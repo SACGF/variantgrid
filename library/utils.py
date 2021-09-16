@@ -813,12 +813,17 @@ class ExportRow:
         return cls.export_methods
 
     @classmethod
+    def _data_generator(cls, data: Iterable[Any]) -> Iterator[Any]:
+        for row_data in data:
+            if not isinstance(row_data, cls):
+                row_data = cls(row_data)
+            yield row_data
+
+    @classmethod
     def csv_generator(cls, data: Iterable[Any]) -> Iterator[str]:
         try:
             yield delimited_row(cls.csv_header())
-            for row_data in data:
-                if not isinstance(row_data, cls):
-                    row_data = cls(row_data)
+            for row_data in cls._data_generator(data):
                 yield delimited_row(row_data.to_csv())
         except:
             from library.log_utils import report_exc_info
@@ -830,10 +835,8 @@ class ExportRow:
     def json_generator(cls, data: Iterable[Any], records_key: str = "records") -> Iterator[str]:
         try:
             yield f'{{"{records_key}": ['
-            for row_data in data:
-                if not isinstance(row_data, cls):
-                    row_data = cls(row_data)
-                yield delimited_row(row_data.to_json())
+            for row_data in cls._data_generator(data):
+                yield json.dumps(row_data.to_json())
             yield f']}}'
         except:
             from library.log_utils import report_exc_info
