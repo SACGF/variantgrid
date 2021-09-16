@@ -6,7 +6,7 @@ from flags.models.models import FlagType
 from snpdb.admin_utils import ModelAdminBasics, AllValuesChoicesFieldListFilter
 
 
-class FlagCommentAdmin(TabularInline):
+class FlagCommentAdminTabular(TabularInline):
     model = FlagComment
 
     def has_add_permission(self, request, obj):
@@ -17,10 +17,15 @@ class FlagCommentAdmin(TabularInline):
 class FlagAdmin(ModelAdminBasics):
     list_display = ('id', 'collection', 'flag_type', 'resolution', 'user', 'data', 'created', 'modified')
     list_filter = (('flag_type', RelatedFieldListFilter), ('resolution__status', AllValuesChoicesFieldListFilter), ('user', RelatedFieldListFilter))
-    inlines = (FlagCommentAdmin,)
+    inlines = (FlagCommentAdminTabular,)
 
     def has_add_permission(self, request):
         return False
+
+
+@admin.register(FlagComment)
+class FlagCommentAdmin(ModelAdminBasics):
+    list_display = ('id', 'flag', 'user', 'text', 'resolution', 'created', 'modified')
 
 
 class FlagTypeResolution(TabularInline):

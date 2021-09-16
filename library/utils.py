@@ -816,12 +816,25 @@ class ExportRow:
     def csv_generator(cls, data: Iterable[Any]) -> Iterator[str]:
         try:
             yield delimited_row(cls.csv_header())
-            for raw_data in data:
-                yield delimited_row(cls(raw_data).to_csv())
+            for row_data in data:
+                yield delimited_row(cls(row_data).to_csv())
         except:
             from library.log_utils import report_exc_info
             report_exc_info(extra_data={"activity": "Exporting"})
             yield "** File terminated due to error"
+            raise
+
+    @classmethod
+    def json_generator(cls, data: Iterable[Any], records_key: str = "records") -> Iterator[str]:
+        try:
+            yield f'{{"{records_key}": ['
+            for row_data in data:
+                yield delimited_row(cls(row_data).to_json())
+            yield f']}}'
+        except:
+            from library.log_utils import report_exc_info
+            report_exc_info(extra_data={"activity": "Exporting"})
+            yield f"\"error\"** File terminated due to error"
             raise
 
     @classmethod
@@ -869,6 +882,14 @@ class ExportRow:
 
     @classmethod
     def streaming_csv(cls, data: Iterable[Any], filename: str):
+        date_time = datetime.now(tz=timezone(settings.TIME_ZONE)).strftime("%Y-%m-%d")
+
+        response = StreamingHttpResponse(cls.csv_generator(data), content_type='text/csv')
+        response['Content-Disposition'] = f'attachment; filename="{filename}_{settings.SITE_NAME}_{date_time}.csv"'
+        return response
+
+    @classmethod
+    def streaming_json(cls, data: Iterable[Any], filename: str, records_key: str = "records"):
         date_time = datetime.now(tz=timezone(settings.TIME_ZONE)).strftime("%Y-%m-%d")
 
         response = StreamingHttpResponse(cls.csv_generator(data), content_type='text/csv')
