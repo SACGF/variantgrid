@@ -271,32 +271,31 @@ class ClassificationResolution(ExportRow):
     def is_valid(self):
         return self._imported_genome_build is not None and self._chgvs_imported is not None
 
+    @staticmethod
+    def diff_description(c_hgvs1: str, c_hgvs2: str):
+        if not c_hgvs1 or not c_hgvs2:
+            return "Failed"
+        if c_hgvs1 != c_hgvs2 and (diff_descripts := chgvs_diff_description(CHGVS(c_hgvs1).diff(CHGVS(c_hgvs2)))):
+            return ", ".join(diff_descripts)
+        return ""  # blank is going to make it easier to view the spreadsheet
+
     @export_column("Normal Diff")
     def diffs(self):
         if not self.is_valid:
             return "Invalid"
 
-        imported_c = CHGVS(self._chgvs_imported)
         if "37" in self.imported_build():
-            normalised_c = CHGVS(self._chgvs_grch37 or '')
+            normalised_c = self._chgvs_grch37
         elif "38" in self.imported_build():
-            normalised_c = CHGVS(self._chgvs_grch38 or '')
+            normalised_c = self._chgvs_grch38
         else:
             return "Invalid"
 
-        if normalised_c.full_c_hgvs == '':
-            return "Failed"
-
-        return ", ".join(chgvs_diff_description(imported_c.diff(normalised_c)))
+        return ClassificationResolution.diff_description(self._chgvs_imported, normalised_c)
 
     @export_column("Liftover Diff")
     def normal_diff(self):
-        if not self._chgvs_grch37 or not self._chgvs_grch38:
-            return "Failed"
-
-        return ", ".join(chgvs_diff_description(
-            CHGVS(self._chgvs_grch37).diff(CHGVS(self._chgvs_grch38))
-        ))
+        return ClassificationResolution.diff_description(self._chgvs_grch37, self._chgvs_grch38)
 
 
 @user_passes_test(is_superuser)
