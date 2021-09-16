@@ -817,7 +817,9 @@ class ExportRow:
         try:
             yield delimited_row(cls.csv_header())
             for row_data in data:
-                yield delimited_row(cls(row_data).to_csv())
+                if not isinstance(row_data, cls):
+                    row_data = cls(row_data)
+                yield delimited_row(row_data.to_csv())
         except:
             from library.log_utils import report_exc_info
             report_exc_info(extra_data={"activity": "Exporting"})
@@ -829,7 +831,9 @@ class ExportRow:
         try:
             yield f'{{"{records_key}": ['
             for row_data in data:
-                yield delimited_row(cls(row_data).to_json())
+                if not isinstance(row_data, cls):
+                    row_data = cls(row_data)
+                yield delimited_row(row_data.to_json())
             yield f']}}'
         except:
             from library.log_utils import report_exc_info
