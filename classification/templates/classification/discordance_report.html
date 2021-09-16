@@ -47,30 +47,10 @@
        });
     });
 </script>
-<style>
-    tr.excluded td, tr.excluded td:not(.reasons) span {
-        text-decoration: line-through;
-    }
-    tr.excluded td.reasons {
-        text-decoration: none !important;
-    }
-    td.reasons .important {
-        font-weight: bold;
-    }
-    .code {
-        min-width: 30px;
-        text-align: center;
-
-        display: inline-block;
-        font-family: monospace;
-    }
-</style>
 {% endblock %}
 {% block content %}
     <div class="container">
-        <h4>Discordance Report</h4>
-
-        {% page_help page_id='classification/discordance_report_help' title='Start Resolving' show_title=False %}
+        {% page_help title="Discordance Report" page_id='classification/discordance_report_help' %}
 
          <div class="card">
             <div class="card-header">
