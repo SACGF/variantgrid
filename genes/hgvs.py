@@ -428,6 +428,7 @@ class HGVSMatcher:
         return self._get_transcript_version_and_pyhgvs_transcript(transcript_name)[1]
 
     def _pyhgvs_get_variant_tuple(self, hgvs_string: str, transcript_version):
+        pyhgvs_transcript = None
         # Check transcript bounds
         if transcript_version:
             # @see https://varnomen.hgvs.org/bg-material/numbering/
@@ -444,12 +445,14 @@ class HGVSMatcher:
                 reason = f"Outside boundaries of transcript {transcript_version}: ({transcript_version.length}bp)"
                 raise pyhgvs.InvalidHGVSName(hgvs_string, reason=reason)
 
+            pyhgvs_transcript = self._create_pyhgvs_transcript(transcript_version)
+
         mitochondria, lookup_hgvs_name = self._fix_mito(hgvs_string)
         variant_tuple = pyhgvs.parse_hgvs_name(lookup_hgvs_name, self.genome_build.genome_fasta.fasta,
-                                               transcript=self._create_pyhgvs_transcript(transcript_version),
+                                               transcript=pyhgvs_transcript,
                                                indels_start_with_same_base=False)
 
-        (chrom, position, ref, alt) = variant_tuple
+        chrom, position, ref, alt = variant_tuple
         contig = self.genome_build.chrom_contig_mappings[chrom]
         if mitochondria and contig != mitochondria:
             reason = f"chrom: {chrom} ({contig}/{contig.get_molecule_type_display()}) is not mitochondrial!"
