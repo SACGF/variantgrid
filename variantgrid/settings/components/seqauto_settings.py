@@ -57,7 +57,6 @@ SEQAUTO_COMBINED_VCF_PATTERNS_FOR_KIT = {
     "default": ["%(sequencing_run)s.gatk.hg38.vcf.gz"],
     "idt_haem": [
         "%(sequencing_run)s.vardict.hg38.vcf.gz",
-        "%(sequencing_run)s.mutect.hg38.vcf.gz",
     ],
 }
 
