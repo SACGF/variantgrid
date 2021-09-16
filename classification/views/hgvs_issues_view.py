@@ -11,11 +11,12 @@ from requests.models import Response
 
 from classification.enums import SpecialEKeys
 from classification.models import Classification, classification_flag_types
-from flags.models import Flag, FlagStatus, FlagComment, FlagType
+from flags.models import Flag, FlagStatus, FlagType
 from flags.models.models import FlagCollection
+from genes.hgvs import CHGVS, chgvs_diff_description
 from library.django_utils import get_url_from_view_path
 from library.guardian_utils import is_superuser
-from library.utils import delimited_row, ExportRow, export_column
+from library.utils import ExportRow, export_column
 from snpdb.models import VariantAllele, allele_flag_types, GenomeBuild, Variant
 from snpdb.models.models_variant import Allele
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
@@ -239,6 +240,65 @@ class ProblemHgvs(ExportRow):
         return self.flag_formatter(allele_flag_types.missing_38)
 
 
+@dataclass(frozen=True)
+class ClassificationResolution(ExportRow):
+    _imported_genome_build: str
+    _chgvs_imported: str
+    _chgvs_grch37: str
+    _chgvs_grch38: str
+
+    @export_column("Import Key")
+    def key(self):
+        return (self._imported_genome_build or "") + "#" + (self._chgvs_imported or "")
+
+    @export_column("Imported Build")
+    def imported_build(self):
+        return self._imported_genome_build
+
+    @export_column("c.HGVS Imported")
+    def imported_chgvs(self):
+        return self._chgvs_imported
+
+    @export_column("c.HGVS 37")
+    def resolved_37(self):
+        return self._chgvs_grch37
+
+    @export_column("c.HGVS 38")
+    def resolved_38(self):
+        return self._chgvs_grch38
+
+    @property
+    def is_valid(self):
+        return self._imported_genome_build is not None and self._chgvs_imported is not None
+
+    @export_column("Normal Diff")
+    def diffs(self):
+        if not self.is_valid:
+            return "Invalid"
+
+        imported_c = CHGVS(self._chgvs_imported)
+        if "37" in self.imported_build():
+            normalised_c = CHGVS(self._chgvs_grch37 or '')
+        elif "38" in self.imported_build():
+            normalised_c = CHGVS(self._chgvs_grch38 or '')
+        else:
+            return "Invalid"
+
+        if normalised_c.full_c_hgvs == '':
+            return "Failed"
+
+        return ", ".join(chgvs_diff_description(imported_c.diff(normalised_c)))
+
+    @export_column("Liftover Diff")
+    def normal_diff(self):
+        if not self._chgvs_grch37 or not self._chgvs_grch38:
+            return "Failed"
+
+        return ", ".join(chgvs_diff_description(
+            CHGVS(self._chgvs_grch37).diff(CHGVS(self._chgvs_grch38))
+        ))
+
+
 @user_passes_test(is_superuser)
 def download_hgvs_issues(request: HttpRequest) -> StreamingHttpResponse:
 
@@ -255,3 +315,26 @@ def download_hgvs_issues(request: HttpRequest) -> StreamingHttpResponse:
 
     return ProblemHgvs.streaming_csv(complete_qs, "hgvs_issues")
 
+
+@user_passes_test(is_superuser)
+def download_hgvs_resolution(request: HttpRequest) -> StreamingHttpResponse:
+
+    imported_genome_build_col = 'evidence__genome_build__value'
+    c_hgvs_imported_col = 'evidence__c_hgvs__value'
+    c_hgvs_37_col = 'chgvs_grch37'
+    c_hgvs_38_col = 'chgvs_grch38'
+
+    qs = Classification.objects.order_by(imported_genome_build_col, c_hgvs_imported_col, c_hgvs_37_col, c_hgvs_38_col).values_list(
+        imported_genome_build_col, c_hgvs_imported_col, c_hgvs_37_col, c_hgvs_38_col
+    ).distinct()
+
+    def mapper(data):
+        return ClassificationResolution(
+            _imported_genome_build=data[0],
+            _chgvs_imported=data[1],
+            _chgvs_grch37=data[2],
+            _chgvs_grch38=data[3]
+        )
+
+    stream = (mapper(row) for row in qs)
+    return ClassificationResolution.streaming_csv(stream, "c_hgvs_resolution")
