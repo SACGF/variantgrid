@@ -1,4 +1,5 @@
 import csv
+import inspect
 import io
 import operator
 import math
@@ -18,7 +19,7 @@ from django.db import models
 from enum import Enum
 from itertools import islice
 from json.encoder import JSONEncoder
-from typing import TypeVar, Optional, Iterator, Tuple, Any, List, Iterable, Set, Dict, Union, Callable
+from typing import TypeVar, Optional, Iterator, Tuple, Any, List, Iterable, Set, Dict, Union, Callable, Type
 import hashlib
 import importlib
 import json
@@ -27,9 +28,13 @@ import re
 import subprocess
 import time
 from django.conf import settings
+from django.http import StreamingHttpResponse
 from django.utils import html
 from django.utils.functional import SimpleLazyObject
 from django.utils.safestring import SafeString, mark_safe
+from pytz import timezone
+
+from uicore.json.json_types import JsonObjType
 
 FLOAT_REGEX = r'([-+]?[0-9]*\.?[0-9]+.|Infinity)'
 
@@ -765,3 +770,130 @@ def segment(iterable: Iterable[P], filter: Callable[[P], bool]) -> Tuple[List[P]
         else:
             fails.append(element)
     return passes, fails
+
+
+def export_column(label: Optional[str] = None, sub_data: Optional[Type] = None):
+    """
+    Extend ExportRow and annotate methods with export_column.
+    The order of defined methods determines the order that the results will appear in an export file
+    :param label: The label that will appear in the CSV header
+    :param sub_data: An optional SubType of another ExportRow for nested data
+    """
+
+    def decorator(method):
+        def wrapper(*args, **kwargs):
+            return method(*args, **kwargs)
+        # have to cache the line number of the source method, otherwise we just get the line number of this wrapper
+        wrapper.line_number = inspect.getsourcelines(method)[1]
+        wrapper.label = label
+        wrapper.__name__ = method.__name__
+        wrapper.is_export = True
+        wrapper.sub_data = sub_data
+        return wrapper
+    return decorator
+
+
+class ExportRow:
+
+    @staticmethod
+    def get_export_methods(cls):
+        if not hasattr(cls, 'export_methods'):
+            export_methods = [func for _, func in inspect.getmembers(cls, lambda x: getattr(x, 'is_export', False))]
+            export_methods.sort(key=lambda x: x.line_number)
+
+            cls.export_methods = export_methods
+
+            if not cls.export_methods:
+                raise ValueError(f"ExportRow class {cls} has no @export_columns")
+        return cls.export_methods
+
+    @classmethod
+    def _data_generator(cls, data: Iterable[Any]) -> Iterator[Any]:
+        for row_data in data:
+            if not isinstance(row_data, cls):
+                row_data = cls(row_data)
+            yield row_data
+
+    @classmethod
+    def csv_generator(cls, data: Iterable[Any]) -> Iterator[str]:
+        try:
+            yield delimited_row(cls.csv_header())
+            for row_data in cls._data_generator(data):
+                yield delimited_row(row_data.to_csv())
+        except:
+            from library.log_utils import report_exc_info
+            report_exc_info(extra_data={"activity": "Exporting"})
+            yield "** File terminated due to error"
+            raise
+
+    @classmethod
+    def json_generator(cls, data: Iterable[Any], records_key: str = "records") -> Iterator[str]:
+        try:
+            yield f'{{"{records_key}": ['
+            for row_data in cls._data_generator(data):
+                yield json.dumps(row_data.to_json())
+            yield f']}}'
+        except:
+            from library.log_utils import report_exc_info
+            report_exc_info(extra_data={"activity": "Exporting"})
+            yield f"\"error\"** File terminated due to error"
+            raise
+
+    @classmethod
+    def csv_header(cls) -> List[str]:
+        row = list()
+        for method in ExportRow.get_export_methods(cls):
+            label = method.label or method.__name__
+            if sub_data := method.sub_data:
+                sub_header = sub_data.csv_header()
+                for sub in sub_header:
+                    row.append(label + "." + sub)
+            else:
+                row.append(label)
+        return row
+
+    def to_csv(self) -> List[str]:
+        row = list()
+        for method in ExportRow.get_export_methods(self.__class__):
+            result = method(self)
+            if sub_data := method.sub_data:
+                if result is None:
+                    for entry in sub_data.csv_header():
+                        row.append("")
+                else:
+                    row += result.to_csv()
+            else:
+                row.append(result)
+        return row
+
+    def to_json(self) -> JsonObjType:
+        row = dict()
+        for method in ExportRow.get_export_methods(self.__class__):
+            result = method(self)
+            value: Any
+            if result is None:
+                value = None
+            elif method.sub_data:
+                value = result.to_json()
+            else:
+                value = result
+
+            row[method.__name__] = value
+
+        return row
+
+    @classmethod
+    def streaming_csv(cls, data: Iterable[Any], filename: str):
+        date_time = datetime.now(tz=timezone(settings.TIME_ZONE)).strftime("%Y-%m-%d")
+
+        response = StreamingHttpResponse(cls.csv_generator(data), content_type='text/csv')
+        response['Content-Disposition'] = f'attachment; filename="{filename}_{settings.SITE_NAME}_{date_time}.csv"'
+        return response
+
+    @classmethod
+    def streaming_json(cls, data: Iterable[Any], filename: str, records_key: str = "records"):
+        date_time = datetime.now(tz=timezone(settings.TIME_ZONE)).strftime("%Y-%m-%d")
+
+        response = StreamingHttpResponse(cls.csv_generator(data), content_type='text/csv')
+        response['Content-Disposition'] = f'attachment; filename="{filename}_{settings.SITE_NAME}_{date_time}.csv"'
+        return response
