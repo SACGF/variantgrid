@@ -810,10 +810,10 @@ class ExportRow:
     @classmethod
     def _data_generator(cls, data: Iterable[Any]) -> Iterator[Any]:
         for row_data in data:
-            if not isinstance(row_data, cls):
-                row_data = cls(row_data)
             if row_data is None:
                 continue
+            if not isinstance(row_data, cls):
+                row_data = cls(row_data)
             yield row_data
 
     @classmethod
