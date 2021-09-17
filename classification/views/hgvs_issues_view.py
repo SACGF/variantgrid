@@ -341,12 +341,10 @@ def download_hgvs_resolution(request: HttpRequest) -> StreamingHttpResponse:
     def mapper(data):
         record = [data[0], data[1], data[2], data[3]]
         if record != last_record:
-            """
             url = get_url_from_view_path(
                 reverse('view_classification', kwargs={'record_id': data[4]}),
             )
-            """
-            url = f"https://test.shariant.org.au/classification/classification/{data[4]}"
+            # url = f"https://test.shariant.org.au/classification/classification/{data[4]}"
             return ClassificationResolution(
                 _imported_genome_build=data[0],
                 _chgvs_imported=data[1],
