@@ -6,6 +6,7 @@ from django.db.models import QuerySet
 from django.http import StreamingHttpResponse
 from django.http.request import HttpRequest
 from django.shortcuts import render
+from django.urls import reverse
 from lazy import lazy
 from requests.models import Response
 
@@ -246,6 +247,7 @@ class ClassificationResolution(ExportRow):
     _chgvs_imported: str
     _chgvs_grch37: str
     _chgvs_grch38: str
+    _url: str
 
     @export_column("Import Key")
     def key_import(self):
@@ -254,6 +256,10 @@ class ClassificationResolution(ExportRow):
     @export_column("Export Key")
     def key_export(self):
         return (self._chgvs_grch37 or "") + "#" + (self._chgvs_grch38 or "")
+
+    @export_column("URL")
+    def url(self):
+        return self._url
 
     @export_column("Imported Build")
     def imported_build(self):
@@ -327,17 +333,27 @@ def download_hgvs_resolution(request: HttpRequest) -> StreamingHttpResponse:
     c_hgvs_37_col = 'chgvs_grch37'
     c_hgvs_38_col = 'chgvs_grch38'
 
-    qs = Classification.objects.order_by(imported_genome_build_col, c_hgvs_imported_col, c_hgvs_37_col, c_hgvs_38_col).values_list(
-        imported_genome_build_col, c_hgvs_imported_col, c_hgvs_37_col, c_hgvs_38_col
-    ).distinct()
+    qs = Classification.objects.order_by(imported_genome_build_col, c_hgvs_imported_col, c_hgvs_37_col, c_hgvs_38_col, 'pk').values_list(
+        imported_genome_build_col, c_hgvs_imported_col, c_hgvs_37_col, c_hgvs_38_col, 'pk'
+    )
 
+    last_record = list()
     def mapper(data):
-        return ClassificationResolution(
-            _imported_genome_build=data[0],
-            _chgvs_imported=data[1],
-            _chgvs_grch37=data[2],
-            _chgvs_grch38=data[3]
-        )
+        record = [data[0], data[1], data[2], data[3]]
+        if record != last_record:
+            """
+            url = get_url_from_view_path(
+                reverse('view_classification', kwargs={'record_id': data[4]}),
+            )
+            """
+            url = f"https://test.shariant.org.au/classification/classification/{data[4]}"
+            return ClassificationResolution(
+                _imported_genome_build=data[0],
+                _chgvs_imported=data[1],
+                _chgvs_grch37=data[2],
+                _chgvs_grch38=data[3],
+                _url=url
+            )
 
     stream = (mapper(row) for row in qs)
     return ClassificationResolution.streaming_csv(stream, "c_hgvs_resolution")

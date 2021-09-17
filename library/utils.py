@@ -817,6 +817,8 @@ class ExportRow:
         for row_data in data:
             if not isinstance(row_data, cls):
                 row_data = cls(row_data)
+            if row_data is None:
+                continue
             yield row_data
 
     @classmethod
