@@ -18,7 +18,7 @@ SYNC_DETAILS = get_shariant_sync_secrets()
 KEYCLOAK_SYNC_DETAILS = get_keycloak_sync_secrets()
 """
 
-CLINVAR_EXPORT = get_clinvar_export_secrets()
+# CLINVAR_EXPORT = get_clinvar_export_secrets()
 
 # import all the base settings #
 VARIANT_CLASSIFICATION_NEW_GROUPING = True
