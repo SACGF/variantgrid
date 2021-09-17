@@ -289,23 +289,29 @@ class ClassificationResolution(ExportRow):
             return ", ".join(diff_descripts)
         return ""  # blank is going to make it easier to view the spreadsheet
 
-    @export_column("Normal Diff")
+    @export_column("Normal/Liftover")
     def diffs(self):
+
+        normal = ""
         if not self.is_valid:
-            return "Invalid"
-
-        if "37" in self.imported_build():
-            normalised_c = self._chgvs_grch37
-        elif "38" in self.imported_build():
-            normalised_c = self._chgvs_grch38
+            normal = "Invalid"
         else:
-            return "Invalid"
+            normalised_c: Optional[CHGVS] = None
+            if "37" in self.imported_build():
+                normalised_c = self._chgvs_grch37
+            elif "38" in self.imported_build():
+                normalised_c = self._chgvs_grch38
+            else:
+                normal = "Invalid"
 
-        return ClassificationResolution.diff_description(self._chgvs_imported, normalised_c)
+            if normalised_c:
+                normal = ClassificationResolution.diff_description(self._chgvs_imported, normalised_c)
 
-    @export_column("Liftover Diff")
-    def normal_diff(self):
-        return ClassificationResolution.diff_description(self._chgvs_grch37, self._chgvs_grch38)
+        liftover = ClassificationResolution.diff_description(self._chgvs_grch37, self._chgvs_grch38)
+        if normal or liftover:
+            return f"{normal}#{liftover}"
+        else:
+            return ""
 
 
 @user_passes_test(is_superuser)
@@ -340,7 +346,7 @@ def download_hgvs_resolution(request: HttpRequest) -> StreamingHttpResponse:
     last_record = list()
     def mapper(data):
         record = [data[0], data[1], data[2], data[3]]
-        if record != last_record:
+        if record != last_record and data[0] and data[1]:
             url = get_url_from_view_path(
                 reverse('view_classification', kwargs={'record_id': data[4]}),
             )
