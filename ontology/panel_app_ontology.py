@@ -62,7 +62,7 @@ def _update_gene_relations(gene_symbol: str):
                                             "evidence": evidence
                                         })
                                 else:
-                                    report_message("Found ontology term from PanelApp not in DB", level="error", extra_data={"target": full_id})
+                                    report_message("Found ontology term from PanelApp not in DB", level="error", extra_data={"target": full_id, "gene_symbol": str(gene_symbol)})
 
                             from annotation.regexes import db_ref_regexes, DbRegexes
                             for result in db_ref_regexes.search(phenotype_row, default_regex=DbRegexes.OMIM):
