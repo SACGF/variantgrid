@@ -111,7 +111,7 @@ class ConditionTextMatchingAPI(APIView):
                         except ValueError:
                             errors.append(f'"{term}" is not a valid ontology term.')
 
-        if not errors and valid_terms:
+        if not errors:
             ctm = ct.conditiontextmatch_set.get(pk=update.get('ctm_id'))
             ctm.condition_xrefs = valid_terms
             ctm.condition_multi_operation = MultiCondition(update.get('joiner') or MultiCondition.NOT_DECIDED)
