@@ -296,22 +296,24 @@ class ClassificationResolution(ExportRow):
         if not self.is_valid:
             normal = "Invalid"
         else:
-            normalised_c: Optional[CHGVS] = None
             if "37" in self.imported_build():
                 normalised_c = self._chgvs_grch37
+                lifted_over_c = self._chgvs_grch38
+
             elif "38" in self.imported_build():
                 normalised_c = self._chgvs_grch38
+                lifted_over_c = self._chgvs_grch37
+
             else:
-                normal = "Invalid"
+                return "Invalid#Invalid"
 
-            if normalised_c:
-                normal = ClassificationResolution.diff_description(self._chgvs_imported, normalised_c)
+            normal = ClassificationResolution.diff_description(self._chgvs_imported, normalised_c)
+            liftover = ClassificationResolution.diff_description(self._chgvs_imported, lifted_over_c)
 
-        liftover = ClassificationResolution.diff_description(self._chgvs_grch37, self._chgvs_grch38)
-        if normal or liftover:
-            return f"{normal}#{liftover}"
-        else:
-            return ""
+            if normal or liftover:
+                return f"{normal}#{liftover}"
+            else:
+                return ""
 
 
 @user_passes_test(is_superuser)
@@ -350,7 +352,7 @@ def download_hgvs_resolution(request: HttpRequest) -> StreamingHttpResponse:
             url = get_url_from_view_path(
                 reverse('view_classification', kwargs={'record_id': data[4]}),
             )
-            # url = f"https://test.shariant.org.au/classification/classification/{data[4]}"
+            # url = f"https://shariant.org.au/classification/classification/{data[4]}"
             return ClassificationResolution(
                 _imported_genome_build=data[0],
                 _chgvs_imported=data[1],
