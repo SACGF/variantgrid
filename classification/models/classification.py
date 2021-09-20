@@ -1993,7 +1993,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                     vcfe.record(value, error=key_errors[k].get('message', 'Validation Error'))
                 else:
                     try:
-                        vcord, method = hgvs_matcher.get_variant_tuple_and_method(value)
+                        vcord, _, method = hgvs_matcher.get_variant_tuple_used_transcript_and_method(value)
                         message = f"HGVS matched by '{method}'"
                         vcfe.record(value, vcord, message=message)
                         if vcord:

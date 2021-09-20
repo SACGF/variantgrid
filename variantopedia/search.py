@@ -575,18 +575,19 @@ def search_hgvs(search_string: str, user: User, genome_build: GenomeBuild, varia
         search_messages = []
         initial_score = 0
         hgvs_string = search_string
+        used_transcript_accession = None
         try:
             if fixed_hgvs := HGVSMatcher.fix_swapped_gene_transcript(hgvs_string):
                 hgvs_string = fixed_hgvs
                 search_messages.append(f"Warning: swapped gene/transcript, ie '{search_string}' => '{hgvs_string}'")
-            variant_tuple = hgvs_matcher.get_variant_tuple(hgvs_string)
+            variant_tuple, used_transcript_accession, _ = hgvs_matcher.get_variant_tuple_used_transcript_and_method(hgvs_string)
         except (ValueError, NotImplementedError) as original_error:  # InvalidHGVSName is subclass of ValueError
             original_hgvs_string = hgvs_string
             try:
                 hgvs_string = HGVSMatcher.clean_hgvs(hgvs_string)
                 if search_string != hgvs_string:
                     search_messages.append(f"Warning: Cleaned '{search_string}' => '{hgvs_string}'")
-                variant_tuple = hgvs_matcher.get_variant_tuple(hgvs_string)
+                variant_tuple, used_transcript_accession, _ = hgvs_matcher.get_variant_tuple_used_transcript_and_method(hgvs_string)
             except (ValueError, NotImplementedError):
                 if gene_symbol := hgvs_matcher.get_gene_symbol_if_no_transcript(hgvs_string):
                     if results := _search_hgvs_using_gene_symbol(gene_symbol, search_messages,
@@ -611,9 +612,8 @@ def search_hgvs(search_string: str, user: User, genome_build: GenomeBuild, varia
             search_messages.append(f"Warning: Using reference '{ref}' from our build: {build_and_patch}")
             initial_score -= 1
 
-        original_tv, used_tv = hgvs_matcher.get_original_and_used_transcript_versions(hgvs_string)
-        if original_tv != used_tv:
-            search_messages.append(f"Warning: Missing transcript version '{original_tv}', using best match '{used_tv}'")
+        if used_transcript_accession and used_transcript_accession not in hgvs_string:
+            search_messages.append(f"Warning: Missing transcript version, using best match '{used_transcript_accession}'")
 
         transcript_id = hgvs_matcher.get_transcript_id(hgvs_string,
                                                        transcript_version=False)

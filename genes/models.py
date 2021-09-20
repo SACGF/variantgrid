@@ -700,11 +700,23 @@ class TranscriptVersion(SortByPKMixin, models.Model):
         return TranscriptVersion.objects.filter(**kwargs)
 
     @staticmethod
-    def filter_best_transcripts_by_accession(genome_build: GenomeBuild, transcript_accession) -> QuerySet['TranscriptVersion']:
+    def filter_best_transcripts_by_accession(genome_build: GenomeBuild, transcript_accession, require_build_data=True) -> Iterable['TranscriptVersion']:
         """ Get the best transcripts you'd want to match a HGVS against - assuming you will try multiple in order
               * If transcript_accession has a version, use that version -> latest in order
               * If transcript_accession has no version, go from latest -> earliest
+
+            If require_build_data is False - return all versions regardless of whether we have data for that build
         """
+        @dataclass
+        class FakeTranscriptVersion:
+            transcript_id: str
+            version: int
+            has_valid_data: bool = False
+
+            @property
+            def accession(self) -> str:
+                return f"{self.transcript_id}.{self.version}"
+
         transcript_id, version = TranscriptVersion.get_transcript_id_and_version(transcript_accession)
         kwargs = {
             "genome_build": genome_build,
@@ -719,7 +731,24 @@ class TranscriptVersion(SortByPKMixin, models.Model):
         else:
             order_by = "-version"
 
-        return TranscriptVersion.objects.filter(**kwargs).order_by(order_by)
+        tv_qs = TranscriptVersion.objects.filter(**kwargs)
+        if require_build_data or not settings.VARIANT_TRANSCRIPT_VERSION_BEST_ATTEMPT:
+            return tv_qs.order_by(order_by)
+
+        tv_by_version = {tv.version: tv for tv in tv_qs}
+        data = Transcript.objects.filter(pk=transcript_id).aggregate(max_tv=Max("transcriptversion__version"),
+                                                                     max_tvsi=Max("transcriptversionsequenceinfo__version"))
+        highest_version = max(data.get("max_tv") or 0, data.get("max_tvsi") or 0)
+        transcript_versions = []
+        min_version = version or 1
+        for v in range(min_version, highest_version+1):
+            if tv := tv_by_version.get(v):
+                transcript_versions.append(tv)
+            else:
+                transcript_versions.append(FakeTranscriptVersion(transcript_id=transcript_id, version=v))
+        if order_by.startswith("-"):
+            transcript_versions = reversed(transcript_versions)
+        return transcript_versions
 
     @staticmethod
     def raise_bad_or_missing_transcript(transcript_accession):

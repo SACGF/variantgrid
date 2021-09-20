@@ -523,7 +523,7 @@ class HGVSMatcher:
     @staticmethod
     def _pyhgvs_ok(transcript_version: TranscriptVersion) -> bool:
         """ Some transcripts align with gaps to the genome, and thus we can't use PyHGVS (which uses exons + CDS) """
-        return not transcript_version.alignment_gap and transcript_version.has_valid_data
+        return transcript_version.has_valid_data and not transcript_version.alignment_gap
 
     @staticmethod
     def _get_clingen_allele_registry_key(transcript_accession: str) -> str:
@@ -546,11 +546,12 @@ class HGVSMatcher:
         cache.set(key, True, timeout=WEEK_SECS)
 
     def get_variant_tuple(self, hgvs_string: str) -> VariantCoordinate:
-        return self.get_variant_tuple_and_method(hgvs_string)[0]
+        return self.get_variant_tuple_used_transcript_and_method(hgvs_string)[0]
 
-    def get_variant_tuple_and_method(self, hgvs_string: str) -> Tuple[VariantCoordinate, str]:
+    def get_variant_tuple_used_transcript_and_method(self, hgvs_string: str) -> Tuple[VariantCoordinate, str, str]:
         """ Returns variant_tuple and method for HGVS resolution = """
 
+        used_transcript_accession = None
         method = None
         hgvs_name = HGVSName(hgvs_string)
         if self._is_lrg(hgvs_name):
@@ -565,7 +566,9 @@ class HGVSMatcher:
 
             variant_tuple = None
             hgvs_methods = []
-            for tv in TranscriptVersion.filter_best_transcripts_by_accession(self.genome_build, transcript_accession):
+            for tv in TranscriptVersion.filter_best_transcripts_by_accession(self.genome_build, transcript_accession,
+                                                                             require_build_data=False):
+                used_transcript_accession = tv.accession
                 hgvs_name.transcript = tv.accession
                 hgvs_string_for_version = hgvs_name.format()
                 method = None
@@ -620,7 +623,7 @@ class HGVSMatcher:
 
         if Variant.is_ref_alt_reference(ref, alt):
             alt = Variant.REFERENCE_ALT
-        return VariantCoordinate(chrom, position, ref, alt), method
+        return VariantCoordinate(chrom, position, ref, alt), used_transcript_accession, method
 
     def _get_hgvs_and_pyhgvs_transcript(self, hgvs_name: str):
         _mitochondria, lookup_hgvs_name = self._fix_mito(hgvs_name)
@@ -633,14 +636,6 @@ class HGVSMatcher:
         if hgvs_name.transcript:
             transcript = self._get_pyhgvs_transcript(hgvs_name.transcript)
         return hgvs_name, transcript
-
-    def get_original_and_used_transcript_versions(self, hgvs_name) -> Tuple[str, str]:
-        hgvs, transcript = self._get_hgvs_and_pyhgvs_transcript(hgvs_name)
-        if transcript:
-            used_tv = transcript.full_name
-        else:
-            used_tv = hgvs.transcript  # So they'll test the same
-        return hgvs.transcript, used_tv
 
     def matches_reference(self, hgvs_name) -> bool:
         hgvs, transcript = self._get_hgvs_and_pyhgvs_transcript(hgvs_name)
@@ -722,7 +717,8 @@ class HGVSMatcher:
             attempt_clingen = True  # Stop on any non-recoverable error - keep going if unknown reference
             hgvs_methods = []
             hgvs_name = None
-            for transcript_version in TranscriptVersion.filter_best_transcripts_by_accession(self.genome_build, transcript_name):
+            for transcript_version in TranscriptVersion.filter_best_transcripts_by_accession(self.genome_build, transcript_name,
+                                                                                             require_build_data=False):
                 if self._pyhgvs_ok(transcript_version):
                     attempted_method = self.HGVS_METHOD_PYHGVS
                     hgvs_methods.append(f"{attempted_method}: {transcript_version}")
