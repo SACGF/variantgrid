@@ -574,15 +574,16 @@ class TranscriptVersion(SortByPKMixin, models.Model):
 
     @lazy
     def _transcript_regions(self) -> Tuple[List, List, List]:
+        """ Returns 5'UTR, CDS, 3'UTR """
         cds_start = self.data["cds_start"]
         cds_end = self.data["cds_end"]
-        fivep_utr = []
+        left_utr = []
         cds = []
-        threep_utr = []
+        right_utr = []
         for exon_start, exon_end in self.data["exons"]:
             if exon_start < cds_start:
-                fivep_end = min(cds_start, exon_end)
-                fivep_utr.append((exon_start, fivep_end))
+                left_end = min(cds_start, exon_end)
+                left_utr.append((exon_start, left_end))
 
             if exon_end > cds_start and exon_start < cds_end:
                 start = max(exon_start, cds_start)
@@ -590,9 +591,13 @@ class TranscriptVersion(SortByPKMixin, models.Model):
                 cds.append((start, end))
 
             if exon_end > cds_end:
-                threep_start = max(exon_start, cds_end)
-                threep_utr.append((threep_start, exon_end))
-        return fivep_utr, cds, threep_utr
+                right_start = max(exon_start, cds_end)
+                right_utr.append((right_start, exon_end))
+
+        if self.data["strand"] == '+':
+            return left_utr, cds, right_utr
+        else:
+            return right_utr, cds, left_utr
 
     @lazy
     def fivep_utr(self):
@@ -791,21 +796,21 @@ class TranscriptVersion(SortByPKMixin, models.Model):
     def _sum_intervals(intervals: List[Tuple]):
         return sum([b - a for a, b in intervals])
 
-    @property
+    @lazy
     def length(self) -> Optional[int]:
         if 'exons' in self.data:
             return self._sum_intervals(self.data["exons"])
         return None
 
-    @property
+    @lazy
     def fivep_utr_length(self) -> int:
         return self._sum_intervals(self.fivep_utr)
 
-    @property
+    @lazy
     def coding_length(self) -> int:
         return self._sum_intervals(self.cds)
 
-    @property
+    @lazy
     def threep_utr_length(self) -> int:
         return self._sum_intervals(self.threep_utr)
 
