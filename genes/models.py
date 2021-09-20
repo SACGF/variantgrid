@@ -1042,7 +1042,14 @@ class TranscriptVersionSequenceInfo(TimeStampedModel):
             records = list(SeqIO.parse(f, "genbank"))
             record = get_single_element(records)
             kwargs = TranscriptVersionSequenceInfo._get_kwargs_from_genbank_record(record)
-            return TranscriptVersionSequenceInfo.objects.create(**kwargs, api_response=api_response)
+            transcript_id = kwargs.pop("transcript_id")
+            version = kwargs.pop("version")
+            Transcript.objects.get_or_create(pk=transcript_id,
+                                             annotation_consortium=AnnotationConsortium.REFSEQ)
+            defaults = kwargs
+            defaults["api_response"] = api_response
+            return TranscriptVersionSequenceInfo.objects.get_or_create(transcript_id=transcript_id, version=version,
+                                                                       defaults=defaults)[0]
 
     @staticmethod
     def _get_and_store_from_ensembl_api(transcript_accession):
@@ -1054,11 +1061,13 @@ class TranscriptVersionSequenceInfo(TimeStampedModel):
         if r.ok:
             transcript, _ = Transcript.objects.get_or_create(identifier=data["id"],
                                                              annotation_consortium=AnnotationConsortium.ENSEMBL)
-            return TranscriptVersionSequenceInfo.objects.create(transcript=transcript,
-                                                                version=data["version"],
-                                                                api_response=r.text,
-                                                                sequence=data["seq"],
-                                                                length=len(data["seq"]))
+            return TranscriptVersionSequenceInfo.objects.get_or_create(transcript=transcript,
+                                                                       version=data["version"],
+                                                                       defaults={
+                                                                           "api_response": r.text,
+                                                                           "sequence": data["seq"],
+                                                                           "length": len(data["seq"])
+                                                                       })[0]
         else:
             error = data.get("error")
             if error:
@@ -1111,6 +1120,10 @@ class TranscriptVersionSequenceInfo(TimeStampedModel):
         # Write them as we go so any failure only loses some
         tvi_by_id = {}
         if new_records:
+            # Create Transcript objects in case they don't exist
+            transcript_records = {Transcript(pk=tvsi.transcript_id, annotation_consortium=AnnotationConsortium.REFSEQ)
+                                  for tvsi in new_records}
+            Transcript.objects.bulk_create(transcript_records, ignore_conflicts=True, batch_size=2000)
             TranscriptVersionSequenceInfo.objects.bulk_create(new_records, ignore_conflicts=True, batch_size=2000)
             for tvi in new_records:
                 tvi_by_id[tvi.accession] = tvi
