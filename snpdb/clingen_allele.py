@@ -204,24 +204,24 @@ def populate_clingen_alleles_for_variants(genome_build: GenomeBuild, variants,
 
         clingen_response = clingen_api.hgvs_put(variant_hgvs)
         for variant_id, api_response in zip(variant_ids_without_alleles, clingen_response):
-            if existing_va := allele_missing_clingen_by_variant_id.get(variant_id):
-                if "errorType" in api_response:
+            existing_va = allele_missing_clingen_by_variant_id.get(variant_id)
+            if "errorType" in api_response:
+                if existing_va:
                     existing_va.error = api_response
                     modified_variant_alleles_list.append(existing_va)
                 else:
-                    clingen_allele_id = ClinGenAllele.get_id_from_response(api_response)
-                    existing_va.allele.clingen_allele_id = clingen_allele_id
-                    modified_alleles_list.append(existing_va.allele)
-            else:
-                if "errorType" in api_response:
                     clingen_errors_by_variant_id[variant_id] = api_response
                     allele_no_clingen_list.append(Allele())
+            else:
+                # Don't store errors, retry in case we screwed up on our end
+                clingen_allele_id = ClinGenAllele.get_id_from_response(api_response)
+                cga = ClinGenAllele(id=clingen_allele_id, api_response=api_response)
+                clingen_allele_list.append(cga)
+                if existing_va:
+                    existing_va.allele.clingen_allele_id = clingen_allele_id
+                    modified_alleles_list.append(existing_va.allele)
                 else:
-                    # Don't store errors, retry in case we screwed up on our end
-                    clingen_allele_id = ClinGenAllele.get_id_from_response(api_response)
                     clingen_by_variant_id[variant_id] = clingen_allele_id
-                    cga = ClinGenAllele(id=clingen_allele_id, api_response=api_response)
-                    clingen_allele_list.append(cga)
                     allele = Allele(clingen_allele_id=clingen_allele_id)
                     new_alleles_with_clingen_list.append(allele)
 
