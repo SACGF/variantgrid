@@ -296,16 +296,12 @@ class ClassificationResolution(ExportRow):
         if not self.is_valid:
             normal = "Invalid"
         else:
-            if "37" in self.imported_build():
-                normalised_c = self._chgvs_grch37
-                lifted_over_c = self._chgvs_grch38
-
-            elif "38" in self.imported_build():
+            if "38" in self.imported_build():
                 normalised_c = self._chgvs_grch38
                 lifted_over_c = self._chgvs_grch37
-
             else:
-                return "Invalid#Invalid"
+                normalised_c = self._chgvs_grch37
+                lifted_over_c = self._chgvs_grch38
 
             normal = ClassificationResolution.diff_description(self._chgvs_imported, normalised_c)
             liftover = ClassificationResolution.diff_description(self._chgvs_imported, lifted_over_c)
