@@ -54,6 +54,17 @@ class TabBuilder:
         return self.tabs[0].url is not None
 
 
+def check_active_tab(tab_set: str, tab_id: str, request: HttpRequest) -> bool:
+    active = False
+    if activeTab := request.GET.get("activeTab"):
+        parts = activeTab.split(":")
+        if len(parts) == 2 and parts[0] == tab_set:
+            active = parts[1] == tab_id
+        elif len(parts) == 1:
+            active = parts[0] == tab_id
+    return active
+
+
 @register.simple_tag(takes_context=True)
 def ui_register_tab(
         context,
@@ -80,15 +91,7 @@ def ui_register_tab(
     param_id = "_" + str(param) if param else ""
     tab_id = url + param_id
 
-    request: HttpRequest = context.request
-    if activeTab := request.GET.get("activeTab"):
-        parts = activeTab.split(":")
-        if len(parts) == 2 and parts[0] == tab_set:
-            active = parts[1] == tab_id
-        elif len(parts) == 1:
-            active = parts[0] == tab_id
-
-    if active:
+    if active or check_active_tab(tab_set, tab_id, context.request):
         builder.active_tab = tab_number
 
     builder.tabs.append(TabBuilderTab(tab_builder=builder, tab_number=tab_number,
@@ -170,6 +173,10 @@ class LocalTabContent(template.Node):
 
         tab_number = len(builder.tabs)
         content: str = self.nodelist.render(context)
+
+        if check_active_tab(tab_set, tab_id, context.request):
+            builder.active_tab = tab_number
+
         if content.startswith('/'):
             builder.tabs.append(TabBuilderTab(tab_builder=builder, tab_number=tab_number,
                                               tab_id=tab_id, label=label, badge=badge, badge_status=badge_status, resolved_url=content))
