@@ -146,8 +146,14 @@ def populate_clingen_alleles_for_variants(genome_build: GenomeBuild, variants,
     if clingen_api is None:
         clingen_api = ClinGenAlleleRegistryAPI()
 
-    qs = VariantAllele.objects.filter(variant__in=variants).values_list("variant_id", flat=True)
-    variant_ids_with_allele = set(qs)
+    va_qs = VariantAllele.objects.filter(genome_build=genome_build, variant__in=variants)
+    variant_ids_with_allele = set(va_qs.values_list("variant_id", flat=True))
+    allele_missing_clingen_by_variant_id = {}
+    for va in va_qs.filter(error__isnull=True, allele__clingen_allele__isnull=True):
+        allele_missing_clingen_by_variant_id[va.variant_id] = va
+
+    if allele_missing_clingen_by_variant_id:
+        logging.info("%d Alleles missing ClinGen Allele", len(allele_missing_clingen_by_variant_id))
 
     skip_variant_ids_without_alleles = []
     # These are kept in sync
@@ -161,13 +167,12 @@ def populate_clingen_alleles_for_variants(genome_build: GenomeBuild, variants,
 
     for v in variants:
         variant_id = v.pk
-        if variant_id not in variant_ids_with_allele:
+        if variant_id not in variant_ids_with_allele or variant_id in allele_missing_clingen_by_variant_id:
             if v.can_have_clingen_allele:
-                skip_variant_ids_without_alleles.append(variant_id)
-            else:
                 variant_ids_without_alleles.append(variant_id)
                 variant_hgvs.append(hgvs_matcher.variant_to_g_hgvs(v))
-        else:
+            else:
+                skip_variant_ids_without_alleles.append(variant_id)
             num_existing_records += 1
 
     num_no_record = len(variant_ids_without_alleles)
@@ -191,44 +196,61 @@ def populate_clingen_alleles_for_variants(genome_build: GenomeBuild, variants,
         # bulk_create doesn't return populated objects when ignore_conflicts=True
         # so break up empty (no chance of failure) and alleles_w_clingen
         allele_no_clingen_list = []
-        alleles_with_clingen_list = []
+        new_alleles_with_clingen_list = []
+        modified_variant_alleles_list = []
+        modified_alleles_list = []
         clingen_by_variant_id = {}
         clingen_errors_by_variant_id = {}
 
         clingen_response = clingen_api.hgvs_put(variant_hgvs)
         for variant_id, api_response in zip(variant_ids_without_alleles, clingen_response):
-            if "errorType" in api_response:
-                clingen_errors_by_variant_id[variant_id] = api_response
-                allele_no_clingen_list.append(Allele())
+            if existing_va := allele_missing_clingen_by_variant_id.get(variant_id):
+                if "errorType" in api_response:
+                    existing_va.error = api_response
+                    modified_variant_alleles_list.append(existing_va)
+                else:
+                    clingen_allele_id = ClinGenAllele.get_id_from_response(api_response)
+                    existing_va.allele.clingen_allele_id = clingen_allele_id
+                    modified_alleles_list.append(existing_va.allele)
             else:
-                # Don't store errors, retry in case we screwed up on our end
-                clingen_allele_id = ClinGenAllele.get_id_from_response(api_response)
-                clingen_by_variant_id[variant_id] = clingen_allele_id
-                cga = ClinGenAllele(id=clingen_allele_id, api_response=api_response)
-                clingen_allele_list.append(cga)
-                allele = Allele(clingen_allele_id=clingen_allele_id)
-                alleles_with_clingen_list.append(allele)
+                if "errorType" in api_response:
+                    clingen_errors_by_variant_id[variant_id] = api_response
+                    allele_no_clingen_list.append(Allele())
+                else:
+                    # Don't store errors, retry in case we screwed up on our end
+                    clingen_allele_id = ClinGenAllele.get_id_from_response(api_response)
+                    clingen_by_variant_id[variant_id] = clingen_allele_id
+                    cga = ClinGenAllele(id=clingen_allele_id, api_response=api_response)
+                    clingen_allele_list.append(cga)
+                    allele = Allele(clingen_allele_id=clingen_allele_id)
+                    new_alleles_with_clingen_list.append(allele)
+
+        if modified_variant_alleles_list:
+            logging.debug("Updating %d VariantAlleles w/Error", len(modified_variant_alleles_list))
+            VariantAllele.objects.bulk_update(modified_variant_alleles_list, ["error"], batch_size=2000)
+
+        if modified_alleles_list:
+            logging.debug("Updating %d Alleles w/ClinGenAlleleID", len(modified_alleles_list))
+            Allele.objects.bulk_update(modified_alleles_list, ["clingen_allele_id"], batch_size=2000)
 
         if clingen_allele_list:
             ClinGenAllele.objects.bulk_create(clingen_allele_list, ignore_conflicts=True)
 
         allele_no_clingen_list = Allele.objects.bulk_create(allele_no_clingen_list)
-        alleles_with_clingen_list = Allele.objects.bulk_create(alleles_with_clingen_list, ignore_conflicts=True)
+        alleles_with_clingen_list = Allele.objects.bulk_create(new_alleles_with_clingen_list, ignore_conflicts=True)
         alleles_by_clingen = {}
         existing_allele_clingen_ids = [a.clingen_allele_id for a in alleles_with_clingen_list if a.pk is None]
         if existing_allele_clingen_ids:
             allele_qs = Allele.objects.filter(clingen_allele_id__in=existing_allele_clingen_ids)
             alleles_by_clingen = {a.clingen_allele_id: a for a in allele_qs}
 
-        for variant_id in variant_ids_without_alleles:
-            error = None
-            clingen_allele_id = clingen_by_variant_id.get(variant_id)
-            if clingen_allele_id:
-                allele = alleles_by_clingen[clingen_allele_id]
-            else:
-                error = clingen_errors_by_variant_id[variant_id]
-                allele = allele_no_clingen_list.pop()  # Any empty Allele will do
+        for variant_id, error in clingen_errors_by_variant_id.items():
+            allele = allele_no_clingen_list.pop()  # Any empty Allele will do
             variant_id_allele_error.append((variant_id, allele, error))
+
+        for variant_id, clingen_allele_id in clingen_by_variant_id.items():
+            allele = alleles_by_clingen[clingen_allele_id]
+            variant_id_allele_error.append((variant_id, allele, None))
 
     if variant_id_allele_error:
         variant_allele_list = []
