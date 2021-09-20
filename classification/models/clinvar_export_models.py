@@ -203,13 +203,14 @@ class ClinVarExportBatch(TimeStampedModel):
         return f"ClinVar Submission Batch : {self.id} - {self.get_status_display()}"
 
     def to_json(self) -> JsonObjType:
+        from classification.models.clinvar_export_sync import clinvar_export_sync
         return {
             "actions": [{
                 "type": "AddData",
                 "targetDb": "clinvar",
                 "data": {
                     "content": {
-                        "behalfOrgID": self.clinvar_key.behalf_org_id or "testorg",
+                        "behalfOrgID": clinvar_export_sync.api_key,
                         "clinvarSubmission": [submission.submission_full for submission in
                                               self.clinvarexportsubmission_set.order_by('created')],
                         "submissionName": f"submission_{self.id}"

@@ -14,9 +14,9 @@ from uicore.json.json_types import JsonObjType
 
 
 class _ClinVarExportConfigDic(TypedDict):
-    enabled: bool
-    test: bool  # if true, dry run
+    mode: str
     api_key: str
+    org_id: str
 
 
 class ClinVarRequestExceptionType(Enum):
@@ -77,11 +77,11 @@ class ClinVarExportSync:
 
     @property
     def is_enabled(self) -> bool:
-        return self._config.get('enabled')
+        return self._config.get('mode') is not None
 
     @property
     def is_test(self) -> bool:
-        return self._config.get('test')
+        return self._config.get('mode') != "prod"
 
     @property
     def api_key(self) -> Optional[str]:
@@ -92,13 +92,16 @@ class ClinVarExportSync:
                    request_type: ClinVarExportRequestType,
                    url: str,
                    json_data: Optional[JsonObjType] = None) -> ClinVarExportRequest:
-        if not self.is_enabled or not self.api_key:
-            raise ValueError("ClinVarExports is not enabled or not ClinVarExport key is provided")
+
+        if not self.is_enabled:
+            raise ValueError("ClinVarExports is not enabled in this environment")
+        if not batch.clinvar_key.api_key:
+            raise ValueError(f"ClinVarKey {batch.clinvar_key} does not have an API Key")
 
         response: Response
         headers = {
             "Content-type": "application/json",
-            "SP-API-KEY": self.api_key
+            "SP-API-KEY": batch.clinvar_key.api_key
         }
 
         if json_data:
