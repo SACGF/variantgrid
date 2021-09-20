@@ -225,6 +225,9 @@ def populate_clingen_alleles_for_variants(genome_build: GenomeBuild, variants,
                     allele = Allele(clingen_allele_id=clingen_allele_id)
                     new_alleles_with_clingen_list.append(allele)
 
+        if clingen_allele_list:
+            ClinGenAllele.objects.bulk_create(clingen_allele_list, ignore_conflicts=True)
+
         if modified_variant_alleles_list:
             logging.debug("Updating %d VariantAlleles w/Error", len(modified_variant_alleles_list))
             VariantAllele.objects.bulk_update(modified_variant_alleles_list, ["error"], batch_size=2000)
@@ -232,9 +235,6 @@ def populate_clingen_alleles_for_variants(genome_build: GenomeBuild, variants,
         if modified_alleles_list:
             logging.debug("Updating %d Alleles w/ClinGenAlleleID", len(modified_alleles_list))
             Allele.objects.bulk_update(modified_alleles_list, ["clingen_allele_id"], batch_size=2000)
-
-        if clingen_allele_list:
-            ClinGenAllele.objects.bulk_create(clingen_allele_list, ignore_conflicts=True)
 
         allele_no_clingen_list = Allele.objects.bulk_create(allele_no_clingen_list)
         alleles_with_clingen_list = Allele.objects.bulk_create(new_alleles_with_clingen_list, ignore_conflicts=True)
