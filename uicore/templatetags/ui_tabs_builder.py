@@ -77,8 +77,10 @@ def ui_register_tab(
     tab_number = len(builder.tabs)
     if active:
         builder.active_tab = tab_number
+
+    param_id = str(param) if param else ""
     builder.tabs.append(TabBuilderTab(tab_builder=builder, tab_number=tab_number,
-                                      tab_id=url, label=label, badge=badge, badge_status=badge_status, url=url, param=param))
+                                      tab_id=url + param_id, label=label, badge=badge, badge_status=badge_status, url=url, param=param))
     return ""
 
 

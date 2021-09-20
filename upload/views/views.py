@@ -217,7 +217,7 @@ def view_upload_stats(request):
                "num_upload_pipelines": num_upload_pipelines,
                "total_times": total_times,
                "time_per_kilo_variant": time_per_kilo_variant}
-    return render(request, 'upload/view_upload_stats.html', context)
+    return render(request, 'upload/view_upload_stats_detail.html', context)
 
 
 def view_upload_pipeline(request, upload_pipeline_id):

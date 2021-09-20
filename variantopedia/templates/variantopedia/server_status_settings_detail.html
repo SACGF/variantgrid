@@ -1,0 +1,37 @@
+{% load js_tags %}
+{% load ui_utils %}
+<div class="container">
+    <div class="row equal">
+        <div class="col-6">
+            <div class="card">
+                <div class="card-header">Basics</div>
+                <div class="card-body">
+                    {% labelled label="Site Name" %}{{ site_name }}{% endlabelled %}
+                    {% labelled label="Debug" %}{{ settings.DEBUG }}{% endlabelled %}
+                    {% labelled label="Send Emails" %}{{ settings.SEND_EMAILS }}{% endlabelled %}
+                </div>
+            </div>
+        </div>
+        <div class="col-6">
+            <div class="card">
+                <div class="card-header">ClinVar</div>
+                <div class="card-body">
+                    {% labelled label="Mode" %}{{ settings.CLINVAR_EXPORT.mode }}{% endlabelled %}
+                    {% labelled label="Org ID" %}{{ settings.CLINVAR_EXPORT.org_id }}{% endlabelled %}
+                    {% labelled label="API Key" %}{{ settings.CLINVAR_EXPORT.api_key|secret }}{% endlabelled %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <h4>Debug</h4>
+    <form method="POST">
+        {% csrf_token %}
+        <div class="btn-toolbar mt-4">
+            <input type="submit" name="action" value="Test Slack" class="btn btn-outline-secondary" />
+            <input type="submit" name="action" value="Test Rollbar" class="btn btn-outline-secondary" />
+            <input type="submit" value="Test Rollbar JS" class="btn btn-outline-secondary" onclick="return testRollbarJs()" />
+            <input type="submit" name="action" value="Test Message Branding" class="btn btn-outline-secondary" />
+        </div>
+    </form>
+</div>

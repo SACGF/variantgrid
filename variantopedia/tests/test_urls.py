@@ -44,7 +44,7 @@ class Test(URLTestCase):
         URL_NAMES_AND_KWARGS = [
             ("variants", {}, 200),
             ("dashboard", {}, 200),
-            ("database_statistics", {}, 200),
+            ("database_statistics_detail", {}, 200),
             ("search", {}, 200),
             ("variantopedia_wiki", {}, 200),
             ("view_variant", {"variant_id": self.variant.pk}, 200),

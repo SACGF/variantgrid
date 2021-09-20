@@ -1,0 +1,139 @@
+{% load crispy_forms_tags %}
+{% load crispy_forms_field %}
+{% load humanize %}
+{% load ui_tabs_builder %}
+{% load ui_menu_bars %}
+{% load ui_utils %}
+{% load ui_help %}
+{% load english_tags %}
+{% load jqgrid_tags %}
+{% load js_tags %}
+{% load seqauto_graph_tags %}
+{% load static %}
+
+{% if dashboard_notices.active_users %}
+<div class="row mt-4">
+    <div class="col-3">
+        <a class="toggle-link" data-toggle="collapse" href="#active-users">{% count dashboard_notices.active_users singular='1 Active User' plural='Active Users' %}</a>
+    </div>
+    <div class="col-9">
+        <a href="{% url 'eventlog' %}">Goto EventLog</a> (Note EventLog is not comprehensive at detecting active users)
+    </div>
+</div>
+<ul class="list-group collapse" id="active-users">
+    {% for user in dashboard_notices.active_users %}
+        <li class='list-group-item list-group-item-success'>{{ user }}</li>
+    {% endfor %}
+</ul>
+{% endif %}
+
+{% if dashboard_notices.events %}
+    <div class="row mt-4">
+        <div class="col-3">
+            <a class='toggle-link' data-toggle='collapse' href='#event-errors'>View {% count dashboard_notices.events singular='1 Error' plural='Errors' %}</a>
+        </div>
+        <div class="col-9">
+            <a href="{% url 'eventlog' %}">Goto EventLog</a> (Note <a href="https://rollbar.com/jimmy.andrews/all/items/" class="external-link" target="_blank">Rollbar</a> is much more accurate in recording errors)
+        </div>
+    </div>
+
+    <ul class='list-group collapse' id="event-errors">
+        {% for e in dashboard_notices.events %}
+            <li class='list-group-item list-group-item-danger'>{{ e }}
+        {% endfor %}
+    </ul>
+{% endif %}
+{% if dashboard_notices.classifications_of_interest %}
+    <div class="row mt-4">
+        <div class="col-3">
+            <a class='toggle-link' data-toggle='collapse' href='#classifications-of-interest'>View {% count dashboard_notices.classifications_of_interest singular='1 Classification' plural='Classifications' %} w Issues</a>
+        </div>
+        <div class="col-9">
+            <a href="{% url 'activity' %}">Goto Classification Activity</a>
+        </div>
+    </div>
+
+    <ul class='list-group collapse' id="classifications-of-interest">
+        {% for c in dashboard_notices.classifications_of_interest %}
+            <a class='list-group-item list-group-item-action' href="{% url 'view_classification' c.pk %}">
+                <div class="row">
+                    <div class="col-4">
+                        {{ c.classification.friendly_label }}
+                    </div>
+                    <div class="col-8">
+                        <span class="text-secondary">New Issues</span>
+                        {% for flag in c.flags %}
+                            <div class="flag flag-{{ flag }} mx-2" title="{{ flag }}" data-toggle="tooltip"></div>
+                        {% endfor %}
+                        {% for issue in c.issues %}
+                           <div class="d-inline-block mx-2">{{ 'warning' | severity_icon }} {{ issue }}</div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </a>
+        {% endfor %}
+    </ul>
+{% endif %}
+{% if dashboard_notices.classifications_created %}
+    <div class="row mt-4">
+        <div class="col-3">
+            <label>{% count dashboard_notices.classifications_created singular='1 New Classification' plural='New Classifications' %}</label>
+        </div>
+        <div class="col-6">
+            <a href="{% url 'classifications' %}">Goto Classifications</a>
+        </div>
+    </div>
+{% endif %}
+{% if dashboard_notices.vcfs %}
+    <div class="row mt-4">
+        <div class="col-3">
+            <a class='toggle-link' data-toggle='collapse' href='#vcfs'>View {% count dashboard_notices.vcfs singular='1 New VCF' plural='New VCFs' %}</a>
+        </div>
+        <div class="col-9">
+            <a href="{% url 'vcfs' %}">Goto VCFs</a>
+        </div>
+    </div>
+    <ul class="list-group collapse" id="vcfs">
+        {% for vcf in dashboard_notices.vcfs %}
+            <a class="list-group-item list-group-item-action" href="{% url 'view_vcf' vcf.pk %}">{{ vcf }}</a>
+        {% endfor %}
+    </ul>
+{% endif %}
+{% if dashboard_notices.analyses_created %}
+    <div class="row mt-4">
+        <div class="col-3">
+            <a class='toggle-link' data-toggle='collapse' href='#analyses_new'>View {% count dashboard_notices.analyses_created singular='1 New Analysis' plural='New Analyses' %}</a>
+        </div>
+        <div class="col-9">
+            <a href="{% url 'analyses' %}">Goto Analyses</a>
+        </div>
+    </div>
+    <ul class="list-group collapse" id="analyses_new">
+        {% for a in dashboard_notices.analyses_created %}
+            {% if url_name_visible.analysis %}
+                <a class="list-group-item list-group-item-action" href="{% url 'analysis' a.pk %}">{{ a }}</a>
+            {% else %}
+                <li class="list-group-item">{{ a }}</li>
+            {% endif %}
+        {% endfor %}
+    </ul>
+{% endif %}
+{% if dashboard_notices.analyses_modified %}
+    <div class="row mt-4">
+        <div class="col-3">
+            <a class='toggle-link' data-toggle='collapse' href='#analyses_modified'>View {% count dashboard_notices.analyses_modified singular='1 Modified Analysis' plural='Modified Analyses' %}</a>
+        </div>
+        <div class="col-9">
+            <a href="{% url 'analyses' %}">Goto Analyses</a>
+        </div>
+    </div>
+    <ul class="list-group collapse" id="analyses_modified">
+        {% for a in dashboard_notices.analyses_modified %}
+            {% if url_name_visible.analysis %}
+                <a class="list-group-item list-group-item-action" href="{% url 'analysis' a.pk %}">{{ a }}</a>
+            {% else %}
+                <li class="list-group-item">{{ a }}</li>
+            {% endif %}
+        {% endfor %}
+    </ul>
+{% endif %}

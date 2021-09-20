@@ -1,13 +1,20 @@
-{% extends "uicore/page/base.html" %}
 {% load static %}
 {% load humanize %}
 {% load js_tags %}
-{% load ui_menu_bars %}
-{% block title %}Database Stats{% endblock %}
-{% block submenu %}{% menu_bar_settings %}{% endblock submenu %}
-{% block head %}
-<script type="text/javascript" src="{% static 'js/lib/plotly-latest.min.js' %}"></script>
-<script type="text/javascript" src="{% static 'js/plotly_helper.js' %}"></script>
+{% load ui_utils %}
+<div class="container">
+    {% labelled label="Max Variant" %}{{ max_variant_id|intcomma }}{% endlabelled %}
+    {%  if num_samples %}
+        {% labelled label="# VCFS" %}{{ num_vcfs|intcomma }}{% endlabelled %}
+        {% labelled label="# Samples" %}{{ num_vcfs|intcomma }}{% endlabelled %}
+    {%  else %}
+         {% labelled label="# VCFS" %}No VCFs or samples have been uploaded.{% endlabelled %}
+    {%  endif %}
+
+    <div id='variant-totals-graph'></div>
+    <div id='variant-genotypes-graph'></div>
+    <div id='variant-percent-known-graph'></div>
+</div>
 <script>
     function plotVariantTotalsGraph(variantStats) {
         const x = variantStats["cumulative_samples"];
@@ -79,26 +86,8 @@
     });
 
 </script>
-{% endblock head %}
-{% block content %}
-
-	<div class="container">
-        <a class="hover-link" href="{% url 'server_status' %}">Back to server status</a>
-		<h3>Database Stats</h3>
-
-		<table class="table">
-		<tr><th>Max Variant: <td> {{ max_variant_id|intcomma }}
-        {%  if num_samples %}
-            <tr><th># VCFs: <td> {{ num_vcfs }}
-            <tr><th># Samples: <td> {{ num_samples }}
-        {%  else %}
-            <tr><th># VCFs: <td> No VCFs or samples have been uploaded.
-        {%  endif %}
-		</table>		
-
-		<div id='variant-totals-graph'></div>
-		<div id='variant-genotypes-graph'></div>
-        <div id='variant-percent-known-graph'></div>
-	</div>
-
-{% endblock %}
+{% comment %}
+<!-- required on the including page -->
+<script type="text/javascript" src="{% static 'js/lib/plotly-latest.min.js' %}"></script>
+<script type="text/javascript" src="{% static 'js/plotly_helper.js' %}"></script>
+{% endcomment %}

@@ -199,14 +199,6 @@ def server_status(request):
             disk_free["status"] = "warning"
         disk_free["messages"].append(message)
 
-    days_ago: Optional[int] = None
-    try:
-        if days_ago_str := request.GET.get('days'):
-            days_ago = int(days_ago_str)
-    except ValueError:
-        pass
-
-    dashboard_notices = get_dashboard_notices(request.user, days_ago)
     total_counts = get_total_counts(request.user)
 
     context = {
@@ -216,10 +208,20 @@ def server_status(request):
         "disk_free": disk_free,
         "highest_variant_annotated": highest_variant_annotated,
         "sample_enrichment_kits_df": sample_enrichment_kits_df,
-        "dashboard_notices": dashboard_notices,
         "total_counts": total_counts,
     }
     return render(request, "variantopedia/server_status.html", context)
+
+
+@require_superuser
+def server_status_activity(request, days_ago: int):
+    dashboard_notices = get_dashboard_notices(request.user, days_ago)
+    return render(request, "variantopedia/server_status_activity_detail.html", {"dashboard_notices": dashboard_notices})
+
+
+@require_superuser
+def server_status_settings(request):
+    return render(request, "variantopedia/server_status_settings_detail.html", {"settings": settings})
 
 
 @dataclass
@@ -274,7 +276,7 @@ def database_statistics(request):
                "num_vcfs": num_vcfs,
                "num_samples": num_samples,
                "variant_stats": variant_stats}
-    return render(request, "variantopedia/database_statistics.html", context)
+    return render(request, "variantopedia/database_statistics_detail.html", context)
 
 
 def view_variant(request, variant_id, genome_build_name=None):

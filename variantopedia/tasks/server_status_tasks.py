@@ -20,7 +20,7 @@ def notify_server_status():
         return
 
     dashboard_notices = get_dashboard_notices(admin_bot(), days_ago=1)
-    url = get_url_from_view_path(reverse('server_status')) + '?days=1'
+    url = get_url_from_view_path(reverse('server_status'))
 
     emoji = ":male-doctor:" if randint(0, 1) else ":female-doctor:"
     nb = NotificationBuilder(message="Health Check", emoji=emoji)

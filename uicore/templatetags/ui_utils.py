@@ -1,11 +1,12 @@
 import json
 import re
 import uuid
+from html import escape
 from typing import Optional, Any
 
 from django import template
 from django.template.base import FilterExpression, kwarg_re
-from django.utils.safestring import SafeString
+from django.utils.safestring import SafeString, mark_safe
 
 register = template.Library()
 
@@ -319,6 +320,7 @@ def checked(test: bool) -> str:
         return SafeString('checked="checked"')
     return ''
 
+
 @register.filter()
 def boolean(test: bool) -> str:
     if test:
@@ -337,6 +339,14 @@ def value(value: Any) -> str:
         return f'{value:,}'
     else:
         return value
+
+
+@register.filter()
+def secret(value: Any, length: int = 4) -> str:
+    if value is None:
+        return ""
+    else:
+        return SafeString("<span class='secret'>" + escape(str(value)[0:4]) + "****</span>")
 
 
 class TagUtils:
