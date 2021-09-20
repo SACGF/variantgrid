@@ -122,7 +122,7 @@ def server_status(request):
         else:
             print(f"Unrecognised action {action}")
 
-        return redirect(reverse('server_status'))
+        # return redirect(reverse('server_status'))
 
         # TODO should redirect to read-only version of the page
 

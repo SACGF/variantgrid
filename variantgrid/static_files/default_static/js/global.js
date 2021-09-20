@@ -81,6 +81,19 @@ function enhanceAndMonitor() {
                 node.click(function(e) {$(this).tooltip('hide');});
             }
         },
+        {test: '.nav-tabs a',
+            func: (node) => {node.on('shown.bs.tab', function(e) {
+                let $this = $(this);
+                let url = new URL(window.location);
+                let id = $this.attr('id');
+                if (id.endsWith('-tab')) {
+                    id = id.substring(0, id.length - 4);
+                }
+                url.searchParams.set('activeTab', $this.attr('data-tab-set') + ":" + id);
+
+                window.history.replaceState({}, $this.innerHTML, url);
+            })}
+        },
         // load the active ajax tab now
         {test: '.nav-tabs a.active[data-href][data-toggle="tab"]',
             func: (node) => {loadAjaxTab(node);}

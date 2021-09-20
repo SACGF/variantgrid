@@ -20,11 +20,10 @@ def get_dashboard_notices(user: User, days_ago: int) -> dict:
     start_time = 0
     notice_header = ""
 
-    if days_ago:
-        # if days ago was passed in, don't update upa
-        days_ago = min(days_ago, MAX_PAST_DAYS)
-        start_time = timezone.now() - timedelta(days=days_ago)
-        notice_header = f"Since the last {days_ago} day{'s' if days_ago > 1 else ''}"
+    # if days ago was passed in, don't update upa
+    days_ago = min(days_ago, MAX_PAST_DAYS)
+    start_time = timezone.now() - timedelta(days=days_ago)
+    notice_header = f"Since the last {days_ago} day{'s' if days_ago > 1 else ''}"
     # else:
     #     upa, created = UserPageAck.objects.get_or_create(user=user, page_id="server_status")
     #     if created:

@@ -21,6 +21,7 @@
                 {% for tab in tab_builder.tabs %}
                     <li class="nav-item">
                         <a class="nav-link {% if tab.active %}show active{% endif %}"
+                           data-tab-set="{{ tab_builder.tab_set }}"
                            id="{{ tab.tab_id }}-tab"
                            href="#{{ tab.tab_id }}-content"
                            data-toggle="tab" role="tab"
@@ -37,7 +38,7 @@
 
             <div class="tab-content no-gutters">
                 {% for tab in tab_builder.tabs %}
-                    <div id="{{ tab.tab_id }}-content" class="tab-pane {% if tab.active %}show active{% endif %}" role="tabpanel">{{ tab.content }}</div>
+                    <div id="{{ tab.tab_id }}-content" data-tab-set="{{ tab_builder.tab_set }}" class="tab-pane {% if tab.active %}show active{% endif %}" role="tabpanel">{{ tab.content }}</div>
                 {% endfor %}
             </div>
         </div>
