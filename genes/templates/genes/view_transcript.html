@@ -11,15 +11,12 @@
         <h3>Transcript: {{ transcript }}</h3>
 
         {% if transcript.annotation_consortium == 'R' %}
-            <h4>RefSeq transcript versions</h4>
-            {% page_help 'genes/transcript_version_refseq' 'RefSeq transcript versions' show_title=False %}
+            {% page_help 'genes/transcript_version_refseq' 'RefSeq Transcript Versions' %}
         {% endif %}
         {% if transcript.annotation_consortium == 'E' %}
-            <h4>Ensembl transcript versions</h4>
-            {% page_help 'genes/transcript_version_ensembl' 'Ensembl transcript versions' show_title=False %}
+            {% page_help 'genes/transcript_version_ensembl' 'Ensembl Transcript Versions' %}
         {% endif %}
 
-        <h4>Transcript versions and lengths</h4>
         <table class="table">
             <thead>
                 <tr>
