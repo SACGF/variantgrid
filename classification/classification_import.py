@@ -1,4 +1,5 @@
 import os
+from collections import defaultdict
 from typing import List
 
 from library.django_utils.django_file_utils import get_import_processing_dir
@@ -42,7 +43,7 @@ def process_classification_import(classification_import: ClassificationImport, i
     from classification.models import Classification
     variant_pk_lookup = VariantPKLookup(classification_import.genome_build)
     variant_tuples_by_hash = {}
-    classifications_by_hash = {}
+    classifications_by_hash = defaultdict(list)
 
     no_variant_qs = classification_import.classification_set.filter(variant__isnull=True)
     classification: Classification
@@ -53,7 +54,7 @@ def process_classification_import(classification_import: ClassificationImport, i
                 variant_hash = variant_pk_lookup.add(*variant_tuple)
                 if variant_hash:
                     variant_tuples_by_hash[variant_hash] = variant_tuple
-                    classifications_by_hash[variant_hash] = classification
+                    classifications_by_hash[variant_hash].append(classification)
             else:
                 classification.set_variant(variant=None, message='Could not derive variant coordinates', failed=True)
         except ValueError as ve:
@@ -63,16 +64,17 @@ def process_classification_import(classification_import: ClassificationImport, i
     unknown_variant_coordinates = variant_pk_lookup.unknown_variant_coordinates
 
     for variant_hash, variant_pk in variant_pk_lookup.variant_pk_by_hash.items():
-        classification = classifications_by_hash[variant_hash]
-        if variant_pk:
-            classification.set_variant(Variant.objects.get(pk=variant_pk))
-        else:
-            variant_tuple = variant_tuples_by_hash[variant_hash]
-            if not _is_safe_for_vcf(variant_tuple):
-                ref_length = len(variant_tuple.ref) if variant_tuple.ref else 0
-                classification.set_variant(None, message=f'Could not process via VCF, ref length = {ref_length}', failed=True)
+        for classification in classifications_by_hash[variant_hash]:
+            if variant_pk:
+                classification.set_variant(Variant.objects.get(pk=variant_pk))
             else:
-                unknown_variant_coordinates.append(variant_tuple)
+                variant_tuple = variant_tuples_by_hash[variant_hash]
+                if not _is_safe_for_vcf(variant_tuple):
+                    ref_length = len(variant_tuple.ref) if variant_tuple.ref else 0
+                    classification.set_variant(None, message=f'Could not process via VCF, ref length = {ref_length}',
+                                               failed=True)
+                else:
+                    unknown_variant_coordinates.append(variant_tuple)
 
     _classification_upload_pipeline(classification_import, unknown_variant_coordinates, import_source)
 
