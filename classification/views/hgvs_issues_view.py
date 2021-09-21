@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Dict, Any, Optional, Tuple
+from typing import Dict, Any, Optional, Tuple, List
 from django.contrib.auth.decorators import user_passes_test
 from django.db.models import QuerySet
 from django.http import StreamingHttpResponse
@@ -247,6 +247,7 @@ class ClassificationResolution(ExportRow):
     _chgvs_imported: str
     _chgvs_grch37: str
     _chgvs_grch38: str
+    _variant_id: Optional[int]
     _url: str
 
     @export_column("Import Key")
@@ -311,6 +312,31 @@ class ClassificationResolution(ExportRow):
             else:
                 return ""
 
+    @lazy
+    def allele(self) -> Optional[Allele]:
+        if variant_id := self._variant_id:
+            v = Variant.objects.get(pk=variant_id)
+            return v.allele
+        return None
+
+    @export_column("Variant")
+    def variant(self):
+        allele: Allele  # @lazy screws up type hints :(
+        if allele := self.allele:
+            parts: List[str] = list()
+            parts.append(allele.clingen_allele_id or "")
+            for genome_build in [GenomeBuild.grch37(), GenomeBuild.grch38()]:
+                coord = ""
+                try:
+                    v = allele.variant_for_build(genome_build)
+                    coord = str(v)
+                except ValueError:
+                    pass
+                parts.append(coord)
+            return "#".join(parts)
+        else:
+            return ""
+
 
 @user_passes_test(is_superuser)
 def download_hgvs_issues(request: HttpRequest) -> StreamingHttpResponse:
@@ -337,14 +363,16 @@ def download_hgvs_resolution(request: HttpRequest) -> StreamingHttpResponse:
     c_hgvs_37_col = 'chgvs_grch37'
     c_hgvs_38_col = 'chgvs_grch38'
 
-    qs = Classification.objects.order_by(imported_genome_build_col, c_hgvs_imported_col, c_hgvs_37_col, c_hgvs_38_col, 'pk').values_list(
-        imported_genome_build_col, c_hgvs_imported_col, c_hgvs_37_col, c_hgvs_38_col, 'pk'
+    qs = Classification.objects.order_by(imported_genome_build_col, c_hgvs_imported_col, c_hgvs_37_col, c_hgvs_38_col, 'variant', 'pk').values_list(
+        imported_genome_build_col, c_hgvs_imported_col, c_hgvs_37_col, c_hgvs_38_col, 'variant', 'pk'
     )
 
     last_record = list()
     def mapper(data):
         record = [data[0], data[1], data[2], data[3]]
         if record != last_record and data[0] and data[1]:
+            variant_id = data[4]
+            classification_id = data[5]
             url = get_url_from_view_path(
                 reverse('view_classification', kwargs={'record_id': data[4]}),
             )
@@ -354,6 +382,7 @@ def download_hgvs_resolution(request: HttpRequest) -> StreamingHttpResponse:
                 _chgvs_imported=data[1],
                 _chgvs_grch37=data[2],
                 _chgvs_grch38=data[3],
+                _variant_id=variant_id,
                 _url=url
             )
 
