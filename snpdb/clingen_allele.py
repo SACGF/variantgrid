@@ -122,17 +122,19 @@ class ClinGenAlleleRegistryAPI:
         cls._check_response(response)
         return response.json()
 
-    def _clingen_hgvs_put_iter(self, hgvs_iter):
-        """ Calls ClinGen in batches """
-        url = settings.CLINGEN_ALLELE_REGISTRY_DOMAIN + "/alleles?file=hgvs"
+    def _clingen_hgvs_put_iter(self, hgvs_iter, file_type="hgvs"):
+        """ Calls ClinGen in batches
+            file_type = {hgvs, id, MyVariantInfo_hg19.id, MyVariantInfo_hg38.id, ExAC.id, gnomAD.id}
+         """
+        url = settings.CLINGEN_ALLELE_REGISTRY_DOMAIN + f"/alleles?file={file_type}"
         chunk_size = settings.CLINGEN_ALLELE_REGISTRY_MAX_RECORDS
 
         for hgvs_chunk in iter_fixed_chunks(hgvs_iter, chunk_size):
             data = "\n".join(hgvs_chunk)
             yield self._put(url, data)
 
-    def hgvs_put(self, hgvs_iter):
-        return itertools.chain.from_iterable(self._clingen_hgvs_put_iter(hgvs_iter))
+    def hgvs_put(self, hgvs_iter, file_type="hgvs"):
+        return itertools.chain.from_iterable(self._clingen_hgvs_put_iter(hgvs_iter, file_type=file_type))
 
 
 def populate_clingen_alleles_for_variants(genome_build: GenomeBuild, variants,

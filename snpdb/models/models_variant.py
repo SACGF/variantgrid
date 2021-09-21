@@ -402,6 +402,14 @@ class Variant(models.Model):
         return self.alt.is_standard_sequence()
 
     @property
+    def is_indel(self) -> bool:
+        return self.alt.seq != Variant.REFERENCE_ALT and self.locus.ref.length != self.alt.length
+
+    @property
+    def is_insertion(self) -> bool:
+        return self.alt.seq != Variant.REFERENCE_ALT and self.locus.ref.length < self.alt.length
+
+    @property
     def is_deletion(self) -> bool:
         return self.alt.seq != Variant.REFERENCE_ALT and self.locus.ref.length > self.alt.length
 
