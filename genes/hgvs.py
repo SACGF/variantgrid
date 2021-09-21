@@ -478,7 +478,12 @@ class HGVSMatcher:
 
         try:
             ca = get_clingen_allele_from_hgvs(cleaned_hgvs)
-            return ca.get_variant_tuple(self.genome_build)
+            variant_coord = ca.get_variant_tuple(self.genome_build)
+            # Was converted to internal, need to return raw strings so standard base validation is OK
+            if variant_coord.alt == Variant.REFERENCE_ALT:
+                variant_coord = VariantCoordinate(variant_coord.chrom, variant_coord.pos,
+                                                  variant_coord.ref, variant_coord.ref)  # ref == alt
+            return variant_coord
         except ClinGenAlleleAPIException as cga_api:
             self.attempt_clingen = False
             raise
