@@ -189,6 +189,10 @@ class ProblemHgvs(ExportRow):
     def classification_url(self):
         return get_url_from_view_path(self.classification.get_absolute_url())
 
+    @export_column("Withdrawn")
+    def withdrawn(self):
+        return self.classification.withdrawn
+
     @export_column("Imported Build")
     def imported_build(self):
         return self.classification.get(SpecialEKeys.GENOME_BUILD)
@@ -378,7 +382,7 @@ def download_hgvs_resolution(request: HttpRequest) -> StreamingHttpResponse:
             variant_id = data[4]
             classification_id = data[5]
             url = get_url_from_view_path(
-                reverse('view_classification', kwargs={'record_id': data[4]}),
+                reverse('view_classification', kwargs={'record_id': data[5]}),
             )
             # url = f"https://shariant.org.au/classification/classification/{data[4]}"
             return ClassificationResolution(
