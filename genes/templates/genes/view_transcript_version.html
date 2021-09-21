@@ -76,9 +76,7 @@
                 {% if transcript_version.has_valid_data %}
                     <td>{{ transcript_version.coordinates }}</td>
                     <td>{{ transcript_version.length }}</td>
-                    <td><a class="hover-link" href="#{{ genome_build_id }}-json" data-toggle="modal">show</a>
-
-                        <a class="modal-link mb-4 d-inline-block" data-toggle="modal" href="#transcript-{{ transcript_version.pk }}-json">Show</a>
+                    <td><a class="hover-link" href="#transcript-{{ transcript_version.pk }}-json" data-toggle="modal">Show</a>
                         <div id="transcript-{{ transcript_version.pk }}-json" class="modal" tabindex="-1">
                             <div class="modal-dialog modal-dialog-scrollable modal-xl">
                                 <div class="modal-content">
