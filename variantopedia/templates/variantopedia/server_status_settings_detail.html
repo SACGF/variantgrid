@@ -3,7 +3,7 @@
 <div class="container">
     <div class="row equal">
         <div class="col-6">
-            <div class="card">
+            <div class="card mb-4">
                 <div class="card-header">Basics</div>
                 <div class="card-body">
                     {% labelled label="Site Name" %}{{ site_name }}{% endlabelled %}
@@ -13,12 +13,31 @@
             </div>
         </div>
         <div class="col-6">
-            <div class="card">
+            <div class="card mb-4">
                 <div class="card-header">ClinVar</div>
                 <div class="card-body">
                     {% labelled label="Mode" %}{{ settings.CLINVAR_EXPORT.mode }}{% endlabelled %}
                     {% labelled label="Org ID" %}{{ settings.CLINVAR_EXPORT.org_id }}{% endlabelled %}
                     {% labelled label="API Key" %}{{ settings.CLINVAR_EXPORT.api_key|secret }}{% endlabelled %}
+                </div>
+            </div>
+        </div>
+        <div class="col-6">
+            <div class="card mb-4">
+                <div class="card-header">Slack</div>
+                <div class="card-body">
+                    {% labelled label="Enabled" %}{{ settings.SLACK.enabled }}{% endlabelled %}
+                    {% labelled label="Callback URL" %}{{ settings.SLACK.admin_callback_url|secret:-4 }}{% endlabelled %}
+                    {% labelled label="Auto Health Check" %}{{ settings.HEALTH_CHECK_ENABLED }}{% endlabelled %}
+                </div>
+            </div>
+        </div>
+        <div class="col-6">
+            <div class="card mb-4">
+                <div class="card-header">Rollbar</div>
+                <div class="card-body">
+                    {% labelled label="Enabled" %}{{ settings.ROLLBAR.enabled }}{% endlabelled %}
+                    {% labelled label="Access Token" %}{{ settings.ROLLBAR.access_token|secret }}{% endlabelled %}
                 </div>
             </div>
         </div>

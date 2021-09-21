@@ -342,11 +342,17 @@ def value(value: Any) -> str:
 
 
 @register.filter()
-def secret(value: Any, length: int = 4) -> str:
+def secret(value: Any, length: int = -4) -> str:
     if value is None:
         return ""
     else:
-        return SafeString("<span class='secret'>" + escape(str(value)[0:4]) + "****</span>")
+        str_value = str(value)
+        if length > 0:
+            return SafeString("<span class='secret'>" + escape(str_value[0:length]) + "****</span>")
+        elif length < 0:
+            return SafeString("<span class='secret'>****" + escape(str_value[length:]) + "</span>")
+        else:
+            return str_value
 
 
 class TagUtils:
