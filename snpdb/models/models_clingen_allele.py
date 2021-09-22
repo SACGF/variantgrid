@@ -1,3 +1,4 @@
+import logging
 import re
 from typing import Dict, Optional, Tuple
 
@@ -89,6 +90,8 @@ class ClinGenAllele(TimeStampedModel):
 
     def get_c_hgvs(self, transcript_accession):
         """ c.HGVS has reference bases on it """
+        from genes.models import TranscriptVersionSequenceInfo
+
         hgvs_string = None
         raw_hgvs_string, t_data = self._get_raw_c_hgvs_and_data(transcript_accession)
         if raw_hgvs_string:  # Has for this transcript version
@@ -96,12 +99,23 @@ class ClinGenAllele(TimeStampedModel):
             if not hgvs_name.gene:  # Ref/Ens HGVSs have transcript no gene, LRG is set as gene
                 hgvs_name.gene = t_data.get("geneSymbol")
             if hgvs_name.mutation_type in {"dup", "del", "delins"}:
+                # We want to add reference bases onto HGVS but ClinGen reference sequence is wrong (see issue #493)
                 coord = t_data["coordinates"][0]
-                if hgvs_name.mutation_type == "dup":
-                    clingen_key = "allele"
+                if "startIntronOffset" in coord:
+                    # We have to accept these - as we get so many but we can't add on the bases
+                    logging.warning("A coding DNA reference sequence does not contain intron or 5' and 3' gene "
+                                    "flanking sequences and can therefore not be used as a reference to describe "
+                                    "variants in these regions")
                 else:
-                    clingen_key = "referenceAllele"
-                hgvs_name.ref_allele = coord[clingen_key]
+                    if hgvs_name.mutation_type == "dup":
+                        ref_end = coord["end"]
+                        ref_start = ref_end - len(coord["allele"])
+                    else:
+                        ref_start = coord["start"]
+                        ref_end = coord["end"]
+
+                    tvsi = TranscriptVersionSequenceInfo.get(transcript_accession)
+                    hgvs_name.ref_allele = tvsi.sequence[ref_start:ref_end]
             hgvs_string = hgvs_name.format()
         return hgvs_string
 
