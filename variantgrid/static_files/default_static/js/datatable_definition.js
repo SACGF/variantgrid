@@ -243,21 +243,19 @@ let DataTableDefinition = (function() {
             if (!this.serverParams.responsive) {
                 return;
             }
-            console.log("Checking responsive show hide");
             let dt = this.dataTable;
-
             let lastShown = null;
 
             dt.on('responsive-display', function (e, datatable, row, showHide, update ) {
                 if (showHide) {
                     if (lastShown) {
-                        dt.row(`:eq(${lastShown})`).hide();
+                        // just calling hide keeps the 'parent' class
+                        lastShown.nodes().to$().trigger('click');
                     }
                     lastShown = row;
                 } else {
                     lastShown = null;
                 }
-                console.log( 'Details for row '+row.index()+' '+(showHide ? 'shown' : 'hidden') );
             });
         },
 

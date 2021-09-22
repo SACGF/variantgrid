@@ -5,6 +5,7 @@ from django.shortcuts import get_object_or_404
 
 from annotation.models import VariantAnnotationVersion, AnnotationRun, HumanProteinAtlasAbundance, AnnotationStatus
 from annotation.models.models import HumanProteinAtlasAnnotationVersion, HumanProteinAtlasTissueSample
+from eventlog.models import Event
 from genes.models import GeneVersion
 from genes.models_enums import AnnotationConsortium
 from library.jqgrid_abstract_genes_grid import AbstractGenesGrid
@@ -92,7 +93,7 @@ class VaraintAnnotationVersionColumns(DatatableConfig[VariantAnnotationVersion])
         super().__init__(request)
 
         self.rich_columns = [
-            RichColumn(key="id", label="ID", orderable=True, default_sort=SortOrder.DESC, css_class='toggle-link dt-preview'),
+            RichColumn(key="id", label="ID", orderable=True, default_sort=SortOrder.DESC, css_class='toggle-link'),
             RichColumn(key="vep", label="VEP", orderable=True),
             RichColumn(key="annotation_consortium", orderable=True, renderer=lambda x: AnnotationConsortium(x['annotation_consortium']).label),
             RichColumn(key="created", client_renderer='TableFormat.timestamp', orderable=True),
