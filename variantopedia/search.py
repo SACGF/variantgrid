@@ -576,18 +576,19 @@ def search_hgvs(search_string: str, user: User, genome_build: GenomeBuild, varia
         initial_score = 0
         hgvs_string = search_string
         used_transcript_accession = None
+        method = None
         try:
             if fixed_hgvs := HGVSMatcher.fix_swapped_gene_transcript(hgvs_string):
                 hgvs_string = fixed_hgvs
                 search_messages.append(f"Warning: swapped gene/transcript, ie '{search_string}' => '{hgvs_string}'")
-            variant_tuple, used_transcript_accession, _ = hgvs_matcher.get_variant_tuple_used_transcript_and_method(hgvs_string)
+            variant_tuple, used_transcript_accession, method = hgvs_matcher.get_variant_tuple_used_transcript_and_method(hgvs_string)
         except (ValueError, NotImplementedError) as original_error:  # InvalidHGVSName is subclass of ValueError
             original_hgvs_string = hgvs_string
             try:
                 hgvs_string = HGVSMatcher.clean_hgvs(hgvs_string)
                 if search_string != hgvs_string:
                     search_messages.append(f"Warning: Cleaned '{search_string}' => '{hgvs_string}'")
-                variant_tuple, used_transcript_accession, _ = hgvs_matcher.get_variant_tuple_used_transcript_and_method(hgvs_string)
+                variant_tuple, used_transcript_accession, method = hgvs_matcher.get_variant_tuple_used_transcript_and_method(hgvs_string)
             except (ValueError, NotImplementedError):
                 if gene_symbol := hgvs_matcher.get_gene_symbol_if_no_transcript(hgvs_string):
                     if results := _search_hgvs_using_gene_symbol(gene_symbol, search_messages,
@@ -604,13 +605,17 @@ def search_hgvs(search_string: str, user: User, genome_build: GenomeBuild, varia
                     raise original_error  # cleaning didn't work don't tell anyone
                 return None
 
-        if not hgvs_matcher.matches_reference(hgvs_string):
-            ref = variant_tuple[2]
-            build_and_patch = genome_build.get_build_with_patch()
-            if len(ref) > 20:
-                ref = f"{Sequence.abbreviate(ref)} ({len(ref)} bases)"
-            search_messages.append(f"Warning: Using reference '{ref}' from our build: {build_and_patch}")
-            initial_score -= 1
+        try:
+            # This currently fails if we switch transcripts
+            if "pyhgvs" in method and not hgvs_matcher.matches_reference(hgvs_string):
+                ref = variant_tuple[2]
+                build_and_patch = genome_build.get_build_with_patch()
+                if len(ref) > 20:
+                    ref = f"{Sequence.abbreviate(ref)} ({len(ref)} bases)"
+                search_messages.append(f"Warning: Using reference '{ref}' from our build: {build_and_patch}")
+                initial_score -= 1
+        except:
+            pass
 
         if used_transcript_accession and used_transcript_accession not in hgvs_string:
             search_messages.append(f"Warning: Missing transcript version, using best match '{used_transcript_accession}'")

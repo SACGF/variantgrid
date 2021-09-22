@@ -192,7 +192,9 @@ class ClinGenAllele(TimeStampedModel):
 
     @staticmethod
     def format_clingen_allele(pk):
-        return f"CA{pk:06}"
+        if pk:
+            return f"CA{pk:06}"
+        return "Unregistered Allele"
 
     def __str__(self):
         """ ClinGen has minimum length of 6 (0 padded) but can go longer """
