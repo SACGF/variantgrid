@@ -29,6 +29,10 @@ class ClinGenAllele(TimeStampedModel):
     class ClinGenNonChromosomeLiftoverError(ValueError):
         pass
 
+    class ClinGenMissingAlleleID(ValueError):
+        """ Coordinate is not yet assigned ID and stored on server """
+        pass
+
     @staticmethod
     def _strip_transcript_version(transcript_id):
         """ strip dot version ie NM_198798.2 => NM_198798 """
@@ -40,8 +44,7 @@ class ClinGenAllele(TimeStampedModel):
         url_id = api_response["@id"]
         if m := ClinGenAllele.CLINGEN_ALLELE_URL_PATTERN.match(url_id):
             return int(m.group(1))
-        msg = f"Couldn't retrieve ClinGen AlleleID from @id '{url_id}'"
-        raise ValueError(msg)
+        raise ClinGenAllele.ClinGenMissingAlleleID(f"Couldn't retrieve ClinGen AlleleID from @id '{url_id}'")
 
     @staticmethod
     def get_id_from_code(code):

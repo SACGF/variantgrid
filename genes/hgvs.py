@@ -481,7 +481,7 @@ class HGVSMatcher:
         cleaned_hgvs = hgvs_name.format()
 
         try:
-            ca = get_clingen_allele_from_hgvs(cleaned_hgvs)
+            ca = get_clingen_allele_from_hgvs(cleaned_hgvs, require_allele_id=False)
             variant_coord = ca.get_variant_tuple(self.genome_build)
             # Was converted to internal, need to return raw strings so standard base validation is OK
             if variant_coord.alt == Variant.REFERENCE_ALT:

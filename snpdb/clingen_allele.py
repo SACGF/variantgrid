@@ -429,13 +429,20 @@ def get_clingen_alleles_from_external_code(er_type: ClinGenAlleleExternalRecordT
     return _store_clingen_api_response(api_response_list)
 
 
-def get_clingen_allele_from_hgvs(hgvs_string, clingen_api: ClinGenAlleleRegistryAPI = None) -> ClinGenAllele:
+def get_clingen_allele_from_hgvs(hgvs_string, require_allele_id=True,
+                                 clingen_api: ClinGenAlleleRegistryAPI = None) -> ClinGenAllele:
     if clingen_api is None:
         clingen_api = ClinGenAlleleRegistryAPI()
 
     api_response = clingen_api.get_hgvs(hgvs_string)
-    clingen_list = _store_clingen_api_response([api_response])
-    return clingen_list[0]
+    try:
+        clingen_list = _store_clingen_api_response([api_response])
+        return clingen_list[0]
+    except ClinGenAllele.ClinGenMissingAlleleID:
+        if require_allele_id:
+            raise
+        # We may just want the HGVS conversion so don't need an ID
+        return ClinGenAllele(api_response=api_response)
 
 
 def link_allele_to_existing_variants(allele: Allele, conversion_tool,
