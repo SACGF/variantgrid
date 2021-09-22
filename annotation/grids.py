@@ -6,10 +6,11 @@ from django.shortcuts import get_object_or_404
 from annotation.models import VariantAnnotationVersion, AnnotationRun, HumanProteinAtlasAbundance, AnnotationStatus
 from annotation.models.models import HumanProteinAtlasAnnotationVersion, HumanProteinAtlasTissueSample
 from genes.models import GeneVersion
+from genes.models_enums import AnnotationConsortium
 from library.jqgrid_abstract_genes_grid import AbstractGenesGrid
 from library.jqgrid_user_row_config import JqGridUserRowConfig
 from snpdb.models.models_genome import GenomeBuild
-from snpdb.views.datatable_view import DatatableConfig, RichColumn
+from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
 
 
 class AnnotationRunColumns(DatatableConfig):
@@ -83,6 +84,41 @@ class VariantAnnotationVersionGrid(JqGridUserRowConfig):
         self.extra_config.update({'sortname': "created",
                                   'sortorder': "desc",
                                   'shrinkToFit': False})
+
+
+class VaraintAnnotationVersionColumns(DatatableConfig[VariantAnnotationVersion]):
+
+    def __init__(self, request):
+        super().__init__(request)
+
+        self.rich_columns = [
+            RichColumn(key="id", label="ID", orderable=True, default_sort=SortOrder.DESC, css_class='toggle-link dt-preview'),
+            RichColumn(key="vep", label="VEP", orderable=True),
+            RichColumn(key="annotation_consortium", orderable=True, renderer=lambda x: AnnotationConsortium(x['annotation_consortium']).label),
+            RichColumn(key="created", client_renderer='TableFormat.timestamp', orderable=True),
+            RichColumn(key="last_checked_date", client_renderer='TableFormat.timestamp', orderable=True),
+            RichColumn(key="gene_annotation_release__version", label="Gene Annotation Release Version", orderable=True),
+            RichColumn(key="ensembl", orderable=True),
+            RichColumn(key="ensembl_funcgen", orderable=True),
+            RichColumn(key="ensembl_variation", orderable=True, detail=True),
+            RichColumn(key="ensembl_io", label="Ensembl-io", orderable=True, detail=True),
+            RichColumn(key="thousand_genomes", orderable=True, detail=True),
+            RichColumn(key="cosmic", orderable=True, detail=True),
+            RichColumn(key="hgmd", label="HGMD", orderable=True, detail=True),
+            RichColumn(key="assembly", orderable=True, detail=True),
+            RichColumn(key="gencode", label="GENCODE", orderable=True, detail=True),
+            RichColumn(key="genebuild", label="GeneBuild", orderable=True, detail=True),
+            RichColumn(key="gnomad", label="gnomAD", orderable=True,  detail=True),
+            RichColumn(key="refseq", orderable=True, detail=True),
+            RichColumn(key="regbuild", label="Regulatory Build", orderable=True, detail=True),
+            RichColumn(key="sift", orderable=True, detail=True),
+            RichColumn(key="dbnsfp", label="dbNSFP", orderable=True, detail=True),
+            RichColumn(key="distance", orderable=True, detail=True)
+        ]
+
+    def get_initial_queryset(self) -> QuerySet[VariantAnnotationVersion]:
+        genome_build = GenomeBuild.get_name_or_alias(self.get_query_param("genome_build_name"))
+        return VariantAnnotationVersion.objects.filter(genome_build=genome_build)
 
 
 class TissueGeneGrid(AbstractGenesGrid):

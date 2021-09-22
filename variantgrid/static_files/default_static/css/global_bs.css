@@ -375,6 +375,13 @@ table.sticky-header thead th {
   z-index: 1;
 }
 
+table.responsive {
+  width: 100%;
+}
+table.responsive tr.odd, table.responsive tr.even {
+  cursor: pointer;
+}
+
 .container-table {
   max-width: 1700px;
   width: 100%;

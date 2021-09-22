@@ -95,7 +95,7 @@ let DataTableDefinition = (function() {
                 dtParams.responsive = {
                     details: {
                         type: 'column',
-                        target: 'td.dt-preview',
+                        target: 'tr',
                         renderer: TableFormat.detailRendererHtml
                     }
                 };
@@ -239,6 +239,28 @@ let DataTableDefinition = (function() {
             });
         },
 
+        setupResponsiveExpand: function() {
+            if (!this.serverParams.responsive) {
+                return;
+            }
+            console.log("Checking responsive show hide");
+            let dt = this.dataTable;
+
+            let lastShown = null;
+
+            dt.on('responsive-display', function (e, datatable, row, showHide, update ) {
+                if (showHide) {
+                    if (lastShown) {
+                        dt.row(`:eq(${lastShown})`).hide();
+                    }
+                    lastShown = row;
+                } else {
+                    lastShown = null;
+                }
+                console.log( 'Details for row '+row.index()+' '+(showHide ? 'shown' : 'hidden') );
+            });
+        },
+
         setup: function() {
             if (this.dom.hasClass('dataTable')) {
                 return;
@@ -249,6 +271,7 @@ let DataTableDefinition = (function() {
                 this.waitOn.then(() => {
                     this.setupDom();
                     this.setupClientExpend();
+                    this.setupResponsiveExpand();
                     this.dataTable.columns.adjust().draw();
                 });
             });

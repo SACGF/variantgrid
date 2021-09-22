@@ -179,7 +179,7 @@ class DatatableConfig(Generic[DC]):
         return [rc for rc in self.rich_columns if rc.enabled]
 
     def get_initial_queryset(self) -> QuerySet[DC]:
-        raise NotImplementedError("Need to provide a model or implement get_initial_queryset!")
+        raise NotImplementedError("Need to provide get_initial_queryset!")
 
     def power_search(self, qs: QuerySet[DC], search_string: str) -> QuerySet[DC]:
         search_cols = set()
@@ -225,6 +225,9 @@ class DatatableConfig(Generic[DC]):
         :param param: the key of the param
         :return: the value of the param
         """
+        if param in self.request.resolver_match.kwargs:
+            return self.request.resolver_match.kwargs[param]
+
         return self._querydict.get(param)
 
     def get_query_json(self, param: str) -> Optional[Dict]:

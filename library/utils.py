@@ -12,6 +12,8 @@ import string
 import subprocess
 import time
 import uuid
+
+from coreschema.encodings.jsonschema import camelcase_to_snakecase
 from pytz import timezone
 from collections import defaultdict
 from dataclasses import dataclass
@@ -30,7 +32,7 @@ from django.conf import settings
 from django.core.serializers import serialize
 from django.db import models
 from django.db.models.query import QuerySet
-from django.http import StreamingHttpResponse
+from django.http import StreamingHttpResponse, HttpRequest
 from django.utils import html
 from django.utils.functional import SimpleLazyObject
 from django.utils.safestring import SafeString, mark_safe
@@ -835,10 +837,12 @@ class ExportRow:
 
     @classmethod
     def json_generator(cls, data: Iterable[Any], records_key: str = "records") -> Iterator[str]:
+        first_row = True
         try:
             yield f'{{"{records_key}": ['
             for row_data in cls._data_generator(data):
-                yield json.dumps(row_data.to_json())
+                yield (', ' if not first_row else '') + json.dumps(row_data.to_json())
+                first_row = False
             yield f']}}'
         except:
             from library.log_utils import report_exc_info
@@ -885,9 +889,18 @@ class ExportRow:
             else:
                 value = result
 
+            if value == "":
+                value = None
             row[method.__name__] = value
 
         return row
+
+    @classmethod
+    def streaming(cls, request: HttpRequest, data: Iterable[Any], filename: str):
+        if request.GET.get('format') == 'json':
+            return cls.streaming_json(data, filename)
+        else:
+            return cls.streaming_csv(data, filename)
 
     @classmethod
     def streaming_csv(cls, data: Iterable[Any], filename: str):
@@ -898,9 +911,12 @@ class ExportRow:
         return response
 
     @classmethod
-    def streaming_json(cls, data: Iterable[Any], filename: str, records_key: str = "records"):
+    def streaming_json(cls, data: Iterable[Any], filename: str, records_key: str = None):
         date_time = datetime.now(tz=timezone(settings.TIME_ZONE)).strftime("%Y-%m-%d")
 
-        response = StreamingHttpResponse(cls.csv_generator(data), content_type='text/csv')
-        response['Content-Disposition'] = f'attachment; filename="{filename}_{settings.SITE_NAME}_{date_time}.csv"'
+        if not records_key:
+            records_key = filename.replace(" ", "_")
+
+        response = StreamingHttpResponse(cls.json_generator(data, records_key), content_type='application/json')
+        response['Content-Disposition'] = f'attachment; filename="{filename}_{settings.SITE_NAME}_{date_time}.json"'
         return response
