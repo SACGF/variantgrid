@@ -48,13 +48,7 @@
             </p>
         {% end_page_help_embedded %}
 
-        <h4>Download</h4>
-        <form method="POST" action="{% url 'condition_match_test_download' %}">
-            {% csrf_token %}
-            <p class="text-info">Downloads auto matching attempts. (Note doesn't apply the results, just produces them for download).</p>
-            <input class="btn btn-primary" type="submit" value="Download" />
-        </form>
-        <hr/>
+        <a href="{% url 'condition_match_test_download' %}" class="download-link type-csv">Download Auto Matching Attempts</a>
         <h4>Test Single Term</h4>
 
         <form method="GET">

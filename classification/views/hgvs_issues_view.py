@@ -360,7 +360,7 @@ def download_hgvs_issues(request: HttpRequest) -> StreamingHttpResponse:
     complete_qs = classification_qs.union(Classification.objects.filter(variant__variantallele__allele__in=alleles_qs))
     complete_qs = complete_qs.order_by('-variant', '-pk')
 
-    return ProblemHgvs.streaming_csv(complete_qs, "hgvs_issues")
+    return ProblemHgvs.streaming(request, complete_qs, "hgvs_issues")
 
 
 @user_passes_test(is_superuser)
@@ -395,4 +395,4 @@ def download_hgvs_resolution(request: HttpRequest) -> StreamingHttpResponse:
             )
 
     stream = (mapper(row) for row in qs)
-    return ClassificationResolution.streaming_csv(stream, "c_hgvs_resolution")
+    return ClassificationResolution.streaming(request, stream, "c_hgvs_resolution")

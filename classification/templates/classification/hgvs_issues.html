@@ -65,10 +65,20 @@
     <div class="container-table">
         <h3>HGVS Issues</h3>
         <p class="text-info">Note that only Alleles with 1 or more classifications attached will be considered.</p>
-        <div class="btn-toolbar">
-        <a class="btn btn-outline-primary" href="{% url 'hgvs_issues_download' %}"><i class="fas fa-file-csv"></i> Download HGVS Issues</a>
-        <a class="btn btn-outline-primary" href="{% url 'liftover_report' %}"><i class="fas fa-file-csv"></i> Liftover Report</a>
+
+        {% labelled label="All HGVS Issues" %}
+        <div class="link-toolbar">
+            <a class="download-link type-csv" href="{% url 'hgvs_issues_download' %}">CSV</a>
+            <a class="download-link type-json" href="{% url 'hgvs_issues_download' %}?format=json">JSON</a>
         </div>
+        {% endlabelled %}
+        {% labelled label="Liftover Report" %}
+            <div class="link-toolbar">
+                <a class="download-link type-csv" href="{% url 'liftover_report' %}">CSV</a>
+                <a class="download-link type-json" href="{% url 'liftover_report' %}?format=json">JSON</a>
+            </div>
+        {% endlabelled %}
+
         <div class="mt-4">
             {% ui_register_tab_embedded tab_set="hgvs_issues" label="Missing 37/38" badge=counts.allele.missing_rep %}
                 <table id="allele-missing-rep" class="sticky-header allele-table" data-datatable-url="{% url 'allele_datatable' %}" data-datatable-data="alleleMissingRepFilter"></table>
