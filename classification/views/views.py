@@ -16,6 +16,7 @@ from django.http.request import HttpRequest
 from django.http.response import HttpResponse
 from django.shortcuts import render, get_object_or_404, redirect
 from django.urls import reverse
+from django.utils.timezone import now
 from django.views.decorators.http import require_POST
 from django.views.generic import TemplateView
 from global_login_required import login_not_required
@@ -67,7 +68,8 @@ def activity(request, latest_timestamp: Optional[str] = None):
     context = {
         'changes': changes,
         'last_date': last_date,
-        'can_create_classifications': settings.VARIANT_CLASSIFICATION_WEB_FORM_CREATE_BY_NON_ADMIN
+        'can_create_classifications': settings.VARIANT_CLASSIFICATION_WEB_FORM_CREATE_BY_NON_ADMIN,
+        'now': latest_timestamp if latest_timestamp else now()
     }
     return render(request, 'classification/activity.html', context)
 
@@ -246,7 +248,8 @@ def classification_history(request, record_id):
     changes = ClassificationChanges.list_changes(classification=ref.record, limit=100)
     context = {
         'changes': changes,
-        'can_create_classifications': Classification.can_create_via_web_form(request.user)
+        'can_create_classifications': Classification.can_create_via_web_form(request.user),
+        'now': now()
     }
     return render(request, 'classification/activity.html', context)
 

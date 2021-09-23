@@ -1,7 +1,9 @@
 {% extends "uicore/page/base.html" %}
 {% load classification_tags %}
 {% load ui_menu_bars %}
+{% load ui_utils %}
 {% load ui_help %}
+{% load js_tags %}
 {% block title %}Variant Classification Activity{% endblock %}
 {% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
 {% block head %}
@@ -72,6 +74,7 @@
         A blank value in the Record or Who column implies it's the same as the value above it.
         </p>
     {% end_page_help_embedded %}
+    {% labelled label="Data as of" %}{% timestamp now time_ago=True %}{% endlabelled %}
     {% classification_changes changes %}
     {% if last_date %}<br/><a class="btn btn-outline-primary" href="{% url 'activity_dated' last_date %}">Load Older</a>{% endif %}
     </div>
