@@ -1059,11 +1059,13 @@ class TranscriptVersionSequenceInfo(TimeStampedModel):
     @staticmethod
     def _get_and_store_from_ensembl_api(transcript_accession):
         transcript_id, version = TranscriptVersion.get_transcript_id_and_version(transcript_accession)
-        url = f"https://rest.ensembl.org/sequence/id/{transcript_id}/{version}?type=cdna"
+        url = f"https://rest.ensembl.org/sequence/id/{transcript_id}?type=cdna"
         r = requests.get(url, headers={"Content-Type": "application/json"})
         data = r.json()
 
         if r.ok:
+            if version != data["version"]:
+                raise NoTranscript("Only latest version can be returned via API")
             transcript, _ = Transcript.objects.get_or_create(identifier=data["id"],
                                                              annotation_consortium=AnnotationConsortium.ENSEMBL)
             return TranscriptVersionSequenceInfo.objects.get_or_create(transcript=transcript,
