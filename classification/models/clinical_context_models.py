@@ -184,7 +184,10 @@ class ClinicalContext(FlagsMixin, TimeStampedModel):
 
         is_significance_change = old_status != new_status
 
-        if cause_code == ClinicalContextRecalcTrigger.VARIANT_SET and settings.DISCORDANCE_ENABLED and settings.DISCORDANCE_PAUSE_TEMP_VARIANT_MATCHING:
+        if cause_code == ClinicalContextRecalcTrigger.VARIANT_SET and \
+                settings.DISCORDANCE_ENABLED and \
+                settings.DISCORDANCE_PAUSE_TEMP_VARIANT_MATCHING and \
+                not (old_status is None and new_status == ClinicalContextStatus.CONCORDANT):
             if is_significance_change:
                 allele_url = get_url_from_view_path(self.allele.get_absolute_url())
                 nb = NotificationBuilder("ClinicalContext changed (muted due to variant matching)")
