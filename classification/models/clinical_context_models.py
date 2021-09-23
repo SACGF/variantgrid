@@ -20,7 +20,8 @@ from classification.models.classification import Classification, \
 from classification.models.flag_types import classification_flag_types
 from flags.models.models import FlagsMixin, FlagCollection, FlagTypeContext, \
     flag_collection_extra_info_signal, FlagInfos
-from library.log_utils import report_message
+from library.django_utils import get_url_from_view_path
+from library.log_utils import report_message, NotificationBuilder
 from snpdb.models import Variant, Lab
 from snpdb.models.models_variant import Allele
 
@@ -123,6 +124,15 @@ class DiscordanceStatus:
         return DiscordanceStatus(level=level, lab_count=len(shared_labs), lab_count_all=len(all_labs), counted_classifications=counted_classifications)
 
 
+class ClinicalContextRecalcTrigger(Enum):
+    ADMIN = "admin"
+    VARIANT_SET = "variant_set"
+    CLINICAL_GROUPING_SET = "clinical_grouping"
+    WITHDRAW_DELETE = "withdraw_delete"
+    SUBMISSION = "submission"
+    OTHER = "other"
+
+
 class ClinicalContext(FlagsMixin, TimeStampedModel):
     default_name = 'default'
 
@@ -165,7 +175,7 @@ class ClinicalContext(FlagsMixin, TimeStampedModel):
         return DiscordanceReport.latest_report(self)
 
     @transaction.atomic
-    def recalc_and_save(self, cause: str):
+    def recalc_and_save(self, cause: str, cause_code: ClinicalContextRecalcTrigger = ClinicalContextRecalcTrigger.OTHER):
         """
         Updates this ClinicalContext with the new status and applies flags where appropriate.
         """
@@ -173,6 +183,13 @@ class ClinicalContext(FlagsMixin, TimeStampedModel):
         new_status = self.calculate_status()
 
         is_significance_change = old_status != new_status
+
+        if cause_code == ClinicalContextRecalcTrigger.VARIANT_SET and settings.DISCORDANCE_ENABLED and settings.DISCORDANCE_PAUSE_TEMP_VARIANT_MATCHING:
+            allele_url = get_url_from_view_path(self.allele.get_absolute_url())
+            nb = NotificationBuilder("ClinicalContext changed (muted due to variant matching)")
+            nb.add_markdown(f"ClinicalGrouping for allele <{allele_url}|{allele_url}> would change from {old_status} -> {new_status} but ignoring due to variant re-matching")
+            nb.send()
+            return
 
         self.last_evaluation = {
             "date": now().timestamp(),

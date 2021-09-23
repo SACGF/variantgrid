@@ -14,7 +14,7 @@ from classification.models.classification import Classification, \
     classification_withdraw_signal
 from classification.models.classification_utils import ValidationMerger
 from classification.models.clinical_context_models import ClinicalContext, \
-    clinical_context_signal
+    clinical_context_signal, ClinicalContextRecalcTrigger
 from classification.models.discordance_models import DiscordanceReport
 from classification.models.evidence_key import EvidenceKey, EvidenceKeyMap
 from classification.models.flag_types import classification_flag_types
@@ -45,9 +45,9 @@ def variant_set(sender, **kwargs):  # pylint: disable=unused-argument
 
     # make sure you do your calculations after
     if old_clinical_context:
-        old_clinical_context.recalc_and_save(cause=f'Classification {record.friendly_label} unmatched')
+        old_clinical_context.recalc_and_save(cause=f'Classification {record.friendly_label} unmatched', cause_code=ClinicalContextRecalcTrigger.VARIANT_SET)
     if new_clinical_context:
-        new_clinical_context.recalc_and_save(cause=f'Classification {record.friendly_label} submitted')
+        new_clinical_context.recalc_and_save(cause=f'Classification {record.friendly_label} submitted', cause_code=ClinicalContextRecalcTrigger.VARIANT_SET)
 
 
 @receiver(post_delete, sender=Classification)
@@ -55,7 +55,7 @@ def deleted_variant(sender, instance: Classification, **kwargs):  # pylint: disa
     classification = instance
     if classification.clinical_context:
         cause = f'Classification {instance.friendly_label} deleted'
-        classification.clinical_context.recalc_and_save(cause=cause)
+        classification.clinical_context.recalc_and_save(cause=cause, cause_code=ClinicalContextRecalcTrigger.WITHDRAW_DELETE)
 
 
 @receiver(classification_withdraw_signal, sender=Classification)
@@ -67,7 +67,7 @@ def withdraw_changed(sender, classification: Classification, **kwargs):  # pylin
         else:
             cause = f'Classification {classification.friendly_label} un-withdrawn'
 
-        classification.clinical_context.recalc_and_save(cause=cause)
+        classification.clinical_context.recalc_and_save(cause=cause, cause_code=ClinicalContextRecalcTrigger.WITHDRAW_DELETE)
 
 
 @receiver(classification_post_publish_signal, sender=Classification)
@@ -136,7 +136,7 @@ def published(sender,
         else:
             cause = f'Classification {classification.friendly_label} re-submitted as {cs}'
 
-        classification.clinical_context.recalc_and_save(cause=cause)
+        classification.clinical_context.recalc_and_save(cause=cause, cause_code=ClinicalContextRecalcTrigger.SUBMISSION)
 
 
 @receiver(clinical_context_signal, sender=ClinicalContext)

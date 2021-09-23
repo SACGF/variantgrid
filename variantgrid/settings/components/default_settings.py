@@ -54,6 +54,8 @@ DISCORDANCE_ENABLED = False
 # How long you have to update flags after a discordance is closed for them to still
 # be considered in the report
 DISCORDANCE_REPORT_LEEWAY = 14
+# If doing large amount of variant re-matching, don't want to fire off discordance reports
+DISCORDANCE_PAUSE_TEMP_VARIANT_MATCHING = False
 
 DEBUG = True
 # If SEND_EMAILS is False, all emails that would go through EmailLog will still be record but wont be sent

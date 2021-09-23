@@ -12,8 +12,9 @@ from classification.classification_import import reattempt_variant_matching
 from classification.enums.classification_enums import EvidenceCategory, SpecialEKeys, SubmissionSource, ShareLevel
 from classification.models import EvidenceKey, EvidenceKeyMap, DiscordanceReport, DiscordanceReportClassification, \
     send_discordance_notification, ClinicalContext, ClassificationReportTemplate, ClassificationModification, \
-    UploadedFileLab
+    UploadedFileLab, ClinicalContextRecalcTrigger
 from classification.models.classification import Classification
+from classification.templatetags.classification_tags import ClinicalGrouping
 from library.guardian_utils import admin_bot
 from snpdb.admin_utils import ModelAdminBasics, admin_action, admin_list_column
 from snpdb.models import GenomeBuild, Lab
@@ -260,7 +261,7 @@ class ClinicalContextAdmin(ModelAdminBasics):
     @admin_action("Recalculate Status")
     def recalculate(self, request, queryset):
         for dc in queryset:
-            dc.recalc_and_save(cause='Admin recalculation')  # cause of None should change to Unknown, which is accurate if this was required
+            dc.recalc_and_save(cause='Admin recalculation', cause_code=ClinicalContextRecalcTrigger.ADMIN)  # cause of None should change to Unknown, which is accurate if this was required
         self.message_user(request, 'Recalculated %i statuses' % queryset.count())
 
 

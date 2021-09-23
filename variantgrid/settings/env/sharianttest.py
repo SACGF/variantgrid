@@ -44,3 +44,4 @@ SITE_NAME = "Shariant Test"
 VARIANT_VCF_DB_PREFIX = "stv"
 
 SITE_MESSAGE = "This is the test version of Shariant. Please avoid sharing real data in this environment."
+DISCORDANCE_PAUSE_TEMP_VARIANT_MATCHING = True
