@@ -102,6 +102,10 @@ class ClinGenAllele(TimeStampedModel):
         raw_hgvs_string, t_data = self._get_raw_c_hgvs_and_data(transcript_accession)
         if raw_hgvs_string:  # Has for this transcript version
             hgvs_name = HGVSName(raw_hgvs_string)
+            # Sometimes ClinGen return "n." on NM transcripts - reported as a bug 22/9/21
+            if hgvs_name.kind == "n" and transcript_accession.startswith("NM_"):
+                hgvs_name.kind = 'c'
+
             if not hgvs_name.gene:  # Ref/Ens HGVSs have transcript no gene, LRG is set as gene
                 hgvs_name.gene = t_data.get("geneSymbol")
             if hgvs_name.mutation_type in {"dup", "del", "delins"}:
