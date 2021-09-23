@@ -3,6 +3,7 @@ import enum
 import itertools
 import logging
 import operator
+from dataclasses import dataclass
 from datetime import datetime
 from functools import reduce
 from typing import List, Dict, Optional, Any, Callable, Union, TypeVar, Generic, Type
@@ -27,6 +28,28 @@ class SortOrder(enum.Enum):
     DESC = 'desc'
 
 
+@dataclass(frozen=True)
+class CellData:
+    """
+    Parameter to be passed to server side renders,
+    call .value to get the single column, otherwise can inspect columns
+    """
+    all_data: Dict[str, Any]
+    key: Optional[str]
+
+    @property
+    def value(self):
+        if not self.key:
+            raise ValueError("Can't call value for RichColumn that didn't specify key")
+        return self.all_data[self.key]
+
+    def __getitem__(self, item):
+        return self.all_data[item]
+
+    def get(self, key: Any, default: Optional[Any] = None) -> Any:
+        return self.all_data.get(key, default)
+
+
 class RichColumn:
     """
     A column to be presented on a DataTable
@@ -48,7 +71,7 @@ class RichColumn:
                  label: str = None,
                  orderable: bool = None,
                  enabled: bool = True,
-                 renderer: Optional[Callable[[Dict[str, Any]], JsonDataType]] = None,
+                 renderer: Optional[Callable[[CellData], JsonDataType]] = None,
                  default_sort: Optional[SortOrder] = None,
                  client_renderer: Optional[str] = None,
                  client_renderer_td: Optional[str] = None,
@@ -315,7 +338,8 @@ class DatabaseTableView(Generic[DC], JSONResponseView):
     def render_cell(self, row: Dict, column: RichColumn) -> JsonDataType:
         """ Renders a column on a row. column can be given in a module notation eg. document.invoice.type """
         if column.renderer:
-            return column.renderer(row)
+            render_data = CellData(all_data=row, key=column.key)
+            return column.renderer(render_data)
         if column.extra_columns:
             data_dict = dict()
             for col in column.value_columns:

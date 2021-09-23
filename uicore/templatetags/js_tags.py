@@ -133,17 +133,28 @@ def code_regex(data: str):
     return {"error": error, "extension": extension, "pattern": pattern}
 
 
+@register.inclusion_tag("uicore/tags/code_shell.html")
+def code_shell(data: str):
+    # doesn't really do anything of note currently, but gives us the opportunity in future
+    return {"text": data}
+
+
 @register.inclusion_tag("uicore/tags/timestamp.html")
-def timestamp(timestamp, time_ago: bool = False):
-    css_class = 'time-ago' if time_ago else ''
+def timestamp(timestamp, time_ago: bool = False, show_seconds: bool = False):
+    css_classes = list()
+    if time_ago:
+        css_classes.append('time-ago')
+    if show_seconds:
+        css_classes.append('seconds')
+
     if timestamp:
         if not isinstance(timestamp, int) and not isinstance(timestamp, float):
             timestamp = timestamp.timestamp()
         return {
             "timestamp": timestamp,
-            "css_class": css_class
+            "css_class": " ".join(css_classes)
         }
-    return {"css_class": "empty"}
+    return {}
 
 
 @register.filter()

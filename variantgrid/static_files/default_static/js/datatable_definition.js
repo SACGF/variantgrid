@@ -341,7 +341,7 @@ TableFormat.preview = (columns, data, type, row) => {
     let dom = $('<div>');
     let hasValue = false;
     for (let col of columns) {
-        let value = row[col];
+        let value = data[col] || row[col];
         if (value && value.length) {
             hasValue = true;
             if (value.length > 80) {

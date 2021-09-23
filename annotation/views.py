@@ -145,8 +145,12 @@ def _get_build_annotation_details(build_contigs, genome_build):
     return annotation_details
 
 
-@not_minified_response
 def annotation(request):
+    return render(request, "annotation/annotation.html", {})
+
+
+@not_minified_response
+def annotation_detail(request):
     # Set Variables to None for uninstalled components, the template will show installation instructions
     ensembl_biomart_transcript_genes = None
     diagnostic_gene_list = None
@@ -256,7 +260,7 @@ def annotation(request):
         "python_command": settings.PYTHON_COMMAND,
         "somalier": somalier
     }
-    return render(request, "annotation/annotation.html", context)
+    return render(request, "annotation/annotation_detail.html", context)
 
 
 def _verify_somalier_config() -> Optional[str]:
@@ -383,8 +387,7 @@ def variant_annotation_runs(request):
         genome_build_summary[genome_build.pk] = summary_data
         genome_build_field_counts[genome_build.pk] = {as_display[k]: v for k, v in field_counts.items()}
     context = {"genome_build_summary": genome_build_summary,
-               "genome_build_field_counts": genome_build_field_counts,
-               "datatable_config": AnnotationRunColumns(request)}
+               "genome_build_field_counts": genome_build_field_counts}
     return render(request, "annotation/variant_annotation_runs.html", context)
 
 

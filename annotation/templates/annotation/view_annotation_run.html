@@ -1,35 +1,17 @@
-{% extends menu_annotation_base %}
+{% extends "uicore/page/base.html" %}
+{% load ui_menu_bars %}
+{% load ui_utils %}
+{% load js_tags %}
+{% load model_helpers %}
+{% load help_tags %}
+{% load humanize %}
+{% block title %}Annotation Status{% endblock title %}
+{% block submenu %}{% menu_bar_annotations %}{% endblock submenu %}
+{% block content %}
+<div class="container">
 
-{% block title %}Annotation Run: {{ annotation_run }} {% endblock title %}
-
-{% block css %}
-tr#pipeline_output-row td.field {
-    white-space: pre-line;
-}
-
-#annotation-status-link {
-    margin-bottom: 30px;
-}
-
-#annotation-run-table {
-    margin-bottom: 100px;
-}
-
-{% endblock css %}
-
-{% block submenu_page_content %}
-    {% load model_helpers %}
-	{% load help_tags %}
-	{% load humanize %}
-	{% page_help user 'annotation/view_annotation_run' %}
-
-    <div>
-        <div id='annotation-status-link'>
-           <a class="hover-link" href="{% url 'variant_annotation_runs' %}">Back to Variant Annotation Runs</a>
-        </div>
-    
-        {% include "messages/messages.html" %}
-    
+    <p>Back to <a href="{% url 'variant_annotation_runs' %}">Annotation Runs</a></p>
+    <div class="btn-toolbar">
         {% if can_retry_annotation_run %}
           <form id="retry-annotation-form" action={% url 'retry_annotation_run' annotation_run.pk %} method="post">
             {% csrf_token %}
@@ -42,25 +24,57 @@ tr#pipeline_output-row td.field {
             <button type='submit' class="btn btn-primary">Retry Annotation (upload only)</button>
           </form>
         {% endif %}
-
-
-        <h3>Annotation Range Lock</h3>
-        <table class="summary">
-        <tr><th>Version <th class="num">Count <th class="num">Min Variant <th class="num">Max Variant
-        <tr><td>{{ annotation_run.annotation_range_lock.version }}
-            <td class="num">{{ annotation_run.annotation_range_lock.count | intcomma }}
-            <td class="num">{{ annotation_run.annotation_range_lock.min_variant_id | intcomma }}
-            <td class="num">{{ annotation_run.annotation_range_lock.max_variant_id | intcomma }}
-        </table>
-        
-        <h3>{{ annotation_run }}</h3> 
-    
-        <table id="annotation-run-table" class="name-field data">
-        {{ annotation_run | as_table | safe }}
-        </table>
-
-        <div class="clear"></div>
-       
     </div>
 
-{% endblock submenu_page_content %}
+    <div class="card">
+        <div class="card-header">Annotation Range Lock</div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-6">
+                    {% labelled hint="tiny" label="Version "%}{{ annotation_run.annotation_range_lock.version }}{% endlabelled %}
+                    {% labelled hint="tiny" label="Count" %}{{ annotation_run.annotation_range_lock.count | intcomma }}{% endlabelled %}
+                </div>
+                <div class="col-6">
+                    {% labelled hint="tiny" label="Min Variant" %}{{ annotation_run.annotation_range_lock.min_variant_id | intcomma }}{% endlabelled %}
+                    {% labelled hint="tiny" label="Max Variant" %}{{ annotation_run.annotation_range_lock.max_variant_id | intcomma }}{% endlabelled %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mt-4">
+        <div class="card-header">Annotation Run ({{ annotation_run.pk }})</div>
+        <div class="card-body">
+            {% labelled hint="tiny" label="Status" %}{{ annotation_run.get_status_display }}{% endlabelled %}
+            <hr/>
+            <div class="row">
+
+                <div class="col-6">
+                    {% labelled hint="tiny" label="Upload Attempts" %}{{ annotation_run.upload_attempts }}{% endlabelled %}
+                    {% labelled hint="tiny" label="Annotated Count" %}{{ annotation_run.annotated_count }}{% endlabelled %}
+                    {% labelled hint="tiny" label="VEP Skipped Count" %}{{ annotation_run.vep_skipped_count }}{% endlabelled %}
+                    {% labelled hint="tiny" label="VEP Warnings" %}{% code_shell annotation_run.vep_warnings %}{% endlabelled %}
+                    {% labelled hint="tiny" label="Created" %}{% timestamp annotation_run.created show_seconds=True %}{% endlabelled %}
+                    {% labelled hint="tiny" label="Modified" %}{% timestamp annotation_run.modified show_seconds=True %}{% endlabelled %}
+                </div>
+                <div class="col-6">
+                    {% labelled hint="tiny" label="Dump Start" %}{% timestamp annotation_run.dump_start show_seconds=True %}{% endlabelled %}
+                    {% labelled hint="tiny" label="Dump End" %}{% timestamp annotation_run.dump_end show_seconds=True %}{% endlabelled %}
+                    {% labelled hint="tiny" label="Annotation Start" %}{% timestamp annotation_run.annotation_start show_seconds=True %}{% endlabelled %}
+                    {% labelled hint="tiny" label="Annotation End" %}{% timestamp annotation_run.annotation_end show_seconds=True %}{% endlabelled %}
+                    {% labelled hint="tiny" label="Upload Start" %}{% timestamp annotation_run.upload_start show_seconds=True %}{% endlabelled %}
+                    {% labelled hint="tiny" label="Upload End" %}{% timestamp annotation_run.upload_end show_seconds=True %}{% endlabelled %}
+                </div>
+            </div>
+            <hr/>
+            {% labelled hint="chunky" label="Celery Task Logs" %}{% code_json annotation_run.celery_task_logs %}{% endlabelled %}
+            {% labelled hint="chunky" label="VCF Dump Filename" %}{% code_shell annotation_run.vcf_dump_filename %}{% endlabelled %}
+            {% labelled hint="chunky" label="VCF Annotated Filename" %}{% code_shell annotation_run.vcf_annotated_filename %}{% endlabelled %}
+            {% labelled hint="chunky" label="Pipeline Command" %}{% code_shell annotation_run.pipeline_command %}{% endlabelled %}
+            {% labelled hint="chunky" label="Pipeline StdOut" %}{% code_shell annotation_run.pipeline_stdout %}{% endlabelled %}
+            {% labelled hint="chunky" label="Pipeline StdErr" %}{% code_shell annotation_run.pipeline_stderr %}{% endlabelled %}
+            {% labelled hint="chunky" label="Error Exception" %}{% code_shell annotation_run.error_exceptionr %}{% endlabelled %}
+        </div>
+    </div>
+</div>
+{% endblock %}

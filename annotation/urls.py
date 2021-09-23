@@ -9,6 +9,7 @@ from variantgrid.perm_path import perm_path
 
 urlpatterns = [
     perm_path('', views.annotation, name='annotation'),
+    perm_path('annotation_detail', views.annotation_detail, name='annotation_detail'),
     perm_path('annotation_versions', views.annotation_versions, name='annotation_versions'),
     perm_path('version_diffs', views.version_diffs, name='version_diffs'),
     perm_path('view_version_diff/<int:version_diff_id>/', views.view_version_diff, name='view_version_diff'),

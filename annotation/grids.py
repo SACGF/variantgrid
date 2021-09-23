@@ -1,6 +1,7 @@
+from datetime import timedelta
 from typing import Dict, Any
-
-from django.db.models import QuerySet
+import json
+from django.db.models import QuerySet, ExpressionWrapper, F, fields
 from django.shortcuts import get_object_or_404
 
 from annotation.models import VariantAnnotationVersion, AnnotationRun, HumanProteinAtlasAbundance, AnnotationStatus
@@ -11,7 +12,7 @@ from genes.models_enums import AnnotationConsortium
 from library.jqgrid_abstract_genes_grid import AbstractGenesGrid
 from library.jqgrid_user_row_config import JqGridUserRowConfig
 from snpdb.models.models_genome import GenomeBuild
-from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
+from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder, CellData
 
 
 class AnnotationRunColumns(DatatableConfig):
@@ -19,8 +20,21 @@ class AnnotationRunColumns(DatatableConfig):
     def status(self, row: Dict[str, Any]):
         return AnnotationStatus(row["status"]).label
 
+    def format_timedelta(self, cell: CellData):
+        delta: timedelta = cell.value
+        if delta is None:
+            return '-'
+        seconds = delta.total_seconds()
+        hours, remainder = divmod(seconds, 3600)
+        minutes, seconds = divmod(remainder, 60)
+        if int(seconds) == 0:
+            return '< 1 second'
+        return '{:02}:{:02}:{:02}'.format(int(hours), int(minutes), int(seconds))
+
     def __init__(self, request):
         super().__init__(request)
+
+        preview_columns = ["error_exception", "pipeline_stdout", "pipeline_stderr"]
 
         self.rich_columns = [
             RichColumn(key="id", label='ID', orderable=True, client_renderer='idRenderer'),
@@ -34,24 +48,28 @@ class AnnotationRunColumns(DatatableConfig):
 
             # RichColumn(key="task_id", label="Task ID", orderable=True),
             RichColumn(key="created", client_renderer='TableFormat.timestamp', orderable=True),
-            RichColumn(key="dump_start", client_renderer='TableFormat.timestamp', orderable=True),
-            RichColumn(key="dump_end", client_renderer='TableFormat.timestamp', orderable=True),
-            RichColumn(key="annotation_start", client_renderer='TableFormat.timestamp', orderable=True),
-            RichColumn(key="annotation_end", client_renderer='TableFormat.timestamp', orderable=True),
-            RichColumn(key="upload_start", client_renderer='TableFormat.timestamp', orderable=True),
-            RichColumn(key="upload_end", client_renderer='TableFormat.timestamp', orderable=True),
+            # RichColumn(key="dump_start", client_renderer='TableFormat.timestamp', orderable=True),
+            RichColumn(key="dump_duration", renderer=self.format_timedelta, orderable=True),
+            # RichColumn(key="annotation_start", client_renderer='TableFormat.timestamp', orderable=True),
+            RichColumn(key="annotation_duration", renderer=self.format_timedelta, orderable=True),
+            # RichColumn(key="upload_start", client_renderer='TableFormat.timestamp', orderable=True),
+            RichColumn(key="upload_duration", renderer=self.format_timedelta, orderable=True),
 
             RichColumn(key=None, name='preview', label='Data',
-                       client_renderer='TableFormat.preview.bind(null, ["error_exception", "pipeline_stdout", "pipeline_stderr"])'),
-            RichColumn(key="error_exception", orderable=True, detail=True),
-            RichColumn(key="pipeline_stdout", detail=True),
-            RichColumn(key="pipeline_stderr", detail=True),
-            RichColumn(key="vcf_dump_filename", detail=True),
-            RichColumn(key="vcf_annotated_filename", detail=True),
+                       renderer=lambda x: {key: x[key] for key in preview_columns},
+                       client_renderer=f'TableFormat.preview.bind(null, {json.dumps(preview_columns)})',
+                       extra_columns=preview_columns)
         ]
 
     def get_initial_queryset(self):
-        return AnnotationRun.objects.all()
+        qs = AnnotationRun.objects.all()
+        qs = qs.annotate(
+            dump_duration=ExpressionWrapper(F('dump_end') - F('dump_start'), output_field=fields.DurationField()))
+        qs = qs.annotate(
+            annotation_duration=ExpressionWrapper(F('annotation_end') - F('annotation_start'), output_field=fields.DurationField()))
+        qs = qs.annotate(
+            upload_duration=ExpressionWrapper(F('upload_end') - F('upload_start'), output_field=fields.DurationField()))
+        return qs
 
     def filter_queryset(self, qs: QuerySet) -> QuerySet:
         if genome_build_str := self.get_query_param("genome_build"):

@@ -96,13 +96,6 @@ td.dt-preview {
     font-family: monospace;
     font-size: 12px;
     overflow-x: hidden;
-    color: #222288;
-    cursor: pointer;
-    &:hover {
-        text-decoration: underline;
-        text-decoration-style: dotted;
-        text-decoration-color: gray;
-    }
 }
 
 // when we expand on that preview to show more details
@@ -771,6 +764,9 @@ table.as_table {
     border-radius: 10px;
     padding: 6px 6px 6px 12px;
     background-color: #eee;
+    white-space: pre-wrap;
+    display: block;
+    line-height: 150%;
 }
 .code.card-body {
   border: none;
@@ -914,4 +910,15 @@ ul.compact {
   .js-comma {
     color: #888; display:inline-block;
   }
+}
+
+// annotations page
+.install-instructions {
+    min-height: 16px;
+    background-size: 16px 16px;
+    background-position: 8px 50%;
+    background-repeat: no-repeat;
+    padding: 16px 16px 16px 28px;
+    border-radius: 4px;
+    background-color: #F0D9ED !important;
 }

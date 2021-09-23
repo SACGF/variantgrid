@@ -75,13 +75,6 @@ td.dt-preview {
   font-family: monospace;
   font-size: 12px;
   overflow-x: hidden;
-  color: #222288;
-  cursor: pointer;
-}
-td.dt-preview:hover {
-  text-decoration: underline;
-  text-decoration-style: dotted;
-  text-decoration-color: gray;
 }
 
 table.dataTable tr.odd:hover, table.dataTable tr.even:hover {
@@ -699,6 +692,9 @@ table.as_table td {
   border-radius: 10px;
   padding: 6px 6px 6px 12px;
   background-color: #eee;
+  white-space: pre-wrap;
+  display: block;
+  line-height: 150%;
 }
 
 .code.card-body {
@@ -878,6 +874,16 @@ ul.compact li:before {
 .json .js-comma {
   color: #888;
   display: inline-block;
+}
+
+.install-instructions {
+  min-height: 16px;
+  background-size: 16px 16px;
+  background-position: 8px 50%;
+  background-repeat: no-repeat;
+  padding: 16px 16px 16px 28px;
+  border-radius: 4px;
+  background-color: #F0D9ED !important;
 }
 
 /*# sourceMappingURL=global_bs.css.map */
