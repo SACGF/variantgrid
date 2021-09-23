@@ -661,6 +661,10 @@ class TranscriptVersion(SortByPKMixin, models.Model):
     def gene(self):
         return self.gene_version.gene
 
+    @property
+    def gene_symbol(self):
+        return self.gene_version.gene_symbol
+
     @staticmethod
     def get_transcript_id_and_version(transcript_name: str) -> Tuple[str, int]:
         parts = transcript_name.split(".")
@@ -712,6 +716,7 @@ class TranscriptVersion(SortByPKMixin, models.Model):
             transcript_id: str
             version: int
             has_valid_data: bool = False
+            gene_symbol = None
 
             @property
             def accession(self) -> str:

@@ -421,7 +421,8 @@ class HGVSMatcher:
     def _create_pyhgvs_transcript(transcript_version: TranscriptVersion):
         # Legacy data stored gene_name in JSON, but that could lead to diverging values vs TranscriptVersion relations
         # so replace it with the DB records
-        transcript_version.data["gene_name"] = transcript_version.gene_version.gene_symbol_id
+        if gene_symbol := transcript_version.gene_version.gene_symbol:
+            transcript_version.data["gene_name"] = str(gene_symbol)
         return make_transcript(transcript_version.data)
 
     def _get_pyhgvs_transcript(self, transcript_name):
@@ -704,8 +705,8 @@ class HGVSMatcher:
 
         # Use ClinGen - will raise exception if can't get it
         if ca := get_clingen_allele_for_variant(self.genome_build, variant):
-            if hgvs_string := ca.get_c_hgvs(lrg_identifier):
-                return HGVSName(hgvs_string), self.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY
+            if hgvs_name := ca.get_c_hgvs_name(lrg_identifier):
+                return hgvs_name, self.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY
             else:
                 problems.append(f"{ca} didn't contain HGVS for '{lrg_identifier}'")
 
@@ -748,13 +749,16 @@ class HGVSMatcher:
                     hgvs_method = attempted_method
                 elif attempt_clingen:
                     # TODO: We could also use VEP then add reference bases on our HGVSs
-                    hgvs_string = None
                     attempted_method = self.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY
                     method_detail = f"{attempted_method}: {transcript_version}"
                     try:
                         if ca := get_clingen_allele_for_variant(self.genome_build, variant):
                             method_detail = f"{attempted_method} ({ca}): {transcript_version}"
-                            if hgvs_string := ca.get_c_hgvs(transcript_version.accession):
+                            if hgvs_name := ca.get_c_hgvs_name(transcript_version.accession):
+                                # Use our latest symbol as ClinGen can be out of date, and this keeps it consistent
+                                # regardless of whether we use PyHGVS or ClinGen to resolve
+                                if gene_symbol := transcript_version.gene_symbol:
+                                    hgvs_name.gene = str(gene_symbol)
                                 hgvs_method = attempted_method
                     except ClinGenAlleleServerException as cga_se:
                         attempt_clingen = False
@@ -762,8 +766,6 @@ class HGVSMatcher:
                         logging.error(cga_re)
 
                     hgvs_methods.append(method_detail)
-                    if hgvs_string:
-                        hgvs_name = HGVSName(hgvs_string)
                 if hgvs_name:
                     break
 

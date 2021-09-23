@@ -94,12 +94,12 @@ class ClinGenAllele(TimeStampedModel):
                     return p_hgvs
         return None
 
-    def get_c_hgvs(self, transcript_accession):
+    def get_c_hgvs_name(self, transcript_accession) -> Optional[HGVSName]:
         """ c.HGVS has reference bases on it """
         from genes.models import TranscriptVersionSequenceInfo
 
-        hgvs_string = None
-        raw_hgvs_string, t_data = self._get_raw_c_hgvs_and_data(transcript_accession)
+        hgvs_name = None
+        raw_hgvs_string, t_data = self._get_raw_hgvs_and_data(transcript_accession)
         if raw_hgvs_string:  # Has for this transcript version
             hgvs_name = HGVSName(raw_hgvs_string)
             # Sometimes ClinGen return "n." on NM transcripts - reported as a bug 22/9/21
@@ -109,6 +109,7 @@ class ClinGenAllele(TimeStampedModel):
 
             if not hgvs_name.gene:  # Ref/Ens HGVSs have transcript no gene, LRG is set as gene
                 hgvs_name.gene = t_data.get("geneSymbol")
+
             if hgvs_name.mutation_type in {"dup", "del", "delins"}:
                 # We want to add reference bases onto HGVS but ClinGen reference sequence is wrong (see issue #493)
                 coord = t_data["coordinates"][0]
@@ -127,11 +128,10 @@ class ClinGenAllele(TimeStampedModel):
 
                     tvsi = TranscriptVersionSequenceInfo.get(transcript_accession)
                     hgvs_name.ref_allele = tvsi.sequence[ref_start:ref_end]
-            hgvs_string = hgvs_name.format()
-        return hgvs_string
+        return hgvs_name
 
-    def _get_raw_c_hgvs_and_data(self, transcript_accession, match_version=True) -> Tuple[Optional[str],
-                                                                                          Optional[Dict]]:
+    def _get_raw_hgvs_and_data(self, transcript_accession, match_version=True) -> Tuple[Optional[str],
+                                                                                        Optional[Dict]]:
         if ta := self._get_transcript_allele(transcript_accession, match_version):
             transcript_id = ClinGenAllele._strip_transcript_version(transcript_accession)
             for t_hgvs in ta["hgvs"]:
