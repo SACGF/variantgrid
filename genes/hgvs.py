@@ -25,8 +25,8 @@ from library.constants import WEEK_SECS
 from library.log_utils import report_exc_info
 from library.utils import clean_string
 from snpdb.clingen_allele import get_clingen_allele_from_hgvs, get_clingen_allele_for_variant, \
-    ClinGenAlleleRegistryException, ClinGenAlleleServerException, ClinGenAlleleAPIException
-from snpdb.models import Variant, AssemblyMoleculeType, Contig
+    ClinGenAlleleServerException, ClinGenAlleleAPIException
+from snpdb.models import Variant, AssemblyMoleculeType, Contig, ClinGenAllele
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_variant import VariantCoordinate
 
@@ -526,7 +526,7 @@ class HGVSMatcher:
 
         try:
             return self._clingen_get_variant_tuple(hgvs_string), self.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY
-        except ClinGenAlleleRegistryException as cga_re:
+        except ClinGenAllele.ClinGenAlleleRegistryException as cga_re:
             raise ValueError(f"Could not retrieve {hgvs_string} from ClinGen Allele Registry") from cga_re
 
     @staticmethod
@@ -585,18 +585,19 @@ class HGVSMatcher:
                     method = self.HGVS_METHOD_PYHGVS
                     variant_tuple = self._pyhgvs_get_variant_tuple(hgvs_string_for_version, tv)
                 elif self._clingen_allele_registry_ok(tv.accession):
-                    error_message = f"Could not convert '{hgvs_string}' using ClinGenAllele Registry"
+                    error_message = f"Could not convert '{hgvs_string}' using ClinGenAllele Registry: %s"
                     try:
                         method = self.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY
                         variant_tuple = self._clingen_get_variant_tuple(hgvs_string_for_version)
-                    except ClinGenAlleleAPIException as cga_api:
-                        logging.error(error_message, cga_api)
                     except ClinGenAlleleServerException as cga_se:
                         # If it's unknown reference we can just retry with another version, other errors are fatal
                         if cga_se.is_unknown_reference():
-                            self._set_clingen_allele_registry_missing_transcript(tv)
+                            self._set_clingen_allele_registry_missing_transcript(tv.accession)
                         else:
                             logging.error(error_message, cga_se)
+                    except ClinGenAllele.ClinGenAlleleRegistryException as cgare:
+                        # API or other recoverable error - try again w/another transcript
+                        logging.error(error_message, cgare)
 
                 if method:
                     if hgvs_string != hgvs_string_for_version:
@@ -755,9 +756,10 @@ class HGVSMatcher:
                             method_detail = f"{attempted_method} ({ca}): {transcript_version}"
                             if hgvs_string := ca.get_c_hgvs(transcript_version.accession):
                                 hgvs_method = attempted_method
-                    except ClinGenAlleleRegistryException as cga_re:
-                        # logging.error(cga_re)
+                    except ClinGenAlleleServerException as cga_se:
                         attempt_clingen = False
+                    except ClinGenAllele.ClinGenAlleleRegistryException as cga_re:
+                        logging.error(cga_re)
 
                     hgvs_methods.append(method_detail)
                     if hgvs_string:

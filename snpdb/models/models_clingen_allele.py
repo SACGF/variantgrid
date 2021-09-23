@@ -23,13 +23,16 @@ class ClinGenAllele(TimeStampedModel):
     CLINGEN_ALLELE_CODE_PATTERN = re.compile(r"^CA(\d+)")
     CLINGEN_ALLELE_MAX_REPRESENTATION_SIZE = 10000
 
-    class ClinGenBuildNotInResponseError(ValueError):
+    class ClinGenAlleleRegistryException(ValueError):
+        """ Base exception """
+
+    class ClinGenBuildNotInResponseError(ClinGenAlleleRegistryException):
         pass
 
-    class ClinGenNonChromosomeLiftoverError(ValueError):
+    class ClinGenNonChromosomeLiftoverError(ClinGenAlleleRegistryException):
         pass
 
-    class ClinGenMissingAlleleID(ValueError):
+    class ClinGenMissingAlleleID(ClinGenAlleleRegistryException):
         """ Coordinate is not yet assigned ID and stored on server """
         pass
 

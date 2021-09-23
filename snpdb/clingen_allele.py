@@ -30,11 +30,7 @@ from snpdb.models import Allele, ClinGenAllele, GenomeBuild, Variant, VariantAll
 from snpdb.models.models_enums import AlleleOrigin, AlleleConversionTool, ClinGenAlleleExternalRecordType
 
 
-class ClinGenAlleleRegistryException(Exception):
-    """ Base exception """
-
-
-class ClinGenAlleleServerException(ClinGenAlleleRegistryException):
+class ClinGenAlleleServerException(ClinGenAllele.ClinGenAlleleRegistryException):
     """ Could not contact server, or response != 200 """
     def __init__(self, method, status_code, response_json):
         print(f"{response_json=}")
@@ -62,7 +58,7 @@ class ClinGenAlleleServerException(ClinGenAlleleRegistryException):
         return api_response
 
 
-class ClinGenAlleleAPIException(ClinGenAlleleRegistryException):
+class ClinGenAlleleAPIException(ClinGenAllele.ClinGenAlleleRegistryException):
     """ API returned 200 OK, but was an error """
 
 
