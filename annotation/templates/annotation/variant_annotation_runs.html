@@ -104,6 +104,7 @@
                             {% endfor %}
                         </div>
                     </div>
+                    {% if genome_build_summary|get_item:build_name|get_item:'Running' or genome_build_summary|get_item:build_name|get_item:'Queued' or genome_build_summary|get_item:build_name|get_item:'Error'%}
                     <div class="card-footer">
                         <div class="btn-toolbar">
                             {% if genome_build_summary|get_item:build_name|get_item:'Running' or genome_build_summary|get_item:build_name|get_item:'Queued' %}
@@ -114,6 +115,7 @@
                             {% endif  %}
                         </div>
                     </div>
+                    {% endif %}
                 </div>
             </form>
         {% endfor %}
