@@ -374,12 +374,14 @@ def view_transcript_version(request, transcript_id, version):
         return render(request, "genes/view_transcript.html", {'transcript_id': transcript_id})
 
     accession = TranscriptVersion.get_accession(transcript_id, version)
+    no_transcript_message = ""
     try:
         # Call this before retrieving TranscriptVersions - as it will retrieve it and set alignment_gap
         # if lengths are different
         tv_sequence_info = TranscriptVersionSequenceInfo.get(accession)
-    except NoTranscript:
+    except NoTranscript as e:
         tv_sequence_info = None
+        no_transcript_message = str(e)
 
     tv_set = transcript.transcriptversion_set.filter(version=version)
     tv: TranscriptVersion = tv_set.first()
@@ -389,6 +391,7 @@ def view_transcript_version(request, transcript_id, version):
     context = {"accession": accession,
                "transcript": transcript,
                "tv_sequence_info": tv_sequence_info,
+               "no_transcript_message": no_transcript_message,
                "version_count": version_count}
 
     if tv:

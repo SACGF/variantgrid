@@ -45,7 +45,9 @@
         <ul class="messages">
             <li class="warning">
                 Could not retrieve transcript sequence information from {{ transcript.get_annotation_consortium_display }} API
-                (may be temporarily down, try again later)
+                {% if no_transcript_message %}
+                    {{ no_transcript_message }}
+                {% endif %}
             </li>
         </ul>
     {% endif %}

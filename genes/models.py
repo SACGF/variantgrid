@@ -1065,7 +1065,7 @@ class TranscriptVersionSequenceInfo(TimeStampedModel):
 
         if r.ok:
             if version != data["version"]:
-                raise NoTranscript("Only latest version can be returned via API")
+                raise NoTranscript(f"Only latest version: (v{data['version']}) can be retrieved via API")
             transcript, _ = Transcript.objects.get_or_create(identifier=data["id"],
                                                              annotation_consortium=AnnotationConsortium.ENSEMBL)
             return TranscriptVersionSequenceInfo.objects.get_or_create(transcript=transcript,
