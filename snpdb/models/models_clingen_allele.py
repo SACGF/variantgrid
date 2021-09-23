@@ -103,8 +103,9 @@ class ClinGenAllele(TimeStampedModel):
         if raw_hgvs_string:  # Has for this transcript version
             hgvs_name = HGVSName(raw_hgvs_string)
             # Sometimes ClinGen return "n." on NM transcripts - reported as a bug 22/9/21
-            if hgvs_name.kind == "n" and transcript_accession.startswith("NM_"):
-                hgvs_name.kind = 'c'
+            if hgvs_name.kind == "n":
+                if transcript_accession.startswith("NM_") or "proteinEffect" in t_data:
+                    hgvs_name.kind = 'c'
 
             if not hgvs_name.gene:  # Ref/Ens HGVSs have transcript no gene, LRG is set as gene
                 hgvs_name.gene = t_data.get("geneSymbol")
