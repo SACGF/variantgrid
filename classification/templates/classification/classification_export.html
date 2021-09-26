@@ -203,16 +203,14 @@
         Recommended for users of Alissa 5.2
         </div>
     {% endlabelled %}
-    {% if user.is_superuser %}
-        {% labelled label="Benchmark Only" value_css="admin-only" %}
-            <div class="form-check">
-                <label class="form-check-label">
-                    <input id="benchmark" name="benchmark" value="true" type="checkbox" class="form-check-input" />
-                    {{ org.name }}
-                </label>
-            </div>
-        {% endlabelled %}
-    {% endif %}
+    {% labelled label="Benchmark Only" admin_only=True %}
+        <div class="form-check">
+            <label class="form-check-label">
+                <input id="benchmark" name="benchmark" value="true" type="checkbox" class="form-check-input" />
+                {{ org.name }}
+            </label>
+        </div>
+    {% endlabelled %}
 
     {% labelled label="Organistion Exclusion" %}
         {% for org in orgs %}

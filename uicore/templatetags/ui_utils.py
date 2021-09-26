@@ -5,6 +5,7 @@ from html import escape
 from typing import Optional, Any
 
 from django import template
+from django.contrib.auth.models import User
 from django.template.base import FilterExpression, kwarg_re
 from django.utils.safestring import SafeString, mark_safe
 
@@ -146,7 +147,8 @@ def render_labelled(parser, token):
                             label_css=kwargs.get('label_css'),
                             value_css=kwargs.get('value_css'),
                             row_css=kwargs.get('row_css'),
-                            shorten_label=kwargs.get('shorten_label')
+                            shorten_label=kwargs.get('shorten_label'),
+                            admin_only=kwargs.get('admin_only')
                             )
 
 
@@ -159,7 +161,8 @@ class LabelledValueTag(template.Node):
                  label_css: FilterExpression = None,
                  value_css: FilterExpression = None,
                  row_css: FilterExpression = None,
-                 shorten_label: FilterExpression = None):
+                 shorten_label: FilterExpression = None,
+                 admin_only: FilterExpression = None):
         self.id_prefix = id_prefix
         self.nodelist = nodelist
         self.value_id = value_id
@@ -169,6 +172,7 @@ class LabelledValueTag(template.Node):
         self.value_css = value_css
         self.row_css = row_css
         self.shorten_label = shorten_label
+        self.admin_only = admin_only
 
     id_regex = re.compile(r"id=[\"|'](.*?)[\"|']")
     big_zero = re.compile(r"^0([.]0+)?$")
@@ -179,7 +183,14 @@ class LabelledValueTag(template.Node):
         complete_id = value_id
         if prefix_id and value_id:
             complete_id = f"{prefix_id}-{value_id}"
+
         label = TagUtils.value_str(context, self.label, (value_id.replace('_', ' ') if value_id else ""))
+        if TagUtils.value_bool(context, self.admin_only):  # if admin only
+            user: User = context.request.user
+            if not user.is_superuser:
+                return ""
+            else:
+                label = '<i class="fas fa-key" title="Admin only functionality"></i>' + label
 
         popover = None
 

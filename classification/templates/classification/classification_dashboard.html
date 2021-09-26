@@ -55,18 +55,14 @@
                 Flags range from issues with variant matching, to discordances or suggestions.<br/>
             </p>
         {% end_page_help_embedded %}
-        {% if user.is_superuser %}
-        <div class="my-4">
-            {% labelled label="Email Preview" %}
-            <div class="link-toolbar admin-only">
+        {% labelled row_css="my-4" label="Email Preview" admin_only=True %}
+            <div class="link-toolbar">
                 <a class="download-link type-csv" href="{% url 'summary_email_html' %}">HTML</a>
                 <a class="download-link type-json" href="{% url 'summary_email_text' %}">TEXT</a>
             </div>
-            {% endlabelled %}
-        </div>
-        {% endif %}
+        {% endlabelled %}
 
-        {% labelled label="Showing issues for your labs" %}{% for lab in labs %}{% if not forloop.first %}, {% endif %}{{ lab }}{% endfor %}{% endlabelled %}
+        {% labelled label="Showing Issues for Your Labs" %}{% for lab in labs %}{% if not forloop.first %}, {% endif %}{{ lab }}{% endfor %}{% endlabelled %}
         <a class="download-link type-csv" href="{% url 'classification_dashboard_download' %}">Download all issues requiring action</a>
 
         <p class="text-info">For instructions on how to fix the outstanding actions, click on the icons in the flag column for each classification.</p>
