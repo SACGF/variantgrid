@@ -75,6 +75,10 @@ def activity(request, latest_timestamp: Optional[str] = None):
 
 
 def classifications(request):
+    """
+    Classification listing page
+    """
+
     user_settings = UserSettings.get_for_user(request.user)
 
     initial = {'classify': True}

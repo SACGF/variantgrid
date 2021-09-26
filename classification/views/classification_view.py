@@ -7,11 +7,13 @@ from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
 from django.utils.decorators import method_decorator
+from django.utils.timezone import now
 from rest_framework.generics import get_object_or_404
 from rest_framework.response import Response
 from rest_framework.status import HTTP_200_OK, HTTP_400_BAD_REQUEST, \
     HTTP_500_INTERNAL_SERVER_ERROR
 from rest_framework.views import APIView
+from threadlocals.threadlocals import get_current_user
 
 from classification.classification_stats import get_lab_gene_counts
 from classification.enums import SubmissionSource, ShareLevel, ClinicalSignificance
@@ -23,6 +25,7 @@ from classification.models.classification_patcher import patch_merge_age_units, 
 from classification.models.evidence_mixin import EvidenceMixin, VCStore
 from classification.models.flag_types import classification_flag_types
 from classification.tasks.classification_import_task import process_classification_import_task
+from eventlog.models import create_event
 from library.log_utils import report_exc_info, report_message
 from library.utils import empty_to_none
 from snpdb.models import Lab, GenomeBuild
@@ -37,11 +40,11 @@ class BulkInserter:
         from being published
         """
         self.user = user
-        self._import_for_genome_build: Dict[Any, ClassificationImport] = {}
+        self._import_for_genome_build: Dict[Any, ClassificationImport] = dict()
         self.single_insert = False
         self.api_version = api_version
-
         self.force_publish = force_publish
+        self.start = now()
 
     def import_for(self, genome_build: GenomeBuild, transcript: str) -> Optional[ClassificationImport]:
         """
@@ -329,6 +332,11 @@ class BulkInserter:
             for vc_import in self.all_imports():
                 task = process_classification_import_task.si(vc_import.pk, ImportSource.API)
                 task.apply_async()
+        if count := len(self.all_imports()):
+            time_taken = now() - self.start
+            total_time = time_taken.total_seconds()
+            time_per_record = total_time / count
+            create_event(user=get_current_user(), name="classification_import", details=f"{count} records imported, {time_per_record:.3f}s each")
 
 
 class ClassificationView(APIView):
