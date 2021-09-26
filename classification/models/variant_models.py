@@ -18,7 +18,7 @@ class ClassificationAttachment(models.Model):
     file_type = models.CharField(max_length=1, choices=AttachmentFileType.CHOICES)
     thumbnail_path = models.TextField(null=True)
 
-    def get_file_dict(self):
+    def get_file_dict(self) -> dict:
         basename = os.path.basename(self.file.path)
         image_url = self.get_absolute_url()
 

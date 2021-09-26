@@ -76,7 +76,6 @@ urlpatterns = [
 
     perm_path('evidence_keys/<max_share_level>', views.evidence_keys, name='evidence_keys_max_share_level'),
     perm_path('evidence_keys', views.evidence_keys, name='evidence_keys'),
-    perm_path('evidence_keys_logged_in', views.evidence_keys_logged_in, name='evidence_keys_logged_in'),
 
     perm_path('summary_email', summary_email_preview_html, name='summary_email_html'),
     perm_path('summary_email_text', summary_email_preview_text, name='summary_email_text'),

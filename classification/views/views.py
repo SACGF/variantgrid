@@ -2,7 +2,7 @@ import json
 import mimetypes
 import re
 from datetime import datetime
-from typing import Optional, List, Set
+from typing import Optional, List, Set, Dict
 
 import rest_framework
 from crispy_forms.bootstrap import FieldWithButtons
@@ -367,19 +367,11 @@ def view_classification_diff(request):
     return render(request, 'classification/classification_diff.html', context)
 
 
-def classification_qs(request):
-    response = HttpResponse(content_type='text/csv')
-    response['Content-Disposition'] = 'attachment; filename="classifications.csv"'
-
-    config = ClassificationColumns(request)
-    qs = ClassificationModification.latest_for_user(user=request.user, published=True)
-    qs = config.filter_queryset(qs)
-    # TODO sort
-
-    return qs
-
-
 def classification_import_tool(request: HttpRequest) -> Response:
+    """
+    This page allows you to upload a file, the fact that the file is probably to do with classifications
+    doesn't really matter, there's not logic to process it here, just to upload it
+    """
     all_labs = list(Lab.valid_labs_qs(request.user, admin_check=True))
     selected_lab = None
     if len(all_labs) == 1:
@@ -396,6 +388,14 @@ def classification_import_tool(request: HttpRequest) -> Response:
         "selected_lab": selected_lab
     }
     return render(request, 'classification/classification_import_tool.html', context)
+
+
+def classification_qs(request):
+    config = ClassificationColumns(request)
+    qs = ClassificationModification.latest_for_user(user=request.user, published=True)
+    qs = config.filter_queryset(qs)
+    # TODO sort
+    return qs
 
 
 def export_classifications_grid(request):
@@ -452,8 +452,9 @@ def classification_file_delete(request, pk):
     return JFUResponse(request, success)
 
 
-def get_classification_attachment_file_dicts(classification):
-    file_dicts = []
+def get_classification_attachment_file_dicts(classification) -> List[Dict]:
+    file_dicts: List[Dict] = list()
+    vca: ClassificationAttachment
     for vca in classification.classificationattachment_set.all():
         file_dicts.append(vca.get_file_dict())
 
@@ -461,7 +462,7 @@ def get_classification_attachment_file_dicts(classification):
     return file_dicts
 
 
-def view_classification_file_attachment(request, pk, thumbnail=False):
+def view_classification_file_attachment(request, pk, thumbnail=False) -> HttpResponse:
     """ This is not done via static files, so we add security later """
 
     # TODO: Check security/access to Classification
@@ -566,29 +567,13 @@ def create_classification_from_hgvs(request, genome_build_name, hgvs_string):
 
 
 @login_not_required
-def evidence_keys(request: HttpRequest, external_page=True) -> HttpResponse:
+def evidence_keys(request: HttpRequest) -> HttpResponse:
     """ public page to display EKey details """
 
-    context = {'keys': EvidenceKeyMap.instance().all_keys}
-
-    if external_page:
-        context.update({
-            "external_page": True,
-            "evidence_keys_url": "evidence_keys",
-            "evidence_keys_max_share_level_url": "evidence_keys_max_share_level",
-            "base_template": 'external_base_content_as_submenu_page_content.html',
-        })
-    else:
-        context.update({
-            "evidence_keys_url": "evidence_keys_logged_in",
-            "evidence_keys_max_share_level_url": "evidence_keys_logged_in_max_share_level",
-            "base_template": 'snpdb/menu/menu_classifications_base.html',
-        })
+    context = {
+        'keys': EvidenceKeyMap.instance().all_keys
+    }
     return render(request, 'classification/evidence_keys.html', context)
-
-
-def evidence_keys_logged_in(request: HttpRequest) -> HttpResponse:
-    return evidence_keys(request, external_page=False)
 
 
 def classification_graphs(request):
