@@ -28,10 +28,6 @@ nav.navbar {
     height: 35px;
 }
 
-body {
-  overflow-y: hidden;
-}
-
 .main-content {
     // background-color: white;
     padding-bottom: 60px;
@@ -75,6 +71,9 @@ body {
     }
 }
 @media screen and (min-width: 992px) {
+    body {
+      overflow-y: hidden;
+    }
     .main-content {
         padding-top: 80px;
         margin-left: 170px;
