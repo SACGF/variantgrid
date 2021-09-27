@@ -28,7 +28,7 @@ from library.utils import ArrayLength
 from ontology.models import OntologyTerm, OntologyService, OntologySnake, OntologyTermRelation, OntologyRelation
 from ontology.ontology_matching import normalize_condition_text, \
     OPRPHAN_OMIM_TERMS, SearchText, pretty_set, PREFIX_SKIP_TERMS
-from snpdb.models import Lab, GenomeBuild
+from snpdb.models import Lab
 
 
 class ConditionText(TimeStampedModel, GuardianPermissionsMixin):
@@ -87,7 +87,7 @@ class ConditionText(TimeStampedModel, GuardianPermissionsMixin):
         return self.conditiontextmatch_set.filter(gene_symbol__isnull=True, mode_of_inheritance__isnull=True, classification=None).first()
 
     @property
-    def gene_levels(self) -> Iterable['ConditionTextMatch']:
+    def gene_levels(self) -> QuerySet['ConditionTextMatch']:
         return self.conditiontextmatch_set.filter(condition_text=self, gene_symbol__isnull=False, mode_of_inheritance__isnull=True, classification=None)
 
 
@@ -248,7 +248,7 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
                 ct.save()
 
     @staticmethod
-    def attempt_automatch(condition_text: ConditionText):
+    def attempt_automatch(condition_text: ConditionText, gene_symbol: Optional[str] = None):
         """
         Set terms that we're effectively certain of, do not override what's already there
         """
@@ -260,7 +260,11 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
                         root.last_edited_by = admin_bot()
                         root.save()
                     else:
-                        for gene_symbol_level in condition_text.gene_levels:
+                        gene_levels_qs = condition_text.gene_levels
+                        if gene_symbol:
+                            gene_levels_qs = gene_levels_qs.filter(gene_symbol=gene_symbol)
+
+                        for gene_symbol_level in gene_levels_qs:
                             if match.is_auto_assignable(gene_symbol=gene_symbol_level.gene_symbol) and not gene_symbol_level.condition_xrefs:
                                 gene_symbol_level.condition_xrefs = match.term_str_array
                                 gene_symbol_level.last_edited_by = admin_bot()
@@ -291,7 +295,7 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
             return
 
         lab = classification.lab
-        gene_symbol: GeneSymbol = None
+        gene_symbol: Optional[GeneSymbol] = None
         gene_symbol_str = cm.get(SpecialEKeys.GENE_SYMBOL)
         if gene_symbol_str:
             gene_symbol = GeneSymbol.objects.filter(symbol=gene_symbol_str).first()
@@ -379,10 +383,9 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
             )
 
         if attempt_automatch and (new_root or new_gene_level):
-            ConditionTextMatch.attempt_automatch(ct)
+            ConditionTextMatch.attempt_automatch(ct, gene_symbol=gene_symbol)
             ct_save_required = True
-
-        if update_counts:
+        elif update_counts:  # attempt automatch update counts
             update_condition_text_match_counts(ct)
             ct_save_required = True
 
