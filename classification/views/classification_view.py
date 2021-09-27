@@ -44,6 +44,7 @@ class BulkInserter:
         self.single_insert = False
         self.api_version = api_version
         self.force_publish = force_publish
+        self.record_count = 0
         self.start = now()
 
     def import_for(self, genome_build: GenomeBuild, transcript: str) -> Optional[ClassificationImport]:
@@ -71,6 +72,7 @@ class BulkInserter:
         if self.single_insert:
             raise ClassificationProcessError('If record_id is provided in URL cannot insert more than one record')
 
+        self.record_count += 1
         data_copy = dict()
         data_copy.update(data)
         data = data_copy
@@ -332,11 +334,12 @@ class BulkInserter:
             for vc_import in self.all_imports():
                 task = process_classification_import_task.si(vc_import.pk, ImportSource.API)
                 task.apply_async()
-        if count := len(self.all_imports()):
+        if count := self.record_count:
+            new_record_count = len(self.all_imports())
             time_taken = now() - self.start
             total_time = time_taken.total_seconds()
             time_per_record = total_time / count
-            create_event(user=get_current_user(), name="classification_import", details=f"{count} records imported, {time_per_record:.3f}s each")
+            create_event(user=get_current_user(), name="classification_import", details=f"{count} records imported {new_record_count} new, avg record processing {time_per_record:.3f}s")
 
 
 class ClassificationView(APIView):
