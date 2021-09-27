@@ -422,8 +422,8 @@ class Command(BaseCommand):
 
         skipped_chroms = Counter()
         num_existing_skipped = 0
-        num_existing_replaced_standard_contigs = 0
-        num_existing_replaced_y_pseudoautosomal = 0
+        num_existing_kept_standard_contigs = 0
+        num_existing_kept_x_pseudoautosomal = 0
         num_no_contig_match = 0
         with open(genepred_filename) as f:
             for transcript_json in read_genepred(f):
@@ -451,34 +451,36 @@ class Command(BaseCommand):
                 # We only have 1 versioned transcript per build (unique_together constraint)
                 # as this simplifies resolving HGVS to variant loci, but because there can be
                 # multiple we choose based on contig (ie standard chroms over alt/fixes etc)
-                transcript_id, version = TranscriptVersion.get_transcript_id_and_version(transcript_json['id'])
+                transcript_accession = transcript_json['id']
+                transcript_id, version = TranscriptVersion.get_transcript_id_and_version(transcript_accession)
                 existing_data = genepred_data_by_transcript_id.get(transcript_id)
                 if not existing_data:
                     existing = gff3_existing_transcripts.get(transcript_id, version)
                     if existing and existing.data:
                         existing_data = existing.data
 
-                if existing_data:
-                    existing_chrom = existing_data.get("chrom")
-                    if existing_chrom:
+                if existing_data == transcript_json:
+                    num_existing_skipped += 1
+                    continue
+                else:
+                    # In general, replace with new data if different but may keep old depending on contigs
+                    if existing_chrom := existing_data.get("chrom"):
                         existing_contig = self.genome_build.chrom_contig_mappings[existing_chrom]
-                        if existing_contig.role != contig.role and contig.role == SequenceRole.ASSEMBLED_MOLECULE:
-                            num_existing_replaced_standard_contigs += 1
-                            # print(f"Replaced {transcript_name} was: {existing_contig} now {contig}")
-                        elif existing_contig.name == 'Y' and contig.name == 'X':
-                            # issue #2047 - Y pseudoautosomal region - take X over existing Y
-                            num_existing_replaced_y_pseudoautosomal += 1
-                        else:
-                            num_existing_skipped += 1
-                            continue  # skip (don't update existing)
+                        if existing_contig != contig:
+                            # issue #2047 - Y pseudoautosomal region - want X over Y
+                            if existing_contig.name == 'X' and contig.name == 'Y':
+                                num_existing_kept_x_pseudoautosomal += 1
+                                continue
+                            if existing_contig.role == SequenceRole.ASSEMBLED_MOLECULE and \
+                                    contig.role != SequenceRole.ASSEMBLED_MOLECULE:
+                                num_existing_kept_standard_contigs += 1
+                                continue
 
                 genepred_data_by_transcript_id[transcript_id] = transcript_json
 
         print("=" * 40)
         print(f"genepred_filename: {genepred_filename}")
-        print(f"num_existing_skipped = {num_existing_skipped}")
-        print(f"num_existing_replaced_standard_contigs = {num_existing_replaced_standard_contigs}")
-        print(f"num_existing_replaced_y_pseudoautosomal = {num_existing_replaced_y_pseudoautosomal}")
+        print(f"{num_existing_skipped=}, {num_existing_kept_x_pseudoautosomal=}, {num_existing_kept_standard_contigs}")
         print(f"num_no_contig_match = {num_no_contig_match}")
         return genepred_data_by_transcript_id
 
