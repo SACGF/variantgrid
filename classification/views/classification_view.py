@@ -45,6 +45,7 @@ class BulkInserter:
         self.api_version = api_version
         self.force_publish = force_publish
         self.record_count = 0
+        self.new_record_count = 0
         self.start = now()
 
     def import_for(self, genome_build: GenomeBuild, transcript: str) -> Optional[ClassificationImport]:
@@ -174,6 +175,8 @@ class BulkInserter:
                     # We only want to link the variant on initial create - as patching may cause issues
                     # as classifications change variants. So the variant is immutable
                     if save:
+                        self.new_record_count += 1
+
                         genome_build = record.get_genome_build()
                         classification_import = self.import_for(genome_build=genome_build, transcript=record.transcript)
                         record.classification_import = classification_import
@@ -339,7 +342,7 @@ class BulkInserter:
             time_taken = now() - self.start
             total_time = time_taken.total_seconds()
             time_per_record = total_time / count
-            create_event(user=get_current_user(), name="classification_import", details=f"{count} records imported {new_record_count} new, avg record processing {time_per_record:.3f}s")
+            create_event(user=get_current_user(), name="classification_import", details=f"{count} records imported {self.new_record_count} new, avg record processing {time_per_record:.3f}s")
 
 
 class ClassificationView(APIView):
