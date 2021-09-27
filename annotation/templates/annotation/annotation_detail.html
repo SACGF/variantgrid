@@ -153,9 +153,7 @@ gff3ToGenePred -processAllGeneChildren -geneNameAttr=Name -rnaNameAttr=transcrip
                             If you just have a GFF the release number can be found via (zcat gff | head)
                         </li>
                         <li>Run import_gene_annotation with a "--release" parameter (ok to re-do a previous GFF you've already imported)
-<code>
-{{ python_command }} manage.py import_gene_annotation --release=XXX
-</code>
+<code>{{ python_command }} manage.py import_gene_annotation --release=XXX</code>
                         </li>
                         <li>
                             In Django Admin, open "variant_annotation_version" then set "gene_annotation_release" to what was uploaded in the previous step.

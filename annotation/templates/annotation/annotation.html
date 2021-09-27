@@ -6,6 +6,14 @@
 {% load humanize %}
 {% block submenu %}{% menu_bar_annotations %}{% endblock %}
 {% block title %}Annotation Info{% endblock title %}
+{% block head %}
+    <style>
+        code {
+            display: block;
+            white-space: pre-wrap;
+        }
+    </style>
+{% endblock %}
 {% block content %}
     <div class="container">
         {% load ui_help %}
