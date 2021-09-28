@@ -12,11 +12,10 @@ import string
 import subprocess
 import time
 import uuid
-
-from coreschema.encodings.jsonschema import camelcase_to_snakecase
+from functools import reduce
 from pytz import timezone
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 from enum import Enum
@@ -654,29 +653,49 @@ class ArrayLength(models.Func):
     function = 'CARDINALITY'
 
 
-@dataclass(frozen=True)
+@dataclass
 class DebugTime:
     description: str
-    duration: timedelta
+    durations: List[timedelta] = field(default_factory=list)
+    occurrences: int = 0
+
+    def tick(self, duration: timedelta):
+        self.durations.append(duration)
+        self.occurrences += 1
+
+    @property
+    def duration(self):
+        return reduce(lambda x, total: x + total, self.durations, timedelta())
 
     def __str__(self):
-        return f"{self.description}: {self.duration}"
+        if self.occurrences == 1:
+            return f"{self.description}: {self.duration}"
+        else:
+            return f"{self.description}: {self.duration} x {self.occurrences}"
 
 
 class DebugTimer:
 
     def __init__(self):
         self.start = datetime.now()
-        self.times: List[DebugTime] = list()
+        self.times: Dict[str, DebugTime] = dict()
 
     def tick(self, description: str):
         now = datetime.now()
         duration = now - self.start
-        self.times.append(DebugTime(description, duration))
+
+        debug_time: DebugTime
+        if existing := self.times.get(description):
+            debug_time = existing
+        else:
+            debug_time = DebugTime(description)
+            self.times[description] = debug_time
+
+        debug_time.tick(duration)
         self.start = now
 
     def __str__(self):
-        return "\n".join((str(debug_time) for debug_time in self.times))
+        return "\n".join((str(debug_time) for debug_time in self.times.values()))
 
 
 class LimitedCollection:
