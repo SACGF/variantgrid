@@ -8,6 +8,7 @@ from classification.models.classification import \
     classification_revalidate_signal
 from classification.models.evidence_key import EvidenceKey
 from classification.models.flag_types import classification_flag_types
+from library.utils import DebugTimer
 
 
 @receiver(classification_revalidate_signal, sender=Classification)
@@ -27,7 +28,7 @@ def classification_created(sender, instance, created, raw, using, update_fields,
 
 
 @receiver(classification_post_publish_signal, sender=Classification)
-def published(sender, classification, previously_published, newly_published, user, **kwargs):  # pylint: disable=unused-argument
+def published(sender, classification, previously_published, newly_published, user, debug_timer: DebugTimer,  **kwargs):  # pylint: disable=unused-argument
 
     if classification.share_level_enum.index > ShareLevel.INSTITUTION.index:
         classification.flag_collection_safe.close_open_flags_of_type(
@@ -53,3 +54,5 @@ def published(sender, classification, previously_published, newly_published, use
                 flag_type=classification_flag_types.significance_change,
                 comment=f'Classification changed from {old_label} to {new_label}'
             )
+
+    debug_timer.tick("Update share flags")

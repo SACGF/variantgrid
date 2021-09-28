@@ -25,7 +25,7 @@ from library.cache import timed_cache
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
 from library.guardian_utils import admin_bot
 from library.log_utils import report_exc_info, report_message
-from library.utils import ArrayLength
+from library.utils import ArrayLength, DebugTimer
 from ontology.models import OntologyTerm, OntologyService, OntologySnake, OntologyTermRelation, OntologyRelation
 from ontology.ontology_matching import normalize_condition_text, \
     OPRPHAN_OMIM_TERMS, SearchText, pretty_set, PREFIX_SKIP_TERMS
@@ -612,11 +612,13 @@ def published(sender,
               newly_published: ClassificationModification,
               previous_share_level: ShareLevel,
               user: User,
+              debug_timer: DebugTimer,
               **kwargs):
     """
     Keeps condition_text_match in sync with the classifications when evidence changes
     """
     ConditionTextMatch.sync_condition_text_classification(newly_published, attempt_automatch=True, update_counts=True)
+    debug_timer.tick("Condition Text Matching")
 
 
 @receiver(flag_comment_action, sender=Flag)

@@ -18,6 +18,7 @@ from classification.models.clinical_context_models import ClinicalContext, \
 from classification.models.discordance_models import DiscordanceReport
 from classification.models.evidence_key import EvidenceKey, EvidenceKeyMap
 from classification.models.flag_types import classification_flag_types
+from library.utils import DebugTimer
 
 INTERNAL_REVIEW_RELEVANT_DAYS = 365
 
@@ -77,6 +78,7 @@ def published(sender,
               newly_published: ClassificationModification,
               previous_share_level: ShareLevel,
               user: User,
+              debug_timer: DebugTimer,
               **kwargs):  # pylint: disable=unused-argument
     """
     Only care about publicly shared records
@@ -137,6 +139,8 @@ def published(sender,
             cause = f'Classification {classification.friendly_label} re-submitted as {cs}'
 
         classification.clinical_context.recalc_and_save(cause=cause, cause_code=ClinicalContextRecalcTrigger.SUBMISSION)
+
+    debug_timer.tick("Update Clinical Grouping")
 
 
 @receiver(clinical_context_signal, sender=ClinicalContext)

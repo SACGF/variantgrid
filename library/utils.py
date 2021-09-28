@@ -698,6 +698,18 @@ class DebugTimer:
         return "\n".join((str(debug_time) for debug_time in self.times.values()))
 
 
+class NullTimer(DebugTimer):
+
+    def tick(self, description: str):
+        pass
+
+    def __str__(self):
+        return "NullTimer"
+
+
+DebugTimer.NullTimer = NullTimer()
+
+
 class LimitedCollection:
 
     def __init__(self, data: List[Any], limit: int):

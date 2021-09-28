@@ -202,9 +202,9 @@ class BulkInserter:
 
                         debug_timer.tick("Prepare for Variant Resolution")
 
-                        record.publish_latest(user=user)
+                        record.publish_latest(user=user, debug_timer=debug_timer)
 
-                        debug_timer.tick("Published")
+                        debug_timer.tick("Publish Complete")
                 else:
                     # patching existing records
                     record = record_ref.record

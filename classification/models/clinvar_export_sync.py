@@ -73,7 +73,7 @@ class ClinVarExportSync:
 
     @lazy
     def _config(self) -> _ClinVarExportConfigDic:
-        return settings.CLINVAR_EXPORT or {"enabled": False, "test": True, "api_key": None}
+        return settings.CLINVAR_EXPORT or {"enabled": False, "mode": "test", "api_key": None}
 
     @property
     def is_enabled(self) -> bool:

@@ -45,7 +45,7 @@ from genes.models import Gene
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
 from library.guardian_utils import clear_permissions
 from library.log_utils import report_exc_info, report_event
-from library.utils import empty_dict, empty_to_none, nest_dict, cautious_attempt_html_to_text
+from library.utils import empty_dict, empty_to_none, nest_dict, cautious_attempt_html_to_text, DebugTimer
 from ontology.models import OntologyTerm, OntologySnake, OntologyTermRelation
 from snpdb.models import Variant, Lab, Sample
 from snpdb.models.models_genome import GenomeBuild
@@ -56,7 +56,7 @@ ChgvsKey = namedtuple('CHGVS', ['short', 'column', 'build'])
 classification_validation_signal = django.dispatch.Signal(providing_args=["classification", "patch_meta", "key_map"])
 classification_current_state_signal = django.dispatch.Signal(providing_args=["user"])
 classification_post_publish_signal = django.dispatch.Signal(
-    providing_args=["classification", "previously_published", "previous_share_level", "newly_published", "user"])
+    providing_args=["classification", "previously_published", "previous_share_level", "newly_published", "user", "debug_timer"])
 classification_withdraw_signal = django.dispatch.Signal(providing_args=["classification", "user"])
 classification_variant_set_signal = django.dispatch.Signal(providing_args=["classification", "variant"])
 classification_revalidate_signal = django.dispatch.Signal(providing_args=["classification"])
@@ -1614,13 +1614,13 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             'modified': modified_keys
         }
 
-    def publish_latest(self, user: User, share_level=None):
+    def publish_latest(self, user: User, share_level=None, debug_timer: DebugTimer = DebugTimer.NullTimer):
         if not share_level:
             share_level = self.share_level_enum
         latest_edited = self.last_edited_version
         if not latest_edited:
             raise ValueError(f'VC {self.id} does not have a last edited version')
-        latest_edited.publish(share_level=share_level, user=user, vc=self)
+        latest_edited.publish(share_level=share_level, user=user, vc=self, debug_timer=debug_timer)
 
     @property
     def last_edited_version(self) -> 'ClassificationModification':
@@ -2374,12 +2374,13 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
             and not self.published
 
     @transaction.atomic()
-    def publish(self, share_level: Union[ShareLevel, str, int], user: User, vc: 'Classification') -> bool:
+    def publish(self, share_level: Union[ShareLevel, str, int], user: User, vc: 'Classification', debug_timer: DebugTimer = DebugTimer.NullTimer) -> bool:
         """
         :param share_level: The share level we want to publish as
         :param user: The user who initiated the publishing
         :param vc: The variant classification we're publishing - even though it's redundant but we get the same object
         instance and don't reload it from the database
+        :param debug_timer: for timing the event
         """
         old_share_level = vc.share_level_enum
         share_level = ShareLevel.from_key(share_level)
@@ -2411,13 +2412,18 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
             assign_perm(self.get_read_perm(), group, self)
 
         vc.save()
+
+        debug_timer.tick("Published Modification")
+
         classification_post_publish_signal.send(
             sender=Classification,
             classification=vc,
             previously_published=previously_published,
             previous_share_level=old_share_level,
             newly_published=self,
-            user=user)
+            user=user,
+            debug_timer=debug_timer)
+
         vc.refresh_from_db()
         return True
 

@@ -800,7 +800,6 @@ TERMS_BASE_TEMPLATE = 'base_tc.html'
 URLS_NAME_REGISTER.update({"classification_dashboard": False,
                            "keycloak_admin": False,
                            "version_diffs": False,
-                           "evidence_keys": False,
                            "classification_import_upload": False})
 
 VARIANT_DETAILS_SHOW_ANNOTATION = True  # also doubles as GENE_SHOW_ANNOTATION
