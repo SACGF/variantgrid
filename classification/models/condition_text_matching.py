@@ -256,10 +256,11 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
         try:
             if root := condition_text.root:
                 if match := top_level_suggestion(condition_text.normalized_text):
-                    if match.is_auto_assignable() and not root.condition_xrefs:
-                        root.condition_xrefs = match.term_str_array
-                        root.last_edited_by = admin_bot()
-                        root.save()
+                    if match.is_auto_assignable():
+                        if not root.condition_xrefs:
+                            root.condition_xrefs = match.term_str_array
+                            root.last_edited_by = admin_bot()
+                            root.save()
                     else:
                         gene_levels_qs = condition_text.gene_levels
                         if gene_symbol:
@@ -352,7 +353,6 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
             classification=None
         )
 
-        ct_save_required = False
         if existing:
             if existing.parent != mode_of_inheritance_level or \
                     existing.condition_text != ct or \
@@ -367,7 +367,6 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
                 existing.condition_text = ct
                 existing.mode_of_inheritance = mode_of_inheritance
                 existing.save()
-                ct_save_required = True
                 if update_counts:
                     update_condition_text_match_counts(old_text)
                     old_text.save()
@@ -385,12 +384,8 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
 
         if attempt_automatch and (new_root or new_gene_level):
             ConditionTextMatch.attempt_automatch(ct, gene_symbol=gene_symbol)
-            ct_save_required = True
         elif update_counts:  # attempt automatch update counts
             update_condition_text_match_counts(ct)
-            ct_save_required = True
-
-        if ct_save_required:
             ct.save()
 
     def as_resolved_condition(self) -> Optional[ConditionResolvedDict]:
@@ -415,7 +410,7 @@ def update_condition_text_match_counts(ct: ConditionText):
     classification_related: List[ConditionTextMatch] = list()
     for ctm in ct.conditiontextmatch_set.all():
         by_id[ctm.id] = ctm
-        if ctm.classification:
+        if ctm.classification_id:
             classification_related.append(ctm)
 
     def check_hierarchy(ctm: ConditionTextMatch) -> bool:
