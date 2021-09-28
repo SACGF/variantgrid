@@ -671,7 +671,7 @@ class DebugTime:
         if self.occurrences == 1:
             return f"{self.duration} - {self.description}"
         else:
-            return f"{self.duration} (x {self.occurrences}) - {self.description} "
+            return f"{self.duration / self.occurrences} (x {self.occurrences}) - {self.description} "
 
 
 class DebugTimer:
