@@ -48,10 +48,7 @@ class BulkInserter:
         self.record_count = 0
         self.new_record_count = 0
         self.start = now()
-
-    @lazy
-    def debug_timer(self) -> DebugTimer:
-        return DebugTimer()
+        self.debug_timer = DebugTimer()
 
     def import_for(self, genome_build: GenomeBuild, transcript: str) -> Optional[ClassificationImport]:
         """

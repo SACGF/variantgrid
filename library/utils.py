@@ -669,9 +669,9 @@ class DebugTime:
 
     def __str__(self):
         if self.occurrences == 1:
-            return f"{self.description}: {self.duration}"
+            return f"{self.duration} - {self.description}"
         else:
-            return f"{self.description}: {self.duration} x {self.occurrences}"
+            return f"{self.duration} (x {self.occurrences}) - {self.description} "
 
 
 class DebugTimer:
