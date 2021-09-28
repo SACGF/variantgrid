@@ -21,6 +21,7 @@ from classification.models import Classification, ClassificationModification, cl
     flag_types, EvidenceKeyMap, ConditionResolvedDict, ConditionResolved
 from flags.models import flag_comment_action, Flag, FlagComment, FlagResolution
 from genes.models import GeneSymbol
+from library.cache import timed_cache
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
 from library.guardian_utils import admin_bot
 from library.log_utils import report_exc_info, report_message
@@ -630,6 +631,7 @@ def check_for_discordance(sender, flag_comment: FlagComment, old_resolution: Fla
             ConditionTextMatch.sync_condition_text_classification(cl.last_published_version, attempt_automatch=True, update_counts=True)
 
 
+@timed_cache(size_limit=2)
 def top_level_suggestion(text: str) -> ConditionMatchingSuggestion:
     """ Make a suggestion at the root level for the given normalised text """
     if suggestion := embedded_ids_check(text):
