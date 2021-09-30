@@ -1,6 +1,7 @@
 from unittest import TestCase
 
-from genes.management.commands.import_gene_annotation2 import convert_transcript_pyreference_to_pyhgvs
+from genes.management.commands.import_gene_annotation2 import convert_transcript_pyreference_to_pyhgvs, \
+    convert_gene_pyreference_to_gene_version_data
 
 
 class TestAnnotationVCF(TestCase):
@@ -272,4 +273,26 @@ class TestAnnotationVCF(TestCase):
         }
 
         output = convert_transcript_pyreference_to_pyhgvs(PYREFERENCE_DATA_NM_015120_4)
+        self.assertEquals(EXPECTED_DATA, output)
+
+    def test_convert_gene(self):
+        PYREFERENCE_GENE = {
+            'HGNC': 'HGNC:1100',
+            'biotype': ['protein_coding'],
+            'chr': 'NC_000017.11',
+            'description': 'BRCA1 DNA repair associated',
+            'name': 'BRCA1',
+            'start': 43044294,
+            'stop': 43125364,
+            'strand': '-',
+            'transcripts': ['NM_007294.4']
+        }
+
+        EXPECTED_DATA = {
+            'hgnc': '1100',
+            'biotype': 'protein_coding',
+            'description': 'BRCA1 DNA repair associated',
+            'gene_symbol': 'BRCA1',
+        }
+        output = convert_gene_pyreference_to_gene_version_data(PYREFERENCE_GENE)
         self.assertEquals(EXPECTED_DATA, output)
