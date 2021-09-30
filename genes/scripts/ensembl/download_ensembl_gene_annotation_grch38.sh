@@ -1,10 +1,5 @@
 #!/bin/bash
 
-filename=Homo_sapiens.GRCh38.78.gtf.gz
-if [[ ! -e ${filename} ]]; then
-  wget ftp://ftp.ensembl.org/pub/release-78/gtf/homo_sapiens/${filename}
-fi
-
 for release in 76 77 78 79 80; do
   filename=Homo_sapiens.GRCh38.${release}.gtf.gz
   if [[ ! -e ${filename} ]]; then

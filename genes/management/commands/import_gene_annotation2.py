@@ -1,3 +1,4 @@
+import json
 import os
 import re
 from collections import Counter, defaultdict
@@ -20,6 +21,25 @@ from snpdb.models.models_genome import GenomeBuild, GenomeFasta
 
 
 class Command(BaseCommand):
+    """
+        * Insert new gene symbols
+        * Insert new Gene
+        * Insert new GeneVerison
+        * Insert new Transcripts
+        * Insert new TranscriptVersions
+
+        UPDATES
+
+        GeneVersion - symbol + import
+        TranscriptVersion - data, gene_version + import
+
+
+        -------------
+
+
+        ReleaseGeneVersion
+        ReleaseTranscriptVersion
+    """
     BATCH_SIZE = 2000
 
     def __init__(self, *args, **kwargs):
@@ -30,8 +50,6 @@ class Command(BaseCommand):
         self.hgnc_ids = set(HGNC.objects.values_list("pk", flat=True))
         # Known objects containers are updated with new inserts
         self.known_gene_symbols = set(GeneSymbol.objects.all().values_list("pk", flat=True))
-        self.known_gene_versions_by_gene_id = defaultdict(dict)
-        self.known_transcript_versions_by_transcript_id = defaultdict(dict)
 
     def add_arguments(self, parser):
         consortia = [ac[1] for ac in AnnotationConsortium.choices]
@@ -42,10 +60,38 @@ class Command(BaseCommand):
         parser.add_argument('--annotation-consortium', choices=consortia, required=True)
         parser.add_argument('--release', required=False,
                             help="Make a release (to match VEP) store all gene/transcript versions")
-        parser.add_argument('filename', help="PyReference JSON.gz")
+        group = parser.add_mutually_exclusive_group()
+        group.add_argument('--pyreference-json', help='PyReference JSON.gz')
+        group.add_argument('--merged-json', help='Merged JSON (from multiple PyReference files)')
 
     def handle(self, *args, **options):
-        filename = options["filename"]
+        if pyreference_json := options["merged_json"]:
+            with open_handle_gzip(pyreference_json) as f:
+                pyreference_data = json.load(f)
+            merged_data = self._convert_to_merged_data(pyreference_data)
+        else:
+            merged_json = options["merged_json"]
+            with open_handle_gzip(merged_json) as f:
+                merged_data = json.load(f)
+
+        self._import_merged_data(merged_data)
+
+    def _convert_to_merged_data(self, pyreference_data: Dict) -> Dict:
+        pass
+
+    def _import_merged_data(self, data: Dict):
+        """
+            [{
+                "gene_annotation_import": {"filename": "", "url": "", "file_md5sum": ""},
+                "gene_symbols": [],
+                "gene": [],
+                "gene_version": [],
+                "transcripts": [],
+                "transcript_versions": [],
+             },
+             }
+        """
+        pass
 
 
 def convert_transcript_pyreference_to_pyhgvs(transcript_data: Dict) -> Dict:
@@ -55,13 +101,16 @@ def convert_transcript_pyreference_to_pyhgvs(transcript_data: Dict) -> Dict:
     # PyHGVS has cds_start/cds_end be equal to start/end for non-coding transcripts
     cds_start = transcript_data.get("cds_start", start)
     cds_end = transcript_data.get("cds_end", end)
-    # PyHGVS exons are in genomic order, pyhgvs are in stranded
+    # PyHGVS exons are in genomic order, PyReference are in stranded
     features = transcript_data["features_by_type"]
     exons = [[ed["start"], ed["stop"]] for ed in features["exon"]]
+    cdna_match = [cdm.get("gap") for cdm in features.get("cDNA_match", [])]
+
     if strand == '-':
         exons.reverse()
+        cdna_match.reverse()
 
-    return {
+    pyhgvs_data = {
         'chrom': transcript_data["chr"],
         'start': start,
         'end': end,
@@ -70,3 +119,12 @@ def convert_transcript_pyreference_to_pyhgvs(transcript_data: Dict) -> Dict:
         'cds_end': cds_end,
         'exons': exons,
     }
+
+    # Optional stuff
+    if cdna_match:
+        pyhgvs_data["cdna_match"] = cdna_match
+    if transcript_data.get("partial"):
+        pyhgvs_data["partial"] = 1
+
+    return pyhgvs_data
+

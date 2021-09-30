@@ -8,13 +8,12 @@ for release in 60 65 70 75; do
   fi
 done
 
-filename=Homo_sapiens.GRCh37.81.gtf.gz
-if [[ ! -e ${filename} ]]; then
-  wget ftp://ftp.ensembl.org/pub/grch37/release-81/gtf/homo_sapiens/${filename}
-fi
-
+#81 is 75 again
 #82 is first GFF3 for GRCh37
-for release in 82 83 84 85 86 87; do
+#83 has no data
+#84 is 82 again
+#86 is 85 again
+for release in 82 85 87; do
   filename=Homo_sapiens.GRCh37.${release}.gff3.gz
   if [[ ! -e ${filename} ]]; then
     wget ftp://ftp.ensembl.org/pub/grch37/release-${release}/gff3/homo_sapiens/${filename}

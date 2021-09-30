@@ -337,6 +337,8 @@ class GeneAnnotationImport(TimeStampedModel):
     annotation_consortium = models.CharField(max_length=1, choices=AnnotationConsortium.choices)
     genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)
     filename = models.TextField()
+    url = models.TextField(null=True)
+    file_md5sum = models.TextField()
 
     def __str__(self):
         return os.path.basename(self.filename)
@@ -564,9 +566,6 @@ class TranscriptVersion(SortByPKMixin, models.Model):
     genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)
     import_source = models.ForeignKey(GeneAnnotationImport, on_delete=CASCADE)
     biotype = models.TextField(null=True)  # Ensembl has gene + transcript biotypes
-    # Sometimes there is a gap aligning transcripts to the genome, which means we can't use this TranscriptVersion
-    # to resolve HGVS (as PyHGVS only uses exons/CDS and has adjustment for gaps)
-    alignment_gap = models.BooleanField(default=False)
     data = models.JSONField(null=False, blank=True, default=empty_dict)  # for pyHGVS
 
     class Meta:
@@ -664,6 +663,19 @@ class TranscriptVersion(SortByPKMixin, models.Model):
     @property
     def gene_symbol(self):
         return self.gene_version.gene_symbol
+
+    @property
+    def alignment_gap(self):
+        if self.transcript.annotation_consortium == AnnotationConsortium.REFSEQ:
+            # Sometimes there is a gap aligning transcripts to the genome, which means we can't use these coordinates
+            # to resolve HGVS (as PyHGVS only uses exons/CDS and has no code to adjust for gaps)
+            if "cdna_match" in self.data or "partial" in self.data:
+                return True
+            tvsi = TranscriptVersionSequenceInfo.get(self.accession)
+            return tvsi.length == self.length
+
+        # Ensembl transcripts use genomic sequence so there is never any gap
+        return False
 
     @staticmethod
     def get_transcript_id_and_version(transcript_name: str) -> Tuple[str, int]:
@@ -986,8 +998,8 @@ class TranscriptVersionSequenceInfoFastaFileImport(TimeStampedModel):
 
 
 class TranscriptVersionSequenceInfo(TimeStampedModel):
-    """ Current main use of this is to download transcript version lengths from the web, and then
-        set TranscriptVersion.alignment_gap = True if they don't match
+    """ Current main use of this is to download transcript version lengths from the web
+        and check if TranscriptVersion exons sum to the same length
 
         Lengths not matching means there is a gap, but we can't be sure there isn't a gap """
     transcript = models.ForeignKey(Transcript, on_delete=CASCADE)
@@ -1021,7 +1033,6 @@ class TranscriptVersionSequenceInfo(TimeStampedModel):
             tvi = TranscriptVersionSequenceInfo._get_and_store_from_refseq_api(transcript_accession)
         else:
             tvi = TranscriptVersionSequenceInfo._get_and_store_from_ensembl_api(transcript_accession)
-        TranscriptVersionSequenceInfo.set_transcript_version_alignment_gap_if_length_different([tvi])
         return tvi
 
     @staticmethod
@@ -1134,29 +1145,7 @@ class TranscriptVersionSequenceInfo(TimeStampedModel):
             TranscriptVersionSequenceInfo.objects.bulk_create(new_records, ignore_conflicts=True, batch_size=2000)
             for tvi in new_records:
                 tvi_by_id[tvi.accession] = tvi
-            TranscriptVersionSequenceInfo.set_transcript_version_alignment_gap_if_length_different(new_records)
         return tvi_by_id
-
-    @staticmethod
-    def set_transcript_version_alignment_gap_if_length_different(tvis: Iterable['TranscriptVersionSequenceInfo']):
-        transcript_version_lengths = defaultdict(dict)
-        for tvi in tvis:
-            transcript_version_lengths[tvi.transcript_id][tvi.version] = tvi.length
-
-        accessions_by_build_with_alignment_gap = defaultdict(list)
-        for tv in TranscriptVersion.objects.filter(alignment_gap=False,
-                                                   transcript__in=transcript_version_lengths.keys()):
-            if known_length := transcript_version_lengths.get(tv.transcript_id, {}).get(tv.version):
-                if calc_length := tv.length:
-                    if known_length != calc_length:
-                        tv.alignment_gap = True
-                        accessions_by_build_with_alignment_gap[tv.genome_build].append(tv.accession)
-
-        for genome_build, accessions_with_alignment_gap in accessions_by_build_with_alignment_gap.items():
-            logging.info("Setting %d records for %s with alignment_gap=True",
-                         len(accessions_with_alignment_gap), genome_build)
-            TranscriptVersion.update_accessions(accessions_with_alignment_gap,
-                                                genome_build=genome_build, alignment_gap=True)
 
 
 class LRGRefSeqGene(models.Model):
