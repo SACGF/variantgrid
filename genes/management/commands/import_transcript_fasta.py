@@ -6,17 +6,25 @@ from django.core.management import BaseCommand
 from genes.models import TranscriptVersionSequenceInfo, TranscriptVersionSequenceInfoFastaFileImport, TranscriptVersion, Transcript
 from genes.models_enums import AnnotationConsortium
 from library.file_utils import file_md5sum, open_handle_gzip
+from library.utils import invert_dict
 
 
 class Command(BaseCommand):
 
     def add_arguments(self, parser):
+        consortia = [ac[1] for ac in AnnotationConsortium.choices]
+
         parser.add_argument('--overwrite', action='store_true', help='Delete and replace fasta import with same md5sum')
+        parser.add_argument('--annotation-consortium', choices=consortia, required=True)
         parser.add_argument('filename')
 
     def handle(self, *args, **options):
         filename = options["filename"]
         overwrite = options["overwrite"]
+        annotation_consortium_name = options["annotation_consortium"]
+
+        ac_dict = invert_dict(dict(AnnotationConsortium.choices))
+        annotation_consortium = ac_dict[annotation_consortium_name]
 
         md5_hash = file_md5sum(filename)
         if existing_import := TranscriptVersionSequenceInfoFastaFileImport.objects.filter(md5_hash=md5_hash).first():
@@ -31,7 +39,7 @@ class Command(BaseCommand):
             raise ValueError("No transcripts! Insert them first!")
 
         fasta_import = TranscriptVersionSequenceInfoFastaFileImport.objects.create(md5_hash=md5_hash,
-                                                                                   annotation_consortium=AnnotationConsortium.REFSEQ,
+                                                                                   annotation_consortium=annotation_consortium,
                                                                                    filename=filename)
         unknown_transcripts = []
         unknown_transcript_prefixes = Counter()
@@ -45,7 +53,7 @@ class Command(BaseCommand):
                     prefix = transcript_id.split("_")[0]
                     unknown_transcript_prefixes[prefix] += 1
                     unknown_transcripts.append(Transcript(identifier=transcript_id,
-                                                          annotation_consortium=AnnotationConsortium.REFSEQ))
+                                                          annotation_consortium=annotation_consortium))
 
                 tvi = TranscriptVersionSequenceInfo(transcript_id=transcript_id, version=version,
                                                     fasta_import=fasta_import,
@@ -61,4 +69,4 @@ class Command(BaseCommand):
             print(f"Inserting {num_records} TranscriptVersionSequenceInfo records")
             TranscriptVersionSequenceInfo.objects.bulk_create(records, ignore_conflicts=True, batch_size=2000)
 
-        TranscriptVersionSequenceInfo.set_transcript_version_alignment_gap_if_length_different(records)
+        # TranscriptVersionSequenceInfo.set_transcript_version_alignment_gap_if_length_different(records)

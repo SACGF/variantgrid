@@ -255,7 +255,7 @@ gff3ToGenePred -processAllGeneChildren -geneNameAttr=Name -rnaNameAttr=transcrip
             {% install-instructions "TranscriptVersion Sequence Info" installed=transcript_fasta_imports %}
             This is genome build independent, so just download most recently updated version.
 <code>wget https://ftp.ncbi.nlm.nih.gov/refseq/H_sapiens/annotation/GRCh38_latest/refseq_identifiers/GRCh38_latest_rna.fna.gz
-{{ python_command }} manage.py import_refseq_transcript_fasta ${VARIANTGRID_SETUP_DATA}/GRCh38_latest_rna.fna.gz</code>
+{{ python_command }} manage.py import_transcript_fasta --annotation-consortium=RefSeq ${VARIANTGRID_SETUP_DATA}/GRCh38_latest_rna.fna.gz</code>
              {% endinstall-instructions %}
         {% endlabelled %}
 

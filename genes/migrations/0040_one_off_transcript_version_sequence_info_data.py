@@ -19,7 +19,7 @@ class Migration(migrations.Migration):
 
     operations = [
         ManualOperation.operation_other(args=[
-            "*** BEFORE fix_retrieve_transcript_version_sequence_info - import_refseq_transcript_fasta - see annotation page"],
+            "*** BEFORE fix_retrieve_transcript_version_sequence_info - import_transcript_fasta - see annotation page"],
             test=_test_has_transcript_versions),
         ManualOperation(task_id=ManualOperation.task_id_manage(["fix_retrieve_transcript_version_sequence_info"]),
                         test=_test_has_transcript_versions)
