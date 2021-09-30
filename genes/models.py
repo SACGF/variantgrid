@@ -417,7 +417,7 @@ class GeneVersion(models.Model):
     """ A specific version of a Gene for a particular version/genome build
         Genes/TranscriptVersion needs to be able to represent both RefSeq and Ensembl """
     gene = models.ForeignKey(Gene, on_delete=CASCADE)
-    version = models.IntegerField()  # RefSeq GeneIDs are always 1 (not versioned)
+    version = models.IntegerField()  # RefSeq GeneIDs are always 0 (not versioned) need non-null for unique_together
     # symbol can be null as Ensembl has genes w/o symbols, eg ENSG00000238009 (lncRNA)
     gene_symbol = models.ForeignKey(GeneSymbol, null=True, on_delete=CASCADE)
     hgnc = models.ForeignKey(HGNC, null=True, on_delete=CASCADE)
@@ -431,7 +431,7 @@ class GeneVersion(models.Model):
 
     @lazy
     def accession(self):
-        if self.version is not None and self.gene.has_versions():
+        if self.gene.has_versions():
             acc = f"{self.gene_id}.{self.version}"
         else:
             acc = self.gene_id
