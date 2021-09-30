@@ -32,15 +32,6 @@ class Command(BaseCommand):
     """
     BATCH_SIZE = 2000
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.annotation_consortium = None
-        self.genome_build = None
-        self.contig_id_to_fasta = None
-        self.hgnc_ids = set(HGNC.objects.values_list("pk", flat=True))
-        # Known objects containers are updated with new inserts
-        self.known_gene_symbols = set(GeneSymbol.objects.all().values_list("pk", flat=True))
-
     def add_arguments(self, parser):
         consortia = [ac[1] for ac in AnnotationConsortium.choices]
         builds = [gb.name for gb in GenomeBuild.builds_with_annotation()]
@@ -51,9 +42,9 @@ class Command(BaseCommand):
         parser.add_argument('--release', required=False,
                             help="Make a release (to match VEP) store all gene/transcript versions")
         parser.add_argument('--save-merged-file', help="Write a file (requires pyreference-json)")
-        # group = parser.add_mutually_exclusive_group()
-        parser.add_argument('--pyreference-json', nargs="+", action="extend", help='PyReference JSON.gz')
-        parser.add_argument('--merged-json', help='Merged JSON (from multiple PyReference files)')
+        group = parser.add_mutually_exclusive_group()
+        group.add_argument('--pyreference-json', nargs="+", action="extend", help='PyReference JSON.gz')
+        group.add_argument('--merged-json', help='Merged JSON (from multiple PyReference files)')
 
     def handle(self, *args, **options):
         if pyreference_json := options["pyreference_json"]:
@@ -67,10 +58,12 @@ class Command(BaseCommand):
                 with gzip.open(save_merged_file, 'w') as outfile:
                     json_str = json.dumps(merged_data)
                     outfile.write(json_str.encode('ascii'))
-        else:
-            merged_json = options["merged_json"]
+                    exit(0)
+        elif merged_json := options["merged_json"]:
             with open_handle_gzip(merged_json) as f:
                 merged_data = json.load(f)
+        else:
+            raise ValueError("You need to specify at least one of '--pyreference-json' or '--merged-json'")
 
         self._import_merged_data(merged_data)
 
@@ -117,12 +110,6 @@ class Command(BaseCommand):
 
     def _import_merged_data(self, merged_data: List[Dict]):
         """
-            [{
-                "gene_annotation_import": {"filename": "", "url": "", "file_md5sum": ""},
-                "gene_version": {},
-                "transcript_versions": {},
-             },
-             }
         """
         print("_import_merged_data")
 
@@ -134,11 +121,12 @@ class Command(BaseCommand):
 
         for data in merged_data:
             import_data = data["gene_annotation_import"]
-            import_source = GeneAnnotationImport.objects.create(annotation_consortium=self.annotation_consortium,
-                                                                genome_build=self.genome_build,
-                                                                filename=import_data["filename"],
-                                                                url=import_data["url"],
-                                                                file_md5sum=import_data["file_md5sum"])
+            logging.info("%s has %d transcripts", import_data, len(data["transcript_versions"]))
+#            import_source = GeneAnnotationImport.objects.create(annotation_consortium=self.annotation_consortium,
+#                                                                genome_build=self.genome_build,
+#                                                                filename=import_data["path"],
+#                                                                url=import_data["url"],
+#                                                                file_md5sum=import_data["md5sum"])
 
             # Go through and create gene_symbols etc, assigning import_source
 
@@ -153,7 +141,7 @@ class Command(BaseCommand):
 def convert_gene_pyreference_to_gene_version_data(gene_data: Dict) -> Dict:
     gene_version_data = {
         'biotype': ",".join(gene_data["biotype"]),
-        'description': gene_data["description"],
+        'description': gene_data.get("description"),
         'gene_symbol': gene_data["name"],
     }
 
