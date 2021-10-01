@@ -4,6 +4,8 @@ import logging
 from typing import Dict, List, Set
 
 from django.core.management.base import BaseCommand
+from django.db.models.functions import Upper
+
 from genes.models import GeneSymbol, GeneAnnotationImport, Gene, GeneVersion, TranscriptVersion, Transcript
 from genes.models_enums import AnnotationConsortium
 from library.file_utils import open_handle_gzip
@@ -86,6 +88,7 @@ class Command(BaseCommand):
                 for transcript_accession in gene["transcripts"]:
                     if transcript_accession in transcripts:
                         transcript_gene_version[transcript_accession] = gv_accession
+                        need_gene = True
 
                 if need_gene:
                     gene_version[gene_id] = convert_gene_pyreference_to_gene_version_data(gene)
@@ -93,7 +96,7 @@ class Command(BaseCommand):
             for transcript_accession in transcripts:
                 transcript = prd["transcripts_by_id"][transcript_accession]
                 tv_data = {
-                    "biotype": transcript["biotype"],
+                    "biotype": ",".join(transcript["biotype"]),
                     "gene_version": transcript_gene_version[transcript_accession],
                     "data": convert_transcript_pyreference_to_pyhgvs(transcript),
                 }
@@ -113,7 +116,7 @@ class Command(BaseCommand):
         """        """
         print("_import_merged_data")
 
-        known_gene_symbols = set(GeneSymbol.objects.all().values_list("pk", flat=True))
+        known_uc_gene_symbols = set(GeneSymbol.objects.annotate(uc_symbol=Upper("symbol")).values_list("uc_symbol", flat=True))
         genes_qs = Gene.objects.filter(annotation_consortium=annotation_consortium)
         known_genes_ids = set(genes_qs.values_list("identifier", flat=True))
         transcripts_qs = Transcript.objects.filter(annotation_consortium=annotation_consortium)
@@ -131,13 +134,12 @@ class Command(BaseCommand):
         for data in merged_data:
             import_data = data["gene_annotation_import"]
             logging.info("%s has %d transcripts", import_data, len(data["transcript_version"]))
-            import_source = GeneAnnotationImport.objects.create(annotation_consortium=annotation_consortium,
-                                                                genome_build=genome_build,
-                                                                filename=import_data["path"],
-                                                                url=import_data["url"],
-                                                                file_md5sum=import_data["md5sum"])
-
-            new_gene_symbols = []
+            import_source = GeneAnnotationImport.objects.get_or_create(annotation_consortium=annotation_consortium,
+                                                                       genome_build=genome_build,
+                                                                       filename=import_data["path"],
+                                                                       url=import_data["url"],
+                                                                       file_md5sum=import_data["md5sum"])[0]
+            new_gene_symbols = set()
             new_genes = []
             new_gene_versions = []
             modified_gene_versions = []
@@ -148,8 +150,8 @@ class Command(BaseCommand):
                                           annotation_consortium=annotation_consortium))
 
                 if symbol := gv_data["gene_symbol"]:
-                    if symbol not in known_gene_symbols:
-                        new_gene_symbols.append(GeneSymbol(symbol=symbol))
+                    if symbol.upper() not in known_uc_gene_symbols:
+                        new_gene_symbols.add(symbol)
                 # RefSeq have no version, set as 0 if missing
                 version = gv_data.get("version", 0)
 
@@ -170,8 +172,9 @@ class Command(BaseCommand):
 
             if new_gene_symbols:
                 logging.info("Creating %d new gene symbols", len(new_gene_symbols))
-                GeneSymbol.objects.bulk_create(new_gene_symbols, batch_size=self.BATCH_SIZE)
-                known_gene_symbols.update({gene_symbol.symbol for gene_symbol in new_gene_symbols})
+                GeneSymbol.objects.bulk_create([GeneSymbol(symbol=symbol) for symbol in new_gene_symbols],
+                                               batch_size=self.BATCH_SIZE)
+                known_uc_gene_symbols.update((s.upper() for s in new_gene_symbols))
 
             if new_genes:
                 logging.info("Creating %d new genes", len(new_genes))

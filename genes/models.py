@@ -341,6 +341,8 @@ class GeneAnnotationImport(TimeStampedModel):
     file_md5sum = models.TextField()
 
     def __str__(self):
+        if self.url:
+            return self.url
         return os.path.basename(self.filename)
 
 
@@ -672,7 +674,7 @@ class TranscriptVersion(SortByPKMixin, models.Model):
             if "cdna_match" in self.data or "partial" in self.data:
                 return True
             tvsi = TranscriptVersionSequenceInfo.get(self.accession)
-            return tvsi.length == self.length
+            return tvsi.length != self.length
 
         # Ensembl transcripts use genomic sequence so there is never any gap
         return False
