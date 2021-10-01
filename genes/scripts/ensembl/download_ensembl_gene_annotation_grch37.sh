@@ -1,14 +1,7 @@
 #!/bin/bash
 
-# 75 is last GRCh37 in main directory
-for release in 60 65 70 75; do
-  filename=Homo_sapiens.GRCh37.${release}.gtf.gz
-  if [[ ! -e ${filename} ]]; then
-    wget ftp://ftp.ensembl.org/pub/release-${release}/gtf/homo_sapiens/${filename}
-  fi
-done
+# v81 (points to 75) and earlier at GTFs that don't have transcript versions - just skip them
 
-#81 is 75 again
 #82 is first GFF3 for GRCh37
 #83 has no data
 #84 is 82 again

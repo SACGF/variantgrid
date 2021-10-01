@@ -96,7 +96,7 @@ class Command(BaseCommand):
                         need_gene = True
 
                 if need_gene:
-                    gene_version[gene_id] = convert_gene_pyreference_to_gene_version_data(gene)
+                    gene_version[gv_accession] = convert_gene_pyreference_to_gene_version_data(gene)
 
             for transcript_accession in transcripts:
                 transcript = prd["transcripts_by_id"][transcript_accession]
