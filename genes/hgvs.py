@@ -423,6 +423,7 @@ class HGVSMatcher:
         # so replace it with the DB records
         if gene_symbol := transcript_version.gene_version.gene_symbol:
             transcript_version.data["gene_name"] = str(gene_symbol)
+        transcript_version.data["id"] = transcript_version.accession
         return make_transcript(transcript_version.data)
 
     def _get_pyhgvs_transcript(self, transcript_name):

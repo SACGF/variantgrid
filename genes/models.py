@@ -824,7 +824,7 @@ class TranscriptVersion(SortByPKMixin, models.Model):
         if transcript_version is None:
             TranscriptVersion.raise_bad_or_missing_transcript(transcript_name)
 
-        if 'id' not in transcript_version.data:
+        if 'exons' not in transcript_version.data:
             # only going to happen if we have legacy data in the database, transcripts that use the default for data {}
             data_str = json.dumps(transcript_version.data)
             raise MissingTranscript(f"Transcript for '{transcript_name}' (build: {genome_build}),"
