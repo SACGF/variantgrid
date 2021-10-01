@@ -1,7 +1,7 @@
 import gzip
 import json
 import logging
-from typing import Dict, List, Set
+from typing import Dict, List, Set, Iterable
 
 from django.core.management.base import BaseCommand
 from django.db.models.functions import Upper
@@ -30,6 +30,13 @@ class Command(BaseCommand):
         group.add_argument('--pyreference-json', nargs="+", action="extend", help='PyReference JSON.gz')
         group.add_argument('--merged-json', help='Merged JSON (from multiple PyReference files)')
 
+    @staticmethod
+    def _get_pyreference_data_iterator(pyreference_json):
+        for prj_filename in pyreference_json:
+            logging.info("Loading %s", prj_filename)
+            with open_handle_gzip(prj_filename) as f:
+                yield json.load(f)
+
     def handle(self, *args, **options):
         build_name = options["genome_build"]
         annotation_consortium_name = options["annotation_consortium"]
@@ -38,11 +45,7 @@ class Command(BaseCommand):
         annotation_consortium = ac_dict[annotation_consortium_name]
 
         if pyreference_json := options["pyreference_json"]:
-            pyreference_data = []
-            for prj_filename in pyreference_json:
-                logging.info("Loading %s", prj_filename)
-                with open_handle_gzip(prj_filename) as f:
-                    pyreference_data.append(json.load(f))
+            pyreference_data = self._get_pyreference_data_iterator(pyreference_json)
             merged_data = self._convert_to_merged_data(pyreference_data)
             if save_merged_file := options["save_merged_file"]:
                 logging.info("Writing '%s'", save_merged_file)
@@ -70,7 +73,7 @@ class Command(BaseCommand):
         most_recent_transcripts.reverse()
         return most_recent_transcripts
 
-    def _convert_to_merged_data(self, pyreference_data: List[Dict]) -> List[Dict]:
+    def _convert_to_merged_data(self, pyreference_data: Iterable[Dict]) -> List[Dict]:
         """ We want to make the minimal amount of data to insert - so only keep the last copy of transcripts """
         print("_convert_to_merged_data")
         most_recent_transcripts = self._get_most_recent_transcripts(pyreference_data)
