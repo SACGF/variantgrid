@@ -149,7 +149,8 @@ class Command(BaseCommand):
             new_gene_versions = []
             modified_gene_versions = []
 
-            for gene_id, gv_data in data["gene_version"].items():
+            for gene_accession, gv_data in data["gene_version"].items():
+                gene_id, version = GeneVersion.get_gene_id_and_version(gene_accession)
                 if gene_id not in known_genes_ids:
                     new_genes.append(Gene(identifier=gene_id,
                                           annotation_consortium=annotation_consortium))
@@ -157,8 +158,6 @@ class Command(BaseCommand):
                 if symbol := gv_data["gene_symbol"]:
                     if symbol.upper() not in known_uc_gene_symbols:
                         new_gene_symbols.add(symbol)
-                # RefSeq have no version, set as 0 if missing
-                version = gv_data.get("version", 0)
 
                 gene_version = GeneVersion(gene_id=gene_id,
                                            version=version,
@@ -168,8 +167,8 @@ class Command(BaseCommand):
                                            biotype=gv_data.get("biotype"),
                                            genome_build=genome_build,
                                            import_source=import_source)
-                gv_accession = f"{gene_id}.{version}"
-                if pk := known_gene_version_ids_by_accession.get(gv_accession):
+
+                if pk := known_gene_version_ids_by_accession.get(gene_accession):
                     gene_version.pk = pk
                     modified_gene_versions.append(gene_version)
                 else:
