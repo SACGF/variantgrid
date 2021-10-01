@@ -45,8 +45,11 @@ class Command(BaseCommand):
         annotation_consortium = ac_dict[annotation_consortium_name]
 
         if pyreference_json := options["pyreference_json"]:
+            # Using iterators means we have to load the JSON twice - but need to do it to keep memory usage down
             pyreference_data = self._get_pyreference_data_iterator(pyreference_json)
-            merged_data = self._convert_to_merged_data(pyreference_data)
+            most_recent_transcripts = self._get_most_recent_transcripts(pyreference_data)
+            pyreference_data = self._get_pyreference_data_iterator(pyreference_json)  # Iterator again
+            merged_data = self._convert_to_merged_data(pyreference_data, most_recent_transcripts)
             if save_merged_file := options["save_merged_file"]:
                 logging.info("Writing '%s'", save_merged_file)
                 with gzip.open(save_merged_file, 'w') as outfile:
@@ -73,10 +76,9 @@ class Command(BaseCommand):
         most_recent_transcripts.reverse()
         return most_recent_transcripts
 
-    def _convert_to_merged_data(self, pyreference_data: Iterable[Dict]) -> List[Dict]:
+    def _convert_to_merged_data(self, pyreference_data: Iterable[Dict], most_recent_transcripts) -> List[Dict]:
         """ We want to make the minimal amount of data to insert - so only keep the last copy of transcripts """
         print("_convert_to_merged_data")
-        most_recent_transcripts = self._get_most_recent_transcripts(pyreference_data)
 
         merged_data = []
         for prd, transcripts in zip(pyreference_data, most_recent_transcripts):
@@ -189,7 +191,7 @@ class Command(BaseCommand):
                 logging.info("Creating %d new gene versions", len(new_gene_versions))
                 GeneVersion.objects.bulk_create(new_gene_versions, batch_size=self.BATCH_SIZE)
                 # Update with newly inserted records - so that we have a PK to use below
-                known_gene_version_ids_by_accession.update({f"{gv.gene_id}.{gv.version}" for gv in new_gene_versions})
+                known_gene_version_ids_by_accession.update({f"{gv.gene_id}.{gv.version}": gv.pk for gv in new_gene_versions})
 
             # Could potentially be duplicate gene versions (diff transcript versions from diff GFFs w/same GeneVersion)
             if modified_gene_versions:
