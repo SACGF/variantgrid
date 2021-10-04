@@ -814,7 +814,7 @@ def export_column(label: Optional[str] = None, sub_data: Optional[Type] = None):
     """
     Extend ExportRow and annotate methods with export_column.
     The order of defined methods determines the order that the results will appear in an export file
-    :param label: The label that will appear in the CSV header
+    :param label: The label that will appear in the CSV header (defaults to method name if not provided)
     :param sub_data: An optional SubType of another ExportRow for nested data
     """
 
@@ -823,7 +823,7 @@ def export_column(label: Optional[str] = None, sub_data: Optional[Type] = None):
             return method(*args, **kwargs)
         # have to cache the line number of the source method, otherwise we just get the line number of this wrapper
         wrapper.line_number = inspect.getsourcelines(method)[1]
-        wrapper.label = label
+        wrapper.label = label or method.__name__
         wrapper.__name__ = method.__name__
         wrapper.is_export = True
         wrapper.sub_data = sub_data
