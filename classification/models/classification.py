@@ -254,6 +254,12 @@ class ConditionResolved:
         else:
             return None
 
+    def as_mondo_if_possible(self) -> 'ConditionResolved':
+        if mondo_term := self.mondo_term:
+            return ConditionResolved(terms=[mondo_term])
+        else:
+            return self
+
     def is_same_or_more_specific(self, other: 'ConditionGroup') -> bool:
         if self.is_multi_condition or other.is_multi_condition:
             # when looking at multiple conditions, do not attempt merging unless we're the exact same

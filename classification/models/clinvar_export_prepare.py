@@ -18,7 +18,7 @@ class ClassificationModificationCandidate:
                  condition_umbrella: Optional[ConditionResolved] = None,
                  failed_candidates: Optional[Set[ClassificationModification]] = None):
         self.modification = modification
-        self.condition_umbrella: ConditionResolved = condition_umbrella or modification.classification.condition_resolution_obj
+        self.condition_umbrella: ConditionResolved = condition_umbrella or modification.classification.condition_resolution_obj.as_mondo_if_possible()
         self.failed_candidates: Set[ClassificationModification] = failed_candidates or set()
 
         if self.condition_umbrella is None or not bool(self.condition_umbrella.terms):
