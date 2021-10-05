@@ -210,7 +210,7 @@ class ClinVarExportBatch(TimeStampedModel):
                 "targetDb": "clinvar",
                 "data": {
                     "content": {
-                        "behalfOrgID": clinvar_export_sync.api_key,
+                        "behalfOrgID": clinvar_export_sync.org_id,
                         "clinvarSubmission": [submission.submission_full for submission in
                                               self.clinvarexportsubmission_set.order_by('created')],
                         "submissionName": f"submission_{self.id}"

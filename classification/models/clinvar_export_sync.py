@@ -87,6 +87,10 @@ class ClinVarExportSync:
     def api_key(self) -> Optional[str]:
         return self._config.get('api_key')
 
+    @property
+    def org_id(self) -> Optional[str]:
+        return self._config.get('org_id')
+
     def _send_data(self,
                    batch: ClinVarExportBatch,
                    request_type: ClinVarExportRequestType,
