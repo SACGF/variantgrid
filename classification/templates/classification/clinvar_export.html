@@ -30,12 +30,14 @@
                     {% labelled label="ClinVar Key" %}{{ clinvar_export.clinvar_allele.clinvar_key }}{% endlabelled %}
                     {% labelled label="Allele" %}{% with allele=clinvar_export.clinvar_allele.allele %}<a class="hover-link" href="{{ allele.get_absolute_url }}">{{ allele }}</a>{% endwith %}{% endlabelled %}
                     {% labelled label="Condition Umbrella" %}{% condition clinvar_export.condition_resolved %}
-                        {% field_help %}If using MONDO, this condition or a more specific condition under this one will be considered as part of this export.{% end_field_help %}
+                        {% field_help %}Records for this variant and this (or a more specific) condition will be considered as part of this export.<br/>
+                        The actual condition sent to ClinVar can be seen next to Source Condition.{% end_field_help %}
                     {% endlabelled %}
                     <hr/>
                     <div class="text-info mb-4">The details of the source data for the (possible) upcoming ClinVar submission/update.</div>
                     {% labelled label="Last Evaluated" %}{% timestamp clinvar_export.clinvar_allele.last_evaluated time_ago=True %}
-                    {% field_help %}{{ site_name }} cached data for this export using the data available at this time.{% end_field_help %}
+                    {% field_help %}{{ site_name }} cached data for this export using the data available at this time.<br/>
+                    The actual condition might be more specific or an OMIM equivilent.{% end_field_help %}
                     {% endlabelled %}
 
                     {%  if clinvar_export.classification_based_on %}
@@ -43,6 +45,7 @@
                                 {{ clinvar_export.classification_based_on.classification.friendly_label }}</a> as of {% timestamp clinvar_export.classification_based_on.created time_ago=True %}
                         {% endlabelled %}
                         {% labelled label="Source c.HGVS" %}{% c_hgvs clinvar_export.classification_based_on show_genome_build=True %}{% endlabelled %}
+                        {% labelled label="Source Condition" %}{% condition clinvar_export.classification_based_on.classification.condition_resolution_obj %}{% endlabelled %}
                     {% else %}
                         {% labelled label="Source Classification" %}<div class="no-value">No classification is a valid candidate for this allele/condition currently.</div>{% endlabelled %}
                     {% endif %}
