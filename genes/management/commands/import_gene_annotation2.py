@@ -270,7 +270,11 @@ def convert_transcript_pyreference_to_pyhgvs(transcript_data: Dict) -> Dict:
     # PyHGVS exons are in genomic order, PyReference are in stranded
     features = transcript_data["features_by_type"]
     exons = [[ed["start"], ed["stop"]] for ed in features["exon"]]
-    cdna_match = [cdm.get("gap") for cdm in features.get("cDNA_match", [])]
+    cdna_match = []
+    for cdm in features.get("cDNA_match", []):
+        if "cdna_strand" in cdm:  # None in Human RefSeq so haven't handled
+            raise ValueError("Haven't handled stranded Target alignment")
+        cdna_match.append([cdm.get(k) for k in ["start", "stop", "cdna_start", "cdna_end", "gap"]])
 
     if strand == '-':
         exons.reverse()
