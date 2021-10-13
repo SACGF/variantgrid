@@ -108,6 +108,7 @@ class ClinVarExportConverter:
         classification_flag_types.matching_variant_warning_flag: JsonMessages.error("Classification has open variant warning flag"),
         classification_flag_types.discordant: JsonMessages.error("Classification is in discordance"),
         classification_flag_types.internal_review: JsonMessages.error("Classification is in internal review"),
+        classification_flag_types.classification_not_public: JsonMessages.error("Classification specifically marked as not to share")
     }
 
     def __init__(self, clinvar_export_record: ClinVarExport):

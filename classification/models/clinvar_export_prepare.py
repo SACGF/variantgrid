@@ -5,7 +5,7 @@ from django.utils.timezone import now
 
 from classification.enums import ShareLevel
 from classification.models import ClinVarAllele, Classification, ClassificationModification, ClinVarExport, \
-    ConditionResolved, ClinVarExportStatus
+    ConditionResolved, ClinVarExportStatus, flag_types, classification_flag_types
 from classification.models.abstract_utils import ConsolidatingMerger
 from library.utils import segment
 from snpdb.models import Allele, ClinVarKey
@@ -108,6 +108,10 @@ class ClinvarAlleleExportPrepare:
             variant__in=self.allele.variants,
             share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS
         )
+
+        # filter out records we're specifically not sharing from consideration
+        #
+        all_classifications = [c for c in all_classifications if not c.flag_collection.get_open_flag_of_type(flag_type=classification_flag_types.classification_not_public)]
 
         def has_condition(c: Classification):
             if resolved_condition := c.condition_resolution_obj:

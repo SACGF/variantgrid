@@ -84,6 +84,7 @@ class CriteriaStrength:
             return self.ekey.pretty_label < other.ekey.pretty_label
         return self.strength_value < other.strength_value
 
+
 class EvidenceMixin:
     """
     For methods common between Classification and ClassificationModification

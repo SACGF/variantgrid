@@ -64,5 +64,9 @@ class ClassificationFlagTypes:
     def clinical_context_discordance(self) -> FlagType:
         return FlagType.objects.get(pk='clinical_context_discordance')
 
+    @lazy
+    def classification_not_public(self) -> FlagType:
+        return FlagType.objects.get(pk='classification_not_public')
+
 
 classification_flag_types = ClassificationFlagTypes()
