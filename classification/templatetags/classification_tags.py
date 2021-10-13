@@ -272,7 +272,7 @@ def c_hgvs(c_hgvs: Union[CHGVS, str], show_genome_build: Optional[bool]=None):
             c_hgvs = CHGVS(c_hgvs)
             c_hgvs.genome_build = GenomeBuildManager.get_current_genome_build()
     elif isinstance(c_hgvs, str):
-        c_hgvs = CHGVS(c_hgvs
+        c_hgvs = CHGVS(c_hgvs)
 
     if c_hgvs is None:  # might have got a none c.hgvs from the ClassificationModification
         c_hgvs = CHGVS()
