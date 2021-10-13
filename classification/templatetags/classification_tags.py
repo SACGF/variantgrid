@@ -267,7 +267,9 @@ def classification_table(
 def c_hgvs(c_hgvs: Union[CHGVS, str], show_genome_build: Optional[bool]=None):
     if show_genome_build is None:
         show_genome_build = c_hgvs.is_desired_build is False or c_hgvs.is_normalised is False
-    if isinstance(c_hgvs, ClassificationModification):
+    if c_hgvs is None:
+        c_hgvs = CHGVS()
+    elif isinstance(c_hgvs, ClassificationModification):
         if c_hgvs := c_hgvs.classification.get_c_hgvs(GenomeBuildManager.get_current_genome_build()):
             c_hgvs = CHGVS(c_hgvs)
             c_hgvs.genome_build = GenomeBuildManager.get_current_genome_build()
