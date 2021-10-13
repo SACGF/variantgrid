@@ -181,6 +181,9 @@ class CHGVS:
         if transcript:
             transcript = self._clean_transcript(transcript)
 
+        if full_c_hgvs is None:
+            full_c_hgvs = ""
+
         self.full_c_hgvs = full_c_hgvs
         self.raw_c = None
         self.transcript = transcript
@@ -192,8 +195,7 @@ class CHGVS:
         self.is_desired_build: Optional[bool] = None
         self.genome_build: Optional[GenomeBuild] = None
 
-        match = CHGVS.HGVS_REGEX.match(full_c_hgvs)
-        if match:
+        if match := CHGVS.HGVS_REGEX.match(full_c_hgvs):
             self.gene = match[2]
             self.raw_c = match[3]
 
