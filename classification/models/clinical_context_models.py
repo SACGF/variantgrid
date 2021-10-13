@@ -52,6 +52,7 @@ class DiscordanceLevel(str, Enum):
     """
 
     NO_ENTRIES = 'no_entries'
+    SINGLE_SUBMISSION = 'single_submission'  # single shared submission
     CONCORDANT_AGREEMENT = 'concordant_agreement'  # complete agreement
     CONCORDANT_DIFF_VUS = 'concordant_diff_vus'  # VUS-A, VUS-B vs VUS-C
     CONCORDANT_CONFIDENCE = 'concordant_confidence'  # Benign vs Likely Benign
@@ -67,6 +68,8 @@ class DiscordanceLevel(str, Enum):
             return "Concordant (Confidence)"
         if self == DiscordanceLevel.NO_ENTRIES:
             return "No Shared Submissions"
+        if self == DiscordanceLevel.SINGLE_SUBMISSION:
+            return "Single Shared Submission"
         if self == DiscordanceLevel.DISCORDANT:
             return "Discordant"
         return "Unknown"
@@ -77,7 +80,7 @@ class DiscordanceLevel(str, Enum):
             return "success"
         if self == DiscordanceLevel.CONCORDANT_CONFIDENCE:
             return "warning"
-        if self == DiscordanceLevel.NO_ENTRIES:
+        if self == DiscordanceLevel.NO_ENTRIES or self == DiscordanceLevel.SINGLE_SUBMISSION:
             return "secondary"
         return "danger"
 
@@ -91,11 +94,11 @@ class DiscordanceStatus:
 
     @staticmethod
     def calculate(modifications: Iterable[ClassificationModification]) -> 'DiscordanceStatus':
-        cs_scores: Set[int] = set()
-        cs_vuses: Set[int] = set()
-        cs_values: Set[str] = set()
-        shared_labs: Set[Lab] = set()
-        all_labs: Set[Lab] = set()
+        cs_scores: Set[int] = set()  # clin sig to score, all VUSs are 3
+        cs_vuses: Set[int] = set()  # all the different VUS A,B,C values
+        cs_values: Set[str] = set()   # all the different clinical sig values
+        shared_labs: Set[Lab] = set()   # all the sharing labs
+        all_labs: Set[Lab] = set()   # all labs involved (sharing and not sharing, only sharing records determine the status)
 
         level: Optional[DiscordanceLevel]
         counted_classifications = 0
@@ -111,14 +114,16 @@ class DiscordanceStatus:
                 if vus_special := SPECIAL_VUS.get(clin_sig):
                     cs_vuses.add(vus_special)
 
-        if len(cs_scores) > 1:
+        if counted_classifications == 0:
+            level = DiscordanceLevel.NO_ENTRIES
+        elif counted_classifications == 1:
+            level = DiscordanceLevel.SINGLE_SUBMISSION
+        elif len(cs_scores) > 1:
             level = DiscordanceLevel.DISCORDANT
-        elif len(cs_values) > 1 or len(cs_vuses) > 1:
+        elif len(cs_values) == 1 and len(cs_vuses) > 1:
             # importantly you can have a VUS vs VUS_A and still be in agreement
             # it's only if you have more than one of VUS_A,B,C that cs_vuses will have multiple values
             level = DiscordanceLevel.CONCORDANT_DIFF_VUS
-        elif len(shared_labs) == 0:
-            level = DiscordanceLevel.NO_ENTRIES
         else:
             level = DiscordanceLevel.CONCORDANT_AGREEMENT
         return DiscordanceStatus(level=level, lab_count=len(shared_labs), lab_count_all=len(all_labs), counted_classifications=counted_classifications)
