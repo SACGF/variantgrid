@@ -69,7 +69,7 @@ class AlleleOverlap:
         elif level == DiscordanceLevel.CONCORDANT_CONFIDENCE:
             score += 25000
         elif level == DiscordanceLevel.CONCORDANT_DIFF_VUS:
-            score += 25000
+            score += 20000
         elif level == DiscordanceLevel.CONCORDANT_AGREEMENT:
             score += 10000 # leave the single submissions as last
 
