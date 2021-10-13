@@ -61,13 +61,17 @@ class AlleleOverlap:
 
         score = 0
         if self.discordance_status.lab_count > 1:
-            score += 10000
+            score += 100000
 
         level = self.discordant_level
         if level == DiscordanceLevel.DISCORDANT:
-            score += 5000
+            score += 50000
         elif level == DiscordanceLevel.CONCORDANT_CONFIDENCE:
-            score += 2500
+            score += 25000
+        elif level == DiscordanceLevel.CONCORDANT_DIFF_VUS:
+            score += 25000
+        elif level == DiscordanceLevel.CONCORDANT_AGREEMENT:
+            score += 10000 # leave the single submissions as last
 
         score += self.discordance_status.lab_count * 100  # give more priority to shared labs
         score += self.discordance_status.lab_count_all * 10  # but still give > 0 priority to unshared labs
