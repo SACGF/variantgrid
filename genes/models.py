@@ -666,15 +666,31 @@ class TranscriptVersion(SortByPKMixin, models.Model):
     def gene_symbol(self):
         return self.gene_version.gene_symbol
 
+    @lazy
+    def hgvs_ok(self) -> bool:
+        """ """
+        if self.has_valid_data:
+            if self.transcript.annotation_consortium == AnnotationConsortium.REFSEQ:
+                if "partial" in self.data:
+                    return False
+                return self.sequence_info.length == self.length
+            elif self.transcript.annotation_consortium == AnnotationConsortium.ENSEMBL:
+                return True
+
+        return False
+
     @property
-    def alignment_gap(self):
+    def sequence_info(self):
+        return TranscriptVersionSequenceInfo.get(self.accession)
+
+    @lazy
+    def alignment_gap(self) -> bool:
         if self.transcript.annotation_consortium == AnnotationConsortium.REFSEQ:
-            # Sometimes there is a gap aligning transcripts to the genome, which means we can't use these coordinates
-            # to resolve HGVS (as PyHGVS only uses exons/CDS and has no code to adjust for gaps)
+            # Sometimes RefSeq transcripts have gaps when aligning to the genome
+            # We've modified PyHGVS to be able to handle this
             if "cdna_match" in self.data or "partial" in self.data:
                 return True
-            tvsi = TranscriptVersionSequenceInfo.get(self.accession)
-            return tvsi.length != self.length
+            return self.sequence_info.length != self.length
 
         # Ensembl transcripts use genomic sequence so there is never any gap
         return False
@@ -846,8 +862,15 @@ class TranscriptVersion(SortByPKMixin, models.Model):
 
     @lazy
     def length(self) -> Optional[int]:
-        if 'exons' in self.data:
-            return self._sum_intervals(self.data["exons"])
+        if cdna_match := self.data.get('cdna_match'):
+            # cdna_match = (genomic start, genomic end, cDNA start, cDNA end, gap) (genomic=0 based, transcript=1)
+            if self.data["strand"] == '-':
+                transcript_end_match = cdna_match[0]
+            else:
+                transcript_end_match = cdna_match[-1]
+            return transcript_end_match[3]
+        if exons := self.data.get("exons"):
+            return self._sum_intervals(exons)
         return None
 
     @lazy

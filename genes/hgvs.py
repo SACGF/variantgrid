@@ -512,7 +512,7 @@ class HGVSMatcher:
         lrg_identifier = hgvs_name.gene
 
         if transcript_version := LRGRefSeqGene.get_transcript_version(genome_build, lrg_identifier):
-            if HGVSMatcher._pyhgvs_ok(transcript_version):
+            if transcript_version.hgvs_ok:
                 # Replace LRG transcript with local RefSeq
                 hgvs_name.gene = None
                 hgvs_name.transcript = transcript_version.accession
@@ -530,11 +530,6 @@ class HGVSMatcher:
             return self._clingen_get_variant_tuple(hgvs_string), self.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY
         except ClinGenAllele.ClinGenAlleleRegistryException as cga_re:
             raise ValueError(f"Could not retrieve {hgvs_string} from ClinGen Allele Registry") from cga_re
-
-    @staticmethod
-    def _pyhgvs_ok(transcript_version: TranscriptVersion) -> bool:
-        """ Some transcripts align with gaps to the genome, and thus we can't use PyHGVS (which uses exons + CDS) """
-        return transcript_version.has_valid_data and not transcript_version.alignment_gap
 
     @staticmethod
     def _get_clingen_allele_registry_key(transcript_accession: str) -> str:
@@ -583,7 +578,7 @@ class HGVSMatcher:
                 hgvs_name.transcript = tv.accession
                 hgvs_string_for_version = hgvs_name.format()
                 method = None
-                if self._pyhgvs_ok(tv):  # Attempt to use PyHGVS 1st as it's faster
+                if tv.hgvs_ok:  # Attempt to use PyHGVS 1st as it's faster
                     method = self.HGVS_METHOD_PYHGVS
                     variant_tuple = self._pyhgvs_get_variant_tuple(hgvs_string_for_version, tv)
                 elif self._clingen_allele_registry_ok(tv.accession):
@@ -691,7 +686,7 @@ class HGVSMatcher:
 
     def _lrg_variant_to_hgvs(self, variant: Variant, lrg_identifier: str = None) -> Tuple[HGVSName, str]:
         if transcript_version := LRGRefSeqGene.get_transcript_version(self.genome_build, lrg_identifier):
-            if HGVSMatcher._pyhgvs_ok(transcript_version):
+            if transcript_version.hgvs_ok:
                 hgvs_name, hgvs_method = self._variant_to_hgvs(variant, transcript_version.accession)
                 if hgvs_name.transcript != transcript_version.accession:
                     msg = f"Error creating HGVS for {variant}, LRG '{lrg_identifier}' asked for HGVS " \
@@ -731,7 +726,7 @@ class HGVSMatcher:
             hgvs_name = None
             for transcript_version in TranscriptVersion.filter_best_transcripts_by_accession(self.genome_build, transcript_name,
                                                                                              require_build_data=False):
-                if self._pyhgvs_ok(transcript_version):
+                if transcript_version.hgvs_ok:
                     attempted_method = self.HGVS_METHOD_PYHGVS
                     hgvs_methods.append(f"{attempted_method}: {transcript_version}")
 

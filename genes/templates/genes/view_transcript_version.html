@@ -60,6 +60,7 @@
                 <th>Gene</th>
                 <th>BioType</th>
                 <th>Alignment Gap</th>
+                <th>HGVS OK</th>
                 <th>Coordinates</th>
                 <th>Length</th>
                 <th>JSON</th>
@@ -75,6 +76,7 @@
                 <td><a class="hover-link" href="{% url 'view_gene' transcript_version.gene.pk %}">{{ transcript_version.gene }}</a></td>
                 <td>{{ transcript_version.biotype }}</td>
                 <td>{{ transcript_version.alignment_gap }}</td>
+                <td>{{ transcript_version.hgvs_ok }}</td>
                 {% if transcript_version.has_valid_data %}
                     <td>{{ transcript_version.coordinates }}</td>
                     <td>{{ transcript_version.length }}</td>
@@ -116,13 +118,15 @@
         <h3>Alignment Gap</h3>
         <p>
             Genomic coordinates for transcript exons/CDS etc are made by aligning cDNA sequences to the genome.
-            These sequences are not identical and the alignment may have gaps.
-            These are detected by the GFF/GTF containing a "gap_count" attribute, or the cDNA transcript length
-            from Fasta or retrieved from API having a different length than the sum of exons lengths in the alignment.
-        </p>
-        <p>
-            When a TranscriptVersion has an alignment gap, we can't use the genome to convert to/from HGVS, and so use ClinGen Allele Registry.
-            This will make conversion slower for these transcripts.
+
+            Ensembl transcripts always match the reference sequence, but some RefSeq transcript sequences differ from
+            the reference genome, so the alignment can have gaps.
+
+            We can adjust for these gaps if we have "cDNA_match" alignment information, but cannot currently handle
+            partial alignments.
+
+            HGVS OK means we can use this transcript version to convert to/from HGVS. If this is false, we will use the
+            ClinGen Allele Registry, though this will be slower as it involves an internet request.
         </p>
 
     {% endif %}
@@ -132,7 +136,7 @@
         
         <ul class="messages">
             <li class="warning">
-                Transcripts differ between genome versions, which may affect HGVS coordinates between builds
+                Transcripts differ between genome versions
             </li>
         </ul>        
 
