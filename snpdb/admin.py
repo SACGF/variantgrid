@@ -1,12 +1,13 @@
 from typing import List
 
 from django.contrib import admin, messages
-
+from django.contrib.admin.widgets import AdminTextInputWidget
+from django.db.models import QuerySet
 from snpdb import models
 from snpdb.admin_utils import ModelAdminBasics, GuardedModelAdminBasics, admin_list_column, \
     admin_action
 from snpdb.liftover import liftover_alleles
-from snpdb.models import Allele, VariantAllele
+from snpdb.models import Allele, VariantAllele, ClinVarKey, ClinVarKeyExcludePattern
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models_admin_forms import LabAdmin, OrganizationAdmin
 
@@ -90,14 +91,46 @@ class UserPageAck(ModelAdminBasics):
     list_display = ('user', 'page_id')
 
 
+class ClinVarKeyExcludePatternAdmin(admin.TabularInline):
+    model = ClinVarKeyExcludePattern
+
+    formfield_overrides = {
+        models.TextField: {'widget': AdminTextInputWidget}
+    }
+
+
 class ClinVarKeyAdmin(ModelAdminBasics):
     list_display = ('id', 'created', 'modified')
+    inlines = (ClinVarKeyExcludePatternAdmin,)
+
+    def run_ignores(self, request, queryset: QuerySet[ClinVarKey], apply: bool):
+        from classification.models.clinvar_export_exclude_utils import ClinVarExcludePatternUtil
+        for clinvar_key in queryset:
+            ignore_util = ClinVarExcludePatternUtil(clinvar_key)
+            test_results = ignore_util.run_all(apply=apply)
+            if not apply:
+                self.message_user(request, "Dry-run Only")
+            if test_results:
+                for key, ids in test_results.items():
+                    message = f"{clinvar_key} {key} : {len(ids)} - e.g. classification ids {ids[0:5]}"
+                    self.message_user(request, message)
+            else:
+                self.message_user(request, f"{clinvar_key} no ignores")
+
+    @admin_action("Don't Share Flags - Dry Run")
+    def ignore_dry_run(self, request, queryset: QuerySet[ClinVarKey]):
+        self.run_ignores(request, queryset, False)
+
+    @admin_action("Don't Share Flags - Apply")
+    def ignore_apply(self, request, queryset: QuerySet[ClinVarKey]):
+        self.run_ignores(request, queryset, True)
 
     def get_form(self, request, obj=None, **kwargs):
 
         return super(ClinVarKeyAdmin, self).get_form(request, obj, widgets={
             'id': admin.widgets.AdminTextInputWidget(),
-            'behalf_org_id': admin.widgets.AdminTextInputWidget()
+            'api_key': admin.widgets.AdminTextInputWidget(),
+            'org_id': admin.widgets.AdminTextInputWidget()
         }, **kwargs)
 
 

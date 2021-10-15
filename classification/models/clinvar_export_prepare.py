@@ -1,6 +1,7 @@
 from collections import defaultdict
 from typing import Dict, List, Optional, Set
 
+from django.db.models import QuerySet
 from django.utils.timezone import now
 
 from classification.enums import ShareLevel
@@ -108,10 +109,6 @@ class ClinvarAlleleExportPrepare:
             variant__in=self.allele.variants,
             share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS
         )
-
-        # filter out records we're specifically not sharing from consideration
-        #
-        all_classifications = [c for c in all_classifications if not c.flag_collection.get_open_flag_of_type(flag_type=classification_flag_types.classification_not_public)]
 
         def has_condition(c: Classification):
             if resolved_condition := c.condition_resolution_obj:
