@@ -9,5 +9,35 @@
     {% labelled label="ClinVar API Key" %}{% if clinvar_key.api_key %}{{ clinvar_key.api_key|slice:"0:4" }}****{% else %}{{ 'error' | severity_icon}} <span class="no-value">NOT PROVIDED</span>{% endif %}{% endlabelled %}
     {% labelled label="Inject ACMG into Description" %}{{ clinvar_key.inject_acmg_description | boolean }}{% endlabelled %}
     {% labelled label="Default Affected Status" %}{{ clinvar_key.get_default_affected_status_display }}{% endlabelled %}
-    {% labelled label="Assert Method Configuration" %}{% code_json clinvar_key.assertion_method_lookup %}</div>{% endlabelled %}
+    {% labelled label="Assert Method Configuration" %}{% code_json clinvar_key.assertion_method_lookup %}{% endlabelled %}
+
+
+    {% labelled label="Exclude Patterns" %}
+        {% if clinvar_key.clinvarkeyexcludepattern_set.exists %}
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Evidence Key</th>
+                        <th>Pattern</th>
+                        <th>Case Insensitive</th>
+                        <th>Mode</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for exclude_pattern in clinvar_key.clinvarkeyexcludepattern_set.all %}
+                    <tr>
+                        <td>{{ exclude_pattern.name }}</td>
+                        <td>{{ exclude_pattern.evidence_key }}</td>
+                        <td>{% code_regex exclude_pattern.pattern %}</td>
+                        <td class="text-center">{{ exclude_pattern.case_insensitive | boolean }}</td>
+                        <td class="text-center">{{ exclude_pattern.get_mode_display }}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <div class="no-value">No Exclude Patterns Configured</div>
+        {% endif %}
+    {% endlabelled %}
 </div>
