@@ -6,9 +6,9 @@ from typing import List, Any, Mapping, TypedDict, Union
 from lazy import lazy
 
 from annotation.regexes import DbRegexes
-from classification.enums import SpecialEKeys, EvidenceKeyValueType
+from classification.enums import SpecialEKeys, EvidenceKeyValueType, ShareLevel
 from classification.models import ClassificationModification, EvidenceKeyMap, EvidenceKey, \
-    MultiCondition, ClinVarExport, classification_flag_types
+    MultiCondition, ClinVarExport, classification_flag_types, Classification
 from classification.models.evidence_mixin import VCDbRefDict
 from genes.hgvs import CHGVS
 from library.utils import html_to_text
@@ -108,7 +108,7 @@ class ClinVarExportConverter:
         classification_flag_types.matching_variant_warning_flag: JsonMessages.error("Classification has open variant warning flag"),
         classification_flag_types.discordant: JsonMessages.error("Classification is in discordance"),
         classification_flag_types.internal_review: JsonMessages.error("Classification is in internal review"),
-        classification_flag_types.classification_not_public: JsonMessages.error("Classification specifically marked as not to share")
+        classification_flag_types.classification_not_public: JsonMessages.error("Classification marked as Exclude from ClinVar")
     }
 
     def __init__(self, clinvar_export_record: ClinVarExport):
@@ -179,6 +179,21 @@ class ClinVarExportConverter:
             for flag in self.classification_based_on.classification.flag_collection.flags(only_open=True):
                 if message := ClinVarExportConverter.FLAG_TYPES_TO_MESSAGES.get(flag.flag_type):
                     messages += message
+
+            # see if other shared classifications for the clinvar_key variant combo don't have a resolved condition
+            # but only if they don't have an open don't share flag
+            allele = self.clinvar_export_record.clinvar_allele.allele
+            if other_classifications_for_key := Classification.objects.filter(
+                withdrawn=False,
+                variant__in=allele.variants,
+                share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS
+            ).exclude(id=self.classification_based_on.id):
+                for c in other_classifications_for_key:
+                    has_condition = (resolved_condition := c.condition_resolution_obj) and len(resolved_condition.terms) >= 1
+                    if not has_condition:
+                        # make sure it doesn't have an exclude flag, no point complaining about that
+                        if not c.flag_collection_safe.get_open_flag_of_type(flag_type=classification_flag_types.classification_not_public):
+                            messages += JsonMessages.error(f"Another classification for this allele '{c.lab_record_id}' has an unresolved condition with text '{c.get(SpecialEKeys.CONDITION)}'")
 
             return ValidatedJson(data, messages)
 

@@ -11,7 +11,6 @@
     {% labelled label="Default Affected Status" %}{{ clinvar_key.get_default_affected_status_display }}{% endlabelled %}
     {% labelled label="Assert Method Configuration" %}{% code_json clinvar_key.assertion_method_lookup %}{% endlabelled %}
 
-
     {% labelled label="Exclude Patterns" %}
         {% if clinvar_key.clinvarkeyexcludepattern_set.exists %}
             <table class="table">
