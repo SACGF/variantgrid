@@ -298,3 +298,53 @@ def convert_transcript_pyreference_to_pyhgvs(transcript_data: Dict) -> Dict:
 
     return pyhgvs_data
 
+# TODO: Need to handle releases
+
+"""
+        release = None
+        if release_version and not dry_run:
+            release, created = GeneAnnotationRelease.objects.update_or_create(version=release_version,
+                                                                              genome_build=self.genome_build,
+                                                                              annotation_consortium=self.annotation_consortium,
+                                                                              defaults={
+                                                                                  "gene_annotation_import": import_source
+                                                                              })
+            if not created:
+                print("Release exists - clearing existing data")
+                release.releasegeneversion_set.all().delete()
+                release.releasetranscriptversion_set.all().delete()
+
+
+        # Insert stuff etc
+
+
+        if release:
+            release_gene_version_list = []
+            for gene_id, version in gff3_gene_versions.items():
+                gv = self.known_gene_versions_by_gene_id[gene_id][version]
+                release_gene_version_list.append(ReleaseGeneVersion(release=release, gene_version=gv))
+            if release_gene_version_list:
+                print(f"Inserting {len(release_gene_version_list)} gene versions for release {release}")
+                if not dry_run:
+                    ReleaseGeneVersion.objects.bulk_create(release_gene_version_list)
+
+            release_transcript_version_list = []
+            for transcript_id, version in gff3_transcript_versions.items():
+                tv = self.known_transcript_versions_by_transcript_id[transcript_id][version]
+                release_transcript_version_list.append(ReleaseTranscriptVersion(release=release, transcript_version=tv))
+            if release_transcript_version_list:
+                print(f"Inserting {len(release_transcript_version_list)} transcript versions for release {release}")
+                if not dry_run:
+                    ReleaseTranscriptVersion.objects.bulk_create(release_transcript_version_list)
+
+            print("Matching existing gene list symbols to this release...")
+            if not dry_run:
+                gm = GeneMatcher(release)
+                gm.match_unmatched_in_hgnc_and_gene_lists()
+
+            if unknown_gene_ids and self.annotation_consortium == AnnotationConsortium.REFSEQ:
+                print("Created new RefSeq genes - retrieving gene summaries via API")
+                if not dry_run:
+                    retrieve_refseq_gene_summaries()
+
+"""
