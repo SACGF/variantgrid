@@ -5,11 +5,6 @@ from django.db import migrations
 from manual.operations.manual_operations import ManualOperation
 
 
-def _test_has_legacy_classifications(apps):
-    Classification = apps.get_model("classification", "Classification")
-    return Classification.objects.all().exists()
-
-
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -17,6 +12,5 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        ManualOperation(task_id=ManualOperation.task_id_manage(["fix_legacy_classification_alignment_gap_hgvs_matching"]),
-                        test=_test_has_legacy_classifications),
+        # This has been deleted
     ]

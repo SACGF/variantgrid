@@ -337,8 +337,12 @@ class GeneAnnotationImport(TimeStampedModel):
     annotation_consortium = models.CharField(max_length=1, choices=AnnotationConsortium.choices)
     genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)
     filename = models.TextField()
+    url = models.TextField(null=True)
+    file_md5sum = models.TextField()
 
     def __str__(self):
+        if self.url:
+            return self.url
         return os.path.basename(self.filename)
 
 
@@ -415,7 +419,7 @@ class GeneVersion(models.Model):
     """ A specific version of a Gene for a particular version/genome build
         Genes/TranscriptVersion needs to be able to represent both RefSeq and Ensembl """
     gene = models.ForeignKey(Gene, on_delete=CASCADE)
-    version = models.IntegerField()  # RefSeq GeneIDs are always 1 (not versioned)
+    version = models.IntegerField()  # RefSeq GeneIDs are always 0 (not versioned) need non-null for unique_together
     # symbol can be null as Ensembl has genes w/o symbols, eg ENSG00000238009 (lncRNA)
     gene_symbol = models.ForeignKey(GeneSymbol, null=True, on_delete=CASCADE)
     hgnc = models.ForeignKey(HGNC, null=True, on_delete=CASCADE)
@@ -429,7 +433,7 @@ class GeneVersion(models.Model):
 
     @lazy
     def accession(self):
-        if self.version is not None and self.gene.has_versions():
+        if self.gene.has_versions():
             acc = f"{self.gene_id}.{self.version}"
         else:
             acc = self.gene_id
@@ -564,9 +568,6 @@ class TranscriptVersion(SortByPKMixin, models.Model):
     genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)
     import_source = models.ForeignKey(GeneAnnotationImport, on_delete=CASCADE)
     biotype = models.TextField(null=True)  # Ensembl has gene + transcript biotypes
-    # Sometimes there is a gap aligning transcripts to the genome, which means we can't use this TranscriptVersion
-    # to resolve HGVS (as PyHGVS only uses exons/CDS and has adjustment for gaps)
-    alignment_gap = models.BooleanField(default=False)
     data = models.JSONField(null=False, blank=True, default=empty_dict)  # for pyHGVS
 
     class Meta:
@@ -664,6 +665,35 @@ class TranscriptVersion(SortByPKMixin, models.Model):
     @property
     def gene_symbol(self):
         return self.gene_version.gene_symbol
+
+    @lazy
+    def hgvs_ok(self) -> bool:
+        """ """
+        if self.has_valid_data:
+            if self.transcript.annotation_consortium == AnnotationConsortium.REFSEQ:
+                if "partial" in self.data:
+                    return False
+                return self.sequence_info.length == self.length
+            elif self.transcript.annotation_consortium == AnnotationConsortium.ENSEMBL:
+                return True
+
+        return False
+
+    @property
+    def sequence_info(self):
+        return TranscriptVersionSequenceInfo.get(self.accession)
+
+    @lazy
+    def alignment_gap(self) -> bool:
+        if self.transcript.annotation_consortium == AnnotationConsortium.REFSEQ:
+            # Sometimes RefSeq transcripts have gaps when aligning to the genome
+            # We've modified PyHGVS to be able to handle this
+            if "cdna_match" in self.data or "partial" in self.data:
+                return True
+            return self.sequence_info.length != self.length
+
+        # Ensembl transcripts use genomic sequence so there is never any gap
+        return False
 
     @staticmethod
     def get_transcript_id_and_version(transcript_name: str) -> Tuple[str, int]:
@@ -810,7 +840,7 @@ class TranscriptVersion(SortByPKMixin, models.Model):
         if transcript_version is None:
             TranscriptVersion.raise_bad_or_missing_transcript(transcript_name)
 
-        if 'id' not in transcript_version.data:
+        if 'exons' not in transcript_version.data:
             # only going to happen if we have legacy data in the database, transcripts that use the default for data {}
             data_str = json.dumps(transcript_version.data)
             raise MissingTranscript(f"Transcript for '{transcript_name}' (build: {genome_build}),"
@@ -832,8 +862,15 @@ class TranscriptVersion(SortByPKMixin, models.Model):
 
     @lazy
     def length(self) -> Optional[int]:
-        if 'exons' in self.data:
-            return self._sum_intervals(self.data["exons"])
+        if cdna_match := self.data.get('cdna_match'):
+            # cdna_match = (genomic start, genomic end, cDNA start, cDNA end, gap) (genomic=0 based, transcript=1)
+            if self.data["strand"] == '-':
+                transcript_end_match = cdna_match[0]
+            else:
+                transcript_end_match = cdna_match[-1]
+            return transcript_end_match[3]
+        if exons := self.data.get("exons"):
+            return self._sum_intervals(exons)
         return None
 
     @lazy
@@ -986,8 +1023,8 @@ class TranscriptVersionSequenceInfoFastaFileImport(TimeStampedModel):
 
 
 class TranscriptVersionSequenceInfo(TimeStampedModel):
-    """ Current main use of this is to download transcript version lengths from the web, and then
-        set TranscriptVersion.alignment_gap = True if they don't match
+    """ Current main use of this is to download transcript version lengths from the web
+        and check if TranscriptVersion exons sum to the same length
 
         Lengths not matching means there is a gap, but we can't be sure there isn't a gap """
     transcript = models.ForeignKey(Transcript, on_delete=CASCADE)
@@ -1021,7 +1058,6 @@ class TranscriptVersionSequenceInfo(TimeStampedModel):
             tvi = TranscriptVersionSequenceInfo._get_and_store_from_refseq_api(transcript_accession)
         else:
             tvi = TranscriptVersionSequenceInfo._get_and_store_from_ensembl_api(transcript_accession)
-        TranscriptVersionSequenceInfo.set_transcript_version_alignment_gap_if_length_different([tvi])
         return tvi
 
     @staticmethod
@@ -1134,29 +1170,7 @@ class TranscriptVersionSequenceInfo(TimeStampedModel):
             TranscriptVersionSequenceInfo.objects.bulk_create(new_records, ignore_conflicts=True, batch_size=2000)
             for tvi in new_records:
                 tvi_by_id[tvi.accession] = tvi
-            TranscriptVersionSequenceInfo.set_transcript_version_alignment_gap_if_length_different(new_records)
         return tvi_by_id
-
-    @staticmethod
-    def set_transcript_version_alignment_gap_if_length_different(tvis: Iterable['TranscriptVersionSequenceInfo']):
-        transcript_version_lengths = defaultdict(dict)
-        for tvi in tvis:
-            transcript_version_lengths[tvi.transcript_id][tvi.version] = tvi.length
-
-        accessions_by_build_with_alignment_gap = defaultdict(list)
-        for tv in TranscriptVersion.objects.filter(alignment_gap=False,
-                                                   transcript__in=transcript_version_lengths.keys()):
-            if known_length := transcript_version_lengths.get(tv.transcript_id, {}).get(tv.version):
-                if calc_length := tv.length:
-                    if known_length != calc_length:
-                        tv.alignment_gap = True
-                        accessions_by_build_with_alignment_gap[tv.genome_build].append(tv.accession)
-
-        for genome_build, accessions_with_alignment_gap in accessions_by_build_with_alignment_gap.items():
-            logging.info("Setting %d records for %s with alignment_gap=True",
-                         len(accessions_with_alignment_gap), genome_build)
-            TranscriptVersion.update_accessions(accessions_with_alignment_gap,
-                                                genome_build=genome_build, alignment_gap=True)
 
 
 class LRGRefSeqGene(models.Model):

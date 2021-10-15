@@ -1,6 +1,7 @@
 from unittest import TestCase
 
-from genes.management.commands.import_gene_annotation2 import convert_transcript_pyreference_to_pyhgvs
+from genes.management.commands.import_gene_annotation2 import convert_transcript_pyreference_to_pyhgvs, \
+    convert_gene_pyreference_to_gene_version_data
 
 
 class TestAnnotationVCF(TestCase):
@@ -131,4 +132,167 @@ class TestAnnotationVCF(TestCase):
         }
 
         output = convert_transcript_pyreference_to_pyhgvs(PYREFERENCE_DATA_NM_004656_4)
+        self.assertEquals(EXPECTED_DATA, output)
+
+    def test_convert_transcript_pyreference_to_pyhgvs_gaps(self):
+        PYREFERENCE_DATA_NM_015120_4 = {
+            'biotype': ['protein_coding'],
+            'cds_end': 73609612,
+            'cds_start': 73385868,
+            'chr': 'NC_000002.12',
+            'features_by_type': {'3PUTR': [{'start': 73609612, 'stop': 73609919}],
+                                 '5PUTR': [{'start': 73385757, 'stop': 73385868}],
+                                 'CDS': [{'start': 73385868, 'stop': 73386192},
+                                         {'start': 73408621, 'stop': 73408747},
+                                         {'start': 73419122, 'stop': 73419318},
+                                         {'start': 73422856, 'stop': 73422974},
+                                         {'start': 73424429, 'stop': 73424902},
+                                         {'start': 73426452, 'stop': 73426553},
+                                         {'start': 73432197, 'stop': 73432291},
+                                         {'start': 73447959, 'stop': 73454067},
+                                         {'start': 73455161, 'stop': 73455295},
+                                         {'start': 73489633, 'stop': 73491498},
+                                         {'start': 73519774, 'stop': 73520016},
+                                         {'start': 73534823, 'stop': 73534949},
+                                         {'start': 73550266, 'stop': 73550437},
+                                         {'start': 73557219, 'stop': 73557354},
+                                         {'start': 73558971, 'stop': 73559142},
+                                         {'start': 73572261, 'stop': 73573424},
+                                         {'start': 73599400, 'stop': 73599521},
+                                         {'start': 73600677, 'stop': 73600881},
+                                         {'start': 73601194, 'stop': 73601436},
+                                         {'start': 73602184, 'stop': 73602368},
+                                         {'start': 73603240, 'stop': 73603304},
+                                         {'start': 73608474, 'stop': 73608574},
+                                         {'start': 73609567, 'stop': 73609612}],
+                                 'cDNA_match': [{'gap': 'M185 I3 M250', 'start': 73385757, 'stop': 73386192},
+                                                {'start': 73408621, 'stop': 73408747},
+                                                {'start': 73419122, 'stop': 73419318},
+                                                {'start': 73422856, 'stop': 73422974},
+                                                {'start': 73424429, 'stop': 73424902},
+                                                {'start': 73426452, 'stop': 73426553},
+                                                {'start': 73432197, 'stop': 73432291},
+                                                {'start': 73447959, 'stop': 73454067},
+                                                {'start': 73455161, 'stop': 73455295},
+                                                {'start': 73489633, 'stop': 73491498},
+                                                {'start': 73519774, 'stop': 73520016},
+                                                {'start': 73534823, 'stop': 73534949},
+                                                {'start': 73550266, 'stop': 73550437},
+                                                {'start': 73557219, 'stop': 73557354},
+                                                {'start': 73558971, 'stop': 73559142},
+                                                {'start': 73572261, 'stop': 73573424},
+                                                {'start': 73599400, 'stop': 73599521},
+                                                {'start': 73600677, 'stop': 73600881},
+                                                {'start': 73601194, 'stop': 73601436},
+                                                {'start': 73602184, 'stop': 73602368},
+                                                {'start': 73603240, 'stop': 73603304},
+                                                {'start': 73608474, 'stop': 73608574},
+                                                {'start': 73609567, 'stop': 73609919}],
+                                 'exon': [{'start': 73385757, 'stop': 73386192},
+                                          {'start': 73408621, 'stop': 73408747},
+                                          {'start': 73419122, 'stop': 73419318},
+                                          {'start': 73422856, 'stop': 73422974},
+                                          {'start': 73424429, 'stop': 73424902},
+                                          {'start': 73426452, 'stop': 73426553},
+                                          {'start': 73432197, 'stop': 73432291},
+                                          {'start': 73447959, 'stop': 73454067},
+                                          {'start': 73455161, 'stop': 73455295},
+                                          {'start': 73489633, 'stop': 73491498},
+                                          {'start': 73519774, 'stop': 73520016},
+                                          {'start': 73534823, 'stop': 73534949},
+                                          {'start': 73550266, 'stop': 73550437},
+                                          {'start': 73557219, 'stop': 73557354},
+                                          {'start': 73558971, 'stop': 73559142},
+                                          {'start': 73572261, 'stop': 73573424},
+                                          {'start': 73599400, 'stop': 73599521},
+                                          {'start': 73600677, 'stop': 73600881},
+                                          {'start': 73601194, 'stop': 73601436},
+                                          {'start': 73602184, 'stop': 73602368},
+                                          {'start': 73603240, 'stop': 73603304},
+                                          {'start': 73608474, 'stop': 73608574},
+                                          {'start': 73609567, 'stop': 73609919}]},
+            'is_coding': 1,
+            'start': 73385757,
+            'stop': 73609919,
+            'strand': '+'
+        }
+
+        EXPECTED_DATA = {
+            'chrom': 'NC_000002.12',
+            'start': 73385757,
+            'end': 73609919,
+            'strand': '+',
+            'cds_start': 73385868,
+            'cds_end': 73609612,
+            'exons': [[73385757, 73386192],
+                      [73408621, 73408747],
+                      [73419122, 73419318],
+                      [73422856, 73422974],
+                      [73424429, 73424902],
+                      [73426452, 73426553],
+                      [73432197, 73432291],
+                      [73447959, 73454067],
+                      [73455161, 73455295],
+                      [73489633, 73491498],
+                      [73519774, 73520016],
+                      [73534823, 73534949],
+                      [73550266, 73550437],
+                      [73557219, 73557354],
+                      [73558971, 73559142],
+                      [73572261, 73573424],
+                      [73599400, 73599521],
+                      [73600677, 73600881],
+                      [73601194, 73601436],
+                      [73602184, 73602368],
+                      [73603240, 73603304],
+                      [73608474, 73608574],
+                      [73609567, 73609919]],
+            'cdna_match': ['M185 I3 M250',
+                           None,
+                           None,
+                           None,
+                           None,
+                           None,
+                           None,
+                           None,
+                           None,
+                           None,
+                           None,
+                           None,
+                           None,
+                           None,
+                           None,
+                           None,
+                           None,
+                           None,
+                           None,
+                           None,
+                           None,
+                           None,
+                           None]
+        }
+
+        output = convert_transcript_pyreference_to_pyhgvs(PYREFERENCE_DATA_NM_015120_4)
+        self.assertEquals(EXPECTED_DATA, output)
+
+    def test_convert_gene(self):
+        PYREFERENCE_GENE = {
+            'HGNC': 'HGNC:1100',
+            'biotype': ['protein_coding'],
+            'chr': 'NC_000017.11',
+            'description': 'BRCA1 DNA repair associated',
+            'name': 'BRCA1',
+            'start': 43044294,
+            'stop': 43125364,
+            'strand': '-',
+            'transcripts': ['NM_007294.4']
+        }
+
+        EXPECTED_DATA = {
+            'hgnc': '1100',
+            'biotype': 'protein_coding',
+            'description': 'BRCA1 DNA repair associated',
+            'gene_symbol': 'BRCA1',
+        }
+        output = convert_gene_pyreference_to_gene_version_data(PYREFERENCE_GENE)
         self.assertEquals(EXPECTED_DATA, output)
