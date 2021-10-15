@@ -32,13 +32,13 @@ def published(sender,
 
 @dataclass(frozen=True)
 class ExcludeStatus:
-    old_ignored: bool
-    new_ignored: bool
+    old_exclude: bool
+    new_exclude: bool
     manual_edit: bool
 
     def __str__(self):
-        old_str = "Exclude" if self.old_ignored else "Consider"
-        new_str = "Exclude" if self.new_ignored else "Consider"
+        old_str = "Exclude" if self.old_exclude else "Consider"
+        new_str = "Exclude" if self.new_exclude else "Consider"
         result: str
         if old_str == new_str:
             result = f"{old_str} (No Change)"
