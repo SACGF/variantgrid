@@ -2,7 +2,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from functools import total_ordering
 from operator import attrgetter
-from typing import Dict, List, Collection, Optional
+from typing import Dict, List, Collection, Optional, Tuple
 
 from django.contrib.auth.models import User
 from lazy import lazy
@@ -50,34 +50,32 @@ class AlleleOverlap:
     def discordant_level(self) -> DiscordanceLevel:
         return self.discordance_status.level
 
+    LEVEL_SORT_DICT = {
+        DiscordanceLevel.DISCORDANT: 4,
+        DiscordanceLevel.CONCORDANT_CONFIDENCE: 3,
+        DiscordanceLevel.CONCORDANT_DIFF_VUS: 2,
+        DiscordanceLevel.CONCORDANT_AGREEMENT: 1
+    }
+
     @lazy
-    def discordance_score(self) -> int:
+    def discordance_score(self) -> Tuple:
         """
-        Return a score indicating how discordant a variant is
-        Ones with clinical context marked as discordant are the most
-        Otherwise assign a score based on how many different clinical significances are present
-        (remember that some environments don't have discordance enabled)
+        Return an object appropriate for comparison sort with bigger meaning "more discordant"
+        Considers the items in the following order:
+        Discordance Level
+        Number of involved labs
+        Number of involved labs that have at least 1 shared record
+        Number of records
+        Allele ID (just for a final tie breaker)
         """
 
-        score = 0
-        if self.discordance_status.lab_count > 1:
-            score += 100000
-
-        level = self.discordant_level
-        if level == DiscordanceLevel.DISCORDANT:
-            score += 50000
-        elif level == DiscordanceLevel.CONCORDANT_CONFIDENCE:
-            score += 25000
-        elif level == DiscordanceLevel.CONCORDANT_DIFF_VUS:
-            score += 20000
-        elif level == DiscordanceLevel.CONCORDANT_AGREEMENT:
-            score += 10000 # leave the single submissions as last
-
-        score += self.discordance_status.lab_count * 100  # give more priority to shared labs
-        score += self.discordance_status.lab_count_all * 10  # but still give > 0 priority to unshared labs
-        score += len(self.ccs) # and finally number of classifications
-
-        return score
+        return (
+            AlleleOverlap.LEVEL_SORT_DICT.get(self.discordant_level, 0),
+            self.discordance_status.lab_count,
+            self.discordance_status.lab_count_all,
+            len(self.vcms),
+            self.allele.id
+        )
 
     @lazy
     def unique_hgvses(self) -> List[CHGVS]:
@@ -114,11 +112,7 @@ class AlleleOverlap:
         return self.allele == other.allele
 
     def __lt__(self, other: 'AlleleOverlap'):
-        score_diff = self.discordance_score - other.discordance_score
-        if score_diff == 0:
-            # fall back on allele ID just to give us consistent ordering
-            return self.allele.id < other.allele.id
-        return score_diff < 0
+        return self.discordance_score < other.discordance_score
 
     def by_clinical_groupings(self) -> List[AlleleOverlapClinicalGrouping]:
         by_group: Dict[ClinicalContext, List[ClassificationModification]] = defaultdict(list)
