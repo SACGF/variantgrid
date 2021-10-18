@@ -76,17 +76,22 @@
         };
     </script>
     <style>
-        .clinvar-export-table .dt-allele {
-            width: 15%;
+        .clinvar-export-table .dt-id {
+            width: 20px;
         }
-        .clinvar-export-table .dt-scv {
-            width: 15%;
+        .clinvar-export-table .dt-c_hgvs {
+            width: 30%;
+        }
+        .clinvar-export-table .dt-condition {
+            width: 30%;
         }
         .clinvar-export-table td.dt-status {
-            width: 10%;
+            width: 30px;
             text-align: center;
             position: relative;
         }
+
+
         .clinvar-export-table td.dt-status i {
             position: relative;
             left: -10px;
@@ -106,7 +111,7 @@
     <div class="container">
         {% if all_keys.count > 1 %}
             <div class="btn-group mb-4" role="group" aria-label="ClinVar Key Picker">
-                {% for key in all_keys %}<a type="button" href="{% url 'clinvar_key_summary' key.pk %}" class="btn {% if key.pk == clinvar_key.pk %}btn-secondary{% else %}btn-outline-secondary{% endif %}">{{ key.pk }}</a>{% endfor %}
+                {% for key in all_keys %}<a type="button" href="{% url 'clinvar_key_summary' key.pk %}" class="btn {% if key.pk == clinvar_key.pk %}btn-secondary text-black-50 font-weight-bold{% else %}btn-outline-secondary{% endif %}">{{ key.pk }}</a>{% endfor %}
             </div>
         {% endif %}
 
@@ -147,7 +152,7 @@
         <div class="text-info mb-1">Important: the status of ClinVar exports is cached. Recent changes may not be reflected yet.</div>
 
         {% ui_register_tab_embedded tab_set="clinvar_tabs" label="Records" badge=count_records badge_status='success' %}
-            <table id="records" data-datatable-url="{% url 'clinvar_exports_datatables' %}" data-datatable-data="records" class_name="sticky-header clinvar-export-table"></table>
+            <table id="records" data-datatable-url="{% url 'clinvar_exports_datatables' %}" data-datatable-data="records" class="sticky-header clinvar-export-table"></table>
             <div data-toolbar="#records">
                 <a class="download-link" href="{% url 'clinvar_key_summary_export_download' clinvar_key.pk %}">Download</a>
             </div>
