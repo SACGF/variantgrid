@@ -417,5 +417,5 @@ def db_ref(data: VCDbRefDict, css: Optional[str] = ''):
 
 
 @register.inclusion_tag("classification/tags/condition.html")
-def condition(condition_obj: ConditionResolved):
-    return {"condition": condition_obj}
+def condition(condition_obj: ConditionResolved, limit: Optional[int] = 100):
+    return {"condition": condition_obj, "limit": limit}

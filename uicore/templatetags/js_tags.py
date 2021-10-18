@@ -59,7 +59,7 @@ def jsstring(text):
 
 @register.filter
 def limit_length(text, limit=100):
-    if text and len(text) > limit:
+    if limit and text and len(text) > limit:
         return text[0:(limit-3)] + '...'
     return text
 

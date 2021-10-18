@@ -343,7 +343,7 @@
             <input class="form-control" id="cs_p" type="text" placeholder="PATHOGENIC" />
         {% endlabelled %}
         {% if user.is_superuser %}
-            {% labelled label="VCF Detail Level" value_css="admin-only" %}
+            {% labelled label="VCF Detail Level" admin_only=True %}
                 <div class="form-check">
                     <label class="form-check-label">
                         <input checked="true" id="mvl_detail_standard" type="radio" name="mvl_detail" value="standard" class="form-check-input" />
