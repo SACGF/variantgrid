@@ -76,5 +76,12 @@ class Command(BaseCommand):
         num_classifications = classification_qs.count()
         print(f"Rematching {num_classifications} classifications")
 
-        valid_record_count, invalid_record_count = reattempt_variant_matching(admin_bot(), classification_qs)
+        # Revalidate
+        user = admin_bot()
+        print(f"Revalidating...")
+        for c in classification_qs:
+            c.revalidate(user)
+
+        print(f"Rematching...")
+        valid_record_count, invalid_record_count = reattempt_variant_matching(user, classification_qs)
         print(f"{valid_record_count=}, {invalid_record_count=}")
