@@ -4,7 +4,8 @@ from django.core.management import BaseCommand
 
 from classification.classification_import import reattempt_variant_matching
 from classification.models import Classification
-from genes.models import TranscriptVersion
+from genes.models import TranscriptVersion, TranscriptVersionSequenceInfo
+from genes.models_enums import AnnotationConsortium
 from library.guardian_utils import admin_bot
 
 
@@ -34,9 +35,19 @@ class Command(BaseCommand):
                 if not tv.alignment_gap:
                     previously_good_transcripts_by_accessions[tv.accession] = tv
 
+            # For RefSeq - do batch API calls as they're much faster
+            refseq_transcripts = []
+            for transcript_accession in transcript_classification_ids.keys():
+                if AnnotationConsortium.get_from_transcript_accession(transcript_accession) == AnnotationConsortium.REFSEQ:
+                    refseq_transcripts.append(transcript_accession)
+
+            print("Batch retrieving RefSeq TranscriptVersionSequenceInfo...")
+            TranscriptVersionSequenceInfo.get_refseq_transcript_versions(refseq_transcripts)
+            print("Finished retrieving batch info")
+
             for t, classifications in transcript_classification_ids.items():
                 if transcript := previously_good_transcripts_by_accessions.get(t):
-                    # This requires an API call so only do this test for those we have to
+                    # Will used cached data from API if available from above
                     if not transcript.alignment_gap:
                         continue
                 classification_ids_to_rematch.extend(classifications)
