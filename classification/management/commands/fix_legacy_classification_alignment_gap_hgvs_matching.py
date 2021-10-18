@@ -32,8 +32,7 @@ class Command(BaseCommand):
                                                                      transcript__identifier__startswith='NM_')
             previously_good_transcripts_by_accessions = {}
             for tv in previously_good_tv_qs:
-                if not tv.alignment_gap:
-                    previously_good_transcripts_by_accessions[tv.accession] = tv
+                previously_good_transcripts_by_accessions[tv.accession] = tv
 
             # For RefSeq - do batch API calls as they're much faster
             refseq_transcripts = []
