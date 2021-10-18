@@ -29,14 +29,17 @@ class Command(BaseCommand):
                                                                      data__cdna_match__isnull=True,
                                                                      data__partial__isnull=True,
                                                                      transcript__identifier__startswith='NM_')
-            previously_good_transcript_accessions = set()
+            previously_good_transcripts_by_accessions = {}
             for tv in previously_good_tv_qs:
                 if not tv.alignment_gap:
-                    previously_good_transcript_accessions.add(tv.accession)
+                    previously_good_transcripts_by_accessions[tv.accession] = tv
 
             for t, classifications in transcript_classification_ids.items():
-                if t not in previously_good_transcript_accessions:
-                    classification_ids_to_rematch.extend(classifications)
+                if transcript := previously_good_transcripts_by_accessions.get(t):
+                    # This requires an API call so only do this test for those we have to
+                    if not transcript.alignment_gap:
+                        continue
+                classification_ids_to_rematch.extend(classifications)
 
         classification_qs = Classification.objects.filter(pk__in=classification_ids_to_rematch)
         num_classifications = classification_qs.count()
