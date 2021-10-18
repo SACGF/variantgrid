@@ -2,14 +2,6 @@
 
 from django.db import migrations
 
-from manual.operations.manual_operations import ManualOperation
-
-
-def _test_has_gene_annotations(apps):
-    GeneAnnotationImport = apps.get_model("genes", "GeneAnnotationImport")
-    return GeneAnnotationImport.objects.exists()
-
-
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -17,6 +9,5 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        ManualOperation.operation_other(args=["Update gene annotations, see https://github.com/SACGF/variantgrid/issues/459#issuecomment-905203754"],
-                                        test=_test_has_gene_annotations),
+        # This has been deleted
     ]

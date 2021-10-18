@@ -45,6 +45,12 @@ class Command(BaseCommand):
                 if transcript_accession in KNOWN_BAD_LIST:
                     continue
 
+                try:
+                    TranscriptVersion.get_transcript_id_and_version(transcript_accession)
+                except ValueError:
+                    print(f"Skipping badly formed transcript accession: '{transcript_accession}'")
+                    continue
+
                 if AnnotationConsortium.get_from_transcript_accession(transcript_accession) == AnnotationConsortium.REFSEQ:
                     refseq_transcripts.append(transcript_accession)
 
