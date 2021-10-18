@@ -1119,7 +1119,7 @@ class TranscriptVersionSequenceInfo(TimeStampedModel):
             raise NoTranscript(f"Unable to understand Ensembl API response: {data}")
 
     @staticmethod
-    def get_refseq_transcript_versions(transcript_accessions: Iterable[str]) -> Dict[str, 'TranscriptVersionSequenceInfo']:
+    def get_refseq_transcript_versions(transcript_accessions: Iterable[str], fail_on_error=True) -> Dict[str, 'TranscriptVersionSequenceInfo']:
         """ Batch method - returns DB copies if we have it, retrieves + stores from API """
         # Find the ones we already have so we don't need to re-retrieve
         all_transcript_accessions = set(transcript_accessions)
@@ -1130,7 +1130,7 @@ class TranscriptVersionSequenceInfo(TimeStampedModel):
                 tvi_by_id[tvi.accession] = tvi
 
         unknown_accessions = all_transcript_accessions - set(tvi_by_id)
-        ENTREZ_BATCH_SIZE = 500
+        ENTREZ_BATCH_SIZE = 100
 
         for id_list in iter_fixed_chunks(unknown_accessions, ENTREZ_BATCH_SIZE):
             id_param = ",".join(id_list)
@@ -1147,7 +1147,8 @@ class TranscriptVersionSequenceInfo(TimeStampedModel):
                 tvi_by_id.update(TranscriptVersionSequenceInfo._insert_from_genbank_handle(fetch_handle))
             except RuntimeError as e:
                 print(f"Entrez failed w/params: {id_param}")
-                raise e
+                if fail_on_error:
+                    raise e
 
         return tvi_by_id
 

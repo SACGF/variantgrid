@@ -35,18 +35,21 @@ class Command(BaseCommand):
                 previously_good_transcripts_by_accessions[tv.accession] = tv
 
             # For RefSeq - do batch API calls as they're much faster
+            KNOWN_BAD_LIST = {"NM_0000529.2"}
             refseq_transcripts = []
             for transcript_accession in transcript_classification_ids.keys():
                 if transcript_accession.startswith("LRG"):
                     continue
                 if "." not in transcript_accession:  # Transcript w/o version
                     continue
+                if transcript_accession in KNOWN_BAD_LIST:
+                    continue
 
                 if AnnotationConsortium.get_from_transcript_accession(transcript_accession) == AnnotationConsortium.REFSEQ:
                     refseq_transcripts.append(transcript_accession)
 
             print("Batch retrieving RefSeq TranscriptVersionSequenceInfo...")
-            TranscriptVersionSequenceInfo.get_refseq_transcript_versions(refseq_transcripts)
+            TranscriptVersionSequenceInfo.get_refseq_transcript_versions(refseq_transcripts, fail_on_error=True)
             print("Finished retrieving batch info")
 
             for t, classifications in transcript_classification_ids.items():
