@@ -237,13 +237,14 @@ class ClinVarExportBatch(TimeStampedModel):
 
         if not force_update:
             qs = qs.filter(status__in=[ClinVarExportStatus.NEW_SUBMISSION, ClinVarExportStatus.CHANGES_PENDING])
+
         qs = qs.select_related('clinvar_allele', 'clinvar_allele__clinvar_key')
         record: ClinVarExport
         for record in qs:
             if force_update:
                 record.update()
                 # only have to do a check if we're not previously doing the filter
-                if record.status in {ClinVarExportStatus.UP_TO_DATE, ClinVarExportStatus.IN_ERROR}:
+                if record.status not in {ClinVarExportStatus.CHANGES_PENDING, ClinVarExportStatus.NEW_SUBMISSION}:
                     continue
 
             full_current = record.submission_full
