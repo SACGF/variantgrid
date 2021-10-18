@@ -1134,16 +1134,20 @@ class TranscriptVersionSequenceInfo(TimeStampedModel):
 
         for id_list in iter_fixed_chunks(unknown_accessions, ENTREZ_BATCH_SIZE):
             id_param = ",".join(id_list)
-            search_results = Entrez.read(Entrez.epost("nuccore", id=id_param))
-            fetch_handle = Entrez.efetch(
-                db="nuccore",
-                rettype="gb",
-                retmode="text",
-                webenv=search_results["WebEnv"],
-                query_key=search_results["QueryKey"],
-                idtype="acc",
-            )
-            tvi_by_id.update(TranscriptVersionSequenceInfo._insert_from_genbank_handle(fetch_handle))
+            try:
+                search_results = Entrez.read(Entrez.epost("nuccore", id=id_param))
+                fetch_handle = Entrez.efetch(
+                    db="nuccore",
+                    rettype="gb",
+                    retmode="text",
+                    webenv=search_results["WebEnv"],
+                    query_key=search_results["QueryKey"],
+                    idtype="acc",
+                )
+                tvi_by_id.update(TranscriptVersionSequenceInfo._insert_from_genbank_handle(fetch_handle))
+            except RuntimeError as e:
+                print(f"Entrez failed w/params: {id_param}")
+                raise e
 
         return tvi_by_id
 
