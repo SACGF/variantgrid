@@ -32,6 +32,10 @@
             data.flags = JSON.stringify(['classification_withdrawn']);
             data.my_labs = "true";
         }
+        function classificationExcludeClinVar(data) {
+            data.flags = JSON.stringify(['classification_not_public']);
+            data.my_labs = "true";
+        }
         $(document).ready(() => {
             $('a[data-toggle="tab"]').on('shown.bs.tab', function (event) {
                 Flags.instance.init({userId: '{{user.id}}', filter: '.active', forceRender: true});
@@ -87,6 +91,12 @@
             {% ui_register_tab_embedded tab_set="classification_issues" label="Withdrawn" badge=counts.classifications.withdrawn %}
                 <table id="classifications-withdrawn" data-datatable-url="{% url 'classification_datatables' %}" class="sticky-header classification-table" data-datatable-data="classificationWithdrawn"></table>
             {% end_ui_register_tab_embedded %}
+
+            {% if clinvar_export_enabled %}
+                {% ui_register_tab_embedded tab_set="classification_issues" label="Exlcude from ClinVar" badge=counts.classifications.clinvar_exclude %}
+                    <table id="classifications-exclude-clinvar" data-datatable-url="{% url 'classification_datatables' %}" class="sticky-header classification-table" data-datatable-data="classificationExcludeClinVar"></table>
+                {% end_ui_register_tab_embedded %}
+            {% endif %}
 
             {% ui_render_tabs tab_set="classification_issues" %}
         </div>
