@@ -49,7 +49,7 @@ class Command(BaseCommand):
                     refseq_transcripts.append(transcript_accession)
 
             print("Batch retrieving RefSeq TranscriptVersionSequenceInfo...")
-            TranscriptVersionSequenceInfo.get_refseq_transcript_versions(refseq_transcripts, fail_on_error=True)
+            TranscriptVersionSequenceInfo.get_refseq_transcript_versions(refseq_transcripts, fail_on_error=False)
             print("Finished retrieving batch info")
 
             for t, classifications in transcript_classification_ids.items():
