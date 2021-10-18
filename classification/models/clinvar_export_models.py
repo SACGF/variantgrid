@@ -10,7 +10,7 @@ from django.utils.timezone import now
 from lazy import lazy
 from model_utils.models import TimeStampedModel
 
-from classification.models import ClassificationModification, ConditionResolved
+from classification.models import ClassificationModification, ConditionResolved, classification_flag_types
 from snpdb.models import ClinVarKey, Allele
 from uicore.json.json_types import JsonObjType
 from uicore.json.json_utils import JsonDiffs
@@ -50,14 +50,7 @@ class ClinVarExportStatus(models.TextChoices):
     CHANGES_PENDING = "C", "Changes Pending"
     UP_TO_DATE = "D", "Up to Date"
     IN_ERROR = "E", "Error"
-
-
-class ClinVarReleaseStatus(models.TextChoices):
-    """
-    As determined by the user currently
-    """
-    WHEN_READY = "R", "Release When Ready"
-    ON_HOLD = "H", "On Hold"
+    EXCLUDE = "X", "Exclude"
 
 
 class ClinVarExport(TimeStampedModel):
@@ -69,7 +62,6 @@ class ClinVarExport(TimeStampedModel):
     classification_based_on = models.ForeignKey(ClassificationModification, null=True, blank=True, on_delete=models.CASCADE)
     scv = models.TextField(blank=True, default='')
     status = models.CharField(max_length=1, choices=ClinVarExportStatus.choices, default=ClinVarExportStatus.NEW_SUBMISSION)
-    release_status = models.CharField(max_length=1, choices=ClinVarReleaseStatus.choices, default=ClinVarReleaseStatus.WHEN_READY)
     last_evaluated = models.DateTimeField(default=now)
     submission_body_validated = models.JSONField(null=False, blank=False, default=dict)
 
@@ -159,7 +151,10 @@ class ClinVarExport(TimeStampedModel):
         lazy.invalidate(self, 'submission_body')
 
         status: ClinVarExportStatus
-        if current_validated_json_body.has_errors:
+
+        if (cm := self.classification_based_on) and cm.classification.flag_collection_safe.get_open_flag_of_type(classification_flag_types.classification_not_public):
+            status = ClinVarExportStatus.EXCLUDE
+        elif current_validated_json_body.has_errors:
             status = ClinVarExportStatus.IN_ERROR
         else:
             if previous_submission := self.previous_submission:
@@ -238,7 +233,6 @@ class ClinVarExportBatch(TimeStampedModel):
         current_batch: Optional[ClinVarExportBatch] = None
         current_batch_size = 0
 
-        qs = qs.exclude(release_status=ClinVarReleaseStatus.ON_HOLD)
         qs = qs.order_by('clinvar_allele__clinvar_key')
 
         if not force_update:

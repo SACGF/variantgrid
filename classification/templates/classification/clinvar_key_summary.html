@@ -31,6 +31,9 @@
             } else if (data == 'C') {
                 dom = $('<i class="fas fa-cloud-upload-alt text-primary"></i>')
                 dom.attr('title', 'Changes to existing ClinVar record pending');
+            } else if (data == 'X') {
+                dom = $('<span/>', {html: [$('<i class="fas fa-globe-americas">'), $('</i><i class="fas fa-times"></i>')]});
+                dom.attr('title', 'Classification has been specifically excluded from ClinVar Export');
             } else {
                 dom = $('<span>', {text: data});
             }
@@ -79,12 +82,12 @@
         .clinvar-export-table .dt-scv {
             width: 15%;
         }
-        .clinvar-export-table td.dt-release_status, .clinvar-export-table td.dt-status {
+        .clinvar-export-table td.dt-status {
             width: 10%;
             text-align: center;
             position: relative;
         }
-        .clinvar-export-table td.dt-release_status i, .clinvar-export-table td.dt-status i {
+        .clinvar-export-table td.dt-status i {
             position: relative;
             left: -10px;
         }

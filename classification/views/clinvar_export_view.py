@@ -13,7 +13,7 @@ from pytz import timezone
 
 from classification.enums import ShareLevel, SpecialEKeys
 from classification.models import ClinVarExport, ClinVarExportBatch, ClinVarExportBatchStatus, \
-    Classification, ClinVarReleaseStatus, EvidenceKeyMap, ClinVarExportStatus
+    Classification, EvidenceKeyMap, ClinVarExportStatus
 from genes.hgvs import CHGVS
 from library.cache import timed_cache
 from library.django_utils import add_save_message, get_url_from_view_path
@@ -138,7 +138,6 @@ class ClinVarExportColumns(DatatableConfig[ClinVarExport]):
                        sort_keys=["condition__sort_text"]
             ),
             RichColumn("status", label="Sync Status", client_renderer='renderStatus', sort_keys=["status_sort"], orderable=True, search=False),
-            RichColumn("release_status", label="Release Status", client_renderer='renderReleaseStatus', orderable=True, search=False),
             RichColumn("scv", label="SCV", orderable=True),
         ]
 
@@ -178,8 +177,6 @@ def clinvar_export_review(request: HttpRequest, pk) -> HttpResponseBase:
 
     if request.method == "POST":
         clinvar_export.scv = request.POST.get("scv") or ""
-        if release_status_str := request.POST.get("release_status"):
-            clinvar_export.release_status = ClinVarReleaseStatus(release_status_str)
         clinvar_export.save()
         add_save_message(request, valid=True, name="ClinVarExport")
         return redirect(clinvar_export)
@@ -253,10 +250,6 @@ class ClinVarExportSummary(ExportRow):
     @export_column("Sync Status")
     def sync_status(self):
         return self.clinvar_export.get_status_display()
-
-    @export_column("Release Status")
-    def release_status(self):
-        return self.clinvar_export.get_release_status_display()
 
     @export_column("SCV")
     def scv(self):
