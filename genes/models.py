@@ -745,7 +745,7 @@ class TranscriptVersion(SortByPKMixin, models.Model):
         class FakeTranscriptVersion:
             transcript_id: str
             version: int
-            has_valid_data: bool = False
+            hgvs_ok: bool = False
             gene_symbol = None
 
             @property
