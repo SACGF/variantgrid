@@ -1,7 +1,6 @@
 from collections import defaultdict
 
 from django.core.management import BaseCommand
-from django.db.models import Q
 
 from classification.classification_import import reattempt_variant_matching
 from classification.models import Classification
@@ -25,17 +24,18 @@ class Command(BaseCommand):
         classification_ids_to_rematch = []
         for genome_build, transcript_classification_ids in build_transcript_classification_ids.items():
             # Things that have gaps, NR etc will not be returned so will forced to rematch
-            previuosly_good_tv_qs = TranscriptVersion.objects.filter(genome_build=genome_build,
+            previously_good_tv_qs = TranscriptVersion.objects.filter(genome_build=genome_build,
                                                                      data__chrom__isnull=False,
                                                                      data__cdna_match__isnull=True,
                                                                      data__partial__isnull=True,
                                                                      transcript__identifier__startswith='NM_')
-            transcript_accessions = set()
-            for transcript_id, version in previuosly_good_tv_qs.values_list("transcript_id", "version"):
-                transcript_accessions.add(f"{transcript_id}.{version}")
+            previously_good_transcript_accessions = set()
+            for tv in previously_good_tv_qs:
+                if not tv.alignment_gap:
+                    previously_good_transcript_accessions.add(tv.accession)
 
             for t, classifications in transcript_classification_ids.items():
-                if t not in transcript_accessions:
+                if t not in previously_good_transcript_accessions:
                     classification_ids_to_rematch.extend(classifications)
 
         classification_qs = Classification.objects.filter(pk__in=classification_ids_to_rematch)
