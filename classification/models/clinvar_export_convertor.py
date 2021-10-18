@@ -159,16 +159,6 @@ class ClinVarExportConverter:
             c = self.classification_based_on.classification
             local_key = c.lab.group_name + "/" + c.lab_record_id
 
-            """
-            # Below was used when condition was literally part of the localID
-            # Important, using the umbrella term as it doesn't change
-            condition = self.clinvar_export_record.condition_resolved
-            term_ids = "_".join([term.id.replace(":", "_") for term in condition.terms])
-            if join := condition.join:
-                join = MultiCondition(join)
-                term_ids = f"{term_ids}_{join.value}"
-            """
-
             data["localID"] = local_id
             data["localKey"] = local_key
             data["observedIn"] = self.observed_in

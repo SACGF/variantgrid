@@ -61,6 +61,7 @@ urlpatterns = [
     perm_path('clinvar_export_batch/<int:pk>/download', clinvar_export_view.clinvar_export_batch_download, name='clinvar_export_batch_download'),
 
     perm_path('condition_matchings', condition_matchings_view, name='condition_matchings'),
+    perm_path('condition_matchings/<int:lab_id>', condition_matchings_view, name='condition_matchings_lab'),
     perm_path('condition_matching/datatable', DatabaseTableView.as_view(column_class=ConditionTextColumns), name='condition_text_datatable'),
     perm_path('condition_matching/<int:pk>', condition_matching_view, name='condition_matching'),
 

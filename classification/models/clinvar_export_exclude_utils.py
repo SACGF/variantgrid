@@ -23,6 +23,11 @@ def published(sender,
               user: User,
               debug_timer: DebugTimer,
               **kwargs):  # pylint: disable=unused-argument
+    """
+    On publishing of a classification, see if if it matches the criteria of the clinvar key
+    and update it's ignore clinvar properties accordingly
+    (will have no effect if ClinVarKey is not configured)
+    """
 
     if clinvar_key := classification.lab.clinvar_key:
         ClinVarExcludePatternUtil(clinvar_key).ignore_pattern_for(newly_published).apply()
@@ -32,6 +37,9 @@ def published(sender,
 
 @dataclass(frozen=True)
 class ExcludeStatus:
+    """
+    Quick class that describes what a record's current exclusion status is and what it is calculated it should be
+    """
     old_exclude: bool
     new_exclude: bool
     manual_edit: bool
@@ -50,6 +58,9 @@ class ExcludeStatus:
 
 
 class ExcludeRecord:
+    """
+    Performs the calculation to see if a record should be excluded (and can update the flag status if asked)
+    """
 
     def __init__(self, record: ClassificationModification, matches_ignores: List[ClinVarKeyExcludePattern]):
         self.record = record
@@ -71,6 +82,10 @@ class ExcludeRecord:
 
     @lazy
     def existing_flag_manual(self) -> bool:
+        """
+        Is there an exclude from ClinVar flag, where the last action was taken by a user
+        (If so, let's not muck around with it)
+        """
         if flag := self.existing_flag:
             if last_comment := flag.flagcomment_set.order_by('created').first():
                 return last_comment.user != admin_bot()
@@ -85,6 +100,10 @@ class ExcludeRecord:
         )
 
     def apply(self):
+        """
+        Updates the exclude from ClinVar flag to the new status
+        Unless existing_flag_manual in which case don't touch it
+        """
         if self.existing_flag_manual or self.is_currently_ignored == self.has_ignore_matches:
             return
 
@@ -110,35 +129,45 @@ class ExcludeRecord:
 
 
 class ClinVarExcludePatternUtil:
+    """
+    Utility for updating one or all records (for a single ClinVarKey) exclude from ClinVarFlags
+    """
 
     def __init__(self, clinvar_key: ClinVarKey):
         self.clinvar_key = clinvar_key
         self.exclude_patterns: List[ClinVarKeyExcludePattern] = list(clinvar_key.clinvarkeyexcludepattern_set.all())
 
-    def matching_exlcude_patterns(self, evidence_mixin: EvidenceMixin) -> List[ClinVarKeyExcludePattern]:
+    def matching_exclude_patterns(self, record: EvidenceMixin) -> List[ClinVarKeyExcludePattern]:
+        """
+        Return list of exclude patterns that the record has failed
+        """
         if not self.exclude_patterns:
             return None
 
         matching_patterns: List[ClinVarKeyExcludePattern] = list()
         for pattern in self.exclude_patterns:
-            value = evidence_mixin.get(pattern.evidence_key)
+            value = record.get(pattern.evidence_key)
             if pattern.should_exclude(str(value)):
                 matching_patterns.append(pattern)
         return matching_patterns
 
-    def all_classifications_for_key(self) -> QuerySet[ClassificationModification]:
+    def _all_classifications_for_key(self) -> QuerySet[ClassificationModification]:
         labs = self.clinvar_key.lab_set.all()
         return ClassificationModification.objects.filter(
             classification__lab__in=labs,
             is_last_published=True
         )
 
-    def ignore_pattern_for(self, evidence_mixin: EvidenceMixin) -> ExcludeRecord:
-        return ExcludeRecord(evidence_mixin, self.matching_exlcude_patterns(evidence_mixin))
+    def ignore_pattern_for(self, record: EvidenceMixin) -> ExcludeRecord:
+        return ExcludeRecord(record, self.matching_exclude_patterns(record))
 
     def run_all(self, apply: bool) -> Dict[ExcludeStatus, List[int]]:
+        """
+        Evaluate all the classifications for the ClinVarKey
+        @param apply: If true update the flags, if false just report on what changes would take place
+        """
         counter = defaultdict(list)
-        for cm in self.all_classifications_for_key():
+        for cm in self._all_classifications_for_key():
             ir = self.ignore_pattern_for(cm)
             counter[ir.status].append(cm.classification_id)
             if apply:

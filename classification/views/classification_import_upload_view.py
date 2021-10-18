@@ -13,7 +13,7 @@ from classification.models.upload_file_lab import UploadedFileLab, UploadedFileL
 from library.django_utils import get_url_from_view_path
 from library.log_utils import NotificationBuilder
 from library.utils import filename_safe
-from snpdb.models import Lab
+from snpdb.models import Lab, UserSettings
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
 
 
@@ -42,16 +42,12 @@ class FileUploadView(View):
     def get(self, request, **kwargs):
         user: User = request.user
         if lab_id := kwargs.get('lab_id'):
-            labs = Lab.valid_labs_qs(user=user, admin_check=True)
-            selected_lab = labs.get(pk=lab_id)
-            context = {
-                "labs": labs,
-                "selected_lab": selected_lab
-            }
-            return render(request, 'classification/import_upload.html', context)
+            return render(request, 'classification/import_upload.html', {
+                "selected_lab": Lab.valid_labs_qs(user=user, admin_check=True).get(pk=lab_id)
+            })
         else:
-            labs = Lab.valid_labs_qs(user=user, admin_check=True)
-            return HttpResponseRedirect(reverse("classification_import_upload_lab", kwargs={"lab_id": labs.first().pk}))
+            selected_lab = UserSettings.get_for_user(user).default_lab_safe()
+            return HttpResponseRedirect(reverse("classification_import_upload_lab", kwargs={"lab_id": selected_lab.pk}))
 
     def post(self, requests, **kwargs):
         # lazily have s3boto3 requirements

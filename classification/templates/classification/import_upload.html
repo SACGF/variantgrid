@@ -4,6 +4,7 @@
 {% load ui_utils %}
 {% load ui_help %}
 {% load js_tags %}
+{% load lab_tags %}
 {% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
 {% block title %}File Upload{% endblock %}
 {% block head %}
@@ -31,45 +32,38 @@
                 This lab has not been configured for uploads yet. Please contact a {{ site_name }} administrator if you'd like to upload a file.
             {% endif %}
         {% end_page_help_embedded %}
-        {% if labs %}
-            <div class="btn-group mb-4" style="flex-wrap: wrap" role="group" aria-label="Lab">
-                {% for lab in labs %}<a type="button" href="{% url 'classification_import_upload_lab' lab.pk %}" class="btn {% if selected_lab.pk == lab.pk %}btn-secondary{% else %}btn-outline-secondary{% endif %}">{{ lab.name }}</a>{% endfor %}
-            </div>
-            {% if selected_lab.upload_location %}
-                 <form method="post" enctype="multipart/form-data">
-                    {% csrf_token %}
-                    <div class="card">
-                        <div class="card-header">File Upload</div>
-                        <div class="card-body">
-                            {% if selected_lab.upload_auto_pattern %}
-                                {% labelled label="Expected Filename Pattern" %}
-                                    {% code_regex selected_lab.upload_auto_pattern %}
-                                {% endlabelled %}
-                            {% else %}
-                                <p class="text-info">Once the file is uploaded it will be added to a queue and processed over the next few days.</p>
-                            {% endif %}
-                            {% if user.is_superuser %}
-                                {% labelled label="Destination" value_css="admin-only" %}{{ selected_lab.upload_location }}{% endlabelled %}
-                            {% endif %}
-                            {% labelled label="Upload File" %}
-                                <input type="file" name="file">
-                            {% endlabelled %}
-                        </div>
-                        <div class="card-footer">
-                            <input type="submit" class="btn btn-primary">
-                        </div>
-                    </div>
-                </form>
-                <h4>File Upload History</h4>
-                <table data-datatable-url="{% url 'classification_import_upload_datatable' %}" data-datatable-data='datatableFilter' class="import-table sticky-header" responsive="true"></table>
 
-                {% else %}
-                    <p>{{ 'warning' | severity_icon }} Your lab has not been configured for file uploads. Please contact a {{ site_name }} administrator if you believe this is required.</p>
-                {% endif %}
-        {% else %}
-            <div class="chunk borderless">
-                <p>You don't belong to any labs that are configured to upload classification files</p>
-            </div>
-        {% endif %}
+        {% lab_picker view_name="classification_import_upload_lab" selected_lab=selected_lab %}
+        {% if selected_lab.upload_location %}
+             <form method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+                <div class="card">
+                    <div class="card-header">File Upload</div>
+                    <div class="card-body">
+                        {% if selected_lab.upload_auto_pattern %}
+                            {% labelled label="Expected Filename Pattern" %}
+                                {% code_regex selected_lab.upload_auto_pattern %}
+                            {% endlabelled %}
+                        {% else %}
+                            <p class="text-info">Once the file is uploaded it will be added to a queue and processed over the next few days.</p>
+                        {% endif %}
+                        {% if user.is_superuser %}
+                            {% labelled label="Destination" value_css="admin-only" %}{{ selected_lab.upload_location }}{% endlabelled %}
+                        {% endif %}
+                        {% labelled label="Upload File" %}
+                            <input type="file" name="file">
+                        {% endlabelled %}
+                    </div>
+                    <div class="card-footer">
+                        <input type="submit" class="btn btn-primary">
+                    </div>
+                </div>
+            </form>
+            <h4>File Upload History</h4>
+            <table data-datatable-url="{% url 'classification_import_upload_datatable' %}" data-datatable-data='datatableFilter' class="import-table sticky-header" responsive="true"></table>
+
+            {% else %}
+                <p>{{ 'warning' | severity_icon }} Your lab "{{ selected_lab.name }}" has not been configured for file uploads. Please contact a {{ site_name }} administrator if you believe this is required.</p>
+            {% endif %}
     </div>
 {% endblock %}

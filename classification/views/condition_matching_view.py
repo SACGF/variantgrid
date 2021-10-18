@@ -2,16 +2,19 @@ from typing import Optional, List
 
 from django.contrib.auth.models import User
 from django.db.models import QuerySet
-from django.shortcuts import render, get_object_or_404
+from django.shortcuts import render, get_object_or_404, redirect
+from django.urls import reverse
 from guardian.shortcuts import get_objects_for_user
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from classification.enums import ShareLevel
 from classification.models import ConditionTextMatch, ConditionText, update_condition_text_match_counts, MultiCondition, \
-    ConditionMatchingSuggestion, condition_matching_suggestions
+    ConditionMatchingSuggestion, condition_matching_suggestions, Classification
 from library.utils import empty_to_none
 from ontology.models import OntologyTerm
 from ontology.ontology_matching import normalize_condition_text
+from snpdb.models import Lab, UserSettings
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
 
 
@@ -21,7 +24,6 @@ class ConditionTextColumns(DatatableConfig):
         super().__init__(request)
 
         self.rich_columns = [
-            RichColumn(key="lab__name", label='Lab', orderable=True, sort_keys=['lab__name', 'normalized_text']),
             RichColumn(key="normalized_text", label='Text', orderable=True, client_renderer="idRenderer", extra_columns=["id"], sort_keys=['normalized_text', 'lab__name']),
             RichColumn(key="classifications_count", label="Classification Count", orderable=True, default_sort=SortOrder.DESC, sort_keys=['classifications_count', '-normalized_text']),
             RichColumn(key="classifications_count_outstanding", label="Classifications Outstanding", default_sort=SortOrder.DESC, orderable=True, sort_keys=['classifications_count_outstanding', '-normalized_text'])
@@ -29,7 +31,9 @@ class ConditionTextColumns(DatatableConfig):
 
     def get_initial_queryset(self):
         # exclude where we've auto matched and have 0 outstanding left
-        return get_objects_for_user(self.user, ConditionText.get_read_perm(), klass=ConditionText, accept_global_perms=True)
+        cts_qs: QuerySet[ConditionText] = get_objects_for_user(self.user, ConditionText.get_read_perm(), klass=ConditionText, accept_global_perms=True)
+        cts_qs = cts_qs.filter(lab_id=self.get_query_param("lab_id"))
+        return cts_qs
 
     def filter_queryset(self, qs: QuerySet) -> QuerySet:
         qs = qs.filter(classifications_count__gt=0)
@@ -44,9 +48,21 @@ class ConditionTextColumns(DatatableConfig):
         return qs
 
 
-def condition_matchings_view(request):
+def condition_matchings_view(request, lab_id: Optional[int] = None):
+    selected_lab: Lab
+    if lab_id:
+        selected_lab = Lab.valid_labs_qs(request.user, admin_check=True).get(pk=lab_id)
+    else:
+        selected_lab = UserSettings.get_for_user(request.user).default_lab_safe()
+        return redirect(reverse('condition_matchings_lab', kwargs={'lab_id': selected_lab.pk}))
+
+    missing_condition_count = Classification.objects.filter(withdrawn=False, lab_id=selected_lab,
+                                                      share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS,
+                                                      condition_resolution__isnull=True).count()
+
     return render(request, 'classification/condition_matchings.html', context={
-        'datatable_config': ConditionTextColumns(request)
+        'selected_lab': selected_lab,
+        'missing_condition_count': missing_condition_count
     })
 
 

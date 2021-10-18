@@ -452,7 +452,7 @@ class Lab(models.Model):
             return Lab.objects.all()
 
         group_names = list(user.groups.values_list('name', flat=True))
-        return Lab.objects.filter(group_name__in=group_names)
+        return Lab.objects.filter(group_name__in=group_names).order_by('name')
 
     def classifications_activity(self, time_period):
         trunc_func = TimePeriod.truncate_func(time_period)
