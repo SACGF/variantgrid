@@ -37,7 +37,12 @@ class Command(BaseCommand):
             # For RefSeq - do batch API calls as they're much faster
             refseq_transcripts = []
             for transcript_accession in transcript_classification_ids.keys():
-                if AnnotationConsortium.get_from_transcript_accession(transcript_accession) == AnnotationConsortium.REFSEQ and not transcript_accession.startswith("LRG"):
+                if transcript_accession.startswith("LRG"):
+                    continue
+                if "." not in transcript_accession:  # Transcript w/o version
+                    continue
+
+                if AnnotationConsortium.get_from_transcript_accession(transcript_accession) == AnnotationConsortium.REFSEQ:
                     refseq_transcripts.append(transcript_accession)
 
             print("Batch retrieving RefSeq TranscriptVersionSequenceInfo...")
