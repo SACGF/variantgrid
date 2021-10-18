@@ -1119,7 +1119,7 @@ class TranscriptVersionSequenceInfo(TimeStampedModel):
             raise NoTranscript(f"Unable to understand Ensembl API response: {data}")
 
     @staticmethod
-    def get_refseq_transcript_versions(transcript_accessions: Iterable[str], fail_on_error=True) -> Dict[str, 'TranscriptVersionSequenceInfo']:
+    def get_refseq_transcript_versions(transcript_accessions: Iterable[str], entrez_batch_size: int=100, fail_on_error=True) -> Dict[str, 'TranscriptVersionSequenceInfo']:
         """ Batch method - returns DB copies if we have it, retrieves + stores from API """
         # Find the ones we already have so we don't need to re-retrieve
         all_transcript_accessions = set(transcript_accessions)
@@ -1130,9 +1130,8 @@ class TranscriptVersionSequenceInfo(TimeStampedModel):
                 tvi_by_id[tvi.accession] = tvi
 
         unknown_accessions = all_transcript_accessions - set(tvi_by_id)
-        ENTREZ_BATCH_SIZE = 100
 
-        for id_list in iter_fixed_chunks(unknown_accessions, ENTREZ_BATCH_SIZE):
+        for id_list in iter_fixed_chunks(unknown_accessions, entrez_batch_size):
             id_param = ",".join(id_list)
             try:
                 search_results = Entrez.read(Entrez.epost("nuccore", id=id_param))

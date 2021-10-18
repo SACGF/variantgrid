@@ -49,7 +49,14 @@ class Command(BaseCommand):
                     refseq_transcripts.append(transcript_accession)
 
             print("Batch retrieving RefSeq TranscriptVersionSequenceInfo...")
-            TranscriptVersionSequenceInfo.get_refseq_transcript_versions(refseq_transcripts, fail_on_error=False)
+            # Some of these are bad, so will cause the batch to fail.
+            TranscriptVersionSequenceInfo.get_refseq_transcript_versions(refseq_transcripts,
+                                                                         entrez_batch_size=100,
+                                                                         fail_on_error=False)
+            # Try to get at least some of the failed data via batches
+            TranscriptVersionSequenceInfo.get_refseq_transcript_versions(refseq_transcripts,
+                                                                         entrez_batch_size=20,
+                                                                         fail_on_error=False)
             print("Finished retrieving batch info")
 
             for t, classifications in transcript_classification_ids.items():
