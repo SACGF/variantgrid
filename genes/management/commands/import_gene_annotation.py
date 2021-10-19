@@ -6,7 +6,7 @@ from typing import Dict, List, Set, Iterable
 from django.core.management.base import BaseCommand
 from django.db.models.functions import Upper
 
-from genes.models import GeneSymbol, GeneAnnotationImport, Gene, GeneVersion, TranscriptVersion, Transcript
+from genes.models import GeneSymbol, GeneAnnotationImport, Gene, GeneVersion, TranscriptVersion, Transcript, HGNC
 from genes.models_enums import AnnotationConsortium
 from library.file_utils import open_handle_gzip
 from library.utils import invert_dict
@@ -126,7 +126,7 @@ class Command(BaseCommand):
         known_genes_ids = set(genes_qs.values_list("identifier", flat=True))
         transcripts_qs = Transcript.objects.filter(annotation_consortium=annotation_consortium)
         known_transcript_ids = set(transcripts_qs.values_list("identifier", flat=True))
-
+        hgnc_ids = set(HGNC.objects.all().values_list("pk", flat=True))
         gene_version_qs = GeneVersion.objects.filter(genome_build=genome_build,
                                                      gene__annotation_consortium=annotation_consortium)
         known_gene_version_ids_by_accession = {f"{gene_id}.{version}": pk for (pk, gene_id, version) in gene_version_qs.values_list("pk", "gene_id", "version")}
@@ -159,10 +159,17 @@ class Command(BaseCommand):
                     if symbol.upper() not in known_uc_gene_symbols:
                         new_gene_symbols.add(symbol)
 
+                # Some HGNC IDs have been withdrawn and are not in the download files
+                hgnc_id = None
+                if hgnc := gv_data.get("hgnc"):
+                    hgnc = int(hgnc)
+                    if hgnc in hgnc_ids:
+                        hgnc_id = hgnc
+
                 gene_version = GeneVersion(gene_id=gene_id,
                                            version=version,
                                            gene_symbol_id=symbol,
-                                           hgnc_id=gv_data.get("hgnc"),
+                                           hgnc_id=hgnc_id,
                                            description=gv_data.get("description"),
                                            biotype=gv_data.get("biotype"),
                                            genome_build=genome_build,
@@ -177,6 +184,7 @@ class Command(BaseCommand):
             if new_gene_symbols:
                 logging.info("Creating %d new gene symbols", len(new_gene_symbols))
                 GeneSymbol.objects.bulk_create([GeneSymbol(symbol=symbol) for symbol in new_gene_symbols],
+                                               ignore_conflicts=True,  # May have different cases for same symbol
                                                batch_size=self.BATCH_SIZE)
                 known_uc_gene_symbols.update((s.upper() for s in new_gene_symbols))
 
