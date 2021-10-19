@@ -19,6 +19,7 @@ django-geojson
 django_glrm
 django_guardian
 django_htmlmin
+django_json_widget
 django-js-reverse
 django-leaflet
 django_model_utils
