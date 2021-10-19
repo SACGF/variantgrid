@@ -43,7 +43,7 @@ def report_event(name: str, request: Request = None, extra_data: Dict = None):
             except:
                 details = "(error saving extra_data)"
     elif request:
-        details = json.dumps(request.query_params.dict())
+        details = json.dumps({**request.POST.dict(), **request.GET.dict()})
 
     Event.objects.create(user=user,
                          app_name='event',  # could potentially look at the stack trace
