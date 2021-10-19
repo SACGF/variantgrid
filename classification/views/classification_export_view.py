@@ -18,6 +18,7 @@ from rest_framework.views import APIView
 from classification.enums.classification_enums import ShareLevel
 from classification.models.classification import ClassificationModification
 from classification.models.classification_ref import ClassificationRef
+from classification.views.classification_export_clinvar_compare import ExportFormatterClinVarCompare
 from classification.views.classification_export_csv import ExportFormatterCSV
 from classification.views.classification_export_json import ExportFormatterJSON
 from classification.views.classification_export_keys import ExportFormatterKeys
@@ -84,12 +85,14 @@ def export_view(request: HttpRequest) -> Response:
     format_keys = {'id': 'keys', 'name': 'Evidence Keys Report', 'admin_only': True}
     format_mvl = {'id': 'mvl', 'name': 'MVL'}
     format_csv = {'id': 'csv', 'name': 'CSV'}
+    format_clinvar_compare = {'id': 'clinvar_compare', 'name': 'ClinVar Compare', 'admin_only': True}
     format_json = {'id': 'json', 'name': 'JSON'}
     format_redcap = {'id': 'redcap', 'name': 'REDCap'}
     format_vcf = {'id': 'vcf', 'name': 'VCF'}
     formats = [
         format_keys,
         format_csv,
+        format_clinvar_compare,
         format_json,
         format_mvl
     ]
@@ -273,6 +276,8 @@ class ClassificationApiExportView(APIView):
             formatter = ExportFormatterCSV(pretty=pretty, **formatter_kwargs)
         elif file_format == 'keys':
             formatter = ExportFormatterKeys(qs=qs)
+        elif file_format == 'clinvar_compare':
+            formatter = ExportFormatterClinVarCompare(**formatter_kwargs)
 
         else:
             raise ValueError(f'Unexpected file format {file_format}')
