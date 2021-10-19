@@ -13,7 +13,7 @@ admin.autodiscover()
 
 APPS_WITH_URLS = ["analysis", "annotation", "eventlog",
                   "expression", "flags", "genes", "pathtests", "patients", "pedigree", "ontology",
-                  "sapath", "seqauto", "snpdb", "upload", "classification", "variantopedia"]
+                  "sapath", "seqauto", "snpdb", "upload", "classification", "variantopedia", "manual"]
 
 urlpatterns = [
     path('', views.index),

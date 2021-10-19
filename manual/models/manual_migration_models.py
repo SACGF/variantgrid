@@ -11,13 +11,17 @@ from model_utils.models import TimeStampedModel
 class ManualMigrationTask(models.Model):
     id = models.TextField(primary_key=True)
 
-    def __str__(self):
-        parts = self.id.split("*", maxsplit=1)
+    @staticmethod
+    def describe_manual(text: str) -> str:
+        parts = text.split("*", maxsplit=1)
         category = parts[0]
         remainder = parts[1]
         if category == "manage":
             return f"python3.8 manage.py {remainder}"
         return f"{category} {remainder}"
+
+    def __str__(self):
+        return ManualMigrationTask.describe_manual(self.id)
 
 
 class ManualMigrationRequired(TimeStampedModel):
