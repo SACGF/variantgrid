@@ -312,7 +312,7 @@ gff3ToGenePred -processAllGeneChildren -geneNameAttr=Name -rnaNameAttr=transcrip
                 <div class="mt-4">
                     <b>MONDO/HGNC GenCC</b><br/>
                     Download gencc-submissions.csv from <a href="https://search.thegencc.org/download">GenCC</a><br/>
-<code>wget https://search.thegencc.org/download/action/submissions-export-csv
+<code>wget https://search.thegencc.org/download/action/submissions-export-csv --output-document=gencc-submissions.csv
 {{ python_command }} manage.py ontology_import --gencc (location of gencc-submissions.csv) </code>
                 </div>
                 <div class="mt-4">
