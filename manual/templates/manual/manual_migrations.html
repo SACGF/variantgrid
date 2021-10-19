@@ -48,7 +48,7 @@
                                     {% if required.note %}<p>{{ required.note }}</p>{% else %}<span class="no-value">-</span>{% endif %}
                                 {% endfor %}
                             </td>
-                            <td>{% if out_task.last_attempt %}{% timestamp out_task.last_attempt %}{% else %}<span class="no-value">-</span>{% endif %}</td>
+                            <td>{% if out_task.last_attempt %}{% timestamp out_task.last_attempt.created %}{% else %}<span class="no-value">-</span>{% endif %}</td>
                         </tr>
                     {% endfor %}
                 </tbody>
