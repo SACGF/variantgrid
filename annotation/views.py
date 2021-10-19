@@ -199,10 +199,6 @@ def annotation_detail(request):
     if diagnostic_gene_list_count:
         diagnostic_gene_list = f"{diagnostic_gene_list_count} diagnostic gene lists"
 
-    if clinvar_citations := ClinVarCitation.objects.count():
-        num_cached_clinvar_citations = CachedCitation.objects.count()
-        clinvar_citations = f"{clinvar_citations} ClinVar citations ({num_cached_clinvar_citations} cached)"
-
     hpa_version = HumanProteinAtlasAnnotationVersion.objects.order_by("-annotation_date").first()
     hpa_counts = HumanProteinAtlasAnnotation.objects.filter(version=hpa_version).count()
 
@@ -230,7 +226,6 @@ def annotation_detail(request):
     # These are empty/None if not set.
     annotations_ok = [all(builds_ok),
                       all_ontologies_accounted_for,
-                      clinvar_citations,
                       hpa_counts > 0]
     if somalier_enabled:
         annotations_ok.append(somalier)
@@ -251,7 +246,6 @@ def annotation_detail(request):
         "ontology_imports": ontology_imports,
         "gene_symbol_alias_counts": gene_symbol_alias_counts,
         "diagnostic_gene_list": diagnostic_gene_list,
-        "clinvar_citations": clinvar_citations,
         "hpa_counts": hpa_counts,
         "transcript_version_sequence_info": transcript_version_sequence_info,
         "transcript_fasta_imports": transcript_fasta_imports,

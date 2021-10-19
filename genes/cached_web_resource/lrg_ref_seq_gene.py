@@ -1,8 +1,7 @@
-import ftplib
 import logging
-from io import BytesIO
 
 import pandas as pd
+import requests
 
 from annotation.models import CachedWebResource
 from genes.models import LRGRefSeqGene
@@ -11,14 +10,8 @@ from library.pandas_utils import df_nan_to_none
 
 
 def store_lrg_ref_seq_gene_from_web(cached_web_resource: CachedWebResource):
-    logging.info("Downloading 'LRG_RefSeqGene' via FTP")
-    ftp = ftplib.FTP("ftp.ncbi.nlm.nih.gov")
-    ftp.login("anonymous", "anonymous")
-    buffer = BytesIO()
-    ftp.retrbinary('RETR /refseq/H_sapiens/RefSeqGene/LRG_RefSeqGene', buffer.write)
-    buffer.seek(0)
-
-    df = pd.read_csv(buffer, sep='\t', error_bad_lines=False)
+    LRG_URL = "https://ftp.ncbi.nlm.nih.gov/refseq/H_sapiens/RefSeqGene/LRG_RefSeqGene"
+    df = pd.read_csv(LRG_URL, sep='\t', error_bad_lines=False)
     lrg_mask = ~pd.isna(df["LRG"])
     lrg_df = df_nan_to_none(df[lrg_mask])
 

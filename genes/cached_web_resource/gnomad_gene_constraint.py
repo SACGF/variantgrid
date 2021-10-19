@@ -23,7 +23,7 @@ from library.pandas_utils import df_nan_to_none
 def store_gnomad_gene_constraint_from_web(cached_web_resource):
     """ https://gnomad.broadinstitute.org/downloads#gene-constraint """
 
-    GNOMAD_GENE_CONSTRAINT_URL = "https://storage.googleapis.com/gnomad-public/release/2.1.1/constraint/gnomad.v2.1.1.lof_metrics.by_gene.txt.bgz"
+    GNOMAD_GENE_CONSTRAINT_URL = "https://storage.googleapis.com/gcp-public-data--gnomad/release/2.1.1/constraint/gnomad.v2.1.1.lof_metrics.by_gene.txt.bgz"
 
     r = requests.get(GNOMAD_GENE_CONSTRAINT_URL, stream=True)
     f = gzip.GzipFile(fileobj=r.raw)

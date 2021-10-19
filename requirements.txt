@@ -1,6 +1,6 @@
 beautifulsoup4==4.9.3
 bgzip==0.3.5
-Bio==0.0.1
+Bio==1.2.6
 celery==4.4.7
 ConfigArgParse==1.2.3
 coreapi==2.3.3

@@ -37,7 +37,7 @@ UPLOAD_ENABLED = True  # This disables uploading files or creating variants (eg 
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media_root')
 MEDIA_URL = '/media/'
 
-PYTHON_COMMAND = "python3.8"
+PYTHON_COMMAND = "python3"
 MANAGE_COMMAND = [PYTHON_COMMAND, os.path.join(BASE_DIR, "manage.py")]
 
 # Need 5x as many as largest cohort for CohortNode zygosity query
@@ -253,6 +253,7 @@ MUTATIONAL_SIGNATURE_DATA_FILE = os.path.join(MUTATIONAL_SIGNATURE_DATA_DIR, "si
 MUTATIONAL_SIGNATURE_INFO_FILE = os.path.join(MUTATIONAL_SIGNATURE_DATA_DIR, "signature_analysis_data.formatted.txt")
 
 CACHED_WEB_RESOURCE_CLINGEN_DISEASE_VALIDITY = "ClinGenDiseaseValidity"
+CACHED_WEB_RESOURCE_CLINVAR_CITATIONS = "ClinVarCitations"
 CACHED_WEB_RESOURCE_GNOMAD_GENE_CONSTRAINT = "GnomADGeneConstraint"
 CACHED_WEB_RESOURCE_HGNC = "HGNC"
 CACHED_WEB_RESOURCE_LRG_REF_SEQ_GENE = "LRGRefSeqGene"
@@ -272,6 +273,7 @@ ANNOTATION_CACHED_WEB_RESOURCES = [
     CACHED_WEB_RESOURCE_REFSEQ_GENE_SUMMARY,
     CACHED_WEB_RESOURCE_UNIPROT,
     CACHED_WEB_RESOURCE_CLINGEN_DISEASE_VALIDITY,
+    CACHED_WEB_RESOURCE_CLINVAR_CITATIONS,
 ]
 
 VARIANT_ANNOTATION_TRANSCRIPT_PREFERENCES = ['lrg_identifier', 'refseq_transcript_accession', 'ensembl_transcript_accession']

@@ -203,18 +203,6 @@ gff3ToGenePred -processAllGeneChildren -geneNameAttr=Name -rnaNameAttr=transcrip
 <div class="card mt-4">
     <div class="card-header"><h5>Information</h5></div>
     <div class="card-body">
-        {% labelled label="ClinVar Citations" %}
-            {% if clinvar_citations %}
-                {{ clinvar_citations }}.
-            {% else %}
-                <div class="no-value">Not installed</div>
-            {% endif %}
-            {% install-instructions label="ClinVar Citations" installed=clinvar_citations %}
-                Download 'var_citations.txt' from <a href="ftp://ftp.ncbi.nlm.nih.gov/pub/clinvar/tab_delimited/">NCBI ClinVar FTP - Tab Delimited</a> then run:
-                <code>{{ python_command }} manage.py import_clinvar_citations ${VARIANTGRID_SETUP_DATA}/var_citations.txt</code>
-            {% endinstall-instructions %}
-        {% endlabelled %}
-
         {% labelled label="Human Protein Atlas" %}
             {% if hpa_counts %}
                 {{ hpa_counts | intcomma }}
