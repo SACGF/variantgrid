@@ -394,11 +394,15 @@ def view_transcript_version(request, transcript_id, version):
                "no_transcript_message": no_transcript_message,
                "version_count": version_count}
 
+    poly_a_tail = 0
     if tv:
         transcript_versions_by_build = {}
         builds_missing_data = set()
         alignment_gap = False
+
         for tv in tv_set.order_by("genome_build__name"):
+            if tv_sequence_info:
+                poly_a_tail = max(poly_a_tail, tv.sequence_poly_a_tail)
             genome_build_id = tv.genome_build.pk
             alignment_gap |= tv.alignment_gap
             transcript_versions_by_build[genome_build_id] = tv
@@ -422,6 +426,13 @@ def view_transcript_version(request, transcript_id, version):
                                  "transcript_versions_by_build": transcript_versions_by_build,
                                  "differences": differences,
                                  "alignment_gap": alignment_gap}}
+
+    if tv_sequence_info:
+        if poly_a_tail:
+            sequence_length = f"{tv_sequence_info.length - poly_a_tail} (w/{poly_a_tail}bp polyA tail)"
+        else:
+            sequence_length = tv_sequence_info.length
+        context["sequence_length"] = sequence_length
     return render(request, "genes/view_transcript_version.html", context)
 
 

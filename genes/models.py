@@ -4,7 +4,7 @@ import os
 import re
 import shutil
 import types
-from collections import namedtuple, defaultdict
+from collections import namedtuple, defaultdict, Counter
 from dataclasses import dataclass
 from datetime import timedelta
 from functools import total_ordering
@@ -673,7 +673,7 @@ class TranscriptVersion(SortByPKMixin, models.Model):
             if self.transcript.annotation_consortium == AnnotationConsortium.REFSEQ:
                 if "partial" in self.data:
                     return False
-                return self.sequence_info.length == self.length
+                return bool(self.sequence_length_matches_exon_length_ignoring_poly_a_tail)
             elif self.transcript.annotation_consortium == AnnotationConsortium.ENSEMBL:
                 return True
 
@@ -683,6 +683,44 @@ class TranscriptVersion(SortByPKMixin, models.Model):
     def sequence_info(self):
         return TranscriptVersionSequenceInfo.get(self.accession)
 
+    @property
+    def sequence_poly_a_tail(self) -> int:
+        """ Returns length of polyA tail if ALL bases after sum of exon lengths are A """
+        if self.sequence_info.length > self.length:
+            seq_end = self.sequence_info.sequence[self.length:]
+            if not seq_end.upper().replace("A", ""):
+                return len(seq_end)
+        return 0
+
+    @property
+    def cdna_match_diff(self) -> str:
+        """ Human readable """
+        match_summary = ""
+        if cdna_match := self.data.get("cdna_match"):
+            gap_operations = Counter()
+            for (_, _, _, _, gap) in cdna_match:
+                if gap:
+                    for gap_op in gap.split():
+                        code = gap_op[0]
+                        length = int(gap_op[1:])
+                        gap_operations[code] += length
+
+            if gap_operations:
+                gap_summary = []
+                for code, label in {"I": "Insertion", "D": "Deletion"}.items():
+                    if value := gap_operations.get(code):
+                        gap_summary.append(f"{value}bp {label}")
+                match_summary = ", ".join(gap_summary)
+                if match_summary:
+                    match_summary = f"Transcript had {match_summary} vs genome reference"
+
+        return match_summary
+
+
+    @property
+    def sequence_length_matches_exon_length_ignoring_poly_a_tail(self) -> bool:
+        return self.sequence_info.length == self.length or self.sequence_poly_a_tail
+
     @lazy
     def alignment_gap(self) -> bool:
         if self.transcript.annotation_consortium == AnnotationConsortium.REFSEQ:
@@ -690,7 +728,7 @@ class TranscriptVersion(SortByPKMixin, models.Model):
             # We've modified PyHGVS to be able to handle this
             if "cdna_match" in self.data or "partial" in self.data:
                 return True
-            return self.sequence_info.length != self.length
+            return not self.sequence_length_matches_exon_length_ignoring_poly_a_tail
 
         # Ensembl transcripts use genomic sequence so there is never any gap
         return False
