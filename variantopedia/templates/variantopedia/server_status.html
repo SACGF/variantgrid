@@ -278,7 +278,9 @@
         {% ui_register_tab url="view_upload_stats_detail" url_check=True label="Upload Stats" tab_set="server_status" %}
         {% ui_register_tab url="database_statistics_detail" label="Database Statistics" tab_set="server_status" %}
         {% ui_register_tab url='server_status_settings_detail' label="Settings" tab_set="server_status" %}
+        {% comment %}
         {% ui_register_tab url="migration_detail" label="Manual Migrations" tab_set="server_status" %}
+        {% endcomment %}
 
         {% ui_register_tab url="server_status_activity_detail" param=1 label="Activity 24 hours" tab_set="server_status" %}
         {% ui_register_tab url="server_status_activity_detail" param=2 label="Activity 48 hours" tab_set="server_status" %}
