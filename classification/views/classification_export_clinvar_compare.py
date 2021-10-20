@@ -41,7 +41,8 @@ class ClinVarCompareRow(ExportRow):
     def server_clinical_significance_set(self) -> Set[str]:
         cs_set: Set[str] = set()
         for cm in self.allele_group.data:
-            cs_set.add(cm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE))
+            if classified := cm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE):
+                cs_set.add(classified)
         return cs_set
 
     @lazy
@@ -61,12 +62,6 @@ class ClinVarCompareRow(ExportRow):
         return cs_set
 
     @export_column()
-    def clinvar_clinical_significance_raw(self) -> str:
-        if clinvar := self.clinvar:
-            return clinvar.clinical_significance
-        return ""
-
-    @export_column()
     def server_clinical_significance(self) -> str:
         (cs_list := list(self.server_clinical_significance_set)).sort()
         return ";".join(cs_list)
@@ -75,6 +70,24 @@ class ClinVarCompareRow(ExportRow):
     def clinvar_clinical_significance(self) -> str:
         (cs_list := list(self.clinvar_clinical_significance_set)).sort()
         return ";".join(cs_list)
+
+    @export_column()
+    def clinvar_clinical_significance_raw(self) -> str:
+        if clinvar := self.clinvar:
+            return clinvar.clinical_significance
+        return ""
+
+    @export_column()
+    def clinvar_origin(self) -> str:
+        clinvar: ClinVar
+        if clinvar := self.clinvar:
+            return clinvar.get_origin_display()
+
+    @export_column()
+    def clinvar_stars(self) -> str:
+        clinvar: ClinVar
+        if clinvar := self.clinvar:
+            return clinvar.stars
 
     @export_column()
     def diff(self):
