@@ -118,6 +118,9 @@ class ClinGenAllele(TimeStampedModel):
                     logging.warning("A coding DNA reference sequence does not contain intron or 5' and 3' gene "
                                     "flanking sequences and can therefore not be used as a reference to describe "
                                     "variants in these regions")
+                elif transcript_accession.startswith("LRG_"):
+                    logging.warning("Don't have sequence for LRGs, relying on ClinGenAlleleRegistry reference "
+                                    "bases which may be wrong")
                 else:
                     if hgvs_name.mutation_type == "dup":
                         ref_end = coord["end"]
