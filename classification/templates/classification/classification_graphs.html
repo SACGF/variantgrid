@@ -65,6 +65,9 @@
             }
             var layout = defaultLayout(title, width, height);
             layout["barmode"] = 'stack';
+            console.log(selector);
+            console.log(vc_gene_data);
+            console.log(layout);
             Plotly.newPlot(selector, vc_gene_data, layout);
             {% endif %}
         }

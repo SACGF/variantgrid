@@ -70,13 +70,16 @@ def get_grouped_classification_counts(user: User,
     classification_counts = defaultdict(Counter)
     for clinical_significance, field in values_qs:
         if evidence_key:
+            # field will either be evidence or published evidence
             value = Classification.get_optional_value_from(field, evidence_key)
         elif field_labels:
             value = field_labels.get(field, field)
         else:
             value = field
-        counts[value] += 1
-        classification_counts[clinical_significance][value] += 1
+
+        if value is not None:
+            counts[value] += 1
+            classification_counts[clinical_significance][value] += 1
 
     top_groups = [i[0] for i in counts.most_common(max_groups)]
 

@@ -590,7 +590,13 @@ def classification_graphs(request):
         visibility = f"visible to {request.user.username}"
         evidence_field = "evidence"
     classification_counts = get_classification_counts(request.user, show_unclassified=show_unclassified)
-    vc_gene_data = get_grouped_classification_counts(request.user, evidence_field, evidence_key="gene_symbol", max_groups=15, show_unclassified=show_unclassified)
+
+    vc_gene_data = get_grouped_classification_counts(
+        user=request.user,
+        field=evidence_field,
+        evidence_key="gene_symbol",
+        max_groups=15,
+        show_unclassified=show_unclassified)
 
     acmg_by_significance = get_criteria_counts(request.user, evidence_field)
     context = {
