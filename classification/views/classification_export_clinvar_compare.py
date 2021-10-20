@@ -37,6 +37,26 @@ class ClinVarCompareRow(ExportRow):
     def allele_url(self) -> str:
         return get_url_from_view_path(reverse('view_allele', kwargs={"pk": self.allele_group.allele_id}))
 
+    @export_column()
+    def clinvar_url(self) -> str:
+        clinvar: ClinVar
+        if clinvar := self.clinvar:
+            return f"https://www.ncbi.nlm.nih.gov/clinvar/variation/{clinvar.clinvar_variation_id}/"
+
+    @export_column()
+    def c_hgvs(self) -> str:
+        for cm in self.allele_group.data:
+            if c_hgvs := cm.c_hgvs_best(self.allele_group.genome_build):
+                if full_c_hgvs := c_hgvs.full_c_hgvs:
+                    return full_c_hgvs
+
+    @export_column()
+    def gene_symbol(self) -> str:
+        for cm in self.allele_group.data:
+            if c_hgvs := cm.c_hgvs_best(self.allele_group.genome_build):
+                if gene_symbol := c_hgvs.gene_symbol:
+                    return gene_symbol
+
     @lazy
     def server_clinical_significance_set(self) -> Set[str]:
         cs_set: Set[str] = set()
