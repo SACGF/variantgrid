@@ -116,8 +116,10 @@ class DiscordanceStatus:
 
         if counted_classifications == 0:
             level = DiscordanceLevel.NO_ENTRIES
+
         elif counted_classifications == 1:
             level = DiscordanceLevel.SINGLE_SUBMISSION
+
         elif len(cs_scores) > 1:
             level = DiscordanceLevel.DISCORDANT
 
@@ -126,7 +128,10 @@ class DiscordanceStatus:
             # importantly you can have a VUS vs VUS_A and still be in agreement
             # it's only if you have more than one of VUS_A,B,C that cs_vuses will have multiple values
             level = DiscordanceLevel.CONCORDANT_DIFF_VUS
-        elif len(cs_values) > 1:
+
+        elif len(cs_values) > 1 and not (len(cs_scores) == 1 and 2 in cs_scores and len(cs_vuses) == 1):
+            # check to make sure we don't have VUS vs VUS_A, or VUS vs VUS_B which should be considered agreemetn
+
             # importantly you can have a VUS vs VUS_A and still be in agreement
             # it's only if you have more than one of VUS_A,B,C that cs_vuses will have multiple values
             level = DiscordanceLevel.CONCORDANT_CONFIDENCE
