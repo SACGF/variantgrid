@@ -85,6 +85,6 @@ done
 VG_DIR=$(dirname $(dirname $(dirname $(dirname ${BASH_SOURCE[0]}))))
 merged_file="vg_gene_annotation.refseq.grch38.json.gz"
 if [[ ! -e ${merged_file} ]]; then
-  python3.8 ${VG_DIR}/manage.py import_gene_annotation2 --annotation-consortium=RefSeq --genome-build=GRCh38 \
+  python3 ${VG_DIR}/manage.py import_gene_annotation2 --annotation-consortium=RefSeq --genome-build=GRCh38 \
     --save-merged-file=${merged_file} ${pyreference_args[@]}
 fi
