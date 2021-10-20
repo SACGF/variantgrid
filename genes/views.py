@@ -35,7 +35,8 @@ from genes.forms import GeneListForm, NamedCustomGeneListForm, UserGeneListForm,
 from genes.models import GeneInfo, CanonicalTranscriptCollection, GeneListCategory, \
     GeneList, GeneCoverageCollection, GeneCoverageCanonicalTranscript, \
     CustomTextGeneList, Transcript, Gene, TranscriptVersion, GeneSymbol, GeneCoverage, \
-    PfamSequenceIdentifier, PanelAppServer, SampleGeneList, HGNC, GeneVersion, TranscriptVersionSequenceInfo, NoTranscript
+    PfamSequenceIdentifier, PanelAppServer, SampleGeneList, HGNC, GeneVersion, TranscriptVersionSequenceInfo, \
+    NoTranscript
 from genes.models_enums import AnnotationConsortium
 from genes.serializers import SampleGeneListSerializer
 from library.constants import MINUTE_SECS

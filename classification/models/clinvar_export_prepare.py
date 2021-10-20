@@ -1,12 +1,11 @@
 from collections import defaultdict
 from typing import Dict, List, Optional, Set
 
-from django.db.models import QuerySet
 from django.utils.timezone import now
 
 from classification.enums import ShareLevel
 from classification.models import ClinVarAllele, Classification, ClassificationModification, ClinVarExport, \
-    ConditionResolved, ClinVarExportStatus, flag_types, classification_flag_types
+    ConditionResolved, ClinVarExportStatus
 from classification.models.abstract_utils import ConsolidatingMerger
 from library.utils import segment
 from snpdb.models import Allele, ClinVarKey

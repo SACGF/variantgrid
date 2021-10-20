@@ -11,7 +11,7 @@ from classification.models.classification import Classification, \
     classification_validation_signal
 from classification.models.classification_utils import ValidationMerger
 from genes.hgvs import HGVSMatcher
-from genes.models import MissingTranscript, BadTranscript, NoTranscript
+from genes.models import NoTranscript
 from snpdb.models import GenomeBuild, Variant
 
 VARIANT_VALIDATING_CODES = {ValidationCode.MATCHING_ERROR, ValidationCode.INCONSISTENT_VARIANT, ValidationCode.MATCHING_ERROR}

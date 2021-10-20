@@ -7,7 +7,7 @@ from django.db.models.signals import post_delete
 from django.dispatch import receiver
 
 from analysis.models.models_variant_tag import VariantTagsImport
-from annotation.models.models import ClinVarCitationsCollection, ManualVariantEntryCollection, ClinVarVersion
+from annotation.models.models import ManualVariantEntryCollection, ClinVarVersion
 from classification.models import ClassificationImport
 from expression.models import CuffDiffFile
 from genes.models import GeneList, GeneCoverageCollection

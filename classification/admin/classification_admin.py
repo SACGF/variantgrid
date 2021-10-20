@@ -14,7 +14,6 @@ from classification.models import EvidenceKey, EvidenceKeyMap, DiscordanceReport
     send_discordance_notification, ClinicalContext, ClassificationReportTemplate, ClassificationModification, \
     UploadedFileLab, ClinicalContextRecalcTrigger
 from classification.models.classification import Classification
-from classification.templatetags.classification_tags import ClinicalGrouping
 from library.guardian_utils import admin_bot
 from snpdb.admin_utils import ModelAdminBasics, admin_action, admin_list_column
 from snpdb.models import GenomeBuild, Lab

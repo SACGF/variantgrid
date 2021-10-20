@@ -19,12 +19,11 @@ from htmlmin.decorators import not_minified_response
 
 from annotation.annotation_versions import get_variant_annotation_version
 from annotation.citations import get_citations, CitationDetails
-from annotation.grids import AnnotationRunColumns
 from annotation.manual_variant_entry import create_manual_variants
 from annotation.models import ClinVar, AnnotationVersion, AnnotationRun, VariantAnnotationVersion, \
     VariantAnnotationVersionDiff
-from annotation.models.models import ClinVarCitation, CachedCitation, \
-    CachedWebResource, Citation, HumanProteinAtlasAnnotationVersion, HumanProteinAtlasAnnotation, ColumnVEPField
+from annotation.models.models import CachedWebResource, Citation, HumanProteinAtlasAnnotationVersion, \
+    HumanProteinAtlasAnnotation, ColumnVEPField
 from annotation.models.models_enums import AnnotationStatus, CitationSource
 from annotation.models.models_version_diff import VersionDiff
 from annotation.tasks.annotate_variants import annotation_run_retry

@@ -1,12 +1,12 @@
+import json
 from datetime import timedelta
 from typing import Dict, Any
-import json
+
 from django.db.models import QuerySet, ExpressionWrapper, F, fields
 from django.shortcuts import get_object_or_404
 
 from annotation.models import VariantAnnotationVersion, AnnotationRun, HumanProteinAtlasAbundance, AnnotationStatus
 from annotation.models.models import HumanProteinAtlasAnnotationVersion, HumanProteinAtlasTissueSample
-from eventlog.models import Event
 from genes.models import GeneVersion
 from genes.models_enums import AnnotationConsortium
 from library.jqgrid_abstract_genes_grid import AbstractGenesGrid

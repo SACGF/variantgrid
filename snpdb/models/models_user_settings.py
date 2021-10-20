@@ -13,7 +13,6 @@ from django_extensions.db.models import TimeStampedModel
 from lazy import lazy
 from model_utils.managers import InheritanceManager
 
-from library.cache import timed_cache
 from library.django_utils import thread_safe_unique_together_get_or_create
 from library.django_utils.avatar import SpaceThemedAvatarProvider
 from library.utils import rgb_invert, string_deterministic_hash

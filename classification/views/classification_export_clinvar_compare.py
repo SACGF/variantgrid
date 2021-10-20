@@ -3,7 +3,7 @@ from typing import Set, Optional, Iterable
 from django.urls import reverse
 from lazy import lazy
 
-from annotation.models import ClinVar, AnnotationVersion, ClinVarVersion
+from annotation.models import ClinVar, ClinVarVersion
 from classification.enums import SpecialEKeys
 from classification.views.classification_export_utils import ExportFormatter, AlleleGroup
 from library.django_utils import get_url_from_view_path

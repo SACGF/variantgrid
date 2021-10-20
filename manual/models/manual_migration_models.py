@@ -17,7 +17,7 @@ class ManualMigrationTask(models.Model):
         category = parts[0]
         remainder = parts[1]
         if category == "manage":
-            return f"python3.8 manage.py {remainder}"
+            return f"python3 manage.py {remainder}"
         return f"{category} {remainder}"
 
     def __str__(self):

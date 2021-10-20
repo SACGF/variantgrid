@@ -19,6 +19,6 @@ class Migration(migrations.Migration):
 
     operations = [
         ManualOperation.operation_other(args=[
-            "Update pyHGVS library - sudo python3.8 -m pip install --force --upgrade git+https://github.com/SACGF/hgvs#egg=pyhgvs"],
+            "Update pyHGVS library - sudo python3 -m pip install --force --upgrade git+https://github.com/SACGF/hgvs#egg=pyhgvs"],
                                         test=_test_has_nr_transcripts),
     ]

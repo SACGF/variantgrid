@@ -12,13 +12,12 @@ import string
 import subprocess
 import time
 import uuid
-from functools import reduce
-from pytz import timezone
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 from enum import Enum
+from functools import reduce
 from itertools import islice
 from json.encoder import JSONEncoder
 from operator import attrgetter
@@ -35,6 +34,8 @@ from django.http import StreamingHttpResponse, HttpRequest
 from django.utils import html
 from django.utils.functional import SimpleLazyObject
 from django.utils.safestring import SafeString, mark_safe
+from pytz import timezone
+
 from uicore.json.json_types import JsonObjType
 
 FLOAT_REGEX = r'([-+]?[0-9]*\.?[0-9]+.|Infinity)'

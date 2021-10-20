@@ -13,7 +13,6 @@ from classification.models.classification import Classification
 from classification.models.clinical_context_models import ClinicalContext, DiscordanceLevel, DiscordanceStatus
 from genes.hgvs import CHGVS
 from library.guardian_utils import admin_bot
-from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import VariantAllele, Allele, GenomeBuild, UserSettings, Lab
 
 

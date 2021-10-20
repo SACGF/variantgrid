@@ -12,7 +12,6 @@ from classification.models.allele_overlap import AlleleOverlap, OverlapCounts, O
 from classification.models.classification import Classification
 from classification.models.clinical_context_models import ClinicalContext
 from classification.models.flag_types import classification_flag_types
-from classification.templatetags.classification_tags import ClinicalGrouping
 from library.django_utils import require_superuser
 from snpdb.models import Allele, Lab
 from snpdb.models.models_variant import Variant

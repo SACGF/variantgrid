@@ -10,7 +10,7 @@ from classification.models import ConditionText, top_level_suggestion, condition
     ConditionMatchingSuggestion
 from genes.models import GeneSymbol
 from library.log_utils import report_exc_info
-from library.utils import delimited_row, ExportRow
+from library.utils import delimited_row
 from ontology.models import OntologySnake
 from ontology.ontology_matching import OntologyMatching, SearchText, normalize_condition_text
 

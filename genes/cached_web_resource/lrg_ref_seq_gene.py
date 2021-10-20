@@ -1,7 +1,6 @@
 import logging
 
 import pandas as pd
-import requests
 
 from annotation.models import CachedWebResource
 from genes.models import LRGRefSeqGene

@@ -1,16 +1,14 @@
 from datetime import timedelta
-from typing import Optional
 
 from django.contrib.auth.models import User
 from django.utils import timezone
-from django.utils.timesince import timesince
 
 from analysis.models import Analysis
 from classification.models import Classification
 from eventlog.models import Event
 from library.enums.log_level import LogLevel
 from library.guardian_utils import bot_group
-from snpdb.models import UserPageAck, VCF
+from snpdb.models import VCF
 
 
 def get_dashboard_notices(user: User, days_ago: int) -> dict:

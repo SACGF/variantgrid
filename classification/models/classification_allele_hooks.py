@@ -1,7 +1,7 @@
 from django.dispatch.dispatcher import receiver
 
 from classification.models.classification import Classification
-from flags.models import FlagStatus, FlagCollection, Flag, FlagResolution
+from flags.models import FlagStatus, FlagResolution
 from genes.hgvs import HGVSMatcher
 from snpdb.models import GenomeBuild
 from snpdb.models.flag_types import allele_flag_types

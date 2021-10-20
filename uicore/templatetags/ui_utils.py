@@ -7,7 +7,7 @@ from typing import Optional, Any
 from django import template
 from django.contrib.auth.models import User
 from django.template.base import FilterExpression, kwarg_re
-from django.utils.safestring import SafeString, mark_safe
+from django.utils.safestring import SafeString
 
 register = template.Library()
 

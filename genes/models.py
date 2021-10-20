@@ -213,11 +213,11 @@ class GeneSymbolAlias(TimeStampedModel):
     """ Gene Aliases record keep track of "source" and are from:
         NCBI:
          * Source: ftp://ftp.ncbi.nlm.nih.gov/gene/DATA/GENE_INFO/Mammalia/Homo_sapiens.gene_info.gz
-         * Code: python3.8 manage.py import_ncbi_gene_info <file>
+         * Code: python3 manage.py import_ncbi_gene_info <file>
 
         HGNC:
          * Source: https://www.genenames.org/cgi-bin/download
-         * Code: python3.8 manage.py hgnc_gene_symbols_import <file>
+         * Code: python3 manage.py hgnc_gene_symbols_import <file>
 
         UCSC: We no longer use UCSC aliases, they will only exist upgraded legacy systems
          * Source: https://genome.ucsc.edu/cgi-bin/hgTables?command=start export kgAlias table
