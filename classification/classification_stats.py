@@ -38,7 +38,7 @@ def get_visible_classifications_qs(user: User):
             exclude_withdrawn=True,
             shared_only=True,
             clinical_significance__isnull=False
-        )
+        ).exclude(classification__variant__isnull=True)
     else:
         qs = Classification.filter_for_user(user)
 

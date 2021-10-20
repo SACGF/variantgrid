@@ -103,18 +103,24 @@
 {% endblock head %}
 {% block content %}
     <div class="container-table">
-        <h3>Classifications ({{ visibility }})</h3>
-        <div class="row">
-            <div id='classifications-graph' class="col-lg-6"></div>
-            <div id='gene-classifications-graph' class="col-lg-4"></div>
-        </div>
+        <h3>Classifications</h3>
 
         {% if user.is_superuser %}
-        <div class="my-2">
-            <a class="download-link admin-only d-inline-block my-1" href="{% url 'lab_gene_classification_counts' %}">Lab gene classification counts</a><br/>
-            <a class="download-link admin-only d-inline-block my-1" href="{% url 'clinical_significance_change_data' %}">Clinical significance change data</a>
-        </div>
+            <div class="my-4">
+                <p class="text-info">Admin classification data downloads.</p>
+                <a class="download-link admin-only d-block my-1" href="{% url 'classification_accumulation_data' %}" class="hover-link download-link">Submissions status over time</a>
+                <a class="download-link admin-only d-block my-1" href="{% url 'clinical_significance_change_data' %}">Clinical significance change data</a>
+                <a class="admin-only d-block my-1" href="{% url 'lab_gene_classification_counts' %}">Lab gene classification counts</a>
+            </div>
         {% endif %}
+
+        <div class="my-4">
+            <p class="text-info">Graphs based on records that are {{ visibility }}.</p>
+            <div class="row">
+                <div id='classifications-graph' class="col-lg-6"></div>
+                <div id='gene-classifications-graph' class="col-lg-4"></div>
+            </div>
+        </div>
 
         <div>
             <h3>Criteria usage</h3>

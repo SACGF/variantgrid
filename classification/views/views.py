@@ -583,11 +583,11 @@ def evidence_keys(request: HttpRequest) -> HttpResponse:
 def classification_graphs(request):
     if settings.VARIANT_CLASSIFICATION_STATS_USE_SHARED:
         show_unclassified = False
-        visibility = "Shared"
+        visibility = "shared & matched to a variant"
         evidence_field = "published_evidence"
     else:
         show_unclassified = True
-        visibility = f"Visible to user"
+        visibility = f"visible to {request.user.username}"
         evidence_field = "evidence"
     classification_counts = get_classification_counts(request.user, show_unclassified=show_unclassified)
     vc_gene_data = get_grouped_classification_counts(request.user, evidence_field, evidence_key="gene_symbol", max_groups=15, show_unclassified=show_unclassified)
