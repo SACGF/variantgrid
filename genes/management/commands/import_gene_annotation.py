@@ -1,12 +1,15 @@
 import gzip
 import json
 import logging
-from typing import Dict, List, Set, Iterable
+from typing import Dict, List, Set, Iterable, Tuple
 
 from django.core.management.base import BaseCommand
 from django.db.models.functions import Upper
 
-from genes.models import GeneSymbol, GeneAnnotationImport, Gene, GeneVersion, TranscriptVersion, Transcript, HGNC
+from genes.cached_web_resource.refseq import retrieve_refseq_gene_summaries
+from genes.gene_matching import GeneMatcher
+from genes.models import GeneSymbol, GeneAnnotationImport, Gene, GeneVersion, TranscriptVersion, Transcript, HGNC, \
+    GeneAnnotationRelease, ReleaseGeneVersion, ReleaseTranscriptVersion
 from genes.models_enums import AnnotationConsortium
 from library.file_utils import open_handle_gzip
 from library.utils import invert_dict
@@ -56,6 +59,9 @@ class Command(BaseCommand):
                     json_str = json.dumps(merged_data)
                     outfile.write(json_str.encode('ascii'))
                     exit(0)
+            if release_version := options["release"]:
+                self._create_release(genome_build, annotation_consortium, release_version, merged_data[0])
+                exit(0)
         elif merged_json := options["merged_json"]:
             with open_handle_gzip(merged_json) as f:
                 merged_data = json.load(f)
@@ -117,6 +123,74 @@ class Command(BaseCommand):
 
         return merged_data
 
+    def _create_release(self, genome_build: GenomeBuild, annotation_consortium, release_version, data):
+        """ A GeneAnnotationRelease doesn't change/store transcript data, but does keep track of eg what
+            symbols are used and how things are linked together """
+        import_data = data["gene_annotation_import"]
+        import_source = self._get_or_create_gene_annotation_import(genome_build, annotation_consortium, import_data)
+
+        release, created = GeneAnnotationRelease.objects.update_or_create(version=release_version,
+                                                                          genome_build=genome_build,
+                                                                          annotation_consortium=annotation_consortium,
+                                                                          defaults={
+                                                                              "gene_annotation_import": import_source
+                                                                          })
+        if not created:
+            print("Release exists - clearing existing data")
+            release.releasegeneversion_set.all().delete()
+            release.releasetranscriptversion_set.all().delete()
+
+        gene_version_ids_by_accession, transcript_version_ids_by_accession = self._get_gene_and_transcript_version_pk_lookups(genome_build, annotation_consortium)
+
+        release_transcript_version_list = []
+        gene_versions_used_by_transcripts = set()
+        for transcript_accession, tv_data in data["transcript_version"].items():
+            transcript_version_id = transcript_version_ids_by_accession[transcript_accession]
+            rtv = ReleaseTranscriptVersion(release=release, transcript_version_id=transcript_version_id)
+            release_transcript_version_list.append(rtv)
+
+            if gene_version := tv_data.get("gene_version"):
+                gene_versions_used_by_transcripts.add(gene_version)
+
+        release_gene_version_list = []
+        for gene_accession in data["gene_version"]:
+            # We only store gene versions that are used in the merged files (which is what's used to insert data)
+            if gene_accession in gene_versions_used_by_transcripts:
+                gene_version_id = gene_version_ids_by_accession[gene_accession]
+                release_gene_version_list.append(ReleaseGeneVersion(release=release, gene_version_id=gene_version_id))
+
+        if release_gene_version_list:
+            print(f"Inserting {len(release_gene_version_list)} gene versions for release {release}")
+            ReleaseGeneVersion.objects.bulk_create(release_gene_version_list)
+
+        if release_transcript_version_list:
+            print(f"Inserting {len(release_transcript_version_list)} transcript versions for release {release}")
+            ReleaseTranscriptVersion.objects.bulk_create(release_transcript_version_list)
+
+        print("Matching existing gene list symbols to this release...")
+        gm = GeneMatcher(release)
+        gm.match_unmatched_in_hgnc_and_gene_lists()
+
+    @staticmethod
+    def _get_gene_and_transcript_version_pk_lookups(genome_build: GenomeBuild, annotation_consortium) -> Tuple[Dict, Dict]:
+        gene_version_qs = GeneVersion.objects.filter(genome_build=genome_build,
+                                                     gene__annotation_consortium=annotation_consortium)
+        gene_version_ids_by_accession = {f"{gene_id}.{version}": pk for (pk, gene_id, version) in gene_version_qs.values_list("pk", "gene_id", "version")}
+        transcript_version_qs = TranscriptVersion.objects.filter(genome_build=genome_build,
+                                                                 transcript__annotation_consortium=annotation_consortium)
+        tv_values = transcript_version_qs.values_list("pk", "transcript_id", "version")
+        transcript_version_ids_by_accession = {f"{transcript_id}.{version}": pk
+                                                     for (pk, transcript_id, version) in tv_values}
+        return gene_version_ids_by_accession, transcript_version_ids_by_accession
+
+    @staticmethod
+    def _get_or_create_gene_annotation_import(genome_build: GenomeBuild, annotation_consortium, import_data):
+        return GeneAnnotationImport.objects.get_or_create(annotation_consortium=annotation_consortium,
+                                                          genome_build=genome_build,
+                                                          filename=import_data["path"],
+                                                          url=import_data["url"],
+                                                          file_md5sum=import_data["md5sum"])[0]
+
     def _import_merged_data(self, genome_build: GenomeBuild, annotation_consortium, merged_data: List[Dict]):
         """        """
         print("_import_merged_data")
@@ -127,23 +201,12 @@ class Command(BaseCommand):
         transcripts_qs = Transcript.objects.filter(annotation_consortium=annotation_consortium)
         known_transcript_ids = set(transcripts_qs.values_list("identifier", flat=True))
         hgnc_ids = set(HGNC.objects.all().values_list("pk", flat=True))
-        gene_version_qs = GeneVersion.objects.filter(genome_build=genome_build,
-                                                     gene__annotation_consortium=annotation_consortium)
-        known_gene_version_ids_by_accession = {f"{gene_id}.{version}": pk for (pk, gene_id, version) in gene_version_qs.values_list("pk", "gene_id", "version")}
-        transcript_version_qs = TranscriptVersion.objects.filter(genome_build=genome_build,
-                                                                 transcript__annotation_consortium=annotation_consortium)
-        tv_values = transcript_version_qs.values_list("pk", "transcript_id", "version")
-        known_transcript_version_ids_by_accession = {f"{transcript_id}.{version}": pk
-                                                     for (pk, transcript_id, version) in tv_values}
+        gene_version_ids_by_accession, transcript_version_ids_by_accession = self._get_gene_and_transcript_version_pk_lookups(genome_build, annotation_consortium)
 
         for data in merged_data:
             import_data = data["gene_annotation_import"]
             logging.info("%s has %d transcripts", import_data, len(data["transcript_version"]))
-            import_source = GeneAnnotationImport.objects.get_or_create(annotation_consortium=annotation_consortium,
-                                                                       genome_build=genome_build,
-                                                                       filename=import_data["path"],
-                                                                       url=import_data["url"],
-                                                                       file_md5sum=import_data["md5sum"])[0]
+            import_source = self._get_or_create_gene_annotation_import(genome_build, annotation_consortium, import_data)
             new_gene_symbols = set()
             new_genes = []
             new_gene_versions = []
@@ -175,7 +238,7 @@ class Command(BaseCommand):
                                            genome_build=genome_build,
                                            import_source=import_source)
 
-                if pk := known_gene_version_ids_by_accession.get(gene_accession):
+                if pk := gene_version_ids_by_accession.get(gene_accession):
                     gene_version.pk = pk
                     modified_gene_versions.append(gene_version)
                 else:
@@ -198,7 +261,7 @@ class Command(BaseCommand):
                 logging.info("Creating %d new gene versions", len(new_gene_versions))
                 GeneVersion.objects.bulk_create(new_gene_versions, batch_size=self.BATCH_SIZE)
                 # Update with newly inserted records - so that we have a PK to use below
-                known_gene_version_ids_by_accession.update({f"{gv.gene_id}.{gv.version}": gv.pk for gv in new_gene_versions})
+                gene_version_ids_by_accession.update({f"{gv.gene_id}.{gv.version}": gv.pk for gv in new_gene_versions})
 
             # Could potentially be duplicate gene versions (diff transcript versions from diff GFFs w/same GeneVersion)
             if modified_gene_versions:
@@ -216,7 +279,7 @@ class Command(BaseCommand):
                 if transcript_id not in known_transcript_ids:
                     new_transcript_ids.add(transcript_id)
 
-                gene_version_id = known_gene_version_ids_by_accession[tv_data["gene_version"]]
+                gene_version_id = gene_version_ids_by_accession[tv_data["gene_version"]]
                 transcript_version = TranscriptVersion(transcript_id=transcript_id,
                                                        version=version,
                                                        gene_version_id=gene_version_id,
@@ -224,7 +287,7 @@ class Command(BaseCommand):
                                                        import_source=import_source,
                                                        biotype=tv_data["biotype"],
                                                        data=tv_data["data"])
-                if pk := known_transcript_version_ids_by_accession.get(transcript_accession):
+                if pk := transcript_version_ids_by_accession.get(transcript_accession):
                     transcript_version.pk = pk
                     modified_transcript_versions.append(transcript_version)
                 else:
@@ -248,6 +311,10 @@ class Command(BaseCommand):
                 TranscriptVersion.objects.bulk_update(modified_transcript_versions,
                                                       ["gene_version_id", "import_source", "biotype", "data"],
                                                       batch_size=self.BATCH_SIZE)
+
+            if new_genes and annotation_consortium == AnnotationConsortium.REFSEQ:
+                print("Created new RefSeq genes - retrieving gene summaries via API")
+                retrieve_refseq_gene_summaries()
 
 
 def convert_gene_pyreference_to_gene_version_data(gene_data: Dict) -> Dict:
@@ -305,54 +372,3 @@ def convert_transcript_pyreference_to_pyhgvs(transcript_data: Dict) -> Dict:
         pyhgvs_data["partial"] = 1
 
     return pyhgvs_data
-
-# TODO: Need to handle releases
-
-"""
-        release = None
-        if release_version and not dry_run:
-            release, created = GeneAnnotationRelease.objects.update_or_create(version=release_version,
-                                                                              genome_build=self.genome_build,
-                                                                              annotation_consortium=self.annotation_consortium,
-                                                                              defaults={
-                                                                                  "gene_annotation_import": import_source
-                                                                              })
-            if not created:
-                print("Release exists - clearing existing data")
-                release.releasegeneversion_set.all().delete()
-                release.releasetranscriptversion_set.all().delete()
-
-
-        # Insert stuff etc
-
-
-        if release:
-            release_gene_version_list = []
-            for gene_id, version in gff3_gene_versions.items():
-                gv = self.known_gene_versions_by_gene_id[gene_id][version]
-                release_gene_version_list.append(ReleaseGeneVersion(release=release, gene_version=gv))
-            if release_gene_version_list:
-                print(f"Inserting {len(release_gene_version_list)} gene versions for release {release}")
-                if not dry_run:
-                    ReleaseGeneVersion.objects.bulk_create(release_gene_version_list)
-
-            release_transcript_version_list = []
-            for transcript_id, version in gff3_transcript_versions.items():
-                tv = self.known_transcript_versions_by_transcript_id[transcript_id][version]
-                release_transcript_version_list.append(ReleaseTranscriptVersion(release=release, transcript_version=tv))
-            if release_transcript_version_list:
-                print(f"Inserting {len(release_transcript_version_list)} transcript versions for release {release}")
-                if not dry_run:
-                    ReleaseTranscriptVersion.objects.bulk_create(release_transcript_version_list)
-
-            print("Matching existing gene list symbols to this release...")
-            if not dry_run:
-                gm = GeneMatcher(release)
-                gm.match_unmatched_in_hgnc_and_gene_lists()
-
-            if unknown_gene_ids and self.annotation_consortium == AnnotationConsortium.REFSEQ:
-                print("Created new RefSeq genes - retrieving gene summaries via API")
-                if not dry_run:
-                    retrieve_refseq_gene_summaries()
-
-"""
