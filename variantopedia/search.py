@@ -618,7 +618,7 @@ def search_hgvs(search_string: str, user: User, genome_build: GenomeBuild, varia
             pass
 
         if used_transcript_accession and used_transcript_accession not in hgvs_string:
-            search_messages.append(f"Warning: Missing transcript version, using best match '{used_transcript_accession}'")
+            search_messages.append(f"Warning: Used transcript version '{used_transcript_accession}'")
 
         transcript_id = hgvs_matcher.get_transcript_id(hgvs_string,
                                                        transcript_version=False)
