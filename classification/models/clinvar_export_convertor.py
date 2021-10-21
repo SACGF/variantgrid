@@ -108,7 +108,7 @@ class ClinVarExportConverter:
         classification_flag_types.matching_variant_warning_flag: JsonMessages.error("Classification has open variant warning flag"),
         classification_flag_types.discordant: JsonMessages.error("Classification is in discordance"),
         classification_flag_types.internal_review: JsonMessages.error("Classification is in internal review"),
-        classification_flag_types.classification_not_public: JsonMessages.error("Classification marked as Exclude from ClinVar")
+        # classification_flag_types.classification_not_public - this has special handling to include a comment
     }
 
     def __init__(self, clinvar_export_record: ClinVarExport):
@@ -167,7 +167,17 @@ class ClinVarExportConverter:
 
             messages = JSON_MESSAGES_EMPTY
             for flag in self.classification_based_on.classification.flag_collection.flags(only_open=True):
-                if message := ClinVarExportConverter.FLAG_TYPES_TO_MESSAGES.get(flag.flag_type):
+                if flag.flag_type == classification_flag_types.classification_not_public:
+                    message_text = "Not submitting to ClinVar as record is flagged to be excluded"
+                    if last_comment := flag.flagcomment_set.order_by('-created').first():
+                        if last_comment_text := last_comment.text:
+                            if "Not submitting to ClinVar as the record matched the following pattern(s):" in last_comment_text:
+                                message_text = last_comment_text
+                            else:
+                                message_text += " - " + last_comment_text
+                    messages += JsonMessages.error(message_text)
+
+                elif message := ClinVarExportConverter.FLAG_TYPES_TO_MESSAGES.get(flag.flag_type):
                     messages += message
 
             # see if other shared classifications for the clinvar_key variant combo don't have a resolved condition
