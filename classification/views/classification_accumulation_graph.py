@@ -144,6 +144,7 @@ class ClassificationAccumulationGraph:
                 if classification_match := Classification.objects \
                         .values_list("variant__variantallele__allele_id", "id", "lab__organization__name") \
                         .filter(flag_collection_id=flag_collection_id) \
+                        .filter(share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS) \
                         .first():
                     flag_collection_id_to_allele_classification[flag_collection_id] = classification_match
                 else:
