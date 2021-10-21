@@ -21,7 +21,7 @@ from classification.enums import SpecialEKeys, ShareLevel
 from classification.models import Classification, ClassificationModification, classification_post_publish_signal, \
     flag_types, EvidenceKeyMap, ConditionResolvedDict, ConditionResolved
 from flags.models import flag_comment_action, Flag, FlagComment, FlagResolution
-from genes.models import GeneSymbol
+from genes.models import GeneSymbol, GeneSymbolAlias
 from library.cache import timed_cache
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
 from library.guardian_utils import admin_bot
@@ -302,6 +302,12 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
         gene_symbol_str = cm.get(SpecialEKeys.GENE_SYMBOL)
         if gene_symbol_str:
             gene_symbol = GeneSymbol.objects.filter(symbol=gene_symbol_str).first()
+
+        # see if there's a single gene symbol alias that this links to, if it's not a gene symbol itself
+        if not gene_symbol:
+            if alias_qs := GeneSymbolAlias.objects.filter(alias__iexact=gene_symbol_str):
+                if alias_qs.count() == 1:
+                    gene_symbol = alias_qs.first().gene_symbol
 
         # if the imported gene symbol doesn't work, see what gene symbols we can extract from the c.hgvs
         if not gene_symbol:
