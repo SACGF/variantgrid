@@ -5,6 +5,7 @@ from operator import attrgetter
 from typing import List, Optional, Dict, Iterable, Set
 
 import requests
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.contrib.postgres.fields import ArrayField
 from django.db import models, transaction
@@ -579,8 +580,11 @@ class ConditionMatchingSuggestion:
             for term in terms:
                 if term.is_stub:
                     if term.ontology_service in OntologyService.LOCAL_ONTOLOGY_PREFIXES:
-                        self.add_message(ConditionMatchingMessage(severity="warning",
-                                                                  text=f"{term.id} : no copy of this term in our system"))
+                        text = f"{term.id} : no copy of this term in our system"
+                        if term.ontology_service == OntologyService.OMIM:
+                            text += f". {settings.SITE_NAME} only stores 'phenotype' OMIM terms. Maybe this term is an OMIM gene?"
+
+                        self.add_message(ConditionMatchingMessage(severity="warning", text=text))
                     else:
                         self.add_message(ConditionMatchingMessage(severity="info",
                                                                   text=f"We do not store {term.ontology_service}, please verify externally"))
