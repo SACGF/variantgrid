@@ -62,9 +62,9 @@
                     </div>
                     <div id="{{ build_name }}-import-sources" class='gene-transcript-instructions collapse'>
                         <b>Import Sources</b>
-                        {% for file_name, import_stats in details.genes_and_transcripts.import_sources.items %}
+                        {% for import_source, import_stats in details.genes_and_transcripts.import_sources.items %}
                             <div>
-                            {{ file_name }}: <b>{{ import_stats.transcripts }}</b> transcripts ({{ import_stats.created|localtime }})
+                            {{ import_source }}: <b>{{ import_stats.transcripts }}</b> transcripts ({{ import_stats.created|localtime }})
                             </div>
                         {% endfor %}
                     </div>

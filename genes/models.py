@@ -336,14 +336,10 @@ class GeneAnnotationImport(TimeStampedModel):
         created the first time it's seen (linked back to input which created it via 'import_source') """
     annotation_consortium = models.CharField(max_length=1, choices=AnnotationConsortium.choices)
     genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)
-    filename = models.TextField()
-    url = models.TextField(null=True)
-    file_md5sum = models.TextField()
+    url = models.TextField()
 
     def __str__(self):
-        if self.url:
-            return self.url
-        return os.path.basename(self.filename)
+        return self.url
 
 
 class Gene(models.Model):
