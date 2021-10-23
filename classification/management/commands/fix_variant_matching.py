@@ -46,7 +46,7 @@ class Command(BaseCommand):
         user = admin_bot()
 
         batch: List[Classification] = list()
-        for c in Classification.objects.all().order_by('classification__evidence__genome_build'):
+        for c in Classification.objects.all().order_by('evidence__genome_build__value'):
             c.revalidate(user=user)
             batch.append(c)
 
