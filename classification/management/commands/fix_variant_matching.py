@@ -3,8 +3,10 @@ from typing import List, Dict
 
 from django.core.management import BaseCommand
 
+from classification.classification_import import process_classification_import
 from classification.models import Classification, ClassificationImport
 from library.guardian_utils import admin_bot
+from snpdb.models import ImportSource
 
 
 class Command(BaseCommand):
@@ -35,6 +37,10 @@ class Command(BaseCommand):
                     vc.save()
                 except ValueError as ve:
                     print(f"Couldn't revalidate {vc.id} due to bad genome build {ve}")
+
+            for vc_import in imports_by_genome.values():
+                process_classification_import(vc_import, ImportSource.API)
+
             self.sleep_for_delay()
 
     def handle(self, *args, **options):
