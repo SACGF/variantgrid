@@ -38,20 +38,24 @@ class Command(BaseCommand):
             self.sleep_for_delay()
 
     def handle(self, *args, **options):
+        row_count = 0
         apply_all = options.get('all')
         if not apply_all:
             print("Must confirm running over all records with --all")
 
         batch_size = self.batch_size
         user = admin_bot()
-
+        
         batch: List[Classification] = list()
         for c in Classification.objects.all().order_by('evidence__genome_build__value'):
             c.revalidate(user=user)
             batch.append(c)
+            row_count += 1
 
             if len(batch) >= batch_size:
                 self.handle_batch(batch)
                 batch = list()
+                print(f"Handled {row_count}")
 
         self.handle_batch(batch)
+        print(f"Handled {row_count}")
