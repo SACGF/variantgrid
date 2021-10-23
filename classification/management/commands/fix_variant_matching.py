@@ -1,5 +1,5 @@
 import time
-from typing import List, Dict
+from typing import List, Dict, Optional
 
 from django.core.management import BaseCommand
 
@@ -11,15 +11,53 @@ from snpdb.models import ImportSource
 
 class Command(BaseCommand):
 
+    def report_unmatched(self):
+        print(f"Unmatched count = {Classification.objects.filter(variant__isnull=True).count()}")
+
+    def handle(self, *args, **options):
+        row_count = 0
+
+        batch_size = 50
+        mode: Optional[str] = None
+        if options.get('all'):
+            mode = 'all'
+        elif options.get('missing'):
+            mode = 'missing'
+            batch_size = 1
+
+        if not self.mode:
+            print("Must confirm running over all records with --all or --missing")
+            return
+
+        self.report_unmatched()
+
+        qs = Classification.objects.all().order_by('evidence__genome_build__value')
+        if mode == 'missing':
+            qs = qs.filter(variant__isnull=True)
+
+        user = admin_bot()
+
+        batch: List[Classification] = list()
+        for c in qs:
+            c.revalidate(user=user)
+            batch.append(c)
+            row_count += 1
+
+            if len(batch) >= batch_size:
+                self.handle_batch(batch)
+                batch = list()
+                print(f"Handled {row_count}")
+
+        self.handle_batch(batch)
+        print(f"Handled {row_count}")
+        self.report_unmatched()
+
     def sleep_for_delay(self):
         time.sleep(10)
 
-    @property
-    def batch_size(self) -> int:
-        return 50
-
     def add_arguments(self, parser):
         parser.add_argument('--all', action='store_true', default=False)
+        parser.add_argument('--missing', action='store_true', default=False)
 
     def handle_batch(self, batch: List[Classification]):
         user = admin_bot()
@@ -42,26 +80,3 @@ class Command(BaseCommand):
                 process_classification_import(vc_import, ImportSource.API)
 
             self.sleep_for_delay()
-
-    def handle(self, *args, **options):
-        row_count = 0
-        apply_all = options.get('all')
-        if not apply_all:
-            print("Must confirm running over all records with --all")
-
-        batch_size = self.batch_size
-        user = admin_bot()
-
-        batch: List[Classification] = list()
-        for c in Classification.objects.all().order_by('evidence__genome_build__value'):
-            c.revalidate(user=user)
-            batch.append(c)
-            row_count += 1
-
-            if len(batch) >= batch_size:
-                self.handle_batch(batch)
-                batch = list()
-                print(f"Handled {row_count}")
-
-        self.handle_batch(batch)
-        print(f"Handled {row_count}")
