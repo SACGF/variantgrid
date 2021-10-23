@@ -373,24 +373,32 @@ def download_hgvs_resolution(request: HttpRequest) -> StreamingHttpResponse:
     c_hgvs_38_col = 'chgvs_grch38'
 
     qs = Classification.objects.order_by(imported_genome_build_col, c_hgvs_imported_col, c_hgvs_37_col, c_hgvs_38_col, 'variant', 'pk').values_list(
-        imported_genome_build_col, c_hgvs_imported_col, c_hgvs_37_col, c_hgvs_38_col, 'variant', 'pk'
+        imported_genome_build_col, c_hgvs_imported_col, c_hgvs_37_col, c_hgvs_38_col, 'variant', 'pk', named=True
     )
 
     last_record = list()
     def mapper(data):
-        record = [data[0], data[1], data[2], data[3]]
-        if record != last_record and data[0] and data[1]:
-            variant_id = data[4]
-            classification_id = data[5]
+        genome_build = getattr(data, imported_genome_build_col)
+        imported_c_hgvs = getattr(data, c_hgvs_imported_col)
+        variant_id = data.variant
+        classification_id = data.pk
+        chgvs_37 = getattr(data, c_hgvs_37_col)
+        chgvs_38 = getattr(data, c_hgvs_38_col)
+        record = [
+            genome_build,
+            imported_c_hgvs,
+            chgvs_37,
+            chgvs_38
+        ]
+        if record != last_record and genome_build and imported_c_hgvs:
             url = get_url_from_view_path(
-                reverse('view_classification', kwargs={'record_id': data[5]}),
+                reverse('view_classification', kwargs={'record_id': classification_id}),
             )
-            # url = f"https://shariant.org.au/classification/classification/{data[4]}"
             return ClassificationResolution(
-                _imported_genome_build=data[0],
-                _chgvs_imported=data[1],
-                _chgvs_grch37=data[2],
-                _chgvs_grch38=data[3],
+                _imported_genome_build=genome_build,
+                _chgvs_imported=imported_c_hgvs,
+                _chgvs_grch37=chgvs_37,
+                _chgvs_grch38=chgvs_38,
                 _variant_id=variant_id,
                 _url=url
             )
