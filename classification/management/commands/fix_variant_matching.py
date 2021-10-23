@@ -25,7 +25,7 @@ class Command(BaseCommand):
             mode = 'missing'
             batch_size = 1
 
-        if not self.mode:
+        if not mode:
             print("Must confirm running over all records with --all or --missing")
             return
 
