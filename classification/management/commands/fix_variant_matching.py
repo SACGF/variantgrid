@@ -1,4 +1,4 @@
-from time import time
+import time
 from typing import List, Dict
 
 from django.core.management import BaseCommand
@@ -45,7 +45,7 @@ class Command(BaseCommand):
 
         batch_size = self.batch_size
         user = admin_bot()
-        
+
         batch: List[Classification] = list()
         for c in Classification.objects.all().order_by('evidence__genome_build__value'):
             c.revalidate(user=user)
