@@ -157,6 +157,7 @@ class Command(BaseCommand):
             if gene_id not in known_genes_ids:
                 new_genes.append(Gene(identifier=gene_id,
                                       annotation_consortium=annotation_consortium))
+                known_genes_ids.add(gene_id)
 
             if symbol := gv_data["gene_symbol"]:
                 if symbol.upper() not in known_uc_gene_symbols:
@@ -195,8 +196,6 @@ class Command(BaseCommand):
         if new_genes:
             logging.info("Creating %d new genes", len(new_genes))
             Gene.objects.bulk_create(new_genes, batch_size=self.BATCH_SIZE)
-            # Update with newly inserted records - so that we have a PK to use below
-            known_genes_ids.update({gene.identifier for gene in new_genes})
 
         if new_gene_versions:
             logging.info("Creating %d new gene versions", len(new_gene_versions))
@@ -220,15 +219,16 @@ class Command(BaseCommand):
             if transcript_id not in known_transcript_ids:
                 new_transcript_ids.add(transcript_id)
 
-            gene_version_id = gene_version_ids_by_accession[tv_data["gene_version"]]
-            import_source = self._get_import_source_by_url(genome_build, annotation_consortium, tv_data["url"])
+            gene_version_id = gene_version_ids_by_accession[tv_data.pop("gene_version")]
+            import_source = self._get_import_source_by_url(genome_build, annotation_consortium, tv_data.pop("url"))
+            del tv_data["gene_name"]  # We'll put in symbol from related data gene_version.gene_symbol
             transcript_version = TranscriptVersion(transcript_id=transcript_id,
                                                    version=version,
                                                    gene_version_id=gene_version_id,
                                                    genome_build=genome_build,
                                                    import_source=import_source,
-                                                   biotype=tv_data["biotype"],
-                                                   data=tv_data["data"])
+                                                   biotype=tv_data.pop("biotype"),
+                                                   data=tv_data)
             if pk := transcript_version_ids_by_accession.get(transcript_accession):
                 transcript_version.pk = pk
                 modified_transcript_versions.append(transcript_version)
