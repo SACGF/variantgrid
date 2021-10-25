@@ -122,15 +122,19 @@ class ClinGenAllele(TimeStampedModel):
                     logging.warning("Don't have sequence for LRGs, relying on ClinGenAlleleRegistry reference "
                                     "bases which may be wrong")
                 else:
-                    if hgvs_name.mutation_type == "dup":
-                        ref_end = coord["end"]
-                        ref_start = ref_end - len(coord["allele"])
-                    else:
-                        ref_start = coord["start"]
-                        ref_end = coord["end"]
+                    from genes.models import NoTranscript
 
-                    tvsi = TranscriptVersionSequenceInfo.get(transcript_accession)
-                    hgvs_name.ref_allele = tvsi.sequence[ref_start:ref_end]
+                    try:
+                        tvsi = TranscriptVersionSequenceInfo.get(transcript_accession)
+                        if hgvs_name.mutation_type == "dup":
+                            ref_end = coord["end"]
+                            ref_start = ref_end - len(coord["allele"])
+                        else:
+                            ref_start = coord["start"]
+                            ref_end = coord["end"]
+                        hgvs_name.ref_allele = tvsi.sequence[ref_start:ref_end]
+                    except NoTranscript as e_no_transcript:
+                        logging.warning(e_no_transcript)
         return hgvs_name
 
     def _get_raw_hgvs_and_data(self, transcript_accession, match_version=True) -> Tuple[Optional[str],
