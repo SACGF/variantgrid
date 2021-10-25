@@ -2,6 +2,7 @@ import time
 from typing import List, Dict, Optional
 
 from django.core.management import BaseCommand
+from django.db.models import Q
 
 from classification.classification_import import process_classification_import
 from classification.models import Classification, ClassificationImport
@@ -10,6 +11,11 @@ from snpdb.models import ImportSource
 
 
 class Command(BaseCommand):
+
+    def add_arguments(self, parser):
+        parser.add_argument('--all', action='store_true', default=False, help='Attempt to rematch every single classification')
+        parser.add_argument('--missing', action='store_true', default=False, help='Attempt to rematch only classifications not linked to a variant - one at a time')
+        parser.add_argument('--chgvs', action='store_true', default=False, help='Re-calculate c.hgvs values for all linked classifications that are missing 37 or 38 rep')
 
     def report_unmatched(self):
         print(f"Unmatched count = {Classification.objects.filter(variant__isnull=True).count()}")
@@ -24,6 +30,9 @@ class Command(BaseCommand):
         elif options.get('missing'):
             mode = 'missing'
             batch_size = 1
+        elif options.get('chgvs'):
+            self.handle_chgvs()
+            return
 
         if not mode:
             print("Must confirm running over all records with --all or --missing")
@@ -55,9 +64,12 @@ class Command(BaseCommand):
     def sleep_for_delay(self):
         time.sleep(10)
 
-    def add_arguments(self, parser):
-        parser.add_argument('--all', action='store_true', default=False)
-        parser.add_argument('--missing', action='store_true', default=False)
+    def handle_chgvs(self):
+        qs = Classification.objects.filter(variant__isnull=False).filter(Q(chgvs_grch37__isnull=True) | Q(chgvs_grch38__isnull=True))
+        print(f"Number of matched records missing 37 or 38 rep : {qs.count()}")
+        for c in qs:
+            c.update_cached_c_hgvs()
+        print("Finished update c.hgvs")
 
     def handle_batch(self, batch: List[Classification]):
         user = admin_bot()
