@@ -139,7 +139,7 @@ gff3ToGenePred -processAllGeneChildren -geneNameAttr=Name -rnaNameAttr=transcrip
 
             {% labelled label="Gene Annotation Release" %}
                 {% if details.gene_annotation_release %}
-                <span title="{{ details.gene_annotation_release.filename }}">{{ details.gene_annotation_release.name }}</span>
+                <span title="{{ details.gene_annotation_release.gene_annotation_import }}">{{ details.gene_annotation_release.name }}</span>
                 {% else %}
                     <div class="no-value">Not Installed</div>
                 {% endif %}

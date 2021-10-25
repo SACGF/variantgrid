@@ -116,7 +116,7 @@ def _get_build_annotation_details(build_contigs, genome_build):
             if gene_annotation_release := av.variant_annotation_version.gene_annotation_release:
                 annotation_details["gene_annotation_release"] = {
                     "name": str(gene_annotation_release),
-                    "filename": os.path.basename(gene_annotation_release.gene_annotation_import.filename),
+                    "gene_annotation_import": str(gene_annotation_release.gene_annotation_import),
                 }
 
         if gene_annotation_counts := av.get_gene_annotation().count():
