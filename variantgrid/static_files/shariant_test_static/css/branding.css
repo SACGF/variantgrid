@@ -3,17 +3,22 @@
 }
 
 .bg-theme {
-  color: white !important;
-}
-.bg-theme * {
   color: #ddd !important;
-  border-color: #ccc !important;
+  border-color: #ccc;
 }
 .bg-theme .fas {
   color: #ccc !important;
 }
 .bg-theme input {
   color: #444 !important;
+}
+
+.login-bg-theme {
+  background-color: #f49043;
+  color: #ddd;
+}
+.login-bg-theme .jumbotron {
+  color: #444;
 }
 
 nav.navbar a.nav-link {

@@ -14,6 +14,18 @@
         color: #444 !important;
     }
 }
+.login-bg-theme {
+    background-color: rgb(27, 117, 188);
+    color: #ddd;
+    .jumbotron {
+        color: #444;
+    }
+    .hover-link {
+        font-weight: 500;
+        color: #ccccff;
+    }
+}
+
 nav.navbar a.nav-link {
     color: #ddd !important;
     &:hover {

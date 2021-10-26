@@ -1,0 +1,65 @@
+{% load static %}
+{% load compress %}
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+        <title>{% block title %}{{ site_name }}{% endblock %}</title>
+
+        <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" integrity="sha384-JcKb8q3iqJ61gNV9KGb8thSsNjpSL0n8PARn9HuZOnIxN0hoP+VmmDGMN5t9UJ0Z" crossorigin="anonymous">
+        <!-- Font Awesome -->
+        <script src="https://kit.fontawesome.com/56193c3ca3.js" crossorigin="anonymous"></script>
+
+        {% compress css %}
+        <!-- standard values -->
+            <link href="{% static 'css/layout.css' %}" rel="stylesheet">
+            <link href="{% static 'css/global_bs.css' %}" rel="stylesheet">
+            <link href="{% static 'css/branding.css' %}" rel="stylesheet">
+        {% endcompress %}
+        {% compress js %}
+            <script>window.SITE_NAME = "{{ site_name }}";</script>
+            <script src="{% static 'js/global.js' %}"></script>
+        {% endcompress %}
+
+        <style>
+            #oidc-login-box {
+                width: 100%;
+                position: absolute;
+                top: 100px;
+                text-align: center;
+            }
+        </style>
+        <script>
+            var $buoop = {
+                required:{e:16,f:60,o:53,s:11,c:66},insecure:false,api:2021.03,reminder:0,test:false,no_permanent_hide: true,
+                text:'Your browser {brow_name} <b>will not work on this site</b>.<br/>Please <a{up_but}>click here</a> for details on getting an up to date browser.'
+            };
+            function $buo_f(){
+             var e = document.createElement("script");
+             e.src = "//browser-update.org/update.min.js";
+             document.body.appendChild(e);
+            };
+            try {document.addEventListener("DOMContentLoaded", $buo_f,false)}
+            catch(e){window.attachEvent("onload", $buo_f)}
+        </script>
+
+
+        <script type="text/javascript">
+            function login() {
+                window.location = '{% url 'oidc_authentication_init' %}'
+            }
+            function resume() {
+                window.location = '/';
+            }
+        </script>
+        <meta name="description" content="VariantGrid: An source available variant database, and web analysis platform."/>
+        {% block head %}{% endblock %}
+    </head>
+    <body class="login-bg-theme">
+        {% block content %}{% endblock content %}
+
+        <!-- Bootstrap 4 requirements -->
+        <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js" integrity="sha384-9/reFTGAW83EW2RDu2S0VKaIzap3H66lZH81PoYlFhbGU+6BZp6G7niu735Sk7lN" crossorigin="anonymous"></script>
+        <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js" integrity="sha384-B4gt1jrGC7Jh4AgTPSdUtOBvfO8shuf57BaghqFfPlYxofvL8/KUEfYiJOMMV+rV" crossorigin="anonymous"></script>
+    </body>
+</html>

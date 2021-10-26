@@ -1,0 +1,24 @@
+{% load ui_utils %}
+
+{% if user.is_authenticated %}
+    <h4>User Login</h4>
+    <button class="btn-login btn btn-primary w-100" id="resume_session" onclick="resume()">Continue as {{ user.username }}</button>
+{% elif use_oidc %}
+    <h4>User Login</h4>
+    <button class="btn-login btn btn-primary w-100" id="login" onclick="login()">Login</button>
+{% else %}
+    <div>
+        <form id='login' method="post" action="." role="login">
+            {% labelled %}<h4 class="text-center">User Login</h4>{% endlabelled %}
+            {% labelled label="Username" %}<input name="username" class="form-control" autofocus />{% endlabelled %}
+            {% labelled label="Password" %}<input name="password" class="form-control" type="password" />{% endlabelled %}
+            <input type="hidden" name="next" value="{{ next }}" />
+            {% if form.non_field_errors %}
+                {{ form.non_field_errors }}
+            {% endif %}
+            {% labelled %}
+                <button class="btn-login btn btn-primary w-100" type="submit">Log In</button>
+            {% endlabelled %}
+        </form>
+    </div>
+{% endif %}

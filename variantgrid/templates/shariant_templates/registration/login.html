@@ -1,228 +1,66 @@
-{% extends "registration/abstract_login.html" %}
+{% extends "registration/abstract_login_bs.html" %}
 {% load static %}
+{% load ui_login %}
+{% load ui_utils %}
 {% block head %}
-{{ block.super }}
-<meta name="description" content="Shariant: Australian Genomics Variant Classification Sharing"/>
-<script> 
-var $buoop = {
-    required:{e:16,f:60,o:53,s:11,c:66},insecure:false,api:2021.03,reminder:0,test:false,no_permanent_hide: true,
-    text:'Your browser {brow_name} <b>will not work on this site</b>.<br/>Please <a{up_but}>click here</a> for details on getting an up to date browser.'
-};
-function $buo_f(){ 
- var e = document.createElement("script"); 
- e.src = "//browser-update.org/update.min.js"; 
- document.body.appendChild(e);
-};
-try {document.addEventListener("DOMContentLoaded", $buo_f,false)}
-catch(e){window.attachEvent("onload", $buo_f)}
-</script>
-<style>
-
-.flex-center-container {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-}
-
-.white-row {
-    width: 100%;
-    background-color: #ffffff;
-    height: 460px;
-}
-
-.navy-row {
-    color: #ffffff;
-    width: 100%;
-    background-color: rgb(27, 117, 188);
-}
-
-.light-blue-row {
-    background-color: #00aedb;
-    color: #ffffff;
-    width: 100%;
-    height: 460px;
-}
-
-.left-col {
-    float: left;
-    width: 60%;
-}
-
-
-.right-col {
-    float: right;
-    width: 40%;
-}
-
-#agha-mission {
-    width: 90%;
-}
-
-#shariant-mission {
-    width: 90%;
-}
-
-#shariant-cloud-map img {
-    max-width: 500px;
-}
-
-#site-name:before {
-    content: "Shariant Test";
-}
-
-:root {
-  --main-fg-color: #ffffff;
-  --secondary-fg-color: #00aedb;
-  --main-bg-color: #054f94;
-}
-
-.main-title-theme-background-color {
-  background-color: var(--main-bg-color);
-}
-
-.main-title-theme-primary-text-color {
-  color: var(--main-fg-color);
-}
-
-.main-title-theme-secondary-background-color {
-  background-color: var(--main-bg-color);
-}
-
-.main-title-theme-secondary-text-color {
-  color: var(--secondary-fg-color);
-}
-
-
-#top-menu-container, #second-level-menu .submenu, #siteMenuBar, #menuContainer {
-    background-color: #adad88 !important;
-}
-#siteMenuBar #menuContainer {
-    border: none !important;
-}
-
-body {
-   font-family: 'Raleway',serif;
-   font-size: 14px;
-}
-
-body.external {
-   font-size: 18pt;
-}
-
-body.external h1 {
-    font-size: 60pt;
-}
-
-body.external h2 {
-    font-size: 40pt;
-}
-
-body.external h3 {
-    font-size: 24pt;
-}
-
-a {
-    color: inherit;
-}
-
-#termsandconditions-section h1 {
-    font-size: 40pt;
-}
-
-#vg-title-container {
-    margin: 8px;
-    width: 262px;
-    height: 45px;
-    background-repeat:no-repeat;
-    background-image: url("/static/images/australiangenomics.png");
-}
-
-#vg-help-container {
-    display: none;
-}
-
-.documentation-link {
-    color: #ffffff;
-    font-size: 20px;
-    float: none;
-    display: table-cell;
-    vertical-align: middle;
-    height:50px;
-    padding-left: 10px;
-    padding-right: 10px;
-}
-
-#header {
-    background-color: rgb(27, 117, 188);
-    min-height: 60px;
-}
-
-body.external #footer {
-    background-color: #2B3939;
-    color: #ffffff;
-    padding: 50px;
-    text-align: center;
-}
-
-/* logged in top left logo */
-#menu-logo {
-    margin-left: 10px;
-    background-image: url("/static/images/Australian Genomics logo_white transp.png");
-    background-position: 4px 4px;
-    background-size: 100px;
-}
-
-
-#shariant-mission {
-    font-size: 32px;
-}
-#second-level-menu > .submenu {
-    text-transform: lowercase;
-}
-</style>
-{% endblock %}
-{% block jsdocumentready %}
-{{ block.super }}
-
+    <style>
+    .btn-login {
+        animation: glow 1s infinite alternate;
+    }
+    @keyframes glow {
+      from {
+        box-shadow: 0 0 5px -5px #ccf;
+      }
+      to {
+        box-shadow: 0 0 5px 5px #ccf;
+      }
+    }
+    </style>
 {% endblock %}
 {% block content %}
-{{ block.super }}
-
-    <div class='white-row flex-center-container'>
-        <div class='left-col flex-center-container'>
-            <div id='agha-mission'>
-                <h1>Shariant: share variants</h1>
-                
-                <p>
-                Australian Genomics Variant Classification Sharing Platform
-                </p>
-            </div>
-        </div>
-        <div id='agha-p2-link' class='right-col'>
-            <p>
-            Developed for <a class="hover-link" href='https://www.australiangenomics.org.au'>Australian Genomics</a> Program 2, Project 1: A national approach to clinical variant classification and sharing.
-            </p>
-            <a class="hover-link" href="https://shariant.readthedocs.io/en/latest/faq/faq.html">FAQ</a>&nbsp;&nbsp;
-            <a class="hover-link" href="https://www.australiangenomics.org.au/our-research/a-national-approach-to-data-federation-and-analysis">About Program 2</a>
-        </div>
-        <div class='clear'></div>
+    <div class="header fixed-top">
+        <a class="ml-4" href="https://www.australiangenomics.org.au/project-areas/genomic-diagnostics/">
+            <img src="{% static 'images/Australian Genomics logo_white transp.png' %}" height="50px" />
+        </a>
     </div>
 
-
-    <div class='navy-row flex-center-container'>
-        <div class='left-col flex-center-container'>
-            <div id='shariant-mission'>
-            <p>
-            Share clinically curated variants with structured supporting evidence and phenotypes between Australian labs
-            <p>Allow collaborative monitoring & review of curated variants
-            <p>Act as a central administrative node for submission to international databases such as ClinVar
+    <div class="container" style="margin-top:70px">
+        <div class="jumbotron py-4" style="font-size: 14px; background-color: #f2f2f2">
+            <div class="row equal" style="font-size: 16px">
+                <div class="col-12 col-md-6" style="border-right: 1px solid gray">
+                    <h1>Shariant</h1>
+                    <p>Australian Genomics Variant Classification Sharing Platform</p>
+                </div>
+                <div class="col-12 col-md-6">
+                    {% for message in messages %}
+                        <div class="alert {{ message.tags }}" role="alert">
+                            {{ message.tags | severity_icon }} {{ message }}
+                            {% if "not authorised for this environment" in message.message %}
+                                <br/>Try our test environment <a href="https://test.shariant.org.au">https://test.shariant.org.au</a>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+                    {% login_form next=next %}
+                </div>
             </div>
         </div>
-        <div id='shariant-cloud-map' class='right-col flex-center-container'>
-            <img src="{% static 'images/shariant_cloud.png' %}" />
+        <div class="row" style="font-size: 16px;">
+            <div class="col-12 col-md-6">
+                <p>Developed for <a class="hover-link" href='https://www.australiangenomics.org.au/project-areas/genomic-diagnostics/'>Australian Genomics</a> to enable sharing of variant interpretations between Australian clinical genetic testing laboratories.</p>
+                <a class="hover-link" href="https://shariant.readthedocs.io/en/latest/faq/faq.html">FAQs about the genomic diagnostics project area</a>
+                <hr/>
+                <p>Enable the real-time sharing of clinically curated variants with structured supporting evidence between Australian clinical genetic testing laboratories.</p>
+                <p>Support a process to automatically identify and promote resolution of discrepancies in variant interpretation between laboratories.</p>
+                <p>Streamline submission to international databases, including ClinVar.</p>
+            </div>
+            <div class="col-12 col-md-6">
+                <img src="{% static 'images/shariant_cloud.png' %}" style="max-width: 500px" />
+            </div>
         </div>
-        <div class='clear'></div>
-    </div>    
+    </div>
 
+    <div class="footer fixed-bottom p-4 bg-dark" style="border-top: 1px solid white">
+      Uses <a class="vg-copyright" href="http://variantgrid.com">VariantGrid Technology.</a>
+    </div>
 {% endblock %}
 

@@ -40,7 +40,7 @@ lazy==1.4
 lxml==4.6.3
 Markdown==3.2.2
 matplotlib==3.3.0
-mozilla_django_oidc==1.2.3
+mozilla_django_oidc==2.0.0
 nameparser==1.0.6
 networkx==2.4
 nltk==3.5

@@ -2,11 +2,8 @@
   background-color: rgb(244, 144, 67) !important;
 }
 .bg-theme {
-    color: white !important;
-    & * {
-      color: #ddd !important;
-      border-color: #ccc !important;
-    }
+    color: #ddd !important;
+    border-color: #ccc;
     .fas {
       color: #ccc !important;
     }
@@ -14,6 +11,14 @@
         color: #444 !important;
     }
 }
+.login-bg-theme {
+    background-color: rgb(244, 144, 67);
+    color: #ddd;
+    .jumbotron {
+        color: #444;
+    }
+}
+
 nav.navbar a.nav-link {
     color: #ddd !important;
     &:hover {

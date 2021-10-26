@@ -16,6 +16,18 @@
   color: #444 !important;
 }
 
+.login-bg-theme {
+  background-color: #1b75bc;
+  color: #ddd;
+}
+.login-bg-theme .jumbotron {
+  color: #444;
+}
+.login-bg-theme .hover-link {
+  font-weight: 500;
+  color: #ccccff;
+}
+
 nav.navbar a.nav-link {
   color: #ddd !important;
 }
