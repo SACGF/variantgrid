@@ -574,8 +574,7 @@ class HGVSMatcher:
 
             variant_tuple = None
             hgvs_methods = []
-            for tv in TranscriptVersion.filter_best_transcripts_by_accession(self.genome_build, transcript_accession,
-                                                                             require_build_data=False):
+            for tv in TranscriptVersion.filter_best_transcripts_by_accession(self.genome_build, transcript_accession):
                 used_transcript_accession = tv.accession
                 hgvs_name.transcript = tv.accession
                 hgvs_string_for_version = hgvs_name.format()
@@ -726,8 +725,7 @@ class HGVSMatcher:
             attempt_clingen = True  # Stop on any non-recoverable error - keep going if unknown reference
             hgvs_methods = []
             hgvs_name = None
-            for transcript_version in TranscriptVersion.filter_best_transcripts_by_accession(self.genome_build, transcript_name,
-                                                                                             require_build_data=False):
+            for transcript_version in TranscriptVersion.filter_best_transcripts_by_accession(self.genome_build, transcript_name):
                 if transcript_version.hgvs_ok:
                     attempted_method = self.HGVS_METHOD_PYHGVS
                     hgvs_methods.append(f"{attempted_method}: {transcript_version}")
