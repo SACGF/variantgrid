@@ -667,8 +667,6 @@ class TranscriptVersion(SortByPKMixin, models.Model):
         """ """
         if self.has_valid_data:
             if self.transcript.annotation_consortium == AnnotationConsortium.REFSEQ:
-                if "partial" in self.data:
-                    return False
                 return bool(self.sequence_length_matches_exon_length_ignoring_poly_a_tail)
             elif self.transcript.annotation_consortium == AnnotationConsortium.ENSEMBL:
                 return True
