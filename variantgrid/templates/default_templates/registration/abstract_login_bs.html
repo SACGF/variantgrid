@@ -21,14 +21,6 @@
             <script src="{% static 'js/global.js' %}"></script>
         {% endcompress %}
 
-        <style>
-            #oidc-login-box {
-                width: 100%;
-                position: absolute;
-                top: 100px;
-                text-align: center;
-            }
-        </style>
         <script>
             var $buoop = {
                 required:{e:16,f:60,o:53,s:11,c:66},insecure:false,api:2021.03,reminder:0,test:false,no_permanent_hide: true,
@@ -45,9 +37,11 @@
 
 
         <script type="text/javascript">
+            {% if use_oidc %}
             function login() {
                 window.location = '{% url 'oidc_authentication_init' %}'
             }
+            {% endif %}
             function resume() {
                 window.location = '/';
             }

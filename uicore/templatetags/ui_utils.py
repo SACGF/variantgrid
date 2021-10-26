@@ -6,6 +6,7 @@ from typing import Optional, Any
 
 from django import template
 from django.contrib.auth.models import User
+from django.forms.utils import ErrorList
 from django.template.base import FilterExpression, kwarg_re
 from django.utils.safestring import SafeString
 
@@ -148,7 +149,8 @@ def render_labelled(parser, token):
                             value_css=kwargs.get('value_css'),
                             row_css=kwargs.get('row_css'),
                             shorten_label=kwargs.get('shorten_label'),
-                            admin_only=kwargs.get('admin_only')
+                            admin_only=kwargs.get('admin_only'),
+                            errors=kwargs.get('errors')
                             )
 
 
@@ -162,7 +164,8 @@ class LabelledValueTag(template.Node):
                  value_css: FilterExpression = None,
                  row_css: FilterExpression = None,
                  shorten_label: FilterExpression = None,
-                 admin_only: FilterExpression = None):
+                 admin_only: FilterExpression = None,
+                 errors: FilterExpression = None):
         self.id_prefix = id_prefix
         self.nodelist = nodelist
         self.value_id = value_id
@@ -173,6 +176,7 @@ class LabelledValueTag(template.Node):
         self.row_css = row_css
         self.shorten_label = shorten_label
         self.admin_only = admin_only
+        self.errors = errors
 
     id_regex = re.compile(r"id=[\"|'](.*?)[\"|']")
     big_zero = re.compile(r"^0([.]0+)?$")
@@ -254,6 +258,12 @@ class LabelledValueTag(template.Node):
         elif LabelledValueTag.big_zero.match(output):
             output = f"<span class=\"zero-value\">{output}</span>"
 
+        errors: Optional[ErrorList]
+        if filter_errors := self.errors:
+            if errors := filter_errors.resolve(context):
+                for error in errors:
+                    output += f'<div class="text-danger">{error}</div>'
+
         label_tag = f'<label {for_id} class="{label_css}">{label}</label>'
         if popover:
             popover = popover.replace('"', '&quot;')
@@ -263,7 +273,10 @@ class LabelledValueTag(template.Node):
 
         if hint == "inline":
             return content
-        return f'<div class="{row_css}">{content}</div>'
+
+        content = f'<div class="{row_css}">{content}</div>'
+
+        return content
 
 
 @register.filter()
