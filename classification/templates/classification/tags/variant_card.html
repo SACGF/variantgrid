@@ -18,7 +18,9 @@
                 {% endif %}
             {% endlabelled %}
             {% if user.is_superuser and variant_allele.error %}
-                {% labelled label="Error" value_clss="variant-coordinate" hint="tiny" %}{{ variant_allele.error | jsonify }}{% endlabelled %}
+                {% labelled label="Error" value_clss="variant-coordinate" hint="chunky" admin_only=True %}
+                    {% code_json variant_allele.error %}
+                {% endlabelled %}
             {% endif %}
             {% labelled label='Origin' hint="chunky" %}{{ variant_allele.get_origin_display }}{% endlabelled%}
             {% labelled label='Conversion Tool' hint="chunky" %}{{ variant_allele.get_conversion_tool_display }}{% endlabelled%}
