@@ -8,7 +8,7 @@
         <tr>
             <th></th>
             <th class="text-center">Concordant <span class="hover-detail" data-toggle="tooltip" title="This counts classifications in agreement<br/>e.g. Benign vs Benign, VUS vs VUS, etc">Agreement</span></th>
-            <th class="text-center">Concordant <span class="hover-detail" data-toggle="tooltip" title="This counts classifications in agreement as VUS but different sub-levels of VUS<br/>e.g. VUS-A vs VUS-B, etc">Agreement VUS A/B/C</span></th>
+            <th class="text-center">Concordant <span class="hover-detail" data-toggle="tooltip" title="This counts classifications in agreement as VUS but different sub-levels of VUS<br/>e.g. VUS-A vs VUS-B, etc">Agreement (Differing VUS)</span></th>
             <th class="text-center">Concordant <span class="hover-detail" data-toggle="tooltip" title="This counts<br/>Likely Benign vs Benign and<br/>Likely Pathogenic vs Pathogenic">Confidence Level</span></th>
             <th class="text-center">Discordant</th>
         </tr>
@@ -38,7 +38,7 @@
         {% ui_register_tab_embedded label=overlap_set.label tab_set="overlaps" %}
             {% for overlap in overlap_set.overlaps %}
                 <div class="card mt-4">
-                    <div class="card-header {{ overlap.discordance_status.level.value }}">
+                    <div class="card-header overlap-{{ overlap.discordance_status.level.value }}">
                         <div class="float-left"><b>{{ overlap.discordance_status.level.label }}</b></div>
                         <div class="float-right" {% if overlap.discordance_status.lab_count <= 1 %}style="font-style:italic"{% else %}style="font-weight:bold"{% endif %}>
                             {% count overlap.discordance_status.lab_count singular="Single Sharing-Lab" plural="Sharing-Labs" %}
@@ -72,8 +72,10 @@
                         {% endfor %}
                     </div>
                     <div class="card-footer">
-                        <a href="{{ overlap.allele.get_absolute_url }}" class="hover-link float-left">Go to Allele</a>
-                        <a href="{% url 'classification_diff' %}?allele={{ overlap.allele.id }}" class="hover-link float-right">Show Diffs</a>
+                        <div class="link-toolbar">
+                            <a href="{{ overlap.allele.get_absolute_url }}" class="hover-link float-left">Go to Allele</a>
+                            <a href="{% url 'classification_diff' %}?allele={{ overlap.allele.id }}" class="hover-link">Show Diffs</a>
+                        </div>
                     </div>
                 </div>
             {% endfor %}

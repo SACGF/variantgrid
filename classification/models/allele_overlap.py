@@ -260,5 +260,5 @@ class OverlapSet:
 
         return [
             OverlapSet(label="Multi-Lab", overlaps=multi_overlaps),
-            OverlapSet(label="Interal", overlaps=inter_overlaps)
+            OverlapSet(label="Internal", overlaps=inter_overlaps)
         ]

@@ -3,19 +3,6 @@
 {% load ui_help %}
 {% block title %}Overlaps{% endblock %}
 {% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
-{% block head %}
-    <style>
-        .card-header.discordant {
-            background-color: #daa;
-        }
-        .card-header.concordant_confidence {
-            background-color: #44bb44;
-        }
-        .card-header.concordant_agreement, .card-header.concordant_diff_vus {
-            background-color: #88dd88;
-        }
-    </style>
-{% endblock %}
 {% block content %}
 <div class="container">
     {% page_help page_id='classification/overlaps_help' title='Classification Overlaps' %}

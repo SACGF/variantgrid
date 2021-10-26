@@ -54,7 +54,7 @@ class DiscordanceLevel(str, Enum):
     NO_ENTRIES = 'no_entries'
     SINGLE_SUBMISSION = 'single_submission'  # single shared submission
     CONCORDANT_AGREEMENT = 'concordant_agreement'  # complete agreement
-    CONCORDANT_DIFF_VUS = 'concordant_diff_vus'  # VUS-A, VUS-B vs VUS-C
+    CONCORDANT_DIFF_VUS = 'concordant_agreement_diff_vus'  # VUS-A, VUS-B vs VUS-C
     CONCORDANT_CONFIDENCE = 'concordant_confidence'  # Benign vs Likely Benign
     DISCORDANT = 'discordant'
 
@@ -63,7 +63,7 @@ class DiscordanceLevel(str, Enum):
         if self == DiscordanceLevel.CONCORDANT_AGREEMENT:
             return "Concordant (Agreement)"
         if self == DiscordanceLevel.CONCORDANT_DIFF_VUS:
-            return "Concordant (Agreement VUS*)"
+            return "Concordant (Agreement Differing VUS)"
         if self == DiscordanceLevel.CONCORDANT_CONFIDENCE:
             return "Concordant (Confidence)"
         if self == DiscordanceLevel.NO_ENTRIES:
@@ -75,14 +75,14 @@ class DiscordanceLevel(str, Enum):
         return "Unknown"
 
     @property
-    def bs_status(self) -> str:
+    def css_class(self) -> str:
         if self == DiscordanceLevel.CONCORDANT_AGREEMENT or self == DiscordanceLevel.CONCORDANT_DIFF_VUS:
-            return "success"
+            return "overlap-agreement"
         if self == DiscordanceLevel.CONCORDANT_CONFIDENCE:
-            return "warning"
-        if self == DiscordanceLevel.NO_ENTRIES or self == DiscordanceLevel.SINGLE_SUBMISSION:
-            return "secondary"
-        return "danger"
+            return "overlap-confidence"
+        if self == DiscordanceLevel.DISCORDANT:
+            return "overlap-discordant"
+        return "overlap-single"
 
 
 @dataclass

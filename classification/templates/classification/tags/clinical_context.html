@@ -7,10 +7,10 @@
 </div>
 <div>
 {% if cc.latest_report %}
-    {% if cc.latest_report.resolution == 'D' %}
-        <b><a class='hover-link' href="{% url 'discordance_report' cc.latest_report.pk %}">{{ cc.latest_report.resolution_text }}</a></b>
+    {% if cc.latest_report.resolution != 'C' %}
+        <span class="text-danger">In Discordance</span><br/><a class='hover-link' href="{% url 'discordance_report' cc.latest_report.pk %}">Click for Discordance Report</a>
     {% else %}
-    <a class='hover-link' href="{% url 'discordance_report' cc.latest_report.pk %}">{{ cc.latest_report.resolution_text }}</a>
+        <a class='hover-link' href="{% url 'discordance_report' cc.latest_report.pk %}">{{ cc.latest_report.resolution_text }}</a>
     {% endif %}
 {% elif cc.status == 'D' %}
     <b>&nbsp;- DISCORDANT</b>

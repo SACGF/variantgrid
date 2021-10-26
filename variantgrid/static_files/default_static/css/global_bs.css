@@ -886,4 +886,20 @@ ul.compact li:before {
   background-color: #F0D9ED !important;
 }
 
+.overlap-discordant {
+  background-color: #ebb;
+}
+
+.overlap-concordant_agreement, .overlap-concordant_agreement_diff_vus {
+  background-color: #88dd88;
+}
+
+.overlap-confidence {
+  background-color: #44bb44;
+}
+
+.overlap-single_submission, .overlap-no_entries {
+  background-color: #ccc;
+}
+
 /*# sourceMappingURL=global_bs.css.map */
