@@ -13,6 +13,18 @@ from django.utils.safestring import SafeString
 register = template.Library()
 
 
+@register.filter()
+def append(suffix, postfix):
+    # man django templates are lame that you need to make this
+    # appends two things together to give you a string
+    return_str = ""
+    if suffix is not None:
+        return_str += str(suffix)
+    if postfix is not None:
+        return_str += str(postfix)
+    return return_str
+
+
 @register.simple_tag(takes_context=True)
 def update_django_messages(context):
     """
