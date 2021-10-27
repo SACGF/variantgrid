@@ -18,20 +18,22 @@
     </style>
 {% endblock %}
 {% block content %}
-    <div class="header fixed-top">
+    <div class="header fixed-top mt-3">
         <a class="ml-4" href="https://www.australiangenomics.org.au/project-areas/genomic-diagnostics/">
             <img src="{% static 'images/Australian Genomics logo_white transp.png' %}" height="50px" />
         </a>
     </div>
 
-    <div class="container" style="margin-top:70px">
-        <div class="jumbotron py-4" style="font-size: 14px; background-color: #f2f2f2">
-            <div class="row equal" style="font-size: 16px">
-                <div class="col-12 col-md-6" style="border-right: 1px solid gray">
-                    <h1>Shariant</h1>
+    <div class="container" style="margin-top:10vh">
+        <div class="row" style="display:flex; align-items:center">
+            <div class="col-12 col-md-6">
+                <img src="{% static 'images/shariant_cloud.png' %}" style="max-width: 500px" />
+            </div>
+            <div class="col-12 col-md-6">
+                <div class="jumbotron py-4">
+                    <h1>{{ site_name }}</h1>
                     <p>Australian Genomics Variant Classification Sharing Platform</p>
-                </div>
-                <div class="col-12 col-md-6">
+                    {% comment %}Not using the standard template for messages as want to provide link to ShariantTest in certain circumstances{% endcomment %}
                     {% for message in messages %}
                         <div class="alert {{ message.tags }}" role="alert">
                             {{ message.tags | severity_icon }} {{ message }}
@@ -41,22 +43,18 @@
                         </div>
                     {% endfor %}
                     {% login_form next=next form=form %}
+
+                    <hr class="my-4"/>
+
+                    <p>Developed for <a class="hover-link" href='https://www.australiangenomics.org.au/project-areas/genomic-diagnostics/'>Australian Genomics</a> to enable sharing of variant interpretations between Australian clinical genetic testing laboratories.</p>
+                    <p><a class="hover-link" href="https://shariant.readthedocs.io/en/latest/faq/faq.html">FAQs about the genomic diagnostics project area</a></p>
+
+                    <p>Enable the real-time sharing of clinically curated variants with structured supporting evidence between Australian clinical genetic testing laboratories.</p>
+                    <p>Support a process to automatically identify and promote resolution of discrepancies in variant interpretation between laboratories.</p>
+                    <p>Streamline submission to international databases, including ClinVar.</p>
                 </div>
             </div>
-        </div>
-        <div class="row" style="font-size: 16px;">
-            <div class="col-12 col-md-6">
-                <p>Developed for <a class="hover-link" href='https://www.australiangenomics.org.au/project-areas/genomic-diagnostics/'>Australian Genomics</a> to enable sharing of variant interpretations between Australian clinical genetic testing laboratories.</p>
-                <a class="hover-link" href="https://shariant.readthedocs.io/en/latest/faq/faq.html">FAQs about the genomic diagnostics project area</a>
-                <hr/>
-                <p>Enable the real-time sharing of clinically curated variants with structured supporting evidence between Australian clinical genetic testing laboratories.</p>
-                <p>Support a process to automatically identify and promote resolution of discrepancies in variant interpretation between laboratories.</p>
-                <p>Streamline submission to international databases, including ClinVar.</p>
-            </div>
-            <div class="col-12 col-md-6">
-                <img src="{% static 'images/shariant_cloud.png' %}" style="max-width: 500px" />
-            </div>
-        </div>
+
     </div>
 
     <div class="footer fixed-bottom p-4 bg-dark" style="border-top: 1px solid white">
