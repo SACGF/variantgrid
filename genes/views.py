@@ -400,15 +400,21 @@ def view_transcript_version(request, transcript_id, version):
         transcript_versions_by_build = {}
         builds_missing_data = set()
         alignment_gap = False
+        other_chroms = False
 
         for tv in tv_set.order_by("genome_build__name"):
             if tv_sequence_info:
                 poly_a_tail = max(poly_a_tail, tv.sequence_poly_a_tail)
             genome_build_id = tv.genome_build.pk
             alignment_gap |= tv.alignment_gap
+            other_chroms |= bool(tv.data.get("other_chroms"))
             transcript_versions_by_build[genome_build_id] = tv
             if not tv.has_valid_data:
                 builds_missing_data.add(tv.genome_build)
+
+        if other_chroms:
+            other_chroms_msg = f"This transcript maps to multiple coordinates in the genome."
+            messages.add_message(request, messages.WARNING, other_chroms_msg)
 
         differences = []
         if builds_missing_data:
