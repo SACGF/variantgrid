@@ -25,14 +25,14 @@ class Command(BaseCommand):
 
         batch_size = 50
         mode: Optional[str] = None
+        if options.get('chgvs'):
+            self.handle_chgvs(all=options.get('all'))
+            return
         if options.get('all'):
             mode = 'all'
         elif options.get('missing'):
             mode = 'missing'
             batch_size = 1
-        elif options.get('chgvs'):
-            self.handle_chgvs()
-            return
 
         if not mode:
             print("Must confirm running over all records with --all or --missing")
@@ -64,9 +64,13 @@ class Command(BaseCommand):
     def sleep_for_delay(self):
         time.sleep(10)
 
-    def handle_chgvs(self):
+    def handle_chgvs(self, all:bool = False):
         qs = Classification.objects.filter(variant__isnull=False).filter(Q(chgvs_grch37__isnull=True) | Q(chgvs_grch38__isnull=True))
         print(f"Number of matched records missing 37 or 38 rep : {qs.count()}")
+
+        if all:
+            qs = Classification.objects.all()
+
         for c in qs:
             c.update_cached_c_hgvs()
         print("Finished update c.hgvs")
