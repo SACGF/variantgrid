@@ -799,6 +799,8 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                                                   comment=message)
                 flag_collection.close_open_flags_of_type(classification_flag_types.matching_variant_warning_flag,
                                                          comment='Variant Re-Matching')
+                flag_collection.close_open_flags_of_type(classification_flag_types.transcript_version_change_flag,
+                                                         comment='Variant Re-Matching')
 
             self.update_cached_c_hgvs()
 
