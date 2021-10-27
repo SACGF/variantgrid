@@ -22,6 +22,7 @@
     {% endif %}
 
     {% if tv_sequence_info %}
+        <h4>Transcript Version Sequence Info</h4>
         <table class="table">
             <thead>
             <tr>
@@ -38,22 +39,21 @@
                         Retrieved from {{ transcript.get_annotation_consortium_display }} API
                     {% endif %}
                 </td>
-                <td>{{ tv_sequence_info.created|localtime }}</td>
+                <td>{% timestamp tv_sequence_info.created %}</td>
                 <td>{{ sequence_length }}</td>
             </tr>
         </table>
     {% else %}
-        <ul class="messages">
-            <li class="warning">
-                Could not retrieve transcript sequence information from {{ transcript.get_annotation_consortium_display }} API
-                {% if no_transcript_message %}
-                    {{ no_transcript_message }}
-                {% endif %}
-            </li>
-        </ul>
+        <div class="alert alert-warning">
+            {{ 'W' | severity_icon }} Could not retrieve transcript sequence information from {{ transcript.get_annotation_consortium_display }} API
+            {% if no_transcript_message %}
+                {{ no_transcript_message }}
+            {% endif %}
+        </div>
     {% endif %}
 
     {% if transcript_versions_by_build %}
+        <h4>Transcript Versions by Build</h4>
         <table class="table">
             <thead>
             <tr>
@@ -112,7 +112,7 @@
     {% endif %}
 
     {% if alignment_gap %}
-        <h3>Alignment Gap</h3>
+        <h4>Alignment Gap</h4>
         <p>
             Genomic coordinates for transcript exons/CDS etc are made by aligning cDNA sequences to the genome.
 
@@ -129,7 +129,7 @@
     {% endif %}
 
     {% if differences %}
-        <h3>Potential Differences</h3>
+        <h4>Potential Differences</h4>
 
         <div class="alert alert-warning">
             {{ 'W' | severity_icon }} Transcripts differ between genome versions
