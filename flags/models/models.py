@@ -1,5 +1,6 @@
 import datetime
 from collections import defaultdict
+from enum import Enum
 from functools import total_ordering, reduce
 from operator import __and__
 from typing import Tuple, List, Optional, Union, Dict, Iterable, Any, TypeVar
@@ -221,6 +222,7 @@ class FlagInfos:
 class FlagCollection(models.Model, GuardianPermissionsMixin):
     ADMIN_PERMISSION = 'admin_flagcollection'
     Q_OPEN_FLAGS = Q(resolution__status=FlagStatus.OPEN)
+    REOPEN_IF_CLOSED_BY_BOT = 'reopen-if-bot'
 
     context = models.ForeignKey(FlagTypeContext, on_delete=PROTECT)
 
@@ -409,6 +411,7 @@ class FlagCollection(models.Model, GuardianPermissionsMixin):
             user_private: bool = False,
             permission_check: bool = True,
             reopen: bool = False,
+            reopen_if_bot_closed: bool = False,
             add_comment_if_open: bool = False,
             data: Optional[dict] = None,
             close_other_data: bool = False,
@@ -421,6 +424,7 @@ class FlagCollection(models.Model, GuardianPermissionsMixin):
         :param user_private: (Not currently used)
         :param permission_check: Should we check to see if the user has permission to open the flag
         :param reopen: If True will re-open a closed flag (if there is one) rather than create a new flag. Will be treated as True for only_one types of flags.
+        :param reopen_if_bot_closed: If True, and there's an existing flag that was closed by admin_bot, act as if reopen=True
         :param add_comment_if_open: If re-opening a closed flag, should the comment still be added?
         :param data: data for the flag, when looking for existing flags we check to see if they have this data.
         :param close_other_data: If we find a flag of the same type that has data different to the data provided, close it
@@ -455,6 +459,11 @@ class FlagCollection(models.Model, GuardianPermissionsMixin):
 
         existing = relevant_qs.first()
         if existing:
+            if not reopen and reopen_if_bot_closed:
+                # see if existing is closed, and was last closed by a bot
+                if FlagComment.last(existing).user == admin_bot():
+                    reopen = True
+
             if reopen:
                 resolution = existing.flag_type.resolution_for_status(FlagStatus.OPEN)
                 existing.flag_action(user=user, resolution=resolution, comment=comment, permission_check=permission_check)

@@ -720,6 +720,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                         flag_type=classification_flag_types.transcript_version_change_flag,
                         comment=transcript_comment,
                         only_if_new=True,
+                        reopen_if_bot_closed=True,
                         data={'resolved': resolved_chgvs.transcript},
                         close_other_data=True
                     )
@@ -731,6 +732,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                         flag_type=classification_flag_types.matching_variant_warning_flag,
                         comment=matching_warning_comment,
                         only_if_new=True,
+                        reopen_if_bot_closed=True,
                         data={'resolved': resolved_chgvs.full_c_hgvs},
                         close_other_data=True
                     )
