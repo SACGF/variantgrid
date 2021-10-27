@@ -2044,6 +2044,7 @@ let VCTable = (function() {
 VCTable.c_hgvs = (data, type, row) => {
     const MAX_C_HGVS_LEN = 100;
 
+    /*
     let labelFn = (chgvsValue) => {
         if (chgvsValue.type === 'imported') {
             return `<i>Imported (${chgvsValue.build})</i>`;
@@ -2051,6 +2052,7 @@ VCTable.c_hgvs = (data, type, row) => {
             return `<i>Normalised (${chgvsValue.build})</i>`;
         }
     };
+    */
 
     if (data) {
         let variant_id = data.variant_id;
@@ -2067,16 +2069,18 @@ VCTable.c_hgvs = (data, type, row) => {
                 displayChgvs = chgvsValue;
             }
         }
+
+        /*
         let tooltipLines = [];
         for (let [text, chgvsValues] of Object.entries(chgvsToValues)) {
             text = text == 'null' ? 'Cannot display' : text;
             tooltipLines.push(chgvsValues.map((val) => labelFn(val)).join(' and \n') + ' -\n' + text);
         }
-
+        */
         let dom = $('<div>');
         if (displayChgvs && displayChgvs.type !== 'normal-pref') {
-            let buildTooltip = `Cannot display normalised c.hgvs in preferred build.\nDisplaying ${labelFn(displayChgvs)} instead`;
-            tooltipLines.splice(0,0,buildTooltip);
+            // let buildTooltip = `Cannot display normalised c.hgvs in preferred build.\nDisplaying ${labelFn(displayChgvs)} instead`;
+            // tooltipLines.splice(0,0,buildTooltip);
 
             $('<span>', {class:'genome-build hover-detail', text: displayChgvs.build || ''}).appendTo(dom);
         }
@@ -2094,9 +2098,9 @@ VCTable.c_hgvs = (data, type, row) => {
                 $('<span>', {class: 'no-value', text: '-'}).appendTo(dom);
             }
         }
-        let tooltip = tooltipLines.join('<br/><br/>');
-        dom.attr('title', 'hgvs');
-        dom.attr('data-content', tooltip);
+        // let tooltip = tooltipLines.join('<br/><br/>');
+        // dom.attr('title', 'hgvs');
+        // dom.attr('data-content', tooltip);
         let p_hgvs = data.p_hgvs;
         if (p_hgvs) {
             $('<span>', {class: 'd-block mt-1 text-secondary', text: limitLength(p_hgvs)}).appendTo(dom);
