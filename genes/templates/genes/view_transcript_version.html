@@ -1,5 +1,6 @@
 {% extends "uicore/page/base.html" %}
 {% load ui_help %}
+{% load ui_utils %}
 {% load js_tags %}
 {% load ui_menu_bars %}
 {% load tz %}
@@ -82,24 +83,14 @@
                         False
                     {% endif %}
                 </td>
-                <td>{{ transcript_version.hgvs_ok }}</td>
+                <td class="text-center">{{ transcript_version.hgvs_ok | boolean }}</td>
                 {% if transcript_version.has_valid_data %}
                     <td>{{ transcript_version.coordinates }}</td>
                     <td>{{ transcript_version.length }}</td>
-                    <td><a class="hover-link" href="#transcript-{{ transcript_version.pk }}-json" data-toggle="modal">Show</a>
-                        <div id="transcript-{{ transcript_version.pk }}-json" class="modal" tabindex="-1">
-                            <div class="modal-dialog modal-dialog-scrollable modal-xl">
-                                <div class="modal-content">
-                                    <div class="modal-header">
-                                        <h5 class="modal-title">API Response</h5>
-                                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                                          <span aria-hidden="true">&times;</span>
-                                        </button>
-                                    </div>
-                                    {% code_json transcript_version.data css_class="modal-body" %}
-                                </div>
-                            </div>
-                        </div>
+                    <td>
+                        {% modal id="transcript-"|append:transcript_version.pk|append:"-json" label="API Response" %}
+                            {% code_json transcript_version.data css_class="modal-body" %}
+                        {% endmodal %}
                     </td>
                 {% else %}
                     <td> N/A</td>
@@ -107,7 +98,7 @@
                     <td> <code>{}</code></td>
                 {% endif %}
                 {% if user.is_staff %}
-                    <td>{{ transcript_version.import_source }}</td>
+                    <td style="word-break: break-all">{{ transcript_version.import_source }}</td>
                 {% endif %}
                 <td><a class="hover-link external-link" target="_blank" href="{{ transcript_version.get_external_url }}">
                         {{ transcript.get_annotation_consortium_display }} page.
@@ -139,30 +130,29 @@
 
     {% if differences %}
         <h3>Potential Differences</h3>
-        
-        <ul class="messages">
-            <li class="warning">
-                Transcripts differ between genome versions
-            </li>
-        </ul>        
+
+        <div class="alert alert-warning">
+            {{ 'W' | severity_icon }} Transcripts differ between genome versions
+        </div>
 
         {% for builds, diff in differences %}
-            
             <table class="table">
                 <thead>
                 <tr>
                     <th>
-                    <th>{{ builds.0 }}
-                    <th>{{ builds.1 }}
+                    <th class="text-center">{{ builds.0 }}</th>
+                    <th class="text-center">{{ builds.1 }}</th>
                 </tr>
                 </thead>
+                <tbody>
                 {% for d, vals in diff.items %}
                 <tr>
-                    <th>{{ d }}
-                    <td>{{ vals.0 }}
-                    <td>{{ vals.1 }}
+                    <th>{{ d }}</th>
+                    <td class="text-center">{{ vals.0 }}</td>
+                    <td class="text-center">{{ vals.1 }}</td>
                 </tr>
                 {% endfor %}
+                </tbody>
             </table>
         {% endfor %}
     {% endif %}
