@@ -14,7 +14,7 @@ from snpdb.models import ImportSource
 
 class Command(BaseCommand):
 
-    def add_arguments(self, parser)
+    def add_arguments(self, parser):
         parser.add_argument('--all', action='store_true', default=False, help='Attempt to rematch every single classification')
         parser.add_argument('--file', type=str, help='If provided expects a csv where the first column is a combination of genome build and imported c.hgvs it expects to import')
         parser.add_argument('--missing', action='store_true', default=False, help='Attempt to rematch only classifications not linked to a variant - one at a time')
@@ -57,7 +57,7 @@ class Command(BaseCommand):
                             raise ValueError("Expected first column of file to be - 'Import Key'")
                         header_row = False
                     else:
-                        import_keys.append(row[0].strip())
+                        import_keys.add(row[0].strip())
             print(f"Only running over import keys in file - {len(import_keys)}")
 
         self.report_unmatched()
@@ -91,7 +91,7 @@ class Command(BaseCommand):
     def sleep_for_delay(self):
         time.sleep(10)
 
-    def handle_chgvs(self, apply_all:bool = False):
+    def handle_chgvs(self, apply_all: bool = False):
         qs = Classification.objects.filter(variant__isnull=False).filter(Q(chgvs_grch37__isnull=True) | Q(chgvs_grch38__isnull=True))
         print(f"Number of matched records missing 37 or 38 rep : {qs.count()}")
 
