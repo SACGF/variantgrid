@@ -265,8 +265,6 @@ def classification_table(
 
 @register.inclusion_tag("classification/tags/c_hgvs.html")
 def c_hgvs(c_hgvs: Union[CHGVS, str], show_genome_build: Optional[bool]=None):
-    if show_genome_build is None:
-        show_genome_build = c_hgvs.is_desired_build is False or c_hgvs.is_normalised is False
     if isinstance(c_hgvs, ClassificationModification):
         if c_hgvs := c_hgvs.classification.get_c_hgvs(GenomeBuildManager.get_current_genome_build()):
             c_hgvs = CHGVS(c_hgvs)
@@ -276,6 +274,9 @@ def c_hgvs(c_hgvs: Union[CHGVS, str], show_genome_build: Optional[bool]=None):
 
     if c_hgvs is None:  # might have got a none c.hgvs from the ClassificationModification
         c_hgvs = CHGVS("")
+
+    if show_genome_build is None:
+        show_genome_build = c_hgvs.is_desired_build is False or c_hgvs.is_normalised is False
 
     return {"c_hgvs": c_hgvs, "show_genome_build": show_genome_build and c_hgvs.genome_build is not None}
 
