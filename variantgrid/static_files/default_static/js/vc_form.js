@@ -779,10 +779,13 @@ const VCForm = (function() {
             if (alleleData) {
                 let clingen = alleleData.clingen_allele_id || "<span class='no-value'>-</span>";
                 if (clingen) {
-                    variantTooltip.push(`ClinGen Canonical Allele ID ${clingen}`);
+                    variantTooltip.push(`<strong>ClinGen Canonical Allele ID</strong><br/>${clingen}`);
                 }
+
+                variantTooltip.push(`<strong>Imported ${this.value(SpecialEKeys.GENOME_BUILD)}</strong> ${variantText}`);
+
                 for (let [genomeBuild, buildData] of Object.entries(alleleData.genome_builds || {})) {
-                    variantTooltip.push(`${genomeBuild} ${buildData.c_hgvs}`);
+                    variantTooltip.push(`<strong>Resolved ${genomeBuild}</strong> ${buildData.c_hgvs}`);
                 }
             }
 
@@ -790,7 +793,11 @@ const VCForm = (function() {
             let alleleVariantData = this.alleleVariantData();
             if (alleleVariantData.variant_id) {
                 let href = Urls.view_allele_from_variant(alleleVariantData.variant_id);
-                variantElement = $('<a>', {class:'hover-link', text: variantText, href:href, title:'Resolved to', 'data-content':variantTooltip.join("<br/>")});
+                variantElement = $('<a>', {class:'hover-link', text: variantText, href:href});
+                variantElement = $('<span>', {html: [
+                    variantElement,
+                    $('<i>', {class:"fas fa-question-circle hover-detail ml-2", title:'Resolved to', 'data-content':variantTooltip.map(x => `<p>${x}</p>`).join("")})
+                ]})
             } else {
                 variantElement = $('<span>', {text: variantText});
             }
