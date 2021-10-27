@@ -72,12 +72,18 @@ class VariantGridOIDCAuthenticationBackend(OIDCAuthenticationBackend):
 
         # currently only variantgrid permission
         is_super_user = False
+        is_bot = False
         for vg in variant_grid_groups:
             permission = '/'.join(vg)
             if permission == 'admin':
                 is_super_user = True
             elif permission == 'bot':
                 groups.add('variantgrid/bot')
+                is_bot = True
+
+        if settings.MAINTENANCE_MODE and (not is_super_user or is_bot):
+            messages.add_message(self.request, messages.ERROR, "Non-administrator logins have temporary been disabled.")
+            return None
 
         user.is_superuser = is_super_user
         user.is_staff = is_super_user

@@ -9,5 +9,6 @@ def login_form(context, next, form):
         "user": context.request.user,
         "next": next,
         "form": form,
-        "use_oidc": settings.USE_OIDC
+        "use_oidc": settings.USE_OIDC,
+        "maintenance_mode": settings.MAINTENANCE_MODE
     }
