@@ -138,6 +138,7 @@ USE_TZ = True
 # If you set this to True (and setup everything else required) the app
 # will do auth through OIDC
 USE_OIDC = False
+MAINTENANCE_MODE = False  # If true, only non-bot admin users will be able to login, currently only works for ODIC
 OIDC_REQUIRED_GROUP = None
 OIDC_USER_SERVICES = None
 
@@ -445,7 +446,7 @@ ROLLBAR = {
     'access_token': rollbar_access_token,
     'client_access_token': rollbar_client_access_token,
     'environment': socket.gethostname().lower().split('.')[0].replace('-', ''),
-    'enabled': rollbar_access_token and rollbar_client_access_token,  # set to false in environments to disable rollbar
+    'enabled': bool(rollbar_access_token and rollbar_client_access_token),  # set to false in environments to disable rollbar
     'branch': 'master',
     'root': BASE_DIR,
     'capture_username': True,
