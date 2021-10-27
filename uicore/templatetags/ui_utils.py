@@ -279,6 +279,65 @@ class LabelledValueTag(template.Node):
         return content
 
 
+@register.tag(name='modal')
+def render_labelled(parser, token):
+    tag_name, args, kwargs = parse_tag(token, parser)
+    nodelist = parser.parse(('endmodal',))
+    parser.delete_first_token()
+    return ModalTag(
+        nodelist,
+        id=kwargs.get('id'),
+        label=kwargs.get('label'),
+        admin_only=kwargs.get('admin_only')
+    )
+
+
+class ModalTag(template.Node):
+    def __init__(self, nodelist,
+                 id: FilterExpression = None,
+                 label: FilterExpression = None,
+                 admin_only: FilterExpression = None):
+        self.nodelist = nodelist
+        self.id = id
+        self.label = label
+        self.admin_only = admin_only
+
+    def render(self, context):
+        admin_only_bool = TagUtils.value_bool(context, self.admin_only)
+        if admin_only_bool and not context.request.user.is_superuser:
+            return ""
+
+        # if an ID isn't provided, generate a uuid and make sure it starts with a letter
+        id_str = escape(TagUtils.value_str(context, self.id) or "x" + str(uuid.uuid4()))
+        label_str = TagUtils.value_str(context, self.label)
+        output = self.nodelist.render(context)
+
+        link = "<div>"
+        if admin_only_bool:
+            link += '<i class="fas fa-key" title="Admin only functionality"></i>'
+
+        link += f'<a href="#{id_str}" data-toggle="modal" class="modal-link">Show {label_str}</a>'
+        link += "</div>"
+
+        modal = \
+            f"""
+                <div id="{id_str}" class="modal" tabindex="-1">
+                    <div class="modal-dialog modal-dialog-scrollable modal-xl">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">{label_str}</h5>
+                                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                  <span aria-hidden="true">&times;</span>
+                                </button>
+                            </div>
+                            {output}
+                        </div>
+                    </div>
+                </div>
+            """
+        return link + modal
+
+
 @register.filter()
 def severity_icon(severity: str) -> str:
     if not severity:
