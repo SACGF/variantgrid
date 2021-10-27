@@ -773,11 +773,24 @@ const VCForm = (function() {
             appendLabelHeadingForKey(SpecialEKeys.GENOME_BUILD, true, 'Build');
 
             let variantText = this.value(SpecialEKeys.C_HGVS) || this.value(SpecialEKeys.G_HGVS) || this.value(SpecialEKeys.VARIANT_COORDINATE) || 'unknown';
+
+            let variantTooltip = [];
+            let alleleData = this.record.allele;
+            if (alleleData) {
+                let clingen = alleleData.clingen_allele_id || "<span class='no-value'>-</span>";
+                if (clingen) {
+                    variantTooltip.push(`ClinGen Canonical Allele ID ${clingen}`);
+                }
+                for (let [genomeBuild, buildData] of Object.entries(alleleData.genome_builds || {})) {
+                    variantTooltip.push(`${genomeBuild} ${buildData.c_hgvs}`);
+                }
+            }
+
             let variantElement = null;
             let alleleVariantData = this.alleleVariantData();
             if (alleleVariantData.variant_id) {
                 let href = Urls.view_allele_from_variant(alleleVariantData.variant_id);
-                variantElement = $('<a>', {class:'hover-link', text: variantText, href:href});
+                variantElement = $('<a>', {class:'hover-link', text: variantText, href:href, title:'Resolved to', 'data-content':variantTooltip.join("<br/>")});
             } else {
                 variantElement = $('<span>', {text: variantText});
             }
