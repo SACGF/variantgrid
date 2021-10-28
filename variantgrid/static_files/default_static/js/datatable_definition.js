@@ -405,7 +405,7 @@ TableFormat.hgvs = function(data, type, columns) {
         }
         cDom.append(":");
         // used to be display:inline-block; but that doesn't underline
-        cDom.append($('<span>', {style: 'word-break:break-all', text: variant}));
+        cDom.append($('<span>', {style: 'word-break:break-all;white-space:normal', text: variant}));
     } else {
         cDom.append(data.full);
     }
