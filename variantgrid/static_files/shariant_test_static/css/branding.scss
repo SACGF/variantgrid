@@ -12,14 +12,46 @@
     }
 }
 .login-bg-theme {
-    background-color: rgb(244, 144, 67);
+    background-color: #DEF4FD;
+    .header, .footer {
+        background-color: rgb(244, 144, 67);
+    }
+    .main-container {
+        margin-top: calc(70px + 10vh);
+        margin-bottom: 70px;
+    }
+    .header a::after {
+        position: relative;
+        top: 5px;
+        left: 15px;
+        content: ' WARNING : This TEST site uses mock data.';
+        color: white;
+        font-weight: bold;
+    }
+    .footer {
+        border-top: 1px solid white;
+        a.external-link {
+            font-weight: 500;
+            color: #55c;
+        }
+    }
     color: #ddd;
-    .jumbotron {
+    .jumbo-box {
         color: #444;
         font-size: 16px;
-        background-color: #f2f2f2
+        background-color: #DEF4FD;
     }
 }
+
+@media screen and (min-width: 0) and (max-width: 991px) {
+    .login-bg-theme .main-container {
+        margin-top: 70px;
+    }
+    .login-bg-theme .poster {
+        text-align: center;
+    }
+}
+
 
 nav.navbar a.nav-link {
     color: #ddd !important;

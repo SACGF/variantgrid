@@ -17,15 +17,39 @@
 }
 
 .login-bg-theme {
-  background-color: #1b75bc;
+  background-color: #DEF4FD;
   color: #ddd;
 }
-.login-bg-theme .jumbotron {
+.login-bg-theme .main-container {
+  margin-top: calc(70px + 10vh);
+  margin-bottom: 70px;
+}
+.login-bg-theme .header, .login-bg-theme .footer {
+  background-color: #1b75bc;
+  min-height: 60px;
+}
+.login-bg-theme .footer {
+  border-top: 1px solid white;
+}
+.login-bg-theme .footer a.external-link {
+  font-weight: 500;
+  color: #bbbbff;
+}
+.login-bg-theme .jumbo-box {
   color: #444;
   font-size: 16px;
-  background-color: #f2f2f2;
+  background-color: #DEF4FD;
 }
 
+@media screen and (min-width: 0) and (max-width: 991px) {
+  .login-bg-theme .main-container {
+    margin-top: 70px;
+  }
+
+  .login-bg-theme .poster {
+    text-align: center;
+  }
+}
 nav.navbar a.nav-link {
   color: #ddd !important;
 }
