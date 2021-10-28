@@ -1,15 +1,51 @@
+from dataclasses import dataclass
+from typing import Set, Dict, Any
+
 from django.dispatch.dispatcher import receiver
 
 from classification.models.classification import Classification
-from flags.models import FlagStatus, FlagResolution
+from flags.models import FlagStatus, FlagComment, Flag
 from genes.hgvs import HGVSMatcher
+from library.guardian_utils import admin_bot
 from snpdb.models import GenomeBuild
 from snpdb.models.flag_types import allele_flag_types
 from snpdb.models.models_variant import Allele, allele_validate_signal
 
 
+@dataclass(frozen=True)
+class TranscriptDifference:
+    transcript: str
+    chgvs37: str
+    chgvs38: str
+
+    @property
+    def comment(self) -> str:
+        return (
+            f'Attached classification with transcript {self.transcript} appears as the following in \n\n'
+            f'{self.chgvs37} (GRCh37)\n'
+            f'{self.chgvs38} (GRCh38)')
+
+    @property
+    def data(self) -> Dict[str, Any]:
+        return {
+            "transcript": self.transcript,
+            'chgvs37': self.chgvs37,
+            'chgvs38': self.chgvs38
+        }
+
+    @staticmethod
+    def from_flag(flag: Flag) -> 'TranscriptDifference':
+        data = flag.data or {}
+        return TranscriptDifference(
+            transcript=data.get('transcript'),
+            chgvs37=data.get('chgvs37'),
+            chgvs38=data.get('chgvs38')
+        )
+
+
 @receiver(allele_validate_signal, sender=Allele)
 def compare_chgvs(sender, allele: Allele, **kwargs):  # pylint: disable=unused-argument
+    transcript_differences: Set[TranscriptDifference] = set()
     vcs = Classification.objects.filter(variant__in=allele.variants).order_by('id')
     v37 = allele.grch37
     v38 = allele.grch38
@@ -21,16 +57,6 @@ def compare_chgvs(sender, allele: Allele, **kwargs):  # pylint: disable=unused-a
         for vc in vcs:
             if transcript := vc.transcript:
                 classification_transcripts.add(transcript)
-
-        # There may be open flags against transcripts no longer used in classifications - remove them
-        for flag in allele.flags_of_type(allele_flag_types.allele_37_not_38).filter(resolution__status=FlagStatus.OPEN):
-            if transcript := flag.data.get("transcript"):
-                if transcript not in classification_transcripts:
-                    allele.close_open_flags_of_type(
-                        allele_flag_types.allele_37_not_38,
-                        data={'transcript': transcript},
-                        comment="Transcript (version) no longer used",
-                    )
 
         for transcript in classification_transcripts:
             chgvs37 = None
@@ -45,28 +71,33 @@ def compare_chgvs(sender, allele: Allele, **kwargs):  # pylint: disable=unused-a
             except ValueError as ve:
                 chgvs38 = f'Error: {str(ve)}'
 
-            are_same = chgvs37 == chgvs38
+            if chgvs37 != chgvs38:
+                transcript_differences.add(TranscriptDifference(transcript=transcript, chgvs37=chgvs37, chgvs38=chgvs38))
 
-            if are_same:
-                allele.close_open_flags_of_type(
-                    allele_flag_types.allele_37_not_38,
-                    data={'transcript': transcript},
-                    comment="37 and 38 representations are now the same"
-                )
+        # loop through existing flags and close them if we don't have a mismatch for them anymore
+        # or re-open them if we do (if flag was closed by admin_bot)
+        existing_flag: Flag
+        for existing_flag in list(allele.flag_collection_safe.flag_set.filter(flag_type=allele_flag_types.allele_37_not_38)):
+            existing_td = TranscriptDifference.from_flag(existing_flag)
+
+            if existing_td in transcript_differences:
+                # current mismatch already has a flag
+                transcript_differences.remove(existing_td)
+
+                # flag is closed, but it was closed by a bot, so we can re-open it
+                if existing_flag.resolution.status != FlagStatus.OPEN and FlagComment.last(existing_flag).user == admin_bot():
+                    existing_flag.flag_action(comment="A classification with this transcript, GRCh37 and GRCh38 has been re-added or resolved", resolution=existing_flag.flag_type.resolution_for_status(FlagStatus.OPEN))
+                # otherwise leave open flag (or closed by a human flag) alone
             else:
-                # simpified the process by using close_other_dta and reopen_if_bot_closed
-                comment = (
-                    f'Attached classification with transcript {transcript} appears as the following in \n\n'
-                    f'{chgvs37} (GRCh37)\n'
-                    f'{chgvs38} (GRCh38)')
+                existing_flag.flag_action(comment="No classifications with this transcript, GRCh37 and GRCh38 combination remaining", resolution=existing_flag.flag_type.resolution_for_status(FlagStatus.CLOSED))
 
-                allele.flag_collection_safe.get_or_create_open_flag_of_type(
-                    flag_type=allele_flag_types.allele_37_not_38,
-                    comment=comment,
-                    data={'transcript': transcript, 'chgvs37': chgvs37, 'chgvs38': chgvs38},
-                    close_other_data=True,
-                    only_if_new=True,
-                    reopen_if_bot_closed=True)
+        for new_issue_td in transcript_differences:
+            # there shouldn't be any other flags with this data based on above checks
+            allele.flag_collection_safe.get_or_create_open_flag_of_type(
+                flag_type=allele_flag_types.allele_37_not_38,
+                comment=new_issue_td.comment,
+                data=new_issue_td.data)
+
     else:
         # if there's no 37 or no 38, close any flag comparing the two
         allele.close_open_flags_of_type(allele_flag_types.allele_37_not_38, comment="Lacking representation in both 37 and 38")
