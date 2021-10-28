@@ -36,6 +36,10 @@ class ClinGenAllele(TimeStampedModel):
         """ Coordinate is not yet assigned ID and stored on server """
         pass
 
+    class ClinGenHGVSReferenceBaseUnavailableError(ClinGenAlleleRegistryException):
+        """ HGVS doesn't have reference """
+        pass
+
     @staticmethod
     def _strip_transcript_version(transcript_id):
         """ strip dot version ie NM_198798.2 => NM_198798 """
@@ -115,9 +119,13 @@ class ClinGenAllele(TimeStampedModel):
                 coord = t_data["coordinates"][0]
                 if "startIntronOffset" in coord:
                     # We have to accept these - as we get so many but we can't add on the bases
-                    logging.warning("A coding DNA reference sequence does not contain intron or 5' and 3' gene "
-                                    "flanking sequences and can therefore not be used as a reference to describe "
-                                    "variants in these regions")
+                    msg = "A coding DNA reference sequence does not contain intron or 5' and 3' gene "\
+                          "flanking sequences and can therefore not be used as a reference to describe " \
+                          "variants in these regions"
+                    if settings.HGVS_REQUIRE_REFERENCE_BASES:
+                        raise ClinGenAllele.ClinGenHGVSReferenceBaseUnavailableError(msg)
+                    else:
+                        logging.warning(msg)
                 elif transcript_accession.startswith("LRG_"):
                     logging.warning("Don't have sequence for LRGs, relying on ClinGenAlleleRegistry reference "
                                     "bases which may be wrong")
@@ -134,7 +142,10 @@ class ClinGenAllele(TimeStampedModel):
                             ref_end = coord["end"]
                         hgvs_name.ref_allele = tvsi.sequence[ref_start:ref_end]
                     except NoTranscript as e_no_transcript:
-                        logging.warning(e_no_transcript)
+                        if settings.HGVS_REQUIRE_REFERENCE_BASES:
+                            raise ClinGenAllele.ClinGenHGVSReferenceBaseUnavailableError() from e_no_transcript
+                        else:
+                            logging.warning(e_no_transcript)
         return hgvs_name
 
     def _get_raw_hgvs_and_data(self, transcript_accession, match_version=True) -> Tuple[Optional[str],

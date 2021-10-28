@@ -763,7 +763,7 @@ class HGVSMatcher:
                                 if gene_symbol := transcript_version.gene_symbol:
                                     hgvs_name.gene = str(gene_symbol)
                                 hgvs_method = attempted_method
-                    except ClinGenAlleleServerException as cga_se:
+                    except ClinGenAlleleServerException:
                         attempt_clingen = False
                     except ClinGenAllele.ClinGenAlleleRegistryException as cga_re:
                         logging.error(cga_re)

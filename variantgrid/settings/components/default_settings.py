@@ -310,6 +310,8 @@ COMPANY = None  # Used for gene list categories
 
 GENERATED_DIR = os.path.join(MEDIA_ROOT, 'generated')
 
+HGVS_REQUIRE_REFERENCE_BASES = True  # Sometimes we can't set reference bases from ClinGen, die in this case if True
+
 PATIENTS_READ_ONLY_SHOW_AGE_NOT_DOB = False
 IMPORT_PROCESSING_DIR = os.path.join(PRIVATE_DATA_ROOT, 'import_processing')
 
