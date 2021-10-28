@@ -75,7 +75,8 @@ def compare_chgvs(sender, allele: Allele, **kwargs):  # pylint: disable=unused-a
                         flag_type=allele_flag_types.allele_37_not_38,
                         comment=comment,
                         data={'transcript': transcript, 'chgvs37': chgvs37, 'chgvs38': chgvs38},
-                        only_if_new=True)
+                        only_if_new=True,
+                        reopen_if_bot_closed=True)
     else:
         # if there's no 37 or no 38, close any flag comparing the two
         allele.close_open_flags_of_type(allele_flag_types.allele_37_not_38, comment="Lacking representation in both 37 and 38")
