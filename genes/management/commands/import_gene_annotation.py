@@ -160,8 +160,10 @@ class Command(BaseCommand):
                 known_genes_ids.add(gene_id)
 
             if symbol := gv_data["gene_symbol"]:
-                if symbol.upper() not in known_uc_gene_symbols:
+                uc_symbol = symbol.upper()
+                if uc_symbol not in known_uc_gene_symbols:
                     new_gene_symbols.add(symbol)
+                    known_uc_gene_symbols.add(uc_symbol)
 
             # Some HGNC IDs have been withdrawn and are not in the download files
             hgnc_id = None
@@ -189,9 +191,7 @@ class Command(BaseCommand):
         if new_gene_symbols:
             logging.info("Creating %d new gene symbols", len(new_gene_symbols))
             GeneSymbol.objects.bulk_create([GeneSymbol(symbol=symbol) for symbol in new_gene_symbols],
-                                           ignore_conflicts=True,  # May have different cases for same symbol
                                            batch_size=self.BATCH_SIZE)
-            known_uc_gene_symbols.update((s.upper() for s in new_gene_symbols))
 
         if new_genes:
             logging.info("Creating %d new genes", len(new_genes))

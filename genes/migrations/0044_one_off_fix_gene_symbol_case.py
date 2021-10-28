@@ -38,7 +38,7 @@ def _change_gene_symbol_case(apps, schema_editor):
     RPL17-C18orf32,ZHX1-C8orf76'
     """
 
-    for symbol in LC_SYMBOLS:
+    for symbol in LC_SYMBOLS.split(","):
         symbol = symbol.strip()
         # FKs still work even if case changes, so we don't have to worry about them
         GeneSymbol.objects.filter(pk=symbol).update(symbol=symbol)
