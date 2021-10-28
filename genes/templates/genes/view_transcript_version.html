@@ -87,16 +87,15 @@
                 {% if transcript_version.has_valid_data %}
                     <td>{{ transcript_version.coordinates }}</td>
                     <td>{{ transcript_version.length }}</td>
-                    <td>
-                        {% modal id="transcript-"|append:transcript_version.pk|append:"-json" label="API Response" %}
-                            {% code_json transcript_version.data css_class="modal-body" %}
-                        {% endmodal %}
-                    </td>
                 {% else %}
                     <td> N/A</td>
                     <td> N/A</td>
-                    <td> <code>{}</code></td>
                 {% endif %}
+                <td>
+                    {% modal id="transcript-"|append:transcript_version.pk|append:"-json" label="API Response" %}
+                        {% code_json transcript_version.data css_class="modal-body" %}
+                    {% endmodal %}
+                </td>
                 {% if user.is_staff %}
                     <td style="word-break: break-all">{{ transcript_version.import_source }}</td>
                 {% endif %}

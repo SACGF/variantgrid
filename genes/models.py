@@ -691,22 +691,25 @@ class TranscriptVersion(SortByPKMixin, models.Model):
         """ Human readable """
         match_summary = ""
         if cdna_match := self.data.get("cdna_match"):
-            gap_operations = Counter()
-            for (_, _, _, _, gap) in cdna_match:
-                if gap:
-                    for gap_op in gap.split():
-                        code = gap_op[0]
-                        length = int(gap_op[1:])
-                        gap_operations[code] += length
+            if cdna_errors := self._validate_cdna_match():
+                match_summary = ", ".join(cdna_errors)
+            else:
+                gap_operations = Counter()
+                for (_, _, _, _, gap) in cdna_match:
+                    if gap:
+                        for gap_op in gap.split():
+                            code = gap_op[0]
+                            length = int(gap_op[1:])
+                            gap_operations[code] += length
 
-            if gap_operations:
-                gap_summary = []
-                for code, label in {"I": "Insertion", "D": "Deletion"}.items():
-                    if value := gap_operations.get(code):
-                        gap_summary.append(f"{value}bp {label}")
-                match_summary = ", ".join(gap_summary)
-                if match_summary:
-                    match_summary = f"Transcript had {match_summary} vs genome reference"
+                if gap_operations:
+                    gap_summary = []
+                    for code, label in {"I": "Insertion", "D": "Deletion"}.items():
+                        if value := gap_operations.get(code):
+                            gap_summary.append(f"{value}bp {label}")
+                    match_summary = ", ".join(gap_summary)
+                    if match_summary:
+                        match_summary = f"Transcript had {match_summary} vs genome reference"
 
         return match_summary
 
@@ -899,12 +902,34 @@ class TranscriptVersion(SortByPKMixin, models.Model):
             coords = f"{self.chrom}:{self.data['start'] + 1}-{self.data['end']} ({self.data['strand']})"
         return coords
 
+    def _validate_cdna_match(self) -> List[str]:
+        cdna_match_errors = []
+        if cdna_match := self.data.get('cdna_match'):
+            # cdna_match = (genomic start, genomic end, cDNA start, cDNA end, gap) (genomic=0 based, transcript=1)
+            if self.data["strand"] == '-':
+                cdna_match = list(reversed(cdna_match))
+
+            if cdna_match[0][2] != 1:
+                cdna_match_errors.append(f"cDNA match starts at {cdna_match[0][2]} not 1")
+
+            last_end = None
+            for _, _, cdna_start, cdna_end, _ in cdna_match:
+                if last_end:
+                    missing = cdna_start - (last_end + 1)
+                    if missing:
+                        msg = f"cDNA match missing transcript: cDNA start: {cdna_start} last cDNA end {last_end}" \
+                              f" (missing {missing} bp)"
+                        cdna_match_errors.append(msg)
+                last_end = cdna_end
+        return cdna_match_errors
+
     @property
     def has_valid_data(self) -> bool:
         try:
             for key in ["chrom", "start", "end", "strand", "exons"]:
                 _ = self.data[key]
-            return True
+
+            return not self._validate_cdna_match()
         except KeyError:
             return False
 
