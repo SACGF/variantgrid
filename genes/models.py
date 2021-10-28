@@ -712,8 +712,8 @@ class TranscriptVersion(SortByPKMixin, models.Model):
 
     @property
     def sequence_length_matches_exon_length_ignoring_poly_a_tail(self) -> bool:
-        sequence_length_minus_polya = self.sequence_info.length - self.sequence_poly_a_tail
-        return sequence_length_minus_polya == self.length
+        # We can't know exactly how long a polyA tail is (only that subtracting it from length is all A's)
+        return self.sequence_info.length == self.length or self.sequence_poly_a_tail
 
     @lazy
     def alignment_gap(self) -> bool:
