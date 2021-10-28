@@ -42,7 +42,14 @@
                         </div>
                     {% endfor %}
                     {% login_form next=next form=form %}
-
+                    <div class="mt-1">
+                    {% modal label="Need an Account?" show_prefix=False size="md" %}
+                        <div class="modal-body">
+                        Access to Shariant is restricted to Australian genomic labs that have signed up to the terms and conditions.<br/><br/>
+                        If you belong to one of those labs, ask your lab head to contact us and we'll organise an account.
+                        </div>
+                    {% endmodal %}
+                    </div>
                     <hr class="my-4"/>
 
                     <p>Developed for <a class="external-link" href='https://www.australiangenomics.org.au'>Australian Genomics</a> as part of the project area “Genomics Diagnostics” to support the efficiency, quality and consistency of genomic diagnostic practice in Australia.</p>

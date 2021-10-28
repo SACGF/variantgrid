@@ -300,6 +300,8 @@ def render_labelled(parser, token):
         nodelist,
         id=kwargs.get('id'),
         label=kwargs.get('label'),
+        show_prefix=kwargs.get('show_prefix'),
+        size=kwargs.get('size'),
         admin_only=kwargs.get('admin_only')
     )
 
@@ -308,10 +310,14 @@ class ModalTag(template.Node):
     def __init__(self, nodelist,
                  id: FilterExpression = None,
                  label: FilterExpression = None,
+                 show_prefix: FilterExpression = None,
+                 size: FilterExpression = None,
                  admin_only: FilterExpression = None):
         self.nodelist = nodelist
         self.id = id
         self.label = label
+        self.show_prefix = show_prefix
+        self.size = size
         self.admin_only = admin_only
 
     def render(self, context):
@@ -328,13 +334,16 @@ class ModalTag(template.Node):
         if admin_only_bool:
             link += '<i class="fas fa-key" title="Admin only functionality"></i>'
 
-        link += f'<a href="#{id_str}" data-toggle="modal" class="modal-link">Show {label_str}</a>'
+        show_prefix_bool = TagUtils.value_bool(context, self.show_prefix, True)
+        link += f'<a href="#{id_str}" data-toggle="modal" class="modal-link">{"Show " if show_prefix_bool else ""}{label_str}</a>'
         link += "</div>"
+
+        size_str = TagUtils.value_str(context, self.size, "xl")
 
         modal = \
             f"""
                 <div id="{id_str}" class="modal" tabindex="-1">
-                    <div class="modal-dialog modal-dialog-scrollable modal-xl">
+                    <div class="modal-dialog modal-dialog-scrollable modal-{size_str}">
                         <div class="modal-content">
                             <div class="modal-header">
                                 <h5 class="modal-title">{label_str}</h5>
