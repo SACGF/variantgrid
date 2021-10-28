@@ -125,7 +125,7 @@ class ClassificationImportAlleleSource(AlleleSource):
         for allele in allele_qs:
             allele.validate()
         report_event('Completed import liftover',
-                     extra_data={'liftover_id': self.pk, 'allele_count': allele_qs().count()})
+                     extra_data={'liftover_id': self.pk, 'allele_count': allele_qs.count()})
 
 
 class AllClassificationsAlleleSource(TimeStampedModel, AlleleSource):
