@@ -47,6 +47,7 @@ from library.guardian_utils import clear_permissions
 from library.log_utils import report_exc_info, report_event
 from library.utils import empty_dict, empty_to_none, nest_dict, cautious_attempt_html_to_text, DebugTimer
 from ontology.models import OntologyTerm, OntologySnake, OntologyTermRelation
+from snpdb.clingen_allele import populate_clingen_alleles_for_variants
 from snpdb.models import Variant, Lab, Sample
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_variant import AlleleSource, Allele, VariantCoordinate, VariantAllele
@@ -113,12 +114,18 @@ class ClassificationImportAlleleSource(AlleleSource):
         return Allele.objects.filter(variantallele__variant__in=variants_qs)
 
     def liftover_complete(self, genome_build: GenomeBuild):
+        allele_qs = self.get_allele_qs()
+        # Populate ClinGen for newly created variants as well as it's possible that old one failed but new could work
+        build_variants = Variant.objects.filter(variantallele__genome_build=genome_build,
+                                                variantallele__allele__in=allele_qs)
+        populate_clingen_alleles_for_variants(genome_build, build_variants)
+
         Classification.bulk_update_cached_c_hgvs(self.classification_import)
         allele: Allele
-        for allele in self.get_allele_qs():
+        for allele in allele_qs:
             allele.validate()
         report_event('Completed import liftover',
-                     extra_data={'liftover_id': self.pk, 'allele_count': self.get_allele_qs().count()})
+                     extra_data={'liftover_id': self.pk, 'allele_count': allele_qs().count()})
 
 
 class AllClassificationsAlleleSource(TimeStampedModel, AlleleSource):
