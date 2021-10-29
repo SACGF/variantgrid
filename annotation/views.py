@@ -61,11 +61,12 @@ def _get_gene_and_transcript_stats(genome_build: GenomeBuild, annotation_consort
     transcript_counts = transcripts_qs.count()
     if gene_counts and transcript_counts:
         genes_and_transcripts = {"genes": gene_counts, "transcripts": transcript_counts}
-        field_counts = get_field_counts(transcripts_qs, "import_source")
+        field_counts = get_field_counts(transcripts_qs, "import_source__url")
         import_sources = {}
-        for import_source in GeneAnnotationImport.objects.filter(pk__in=field_counts).order_by("created"):
-            num_transcripts = field_counts[import_source.pk]
-            import_sources[str(import_source)] = {"transcripts": num_transcripts, "created": import_source.created}
+        for import_source in GeneAnnotationImport.objects.filter(url__in=field_counts).order_by("created"):
+            field = import_source.url
+            num_transcripts = field_counts[field]
+            import_sources[field] = {"transcripts": num_transcripts, "created": import_source.created}
         genes_and_transcripts["import_sources"] = import_sources
 
     return genes_and_transcripts
