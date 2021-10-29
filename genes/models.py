@@ -780,7 +780,6 @@ class TranscriptVersion(SortByPKMixin, models.Model):
         """
         return [TranscriptVersion.get_transcript_version(genome_build, transcript_accession)]
 
-
     @staticmethod
     def raise_bad_or_missing_transcript(transcript_accession):
         """ Checks whether a transcript we can't match is wrong (their fault) or we don't have it (our fault) """
