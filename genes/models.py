@@ -928,10 +928,10 @@ class TranscriptVersion(SortByPKMixin, models.Model):
         try:
             for key in ["chrom", "start", "end", "strand", "exons"]:
                 _ = self.data[key]
-
-            return not self._validate_cdna_match()
         except KeyError:
             return False
+
+        return not ("error" in self.data or self._validate_cdna_match())
 
     def get_differences(self, transcript_version):
         """ Used to inform while HGVS may resolve differently """
