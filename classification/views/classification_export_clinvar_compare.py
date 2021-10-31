@@ -19,7 +19,8 @@ class ClinVarCompareRow(ExportRow):
         "Likely_pathogenic": "LP",
         "Pathogenic": "P",
         "Pathogenic/Likely_pathogenic": ["P", "LP"],
-        "Benign/Likely_benign": ["B", "LB"]
+        "Benign/Likely_benign": ["B", "LB"],
+        "risk_factor": "R"
     }
     CLINSIG_BUCKETS = {
         "B": 1,
