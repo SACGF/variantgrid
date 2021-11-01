@@ -926,15 +926,15 @@ ul.compact {
     background-color: #F0D9ED !important;
 }
 
-// discordance levels
+// discordance levels from most disagreeable to least
 .overlap-discordant {
     background-color: #ebb;
 }
+.overlap-concordant_confidence {
+    background-color: rgb(244,188,9);
+}
 .overlap-concordant_agreement, .overlap-concordant_agreement_diff_vus {
     background-color: #88dd88;
-}
-.overlap-concordant_confidence {
-    background-color: #44bb44;
 }
 .overlap-single_submission, .overlap-no_entries {
     background-color: #ccc;

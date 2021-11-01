@@ -894,12 +894,12 @@ ul.compact li:before {
   background-color: #ebb;
 }
 
-.overlap-concordant_agreement, .overlap-concordant_agreement_diff_vus {
-  background-color: #88dd88;
+.overlap-concordant_confidence {
+  background-color: #f4bc09;
 }
 
-.overlap-concordant_confidence {
-  background-color: #44bb44;
+.overlap-concordant_agreement, .overlap-concordant_agreement_diff_vus {
+  background-color: #88dd88;
 }
 
 .overlap-single_submission, .overlap-no_entries {
