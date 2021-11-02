@@ -71,7 +71,7 @@ class Command(BaseCommand):
         batch: List[Classification] = list()
         for c in qs:
             if import_keys is not None:
-                import_key = c.get(SpecialEKeys.GENOME_BUILD) + "#" + c.get(SpecialEKeys.C_HGVS)
+                import_key = f"{c.get(SpecialEKeys.GENOME_BUILD) or ''}#{c.get(SpecialEKeys.C_HGVS) or ''}"
                 if import_key not in import_keys:
                     continue
 

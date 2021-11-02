@@ -76,10 +76,11 @@ def report_message(message: str, level: str = 'warning', request=None, extra_dat
                            extra_data=extra_data)
 
 
-def report_exc_info(extra_data=None, request=None):
+def report_exc_info(extra_data=None, request=None, report_externally=True):
     if not request:
         request = get_current_request()
-    rollbar.report_exc_info(extra_data=extra_data, request=request)
+    if report_externally:
+        rollbar.report_exc_info(extra_data=extra_data, request=request)
     exc_info = sys.exc_info()
     if exc_info:
         print(exc_info)
