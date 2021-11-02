@@ -784,10 +784,10 @@ const VCForm = (function() {
 
                 variantTooltip.push(`<strong>Imported ${this.value(SpecialEKeys.GENOME_BUILD)}</strong> ${variantText}`);
 
-                let allBuilds = Object.keys(allele.genome_builds);
+                let allBuilds = Object.keys(alleleData.genome_builds);
                 allBuilds.sort();
                 for (let genomeBuild of allBuilds) {
-                    let buildData = allele.genome_builds[genomeBuild];
+                    let buildData = alleleData.genome_builds[genomeBuild];
                     variantTooltip.push(`<strong>Resolved ${genomeBuild}</strong> ${buildData.c_hgvs}`);
                 }
             }
