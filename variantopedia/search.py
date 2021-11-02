@@ -354,11 +354,14 @@ class Searcher:
                 variant_qs = get_visible_variants(self.user, genome_build)
                 searches = self.genome_build_searches
             except Exception as e:
-                report_exc_info(extra_data={
-                    'search_string': self.search_string,
-                    'classify': self.classify,
-                    'genome_build_id': genome_build.name if genome_build else None
-                })
+                report_exc_info(
+                    extra_data={
+                        'search_string': self.search_string,
+                        'classify': self.classify,
+                        'genome_build_id': genome_build.name if genome_build else None
+                    },
+                    report_externally=False
+                )
                 results.append_error(("variants", e, genome_build))
                 return results
         else:
@@ -409,12 +412,15 @@ class Searcher:
                             results.append_result(sr)
 
                 except Exception as e:
-                    report_exc_info(extra_data={
-                        'search_string': self.search_string,
-                        'search_type': search_type,
-                        'classify': self.classify,
-                        'genome_build_id': genome_build.name if genome_build else None
-                    })
+                    report_exc_info(
+                        extra_data={
+                            'search_string': self.search_string,
+                            'search_type': search_type,
+                            'classify': self.classify,
+                            'genome_build_id': genome_build.name if genome_build else None
+                        },
+                        report_externally=False
+                    )
                     results.append_error((search_type, e, genome_build))
         return results
 
