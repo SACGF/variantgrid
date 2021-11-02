@@ -605,8 +605,14 @@ let Flags = (function () {
                 }
                 
                 let resolvedFlags = this.collection.importantResolvedFlags();
+                let seenOnlyOneFlagTypes = {};
                 if (resolvedFlags.length) {
                     this.flagChunk(resolvedFlags, 'Resolved Flags', false).appendTo(dom);
+                    for (let rf of resolvedFlags) {
+                        if (rf.db.flagTypes.get(rf.flag_type).only_one) {
+                            seenOnlyOneFlagTypes[rf.flag_type] = true;
+                        }
+                    }
                 }
 
                 if (!openFlags.length && !resolvedFlags.length) {
@@ -616,8 +622,15 @@ let Flags = (function () {
                 }
 
                 let raisableFlags = this.collection.raisableFlags();
-                if (raisableFlags.length) {
-                    this.flagChunk(raisableFlags, 'Raise New Flags', 'new', owner).appendTo(dom);
+                let notSeenRaisableFlags = [];
+                for (let raisableFlag of raisableFlags) {
+                    if (!seenOnlyOneFlagTypes[raisableFlag.flag_type]) {
+                        notSeenRaisableFlags.push(raisableFlag);
+                    }
+                }
+
+                if (notSeenRaisableFlags.length) {
+                    this.flagChunk(notSeenRaisableFlags, 'Raise New Flags', 'new', owner).appendTo(dom);
                 }
 
                 // this is mostly redundant to Variant Classification History
