@@ -186,7 +186,8 @@ class ClinVarExportConverter:
             if other_classifications_for_key := Classification.objects.filter(
                 withdrawn=False,
                 variant__in=allele.variants,
-                share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS
+                share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS,
+                lab__clinvar_key=self.clinvar_key
             ).exclude(id=self.classification_based_on.id):
                 for c in other_classifications_for_key:
                     has_condition = (resolved_condition := c.condition_resolution_obj) and len(resolved_condition.terms) >= 1
