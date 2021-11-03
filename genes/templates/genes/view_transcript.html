@@ -8,7 +8,7 @@
 
 {% block content %}
     <div class="container">
-        <h3>Transcript: {{ transcript }}</h3>
+        <h3>Transcript {{ transcript }}</h3>
 
         {% if transcript.annotation_consortium == 'R' %}
             {% page_help 'genes/transcript_version_refseq' 'RefSeq Transcript Versions' %}
@@ -89,8 +89,7 @@
                                     </td>
                                     <td class="text-center">{{ d.hgvs_ok | boolean }}</td>
                                 {% else %}
-                                    <td><span class="no-value">-</span></td>
-                                    <td class="text-center">{{ False | boolean }}</td>
+                                    <td colspan="2"><span class="no-value">No local copy of transcript version</span></td>
                                  {% endif %}
                                 <td>
                                     {% for tv, method in hgvs_method %}
