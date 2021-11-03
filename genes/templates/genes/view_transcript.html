@@ -38,7 +38,7 @@
             <tbody>
                 {% for tvd in transcript_version_details %}
                 <tr>
-                    <td style="width:80px">{% ifchanged tvd.version %}<a class="hover-link" href="{% url 'view_transcript_version' transcript.pk tvd.version %}">Version {{ tvd.version }}</a>{% endifchanged %}</td>
+                    <td style="width:90px">{% ifchanged tvd.version %}<a class="hover-link" href="{% url 'view_transcript_version' transcript.pk tvd.version %}">{{ transcript }}.<b>{{ tvd.version }}</b></a>{% endifchanged %}</td>
                     <td>{{ tvd.genome_build }}</td>
                     {% with tv=tvd.tv %}
                         {% if tv %}
