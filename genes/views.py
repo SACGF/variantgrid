@@ -32,6 +32,7 @@ from classification.views.classification_datatables import ClassificationColumns
 from genes.custom_text_gene_list import create_custom_text_gene_list
 from genes.forms import GeneListForm, NamedCustomGeneListForm, UserGeneListForm, CustomGeneListForm, \
     GeneSymbolForm, GeneAnnotationReleaseGenomeBuildForm
+from genes.hgvs import HGVSMatcher
 from genes.models import GeneInfo, CanonicalTranscriptCollection, GeneListCategory, \
     GeneList, GeneCoverageCollection, GeneCoverageCanonicalTranscript, \
     CustomTextGeneList, Transcript, Gene, TranscriptVersion, GeneSymbol, GeneCoverage, \
@@ -352,19 +353,29 @@ def view_transcript(request, transcript_id):
 
     genome_builds = sorted(gene_by_build.keys())
     build_genes = [gene_by_build.get(genome_build) for genome_build in genome_builds]
-    transcript_versions = []
+    build_matcher = {genome_build: HGVSMatcher(genome_build) for genome_build in genome_builds}
+    transcript_version_lengths = []
+    transcript_version_hgvs_methods = []
     for version in sorted(versions):
-        data = [version]
-        for genome_build_id in genome_builds:
-            tv = transcripts_versions_by_build.get(genome_build_id, {}).get(version)
-            data.append(tv)
+        transcript_accession = f"{transcript}.{version}"
+        length_row = [version]
+        hgvs_row = [version]
+        for genome_build in genome_builds:
+            tv = transcripts_versions_by_build.get(genome_build, {}).get(version)
+            length_row.append(tv)
+            matcher = build_matcher[genome_build]
+            hgvs_row.append(matcher.filter_best_transcripts_and_method_by_accession(transcript_accession))
 
-        transcript_versions.append(data)
+        transcript_version_lengths.append(length_row)
+        transcript_version_hgvs_methods.append(hgvs_row)
 
-    context = {"transcript": transcript,
-               "genome_builds": genome_builds,
-               "build_genes": build_genes,
-               "transcript_versions": transcript_versions}
+    context = {
+        "transcript": transcript,
+        "genome_builds": genome_builds,
+        "build_genes": build_genes,
+        "transcript_version_lengths": transcript_version_lengths,
+        "transcript_version_hgvs_methods": transcript_version_hgvs_methods,
+    }
     return render(request, "genes/view_transcript.html", context)
 
 
