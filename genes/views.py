@@ -3,7 +3,7 @@ import uuid
 from collections import defaultdict
 from dataclasses import dataclass
 from itertools import combinations
-from typing import Tuple, List, Optional, Dict, Set, Iterable, Union
+from typing import Tuple, List, Optional, Dict, Set, Iterable, Union, Any
 
 from django.conf import settings
 from django.contrib import messages
@@ -338,13 +338,27 @@ def view_classifications(request, gene_symbol: str, genome_build_name: str):
     })
 
 
+@dataclass(frozen=True)
+class GenomeBuildGenes:
+    genome_build: GenomeBuild
+    genes: List[Gene]
+
+
+@dataclass(frozen=True)
+class TranscriptVersionDetails:
+    tv: Optional[TranscriptVersion]
+    version: int  # redundant to tv if provided
+    genome_build: GenomeBuild  # redundant to tv if provided
+    hgvs_method: Any
+
+
 def view_transcript(request, transcript_id):
     transcript = get_object_or_404(Transcript, pk=transcript_id)
 
-    gene_by_build = defaultdict(set)
+    gene_by_build: Dict[GenomeBuild, Set[Gene]] = defaultdict(set)
     transcripts_versions_by_build = defaultdict(dict)
 
-    versions = set()
+    versions: Set[int] = set()
     for tv in transcript.transcriptversion_set.order_by("version"):
         gene_by_build[tv.genome_build].add(tv.gene)
         version = tv.version or 0  # 0 = unknown
@@ -352,9 +366,11 @@ def view_transcript(request, transcript_id):
         versions.add(version)
 
     genome_builds = sorted(gene_by_build.keys())
-    build_genes = [gene_by_build.get(genome_build) for genome_build in genome_builds]
+    genome_build_genes = [GenomeBuildGenes(genome_build, sorted(gene_by_build.get(genome_build))) for genome_build in genome_builds]
+    transcript_version_details: List[TranscriptVersionDetails] = list()
+
+    build_genes: List[GenomeBuild] = [gene_by_build.get(genome_build) for genome_build in genome_builds]
     build_matcher = {genome_build: HGVSMatcher(genome_build) for genome_build in genome_builds}
-    transcript_versions = []
     for version in sorted(versions):
         transcript_accession = f"{transcript}.{version}"
         version_row = [(version, None)]
@@ -362,18 +378,24 @@ def view_transcript(request, transcript_id):
             tv = transcripts_versions_by_build.get(genome_build, {}).get(version)
             matcher = build_matcher[genome_build]
             hgvs_method = {
-                "prefer pyHGVS up then down": matcher.filter_best_transcripts_and_method_by_accession(transcript_accession),
-                "closest": matcher.filter_best_transcripts_and_method_by_accession(transcript_accession, prefer_pyhgvs=False, closest=True),
+                "Prefer pyHGVS Up then Down": matcher.filter_best_transcripts_and_method_by_accession(transcript_accession),
+                "Closest": matcher.filter_best_transcripts_and_method_by_accession(transcript_accession, prefer_pyhgvs=False, closest=True),
             }
             version_row.append((tv, hgvs_method))
 
-        transcript_versions.append(version_row)
+            transcript_version_details.append(
+                TranscriptVersionDetails(
+                    tv=tv,
+                    genome_build=genome_build,
+                    version=version,
+                    hgvs_method=hgvs_method
+                )
+            )
 
     context = {
         "transcript": transcript,
-        "genome_builds": genome_builds,
-        "build_genes": build_genes,
-        "transcript_versions": transcript_versions,
+        "genome_build_genes": genome_build_genes,
+        "transcript_version_details": transcript_version_details
     }
     return render(request, "genes/view_transcript.html", context)
 

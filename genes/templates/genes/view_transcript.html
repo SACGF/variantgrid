@@ -16,94 +16,52 @@
             {% page_help 'genes/transcript_version_ensembl' 'Ensembl Transcript Versions' %}
         {% endif %}
 
-        <table class="table">
-            <thead>
-                <tr>
-                    <th></th>
-                    {% for genome_build in genome_builds %}
-                        <th>{{ genome_build }} length</th>
-                    {% endfor %}
-                </tr>
-                <tr>
-                    <th>Gene</th>
-                    {% for genes in build_genes %}
-                        <td>
-                            {% for g in genes %}
-                                <a class="hover-link" href="{% url 'view_gene' g.pk %}">{{ g }}</a>
-                            {% endfor %}
-                        </td>
-                    {% endfor %}
-                </tr>
-            </thead>
-            <tbody>
-                {% for version_data in transcript_versions %}
-                    <tr>
-                        {% for d, _ in version_data %}
-                            {% if forloop.first %}
-                                <td><a class="hover-link" href="{% url 'view_transcript_version' transcript.pk d %}">Version {{ identifier }}.{{ d }}</a></td>
-                            {% elif d.length %}
-                                <td>{{ d.length }}</td>
-                            {% else %}
-                                 <td><span class="no-value">-</span></td>
-                            {% endif %}
-                        {% endfor %}
-                    </tr>
+        {% for genome_build_genes in genome_build_genes %}
+            {% labelled label=genome_build_genes.genome_build|append:" Gene" %}
+                {% for g in genome_build_genes.genes %}
+                    <a class="hover-link" href="{% url 'view_gene' g.pk %}">{{ g }}</a>
                 {% endfor %}
-            </tbody>
-        </table>
-
-        <h4>HGVS Transcript Resolution</h4>
+            {% endlabelled %}
+        {% endfor %}
 
         <table class="table">
             <thead>
                 <tr>
-                    <th></th>
-                    {% for genome_build in genome_builds %}
-                        <th style="text-align: center" colspan="3">{{ genome_build }}</th>
-                    {% endfor %}
-                </tr>
-
-                <tr>
-                    <th></th>
-                {% for genome_build in genome_builds %}
+                    <th>Version</th>
+                    <th>Genome Build</th>
+                    <th>Length</th>
                     <th>Alignment Gap</th>
-                    <th>OK for local HGVS resolution</th>
+                    <th>OK for Local HGVS Resolution</th>
                     <th>Method</th>
-                {% endfor %}
                 </tr>
             </thead>
             <tbody>
-                {% for version_data in transcript_versions %}
-                    <tr>
-                        {% for d, hgvs_method in version_data %}
-                            {% if forloop.first %}
-                                <td><a class="hover-link" href="{% url 'view_transcript_version' transcript.pk d %}">Version {{ identifier }}.{{ d }}</a></td>
-                            {% else %}
-                                {% if d %}
-                                    <td>
-                                    {% if d.alignment_gap %}
-                                        {{ d.cdna_match_diff }}
-                                    {% else %}
-                                        <span class="no-value">-</span>
-                                    {% endif %}
-                                    </td>
-                                    <td class="text-center">{{ d.hgvs_ok | boolean }}</td>
-                                {% else %}
-                                    <td colspan="2"><span class="no-value">No local copy of transcript version</span></td>
-                                 {% endif %}
-                                <td>
-                                    {% for description, resolution_order in hgvs_method.items %}
-                                        <div>
-                                            <b>{{ description }}:</b>
-                                            {% for tv, method in resolution_order %}
-                                                <div>{{ tv.accession }} using {{ method }}</div>
-                                            {% endfor %}
-                                        </div>
-                                    {% endfor %}
-                                </td>
+                {% for tvd in transcript_version_details %}
+                <tr>
+                    <td style="width:80px">{% ifchanged tvd.version %}<a class="hover-link" href="{% url 'view_transcript_version' transcript.pk tvd.version %}">Version {{ tvd.version }}</a>{% endifchanged %}</td>
+                    <td>{{ tvd.genome_build }}</td>
+                    {% with tv=tvd.tv %}
+                        {% if tv %}
+                            <td class="num">{{ tv.length }}</td>
+                            <td>{% if tv.alignment_gap %}{{ tv.cdna_match_diff }}{% else %}<span class="no-value">-</span>{% endif %}</td>
+                            <td class="text-center">{{ tv.hgvs_ok | boolean }}</td>
+                        {% else %}
+                            <td colspan="3"><div class="no-value text-center">No local copy of transcript version</div></td>
                         {% endif %}
+                    {% endwith %}
+                     <td style="width:50%">
+                        <div class="d-flex">
+                        {% for description, resolution_order in tvd.hgvs_method.items %}
+                            <div class="mx-1">
+                                <label>{{ description }}</label>
+                                {% for tv, method in resolution_order %}
+                                    <div>{{ tv.accession }} using {{ method }}</div>
+                                {% endfor %}
+                            </div>
                         {% endfor %}
-                    </tr>
+                        </div>
+                    </td>
+                </tr>
                 {% endfor %}
             </tbody>
         </table>
