@@ -769,18 +769,6 @@ class TranscriptVersion(SortByPKMixin, models.Model):
         return TranscriptVersion.objects.filter(**kwargs)
 
     @staticmethod
-    def filter_best_transcripts_by_accession(genome_build: GenomeBuild, transcript_accession) -> Iterable['TranscriptVersion']:
-        """ Get the best transcripts you'd want to match a HGVS against - assuming you will try multiple in order
-
-            This currently only returns the 1 best (as per old method)
-
-            Check history of this method if you decide to eg return every version (even ones we don't have data for)
-            or some other ranking eg distance from version, for example asking for 5 would return [6,4,7,2]
-            We could also consider only returning those that have the same length as the one requested
-        """
-        return [TranscriptVersion.get_transcript_version(genome_build, transcript_accession)]
-
-    @staticmethod
     def raise_bad_or_missing_transcript(transcript_accession):
         """ Checks whether a transcript we can't match is wrong (their fault) or we don't have it (our fault) """
 

@@ -563,6 +563,24 @@ class HGVSMatcher:
     def get_variant_tuple(self, hgvs_string: str) -> VariantCoordinate:
         return self.get_variant_tuple_used_transcript_and_method(hgvs_string)[0]
 
+    def filter_best_transcripts_and_method_by_accession(self, transcript_accession) -> List[Tuple[TranscriptVersion, str]]:
+        """ Get the best transcripts you'd want to match a HGVS against - assuming you will try multiple in order
+
+            This currently only returns the 1 best (as per old method)
+
+            Check history of this method if you decide to eg return every version (even ones we don't have data for)
+            or some other ranking eg distance from version, for example asking for 5 would return [6,4,7,2]
+            We could also consider only returning those that have the same length as the one requested
+        """
+        transcript_version = TranscriptVersion.get_transcript_version(self.genome_build, transcript_accession)
+        tv_and_method = []
+        if transcript_version.hgvs_ok:
+            tv_and_method.append((transcript_version, HGVSMatcher.HGVS_METHOD_PYHGVS))
+        # setting to use clingen?
+        tv_and_method.append((transcript_version, HGVSMatcher.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY))
+
+        return tv_and_method
+
     def get_variant_tuple_used_transcript_and_method(self, hgvs_string: str) -> Tuple[VariantCoordinate, str, str]:
         """ Returns variant_tuple and method for HGVS resolution = """
 
@@ -581,29 +599,28 @@ class HGVSMatcher:
 
             variant_tuple = None
             hgvs_methods = []
-            for tv in TranscriptVersion.filter_best_transcripts_by_accession(self.genome_build, transcript_accession):
+            for tv, method in self.filter_best_transcripts_and_method_by_accession(transcript_accession):
                 used_transcript_accession = tv.accession
                 hgvs_name.transcript = tv.accession
                 hgvs_string_for_version = hgvs_name.format()
-                method = None
-                if tv.hgvs_ok:  # Attempt to use PyHGVS 1st as it's faster
-                    method = self.HGVS_METHOD_PYHGVS
+                if method == self.HGVS_METHOD_PYHGVS:
                     variant_tuple = self._pyhgvs_get_variant_tuple(hgvs_string_for_version, tv)
-                elif self._clingen_allele_registry_ok(tv.accession):
-                    error_message = f"Could not convert '{hgvs_string}' using ClinGenAllele Registry: %s"
-                    try:
-                        method = self.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY
-                        variant_tuple = self._clingen_get_variant_tuple(hgvs_string_for_version)
-                    except ClinGenAlleleServerException as cga_se:
-                        # If it's unknown reference we can just retry with another version, other errors are fatal
-                        if cga_se.is_unknown_reference():
-                            self._set_clingen_allele_registry_missing_transcript(tv.accession)
-                        else:
-                            logging.error(error_message, cga_se)
-                    except ClinGenAllele.ClinGenAlleleRegistryException as cgare:
-                        # API or other recoverable error - try again w/another transcript
-                        logging.error(error_message, cgare)
-
+                elif method == self.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY:
+                    if self._clingen_allele_registry_ok(tv.accession):
+                        error_message = f"Could not convert '{hgvs_string}' using ClinGenAllele Registry: %s"
+                        try:
+                            variant_tuple = self._clingen_get_variant_tuple(hgvs_string_for_version)
+                        except ClinGenAlleleServerException as cga_se:
+                            # If it's unknown reference we can just retry with another version, other errors are fatal
+                            if cga_se.is_unknown_reference():
+                                self._set_clingen_allele_registry_missing_transcript(tv.accession)
+                            else:
+                                logging.error(error_message, cga_se)
+                        except ClinGenAllele.ClinGenAlleleRegistryException as cgare:
+                            # API or other recoverable error - try again w/another transcript
+                            logging.error(error_message, cgare)
+                    else:
+                        continue
                 if method:
                     if hgvs_string != hgvs_string_for_version:
                         method += f" as '{hgvs_string_for_version}'"
@@ -717,7 +734,7 @@ class HGVSMatcher:
         problem_str = ", ".join(problems)
         raise ValueError(f"Could not convert {variant} to HGVS using '{lrg_identifier}': {problem_str}")
 
-    def _variant_to_hgvs(self, variant: Variant, transcript_name=None) -> Tuple[HGVSName, str]:
+    def _variant_to_hgvs(self, variant: Variant, transcript_accession=None) -> Tuple[HGVSName, str]:
         """ returns (hgvs, method) - hgvs is c.HGVS is transcript provided, g.HGVS if not """
 
         chrom, offset, ref, alt = variant.as_tuple()
@@ -725,17 +742,17 @@ class HGVSMatcher:
             alt = ref
 
         hgvs_method = None
-        if transcript_name:
-            if transcript_name.startswith("LRG_"):
-                return self._lrg_variant_to_hgvs(variant, transcript_name)
+        if transcript_accession:
+            if transcript_accession.startswith("LRG_"):
+                return self._lrg_variant_to_hgvs(variant, transcript_accession)
 
-            attempt_clingen = True  # Stop on any non-recoverable error - keep going if unknown reference
             hgvs_methods = []
             hgvs_name = None
-            for transcript_version in TranscriptVersion.filter_best_transcripts_by_accession(self.genome_build, transcript_name):
-                if transcript_version.hgvs_ok:
-                    attempted_method = self.HGVS_METHOD_PYHGVS
-                    hgvs_methods.append(f"{attempted_method}: {transcript_version}")
+            for transcript_version, method in self.filter_best_transcripts_and_method_by_accession(transcript_accession):
+                method_detail = f"{method}: {transcript_version}"
+
+                if method == self.HGVS_METHOD_PYHGVS:
+                    hgvs_methods.append(method_detail)
 
                     # Sanity Check - make sure contig is the same
                     contig_mappings = self.genome_build.chrom_contig_mappings
@@ -749,26 +766,30 @@ class HGVSMatcher:
                     pyhgvs_transcript = self._create_pyhgvs_transcript(transcript_version)
                     hgvs_name = pyhgvs.variant_to_hgvs_name(chrom, offset, ref, alt, self.genome_build.genome_fasta.fasta,
                                                             pyhgvs_transcript, max_allele_length=sys.maxsize)
-                    hgvs_method = attempted_method
-                elif attempt_clingen:
-                    # TODO: We could also use VEP then add reference bases on our HGVSs
-                    attempted_method = self.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY
-                    method_detail = f"{attempted_method}: {transcript_version}"
-                    try:
-                        if ca := get_clingen_allele_for_variant(self.genome_build, variant):
-                            method_detail = f"{attempted_method} ({ca}): {transcript_version}"
-                            if hgvs_name := ca.get_c_hgvs_name(transcript_version.accession):
-                                # Use our latest symbol as ClinGen can be out of date, and this keeps it consistent
-                                # regardless of whether we use PyHGVS or ClinGen to resolve
-                                if gene_symbol := transcript_version.gene_symbol:
-                                    hgvs_name.gene = str(gene_symbol)
-                                hgvs_method = attempted_method
-                    except ClinGenAlleleServerException:
-                        attempt_clingen = False
-                    except ClinGenAllele.ClinGenAlleleRegistryException as cga_re:
-                        logging.error(cga_re)
+                elif method == self.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY:
+                    if self._clingen_allele_registry_ok(transcript_version.accession):
+                        error_message = f"Could not convert '{variant}' ({transcript_version}) using {method}: %s"
+                        # TODO: We could also use VEP then add reference bases on our HGVSs
+                        try:
+                            if ca := get_clingen_allele_for_variant(self.genome_build, variant):
+                                method_detail = f"{method} ({ca}): {transcript_version}"
+                                if hgvs_name := ca.get_c_hgvs_name(transcript_version.accession):
+                                    # Use our latest symbol as ClinGen can be out of date, and this keeps it consistent
+                                    # regardless of whether we use PyHGVS or ClinGen to resolve
+                                    if gene_symbol := transcript_version.gene_symbol:
+                                        hgvs_name.gene = str(gene_symbol)
+                                    hgvs_method = method
+                        except ClinGenAlleleServerException as cga_se:
+                            # If it's unknown reference we can just retry with another version, other errors are fatal
+                            if cga_se.is_unknown_reference():
+                                self._set_clingen_allele_registry_missing_transcript(transcript_version.accession)
+                            else:
+                                logging.error(error_message, cga_se)
+                        except ClinGenAllele.ClinGenAlleleRegistryException as cgare:
+                            # API or other recoverable error - try again w/another transcript
+                            logging.error(error_message, cgare)
 
-                    hgvs_methods.append(method_detail)
+                        hgvs_methods.append(method_detail)
                 if hgvs_name:
                     break
 
@@ -778,11 +799,12 @@ class HGVSMatcher:
                     raise ValueError(f"Could not convert {variant} to HGVS - tried: {attempts}")
             else:
                 # No methods tried, mustn't have had any transcripts
-                raise TranscriptVersion.raise_bad_or_missing_transcript(transcript_name)
+                raise TranscriptVersion.raise_bad_or_missing_transcript(transcript_accession)
         else:
+            # No transcript = Genomic HGVS
             hgvs_name = pyhgvs.variant_to_hgvs_name(chrom, offset, ref, alt, self.genome_build.genome_fasta.fasta,
                                                     transcript=None, max_allele_length=sys.maxsize)
-            hgvs_method = "pyhgvs"
+            hgvs_method = self.HGVS_METHOD_PYHGVS
 
         return hgvs_name, hgvs_method
 
