@@ -41,8 +41,10 @@
                         {% for d, _ in version_data %}
                             {% if forloop.first %}
                                 <td><a class="hover-link" href="{% url 'view_transcript_version' transcript.pk d %}">Version {{ identifier }}.{{ d }}</a></td>
-                            {% else %}
+                            {% elif d.length %}
                                 <td>{{ d.length }}</td>
+                            {% else %}
+                                 <td><span class="no-value">-</span></td>
                             {% endif %}
                         {% endfor %}
                     </tr>
@@ -50,7 +52,7 @@
             </tbody>
         </table>
 
-        <h3>HGVS Transcript resolution</h3>
+        <h4>HGVS Transcript Resolution</h4>
 
         <table class="table">
             <thead>
@@ -85,7 +87,8 @@
                                     </td>
                                     <td class="text-center">{{ d.hgvs_ok | boolean }}</td>
                                 {% else %}
-                                    <td colspan="2"></td>
+                                    <td><span class="no-value">-</span></td>
+                                    <td class="text-center">{{ False | boolean }}</td>
                                  {% endif %}
                                 <td>
                                     {% for tv, method in hgvs_method %}
