@@ -345,25 +345,24 @@ def view_transcript(request, transcript_id):
 
     versions = set()
     for tv in transcript.transcriptversion_set.order_by("version"):
-        genome_build_id = tv.genome_build.pk
-        gene_by_build[genome_build_id].add(tv.gene)
+        gene_by_build[tv.genome_build].add(tv.gene)
         version = tv.version or 0  # 0 = unknown
-        transcripts_versions_by_build[genome_build_id][version] = tv
+        transcripts_versions_by_build[tv.genome_build][version] = tv
         versions.add(version)
 
-    genome_build_ids = sorted(gene_by_build.keys())
-    build_genes = [gene_by_build.get(genome_build_id) for genome_build_id in genome_build_ids]
+    genome_builds = sorted(gene_by_build.keys())
+    build_genes = [gene_by_build.get(genome_build) for genome_build in genome_builds]
     transcript_versions = []
     for version in sorted(versions):
         data = [version]
-        for genome_build_id in genome_build_ids:
+        for genome_build_id in genome_builds:
             tv = transcripts_versions_by_build.get(genome_build_id, {}).get(version)
             data.append(tv)
 
         transcript_versions.append(data)
 
     context = {"transcript": transcript,
-               "genome_build_ids": genome_build_ids,
+               "genome_builds": genome_builds,
                "build_genes": build_genes,
                "transcript_versions": transcript_versions}
     return render(request, "genes/view_transcript.html", context)
