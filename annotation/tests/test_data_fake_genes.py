@@ -11,7 +11,7 @@ def create_fake_transcript_version(genome_build: GenomeBuild,
                                                      annotation_consortium=AnnotationConsortium.ENSEMBL)
     gene, _ = Gene.objects.get_or_create(identifier="ENSG00000159216",
                                          annotation_consortium=AnnotationConsortium.ENSEMBL)
-    import_source, _ = GeneAnnotationImport.objects.get_or_create(filename="fake", genome_build=genome_build,
+    import_source, _ = GeneAnnotationImport.objects.get_or_create(url="fake", genome_build=genome_build,
                                                                   annotation_consortium=AnnotationConsortium.ENSEMBL)
     gene_version, _ = GeneVersion.objects.get_or_create(gene=gene, gene_symbol=runx1_symbol, version=1,
                                                         genome_build=genome_build, import_source=import_source)
