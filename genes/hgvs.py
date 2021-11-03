@@ -577,7 +577,7 @@ class HGVSMatcher:
         return self.get_variant_tuple_used_transcript_and_method(hgvs_string)[0]
 
     @staticmethod
-    def _get_sort_key_transcript_version_and_methods(version, always_prefer_pyhgvs=True, closest=False):
+    def _get_sort_key_transcript_version_and_methods(version, prefer_pyhgvs=True, closest=False):
         def get_sort_key(item):
             tv, method = item
 
@@ -600,7 +600,7 @@ class HGVSMatcher:
             else:
                 method_sort = 2
 
-            if always_prefer_pyhgvs:
+            if prefer_pyhgvs:
                 sort_keys.insert(0, method_sort)
             else:
                 sort_keys.append(method_sort)
@@ -610,7 +610,7 @@ class HGVSMatcher:
 
         return get_sort_key
 
-    def filter_best_transcripts_and_method_by_accession(self, transcript_accession) -> List[Tuple[TranscriptVersion, str]]:
+    def filter_best_transcripts_and_method_by_accession(self, transcript_accession, prefer_pyhgvs=True, closest=False) -> List[Tuple[TranscriptVersion, str]]:
         """ Get the best transcripts you'd want to match a HGVS against - assuming you will try multiple in order """
 
         transcript_id, version = TranscriptVersion.get_transcript_id_and_version(transcript_accession)
@@ -636,7 +636,7 @@ class HGVSMatcher:
             tv_and_method.append((transcript_version, HGVSMatcher.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY))
 
         # TODO: Maybe we should filter transcript versions that have the same length
-        sort_key = self._get_sort_key_transcript_version_and_methods(version)
+        sort_key = self._get_sort_key_transcript_version_and_methods(version, prefer_pyhgvs=prefer_pyhgvs, closest=closest)
         return sorted(tv_and_method, key=sort_key)
 
     def get_variant_tuple_used_transcript_and_method(self, hgvs_string: str) -> Tuple[VariantCoordinate, str, str]:

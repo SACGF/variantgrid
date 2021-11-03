@@ -92,8 +92,13 @@
                                     <td colspan="2"><span class="no-value">No local copy of transcript version</span></td>
                                  {% endif %}
                                 <td>
-                                    {% for tv, method in hgvs_method %}
-                                        <div>{{ tv.accession }} using {{ method }}</div>
+                                    {% for description, resolution_order in hgvs_method.items %}
+                                        <div>
+                                            <b>{{ description }}:</b>
+                                            {% for tv, method in resolution_order %}
+                                                <div>{{ tv.accession }} using {{ method }}</div>
+                                            {% endfor %}
+                                        </div>
                                     {% endfor %}
                                 </td>
                         {% endif %}
