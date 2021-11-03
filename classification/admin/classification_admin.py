@@ -248,6 +248,7 @@ class ClassificationAdmin(ModelAdminBasics):
 @admin.register(ClinicalContext)
 class ClinicalContextAdmin(ModelAdminBasics):
     list_display = ('id', 'allele', 'name', 'status', 'modified',)
+    search_fields = ('id', 'allele__pk', 'name')
 
     def get_form(self, request, obj=None, **kwargs):
         return super().get_form(request, obj, widgets={
