@@ -7,7 +7,7 @@ from django.test.testcases import TestCase
 from pyhgvs import HGVSName, InvalidHGVSName
 
 from annotation.tests.test_data_fake_genes import create_fake_transcript_version
-from genes.hgvs import HGVSMatcher
+from genes.hgvs import HGVSMatcher, FakeTranscriptVersion
 from snpdb.models import GenomeBuild
 
 
@@ -66,3 +66,56 @@ class TestAnnotationVCF(TestCase):
 
         with self.assertRaises(InvalidHGVSName):
             matcher.get_variant_tuple("ENST00000300305.3:c.9999A>T")
+
+    def test_sort_transcript_versions(self):
+        transcript_version_and_methods = [
+            (FakeTranscriptVersion("", 1), HGVSMatcher.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY),
+            (FakeTranscriptVersion("", 1), HGVSMatcher.HGVS_METHOD_PYHGVS),
+            (FakeTranscriptVersion("", 2), HGVSMatcher.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY),
+            (FakeTranscriptVersion("", 2), HGVSMatcher.HGVS_METHOD_PYHGVS),
+            (FakeTranscriptVersion("", 3), HGVSMatcher.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY),
+            (FakeTranscriptVersion("", 3), HGVSMatcher.HGVS_METHOD_PYHGVS),
+            # Missing v4
+            (FakeTranscriptVersion("", 4), HGVSMatcher.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY),
+            (FakeTranscriptVersion("", 5), HGVSMatcher.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY),
+            (FakeTranscriptVersion("", 5), HGVSMatcher.HGVS_METHOD_PYHGVS),
+            (FakeTranscriptVersion("", 6), HGVSMatcher.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY),
+            (FakeTranscriptVersion("", 6), HGVSMatcher.HGVS_METHOD_PYHGVS),
+        ]
+
+        expected_up_then_down = [
+            (FakeTranscriptVersion("", 5), HGVSMatcher.HGVS_METHOD_PYHGVS),
+            (FakeTranscriptVersion("", 6), HGVSMatcher.HGVS_METHOD_PYHGVS),
+            (FakeTranscriptVersion("", 3), HGVSMatcher.HGVS_METHOD_PYHGVS),
+            (FakeTranscriptVersion("", 2), HGVSMatcher.HGVS_METHOD_PYHGVS),
+            (FakeTranscriptVersion("", 1), HGVSMatcher.HGVS_METHOD_PYHGVS),
+            (FakeTranscriptVersion("", 4), HGVSMatcher.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY),
+            (FakeTranscriptVersion("", 5), HGVSMatcher.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY),
+            (FakeTranscriptVersion("", 6), HGVSMatcher.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY),
+            (FakeTranscriptVersion("", 3), HGVSMatcher.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY),
+            (FakeTranscriptVersion("", 2), HGVSMatcher.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY),
+            (FakeTranscriptVersion("", 1), HGVSMatcher.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY),
+        ]
+
+        expected_closest = [
+            (FakeTranscriptVersion("", 5), HGVSMatcher.HGVS_METHOD_PYHGVS),
+            (FakeTranscriptVersion("", 3), HGVSMatcher.HGVS_METHOD_PYHGVS),
+            (FakeTranscriptVersion("", 6), HGVSMatcher.HGVS_METHOD_PYHGVS),
+            (FakeTranscriptVersion("", 2), HGVSMatcher.HGVS_METHOD_PYHGVS),
+            (FakeTranscriptVersion("", 1), HGVSMatcher.HGVS_METHOD_PYHGVS),
+            (FakeTranscriptVersion("", 4), HGVSMatcher.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY),
+            (FakeTranscriptVersion("", 5), HGVSMatcher.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY),
+            (FakeTranscriptVersion("", 3), HGVSMatcher.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY),
+            (FakeTranscriptVersion("", 6), HGVSMatcher.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY),
+            (FakeTranscriptVersion("", 2), HGVSMatcher.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY),
+            (FakeTranscriptVersion("", 1), HGVSMatcher.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY),
+        ]
+
+        version = 4
+        key_up_then_down = HGVSMatcher._get_sort_key_transcript_version_and_methods(version)
+        sorted_up_then_down = list(sorted(transcript_version_and_methods, key=key_up_then_down))
+        self.assertEqual(sorted_up_then_down, expected_up_then_down, "Sorted up then down")
+
+        key_closest = HGVSMatcher._get_sort_key_transcript_version_and_methods(version, closest=True)
+        sorted_closest = list(sorted(transcript_version_and_methods, key=key_closest))
+        self.assertEqual(sorted_closest, expected_closest, "Sorted closest")

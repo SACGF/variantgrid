@@ -16,6 +16,7 @@ import pyhgvs
 from Bio.Data.IUPACData import protein_letters_1to3_extended
 from django.conf import settings
 from django.core.cache import cache
+from django.db.models import Max
 from lazy import lazy
 from pyhgvs import HGVSName
 from pyhgvs.utils import make_transcript
@@ -386,6 +387,18 @@ class HGVSNameExtra:
         return count
 
 
+@dataclass
+class FakeTranscriptVersion:
+    transcript_id: str
+    version: int
+    hgvs_ok: bool = False
+    gene_symbol = None
+
+    @property
+    def accession(self) -> str:
+        return f"{self.transcript_id}.{self.version}"
+
+
 class HGVSMatcher:
     TRANSCRIPT_NO_UNDERSCORE = re.compile(r"(NM|NC)(\d+)")
     TRANSCRIPT_UNDERSCORE_REPLACE = r"\g<1>_\g<2>"
@@ -563,23 +576,68 @@ class HGVSMatcher:
     def get_variant_tuple(self, hgvs_string: str) -> VariantCoordinate:
         return self.get_variant_tuple_used_transcript_and_method(hgvs_string)[0]
 
+    @staticmethod
+    def _get_sort_key_transcript_version_and_methods(version, always_prefer_pyhgvs=True, closest=False):
+        def get_sort_key(item):
+            tv, method = item
+
+            if version:
+                # Ask for 3, have [1, 2, 3, 4, 5, 6]
+                # Closest:           4, 5, 3, 6, 2, 1
+                # Up then down:      4, 5, 6, 3, 2, 1
+                version_distance = abs(version-tv.version)
+                prefer_later = tv.version < version
+                if closest:
+                    sort_keys = [version_distance, prefer_later]
+                else:
+                    sort_keys = [prefer_later, version_distance]
+            else:
+                # Latest to earliest
+                sort_keys = [-tv.version]
+
+            if method == HGVSMatcher.HGVS_METHOD_PYHGVS:
+                method_sort = 1
+            else:
+                method_sort = 2
+
+            if always_prefer_pyhgvs:
+                sort_keys.insert(0, method_sort)
+            else:
+                sort_keys.append(method_sort)
+
+            return tuple(sort_keys)
+
+
+        return get_sort_key
+
     def filter_best_transcripts_and_method_by_accession(self, transcript_accession) -> List[Tuple[TranscriptVersion, str]]:
-        """ Get the best transcripts you'd want to match a HGVS against - assuming you will try multiple in order
+        """ Get the best transcripts you'd want to match a HGVS against - assuming you will try multiple in order """
 
-            This currently only returns the 1 best (as per old method)
+        transcript_id, version = TranscriptVersion.get_transcript_id_and_version(transcript_accession)
+        tv_qs = TranscriptVersion.objects.filter(genome_build=self.genome_build, transcript_id=transcript_id)
+        if not settings.VARIANT_TRANSCRIPT_VERSION_BEST_ATTEMPT:
+            if version:
+                return tv_qs.get(version=version)
+            else:
+                raise ValueError("Transcript version must be provided if settings.VARIANT_TRANSCRIPT_VERSION_BEST_ATTEMPT=False")
 
-            Check history of this method if you decide to eg return every version (even ones we don't have data for)
-            or some other ranking eg distance from version, for example asking for 5 would return [6,4,7,2]
-            We could also consider only returning those that have the same length as the one requested
-        """
-        transcript_version = TranscriptVersion.get_transcript_version(self.genome_build, transcript_accession)
+        tv_by_version = {tv.version: tv for tv in tv_qs}
+        data = Transcript.objects.filter(pk=transcript_id).aggregate(max_tv=Max("transcriptversion__version"),
+                                                                     max_tvsi=Max("transcriptversionsequenceinfo__version"))
+        highest_version = max(data.get("max_tv") or 0, data.get("max_tvsi") or 0)
         tv_and_method = []
-        if transcript_version.hgvs_ok:
-            tv_and_method.append((transcript_version, HGVSMatcher.HGVS_METHOD_PYHGVS))
-        # setting to use clingen?
-        tv_and_method.append((transcript_version, HGVSMatcher.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY))
+        min_version = version or 1
+        for v in range(min_version, highest_version+1):
+            transcript_version = tv_by_version.get(v)
+            if not transcript_version:
+                transcript_version = FakeTranscriptVersion(transcript_id=transcript_id, version=v)
+            if transcript_version.hgvs_ok:
+                tv_and_method.append((transcript_version, HGVSMatcher.HGVS_METHOD_PYHGVS))
+            tv_and_method.append((transcript_version, HGVSMatcher.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY))
 
-        return tv_and_method
+        # TODO: Maybe we should filter transcript versions that have the same length
+        sort_key = self._get_sort_key_transcript_version_and_methods(version)
+        return sorted(tv_and_method, key=sort_key)
 
     def get_variant_tuple_used_transcript_and_method(self, hgvs_string: str) -> Tuple[VariantCoordinate, str, str]:
         """ Returns variant_tuple and method for HGVS resolution = """
