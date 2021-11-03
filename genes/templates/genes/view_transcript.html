@@ -7,12 +7,6 @@
 {% block submenu %}{% menu_bar_data %}{% endblock %}
 
 {% block content %}
-    <style>
-        #hgvs-resolution-table {
-            margin-top: 50px;
-        }
-    </style>
-
     <div class="container">
         <h3>Transcript: {{ transcript }}</h3>
 
@@ -42,13 +36,13 @@
                 </tr>
             </thead>
             <tbody>
-                {% for version_data in transcript_version_lengths %}
+                {% for version_data in transcript_versions %}
                     <tr>
-                        {% for d in version_data %}
+                        {% for d, _ in version_data %}
                             {% if forloop.first %}
                                 <td><a class="hover-link" href="{% url 'view_transcript_version' transcript.pk d %}">Version {{ identifier }}.{{ d }}</a></td>
                             {% else %}
-                                <td>{{ d.length | default_if_none:"Unknown" }}</td>
+                                <td>{{ d.length }}</td>
                             {% endif %}
                         {% endfor %}
                     </tr>
@@ -56,39 +50,55 @@
             </tbody>
         </table>
 
+        <h3>HGVS Transcript resolution</h3>
 
-        <table id="hgvs-resolution-table" class="table">
+        <table class="table">
             <thead>
                 <tr>
                     <th></th>
                     {% for genome_build in genome_builds %}
-                        <th>{{ genome_build }} HGVS transcript version & method</th>
+                        <th style="text-align: center" colspan="3">{{ genome_build }}</th>
                     {% endfor %}
+                </tr>
+
+                <tr>
+                    <th></th>
+                {% for genome_build in genome_builds %}
+                    <th>Alignment Gap</th>
+                    <th>HGVS OK</th>
+                    <th>Method</th>
+                {% endfor %}
                 </tr>
             </thead>
             <tbody>
-                {% for hgvs_row in transcript_version_hgvs_methods %}
+                {% for version_data in transcript_versions %}
                     <tr>
-                        {% for d in hgvs_row %}
+                        {% for d, hgvs_method in version_data %}
                             {% if forloop.first %}
                                 <td><a class="hover-link" href="{% url 'view_transcript_version' transcript.pk d %}">Version {{ identifier }}.{{ d }}</a></td>
                             {% else %}
+                                {% if d %}
+                                    <td>
+                                    {% if d.alignment_gap %}
+                                        {{ d.cdna_match_diff }}
+                                    {% else %}
+                                        False
+                                    {% endif %}
+                                    </td>
+                                    <td class="text-center">{{ d.hgvs_ok | boolean }}</td>
+                                {% else %}
+                                    <td colspan="2"></td>
+                                 {% endif %}
                                 <td>
-                                    {% for tv, method in d %}
-                                        <div>
-                                        {{ tv }} using {{ method }}
-                                        </div>
+                                    {% for tv, method in hgvs_method %}
+                                        {{ tv.accession }} using {{ method }}
                                     {% endfor %}
                                 </td>
-                            {% endif %}
+                        {% endif %}
                         {% endfor %}
                     </tr>
                 {% endfor %}
             </tbody>
         </table>
-
-
-
-
     </div>
 {% endblock content %}

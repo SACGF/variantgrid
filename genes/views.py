@@ -354,27 +354,23 @@ def view_transcript(request, transcript_id):
     genome_builds = sorted(gene_by_build.keys())
     build_genes = [gene_by_build.get(genome_build) for genome_build in genome_builds]
     build_matcher = {genome_build: HGVSMatcher(genome_build) for genome_build in genome_builds}
-    transcript_version_lengths = []
-    transcript_version_hgvs_methods = []
+    transcript_versions = []
     for version in sorted(versions):
         transcript_accession = f"{transcript}.{version}"
-        length_row = [version]
-        hgvs_row = [version]
+        version_row = [(version, None)]
         for genome_build in genome_builds:
             tv = transcripts_versions_by_build.get(genome_build, {}).get(version)
-            length_row.append(tv)
             matcher = build_matcher[genome_build]
-            hgvs_row.append(matcher.filter_best_transcripts_and_method_by_accession(transcript_accession))
+            hgvs_method = matcher.filter_best_transcripts_and_method_by_accession(transcript_accession)
+            version_row.append((tv, hgvs_method))
 
-        transcript_version_lengths.append(length_row)
-        transcript_version_hgvs_methods.append(hgvs_row)
+        transcript_versions.append(version_row)
 
     context = {
         "transcript": transcript,
         "genome_builds": genome_builds,
         "build_genes": build_genes,
-        "transcript_version_lengths": transcript_version_lengths,
-        "transcript_version_hgvs_methods": transcript_version_hgvs_methods,
+        "transcript_versions": transcript_versions,
     }
     return render(request, "genes/view_transcript.html", context)
 
