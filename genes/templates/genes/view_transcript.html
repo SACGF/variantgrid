@@ -83,6 +83,8 @@
                                     <td>
                                     {% if d.alignment_gap %}
                                         {{ d.cdna_match_diff }}
+                                    {% else %}
+                                        <span class="no-value">-</span>
                                     {% endif %}
                                     </td>
                                     <td class="text-center">{{ d.hgvs_ok | boolean }}</td>
