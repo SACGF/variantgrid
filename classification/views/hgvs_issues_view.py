@@ -365,7 +365,7 @@ def download_hgvs_issues(request: HttpRequest) -> StreamingHttpResponse:
 
 
 @user_passes_test(is_superuser)
-def download_hgvs_resolution(request: HttpRequest) -> StreamingHttpResponse:
+def download_liftover_report(request: HttpRequest) -> StreamingHttpResponse:
 
     imported_genome_build_col = 'evidence__genome_build__value'
     c_hgvs_imported_col = 'evidence__c_hgvs__value'

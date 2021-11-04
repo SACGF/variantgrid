@@ -20,7 +20,7 @@ from classification.views.condition_matching_view import condition_matching_view
 from classification.views.discordance_report_views import discordance_report_view, export_discordance_report
 from classification.views.evidence_keys_view import EvidenceKeysView
 from classification.views.hgvs_issues_view import view_hgvs_issues, download_hgvs_issues, AlleleColumns, \
-    download_hgvs_resolution
+    download_liftover_report
 from classification.views.views import classification_import_tool, AutopopulateView
 from snpdb.views.datatable_view import DatabaseTableView
 from variantgrid.perm_path import perm_path
@@ -101,7 +101,7 @@ urlpatterns = [
     perm_path('hgvs_issues', view_hgvs_issues, name='hgvs_issues'),
     perm_path('hgvs_issues/allele/datatable', DatabaseTableView.as_view(column_class=AlleleColumns), name='allele_datatable'),
     perm_path('hgvs_issues_download', download_hgvs_issues, name='hgvs_issues_download'),
-    perm_path('liftover_report', download_hgvs_resolution, name='liftover_report'),
+    perm_path('liftover_report', download_liftover_report, name='liftover_report'),
 
     perm_path('classification_graphs', views.classification_graphs, name='classification_graphs'),
     perm_path('lab_gene_classification_counts', views.lab_gene_classification_counts, name='lab_gene_classification_counts'),
