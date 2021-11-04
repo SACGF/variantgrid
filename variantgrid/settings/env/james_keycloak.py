@@ -50,9 +50,10 @@ REST_FRAMEWORK = {
     ],
 }
 
+MAINTENANCE_MODE = False
 OIDC_DRF_AUTH_BACKEND = 'auth.backend.VariantGridOIDCAuthenticationBackend'
 USE_OIDC = True
-#OIDC_REQUIRED_GROUP = '/variantgrid/shariant_production'
+# OIDC_REQUIRED_GROUP = '/variantgrid/shariant_production'
 LOGIN_URL = '/oidc_login/'
 
 OIDC_RP_SIGN_ALGO = 'RS256'
@@ -162,7 +163,8 @@ if _SHARIANT_MODE:
 
     SHARIANT_STATIC_FILES_DIR = os.path.join(VARIANTGRID_APP_DIR, "static_files", "shariant_static")
     SHARIANT_TEST_STATIC_FILES_DIR = os.path.join(VARIANTGRID_APP_DIR, "static_files", "shariant_test_static")
-    STATICFILES_DIRS = (SHARIANT_TEST_STATIC_FILES_DIR, SHARIANT_STATIC_FILES_DIR,) + STATICFILES_DIRS
+    # STATICFILES_DIRS = (SHARIANT_TEST_STATIC_FILES_DIR, SHARIANT_STATIC_FILES_DIR,) + STATICFILES_DIRS
+    STATICFILES_DIRS = (SHARIANT_STATIC_FILES_DIR,) + STATICFILES_DIRS
 
     SHARIANT_TEMPLATES_DIR = os.path.join(VARIANTGRID_APP_DIR, "templates/shariant_templates")
     TEMPLATES[0]["DIRS"].insert(0, SHARIANT_TEMPLATES_DIR)
