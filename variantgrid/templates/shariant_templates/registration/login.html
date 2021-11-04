@@ -37,7 +37,7 @@
                         <div class="alert {{ message.tags }}" role="alert">
                             {{ message.tags | severity_icon }} {{ message }}
                             {% if "not authorised for this environment" in message.message %}
-                                <br/>Try our test environment <a href="https://test.shariant.org.au">https://test.shariant.org.au</a>
+                                <br/>Please try our test environment <a href="https://test.shariant.org.au">https://test.shariant.org.au</a>
                             {% endif %}
                         </div>
                     {% endfor %}
