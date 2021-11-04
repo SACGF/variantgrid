@@ -23,16 +23,17 @@
                 {% endfor %}
             {% endlabelled %}
         {% endfor %}
+        {% labelled label="Method" %}<a class="toggle-link" href=".method" data-toggle="collapse">Toggle Display</a>{% endlabelled %}
 
         <table class="table">
             <thead>
                 <tr>
                     <th>Version</th>
-                    <th>Genome Build</th>
-                    <th>Length</th>
-                    <th>Alignment Gap</th>
+                    <th class="text-left">Genome Build</th>
+                    <th class="text-right">Length</th>
+                    <th class="text-left">Alignment Gap</th>
                     <th>OK for Local HGVS Resolution</th>
-                    <th>Method</th>
+                    <th class="collapse method">Method</th>
                 </tr>
             </thead>
             <tbody>
@@ -49,7 +50,7 @@
                             <td colspan="3"><div class="no-value text-center">No local copy of transcript version</div></td>
                         {% endif %}
                     {% endwith %}
-                     <td style="width:50%">
+                     <td style="width:50%" class="collapse method">
                         <div class="d-flex">
                         {% for description, resolution_order in tvd.hgvs_method.items %}
                             <div class="mx-1">
