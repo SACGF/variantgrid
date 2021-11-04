@@ -629,10 +629,14 @@ class HGVSMatcher:
                                                                      max_tvsi=Max("transcriptversionsequenceinfo__version"))
         if version is None:
             version = 1  # If we have no local transcript versions we'll just try 1
-        min_version = min(version, data.get("min_tv", version), data.get("min_tvsi", version))
-        highest_version = max(version, data.get("max_tv", version), data.get("max_tvsi", version))
+
+        min_versions = [v for v in [version, data.get("min_tv", version), data.get("min_tvsi", version)] if v is not None]
+        max_versions = [v for v in [version, data.get("max_tv", version), data.get("max_tvsi", version)] if v is not None]
+
+        min_version = min(min_versions)
+        max_version = max(max_versions)
         tv_and_method = []
-        for v in range(min_version, highest_version+1):
+        for v in range(min_version, max_version+1):
             transcript_version = tv_by_version.get(v)
             if not transcript_version:
                 transcript_version = FakeTranscriptVersion(transcript_id=transcript_id, version=v)
