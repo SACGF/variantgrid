@@ -9,14 +9,14 @@ import logging
 import re
 import sys
 from dataclasses import dataclass
-from importlib.metadata import version
+from importlib import metadata
 from typing import List, Optional, Tuple
 
 import pyhgvs
 from Bio.Data.IUPACData import protein_letters_1to3_extended
 from django.conf import settings
 from django.core.cache import cache
-from django.db.models import Max
+from django.db.models import Max, Min
 from lazy import lazy
 from pyhgvs import HGVSName
 from pyhgvs.utils import make_transcript
@@ -406,7 +406,7 @@ class HGVSMatcher:
     HGVS_SLOPPY_PATTERN = re.compile(r"(\d):?(c|g|p)\.?(\d+)")
     HGVS_SLOPPY_REPLACE = r"\g<1>:\g<2>.\g<3>"
 
-    HGVS_METHOD_PYHGVS = f"pyhgvs v{version('pyhgvs')}"
+    HGVS_METHOD_PYHGVS = f"pyhgvs v{metadata.version('pyhgvs')}"
     HGVS_METHOD_CLINGEN_ALLELE_REGISTRY = "ClinGen Allele Registry"
 
     class TranscriptContigMismatchError(ValueError):
@@ -622,11 +622,16 @@ class HGVSMatcher:
                 raise ValueError("Transcript version must be provided if settings.VARIANT_TRANSCRIPT_VERSION_BEST_ATTEMPT=False")
 
         tv_by_version = {tv.version: tv for tv in tv_qs}
-        data = Transcript.objects.filter(pk=transcript_id).aggregate(max_tv=Max("transcriptversion__version"),
+        # When looking at the range of versions to check, we'll use the lowest/highest we've seen in any build
+        data = Transcript.objects.filter(pk=transcript_id).aggregate(min_tv=Min("transcriptversion__version"),
+                                                                     max_tv=Max("transcriptversion__version"),
+                                                                     min_tvsi=Min("transcriptversionsequenceinfo__version"),
                                                                      max_tvsi=Max("transcriptversionsequenceinfo__version"))
-        highest_version = max(data.get("max_tv") or 0, data.get("max_tvsi") or 0)
+        if version is None:
+            version = 1  # If we have no local transcript versions we'll just try 1
+        min_version = min(version, data.get("min_tv", version), data.get("min_tvsi", version))
+        highest_version = max(version, data.get("max_tv", version), data.get("max_tvsi", version))
         tv_and_method = []
-        min_version = version or 1
         for v in range(min_version, highest_version+1):
             transcript_version = tv_by_version.get(v)
             if not transcript_version:
