@@ -788,7 +788,7 @@ const VCForm = (function() {
                 allBuilds.sort();
                 for (let genomeBuild of allBuilds) {
                     let buildData = alleleData.genome_builds[genomeBuild];
-                    variantTooltip.push(`<strong>Resolved ${genomeBuild}</strong> ${buildData.c_hgvs}`);
+                    variantTooltip.push(`<strong>Resolved ${genomeBuild}</strong> ${buildData.c_hgvs || '<span class="no-value">Could Not Resolved</span>'}`);
                 }
             }
 
