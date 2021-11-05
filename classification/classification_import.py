@@ -135,6 +135,7 @@ def reattempt_variant_matching(user: User, queryset: QuerySet[Classification]) -
 
     for vc in qs:
         try:
+            vc.revalidate(user=user)
             genome_build = vc.get_genome_build()
             if genome_build.pk not in imports_by_genome:
                 imports_by_genome[genome_build.pk] = ClassificationImport.objects.create(user=user,
