@@ -7,9 +7,16 @@ class AnnotationConsortium(models.TextChoices):
 
     @staticmethod
     def get_from_transcript_accession(transcript_accession: str):
-        if transcript_accession.startswith("ENST"):
-            return AnnotationConsortium.ENSEMBL
-        return AnnotationConsortium.REFSEQ
+        TRANSCRIPT_PREFIXES = [
+            (AnnotationConsortium.ENSEMBL, 4, {"ENST"}),
+            (AnnotationConsortium.REFSEQ, 3, {'NM_', 'NR_', 'XM_' 'XR_'}),
+        ]
+
+        for (ac, length, prefixes) in TRANSCRIPT_PREFIXES:
+            prefix = transcript_accession[:length]
+            if prefix in prefixes:
+                return ac
+        raise ValueError(f"Couldn't determine annotation consortium for {transcript_accession}")
 
 
 class HGNCStatus(models.TextChoices):
