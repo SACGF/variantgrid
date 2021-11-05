@@ -93,45 +93,40 @@
                     </p>
 
                     <p>
-                    This only installs the latest annotations. See <a href="https://github.com/SACGF/variantgrid/wiki/Transcripts-and-HGVS">instructions for historical transcript versions</a> (to resolve obsolete HGVS)
+                    See <a href="https://github.com/SACGF/variantgrid/wiki/Transcripts-and-HGVS">Historical transcript versions</a> for details and how to generate this from scratch
                     </p>
 
-<code>wget hgdownload.cse.ucsc.edu/admin/exe/linux.x86_64/gff3ToGenePred
-chmod a+x gff3ToGenePred</code>
+<code>
+export gene_annotation_dir=${VARIANTGRID_SETUP_DATA}/gene_annotation
+mkdir -p ${gene_annotation_dir}
+cd ${gene_annotation_dir}
+</code>
                     {% if build_name == 'GRCh37' %}
                     <h5>Ensembl GRCh37</h5>
 
-<code>wget ftp://ftp.ensembl.org/pub/grch37/release-97/gff3/homo_sapiens/Homo_sapiens.GRCh37.87.gff3.gz
-gff3ToGenePred -processAllGeneChildren Homo_sapiens.GRCh37.87.gff3.gz Homo_sapiens.GRCh37.87.genePred
-{{ python_command }} manage.py import_gene_annotation --genome-build=GRCh37 --annotation-consortium=Ensembl \
---gff ${GENEPRED_DATA_DIR}/Homo_sapiens.GRCh37.87.gff3.gz \
---genePred ${GENEPRED_DATA_DIR}/Homo_sapiens.GRCh37.87.genePred
+<code>
+wget https://variantgrid.com/static/gene_annotation/pyhgvs_transcripts_ensembl_grch37.json.gz
+python3 manage.py import_gene_annotation --annotation-consortium=Ensembl --genome-build=GRCh37 --json-file ${gene_annotation_dir}/pyhgvs_transcripts_ensembl_grch37.json.gz
 </code>
                     {% elif build_name == 'GRCh38' %}
                     <h5>Ensembl GRCh38</h5>
-<code>wget ftp://ftp.ensembl.org/pub/release-97/gff3/homo_sapiens/Homo_sapiens.GRCh38.97.gff3.gz
-gff3ToGenePred -processAllGeneChildren Homo_sapiens.GRCh38.97.gff3.gz Homo_sapiens.GRCh38.97.genePred
-{{ python_command }} manage.py import_gene_annotation --genome-build=GRCh38 --annotation-consortium=Ensembl \
---gff ${GENEPRED_DATA_DIR}/Homo_sapiens.GRCh38.97.gff3.gz \
---genePred ${GENEPRED_DATA_DIR}/Homo_sapiens.GRCh38.97.genePred
+<code>
+wget https://variantgrid.com/static/gene_annotation/pyhgvs_transcripts_ensembl_grch38.json.gz
+python3 manage.py import_gene_annotation --annotation-consortium=Ensembl --genome-build=GRCh38 --json-file ${gene_annotation_dir}/pyhgvs_transcripts_ensembl_grch38.json.gz
 </code>
                     {% endif %}
 
                     {% if build_name == 'GRCh37' %}
                     <h5>RefSeq GRCh37</h5>
-<code>wget ftp://ftp.ncbi.nlm.nih.gov/genomes/Homo_sapiens/ARCHIVE/ANNOTATION_RELEASE.105/GFF/ref_GRCh37.p13_top_level.gff3.gz
-gff3ToGenePred -processAllGeneChildren -geneNameAttr=Name -rnaNameAttr=transcript_id ref_GRCh37.p13_top_level.gff3.gz ref_GRCh37.p13_top_level.genePred
-{{ python_command }} manage.py import_gene_annotation --genome-build=GRCh37 --annotation-consortium=RefSeq \
---gff ${GENEPRED_DATA_DIR}/ref_GRCh37.p13_top_level.gff3.gz \
---genePred ${GENEPRED_DATA_DIR}/ref_GRCh37.p13_top_level.genePred
+<code>
+wget https://variantgrid.com/static/gene_annotation/pyhgvs_transcripts_refseq_grch37.json.gz
+python3 manage.py import_gene_annotation --annotation-consortium=RefSeq --genome-build=GRCh37 --json-file ${gene_annotation_dir}/pyhgvs_transcripts_refseq_grch37.json.gz
 </code>
                     {% elif build_name == 'GRCh38' %}
                     <h5>RefSeq GRCh38</h5>
-<code>wget ftp://ftp.ncbi.nlm.nih.gov/genomes/Homo_sapiens/GFF/ref_GRCh38.p12_top_level.gff3.gz
-gff3ToGenePred -processAllGeneChildren -geneNameAttr=Name -rnaNameAttr=transcript_id ref_GRCh38.p12_top_level.gff3.gz ref_GRCh38.p12_top_level.genePred
-{{ python_command }} manage.py import_gene_annotation --genome-build=GRCh38 --annotation-consortium=RefSeq \
---gff ${GENEPRED_DATA_DIR}/ref_GRCh38.p12_top_level.gff3.gz \
---genePred ${GENEPRED_DATA_DIR}/ref_GRCh38.p12_top_level.genePred
+<code>
+wget https://variantgrid.com/static/gene_annotation/pyhgvs_transcripts_refseq_grch38.json.gz
+python3 manage.py import_gene_annotation --annotation-consortium=RefSeq --genome-build=GRCh38 --json-file ${gene_annotation_dir}/pyhgvs_transcripts_refseq_grch38.json.gz
 </code>
                     {% endif %}
                 {% endinstall-instructions %}
