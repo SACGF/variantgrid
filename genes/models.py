@@ -658,9 +658,15 @@ class TranscriptVersion(SortByPKMixin, models.Model):
     def gene(self):
         return self.gene_version.gene
 
-    @property
+    @lazy
     def gene_symbol(self):
-        return self.gene_version.gene_symbol
+        """ Returns HGNC symbol if available (to keep consistency between builds) or GeneVersion symbol (from GFF)
+            GeneVersion symbol from GFF can diverge eg Entrez GeneID: 6901 - TAZ(37) and TAFAZZIN(38) """
+        if hgnc := self.gene_version.hgnc:
+            gene_symbol = hgnc.gene_symbol
+        else:
+            gene_symbol = self.gene_version.gene_symbol
+        return gene_symbol
 
     @lazy
     def hgvs_ok(self) -> bool:

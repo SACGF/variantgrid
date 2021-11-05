@@ -436,15 +436,8 @@ class HGVSMatcher:
     def _create_pyhgvs_transcript(transcript_version: TranscriptVersion):
         # Legacy data stored gene_name in JSON, but that could lead to diverging values vs TranscriptVersion relations
         # so use DB as source of truth and replace into PyHGVS at last minute
-        # The symbol can also diverge between builds, ie Entrez GeneID: 6901 - TAZ(37) and TAFAZZIN(38)
-        # To make it consistent between builds, use HGNC if available
-        gene_symbol = None
-        if hgnc := transcript_version.gene_version.hgnc:
-            gene_symbol = hgnc.gene_symbol
-        else:
-            gene_symbol = transcript_version.gene_version.gene_symbol
-        if gene_symbol:
-            transcript_version.data["gene_name"] = str(gene_symbol)
+        if transcript_version.gene_symbol:
+            transcript_version.data["gene_name"] = str(transcript_version.gene_symbol)
         transcript_version.data["id"] = transcript_version.accession
         return make_transcript(transcript_version.data)
 
@@ -785,8 +778,8 @@ class HGVSMatcher:
                           f"'{transcript_version.accession}' but got '{hgvs_name.transcript}'"
                     raise ValueError(msg)
                 # Replace with our LRG
-                hgvs_name.transcript = None
-                hgvs_name.gene = lrg_identifier
+                hgvs_name.transcript = lrg_identifier
+                hgvs_name.gene = str(transcript_version.gene_symbol)
                 return hgvs_name, hgvs_method
 
         problems = ["No transcript via LRGRefSeqGene"]
