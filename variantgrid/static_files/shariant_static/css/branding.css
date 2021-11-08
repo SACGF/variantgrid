@@ -16,6 +16,10 @@
   color: #444 !important;
 }
 
+body.login-bg-theme {
+  overflow-y: initial;
+}
+
 .login-bg-theme {
   background-color: #DEF4FD;
   color: #ddd;
