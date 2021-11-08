@@ -18,7 +18,7 @@ from uicore.json.validated_json import JsonMessages, JSON_MESSAGES_EMPTY, Valida
 
 
 # Code in this file is responsible for converting VariantGrid formatted classifications to ClinVar JSON
-
+CLINVAR_ACCEPTED_TRANSCRIPTS = {"NM_", "NR_"}
 
 class ClinVarEvidenceKey:
     """
@@ -210,8 +210,11 @@ class ClinVarExportConverter:
                 json_data = {"variant": [{"hgvs": c_hgvs_no_gene}]}
 
                 hgvs_errors = JSON_MESSAGES_EMPTY
-                if c_hgvs.startswith("ENST"):
-                    hgvs_errors += JsonMessages.error("ClinVar doesn't support Ensembl transcripts")
+                for accepted_transcript in CLINVAR_ACCEPTED_TRANSCRIPTS:
+                    if c_hgvs.startswith(accepted_transcript):
+                        break
+                else:
+                    hgvs_errors += JsonMessages.error(f"ClinVar only accepts transcripts starting with one of {CLINVAR_ACCEPTED_TRANSCRIPTS}")
 
                 gene_symbols = list()
                 if gene_symbol := self.value(SpecialEKeys.GENE_SYMBOL):

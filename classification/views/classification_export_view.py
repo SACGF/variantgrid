@@ -1,10 +1,12 @@
+import operator
 import re
 from datetime import datetime, timedelta
+from functools import reduce
 from typing import List
 from urllib.parse import unquote_plus
 
 from django.conf import settings
-from django.db.models import QuerySet
+from django.db.models import QuerySet, Q
 from django.http.request import HttpRequest
 from django.http.response import HttpResponse, HttpResponseBase
 from django.shortcuts import render
@@ -34,6 +36,9 @@ from library.django_utils import get_url_from_view_path
 from snpdb.models.models import Lab, Organization
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_user_settings import UserSettings
+
+
+ALISSA_ACCEPTED_TRANSCRIPTS = {"NM_", "NR_"}
 
 
 def parse_since(since_str: str) -> datetime:
@@ -247,8 +252,11 @@ class ClassificationApiExportView(APIView):
         if file_format == 'mvl':
             transcript_strategy = request.query_params.get('transcript_strategy', 'refseq')
             if transcript_strategy == 'refseq':
-                # exclude ensembl transcripts
-                qs = qs.exclude(published_evidence__c_hgvs__value__startswith='ENS')
+                # exclude non NC/NR/NX transcripts
+                acceptable_transcripts: List[Q] = [
+                    Q(published_evidence__c_hgvs__value__startswith=tran) for tran in ALISSA_ACCEPTED_TRANSCRIPTS
+                ]
+                qs = qs.filter(reduce(operator.or_, acceptable_transcripts))
 
         formatter: BaseExportFormatter
         qs = qs.select_related('classification', 'classification__lab', 'classification__clinical_context')
