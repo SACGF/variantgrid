@@ -49,7 +49,7 @@ def store_clinvar_citations_from_web(cached_web_resource):
 
     # Insert the new citations
     logging.info("Inserting %d citations", len(new_citations_by_key))
-    Citation.objects.bulk_create(new_citations_by_key.values(), batch_size=2000)
+    Citation.objects.bulk_create(new_citations_by_key.values(), batch_size=2000, ignore_conflicts=True)
 
     # Update hash
     for citation in Citation.objects.filter(pk__gt=max_previously_existing_citation_id):
