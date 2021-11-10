@@ -88,7 +88,8 @@ def compare_chgvs(sender, allele: Allele, **kwargs):  # pylint: disable=unused-a
                 if existing_flag.resolution.status != FlagStatus.OPEN and FlagComment.last(existing_flag).user == admin_bot():
                     existing_flag.flag_action(comment="A classification with this transcript, GRCh37 and GRCh38 has been re-added or resolved", resolution=existing_flag.flag_type.resolution_for_status(FlagStatus.OPEN))
                 # otherwise leave open flag (or closed by a human flag) alone
-            else:
+
+            elif existing_flag.resolution.status == FlagStatus.OPEN:
                 existing_flag.flag_action(comment="No classifications with this transcript, GRCh37 and GRCh38 combination remaining", resolution=existing_flag.flag_type.resolution_for_status(FlagStatus.CLOSED))
 
         for new_issue_td in transcript_differences:
