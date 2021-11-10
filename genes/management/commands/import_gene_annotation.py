@@ -201,7 +201,7 @@ class Command(BaseCommand):
             logging.info("Creating %d new gene versions", len(new_gene_versions))
             GeneVersion.objects.bulk_create(new_gene_versions, batch_size=self.BATCH_SIZE)
             # Update with newly inserted records - so that we have a PK to use below
-            gene_version_ids_by_accession.update({f"{gv.gene_id}.{gv.version}": gv.pk for gv in new_gene_versions})
+            gene_version_ids_by_accession.update({gv.accession: gv.pk for gv in new_gene_versions})
 
         # Could potentially be duplicate gene versions (diff transcript versions from diff GFFs w/same GeneVersion)
         if modified_gene_versions:
