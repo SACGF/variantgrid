@@ -808,10 +808,10 @@ class HGVSMatcher:
             hgvs_methods = []
             hgvs_name = None
             for transcript_version, method in self.filter_best_transcripts_and_method_by_accession(transcript_accession):
-                method_detail = f"{method}: {transcript_version}"
+                hgvs_method = f"{method}: {transcript_version}"
+                hgvs_methods.append(hgvs_method)
 
                 if method == self.HGVS_METHOD_PYHGVS:
-                    hgvs_methods.append(method_detail)
 
                     # Sanity Check - make sure contig is the same
                     contig_mappings = self.genome_build.chrom_contig_mappings
@@ -848,7 +848,6 @@ class HGVSMatcher:
                             # API or other recoverable error - try again w/another transcript
                             logging.error(error_message, cgare)
 
-                        hgvs_methods.append(method_detail)
                 if hgvs_name:
                     break
 
