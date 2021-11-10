@@ -373,15 +373,10 @@ def view_transcript(request, transcript_id):
     build_matcher = {genome_build: HGVSMatcher(genome_build) for genome_build in genome_builds}
     for version in sorted(versions):
         transcript_accession = f"{transcript}.{version}"
-        version_row = [(version, None)]
         for genome_build in genome_builds:
             tv = transcripts_versions_by_build.get(genome_build, {}).get(version)
             matcher = build_matcher[genome_build]
-            hgvs_method = {
-                "Prefer pyHGVS Up then Down": matcher.filter_best_transcripts_and_method_by_accession(transcript_accession),
-                "Closest": matcher.filter_best_transcripts_and_method_by_accession(transcript_accession, prefer_pyhgvs=False, closest=True),
-            }
-            version_row.append((tv, hgvs_method))
+            hgvs_method = matcher.filter_best_transcripts_and_method_by_accession(transcript_accession)
 
             transcript_version_details.append(
                 TranscriptVersionDetails(

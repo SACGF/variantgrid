@@ -51,15 +51,10 @@
                         {% endif %}
                     {% endwith %}
                      <td style="width:50%" class="collapse method">
-                        <div class="d-flex">
-                        {% for description, resolution_order in tvd.hgvs_method.items %}
-                            <div class="mx-1">
-                                <label>{{ description }}</label>
-                                {% for tv, method in resolution_order %}
-                                    <div>{{ tv.accession }} using {{ method }}</div>
-                                {% endfor %}
-                            </div>
-                        {% endfor %}
+                        <div class="mx-1">
+                            {% for tv, method in tvd.hgvs_method %}
+                                <div>{{ tv.accession }} using {{ method }}</div>
+                            {% endfor %}
                         </div>
                     </td>
                 </tr>
