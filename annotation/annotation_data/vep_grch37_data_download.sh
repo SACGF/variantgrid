@@ -29,10 +29,7 @@ cd annotation_data/GRCh37
 
 echo "Conservation"
 wget ftp://hgdownload.soe.ucsc.edu/goldenPath/hg19/phastCons100way/hg19.100way.phastCons.bw
-wget --recursive --no-parent -R "index.html*" ftp://hgdownload.soe.ucsc.edu/goldenPath/hg19/phastCons46way/placentalMammals/
-
 wget ftp://hgdownload.soe.ucsc.edu/goldenPath/hg19/phyloP100way/hg19.100way.phyloP100way.bw
-wget --recursive --no-parent -R "index.html*" ftp://hgdownload.soe.ucsc.edu/goldenPath/hg19/phyloP46way/placentalMammals/
 
 echo "Population databases"
 wget ftp://ftp.ensembl.org/pub/data_files/homo_sapiens/GRCh37/variation_genotype/TOPMED_GRCh37.vcf.gz

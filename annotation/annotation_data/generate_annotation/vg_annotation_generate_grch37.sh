@@ -11,6 +11,8 @@ wget http://hgdownload.cse.ucsc.edu/admin/exe/linux.x86_64/wigToBigWig
 wget http://hgdownload.cse.ucsc.edu/admin/exe/linux.x86_64/bigWigCat
 chmod a+x wigToBigWig bigWigCat
 
+wget --recursive --no-parent -R "index.html*" ftp://hgdownload.soe.ucsc.edu/goldenPath/hg19/phastCons46way/placentalMammals/
+wget --recursive --no-parent -R "index.html*" ftp://hgdownload.soe.ucsc.edu/goldenPath/hg19/phyloP46way/placentalMammals/
 
 # Gnomad is done in own script + processed
 
