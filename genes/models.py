@@ -429,7 +429,9 @@ class GeneVersion(models.Model):
 
     @lazy
     def accession(self):
-        if self.gene.has_versions():
+        # RefSeq has no versions, so is always 0
+        # Ensembl had some old ones with no version provided, they are 0 as well
+        if self.version:
             acc = f"{self.gene_id}.{self.version}"
         else:
             acc = self.gene_id
