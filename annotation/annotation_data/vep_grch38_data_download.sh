@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# This downloads the files we can get straight from the web
+
 DISK_FREE_CWD=$(df -Ph . | tail -1 | awk '{print $4}')
 
 echo "This will take a lot of space - make sure you're have a lot of disk space!"
@@ -27,5 +29,3 @@ wget ftp://ftp.ensembl.org/pub/data_files/homo_sapiens/GRCh38/variation_genotype
 
 wget ftp://ftp.ensembl.org/pub/data_files/homo_sapiens/GRCh38/variation_genotype/UK10K_COHORT.20160215.sites.GRCh38.vcf.gz
 wget ftp://ftp.ensembl.org/pub/data_files/homo_sapiens/GRCh38/variation_genotype/UK10K_COHORT.20160215.sites.GRCh38.vcf.gz.tbi
-
-# Gnomad is done in own script + processed

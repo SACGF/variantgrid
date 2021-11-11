@@ -1,0 +1,1 @@
+These scripts generate annotation data from scratch.

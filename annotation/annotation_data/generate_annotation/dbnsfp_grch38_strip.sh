@@ -18,6 +18,13 @@ set -e
 # ",".join([str(c) for c in sorted(cols)])
 # Out[18]: '1,2,3,4,15,48,55,60,63,79,102,104,137,373'
 
+# https://m.ensembl.org/info/docs/tools/vep/script/vep_plugins.html#dbnsfp
+
+# zcat dbNSFP4.0a_variant.chr1.gz | head -n1 > h
+# zgrep -h -v ^#chr dbNSFP4.0a_variant.chr* | sort -T /path/to/tmp_folder -k1,1 -k2,2n - | cat h - | bgzip -c > dbNSFP4.0a.gz
+# tabix -s 1 -b 2 -e 2 dbNSFP4.0a.gz
+
+
 IN_FILE=dbNSFP4.0a.grch38.gz
 OUT_FILE=dbNSFP4.0a.grch38.stripped.gz
 
