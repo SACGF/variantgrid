@@ -130,7 +130,7 @@ class ClassificationChanges:
         # Variant Classification Changes
         vcm_qs = ClassificationModification.objects.filter(vcm_q) \
                      .select_related('classification', 'classification__lab',
-                                     'classification__user', 'user').order_by('-created')[:limit]
+                                     'classification__user', 'user').order_by('-created')[:limit+1]
 
         # Flag Changes
         flags_qs = FlagComment.objects.filter(
@@ -138,7 +138,7 @@ class ClassificationChanges:
         ).exclude(flag__flag_type__in=[
             classification_flag_types.classification_outstanding_edits,
             classification_flag_types.unshared_flag
-        ]).select_related('flag', 'flag__flag_type', 'flag__collection', 'resolution', 'user').order_by('-created')[:limit]
+        ]).select_related('flag', 'flag__flag_type', 'flag__collection', 'resolution', 'user').order_by('-created')[:limit+1]
 
         stitcher = IteratableStitcher(
             iterables=[
