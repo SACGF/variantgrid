@@ -101,6 +101,14 @@ class HGNC(models.Model):
         return f"HGNC:{self.pk} approved symbol: {self.gene_symbol}, " \
                f"previous symbols: {self.previous_symbols}, alias_symbols: {self.alias_symbols}"
 
+    @property
+    def hgnc_id(self) -> str:
+        return f"HGNC:{self.pk}"
+
+    def get_absolute_url(self):
+        safe_hgnc = f"HGNC_{self.pk}"
+        return reverse('ontology_term', kwargs={"term": safe_hgnc})
+
     def url(self):
         return f"https://www.genenames.org/data/gene-symbol-report/#!/hgnc_id/HGNC:{self.pk}"
 
