@@ -698,26 +698,25 @@ class TranscriptVersion(SortByPKMixin, models.Model):
     def cdna_match_diff(self) -> str:
         """ Human readable """
         match_summary = ""
-        if cdna_match := self.data.get("cdna_match"):
-            if cdna_errors := self._validate_cdna_match():
-                match_summary = ", ".join(cdna_errors)
-            else:
-                gap_operations = Counter()
-                for (_, _, _, _, gap) in cdna_match:
-                    if gap:
-                        for gap_op in gap.split():
-                            code = gap_op[0]
-                            length = int(gap_op[1:])
-                            gap_operations[code] += length
+        if cdna_errors := self._validate_cdna_match():
+            match_summary = ", ".join(cdna_errors)
+        elif cdna_match := self.data.get("cdna_match"):
+            gap_operations = Counter()
+            for (_, _, _, _, gap) in cdna_match:
+                if gap:
+                    for gap_op in gap.split():
+                        code = gap_op[0]
+                        length = int(gap_op[1:])
+                        gap_operations[code] += length
 
-                if gap_operations:
-                    gap_summary = []
-                    for code, label in {"I": "Insertion", "D": "Deletion"}.items():
-                        if value := gap_operations.get(code):
-                            gap_summary.append(f"{value}bp {label}")
-                    match_summary = ", ".join(gap_summary)
-                    if match_summary:
-                        match_summary = f"Transcript had {match_summary} vs genome reference"
+            if gap_operations:
+                gap_summary = []
+                for code, label in {"I": "Insertion", "D": "Deletion"}.items():
+                    if value := gap_operations.get(code):
+                        gap_summary.append(f"{value}bp {label}")
+                match_summary = ", ".join(gap_summary)
+                if match_summary:
+                    match_summary = f"Transcript had {match_summary} vs genome reference"
 
         return match_summary
 
@@ -899,6 +898,9 @@ class TranscriptVersion(SortByPKMixin, models.Model):
 
     def _validate_cdna_match(self) -> List[str]:
         cdna_match_errors = []
+        if alignent_gap_error := self.data.get("alignent_gap_error"):
+            cdna_match_errors.append(alignent_gap_error)
+
         if cdna_match := self.data.get('cdna_match'):
             # cdna_match = (genomic start, genomic end, cDNA start, cDNA end, gap) (genomic=0 based, transcript=1)
             if self.data["strand"] == '-':
