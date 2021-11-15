@@ -264,5 +264,5 @@ def get_classification_accumulation_traces() -> List[Dict]:
             "y": df[org].tolist(),
             "name": org,
         })
+    traces.sort(key=lambda t: t["y"][-1], reverse=True)
     return traces
-
