@@ -519,17 +519,17 @@ class HGVSMatcher:
 
     @staticmethod
     def _is_lrg(hgvs_name: HGVSName) -> bool:
-        return not hgvs_name.transcript and (hgvs_name.gene and hgvs_name.gene.startswith("LRG_"))
+        """ As of 15/11/2021 PyHGVS recognises LRG and returns it as transcript """
+        return hgvs_name.transcript and hgvs_name.transcript.startswith("LRG_")
 
     @staticmethod
     def _lrg_get_hgvs_name_and_transcript_version(genome_build: GenomeBuild, hgvs_string: str):
         hgvs_name = HGVSName(hgvs_string)
-        lrg_identifier = hgvs_name.gene
+        lrg_identifier = hgvs_name.transcript
 
         if transcript_version := LRGRefSeqGene.get_transcript_version(genome_build, lrg_identifier):
             if transcript_version.hgvs_ok:
                 # Replace LRG transcript with local RefSeq
-                hgvs_name.gene = None
                 hgvs_name.transcript = transcript_version.accession
                 return hgvs_name, transcript_version
         return None, None
