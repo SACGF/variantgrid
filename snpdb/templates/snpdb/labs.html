@@ -45,6 +45,7 @@
 
     function plotCumulativeClassifications(selector, cum_data, title, width, height) {
         let layout = defaultLayout(title, width, height);
+        layout["xaxis"] = {"nticks": 20}; // keep under 20 dates so they don't get too crowded
         Plotly.newPlot(selector, cum_data, layout);
     }
 
