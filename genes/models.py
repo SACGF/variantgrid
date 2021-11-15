@@ -63,6 +63,9 @@ class NoTranscript(ValueError):
     Indicates the transcript we are looking for is not in our database
     """
 
+class NoTranscriptVersion(NoTranscript):
+    """ """
+
 
 class MissingTranscript(NoTranscript):
     """
@@ -795,12 +798,20 @@ class TranscriptVersion(SortByPKMixin, models.Model):
             bad_transcript_key = key_base + "BAD"
             if message := cache.get(bad_transcript_key):
                 raise BadTranscript(message)
+
+            no_transcript_key = key_base + "NO"
+            if message := cache.get(no_transcript_key):
+                raise NoTranscript(message)
             try:
                 TranscriptVersionSequenceInfo.get(transcript_accession)  # Throws BadTranscript
                 raise MissingTranscript(f"Transcript '{transcript_accession}' valid but missing from our database.")
             except BadTranscript as bt:
                 # Only cache if we don't have it (DB will have it if we do)
                 cache.set(bad_transcript_key, str(bt), timeout=WEEK_SECS)
+                raise
+            except NoTranscript as nt:
+                # Only cache if we don't have it (DB will have it if we do)
+                cache.set(no_transcript_key, str(nt), timeout=WEEK_SECS)
                 raise
             except (RequestException, URLError) as e:
                 cache.set(transcript_connection_error_key, True, timeout=HOUR_SECS)
@@ -1100,7 +1111,7 @@ class TranscriptVersionSequenceInfo(TimeStampedModel):
             data = Entrez.efetch(db='nuccore', id=transcript_accession, rettype='gb', retmode='text')
         except HTTPError as e:
             if e.code == 400:
-                raise BadTranscript(f"Entrez error for '{transcript_accession}': {e}")
+                raise BadTranscript(f"Bad Transcript: Entrez API reports '{transcript_accession}' not found")
             raise e
         api_response = data.read()
         with StringIO(api_response) as f:
@@ -1117,9 +1128,16 @@ class TranscriptVersionSequenceInfo(TimeStampedModel):
                                                                        defaults=defaults)[0]
 
     @staticmethod
-    def _get_and_store_from_ensembl_api(transcript_accession):
+    def _get_and_store_from_ensembl_api(transcript_accession, genome_build: GenomeBuild=None):
+        if genome_build is None:
+            genome_build = GenomeBuild.grch38()
+        ENSEMBL_REST_BASE_URLS = {
+            "GRCh37": "https://grch37.rest.ensembl.org",
+            "GRCh38": "https://rest.ensembl.org",
+        }
+        base_url = ENSEMBL_REST_BASE_URLS[genome_build.name]
         transcript_id, version = TranscriptVersion.get_transcript_id_and_version(transcript_accession)
-        url = f"https://rest.ensembl.org/sequence/id/{transcript_id}?type=cdna"
+        url = f"{base_url}/sequence/id/{transcript_id}?type=cdna"
         r = requests.get(url, headers={"Content-Type": "application/json"})
         data = r.json()
 
@@ -1139,7 +1157,11 @@ class TranscriptVersionSequenceInfo(TimeStampedModel):
             error = data.get("error")
             if error:
                 if "not found" in error:
-                    raise BadTranscript(f"Ensembl API error response: '{error}'")
+                    if genome_build != GenomeBuild.grch37():
+                        # Try 37 this time
+                        return TranscriptVersionSequenceInfo._get_and_store_from_ensembl_api(transcript_accession,
+                                                                                             GenomeBuild.grch37())
+                    raise BadTranscript(f"Ensembl API reports '{transcript_id}' not found")
             raise NoTranscript(f"Unable to understand Ensembl API response: {data}")
 
     @staticmethod

@@ -21,7 +21,8 @@ from lazy import lazy
 from pyhgvs import HGVSName
 from pyhgvs.utils import make_transcript
 
-from genes.models import TranscriptVersion, TranscriptParts, Transcript, GeneSymbol, LRGRefSeqGene
+from genes.models import TranscriptVersion, TranscriptParts, Transcript, GeneSymbol, LRGRefSeqGene, BadTranscript, \
+    NoTranscript
 from library.constants import WEEK_SECS
 from library.log_utils import report_exc_info
 from library.utils import clean_string
@@ -600,7 +601,6 @@ class HGVSMatcher:
 
             return tuple(sort_keys)
 
-
         return get_sort_key
 
     def filter_best_transcripts_and_method_by_accession(self, transcript_accession, prefer_pyhgvs=True, closest=False) -> List[Tuple[TranscriptVersion, str]]:
@@ -615,6 +615,16 @@ class HGVSMatcher:
                 raise ValueError("Transcript version must be provided if settings.VARIANT_TRANSCRIPT_VERSION_BEST_ATTEMPT=False")
 
         tv_by_version = {tv.version: tv for tv in tv_qs}
+        if not tv_by_version:
+            # If we don't have any in DB - we should check that it's actually real
+            try:
+                # The only thing we care about is BadTranscript - otherwise can carry on
+                TranscriptVersion.raise_bad_or_missing_transcript(transcript_accession)
+            except BadTranscript:
+                raise  # RefSeq/Ensembl def don't have this transcript
+            except NoTranscript:
+                pass  # ok
+
         # When looking at the range of versions to check, we'll use the lowest/highest we've seen in any build
         data = Transcript.objects.filter(pk=transcript_id).aggregate(min_tv=Min("transcriptversion__version"),
                                                                      max_tv=Max("transcriptversion__version"),
@@ -678,8 +688,7 @@ class HGVSMatcher:
                         except ClinGenAllele.ClinGenAlleleRegistryException as cgare:
                             # API or other recoverable error - try again w/another transcript
                             logging.error(error_message, cgare)
-                    else:
-                        continue
+
                 if method:
                     if hgvs_string != hgvs_string_for_version:
                         method += f" as '{hgvs_string_for_version}'"
