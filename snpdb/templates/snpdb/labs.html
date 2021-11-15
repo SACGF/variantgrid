@@ -11,26 +11,15 @@
 <script type="text/javascript" src="{% static 'js/lib/plotly-latest.min.js' %}"></script>
 <script type="text/javascript" src="{% static 'js/plotly_helper.js' %}"></script>
 <style>
-
-    .leaflet-container {  /* map thumbnail */
-        margin-top: 50px;
-        width:  310px;
-        height: 310px;
+    #graph-carousel .carousel-control-next,
+    #graph-carousel .carousel-control-prev,
+    #graph-carousel .carousel-indicators {
+        filter: invert(100%);
     }
 
-    .graph-switch {
-        position: relative;
-        top: -10px;
-        text-align: center;
-    }
-
-    .per-org {
-        display: none;
-    }
     .lab-card {
         height: 100%;
     }
-
 </style>
 <script>
     var PATHOGENIC_COLORS = [   '#777777', // other
@@ -46,34 +35,35 @@
     {%  endif %}
 
     function plotClassifications(selector, vc_data, title, width, height) {
-        for (var i=0 ; i<vc_data.length ; ++i) {
+        for (let i=0 ; i<vc_data.length ; ++i) {
             vc_data[i]["marker"] = {color : PATHOGENIC_COLORS[i]};
         }
-        var layout = defaultLayout(title, width, height);
+        let layout = defaultLayout(title, width, height);
         layout["barmode"] = 'stack';
         Plotly.newPlot(selector, vc_data, layout);
     }
 
-    function showOrg() {
-        $(".per-org").show();
-        $(".per-state").hide();
-    }
-
-    function showState() {
-        $(".per-org").hide();
-        $(".per-state").show();
+    function plotCumulativeClassifications(selector, cum_data, title, width, height) {
+        let layout = defaultLayout(title, width, height);
+        Plotly.newPlot(selector, cum_data, layout);
     }
 
     $(document).ready(() => {
         {% if vc_org_data %}
-            var vc_org_data = {{ vc_org_data | jsonify }};
+            let vc_org_data = {{ vc_org_data | jsonify }};
             plotClassifications('org-classifications-graph', vc_org_data, 'Classifications per organisation', 600, 380);
         {% endif %}
 
         {% if vc_state_data %}
-            var vc_state_data = {{ vc_state_data | jsonify }};
+            let vc_state_data = {{ vc_state_data | jsonify }};
             plotClassifications('state-classifications-graph', vc_state_data, 'Classifications per state', 600, 380);
         {% endif %}
+
+        {% if classification_accumulation_traces %}
+            let classification_accumulation_traces = {{ classification_accumulation_traces | jsonify }};
+            plotCumulativeClassifications("classifications-accumulation-graph", classification_accumulation_traces, "Cumulative Classifications", 600, 380)
+        {% endif %}
+
     });
 </script>
 {% endblock %}
@@ -81,13 +71,31 @@
     <div class="container">
         <h3>Lab Submissions</h3>
         <div class="row">
-            <div class="col-lg-8">
-                <div id='org-classifications-graph' class="per-org"></div>
-                <div id='state-classifications-graph' class="per-state"></div>
-                <div class="graph-switch">
-                    <a class="per-state hover-link" href="javascript:showOrg();">Show by organisation</a></span>
-                    <a class="per-org hover-link" href="javascript:showState();">Show by state</a></span>
+            <div id="graph-carousel" class="col-lg-8 carousel slide" data-ride="carousel">
+              <ol class="carousel-indicators">
+                <li data-target="#graph-carousel" title="By State" data-slide-to="0" class="active"></li>
+                <li data-target="#graph-carousel" title="By Org" data-slide-to="1"></li>
+                <li data-target="#graph-carousel" title="Cumulative" data-slide-to="2"></li>
+              </ol>
+              <div class="carousel-inner">
+                <div class="carousel-item active">
+                    <div id='state-classifications-graph'></div>
                 </div>
+                <div class="carousel-item">
+                    <div id='org-classifications-graph'></div>
+                </div>
+                <div class="carousel-item">
+                    <div id='classifications-accumulation-graph'></div>
+                </div>
+              </div>
+              <a class="carousel-control-prev" href="#graph-carousel" role="button" data-slide="prev">
+                <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+                <span class="sr-only">Previous</span>
+              </a>
+              <a class="carousel-control-next" href="#graph-carousel" role="button" data-slide="next">
+                <span class="carousel-control-next-icon" aria-hidden="true"></span>
+                <span class="sr-only">Next</span>
+              </a>
             </div>
             <div class="col-lg-4">
               {% load lab_location_tags %}

@@ -1,3 +1,4 @@
+import pandas as pd
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime
@@ -203,37 +204,65 @@ class ClassificationAccumulationGraph:
 
             running_accum.add_modification(summary)
 
-        sub_totals.append(running_accum.snapshot(at=start_date))
-        sub_totals.append(running_accum.snapshot(at=start_date + time_delta))
+        if start_date:
+            sub_totals.append(running_accum.snapshot(at=start_date))
+            sub_totals.append(running_accum.snapshot(at=start_date + time_delta))
 
         return sub_totals
 
 
-def download_report(request):
+def _iter_report_list(allele_statuses=True):
+    ALLELE_STATUSES = ["unique", "agreement", "confidence", "discordant", "withdrawn"]
     cag = ClassificationAccumulationGraph()
     report_data = cag.report()
 
-    def iter_report():
+    valid_orgs = set()
+    for row in report_data:
+        for key in [key for key in row.counts.keys() if isinstance(key, str)]:
+            valid_orgs.add(key)
 
-        valid_orgs = set()
-        for row in report_data:
-            for key in [key for key in row.counts.keys() if isinstance(key, str)]:
-                valid_orgs.add(key)
+    org_list = list(valid_orgs)
+    org_list.sort()
 
-        org_list = list(valid_orgs)
-        org_list.sort()
+    header = ["date"]
+    if allele_statuses:
+        header += ALLELE_STATUSES
+    header.extend(org_list)
 
-        yield delimited_row(["date", "unique", "agreement", "confidence", "discordant", "withdrawn"] + org_list)
-        for row in report_data:
-            yield delimited_row([
-                row.at.strftime('%Y-%m-%d'),
+    yield header
+    for row in report_data:
+        row_date = [row.at.strftime('%Y-%m-%d')]
+        if allele_statuses:
+            row_date.extend([
                 row.counts.get(AlleleStatus.Unique, 0),
                 row.counts.get(AlleleStatus.Agreement, 0),
                 row.counts.get(AlleleStatus.Confidence, 0),
                 row.counts.get(AlleleStatus.Discordant, 0),
                 row.counts.get(AlleleStatus.Withdrawn, 0)
-            ] + [row.counts.get(org, 0) for org in org_list])
+            ])
+        row_date.extend([row.counts.get(org, 0) for org in org_list])
+        yield row_date
 
-    response = StreamingHttpResponse(iter_report(), content_type="text/csv")
+
+def download_report(request):
+    response = StreamingHttpResponse((delimited_row(r) for r in _iter_report_list()), content_type="text/csv")
     response['Content-Disposition'] = f'attachment; filename="classification_accumulation_report.csv"'
     return response
+
+
+def get_classification_accumulation_traces() -> List[Dict]:
+    data = list(_iter_report_list(allele_statuses=False))
+    header = data[0]
+    rows = data[1:]
+    df = pd.DataFrame(rows, columns=header)
+    orgs = df.columns[1:]
+    dates = df["date"].tolist()
+    traces = []
+    for org in orgs:
+        traces.append({
+            "x": dates,
+            "y": df[org].tolist(),
+            "name": org,
+        })
+    return traces
+

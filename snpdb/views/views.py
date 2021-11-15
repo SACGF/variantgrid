@@ -35,6 +35,7 @@ from annotation.models.models_gene_counts import GeneValueCountCollection, \
     GeneCountType, SampleAnnotationVersionVariantSource, CohortGeneCounts
 from classification.classification_stats import get_grouped_classification_counts
 from classification.models.clinvar_export_sync import clinvar_export_sync
+from classification.views.classification_accumulation_graph import get_classification_accumulation_traces
 from classification.views.classification_datatables import ClassificationColumns
 from genes.custom_text_gene_list import create_custom_text_gene_list
 from genes.forms import CustomGeneListForm, UserGeneListForm, GeneAndTranscriptForm
@@ -1304,6 +1305,7 @@ def labs(request):
         "vc_org_data": vc_org_data_json,
         "vc_state_data": vc_state_data_json,
         "show_unclassified": show_unclassified,
+        "classification_accumulation_traces": get_classification_accumulation_traces(),
     }
     return render(request, "snpdb/labs.html", context)
 
