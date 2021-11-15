@@ -122,7 +122,8 @@ SITE_NAME = "Shariant"
 
 # SITE_MESSAGE = "Shariant is currently in pre-BETA. Please excuse bugs and missing features, and the site may be shut down for upgrades"
 
-VARIANT_CLASSIFICATION_SUPPORTED_TRANSCRIPTS = {"NM", "NR", "ENST", "XR", "LRG_"}
+# "LRG_" has been disabled, see https://github.com/SACGF/shariant-admin/issues/126
+VARIANT_CLASSIFICATION_SUPPORTED_TRANSCRIPTS = {"NM", "NR", "ENST", "XR"}
 VARIANT_CLASSIFICATION_REQUIRE_OVERWRITE_NOTE = False
 VARIANT_CLASSIFICATION_AUTOFUZZ_AGE = True
 VARIANT_CLASSIFICATION_GRID_SHOW_USERNAME = False  # In Shariant - this may be a lab's API user so hide it
