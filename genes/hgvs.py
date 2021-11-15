@@ -814,12 +814,11 @@ class HGVSMatcher:
             if transcript_accession.startswith("LRG_"):
                 return self._lrg_variant_to_hgvs(variant, transcript_accession)
 
-            hgvs_methods = []
+            hgvs_methods = {}
             hgvs_name = None
             for transcript_version, method in self.filter_best_transcripts_and_method_by_accession(transcript_accession):
                 hgvs_method = f"{method}: {transcript_version}"
-                hgvs_methods.append(hgvs_method)
-
+                hgvs_methods[hgvs_method] = None
                 if method == self.HGVS_METHOD_PYHGVS:
 
                     # Sanity Check - make sure contig is the same
@@ -840,7 +839,6 @@ class HGVSMatcher:
                         # TODO: We could also use VEP then add reference bases on our HGVSs
                         try:
                             if ca := get_clingen_allele_for_variant(self.genome_build, variant):
-                                method_detail = f"{method} ({ca}): {transcript_version}"
                                 if hgvs_name := ca.get_c_hgvs_name(transcript_version.accession):
                                     # Use our latest symbol as ClinGen can be out of date, and this keeps it consistent
                                     # regardless of whether we use PyHGVS or ClinGen to resolve
@@ -853,16 +851,23 @@ class HGVSMatcher:
                                 self._set_clingen_allele_registry_missing_transcript(transcript_version.accession)
                             else:
                                 logging.error(error_message, cga_se)
+                                hgvs_methods[hgvs_method] = str(cga_se)
                         except ClinGenAllele.ClinGenAlleleRegistryException as cgare:
                             # API or other recoverable error - try again w/another transcript
                             logging.error(error_message, cgare)
+                            hgvs_methods[hgvs_method] = str(cgare)
 
                 if hgvs_name:
                     break
 
             if hgvs_methods:
-                attempts = ", ".join(hgvs_methods)
                 if hgvs_name is None:
+                    method_and_errors = []
+                    for method, errors in hgvs_methods.items():
+                        if errors:
+                            method += ": " + errors
+                        method_and_errors.append(method)
+                    attempts = ", ".join(method_and_errors)
                     raise ValueError(f"Could not convert {variant} to HGVS - tried: {attempts}")
             else:
                 # No methods tried, mustn't have had any transcripts
