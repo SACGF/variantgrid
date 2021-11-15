@@ -216,7 +216,11 @@ def _one_off_flag_uta_transcripts_with_gaps(apps, schema_editor):
     q_uta_or_ucsc = Q(import_source__url__contains='uta') | Q(import_source__url__contains='ucsc')
     for tv in TranscriptVersion.objects.filter(q_uta_or_ucsc,
                                                data__cdna_match__isnull=True):
-        if tv.accession in UTA_TRANSCRIPTS_WITH_GAPS:
+        if tv.version is not None:
+            accession = f"{tv.transcript_id}.{tv.version}"
+        else:
+            accession = tv.transcript_id
+        if accession in UTA_TRANSCRIPTS_WITH_GAPS:
             if "error" in tv.data:
                 del tv.data["error"]  # Was manually set in Shariant envs
             tv.data["alignent_gap_error"] = "Incorrectly converted UTA/UCSC transcript is missing alignment info"
