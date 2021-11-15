@@ -738,7 +738,8 @@ class TranscriptVersion(SortByPKMixin, models.Model):
         if self.transcript.annotation_consortium == AnnotationConsortium.REFSEQ:
             # Sometimes RefSeq transcripts have gaps when aligning to the genome
             # We've modified PyHGVS to be able to handle this
-            if "cdna_match" in self.data or "partial" in self.data:
+            GAP_CODES = ["cdna_match", "partial", "alignent_gap_error"]
+            if any([gap in self.data for gap in GAP_CODES]):
                 return True
             return not self.sequence_length_matches_exon_length_ignoring_poly_a_tail
 
