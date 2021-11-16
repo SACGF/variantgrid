@@ -162,9 +162,6 @@ def _liftover_using_same_contig(genome_build, av_tuples: List[Tuple[int, int]]):
     """ Special case of eg Mitochondria that has the same contig across multiple builds
         we just need to create a VariantAllele object - will already have annotation for both builds """
 
-    print(f"_liftover_using_same_contig")
-    print(av_tuples)
-
     variant_alleles = []
     for allele_id, variant_id in av_tuples:
         va = VariantAllele(variant_id=variant_id,
