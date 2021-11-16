@@ -417,17 +417,6 @@ class HGVSMatcher:
         self.genome_build = genome_build
         self.attempt_clingen = True  # Stop on any non-recoverable error - keep going if unknown reference
 
-    def _fix_mito(self, hgvs_string: str) -> Tuple[Contig, str]:
-        """ mito contig returned if mito (name possibly changed)
-            PyHGVS doesn't support m. yet """
-        mitochondria = None
-        if "m." in hgvs_string:
-            mitochondria = self.genome_build.contigs.get(molecule_type=AssemblyMoleculeType.MITOCHONDRION)
-            if hgvs_string.startswith("m."):  # Bare ie "m.4409T>C"
-                hgvs_string = mitochondria.refseq_accession + ":" + hgvs_string
-            hgvs_string = hgvs_string.replace(":m.", ":g.")
-        return mitochondria, hgvs_string
-
     def _get_transcript_version_and_pyhgvs_transcript(self, transcript_name):
         transcript_version = TranscriptVersion.get_transcript_version(self.genome_build, transcript_name,
                                                                       best_attempt=settings.VARIANT_TRANSCRIPT_VERSION_BEST_ATTEMPT)
@@ -478,16 +467,12 @@ class HGVSMatcher:
             self._validate_in_transcript_range(transcript_version, hgvs_name, hgvs_name.cdna_end)
             pyhgvs_transcript = self._create_pyhgvs_transcript(transcript_version)
 
-        mitochondria, lookup_hgvs_name = self._fix_mito(hgvs_string)
-        variant_tuple = pyhgvs.parse_hgvs_name(lookup_hgvs_name, self.genome_build.genome_fasta.fasta,
+        variant_tuple = pyhgvs.parse_hgvs_name(hgvs_string, self.genome_build.genome_fasta.fasta,
                                                transcript=pyhgvs_transcript,
                                                indels_start_with_same_base=False)
 
         chrom, position, ref, alt = variant_tuple
         contig = self.genome_build.chrom_contig_mappings[chrom]
-        if mitochondria and contig != mitochondria:
-            reason = f"chrom: {chrom} ({contig}/{contig.get_molecule_type_display()}) is not mitochondrial!"
-            raise pyhgvs.InvalidHGVSName(hgvs_string, reason=reason)
         chrom = contig.name
         return chrom, position, ref, alt
 
@@ -726,10 +711,9 @@ class HGVSMatcher:
         return VariantCoordinate(chrom, position, ref, alt), used_transcript_accession, method
 
     def _get_hgvs_and_pyhgvs_transcript(self, hgvs_name: str):
-        _mitochondria, lookup_hgvs_name = self._fix_mito(hgvs_name)
-        hgvs_name = HGVSName(lookup_hgvs_name)
+        hgvs_name = HGVSName(hgvs_name)
         if self._is_lrg(hgvs_name):
-            if new_hgvs_name := self._lrg_get_hgvs_name_and_transcript_version(self.genome_build, lookup_hgvs_name)[0]:
+            if new_hgvs_name := self._lrg_get_hgvs_name_and_transcript_version(self.genome_build, hgvs_name)[0]:
                 hgvs_name = new_hgvs_name
 
         transcript = None
