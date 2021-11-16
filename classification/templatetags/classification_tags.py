@@ -384,7 +384,7 @@ def variant_card(context, allele: Allele, genome_build: GenomeBuild):
                 check_can_create_variants(request.user)
                 try:
                     # See if we can have data already to liftover
-                    conversion_tool, _ = allele.get_liftover_variant_tuple(genome_build)
+                    conversion_tool, _ = allele.get_liftover_tuple(genome_build)
                     can_create_variant = conversion_tool is not None
                 except (Contig.ContigNotInBuildError, GenomeFasta.ContigNotInFastaError):
                     pass

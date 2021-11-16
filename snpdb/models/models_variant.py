@@ -1,7 +1,7 @@
 import collections
 import logging
 import re
-from typing import Optional, Pattern, Tuple, Iterable, Set
+from typing import Optional, Pattern, Tuple, Iterable, Set, Union
 
 import django.dispatch
 from django.conf import settings
@@ -92,7 +92,8 @@ class Allele(FlagsMixin, models.Model):
             return va.variant
         raise ValueError(f'Could not find any variants in allele {self.id}')
 
-    def get_liftover_variant_tuple(self, genome_build: GenomeBuild) -> Tuple[str, 'VariantCoordinate']:
+    def get_liftover_tuple(self, genome_build: GenomeBuild) -> Tuple[AlleleConversionTool,
+                                                                     Union[int, 'VariantCoordinate']]:
         """ Used by to write VCF coordinates during liftover. Can be slow (API call)
             If you know a VariantAllele exists for your build, use variant_for_build(genome_build).as_tuple() """
 
@@ -104,8 +105,8 @@ class Allele(FlagsMixin, models.Model):
         for variant_allele in self.variantallele_set.all():
             if variant_allele.variant.locus.contig_id in genome_build_contigs:
                 conversion_tool = AlleleConversionTool.SAME_CONTIG
-                variant_tuple = variant_allele.variant.as_tuple()
-                return conversion_tool, variant_tuple
+                # Return variant_id so we can create it directly
+                return conversion_tool, variant_allele.variant_id
 
         conversion_tool = None
         g_hgvs = None
