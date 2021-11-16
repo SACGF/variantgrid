@@ -1553,6 +1553,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                             patched.pop_immutability()
 
                     # if we ended up with no attributes to patch, don't patch with an empty dict
+                    # could be two floats that are close enough to each other
                     if not patched.has_data:
                         patched.wipe(WipeMode.POP)
 

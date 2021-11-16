@@ -1,3 +1,4 @@
+import math
 import re
 from enum import Enum
 from typing import Any, List, Optional, Dict, Iterable, Mapping, Union, Set, TypedDict, cast
@@ -16,6 +17,7 @@ from library.utils import empty_to_none
 from snpdb.models import VariantGridColumn, Lab
 from uicore.json.json_utils import strip_json
 
+CLASSIFICATION_VALUE_TOLERANCE = 0.00000001
 
 class EvidenceKeyOption(TypedDict):
     key: str
@@ -648,8 +650,11 @@ class VCDataCell:
                     diff_dict[key] = None
             elif key in dest:
                 # key is in both source and dest but with diff values
-                if dest[key] != value:
-                    diff_dict[key] = value
+                dest_value = dest[key]
+                if dest_value != value:
+                    if isinstance(dest_value, float) and isinstance(value, float):
+                        if not math.isclose(dest_value, value, abs_tol=CLASSIFICATION_VALUE_TOLERANCE):
+                            diff_dict[key] = value
             else:
                 # value is not None and key is not in dest
                 diff_dict[key] = value
