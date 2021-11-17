@@ -22,7 +22,7 @@ $(document).ready(function() {
             <span>{{ form.sample }} {{ form.media }}</span>
         </p>
     </div>
-    {% vcf_grid_filter 'samples' %}
+    {% vcf_grid_filter 'samples' variants_type=True %}
 </form>
 
 {% user_data_grid_filter 'samples' 'Samples' %}

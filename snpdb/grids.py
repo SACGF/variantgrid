@@ -126,6 +126,9 @@ class SamplesListGrid(JqGridUserRowConfig):
             if genome_build_name := extra_filters.get("genome_build_name"):
                 genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
                 queryset = queryset.filter(vcf__genome_build=genome_build)
+            variants_type = extra_filters.get("variants_type")
+            if variants_type is not None:
+                queryset = queryset.filter(variants_type__in=variants_type)
 
         # If you don't have permission to view a patient - blank it out
         # If you have read only and
