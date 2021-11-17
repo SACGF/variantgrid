@@ -655,6 +655,8 @@ class VCDataCell:
                     if isinstance(dest_value, float) and isinstance(value, float):
                         if not math.isclose(dest_value, value, abs_tol=CLASSIFICATION_VALUE_TOLERANCE):
                             diff_dict[key] = value
+                    else:
+                        diff_dict[key] = value
             else:
                 # value is not None and key is not in dest
                 diff_dict[key] = value
