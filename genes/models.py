@@ -48,7 +48,7 @@ from library.log_utils import log_traceback
 from library.utils import empty_dict, get_single_element, iter_fixed_chunks
 from snpdb.models import Wiki, Company, Sample, DataState
 from snpdb.models.models_enums import ImportStatus
-from snpdb.models.models_genome import GenomeBuild
+from snpdb.models.models_genome import GenomeBuild, Contig
 from upload.vcf.sql_copy_files import write_sql_copy_csv, gene_coverage_canonical_transcript_sql_copy_csv, \
     gene_coverage_sql_copy_csv, GENE_COVERAGE_HEADER
 
@@ -915,6 +915,15 @@ class TranscriptVersion(SortByPKMixin, models.Model):
         if self.data:
             coords = f"{self.chrom}:{self.data['start'] + 1}-{self.data['end']} ({self.data['strand']})"
         return coords
+
+    def get_contigs(self) -> Set[Contig]:
+        raw_chrom = {self.data["chrom"]}
+        if other_chroms := self.data.get("other_chroms"):
+            raw_chrom.update(other_chroms)
+        return {self.genome_build.chrom_contig_mappings[c] for c in raw_chrom}
+
+    def get_chromosomes(self) -> Set[str]:
+        return {c.name for c in self.get_contigs()}
 
     def _validate_cdna_match(self) -> List[str]:
         cdna_match_errors = []

@@ -89,10 +89,16 @@ def view_gene(request, gene_id):
     transcript_versions_by_id_and_build = defaultdict(lambda: defaultdict(OrderedSet))
     transcript_genome_build_ids = set()
     transcript_biotype = defaultdict(set)
+    transcript_chroms = set()
     for tv in TranscriptVersion.objects.filter(gene_version__gene=gene).order_by("transcript_id", "version"):
         transcript_genome_build_ids.add(tv.genome_build_id)
         transcript_versions_by_id_and_build[tv.transcript_id][tv.genome_build_id].add(tv)
         transcript_biotype[tv.transcript_id].add(tv.biotype)
+        transcript_chroms.update(tv.get_chromosomes())
+
+    if len(transcript_chroms) > 1:
+        other_chroms_msg = f"Gene has transcripts that maps to multiple chromosomes ({', '.join(transcript_chroms)})"
+        messages.add_message(request, messages.WARNING, other_chroms_msg)
 
     transcript_genome_build_ids = sorted(transcript_genome_build_ids)
     transcript_versions = []  # ID, biotype, [[GRCh37 versions...], [GRCh38 versions]]
@@ -359,11 +365,13 @@ def view_transcript(request, transcript_id):
     transcripts_versions_by_build = defaultdict(dict)
 
     versions: Set[int] = set()
+    transcript_chroms = set()
     for tv in transcript.transcriptversion_set.order_by("version"):
         gene_by_build[tv.genome_build].add(tv.gene)
         version = tv.version or 0  # 0 = unknown
         transcripts_versions_by_build[tv.genome_build][version] = tv
         versions.add(version)
+        transcript_chroms.update(tv.get_chromosomes())
 
     genome_builds = sorted(gene_by_build.keys())
     genome_build_genes = [GenomeBuildGenes(genome_build, sorted(gene_by_build.get(genome_build))) for genome_build in genome_builds]
@@ -386,6 +394,10 @@ def view_transcript(request, transcript_id):
                     hgvs_method=hgvs_method
                 )
             )
+
+    if len(transcript_chroms) > 1:
+        other_chroms_msg = f"Transcript maps to multiple chromosomes ({', '.join(transcript_chroms)})"
+        messages.add_message(request, messages.WARNING, other_chroms_msg)
 
     context = {
         "transcript": transcript,
@@ -426,20 +438,20 @@ def view_transcript_version(request, transcript_id, version):
         transcript_versions_by_build = {}
         builds_missing_data = set()
         alignment_gap = False
-        other_chroms = False
+        transcript_chroms = set()
 
         for tv in tv_set.order_by("genome_build__name"):
             if tv_sequence_info:
                 poly_a_tail = max(poly_a_tail, tv.sequence_poly_a_tail)
             genome_build_id = tv.genome_build.pk
             alignment_gap |= tv.alignment_gap
-            other_chroms |= bool(tv.data.get("other_chroms"))
+            transcript_chroms.update(tv.get_chromosomes())
             transcript_versions_by_build[genome_build_id] = tv
             if not tv.has_valid_data:
                 builds_missing_data.add(tv.genome_build)
 
-        if other_chroms:
-            other_chroms_msg = f"This transcript maps to multiple coordinates in the genome."
+        if len(transcript_chroms) > 1:
+            other_chroms_msg = f"Transcript version maps to multiple chromosomes ({', '.join(transcript_chroms)})"
             messages.add_message(request, messages.WARNING, other_chroms_msg)
 
         differences = []
