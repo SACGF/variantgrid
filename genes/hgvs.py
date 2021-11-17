@@ -28,7 +28,7 @@ from library.log_utils import report_exc_info
 from library.utils import clean_string
 from snpdb.clingen_allele import get_clingen_allele_from_hgvs, get_clingen_allele_for_variant, \
     ClinGenAlleleServerException, ClinGenAlleleAPIException
-from snpdb.models import Variant, AssemblyMoleculeType, Contig, ClinGenAllele
+from snpdb.models import Variant, ClinGenAllele
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_variant import VariantCoordinate
 

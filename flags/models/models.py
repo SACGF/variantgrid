@@ -1,6 +1,5 @@
 import datetime
 from collections import defaultdict
-from enum import Enum
 from functools import total_ordering, reduce
 from operator import __and__
 from typing import Tuple, List, Optional, Union, Dict, Iterable, Any, TypeVar

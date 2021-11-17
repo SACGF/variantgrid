@@ -1,5 +1,4 @@
 import logging
-import os
 import subprocess
 from collections import defaultdict, Counter
 from subprocess import check_output
