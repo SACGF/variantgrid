@@ -79,15 +79,21 @@
                 <li data-target="#graph-carousel" title="Cumulative" data-slide-to="2"></li>
               </ol>
               <div class="carousel-inner">
-                <div class="carousel-item active">
-                    <div id='state-classifications-graph'></div>
-                </div>
-                <div class="carousel-item">
-                    <div id='org-classifications-graph'></div>
-                </div>
-                <div class="carousel-item">
-                    <div id='classifications-accumulation-graph'></div>
-                </div>
+                {% if vc_state_data %}
+                    <div class="carousel-item active">
+                        <div id='state-classifications-graph'></div>
+                    </div>
+                {% endif %}
+                {% if vc_org_data %}
+                    <div class="carousel-item">
+                        <div id='org-classifications-graph'></div>
+                    </div>
+                {% endif %}
+                {% if classification_accumulation_traces %}
+                    <div class="carousel-item">
+                        <div id='classifications-accumulation-graph'></div>
+                    </div>
+                {% endif %}
               </div>
               <a class="carousel-control-prev" href="#graph-carousel" role="button" data-slide="prev">
                 <span class="carousel-control-prev-icon" aria-hidden="true"></span>

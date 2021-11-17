@@ -1305,8 +1305,11 @@ def labs(request):
         "vc_org_data": vc_org_data_json,
         "vc_state_data": vc_state_data_json,
         "show_unclassified": show_unclassified,
-        "classification_accumulation_traces": get_classification_accumulation_traces(),
     }
+
+    if request.user.is_superuser:
+        context["classification_accumulation_traces"] = get_classification_accumulation_traces()
+
     return render(request, "snpdb/labs.html", context)
 
 
