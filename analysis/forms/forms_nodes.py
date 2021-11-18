@@ -231,8 +231,10 @@ class CohortNodeForm(VCFSourceNodeForm):
     def __init__(self, *args, **kwargs):
         genome_build = kwargs.pop("genome_build", None)
         super().__init__(*args, **kwargs)
+        widget_forward = []
         if genome_build:
-            self.fields["cohort"].widget.forward.append(forward.Const(genome_build.pk, "genome_build_id"))
+            widget_forward.append(forward.Const(genome_build.pk, "genome_build_id"))
+        self.fields["cohort"].widget.forward = widget_forward
 
     def save(self, commit=True):
         node = super().save(commit=False)

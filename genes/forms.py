@@ -37,7 +37,8 @@ class GeneAndTranscriptForm(forms.Form):
         genome_build = kwargs.pop("genome_build")
         super().__init__(*args, **kwargs)
         self.fields["gene"].widget.forward = [forward.Const(genome_build.annotation_consortium, "annotation_consortium")]
-        self.fields["transcript"].widget.forward += [forward.Const(genome_build.pk, "genome_build")]
+        self.fields["transcript"].widget.forward = ["gene",
+                                                    forward.Const(genome_build.pk, "genome_build")]
 
     gene = forms.ModelChoiceField(queryset=Gene.objects.all(),
                                   required=True,
@@ -46,7 +47,6 @@ class GeneAndTranscriptForm(forms.Form):
     transcript = forms.ModelChoiceField(queryset=Transcript.objects.all(),
                                         required=True,
                                         widget=autocomplete.ModelSelect2(url='transcript_autocomplete',
-                                                                         forward=['gene'],
                                                                          attrs={'data-placeholder': 'Transcript...'}))
 
 
