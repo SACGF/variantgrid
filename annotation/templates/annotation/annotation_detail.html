@@ -93,7 +93,7 @@
                     </p>
 
                     <p>
-                    See <a href="https://github.com/SACGF/variantgrid/wiki/Transcripts-and-HGVS">Historical transcript versions</a> for details and how to generate this from scratch
+                    See <a href="https://github.com/SACGF/variantgrid/wiki/Gene-and-Transcript-version-data">Gene and Transcript version data</a> for details and how to generate this from scratch
                     </p>
 
 <code>
@@ -148,7 +148,7 @@ python3 manage.py import_gene_annotation --annotation-consortium=RefSeq --genome
                             If you just have a GFF the release number can be found via (zcat gff | head)
                         </li>
                         <li>Run import_gene_annotation with a "--release" parameter (ok to re-do a previous GFF you've already imported)
-<code>{{ python_command }} manage.py import_gene_annotation --release=XXX</code>
+<code>{{ python_command }} manage.py import_gene_annotation  --json-file=(pyreference_file.json.gz) --release=XXX</code>
                         </li>
                         <li>
                             In Django Admin, open "variant_annotation_version" then set "gene_annotation_release" to what was uploaded in the previous step.
