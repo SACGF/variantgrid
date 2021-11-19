@@ -241,8 +241,8 @@ class ClinicalContext(FlagsMixin, TimeStampedModel):
                 )
 
             if is_significance_change and (old_status or new_status == ClinicalContextStatus.DISCORDANT):
-                report_message(f'Allele ID {self.allele_id} clinical grouping {old_status} -> {new_status}', extra_data={
-                    'allele_id': self.allele_id
+                report_message(f'Allele ID clinical grouping change', extra_data={
+                    'target': f'Allele ID {self.allele_id} {old_status} -> {new_status}'
                 })
 
         else:

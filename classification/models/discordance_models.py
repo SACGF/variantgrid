@@ -97,8 +97,10 @@ class DiscordanceReport(TimeStampedModel):
             self.save()
 
         existing_vms = set()
-        for drc_id in DiscordanceReportClassification.objects.filter(report=self).values_list('classification_original__classification', flat=True):
-            existing_vms.add(drc_id)
+        existing_labs = set()
+        for drc in DiscordanceReportClassification.objects.filter(report=self):
+            existing_vms.add(drc.classification_original.classification_id)
+            existing_labs.add(drc.classification_original.classification.lab)
 
         newly_added_labs: Set[Lab] = set()
         for vcm_id in self.clinical_context.classifications_qs.values_list('id', flat=True):
@@ -106,7 +108,8 @@ class DiscordanceReport(TimeStampedModel):
                 existing_vms.remove(vcm_id)
             else:
                 vcm = ClassificationModification.objects.filter(is_last_published=True, classification=vcm_id).get()
-                newly_added_labs.add(vcm.classification.lab)
+                if vcm.classification.lab not in existing_labs:
+                    newly_added_labs.add(vcm.classification.lab)
                 DiscordanceReportClassification(
                     report=self,
                     classification_original=vcm
