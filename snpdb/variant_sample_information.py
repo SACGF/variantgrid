@@ -1,16 +1,19 @@
 import logging
 from collections import Counter
 from collections import defaultdict
+
+import pandas as pd
+from django.conf import settings
 from django.contrib.postgres.aggregates.general import StringAgg
 from django.db.models import Q, TextField
 from lazy import lazy
 
 from annotation.models.models_phenotype_match import PATIENT_TPM_PATH, PATIENT_ONTOLOGY_TERM_PATH
+from library.unit_percent import format_af
 from ontology.models import OntologyService
 from patients.models import Patient
 from patients.models_enums import Zygosity
-from snpdb.models import Variant, Sample, Locus, CohortGenotypeCollection, GenomeBuild, VCF
-import pandas as pd
+from snpdb.models import Variant, Sample, Locus, CohortGenotypeCollection, GenomeBuild, VCF, CohortGenotype
 
 
 class VariantSampleInformation:
@@ -135,8 +138,10 @@ class VariantSampleInformation:
                     continue
 
                 allele_frequency = samples_allele_frequency[i]
-                if s_values["vcf__allele_frequency_percent"]:
-                    allele_frequency = VCF.convert_from_percent_to_unit(allele_frequency)
+                allele_frequency = format_af(allele_frequency,
+                                             source_in_percent=s_values["vcf__allele_frequency_percent"],
+                                             dest_in_percent=settings.VARIANT_ALLELE_FREQUENCY_CLIENT_SIDE_PERCENT,
+                                             missing_value=CohortGenotype.MISSING_NUMBER_VALUE)
                 allele_depth = samples_allele_depth[i]
                 read_depth = samples_read_depth[i]
                 phred_likelihood = samples_phred_likelihood[i]

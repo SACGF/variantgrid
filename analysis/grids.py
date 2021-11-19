@@ -1,6 +1,7 @@
 import pandas as pd
 from typing import Dict, List, Tuple
 
+from django.conf import settings
 from django.core.exceptions import PermissionDenied
 from django.db.models import Max, F, Q
 from django.urls.base import reverse
@@ -14,13 +15,14 @@ from library.database_utils import get_queryset_column_names, get_queryset_selec
 from library.jqgrid_sql import JqGridSQL, get_overrides
 from library.jqgrid_user_row_config import JqGridUserRowConfig
 from library.pandas_jqgrid import DataFrameJqGrid
+from library.unit_percent import get_allele_frequency_formatter
 from library.utils import md5sum_str
 from ontology.grids import AbstractOntologyGenesGrid
 from patients.models_enums import Zygosity
 from snpdb.grid_columns.custom_columns import get_custom_column_fields_override_and_sample_position, \
     get_variantgrid_extra_alias_and_select_columns
 from snpdb.grid_columns.grid_sample_columns import get_columns_and_sql_parts_for_cohorts, get_available_format_columns
-from snpdb.models import VariantGridColumn, UserGridConfig, VCFFilter, Sample, VCF, ClinGenAllele
+from snpdb.models import VariantGridColumn, UserGridConfig, VCFFilter, Sample, ClinGenAllele, CohortGenotype
 from snpdb.models.models_genome import GenomeBuild
 
 
@@ -42,6 +44,8 @@ class VariantGrid(JqGridSQL):
     caption = 'VariantGrid'
     url = SimpleLazyObject(lambda: reverse("node_grid_handler"))
     colmodel_overrides = {
+        # Note:     client side formatters should only be used for adding links etc, never conversion of data, such as
+        #           unit to percent, as the CSV downloads (w/o JS formatters) won't match the grid.
         'id': {'editable': False, 'width': 90, 'fixed': True, 'formatter': 'detailsLink', 'sorttype': 'int'},
         'tags': {'classes': 'no-word-wrap', 'formatter': 'tagsFormatter', 'sortable': False},
         'tags_global': {'classes': 'no-word-wrap', 'formatter': 'tagsGlobalFormatter', 'sortable': False},
@@ -57,25 +61,14 @@ class VariantGrid(JqGridSQL):
         'variantannotation__gnomad_filtered': {"formatter": "gnomadFilteredFormatter"},
         'variantannotation__exon': {"server_side_formatter": server_side_format_exon_and_intron},
         'variantannotation__intron': {"server_side_formatter": server_side_format_exon_and_intron},
-        # Unit -> Percent
-        'variantannotation__af_1kg': {'formatter': 'unitAsPercentFormatter'},
-        'variantannotation__af_uk10k': {'formatter': 'unitAsPercentFormatter'},
-        'variantannotation__gnomad2_liftover_af': {'formatter': 'unitAsPercentFormatter'},
-        'variantannotation__gnomad_af': {'formatter': 'unitAsPercentFormatter'},
-        'variantannotation__gnomad_afr_af': {'formatter': 'unitAsPercentFormatter'},
-        'variantannotation__gnomad_amr_af': {'formatter': 'unitAsPercentFormatter'},
-        'variantannotation__gnomad_asj_af': {'formatter': 'unitAsPercentFormatter'},
-        'variantannotation__gnomad_eas_af': {'formatter': 'unitAsPercentFormatter'},
-        'variantannotation__gnomad_fin_af': {'formatter': 'unitAsPercentFormatter'},
-        'variantannotation__gnomad_nfe_af': {'formatter': 'unitAsPercentFormatter'},
-        'variantannotation__gnomad_oth_af': {'formatter': 'unitAsPercentFormatter'},
-        'variantannotation__gnomad_popmax_af': {'formatter': 'unitAsPercentFormatter'},
-        'variantannotation__gnomad_sas_af': {'formatter': 'unitAsPercentFormatter'},
-        'variantannotation__topmed_af': {'formatter': 'unitAsPercentFormatter'},
+        # There is more server side formatting (Unit -> Percent) added in _get_fields_and_overrides
     }
 
-    def __init__(self, user, node, extra_filters=None, sort_by_contig_and_position=False):
-        self.fields, override = self._get_fields_and_overrides(node)
+    def __init__(self, user, node, extra_filters=None, sort_by_contig_and_position=False, af_show_in_percent=None):
+        if af_show_in_percent is None:
+            af_show_in_percent = settings.VARIANT_ALLELE_FREQUENCY_CLIENT_SIDE_PERCENT
+
+        self.fields, override = self._get_fields_and_overrides(node, af_show_in_percent)
         super().__init__(user)  # Need to call init after setting fields
 
         self.sort_by_contig_and_position = sort_by_contig_and_position
@@ -84,11 +77,7 @@ class VariantGrid(JqGridSQL):
         if default_sort_by_column:
             self.extra_config['sortname'] = default_sort_by_column.variant_column
 
-        # Update hash values
-        for field, field_cmo in override.items():
-            cmo = self._overrides.get(field) or {}
-            cmo.update(field_cmo)
-            self._overrides[field] = cmo
+        self.update_overrides(override)
 
         self.node = node
         self.name = node.name
@@ -222,15 +211,37 @@ class VariantGrid(JqGridSQL):
         raise PermissionDenied(msg)
 
     @staticmethod
-    def _get_fields_and_overrides(node: AnalysisNode) -> Tuple[List, Dict]:
+    def _get_fields_and_overrides(node: AnalysisNode, af_show_in_percent: bool) -> Tuple[List, Dict]:
         ccc = node.analysis.custom_columns_collection
         fields, overrides, sample_columns_position = get_custom_column_fields_override_and_sample_position(ccc)
         fields.extend(node.get_extra_columns())
         overrides.update(node.get_extra_colmodel_overrides())
+        if af_show_in_percent:
+            # gnomAD etc are all stored as AF in DB
+            server_side_format_unit_af = get_allele_frequency_formatter(source_in_percent=False,
+                                                                        dest_in_percent=af_show_in_percent)
+            af_override = {
+                # Unit -> Percent
+                'variantannotation__af_1kg': {'server_side_formatter': server_side_format_unit_af},
+                'variantannotation__af_uk10k': {'server_side_formatter': server_side_format_unit_af},
+                'variantannotation__gnomad2_liftover_af': {'server_side_formatter': server_side_format_unit_af},
+                'variantannotation__gnomad_af': {'server_side_formatter': server_side_format_unit_af},
+                'variantannotation__gnomad_afr_af': {'server_side_formatter': server_side_format_unit_af},
+                'variantannotation__gnomad_amr_af': {'server_side_formatter': server_side_format_unit_af},
+                'variantannotation__gnomad_asj_af': {'server_side_formatter': server_side_format_unit_af},
+                'variantannotation__gnomad_eas_af': {'server_side_formatter': server_side_format_unit_af},
+                'variantannotation__gnomad_fin_af': {'server_side_formatter': server_side_format_unit_af},
+                'variantannotation__gnomad_nfe_af': {'server_side_formatter': server_side_format_unit_af},
+                'variantannotation__gnomad_oth_af': {'server_side_formatter': server_side_format_unit_af},
+                'variantannotation__gnomad_popmax_af': {'server_side_formatter': server_side_format_unit_af},
+                'variantannotation__gnomad_sas_af': {'server_side_formatter': server_side_format_unit_af},
+                'variantannotation__topmed_af': {'server_side_formatter': server_side_format_unit_af},
+            }
+            overrides.update(af_override)
 
         cohorts, visibility = node.get_cohorts_and_sample_visibility()
         if cohorts:
-            sample_columns, sample_overrides = VariantGrid.get_grid_genotype_columns_and_overrides(cohorts, visibility)
+            sample_columns, sample_overrides = VariantGrid.get_grid_genotype_columns_and_overrides(cohorts, visibility, af_show_in_percent)
             if sample_columns_position:
                 fields = fields[:sample_columns_position] + sample_columns + fields[sample_columns_position:]
             else:
@@ -239,7 +250,8 @@ class VariantGrid(JqGridSQL):
         return fields, overrides
 
     @staticmethod
-    def _get_sample_columns_server_side_formatter(sample: Sample, packed_data_replace: Dict, column, i: int):
+    def _get_sample_columns_server_side_formatter(sample: Sample, packed_data_replace: Dict,
+                                                  column, i: int, af_show_in_percent: bool):
         """ A function to capture loop variable """
 
         def packed_data_formatter(row, _field):
@@ -262,28 +274,23 @@ class VariantGrid(JqGridSQL):
 
             server_side_formatter = sample_filters_formatter
         elif column == "samples_allele_frequency":
-            if sample.vcf.allele_frequency_percent:
-                def samples_allele_frequency_percent_formatter(row, field):
-                    """ Convert from legacy percent to AF (0-1) """
-                    val = packed_data_formatter(row, field)
-                    if val != '.':
-                        val = VCF.convert_from_percent_to_unit(val)
-                    return val
-                server_side_formatter = samples_allele_frequency_percent_formatter
-
+            server_side_formatter = get_allele_frequency_formatter(source_in_percent=sample.vcf.allele_frequency_percent,
+                                                                   dest_in_percent=af_show_in_percent,
+                                                                   get_data_func=packed_data_formatter,
+                                                                   missing_value=CohortGenotype.MISSING_NUMBER_VALUE)
         return server_side_formatter
 
     @staticmethod
-    def get_grid_genotype_columns_and_overrides(cohorts, visibility):
+    def get_grid_genotype_columns_and_overrides(cohorts, visibility, af_show_in_percent: bool):
         available_format_columns = get_available_format_columns(cohorts)
         sample_columns = {
-            'samples_zygosity': ('Zygosity', '%(sample)s %(label)s', 55, None),
-            'samples_allele_depth': ('AD', '%(label)s %(sample)s', 25, None),
-            'samples_allele_frequency': ('AF', '%(label)s %(sample)s', 30, 'unitAsPercentFormatter'),
-            'samples_read_depth': ('DP', '%(label)s %(sample)s', 25, None),
-            'samples_genotype_quality': ('GQ', '%(label)s %(sample)s', 25, None),
-            'samples_phred_likelihood': ('PL', '%(label)s %(sample)s', 25, None),
-            'samples_filters': ('FT', '%(label)s %(sample)s', 100, None),
+            'samples_zygosity': ('Zygosity', '%(sample)s %(label)s', 55),
+            'samples_allele_depth': ('AD', '%(label)s %(sample)s', 25),
+            'samples_allele_frequency': ('AF', '%(label)s %(sample)s', 30),
+            'samples_read_depth': ('DP', '%(label)s %(sample)s', 25),
+            'samples_genotype_quality': ('GQ', '%(label)s %(sample)s', 25),
+            'samples_phred_likelihood': ('PL', '%(label)s %(sample)s', 25),
+            'samples_filters': ('FT', '%(label)s %(sample)s', 100),
         }
         packed_data_replace = dict(Zygosity.CHOICES)
         # Some legacy data (Missing data in FreeBayes before PythonKnownVariantsImporter v12) has -2147483647 for
@@ -305,18 +312,18 @@ class VariantGrid(JqGridSQL):
         column_names = []
         column_data = []
         for sample, (cohort, cc_index) in sample_cohort_cat_cohorts_index.items():
-            for column, (column_label, label_format, width, formatter) in sample_columns.items():
+            for column, (column_label, label_format, width) in sample_columns.items():
                 if not available_format_columns[column]:
                     continue
                 column_names.append(f"{sample.pk}_{column}")
                 label = label_format % {"sample": sample.name, "label": column_label}
                 server_side_formatter = VariantGrid._get_sample_columns_server_side_formatter(sample,
                                                                                               packed_data_replace,
-                                                                                              column, cc_index)
+                                                                                              column, cc_index,
+                                                                                              af_show_in_percent)
                 col_data_dict = {
                     "label": label,
                     "width": width,
-                    "formatter": formatter,  # Client side formatter
                     "server_side_formatter": server_side_formatter,
                     "order_by": cohort.get_sample_column_order_by(sample, column)
                 }
