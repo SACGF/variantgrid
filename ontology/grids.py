@@ -9,13 +9,13 @@ from ontology.models import OntologyTerm, OntologySnake
 
 class AbstractOntologyGenesGrid(DataFrameJqGrid, abc.ABC):
     @abc.abstractmethod
-    def _get_ontology_terms_ids(self):
+    def _get_ontology_term_ids(self):
         pass
 
     def get_dataframe(self):
         # This uses the same method as gene filter (special_case_gene_symbols_for_hpo_and_omim) though with individual
         # calls per term so that it matches what gene filters is doing
-        hpo_qs, omim_qs = OntologyTerm.split_hpo_and_omim(self._get_ontology_terms_ids())
+        hpo_qs, omim_qs = OntologyTerm.split_hpo_and_omim(self._get_ontology_term_ids())
         gene_terms_set = defaultdict(lambda: defaultdict(set))
         for hpo in hpo_qs:
             for gene in OntologySnake.gene_symbols_for_terms([hpo]):

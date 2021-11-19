@@ -633,3 +633,9 @@ span.gene-list-security {
 #footer, #footer-bottom {
 	display: none;
 }
+
+#node-editor-container .warning {
+    width: 500px;
+    padding: 20px;
+    margin: 10px;
+}

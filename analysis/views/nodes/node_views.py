@@ -1,4 +1,5 @@
 import json
+from typing import List, Optional
 
 from django.conf import settings
 from django.http.response import HttpResponse
@@ -33,6 +34,7 @@ from classification.models.classification import Classification
 from classification.views.classification_datatables import ClassificationColumns
 from library.django_utils import highest_pk
 from library.jqgrid import JqGrid
+from ontology.models import OntologySnake
 from snpdb.models.models_variant import Variant
 
 
@@ -202,6 +204,7 @@ class PhenotypeNodeView(NodeView):
 
     def _get_form_initial(self):
         form_initial = super()._get_form_initial()
+        # These are the ones added manually, not the ones currently selected in the node (could be patient)
         ontology_terms = self.object.phenotypenodeontologyterm_set.all().values_list("ontology_term", flat=True)
         hpo, omim = OntologyTerm.split_hpo_and_omim(ontology_terms)
         form_initial["hpo"] = hpo
@@ -225,9 +228,33 @@ class PhenotypeNodeView(NodeView):
         context.update({
             'has_patients': has_patients,
             "patient_hpo": patient_hpo,
-            "patient_omim": patient_omim
+            "patient_omim": patient_omim,
+            "node_warnings": self._get_node_warnings(),
         })
         return context
+
+    @staticmethod
+    def _get_no_gene_warnings(label: str, terms) -> Optional[str]:
+        terms_without_genes = set()
+        for ontology_term in terms:
+            if not OntologySnake.gene_symbols_for_terms([ontology_term]):
+                terms_without_genes.add(str(ontology_term))
+        warning = None
+        if terms_without_genes:
+            sorted_terms = ', '.join([f"'{ot}'" for ot in sorted(terms_without_genes)])
+            warning = f"{label} terms: {sorted_terms} have no associated genes, and will not affect node filtering."
+        return warning
+
+    def _get_node_warnings(self) -> List[str]:
+        node_warnings = []
+
+        # This uses the same method as gene filter (special_case_gene_symbols_for_hpo_and_omim) though with individual
+        # calls per term so that it matches what gene filters is doing
+        hpo_qs, omim_qs = OntologyTerm.split_hpo_and_omim(self.object.get_ontology_term_ids())
+        for label, terms in {"HPO": hpo_qs, "OMIM": omim_qs}.items():
+            if w := self._get_no_gene_warnings(label, terms):
+                node_warnings.append(w)
+        return node_warnings
 
 
 class PopulationNodeView(NodeView):
