@@ -118,5 +118,5 @@ class PatientOntologyGenesGrid(AbstractOntologyGenesGrid):
         self.patient = Patient.get_for_user(user, pk=patient_id)
         super().__init__()
 
-    def _get_ontology_terms_ids(self):
+    def _get_ontology_term_ids(self):
         return self.patient.get_ontology_term_ids()

@@ -523,5 +523,5 @@ class NodeOntologyGenesGrid(AbstractOntologyGenesGrid):
         self.node = get_node_subclass_or_404(user, node_id, version=version)
         super().__init__()
 
-    def _get_ontology_terms_ids(self):
+    def _get_ontology_term_ids(self):
         return self.node.get_ontology_term_ids()
