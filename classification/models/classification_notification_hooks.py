@@ -42,7 +42,7 @@ def send_discordance_notification(discordance_report: DiscordanceReport):
         notification.send()
 
         NotificationBuilder(message=f"Discordance notification re Discordance Report <{report_url}> sent to {lab.name}", emoji=":email:")\
-            .add_markdown("Discordance notification re Discordance Report <{report_url}> sent to {lab.name}").send()
+            .add_markdown(f"Discordance notification re Discordance Report <{report_url}> sent to {lab.name}").send()
 
 
 """
