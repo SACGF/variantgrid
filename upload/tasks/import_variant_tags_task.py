@@ -1,4 +1,5 @@
 import logging
+from collections import defaultdict
 
 import pandas as pd
 from dateutil import parser
@@ -6,6 +7,7 @@ from django.contrib.auth.models import User
 from django.utils.timezone import make_aware
 
 from analysis.models import VariantTagsImport, ImportedVariantTag, VariantTag, TagLocation
+from library.guardian_utils import assign_permission_to_user_and_groups
 from library.pandas_utils import df_nan_to_none
 from library.vcf_utils import write_vcf_from_tuples
 from snpdb.clingen_allele import populate_clingen_alleles_for_variants
@@ -148,6 +150,15 @@ class VariantTagsInsertTask(ImportVCFStepTask):
             logging.info("Creating %d variant tags", len(variant_tags))
             # VariantTag.created will be set by auto_now_add (no way to stop this)
             variant_tags = VariantTag.objects.bulk_create(variant_tags, batch_size=2000)
+
+            # As we bulk created - permissions weren't done - need to make them
+            tags_by_user = defaultdict(list)
+            for vt in variant_tags:
+                tags_by_user[vt.user].append(vt)
+
+            for user, user_tags in tags_by_user.items():
+                assign_permission_to_user_and_groups(user, user_tags)
+
             # Update date to be from imported date
             for vt, created in zip(variant_tags, created_date):
                 vt.created = created

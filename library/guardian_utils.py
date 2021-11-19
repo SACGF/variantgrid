@@ -1,7 +1,9 @@
+from typing import Union, List
+
 from django.conf import settings
 from django.contrib.auth.models import Group, User
 from django.core.exceptions import PermissionDenied
-from django.db.models import Model
+from django.db.models import Model, QuerySet
 from guardian.shortcuts import get_groups_with_perms, get_users_with_perms, remove_perm, assign_perm
 
 
@@ -80,11 +82,18 @@ class DjangoPermission:
     WRITE = 'change'
 
     @staticmethod
-    def perm(klass: Model, permission):
+    def perm(obj: Union[Model, List, QuerySet], permission):
+        if isinstance(obj, QuerySet):
+            klass = obj.model
+        elif isinstance(obj, List):
+            klass = obj[0]
+        else:
+            klass = obj
+
         return f"{permission}_{klass._meta.model_name}"
 
 
-def assign_permission_to_user_and_groups(user, obj):
+def assign_permission_to_user_and_groups(user: User, obj):
     """ adds to all non-public groups """
 
     from snpdb.models import UserSettings
