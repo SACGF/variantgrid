@@ -377,6 +377,7 @@ ANALYSIS_TEMPLATES_AUTO_SAMPLE = "Sample tab auto analysis"
 ANALYSIS_WARN_IF_NO_QC_GENE_LIST_MESSAGE = None  # disabled by default
 ANALYSIS_NODE_CACHE_Q = True
 
+VARIANT_ALLELE_FREQUENCY_CLIENT_SIDE_PERCENT = True  # False = Unit (Server side)
 VARIANT_STANDARD_BASES_ONLY = True  # True to reject anything other than A, C, G, T
 VARIANT_SHOW_CANONICAL_HGVS = True
 

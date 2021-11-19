@@ -89,8 +89,12 @@ def format_items_iterator(analysis, sample_ids, items):
 
 
 def node_grid_export(request):
+    export_type = request.GET["export_type"]
     node = _node_from_request(request)
-    grid = _variant_grid_from_request(request, node, sort_by_contig_and_position=True)
+    af_show_in_percent = export_type == 'csv'
+    grid = _variant_grid_from_request(request, node,
+                                      sort_by_contig_and_position=True,
+                                      af_show_in_percent=af_show_in_percent)
 
     # TODO: Change filename to use set operation between samples
     basename = f"node_{grid.node.pk}"
@@ -102,7 +106,6 @@ def node_grid_export(request):
     _, _, items = grid.get_items(request)
     items = format_items_iterator(grid.node.analysis, sample_ids, items)
 
-    export_type = request.GET["export_type"]
     colmodels = grid.get_colmodels()
 
     if export_type == 'csv':
