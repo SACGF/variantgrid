@@ -413,6 +413,15 @@ class Gene(models.Model):
             transcript = vta.transcript
         return transcript
 
+    def __lt__(self, other):
+        if self.annotation_consortium == AnnotationConsortium.REFSEQ:
+            try:
+                return int(self.identifier) < int(other.identifier)
+            except ValueError:
+                pass
+
+        return self.identifier < other.identifier
+
     def __str__(self):
         if self.annotation_consortium == AnnotationConsortium.REFSEQ:
             gene_id_summary = f"GeneID:{self.identifier}"
