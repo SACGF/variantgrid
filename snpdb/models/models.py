@@ -324,7 +324,7 @@ class ClinVarKeyExcludePattern(TimeStampedModel):
 
 class Country(models.Model):
     name = models.TextField(primary_key=True)
-    short_name = models.TextField(unique=True)
+    short_name = models.TextField(unique=True, null=True)
     population = models.IntegerField(null=True)
 
     def __str__(self):
@@ -333,7 +333,7 @@ class Country(models.Model):
 
 class State(models.Model):
     name = models.TextField(primary_key=True)
-    short_name = models.TextField(unique=True)
+    short_name = models.TextField(unique=True, null=True)
     country = models.ForeignKey(Country, on_delete=CASCADE)
     population = models.IntegerField(null=True)
 

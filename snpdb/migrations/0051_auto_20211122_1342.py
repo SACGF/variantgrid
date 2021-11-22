@@ -15,7 +15,7 @@ class Migration(migrations.Migration):
             name='Country',
             fields=[
                 ('name', models.TextField(primary_key=True, serialize=False)),
-                ('short_name', models.TextField(unique=True)),
+                ('short_name', models.TextField(unique=True, null=True)),
                 ('population', models.IntegerField(null=True)),
             ],
         ),
@@ -33,7 +33,7 @@ class Migration(migrations.Migration):
             name='State',
             fields=[
                 ('name', models.TextField(primary_key=True, serialize=False)),
-                ('short_name', models.TextField(unique=True)),
+                ('short_name', models.TextField(unique=True, null=True)),
                 ('population', models.IntegerField(null=True)),
                 ('country', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='snpdb.country')),
             ],
