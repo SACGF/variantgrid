@@ -41,7 +41,7 @@ def _one_off_assign_labs_to_states(apps, schema_editor):
             Lab.objects.filter(old_country=country_name).update(country=country)
 
         for state in State.objects.all():
-            qs = Lab.objects.filter(Q(old_state=state.name) | Q(old_state=state.short_name))
+            qs = Lab.objects.filter(Q(old_state__iexact=state.name) | Q(old_state__iexact=state.short_name))
             qs.update(state=state, country=state.country)
 
         if lab_no_state_count := Lab.objects.filter(state__isnull=True).count():
