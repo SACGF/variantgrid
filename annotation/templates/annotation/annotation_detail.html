@@ -139,21 +139,9 @@ python3 manage.py import_gene_annotation --annotation-consortium=RefSeq --genome
                     <div class="no-value">Not Installed</div>
                 {% endif %}
                 {% install-instructions "Gene Annotation Release" installed=details.gene_annotation_release %}
-                    The latest variant annotation version does not have a Gene Annotation Release set. We need this to be able to match to the
-                    exact gene/transcript versions used in a VEP release.
+                    You need a Gene Annotation Release that matches the exact symbol/gene/transcript versions used by VEP.
 
-                    <ol>
-                        <li>Find the release and GTF for your VEP release (see <a href="https://m.ensembl.org/info/docs/tools/vep/script/vep_cache.html">VEP Cache</a>
-                            or <a href="https://github.com/Ensembl/ensembl-vep/issues/833">Issue</a>)
-                            If you just have a GFF the release number can be found via (zcat gff | head)
-                        </li>
-                        <li>Run import_gene_annotation with a "--release" parameter (ok to re-do a previous GFF you've already imported)
-<code>{{ python_command }} manage.py import_gene_annotation  --json-file=(pyreference_file.json.gz) --release=XXX</code>
-                        </li>
-                        <li>
-                            In Django Admin, open "variant_annotation_version" then set "gene_annotation_release" to what was uploaded in the previous step.
-                        </li>
-                    </ol>
+                    <a href="https://github.com/SACGF/variantgrid/wiki/Gene-and-Transcript-Version-Data#gene-annotation-release---install">See Wiki for details</a>
                 {% endinstall-instructions %}
             {% endlabelled %}
             {% labelled label="Gene Annotation" %}
