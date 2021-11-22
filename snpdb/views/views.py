@@ -66,7 +66,7 @@ from snpdb.models import CachedGeneratedFile, VariantGridColumn, UserSettings, \
     get_igv_data, SampleLocusCount, UserContact, Tag, Wiki, Organization, GenomeBuild, \
     Trio, AbstractNodeCountSettings, CohortGenotypeCollection, UserSettingsOverride, NodeCountSettingsCollection, Lab, \
     LabUserSettingsOverride, OrganizationUserSettingsOverride, LabHead, SomalierRelatePairs, \
-    VariantZygosityCountCollection, VariantZygosityCountForVCF, ClinVarKey, AvatarDetails
+    VariantZygosityCountCollection, VariantZygosityCountForVCF, ClinVarKey, AvatarDetails, State
 from snpdb.models.models_enums import ProcessingStatus, ImportStatus, BuiltInFilters
 from snpdb.tasks.soft_delete_tasks import soft_delete_vcfs
 from snpdb.utils import LabNotificationBuilder
@@ -1288,6 +1288,17 @@ def labs(request):
         max_groups=15,
         show_unclassified=show_unclassified)
 
+    state_pop_multiplier = {}
+    for state in State.objects.filter(population__gt=0):
+        state_pop_multiplier[state.name] = 100_000 / state.population
+
+    vc_normalized_state_data_json = get_grouped_classification_counts(
+        user=request.user,
+        field=state_field,
+        max_groups=15,
+        show_unclassified=show_unclassified,
+        norm_factor=state_pop_multiplier)
+
     active_organizations = Organization.objects.filter(active=True).order_by('name')
     organization_labs = {}
     for org in active_organizations:
@@ -1304,6 +1315,7 @@ def labs(request):
         "shared_classifications": settings.VARIANT_CLASSIFICATION_STATS_USE_SHARED,
         "vc_org_data": vc_org_data_json,
         "vc_state_data": vc_state_data_json,
+        "vc_normalized_state_data_json": vc_normalized_state_data_json,
         "show_unclassified": show_unclassified,
     }
 

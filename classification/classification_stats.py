@@ -1,4 +1,4 @@
-
+import operator
 from collections import Counter, defaultdict
 from typing import Dict, List, Optional
 
@@ -50,7 +50,8 @@ def get_grouped_classification_counts(user: User,
                                       evidence_key: Optional[str] = None,
                                       field_labels: Optional[Dict[str, str]] = None,
                                       max_groups=10,
-                                      show_unclassified=True) -> List[Dict[str, Dict]]:
+                                      show_unclassified=True,
+                                      norm_factor: Dict[str, float] = None) -> List[Dict[str, Dict]]:
     """ :param user: User used to check visibility of classifications
         :param field: the value we're extracting from evidence to group on (from Classification)
         :param evidence_key: label from ekey lookup
@@ -81,14 +82,31 @@ def get_grouped_classification_counts(user: User,
             counts[value] += 1
             classification_counts[clinical_significance][value] += 1
 
-    top_groups = [i[0] for i in counts.most_common(max_groups)]
+    if norm_factor:
+        group_counts = {}
+        for g, count in counts.items():
+            if nf := norm_factor.get(g):
+                group_counts[g] = nf * count
+    else:
+        group_counts = counts
+
+    top_groups = [gc[0] for gc in sorted(group_counts.items(), key=operator.itemgetter(1), reverse=True)][:max_groups]
 
     data = []
     for cs, clinical_significance_label in ClinicalSignificance.LABELS.items():
         if cs or show_unclassified:
             counts = classification_counts[cs]
-            y = [counts[i] for i in top_groups]
-            data.append({"x": top_groups,
+            if norm_factor:
+                x = []
+                y = []
+                for g in top_groups:
+                    if nf := norm_factor.get(g):
+                        x.append(g)
+                        y.append(nf * counts[g])
+            else:
+                x = top_groups
+                y = [counts[i] for i in top_groups]
+            data.append({"x": x,
                          "y": y,
                          "name": clinical_significance_label,
                          "type": 'bar'})
