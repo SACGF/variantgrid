@@ -21,7 +21,7 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import models
 from django.db.models import QuerySet, TextChoices
 from django.db.models.aggregates import Count
-from django.db.models.deletion import SET_NULL, CASCADE
+from django.db.models.deletion import SET_NULL, CASCADE, PROTECT
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.timezone import now
@@ -322,12 +322,30 @@ class ClinVarKeyExcludePattern(TimeStampedModel):
         return EvidenceKeyMap.cached_key(self.evidence_key).pretty_label + " : " + (self.name or self.pattern_str)
 
 
+class Country(models.Model):
+    name = models.TextField(primary_key=True)
+    short_name = models.TextField(unique=True)
+    population = models.IntegerField(null=True)
+
+    def __str__(self):
+        return self.name
+
+
+class State(models.Model):
+    name = models.TextField(primary_key=True)
+    short_name = models.TextField(unique=True)
+    country = models.ForeignKey(Country, on_delete=CASCADE)
+    population = models.IntegerField(null=True)
+
+    def __str__(self):
+        return self.name
+
 class Lab(models.Model):
     name = models.TextField()
     external = models.BooleanField(default=False, blank=True)  # From somewhere else, eg Shariant
     city = models.TextField()
-    state = models.TextField(null=True)
-    country = models.TextField()
+    state = models.ForeignKey(State, null=True, on_delete=PROTECT)
+    country = models.ForeignKey(Country, null=True, on_delete=PROTECT)
     url = models.TextField(blank=True)
     css_class = models.TextField(blank=True)
     lat = models.FloatField(null=True, blank=True)

@@ -21,7 +21,8 @@ def make_code_friendly(text: str) -> str:
 
 class LabAdmin(ModelAdminBasics):
     list_per_page = 200
-    list_display = ('name', 'group_name', 'organization', 'external', 'clinvar_key', 'upload_location', 'upload_auto_pattern', 'classification_config')
+    list_display = ('name', 'group_name', 'organization', 'state', 'country',
+                    'external', 'clinvar_key', 'upload_location', 'upload_auto_pattern', 'classification_config')
 
     fieldsets = (
         ('Basic', {'fields': ('name', 'group_name', 'organization')}),
@@ -31,7 +32,7 @@ class LabAdmin(ModelAdminBasics):
     )
 
     def is_readonly_field(self, f) -> bool:
-        if f.name == 'clinvar_key' or f.name == 'organization':
+        if f.name in ('clinvar_key', 'organization', 'state', 'country'):
             return False
         return super().is_readonly_field(f)
 
@@ -39,11 +40,8 @@ class LabAdmin(ModelAdminBasics):
 
         return super(LabAdmin, self).get_form(request, obj, widgets={
             'name': admin.widgets.AdminTextInputWidget(),
-            'institution': admin.widgets.AdminTextInputWidget(),
             'group_name': admin.widgets.AdminTextInputWidget(),
             'city': admin.widgets.AdminTextInputWidget(),
-            'state': admin.widgets.AdminTextInputWidget(),
-            'country': admin.widgets.AdminTextInputWidget(),
             'lat': admin.widgets.AdminTextInputWidget(),
             'long': admin.widgets.AdminTextInputWidget(),
             'url': admin.widgets.AdminURLFieldWidget(),
