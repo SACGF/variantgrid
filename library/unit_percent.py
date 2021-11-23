@@ -12,12 +12,12 @@ def convert_from_percent_to_unit(percent, missing_value=None):
     return unit
 
 
-def convert_from_unit_to_percent(percent, missing_value=None):
-    if percent != missing_value:
-        unit = percent * 100.0
+def convert_from_unit_to_percent(unit, missing_value=None):
+    if unit != missing_value:
+        percent = unit * 100.0
     else:
-        unit = missing_value
-    return unit
+        percent = missing_value
+    return percent
 
 
 def server_side_format_percent(val, missing_value=None):

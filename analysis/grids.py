@@ -43,6 +43,7 @@ class VariantGrid(JqGridSQL):
     model = AnalysisNode.model
     caption = 'VariantGrid'
     url = SimpleLazyObject(lambda: reverse("node_grid_handler"))
+    GENOTYPE_COLUMNS_MISSING_VALUE = "."
     colmodel_overrides = {
         # Note:     client side formatters should only be used for adding links etc, never conversion of data, such as
         #           unit to percent, as the CSV downloads (w/o JS formatters) won't match the grid.
@@ -279,7 +280,7 @@ class VariantGrid(JqGridSQL):
             server_side_formatter = get_allele_frequency_formatter(source_in_percent=sample.vcf.allele_frequency_percent,
                                                                    dest_in_percent=af_show_in_percent,
                                                                    get_data_func=packed_data_formatter,
-                                                                   missing_value=CohortGenotype.MISSING_NUMBER_VALUE)
+                                                                   missing_value=VariantGrid.GENOTYPE_COLUMNS_MISSING_VALUE)
         return server_side_formatter
 
     @staticmethod
@@ -297,8 +298,8 @@ class VariantGrid(JqGridSQL):
         packed_data_replace = dict(Zygosity.CHOICES)
         # Some legacy data (Missing data in FreeBayes before PythonKnownVariantsImporter v12) has -2147483647 for
         # empty values (what CyVCF2 returns using format()) @see https://github.com/SACGF/variantgrid/issues/59
-        MISSING_VALUES = [-1, -2147483648]
-        packed_data_replace.update({mv: "." for mv in MISSING_VALUES})
+        MISSING_VALUES = [CohortGenotype.MISSING_NUMBER_VALUE, -2147483648]
+        packed_data_replace.update({mv: VariantGrid.GENOTYPE_COLUMNS_MISSING_VALUE for mv in MISSING_VALUES})
 
         # Record the 1st cohort a sample appears in, and the concatenated cohorts index
         sample_cohort_cat_cohorts_index = {}
