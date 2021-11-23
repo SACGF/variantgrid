@@ -8,7 +8,14 @@
 {% endif %}
 
 {% if user.is_authenticated %}
-    <button class="btn-login btn btn-primary w-100" id="resume_session" onclick="resume()">Continue as {{ user.username }}</button>
+    {% if use_oidc %}
+        <div class="btn-toolbar">
+            <button class="btn btn-primary btn-login " id="resume_session" onclick="resume()">Continue as {{ user.username }}</button>
+            <button class="btn btn-secondary" id="logout" onclick="logout()">Logout</button>
+        </div>
+    {% else %}
+        <button class="btn-login btn btn-primary w-100" id="resume_session" onclick="resume()">Continue as {{ user.username }}</button>
+    {% endif %}
 {% elif use_oidc %}
     <button class="btn-login btn btn-primary w-100" id="login" onclick="login()">{% if maintenance_mode %}Administrator{% else %}User{% endif %} Login</button>
 {% else %}

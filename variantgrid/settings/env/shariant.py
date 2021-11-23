@@ -87,12 +87,11 @@ OIDC_USER_SERVICES = KEY_CLOAK_BASE + '/realms/' + KEY_CLOAK_REALM + '/account'
 OIDC_OP_LOGOUT_URL_METHOD = 'auth.backend.provider_logout'
 
 # login failure is generally user is inactive, which is how prod distinguishes between prod and test logins
-# but turns out it isn't 100% due to user is inactive, disable this functionality until we can handle it better
-# LOGIN_REDIRECT_URL_FAILURE = "/static/error_pages/user_inactive.html"
 
 HELP_URL = "https://shariant.readthedocs.io/en/latest/"
 # LOGIN_REDIRECT_URL = '/variantopedia/dashboard'
 LOGOUT_REDIRECT_URL = KEY_CLOAK_PROTOCOL_BASE + '/logout?redirect_uri=https%3A%2F%2Fshariant.org.au'
+LOGIN_REDIRECT_URL_FAILURE = '/accounts/logout'
 
 EMAIL_BACKEND = 'django_amazon_ses.EmailBackend'
 # Overwrite settings for your system below
