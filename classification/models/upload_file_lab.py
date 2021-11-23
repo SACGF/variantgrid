@@ -20,5 +20,5 @@ class UploadedFileLab(TimeStampedModel):
     filename = models.TextField()
     lab = models.ForeignKey(Lab, on_delete=models.CASCADE)
     user = models.ForeignKey(User, on_delete=models.PROTECT)
-    comment = models.TextField(default="")
+    comment = models.TextField(default="", blank=True)
     status = models.CharField(max_length=2, choices=UploadedFileLabStatus.choices, default=UploadedFileLabStatus.Pending)
