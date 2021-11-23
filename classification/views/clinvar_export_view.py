@@ -163,7 +163,8 @@ class ClinVarExportColumns(DatatableConfig[ClinVarExport]):
             When(status=ClinVarExportStatus.NEW_SUBMISSION, then=Value(1)),
             When(status=ClinVarExportStatus.CHANGES_PENDING, then=Value(2)),
             When(status=ClinVarExportStatus.UP_TO_DATE, then=Value(3)),
-            When(status=ClinVarExportStatus.IN_ERROR, then=Value(4))
+            When(status=ClinVarExportStatus.IN_ERROR, then=Value(4)),
+            When(status=ClinVarExportStatus.EXCLUDE, then=Value(5))
         ]
         case = Case(*whens, default=Value(0), output_field=IntegerField())
         initial_qs = initial_qs.annotate(status_sort=case)
