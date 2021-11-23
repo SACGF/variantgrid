@@ -53,7 +53,7 @@ class TestAnnotationVCF(TestCase):
 
         for hgvs_string, hgvs_expected in LONG_HGVS_OLD_NEW.items():
             hgvs_name = HGVSName(hgvs_string)
-            HGVSMatcher.format_hgvs_remove_long_ref(hgvs_name)
+            HGVSMatcher.format_hgvs_remove_long_ref(hgvs_name, max_ref_length=10)
             self.assertEqual(hgvs_name.format(), hgvs_expected)
 
     @skip

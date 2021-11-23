@@ -3,23 +3,25 @@ from typing import Tuple
 from django.contrib.auth.models import User
 
 from classification.models import Classification
-from snpdb.models import Lab, Organization
+from snpdb.models import Lab, Organization, Country
 
 
 class ClassificationTestUtils:
 
     @staticmethod
     def setUp():
-        org = Organization(
+        org = Organization.objects.create(
             name='InstX',
             group_name='instx'
         )
-        org.save()
+        country_a = Country.objects.get_or_create(name='CountryA')[0]
+        country_b = Country.objects.get_or_create(name='CountryB')[0]
+
         lab = Lab.objects.create(
             name='Labby',
             organization=org,
             city='CityA',
-            country='CountryA',
+            country=country_a,
             group_name='instx/labby'
         )
 
@@ -28,7 +30,7 @@ class ClassificationTestUtils:
             name='External',
             organization=org,
             city='CityB',
-            country='CountryB',
+            country=country_b,
             group_name='instx/ext'
         )
 
