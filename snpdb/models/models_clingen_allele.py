@@ -122,7 +122,7 @@ class ClinGenAllele(TimeStampedModel):
                     msg = "A coding DNA reference sequence does not contain intron or 5' and 3' gene "\
                           "flanking sequences and can therefore not be used as a reference to describe " \
                           "variants in these regions"
-                    if settings.HGVS_REQUIRE_REFERENCE_BASES:
+                    if settings.CLINGEN_ALLELE_REGISTRY_REQUIRE_REF_ALLELE:
                         raise ClinGenAllele.ClinGenHGVSReferenceBaseUnavailableError(msg)
                     else:
                         logging.warning(msg)
@@ -142,7 +142,7 @@ class ClinGenAllele(TimeStampedModel):
                             ref_end = coord["end"]
                         hgvs_name.ref_allele = tvsi.sequence[ref_start:ref_end]
                     except NoTranscript as e_no_transcript:
-                        if settings.HGVS_REQUIRE_REFERENCE_BASES:
+                        if settings.CLINGEN_ALLELE_REGISTRY_REQUIRE_REF_ALLELE:
                             raise ClinGenAllele.ClinGenHGVSReferenceBaseUnavailableError() from e_no_transcript
                         else:
                             logging.warning(e_no_transcript)

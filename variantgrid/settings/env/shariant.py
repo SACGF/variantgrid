@@ -136,7 +136,7 @@ VARIANT_CLASSIFICATION_ID_FILTER = False
 VARIANT_CLASSIFICAITON_SHOW_SPECIMEN_ID = False
 
 VARIANT_SHOW_CANONICAL_HGVS = False
-VARIANT_CLASSIFICATION_MAX_FULL_ALLELE_LENGTH = 1000000  # Try to generate large values for sake of MVL
+VARIANT_CLASSIFICATION_MAX_REFERENCE_LENGTH = 1000000  # Try to generate large values for sake of MVL
 
 # Lock down Shariant menu - hide a lot of VariantGrid urls
 # Completely hide URLS from these apps

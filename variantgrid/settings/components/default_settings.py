@@ -293,6 +293,7 @@ CLINGEN_ALLELE_REGISTRY_MAX_RECORDS = 2000
 CLINGEN_ALLELE_REGISTRY_LOGIN = get_secret("CLINGEN_ALLELE_REGISTRY.login")
 CLINGEN_ALLELE_REGISTRY_PASSWORD = get_secret("CLINGEN_ALLELE_REGISTRY.password")
 CLINGEN_ALLELE_REGISTRY_MAX_MANUAL_REQUESTS = 10_000  # On nodes and VCFs
+CLINGEN_ALLELE_REGISTRY_REQUIRE_REF_ALLELE = True
 
 NO_DNA_CONTROL_REGEX = "(^|[^a-zA-Z])NDC([^a-zA-Z]|$)"  # No DNA Control - eg _NDC_ or -NDC_
 
@@ -312,7 +313,7 @@ COMPANY = None  # Used for gene list categories
 
 GENERATED_DIR = os.path.join(MEDIA_ROOT, 'generated')
 
-HGVS_REQUIRE_REFERENCE_BASES = True  # Sometimes we can't set reference bases from ClinGen, die in this case if True
+HGVS_MAX_REF_ALLELE_LENGTH = 10  # Set to 0 for "del" instead of "delC" etc
 
 PATIENTS_READ_ONLY_SHOW_AGE_NOT_DOB = False
 IMPORT_PROCESSING_DIR = os.path.join(PRIVATE_DATA_ROOT, 'import_processing')
@@ -404,7 +405,7 @@ VARIANT_CLASSIFICATION_WEB_FORM_CREATE_ALLOW_NO_VARIANT = True  # Can create pur
 
 VARIANT_CLASSIFICATION_FILE_ATTACHMENTS = True  # allow users to attach files to classifications
 
-VARIANT_CLASSIFICATION_MAX_FULL_ALLELE_LENGTH = 100  # Used for MVL export, for general display limit is 10
+VARIANT_CLASSIFICATION_MAX_REFERENCE_LENGTH = 100  # Used for MVL export, general display use HGVS_MAX_REF_ALLELE_LENGTH
 
 VARIANT_CLASSIFICATION_REDCAP_EXPORT = True
 

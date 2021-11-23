@@ -360,17 +360,36 @@ class HGVSNameExtra:
         copy = HGVSName(**params)
         return copy
 
-    def format(self, max_allele_length=10) -> Optional[str]:
+    def format(self, max_ref_length=settings.HGVS_MAX_REF_ALLELE_LENGTH) -> Optional[str]:
         # would be better practise to throw an error if we couldn't generate
         # but this keeps existing behaviour
         if not self._hgvs_name:
             return None
 
-        if HGVSMatcher.can_shrink_long_ref(self._hgvs_name):
+        if HGVSNameExtra.can_shrink_long_ref(self._hgvs_name, max_ref_length=max_ref_length):
             hgvs_name = self._safe()
-            HGVSMatcher.format_hgvs_remove_long_ref(hgvs_name, max_allele_length=max_allele_length)
+            HGVSNameExtra.format_hgvs_remove_long_ref(hgvs_name, max_ref_length=max_ref_length)
             return hgvs_name.format()
         return self._hgvs_name.format()
+
+    @staticmethod
+    def can_shrink_long_ref(hgvs_name, max_ref_length=10) -> bool:
+        SHRINKABLE_MUTATION_TYPES = {"del", "dup", "delins"}
+        return hgvs_name.mutation_type in SHRINKABLE_MUTATION_TYPES and len(hgvs_name.ref_allele) > max_ref_length
+
+    @staticmethod
+    def format_hgvs_remove_long_ref(hgvs_name, max_ref_length=10):
+        """ Similar to pyhgvs.variant_to_hgvs_name but only for dels, delins and dups and we don't specify length
+
+            From a Facebook post:
+            Q: What is the correct way to describe a deletion, c.7432-2025_7536+372del2502 or c.7432-2025_7536+372del.
+            While ClinVar seems to prefer the first, #HGVS seems to prefer the second format.
+            A: HGVS descriptions do not contain redundant information. The size of the deletion, in the example 2502
+            nucleotides, can be deduced from the variant description. HGVS thus suggests to use c.7432-2025_7536+372del.
+        """
+
+        if HGVSNameExtra.can_shrink_long_ref(hgvs_name, max_ref_length=max_ref_length):
+            hgvs_name.ref_allele = ""
 
     def ref_lengths(self) -> int:
         if not self._hgvs_name:
@@ -509,8 +528,7 @@ class HGVSMatcher:
         return hgvs_name.transcript and hgvs_name.transcript.startswith("LRG_")
 
     @staticmethod
-    def _lrg_get_hgvs_name_and_transcript_version(genome_build: GenomeBuild, hgvs_string: str):
-        hgvs_name = HGVSName(hgvs_string)
+    def _lrg_get_hgvs_name_and_transcript_version(genome_build: GenomeBuild, hgvs_name: HGVSName):
         lrg_identifier = hgvs_name.transcript
 
         if transcript_version := LRGRefSeqGene.get_transcript_version(genome_build, lrg_identifier):
@@ -521,7 +539,8 @@ class HGVSMatcher:
         return None, None
 
     def _lrg_get_variant_tuple(self, hgvs_string: str) -> Tuple[Tuple, str]:
-        new_hgvs_name, transcript_version = self._lrg_get_hgvs_name_and_transcript_version(self.genome_build, hgvs_string)
+        hgvs_name = HGVSName(hgvs_string)
+        new_hgvs_name, transcript_version = self._lrg_get_hgvs_name_and_transcript_version(self.genome_build, hgvs_name)
         if new_hgvs_name:
             new_hgvs_string = new_hgvs_name.format()
             method = f"{self.HGVS_METHOD_PYHGVS} as '{new_hgvs_string}' (from LRG_RefSeqGene)"
@@ -710,8 +729,8 @@ class HGVSMatcher:
             alt = Variant.REFERENCE_ALT
         return VariantCoordinate(chrom, position, ref, alt), used_transcript_accession, method
 
-    def _get_hgvs_and_pyhgvs_transcript(self, hgvs_name: str):
-        hgvs_name = HGVSName(hgvs_name)
+    def _get_hgvs_and_pyhgvs_transcript(self, hgvs_string: str):
+        hgvs_name = HGVSName(hgvs_string)
         if self._is_lrg(hgvs_name):
             if new_hgvs_name := self._lrg_get_hgvs_name_and_transcript_version(self.genome_build, hgvs_name)[0]:
                 hgvs_name = new_hgvs_name
@@ -734,27 +753,6 @@ class HGVSMatcher:
             else:
                 transcript_id = transcript.name
         return transcript_id
-
-    @staticmethod
-    def can_shrink_long_ref(hgvs_name, max_allele_length=10) -> bool:
-        # "delins" in more complicated than just removing ref_allele as alt_allele can be massive too
-        SHRINKABLE_MUTATION_TYPES = {"del", "dup"}
-        return hgvs_name.mutation_type in SHRINKABLE_MUTATION_TYPES and \
-            len(hgvs_name.ref_allele) > max_allele_length
-
-    @staticmethod
-    def format_hgvs_remove_long_ref(hgvs_name, max_allele_length=10):
-        """ Similar to pyhgvs.variant_to_hgvs_name but only for dels, delins and dups and we don't specify length
-
-            From a Facebook post:
-            Q: What is the correct way to describe a deletion, c.7432-2025_7536+372del2502 or c.7432-2025_7536+372del.
-            While ClinVar seems to prefer the first, #HGVS seems to prefer the second format.
-            A: HGVS descriptions do not contain redundant information. The size of the deletion, in the example 2502
-            nucleotides, can be deduced from the variant description. HGVS thus suggests to use c.7432-2025_7536+372del.
-        """
-
-        if HGVSMatcher.can_shrink_long_ref(hgvs_name, max_allele_length=max_allele_length):
-            hgvs_name.ref_allele = ""
 
     def _variant_to_hgvs_extra(self, variant: Variant, transcript_name=None) -> HGVSNameExtra:
         hgvs_name, hgvs_method = self._variant_to_hgvs(variant, transcript_name)
@@ -787,7 +785,9 @@ class HGVSMatcher:
         raise ValueError(f"Could not convert {variant} to HGVS using '{lrg_identifier}': {problem_str}")
 
     def _variant_to_hgvs(self, variant: Variant, transcript_accession=None) -> Tuple[HGVSName, str]:
-        """ returns (hgvs, method) - hgvs is c.HGVS is transcript provided, g.HGVS if not """
+        """ returns (hgvs, method) - hgvs is c.HGVS is transcript provided, g.HGVS if not
+            We always generate the HGVS with full-length reference bases etc, as we adjust that in HGVSExtra.format()
+        """
 
         chrom, offset, ref, alt = variant.as_tuple()
         if alt == Variant.REFERENCE_ALT:
@@ -864,9 +864,11 @@ class HGVSMatcher:
 
         return hgvs_name, hgvs_method
 
-    def variant_to_hgvs(self, variant: Variant, transcript_name=None, max_allele_length=10) -> Optional[str]:
+    def variant_to_hgvs(self, variant: Variant, transcript_name=None,
+                        max_ref_length=settings.HGVS_MAX_REF_ALLELE_LENGTH) -> Optional[str]:
         """ returns c.HGVS is transcript provided, g.HGVS if no transcript"""
-        return self._variant_to_hgvs_extra(variant=variant, transcript_name=transcript_name).format(max_allele_length=max_allele_length)
+        hgvs_extra = self._variant_to_hgvs_extra(variant=variant, transcript_name=transcript_name)
+        return hgvs_extra.format(max_ref_length=max_ref_length)
 
     def variant_to_g_hgvs(self, variant: Variant):
         g_hgvs = self.variant_to_hgvs(variant)
