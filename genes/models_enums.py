@@ -9,7 +9,7 @@ class AnnotationConsortium(models.TextChoices):
     def get_from_transcript_accession(transcript_accession: str):
         TRANSCRIPT_PREFIXES = [
             (AnnotationConsortium.ENSEMBL, 4, {"ENST"}),
-            (AnnotationConsortium.REFSEQ, 3, {'NM_', 'NR_', 'XM_', 'XR_'}),
+            (AnnotationConsortium.REFSEQ, 3, {'NM_', 'NR_', 'NG_', 'XM_', 'XR_'}),
         ]
 
         for (ac, length, prefixes) in TRANSCRIPT_PREFIXES:
