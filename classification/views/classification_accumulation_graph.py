@@ -138,9 +138,9 @@ class ClassificationAccumulationGraph:
                         counts[summary.org_name] = counts[summary.org_name] + 1
 
                 elif self.mode == AccumulationReportMode.Allele:
-                    if status != AlleleStatus.Empty:
+                    if status != AlleleStatus.Empty and allele_summary.classification_count():
                         counts[status] += 1
-                    counts[AlleleStatus.Withdrawn] += allele_summary.withdrawn_count()
+
                     allele_summary.reset()
 
                     involved_orgs: Set[str] = set()
