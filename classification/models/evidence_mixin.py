@@ -59,10 +59,13 @@ class CriteriaStrength:
         self.strength = strength or ekey.default_crit_evaluation
 
     def __str__(self) -> str:
+        # alternatively can replace " " with "" if key is in camelcase?
+        pretty_label = self.ekey.pretty_label.replace(" ", "_")
         if self.ekey.namespace:
-            return f'{self.ekey.pretty_label}_{self.strength}'
+            return f'{pretty_label}_{self.strength}'
         if self.ekey.default_crit_evaluation == self.strength:
-            return self.ekey.pretty_label
+            return pretty_label
+
         criteria_first_letter = self.ekey.key[0].upper()
         suffix = self.strength
         if criteria_first_letter in {'B', 'P'} and suffix[0] == criteria_first_letter:
@@ -71,8 +74,10 @@ class CriteriaStrength:
         # UNSPECIFIED STRENGTH HANDLING
         if suffix == "X":
             suffix = "unspecified"
+        elif suffix.endswith("X"):
+            suffix = f"{suffix[0]}_unspecified"
 
-        return f'{self.ekey.pretty_label}_{suffix}'
+        return f'{pretty_label}_{suffix}'
 
     def __eq__(self, other) -> bool:
         if not isinstance(other, CriteriaStrength):
