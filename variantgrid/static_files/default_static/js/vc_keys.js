@@ -216,17 +216,20 @@ let EKey = (function() {
 
 EKey.HTML_WHITE_LIST = new Set(['BR','B','I','OL','UL','LI','U']);
 
+// UNSPECIFIED STRENGTH HANDLING
 EKey.critValues = {
     "NM": "Not Met",
     "NA": "Not Applicable",
     "BA": "Benign Standalone",
     "BS": "Benign Strong",
     "BP": "Benign Supporting",
+    // "BX": "Benign (Unspecified Strength)",
     "N": "Neutral",
     "PP": "Pathogenic Supporting",
     "PM": "Pathogenic Moderate",
     "PS": "Pathogenic Strong",
-    "PVS": "Pathogenic Very Strong"
+    "PVS": "Pathogenic Very Strong",
+    // "PX": "Pathogenic (Unspecified Strength)"
 };
 
 EKey.families = {

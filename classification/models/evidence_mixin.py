@@ -67,6 +67,11 @@ class CriteriaStrength:
         suffix = self.strength
         if criteria_first_letter in {'B', 'P'} and suffix[0] == criteria_first_letter:
             suffix = suffix[1:]
+
+        # UNSPECIFIED STRENGTH HANDLING
+        if suffix == "X":
+            suffix = "unspecified"
+
         return f'{self.ekey.pretty_label}_{suffix}'
 
     def __eq__(self, other) -> bool:

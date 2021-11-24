@@ -858,7 +858,13 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         for strength in CriteriaEvaluation.ALL_STRENGTHS:
             count = weights.get(strength, 0)
             if count > 0:
-                evidence_strings.append(str(count) + 'x' + strength)
+                # UNSPECIFIED STRENGTH HANDLING
+                strength_str = strength
+                if strength_str == CriteriaEvaluation.BENIGN_UNSPECIFIED:
+                    strength_str = "B(Unspecified)"
+                elif strength_str == CriteriaEvaluation.PATHOGENIC_UNSPECIFIED:
+                    strength_str = "P(Unspecified)"
+                evidence_strings.append(str(count) + 'x' + strength_str)
 
         return ', '.join(evidence_strings)
 

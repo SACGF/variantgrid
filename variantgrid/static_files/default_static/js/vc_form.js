@@ -1779,8 +1779,8 @@ const VCForm = (function() {
             let BS = getStr('BS');
             let BP = getStr('BP');
             let BM = getStr('BM'); // note this aren't standard, so can't calculate anything with it
-            let BX = getStr('B?');
-            let PX = getStr('P?');
+            let BX = getStr('BX');
+            let PX = getStr('PX');
 
             let result = {
                 P: null,
