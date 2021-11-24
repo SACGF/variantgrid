@@ -7,7 +7,7 @@ coreapi
 cyvcf2
 Django
 django_admin_json_editor
-django_autocomplete_light
+django_autocomplete_light==3.5.1
 django-avatar
 django-compressor
 django-dag
