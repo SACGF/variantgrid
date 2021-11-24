@@ -5,6 +5,8 @@ from importlib.metadata import PackageNotFoundError
 
 from django.db import migrations
 
+from manual.operations.manual_operations import ManualOperation
+
 
 def _test_old_version(apps):
     needs_upgrade = False
@@ -28,5 +30,5 @@ class Migration(migrations.Migration):
     operations = [
         ManualOperation.operation_other(args=[
             "Update pyHGVS library - sudo python3 -m pip install --force --upgrade git+https://github.com/SACGF/hgvs#egg=pyhgvs"],
-            test=_test_has_nr_transcripts),
+            test=_test_old_version),
     ]
