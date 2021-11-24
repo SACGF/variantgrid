@@ -35,7 +35,8 @@ from annotation.models.models_gene_counts import GeneValueCountCollection, \
     GeneCountType, SampleAnnotationVersionVariantSource, CohortGeneCounts
 from classification.classification_stats import get_grouped_classification_counts
 from classification.models.clinvar_export_sync import clinvar_export_sync
-from classification.views.classification_accumulation_graph import get_classification_accumulation_traces
+from classification.views.classification_accumulation_graph import get_classification_accumulation_traces, \
+    AccumulationReportMode
 from classification.views.classification_datatables import ClassificationColumns
 from genes.custom_text_gene_list import create_custom_text_gene_list
 from genes.forms import CustomGeneListForm, UserGeneListForm, GeneAndTranscriptForm
@@ -1320,7 +1321,7 @@ def labs(request):
     }
 
     if request.user.is_superuser:
-        context["classification_accumulation_traces"] = get_classification_accumulation_traces()
+        context["classification_accumulation_traces_allele"] = get_classification_accumulation_traces(mode=AccumulationReportMode.Allele)
 
     return render(request, "snpdb/labs.html", context)
 

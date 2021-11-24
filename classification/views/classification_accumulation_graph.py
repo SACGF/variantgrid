@@ -290,8 +290,8 @@ def download_report(request):
     return response
 
 
-def get_classification_accumulation_traces() -> List[Dict]:
-    data = list(_iter_report_list(allele_statuses=False))
+def get_classification_accumulation_traces(mode: AccumulationReportMode = AccumulationReportMode.Classification) -> List[Dict]:
+    data = list(_iter_report_list(allele_statuses=False, mode=mode))
     header = data[0]
     rows = data[1:]
     df = pd.DataFrame(rows, columns=header)
