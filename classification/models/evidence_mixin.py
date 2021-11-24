@@ -47,6 +47,10 @@ VCPatch = Dict[str, VCPatchValue]
 @total_ordering
 class CriteriaStrength:
 
+    def __init__(self, ekey: 'EvidenceKey', strength: Optional[str]):
+        self.ekey = ekey
+        self.strength = strength or ekey.default_crit_evaluation
+
     @property
     def strength_value(self) -> int:
         try:
@@ -54,30 +58,31 @@ class CriteriaStrength:
         except:
             return 0
 
-    def __init__(self, ekey: 'EvidenceKey', strength: Optional[str]):
-        self.ekey = ekey
-        self.strength = strength or ekey.default_crit_evaluation
-
     def __str__(self) -> str:
-        # alternatively can replace " " with "" if key is in camelcase?
-        pretty_label = self.ekey.pretty_label.replace(" ", "_")
-        if self.ekey.namespace:
-            return f'{pretty_label}_{self.strength}'
-        if self.ekey.default_crit_evaluation == self.strength:
-            return pretty_label
 
-        criteria_first_letter = self.ekey.key[0].upper()
+        # just need special handling of X
+        def strength_suffix(strength:str):
+            if strength == "X":
+                return "unspecified"
+            elif strength.endswith("X"):
+                return strength[0] + "_unspecified"
+            return strength
+
+        # Make sure criteria are in camel case so removing spaces still leaves it readable
+        pretty_label = self.ekey.pretty_label.replace(" ", "")
         suffix = self.strength
-        if criteria_first_letter in {'B', 'P'} and suffix[0] == criteria_first_letter:
+
+        matches_direction = False
+        if not self.ekey.namespace:
+            if self.ekey.default_crit_evaluation == self.strength:
+                return pretty_label
+            criteria_first_letter = self.ekey.key[0].upper()
+            matches_direction = criteria_first_letter == suffix[0]
+
+        if matches_direction:
             suffix = suffix[1:]
 
-        # UNSPECIFIED STRENGTH HANDLING
-        if suffix == "X":
-            suffix = "unspecified"
-        elif suffix.endswith("X"):
-            suffix = f"{suffix[0]}_unspecified"
-
-        return f'{pretty_label}_{suffix}'
+        return f"{pretty_label}_{strength_suffix(suffix)}"
 
     def __eq__(self, other) -> bool:
         if not isinstance(other, CriteriaStrength):
