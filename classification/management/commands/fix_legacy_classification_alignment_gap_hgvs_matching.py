@@ -51,8 +51,12 @@ class Command(BaseCommand):
                     print(f"Skipping badly formed transcript accession: '{transcript_accession}'")
                     continue
 
-                if AnnotationConsortium.get_from_transcript_accession(transcript_accession) == AnnotationConsortium.REFSEQ:
-                    refseq_transcripts.append(transcript_accession)
+                try:
+                    if AnnotationConsortium.get_from_transcript_accession(transcript_accession) == AnnotationConsortium.REFSEQ:
+                        refseq_transcripts.append(transcript_accession)
+                except ValueError as ve:
+                    print(f"Skipping {transcript_accession}: {ve}")
+                    continue
 
             print("Batch retrieving RefSeq TranscriptVersionSequenceInfo...")
             # Some of these are bad, so will cause the batch to fail.
