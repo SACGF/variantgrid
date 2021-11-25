@@ -220,7 +220,7 @@ def view_sequencing_run_stats_tab(request, sequencing_run_id):
     illumina_qc, show_stats = get_illumina_qc_and_show_stats_for_sample_sheet(sample_sheet)
     read_q30s = None
     try:
-        read_q30s = {read: illumina_qc.readq30_set.filter(read=read).get().percent for read in ['R1', 'R2']}
+        read_q30s = {read: illumina_qc.readq30_set.get(read=read).percent for read in ['R1', 'R2']}
     except:
         pass
 

@@ -25,7 +25,7 @@ class ClassificationTestCaseAge(TestCase):
         :return:
         """
         lab, user = ClassificationTestUtils.lab_and_user()
-        user2 = User.objects.filter(username='joejoe2').get()
+        user2 = User.objects.get(username='joejoe2')
         vc = Classification.create(
             user=user,
             lab=lab,
@@ -71,7 +71,7 @@ class ClassificationTestCaseAge(TestCase):
         Test converting age to a range of 10
         """
         lab, user = ClassificationTestUtils.lab_and_user()
-        user2 = User.objects.filter(username='joejoe2').get()
+        user2 = User.objects.get(username='joejoe2')
         vc = Classification.create(
             user=user,
             lab=lab,

@@ -266,7 +266,7 @@ def import_vcf_file(upload_step, bulk_inserter) -> int:
 
 def get_preprocess_vcf_import_info(upload_pipeline):
     try:
-        preprocess_vcf_sub_step = upload_pipeline.uploadstep_set.filter(name=UploadStep.PREPROCESS_VCF_NAME).get()
+        preprocess_vcf_sub_step = upload_pipeline.uploadstep_set.get(name=UploadStep.PREPROCESS_VCF_NAME)
         # ModifiedImportedVariants object was created in Preprocess upload step
         return ModifiedImportedVariants.objects.get(upload_step=preprocess_vcf_sub_step)
     except:

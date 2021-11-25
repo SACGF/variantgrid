@@ -866,7 +866,7 @@ class SampleSheetCombinedVCFFile(SeqAutoRecord):
                 from upload.models import UploadedVCF
                 from upload.vcf.vcf_import import create_backend_vcf_links
 
-                uploaded_vcf = UploadedVCF.objects.filter(uploaded_file__path=self.path).get()
+                uploaded_vcf = UploadedVCF.objects.get(uploaded_file__path=self.path)
                 create_backend_vcf_links(uploaded_vcf)
             except:
                 log_traceback()

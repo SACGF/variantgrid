@@ -107,7 +107,7 @@ class DiscordanceReport(TimeStampedModel):
             if vcm_id in existing_vms:
                 existing_vms.remove(vcm_id)
             else:
-                vcm = ClassificationModification.objects.filter(is_last_published=True, classification=vcm_id).get()
+                vcm = ClassificationModification.objects.get(is_last_published=True, classification=vcm_id)
                 if vcm.classification.lab not in existing_labs:
                     newly_added_labs.add(vcm.classification.lab)
                 DiscordanceReportClassification(

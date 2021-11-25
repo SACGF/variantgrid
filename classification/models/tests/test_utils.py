@@ -60,8 +60,8 @@ class ClassificationTestUtils:
 
     @staticmethod
     def lab_and_user() -> Tuple[Lab, User]:
-        return Lab.objects.filter(group_name='instx/labby').get(), User.objects.filter(username='joejoe').get()
+        return Lab.objects.get(group_name='instx/labby'), User.objects.get(username='joejoe')
 
     @staticmethod
     def external_lab_and_user() -> Tuple[Lab, User]:
-        return Lab.objects.filter(group_name='instx/ext').get(), User.objects.filter(username='joejoe').get()
+        return Lab.objects.get(group_name='instx/ext'), User.objects.get(username='joejoe')

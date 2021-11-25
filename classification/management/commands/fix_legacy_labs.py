@@ -11,7 +11,7 @@ class Command(BaseCommand):
         parser.add_argument('--delete', action='store_true', default=False)
 
     def handle(self, *args, **options):
-        org = Organization.objects.filter(group_name="sa_pathology").get()
+        org = Organization.objects.get(group_name="sa_pathology")
         legacy, _ = Lab.objects.get_or_create(group_name="sa_pathology/legacy", defaults={
             "name": "LEGACY",
             "organization": org,
