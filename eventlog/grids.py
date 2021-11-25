@@ -17,7 +17,6 @@ class EventColumns(DatatableConfig[Event]):
         elif detail := row.get('details'):
             return detail.split('\n', 1)[0]
 
-
     def __init__(self, request: HttpRequest):
         super().__init__(request)
 

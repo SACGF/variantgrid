@@ -226,7 +226,6 @@ class ClinVarAssertionMethods(TextChoices):
     not_applicable = "not applicable"
 
 
-
 class ClinVarKey(TimeStampedModel):
     class Meta:
         verbose_name = "ClinVar key"

@@ -130,7 +130,6 @@ class AlleleOverlap:
             groups.append(AlleleOverlapClinicalGrouping(clinical_grouping=None, cms=unshared))
         return groups
 
-
     @staticmethod
     def overlaps_for_user(user: User) -> List['AlleleOverlap']:
         if user is None:

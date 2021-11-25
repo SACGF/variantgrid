@@ -2165,7 +2165,6 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         c_hgvs.is_desired_build = preferred_genome_build == c_hgvs.genome_build
         return c_hgvs
 
-
     def _generate_c_hgvs_extra(self, genome_build: GenomeBuild) -> HGVSNameExtra:
         variant = self.get_variant_for_build(genome_build)
         hgvs_matcher = HGVSMatcher(genome_build=genome_build)

@@ -60,7 +60,6 @@ class TestAnnotationVCF(TestCase):
             hgvs_actual_no_trim = hgvs_name_extra.format(max_ref_length=100)
             self.assertEqual(hgvs_actual_no_trim, hgvs_string)  # No change
 
-
     @skip
     def test_c_hgvs_out_of_range(self):
         """ Disabled as it needs Ensembl contigs """

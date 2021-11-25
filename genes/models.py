@@ -1146,7 +1146,7 @@ class TranscriptVersionSequenceInfo(TimeStampedModel):
                                                                        defaults=defaults)[0]
 
     @staticmethod
-    def _get_and_store_from_ensembl_api(transcript_accession, genome_build: GenomeBuild=None):
+    def _get_and_store_from_ensembl_api(transcript_accession, genome_build: GenomeBuild = None):
         if genome_build is None:
             genome_build = GenomeBuild.grch38()
         ENSEMBL_REST_BASE_URLS = {
@@ -1183,7 +1183,7 @@ class TranscriptVersionSequenceInfo(TimeStampedModel):
             raise NoTranscript(f"Unable to understand Ensembl API response: {data}")
 
     @staticmethod
-    def get_refseq_transcript_versions(transcript_accessions: Iterable[str], entrez_batch_size: int=100, fail_on_error=True) -> Dict[str, 'TranscriptVersionSequenceInfo']:
+    def get_refseq_transcript_versions(transcript_accessions: Iterable[str], entrez_batch_size: int = 100, fail_on_error=True) -> Dict[str, 'TranscriptVersionSequenceInfo']:
         """ Batch method - returns DB copies if we have it, retrieves + stores from API """
         # Find the ones we already have so we don't need to re-retrieve
         all_transcript_accessions = set(transcript_accessions)

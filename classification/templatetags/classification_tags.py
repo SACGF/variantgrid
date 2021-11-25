@@ -264,7 +264,7 @@ def classification_table(
 
 
 @register.inclusion_tag("classification/tags/c_hgvs.html")
-def c_hgvs(c_hgvs: Union[CHGVS, str], show_genome_build: Optional[bool]=None):
+def c_hgvs(c_hgvs: Union[CHGVS, str], show_genome_build: Optional[bool] = None):
     if isinstance(c_hgvs, ClassificationModification):
         if c_hgvs := c_hgvs.classification.get_c_hgvs(GenomeBuildManager.get_current_genome_build()):
             c_hgvs = CHGVS(c_hgvs)

@@ -257,5 +257,3 @@ class Command(BaseCommand):
         if new_genes and annotation_consortium == AnnotationConsortium.REFSEQ:
             print("Created new RefSeq genes - retrieving gene summaries via API")
             retrieve_refseq_gene_summaries()
-
-
