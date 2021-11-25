@@ -16,6 +16,7 @@ class HistoricalEKeyConverter:
 
     HISTORICAL_AND_SHARIANT = [
         # if Shariant and other environment diverge from keys, add converters here, see below for historical examples
+        (("variant_type", None), (None, None)),  # No easy mappings - don't send
     ]
     # historical is (key_name, actual_historical_type) as the types were wrong...
     #
@@ -31,7 +32,6 @@ class HistoricalEKeyConverter:
     (("grantham", None), ("grantham", EvidenceKeyValueType.INTEGER)),
     (("uk10k", EvidenceKeyValueType.UNIT), ("uk10k_af", EvidenceKeyValueType.UNIT)),
     (("sample", None), ("sample_type", EvidenceKeyValueType.SELECT)),  # renamed 2019-05-22
-    (("variant_type", None), (None, None)),  # No easy mappings - don't send
     """
 
     # Everything is stored as string - so arg = string
