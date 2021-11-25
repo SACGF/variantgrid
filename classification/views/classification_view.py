@@ -364,7 +364,7 @@ class BulkInserter:
             time_taken = now() - self.start
             total_time = time_taken.total_seconds()
             time_per_record = total_time / count
-            create_event(user=get_current_user(), name="classification_import", details=f"{count} records imported {self.new_record_count} new, avg record processing {time_per_record:.3f}s\n{debug_timer}")
+            create_event(user=self.user, name="classification_import", details=f"{count} records imported {self.new_record_count} new, avg record processing {time_per_record:.3f}s\n{debug_timer}")
 
 
 class ClassificationView(APIView):
