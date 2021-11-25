@@ -47,7 +47,7 @@ class ClassificationSummary:
 
 class AlleleStatus(IntEnum):
     Empty = 0
-    Unique = 1
+    Single = 1
     Agreement = 2
     Confidence = 3
     Discordant = 4
@@ -82,6 +82,17 @@ class AlleleSummary:
     def classification_count(self) -> int:
         return len(self.not_withdrawn)
 
+    @property
+    def multi_org(self) -> int:
+        if len(self.not_withdrawn) <= 1:
+            return False
+        orgs = set()
+        for summary in self.not_withdrawn:
+            orgs.add(summary.org_name)
+            if len(orgs) > 1:
+                return True
+        return False
+
     def withdrawn_count(self):
         return len(self.classifications) - len(self.not_withdrawn)
 
@@ -89,8 +100,8 @@ class AlleleSummary:
         count = len(self.not_withdrawn)
         if count == 0:
             return AlleleStatus.Empty
-        elif count == 1:
-            return AlleleStatus.Unique
+        elif not self.multi_org:
+            return AlleleStatus.Single
         else:
             all_values = set()
             all_buckets = set()
@@ -245,7 +256,7 @@ def _iter_report_list(
         allele_statuses:bool = True,
         mode: AccumulationReportMode = AccumulationReportMode.Classification,
         shared_only: bool = True):
-    ALLELE_STATUSES = ["unique", "agreement", "confidence", "discordant", "withdrawn"]
+    ALLELE_STATUSES = ["Single Submitter", "Agreement", "Confidence", "Discordant", "Withdrawn"]
     cag = ClassificationAccumulationGraph(mode=mode, shared_only=shared_only)
     report_data = cag.report()
 
@@ -267,7 +278,7 @@ def _iter_report_list(
         row_date = [row.at.strftime('%Y-%m-%d')]
         if allele_statuses:
             row_date.extend([
-                row.counts.get(AlleleStatus.Unique, 0),
+                row.counts.get(AlleleStatus.Single, 0),
                 row.counts.get(AlleleStatus.Agreement, 0),
                 row.counts.get(AlleleStatus.Confidence, 0),
                 row.counts.get(AlleleStatus.Discordant, 0),
