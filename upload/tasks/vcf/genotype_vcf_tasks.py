@@ -165,7 +165,7 @@ class SomalierVCFTask(ImportVCFStepTask):
         vcf = uploaded_vcf.vcf
         if vcf.has_genotype:
             somalier_vcf_id(vcf.pk)
-            somalier_all_samples()
+            # somalier_all_samples()
 
 
 class ImportGenotypeVCFSuccessTask(ImportVCFStepTask):

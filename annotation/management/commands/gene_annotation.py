@@ -20,7 +20,7 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument('--force', action="store_true", help="Force create new GeneAnnotation for same release")
         group = parser.add_mutually_exclusive_group(required=True)
-        group.add_argument('--gene-annotation-release', type=int)
+        group.add_argument('--gene-annotation-release')
         group.add_argument('--missing', action="store_true",
                            help="Automatically create for latest AnnotationVersions for each build if missing")
 
