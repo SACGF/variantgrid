@@ -191,8 +191,8 @@ class GenesGrid(JqGridUserRowConfig):
 
     def __init__(self, user, genome_build_name, **kwargs):
         extra_filters = kwargs.pop("extra_filters", None)
-        super().__init__(user)
         self.fields = _get_gene_fields()
+        super().__init__(user)
         queryset = self.model.objects.all()
         genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
 
