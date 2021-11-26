@@ -123,13 +123,17 @@ class VariantGrid(JqGridSQL):
             self.queryset_is_sorted = True
         return qs
 
-    def get_values_queryset(self):
+    def get_values_queryset(self, field_names: List = None):
+        if field_names is None:
+            field_names = self.get_queryset_field_names()
+
         self.queryset = self._get_queryset()
         if self.node_count:
             analysis = self.node.analysis
             extra_filters_q = get_extra_filters_q(analysis.user, analysis.genome_build, self.node_count.label)
             self.queryset = self.queryset.filter(extra_filters_q)
-        self.queryset = self.queryset.values(*self.get_queryset_field_names())
+
+        self.queryset = self.queryset.values(*field_names)
         return self.queryset
 
     def column_in_queryset_fields(self, field):
