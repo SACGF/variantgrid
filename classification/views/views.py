@@ -637,7 +637,7 @@ def clin_sig_change_data(request):
     def yield_data():
 
         genome_build = GenomeBuildManager.get_current_genome_build()
-        yield delimited_row(['classification first submitted', 'date changed', 'org', 'lab', f'c.hgvs {genome_build}', 'url', 'from', 'to', 'status', 'comments', 'discordance(s)', 'other labs for allele at time'], '\t')
+        yield delimited_row(['Classification First Submitted (UTC)', 'Date Changed (UTC)', 'Org', 'Lab', f'c.hgvs {genome_build}', 'URL', 'From', 'To', 'Status', 'Comments', 'Discordance(s)', 'Other Labs for Allele at Time'], '\t')
 
         flag_changed_re = re.compile(r"^Classification (has )?changed from (?P<from>.*?) to (?P<to>.*?)$")
         de_number_re = re.compile(r"(.*?) [(].*?[)]")
