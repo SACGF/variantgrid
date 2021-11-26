@@ -591,7 +591,7 @@ def create_fastqs_for_sample_sheet(sample_sheet, existing_fastq_files, existing_
 def unaligned_reads_list_from_fastqs(fastq_pairs):
     unaligned_reads_list = []
 
-    for _, reads in fastq_pairs.items():
+    for reads in fastq_pairs.values():
         fastq_r1 = reads.get("R1")
         fastq_r2 = reads.get("R2")
         if fastq_r1 and fastq_r2:
