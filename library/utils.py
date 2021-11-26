@@ -443,7 +443,7 @@ def group_by_key(qs: Iterable, key: attrgetter) -> Iterator[Tuple[Any, List]]:
 
 # note this tags expected in a single line of text
 # don't catch too many tags in case you get some false positives
-EXPECTED_HTML_TAGS_SINGLE_LINE = {'div', 'b', 'i', 'u', 'strong', 'em'}
+EXPECTED_HTML_TAGS_SINGLE_LINE = {'div', 'b', 'i', 'u', 'strong', 'em', 'sup', 'sub'}
 
 
 def cautious_attempt_html_to_text(text: str, whitelist: Set[str] = None) -> str:
