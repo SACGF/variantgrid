@@ -25,7 +25,7 @@ def jsonify_for_js(json_me, pretty=False) -> Union[str, Any]:
         return mark_safe('false')
     if isinstance(json_me, (int, float)):
         return json_me
-    indent = 0 if not pretty else 4
+    indent = None if not pretty else 4
     text = json.dumps(json_me, indent=indent)
     if pretty:
         # this stops arrays of arrays taking up too much vertical space
