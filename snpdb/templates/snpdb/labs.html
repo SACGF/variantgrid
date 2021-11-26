@@ -1,6 +1,7 @@
 {% extends "uicore/page/base.html" %}
 {% load ui_menu_bars %}
 {% load ui_utils %}
+{% load ui_tabs_builder %}
 {% load ui_help %}
 {% load js_tags %}
 {% load lab_tags %}
@@ -11,12 +12,11 @@
 <script type="text/javascript" src="{% static 'js/lib/plotly-latest.min.js' %}"></script>
 <script type="text/javascript" src="{% static 'js/plotly_helper.js' %}"></script>
 <style>
-    #graph-carousel .carousel-control-next,
-    #graph-carousel .carousel-control-prev,
-    #graph-carousel .carousel-indicators {
+    .carousel-control-next,
+    .carousel-control-prev,
+    .carousel-indicators {
         filter: invert(100%);
     }
-
     .lab-card {
         height: 100%;
     }
@@ -50,11 +50,21 @@
     }
 
     $(document).ready(() => {
+        let graph_width = 1000;
+        let graph_height = 400;
         {% if vc_org_data %}
             let vc_org_data = {{ vc_org_data | jsonify }};
-            plotClassifications('org-classifications-graph', vc_org_data, 'Classifications per Organisation', 700, 380);
+            plotClassifications('org-classifications-graph', vc_org_data, 'Allele Clinical Significance by Organisation', graph_width, graph_height);
         {% endif %}
-
+        {% if accumulation_by_status %}
+            let accumulation_by_status = {{ accumulation_by_status | jsonify }};
+            plotCumulativeClassifications("accumulation-status-graph", accumulation_by_status, "Cumulative Alleles by  Status", graph_width, graph_height)
+        {% endif %}
+        {% if accumulation_by_org %}
+            let accumulation_by_org = {{ accumulation_by_org | jsonify }};
+            plotCumulativeClassifications("accumulation-org-graph", accumulation_by_org, "Cumulative Alleles by Organisation", graph_width, graph_height)
+        {% endif %}
+        {% comment %}
         {% if vc_state_data %}
             let vc_state_data = {{ vc_state_data | jsonify }};
             plotClassifications('state-classifications-graph', vc_state_data, 'Classifications per State', 700, 380);
@@ -64,60 +74,36 @@
             let vc_normalized_state_data_json = {{ vc_normalized_state_data_json | jsonify }};
             plotClassifications('normalized-state-classifications-graph', vc_normalized_state_data_json, 'Classifications/100k Pop by State', 700, 380);
         {% endif %}
-
-        {% if classification_accumulation_traces %}
-            let classification_accumulation_traces = {{ classification_accumulation_traces | jsonify }};
-            plotCumulativeClassifications("classifications-accumulation-graph", classification_accumulation_traces, "Cumulative Classifications", 700, 380)
-        {% endif %}
-        {% if classification_accumulation_traces_allele %}
-            let classification_accumulation_traces_allele = {{ classification_accumulation_traces_allele | jsonify }};
-            plotCumulativeClassifications("classifications-accumulation-graph-allele", classification_accumulation_traces_allele, "Cumulative Alleles", 700, 380)
-        {% endif %}
-
+        {% endcomment %}
     });
 </script>
 {% endblock %}
 {% block content %}
     <div class="container">
         <h3>Lab Submissions</h3>
+        <p class="text-info">These graphs plot data as one point per allele. This means 10 records for the same allele will only count once.</p>
         <div class="row">
-            <div id="graph-carousel" class="col-lg-8 carousel slide" data-ride="carousel">
-              <ol class="carousel-indicators">
-                <li data-target="#graph-carousel" title="By State" data-slide-to="0" class="active"></li>
-                <li data-target="#graph-carousel" title="By Org" data-slide-to="1"></li>
-                <li data-target="#graph-carousel" title="State pop" data-slide-to="2"></li>
-                <li data-target="#graph-carousel" title="Cumulative" data-slide-to="3"></li>
-              </ol>
-              <div class="carousel-inner">
-                {% if vc_state_data %}
-                    <div class="carousel-item active"><div id='state-classifications-graph'></div></div>
-                {% endif %}
+            <div class="col">
+
+                {% ui_register_tabs tab_set="graph_tabs" %}
                 {% if vc_org_data %}
-                    <div class="carousel-item"><div id='org-classifications-graph'></div></div>
+                    {% ui_register_tab_embedded tab_set="graph_tabs" label="Clinical Significance by Org" %}<div id='org-classifications-graph'></div>{% end_ui_register_tab_embedded %}
                 {% endif %}
-                {% if vc_normalized_state_data_json %}
-                    <div class="carousel-item"><div id='normalized-state-classifications-graph'></div></div>
+                {% if accumulation_by_status %}
+                    {% ui_register_tab_embedded tab_set="graph_tabs" label="Cumulative Alleles by Status" %}<div id='accumulation-status-graph'></div>{% end_ui_register_tab_embedded %}
                 {% endif %}
-                {% if classification_accumulation_traces %}
-                    <div class="carousel-item"><div id='classifications-accumulation-graph'></div></div>
+                {% if accumulation_by_org %}
+                    {% ui_register_tab_embedded tab_set="graph_tabs" label="Cumulative Alleles by Org" %}<div id='accumulation-org-graph'></div>{% end_ui_register_tab_embedded %}
                 {% endif %}
-                {% if classification_accumulation_traces_allele %}
-                    <div class="carousel-item"><div id='classifications-accumulation-graph-allele'></div></div>
-                {% endif %}
-              </div>
-              <a class="carousel-control-prev" href="#graph-carousel" role="button" data-slide="prev">
-                <span class="carousel-control-prev-icon" aria-hidden="true"></span>
-                <span class="sr-only">Previous</span>
-              </a>
-              <a class="carousel-control-next" href="#graph-carousel" role="button" data-slide="next">
-                <span class="carousel-control-next-icon" aria-hidden="true"></span>
-                <span class="sr-only">Next</span>
-              </a>
+                {% ui_render_tabs tab_set="graph_tabs" mode="tabs" %}
+
             </div>
+            {% comment %} This just becomes a graph of Australian capital cities
             <div class="col-lg-4">
               {% load lab_location_tags %}
               {% lab_locations labs=labs involved_only=False center_lat=-33 center_long=133.7751 zoom_level=3 %}
             </div>
+           {% endcomment %}
         </div>
 
         <div class="row equal">

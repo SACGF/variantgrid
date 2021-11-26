@@ -35,7 +35,7 @@ from annotation.models.models_gene_counts import GeneValueCountCollection, \
     GeneCountType, SampleAnnotationVersionVariantSource, CohortGeneCounts
 from classification.classification_stats import get_grouped_classification_counts
 from classification.models.clinvar_export_sync import clinvar_export_sync
-from classification.views.classification_accumulation_graph import get_classification_accumulation_traces, \
+from classification.views.classification_accumulation_graph import get_accumulation_graph_data, \
     AccumulationReportMode
 from classification.views.classification_datatables import ClassificationColumns
 from genes.custom_text_gene_list import create_custom_text_gene_list
@@ -1281,8 +1281,10 @@ def labs(request):
         field=org_field,
         max_groups=15,
         field_labels=name_to_short_name,
-        show_unclassified=show_unclassified)
+        show_unclassified=show_unclassified,
+        allele_level=True)
 
+    """
     vc_state_data_json = get_grouped_classification_counts(
         user=request.user,
         field=state_field,
@@ -1299,6 +1301,7 @@ def labs(request):
         max_groups=15,
         show_unclassified=show_unclassified,
         norm_factor=state_pop_multiplier)
+    """
 
     active_organizations = Organization.objects.filter(active=True).order_by('name')
     organization_labs = {}
@@ -1315,13 +1318,16 @@ def labs(request):
         "labs": lab_list,
         "shared_classifications": settings.VARIANT_CLASSIFICATION_STATS_USE_SHARED,
         "vc_org_data": vc_org_data_json,
-        "vc_state_data": vc_state_data_json,
-        "vc_normalized_state_data_json": vc_normalized_state_data_json,
+        # "vc_state_data": vc_state_data_json,
+        # "vc_normalized_state_data_json": vc_normalized_state_data_json,
         "show_unclassified": show_unclassified,
     }
 
+    graph_data = get_accumulation_graph_data(mode=AccumulationReportMode.Allele)
+    context["accumulation_by_status"] = graph_data["status"]
     if request.user.is_superuser:
-        context["classification_accumulation_traces_allele"] = get_classification_accumulation_traces(mode=AccumulationReportMode.Allele)
+        # TODO, do we really need to hide this graph away?
+        context["accumulation_by_org"] = graph_data["org"]
 
     return render(request, "snpdb/labs.html", context)
 

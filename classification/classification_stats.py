@@ -1,6 +1,6 @@
 import operator
 from collections import Counter, defaultdict
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Set
 
 import numpy as np
 from django.conf import settings
@@ -51,7 +51,8 @@ def get_grouped_classification_counts(user: User,
                                       field_labels: Optional[Dict[str, str]] = None,
                                       max_groups=10,
                                       show_unclassified=True,
-                                      norm_factor: Dict[str, float] = None) -> List[Dict[str, Dict]]:
+                                      norm_factor: Dict[str, float] = None,
+                                      allele_level: bool = False) -> List[Dict[str, Dict]]:
     """ :param user: User used to check visibility of classifications
         :param field: the value we're extracting from evidence to group on (from Classification)
         :param evidence_key: label from ekey lookup
@@ -59,17 +60,26 @@ def get_grouped_classification_counts(user: User,
         mutually exclusive with evidence_key
         :param max_groups: the max size of the returns list
         :param show_unclassified: return counts for clinical_significance=None (as 'Unclassified')
+        :param allele_level: if True should only count one record per allele (currently cheats and assumes each lab
+        only submits primarily in one genome so uses variant)
         :return: data for graphing, a list of dicts with x,y,name and type
     """
     if evidence_key and field_labels:
         raise ValueError("Can't supply both 'evidence_key' and 'field_labels'")
 
     vc_qs = get_visible_classifications_qs(user)
-    values_qs = vc_qs.values_list("clinical_significance", field)
+    values_qs = vc_qs.values_list("clinical_significance", field, "classification__variant")
 
     counts = Counter()
     classification_counts = defaultdict(Counter)
-    for clinical_significance, field in values_qs:
+    seen_variants: Set[int] = set()
+
+    for clinical_significance, field, variant in values_qs:
+        if allele_level:
+            if variant in seen_variants:
+                continue
+            seen_variants.add(variant)
+
         if evidence_key:
             # field will either be evidence or published evidence
             value = Classification.get_optional_value_from(field, evidence_key)

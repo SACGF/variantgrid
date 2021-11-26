@@ -54,6 +54,25 @@ class AlleleStatus(IntEnum):
     Withdrawn = 5
 
 
+allele_status_report = [AlleleStatus.Withdrawn, AlleleStatus.Discordant, AlleleStatus.Confidence, AlleleStatus.Agreement, AlleleStatus.Single]
+
+
+@dataclass
+class AlleleStatusData:
+    label: str
+    color: str
+    line_color: str
+
+
+allele_status_data = {
+    AlleleStatus.Single: AlleleStatusData(label="Single Submitter", color="#ccc", line_color="#888"),
+    AlleleStatus.Agreement: AlleleStatusData(label="Agreement", color="#88dd88", line_color="#66bb66"),
+    AlleleStatus.Confidence: AlleleStatusData(label="Confidence", color="#fff3cd", line_color="#ddd1ab"),
+    AlleleStatus.Discordant: AlleleStatusData(label="Discordant", color="#ebb", line_color="#c99"),
+    AlleleStatus.Withdrawn: AlleleStatusData(label="Withdrawn", color="#111", line_color="#000"),
+}
+
+
 class AccumulationReportMode(str, Enum):
     Classification = "classification"
     Allele = "allele"
@@ -186,6 +205,7 @@ class ClassificationAccumulationGraph:
             if flag_collection_id not in flag_collection_id_to_allele_classification:
                 if classification_match := Classification.objects \
                         .values_list("variant__variantallele__allele_id", "id", "lab__organization__name") \
+                        .filter(lab__external=False) \
                         .filter(flag_collection_id=flag_collection_id) \
                         .filter(share_level__in=self.share_levels) \
                         .first():
@@ -203,8 +223,11 @@ class ClassificationAccumulationGraph:
         return IterableTransformer(flag_qs, transformer)
 
     def classification_iterable(self):
-        cm_qs_summary = ClassificationModification.objects.filter(published=True, classification__variant__isnull=False,
-                                                          share_level__in=self.share_levels).order_by(
+        cm_qs_summary = ClassificationModification.objects.filter(
+            published=True,
+            classification__variant__isnull=False,
+            share_level__in=self.share_levels,
+            classification__lab__external=False).order_by(
             "created").values_list("classification_id", "created",
                                             "published_evidence__clinical_significance__value",
                                             "classification__variant__variantallele__allele_id",
@@ -217,7 +240,7 @@ class ClassificationAccumulationGraph:
 
         return IterableTransformer(cm_qs_summary, classification_transformer)
 
-    def report(self):
+    def report(self) -> List['ClassificationAccumulationGraph._SummarySnapshot']:
 
         time_delta = relativedelta.relativedelta(days=7)
 
@@ -253,10 +276,8 @@ class ClassificationAccumulationGraph:
 
 
 def _iter_report_list(
-        allele_statuses:bool = True,
         mode: AccumulationReportMode = AccumulationReportMode.Classification,
         shared_only: bool = True):
-    ALLELE_STATUSES = ["Single Submitter", "Agreement", "Confidence", "Discordant", "Withdrawn"]
     cag = ClassificationAccumulationGraph(mode=mode, shared_only=shared_only)
     report_data = cag.report()
 
@@ -268,22 +289,14 @@ def _iter_report_list(
     org_list = list(valid_orgs)
     org_list.sort()
 
-    header = ["date"]
-    if allele_statuses:
-        header += ALLELE_STATUSES
+    header = ["Date"] + [allele_status_data[status].label for status in allele_status_report]
     header.extend(org_list)
 
     yield header
     for row in report_data:
         row_date = [row.at.strftime('%Y-%m-%d')]
-        if allele_statuses:
-            row_date.extend([
-                row.counts.get(AlleleStatus.Single, 0),
-                row.counts.get(AlleleStatus.Agreement, 0),
-                row.counts.get(AlleleStatus.Confidence, 0),
-                row.counts.get(AlleleStatus.Discordant, 0),
-                row.counts.get(AlleleStatus.Withdrawn, 0)
-            ])
+        for status in allele_status_report:
+            row_date.append(row.counts.get(status, 0))
         row_date.extend([row.counts.get(org, 0) for org in org_list])
         yield row_date
 
@@ -301,19 +314,41 @@ def download_report(request):
     return response
 
 
-def get_classification_accumulation_traces(mode: AccumulationReportMode = AccumulationReportMode.Classification) -> List[Dict]:
-    data = list(_iter_report_list(allele_statuses=False, mode=mode))
+def get_accumulation_graph_data(mode: AccumulationReportMode = AccumulationReportMode.Classification) -> List[Dict]:
+    data = list(_iter_report_list(mode=mode))
     header = data[0]
     rows = data[1:]
     df = pd.DataFrame(rows, columns=header)
-    orgs = df.columns[1:]
-    dates = df["date"].tolist()
-    traces = []
+    orgs = df.columns[6:]
+    statuses = df.columns[1:5]
+    dates = df["Date"].tolist()
+
+    by_org = list()
+    by_status = list()
+
     for org in orgs:
-        traces.append({
+        by_org.append({
             "x": dates,
             "y": df[org].tolist(),
-            "name": org,
+            "name": org
         })
-    traces.sort(key=lambda t: t["y"][-1], reverse=True)
-    return traces
+
+    for status in allele_status_report[1:]:
+        status_data = allele_status_data[status]
+        by_status.append({
+            "x": dates,
+            "y": df[status_data.label].tolist(),
+            "name": status_data.label,
+            "fillcolor": status_data.color,
+            "line": {
+                "color": status_data.line_color
+            },
+            "stackgroup": "one"
+        })
+
+    by_org.sort(key=lambda t: t["y"][-1], reverse=True)
+
+    return {
+        "org": by_org,
+        "status": by_status
+    }
