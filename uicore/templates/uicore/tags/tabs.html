@@ -15,6 +15,31 @@
               </div>
             {% endfor %}
         </div>
+    {% elif mode == 'carousel' %}
+        {% comment %}If we don't want the carousel to auto-transition, set data-interval="false"{% endcomment %}
+        <div id="{{ id }}" class="carousel slide" data-ride="carousel">
+            <ol class="carousel-indicators">
+                {% for tab in tab_builder.tabs %}
+                    <li data-target="#{{ id }}" title="{{ tab.label }}" data-slide-to="{{ forloop.counter0 }}" {% if tab.active %}class="active"{% endif %}></li>
+                {% endfor %}
+            </ol>
+
+            <div class="carousel-inner">
+                {% for tab in tab_builder.tabs %}
+                    <div id="{{ tab.tab_id }}" class="carousel-item {% if tab.active %}active{% endif %}">
+                        {{ tab.content }}
+                    </div>
+                {% endfor %}
+            </div>
+            <a class="carousel-control-prev" href="#{{ id }}" role="button" data-slide="prev">
+                <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+                <span class="sr-only">Previous</span>
+              </a>
+              <a class="carousel-control-next" href="#{{ id }}" role="button" data-slide="next">
+                <span class="carousel-control-next-icon" aria-hidden="true"></span>
+                <span class="sr-only">Next</span>
+              </a>
+        </div>
     {% else %}
         <div class="{{ css }}" id="{{ id }}">
             <ul class="nav nav-tabs mb-4" role="tablist">
