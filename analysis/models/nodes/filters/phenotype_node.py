@@ -6,6 +6,7 @@ from typing import Optional, Tuple, List
 from django.db import models
 from django.db.models.deletion import SET_NULL, CASCADE
 from django.db.models.query_utils import Q
+from lazy import lazy
 
 from analysis.models.nodes.analysis_node import AnalysisNode
 from annotation.models import VariantTranscriptAnnotation, OntologyTerm
@@ -119,7 +120,7 @@ class PhenotypeNode(AnalysisNode):
 
     def _get_method_summary(self):
         if self.modifies_parents():
-            method_list = self._get_short_and_long_descriptions()[1]
+            method_list = self._short_and_long_descriptions[1]
 
             genes_symbols_qs = GeneSymbol.objects.filter(geneversion__gene__in=self.get_gene_qs()).distinct()
             genes_symbols = ', '.join(genes_symbols_qs.order_by("pk").values_list("pk", flat=True))
@@ -130,7 +131,8 @@ class PhenotypeNode(AnalysisNode):
 
         return method_summary
 
-    def _get_short_and_long_descriptions(self) -> Tuple[List[str], List[str]]:
+    @lazy
+    def _short_and_long_descriptions(self) -> Tuple[List[str], List[str]]:
         long_descriptions = []
         short_descriptions = []
 
@@ -166,7 +168,7 @@ class PhenotypeNode(AnalysisNode):
             if self.accordion_panel == self.PANEL_PATIENT and self.patient:
                 name = f"{self.patient} patient phenotypes"
             else:
-                short_descriptions, long_descriptions = self._get_short_and_long_descriptions()
+                short_descriptions, long_descriptions = self._short_and_long_descriptions
 
                 long_description = ','.join(long_descriptions)
                 if len(long_description) <= MAX_NAME_LENGTH:
