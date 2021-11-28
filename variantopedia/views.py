@@ -50,7 +50,7 @@ from variantopedia import forms
 from variantopedia.interesting_nearby import get_nearby_qs, get_method_summaries, get_nearby_summaries
 from variantopedia.search import search_data, SearchResults
 from variantopedia.server_status import get_dashboard_notices
-from variantopedia.tasks.server_status_tasks import notify_server_status
+from variantopedia.tasks.server_status_tasks import notify_server_status, notify_server_status_now
 
 
 def variants(request):
@@ -102,7 +102,7 @@ def server_status(request):
     if request.method == "POST":
         action = request.POST.get('action')
         if action == 'Test Slack':
-            notify_server_status.apply_async()
+            notify_server_status_now()
             messages.add_message(request, level=messages.INFO, message=f"Slack should have been sent the health check.")
         elif action == 'Test Rollbar':
             report_message("Testing Rollbar", level='error')
