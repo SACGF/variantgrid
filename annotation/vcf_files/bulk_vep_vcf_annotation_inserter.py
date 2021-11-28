@@ -137,10 +137,12 @@ class BulkVEPVCFAnnotationInserter:
         extract_cosmic = get_extract_existing_variation("COSV")
         extract_dbsnp = get_extract_existing_variation("rs")
 
-        # Some variants return 2 rsIds, and 2 frequencies eg "0.6764&0.2433" - take max
+        # Some annotations return multiple results eg 2 frequencies eg "0.6764&0.2433"
+        # Need to work out what to do (eg pick max)
         self.field_formatters = {
             "af_1kg": format_pick_highest_float,
             "af_uk10k": format_pick_highest_float,
+            "gnomad2_liftover_af": format_pick_highest_float,
             "cosmic_count": format_pick_highest_int,
             "cosmic_id": extract_cosmic,
             "cosmic_legacy_id": remove_empty_multiples,
