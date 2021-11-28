@@ -1,5 +1,6 @@
-from django.template import Library
 import json
+
+from django.template import Library
 
 from analysis.models.nodes.analysis_node import NodeAlleleFrequencyFilter
 from analysis.serializers import NodeAlleleFrequencyFilterSerializer

@@ -1,14 +1,28 @@
 import json
+import re
 import uuid
+from html import escape
 from typing import Optional, Any
 
 from django import template
+from django.contrib.auth.models import User
+from django.forms.utils import ErrorList
 from django.template.base import FilterExpression, kwarg_re
-import re
-
 from django.utils.safestring import SafeString
 
 register = template.Library()
+
+
+@register.filter()
+def append(suffix, postfix):
+    # man django templates are lame that you need to make this
+    # appends two things together to give you a string
+    return_str = ""
+    if suffix is not None:
+        return_str += str(suffix)
+    if postfix is not None:
+        return_str += str(postfix)
+    return return_str
 
 
 @register.simple_tag(takes_context=True)
@@ -80,7 +94,7 @@ def render_install_instructions(parser, token):
 
 class InstallInstructionsTag(template.Node):
 
-    def __init__(self, nodelist, installed: bool, label: FilterExpression = None):
+    def __init__(self, nodelist, installed: FilterExpression, label: FilterExpression = None):
         self.nodelist = nodelist
         self.installed = installed
         self.label = label
@@ -95,16 +109,21 @@ class InstallInstructionsTag(template.Node):
             id_safe = str(uuid.uuid4()).replace("-", "_") + "_instructions"
         else:
             id_safe = re.sub(r"\W", "_", label_str).lower()
-        css_classes = ["install-instructions"]
+
+        div_css_classes = ["install-instructions", "collapse"]
+        link_css_classes = ["toggle-link"]
+        link_extra = ""
         if self.installed.resolve(context):
-            css_classes.append("collapse")
+            link_css_classes.append("collapsed")
         else:
-            css_classes.append("not-installed")
+            link_extra = "aria-expanded='true'"
+            div_css_classes.append("not-installed")
+            div_css_classes.append("show")
 
         return f"""
         <div>
-        <a class='toggle-link install-instructions-toggle' data-toggle='collapse' href='#{id_safe}'>{label_str} Install/Update Instructions</a>
-        <div class='{' '.join(css_classes)}' id='{id_safe}'>
+        <a class='{' '.join(link_css_classes)}' data-toggle='collapse' href='#{id_safe}' {link_extra}><i class="fas fa-key" aria-hidden="true"></i> {label_str} Install/Update Instructions</a>
+        <div class='{' '.join(div_css_classes)}' id='{id_safe}'>
         {self.nodelist.render(context)}
         </div>
         </div>
@@ -141,7 +160,9 @@ def render_labelled(parser, token):
                             label_css=kwargs.get('label_css'),
                             value_css=kwargs.get('value_css'),
                             row_css=kwargs.get('row_css'),
-                            shorten_label=kwargs.get('shorten_label')
+                            shorten_label=kwargs.get('shorten_label'),
+                            admin_only=kwargs.get('admin_only'),
+                            errors=kwargs.get('errors')
                             )
 
 
@@ -154,7 +175,9 @@ class LabelledValueTag(template.Node):
                  label_css: FilterExpression = None,
                  value_css: FilterExpression = None,
                  row_css: FilterExpression = None,
-                 shorten_label: FilterExpression = None):
+                 shorten_label: FilterExpression = None,
+                 admin_only: FilterExpression = None,
+                 errors: FilterExpression = None):
         self.id_prefix = id_prefix
         self.nodelist = nodelist
         self.value_id = value_id
@@ -164,6 +187,8 @@ class LabelledValueTag(template.Node):
         self.value_css = value_css
         self.row_css = row_css
         self.shorten_label = shorten_label
+        self.admin_only = admin_only
+        self.errors = errors
 
     id_regex = re.compile(r"id=[\"|'](.*?)[\"|']")
     big_zero = re.compile(r"^0([.]0+)?$")
@@ -174,7 +199,14 @@ class LabelledValueTag(template.Node):
         complete_id = value_id
         if prefix_id and value_id:
             complete_id = f"{prefix_id}-{value_id}"
+
         label = TagUtils.value_str(context, self.label, (value_id.replace('_', ' ') if value_id else ""))
+        if TagUtils.value_bool(context, self.admin_only):  # if admin only
+            user: User = context.request.user
+            if not user.is_superuser:
+                return ""
+            else:
+                label = '<i class="fas fa-key" title="Admin only functionality"></i>' + label
 
         popover = None
 
@@ -238,6 +270,12 @@ class LabelledValueTag(template.Node):
         elif LabelledValueTag.big_zero.match(output):
             output = f"<span class=\"zero-value\">{output}</span>"
 
+        errors: Optional[ErrorList]
+        if filter_errors := self.errors:
+            if errors := filter_errors.resolve(context):
+                for error in errors:
+                    output += f'<div class="text-danger">{error}</div>'
+
         label_tag = f'<label {for_id} class="{label_css}">{label}</label>'
         if popover:
             popover = popover.replace('"', '&quot;')
@@ -247,7 +285,78 @@ class LabelledValueTag(template.Node):
 
         if hint == "inline":
             return content
-        return f'<div class="{row_css}">{content}</div>'
+
+        content = f'<div class="{row_css}">{content}</div>'
+
+        return content
+
+
+@register.tag(name='modal')
+def render_labelled(parser, token):
+    tag_name, args, kwargs = parse_tag(token, parser)
+    nodelist = parser.parse(('endmodal',))
+    parser.delete_first_token()
+    return ModalTag(
+        nodelist,
+        id=kwargs.get('id'),
+        label=kwargs.get('label'),
+        show_prefix=kwargs.get('show_prefix'),
+        size=kwargs.get('size'),
+        admin_only=kwargs.get('admin_only')
+    )
+
+
+class ModalTag(template.Node):
+    def __init__(self, nodelist,
+                 id: FilterExpression = None,
+                 label: FilterExpression = None,
+                 show_prefix: FilterExpression = None,
+                 size: FilterExpression = None,
+                 admin_only: FilterExpression = None):
+        self.nodelist = nodelist
+        self.id = id
+        self.label = label
+        self.show_prefix = show_prefix
+        self.size = size
+        self.admin_only = admin_only
+
+    def render(self, context):
+        admin_only_bool = TagUtils.value_bool(context, self.admin_only)
+        if admin_only_bool and not context.request.user.is_superuser:
+            return ""
+
+        # if an ID isn't provided, generate a uuid and make sure it starts with a letter
+        id_str = escape(TagUtils.value_str(context, self.id) or "x" + str(uuid.uuid4()))
+        label_str = TagUtils.value_str(context, self.label)
+        output = self.nodelist.render(context)
+
+        link = "<div>"
+        if admin_only_bool:
+            link += '<i class="fas fa-key" title="Admin only functionality"></i>'
+
+        show_prefix_bool = TagUtils.value_bool(context, self.show_prefix, True)
+        link += f'<a href="#{id_str}" data-toggle="modal" class="modal-link">{"Show " if show_prefix_bool else ""}{label_str}</a>'
+        link += "</div>"
+
+        size_str = TagUtils.value_str(context, self.size, "xl")
+
+        modal = \
+            f"""
+                <div id="{id_str}" class="modal" tabindex="-1">
+                    <div class="modal-dialog modal-dialog-scrollable modal-{size_str}">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">{label_str}</h5>
+                                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                  <span aria-hidden="true">&times;</span>
+                                </button>
+                            </div>
+                            {output}
+                        </div>
+                    </div>
+                </div>
+            """
+        return link + modal
 
 
 @register.filter()
@@ -322,6 +431,32 @@ def boolean(test: bool) -> str:
         return SafeString('<i class="text-success fas fa-check-circle" style="margin-top:4px"></i>')
     else:
         return SafeString('<i class="text-secondary fas fa-times-circle" style="margin-top:4px"></i>')
+
+
+@register.filter()
+def value(value: Any) -> str:
+    if isinstance(value, bool):
+        return boolean(value)
+    if value == '' or value == 0 or value == '-':
+        return SafeString(f'<span class="no-value">{value}</span>')
+    elif isinstance(value, int):
+        return f'{value:,}'
+    else:
+        return value
+
+
+@register.filter()
+def secret(value: Any, length: int = -4) -> str:
+    if value is None:
+        return ""
+    else:
+        str_value = str(value)
+        if length > 0:
+            return SafeString("<span class='secret'>" + escape(str_value[0:length]) + "****</span>")
+        elif length < 0:
+            return SafeString("<span class='secret'>****" + escape(str_value[length:]) + "</span>")
+        else:
+            return str_value
 
 
 class TagUtils:

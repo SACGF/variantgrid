@@ -1,4 +1,5 @@
 import os
+
 from variantgrid.settings.components.default_settings import BASE_DIR, MANAGE_COMMAND, PRIVATE_DATA_ROOT
 
 SEQAUTO_ENABLED = False
@@ -52,12 +53,16 @@ SEQAUTO_HISEQ_ALIGNED_PATTERN = "%(sample_id)s"
 
 SEQAUTO_BAM_PATTERN = "%(sample_name)s.hg38.bam"
 SEQAUTO_VCF_PATTERN = "gatk_per_sample/%(sample_name)s.gatk.hg38.vcf.gz"
+
+# If the sequencing run name ends with '_FFPE' we'll add "_ffpe" onto the end of the kit name
 SEQAUTO_COMBINED_VCF_PATTERNS_FOR_KIT = {
     "default": ["%(sequencing_run)s.gatk.hg38.vcf.gz"],
     "idt_haem": [
         "%(sequencing_run)s.vardict.hg38.vcf.gz",
-        "%(sequencing_run)s.mutect.hg38.vcf.gz",
     ],
+    "idt_gmp_focus_ffpe": [
+        "%(sequencing_run)s.vardict.hg38.vcf.gz",
+    ]
 }
 
 SEQAUTO_GOI_LIST_PATTERN = "%(sequencing_run)s_%(sample_name)s.txt"

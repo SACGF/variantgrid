@@ -269,6 +269,9 @@
 .flag.flag-classification_transcript_version_change.res-tv_rejected {
   background-image: url(/static/icons/flags/transcript_ver_change_rejected.svg);
 }
+.flag.flag-classification_not_public {
+  background-image: url(/static/icons/flags/world-ban.png);
+}
 .flag.flag-settings {
   background-image: url(/static/icons/flags/settings.svg);
 }

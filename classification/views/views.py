@@ -1,32 +1,47 @@
+import json
+import mimetypes
+import re
 from datetime import datetime
+from typing import Optional, List, Set, Dict
 
 import rest_framework
-import re
 from crispy_forms.bootstrap import FieldWithButtons
 from crispy_forms.layout import Layout, Field, Submit
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import user_passes_test
 from django.core.exceptions import PermissionDenied
-from django.forms import formset_factory
 from django.http import StreamingHttpResponse
 from django.http.request import HttpRequest
 from django.http.response import HttpResponse
 from django.shortcuts import render, get_object_or_404, redirect
 from django.urls import reverse
+from django.utils.timezone import now
 from django.views.decorators.http import require_POST
 from django.views.generic import TemplateView
 from global_login_required import login_not_required
 from jfu.http import upload_receive, UploadResponse, JFUResponse
-import json
-import mimetypes
 from requests.models import Response
-from typing import Optional, List
-
 from rest_framework.status import HTTP_200_OK
 from rest_framework.views import APIView
 
 from annotation.transcripts_annotation_selections import VariantTranscriptSelections
+from classification.autopopulate_evidence_keys.autopopulate_evidence_keys import \
+    create_classification_for_sample_and_variant_objects, generate_auto_populate_data
+from classification.classification_changes import ClassificationChanges
+from classification.classification_stats import get_grouped_classification_counts, \
+    get_classification_counts, get_criteria_counts
+from classification.enums import SubmissionSource, SpecialEKeys
+from classification.models import ClassificationAttachment, Classification, \
+    ClassificationRef, ClassificationJsonParams, ClassificationConsensus, ClassificationReportTemplate, ReportNames, \
+    ConditionResolvedDict
+from classification.models.classification import ClassificationModification
+from classification.models.clinical_context_models import ClinicalContext
+from classification.models.evidence_key import EvidenceKeyMap
+from classification.models.flag_types import classification_flag_types
+from classification.views.classification_datatables import ClassificationColumns
+from classification.views.classification_export_csv import ExportFormatterCSV
+from classification.views.classification_export_redcap import ExportFormatterRedcap
 from flags.models import Flag, FlagComment
 from flags.models.models import FlagType
 from genes.forms import GeneSymbolForm
@@ -34,48 +49,36 @@ from genes.hgvs import get_kind_and_transcript_accession_from_invalid_hgvs
 from library.django_utils import require_superuser, get_url_from_view_path
 from library.file_utils import rm_if_exists
 from library.guardian_utils import is_superuser
-from library.log_utils import log_traceback, report_event
+from library.log_utils import log_traceback
 from library.utils import delimited_row
 from snpdb.forms import SampleChoiceForm, UserSelectForm, LabSelectForm
 from snpdb.genome_build_manager import GenomeBuildManager
-from snpdb.models import Variant, UserSettings, Sample, Allele, Lab, ClinVarKey
+from snpdb.models import Variant, UserSettings, Sample, Lab, Allele
 from snpdb.models.models_genome import GenomeBuild
 from uicore.utils.form_helpers import form_helper_horizontal
-from classification.autopopulate_evidence_keys.autopopulate_evidence_keys import \
-    create_classification_for_sample_and_variant_objects, generate_auto_populate_data
-from classification.classification_stats import get_grouped_classification_counts, \
-    get_classification_counts, get_criteria_counts
-from classification.enums import SubmissionSource, SpecialEKeys, ShareLevel
-from classification.forms import EvidenceKeyForm
-from classification.models import ClassificationAttachment, Classification, \
-    ClassificationRef, ClassificationJsonParams, ClassificationConsensus, ClassificationReportTemplate, ReportNames, \
-    ConditionResolvedDict, ClinVarExportStatus
-from classification.models.clinical_context_models import ClinicalContext
-from classification.models.evidence_key import EvidenceKeyMap
-from classification.models.flag_types import classification_flag_types
-from classification.models.classification import ClassificationModification
-from classification.classification_changes import ClassificationChanges
-from classification.views.classification_datatables import ClassificationColumns
-from classification.views.classification_export_csv import ExportFormatterCSV
-from classification.views.classification_export_redcap import ExportFormatterRedcap
 from variantopedia.forms import SearchAndClassifyForm
 
 
 @user_passes_test(is_superuser)
 def activity(request, latest_timestamp: Optional[str] = None):
     if latest_timestamp:
-        latest_timestamp = datetime.fromtimestamp( float(latest_timestamp) )
+        latest_timestamp = datetime.fromtimestamp(float(latest_timestamp))
     changes = ClassificationChanges.list_changes(latest_date=latest_timestamp)
     last_date = changes[len(changes)-1].date.timestamp() if changes else None
     context = {
         'changes': changes,
         'last_date': last_date,
-        'can_create_classifications': settings.VARIANT_CLASSIFICATION_WEB_FORM_CREATE_BY_NON_ADMIN
+        'can_create_classifications': settings.VARIANT_CLASSIFICATION_WEB_FORM_CREATE_BY_NON_ADMIN,
+        'now': latest_timestamp if latest_timestamp else now()
     }
     return render(request, 'classification/activity.html', context)
 
 
 def classifications(request):
+    """
+    Classification listing page
+    """
+
     user_settings = UserSettings.get_for_user(request.user)
 
     initial = {'classify': True}
@@ -108,7 +111,7 @@ def classifications(request):
         "VARIANT_CLASSIFICATION_GRID_SHOW_USERNAME": settings.VARIANT_CLASSIFICATION_GRID_SHOW_USERNAME,
         "VARIANT_CLASSIFICATION_GRID_SHOW_ORIGIN": settings.VARIANT_CLASSIFICATION_GRID_SHOW_ORIGIN,
         "VARIANT_CLASSIFICATION_ID_FILTER": settings.VARIANT_CLASSIFICATION_ID_FILTER,
-        "datatable_config": ClassificationColumns(request),
+        "VARIANT_CLASSIFICATION_REDCAP_EXPORT": settings.VARIANT_CLASSIFICATION_REDCAP_EXPORT,
         "user_settings": user_settings,
     }
     return render(request, 'classification/classifications.html', context)
@@ -249,7 +252,8 @@ def classification_history(request, record_id):
     changes = ClassificationChanges.list_changes(classification=ref.record, limit=100)
     context = {
         'changes': changes,
-        'can_create_classifications': Classification.can_create_via_web_form(request.user)
+        'can_create_classifications': Classification.can_create_via_web_form(request.user),
+        'now': now()
     }
     return render(request, 'classification/activity.html', context)
 
@@ -292,11 +296,10 @@ def view_classification(request, record_id):
 
 
 def view_classification_diff(request):
-    records = []
     extra_data = dict()
 
-    if request.GET.get('history'):
-        vc_id = int(request.GET.get('history'))
+    if history_str := request.GET.get('history'):
+        vc_id = int(history_str)
         vc = Classification.objects.get(pk=vc_id)
         qs = ClassificationModification.objects.filter(classification=vc, published=True)
         qs = ClassificationModification.filter_for_user(request.user, qs).order_by('-created')
@@ -317,13 +320,13 @@ def view_classification_diff(request):
         if vc.can_write(request.user) and vc.last_published_version.id != vc.last_edited_version.id:
             records.insert(0, vc.last_edited_version)
 
-    elif request.GET.get('clinical_context'):
-        cc = ClinicalContext.objects.get(pk=request.GET.get('clinical_context'))
+    elif clinical_context_str := request.GET.get('clinical_context'):
+        cc = ClinicalContext.objects.get(pk=clinical_context_str)
         records = cc.classification_modifications
         records.sort(key=lambda cm: cm.curated_date_check, reverse=True)
 
-    elif request.GET.get('variant_compare'):
-        ref = ClassificationRef.init_from_str(user=request.user, id_str=request.GET.get('variant_compare'))
+    elif variant_id_str := request.GET.get('variant_compare'):
+        ref = ClassificationRef.init_from_str(user=request.user, id_str=variant_id_str)
         compare_all = ClassificationModification.latest_for_user(user=request.user, allele=ref.record.variant.allele, published=True)
         # filter out variant we're comparing with, make it last in calculation
         latest_others_for_variant = [vcm for vcm in compare_all if vcm.classification.id != ref.record.id]
@@ -331,14 +334,8 @@ def view_classification_diff(request):
         compare_all = [ref.modification] + latest_others_for_variant
         records = compare_all
 
-    elif request.GET.get('variant'):
-        variant_id = int(request.GET.get('variant'))
-        compare_all = ClassificationModification.latest_for_user(user=request.user, allele=Variant.objects.get(pk=variant_id).allele, published=True)
-        compare_all.sort(key=lambda cm: cm.curated_date_check, reverse=True)
-        records = compare_all
-
-    elif request.GET.get('allele'):
-        allele_id = int(request.GET.get('allele'))
+    elif allele_id_str := request.GET.get('allele'):
+        allele_id = int(allele_id_str)
         compare_all = list(ClassificationModification.latest_for_user(user=request.user, allele=Allele.objects.get(pk=allele_id), published=True))
         compare_all.sort(key=lambda cm: cm.curated_date_check, reverse=True)
         records = compare_all
@@ -346,6 +343,9 @@ def view_classification_diff(request):
     elif cids := request.GET.get('cids'):
         records = [ClassificationModification.latest_for_user(user=request.user, classification=cid, published=True).first() for cid in [cid.strip() for cid in cids.split(',')]]
         records = [record for record in records if record]
+
+    else:
+        raise ValueError("Diff not given valid diff type")
 
     # filter out any Nones inserted by filtering on user permission etc
     records = [record for record in records if record]
@@ -371,24 +371,11 @@ def view_classification_diff(request):
     return render(request, 'classification/classification_diff.html', context)
 
 
-def classification_qs(request):
-    response = HttpResponse(content_type='text/csv')
-    response['Content-Disposition'] = 'attachment; filename="classifications.csv"'
-
-    extra_filters = request.GET.get("extra_filters")
-    if extra_filters:
-        extra_filters = json.loads(extra_filters)
-
-    config = ClassificationColumns(request)
-    qs = ClassificationModification.latest_for_user(user=request.user, published=True)
-    qs = config.filter_queryset(qs)
-    # TODO sort
-
-    return qs
-
-
 def classification_import_tool(request: HttpRequest) -> Response:
-    EKeyFormSet = formset_factory(EvidenceKeyForm, extra=3)
+    """
+    This page allows you to upload a file, the fact that the file is probably to do with classifications
+    doesn't really matter, there's not logic to process it here, just to upload it
+    """
     all_labs = list(Lab.valid_labs_qs(request.user, admin_check=True))
     selected_lab = None
     if len(all_labs) == 1:
@@ -405,6 +392,14 @@ def classification_import_tool(request: HttpRequest) -> Response:
         "selected_lab": selected_lab
     }
     return render(request, 'classification/classification_import_tool.html', context)
+
+
+def classification_qs(request):
+    config = ClassificationColumns(request)
+    qs = ClassificationModification.latest_for_user(user=request.user, published=True)
+    qs = config.filter_queryset(qs)
+    # TODO sort
+    return qs
 
 
 def export_classifications_grid(request):
@@ -461,8 +456,9 @@ def classification_file_delete(request, pk):
     return JFUResponse(request, success)
 
 
-def get_classification_attachment_file_dicts(classification):
-    file_dicts = []
+def get_classification_attachment_file_dicts(classification) -> List[Dict]:
+    file_dicts: List[Dict] = list()
+    vca: ClassificationAttachment
     for vca in classification.classificationattachment_set.all():
         file_dicts.append(vca.get_file_dict())
 
@@ -470,7 +466,7 @@ def get_classification_attachment_file_dicts(classification):
     return file_dicts
 
 
-def view_classification_file_attachment(request, pk, thumbnail=False):
+def view_classification_file_attachment(request, pk, thumbnail=False) -> HttpResponse:
     """ This is not done via static files, so we add security later """
 
     # TODO: Check security/access to Classification
@@ -575,42 +571,32 @@ def create_classification_from_hgvs(request, genome_build_name, hgvs_string):
 
 
 @login_not_required
-def evidence_keys(request, external_page=True, max_share_level=None):
+def evidence_keys(request: HttpRequest) -> HttpResponse:
     """ public page to display EKey details """
 
-    context = {'keys': EvidenceKeyMap.instance().all_keys}
-
-    if external_page:
-        context.update({
-            "external_page": True,
-            "evidence_keys_url": "evidence_keys",
-            "evidence_keys_max_share_level_url": "evidence_keys_max_share_level",
-            "base_template": 'external_base_content_as_submenu_page_content.html',
-        })
-    else:
-        context.update({
-            "evidence_keys_url": "evidence_keys_logged_in",
-            "evidence_keys_max_share_level_url": "evidence_keys_logged_in_max_share_level",
-            "base_template": 'snpdb/menu/menu_classifications_base.html',
-        })
+    context = {
+        'keys': EvidenceKeyMap.instance().all_keys
+    }
     return render(request, 'classification/evidence_keys.html', context)
-
-
-def evidence_keys_logged_in(request, max_share_level=None):
-    return evidence_keys(request, external_page=False, max_share_level=max_share_level)
 
 
 def classification_graphs(request):
     if settings.VARIANT_CLASSIFICATION_STATS_USE_SHARED:
         show_unclassified = False
-        visibility = "Shared"
+        visibility = "shared & matched to a variant"
         evidence_field = "published_evidence"
     else:
         show_unclassified = True
-        visibility = f"Visible to user"
+        visibility = f"visible to {request.user.username}"
         evidence_field = "evidence"
     classification_counts = get_classification_counts(request.user, show_unclassified=show_unclassified)
-    vc_gene_data = get_grouped_classification_counts(request.user, evidence_field, evidence_key="gene_symbol", max_groups=15, show_unclassified=show_unclassified)
+
+    vc_gene_data = get_grouped_classification_counts(
+        user=request.user,
+        field=evidence_field,
+        evidence_key="gene_symbol",
+        max_groups=15,
+        show_unclassified=show_unclassified)
 
     acmg_by_significance = get_criteria_counts(request.user, evidence_field)
     context = {
@@ -651,7 +637,7 @@ def clin_sig_change_data(request):
     def yield_data():
 
         genome_build = GenomeBuildManager.get_current_genome_build()
-        yield delimited_row(['classification first submitted', 'date changed', 'org', 'lab', f'c.hgvs {genome_build}', 'url', 'from', 'to', 'status', 'comments', 'discordance(s)','other labs for allele at time'], '\t')
+        yield delimited_row(['Classification First Submitted (UTC)', 'Date Changed (UTC)', 'Org', 'Lab', f'c.hgvs {genome_build}', 'URL', 'From', 'To', 'Status', 'Comments', 'Discordance(s)', 'Other Labs for Allele at Time'], '\t')
 
         flag_changed_re = re.compile(r"^Classification (has )?changed from (?P<from>.*?) to (?P<to>.*?)$")
         de_number_re = re.compile(r"(.*?) [(].*?[)]")
@@ -671,13 +657,10 @@ def clin_sig_change_data(request):
             cs_to: str = 'ERROR'
             comments: List[str] = list()
             resolution: Optional[str] = 'In Progress'
-            c_hgvs: Optional[str] = 'CANT RESOLVE'
-            org: Optional[str] = 'Record has been deleted'
-            lab: Optional[str] = ''
-            url: Optional[str] = ''
             classification_created: datetime
             date_raised: datetime = flag.created
             discordance_dates: List[datetime] = list()
+            other_labs: Set[Lab] = set()
 
             flag_collection = flag.collection
             if source := flag_collection.source_object:
@@ -693,11 +676,9 @@ def clin_sig_change_data(request):
                     for discordance in Flag.objects.filter(collection=source.flag_collection_safe,
                                                            flag_type=classification_flag_types.discordant).order_by(
                             'created'):
-                        discordance_date = discordance.created
-                        discordance_dates.append(discordance_date)
+                        discordance_dates.append(discordance.created)
 
                     if allele := source.variant.allele:
-                        other_labs = set()
                         cl: Classification
                         for cl in Classification.objects.filter(variant__in=allele.variants):
                             if cl.lab != source.lab and cl.created < flag.created:
@@ -710,7 +691,6 @@ def clin_sig_change_data(request):
                 continue
 
             for index, flag_comment in enumerate(flag.flagcomment_set.order_by('created')):
-                last_comment = flag_comment
                 if text := flag_comment.text:
                     if index == 0:
                         if match := flag_changed_re.match(text):
@@ -726,7 +706,7 @@ def clin_sig_change_data(request):
             other_lab_list = list(other_labs)
             other_lab_list.sort()
             other_lab_str = ", ".join(other_lab.name for other_lab in other_lab_list)
-            discordance_date_str = " ".join([discordance_date.strftime('%Y-%m-%d %H:%M:%S') for dd in discordance_dates])
+            discordance_date_str = " ".join([dd.strftime('%Y-%m-%d %H:%M:%S') for dd in discordance_dates])
             yield delimited_row([classification_created.strftime('%Y-%m-%d %H:%M:%S'), date_raised.strftime('%Y-%m-%d %H:%M:%S'), org, lab, c_hgvs, url, cs_from, cs_to, resolution, '\n'.join(comments), discordance_date_str, other_lab_str], '\t')
 
     response = StreamingHttpResponse(yield_data(), content_type='text/tsv')

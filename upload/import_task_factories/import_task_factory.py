@@ -1,10 +1,10 @@
+import inspect
 from abc import ABC, abstractmethod
 from typing import Iterable, Type, List
 
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.db import models
-from django.conf import settings
-import inspect
 
 from library.utils import get_all_subclasses
 from upload.models import UploadPipeline

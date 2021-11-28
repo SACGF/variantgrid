@@ -1,7 +1,8 @@
-from analysis.models import AnalysisNode
-from library.utils import sha1_str
 import numpy as np
 import pandas as pd
+
+from analysis.models import AnalysisNode
+from library.utils import sha1_str
 from snpdb.graphs.graphcache import CacheableGraph
 
 

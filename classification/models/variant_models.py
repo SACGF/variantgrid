@@ -1,11 +1,12 @@
+import os
+
 from django.db import models
 from django.db.models.deletion import CASCADE
 from django.urls.base import reverse
-import os
 
+from classification.models.classification import Classification
 from library.django_utils.django_file_system_storage import PrivateUploadStorage
 from library.enums.file_attachments import AttachmentFileType
-from classification.models.classification import Classification
 
 
 class ClassificationAttachment(models.Model):
@@ -17,7 +18,7 @@ class ClassificationAttachment(models.Model):
     file_type = models.CharField(max_length=1, choices=AttachmentFileType.CHOICES)
     thumbnail_path = models.TextField(null=True)
 
-    def get_file_dict(self):
+    def get_file_dict(self) -> dict:
         basename = os.path.basename(self.file.path)
         image_url = self.get_absolute_url()
 

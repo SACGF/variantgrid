@@ -1,18 +1,18 @@
+import logging
+import time
 from collections import defaultdict
 
 import celery
 from celery.result import AsyncResult
 from django.db.models.query_utils import Q
-import logging
-import time
 
 from library.database_utils import run_sql
 from library.log_utils import log_traceback
 from library.utils import single_quote
 from patients.models_enums import Zygosity
 from snpdb.grid_columns.grid_sample_columns import get_left_outer_join_on_variant
-from snpdb.models import CohortGenotypeCollection, CohortGenotype, CohortGenotypeTaskVersion
 from snpdb.models import Cohort, ImportStatus
+from snpdb.models import CohortGenotypeCollection, CohortGenotype, CohortGenotypeTaskVersion
 
 
 def create_cohort_genotype_and_launch_task(cohort, run_async=True):
@@ -152,7 +152,7 @@ WHERE
     return insert_sql
 
 
-@celery.task(ignore_result=False)
+@celery.shared_task(ignore_result=False)
 def cohort_genotype_task(cohort_genotype_collection_id):
     """ This takes a cohort, performs a count on it, stores it to the database,
         and then saves the stored count to the cohort object  """

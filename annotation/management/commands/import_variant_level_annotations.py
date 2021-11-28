@@ -4,10 +4,11 @@
     annotation which will require re-annotating the VCF
 """
 
-from django.core.management.base import BaseCommand
-from django.utils import timezone
 import logging
 import os
+
+from django.core.management.base import BaseCommand
+from django.utils import timezone
 
 from annotation.models.models import AnnotationRun, VariantAnnotation, VariantTranscriptAnnotation
 from annotation.signals import annotation_run_complete_signal

@@ -1,11 +1,11 @@
 from typing import List, Tuple
 
+import celery
+import requests
 from django.conf import settings
 
 from library.file_utils import get_disk_usage
 from library.log_utils import report_message
-import celery
-import requests
 
 
 def get_disk_messages(directories_list: List[str] = None, info_messages=False) -> List[Tuple[str, str]]:
@@ -40,7 +40,7 @@ def get_disk_messages(directories_list: List[str] = None, info_messages=False) -
     return low_disk_messages
 
 
-@celery.task
+@celery.shared_task
 def warn_low_disk_space():
     low_disk_messages = get_disk_messages(info_messages=False)
     if low_disk_messages:
@@ -48,7 +48,7 @@ def warn_low_disk_space():
         report_message(message=message, level='warning')
 
 
-@celery.task
+@celery.shared_task
 def heartbeat():
     if settings.HEARTBEAT_URL:
         r = requests.get(settings.HEARTBEAT_URL)

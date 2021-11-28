@@ -81,6 +81,19 @@ function enhanceAndMonitor() {
                 node.click(function(e) {$(this).tooltip('hide');});
             }
         },
+        {test: '.nav-tabs a',
+            func: (node) => {node.on('shown.bs.tab', function(e) {
+                let $this = $(this);
+                let url = new URL(window.location);
+                let id = $this.attr('id');
+                if (id.endsWith('-tab')) {
+                    id = id.substring(0, id.length - 4);
+                }
+                url.searchParams.set('activeTab', $this.attr('data-tab-set') + ":" + id);
+
+                window.history.replaceState({}, $this.innerHTML, url);
+            })}
+        },
         // load the active ajax tab now
         {test: '.nav-tabs a.active[data-href][data-toggle="tab"]',
             func: (node) => {loadAjaxTab(node);}
@@ -109,12 +122,15 @@ function enhanceAndMonitor() {
 
         {test: '.format-json', func: (node) => {
             let text = node.text().trim();
-            let textJson = JSON.parse(text);
-            let prettyHtml = formatJson(textJson);
-            prettyHtml.attr('class', node.attr('class') + ' ' + prettyHtml.attr('class'));
-            prettyHtml.removeClass('format-json');
-            prettyHtml.attr('data-p', 1);
-            node.replaceWith(prettyHtml);
+            try {
+                // if not valid JSON, just print as is
+                let textJson = JSON.parse(text);
+                let prettyHtml = formatJson(textJson);
+                prettyHtml.attr('class', node.attr('class') + ' ' + prettyHtml.attr('class'));
+                prettyHtml.removeClass('format-json');
+                prettyHtml.attr('data-p', 1);
+                node.replaceWith(prettyHtml);
+            } catch (e) {}
         }},
 
         // if have a wide checkbox row, make it so clicking anywhere on the row activates the checkbox
@@ -168,6 +184,19 @@ function enhanceAndMonitor() {
                     node.val(cookie);
                     return true;
                 });
+            }
+        },
+
+        {test: 'table[data-datatable-url]',
+            func: (node) => {
+                let dataTableUrl = node.attr('data-datatable-url');
+                let data = node.attr('data-datatable-data');
+                new DataTableDefinition({
+                    url: dataTableUrl,
+                    data: data, // as in a function that filters the data displayed
+                    filterCount: node.attr('data-datatable-filter-count'),
+                    dom: node
+                }).setup();
             }
         }
     ];
@@ -255,6 +284,13 @@ function loadAjaxModal(linkDom) {
 function loadAjaxBlock(dom, url) {
     if (!url) {
         url = dom.attr('href');
+    }
+    if (!url) {
+        dom.html([
+            severityIcon('C'),
+            "No href provided for AJAX block"
+        ]);
+        throw new Error("Ajax Block not given href");
     }
 
     let showingOverlay = false;
@@ -639,194 +675,6 @@ function highlightTextAsDom(value, full_text) {
         return $('<span>', {text: full_text});
     }
 }
-
-let TableFormat = (function() {
-    let TableFormat = function() {};
-    TableFormat.prototype = {};
-    return TableFormat;
-})();
-TableFormat.timestamp = (data, type, row) => {
-    if (data) {
-        let timestampStr = convertTimestamp(data);
-        return $('<span>', {class:'timestamp', text: timestampStr}).prop('outerHTML');
-    } else {
-        return '';
-    }
-};
-TableFormat.timeAgo = (data, type, row) => {
-    if (data) {
-        return $('<data>', {class:'convert-timestamp time-ago', 'data-timestamp':data, text:data}).prop('outerHTML');
-
-        let timestampStr = convertTimestamp(data);
-        return $('<span>', {class:'timestamp', text: timestampStr}).prop('outerHTML');
-    } else {
-        return '';
-    }
-}
-TableFormat.choices = (choices, data, type, row) => {
-    return $('<span>', {class:`val-${data}`, text:choices[data] || data}).prop('outerHTML');
-};
-TableFormat.flags = (data, type, row) => {
-    if (data) {
-        return $('<div>', {'data-flags': data, class:'flags', text:'...'}).prop('outerHTML');
-    }
-};
-TableFormat.limit = (limit, data, type, row) => {
-    if (typeof(data) === 'string' && data.length > limit) {
-        return $('<span>', {class:'hover-detail', text:data.substring(0, limit) + '...', title:data}).prop('outerHTML');
-    }
-    return data;
-};
-TableFormat.preview = (columns, data, type, row) => {
-    let dom = $('<div>');
-    let hasValue = false;
-    for (let col of columns) {
-        let value = row[col];
-        if (value && value.length) {
-            hasValue = true;
-            if (value.length > 80) {
-                value = value.substring(0, 80) + '...';
-            }
-            $('<div>', {text: value}).appendTo(dom);
-        }
-    }
-    if (!hasValue) {
-        dom = $('<div>', {class:'no-value', text:'-'});
-    }
-    return dom.prop('outerHTML');
-};
-TableFormat.detailRenderer = function ( api, rowIdx, columns ) {
-    console.log(api);
-    let fieldset = $('<div>', {class:'mt-3'});
-    for (let col of columns) {
-        if (col.hidden) {
-            if (col === null || col.data.length === 0) {
-                // pass
-            } else {
-                $('<div>', {class:'row mt-2', html:[
-                    $('<div>', {class: 'col-2 text-right', html:
-                        $('<label>', {text: col.title})
-                    }),
-                    $('<div>', {class: 'col-10', html:
-                        $('<span>', {class: 'dt-detail', text: col.data})
-                    }),
-                ]}).appendTo(fieldset);
-            }
-        }
-    }
-    return fieldset;
-};
-TableFormat.detailRendererHtml = function ( api, rowIdx, columns ) {
-    let fieldset = $('<div>', {class:'mt-3'});
-    for (let col of columns) {
-        if (col.hidden) {
-            if (col === null || col.data.length === 0) {
-                // pass
-            } else {
-                $('<div>', {
-                    class: 'row mt-2', style:'align-items:center', html: [
-                        $('<div>', {
-                            class: 'col-2 text-right', html:
-                                $('<label>', {html: col.title})
-                        }),
-                        $('<div>', {
-                            class: 'col-10', html:
-                                $('<span>', {class: 'dt-detail', html: col.data})
-                        }),
-                    ]
-                }).appendTo(fieldset);
-            }
-        }
-    }
-    return fieldset;
-};
-TableFormat.boolean = function(style, data, type, columns) {
-    if (style == 'warning') {
-        if (data) {
-            return '<i class="fas fa-exclamation-circle"></i>';
-        }
-    } else {
-        return data ? '<i class="fas fa-check-circle text-success"></i>' : '<i class="far fa-circle"></i>';
-    }
-    return null;
-};
-TableFormat.severeNumber = function(severity, data, type, columns) {
-    if (data === 0) {
-        return '<span class="no-value mono font-weight-bold">0</span>';
-    } else {
-        return `<span class="mono font-weight-bold text-${severity}">${data}</span>`;
-    }
-};
-TableFormat.hgvs = function(data, type, columns) {
-    if (!data) {
-        return "?";
-    }
-    let genomeBuild = data.genomeBuild;
-    let transcript = data.transcript;
-    let geneSymbol = data.geneSymbol;
-    let variant = data.variant;
-    // also turn into a link
-    let dom = $('<div>');
-    if (genomeBuild) {
-        dom.append($('<div>', {text: genomeBuild, class:'text-info'}));
-        // <span style="white-space: nowrap"><span>{{ c_hgvs.transcript }}</span>{% if c_hgvs.gene_symbol %}(<span class="text-secondary" style="letter-spacing: 0.5px">{{ c_hgvs.gene_symbol }}</span>){% endif %}:</span><span style="display:inline-block;word-break: break-all">{{ c_hgvs.raw_c }}</span>
-    }
-
-    let cDom = $('<span>', {style:'white-space:nowrap'});
-    if (transcript && variant) {
-        cDom.append($('<span>', {text: transcript}));
-        if (geneSymbol) {
-            cDom.append("(");
-            cDom.append($('<span>', {class: 'text-secondary', style: 'letter-spacing: 0.5px', text: geneSymbol}));
-            cDom.append(")");
-        }
-        cDom.append(":");
-        // used to be display:inline-block; but that doesn't underline
-        cDom.append($('<span>', {style: 'word-break:break-all', text: variant}));
-    } else {
-        cDom.append(data.full);
-    }
-    let variantId = data.variantId;
-    if (variantId) {
-        cDom = $('<a>', {href: Urls.view_allele_from_variant(variantId), class:'hover-link', html: cDom});
-    }
-    dom.append(cDom);
-
-    return dom.prop('outerHTML');
-};
-TableFormat.expandAjax = function(url, param, expectedHeight, data) {
-    if (data) {
-        let dataId = data[param];
-        if (!dataId) {
-            return `<i class="fas fa-bomb text-danger"></i> No value for "${param}" in this ${JSON.stringify(data)} : Developer, is ${param} a column in this table, visible or otherwise?`;
-        }
-        let ajaxId = `ajax_${dataId}`
-        let reverseUrl = Urls[url];
-        if (!reverseUrl) {
-            return `<i class="fas fa-bomb text-danger"></i> URL not configured for "${url} : Developer may need to run<br/>
-            <div class="code">manage.py collectstatic_js_reverse</div>`;
-        }
-        if (param) {
-            reverseUrl = reverseUrl(dataId)
-        }
-
-        let ajaxDom =
-            $('<div>', {html:[
-                $('<div>', {style:`text-align: center;color: #888; min-height:${expectedHeight}`, text:'Loading...'})
-            ]});
-
-        loadAjaxBlock(ajaxDom, reverseUrl);
-
-        if (!expectedHeight) {
-            // put a small div in the row to show that we're thinking
-            expectedHeight = "50px";
-        }
-        // fixme make m proper jquery
-        return ajaxDom;
-    } else {
-        return '';
-    }
-};
 
 // Dialogs
 function createModalShell(id, title) {

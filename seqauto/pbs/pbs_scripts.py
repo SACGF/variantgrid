@@ -1,6 +1,7 @@
+import os
+
 from django.conf import settings
 from django.template.loader import render_to_string
-import os
 
 PBS_TEMPLATE = os.path.join(settings.SEQAUTO_DIR, "templates", "pbs_script.template")
 

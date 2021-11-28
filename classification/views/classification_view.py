@@ -1,31 +1,35 @@
 import collections
+from typing import Optional, Dict, Any
+
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
 from django.utils.decorators import method_decorator
+from django.utils.timezone import now
 from rest_framework.generics import get_object_or_404
 from rest_framework.response import Response
 from rest_framework.status import HTTP_200_OK, HTTP_400_BAD_REQUEST, \
     HTTP_500_INTERNAL_SERVER_ERROR
 from rest_framework.views import APIView
-from typing import Optional, Dict, Any
+from threadlocals.threadlocals import get_current_user
 
 from classification.classification_stats import get_lab_gene_counts
-from library.log_utils import report_exc_info, report_message
-from library.utils import empty_to_none
-from snpdb.models import Lab, GenomeBuild
-from snpdb.models.models_enums import ImportSource
 from classification.enums import SubmissionSource, ShareLevel, ClinicalSignificance
 from classification.models import ClassificationRef, ClassificationImport, \
     ClassificationJsonParams, PatchMeta, Classification
-from classification.models.evidence_mixin import EvidenceMixin, VCStore
-from classification.models.flag_types import classification_flag_types
 from classification.models.classification import ClassificationProcessError, \
     ClassificationModification
 from classification.models.classification_patcher import patch_merge_age_units, patch_fuzzy_age
+from classification.models.evidence_mixin import EvidenceMixin, VCStore
+from classification.models.flag_types import classification_flag_types
 from classification.tasks.classification_import_task import process_classification_import_task
+from eventlog.models import create_event
+from library.log_utils import report_exc_info, report_message
+from library.utils import empty_to_none, DebugTimer
+from snpdb.models import Lab, GenomeBuild
+from snpdb.models.models_enums import ImportSource
 
 
 class BulkInserter:
@@ -36,15 +40,18 @@ class BulkInserter:
         from being published
         """
         self.user = user
-        self._import_for_genome_build: Dict[Any, ClassificationImport] = {}
+        self._import_for_genome_build: Dict[Any, ClassificationImport] = dict()
         self.single_insert = False
         self.api_version = api_version
-
         self.force_publish = force_publish
+        self.record_count = 0
+        self.new_record_count = 0
+        self.start = now()
+        self.debug_timer = DebugTimer()
 
     def import_for(self, genome_build: GenomeBuild, transcript: str) -> Optional[ClassificationImport]:
         """
-        Returns the ClassificationImport record taht a classification should attach to to have its variant processed
+        Returns the ClassificationImport record that a classification should attach to to have its variant processed
         """
         if transcript:
             if not Classification.is_supported_transcript(transcript):
@@ -64,9 +71,12 @@ class BulkInserter:
 
     @transaction.atomic
     def insert(self, data: dict, record_id: str = None, request=None):
+        debug_timer = self.debug_timer
+
         if self.single_insert:
             raise ClassificationProcessError('If record_id is provided in URL cannot insert more than one record')
 
+        self.record_count += 1
         data_copy = dict()
         data_copy.update(data)
         data = data_copy
@@ -107,6 +117,8 @@ class BulkInserter:
             delete_value = data.pop('delete', None)
             requested_delete = delete_value is True
             requested_undelete = delete_value is False
+
+            debug_timer.tick("Security Check")
 
             for op in ['create', 'upsert', 'overwrite', 'data', 'patch']:
                 op_data = data.pop(op, None)
@@ -158,6 +170,8 @@ class BulkInserter:
                 if operation in ('create', 'upsert', 'overwrite') and not record_ref.exists():
                     # creating a new record
 
+                    debug_timer.tick("Preparing to Insert")
+
                     pre_process({})
                     record = record_ref.create(
                         source=source,
@@ -165,9 +179,13 @@ class BulkInserter:
                         save=save,
                         make_fields_immutable=immutable)
 
+                    debug_timer.tick("Inserted")
+
                     # We only want to link the variant on initial create - as patching may cause issues
                     # as classifications change variants. So the variant is immutable
                     if save:
+                        self.new_record_count += 1
+
                         genome_build = record.get_genome_build()
                         classification_import = self.import_for(genome_build=genome_build, transcript=record.transcript)
                         record.classification_import = classification_import
@@ -180,13 +198,18 @@ class BulkInserter:
                                 record.set_variant()
 
                         record.save()
-                        record.publish_latest(user=user)
+
+                        debug_timer.tick("Prepare for Variant Resolution")
+
+                        record.publish_latest(user=user, debug_timer=debug_timer)
+
+                        debug_timer.tick("Publish Complete")
                 else:
                     # patching existing records
                     record = record_ref.record
                     record.check_can_write(user)
 
-                    ### THE ACTUAL PATCHING OF DATA VALUES
+                    # THE ACTUAL PATCHING OF DATA VALUES
                     pre_process(record.evidence)
                     patch_result = record.patch_value(operation_data,
                                                       clear_all_fields=operation == 'overwrite',
@@ -197,6 +220,7 @@ class BulkInserter:
                     patch_messages = patch_result['messages']
                     patched_keys = patch_result['modified']
 
+                    debug_timer.tick("Update Existing Record")
             else:
                 record = record_ref.record
 
@@ -310,6 +334,9 @@ class BulkInserter:
                 include_lab_config=data.pop('config', False),
                 api_version=self.api_version
             ))
+
+            debug_timer.tick("Generate Response")
+
             if patch_messages:
                 json_data['patch_messages'] = patch_messages
             return json_data
@@ -324,10 +351,20 @@ class BulkInserter:
             return {'internal_error': str(e)}
 
     def finish(self):
+        debug_timer: DebugTimer = self.debug_timer
+
         if settings.VARIANT_CLASSIFICATION_MATCH_VARIANTS:
             for vc_import in self.all_imports():
                 task = process_classification_import_task.si(vc_import.pk, ImportSource.API)
                 task.apply_async()
+
+        debug_timer.tick("Setup Async Variant Matching")
+
+        if count := self.record_count:
+            time_taken = now() - self.start
+            total_time = time_taken.total_seconds()
+            time_per_record = total_time / count
+            create_event(user=self.user, name="classification_import", details=f"{count} records imported {self.new_record_count} new, avg record processing {time_per_record:.3f}s\n{debug_timer}")
 
 
 class ClassificationView(APIView):

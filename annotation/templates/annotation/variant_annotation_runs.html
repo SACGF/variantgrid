@@ -5,16 +5,12 @@
 {% load js_tags %}
 {% load jqgrid_tags %}
 {% load ui_utils %}
-{% load datatable_tags %}
 {% block title %}Annotation Status{% endblock title %}
 {% block submenu %}{% menu_bar_annotations %}{% endblock submenu %}
 {% block head %}
 {{ block.super }}
 <script type="text/javascript" src="{% static 'js/lib/plotly-latest.min.js' %}"></script>
 <script type="text/javascript" src="{% static 'js/plotly_helper.js' %}"></script>
-<style>
-    .dt-preview { word-break: break-all; }
-</style>
 <script>
     var filter_data = {"status": "", "genome_build": ""}
     $(document).ready(() => {
@@ -81,7 +77,6 @@
         $('.table-filter').change(() => {
             $('#annotation-runs-table').DataTable().ajax.reload();
         });
-        {% datatable_definition table_config=datatable_config table_id='annotation-runs-table' url='annotation_run_datatable' data='datatableFilter' responsive=True %}
     });
     function idRenderer(data, type, row) {
         return $('<a>', {href:Urls.view_annotation_run(data), text:data}).prop('outerHTML');
@@ -97,28 +92,32 @@
         {% page_help 'annotation/variant_annotation_runs_help' 'Variant Annotation Runs' %}
 
         {% for build_name, field_counts in genome_build_field_counts.items %}
-            <div id="build-{{ build_name }}-details" class="card mt-4">
-                <div class="card-header">{{ build_name }}</div>
-                <div class="card-body">
-                    <div id="build-{{ build_name }}-details">
-                        <div id="build-{{ build_name }}-summary-graph"></div>
-                        {% for field, count in field_counts.items %}
-                            {% labelled label=field %}{{ count }}{% endlabelled %}
-                        {% endfor %}
-                    </div>
-                    <form method="post" id='vcf-form'>
-                        <div class="btn-toolbar">
-                        {% csrf_token %}
-                        {% if genome_build_summary|get_item:build_name|get_item:'Running' or genome_build_summary|get_item:build_name|get_item:'Queued' %}
-                            <button name="set-non-finished-to-error-{{ build_name }}" class="btn btn-danger">Set non-finished runs to Error</button>
-                        {% endif %}
-                        {% if genome_build_summary|get_item:build_name|get_item:'Error' %}
-                            <button name="retry-annotation-runs-{{ build_name }}" class="btn btn-danger">Retry all failed runs</button>
-                        {% endif  %}
+            <form method="post" id='vcf-form'>
+                {% csrf_token %}
+                <div id="build-{{ build_name }}-details" class="card mt-4">
+                    <div class="card-header">{{ build_name }}</div>
+                    <div class="card-body">
+                        <div id="build-{{ build_name }}-details">
+                            <div id="build-{{ build_name }}-summary-graph"></div>
+                            {% for field, count in field_counts.items %}
+                                {% labelled label=field %}{{ count }}{% endlabelled %}
+                            {% endfor %}
                         </div>
-                    </form>
+                    </div>
+                    {% if genome_build_summary|get_item:build_name|get_item:'Running' or genome_build_summary|get_item:build_name|get_item:'Queued' or genome_build_summary|get_item:build_name|get_item:'Error'%}
+                    <div class="card-footer">
+                        <div class="btn-toolbar">
+                            {% if genome_build_summary|get_item:build_name|get_item:'Running' or genome_build_summary|get_item:build_name|get_item:'Queued' %}
+                                <button name="set-non-finished-to-error-{{ build_name }}" class="btn btn-danger">Set non-finished runs to Error</button>
+                            {% endif %}
+                            {% if genome_build_summary|get_item:build_name|get_item:'Error' %}
+                                <button name="retry-annotation-runs-{{ build_name }}" class="btn btn-danger">Retry all failed runs</button>
+                            {% endif  %}
+                        </div>
+                    </div>
+                    {% endif %}
                 </div>
-            </div>
+            </form>
         {% endfor %}
         <div class="mt-4">
             {% labelled label="Genome Build" %}
@@ -140,7 +139,7 @@
                 </select>
             {% endlabelled %}
         </div>
-        {% datatable datatable_config table_id='annotation-runs-table' class_name='responsive sticky-header' %}
+        <table id="annotation-runs-table" data-datatable-url="{% url 'annotation_run_datatable' %}" data-datatable-data='datatableFilter' class="sticky-header"></table>
     </div>
 
 {% endblock content %}

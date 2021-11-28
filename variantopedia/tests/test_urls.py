@@ -1,5 +1,6 @@
-from django.contrib.auth.models import User
 import unittest
+
+from django.contrib.auth.models import User
 
 from annotation.fake_annotation import get_fake_annotation_version, create_fake_variants, create_fake_variant_annotation
 from annotation.tests.test_data_fake_genes import create_fake_transcript_version
@@ -43,7 +44,7 @@ class Test(URLTestCase):
         URL_NAMES_AND_KWARGS = [
             ("variants", {}, 200),
             ("dashboard", {}, 200),
-            ("database_statistics", {}, 200),
+            ("database_statistics_detail", {}, 200),
             ("search", {}, 200),
             ("variantopedia_wiki", {}, 200),
             ("view_variant", {"variant_id": self.variant.pk}, 200),

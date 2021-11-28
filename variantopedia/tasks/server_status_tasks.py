@@ -14,13 +14,13 @@ from variantgrid.tasks.server_monitoring_tasks import get_disk_messages
 from variantopedia.server_status import get_dashboard_notices
 
 
-@celery.task
+@celery.shared_task
 def notify_server_status():
     if not settings.HEALTH_CHECK_ENABLED:
         return
 
     dashboard_notices = get_dashboard_notices(admin_bot(), days_ago=1)
-    url = get_url_from_view_path(reverse('server_status')) + '?days=1'
+    url = get_url_from_view_path(reverse('server_status')) + '?activeTab=server_status_activity_detail_1'
 
     emoji = ":male-doctor:" if randint(0, 1) else ":female-doctor:"
     nb = NotificationBuilder(message="Health Check", emoji=emoji)

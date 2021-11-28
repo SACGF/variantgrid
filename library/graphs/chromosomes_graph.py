@@ -2,11 +2,11 @@
 Based on example code from Ryan Dale - https://www.biostars.org/p/9922/#9969
 """
 
+import pandas as pd
 from matplotlib.collections import BrokenBarHCollection
 
 from library.genomics import format_chrom
 from library.utils import sorted_nicely
-import pandas as pd
 
 DEFAULT_COLOR_LOOKUP = {'gneg': (1., 1., 1.),
                         'gpos25': (.6, .6, .6),

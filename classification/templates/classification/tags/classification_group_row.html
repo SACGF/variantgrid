@@ -68,8 +68,10 @@
     <td data-order="{{ group.date_sort_order_str }}"></td>{% comment %}hidden column just used for sorting{% endcomment %}
     {% endwith %}
     {% if not sub_index %}
-        <td>
-            {{ group.most_recent | get_item:'genome_build' | default_if_none:'(No genome build provided)' }} {% c_hgvs group.most_recent.c_parts %}
+        <td>{% comment %}Latest Imported as{% endcomment %}
+            <label style="display: inline-block; min-width:140px; text-align: right">Imported {{ group.most_recent | get_item:'genome_build' | default_if_none:'(No genome build provided)' }}</label>&nbsp; {% c_hgvs group.most_recent.c_parts %}<br/>
+            <label style="display: inline-block; min-width:140px; text-align: right">Resolved GRCh37</label>&nbsp; {% c_hgvs group.most_recent.classification.chgvs_grch37 %}<br/>
+            <label style="display: inline-block; min-width:140px; text-align: right">Resolved GRCh38</label>&nbsp; {% c_hgvs group.most_recent.classification.chgvs_grch38 %}
         </td>
         <td>
             {% if group.allele %}<a class="hover-link" href="{% url 'view_allele' group.allele.id %}">{{ group.allele }}</a>{% else %}<span class="no-value">-</span>{% endif %}

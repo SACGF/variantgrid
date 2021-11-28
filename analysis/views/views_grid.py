@@ -1,4 +1,5 @@
 import logging
+import re
 from io import StringIO
 from urllib.parse import urlencode
 
@@ -8,8 +9,6 @@ from django.urls import reverse
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 from django.views.decorators.vary import vary_on_cookie
-import re
-
 from vcf import Writer, Reader
 from vcf.model import _Substitution, _Record, make_calldata_tuple, _Call
 
@@ -17,11 +16,14 @@ from analysis import grids
 from analysis.models import AnalysisNode
 from analysis.views.analysis_permissions import get_node_subclass_or_non_fatal_exception
 from analysis.views.node_json_view import NodeJSONGetView
-from snpdb.vcf_export_utils import get_vcf_header_from_contigs
+from annotation.models import VariantTranscriptAnnotation
+from genes.models import CanonicalTranscriptCollection
 from library.constants import WEEK_SECS
+from library.django_utils import get_model_fields
 from library.jqgrid_export import grid_export_csv, StashFile
 from snpdb.models import Sample, ColumnVCFInfo, VCFInfoTypes, Zygosity
 from snpdb.models.models_variant import Variant
+from snpdb.vcf_export_utils import get_vcf_header_from_contigs
 
 
 @method_decorator([cache_page(WEEK_SECS), vary_on_cookie], name='get')
@@ -89,9 +91,60 @@ def format_items_iterator(analysis, sample_ids, items):
         yield item
 
 
+def replace_transcripts_iterator(grid, ctc: CanonicalTranscriptCollection, items):
+    """ This uses a large amount of RAM - reading a whole  """
+
+    transcript_variant_id_field = "varianttranscriptannotation__variant_id"
+
+    # Work out what fields
+    transcript_replace_fields = {transcript_variant_id_field: "id"}
+
+    transcript_fields = set(get_model_fields(VariantTranscriptAnnotation, ignore_fields=["id", "version", "variant"]))
+    annotation_prefix = "variantannotation__"
+    transcript_prefix = "varianttranscriptannotation__"
+    annotation_prefix_len = len(annotation_prefix)
+    for f in grid.get_field_names():
+        if f.startswith(annotation_prefix):
+            suffix = f[annotation_prefix_len:]
+            tf = suffix.split("__", 1)[0]
+            if tf in transcript_fields:
+                transcript_replace_fields[transcript_prefix + suffix] = f
+
+    transcript_values = grid.get_values_queryset(field_names=transcript_replace_fields.keys())
+    ct_qs = ctc.canonicaltranscript_set
+    transcript_versions = ct_qs.values_list("transcript_version", flat=True)
+    transcript_values = transcript_values.filter(varianttranscriptannotation__transcript_version__in=transcript_versions)
+
+    # Read into a massive dictionary
+    transcript_items_by_id = {}
+
+    def transcript_items():
+        for transcript_data in transcript_values:
+            transcript_item = {}
+            for before, after in transcript_replace_fields.items():
+                transcript_item[after] = transcript_data[before]
+            yield transcript_item
+
+    for item in grid.iter_format_items(transcript_items()):
+        transcript_items_by_id[item["id"]] = item
+
+    # Loop through items and changeroo
+    for item in items:
+        variant_id = item["id"]
+        if transcript_data := transcript_items_by_id.get(variant_id):
+            item.update(transcript_data)
+        yield item
+
+
 def node_grid_export(request):
+    export_type = request.GET["export_type"]
     node = _node_from_request(request)
-    grid = _variant_grid_from_request(request, node, sort_by_contig_and_position=True)
+    grid_kwargs = {}
+    if export_type == 'vcf':
+        grid_kwargs["sort_by_contig_and_position"] = True
+        grid_kwargs["af_show_in_percent"] = False
+
+    grid = _variant_grid_from_request(request, node, **grid_kwargs)
 
     # TODO: Change filename to use set operation between samples
     basename = f"node_{grid.node.pk}"
@@ -101,9 +154,16 @@ def node_grid_export(request):
 
     sample_ids = grid.node.get_sample_ids()
     _, _, items = grid.get_items(request)
+
+    # TODO: How to work out whether to do this (Haem only, but they will upload stuff)?
+    replace_transcripts = False
+    if replace_transcripts:
+        ctc = CanonicalTranscriptCollection.objects.get(enrichmentkit__name='idt_haem')
+        basename += f"_{ctc}"
+        items = replace_transcripts_iterator(grid, ctc, items)
+
     items = format_items_iterator(grid.node.analysis, sample_ids, items)
 
-    export_type = request.GET["export_type"]
     colmodels = grid.get_colmodels()
 
     if export_type == 'csv':

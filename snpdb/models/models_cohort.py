@@ -1,3 +1,4 @@
+import logging
 from typing import List, Dict
 
 import celery
@@ -15,7 +16,6 @@ from django.urls.base import reverse
 from django_extensions.db.models import TimeStampedModel
 from guardian.shortcuts import get_objects_for_user
 from lazy import lazy
-import logging
 
 from library.django_utils import SortByPKMixin
 from library.django_utils.django_partition import RelatedModelsPartitionModel
@@ -24,10 +24,10 @@ from library.django_utils.guardian_permissions_mixin import GuardianPermissionsM
 from library.guardian_utils import DjangoPermission, assign_permission_to_user_and_groups
 from library.utils import invert_dict
 from patients.models_enums import Zygosity
+from snpdb.models.models_enums import ImportStatus
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_variant import Variant
 from snpdb.models.models_vcf import VCF, Sample
-from snpdb.models.models_enums import ImportStatus
 
 
 class Cohort(SortByPKMixin, TimeStampedModel):
@@ -530,7 +530,7 @@ class Trio(GuardianPermissionsMixin, SortByPKMixin, models.Model):
 
 
 # This has to be in this file so we don't end up with circular references
-@celery.task(ignore_result=False)
+@celery.shared_task(ignore_result=False)
 def delete_old_cohort_genotypes_task():
     logging.debug("About to delete old CohortGenotypeCollection")
 

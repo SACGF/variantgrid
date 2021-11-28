@@ -1,25 +1,26 @@
+import operator
+import re
 from datetime import datetime, timedelta
-from django.utils import timezone
+from functools import reduce
+from typing import List
 from urllib.parse import unquote_plus
 
-from django.db.models import QuerySet
+from django.conf import settings
+from django.db.models import QuerySet, Q
 from django.http.request import HttpRequest
 from django.http.response import HttpResponse, HttpResponseBase
 from django.shortcuts import render
 from django.urls.base import reverse
+from django.utils import timezone
 from htmlmin.decorators import not_minified_response
 from requests.models import Response
 from rest_framework.request import Request
 from rest_framework.views import APIView
-from typing import List
 
-from library.django_utils import get_url_from_view_path
-from snpdb.models.models import Lab, Organization
-from snpdb.models.models_genome import GenomeBuild
-from snpdb.models.models_user_settings import UserSettings
 from classification.enums.classification_enums import ShareLevel
 from classification.models.classification import ClassificationModification
 from classification.models.classification_ref import ClassificationRef
+from classification.views.classification_export_clinvar_compare import ExportFormatterClinVarCompare
 from classification.views.classification_export_csv import ExportFormatterCSV
 from classification.views.classification_export_json import ExportFormatterJSON
 from classification.views.classification_export_keys import ExportFormatterKeys
@@ -31,7 +32,13 @@ from classification.views.classification_export_report import ExportFormatterRep
 from classification.views.classification_export_utils import ConflictStrategy, \
     VCFEncoding, BaseExportFormatter
 from classification.views.classification_export_vcf import ExportFormatterVCF
-import re
+from library.django_utils import get_url_from_view_path
+from snpdb.models.models import Lab, Organization
+from snpdb.models.models_genome import GenomeBuild
+from snpdb.models.models_user_settings import UserSettings
+
+
+ALISSA_ACCEPTED_TRANSCRIPTS = {"NM_", "NR_"}
 
 
 def parse_since(since_str: str) -> datetime:
@@ -39,10 +46,10 @@ def parse_since(since_str: str) -> datetime:
         since_date = datetime.strptime(since_str, '%Y-%m-%d').replace(tzinfo=timezone.get_current_timezone())
         since_date = since_date.replace(minute=0, hour=0, second=0, microsecond=0)
         return since_date
-    except:
+    except BaseException:
         pass
 
-    if m := re.compile("([0-9]+)(\w*)").match(since_str):
+    if m := re.compile(r"([0-9]+)(\w*)").match(since_str):
         amount = int(m.group(1))
         unit = m.group(2)
         if unit:
@@ -66,7 +73,7 @@ def parse_since(since_str: str) -> datetime:
 
     try:
         return datetime.utcfromtimestamp(float(since_str)).replace(tzinfo=timezone.utc)
-    except:
+    except BaseException:
         pass
 
     raise ValueError(f"Could not parse since string {since_str}")
@@ -83,18 +90,22 @@ def export_view(request: HttpRequest) -> Response:
     format_keys = {'id': 'keys', 'name': 'Evidence Keys Report', 'admin_only': True}
     format_mvl = {'id': 'mvl', 'name': 'MVL'}
     format_csv = {'id': 'csv', 'name': 'CSV'}
+    format_clinvar_compare = {'id': 'clinvar_compare', 'name': 'ClinVar Compare', 'admin_only': True}
     format_json = {'id': 'json', 'name': 'JSON'}
     format_redcap = {'id': 'redcap', 'name': 'REDCap'}
     format_vcf = {'id': 'vcf', 'name': 'VCF'}
-    #format_errors = {'id': 'errors', 'name': 'Liftover Errors'}
     formats = [
         format_keys,
         format_csv,
+        format_clinvar_compare,
         format_json,
-        format_mvl,
-        format_redcap,
-        format_vcf,
-    #    format_errors
+        format_mvl
+    ]
+    if settings.VARIANT_CLASSIFICATION_REDCAP_EXPORT:
+        formats += [format_redcap]
+
+    formats += [
+        format_vcf
     ]
 
     context = {
@@ -122,11 +133,8 @@ def export_view_redirector(request: HttpRequest) -> Response:
     include_labs = all_params.pop('include_labs', None)
     since_str = all_params.pop('since', None)
     if since_str:
-        # try:
         since = parse_since(since_str).astimezone(timezone.get_default_timezone())
         since_str = since_str + " -> " + since.strftime("%Y-%m-%d %H:%M:%S %z")
-        #except Exception as e:
-        #    since_str = str(e)
     else:
         since_str = 'All'
 
@@ -244,8 +252,11 @@ class ClassificationApiExportView(APIView):
         if file_format == 'mvl':
             transcript_strategy = request.query_params.get('transcript_strategy', 'refseq')
             if transcript_strategy == 'refseq':
-                # exclude ensembl transcripts
-                qs = qs.exclude(published_evidence__c_hgvs__value__startswith='ENS')
+                # exclude non NC/NR/NX transcripts
+                acceptable_transcripts: List[Q] = [
+                    Q(published_evidence__c_hgvs__value__startswith=tran) for tran in ALISSA_ACCEPTED_TRANSCRIPTS
+                ]
+                qs = qs.filter(reduce(operator.or_, acceptable_transcripts))
 
         formatter: BaseExportFormatter
         qs = qs.select_related('classification', 'classification__lab', 'classification__clinical_context')
@@ -273,6 +284,8 @@ class ClassificationApiExportView(APIView):
             formatter = ExportFormatterCSV(pretty=pretty, **formatter_kwargs)
         elif file_format == 'keys':
             formatter = ExportFormatterKeys(qs=qs)
+        elif file_format == 'clinvar_compare':
+            formatter = ExportFormatterClinVarCompare(**formatter_kwargs)
 
         else:
             raise ValueError(f'Unexpected file format {file_format}')
@@ -284,28 +297,28 @@ class ClassificationApiExportView(APIView):
         return formatter.export()
 
 
-def _single_classification_mod_qs(request, record_id) -> QuerySet:
+def _single_classification_mod_qs(request: HttpRequest, record_id) -> QuerySet:
     vcm = ClassificationRef.init_from_obj(request.user, record_id).modification
     qs = ClassificationModification.objects.filter(pk=vcm.id)
     return qs
 
 
 @not_minified_response
-def template_report(request, record_id) -> HttpResponseBase:
+def template_report(request: HttpRequest, record_id) -> HttpResponseBase:
     qs = _single_classification_mod_qs(request, record_id)
     genome_build = UserSettings.get_for_user(request.user).default_genome_build
 
     return ExportFormatterReport(user=request.user, genome_build=genome_build, qs=qs).export(as_attachment=False)
 
 
-def redcap_data_dictionary(request) -> HttpResponseBase:
+def redcap_data_dictionary(request: HttpRequest) -> HttpResponseBase:
     response = HttpResponse(content_type='text/csv')
     response['Content-Disposition'] = 'attachment; filename="redcap_data_definition.csv"'
     export_redcap_definition(response)
     return response
 
 
-def record_csv(request, record_id) -> HttpResponseBase:
+def record_csv(request: HttpRequest, record_id) -> HttpResponseBase:
     vcm: ClassificationModification = ClassificationRef.init_from_obj(request.user, record_id).modification
     qs = ClassificationModification.objects.filter(pk=vcm.id)
 

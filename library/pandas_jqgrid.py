@@ -28,11 +28,10 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 import abc
-from copy import deepcopy
 import json
 import logging
 import math
-
+from copy import deepcopy
 
 # TODO: Merge code from jqGrid and this together?
 from library.pandas_utils import df_nan_to_none

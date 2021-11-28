@@ -1,17 +1,16 @@
 import csv
+import logging
+import os
 from typing import Optional
 
 import cyvcf2
+import numpy as np
 from django.conf import settings
-import logging
-import os
 
 from library.django_utils import thread_safe_unique_together_get_or_create
 from library.django_utils.django_file_utils import get_import_processing_filename
 from library.git import Git
 from library.postgres_utils import postgres_arrays
-import numpy as np
-
 from library.utils import double_quote
 from library.vcf_utils import VCFConstant, cyvcf2_gt_types
 from patients.models_enums import Zygosity
@@ -108,10 +107,6 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
         if self.cohort_gt_vaf_index < 0:
             raise ValueError(f"Could not find 'samples_allele_frequency' in {COHORT_GENOTYPE_HEADER}")
         self.cohort_gt_vaf_index -= self.COHORT_GT_NUM_ADDED_FIELDS
-
-    def get_max_variant_id(self):
-        """ 0 means it was never set, so we return None """
-        return self.max_variant_id or None
 
     def finish(self):
         """ This is called at the very end so we can collect any remaining items to process """

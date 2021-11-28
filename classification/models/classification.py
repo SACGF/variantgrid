@@ -1,9 +1,14 @@
-from collections import Counter, namedtuple
 import copy
+import logging
+import re
+import uuid
+from collections import Counter, namedtuple
 from dataclasses import dataclass, field
 from datetime import datetime, timezone, timedelta
 from enum import Enum
+from typing import Any, Dict, List, Union, Optional, Iterable, Callable, Mapping, TypedDict
 
+import django.dispatch
 import pytz
 from datetimeutc.fields import DateTimeUTCField
 from django.conf import settings
@@ -16,18 +21,22 @@ from django.db.models.expressions import RawSQL, OuterRef, Value, Subquery
 from django.db.models.functions import LPad, Cast, Concat
 from django.db.models.query import QuerySet
 from django.db.models.query_utils import Q
-import django.dispatch
 from django.dispatch.dispatcher import receiver
 from django.urls.base import reverse
 from django_extensions.db.models import TimeStampedModel
 from guardian.shortcuts import assign_perm, get_objects_for_user
 from lazy import lazy
-import logging
-import re
-from typing import Any, Dict, List, Union, Optional, Iterable, Callable, Mapping, TypedDict
-import uuid
 
 from annotation.models.models import AnnotationVersion, VariantAnnotationVersion, VariantAnnotation
+from annotation.regexes import db_ref_regexes, DbRegexes
+from classification.enums import ClinicalSignificance, SubmissionSource, ShareLevel, SpecialEKeys, \
+    CRITERIA_NOT_MET, ValidationCode, CriteriaEvaluation
+from classification.models.classification_utils import \
+    ValidationMerger, ClassificationJsonParams, VariantCoordinateFromEvidence, PatchMeta
+from classification.models.evidence_key import EvidenceKeyValueType, \
+    EvidenceKey, EvidenceKeyMap, VCDataDict, WipeMode, VCDataCell
+from classification.models.evidence_mixin import EvidenceMixin, VCPatch
+from classification.models.flag_types import classification_flag_types
 from flags.models import Flag, FlagPermissionLevel, FlagStatus
 from flags.models.models import FlagsMixin, FlagCollection, FlagTypeContext, \
     flag_collection_extra_info_signal, FlagInfos
@@ -36,28 +45,19 @@ from genes.models import Gene
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
 from library.guardian_utils import clear_permissions
 from library.log_utils import report_exc_info, report_event
-from library.utils import empty_dict, empty_to_none, nest_dict, cautious_attempt_html_to_text
+from library.utils import empty_dict, empty_to_none, nest_dict, cautious_attempt_html_to_text, DebugTimer
 from ontology.models import OntologyTerm, OntologySnake, OntologyTermRelation
+from snpdb.clingen_allele import populate_clingen_alleles_for_variants
 from snpdb.models import Variant, Lab, Sample
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_variant import AlleleSource, Allele, VariantCoordinate, VariantAllele
-from classification.enums import ClinicalSignificance, SubmissionSource, ShareLevel, SpecialEKeys, \
-    CRITERIA_NOT_MET, ValidationCode, CriteriaEvaluation
-from classification.models.best_hgvs import BestHGVS
-from classification.models.evidence_key import EvidenceKeyValueType, \
-    EvidenceKey, EvidenceKeyMap, VCDataDict, WipeMode, VCDataCell
-from classification.models.evidence_mixin import EvidenceMixin, VCPatch
-from classification.models.flag_types import classification_flag_types
-from classification.models.classification_utils import \
-    ValidationMerger, ClassificationJsonParams, VariantCoordinateFromEvidence, PatchMeta
-from annotation.regexes import db_ref_regexes, DbRegexes
 
 ChgvsKey = namedtuple('CHGVS', ['short', 'column', 'build'])
 
 classification_validation_signal = django.dispatch.Signal(providing_args=["classification", "patch_meta", "key_map"])
 classification_current_state_signal = django.dispatch.Signal(providing_args=["user"])
 classification_post_publish_signal = django.dispatch.Signal(
-    providing_args=["classification", "previously_published", "previous_share_level", "newly_published", "user"])
+    providing_args=["classification", "previously_published", "previous_share_level", "newly_published", "user", "debug_timer"])
 classification_withdraw_signal = django.dispatch.Signal(providing_args=["classification", "user"])
 classification_variant_set_signal = django.dispatch.Signal(providing_args=["classification", "variant"])
 classification_revalidate_signal = django.dispatch.Signal(providing_args=["classification"])
@@ -114,12 +114,18 @@ class ClassificationImportAlleleSource(AlleleSource):
         return Allele.objects.filter(variantallele__variant__in=variants_qs)
 
     def liftover_complete(self, genome_build: GenomeBuild):
+        allele_qs = self.get_allele_qs()
+        # Populate ClinGen for newly created variants as well as it's possible that old one failed but new could work
+        build_variants = Variant.objects.filter(variantallele__genome_build=genome_build,
+                                                variantallele__allele__in=allele_qs)
+        populate_clingen_alleles_for_variants(genome_build, build_variants)
+
         Classification.bulk_update_cached_c_hgvs(self.classification_import)
         allele: Allele
-        for allele in self.get_allele_qs():
+        for allele in allele_qs:
             allele.validate()
         report_event('Completed import liftover',
-                     extra_data={'liftover_id': self.pk, 'allele_count': self.get_allele_qs().count()})
+                     extra_data={'liftover_id': self.pk, 'allele_count': allele_qs.count()})
 
 
 class AllClassificationsAlleleSource(TimeStampedModel, AlleleSource):
@@ -255,6 +261,12 @@ class ConditionResolved:
         else:
             return None
 
+    def as_mondo_if_possible(self) -> 'ConditionResolved':
+        if mondo_term := self.mondo_term:
+            return ConditionResolved(terms=[mondo_term])
+        else:
+            return self
+
     def is_same_or_more_specific(self, other: 'ConditionGroup') -> bool:
         if self.is_multi_condition or other.is_multi_condition:
             # when looking at multiple conditions, do not attempt merging unless we're the exact same
@@ -295,6 +307,13 @@ class ConditionResolved:
         }
         return term_dict
 
+    @property
+    def as_plain_text(self) -> str:
+        if text := self.plain_text:
+            return text
+        else:
+            return self.to_json()['display_text']
+
     def to_json(self) -> ConditionResolvedDict:
         jsoned: ConditionResolvedDict
         if self.terms:
@@ -315,7 +334,7 @@ class ConditionResolved:
 
             resolved_term_dicts: List[ConditionResolvedTermDict] = [ConditionResolved.term_to_dict(term) for term in self.terms]
 
-            jsoned = {
+            jsoned: ConditionResolvedDict = {
                 "resolved_terms": resolved_term_dicts,
                 "resolved_join": join,
                 "display_text": text,
@@ -323,7 +342,7 @@ class ConditionResolved:
             }
             return jsoned
         else:
-            jsoned = {
+            jsoned: ConditionResolvedDict = {
                 "display_text": self.plain_text,
                 "sort_text": self.plain_text
             }
@@ -641,13 +660,13 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 max_length = max(c_hgvs_name.ref_lengths(), max_length)
                 self.chgvs_grch37 = c_hgvs_name.format()
                 self.chgvs_grch37_full = c_hgvs_name.format(
-                    max_allele_length=settings.VARIANT_CLASSIFICATION_MAX_FULL_ALLELE_LENGTH)
+                    max_ref_length=settings.VARIANT_CLASSIFICATION_MAX_REFERENCE_LENGTH)
             if GenomeBuild.grch38().is_annotated:
                 c_hgvs_name = self._generate_c_hgvs_extra(genome_build=GenomeBuild.grch38())
                 max_length = max(c_hgvs_name.ref_lengths(), max_length)
                 self.chgvs_grch38 = c_hgvs_name.format()
                 self.chgvs_grch38_full = c_hgvs_name.format(
-                    max_allele_length=settings.VARIANT_CLASSIFICATION_MAX_FULL_ALLELE_LENGTH)
+                    max_ref_length=settings.VARIANT_CLASSIFICATION_MAX_REFERENCE_LENGTH)
         else:
             self.chgvs_grch37 = None
             self.chgvs_grch37_full = None
@@ -670,23 +689,23 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
 
                 # see if the match looks suspect
                 c_hgvs = self.get(SpecialEKeys.C_HGVS)
-                lifted_chgvs: Optional[CHGVS] = None
+                resolved_chgvs: Optional[CHGVS] = None
                 transcript_comment: Optional[str] = None
                 matching_warning_comment: Optional[str] = None
                 compare_to: Optional[str] = None
                 diff: Optional[CHGVSDiff] = None
                 if self.get(SpecialEKeys.GENOME_BUILD):
-                    current_build = self.get_genome_build()
-                    if current_build == GenomeBuild.grch37():
+                    genome_build = self.get_genome_build()
+                    if genome_build == GenomeBuild.grch37():
                         compare_to = self.chgvs_grch37
-                    elif current_build == GenomeBuild.grch38():
+                    elif genome_build == GenomeBuild.grch38():
                         compare_to = self.chgvs_grch38
 
                     if c_hgvs and compare_to:
                         original_chgvs = CHGVS(c_hgvs)
-                        lifted_chgvs = CHGVS(compare_to)
+                        resolved_chgvs = CHGVS(compare_to)
 
-                        diff = original_chgvs.diff(lifted_chgvs)
+                        diff = original_chgvs.diff(resolved_chgvs)
 
                         if diff:
                             # DIFF_RAW_CGVS_EXPANDED is minor and expected process
@@ -695,20 +714,21 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                             if diff == CHGVSDiff.DIFF_TRANSCRIPT_VER:
                                 transcript_comment = \
                                     (f'For c.hgvs {c_hgvs} the transcripts are:\n\n'
-                                     f'{original_chgvs.transcript} (imported)\n{lifted_chgvs.transcript} (resolved)')
+                                     f'{original_chgvs.transcript} (imported)\n{resolved_chgvs.transcript} (resolved)')
                             elif diff:
                                 important_diffs = chgvs_diff_description(diff)
                                 diff_desc = ' - ' + '\n - '.join(important_diffs)
                                 matching_warning_comment = (
                                     f'Imported c.hgvs and matched c.hgvs differ in the following ways:\n\n{diff_desc}\n\n'
-                                    f'{original_chgvs.full_c_hgvs} (imported)\n{lifted_chgvs.full_c_hgvs} (resolved)')
+                                    f'{original_chgvs.full_c_hgvs} (imported)\n{resolved_chgvs.full_c_hgvs} (resolved)')
 
                 if transcript_comment:
                     flag_collection.get_or_create_open_flag_of_type(
                         flag_type=classification_flag_types.transcript_version_change_flag,
                         comment=transcript_comment,
                         only_if_new=True,
-                        data={'resolved': lifted_chgvs.transcript},
+                        reopen_if_bot_closed=True,
+                        data={'resolved': resolved_chgvs.transcript},
                         close_other_data=True
                     )
                 else:
@@ -719,7 +739,8 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                         flag_type=classification_flag_types.matching_variant_warning_flag,
                         comment=matching_warning_comment,
                         only_if_new=True,
-                        data={'resolved': lifted_chgvs.full_c_hgvs},
+                        reopen_if_bot_closed=True,
+                        data={'resolved': resolved_chgvs.full_c_hgvs},
                         close_other_data=True
                     )
                 else:
@@ -752,6 +773,10 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         if variant is None and failed:
             self.classification_import = None
 
+        # see if the clinical context is still relevant (if we have one)
+        if not variant or ((cc := self.clinical_context) and (variant.allele != cc.allele)):
+            self.clinical_context = None
+
         if not self.id:
             # need to save to have a flag collection
             self.save()
@@ -779,6 +804,10 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 flag_collection.ensure_resolution(classification_flag_types.matching_variant_flag,
                                                   resolution='open',
                                                   comment=message)
+                flag_collection.close_open_flags_of_type(classification_flag_types.matching_variant_warning_flag,
+                                                         comment='Variant Re-Matching')
+                flag_collection.close_open_flags_of_type(classification_flag_types.transcript_version_change_flag,
+                                                         comment='Variant Re-Matching')
 
             self.update_cached_c_hgvs()
 
@@ -829,7 +858,13 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         for strength in CriteriaEvaluation.ALL_STRENGTHS:
             count = weights.get(strength, 0)
             if count > 0:
-                evidence_strings.append(str(count) + 'x' + strength)
+                # UNSPECIFIED STRENGTH HANDLING
+                strength_str = strength
+                if strength_str == CriteriaEvaluation.BENIGN_UNSPECIFIED:
+                    strength_str = "B(Unspecified)"
+                elif strength_str == CriteriaEvaluation.PATHOGENIC_UNSPECIFIED:
+                    strength_str = "P(Unspecified)"
+                evidence_strings.append(str(count) + 'x' + strength_str)
 
         return ', '.join(evidence_strings)
 
@@ -1396,6 +1431,8 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                         transcript_key = SpecialEKeys.REFSEQ_TRANSCRIPT_ID
                         if transcript.startswith('ENST'):
                             transcript_key = SpecialEKeys.ENSEMBL_TRANSCRIPT_ID
+                        elif transcript.startswith('LRG_'):
+                            transcript_key = SpecialEKeys.LRG_ID
 
                         transcript_cell = patch[transcript_key]
                         if not transcript_cell.provided:
@@ -1522,6 +1559,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                             patched.pop_immutability()
 
                     # if we ended up with no attributes to patch, don't patch with an empty dict
+                    # could be two floats that are close enough to each other
                     if not patched.has_data:
                         patched.wipe(WipeMode.POP)
 
@@ -1530,7 +1568,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             # if this is the first submission, create a version regardless of if there's data or not
             apply_patch = self.id is None
 
-        pending_modification: Optional[ClassificationModification] = None
+        pending_modification: Optional[ClassificationModification]
 
         # only make a modification if there's data to actually patch
         if apply_patch:
@@ -1564,7 +1602,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             # ACTUALLY APPLY THE PATCH
             # update the actual evidence with normalised patch values
             ###
-            Classification.patch_with(target=use_evidence.data, patch=diffs_only_patch)
+            Classification.patch_with(target=use_evidence.data, patch=diffs_only_patch, tidy_nones=True)
 
             self.evidence = use_evidence.data
             clinical_significance_choice = self.calc_clinical_significance_choice()
@@ -1600,13 +1638,13 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             'modified': modified_keys
         }
 
-    def publish_latest(self, user: User, share_level=None):
+    def publish_latest(self, user: User, share_level=None, debug_timer: DebugTimer = DebugTimer.NullTimer):
         if not share_level:
             share_level = self.share_level_enum
         latest_edited = self.last_edited_version
         if not latest_edited:
             raise ValueError(f'VC {self.id} does not have a last edited version')
-        latest_edited.publish(share_level=share_level, user=user, vc=self)
+        latest_edited.publish(share_level=share_level, user=user, vc=self, debug_timer=debug_timer)
 
     @property
     def last_edited_version(self) -> 'ClassificationModification':
@@ -1981,8 +2019,9 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                     vcfe.record(value, error=key_errors[k].get('message', 'Validation Error'))
                 else:
                     try:
-                        vcord = hgvs_matcher.get_variant_tuple(value)
-                        vcfe.record(value, vcord)
+                        vcord, _, method = hgvs_matcher.get_variant_tuple_used_transcript_and_method(value)
+                        message = f"HGVS matched by '{method}'"
+                        vcfe.record(value, vcord, message=message)
                         if vcord:
                             return vcfe
                     except Exception as e:
@@ -2091,49 +2130,40 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             variant_annotation = variant.variantannotation_set.filter(version=variant_annotation_version).first()
         return variant_annotation
 
-    def best_hgvs(self, genome_build: GenomeBuild) -> BestHGVS:
-        """
-        Returns a BestHGVS for this record for the given genome_build.
-        Attempts to get cached version first, if it fails is_fallback will be True
-        Fallsback to generate the c hgvs, then use the c hgvs evidence key, then the g hgvs evidence key
-        :param genome_build: The genome we want the build for
-        :return: A BestHGVS with is_fallback = did we have this value cached
-        """
+    def c_hgvs_all(self) -> List[CHGVS]:
+        all_chgvs: List[CHGVS] = list()
+        for genome_build in GenomeBuild.builds_with_annotation_cached():
+            if text := self.get_c_hgvs(genome_build):
+                chgvs = CHGVS(full_c_hgvs=text)
+                chgvs.genome_build = genome_build
+                chgvs.is_normalised = True
+                all_chgvs.append(chgvs)
+        return all_chgvs
 
-        # see if we can get the cached HGVS
-        hgvs = None
-        if genome_build == genome_build.grch37():
-            hgvs = self.chgvs_grch37
-        elif genome_build == genome_build.grch38():
-            hgvs = self.chgvs_grch38
-
-        if hgvs:
-            return BestHGVS(
-                genome_build=genome_build,
-                desired_build=genome_build,
-                hgvs=hgvs,
-                variant=self.variant
-            )
-        # all non cached HGVS values are to be treated as "is_fallback"
-        # for consistency with the grid view
-        hgvs = self._generate_c_hgvs_extra(genome_build).format()
-        if not hgvs:
-            hgvs = self.get(SpecialEKeys.C_HGVS)
-            if not hgvs:
-                hgvs = self.get(SpecialEKeys.G_HGVS)
-
-        actual_build = None
+    def c_hgvs_best(self, preferred_genome_build: GenomeBuild) -> CHGVS:
+        if c_hgvs_str := self.get_c_hgvs(preferred_genome_build):
+            c_hgvs = CHGVS(c_hgvs_str)
+            c_hgvs.genome_build = preferred_genome_build
+            c_hgvs.is_normalised = True
+            c_hgvs.is_desired_build = True
+            return c_hgvs
+        for alt_genome_build in GenomeBuild.builds_with_annotation_cached():
+            if preferred_genome_build == alt_genome_build:
+                continue
+            if c_hgvs_str := self.get_c_hgvs(alt_genome_build):
+                c_hgvs = CHGVS(c_hgvs_str)
+                c_hgvs.genome_build = alt_genome_build
+                c_hgvs.is_normalised = True
+                c_hgvs.is_desired_build = False
+                return c_hgvs
+        c_hgvs = CHGVS(self.get(SpecialEKeys.C_HGVS) or "")
         try:
-            actual_build = self.get_genome_build()
-        except:
+            c_hgvs.genome_build = self.get_genome_build()
+        except ValueError:
             pass
-        return BestHGVS(
-            genome_build=actual_build,
-            desired_build=genome_build,
-            hgvs=hgvs,
-            variant=self.variant,
-            is_fallback=True
-        )
+        c_hgvs.is_normalised = False
+        c_hgvs.is_desired_build = preferred_genome_build == c_hgvs.genome_build
+        return c_hgvs
 
     def _generate_c_hgvs_extra(self, genome_build: GenomeBuild) -> HGVSNameExtra:
         variant = self.get_variant_for_build(genome_build)
@@ -2304,7 +2334,7 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
                         clinical_context: Optional['ClinicalContext'] = None,
                         exclude_withdrawn: bool = True,
                         shared_only: bool = False,
-                        **kwargs) -> QuerySet:
+                        **kwargs) -> QuerySet['ClassificationModification']:
         """
 
         :param user: The active user
@@ -2367,12 +2397,13 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
             and not self.published
 
     @transaction.atomic()
-    def publish(self, share_level: Union[ShareLevel, str, int], user: User, vc: 'Classification') -> bool:
+    def publish(self, share_level: Union[ShareLevel, str, int], user: User, vc: 'Classification', debug_timer: DebugTimer = DebugTimer.NullTimer) -> bool:
         """
         :param share_level: The share level we want to publish as
         :param user: The user who initiated the publishing
         :param vc: The variant classification we're publishing - even though it's redundant but we get the same object
         instance and don't reload it from the database
+        :param debug_timer: for timing the event
         """
         old_share_level = vc.share_level_enum
         share_level = ShareLevel.from_key(share_level)
@@ -2404,13 +2435,18 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
             assign_perm(self.get_read_perm(), group, self)
 
         vc.save()
+
+        debug_timer.tick("Published Modification")
+
         classification_post_publish_signal.send(
             sender=Classification,
             classification=vc,
             previously_published=previously_published,
             previous_share_level=old_share_level,
             newly_published=self,
-            user=user)
+            user=user,
+            debug_timer=debug_timer)
+
         vc.refresh_from_db()
         return True
 
@@ -2444,7 +2480,7 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
 
                 patches_since_evidence.reverse()
                 for patch in patches_since_evidence:
-                    Classification.patch_with(target=data, patch=patch)
+                    Classification.patch_with(target=data, patch=patch, tidy_nones=True)
                 self.cached_evidence = data
         return self.cached_evidence
 
@@ -2453,8 +2489,8 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
         lowest_share_level = self.classification.lowest_share_level(user)
         return self.classification.get_visible_evidence(self.evidence, lowest_share_level)
 
-    def best_hgvs(self, genome_build: GenomeBuild) -> BestHGVS:
-        return self.classification.best_hgvs(genome_build=genome_build)
+    def c_hgvs_best(self, genome_build: GenomeBuild) -> CHGVS:
+        return self.classification.c_hgvs_best(preferred_genome_build=genome_build)
 
     def is_significantly_equal(self, other: 'ClassificationModification', care_about_explains: bool = False) -> bool:
         """

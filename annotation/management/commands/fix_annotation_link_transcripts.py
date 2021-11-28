@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 
+import logging
+
 from django.core.management.base import BaseCommand
 from django.db.models import Q, Func, Value, F
-import logging
 
 from annotation.models import VariantAnnotation, VariantTranscriptAnnotation, VariantAnnotationVersion, \
     TranscriptVersion, defaultdict

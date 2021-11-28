@@ -1,6 +1,7 @@
+import os
+
 from django.conf import settings
 from django.core.exceptions import PermissionDenied
-import os
 
 from annotation.models import ManualVariantEntryType
 from annotation.models.models import ManualVariantEntryCollection, ManualVariantEntry
@@ -8,8 +9,8 @@ from annotation.tasks.process_manual_variants_task import ManualVariantsPostInse
 from library.django_utils.django_file_utils import get_import_processing_dir
 from library.utils import full_class_name
 from library.vcf_utils import write_vcf_from_tuples
-from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_enums import ImportSource
+from snpdb.models.models_genome import GenomeBuild
 from upload.models import UploadPipeline, UploadedFile, UploadStep, UploadedManualVariantEntryCollection
 from upload.models.models_enums import UploadedFileTypes, UploadStepTaskType, VCFPipelineStage, UploadStepOrigin
 from upload.upload_processing import process_upload_pipeline
@@ -53,6 +54,10 @@ def create_manual_variants(user, genome_build: GenomeBuild, variants_text: str):
             except ValueError as ve:
                 mve.error_message = f"Error parsing {entry_type}: '{ve}'"
                 mve.save()
+
+    if not variants_list:
+        # Pipeline would have just hung forever
+        raise ValueError("No valid variants to create!")
 
     # Because we need to normalise / insert etc, it's easier just to write a VCF
     # and run through upload pipeline

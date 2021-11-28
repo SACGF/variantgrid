@@ -5,14 +5,13 @@ from rest_framework.response import Response
 from termsandconditions.decorators import terms_required
 
 from classification.models import classification_flag_types
-from flags.models import FlagCollection
-from snpdb.forms import LabSelectForm
-from snpdb.models import Lab
-from snpdb.models.models_genome import GenomeBuild
 from classification.models.classification import Classification, \
     ClassificationModification
-from classification.views.classification_datatables import ClassificationColumns
+from classification.models.clinvar_export_sync import clinvar_export_sync
 from classification.views.classification_export_flags import ExportFormatterFlags
+from flags.models import FlagCollection
+from snpdb.models import Lab
+from snpdb.models.models_genome import GenomeBuild
 
 
 @terms_required
@@ -44,6 +43,11 @@ def dashboard(request: HttpRequest) -> Response:
     withdrawn = FlagCollection.filter_for_open_flags(qs=vcqs_user.filter(withdrawn=True), flag_types=[
         classification_flag_types.classification_withdrawn
     ])
+    clinvar_exclude = Classification.objects.none()
+    if clinvar_export_sync.is_enabled:
+        clinvar_exclude = FlagCollection.filter_for_open_flags(qs=vcqs, flag_types=[
+            classification_flag_types.classification_not_public
+        ])
 
     issue_counts = {
         "classifications": {
@@ -51,13 +55,14 @@ def dashboard(request: HttpRequest) -> Response:
             "variant_matching": variant_matching.count(),
             "comments": comments.count(),
             "unshared": unshared.count(),
-            "withdrawn": withdrawn.count()
+            "withdrawn": withdrawn.count(),
+            "clinvar_exclude": clinvar_exclude.count()
         }
     }
 
     context = {
-        "datatable_config": ClassificationColumns(request),
         "labs": labs,
+        "clinvar_export_enabled": clinvar_export_sync.is_enabled,
         "counts": issue_counts
     }
 

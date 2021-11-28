@@ -1,10 +1,10 @@
 import csv
+import json
+import os
 from typing import Optional
 
 from django.contrib.auth.models import User
 from django.core.management.base import BaseCommand
-import json
-import os
 
 from snpdb.models.models import Lab, Organization
 from snpdb.models.models_user_settings import UserSettings

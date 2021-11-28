@@ -6,9 +6,13 @@ etc and things that don't fit anywhere else.
 'snpdb' was the highly unoriginal name I used before 'VariantGrid'
 """
 import json
+import logging
 import re
-from functools import total_ordering
 from datetime import datetime
+from functools import total_ordering
+from re import RegexFlag
+from typing import List, TypedDict, Optional
+
 from celery.result import AsyncResult
 from django.conf import settings
 from django.contrib.auth.models import User, Group
@@ -17,20 +21,18 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import models
 from django.db.models import QuerySet, TextChoices
 from django.db.models.aggregates import Count
-from django.db.models.deletion import SET_NULL, CASCADE
+from django.db.models.deletion import SET_NULL, CASCADE, PROTECT
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.timezone import now
 from django_extensions.db.models import TimeStampedModel
 from lazy import lazy
-import logging
 from model_utils.managers import InheritanceManager
-from typing import List, TypedDict, Optional, Dict
+
+from classification.enums.classification_enums import ShareLevel
 from library.enums.log_level import LogLevel
 from library.enums.time_enums import TimePeriod
-from library.log_utils import send_notification
 from library.utils import import_class
-from classification.enums.classification_enums import ShareLevel
 
 
 class Tag(models.Model):
@@ -205,8 +207,8 @@ class LabUser:
 
     @lazy
     def preferred_label(self) -> str:
-        from snpdb.models import UserSettings
-        return UserSettings.preferred_label_for(self.user)
+        from snpdb.models import AvatarDetails
+        return AvatarDetails.avatar_for(self.user).preferred_label
 
     def __lt__(self, other):
         return self.preferred_label < other.preferred_label
@@ -230,7 +232,7 @@ class ClinVarKey(TimeStampedModel):
 
     id = models.TextField(primary_key=True)
     api_key = models.TextField(null=True, blank=True)
-    behalf_org_id = models.TextField(null=False, blank=True, default='')  # maybe this should be the id?
+    org_id = models.TextField(null=False, blank=True, default='')  # maybe this should be the id?
 
     default_affected_status = models.TextField(choices=ClinVarAssertionMethods.choices, null=True, blank=True)
     inject_acmg_description = models.BooleanField(blank=True, default=False)
@@ -277,12 +279,72 @@ class ClinVarKey(TimeStampedModel):
                     raise PermissionDenied("User does not belong to a lab that uses the submission key")
 
 
+class ClinVarKeyExcludePatternMode(TextChoices):
+    EXCLUDE_IF_MATCH = 'X'
+    EXCLUDE_IF_NO_MATCH = 'N'
+
+
+class ClinVarKeyExcludePattern(TimeStampedModel):
+    clinvar_key = models.ForeignKey(ClinVarKey, on_delete=CASCADE)
+    evidence_key = models.TextField()  # Actually EvidenceKey but can't link to that from snpdb
+    pattern = models.TextField()
+    name = models.TextField(blank=True)
+    case_insensitive = models.BooleanField(default=True, blank=True)
+    mode = models.TextField(choices=ClinVarKeyExcludePatternMode.choices, default=ClinVarKeyExcludePatternMode.EXCLUDE_IF_MATCH)
+
+    @lazy
+    def regex(self):
+        flags = 0
+        if self.case_insensitive:
+            flags = RegexFlag.IGNORECASE
+        return re.compile(self.pattern, flags=flags)
+
+    def should_exclude(self, text: str) -> bool:
+        matches = bool(self.regex.search(text))
+        if self.mode == ClinVarKeyExcludePatternMode.EXCLUDE_IF_MATCH:
+            return matches
+        else:
+            return not matches
+
+    def clean(self):
+        try:
+            re.compile(self.pattern)
+        except:
+            raise ValidationError({'pattern': ValidationError(f'{self.pattern} is not a valid regular expression')})
+
+        from classification.models import EvidenceKeyMap
+        if EvidenceKeyMap.cached_key(self.evidence_key).is_dummy:
+            raise ValidationError({'evidence_key': ValidationError(f'{self.evidence_key} is not a valid EvidenceKey')})
+
+    def __str__(self):
+        from classification.models import EvidenceKeyMap
+        return EvidenceKeyMap.cached_key(self.evidence_key).pretty_label + " : " + (self.name or self.pattern_str)
+
+
+class Country(models.Model):
+    name = models.TextField(primary_key=True)
+    short_name = models.TextField(unique=True, null=True)
+    population = models.IntegerField(null=True)
+
+    def __str__(self):
+        return self.name
+
+
+class State(models.Model):
+    name = models.TextField(primary_key=True)
+    short_name = models.TextField(unique=True, null=True)
+    country = models.ForeignKey(Country, on_delete=CASCADE)
+    population = models.IntegerField(null=True)
+
+    def __str__(self):
+        return self.name
+
 class Lab(models.Model):
     name = models.TextField()
     external = models.BooleanField(default=False, blank=True)  # From somewhere else, eg Shariant
     city = models.TextField()
-    state = models.TextField(null=True)
-    country = models.TextField()
+    state = models.ForeignKey(State, null=True, on_delete=PROTECT)
+    country = models.ForeignKey(Country, null=True, on_delete=PROTECT)
     url = models.TextField(blank=True)
     css_class = models.TextField(blank=True)
     lat = models.FloatField(null=True, blank=True)
@@ -298,6 +360,10 @@ class Lab(models.Model):
     organization = models.ForeignKey(Organization, null=False, blank=False, on_delete=CASCADE)
     # location where the lab can upload files to, (in some environments may refer to s3 directory)
     upload_location = models.TextField(null=True, blank=True)
+    upload_auto_pattern = models.TextField(default="", blank=True)
+    """
+    If provided, and filename matches, file upload will be automatically set to auto_processed
+    """
 
     email = models.TextField(blank=True)
     slack_webhook = models.TextField(blank=True)
@@ -306,16 +372,6 @@ class Lab(models.Model):
         if self.organization != other.organization:
             return self.organization.name < other.organization.name
         return self.name < other.name
-
-    def send_notification(self,
-                          message: str,
-                          blocks: Optional[Dict] = None,
-                          username: Optional[str] = None,
-                          emoji: str = ":dna:"):
-        if slack_url := self.slack_webhook:
-            send_notification(message=message, blocks=blocks, username=username, emoji=emoji, slack_webhook_url=slack_url)
-        else:
-            raise ValueError("Lab is not configured to send Slack notifications")
 
     class Meta:
         ordering = ['name']
@@ -414,7 +470,7 @@ class Lab(models.Model):
             return Lab.objects.all()
 
         group_names = list(user.groups.values_list('name', flat=True))
-        return Lab.objects.filter(group_name__in=group_names)
+        return Lab.objects.filter(group_name__in=group_names).order_by('name')
 
     def classifications_activity(self, time_period):
         trunc_func = TimePeriod.truncate_func(time_period)
@@ -437,6 +493,12 @@ class Lab(models.Model):
             raise PermissionDenied(msg)
 
     def save(self, **kwargs):
+        if upload_auto_pattern := self.upload_auto_pattern:
+            try:
+                re.compile(upload_auto_pattern)
+            except ValueError as ve:
+                raise ValueError(f"Upload auto pattern {upload_auto_pattern} is not a valid regular expression")
+
         super().save(**kwargs)
         if self.group_name:
             # pre-create the groups

@@ -1,4 +1,5 @@
 from django.template import Library
+
 from snpdb.models import VCF
 from upload.models import UploadedVCF
 

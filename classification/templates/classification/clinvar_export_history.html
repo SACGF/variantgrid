@@ -1,12 +1,14 @@
 {% load js_tags %}
 {% load ui_utils %}
 {% if history %}
-    <p class="text-info">Below is the history of what was sent to ClinVar for this submitter/allele/condition combination.</p>
+    <p class="text-info">Below is the history of what was sent to ClinVar for this ClinVar Key/allele/condition combination.</p>
     {% for history_entry in history %}
         <div class="card mb-4">
-            <div class="card-header">ClinVar Submission ({{ history_entry.pk }})</div>
+            <div class="card-header">
+                <div class="float-left">ClinVar Submission ({{ history_entry.pk }})</div>
+                <div class="float-right">{% timestamp history_entry.created time_ago=True %}</div>
+            </div>
             <div class="card-body">
-                {% labelled label="Created" %}{% timestamp history_entry.created time_ago=True %}{% endlabelled %}
                 {% labelled label="Status" %}{{ history_entry.get_status_display }}{% endlabelled %}
                 {% labelled label="Source Classification" %}
                     <a href="{% url 'view_classification' history_entry.classification_based_on.id_str %}" target="_blank">

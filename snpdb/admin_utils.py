@@ -31,6 +31,7 @@ def admin_action(short_description: str):
 
             return method(*args, **kwargs)
         wrapper.short_description = short_description
+        wrapper.line_number = inspect.getsourcelines(method)[1]
         wrapper.__name__ = method.__name__
         wrapper.is_action = True
         return wrapper
@@ -136,11 +137,11 @@ class ModelAdminBasics(admin.ModelAdmin):
         """
         Sets up actions (methods annotated with @admin_action)
         """
-        actions = {}
+        actions = [func for _, func in inspect.getmembers(cls, lambda x: getattr(x, 'is_action', False))]
 
-        actions = dict((name, func) for name, func in inspect.getmembers(cls, lambda x: getattr(x, 'is_action', False)))
         if actions:
-            cls.actions = ['export_as_csv'] + list(actions.keys())
+            actions.sort(key=lambda x: x.line_number)
+            cls.actions = ['export_as_csv'] + actions
         return super().__new__(cls)
 
     def is_readonly_field(self, f) -> bool:

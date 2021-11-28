@@ -1,3 +1,5 @@
+import json
+import re
 import urllib
 from decimal import Decimal
 from html import escape
@@ -5,13 +7,10 @@ from typing import Union, Any, Optional
 
 from django import template
 from django.utils.safestring import mark_safe
-import json
-import re
 
-
-from uicore.json.validated_json import ValidatedJson
-from uicore.json.json_types import JsonDataType
 from library.utils import format_significant_digits
+from uicore.json.json_types import JsonDataType
+from uicore.json.validated_json import ValidatedJson
 
 register = template.Library()
 
@@ -26,7 +25,7 @@ def jsonify_for_js(json_me, pretty=False) -> Union[str, Any]:
         return mark_safe('false')
     if isinstance(json_me, (int, float)):
         return json_me
-    indent = 0 if not pretty else 4
+    indent = None if not pretty else 4
     text = json.dumps(json_me, indent=indent)
     if pretty:
         # this stops arrays of arrays taking up too much vertical space
@@ -60,7 +59,7 @@ def jsstring(text):
 
 @register.filter
 def limit_length(text, limit=100):
-    if text and len(text) > limit:
+    if limit and text and len(text) > limit:
         return text[0:(limit-3)] + '...'
     return text
 
@@ -114,22 +113,48 @@ def code_json(data: JsonDataType, css_class: Optional[str] = ""):
         # if we're formatting ValidatedJson and the first element has messages, that provides formatting
         # so we don't need code-block
         # Also if we already have a css_class (like card-body) we don't need code-block
-        if not data or ('*wrapper$' not in data and not data.get('messages')):
+        if not data or not isinstance(data, dict) or ('*wrapper$' not in data and not data.get('messages')):
             css_class = "code-block"
     return {"data": data, "css_class": css_class}
 
 
+@register.inclusion_tag("uicore/tags/code_block_regex.html")
+def code_regex(data: str):
+    error = None
+    extension = None
+    pattern = data
+    try:
+        re.compile(data)
+    except ValueError:
+        error = f"Invalid pattern: {data}"
+
+    if match := re.compile(r"\.\*\\\.(?P<extension>.+)").match(data):
+        extension = match.group('extension')
+    return {"error": error, "extension": extension, "pattern": pattern}
+
+
+@register.inclusion_tag("uicore/tags/code_shell.html")
+def code_shell(data: str):
+    # doesn't really do anything of note currently, but gives us the opportunity in future
+    return {"text": data}
+
+
 @register.inclusion_tag("uicore/tags/timestamp.html")
-def timestamp(timestamp, time_ago: bool = False):
-    css_class = 'time-ago' if time_ago else ''
+def timestamp(timestamp, time_ago: bool = False, show_seconds: bool = False):
+    css_classes = list()
+    if time_ago:
+        css_classes.append('time-ago')
+    if show_seconds:
+        css_classes.append('seconds')
+
     if timestamp:
         if not isinstance(timestamp, int) and not isinstance(timestamp, float):
             timestamp = timestamp.timestamp()
         return {
             "timestamp": timestamp,
-            "css_class": css_class
+            "css_class": " ".join(css_classes)
         }
-    return {"css_class": "empty"}
+    return {}
 
 
 @register.filter()

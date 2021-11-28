@@ -1,15 +1,16 @@
+import urllib
+
 from django.conf import settings
 from django.contrib.sites.models import Site
 from django.urls.base import reverse
-import urllib
 
-from library.django_utils import get_url_from_view_path
-from snpdb.models.models_genome import GenomeBuildContig
 from classification.enums.classification_enums import SpecialEKeys
-from classification.models.evidence_key import EvidenceKeyMap, EvidenceKey
 from classification.models.classification import ClassificationModification
+from classification.models.evidence_key import EvidenceKey
 from classification.views.classification_export_utils import ExportFormatter, \
     AlleleGroup, VCFEncoding
+from library.django_utils import get_url_from_view_path
+from snpdb.models.models_genome import GenomeBuildContig
 
 
 class ExportFormatterVCF(ExportFormatter):
@@ -17,7 +18,7 @@ class ExportFormatterVCF(ExportFormatter):
     Formats as a VCF with INFO fields as RefSeq Transcript ID, clinical significance and condition as INFO
     """
 
-    def __init__(self, encoding:str = VCFEncoding.BASIC, *args, **kwargs):
+    def __init__(self, encoding: str = VCFEncoding.BASIC, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.report_keys = [self.ekeys.get(key) for key in [SpecialEKeys.CLINICAL_SIGNIFICANCE]]
         self.db_prefix = settings.VARIANT_VCF_DB_PREFIX

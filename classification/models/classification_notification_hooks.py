@@ -6,13 +6,13 @@ from classification.enums import SpecialEKeys
 from classification.models import DiscordanceReport, discordance_change_signal, EvidenceKeyMap
 from classification.models.classification_groups import ClassificationGroups
 from library.django_utils import get_url_from_view_path
-from library.log_utils import send_notification
+from library.log_utils import NotificationBuilder
 from snpdb.utils import LabNotificationBuilder
 
 
 @receiver(discordance_change_signal, sender=DiscordanceReport)
 def notify_discordance_change(discordance_report: DiscordanceReport, **kwargs):
-    if settings.DISCORDANCE_ENABLED:
+    if settings.DISCORDANCE_ENABLED and not settings.DISCORDANCE_PAUSE_TEMP_VARIANT_MATCHING:
         send_discordance_notification(discordance_report=discordance_report)
 
 
@@ -40,7 +40,9 @@ def send_discordance_notification(discordance_report: DiscordanceReport):
         notification.add_markdown(listing)
         notification.add_markdown(f"Full details of the discordance can be seen here : <{report_url}>")
         notification.send()
-        send_notification(message=f"Discordance notification re Discordance Report <{report_url}> sent to {lab.name}", emoji=":email:")
+
+        NotificationBuilder(message=f"Discordance notification re Discordance Report <{report_url}> sent to {lab.name}", emoji=":email:")\
+            .add_markdown(f"Discordance notification re Discordance Report <{report_url}> sent to {lab.name}").send()
 
 
 """

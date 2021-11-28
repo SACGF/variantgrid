@@ -11,3 +11,5 @@ from classification.models.variant_models import *
 from classification.models.condition_text_matching import *
 from classification.models.clinvar_export_models import *
 from classification.models.classification_report_models import *
+from classification.models.upload_file_lab import *
+from classification.models.clinvar_export_exclude_utils import *  # so we load the receivers

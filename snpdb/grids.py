@@ -1,10 +1,11 @@
+import operator
+from functools import reduce
+
 from django.conf import settings
 from django.db.models import F
 from django.db.models.aggregates import Count
 from django.db.models.query_utils import Q
-from functools import reduce
 from guardian.shortcuts import get_objects_for_user
-import operator
 
 from library.database_utils import get_queryset_column_names, \
     get_queryset_select_from_where_parts
@@ -125,6 +126,9 @@ class SamplesListGrid(JqGridUserRowConfig):
             if genome_build_name := extra_filters.get("genome_build_name"):
                 genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
                 queryset = queryset.filter(vcf__genome_build=genome_build)
+            variants_type = extra_filters.get("variants_type")
+            if variants_type is not None:
+                queryset = queryset.filter(variants_type__in=variants_type)
 
         # If you don't have permission to view a patient - blank it out
         # If you have read only and

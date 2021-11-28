@@ -8,7 +8,8 @@
 {% for clinvar_request in batch.requests %}
     <div class="card mt-4">
         <div class="card-header">
-            ClinVar Request ({{ clinvar_request.pk }})
+            <div class="float-left">ClinVar Request ({{ clinvar_request.pk }})</div>
+            <div class="float-right">{% timestamp clinvar_request.created time_ago=True %}</div>
         </div>
         <div class="card-body">
             {% labelled label="Type" %}{{ clinvar_request.get_request_type_display }}{% endlabelled %}
@@ -18,7 +19,7 @@
                 <a href="#creq-{{clinvar_request.pk}}" data-toggle="collapse" class="toggle-link">Toggle</a>
             {% endlabelled %}
             <div id="creq-{{clinvar_request.pk}}" class="collapse">
-                <div class="mt-4"><label>Request</label>view_classification
+                <div class="mt-4"><label>Request</label>
                 {% code_json clinvar_request.request_json %}
                 </div>
                 <div class="mt-4"><label>Response</label>

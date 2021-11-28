@@ -1,29 +1,29 @@
 from dataclasses import dataclass
 from enum import Enum
+from typing import List, Optional, Iterable, Set
 
+import django.dispatch
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.db import models, transaction
 from django.db.models.deletion import CASCADE
 from django.db.models.query import QuerySet
-import django.dispatch
 from django.dispatch.dispatcher import receiver
 from django.utils.timezone import now
 from django_extensions.db.models import TimeStampedModel
-from typing import List, Optional, Iterable
-
 from lazy import lazy
 
-from flags.models.models import FlagsMixin, FlagCollection, FlagTypeContext, \
-    flag_collection_extra_info_signal, FlagInfos
-from library.log_utils import report_message
-from snpdb.models import Variant
-from snpdb.models.models_variant import Allele
 from classification.enums import ShareLevel, SpecialEKeys
 from classification.enums.clinical_context_enums import ClinicalContextStatus
-from classification.models.flag_types import classification_flag_types
 from classification.models.classification import Classification, \
     ClassificationModification
+from classification.models.flag_types import classification_flag_types
+from flags.models.models import FlagsMixin, FlagCollection, FlagTypeContext, \
+    flag_collection_extra_info_signal, FlagInfos
+from library.django_utils import get_url_from_view_path
+from library.log_utils import report_message, NotificationBuilder
+from snpdb.models import Variant, Lab
+from snpdb.models.models_variant import Allele
 
 clinical_context_signal = django.dispatch.Signal(providing_args=["clinical_context", "status", "is_significance_change", "cause"])
 
@@ -38,6 +38,11 @@ CS_TO_NUMBER = {
     'P': 3,
     'R': 4
 }
+SPECIAL_VUS = {
+    'VUS_A': 1,
+    'VUS_B': 2,
+    'VUS_C': 3
+}
 
 
 class DiscordanceLevel(str, Enum):
@@ -47,7 +52,9 @@ class DiscordanceLevel(str, Enum):
     """
 
     NO_ENTRIES = 'no_entries'
+    SINGLE_SUBMISSION = 'single_submission'  # single shared submission
     CONCORDANT_AGREEMENT = 'concordant_agreement'  # complete agreement
+    CONCORDANT_DIFF_VUS = 'concordant_agreement_diff_vus'  # VUS-A, VUS-B vs VUS-C
     CONCORDANT_CONFIDENCE = 'concordant_confidence'  # Benign vs Likely Benign
     DISCORDANT = 'discordant'
 
@@ -55,56 +62,93 @@ class DiscordanceLevel(str, Enum):
     def label(self) -> str:
         if self == DiscordanceLevel.CONCORDANT_AGREEMENT:
             return "Concordant (Agreement)"
+        if self == DiscordanceLevel.CONCORDANT_DIFF_VUS:
+            return "Concordant (Agreement Differing VUS)"
         if self == DiscordanceLevel.CONCORDANT_CONFIDENCE:
             return "Concordant (Confidence)"
         if self == DiscordanceLevel.NO_ENTRIES:
             return "No Shared Submissions"
+        if self == DiscordanceLevel.SINGLE_SUBMISSION:
+            return "Single Shared Submission"
         if self == DiscordanceLevel.DISCORDANT:
             return "Discordant"
         return "Unknown"
 
     @property
-    def bs_status(self) -> str:
-        if self == DiscordanceLevel.CONCORDANT_AGREEMENT:
-            return "success"
+    def css_class(self) -> str:
+        if self == DiscordanceLevel.CONCORDANT_AGREEMENT or self == DiscordanceLevel.CONCORDANT_DIFF_VUS:
+            return "overlap-agreement"
         if self == DiscordanceLevel.CONCORDANT_CONFIDENCE:
-            return "warning"
-        if self == DiscordanceLevel.NO_ENTRIES:
-            return "secondary"
-        return "danger"
+            return "overlap-confidence"
+        if self == DiscordanceLevel.DISCORDANT:
+            return "overlap-discordant"
+        return "overlap-single"
 
 
 @dataclass
 class DiscordanceStatus:
     level: DiscordanceLevel
     lab_count: int
+    lab_count_all: int
     counted_classifications: int
 
     @staticmethod
     def calculate(modifications: Iterable[ClassificationModification]) -> 'DiscordanceStatus':
-        cs_scores = set()
-        cs_values = set()
-        labs = set()
+        cs_scores: Set[int] = set()  # clin sig to score, all VUSs are 3
+        cs_vuses: Set[int] = set()  # all the different VUS A,B,C values
+        cs_values: Set[str] = set()   # all the different clinical sig values
+        shared_labs: Set[Lab] = set()   # all the sharing labs
+        all_labs: Set[Lab] = set()   # all labs involved (sharing and not sharing, only sharing records determine the status)
+
         level: Optional[DiscordanceLevel]
         counted_classifications = 0
         for vcm in modifications:
+            all_labs.add(vcm.classification.lab)
             clin_sig = vcm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
             if vcm.share_level_enum.is_discordant_level and vcm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE) is not None:
-                strength = CS_TO_NUMBER.get(clin_sig)
-                if strength:
+                if strength := CS_TO_NUMBER.get(clin_sig):
                     counted_classifications += 1
-                    labs.add(vcm.classification.lab)
+                    shared_labs.add(vcm.classification.lab)
                     cs_scores.add(strength)
                     cs_values.add(clin_sig)
-        if len(cs_scores) > 1:
-            level = DiscordanceLevel.DISCORDANT
-        elif len(cs_values) > 1:
-            level = DiscordanceLevel.CONCORDANT_CONFIDENCE
-        elif len(labs) == 0:
+                if vus_special := SPECIAL_VUS.get(clin_sig):
+                    cs_vuses.add(vus_special)
+
+        if counted_classifications == 0:
             level = DiscordanceLevel.NO_ENTRIES
+
+        elif counted_classifications == 1:
+            level = DiscordanceLevel.SINGLE_SUBMISSION
+
+        elif len(cs_scores) > 1:
+            level = DiscordanceLevel.DISCORDANT
+
+            # not discordant if we've reached here, see if we have multiple VUS kinds
+        elif len(cs_vuses) > 1:
+            # importantly you can have a VUS vs VUS_A and still be in agreement
+            # it's only if you have more than one of VUS_A,B,C that cs_vuses will have multiple values
+            level = DiscordanceLevel.CONCORDANT_DIFF_VUS
+
+        elif len(cs_values) > 1 and not (len(cs_scores) == 1 and 2 in cs_scores and len(cs_vuses) == 1):
+            # check to make sure we don't have VUS vs VUS_A, or VUS vs VUS_B which should be considered agreemetn
+
+            # importantly you can have a VUS vs VUS_A and still be in agreement
+            # it's only if you have more than one of VUS_A,B,C that cs_vuses will have multiple values
+            level = DiscordanceLevel.CONCORDANT_CONFIDENCE
+
         else:
             level = DiscordanceLevel.CONCORDANT_AGREEMENT
-        return DiscordanceStatus(level=level, lab_count=len(labs), counted_classifications=counted_classifications)
+
+        return DiscordanceStatus(level=level, lab_count=len(shared_labs), lab_count_all=len(all_labs), counted_classifications=counted_classifications)
+
+
+class ClinicalContextRecalcTrigger(Enum):
+    ADMIN = "admin"
+    VARIANT_SET = "variant_set"
+    CLINICAL_GROUPING_SET = "clinical_grouping"
+    WITHDRAW_DELETE = "withdraw_delete"
+    SUBMISSION = "submission"
+    OTHER = "other"
 
 
 class ClinicalContext(FlagsMixin, TimeStampedModel):
@@ -149,7 +193,7 @@ class ClinicalContext(FlagsMixin, TimeStampedModel):
         return DiscordanceReport.latest_report(self)
 
     @transaction.atomic
-    def recalc_and_save(self, cause: str):
+    def recalc_and_save(self, cause: str, cause_code: ClinicalContextRecalcTrigger = ClinicalContextRecalcTrigger.OTHER):
         """
         Updates this ClinicalContext with the new status and applies flags where appropriate.
         """
@@ -157,6 +201,17 @@ class ClinicalContext(FlagsMixin, TimeStampedModel):
         new_status = self.calculate_status()
 
         is_significance_change = old_status != new_status
+
+        if cause_code == ClinicalContextRecalcTrigger.VARIANT_SET and \
+                settings.DISCORDANCE_ENABLED and \
+                settings.DISCORDANCE_PAUSE_TEMP_VARIANT_MATCHING and \
+                not (old_status is None and new_status == ClinicalContextStatus.CONCORDANT):
+            if is_significance_change:
+                allele_url = get_url_from_view_path(self.allele.get_absolute_url())
+                nb = NotificationBuilder("ClinicalContext changed (muted due to variant matching)")
+                nb.add_markdown(f"ClinicalGrouping for allele <{allele_url}|{allele_url}> would change from {old_status} -> {new_status} but ignoring due to variant re-matching")
+                nb.send()
+            return
 
         self.last_evaluation = {
             "date": now().timestamp(),
@@ -186,8 +241,8 @@ class ClinicalContext(FlagsMixin, TimeStampedModel):
                 )
 
             if is_significance_change and (old_status or new_status == ClinicalContextStatus.DISCORDANT):
-                report_message(f'Allele ID {self.allele_id} clinical grouping {old_status} -> {new_status}', extra_data={
-                    'allele_id': self.allele_id
+                report_message(f'Allele ID clinical grouping change', extra_data={
+                    'target': f'Allele ID {self.allele_id} {old_status} -> {new_status}'
                 })
 
         else:
@@ -235,7 +290,7 @@ class ClinicalContext(FlagsMixin, TimeStampedModel):
 
     def __str__(self) -> str:
         if self.is_default:
-            return 'Default for allele'
+            return 'Default Grouping for Allele'
         return self.name
 
 

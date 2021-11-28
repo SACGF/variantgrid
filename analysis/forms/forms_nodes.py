@@ -1,3 +1,5 @@
+import json
+
 from dal import autocomplete, forward
 from dal_select2.widgets import ModelSelect2Multiple
 from django import forms
@@ -5,7 +7,6 @@ from django.forms.models import fields_for_model
 from django.forms.widgets import TextInput, HiddenInput
 from django_starfield import Stars
 from guardian.shortcuts import get_objects_for_user
-import json
 
 from analysis import models
 from analysis.models import AnalysisNode, AnalysisTemplateType, Analysis
@@ -230,8 +231,10 @@ class CohortNodeForm(VCFSourceNodeForm):
     def __init__(self, *args, **kwargs):
         genome_build = kwargs.pop("genome_build", None)
         super().__init__(*args, **kwargs)
+        widget_forward = []
         if genome_build:
-            self.fields["cohort"].widget.forward.append(forward.Const(genome_build.pk, "genome_build_id"))
+            widget_forward.append(forward.Const(genome_build.pk, "genome_build_id"))
+        self.fields["cohort"].widget.forward = widget_forward
 
     def save(self, commit=True):
         node = super().save(commit=False)

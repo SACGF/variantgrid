@@ -1,9 +1,9 @@
+import json
 from typing import Optional
 
 from django.db import models
 from django.db.models import Q
 from django.db.models.deletion import CASCADE
-import json
 
 from analysis.models.nodes.analysis_node import AnalysisNode
 from library import jqgrid

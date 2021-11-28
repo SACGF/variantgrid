@@ -1,16 +1,16 @@
+import logging
 from collections import defaultdict
 
 from django.contrib.auth.models import User
 from django.core.exceptions import EmptyResultSet
 from django.db import connection
 from django.db.models.query_utils import Q
-import logging
 
 from annotation.models.damage_enums import PathogenicityImpact
-from library.database_utils import get_queryset_select_from_where_parts, dictfetchall
-from snpdb.models.models_enums import BuiltInFilters
 from classification.enums import ClinicalSignificance
 from classification.models import Classification, GenomeBuild
+from library.database_utils import get_queryset_select_from_where_parts, dictfetchall
+from snpdb.models.models_enums import BuiltInFilters
 
 # Add the necessary fields to qs to create join:
 REQUIRED_FIELDS = [

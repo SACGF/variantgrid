@@ -1,13 +1,13 @@
+import logging
+
+from django.http import HttpRequest
 from django.http.response import HttpResponse
 from django.shortcuts import render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
-import logging
 
-from eventlog.grids import EventColumns
 from eventlog.models import Event
 from library.enums.log_level import LogLevel
-from snpdb.views.datatable_view import BaseDatatableView
 
 
 def eventlog_view(view_func):
@@ -27,15 +27,12 @@ def eventlog_view(view_func):
 
 
 def eventlog(request):
-    return render(request, 'eventlog.html', context={
-        'datatable_config': EventColumns(request)
-    })
+    return render(request, 'eventlog.html', context={})
 
 
-class EventLogDatatableView(BaseDatatableView):
-
-    def config_for_request(self, request):
-        return EventColumns(request)
+def eventlog_detail(request: HttpRequest, pk: int):
+    event = Event.objects.get(pk=pk)
+    return render(request, 'eventlog_detail.html', context={'event': event})
 
 
 @require_POST

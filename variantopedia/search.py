@@ -1,3 +1,4 @@
+import logging
 import operator
 import re
 from collections import defaultdict
@@ -17,12 +18,14 @@ from pyhgvs import HGVSName
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
 from annotation.manual_variant_entry import check_can_create_variants, CreateManualVariantForbidden
 from annotation.models.models import AnnotationVersion
+from classification.models.classification import ClassificationModification, Classification, \
+    CreateNoClassificationForbidden
 from genes.hgvs import HGVSMatcher
-from genes.models import TranscriptVersion, Transcript, MissingTranscript, Gene, GeneSymbol, GeneSymbolAlias, \
-    BadTranscript
+from genes.models import TranscriptVersion, Transcript, MissingTranscript, Gene, GeneSymbol, GeneSymbolAlias
 from genes.models_enums import AnnotationConsortium
 from library.genomics import format_chrom
 from library.log_utils import report_exc_info
+from library.utils import clean_string
 from ontology.models import OntologyTerm, OntologyService
 from patients.models import ExternalPK, Patient
 from seqauto.illumina.illumina_sequencers import SEQUENCING_RUN_REGEX
@@ -32,15 +35,13 @@ from snpdb.models import VARIANT_PATTERN, LOCUS_PATTERN, LOCUS_NO_REF_PATTERN, D
     ClinGenAllele, GenomeBuild, Sample, Variant, Sequence, VariantCoordinate, UserSettings, Organization, Lab, VCF
 from snpdb.models.models_enums import ClinGenAlleleExternalRecordType
 from upload.models import ModifiedImportedVariant
-from classification.models.classification import ClassificationModification, Classification, \
-    CreateNoClassificationForbidden
 from variantgrid.perm_path import get_visible_url_names
 from variantopedia.models import SearchTypes
 
 DB_PREFIX_PATTERN = re.compile(fr"^(v|{settings.VARIANT_VCF_DB_PREFIX})(\d+)$")
 VARIANT_VCF_PATTERN = re.compile(r"((?:chr)?\S*)\s+(\d+)\s+\.?\s*([GATC]+)\s+([GATC]+)")
 VARIANT_GNOMAD_PATTERN = re.compile(r"(?:chr)?(\S*)-(\d+)-([GATC]+)-([GATC]+)")
-HGVS_MINIMUM_TO_SHOW_ERROR_PATTERN = re.compile(r":(c|g|p)\..*\d+")
+HGVS_MINIMUM_TO_SHOW_ERROR_PATTERN = re.compile(r":[cgpn]\..*\d+")
 ONTOLOGY_PATTERN = re.compile(r"\w+:\s*.*")
 MAX_RESULTS_PER_TYPE = 50
 
@@ -293,7 +294,7 @@ class Searcher:
             (SearchTypes.CLASSIFICATION, None, search_classification),
             (SearchTypes.PATIENT, HAS_ALPHA_PATTERN, search_patient),
             (SearchTypes.SEQUENCING_RUN, SEQUENCING_RUN_REGEX, search_sequencing_run),
-            (SearchTypes.TRANSCRIPT, r"^(ENST|NM_|NR_)\d+\.?\d*$", search_transcript),
+            (SearchTypes.TRANSCRIPT, r"^(ENST|NM_|NR_|XR_)\d+\.?\d*$", search_transcript),
             (SearchTypes.VARIANT, DB_PREFIX_PATTERN, search_variant_id),
             (SearchTypes.LAB, r"[a-zA-Z]{3,}", search_lab),
             (SearchTypes.ORG, r"[a-zA-Z]{3,}", search_org),
@@ -316,7 +317,7 @@ class Searcher:
         # if user can only see variants with classifications, then they def shouldn't be able to classify new variants
         self.can_create = True
         self.user = user
-        self.search_string = search_string.strip()
+        self.search_string = clean_string(search_string)
         self.classify = classify
 
         if settings.SEARCH_VARIANT_REQUIRE_CLASSIFICATION_FOR_NON_ADMIN and not user.is_superuser:
@@ -353,11 +354,14 @@ class Searcher:
                 variant_qs = get_visible_variants(self.user, genome_build)
                 searches = self.genome_build_searches
             except Exception as e:
-                report_exc_info(extra_data={
-                    'search_string': self.search_string,
-                    'classify': self.classify,
-                    'genome_build_id': genome_build.name if genome_build else None
-                })
+                report_exc_info(
+                    extra_data={
+                        'search_string': self.search_string,
+                        'classify': self.classify,
+                        'genome_build_id': genome_build.name if genome_build else None
+                    },
+                    report_externally=False
+                )
                 results.append_error(("variants", e, genome_build))
                 return results
         else:
@@ -408,12 +412,15 @@ class Searcher:
                             results.append_result(sr)
 
                 except Exception as e:
-                    report_exc_info(extra_data={
-                        'search_string': self.search_string,
-                        'search_type': search_type,
-                        'classify': self.classify,
-                        'genome_build_id': genome_build.name if genome_build else None
-                    })
+                    report_exc_info(
+                        extra_data={
+                            'search_string': self.search_string,
+                            'search_type': search_type,
+                            'classify': self.classify,
+                            'genome_build_id': genome_build.name if genome_build else None
+                        },
+                        report_externally=False
+                    )
                     results.append_error((search_type, e, genome_build))
         return results
 
@@ -522,48 +529,47 @@ def search_transcript(search_string: str, **kwargs) -> VARIANT_SEARCH_RESULTS:
     return []
 
 
-def _search_hgvs_using_gene_symbol(hgvs_matcher, search_messages,
+def _search_hgvs_using_gene_symbol(gene_symbol, search_messages,
                                    hgvs_string: str, user: User, genome_build: GenomeBuild, variant_qs: QuerySet) -> VARIANT_SEARCH_RESULTS:
     results = []
-    # May have used gene symbol instead
-    if gene_symbol := hgvs_matcher.get_gene_symbol_if_no_transcript(hgvs_string):
-        search_messages.append(f"Warning: HGVS requires transcript, given symbol: '{gene_symbol}'")
-        # Group results + hgvs by result.record hashcode
-        results_by_record = defaultdict(list)
-        transcript_accessions_by_record = defaultdict(list)
-        allele = HGVSName(hgvs_string).format(use_gene=False)
-        for gene in gene_symbol.genes:
-            tv_qs = TranscriptVersion.objects.filter(genome_build=genome_build, gene_version__gene=gene)
-            latest_tv_qs = tv_qs.order_by("transcript_id", "-version").distinct("transcript_id")
-            for transcript_version in latest_tv_qs:
-                transcript_hgvs = f"{transcript_version.accession}:{allele}"
-                try:
-                    for result in search_hgvs(transcript_hgvs, user, genome_build, variant_qs):
-                        result.annotation_consortia = [gene.annotation_consortium]
-                        results_by_record[result.record].append(result)
-                        transcript_accessions_by_record[result.record].append(transcript_version.accession)
-                except:
-                    pass  # Just swallow all these errors
+    search_messages.append(f"Warning: HGVS requires transcript, given symbol: '{gene_symbol}'")
+    # Group results + hgvs by result.record hashcode
+    results_by_record = defaultdict(list)
+    transcript_accessions_by_record = defaultdict(list)
+    allele = HGVSName(hgvs_string).format(use_gene=False)
+    for gene in gene_symbol.genes:
+        tv_qs = TranscriptVersion.objects.filter(genome_build=genome_build, gene_version__gene=gene)
+        latest_tv_qs = tv_qs.order_by("transcript_id", "-version").distinct("transcript_id")
+        for transcript_version in latest_tv_qs:
+            transcript_hgvs = f"{transcript_version.accession}:{allele}"
+            try:
+                for result in search_hgvs(transcript_hgvs, user, genome_build, variant_qs):
+                    result.annotation_consortia = [gene.annotation_consortium]
+                    results_by_record[result.record].append(result)
+                    transcript_accessions_by_record[result.record].append(transcript_version.accession)
+            except Exception as e:
+                logging.warning(e)
+                pass  # Just swallow all these errors
 
-        for record, results_for_record in results_by_record.items():
-            unique_messages = {m: True for m in search_messages}  # Use dict for uniqueness
-            result_message = f"Results for: {', '.join(transcript_accessions_by_record[record])}"
-            unique_messages[result_message] = True
-            # Go through messages for each result together, so they stay in same order
-            for messages in zip_longest(*[r.messages for r in results_for_record]):
-                for m in messages:
-                    if m:
-                        unique_messages[m] = True
+    for record, results_for_record in results_by_record.items():
+        unique_messages = {m: True for m in search_messages}  # Use dict for uniqueness
+        result_message = f"Results for: {', '.join(transcript_accessions_by_record[record])}"
+        unique_messages[result_message] = True
+        # Go through messages for each result together, so they stay in same order
+        for messages in zip_longest(*[r.messages for r in results_for_record]):
+            for m in messages:
+                if m:
+                    unique_messages[m] = True
 
-            unique_annotation_consortia = set()
-            for r in results_for_record:
-                unique_annotation_consortia.update(r.annotation_consortia)
+        unique_annotation_consortia = set()
+        for r in results_for_record:
+            unique_annotation_consortia.update(r.annotation_consortia)
 
-            messages = list(unique_messages.keys())
-            # All weights should be the same, just take 1st
-            initial_score = results_for_record[0].initial_score
-            results.append(SearchResult(record, message=messages, initial_score=initial_score,
-                                        annotation_consortia=list(unique_annotation_consortia)))
+        messages = list(unique_messages.keys())
+        # All weights should be the same, just take 1st
+        initial_score = results_for_record[0].initial_score
+        results.append(SearchResult(record, message=messages, initial_score=initial_score,
+                                    annotation_consortia=list(unique_annotation_consortia)))
     return results
 
 
@@ -575,29 +581,26 @@ def search_hgvs(search_string: str, user: User, genome_build: GenomeBuild, varia
         search_messages = []
         initial_score = 0
         hgvs_string = search_string
+        used_transcript_accession = None
+        method = None
         try:
             if fixed_hgvs := HGVSMatcher.fix_swapped_gene_transcript(hgvs_string):
                 hgvs_string = fixed_hgvs
                 search_messages.append(f"Warning: swapped gene/transcript, ie '{search_string}' => '{hgvs_string}'")
-            variant_tuple = hgvs_matcher.get_variant_tuple(hgvs_string)
-        except BadTranscript:
-            if results := _search_hgvs_using_gene_symbol(hgvs_matcher, search_messages,
-                                                         hgvs_string, user, genome_build, variant_qs):
-                return results
-            raise
+            variant_tuple, used_transcript_accession, method = hgvs_matcher.get_variant_tuple_used_transcript_and_method(hgvs_string)
         except (ValueError, NotImplementedError) as original_error:  # InvalidHGVSName is subclass of ValueError
             original_hgvs_string = hgvs_string
             try:
                 hgvs_string = HGVSMatcher.clean_hgvs(hgvs_string)
                 if search_string != hgvs_string:
                     search_messages.append(f"Warning: Cleaned '{search_string}' => '{hgvs_string}'")
-                variant_tuple = hgvs_matcher.get_variant_tuple(hgvs_string)
-            except BadTranscript:
-                if results := _search_hgvs_using_gene_symbol(hgvs_matcher, search_messages,
-                                                             hgvs_string, user, genome_build, variant_qs):
-                    return results
-                raise
+                variant_tuple, used_transcript_accession, method = hgvs_matcher.get_variant_tuple_used_transcript_and_method(hgvs_string)
             except (ValueError, NotImplementedError):
+                if gene_symbol := hgvs_matcher.get_gene_symbol_if_no_transcript(hgvs_string):
+                    if results := _search_hgvs_using_gene_symbol(gene_symbol, search_messages,
+                                                                 hgvs_string, user, genome_build, variant_qs):
+                        return results
+
                 if classify:
                     search_message = f"Error reading HGVS: '{original_error}'"
                     return [SearchResult(ClassifyNoVariantHGVS(genome_build, original_hgvs_string), message=search_message)]
@@ -608,17 +611,20 @@ def search_hgvs(search_string: str, user: User, genome_build: GenomeBuild, varia
                     raise original_error  # cleaning didn't work don't tell anyone
                 return None
 
-        if not hgvs_matcher.matches_reference(hgvs_string):
-            ref = variant_tuple[2]
-            build_and_patch = genome_build.get_build_with_patch()
-            if len(ref) > 20:
-                ref = f"{Sequence.abbreviate(ref)} ({len(ref)} bases)"
-            search_messages.append(f"Warning: Using reference '{ref}' from our build: {build_and_patch}")
-            initial_score -= 1
+        try:
+            # This currently fails if we switch transcripts
+            if "pyhgvs" in method and not hgvs_matcher.matches_reference(hgvs_string):
+                ref = variant_tuple[2]
+                build_and_patch = genome_build.get_build_with_patch()
+                if len(ref) > 20:
+                    ref = f"{Sequence.abbreviate(ref)} ({len(ref)} bases)"
+                search_messages.append(f"Warning: Using reference '{ref}' from our build: {build_and_patch}")
+                initial_score -= 1
+        except:
+            pass
 
-        original_tv, used_tv = hgvs_matcher.get_original_and_used_transcript_versions(hgvs_string)
-        if original_tv != used_tv:
-            search_messages.append(f"Warning: Missing transcript version '{original_tv}', using best match '{used_tv}'")
+        if used_transcript_accession and used_transcript_accession not in hgvs_string:
+            search_messages.append(f"Warning: Used transcript version '{used_transcript_accession}'")
 
         transcript_id = hgvs_matcher.get_transcript_id(hgvs_string,
                                                        transcript_version=False)

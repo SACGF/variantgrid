@@ -1,6 +1,7 @@
 from typing import Union
 
 from django.template import Library
+
 from snpdb.views.datatable_view import DatatableConfig, SortOrder
 
 register = Library()
@@ -8,6 +9,10 @@ register = Library()
 
 @register.inclusion_tag("datatables/datatable.html")
 def datatable(table_config: DatatableConfig, table_id: str, class_name: str = ''):
+    """
+    Deprecated, use instead
+    <table id="{table_id}" data-datatable-url="{url}" class="{class_name}"></table>
+    """
     return {
         "rich_columns": table_config.enabled_columns,
         "search_box_enabled": table_config.search_box_enabled,
@@ -25,6 +30,9 @@ def datatable_definition(
         data: str = None,
         hide_filter_count: bool = False,
         responsive: Union[bool, str] = False):
+    """
+    Deprecated, use table tag as seen in datatable tag instead
+    """
     if not isinstance(table_config, DatatableConfig):
         raise ValueError(f"Expected DatatableConfig but got '{table_config}'")
     sort_order = None

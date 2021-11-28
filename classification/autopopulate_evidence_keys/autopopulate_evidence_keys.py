@@ -2,22 +2,23 @@
     Auto-populate a Classification object with evidence keys from
     info we can get from VariantGrid DB
 """
+import socket
 from typing import Optional
 
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.contrib.sites.models import Site
-import socket
 
 from annotation.models.models import AnnotationVersion
-from library.git import Git
-from snpdb.models import GenomeBuild, ImportSource, Sample, UserSettings, Variant
-from classification.autopopulate_evidence_keys.evidence_from_sample_and_patient import get_evidence_fields_for_sample_and_patient
+from classification.autopopulate_evidence_keys.evidence_from_sample_and_patient import \
+    get_evidence_fields_for_sample_and_patient
 from classification.autopopulate_evidence_keys.evidence_from_variant import get_evidence_fields_for_variant, \
     AutopopulateData
 from classification.enums import SubmissionSource, SpecialEKeys
 from classification.models import EvidenceKey, Classification, ClassificationImport
 from classification.tasks.classification_import_process_variants_task import liftover_classification_import
+from library.git import Git
+from snpdb.models import GenomeBuild, ImportSource, Sample, UserSettings, Variant
 
 
 def create_classification_for_sample_and_variant_objects(

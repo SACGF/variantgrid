@@ -1,16 +1,17 @@
-from django.conf import settings
-from io import TextIOWrapper
-import celery
 import logging
 import os
 import shutil
 import subprocess
 import tempfile
+from io import TextIOWrapper
 
-from snpdb.variants_to_vcf import write_qs_to_vcf_file_sort_alphabetically
+import celery
+from django.conf import settings
+
 from library.log_utils import log_traceback, get_traceback
 from snpdb.models import VariantCollection, Variant, VCFBedIntersection
 from snpdb.models.models_enums import ProcessingStatus
+from snpdb.variants_to_vcf import write_qs_to_vcf_file_sort_alphabetically
 
 
 def create_vcf_bed_intersection(vcf, enrichment_kit):
@@ -46,7 +47,7 @@ def create_backend_vcf_bed_intersections(backend_vcf):
         log_traceback()
 
 
-@celery.task
+@celery.shared_task
 def vcf_bed_intersection_task(vcf_bed_intersection_id):
     vbi = VCFBedIntersection.objects.get(pk=vcf_bed_intersection_id)
     vbi.status = ProcessingStatus.PROCESSING

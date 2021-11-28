@@ -1,4 +1,5 @@
 from django.core.management.base import BaseCommand
+
 from seqauto.tasks.scan_run_jobs import scan_run_jobs
 
 

@@ -1,3 +1,4 @@
+import pandas as pd
 from django.shortcuts import get_object_or_404
 from django.urls.base import reverse
 
@@ -6,7 +7,6 @@ from library.django_utils.jqgrid_view import JQGridViewOp
 from library.jqgrid_user_row_config import JqGridUserRowConfig
 from library.pandas_jqgrid import DataFrameJqGrid
 from library.pandas_utils import nan_to_none
-import pandas as pd
 from seqauto.models import SeqAutoRun, SequencingSample, GoldCoverageSummary, \
     GoldReference, EnrichmentKit
 from seqauto.seqauto_stats import get_sample_enrichment_kits_df, group_enrichment_kits_df

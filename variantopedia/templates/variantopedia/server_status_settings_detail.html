@@ -1,0 +1,68 @@
+{% load js_tags %}
+{% load ui_utils %}
+<div class="container">
+    <div class="row equal">
+        <div class="col-6">
+            <div class="card mb-4">
+                <div class="card-header">Basics</div>
+                <div class="card-body">
+                    {% labelled hint="tiny" label="Site Name" %}{{ site_name }}{% endlabelled hint="tiny" %}
+                    {% labelled hint="tiny" label="Debug" %}{{ settings.DEBUG }}{% endlabelled hint="tiny" %}
+                    {% labelled hint="tiny" label="Send Emails" %}{{ settings.SEND_EMAILS }}{% endlabelled hint="tiny" %}
+                </div>
+            </div>
+        </div>
+        <div class="col-6">
+            <div class="card mb-4">
+                <div class="card-header">ClinVar</div>
+                <div class="card-body">
+                    {% labelled hint="tiny" label="Mode" %}{{ settings.CLINVAR_EXPORT.mode }}{% endlabelled hint="tiny" %}
+                    {% labelled hint="tiny" label="Org ID" %}{{ settings.CLINVAR_EXPORT.org_id }}{% endlabelled hint="tiny" %}
+                    {% labelled hint="tiny" label="API Key" %}{{ settings.CLINVAR_EXPORT.api_key|secret }}{% endlabelled hint="tiny" %}
+                </div>
+            </div>
+        </div>
+        <div class="col-6">
+            <div class="card mb-4">
+                <div class="card-header">Slack</div>
+                <div class="card-body">
+                    {% labelled hint="tiny" label="Enabled" %}{{ settings.SLACK.enabled }}{% endlabelled hint="tiny" %}
+                    {% labelled hint="tiny" label="Callback URL" %}{{ settings.SLACK.admin_callback_url|secret:-4 }}{% endlabelled hint="tiny" %}
+                    {% labelled hint="tiny" label="Auto Health Check" %}{{ settings.HEALTH_CHECK_ENABLED }}{% endlabelled hint="tiny" %}
+                </div>
+            </div>
+        </div>
+        <div class="col-6">
+            <div class="card mb-4">
+                <div class="card-header">Rollbar</div>
+                <div class="card-body">
+                    {% labelled hint="tiny" label="Enabled" %}{{ settings.ROLLBAR.enabled }}{% endlabelled hint="tiny" %}
+                    {% labelled hint="tiny" label="Access Token" %}{{ settings.ROLLBAR.access_token|secret }}{% endlabelled hint="tiny" %}
+                </div>
+            </div>
+        </div>
+        <div class="col-6">
+            <div class="card mb-4">
+                <div class="card-header">Discordance</div>
+                <div class="card-body">
+                    {% labelled hint="tiny" label="Enabled" %}{{ settings.DISCORDANCE_ENABLED }}{% endlabelled hint="tiny" %}
+                    {% if settings.DISCORDANCE_ENABLED %}
+                        {% labelled hint="tiny" label="Discordance Email" %}{{ settings.DISCORDANCE_EMAIL }}{% endlabelled hint="tiny" %}
+                        {% labelled hint="tiny" label="Pausing Due to Variant Matching" %}{{ settings.DISCORDANCE_PAUSE_TEMP_VARIANT_MATCHING }}{% endlabelled hint="tiny" %}
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <h4>Debug</h4>
+    <form method="POST">
+        {% csrf_token %}
+        <div class="btn-toolbar mt-4">
+            <input type="submit" name="action" value="Test Slack" class="btn btn-outline-secondary" />
+            <input type="submit" name="action" value="Test Rollbar" class="btn btn-outline-secondary" />
+            <input type="submit" value="Test Rollbar JS" class="btn btn-outline-secondary" onclick="return testRollbarJs()" />
+            <input type="submit" name="action" value="Test Message Branding" class="btn btn-outline-secondary" />
+        </div>
+    </form>
+</div>

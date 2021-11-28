@@ -1,14 +1,15 @@
 import glob
-from collections import OrderedDict
-from django.conf import settings
-from django.utils import timezone
 import logging
 import os
+from collections import OrderedDict
 from subprocess import Popen, PIPE, CalledProcessError
+
+import pandas as pd
+from django.conf import settings
+from django.utils import timezone
 
 from library.django_utils.django_file_utils import get_import_processing_filename
 from library.file_utils import name_from_filename
-import pandas as pd
 from upload.models import ModifiedImportedVariants, ToolVersion, UploadStep, \
     UploadStepTaskType, VCFSkippedContigs, VCFSkippedContig, UploadStepMultiFileOutput, VCFPipelineStage, \
     SimpleVCFImportInfo

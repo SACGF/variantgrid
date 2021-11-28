@@ -1,0 +1,74 @@
+{% extends "uicore/page/base.html" %}
+{% load js_tags %}
+{% load ui_menu_bars %}
+{% load ui_utils %}
+
+{% block title %}Manual Migrations{% endblock %}
+
+{% block submenu %}{% menu_bar_settings %}{% endblock submenu %}
+{% block content %}
+    <style>
+        .dt-created {
+            width: 120px;
+        }
+        .dt-task {
+            word-break: break-all;
+        }
+    </style>
+    <script>
+        function manualDatatableFilter(data) {
+            data.exclude_standard = $("#manual-exclude-standard").is(':checked');
+        }
+
+        function manualApplyFilters() {
+            $('#migrations-datatable').DataTable().ajax.reload();
+        }
+    </script>
+
+    <div class="container">
+
+        <h4>Outstanding Migrations</h4>
+        {% if not outstanding %}
+            <div class="no-value">Up to date</div>
+        {% else %}
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Task</th>
+                        <th>Notes</th>
+                        <th>Attempted</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for out_task in outstanding %}
+                        <tr>
+                            <td class="text-monospace">{{ out_task.task }}</td>
+                            <td>
+                                {% for required in out_task.outstanding_required %}
+                                    {% if required.note %}<p>{{ required.note }}</p>{% else %}<span class="no-value">-</span>{% endif %}
+                                {% endfor %}
+                            </td>
+                            <td>{% if out_task.last_attempt %}{% timestamp out_task.last_attempt.created %}{% else %}<span class="no-value">-</span>{% endif %}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <div class="btn-toolbar">
+                <form method="POST">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="skip" />
+                    <button class="btn btn-danger">Skip All Outstanding Tasks</button>
+                </form>
+            </div>
+        {% endif %}
+
+        <h4>Manual Migrations</h4>
+        <div class="ml-4">
+            <input type="checkbox" class="form-check-input" id="manual-exclude-standard" checked="checked" onclick="manualApplyFilters()"/>
+            <label for="manual-exclude-standard">Only show non-standard migrations (exclude git updates, collect static, etc)</label>
+        </div>
+
+        <table id="migrations-datatable" class="sticky-header" data-datatable-responsive="true" data-datatable-url="{% url 'manual_migrations_datatable' %}" data-datatable-data="manualDatatableFilter"></table>
+
+    </div>
+{% endblock %}

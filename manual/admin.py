@@ -1,5 +1,5 @@
 from django.contrib import admin
-from manual import models
+
 from manual.models import ManualMigrationAttempt, ManualMigrationRequired
 from snpdb.admin_utils import ModelAdminBasics
 

@@ -1,5 +1,5 @@
 import json
-from typing import Dict, Set
+from typing import Set
 
 from django.contrib import admin, messages
 from django.contrib.admin import RelatedFieldListFilter
@@ -8,15 +8,15 @@ from django.utils import timezone
 
 from annotation.models.models import AnnotationVersion
 from classification.autopopulate_evidence_keys.evidence_from_variant import get_evidence_fields_for_variant
-from classification.classification_import import process_classification_import
+from classification.classification_import import reattempt_variant_matching
 from classification.enums.classification_enums import EvidenceCategory, SpecialEKeys, SubmissionSource, ShareLevel
-from classification.models import EvidenceKey, DiscordanceReport, DiscordanceReportClassification, \
-    send_discordance_notification, \
-    EvidenceKeyMap, ClinicalContext, ClassificationReportTemplate, ClassificationModification
-from classification.models.classification import Classification, ClassificationImport
+from classification.models import EvidenceKey, EvidenceKeyMap, DiscordanceReport, DiscordanceReportClassification, \
+    send_discordance_notification, ClinicalContext, ClassificationReportTemplate, ClassificationModification, \
+    UploadedFileLab, ClinicalContextRecalcTrigger
+from classification.models.classification import Classification
 from library.guardian_utils import admin_bot
 from snpdb.admin_utils import ModelAdminBasics, admin_action, admin_list_column
-from snpdb.models import ImportSource, GenomeBuild, Lab
+from snpdb.models import GenomeBuild, Lab
 
 
 class VariantMatchedFilter(admin.SimpleListFilter):
@@ -98,10 +98,10 @@ class ClassificationModificationAdmin(admin.TabularInline):
 
 @admin.register(Classification)
 class ClassificationAdmin(ModelAdminBasics):
-    list_display = ['id', 'lab', 'lab_record_id', 'share_level', 'clinical_significance', 'clinical_context', 'imported_genome_build', 'imported_c_hgvs', 'chgvs_grch37', 'chgvs_grch38', 'withdrawn', 'user', 'created_detailed', 'modified_detailed']
+    list_display = ['id', 'lab', 'lab_record_id', 'share_level', 'clinical_significance', 'clinical_context', 'variant', 'imported_genome_build', 'imported_c_hgvs', 'chgvs_grch37', 'chgvs_grch38', 'withdrawn', 'user', 'created_detailed', 'modified_detailed']
     list_filter = (('lab__organization', RelatedFieldListFilter), ('lab', RelatedFieldListFilter), ClassificationShareLevelFilter, VariantMatchedFilter, ClinicalContextFilter, ClassificationImportedGenomeBuildFilter, ('user', RelatedFieldListFilter),)
     search_fields = ('id', 'lab_record_id')
-    list_per_page = 500
+    list_per_page = 100
     inlines = (ClassificationModificationAdmin,)
 
     @admin_list_column(short_description="Created", order_field="created")
@@ -195,32 +195,9 @@ class ClassificationAdmin(ModelAdminBasics):
 
     @admin_action("Variant re-matching")
     def reattempt_variant_matching(self, request, queryset: QuerySet[Classification]):
-        qs: QuerySet[Classification] = queryset.order_by('evidence__genome_build')
-
-        invalid_genome_build_count = 0
-        valid_record_count = 0
-        imports_by_genome: Dict[int, ClassificationImport] = dict()
-
-        for vc in qs:
-            try:
-                genome_build = vc.get_genome_build()
-                if genome_build.pk not in imports_by_genome:
-                    imports_by_genome[genome_build.pk] = ClassificationImport.objects.create(user=request.user,
-                                                                                             genome_build=genome_build)
-                vc_import = imports_by_genome[genome_build.pk]
-                vc.set_variant(variant=None, message='Admin has re-triggered variant matching')
-                vc.classification_import = vc_import
-                vc.save()
-                valid_record_count = valid_record_count + 1
-
-            except BaseException:
-                invalid_genome_build_count = invalid_genome_build_count + 1
-
-        for vc_import in imports_by_genome.values():
-            process_classification_import(vc_import, ImportSource.API)
-
-        if invalid_genome_build_count:
-            self.message_user(request, f'Records with missing or invalid genome_builds : {invalid_genome_build_count}')
+        valid_record_count, invalid_record_count = reattempt_variant_matching(request.user, queryset)
+        if invalid_record_count:
+            self.message_user(request, f'Records with missing or invalid builds/coordinates : {invalid_record_count}')
         self.message_user(request, f'Records revalidating : {valid_record_count}')
 
     @admin_action("Re-calculate cached chgvs")
@@ -271,6 +248,7 @@ class ClassificationAdmin(ModelAdminBasics):
 @admin.register(ClinicalContext)
 class ClinicalContextAdmin(ModelAdminBasics):
     list_display = ('id', 'allele', 'name', 'status', 'modified',)
+    search_fields = ('id', 'allele__pk', 'name')
 
     def get_form(self, request, obj=None, **kwargs):
         return super().get_form(request, obj, widgets={
@@ -283,7 +261,7 @@ class ClinicalContextAdmin(ModelAdminBasics):
     @admin_action("Recalculate Status")
     def recalculate(self, request, queryset):
         for dc in queryset:
-            dc.recalc_and_save(cause='Admin recalculation')  # cause of None should change to Unknown, which is accurate if this was required
+            dc.recalc_and_save(cause='Admin recalculation', cause_code=ClinicalContextRecalcTrigger.ADMIN)  # cause of None should change to Unknown, which is accurate if this was required
         self.message_user(request, 'Recalculated %i statuses' % queryset.count())
 
 
@@ -455,3 +433,14 @@ class DiscordanceReportAdmin(ModelAdminBasics):
         ds: DiscordanceReport
         for ds in queryset:
             send_discordance_notification(ds)
+
+
+@admin.register(UploadedFileLab)
+class UploadedFileLabAdmin(ModelAdminBasics):
+    list_display = ("pk", "lab", "created", "url", "status", "comment")
+    pass
+
+    def is_readonly_field(self, f) -> bool:
+        if f.name in ("url", "filename"):
+            return True
+        return super().is_readonly_field(f)

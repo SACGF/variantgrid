@@ -1,11 +1,12 @@
+import logging
+import subprocess
+
+import celery
 from celery.app.task import Task
 from celery.canvas import chain
 from django.db.models.aggregates import Min, Max
 from django.db.models.expressions import F
 from django.utils import timezone
-import celery
-import logging
-import subprocess
 
 from library.log_utils import get_traceback
 from library.utils import import_class
@@ -112,7 +113,7 @@ class ImportVCFStepTask(Task):
             self.check_pipeline_stage(upload_pipeline, upload_step)
 
 
-@celery.task
+@celery.shared_task
 def schedule_pipeline_stage_steps(upload_pipeline_id, pipeline_stage):
     """ Only want to do this once per VCF import, so run in own task on single queue to avoid race conditions.
         May be executed multiple times but will only run jobs the 1st time """
@@ -153,13 +154,13 @@ def schedule_pipeline_stage_steps(upload_pipeline_id, pipeline_stage):
         upload_pipeline.error(message)
 
 
-@celery.task
+@celery.shared_task
 def pipeline_start_task(upload_pipeline_id):
     upload_pipeline = UploadPipeline.objects.get(pk=upload_pipeline_id)
     upload_pipeline.start()
 
 
-@celery.task
+@celery.shared_task
 def pipeline_success_task(upload_pipeline_id):
     upload_pipeline = UploadPipeline.objects.get(pk=upload_pipeline_id)
     if upload_pipeline.status == ProcessingStatus.PROCESSING:

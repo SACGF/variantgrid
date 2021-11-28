@@ -1,13 +1,14 @@
 # From https://gist.github.com/tclancy/10269504
 
 import datetime
+from importlib import import_module
+
 from django.conf import settings
 from django.contrib.auth import logout
 from django.contrib.auth.models import User
 from django.contrib.sessions.models import Session
 from django.core.management.base import BaseCommand
 from django.http import HttpRequest
-from importlib import import_module
 
 
 def init_session(session_key):

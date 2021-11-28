@@ -214,19 +214,22 @@ let EKey = (function() {
     
 })();
 
-EKey.HTML_WHITE_LIST = new Set(['BR','B','I','OL','UL','LI','U']);
+EKey.HTML_WHITE_LIST = new Set(['BR','B','I','OL','UL','LI','U','SUP','SUB', 'SPAN', 'DIV']);
 
+// UNSPECIFIED STRENGTH HANDLING
 EKey.critValues = {
     "NM": "Not Met",
     "NA": "Not Applicable",
     "BA": "Benign Standalone",
     "BS": "Benign Strong",
     "BP": "Benign Supporting",
+    // "BX": "Benign (Unspecified Strength)",
     "N": "Neutral",
     "PP": "Pathogenic Supporting",
     "PM": "Pathogenic Moderate",
     "PS": "Pathogenic Strong",
-    "PVS": "Pathogenic Very Strong"
+    "PVS": "Pathogenic Very Strong",
+    // "PX": "Pathogenic (Unspecified Strength)"
 };
 
 EKey.families = {
@@ -367,38 +370,44 @@ var EKeys = (function() {
 EKeys.cacheTimeMs = 60000;
 
 EKeys.load = function() {
-    if (EKeys.cachedKeys) {
-        return Promise.resolve(EKeys.cachedKeys);
+    if (EKeys._load) {
+        return EKeys._load;
     }
-
-    cached = window.localStorage.getItem('evidenceKeys');
-    use_cache = null;
-    if (cached) {
-        try {
-            cached = JSON.parse(cached);
-            ageMs = Date.now() - cached.date;
-            if (ageMs <= EKeys.cacheTimeMs) {
-                use_cache = cached;
-            }
-        } catch (e) {
-            console.log(e);
+    EKeys._load = new Promise((resolve, reject) => {
+        if (EKeys.cachedKeys) {
+            resolve(EKeys.cachedKeys);
         }
-    }
-    if (use_cache) {
-        EKeys.cachedKeys = new EKeys(use_cache.data);
-        return Promise.resolve(
-            EKeys.cachedKeys
-        );
-    } else {
-        return $.getJSON( Urls.evidence_keys_api() ).then(keys => {
-            window.localStorage.setItem('evidenceKeys', JSON.stringify({
-                date: Date.now(),
-                data: keys
-            }));
-            EKeys.cachedKeys = new EKeys(keys);
-            return EKeys.cachedKeys;
-        });
-    }
+
+        let cached = window.localStorage.getItem('evidenceKeys');
+        let use_cache = null;
+        if (cached) {
+            try {
+                cached = JSON.parse(cached);
+                let ageMs = Date.now() - cached.date;
+                if (ageMs <= EKeys.cacheTimeMs) {
+                    use_cache = cached;
+                }
+            } catch (e) {
+                console.log(e);
+            }
+        }
+        if (use_cache) {
+            EKeys.cachedKeys = new EKeys(use_cache.data);
+            resolve(
+                EKeys.cachedKeys
+            );
+        } else {
+            return $.getJSON(Urls.evidence_keys_api()).then(keys => {
+                window.localStorage.setItem('evidenceKeys', JSON.stringify({
+                    date: Date.now(),
+                    data: keys
+                }));
+                EKeys.cachedKeys = new EKeys(keys);
+                return resolve(EKeys.cachedKeys);
+            });
+        }
+    });
+    return EKeys._load;
 };
 
 EKeys.levelToIndex = {

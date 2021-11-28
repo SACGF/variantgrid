@@ -1,8 +1,7 @@
+import unittest
 import uuid
 
 from django.contrib.auth.models import User
-import unittest
-
 from django.utils import timezone
 
 from library.django_utils.unittest_utils import URLTestCase

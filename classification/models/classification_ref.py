@@ -1,3 +1,4 @@
+import re
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -5,14 +6,13 @@ from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
 from django.http.response import Http404
 from lazy import lazy
-import re
 
-from library.utils import empty_to_none
-from snpdb.models import Lab
 from classification.enums import SubmissionSource
+from classification.models import ClassificationJsonParams
 from classification.models.classification import Classification, \
     ClassificationProcessError, ClassificationModification
-from classification.models import ClassificationJsonParams
+from library.utils import empty_to_none
+from snpdb.models import Lab
 
 
 class ClassificationRef:
@@ -129,7 +129,7 @@ class ClassificationRef:
                 params: ClassificationJsonParams) -> dict:
 
         params.version = self.cached_version or self.version
-        params.include_data = params.include_data or not params.version is None
+        params.include_data = params.include_data or params.version is not None
 
         return self.record.as_json(params)
 

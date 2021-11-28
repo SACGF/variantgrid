@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 from typing import List, Any, Optional
+
 from django import template
+from django.http import HttpRequest
 from django.template.base import FilterExpression
 
 from uicore.templatetags.ui_utils import parse_tag, TagUtils
@@ -28,7 +30,8 @@ class TabBuilderTab:
 
 class TabBuilder:
 
-    def __init__(self):
+    def __init__(self, tab_set: str):
+        self.tab_set = tab_set
         self.rendered = False
         self.active_tab = 0
         self.tabs: List[TabBuilderTab] = list()
@@ -51,6 +54,17 @@ class TabBuilder:
         return self.tabs[0].url is not None
 
 
+def check_active_tab(tab_set: str, tab_id: str, request: HttpRequest) -> bool:
+    active = False
+    if activeTab := request.GET.get("activeTab"):
+        parts = activeTab.split(":")
+        if len(parts) == 2 and parts[0] == tab_set:
+            active = parts[1] == tab_id
+        elif len(parts) == 1:
+            active = parts[0] == tab_id
+    return active
+
+
 @register.simple_tag(takes_context=True)
 def ui_register_tab(
         context,
@@ -70,14 +84,18 @@ def ui_register_tab(
     tab_key = f"ui-tab-{tab_set}"
     builder: TabBuilder = context.get(tab_key)
     if not builder:
-        builder = TabBuilder()
+        builder = TabBuilder(tab_set)
         context[tab_key] = builder
 
     tab_number = len(builder.tabs)
-    if active:
+    param_id = "_" + str(param) if param else ""
+    tab_id = url + param_id
+
+    if active or check_active_tab(tab_set, tab_id, context.request):
         builder.active_tab = tab_number
+
     builder.tabs.append(TabBuilderTab(tab_builder=builder, tab_number=tab_number,
-                                      tab_id=url, label=label, badge=badge, badge_status=badge_status, url=url, param=param))
+                                      tab_id=url + param_id, label=label, badge=badge, badge_status=badge_status, url=url, param=param))
     return ""
 
 
@@ -87,7 +105,7 @@ def ui_register_tabs(context, tab_set: str):
     Used because the creation of he tabs in subcontext e.g. for loops, will dissapear when poping to a higher context
     """
     tab_key = f"ui-tab-{tab_set}"
-    context[tab_key] = TabBuilder()
+    context[tab_key] = TabBuilder(tab_set)
     return ""
 
 
@@ -150,11 +168,15 @@ class LocalTabContent(template.Node):
         tab_key = f"ui-tab-{tab_set}"
         builder: TabBuilder = context.get(tab_key)
         if not builder:
-            builder = TabBuilder()
+            builder = TabBuilder(tab_set)
             context[tab_key] = builder
 
         tab_number = len(builder.tabs)
         content: str = self.nodelist.render(context)
+
+        if check_active_tab(tab_set, tab_id, context.request):
+            builder.active_tab = tab_number
+
         if content.startswith('/'):
             builder.tabs.append(TabBuilderTab(tab_builder=builder, tab_number=tab_number,
                                               tab_id=tab_id, label=label, badge=badge, badge_status=badge_status, resolved_url=content))

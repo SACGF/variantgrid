@@ -1,7 +1,7 @@
-import celery
 import logging
 import os
 
+import celery
 import cyvcf2
 
 from analysis.tasks.mutational_signatures_task import calculate_mutational_signature
@@ -14,10 +14,10 @@ from seqauto.signals import backend_vcf_import_success_signal
 from snpdb.import_status import set_vcf_and_samples_import_status
 from snpdb.models import VCF
 from snpdb.models.models_enums import ImportStatus, VariantsType, ProcessingStatus
+from snpdb.tasks.sample_locus_count_task import do_sample_locus_count_for_vcf_id
 from snpdb.tasks.somalier_tasks import somalier_vcf_id, somalier_all_samples
 from snpdb.variant_zygosity_count import update_all_variant_zygosity_counts_for_vcf, \
     create_variant_zygosity_counts
-from snpdb.tasks.sample_locus_count_task import do_sample_locus_count_for_vcf_id
 from upload.models import VCFPipelineStage, UploadStep, UploadStepTaskType, UploadedVCFPendingAnnotation, \
     UploadPipeline, SimpleVCFImportInfo, SkipUploadStepException
 from upload.tasks.vcf.import_vcf_step_task import ImportVCFStepTask
@@ -91,10 +91,6 @@ class VCFCheckAnnotationTask(ImportVCFStepTask):
 
     def process_items(self, upload_step):
         uploaded_vcf = upload_step.get_uploaded_vcf()
-        if uploaded_vcf.max_variant is None:
-            msg = "UploadedVCF.max_variant is None! This must be set so we know if we need to perform annotation"
-            raise ValueError(msg)
-
         pending_annotation = UploadedVCFPendingAnnotation.objects.create(uploaded_vcf=uploaded_vcf)
         annotation_version = AnnotationVersion.latest(upload_step.genome_build)
         variant_annotation_version = annotation_version.variant_annotation_version
@@ -186,7 +182,7 @@ class ImportGenotypeVCFSuccessTask(ImportVCFStepTask):
         create_import_success_message(vcf)
 
 
-@celery.task
+@celery.shared_task
 def reload_vcf_task(upload_pipeline_id, vcf_id):
     """ Needs to be done thread safely for zygosity count """
 

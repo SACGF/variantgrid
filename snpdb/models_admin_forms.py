@@ -1,9 +1,10 @@
+import re
+
 from django.contrib import admin
 from unidecode import unidecode
 
 from snpdb.admin_utils import ModelAdminBasics
 from snpdb.models import Organization, Lab
-import re
 
 
 def make_code_friendly(text: str) -> str:
@@ -20,36 +21,33 @@ def make_code_friendly(text: str) -> str:
 
 class LabAdmin(ModelAdminBasics):
     list_per_page = 200
-    list_display = ('name', 'group_name', 'organization', 'external', 'clinvar_key', 'classification_config')
+    list_display = ('name', 'group_name', 'organization', 'state', 'country',
+                    'external', 'clinvar_key', 'upload_location', 'upload_auto_pattern', 'classification_config')
 
     fieldsets = (
         ('Basic', {'fields': ('name', 'group_name', 'organization')}),
         ('Position', {'fields': ('city', 'state', 'country', 'lat', 'long')}),
         ('Style', {'fields': ('url', 'css_class')}),
-        ('Submissions', {'fields': ('classification_config', 'upload_location', 'external', 'clinvar_key')})
+        ('Submissions', {'fields': ('classification_config', 'upload_location', 'upload_auto_pattern', 'external', 'clinvar_key')})
     )
 
     def is_readonly_field(self, f) -> bool:
-        if f.name == 'clinvar_key':
+        if f.name in ('clinvar_key', 'organization', 'state', 'country'):
             return False
         return super().is_readonly_field(f)
-
 
     def get_form(self, request, obj=None, **kwargs):
 
         return super(LabAdmin, self).get_form(request, obj, widgets={
             'name': admin.widgets.AdminTextInputWidget(),
-            'institution': admin.widgets.AdminTextInputWidget(),
             'group_name': admin.widgets.AdminTextInputWidget(),
             'city': admin.widgets.AdminTextInputWidget(),
-            'state': admin.widgets.AdminTextInputWidget(),
-            'country': admin.widgets.AdminTextInputWidget(),
             'lat': admin.widgets.AdminTextInputWidget(),
             'long': admin.widgets.AdminTextInputWidget(),
             'url': admin.widgets.AdminURLFieldWidget(),
             'css_class': admin.widgets.AdminTextInputWidget(),
-            'upload_location': admin.widgets.AdminTextInputWidget()
-
+            'upload_location': admin.widgets.AdminTextInputWidget(),
+            'upload_auto_pattern': admin.widgets.AdminTextInputWidget()
         }, **kwargs)
 
     def fix_group_name(self, request, queryset):

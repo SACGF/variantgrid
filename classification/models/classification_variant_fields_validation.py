@@ -1,18 +1,18 @@
 import re
 from re import RegexFlag
+from typing import Optional, Set
 
 from django.conf import settings
 from django.dispatch.dispatcher import receiver
-from typing import Optional, Set
 
-from genes.hgvs import HGVSMatcher
-from genes.models import MissingTranscript, BadTranscript
-from snpdb.models import GenomeBuild, Variant
 from classification.enums import ValidationCode, SpecialEKeys
 from classification.models import EvidenceKeyMap, PatchMeta
 from classification.models.classification import Classification, \
     classification_validation_signal
 from classification.models.classification_utils import ValidationMerger
+from genes.hgvs import HGVSMatcher
+from genes.models import NoTranscript
+from snpdb.models import GenomeBuild, Variant
 
 VARIANT_VALIDATING_CODES = {ValidationCode.MATCHING_ERROR, ValidationCode.INCONSISTENT_VARIANT, ValidationCode.MATCHING_ERROR}
 
@@ -80,7 +80,7 @@ def validate_variant_fields(sender, **kwargs) -> Optional[ValidationMerger]:  # 
 
                     variant_str = Variant.format_tuple(*variant_tuple)
                     variant_map[variant_str] = variant_map.get(variant_str, []) + [evidence_key]
-                except (MissingTranscript, BadTranscript):
+                except NoTranscript:
                     # this should find its way into Validation Matching flag
                     pass
                 except ValueError as ve:

@@ -77,14 +77,6 @@
             return formatFieldString;
         }
 
-        function sampleFormatFieldPercentFormatter(formatField) {
-            let val = sampleFormatFieldFormatter(formatField);
-            if (val !== '.') {
-                val = unitAsPercentFormatter(val);
-            }
-            return val;
-        }
-
         function getTermLinks(term_type, term_list) {
             let links = '';
             if (term_list) {
@@ -187,7 +179,6 @@
                     return getTermLinks('omim', omim_terms);
                 },
                 sampleFormatFieldFormatter : sampleFormatFieldFormatter,
-                sampleFormatFieldPercentFormatter: sampleFormatFieldPercentFormatter,
             });
 
             jQuery("#genotype-grid").jqGrid({
@@ -200,7 +191,7 @@
                           {name:'patient_hpo', index:'patient_hpo', label: 'Patient HPO', classes: 'no-word-wrap', formatter: 'hpoFormatter'},
                           {name:'patient_omim', index:'patient_omim', label: 'Patient OMIM', classes: 'no-word-wrap', formatter: 'omimFormatter'},
                           {name:'sample__vcf__name', index:'sample__vcf__name', label: 'VCF'},
-                          {name:'allele_frequency', index:'allele_frequency', label: 'Allele Frequency', sorttype: 'float', formatter: 'sampleFormatFieldPercentFormatter'},
+                          {name:'allele_frequency', index:'allele_frequency', label: 'Allele Frequency', sorttype: 'float', formatter: 'sampleFormatFieldFormatter'},
                           {name:'allele_depth', index:'allele_depth', label: 'Allele Depth', sorttype: 'int', formatter: 'sampleFormatFieldFormatter'},
                           {name:'read_depth', index:'read_depth', label: 'Read Depth', sorttype: 'int', formatter: 'sampleFormatFieldFormatter'},
                           {name:'phred_likelihood', index:'phred_likelihood', label: 'Phred Likelihood', sorttype: 'int', formatter: 'sampleFormatFieldFormatter'},

@@ -1,0 +1,93 @@
+{% load static %}
+{% load humanize %}
+{% load js_tags %}
+{% load ui_utils %}
+<div class="container">
+    {% labelled label="Max Variant" %}{{ max_variant_id|intcomma }}{% endlabelled %}
+    {%  if num_samples %}
+        {% labelled label="# VCFS" %}{{ num_vcfs|intcomma }}{% endlabelled %}
+        {% labelled label="# Samples" %}{{ num_vcfs|intcomma }}{% endlabelled %}
+    {%  else %}
+         {% labelled label="# VCFS" %}No VCFs or samples have been uploaded.{% endlabelled %}
+    {%  endif %}
+
+    <div id='variant-totals-graph'></div>
+    <div id='variant-genotypes-graph'></div>
+    <div id='variant-percent-known-graph'></div>
+</div>
+<script>
+    function plotVariantTotalsGraph(variantStats) {
+        const x = variantStats["cumulative_samples"];
+
+        const data = [
+            {
+                x: x,
+                y: variantStats["cumulative_variants"],
+                type: 'line'
+            },
+        ];
+
+        const layout = {
+            title: "Total Variants / samples",
+            xaxis: {title: "Samples"},
+            yaxis: {title: "Variants"}
+        };
+
+        Plotly.newPlot('variant-totals-graph', data, layout);
+    }
+
+    function plotVariantGenotypesGraph(variantStats) {
+        const x = variantStats["cumulative_genotypes"];
+
+        const data = [
+            {
+                x: x,
+                y: variantStats["cumulative_variants"],
+                type: 'line'
+            },
+        ];
+
+        const layout = {
+            title: "Total Variants / genotypes",
+            xaxis: {title: "Genotypes"},
+            yaxis: {title: "Variants"}
+        };
+
+        Plotly.newPlot('variant-genotypes-graph', data, layout);
+    }
+
+    function plotVariantPercentKnownGraph(variantStats) {
+        const x = variantStats["cumulative_samples"];
+
+        const data = [
+            {
+                x: x,
+                y: variantStats["percent_known"],
+                type: 'line'
+            },
+        ];
+
+        const layout = {
+            title: "Percent of imported variants already seen.",
+            xaxis: {title: "Samples"},
+            yaxis: {title: "Variants"}
+        };
+
+        Plotly.newPlot('variant-percent-known-graph', data, layout);
+    }
+
+    $(document).ready(() => {
+        const variantStats = {{ variant_stats | jsonify }};
+        {% if num_samples %}
+        plotVariantTotalsGraph(variantStats);
+        plotVariantGenotypesGraph(variantStats);
+        plotVariantPercentKnownGraph(variantStats);
+        {% endif %}
+    });
+
+</script>
+{% comment %}
+<!-- required on the including page -->
+<script type="text/javascript" src="{% static 'js/lib/plotly-latest.min.js' %}"></script>
+<script type="text/javascript" src="{% static 'js/plotly_helper.js' %}"></script>
+{% endcomment %}

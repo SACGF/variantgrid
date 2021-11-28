@@ -1,11 +1,12 @@
+import json
+import logging
+import random
+
 from django.conf import settings
 from django.db.models import Max
 from django.http.response import JsonResponse
 from django.shortcuts import get_object_or_404
 from django.views.decorators.http import require_POST
-import json
-import logging
-import random
 
 from analysis.models import AnalysisVariable, AnalysisTemplate, AnalysisTemplateType, NodeCount, \
     AnalysisTemplateVersion, VariantTag
@@ -21,9 +22,9 @@ from analysis.models.nodes.node_types import get_node_types_hash_by_class_name
 from analysis.models.nodes.node_utils import reload_analysis_nodes, update_analysis, \
     get_toposorted_nodes, get_rendering_dict
 from analysis.serializers import VariantTagSerializer
-from analysis.views.node_json_view import NodeJSONPostView
 from analysis.views.analysis_permissions import get_analysis_or_404, get_node_subclass_or_404, \
     get_node_subclass_or_non_fatal_exception
+from analysis.views.node_json_view import NodeJSONPostView
 from library.django_utils import require_superuser
 from snpdb.models import Tag, BuiltInFilters, GenomeBuild
 from snpdb.tasks.clingen_tasks import populate_clingen_alleles_from_allele_source

@@ -1,8 +1,8 @@
 import json
+import unittest
 import uuid
 
 from django.contrib.auth.models import User
-import unittest
 
 from annotation.fake_annotation import get_fake_annotation_version
 from annotation.models import CachedWebResource

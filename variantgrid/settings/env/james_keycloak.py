@@ -2,9 +2,8 @@
 See https://bitbucket.org/sacgf/variantgrid/wiki/Annotation%20Setup
 (test)
 """
-
-import json
-
+GDAL_LIBRARY_PATH="/opt/homebrew/Cellar/gdal/3.3.3/lib/libgdal.29.dylib"
+GEOS_LIBRARY_PATH="/opt/homebrew/Cellar/geos/3.10.1/lib/libgeos_c.dylib"
 # IMPORTANT : THE BELOW IMPORTS ARE USED TO APPLY THEIR RESPECTIVE SETTINGS VALUES
 from variantgrid.settings.components.celery_settings import *  # pylint: disable=wildcard-import, unused-wildcard-import
 from variantgrid.settings.components.default_settings import *  # pylint: disable=wildcard-import, unused-wildcard-import
@@ -19,6 +18,8 @@ SYNC_DETAILS = get_shariant_sync_secrets()
 
 KEYCLOAK_SYNC_DETAILS = get_keycloak_sync_secrets()
 """
+
+# CLINVAR_EXPORT = get_clinvar_export_secrets()
 
 # import all the base settings #
 VARIANT_CLASSIFICATION_NEW_GROUPING = True
@@ -50,9 +51,10 @@ REST_FRAMEWORK = {
     ],
 }
 
+MAINTENANCE_MODE = False
 OIDC_DRF_AUTH_BACKEND = 'auth.backend.VariantGridOIDCAuthenticationBackend'
 USE_OIDC = True
-#OIDC_REQUIRED_GROUP = '/variantgrid/shariant_production'
+OIDC_REQUIRED_GROUP = '/variantgrid/shariant_productionz'
 LOGIN_URL = '/oidc_login/'
 
 OIDC_RP_SIGN_ALGO = 'RS256'
@@ -69,7 +71,8 @@ OIDC_OP_USER_ENDPOINT = KEY_CLOAK_PROTOCOL_BASE + '/userinfo'
 OIDC_USER_SERVICES = KEY_CLOAK_BASE + '/realms/' + KEY_CLOAK_REALM + '/account'
 OIDC_OP_LOGOUT_URL_METHOD = 'auth.backend.provider_logout'
 LOGIN_REDIRECT_URL = '/variantopedia/dashboard'
-LOGOUT_REDIRECT_URL = KEY_CLOAK_PROTOCOL_BASE + '/logout?redirect_uri=http%3A%2F%2Fubuntu-18.04%3A8000'
+LOGOUT_REDIRECT_URL = KEY_CLOAK_PROTOCOL_BASE + '/logout?redirect_uri=http%3A%2F%2F127.0.0.1%3A8000'
+LOGIN_REDIRECT_URL_FAILURE = '/accounts/logout'
 
 ALLOWED_HOSTS = ["*"]
 COMPRESS_ENABLED = False
@@ -162,7 +165,8 @@ if _SHARIANT_MODE:
 
     SHARIANT_STATIC_FILES_DIR = os.path.join(VARIANTGRID_APP_DIR, "static_files", "shariant_static")
     SHARIANT_TEST_STATIC_FILES_DIR = os.path.join(VARIANTGRID_APP_DIR, "static_files", "shariant_test_static")
-    STATICFILES_DIRS = (SHARIANT_TEST_STATIC_FILES_DIR, SHARIANT_STATIC_FILES_DIR,) + STATICFILES_DIRS
+    # STATICFILES_DIRS = (SHARIANT_TEST_STATIC_FILES_DIR, SHARIANT_STATIC_FILES_DIR,) + STATICFILES_DIRS
+    STATICFILES_DIRS = (SHARIANT_STATIC_FILES_DIR,) + STATICFILES_DIRS
 
     SHARIANT_TEMPLATES_DIR = os.path.join(VARIANTGRID_APP_DIR, "templates/shariant_templates")
     TEMPLATES[0]["DIRS"].insert(0, SHARIANT_TEMPLATES_DIR)

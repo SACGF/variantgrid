@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 
-from django.core.management.base import BaseCommand
 import logging
+
+from django.core.management.base import BaseCommand
 
 from genes.canonical_transcripts.create_canonical_transcripts import create_canonical_transcript_collection
 from library.utils import invert_dict

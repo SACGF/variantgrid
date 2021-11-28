@@ -1,16 +1,16 @@
-
+import operator
 from collections import Counter, defaultdict
+from typing import Dict, List, Optional, Set
+
+import numpy as np
 from django.conf import settings
 from django.contrib.auth.models import User
-from typing import Dict, List, Optional
 
-from library.django_utils import get_field_counts
 from classification.enums import ClinicalSignificance
 from classification.enums.classification_enums import CriteriaEvaluation
 from classification.models import EvidenceKeyMap
 from classification.models.classification import Classification, ClassificationModification
-import numpy as np
-
+from library.django_utils import get_field_counts
 from snpdb.models import Lab
 
 
@@ -38,7 +38,7 @@ def get_visible_classifications_qs(user: User):
             exclude_withdrawn=True,
             shared_only=True,
             clinical_significance__isnull=False
-        )
+        ).exclude(classification__variant__isnull=True)
     else:
         qs = Classification.filter_for_user(user)
 
@@ -50,7 +50,9 @@ def get_grouped_classification_counts(user: User,
                                       evidence_key: Optional[str] = None,
                                       field_labels: Optional[Dict[str, str]] = None,
                                       max_groups=10,
-                                      show_unclassified=True) -> List[Dict[str, Dict]]:
+                                      show_unclassified=True,
+                                      norm_factor: Dict[str, float] = None,
+                                      allele_level: bool = False) -> List[Dict[str, Dict]]:
     """ :param user: User used to check visibility of classifications
         :param field: the value we're extracting from evidence to group on (from Classification)
         :param evidence_key: label from ekey lookup
@@ -58,34 +60,63 @@ def get_grouped_classification_counts(user: User,
         mutually exclusive with evidence_key
         :param max_groups: the max size of the returns list
         :param show_unclassified: return counts for clinical_significance=None (as 'Unclassified')
+        :param allele_level: if True should only count one record per allele (currently cheats and assumes each lab
+        only submits primarily in one genome so uses variant)
         :return: data for graphing, a list of dicts with x,y,name and type
     """
     if evidence_key and field_labels:
         raise ValueError("Can't supply both 'evidence_key' and 'field_labels'")
 
     vc_qs = get_visible_classifications_qs(user)
-    values_qs = vc_qs.values_list("clinical_significance", field)
+    values_qs = vc_qs.values_list("clinical_significance", field, "classification__variant")
 
     counts = Counter()
     classification_counts = defaultdict(Counter)
-    for clinical_significance, field in values_qs:
+    seen_variants: Set[int] = set()
+
+    for clinical_significance, field, variant in values_qs:
+        if allele_level:
+            if variant in seen_variants:
+                continue
+            seen_variants.add(variant)
+
         if evidence_key:
+            # field will either be evidence or published evidence
             value = Classification.get_optional_value_from(field, evidence_key)
         elif field_labels:
             value = field_labels.get(field, field)
         else:
             value = field
-        counts[value] += 1
-        classification_counts[clinical_significance][value] += 1
 
-    top_groups = [i[0] for i in counts.most_common(max_groups)]
+        if value is not None:
+            counts[value] += 1
+            classification_counts[clinical_significance][value] += 1
+
+    if norm_factor:
+        group_counts = {}
+        for g, count in counts.items():
+            if nf := norm_factor.get(g):
+                group_counts[g] = nf * count
+    else:
+        group_counts = counts
+
+    top_groups = [gc[0] for gc in sorted(group_counts.items(), key=operator.itemgetter(1), reverse=True)][:max_groups]
 
     data = []
     for cs, clinical_significance_label in ClinicalSignificance.LABELS.items():
         if cs or show_unclassified:
             counts = classification_counts[cs]
-            y = [counts[i] for i in top_groups]
-            data.append({"x": top_groups,
+            if norm_factor:
+                x = []
+                y = []
+                for g in top_groups:
+                    if nf := norm_factor.get(g):
+                        x.append(g)
+                        y.append(nf * counts[g])
+            else:
+                x = top_groups
+                y = [counts[i] for i in top_groups]
+            data.append({"x": x,
                          "y": y,
                          "name": clinical_significance_label,
                          "type": 'bar'})

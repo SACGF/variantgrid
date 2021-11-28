@@ -1,15 +1,16 @@
+import json
+import os
+
 from celery.result import AsyncResult
 from django.conf import settings
 from django.http.response import JsonResponse
 from django.shortcuts import get_object_or_404
 from django.views.decorators.http import require_POST
-import json
-import os
 
 from library.django_utils import require_superuser
 from snpdb.models import CachedGeneratedFile, Cohort, Sample, VCF, VCFAlleleSource, CustomColumnsCollection
-from snpdb.tasks.cohort_genotype_tasks import create_cohort_genotype_and_launch_task
 from snpdb.tasks.clingen_tasks import populate_clingen_alleles_from_allele_source
+from snpdb.tasks.cohort_genotype_tasks import create_cohort_genotype_and_launch_task
 from snpdb.tasks.vcf_zygosity_count_tasks import update_variant_zygosity_count_for_vcf_task
 
 

@@ -1,4 +1,4 @@
-from typing import List, Any, Optional
+from typing import Any
 
 from django.template.library import Library
 from django.urls import reverse

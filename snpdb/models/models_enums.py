@@ -114,9 +114,9 @@ class AlleleOrigin(models.TextChoices):
     LIFTOVER_NORMALIZED = 'M', 'Liftover (normalized)'  # This probably shouldn't happen!
 
     @staticmethod
-    def variant_origin(variant, genome_build):
+    def variant_origin(variant, allele, genome_build):
         try:
-            origin = variant.variantallele_set.get(genome_build=genome_build).origin
+            origin = variant.variantallele_set.get(genome_build=genome_build, allele=allele).origin
         except ObjectDoesNotExist:
             # Variant w/o allele must have been imported directly
             if variant.modifiedimportedvariant_set.exists():

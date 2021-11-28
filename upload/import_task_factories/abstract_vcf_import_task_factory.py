@@ -1,6 +1,6 @@
+import operator
 from abc import abstractmethod
 from functools import reduce
-import operator
 
 from library.utils import full_class_name, is_not_none
 from upload.import_task_factories.import_task_factory import ImportTaskFactory

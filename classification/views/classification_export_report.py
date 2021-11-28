@@ -1,17 +1,15 @@
 from typing import Optional
 
-from django.http import StreamingHttpResponse, HttpResponse
+from django.http import HttpResponse
 from django.template import engines
-import re
 
 from annotation.citations import get_citations
-from snpdb.models import Organization
-from classification.enums.classification_enums import SpecialEKeys
-from classification.models.evidence_key import EvidenceKeyMap
+from classification.models import ClassificationJsonParams, ClassificationReportTemplate
 from classification.models.classification import ClassificationModification, \
     Classification
-from classification.models import ClassificationJsonParams, ClassificationReportTemplate
+from classification.models.evidence_key import EvidenceKeyMap
 from classification.views.classification_export_utils import ExportFormatter
+from snpdb.models import GenomeBuild
 
 
 class ExportFormatterReport(ExportFormatter):
@@ -33,13 +31,10 @@ class ExportFormatterReport(ExportFormatter):
         self.prepare_groups()
 
         row_datas = list()
-        org: Optional[Organization] = None
-        for vcm in self.raw_qs:
-            row_data = self.row_data(vcm)
-            row_datas.append(row_data)
-            org = vcm.classification.lab.organization
-            # only support 1 record for now
-            break
+        # only support 1 record for now
+        vcm = self.raw_qs.first()
+        row_data = self.row_data(vcm)
+        row_datas.append(row_data)
 
         self.row_count += 1
         report = ClassificationReportTemplate.preferred_template_for(vcm)
@@ -67,6 +62,16 @@ class ExportFormatterReport(ExportFormatter):
             report_blob['formatted'] = e_key.pretty_value(blob)
             report_blob['label'] = e_key.pretty_label
             context[e_key.key] = report_blob
+
+        for genome_build in [GenomeBuild.grch37(), GenomeBuild.grch38()]:
+            c_hgvs = record.classification.get_c_hgvs(genome_build)
+            key = "c_hgvs_" + genome_build.pk.lower()
+            report_blob = dict()
+            report_blob['value'] = c_hgvs
+            report_blob['note'] = None
+            report_blob['formatted'] = c_hgvs
+            report_blob['label'] = "c.HGVS"
+            context[key] = report_blob
 
         context['citations'] = [vars(citation) for citation in get_citations(record.citations)]
         context['evidence_weights'] = Classification.summarize_evidence_weights(evidence)

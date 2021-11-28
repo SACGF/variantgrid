@@ -1,3 +1,4 @@
+{% load js_tags %}
 {% load ui_utils %}
 <div class="vcf-grid-filter-tags-{{ grid_id }}">
     <style>
@@ -15,8 +16,18 @@
         margin-left: 5px;
     }
 
+    #id_variants_type li {
+        float: left;
+        margin-right: 10px;
+    }
+
+    #id_variants_type li input {
+        margin-right: 5px;
+    }
+
     </style>
     <script>
+        // Use vars as may be reloaded multiple times in tabs
         var ignoreFilterGrid = false;
         var vcfGridParams = {};
         var tagContainer = $(".vcf-grid-filter-tags-{{ grid_id }}");
@@ -67,6 +78,22 @@
                 if (project) {
                     descriptions.push("Project = " + project);
                 }
+
+                let variantsType = vcfGridParams["variants_type"];
+                if (variantsType) {
+                    const VARIANTS_TYPE_LABELS = {{ variants_type_labels | jsonify }};
+                    let variantsTypeLabels = []
+                    for (let i=0 ; i<variantsType.length ; i++) {
+                        let vt = variantsType[i];
+                        variantsTypeLabels.push(VARIANTS_TYPE_LABELS[vt]);
+                    }
+                    let variantsTypeDescriptions = variantsTypeLabels.join(", ");
+                    if (!variantsTypeDescriptions) {
+                        variantsTypeDescriptions = "(None selected)"
+                    }
+                    descriptions.push("Variants Type = " + variantsTypeDescriptions);
+                }
+
                 if (descriptions) {
                     $("#vcf-grid-filter", tagContainer).html(descriptions.join(", "));
                     descriptionContainer.show();
@@ -81,8 +108,6 @@
 
     $(document).ready(function() {
         let grid = $("#{{ grid_id }}");
-        console.log("doc ready - GRID: ")
-        console.log(grid);
 
         $('#id_project_{{ grid_id }}', tagContainer).change(function() {
             vcfGridParams["project"] = $(this).val();
@@ -96,6 +121,15 @@
             } else {
                 delete vcfGridParams["genome_build_name"];
             }
+            filterGrid(grid);
+        });
+
+        $("input[type=checkbox]", "#id_variants_type").change(function() {
+            let variantsTypeList = [];
+            $("input:checked", "#id_variants_type").each(function() {
+                variantsTypeList.push($(this).val());
+            });
+            vcfGridParams["variants_type"] = variantsTypeList;
             filterGrid(grid);
         });
 
@@ -122,6 +156,12 @@
             {{ project_form.project }}
             {% endlabelled %}
         </div>
+        {% if variants_type_form %}
+        <div>
+            {{  variants_type_form }}
+        </div>
+        {% endif %}
+
 
         <div id='vcf-grid-filter-description'>
             Filtering to <span id='vcf-grid-filter'></span>. <a href='javascript:vcfShowAll()'>Show All</a>

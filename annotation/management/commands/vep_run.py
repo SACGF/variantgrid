@@ -3,10 +3,11 @@ Test program to run VEP
 
 """
 
-from django.conf import settings
-from django.core.management.base import BaseCommand
 import logging
 import os
+
+from django.conf import settings
+from django.core.management.base import BaseCommand
 
 from annotation.vep_annotation import run_vep
 from snpdb.models.models_genome import GenomeBuild

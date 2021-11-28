@@ -7,7 +7,7 @@ from django.db.models.signals import post_delete
 from django.dispatch import receiver
 
 from analysis.models.models_variant_tag import VariantTagsImport
-from annotation.models.models import ClinVarCitationsCollection, ManualVariantEntryCollection, ClinVarVersion
+from annotation.models.models import ManualVariantEntryCollection, ClinVarVersion
 from classification.models import ClassificationImport
 from expression.models import CuffDiffFile
 from genes.models import GeneList, GeneCoverageCollection
@@ -123,18 +123,6 @@ def uploaded_gene_coverage_post_delete_handler(sender, instance, **kwargs):  # p
 class UploadedClinVarVersion(models.Model):
     uploaded_file = models.OneToOneField(UploadedFile, on_delete=CASCADE)
     clinvar_version = models.OneToOneField(ClinVarVersion, null=True, on_delete=CASCADE)
-
-
-class UploadedClinVarCitations(models.Model):
-    uploaded_file = models.ForeignKey(UploadedFile, on_delete=CASCADE)
-    md5_hash = models.CharField(max_length=32)
-    clinvar_citations_collection = models.ForeignKey(ClinVarCitationsCollection, null=True, on_delete=CASCADE)
-
-
-@receiver(post_delete, sender=UploadedClinVarCitations)
-def uploaded_clinvar_citations_post_delete_handler(sender, instance, **kwargs):  # pylint: disable=unused-argument
-    if instance.clinvar_citations_collection:
-        instance.clinvar_citations_collection.delete()
 
 
 class UploadedVariantTags(models.Model):

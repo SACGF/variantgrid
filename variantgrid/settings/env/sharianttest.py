@@ -4,7 +4,6 @@ Shariant - https://shariant.org.au
 See https://github.com/sacgf/variantgrid/wiki/Annotation%20Setup
 
 """
-import json
 
 from variantgrid.settings.env.shariant import *  # pylint: disable=wildcard-import, unused-wildcard-import
 
@@ -40,8 +39,9 @@ STATICFILES_DIRS = (SHARIANT_TEST_STATIC_FILES_DIR, SHARIANT_STATIC_FILES_DIR,) 
 
 SHARIANT_TEMPLATES_DIR = os.path.join(VARIANTGRID_APP_DIR, "templates/shariant_templates")
 TEMPLATES[0]["DIRS"].insert(0, SHARIANT_TEMPLATES_DIR)
-SITE_NAME = "Shariant"
+SITE_NAME = "Shariant Test"
 
 VARIANT_VCF_DB_PREFIX = "stv"
 
 SITE_MESSAGE = "This is the test version of Shariant. Please avoid sharing real data in this environment."
+# DISCORDANCE_PAUSE_TEMP_VARIANT_MATCHING = True

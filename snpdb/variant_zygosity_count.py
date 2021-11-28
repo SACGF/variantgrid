@@ -1,10 +1,10 @@
 #
+import logging
 from typing import Tuple, List
 
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Max
 from django.utils import timezone
-import logging
 
 from eventlog.models import create_event
 from library.database_utils import run_sql

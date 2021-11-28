@@ -1,10 +1,11 @@
 import hashlib
 
-from seqauto.models import IlluminaFlowcellQC
-from library.graphs.graph_utils import MandKIntFormatter
-from snpdb.graphs.graphcache import CacheableGraph
 import numpy as np
 from django.shortcuts import get_object_or_404
+
+from library.graphs.graph_utils import MandKIntFormatter
+from seqauto.models import IlluminaFlowcellQC
+from snpdb.graphs.graphcache import CacheableGraph
 
 
 class IndexMetricsQCGraph(CacheableGraph):

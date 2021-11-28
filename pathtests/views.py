@@ -1,4 +1,7 @@
+import json
+import logging
 from collections import defaultdict
+
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.models import User
@@ -8,8 +11,6 @@ from django.http.response import JsonResponse, HttpResponse
 from django.shortcuts import render, get_object_or_404, redirect
 from django.utils import timezone
 from django.views.decorators.http import require_POST
-import json
-import logging
 
 from genes.models import GeneListCategory, GeneList, GeneSymbol
 from genes.views import add_gene_list_unmatched_genes_message

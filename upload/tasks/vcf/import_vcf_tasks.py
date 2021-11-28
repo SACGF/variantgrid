@@ -1,6 +1,7 @@
+import logging
+
 import celery
 from django.contrib.auth.models import User
-import logging
 
 from annotation.tasks.annotation_scheduler_task import annotation_scheduler
 from library.log_utils import log_traceback
@@ -135,7 +136,7 @@ class LiftoverCompleteTask(ImportVCFStepTask):
         liftover.complete()
 
 
-@celery.task
+@celery.shared_task
 def process_vcf_file_task(vcf_filename, name, user_id, import_source):
     """ This has been made a task so we can call it by name (not imports) via seqauto """
 

@@ -1,10 +1,12 @@
+import inspect
+import logging
+from typing import Optional
+
 from django.contrib.auth.models import User
 from django.contrib.auth.signals import user_logged_in
 from django.db import models
 from django.db.models.deletion import SET_NULL
 from django.utils import timezone
-import inspect
-import logging
 
 from library.enums.log_level import LogLevel
 
@@ -41,7 +43,15 @@ def create_login_event(sender, user, request, **kwargs):  # pylint: disable=unus
     event.save()
 
 
-def create_event(user, name, details=None, filename=None, severity=LogLevel.INFO, app_name=None, log=True):
+def create_event(
+        user: Optional[User],
+        name: str,
+        details: Optional[str] = None,
+        filename: Optional[str] = None,
+        severity=LogLevel.INFO,
+        app_name: Optional[str] = None,
+        log=True):
+
     if app_name is None:
         frm = inspect.stack()[1]
         mod = inspect.getmodule(frm[0])

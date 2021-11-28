@@ -1,15 +1,15 @@
+import csv
 import itertools
 import json
 import re
-import csv
 from collections import defaultdict
-from dataclasses import dataclass, field
-from typing import List, Optional, Dict, Set
+from dataclasses import dataclass
+from typing import List, Optional, Dict
 
 import pandas as pd
-import numpy as np
 import pronto
 from django.core.management import BaseCommand
+from model_utils.models import now
 from pandas import DataFrame, isna
 
 from annotation.models.models_enums import HPOSynonymScope
@@ -18,7 +18,6 @@ from library.file_utils import file_md5sum
 from ontology.models import OntologyService, OntologyRelation, OntologyTerm, OntologyImportSource, OntologyImport, \
     OntologyTermRelation
 from ontology.ontology_builder import OntologyBuilder, OntologyBuilderDataUpToDateException
-from model_utils.models import now
 
 """
 MONDO import file can be found http://www.obofoundry.org/ontology/mondo.html

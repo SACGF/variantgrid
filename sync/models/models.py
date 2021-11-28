@@ -3,6 +3,7 @@ from typing import Optional
 from django.db import models
 from django.db.models.deletion import CASCADE
 from django_extensions.db.models import TimeStampedModel
+
 from library.utils import empty_dict
 from sync.models.enums import SyncStatus
 

@@ -1,35 +1,42 @@
 import csv
+import hashlib
+import importlib
+import inspect
 import io
-import operator
+import json
+import logging
 import math
+import operator
+import re
+import string
+import subprocess
+import time
 import uuid
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
+from decimal import Decimal
+from enum import Enum
+from functools import reduce
+from itertools import islice
+from json.encoder import JSONEncoder
 from operator import attrgetter
+from typing import TypeVar, Optional, Iterator, Tuple, Any, List, Iterable, Set, Dict, Union, Callable, Type
 from urllib.parse import urlparse
 
 from bs4 import BeautifulSoup
 from dateutil import parser
-from decimal import Decimal
-from django.core.serializers import serialize
-from django.db.models.query import QuerySet
-from django.db import models
-from enum import Enum
-from itertools import islice
-from json.encoder import JSONEncoder
-from typing import TypeVar, Optional, Iterator, Tuple, Any, List, Iterable, Set, Dict, Union, Callable
-import hashlib
-import importlib
-import json
-import logging
-import re
-import subprocess
-import time
 from django.conf import settings
+from django.core.serializers import serialize
+from django.db import models
+from django.db.models.query import QuerySet
+from django.http import StreamingHttpResponse, HttpRequest
 from django.utils import html
 from django.utils.functional import SimpleLazyObject
 from django.utils.safestring import SafeString, mark_safe
+from pytz import timezone
+
+from uicore.json.json_types import JsonObjType
 
 FLOAT_REGEX = r'([-+]?[0-9]*\.?[0-9]+.|Infinity)'
 
@@ -436,7 +443,7 @@ def group_by_key(qs: Iterable, key: attrgetter) -> Iterator[Tuple[Any, List]]:
 
 # note this tags expected in a single line of text
 # don't catch too many tags in case you get some false positives
-EXPECTED_HTML_TAGS_SINGLE_LINE = {'div', 'b', 'i', 'u', 'strong', 'em'}
+EXPECTED_HTML_TAGS_SINGLE_LINE = {'div', 'b', 'i', 'u', 'strong', 'em', 'sup', 'sub'}
 
 
 def cautious_attempt_html_to_text(text: str, whitelist: Set[str] = None) -> str:
@@ -547,6 +554,11 @@ def delimited_row(data: list, delimiter: str = ',') -> str:
     return out.getvalue()
 
 
+def clean_string(input_string: str) -> str:
+    """ Removes non-printable characters, strips whitespace """
+    return re.sub(f'[^{re.escape(string.printable)}]', '', input_string.strip())
+
+
 class IterableTransformer:
     """
     Given an iterable and a transformer, makes a new iterable that will lazily transform the elements
@@ -642,29 +654,61 @@ class ArrayLength(models.Func):
     function = 'CARDINALITY'
 
 
-@dataclass(frozen=True)
+@dataclass
 class DebugTime:
     description: str
-    duration: timedelta
+    durations: List[timedelta] = field(default_factory=list)
+    occurrences: int = 0
+
+    def tick(self, duration: timedelta):
+        self.durations.append(duration)
+        self.occurrences += 1
+
+    @property
+    def duration(self):
+        return reduce(lambda x, total: x + total, self.durations, timedelta())
 
     def __str__(self):
-        return f"{self.description}: {self.duration}"
+        if self.occurrences == 1:
+            return f"{self.duration} - {self.description}"
+        else:
+            return f"{self.duration / self.occurrences} (x {self.occurrences}) - {self.description} "
 
 
 class DebugTimer:
 
     def __init__(self):
         self.start = datetime.now()
-        self.times: List[DebugTime] = list()
+        self.times: Dict[str, DebugTime] = dict()
 
     def tick(self, description: str):
         now = datetime.now()
         duration = now - self.start
-        self.times.append(DebugTime(description, duration))
+
+        debug_time: DebugTime
+        if existing := self.times.get(description):
+            debug_time = existing
+        else:
+            debug_time = DebugTime(description)
+            self.times[description] = debug_time
+
+        debug_time.tick(duration)
         self.start = now
 
     def __str__(self):
-        return "\n".join((str(debug_time) for debug_time in self.times))
+        return "\n".join((str(debug_time) for debug_time in self.times.values()))
+
+
+class NullTimer(DebugTimer):
+
+    def tick(self, description: str):
+        pass
+
+    def __str__(self):
+        return "NullTimer"
+
+
+DebugTimer.NullTimer = NullTimer()
 
 
 class LimitedCollection:
@@ -765,3 +809,146 @@ def segment(iterable: Iterable[P], filter: Callable[[P], bool]) -> Tuple[List[P]
         else:
             fails.append(element)
     return passes, fails
+
+
+def export_column(label: Optional[str] = None, sub_data: Optional[Type] = None):
+    """
+    Extend ExportRow and annotate methods with export_column.
+    The order of defined methods determines the order that the results will appear in an export file
+    :param label: The label that will appear in the CSV header (defaults to method name if not provided)
+    :param sub_data: An optional SubType of another ExportRow for nested data
+    """
+
+    def decorator(method):
+        def wrapper(*args, **kwargs):
+            return method(*args, **kwargs)
+        # have to cache the line number of the source method, otherwise we just get the line number of this wrapper
+        wrapper.line_number = inspect.getsourcelines(method)[1]
+        wrapper.label = label or method.__name__
+        wrapper.__name__ = method.__name__
+        wrapper.is_export = True
+        wrapper.sub_data = sub_data
+        return wrapper
+    return decorator
+
+
+class ExportRow:
+
+    @staticmethod
+    def get_export_methods(cls):
+        if not hasattr(cls, 'export_methods'):
+            export_methods = [func for _, func in inspect.getmembers(cls, lambda x: getattr(x, 'is_export', False))]
+            export_methods.sort(key=lambda x: x.line_number)
+
+            cls.export_methods = export_methods
+
+            if not cls.export_methods:
+                raise ValueError(f"ExportRow class {cls} has no @export_columns")
+        return cls.export_methods
+
+    @classmethod
+    def _data_generator(cls, data: Iterable[Any]) -> Iterator[Any]:
+        for row_data in data:
+            if row_data is None:
+                continue
+            if not isinstance(row_data, cls):
+                row_data = cls(row_data)
+            yield row_data
+
+    @classmethod
+    def csv_generator(cls, data: Iterable[Any]) -> Iterator[str]:
+        try:
+            yield delimited_row(cls.csv_header())
+            for row_data in cls._data_generator(data):
+                yield delimited_row(row_data.to_csv())
+        except:
+            from library.log_utils import report_exc_info
+            report_exc_info(extra_data={"activity": "Exporting"})
+            yield "** File terminated due to error"
+            raise
+
+    @classmethod
+    def json_generator(cls, data: Iterable[Any], records_key: str = "records") -> Iterator[str]:
+        first_row = True
+        try:
+            yield f'{{"{records_key}": ['
+            for row_data in cls._data_generator(data):
+                yield (', ' if not first_row else '') + json.dumps(row_data.to_json())
+                first_row = False
+            yield f']}}'
+        except:
+            from library.log_utils import report_exc_info
+            report_exc_info(extra_data={"activity": "Exporting"})
+            yield f"\"error\"** File terminated due to error"
+            raise
+
+    @classmethod
+    def csv_header(cls) -> List[str]:
+        row = list()
+        for method in ExportRow.get_export_methods(cls):
+            label = method.label or method.__name__
+            if sub_data := method.sub_data:
+                sub_header = sub_data.csv_header()
+                for sub in sub_header:
+                    row.append(label + "." + sub)
+            else:
+                row.append(label)
+        return row
+
+    def to_csv(self) -> List[str]:
+        row = list()
+        for method in ExportRow.get_export_methods(self.__class__):
+            result = method(self)
+            if sub_data := method.sub_data:
+                if result is None:
+                    for entry in sub_data.csv_header():
+                        row.append("")
+                else:
+                    row += result.to_csv()
+            else:
+                row.append(result)
+        return row
+
+    def to_json(self) -> JsonObjType:
+        row = dict()
+        for method in ExportRow.get_export_methods(self.__class__):
+            result = method(self)
+            value: Any
+            if result is None:
+                value = None
+            elif method.sub_data:
+                value = result.to_json()
+            else:
+                value = result
+
+            if value == "":
+                value = None
+            row[method.__name__] = value
+
+        return row
+
+    @classmethod
+    def streaming(cls, request: HttpRequest, data: Iterable[Any], filename: str):
+        if request.GET.get('format') == 'json':
+            return cls.streaming_json(data, filename)
+        else:
+            return cls.streaming_csv(data, filename)
+
+    @classmethod
+    def streaming_csv(cls, data: Iterable[Any], filename: str):
+        date_time = datetime.now(tz=timezone(settings.TIME_ZONE)).strftime("%Y-%m-%d")
+
+        response = StreamingHttpResponse(cls.csv_generator(data), content_type='text/csv')
+        response['Content-Disposition'] = f'attachment; filename="{filename}_{settings.SITE_NAME}_{date_time}.csv"'
+        return response
+
+    @classmethod
+    def streaming_json(cls, data: Iterable[Any], filename: str, records_key: str = None):
+        date_time = datetime.now(tz=timezone(settings.TIME_ZONE)).strftime("%Y-%m-%d")
+
+        if not records_key:
+            records_key = filename.replace(" ", "_")
+
+        response = StreamingHttpResponse(cls.json_generator(data, records_key), content_type='application/json')
+        response['Content-Disposition'] = f'attachment; filename="{filename}_{settings.SITE_NAME}_{date_time}.json"'
+        return response

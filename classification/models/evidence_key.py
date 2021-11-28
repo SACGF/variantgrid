@@ -1,3 +1,4 @@
+import math
 import re
 from enum import Enum
 from typing import Any, List, Optional, Dict, Iterable, Mapping, Union, Set, TypedDict, cast
@@ -10,43 +11,56 @@ from lazy import lazy
 from classification.enums import CriteriaEvaluation, SubmissionSource
 from classification.enums.classification_enums import EvidenceCategory, \
     EvidenceKeyValueType, ShareLevel
-from uicore.json.json_utils import strip_json
 from classification.models.evidence_mixin import VCBlobDict, VCPatchValue, VCPatch, VCDbRefDict
 from library.cache import timed_cache
 from library.utils import empty_to_none
 from snpdb.models import VariantGridColumn, Lab
-from snpdb.views.datatable_view import RichColumn
+from uicore.json.json_utils import strip_json
 
+CLASSIFICATION_VALUE_TOLERANCE = 0.00000001
 
 class EvidenceKeyOption(TypedDict):
     key: str
     label: Optional[str]
     default: Optional[bool]
     override: Optional[bool]
+    """
+    :cvar key: The key for the option (as what will be sorted in the DB)
+    :cvar label: The label to display for the option
+    :cvar default: Is this the default option - only applies to (ACMG) criteria (e.g. BA1's default is BA, PM2 is PM)
+    :cavr override: Is this considered an override strength - only applies to criteria (ACMG) criteria - not default and not "not met"
+    """
 
 
 class EvidenceKey(TimeStampedModel):
-    """ This is global / visible to everyone """
     key = models.TextField(primary_key=True)
     mandatory = models.BooleanField(default=False)
-    # max_share_level restricts sharing on an evidence-key level eg Public allows evidence
-    # key level sharing to anon users or exporting to external systems, while setting to
-    # INSTITUTION restricts visibility of a particular field even if the classification is public
+
     max_share_level = models.CharField(max_length=16, choices=ShareLevel.choices(), default='logged_in_users')
+    """
+    max_share_level restricts sharing on an evidence-key level eg Public allows evidence
+    key level sharing to anon users or exporting to external systems, while setting to
+    INSTITUTION restricts visibility of a particular field even if the classification is public
+    """
 
     @property
     def max_share_level_enum(self) -> ShareLevel:
         return ShareLevel(self.max_share_level)
 
     order = models.IntegerField(default=0)
-    # TODO provide a list of choices
+    """
+    Order within the section (if tied on order within a section, sorted by label)
+    """
+
     label = models.TextField(null=True, blank=True)
     sub_label = models.TextField(null=True, blank=True)
     description = models.TextField(null=True, blank=True)
     examples = models.JSONField(null=True, blank=True)
     options = models.JSONField(null=True, blank=True)
-    # Primary URL for key
-    see = models.TextField(null=True, blank=True)  # see this (ie a link)
+    see = models.TextField(null=True, blank=True)
+    """
+    Primary URL to describe EvidenceKey, might be worth deprecating in favour of URLs in description
+    """
     evidence_category = models.CharField(max_length=3, choices=EvidenceCategory.CHOICES, null=False, blank=False)
     value_type = models.CharField(max_length=1, choices=EvidenceKeyValueType.CHOICES, null=False, blank=True, default=EvidenceKeyValueType.FREE_ENTRY)
 
@@ -59,8 +73,10 @@ class EvidenceKey(TimeStampedModel):
 
     copy_consensus = models.BooleanField(default=True, null=False, blank=True)
 
-    # This column ise used to auto-populate the keys
     variantgrid_column = models.ForeignKey(VariantGridColumn, blank=True, null=True, on_delete=SET_NULL)
+    """
+    If provided, column is auto-populated from annotation data
+    """
 
     def __init__(self, *args, **kwargs):
         super(EvidenceKey, self).__init__(*args, **kwargs)
@@ -69,6 +85,13 @@ class EvidenceKey(TimeStampedModel):
         self.exclude_namespace = False  # if the key was in a namespace not used by the lab
 
     def redcap_key(self, suffix: int = None, is_note=False):
+        """
+        redcap warns if variables go over 26 characters for a key
+        BUT we get conflicts if we shorten them... so leave it as it is for now
+        (needed to shorten to 20 to deal with suffixes and prefixes)
+        if len(lower_key) > 20:
+            lower_key = lower_key[:20]
+        """
         suffix_str = ''
         if suffix:
             if is_note:
@@ -79,12 +102,6 @@ class EvidenceKey(TimeStampedModel):
         lower_key = self.key.lower().replace(' ', '_')
         if re.match('^[0-9].*', lower_key):
             lower_key = 'x' + lower_key
-
-        # redcap warns if variables go over 26 characters for a key
-        # BUT we get conflicts if we shorten them... so leave it as it is for now
-        # (needed to shorten to 20 to deal with suffixes and prefixes)
-        # if len(lower_key) > 20:
-        #    lower_key = lower_key[:20]
 
         return lower_key + suffix_str
 
@@ -120,8 +137,12 @@ class EvidenceKey(TimeStampedModel):
         return [{'key': value, 'label': value}]
 
     @staticmethod
-    def __special_up_options(options, default) -> List[EvidenceKeyOption]:
-        use_options = []
+    def __special_up_options(options: List[Dict[str, Any]], default: str) -> List[EvidenceKeyOption]:
+        """
+        Converts a CriteriaEvaluation options (e.g. CriteriaEvaluation.BENIGN_OPTIONS) and a default strength (e.g. BM)
+        to a list of evidence keys with default and override populated appropriately
+        """
+        use_options = list()
         for entry in options:
             if entry.get('key') == default:
                 entry = entry.copy()
@@ -158,12 +179,15 @@ class EvidenceKey(TimeStampedModel):
                 index_map[option.get('key')] = index + 1
         return index_map
 
-    def classification_sorter_value(self, val):
+    def classification_sorter_value(self, val: Any) -> Union[int, Any]:
         if index_map := self._option_indexes:
             return index_map.get(val, 0)
         return val
 
-    def classification_sorter(self, evidence):
+    def classification_sorter(self, evidence: Dict[str, Any]) -> Union[int, Any]:
+        """
+        Provide .classification_sorter as a Callable[dict aka ClassificationData] -> sortable
+        """
         val = evidence.get(self.key)
         return self.classification_sorter_value(val)
 
@@ -176,11 +200,17 @@ class EvidenceKey(TimeStampedModel):
                         raise ValueError(f'{self.key} option with space in it "{option_key}"')
 
     @property
-    def option_dictionary(self):
-        return {x.get('key'): x.get('label') for x in self.virtual_options}
+    def option_dictionary(self) -> Dict[str, str]:
+        if options := self.virtual_options:
+            return {x.get('key'): x.get('label') for x in options}
+        else:
+            return dict()
 
     @staticmethod
-    def dummy_key(key: str):
+    def dummy_key(key: str) -> 'EvidenceKey':
+        """
+        For use when an EvidenceKey (that doesn't exist) is refernced and you don't want None exceptions
+        """
         dummy = EvidenceKey()
         dummy.key = key
         dummy.value_type = EvidenceKeyValueType.FREE_ENTRY
@@ -188,7 +218,7 @@ class EvidenceKey(TimeStampedModel):
         return dummy
 
     @lazy
-    def namespace(self):
+    def namespace(self) -> Optional[str]:
         try:
             return self.key[0:self.key.index(':')]
         except:
@@ -201,14 +231,20 @@ class EvidenceKey(TimeStampedModel):
         return EvidenceKey.pretty_label_from_string(self.key)
 
     @staticmethod
-    def pretty_label_from_string(key: str):
+    def pretty_label_from_string(key: str) -> str:
         if re.search("^([A-Z|a-z])[_-]", key):
             key = key[:1] + '-' + key[2:]
 
         return key[:1].upper() + key[1:].replace('_', ' ')
 
     @staticmethod
-    def merge_config(config1: dict, config2: dict) -> dict:
+    def merge_config(config1: Dict[str, Any], config2: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        This method is typically used to merge org and lab config together
+        :param config1 An evidence key config, with key-EvidenceKeyDefinition or key-False (to hide)
+        :param config2 An evidence key config, with key-EvidenceKeyDefinition or key-False (to hide)
+        :return the merging of the two configs
+        """
         if config1 is None:
             config1 = {}
         if config2 is None:
@@ -234,27 +270,19 @@ class EvidenceKey(TimeStampedModel):
                 merged[key] = value
         return merged
 
-    def special_to_key(self, option_key: str, val):
-        if val is None:
-            return None
-        for option in self.virtual_options:
-            if option_key in option and option[option_key] == val:
-                return option.get('key')
-        # couldnt match
-        return val
-
-    def pretty_value(self, normalValueObj: Any, dash_for_none: bool = False) -> Optional[str]:
-        value = None
-        if isinstance(normalValueObj, Mapping):
-            value = normalValueObj.get('value')
+    def pretty_value(self, normal_value_obj: Any, dash_for_none: bool = False) -> Optional[str]:
+        """
+        :param normal_value_obj: The blob for the evidence key, e.g. {"value":x} or just x
+        :param dash_for_none: If the value obj doesn't contain a value, return "-" if no value is selected
+        :return
+        """
+        value: Any
+        if isinstance(normal_value_obj, Mapping):
+            value = normal_value_obj.get('value')
         else:
-            value = normalValueObj
+            value = normal_value_obj
 
-        if (value == '' or value is None) and dash_for_none:
-            return '-'
-
-        options = self.virtual_options
-        if options is not None and len(options) > 0:
+        if options := self.virtual_options:
             if not isinstance(value, list):
                 value = [value]
             str_values = []
@@ -273,16 +301,14 @@ class EvidenceKey(TimeStampedModel):
                     str_values.append(part_value)
 
             if len(str_values) == 0:
-                return None
-            return ', '.join(str_values)
-        return value
+                return '-' if dash_for_none else None
 
-    @property
-    def label_dict(self) -> Dict[str, str]:
-        options = self.virtual_options
-        if options:
-            return {option.get('key'): option.get('label') or EvidenceKey.pretty_label_from_string(option.get('key')) for option in options}
-        return {}
+            return ', '.join(str_values)
+
+        if (value == '' or value is None) and dash_for_none:
+            return '-'
+
+        return value
 
     @property
     def striped_options(self):
@@ -319,14 +345,6 @@ class EvidenceKey(TimeStampedModel):
         else:
             name = self.key
         return name
-
-    def rich_column(self, prefix: str):
-        return RichColumn(
-            key=f"{prefix}__{self.key}__value",
-            orderable=True,
-            client_renderer=f"VCTable.evidence_key.bind(null, '{self.key}')",
-            label=self.pretty_label
-        )
 
 
 class EvidenceKeyMap:
@@ -632,8 +650,13 @@ class VCDataCell:
                     diff_dict[key] = None
             elif key in dest:
                 # key is in both source and dest but with diff values
-                if dest[key] != value:
-                    diff_dict[key] = value
+                dest_value = dest[key]
+                if dest_value != value:
+                    if isinstance(dest_value, float) and isinstance(value, float):
+                        if not math.isclose(dest_value, value, abs_tol=CLASSIFICATION_VALUE_TOLERANCE):
+                            diff_dict[key] = value
+                    else:
+                        diff_dict[key] = value
             else:
                 # value is not None and key is not in dest
                 diff_dict[key] = value
@@ -703,10 +726,10 @@ class VCDataDict:
         self.data.pop(key, None)
 
     @staticmethod
-    def add_validation(valueObj: dict, code: str, severity: str, message: str, options=None):
+    def add_validation(value_obj: VCBlobDict, code: str, severity: str, message: str, options=None):
         validation_key = 'validation'
-        validation_array = valueObj.get(validation_key, [])
-        valueObj[validation_key] = validation_array
+        validation_array = value_obj.get(validation_key, [])
+        value_obj[validation_key] = validation_array
 
         valid_dict = {
             "severity": severity,

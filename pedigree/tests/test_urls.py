@@ -1,5 +1,6 @@
-from django.contrib.auth.models import User
 import unittest
+
+from django.contrib.auth.models import User
 
 from library.django_utils.unittest_utils import URLTestCase, prevent_request_warnings
 from pedigree.models import PedFile, Pedigree, PedFileFamily

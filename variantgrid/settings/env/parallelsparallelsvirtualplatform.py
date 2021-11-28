@@ -3,8 +3,6 @@ See https://bitbucket.org/sacgf/variantgrid/wiki/Annotation%20Setup
 (test)
 """
 
-import json
-
 # IMPORTANT : THE BELOW IMPORTS ARE USED TO APPLY THEIR RESPECTIVE SETTINGS VALUES
 from variantgrid.settings.components.celery_settings import *  # pylint: disable=wildcard-import, unused-wildcard-import
 from variantgrid.settings.components.default_settings import *  # pylint: disable=wildcard-import, unused-wildcard-import

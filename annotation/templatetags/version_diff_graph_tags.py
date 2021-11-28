@@ -1,9 +1,8 @@
-from django.template import Library
-import json
 import uuid
 
-from library.pandas_utils import get_rows_percent_dataframe
+from django.template import Library
 
+from library.pandas_utils import get_rows_percent_dataframe
 
 register = Library()
 

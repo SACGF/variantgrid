@@ -7,18 +7,18 @@ from django.db.models.signals import post_delete
 from django.dispatch.dispatcher import receiver
 
 from classification.enums import SpecialEKeys, ShareLevel
-from classification.models.clinical_context_models import ClinicalContext, \
-    clinical_context_signal
-from classification.models.discordance_models import DiscordanceReport
-from classification.models.evidence_key import EvidenceKey, EvidenceKeyMap
-from classification.models.flag_types import classification_flag_types
 from classification.models.classification import Classification, \
     classification_current_state_signal, \
     classification_post_publish_signal, \
     classification_variant_set_signal, ClassificationModification, \
     classification_withdraw_signal
 from classification.models.classification_utils import ValidationMerger
-
+from classification.models.clinical_context_models import ClinicalContext, \
+    clinical_context_signal, ClinicalContextRecalcTrigger
+from classification.models.discordance_models import DiscordanceReport
+from classification.models.evidence_key import EvidenceKey, EvidenceKeyMap
+from classification.models.flag_types import classification_flag_types
+from library.utils import DebugTimer
 
 INTERNAL_REVIEW_RELEVANT_DAYS = 365
 
@@ -46,9 +46,9 @@ def variant_set(sender, **kwargs):  # pylint: disable=unused-argument
 
     # make sure you do your calculations after
     if old_clinical_context:
-        old_clinical_context.recalc_and_save(cause=f'Classification {record.friendly_label} unmatched')
+        old_clinical_context.recalc_and_save(cause=f'Classification {record.friendly_label} unmatched', cause_code=ClinicalContextRecalcTrigger.VARIANT_SET)
     if new_clinical_context:
-        new_clinical_context.recalc_and_save(cause=f'Classification {record.friendly_label} submitted')
+        new_clinical_context.recalc_and_save(cause=f'Classification {record.friendly_label} submitted', cause_code=ClinicalContextRecalcTrigger.VARIANT_SET)
 
 
 @receiver(post_delete, sender=Classification)
@@ -56,7 +56,7 @@ def deleted_variant(sender, instance: Classification, **kwargs):  # pylint: disa
     classification = instance
     if classification.clinical_context:
         cause = f'Classification {instance.friendly_label} deleted'
-        classification.clinical_context.recalc_and_save(cause=cause)
+        classification.clinical_context.recalc_and_save(cause=cause, cause_code=ClinicalContextRecalcTrigger.WITHDRAW_DELETE)
 
 
 @receiver(classification_withdraw_signal, sender=Classification)
@@ -68,7 +68,7 @@ def withdraw_changed(sender, classification: Classification, **kwargs):  # pylin
         else:
             cause = f'Classification {classification.friendly_label} un-withdrawn'
 
-        classification.clinical_context.recalc_and_save(cause=cause)
+        classification.clinical_context.recalc_and_save(cause=cause, cause_code=ClinicalContextRecalcTrigger.WITHDRAW_DELETE)
 
 
 @receiver(classification_post_publish_signal, sender=Classification)
@@ -78,6 +78,7 @@ def published(sender,
               newly_published: ClassificationModification,
               previous_share_level: ShareLevel,
               user: User,
+              debug_timer: DebugTimer,
               **kwargs):  # pylint: disable=unused-argument
     """
     Only care about publicly shared records
@@ -137,7 +138,9 @@ def published(sender,
         else:
             cause = f'Classification {classification.friendly_label} re-submitted as {cs}'
 
-        classification.clinical_context.recalc_and_save(cause=cause)
+        classification.clinical_context.recalc_and_save(cause=cause, cause_code=ClinicalContextRecalcTrigger.SUBMISSION)
+
+    debug_timer.tick("Update Clinical Grouping")
 
 
 @receiver(clinical_context_signal, sender=ClinicalContext)
@@ -165,70 +168,6 @@ def clinical_context_update(sender, clinical_context: ClinicalContext, status: s
                 flag_type=classification_flag_types.discordant,
                 comment='Discordance functionality has been disabled'
             )
-
-# note we used to have a listener that would recalc a clinical context's state when flags were saved
-# but we're no longer close discordance due to flags
-"""
-@receiver(clinical_context_signal, sender=ClinicalContext)
-def apply_classification_flags(sender, clinical_context: ClinicalContext, is_significance_change: bool, *args, **kwargs):
-    classifications_modifications = clinical_context.classification_modifications
-    
-    pause_discussion = clinical_context.flag_collection_safe.get_open_flag_of_type(flag_type_attributes={"pause_discussion": True})
-    
-    # records that aren't shared at discordant levels shouldn't have discordant flags
-    for vc in Classification.objects.filter(clinical_context=clinical_context).exclude(share_level__in = ShareLevel.DISCORDANT_LEVEL_KEYS):
-        fc = vc.flag_collection_safe
-        fc.close_open_flags_of_type(flag_type=classification_flag_types.internal_review, comment='No longer in discordance')
-        fc.close_open_flags_of_type(flag_type=classification_flag_types.discordance_discussion, comment='No longer in discordance')
-    
-    if not clinical_context.is_discordant():
-        for vc in clinical_context.classifications_qs:
-            fc = vc.flag_collection_safe
-            fc.close_open_flags_of_type(flag_type=classification_flag_types.internal_review, comment='No longer in discordance')
-            fc.close_open_flags_of_type(flag_type=classification_flag_types.discordance_discussion, comment='No longer in discordance')
-    else:
-        last_reviewed = {}
-        now = timezone.now()
-        
-        # calculate when last reviewed
-        for vcm in classifications_modifications:
-            vc = vcm.classification
-            fc = vc.flag_collection_safe
-            last_closed = Flag.objects.filter(collection=fc, flag_type=classification_flag_types.internal_review).exclude(status=FlagStatus.OPEN)\
-                .order_by('-modified').values_list('modified', flat=True).first()
-            currently_open = Flag.objects.filter(collection=fc, flag_type=classification_flag_types.internal_review, status=FlagStatus.OPEN).exists()
-            if last_closed:
-                delta = now - last_closed
-                recent = delta.days < INTERNAL_REVIEW_RELEVANT_DAYS
-                last_reviewed[vc.id] = (recent, currently_open, delta)
-            else:
-                last_reviewed[vc.id] = (False, currently_open, None)
-        
-        # set internal review required and discussion flags
-        for vcm in classifications_modifications:
-            vc = vcm.classification
-            fc = vc.flag_collection_safe
-           
-            recently_reviewed, currently_in_review, review_age = last_reviewed[vc.id]
-            
-            # if we're in discordance and we don't have a review open (or recently completed)
-            if not recently_reviewed and not currently_in_review:
-                review_required_comment = 'Internal Review required due to current discordance'
-                if review_age:
-                    review_required_comment += f' and it has been {review_age.days} days since the last internal review of this classification'
-                    # note that we don't re-open previously opened reviews in case they were closed as complete (we'd then lose the fact that a review was completed)
-                fc.get_or_create_open_flag_of_type(flag_type=classification_flag_types.internal_review, comment=review_required_comment, reopen=False)
-        
-            # if reviewed and there isn't a discussion pause flag, have a discussion
-            if recently_reviewed and not currently_in_review and not pause_discussion:
-                fc.get_or_create_open_flag_of_type(flag_type=classification_flag_types.discordance_discussion, reopen=True)
-            
-            # close discussion flags if we're in review or if there's a pause flag on the cc
-            if currently_in_review:
-                fc.close_open_flags_of_type(flag_type=classification_flag_types.discordance_discussion, comment=f"Discussion paused due to Internal Review")
-            elif pause_discussion:
-                fc.close_open_flags_of_type(flag_type=classification_flag_types.discordance_discussion, comment=f"Discussion paused due to {pause_discussion.flag_type.label}")
- """
 
 
 @transaction.atomic

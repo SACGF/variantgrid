@@ -2,8 +2,6 @@
 
 from django.db import migrations
 
-from library.django_utils import bulk_insert_class_data
-
 
 def rename_variant_classification(apps, schema_editor):
     FlagTypeContext = apps.get_model("flags", "FlagTypeContext")

@@ -1,9 +1,8 @@
-from django.core.management.base import BaseCommand
-import logging
 import numpy as np
+from django.core.management.base import BaseCommand
 
-from annotation.models import VariantAnnotationVersion, AnnotationRangeLock, VariantAnnotation
-from snpdb.models import GenomeBuild, Variant, VariantZygosityCount
+from annotation.models import AnnotationRangeLock, VariantAnnotation
+from snpdb.models import Variant, VariantZygosityCount
 
 
 class Command(BaseCommand):

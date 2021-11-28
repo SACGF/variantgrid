@@ -1,6 +1,7 @@
 from django.core.management import BaseCommand
-from genes.models import GeneAnnotationRelease, ReleaseGeneSymbolGene, ReleaseGeneSymbol
+
 from genes.gene_matching import GeneMatcher
+from genes.models import GeneAnnotationRelease, ReleaseGeneSymbolGene, ReleaseGeneSymbol
 
 
 class Command(BaseCommand):

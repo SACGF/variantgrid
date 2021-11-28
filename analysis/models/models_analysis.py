@@ -19,8 +19,8 @@ from library.django_utils.guardian_permissions_mixin import GuardianPermissionsA
 from library.guardian_utils import admin_bot, assign_permission_to_user_and_groups
 from snpdb.models import CustomColumnsCollection, CustomColumn, \
     UserSettings, AbstractNodeCountSettings, Sample
-from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_enums import BuiltInFilters
+from snpdb.models.models_genome import GenomeBuild
 
 
 class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):

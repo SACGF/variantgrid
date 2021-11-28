@@ -4,7 +4,6 @@ from django.forms.models import modelform_factory, ALL_FIELDS
 from library.forms import ROFormMixin
 from .models import CuffDiffFile
 
-
 EXPRESSION_WIDGETS = {'name': forms.TextInput(),
                       'sample_1': forms.TextInput(),
                       'sample_2': forms.TextInput()}

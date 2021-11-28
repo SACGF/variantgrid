@@ -1,4 +1,8 @@
+import logging
+import os
 import pathlib
+import re
+import shutil
 from datetime import datetime
 from typing import List, Optional
 
@@ -14,11 +18,6 @@ from django.dispatch.dispatcher import receiver
 from django.urls.base import reverse
 from django.utils.timezone import make_aware
 from django_extensions.db.models import TimeStampedModel
-import logging
-import os
-import re
-import shutil
-
 from lazy import lazy
 
 from genes.models import GeneListCategory, CustomTextGeneList, GeneList, GeneCoverageCollection, \
@@ -31,10 +30,10 @@ from library.vcf_utils import get_variant_caller_and_version_from_vcf
 from patients.models import FakeData, Patient
 from seqauto.illumina import illuminate_report
 from seqauto.illumina.illumina_sequencers import SEQUENCING_RUN_REGEX
-from seqauto.models.models_sequencing import Sequencer, EnrichmentKit, Experiment
-from seqauto.models.models_software import Aligner, VariantCaller
 from seqauto.models.models_enums import DataGeneration, SequencerRead, PairedEnd, \
     SequencingFileType, JobScriptStatus, SeqAutoRunStatus
+from seqauto.models.models_sequencing import Sequencer, EnrichmentKit, Experiment
+from seqauto.models.models_software import Aligner, VariantCaller
 from seqauto.qc.exec_summary import load_exec_summary
 from seqauto.qc.fastqc_parser import read_fastqc_data
 from seqauto.qc.flag_stats import load_flagstats
@@ -538,10 +537,9 @@ class Fastq(SeqAutoRecord):
     read = models.CharField(max_length=2, choices=PairedEnd.choices)
 
     def get_common_pair_name_and_read(self):
-        name = os.path.basename(self.path)
+        """ Need a way to group R1/R2 FastQs together (using globally unique key - ie shared path prefix)  """
         regex_pattern = "(.+)_(R[12])(_001)?.fastq.gz"
-
-        m = re.match(regex_pattern, name)
+        m = re.match(regex_pattern, self.path)
         if not m:
             msg = f"FastQ path '{self.path}' does not match regex pattern '{regex_pattern}'"
             raise ValueError(msg)
@@ -868,7 +866,7 @@ class SampleSheetCombinedVCFFile(SeqAutoRecord):
                 from upload.models import UploadedVCF
                 from upload.vcf.vcf_import import create_backend_vcf_links
 
-                uploaded_vcf = UploadedVCF.objects.filter(uploaded_file__path=self.path).get()
+                uploaded_vcf = UploadedVCF.objects.get(uploaded_file__path=self.path)
                 create_backend_vcf_links(uploaded_vcf)
             except:
                 log_traceback()
@@ -896,7 +894,10 @@ class SampleSheetCombinedVCFFile(SeqAutoRecord):
         enrichment_kit = sample_sheet.sequencing_run.enrichment_kit
         pattern_list = None
         if enrichment_kit:
-            pattern_list = settings.SEQAUTO_COMBINED_VCF_PATTERNS_FOR_KIT.get(enrichment_kit.name)
+            kit_name = enrichment_kit.name
+            if sample_sheet.sequencing_run.name.endswith("_FFPE"):
+                kit_name += "_ffpe"
+            pattern_list = settings.SEQAUTO_COMBINED_VCF_PATTERNS_FOR_KIT.get(kit_name)
 
         if pattern_list is None:
             pattern_list = settings.SEQAUTO_COMBINED_VCF_PATTERNS_FOR_KIT["default"]

@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 
+import logging
+
 from django.contrib.auth.models import User
 from django.core.management.base import BaseCommand
-import logging
 
 from snpdb.models.models_enums import ImportSource
 from upload.upload_processing import process_vcf_file

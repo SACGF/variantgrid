@@ -1,7 +1,9 @@
 {% extends "uicore/page/base.html" %}
 {% load ui_help %}
+{% load ui_utils %}
 {% load js_tags %}
 {% load ui_menu_bars %}
+{% load tz %}
 {% block title %}{{ accession }}{% endblock title %}
 {% block submenu %}{% menu_bar_data %}{% endblock %}
 {% block content %}
@@ -13,24 +15,58 @@
     </p>
 
     {% if transcript.annotation_consortium == 'R' %}
-        {% page_help 'genes/transcript_version_refseq' 'RefSeq transcript versions' %}
+        {% page_help 'genes/transcript_version_refseq' 'RefSeq Transcript Versions' %}
     {% endif %}
     {% if transcript.annotation_consortium == 'E' %}
-        {% page_help 'genes/transcript_version_ensembl' 'Ensembl transcript versions' %}
+        {% page_help 'genes/transcript_version_ensembl' 'Ensembl Transcript Versions' %}
+    {% endif %}
+
+    {% if tv_sequence_info %}
+        <h4>Transcript Version Sequence Info</h4>
+        <table class="table">
+            <thead>
+            <tr>
+                <th>Source</th>
+                <th>Retrieval Date</th>
+                <th>Length</th>
+            </tr>
+            </thead>
+            <tr>
+                <td>
+                    {% if tv_sequence_info.fasta_import %}
+                        Imported via {{ tv_sequence_info.fasta_import }} on {{ tv_sequence_info.fasta_import.created|localtime }}
+                    {% else %}
+                        Retrieved from {{ transcript.get_annotation_consortium_display }} API
+                    {% endif %}
+                </td>
+                <td>{% timestamp tv_sequence_info.created %}</td>
+                <td>{{ sequence_length }}</td>
+            </tr>
+        </table>
+    {% else %}
+        <div class="alert alert-warning">
+            {{ 'W' | severity_icon }} Could not retrieve transcript sequence information from {{ transcript.get_annotation_consortium_display }} API
+            {% if no_transcript_message %}
+                {{ no_transcript_message }}
+            {% endif %}
+        </div>
     {% endif %}
 
     {% if transcript_versions_by_build %}
+        <h4>Transcript Versions by Build</h4>
         <table class="table">
             <thead>
             <tr>
                 <th>Genome Build</th>
                 <th>Gene</th>
                 <th>BioType</th>
+                <th>Alignment Gap</th>
+                <th>OK for local HGVS resolution</th>
                 <th>Coordinates</th>
                 <th>Length</th>
                 <th>JSON</th>
                 {% if user.is_staff %}
-                    <th>Import filename</th>
+                    <th>Import Filename</th>
                 {% endif %}
                 <th>External Link</th>
             </tr>
@@ -40,26 +76,32 @@
                 <td>{{ genome_build_id }}</td>
                 <td><a class="hover-link" href="{% url 'view_gene' transcript_version.gene.pk %}">{{ transcript_version.gene }}</a></td>
                 <td>{{ transcript_version.biotype }}</td>
+                <td>
+                    {% if transcript_version.alignment_gap %}
+                        {{ transcript_version.cdna_match_diff }}
+                    {% else %}
+                        False
+                    {% endif %}
+                </td>
+                <td class="text-center">{{ transcript_version.hgvs_ok | boolean }}</td>
                 {% if transcript_version.has_valid_data %}
                     <td>{{ transcript_version.coordinates }}</td>
                     <td>{{ transcript_version.length }}</td>
-                    <td><a class="hover-link" href="#{{ genome_build_id }}-json" data-toggle="collapse">show</a></td>
                 {% else %}
                     <td> N/A</td>
                     <td> N/A</td>
-                    <td> <code>{}</code></td>
                 {% endif %}
+                <td>
+                    {% modal id="transcript-"|append:transcript_version.pk|append:"-json" label="API Response" %}
+                        {% code_json transcript_version.data css_class="modal-body" %}
+                    {% endmodal %}
+                </td>
                 {% if user.is_staff %}
-                    <td>{{ transcript_version.import_source }}</td>
+                    <td style="word-break: break-all">{{ transcript_version.import_source }}</td>
                 {% endif %}
                 <td><a class="hover-link external-link" target="_blank" href="{{ transcript_version.get_external_url }}">
                         {{ transcript.get_annotation_consortium_display }} page.
                     </a>
-                </td>
-            </tr>
-            <tr class='collapse' id='{{ genome_build_id }}-json'>
-                <td colspan="8">
-                    <pre><code>{{ transcript_version.data|jsonify_pretty }}</code></pre>
                 </td>
             </tr>
         {% endfor %}
@@ -68,32 +110,48 @@
     <div class="alert alert-danger">We don't have any data for this transcript version on file.</div>
     {% endif %}
 
+    {% if alignment_gap %}
+        <h4>Alignment Gap</h4>
+        <p>
+            Genomic coordinates for transcript exons/CDS etc are made by aligning cDNA sequences to the genome.
+
+            Ensembl transcripts always match the reference sequence, but some RefSeq transcript sequences differ from
+            the reference genome, so the alignment can have gaps.
+
+            We can adjust for these gaps if we have "cDNA_match" alignment information, but cannot currently handle
+            partial alignments.
+
+            HGVS OK means we can use this transcript version to convert to/from HGVS. If this is false, we will use the
+            ClinGen Allele Registry, though this will be slower as it involves an internet request.
+        </p>
+
+    {% endif %}
+
     {% if differences %}
-        <h3>Potential Differences</h3>
-        
-        <ul class="messages">
-            <li class="warning">
-                Transcripts differ between genome versions, which may affect HGVS coordinates between builds
-            </li>
-        </ul>        
+        <h4>Potential Differences</h4>
+
+        <div class="alert alert-warning">
+            {{ 'W' | severity_icon }} Transcripts differ between genome versions
+        </div>
 
         {% for builds, diff in differences %}
-            
             <table class="table">
                 <thead>
                 <tr>
                     <th>
-                    <th>{{ builds.0 }}
-                    <th>{{ builds.1 }}
+                    <th class="text-center">{{ builds.0 }}</th>
+                    <th class="text-center">{{ builds.1 }}</th>
                 </tr>
                 </thead>
+                <tbody>
                 {% for d, vals in diff.items %}
                 <tr>
-                    <th>{{ d }}
-                    <td>{{ vals.0 }}
-                    <td>{{ vals.1 }}
+                    <th>{{ d }}</th>
+                    <td class="text-center">{{ vals.0 }}</td>
+                    <td class="text-center">{{ vals.1 }}</td>
                 </tr>
                 {% endfor %}
+                </tbody>
             </table>
         {% endfor %}
     {% endif %}

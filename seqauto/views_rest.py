@@ -1,10 +1,12 @@
+import json
+import operator
 from collections import defaultdict
+from functools import reduce
+
+import numpy as np
 from django.db.models.query_utils import Q
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
-from functools import reduce
-import json
-import operator
 from rest_framework.generics import get_object_or_404, RetrieveAPIView
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -13,7 +15,6 @@ from genes.models import GeneVersion
 from genes.views import get_coverage_stats
 from library.constants import WEEK_SECS
 from library.utils import defaultdict_to_dict
-import numpy as np
 from seqauto.models import GoldCoverageSummary, EnrichmentKit
 from seqauto.serializers import EnrichmentKitSerializer, \
     GoldCoverageSummarySerializer, EnrichmentKitSummarySerializer

@@ -6,13 +6,12 @@ See __init__.py in this dir for details
 
 """
 
-from collections import defaultdict
 import os
 import socket
+from collections import defaultdict
 
 from library.django_utils.django_secret_key import get_or_create_django_secret_key
 from library.git import Git
-
 # if certain user settings are not relevant for the environment, list the columns in this
 from variantgrid.settings.components.secret_settings import get_secret, get_secrets
 
@@ -38,7 +37,7 @@ UPLOAD_ENABLED = True  # This disables uploading files or creating variants (eg 
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media_root')
 MEDIA_URL = '/media/'
 
-PYTHON_COMMAND = "python3.8"
+PYTHON_COMMAND = "python3"
 MANAGE_COMMAND = [PYTHON_COMMAND, os.path.join(BASE_DIR, "manage.py")]
 
 # Need 5x as many as largest cohort for CohortNode zygosity query
@@ -55,6 +54,8 @@ DISCORDANCE_ENABLED = False
 # How long you have to update flags after a discordance is closed for them to still
 # be considered in the report
 DISCORDANCE_REPORT_LEEWAY = 14
+# If doing large amount of variant re-matching, don't want to fire off discordance reports
+DISCORDANCE_PAUSE_TEMP_VARIANT_MATCHING = False
 
 DEBUG = True
 # If SEND_EMAILS is False, all emails that would go through EmailLog will still be record but wont be sent
@@ -137,6 +138,7 @@ USE_TZ = True
 # If you set this to True (and setup everything else required) the app
 # will do auth through OIDC
 USE_OIDC = False
+MAINTENANCE_MODE = False  # If true, only non-bot admin users will be able to login, currently only works for ODIC
 OIDC_REQUIRED_GROUP = None
 OIDC_USER_SERVICES = None
 
@@ -252,26 +254,32 @@ MUTATIONAL_SIGNATURE_DATA_FILE = os.path.join(MUTATIONAL_SIGNATURE_DATA_DIR, "si
 MUTATIONAL_SIGNATURE_INFO_FILE = os.path.join(MUTATIONAL_SIGNATURE_DATA_DIR, "signature_analysis_data.formatted.txt")
 
 CACHED_WEB_RESOURCE_CLINGEN_DISEASE_VALIDITY = "ClinGenDiseaseValidity"
+CACHED_WEB_RESOURCE_CLINVAR_CITATIONS = "ClinVarCitations"
 CACHED_WEB_RESOURCE_GNOMAD_GENE_CONSTRAINT = "GnomADGeneConstraint"
 CACHED_WEB_RESOURCE_HGNC = "HGNC"
+CACHED_WEB_RESOURCE_LRG_REF_SEQ_GENE = "LRGRefSeqGene"
 CACHED_WEB_RESOURCE_PANEL_APP_AUSTRALIA_PANELS = "PanelApp Australia Panels"
 CACHED_WEB_RESOURCE_PANEL_APP_ENGLAND_PANELS = "Genomics England PanelApp Panels"
 CACHED_WEB_RESOURCE_PFAM = "Pfam"
 CACHED_WEB_RESOURCE_REFSEQ_GENE_SUMMARY = "RefSeq Gene Summary"
+CACHED_WEB_RESOURCE_REFSEQ_GENE_INFO = "RefSeq Gene Info"
 CACHED_WEB_RESOURCE_UNIPROT = "UniProt"
 
 ANNOTATION_CACHED_WEB_RESOURCES = [
     CACHED_WEB_RESOURCE_GNOMAD_GENE_CONSTRAINT,
     CACHED_WEB_RESOURCE_HGNC,
+    CACHED_WEB_RESOURCE_LRG_REF_SEQ_GENE,
     CACHED_WEB_RESOURCE_PANEL_APP_AUSTRALIA_PANELS,
     CACHED_WEB_RESOURCE_PANEL_APP_ENGLAND_PANELS,
     CACHED_WEB_RESOURCE_PFAM,
     CACHED_WEB_RESOURCE_REFSEQ_GENE_SUMMARY,
+    CACHED_WEB_RESOURCE_REFSEQ_GENE_INFO,
     CACHED_WEB_RESOURCE_UNIPROT,
     CACHED_WEB_RESOURCE_CLINGEN_DISEASE_VALIDITY,
+    CACHED_WEB_RESOURCE_CLINVAR_CITATIONS,
 ]
 
-VARIANT_ANNOTATION_TRANSCRIPT_PREFERENCES = ['refseq_transcript_accession', 'ensembl_transcript_accession']
+VARIANT_ANNOTATION_TRANSCRIPT_PREFERENCES = ['lrg_identifier', 'refseq_transcript_accession', 'ensembl_transcript_accession']
 VARIANT_ANNOTATION_DELETE_TEMP_FILES_ON_SUCCESS = not DEBUG
 # If true, then if we don't have a specific transcript version, we'll match it to the closest one we can
 VARIANT_TRANSCRIPT_VERSION_BEST_ATTEMPT = True
@@ -285,6 +293,7 @@ CLINGEN_ALLELE_REGISTRY_MAX_RECORDS = 2000
 CLINGEN_ALLELE_REGISTRY_LOGIN = get_secret("CLINGEN_ALLELE_REGISTRY.login")
 CLINGEN_ALLELE_REGISTRY_PASSWORD = get_secret("CLINGEN_ALLELE_REGISTRY.password")
 CLINGEN_ALLELE_REGISTRY_MAX_MANUAL_REQUESTS = 10_000  # On nodes and VCFs
+CLINGEN_ALLELE_REGISTRY_REQUIRE_REF_ALLELE = True
 
 NO_DNA_CONTROL_REGEX = "(^|[^a-zA-Z])NDC([^a-zA-Z]|$)"  # No DNA Control - eg _NDC_ or -NDC_
 
@@ -303,6 +312,8 @@ VCF_IMPORT_SKIP_RECORD_REGEX = {
 COMPANY = None  # Used for gene list categories
 
 GENERATED_DIR = os.path.join(MEDIA_ROOT, 'generated')
+
+HGVS_MAX_REF_ALLELE_LENGTH = 10  # Set to 0 for "del" instead of "delC" etc
 
 PATIENTS_READ_ONLY_SHOW_AGE_NOT_DOB = False
 IMPORT_PROCESSING_DIR = os.path.join(PRIVATE_DATA_ROOT, 'import_processing')
@@ -367,10 +378,11 @@ ANALYSIS_TEMPLATES_AUTO_SAMPLE = "Sample tab auto analysis"
 ANALYSIS_WARN_IF_NO_QC_GENE_LIST_MESSAGE = None  # disabled by default
 ANALYSIS_NODE_CACHE_Q = True
 
+VARIANT_ALLELE_FREQUENCY_CLIENT_SIDE_PERCENT = True  # For analysis Grid/CSV export. VCF export is always unit
 VARIANT_STANDARD_BASES_ONLY = True  # True to reject anything other than A, C, G, T
 VARIANT_SHOW_CANONICAL_HGVS = True
 
-VARIANT_CLASSIFICATION_SUPPORTED_TRANSCRIPTS = {"NR", "NM", "NC", "ENST"}
+VARIANT_CLASSIFICATION_SUPPORTED_TRANSCRIPTS = {"NR", "NM", "NC", "ENST", "LRG_", "XR"}
 VARIANT_CLASSIFICATION_MATCH_VARIANTS = True  # exists only so we can turn it off during testing
 VARIANT_CLASSIFICATION_REQUIRE_OVERWRITE_NOTE = True
 VARIANT_CLASSIFICATION_AUTOFUZZ_AGE = False
@@ -391,9 +403,15 @@ VARIANT_CLASSIFICATION_WEB_FORM_CREATE = True
 VARIANT_CLASSIFICATION_WEB_FORM_CREATE_BY_NON_ADMIN = True
 VARIANT_CLASSIFICATION_WEB_FORM_CREATE_ALLOW_NO_VARIANT = True  # Can create purely from HGVS
 
+# If change is synonymous, and molecular consequence is splicing, then change from p.= to p.?
+VARIANT_CLASSIFICATION_AUTO_POPULATE_P_HGVS_SYNONYMOUS_SPLICE_CHANGE_TO_UNKNOWN = False
+
 VARIANT_CLASSIFICATION_FILE_ATTACHMENTS = True  # allow users to attach files to classifications
 
-VARIANT_CLASSIFICATION_MAX_FULL_ALLELE_LENGTH = 100  # Used for MVL export, for general display limit is 10
+VARIANT_CLASSIFICATION_MAX_REFERENCE_LENGTH = 100  # Used for MVL export, general display use HGVS_MAX_REF_ALLELE_LENGTH
+
+VARIANT_CLASSIFICATION_REDCAP_EXPORT = True
+
 
 PATHOLOGY_TESTS_ENABLED = False
 PATHOLOGY_TEST_REQUESTS_REDIRECT_URL = None
@@ -438,7 +456,7 @@ ROLLBAR = {
     'access_token': rollbar_access_token,
     'client_access_token': rollbar_client_access_token,
     'environment': socket.gethostname().lower().split('.')[0].replace('-', ''),
-    'enabled': rollbar_access_token and rollbar_client_access_token,  # set to false in environments to disable rollbar
+    'enabled': bool(rollbar_access_token and rollbar_client_access_token),  # set to false in environments to disable rollbar
     'branch': 'master',
     'root': BASE_DIR,
     'capture_username': True,
@@ -795,7 +813,6 @@ TERMS_BASE_TEMPLATE = 'base_tc.html'
 URLS_NAME_REGISTER.update({"classification_dashboard": False,
                            "keycloak_admin": False,
                            "version_diffs": False,
-                           "evidence_keys_logged_in": False,
                            "classification_import_upload": False})
 
 VARIANT_DETAILS_SHOW_ANNOTATION = True  # also doubles as GENE_SHOW_ANNOTATION
@@ -850,7 +867,7 @@ MESSAGE_TAGS = {
 }
 
 def get_clinvar_export_secrets() -> dict:
-    return get_secrets("CLINVAR_EXPORT", ["enabled", "test", "api_key"])
+    return get_secrets("CLINVAR_EXPORT", ["mode", "api_key", "org_id"])
 
 
 def get_keycloak_sync_secrets() -> dict:

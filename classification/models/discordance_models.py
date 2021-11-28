@@ -1,6 +1,8 @@
 import typing
 from datetime import datetime, timedelta
+from typing import Set, Optional, List
 
+import django.dispatch
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.db import models, transaction
@@ -8,18 +10,15 @@ from django.db.models.deletion import PROTECT, CASCADE
 from django.urls.base import reverse
 from django_extensions.db.models import TimeStampedModel
 from lazy import lazy
-from typing import Set, Optional, List
 
-from flags.models.enums import FlagStatus
-from flags.models.models import FlagComment
-from classification.enums.discordance_enums import DiscordanceReportResolution, ContinuedDiscordanceReason
 from classification.enums.classification_enums import SpecialEKeys, ClinicalSignificance
+from classification.enums.discordance_enums import DiscordanceReportResolution, ContinuedDiscordanceReason
+from classification.models.classification import ClassificationModification, Classification
 from classification.models.clinical_context_models import ClinicalContext
 from classification.models.flag_types import classification_flag_types
-from classification.models.classification import ClassificationModification, Classification
+from flags.models.enums import FlagStatus
+from flags.models.models import FlagComment
 from snpdb.models import Lab
-import django.dispatch
-
 
 discordance_change_signal = django.dispatch.Signal(providing_args=["discordance_report"])
 
@@ -98,16 +97,19 @@ class DiscordanceReport(TimeStampedModel):
             self.save()
 
         existing_vms = set()
-        for drc_id in DiscordanceReportClassification.objects.filter(report=self).values_list('classification_original__classification', flat=True):
-            existing_vms.add(drc_id)
+        existing_labs = set()
+        for drc in DiscordanceReportClassification.objects.filter(report=self):
+            existing_vms.add(drc.classification_original.classification_id)
+            existing_labs.add(drc.classification_original.classification.lab)
 
         newly_added_labs: Set[Lab] = set()
         for vcm_id in self.clinical_context.classifications_qs.values_list('id', flat=True):
             if vcm_id in existing_vms:
                 existing_vms.remove(vcm_id)
             else:
-                vcm = ClassificationModification.objects.filter(is_last_published=True, classification=vcm_id).get()
-                newly_added_labs.add(vcm.classification.lab)
+                vcm = ClassificationModification.objects.get(is_last_published=True, classification=vcm_id)
+                if vcm.classification.lab not in existing_labs:
+                    newly_added_labs.add(vcm.classification.lab)
                 DiscordanceReportClassification(
                     report=self,
                     classification_original=vcm

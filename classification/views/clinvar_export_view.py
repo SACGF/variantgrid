@@ -1,23 +1,26 @@
+import json
 from typing import Dict, Any, Optional, Iterable
+
 from django.conf import settings
-from django.db.models import QuerySet, When, Value, Case, IntegerField
-from django.http import HttpResponse, StreamingHttpResponse
+from django.db.models import QuerySet, When, Value, Case, IntegerField, Count
+from django.http import HttpResponse, StreamingHttpResponse, HttpRequest
+from django.http.response import HttpResponseBase
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
 from django.utils.timezone import now
+from lazy import lazy
 from pytz import timezone
-from htmlmin.decorators import not_minified_response
 
 from classification.enums import ShareLevel, SpecialEKeys
 from classification.models import ClinVarExport, ClinVarExportBatch, ClinVarExportBatchStatus, \
-    Classification, ClinVarReleaseStatus, EvidenceKeyMap, ClinVarExportStatus
+    Classification, EvidenceKeyMap, ClinVarExportStatus
 from genes.hgvs import CHGVS
 from library.cache import timed_cache
 from library.django_utils import add_save_message, get_url_from_view_path
-from library.utils import html_to_text, delimited_row
+from library.utils import html_to_text, export_column, ExportRow
 from snpdb.models import ClinVarKey, Lab, Allele
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
-import json
+from uicore.json.json_types import JsonDataType
 
 
 @timed_cache(size_limit=30, ttl=60)
@@ -36,8 +39,9 @@ class ClinVarExportBatchColumns(DatatableConfig):
         self.expand_client_renderer = DatatableConfig._row_expand_ajax('clinvar_export_batch_detail', expected_height=120)
         self.rich_columns = [
             RichColumn("id", label="ID", orderable=True, default_sort=SortOrder.DESC),
-            RichColumn("clinvar_key", name="ClinVar Key", orderable=True, enabled=False),
+            RichColumn("clinvar_key", label="ClinVar Key", orderable=True, enabled=False),
             RichColumn("created", client_renderer='TableFormat.timestamp', orderable=True),
+            RichColumn("record_count", label="Records In Submission", orderable=True),
             RichColumn("status", renderer=self.render_status, orderable=True)
         ]
 
@@ -49,9 +53,11 @@ class ClinVarExportBatchColumns(DatatableConfig):
         return cve
 
     def get_initial_queryset(self):
-        return self.get_initial_query_params(
+        initial_qs = self.get_initial_query_params(
             clinvar_key=self.get_query_param('clinvar_key')
         )
+        initial_qs = initial_qs.annotate(record_count=Count('clinvarexportsubmission'))
+        return initial_qs
 
 
 def clinvar_export_batch_detail(request, pk: int):
@@ -65,13 +71,13 @@ def clinvar_export_batch_detail(request, pk: int):
     })
 
 
-class ClinVarExportColumns(DatatableConfig):
+class ClinVarExportColumns(DatatableConfig[ClinVarExport]):
 
     def render_allele(self, row: Dict[str, Any]) -> str:
         allele = allele_for(row["clinvar_allele__allele"])
         return f"{allele:CA}"
 
-    def render_c_hgvs(self, row: Dict[str, Any]):
+    def render_c_hgvs(self, row: Dict[str, Any]) -> JsonDataType:
         if row["classification_based_on__classification__variant"]:
             genome_build = row["classification_based_on__published_evidence__genome_build__value"]
             c_hgvs_str: str
@@ -80,9 +86,10 @@ class ClinVarExportColumns(DatatableConfig):
             else:
                 c_hgvs_str = row["classification_based_on__classification__chgvs_grch38"]
 
+            data: Dict[str, Any]
             c_hgvs = CHGVS(c_hgvs_str)
             if c_hgvs.raw_c != c_hgvs.full_c_hgvs:
-                return {
+                data = {
                     "genomeBuild": genome_build,
                     "transcript": c_hgvs.transcript,
                     "geneSymbol": c_hgvs.gene_symbol,
@@ -91,22 +98,27 @@ class ClinVarExportColumns(DatatableConfig):
                     # "variantId": row["classification_based_on__classification__variant"]
                 }
             else:
-                return {"full": c_hgvs_str}
+                data = {"full": c_hgvs_str}
+
+            if allele_id := row["clinvar_allele__allele"]:
+                allele = allele_for(allele_id)
+                data["allele"] = f"{allele:CA}"
+
+            return data
         else:
             return None
 
-    def __init__(self, request):
+    def __init__(self, request: HttpRequest):
         super().__init__(request)
 
         self.search_box_enabled = True
         self.expand_client_renderer = DatatableConfig._row_expand_ajax('clinvar_export_detail')
         self.rich_columns = [
             RichColumn("id", label="ID", orderable=True, default_sort=SortOrder.DESC),
-            RichColumn("clinvar_allele__allele", name="Allele", renderer=self.render_allele),
-            RichColumn(name="c_hgvs", label='c.hgvs',
-                    visible=False,  # still allow this to be searched on
+            RichColumn(name="c_hgvs", label='Allele',
                     sort_keys=["classification_based_on__classification__chgvs_grch38"],
                     extra_columns=[
+                        "clinvar_allele__allele",
                         "classification_based_on__classification__variant",
                         "classification_based_on__published_evidence__genome_build__value",
                         "classification_based_on__classification__chgvs_grch37",
@@ -114,12 +126,11 @@ class ClinVarExportColumns(DatatableConfig):
                     ],
                     renderer=self.render_c_hgvs, client_renderer='TableFormat.hgvs',
                     search=[
+                        # "clinvar_allele__allele__clingen_allele__id",  # need a string
                         "classification_based_on__classification__chgvs_grch37",
                         "classification_based_on__classification__chgvs_grch38"
                     ]
             ),
-
-            # TODO store plain text condition so we can search it and sort it
             RichColumn("condition",
                        label="Condition Umbrella",
                        client_renderer='VCTable.condition',
@@ -127,7 +138,6 @@ class ClinVarExportColumns(DatatableConfig):
                        sort_keys=["condition__sort_text"]
             ),
             RichColumn("status", label="Sync Status", client_renderer='renderStatus', sort_keys=["status_sort"], orderable=True, search=False),
-            RichColumn("release_status", label="Release Status", client_renderer='renderReleaseStatus', orderable=True, search=False),
             RichColumn("scv", label="SCV", orderable=True),
         ]
 
@@ -153,7 +163,8 @@ class ClinVarExportColumns(DatatableConfig):
             When(status=ClinVarExportStatus.NEW_SUBMISSION, then=Value(1)),
             When(status=ClinVarExportStatus.CHANGES_PENDING, then=Value(2)),
             When(status=ClinVarExportStatus.UP_TO_DATE, then=Value(3)),
-            When(status=ClinVarExportStatus.IN_ERROR, then=Value(4))
+            When(status=ClinVarExportStatus.IN_ERROR, then=Value(4)),
+            When(status=ClinVarExportStatus.EXCLUDE, then=Value(5))
         ]
         case = Case(*whens, default=Value(0), output_field=IntegerField())
         initial_qs = initial_qs.annotate(status_sort=case)
@@ -161,15 +172,12 @@ class ClinVarExportColumns(DatatableConfig):
         return initial_qs
 
 
-
-def clinvar_export_review(request, pk):
+def clinvar_export_review(request: HttpRequest, pk) -> HttpResponseBase:
     clinvar_export: ClinVarExport = ClinVarExport.objects.get(pk=pk)  # fixme get or 404
     clinvar_export.clinvar_allele.clinvar_key.check_user_can_access(request.user)
 
     if request.method == "POST":
         clinvar_export.scv = request.POST.get("scv") or ""
-        if release_status_str := request.POST.get("release_status"):
-            clinvar_export.release_status = ClinVarReleaseStatus(release_status_str)
         clinvar_export.save()
         add_save_message(request, valid=True, name="ClinVarExport")
         return redirect(clinvar_export)
@@ -180,7 +188,7 @@ def clinvar_export_review(request, pk):
     })
 
 
-def clinvar_export_history(request, pk):
+def clinvar_export_history(request: HttpRequest, pk) -> HttpResponseBase:
     clinvar_export: ClinVarExport = ClinVarExport.objects.get(pk=pk)
     clinvar_export.clinvar_allele.clinvar_key.check_user_can_access(request.user)
 
@@ -192,29 +200,71 @@ def clinvar_export_history(request, pk):
     })
 
 
-def clinvar_export_download(request, clinvar_key: str):
+class ClinVarExportSummary(ExportRow):
+
+    def __init__(self, clinvar_export: ClinVarExport):
+        self.clinvar_export = clinvar_export
+
+    @property
+    def classification(self):
+        return self.clinvar_export.classification_based_on
+
+    @lazy
+    def genome_build_row(self):
+        if classification := self.classification:
+            try:
+                return classification.get_genome_build()
+            except KeyError:
+                pass
+
+    @export_column("ID")
+    def id(self):
+        return self.clinvar_export.id
+
+    @export_column("URL")
+    def url(self):
+        return get_url_from_view_path(self.clinvar_export.get_absolute_url())
+
+    @export_column("Genome Build")
+    def genome_build(self):
+        return str(self.genome_build_row) if self.genome_build_row else None
+
+    @export_column("c.HGVS")
+    def c_hgvs(self):
+        if genome_build := self.genome_build_row:
+            return self.classification.classification.get_c_hgvs(genome_build)
+
+    @export_column("Condition Umbrella")
+    def condition_umbrella(self):
+        return self.clinvar_export.condition_resolved.as_plain_text
+
+    @export_column("Interpretation Summary")
+    def interpretation_summary(self):
+        if classification := self.classification:
+            return html_to_text(classification.get(SpecialEKeys.INTERPRETATION_SUMMARY))
+
+    @export_column("Clinical Significance")
+    def clinical_significance(self):
+        if classification := self.classification:
+            return EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE).pretty_value(classification.get(SpecialEKeys.CLINICAL_SIGNIFICANCE))
+
+    @export_column("Sync Status")
+    def sync_status(self):
+        return self.clinvar_export.get_status_display()
+
+    @export_column("SCV")
+    def scv(self):
+        return self.clinvar_export.scv
+
+
+def clinvar_export_download(request: HttpRequest, clinvar_key: str) -> HttpResponseBase:
     clinvar_key: ClinVarKey = get_object_or_404(ClinVarKey, pk=clinvar_key)
     clinvar_key.check_user_can_access(request.user)
 
     def rows() -> Iterable[str]:
-        yield delimited_row(["ID", "URL", "Genome Build", "c.hgvs", "Clinical Significance", "Interpretation Summary", "Sync Status", "Release Status", "SCV"])
-        row: ClinVarExport
-        clin_sig_e_key = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE)
-        for row in ClinVarExport.objects.filter(clinvar_allele__clinvar_key=clinvar_key).order_by('-id'):
-            genome_build: Optional[str] = None
-            c_hgvs: Optional[str] = None
-            interpretation_summary: Optional[str] = None
-            clinical_significance: Optional[str] = None
-            if classification_based_on := row.classification_based_on:
-                genome_build_obj = classification_based_on.get_genome_build()
-                genome_build = str(genome_build_obj)
-                c_hgvs = classification_based_on.classification.get_c_hgvs(genome_build_obj)
-                interpretation_summary = html_to_text(classification_based_on.get(SpecialEKeys.INTERPRETATION_SUMMARY))
-                clinical_significance = clin_sig_e_key.pretty_value(classification_based_on.get(SpecialEKeys.CLINICAL_SIGNIFICANCE))
-
-            url = get_url_from_view_path(row.get_absolute_url())
-            yield delimited_row([row.id, url, genome_build or "", c_hgvs or "", clinical_significance or "", interpretation_summary or "", row.get_status_display(), row.get_release_status_display(), row.scv])
-            pass
+        return ClinVarExportSummary.csv_generator(
+            ClinVarExport.objects.filter(clinvar_allele__clinvar_key=clinvar_key).order_by('-id')
+        )
 
     date_str = now().astimezone(tz=timezone(settings.TIME_ZONE)).strftime("%Y-%m-%d")
     response = StreamingHttpResponse(rows(), content_type='text/csv')
@@ -222,7 +272,7 @@ def clinvar_export_download(request, clinvar_key: str):
     return response
 
 
-def clinvar_export_batch_download(request, pk):
+def clinvar_export_batch_download(request: HttpRequest, pk) -> HttpResponseBase:
     clinvar_export_batch: ClinVarExportBatch = ClinVarExportBatch.objects.get(pk=pk)
     clinvar_export_batch.clinvar_key.check_user_can_access(request.user)
 
@@ -234,7 +284,7 @@ def clinvar_export_batch_download(request, pk):
     return response
 
 
-def clinvar_export_summary(request, pk: Optional[str] = None):
+def clinvar_export_summary(request: HttpRequest, pk: Optional[str] = None) -> HttpResponseBase:
     clinvar_key: ClinVarKey
     if not pk:
         if clinvar_key := ClinVarKey.clinvar_keys_for_user(request.user).first():
@@ -247,7 +297,7 @@ def clinvar_export_summary(request, pk: Optional[str] = None):
     clinvar_key.check_user_can_access(request.user)
 
     labs = Lab.objects.filter(clinvar_key=clinvar_key).order_by('name')
-    missing_condition = Classification.objects.filter(lab__in=labs, share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS, condition_resolution__isnull=True)
+    missing_condition = Classification.objects.filter(withdrawn=False, lab__in=labs, share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS, condition_resolution__isnull=True)
 
     export_columns = ClinVarExportColumns(request)
     export_batch_columns = ClinVarExportBatchColumns(request)
@@ -257,14 +307,12 @@ def clinvar_export_summary(request, pk: Optional[str] = None):
         'clinvar_key': clinvar_key,
         'labs': labs,
         'missing_condition_count': missing_condition.count(),
-        'export_columns': export_columns,
-        'export_batch_columns': export_batch_columns,
         'count_records': export_columns.get_initial_query_params(clinvar_key=pk).count(),
         'count_batch': export_batch_columns.get_initial_query_params(clinvar_key=pk).count()
     })
 
 
-def clinvar_export_detail(request, pk: Optional[str] = None):
+def clinvar_export_detail(request: HttpRequest, pk: Optional[str] = None) -> HttpResponseBase:
     clinvar_export = get_object_or_404(ClinVarExport, pk=pk)
     clinvar_export.clinvar_allele.clinvar_key.check_user_can_access(request.user)
 

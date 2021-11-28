@@ -1,6 +1,7 @@
+import uuid
+
 from django.db.models.aggregates import Count
 from django.template import Library
-import uuid
 
 from genes.models import GeneSymbol
 from ontology.models import OntologyTerm, OntologyService

@@ -1,5 +1,5 @@
-from django.db import connection, transaction
 import sqlparse
+from django.db import connection, transaction
 
 
 #970: Added transaction wrapper due to Postgres hanging query
@@ -85,8 +85,7 @@ def iter_dictfetchall(cursor, column_names=None):
         column_names = get_cursor_column_names(cursor)
 
     for row in iter_db_results(cursor, 10000):
-        data = dict(list(zip(column_names, row)))
-        yield data
+        yield dict(zip(column_names, row))
 
 
 def sql_delete_qs(qs, batch_size=None):

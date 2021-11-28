@@ -1,3 +1,4 @@
+import copy
 from typing import Optional, List, Iterable
 
 from django.db import models, transaction
@@ -5,17 +6,15 @@ from django.db.models import QuerySet, TextChoices
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.urls import reverse
+from django.utils.timezone import now
 from lazy import lazy
 from model_utils.models import TimeStampedModel
 
-from uicore.json.json_utils import JsonDiff, JsonDiffs
-from uicore.json.validated_json import ValidatedJson
-from uicore.json.json_types import JsonObjType
-from classification.models import ClassificationModification, ConditionResolved
+from classification.models import ClassificationModification, ConditionResolved, classification_flag_types
 from snpdb.models import ClinVarKey, Allele
-from django.utils.timezone import now
-import copy
-
+from uicore.json.json_types import JsonObjType
+from uicore.json.json_utils import JsonDiffs
+from uicore.json.validated_json import ValidatedJson
 
 CLINVAR_EXPORT_CONVERSION_VERSION = 3
 
@@ -51,14 +50,7 @@ class ClinVarExportStatus(models.TextChoices):
     CHANGES_PENDING = "C", "Changes Pending"
     UP_TO_DATE = "D", "Up to Date"
     IN_ERROR = "E", "Error"
-
-
-class ClinVarReleaseStatus(models.TextChoices):
-    """
-    As determined by the user currently
-    """
-    WHEN_READY = "R", "Release When Ready"
-    ON_HOLD = "H", "On Hold"
+    EXCLUDE = "X", "Exclude"
 
 
 class ClinVarExport(TimeStampedModel):
@@ -70,7 +62,6 @@ class ClinVarExport(TimeStampedModel):
     classification_based_on = models.ForeignKey(ClassificationModification, null=True, blank=True, on_delete=models.CASCADE)
     scv = models.TextField(blank=True, default='')
     status = models.CharField(max_length=1, choices=ClinVarExportStatus.choices, default=ClinVarExportStatus.NEW_SUBMISSION)
-    release_status = models.CharField(max_length=1, choices=ClinVarReleaseStatus.choices, default=ClinVarReleaseStatus.WHEN_READY)
     last_evaluated = models.DateTimeField(default=now)
     submission_body_validated = models.JSONField(null=False, blank=False, default=dict)
 
@@ -160,7 +151,10 @@ class ClinVarExport(TimeStampedModel):
         lazy.invalidate(self, 'submission_body')
 
         status: ClinVarExportStatus
-        if current_validated_json_body.has_errors:
+
+        if (cm := self.classification_based_on) and cm.classification.flag_collection_safe.get_open_flag_of_type(classification_flag_types.classification_not_public):
+            status = ClinVarExportStatus.EXCLUDE
+        elif current_validated_json_body.has_errors:
             status = ClinVarExportStatus.IN_ERROR
         else:
             if previous_submission := self.previous_submission:
@@ -204,13 +198,14 @@ class ClinVarExportBatch(TimeStampedModel):
         return f"ClinVar Submission Batch : {self.id} - {self.get_status_display()}"
 
     def to_json(self) -> JsonObjType:
+        from classification.models.clinvar_export_sync import clinvar_export_sync
         return {
             "actions": [{
                 "type": "AddData",
                 "targetDb": "clinvar",
                 "data": {
                     "content": {
-                        "behalfOrgID": self.clinvar_key.behalf_org_id or "testorg",
+                        "behalfOrgID": clinvar_export_sync.org_id,
                         "clinvarSubmission": [submission.submission_full for submission in
                                               self.clinvarexportsubmission_set.order_by('created')],
                         "submissionName": f"submission_{self.id}"
@@ -238,18 +233,18 @@ class ClinVarExportBatch(TimeStampedModel):
         current_batch: Optional[ClinVarExportBatch] = None
         current_batch_size = 0
 
-        qs = qs.exclude(release_status=ClinVarReleaseStatus.ON_HOLD)
         qs = qs.order_by('clinvar_allele__clinvar_key')
 
         if not force_update:
             qs = qs.filter(status__in=[ClinVarExportStatus.NEW_SUBMISSION, ClinVarExportStatus.CHANGES_PENDING])
+
         qs = qs.select_related('clinvar_allele', 'clinvar_allele__clinvar_key')
         record: ClinVarExport
         for record in qs:
             if force_update:
                 record.update()
                 # only have to do a check if we're not previously doing the filter
-                if record.status in {ClinVarExportStatus.UP_TO_DATE, ClinVarExportStatus.IN_ERROR}:
+                if record.status not in {ClinVarExportStatus.CHANGES_PENDING, ClinVarExportStatus.NEW_SUBMISSION}:
                     continue
 
             full_current = record.submission_full

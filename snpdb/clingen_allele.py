@@ -24,23 +24,29 @@ from typing import Dict, List, Tuple, Optional
 import requests
 from django.conf import settings
 
-from genes.hgvs import HGVSMatcher
 from library.django_utils import thread_safe_unique_together_get_or_create
 from library.utils import iter_fixed_chunks, get_single_element
 from snpdb.models import Allele, ClinGenAllele, GenomeBuild, Variant, VariantAllele, Contig, GenomeFasta
 from snpdb.models.models_enums import AlleleOrigin, AlleleConversionTool, ClinGenAlleleExternalRecordType
 
 
-class ClinGenAlleleRegistryException(Exception):
-    """ Base exception """
-
-
-class ClinGenAlleleServerException(ClinGenAlleleRegistryException):
-    """ Could not contact server """
-    def __init__(self, method, status_code, reason):
-        msg = f"Error contacting ClinGen Allele Registry. Method: '{method}', Response: {status_code}"
+class ClinGenAlleleServerException(ClinGenAllele.ClinGenAlleleRegistryException):
+    """ Could not contact server, or response != 200 """
+    def __init__(self, method, status_code, response_json):
+        print(f"{response_json=}")
+        json_str = ", ".join([f"{k}: {v}" for k, v in response_json.items()])
+        msg = f"Error contacting ClinGen Allele Registry. Method: '{method}', Response: {status_code}, JSON: {json_str}"
         super().__init__(msg)
-        self.description = f'Error connecting to server: {reason}'
+        self.status_code = status_code
+        self.response_json = response_json
+        self.description = json_str
+
+    def is_unknown_reference(self):
+        """ Eg error is they don't have that particular transcript - could retry """
+        if self.status_code == 500:
+            if message := self.response_json.get("message"):
+                return "Unknown reference" in message
+        return False
 
     def get_fake_api_response(self):
         msg = self.args[0]
@@ -52,8 +58,8 @@ class ClinGenAlleleServerException(ClinGenAlleleRegistryException):
         return api_response
 
 
-class ClinGenAlleleAPIException(ClinGenAlleleRegistryException):
-    """ API returned response, but was an error """
+class ClinGenAlleleAPIException(ClinGenAllele.ClinGenAlleleRegistryException):
+    """ API returned 200 OK, but was an error """
 
 
 class ClinGenAlleleRegistryAPI:
@@ -76,7 +82,7 @@ class ClinGenAlleleRegistryAPI:
     def _check_response(response: requests.Response):
         """ Throws Exception if response status code is not 200 OK """
         if response.status_code != 200:
-            raise ClinGenAlleleServerException(response.request.method, response.status_code, response.reason)
+            raise ClinGenAlleleServerException(response.request.method, response.status_code, response.json())
 
     def _put(self, url, data):
         logging.debug("Calling ClinGen API")
@@ -95,36 +101,59 @@ class ClinGenAlleleRegistryAPI:
         return cls.get(url)
 
     @classmethod
+    def get_external_code(cls, er_type: ClinGenAlleleExternalRecordType, external_code):
+        suffix = f"/alleles?{er_type.value}={external_code}"
+        url = settings.CLINGEN_ALLELE_REGISTRY_DOMAIN + suffix
+        return cls.get(url)
+
+    @classmethod
+    def get_hgvs(cls, hgvs_string: str):
+        suffix = f"/allele?hgvs={hgvs_string}"
+        url = settings.CLINGEN_ALLELE_REGISTRY_DOMAIN + suffix
+        return cls.get(url)
+
+    @classmethod
     def get(cls, url):
         response = requests.get(url)
         cls._check_response(response)
         return response.json()
 
-    def _clingen_hgvs_put_iter(self, hgvs_iter):
-        """ Calls ClinGen in batches """
-        url = settings.CLINGEN_ALLELE_REGISTRY_DOMAIN + "/alleles?file=hgvs"
+    def _clingen_hgvs_put_iter(self, hgvs_iter, file_type="hgvs"):
+        """ Calls ClinGen in batches
+            file_type = {hgvs, id, MyVariantInfo_hg19.id, MyVariantInfo_hg38.id, ExAC.id, gnomAD.id}
+         """
+        url = settings.CLINGEN_ALLELE_REGISTRY_DOMAIN + f"/alleles?file={file_type}"
         chunk_size = settings.CLINGEN_ALLELE_REGISTRY_MAX_RECORDS
 
         for hgvs_chunk in iter_fixed_chunks(hgvs_iter, chunk_size):
             data = "\n".join(hgvs_chunk)
             yield self._put(url, data)
 
-    def hgvs_put(self, hgvs_iter):
-        return itertools.chain.from_iterable(self._clingen_hgvs_put_iter(hgvs_iter))
+    def hgvs_put(self, hgvs_iter, file_type="hgvs"):
+        return itertools.chain.from_iterable(self._clingen_hgvs_put_iter(hgvs_iter, file_type=file_type))
 
 
 def populate_clingen_alleles_for_variants(genome_build: GenomeBuild, variants,
                                           clingen_api: ClinGenAlleleRegistryAPI = None):
     """ Ensures that we have ClinGenAllele for variants
         You don't need to, but more efficient to make variants distinct """
-    from upload.models import ModifiedImportedVariant  # Circular import
+    # Circular imports
+    from genes.hgvs import HGVSMatcher
+    from upload.models import ModifiedImportedVariant
+
     if clingen_api is None:
         clingen_api = ClinGenAlleleRegistryAPI()
 
-    qs = VariantAllele.objects.filter(variant__in=variants).values_list("variant_id", flat=True)
-    variant_ids_with_allele = set(qs)
+    va_qs = VariantAllele.objects.filter(genome_build=genome_build, variant__in=variants)
+    variant_ids_with_allele = set(va_qs.values_list("variant_id", flat=True))
+    allele_missing_clingen_by_variant_id = {}
+    for va in va_qs.filter(error__isnull=True, allele__clingen_allele__isnull=True):
+        allele_missing_clingen_by_variant_id[va.variant_id] = va
 
-    reference_variant_ids_without_alleles = []
+    if allele_missing_clingen_by_variant_id:
+        logging.info("%d Alleles missing ClinGen Allele", len(allele_missing_clingen_by_variant_id))
+
+    skip_variant_ids_without_alleles = []
     # These are kept in sync
     variant_ids_without_alleles = []
     variant_hgvs = []
@@ -136,13 +165,12 @@ def populate_clingen_alleles_for_variants(genome_build: GenomeBuild, variants,
 
     for v in variants:
         variant_id = v.pk
-        if variant_id not in variant_ids_with_allele:
-            if v.is_reference:
-                reference_variant_ids_without_alleles.append(variant_id)
-            else:
+        if variant_id not in variant_ids_with_allele or variant_id in allele_missing_clingen_by_variant_id:
+            if v.can_have_clingen_allele:
                 variant_ids_without_alleles.append(variant_id)
                 variant_hgvs.append(hgvs_matcher.variant_to_g_hgvs(v))
-        else:
+            else:
+                skip_variant_ids_without_alleles.append(variant_id)
             num_existing_records += 1
 
     num_no_record = len(variant_ids_without_alleles)
@@ -150,12 +178,12 @@ def populate_clingen_alleles_for_variants(genome_build: GenomeBuild, variants,
                   genome_build, num_existing_records, num_no_record)
 
     variant_id_allele_error: List[Tuple[int, Allele, Optional[str]]] = []
-    if reference_variant_ids_without_alleles:
-        logging.debug("%d reference variants", len(reference_variant_ids_without_alleles))
-        empty_alleles = [Allele()] * len(reference_variant_ids_without_alleles)
+    if num_skip := len(skip_variant_ids_without_alleles):
+        logging.debug("%d variants skipping ClingenAlleleRegistry", num_skip)
+        empty_alleles = [Allele() for _ in range(num_skip)]
         reference_alleles = Allele.objects.bulk_create(empty_alleles)
         variant_id_allele_error.extend(((variant_id, allele, None) for variant_id, allele in
-                                        zip(reference_variant_ids_without_alleles, reference_alleles)))
+                                        zip(skip_variant_ids_without_alleles, reference_alleles)))
 
     if variant_hgvs:
         # Create Allele / ClinGenAlleles if they don't exist
@@ -166,44 +194,61 @@ def populate_clingen_alleles_for_variants(genome_build: GenomeBuild, variants,
         # bulk_create doesn't return populated objects when ignore_conflicts=True
         # so break up empty (no chance of failure) and alleles_w_clingen
         allele_no_clingen_list = []
-        alleles_with_clingen_list = []
+        new_alleles_with_clingen_list = []
+        modified_variant_alleles_list = []
+        modified_alleles_list = []
         clingen_by_variant_id = {}
         clingen_errors_by_variant_id = {}
 
         clingen_response = clingen_api.hgvs_put(variant_hgvs)
         for variant_id, api_response in zip(variant_ids_without_alleles, clingen_response):
+            existing_va = allele_missing_clingen_by_variant_id.get(variant_id)
             if "errorType" in api_response:
-                clingen_errors_by_variant_id[variant_id] = api_response
-                allele_no_clingen_list.append(Allele())
+                if existing_va:
+                    existing_va.error = api_response
+                    modified_variant_alleles_list.append(existing_va)
+                else:
+                    clingen_errors_by_variant_id[variant_id] = api_response
+                    allele_no_clingen_list.append(Allele())
             else:
                 # Don't store errors, retry in case we screwed up on our end
                 clingen_allele_id = ClinGenAllele.get_id_from_response(api_response)
-                clingen_by_variant_id[variant_id] = clingen_allele_id
                 cga = ClinGenAllele(id=clingen_allele_id, api_response=api_response)
                 clingen_allele_list.append(cga)
-                allele = Allele(clingen_allele_id=clingen_allele_id)
-                alleles_with_clingen_list.append(allele)
+                if existing_va:
+                    existing_va.allele.clingen_allele_id = clingen_allele_id
+                    modified_alleles_list.append(existing_va.allele)
+                else:
+                    clingen_by_variant_id[variant_id] = clingen_allele_id
+                    allele = Allele(clingen_allele_id=clingen_allele_id)
+                    new_alleles_with_clingen_list.append(allele)
 
         if clingen_allele_list:
             ClinGenAllele.objects.bulk_create(clingen_allele_list, ignore_conflicts=True)
 
+        if modified_variant_alleles_list:
+            logging.debug("Updating %d VariantAlleles w/Error", len(modified_variant_alleles_list))
+            VariantAllele.objects.bulk_update(modified_variant_alleles_list, ["error"], batch_size=2000)
+
+        if modified_alleles_list:
+            logging.debug("Updating %d Alleles w/ClinGenAlleleID", len(modified_alleles_list))
+            Allele.objects.bulk_update(modified_alleles_list, ["clingen_allele_id"], batch_size=2000)
+
         allele_no_clingen_list = Allele.objects.bulk_create(allele_no_clingen_list)
-        alleles_with_clingen_list = Allele.objects.bulk_create(alleles_with_clingen_list, ignore_conflicts=True)
+        alleles_with_clingen_list = Allele.objects.bulk_create(new_alleles_with_clingen_list, ignore_conflicts=True)
         alleles_by_clingen = {}
         existing_allele_clingen_ids = [a.clingen_allele_id for a in alleles_with_clingen_list if a.pk is None]
         if existing_allele_clingen_ids:
             allele_qs = Allele.objects.filter(clingen_allele_id__in=existing_allele_clingen_ids)
             alleles_by_clingen = {a.clingen_allele_id: a for a in allele_qs}
 
-        for variant_id in variant_ids_without_alleles:
-            error = None
-            clingen_allele_id = clingen_by_variant_id.get(variant_id)
-            if clingen_allele_id:
-                allele = alleles_by_clingen[clingen_allele_id]
-            else:
-                error = clingen_errors_by_variant_id[variant_id]
-                allele = allele_no_clingen_list.pop()  # Any empty Allele will do
+        for variant_id, error in clingen_errors_by_variant_id.items():
+            allele = allele_no_clingen_list.pop()  # Any empty Allele will do
             variant_id_allele_error.append((variant_id, allele, error))
+
+        for variant_id, clingen_allele_id in clingen_by_variant_id.items():
+            allele = alleles_by_clingen[clingen_allele_id]
+            variant_id_allele_error.append((variant_id, allele, None))
 
     if variant_id_allele_error:
         variant_allele_list = []
@@ -230,8 +275,8 @@ def get_variant_allele_for_variant(genome_build: GenomeBuild, variant: Variant,
         Successful calls link variants in all builds (that exist)
         errors are only stored on the requesting build """
 
-    if not variant.is_standard_variant:
-        msg = f"No ClinGenAllele for non-standard variant: {variant}"
+    if not variant.can_have_clingen_allele:
+        msg = f"No ClinGenAllele for variant: {variant}"
         raise ClinGenAlleleAPIException(msg)
 
     try:
@@ -248,13 +293,16 @@ def get_variant_allele_for_variant(genome_build: GenomeBuild, variant: Variant,
             va = VariantAllele.objects.create(variant_id=variant.pk,
                                               genome_build=genome_build,
                                               allele=allele,
-                                              origin=AlleleOrigin.variant_origin(variant, genome_build))
+                                              origin=AlleleOrigin.variant_origin(variant, allele, genome_build))
     return va
 
 
 def variant_allele_clingen(genome_build, variant, existing_variant_allele=None,
                            clingen_api: ClinGenAlleleRegistryAPI = None) -> VariantAllele:
     """ Call ClinGen and setup VariantAllele - use existing if provided, otherwise create """
+    # Circular import
+    from genes.hgvs import HGVSMatcher
+
     if clingen_api is None:
         clingen_api = ClinGenAlleleRegistryAPI()
 
@@ -282,7 +330,7 @@ def variant_allele_clingen(genome_build, variant, existing_variant_allele=None,
             va = VariantAllele.objects.create(variant_id=variant.pk,
                                               genome_build=genome_build,
                                               allele=allele,
-                                              origin=AlleleOrigin.variant_origin(variant, genome_build),
+                                              origin=AlleleOrigin.variant_origin(variant, allele, genome_build),
                                               error=api_response)
 
     else:
@@ -320,9 +368,12 @@ def variant_allele_clingen(genome_build, variant, existing_variant_allele=None,
 def get_clingen_allele_for_variant(genome_build: GenomeBuild, variant: Variant,
                                    clingen_api: ClinGenAlleleRegistryAPI = None) -> ClinGenAllele:
     """ Retrieves from DB or calls API then caches in DB   """
-    va = get_variant_allele_for_variant(genome_build, variant, clingen_api=clingen_api)
+    if clingen_api is None:
+        clingen_api = ClinGenAlleleRegistryAPI()
 
+    va = get_variant_allele_for_variant(genome_build, variant, clingen_api=clingen_api)
     if va.allele.clingen_allele is None:
+        logging.error("ClinGen Allele failed!")
         if va.error:
             clingen_api.check_api_response(va.error)
         if not settings.CLINGEN_ALLELE_REGISTRY_LOGIN:
@@ -351,17 +402,7 @@ def get_clingen_allele(code: str, clingen_api: ClinGenAlleleRegistryAPI = None) 
     return clingen_allele
 
 
-def get_clingen_alleles_from_external_code(er_type: ClinGenAlleleExternalRecordType, external_code,
-                                           clingen_api: ClinGenAlleleRegistryAPI = None) -> List[ClinGenAllele]:
-    # TODO: We could cache this? At the moment we have to make a new API call every build
-    if clingen_api is None:
-        clingen_api = ClinGenAlleleRegistryAPI()
-
-    suffix = f"/alleles?{er_type.value}={external_code}"
-    url = settings.CLINGEN_ALLELE_REGISTRY_DOMAIN + suffix
-
-    # Returns a list for external records
-    api_response_list = clingen_api.get(url)
+def _store_clingen_api_response(api_response_list) -> List[ClinGenAllele]:
     clingen_allele_list = []
     for api_response in api_response_list:
         clingen_allele_id = ClinGenAllele.get_id_from_response(api_response)
@@ -372,6 +413,32 @@ def get_clingen_alleles_from_external_code(er_type: ClinGenAlleleExternalRecordT
         link_allele_to_existing_variants(allele, AlleleConversionTool.CLINGEN_ALLELE_REGISTRY)
 
     return clingen_allele_list
+
+
+def get_clingen_alleles_from_external_code(er_type: ClinGenAlleleExternalRecordType, external_code,
+                                           clingen_api: ClinGenAlleleRegistryAPI = None) -> List[ClinGenAllele]:
+    # TODO: We could cache this? At the moment we have to make a new API call every build
+    if clingen_api is None:
+        clingen_api = ClinGenAlleleRegistryAPI()
+
+    api_response_list = clingen_api.get_external_code(er_type, external_code)
+    return _store_clingen_api_response(api_response_list)
+
+
+def get_clingen_allele_from_hgvs(hgvs_string, require_allele_id=True,
+                                 clingen_api: ClinGenAlleleRegistryAPI = None) -> ClinGenAllele:
+    if clingen_api is None:
+        clingen_api = ClinGenAlleleRegistryAPI()
+
+    api_response = clingen_api.get_hgvs(hgvs_string)
+    try:
+        clingen_list = _store_clingen_api_response([api_response])
+        return clingen_list[0]
+    except ClinGenAllele.ClinGenMissingAlleleID:
+        if require_allele_id:
+            raise
+        # We may just want the HGVS conversion so don't need an ID
+        return ClinGenAllele(api_response=api_response)
 
 
 def link_allele_to_existing_variants(allele: Allele, conversion_tool,
@@ -401,12 +468,16 @@ def link_allele_to_existing_variants(allele: Allele, conversion_tool,
                     raise
 
             if variant:
-                defaults = {"origin": AlleleOrigin.variant_origin(variant, genome_build),
-                            "conversion_tool": conversion_tool}
+                defaults = {"origin": AlleleOrigin.variant_origin(variant, allele, genome_build),
+                            "conversion_tool": conversion_tool,
+                            "allele": allele}
                 va, _ = VariantAllele.objects.get_or_create(variant=variant,
                                                             genome_build=genome_build,
-                                                            allele=allele,
                                                             defaults=defaults)
+                if va.allele != allele:  # Existing!
+                    if not va.allele.merge(conversion_tool, allele):
+                        logging.warning(f"Couldn't merge 2xAlleles (ClinGen Allele Registry) - Allele IDs: {va.allele_id} and {allele.id}")
+
                 variant_allele_by_build[genome_build] = va
         except Variant.DoesNotExist:
             pass  # Variant may not be created for build

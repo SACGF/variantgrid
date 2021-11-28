@@ -2,8 +2,8 @@
 import logging
 import os
 
-from django.conf import settings
 import cyvcf2
+from django.conf import settings
 from django.utils import timezone
 
 from annotation.annotation_version_querysets import get_unannotated_variants_qs

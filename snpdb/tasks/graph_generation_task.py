@@ -1,6 +1,7 @@
-import celery
 import logging
 import traceback
+
+import celery
 
 from eventlog.models import create_event
 from library import file_utils
@@ -9,7 +10,7 @@ from library.log_utils import get_traceback
 from library.utils import import_class
 
 
-@celery.task(ignore_result=False)
+@celery.shared_task(ignore_result=False)
 def generate_graph(graph_class_name, *args):
     """
         cacheablegraph : snpdb.graphs.graphcache.CacheableGraph

@@ -5,6 +5,7 @@ from operator import attrgetter
 from typing import List, Optional, Dict, Iterable, Set
 
 import requests
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.contrib.postgres.fields import ArrayField
 from django.db import models, transaction
@@ -15,16 +16,17 @@ from guardian.shortcuts import assign_perm
 from lazy import lazy
 from model_utils.models import TimeStampedModel
 
+from annotation.regexes import db_ref_regexes
 from classification.enums import SpecialEKeys, ShareLevel
 from classification.models import Classification, ClassificationModification, classification_post_publish_signal, \
     flag_types, EvidenceKeyMap, ConditionResolvedDict, ConditionResolved
-from annotation.regexes import db_ref_regexes
 from flags.models import flag_comment_action, Flag, FlagComment, FlagResolution
-from genes.models import GeneSymbol
+from genes.models import GeneSymbol, GeneSymbolAlias
+from library.cache import timed_cache
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
 from library.guardian_utils import admin_bot
 from library.log_utils import report_exc_info, report_message
-from library.utils import ArrayLength
+from library.utils import ArrayLength, DebugTimer
 from ontology.models import OntologyTerm, OntologyService, OntologySnake, OntologyTermRelation, OntologyRelation
 from ontology.ontology_matching import normalize_condition_text, \
     OPRPHAN_OMIM_TERMS, SearchText, pretty_set, PREFIX_SKIP_TERMS
@@ -87,7 +89,7 @@ class ConditionText(TimeStampedModel, GuardianPermissionsMixin):
         return self.conditiontextmatch_set.filter(gene_symbol__isnull=True, mode_of_inheritance__isnull=True, classification=None).first()
 
     @property
-    def gene_levels(self) -> Iterable['ConditionTextMatch']:
+    def gene_levels(self) -> QuerySet['ConditionTextMatch']:
         return self.conditiontextmatch_set.filter(condition_text=self, gene_symbol__isnull=False, mode_of_inheritance__isnull=True, classification=None)
 
 
@@ -153,7 +155,7 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
         return not self.classification_id and self.mode_of_inheritance is None and self.gene_symbol_id is not None
 
     @lazy
-    def children(self) -> QuerySet:
+    def children(self) -> QuerySet['ConditionTextMatch']:
         order_by: str
         if self.is_root:
             order_by = 'gene_symbol__symbol'
@@ -248,19 +250,24 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
                 ct.save()
 
     @staticmethod
-    def attempt_automatch(condition_text: ConditionText):
+    def attempt_automatch(condition_text: ConditionText, gene_symbol: Optional[str] = None):
         """
         Set terms that we're effectively certain of, do not override what's already there
         """
         try:
             if root := condition_text.root:
                 if match := top_level_suggestion(condition_text.normalized_text):
-                    if match.is_auto_assignable() and not root.condition_xrefs:
-                        root.condition_xrefs = match.term_str_array
-                        root.last_edited_by = admin_bot()
-                        root.save()
+                    if match.is_auto_assignable():
+                        if not root.condition_xrefs:
+                            root.condition_xrefs = match.term_str_array
+                            root.last_edited_by = admin_bot()
+                            root.save()
                     else:
-                        for gene_symbol_level in condition_text.gene_levels:
+                        gene_levels_qs = condition_text.gene_levels
+                        if gene_symbol:
+                            gene_levels_qs = gene_levels_qs.filter(gene_symbol=gene_symbol)
+
+                        for gene_symbol_level in gene_levels_qs:
                             if match.is_auto_assignable(gene_symbol=gene_symbol_level.gene_symbol) and not gene_symbol_level.condition_xrefs:
                                 gene_symbol_level.condition_xrefs = match.term_str_array
                                 gene_symbol_level.last_edited_by = admin_bot()
@@ -291,14 +298,32 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
             return
 
         lab = classification.lab
-        gene_str = cm.get(SpecialEKeys.GENE_SYMBOL)
-        gene_symbol = GeneSymbol.objects.filter(symbol=gene_str).first()
+        gene_symbol: Optional[GeneSymbol] = None
+        gene_symbol_str = cm.get(SpecialEKeys.GENE_SYMBOL)
+        if gene_symbol_str:
+            gene_symbol = GeneSymbol.objects.filter(symbol=gene_symbol_str).first()
+
+        # see if there's a single gene symbol alias that this links to, if it's not a gene symbol itself
+        if not gene_symbol:
+            if alias_qs := GeneSymbolAlias.objects.filter(alias__iexact=gene_symbol_str):
+                if alias_qs.count() == 1:
+                    gene_symbol = alias_qs.first().gene_symbol
+
+        # if the imported gene symbol doesn't work, see what gene symbols we can extract from the c.hgvs
+        if not gene_symbol:
+            try:
+                genome_build = cm.get_genome_build()
+                resolved_gene_symbol_str = cm.c_hgvs_best(genome_build).gene_symbol
+                gene_symbol = GeneSymbol.objects.filter(symbol=resolved_gene_symbol_str).first()
+            except ValueError:
+                # couldn't extract genome build
+                pass
 
         if not gene_symbol:
             report_message("Classification has blank or unrecognised gene symbol, cannot link it to condition text", extra_data={
-                "target": gene_str or "<blank>",
+                "target": gene_symbol_str or "<blank>",
                 "classification_id": classification.id,
-                "gene_symbol": gene_str
+                "gene_symbol": gene_symbol_str
             })
             return
 
@@ -335,7 +360,6 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
             classification=None
         )
 
-        ct_save_required = False
         if existing:
             if existing.parent != mode_of_inheritance_level or \
                     existing.condition_text != ct or \
@@ -350,7 +374,6 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
                 existing.condition_text = ct
                 existing.mode_of_inheritance = mode_of_inheritance
                 existing.save()
-                ct_save_required = True
                 if update_counts:
                     update_condition_text_match_counts(old_text)
                     old_text.save()
@@ -367,14 +390,9 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
             )
 
         if attempt_automatch and (new_root or new_gene_level):
-            ConditionTextMatch.attempt_automatch(ct)
-            ct_save_required = True
-
-        if update_counts:
+            ConditionTextMatch.attempt_automatch(ct, gene_symbol=gene_symbol)
+        elif update_counts:  # attempt automatch update counts
             update_condition_text_match_counts(ct)
-            ct_save_required = True
-
-        if ct_save_required:
             ct.save()
 
     def as_resolved_condition(self) -> Optional[ConditionResolvedDict]:
@@ -399,7 +417,7 @@ def update_condition_text_match_counts(ct: ConditionText):
     classification_related: List[ConditionTextMatch] = list()
     for ctm in ct.conditiontextmatch_set.all():
         by_id[ctm.id] = ctm
-        if ctm.classification:
+        if ctm.classification_id:
             classification_related.append(ctm)
 
     def check_hierarchy(ctm: ConditionTextMatch) -> bool:
@@ -568,8 +586,11 @@ class ConditionMatchingSuggestion:
             for term in terms:
                 if term.is_stub:
                     if term.ontology_service in OntologyService.LOCAL_ONTOLOGY_PREFIXES:
-                        self.add_message(ConditionMatchingMessage(severity="warning",
-                                                                  text=f"{term.id} : no copy of this term in our system"))
+                        text = f"{term.id} : no copy of this term in our system"
+                        if term.ontology_service == OntologyService.OMIM:
+                            text += f". {settings.SITE_NAME} only stores 'phenotype' OMIM terms. Maybe this term is an OMIM gene?"
+
+                        self.add_message(ConditionMatchingMessage(severity="warning", text=text))
                     else:
                         self.add_message(ConditionMatchingMessage(severity="info",
                                                                   text=f"We do not store {term.ontology_service}, please verify externally"))
@@ -596,11 +617,13 @@ def published(sender,
               newly_published: ClassificationModification,
               previous_share_level: ShareLevel,
               user: User,
+              debug_timer: DebugTimer,
               **kwargs):
     """
     Keeps condition_text_match in sync with the classifications when evidence changes
     """
     ConditionTextMatch.sync_condition_text_classification(newly_published, attempt_automatch=True, update_counts=True)
+    debug_timer.tick("Condition Text Matching")
 
 
 @receiver(flag_comment_action, sender=Flag)
@@ -615,6 +638,7 @@ def check_for_discordance(sender, flag_comment: FlagComment, old_resolution: Fla
             ConditionTextMatch.sync_condition_text_classification(cl.last_published_version, attempt_automatch=True, update_counts=True)
 
 
+@timed_cache(size_limit=2)
 def top_level_suggestion(text: str) -> ConditionMatchingSuggestion:
     """ Make a suggestion at the root level for the given normalised text """
     if suggestion := embedded_ids_check(text):
@@ -850,7 +874,6 @@ def condition_matching_suggestions(ct: ConditionText, ignore_existing=False) -> 
     suggestions.append(display_root_cms)
 
     # filled in and gene level, exclude root as we take care of that before-hand
-    filled_in: QuerySet
     filled_in = ct.conditiontextmatch_set.annotate(condition_xrefs_length=ArrayLength('condition_xrefs'))
     filled_in = filled_in.filter(Q(condition_xrefs_length__gt=0) | Q(parent=root_level)).exclude(gene_symbol=None)
     root_level_terms = root_cms.terms

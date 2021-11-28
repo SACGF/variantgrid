@@ -1,6 +1,11 @@
+import importlib
+import inspect
 import json
+import logging
 from collections import Counter, defaultdict
 
+import numpy as np
+import pandas as pd
 from celery.contrib.abortable import AbortableAsyncResult
 from django.conf import settings
 from django.contrib import messages
@@ -17,10 +22,6 @@ from django.utils import timezone
 from django.views.decorators.cache import cache_page
 from django.views.decorators.http import require_POST
 from django.views.decorators.vary import vary_on_cookie
-import importlib
-import inspect
-import logging
-
 from htmlmin.decorators import not_minified_response
 from lazy import lazy
 
@@ -57,8 +58,6 @@ from snpdb.graphs import graphcache
 from snpdb.models import UserSettings, Sample, \
     Cohort, CohortSample, ImportStatus, VCF, get_igv_data, Trio, Variant, GenomeBuild
 from variantgrid.celery import app
-import numpy as np
-import pandas as pd
 
 
 def analysis_list(request):

@@ -1,9 +1,8 @@
-from django.template import Library
-import json
 import uuid
 
-from seqauto.seqauto_stats import group_enrichment_kits_df
+from django.template import Library
 
+from seqauto.seqauto_stats import group_enrichment_kits_df
 
 register = Library()
 

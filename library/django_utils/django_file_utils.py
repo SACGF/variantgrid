@@ -1,5 +1,6 @@
-from django.conf import settings
 import os
+
+from django.conf import settings
 
 from library.file_utils import mk_path
 

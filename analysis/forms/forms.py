@@ -1,10 +1,10 @@
+import itertools
+import operator
 from collections import defaultdict
 
 from dal import autocomplete, forward
 from django import forms
 from django.forms.widgets import TextInput
-import itertools
-import operator
 
 from analysis.models import Analysis, NodeGraphType, FilterNodeItem, AnalysisTemplate
 from analysis.models.enums import SNPMatrix, AnalysisTemplateType, TrioSample

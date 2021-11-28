@@ -1,5 +1,5 @@
-from collections import Counter
 import os
+from collections import Counter
 
 _end = '_end_'
 

@@ -1,4 +1,7 @@
+import logging
+import operator
 from collections import namedtuple
+from functools import reduce
 from typing import Dict, List
 
 from django.conf import settings
@@ -12,11 +15,8 @@ from django.db.models.signals import pre_delete
 from django.dispatch.dispatcher import receiver
 from django.shortcuts import get_object_or_404
 from django.urls.base import reverse
-from functools import reduce
 from guardian.shortcuts import get_objects_for_user
 from lazy import lazy
-import logging
-import operator
 
 from library.django_utils import SortByPKMixin
 from library.guardian_utils import DjangoPermission
@@ -24,10 +24,10 @@ from library.log_utils import log_traceback, report_event
 from patients.models import FakeData, Patient, Specimen
 from patients.models_enums import Sex
 from snpdb.models.models import Tag, LabProject
+from snpdb.models.models_enums import ImportStatus, VariantsType, ProcessingStatus
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_genomic_interval import GenomicIntervalsCollection
 from snpdb.models.models_variant import Variant, VariantCollection, AlleleSource
-from snpdb.models.models_enums import ImportStatus, VariantsType, ProcessingStatus
 
 
 class Project(models.Model):

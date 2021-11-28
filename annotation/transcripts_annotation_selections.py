@@ -1,8 +1,9 @@
+import operator
+
 from django.conf import settings
 from django.forms.models import model_to_dict
 from django.utils.timesince import timesince
 from lazy import lazy
-import operator
 
 from annotation.models import VEPSkippedReason, AnnotationStatus
 from annotation.models.models import VariantAnnotation, AnnotationVersion, \
@@ -102,8 +103,7 @@ class VariantTranscriptSelections:
             data["flagged_pathogenicity"] = obj.flagged_pathogenicity
 
             for col in settings.VARIANT_ANNOTATION_TRANSCRIPT_PREFERENCES:
-                transcript_id = data.get(col)
-                if transcript_id:
+                if transcript_id := data.get(col):
                     data["transcript_id"] = transcript_id
                     break
 
@@ -142,8 +142,7 @@ class VariantTranscriptSelections:
             transcripts_list = list(variant.varianttranscriptannotation_set.filter(version=vav))
 
             for vsta in transcripts_list:
-                transcript = vsta.transcript
-                if transcript:
+                if transcript := vsta.transcript:
                     t_data = get_transcript_data(vsta, representative_transcript)
                     self.transcript_data.append(t_data)
 
@@ -192,8 +191,7 @@ class VariantTranscriptSelections:
 
         existing_other_transcripts = set()
         for td in self.transcript_data:
-            other_transcript_accession = td.get(other_ac_key)
-            if other_transcript_accession:
+            if other_transcript_accession := td.get(other_ac_key):
                 existing_other_transcripts.add(other_transcript_accession)
             # Just in case it's not the same as HGNC above
             gene_symbol = td.get("symbol")

@@ -4,12 +4,16 @@ Shariant - https://shariant.org.au
 See https://github.com/sacgf/variantgrid/wiki/Annotation%20Setup
 
 """
-import json
 
 # IMPORTANT : THE BELOW IMPORTS ARE USED TO APPLY THEIR RESPECTIVE SETTINGS VALUES
 from variantgrid.settings.components.celery_settings import *  # pylint: disable=wildcard-import, unused-wildcard-import
 from variantgrid.settings.components.default_settings import *  # pylint: disable=wildcard-import, unused-wildcard-import
 from variantgrid.settings.components.seqauto_settings import *  # pylint: disable=wildcard-import, unused-wildcard-import
+
+AVATAR_PROVIDERS = (
+    'library.django_utils.avatar.SpaceThemedAvatarProvider'
+)
+VARIANT_CLASSIFICATION_REDCAP_EXPORT = False
 
 CLINVAR_EXPORT = get_clinvar_export_secrets()
 
@@ -83,12 +87,11 @@ OIDC_USER_SERVICES = KEY_CLOAK_BASE + '/realms/' + KEY_CLOAK_REALM + '/account'
 OIDC_OP_LOGOUT_URL_METHOD = 'auth.backend.provider_logout'
 
 # login failure is generally user is inactive, which is how prod distinguishes between prod and test logins
-# but turns out it isn't 100% due to user is inactive, disable this functionality until we can handle it better
-# LOGIN_REDIRECT_URL_FAILURE = "/static/error_pages/user_inactive.html"
 
 HELP_URL = "https://shariant.readthedocs.io/en/latest/"
 # LOGIN_REDIRECT_URL = '/variantopedia/dashboard'
 LOGOUT_REDIRECT_URL = KEY_CLOAK_PROTOCOL_BASE + '/logout?redirect_uri=https%3A%2F%2Fshariant.org.au'
+LOGIN_REDIRECT_URL_FAILURE = '/accounts/logout'
 
 EMAIL_BACKEND = 'django_amazon_ses.EmailBackend'
 # Overwrite settings for your system below
@@ -118,7 +121,8 @@ SITE_NAME = "Shariant"
 
 # SITE_MESSAGE = "Shariant is currently in pre-BETA. Please excuse bugs and missing features, and the site may be shut down for upgrades"
 
-VARIANT_CLASSIFICATION_SUPPORTED_TRANSCRIPTS = {"NM", "ENST"}
+# "LRG_" has been disabled, see https://github.com/SACGF/shariant-admin/issues/126
+VARIANT_CLASSIFICATION_SUPPORTED_TRANSCRIPTS = {"NM", "NR", "ENST", "XR"}
 VARIANT_CLASSIFICATION_REQUIRE_OVERWRITE_NOTE = False
 VARIANT_CLASSIFICATION_AUTOFUZZ_AGE = True
 VARIANT_CLASSIFICATION_GRID_SHOW_USERNAME = False  # In Shariant - this may be a lab's API user so hide it
@@ -132,7 +136,7 @@ VARIANT_CLASSIFICATION_ID_FILTER = False
 VARIANT_CLASSIFICAITON_SHOW_SPECIMEN_ID = False
 
 VARIANT_SHOW_CANONICAL_HGVS = False
-VARIANT_CLASSIFICATION_MAX_FULL_ALLELE_LENGTH = 1000000  # Try to generate large values for sake of MVL
+VARIANT_CLASSIFICATION_MAX_REFERENCE_LENGTH = 1000000  # Try to generate large values for sake of MVL
 
 # Lock down Shariant menu - hide a lot of VariantGrid urls
 # Completely hide URLS from these apps
@@ -184,7 +188,7 @@ URLS_NAME_REGISTER.update({  # Disable selected snpdb urls
     "upload_retry_import": False,
     "upload_step_grid": False,
     "upload_pipeline_modified_variants_grid": False,
-    "view_upload_stats": False,
+    "view_upload_stats_detail": False,
     "accept_vcf_import_info_tag": False,
     "jfu_upload": False,
     "jfu_delete": False,
@@ -192,8 +196,11 @@ URLS_NAME_REGISTER.update({  # Disable selected snpdb urls
 
     "classification_import_upload": True,
     "condition_matchings": True,
-    "condition_match_test": True
+    "condition_match_test": True,
     # "condition_aliases": True
+
+    # ClinVarExport
+    "clinvar_key_summary": True
 })
 
 PREFER_ALLELE_LINKS = True

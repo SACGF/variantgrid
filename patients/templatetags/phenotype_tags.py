@@ -1,5 +1,6 @@
-from django.template import Library
 import uuid
+
+from django.template import Library
 
 from genes.forms import GeneSymbolForm
 from ontology.forms import HPOForm, OMIMForm

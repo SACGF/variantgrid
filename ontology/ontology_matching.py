@@ -68,7 +68,6 @@ class OntologyMatch:
 
     def as_json(self) -> Dict:
 
-
         data = {
             "id": self.term.id,
             "url": reverse("ontology_term", kwargs={"term": self.term.url_safe_id}),

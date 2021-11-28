@@ -1,12 +1,12 @@
+import csv
 from collections import defaultdict, OrderedDict
+
 from django.core.exceptions import PermissionDenied
 from django.http.response import StreamingHttpResponse
 from django.shortcuts import get_object_or_404, render, redirect
 from django.urls.base import reverse
 from django.views.decorators.cache import cache_page
 from django.views.decorators.vary import vary_on_cookie
-import csv
-import json
 
 from analysis.forms import KaryomappingGeneForm, UserTrioForm
 from analysis.models.models_karyomapping import KaryomappingAnalysis, KaryotypeBins, \

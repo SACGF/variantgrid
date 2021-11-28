@@ -84,19 +84,20 @@ class TestClinVarExportModels(TestCase):
         m_big_toe = OntologyTerm.get_or_stub(ConditionMock.MONDO_BIG_TOE_BROKEN)
         m_bad_lung = OntologyTerm.get_or_stub(ConditionMock.MONDO_BAD_LUNG)
         m_bad_heart = OntologyTerm.get_or_stub(ConditionMock.MONDO_BAD_HEART)
+        o_big_toe = OntologyTerm.get_or_stub(ConditionMock.OMIM_BIG_TOE_BROKEN)
 
         simple_big_toe = ConditionResolved(terms=[m_big_toe])
         simple_toe = ConditionResolved(terms=[m_toe])
         simple_bad_lung = ConditionResolved(terms=[m_bad_lung])
         simple_bad_heart = ConditionResolved(terms=[m_bad_heart])
-        # simple_o_big_toe = ConditionResolved(terms=[o_big_toe])
+        simple_o_big_toe = ConditionResolved(terms=[o_big_toe])
 
         group_toe = MockCandidate(
             condition=simple_toe,
             candidate=1
         )
         group_big_toe = MockCandidate(
-            condition=simple_big_toe,
+            condition=simple_o_big_toe,
             candidate=2
         )
         group_lung = MockCandidate(

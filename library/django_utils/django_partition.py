@@ -1,8 +1,9 @@
+import logging
+
 from django.conf import settings
 from django.db import models
 from django.db.utils import ProgrammingError
 from django.utils.text import slugify
-import logging
 
 from library.database_utils import run_sql
 from library.log_utils import log_traceback

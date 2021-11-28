@@ -20,10 +20,10 @@ h3:not(:first-child):not(.popover-header), h4:not(:first-child):not(.popover-hea
 }
 
 .form-control .select2-selection__arrow {
-  top: 5px !important;
+  display: none;
 }
 
-label {
+label, form label {
   color: #555;
   font-weight: 500;
 }
@@ -75,13 +75,6 @@ td.dt-preview {
   font-family: monospace;
   font-size: 12px;
   overflow-x: hidden;
-  color: #222288;
-  cursor: pointer;
-}
-td.dt-preview:hover {
-  text-decoration: underline;
-  text-decoration-style: dotted;
-  text-decoration-color: gray;
 }
 
 table.dataTable tr.odd:hover, table.dataTable tr.even:hover {
@@ -139,6 +132,13 @@ table.datatable.expandable tr.even, table.datatable.expandable tr.odd {
 .dataTables_wrapper .toolbar .custom {
   flex-grow: 1;
 }
+.dataTables_wrapper .bottom {
+  display: flex;
+  align-items: center;
+}
+.dataTables_wrapper .bottom .showing {
+  flex-grow: 1;
+}
 
 .variant-coordinate {
   word-break: break-all;
@@ -157,6 +157,10 @@ time.future:after {
 span.select2-container {
   min-width: 100% !important;
   width: 100% !important;
+}
+
+strong {
+  font-weight: 500;
 }
 
 .no-padding {
@@ -252,20 +256,39 @@ a.list-group-item-action {
   height: 32px;
 }
 
+.link-toolbar > *:not(:first-child) {
+  margin-left: 10px;
+}
+.link-toolbar > *:not(:first-child)::before {
+  content: "|";
+  margin-right: 10px;
+  color: grey !important;
+}
+
 .btn-rnd-rect {
-  width: 40px;
-  height: 40px;
-  padding: 7px 8px 7px 12px;
-  border-radius: 15px;
-  text-align: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 12px;
+  justify-content: center;
+  display: inline-flex;
+  align-items: center;
+  margin-left: 4px;
+  margin-right: 4px;
+}
+.btn-rnd-rect i.fas {
+  margin: 0;
 }
 
 .btn-circle {
   width: 50px;
-  height: 50px;
-  padding: 7px 8px 7px 12px;
+  height: 32px;
   border-radius: 25px;
-  text-align: center;
+  justify-content: center;
+  display: inline-flex;
+  align-items: center;
+}
+.btn-circle i.fas {
+  margin: 0;
 }
 
 .accordion > .card {
@@ -347,6 +370,13 @@ table.sticky-header thead th {
   position: sticky !important;
   top: -36px;
   z-index: 1;
+}
+
+table.responsive {
+  width: 100%;
+}
+table.responsive tr.odd, table.responsive tr.even {
+  cursor: pointer;
 }
 
 .container-table {
@@ -502,6 +532,15 @@ div.background-image {
   border-color: #dddddd !important;
 }
 
+.loading-message {
+  margin-top: 40px;
+  margin-bottom: 20px;
+  border-top: 60px solid transparent;
+  width: 100%;
+  text-align: center;
+  font-weight: 500;
+}
+
 .zero-value {
   color: #AAAAAA;
 }
@@ -536,6 +575,11 @@ div.background-image {
 }
 .hover-link:hover, nav ol.breadcrumb .breadcrumb-item a:hover, .modal-link:hover, .download-link:hover, .mail-link:hover {
   text-display: underline;
+}
+
+.card-footer .hover-link {
+  color: #66a !important;
+  font-weight: 500;
 }
 
 .hover-delete {
@@ -652,11 +696,20 @@ table.as_table td {
   border-radius: 10px;
   padding: 6px 6px 6px 12px;
   background-color: #eee;
+  white-space: pre-wrap;
+  display: block;
+  line-height: 150%;
 }
 
 .code.card-body {
   border: none;
   border-radius: 0;
+}
+
+.secret {
+  color: #444;
+  font-family: monospace;
+  letter-spacing: 2px;
 }
 
 ul.compact {
@@ -825,6 +878,32 @@ ul.compact li:before {
 .json .js-comma {
   color: #888;
   display: inline-block;
+}
+
+.install-instructions {
+  min-height: 16px;
+  background-size: 16px 16px;
+  background-position: 8px 50%;
+  background-repeat: no-repeat;
+  padding: 16px 16px 16px 28px;
+  border-radius: 4px;
+  background-color: #F0D9ED !important;
+}
+
+.overlap-discordant {
+  background-color: #ebb;
+}
+
+.overlap-concordant_confidence {
+  background-color: #fff3cd;
+}
+
+.overlap-concordant_agreement, .overlap-concordant_agreement_diff_vus {
+  background-color: #88dd88;
+}
+
+.overlap-single_submission, .overlap-no_entries {
+  background-color: #ccc;
 }
 
 /*# sourceMappingURL=global_bs.css.map */

@@ -1,6 +1,7 @@
 from django.contrib import admin
 from django.contrib.admin import RelatedFieldListFilter
 from django.db.models import QuerySet
+
 from classification.models import ConditionText, ConditionTextMatch
 from library.guardian_utils import admin_bot
 from snpdb.admin_utils import ModelAdminBasics, admin_action

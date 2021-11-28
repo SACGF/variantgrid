@@ -149,19 +149,21 @@ class VariantCoordinateFromEvidence:
         from classification.models import classification_flag_types
         self.variant_coordinate = None
         self.messages = []
-        self.matching_flag = classification.flag_collection_safe.get_flag_of_type\
-            (flag_type=classification_flag_types.matching_variant_flag, open_only=True)
+        self.matching_flag = classification.flag_collection_safe.get_flag_of_type(
+            flag_type=classification_flag_types.matching_variant_flag, open_only=True)
         try:
             genome_build = classification.get_genome_build()
             self.genome_build_str = genome_build.name
         except:
             self.genome_build_str = 'No genome build'
 
-    def record(self, value: str, variant_coordinate: Optional[VariantCoordinate] = None, error: Optional[str] = None) -> None:
+    def record(self, value: str, variant_coordinate: Optional[VariantCoordinate] = None,
+               message: Optional[str] = None, error: Optional[str] = None) -> None:
         """
         Record what value we're using (or attempted to use) to get the variant coordinates
         :param value: The source value we tried to extract VariantCoordinate from e.g. a c.hgvs, g.hgvs or variant coordinate string
         :param variant_coordinate: The variant coordinate we processed from the value (or None if we couldn't)
+        :param message: If present, add message
         :param error: If present, indicates the reason why we couldn't extract a variant_coordinate from the value
         """
         if variant_coordinate:
@@ -176,6 +178,9 @@ class VariantCoordinateFromEvidence:
             self.messages.append(f'Matching on {self.genome_build_str} {value} resolved to {variant_coordinate.chrom}:{variant_coordinate.pos} {ref}->{variant_coordinate.alt}')
         else:
             self.messages.append(f'Attempted to match {self.genome_build_str} {value}, could not derive coordinate')
+
+        if message:
+            self.messages.append(message)
 
     def report(self) -> None:
         """
@@ -268,7 +273,7 @@ class UserClassificationStats:
         ).filter(lab__in=Lab.valid_labs_qs(self.user, admin_check=True)).order_by('-created').exclude(withdrawn=True).count()
 
 
-def classification_gene_symbol_filter(gene_symbol: Union[str, GeneSymbol]) -> Q:
+def classification_gene_symbol_filter(gene_symbol: Union[str, GeneSymbol]) -> Optional[Q]:
 
     # We want to filter using the genes set via variant annotation
     genes: Optional[Iterable[Gene]] = None
@@ -288,11 +293,16 @@ def classification_gene_symbol_filter(gene_symbol: Union[str, GeneSymbol]) -> Q:
             t_qs = Transcript.objects.filter(transcriptversion__gene_version__gene__in=genes).distinct()
             for transcript_id, annotation_consortium in t_qs.values_list("identifier", "annotation_consortium"):
                 e_key = SpecialEKeys.ANNOTATION_CONSORTIUM_KEYS[annotation_consortium]
-                evidence_q_list.append(Q(**{f"published_evidence__{e_key}__value__startswith": transcript_id}))
+                # We want to match transcript versions (ie X should match X, X.1, X.2 etc)
+                # This is quick but wrong - startswith=NM_001099 wrongly matches NM_00109911
+                q_transcript_startswith = Q(**{f"published_evidence__{e_key}__value__startswith": transcript_id})
+                # This regex correctly handles transcripts but is very slow (10x previous query)
+                regex = rf"^{transcript_id}(\.\d+)?$"
+                q_regex = Q(**{f"published_evidence__{e_key}__value__regex": regex})
+                # Run both quick startwith and regex queries (only slightly slower than original startswith)
+                evidence_q_list.append(q_transcript_startswith & q_regex)
 
             match_evidence = reduce(operator.or_, evidence_q_list)
-        else:
-            return None
-    else:
-        return None
-    return match_gene | match_evidence
+            return match_gene | match_evidence
+
+    return None

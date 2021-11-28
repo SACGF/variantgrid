@@ -1,6 +1,6 @@
-from django.contrib.auth.models import User
 import unittest
 
+from django.contrib.auth.models import User
 from django.utils.timezone import localdate
 
 from annotation.fake_annotation import get_fake_annotation_version
@@ -51,7 +51,7 @@ class Test(URLTestCase):
         URL_NAMES_AND_KWARGS = [
             ("upload", {}, 200),
             ("upload_poll", {}, 200),
-            ("view_upload_stats", {}, 200),
+            ("view_upload_stats_detail", {}, 200),
         ]
         self._test_urls(URL_NAMES_AND_KWARGS, self.user_non_owner)
 

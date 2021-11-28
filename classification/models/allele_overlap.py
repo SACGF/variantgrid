@@ -1,17 +1,38 @@
 from collections import defaultdict
+from dataclasses import dataclass
 from functools import total_ordering
 from operator import attrgetter
-from typing import Dict, List, Collection
+from typing import Dict, List, Collection, Optional, Tuple
 
 from django.contrib.auth.models import User
 from lazy import lazy
 
-from library.guardian_utils import admin_bot
-from snpdb.models import VariantAllele, Allele, GenomeBuild, UserSettings, Lab
 from classification.enums import SpecialEKeys
 from classification.models import ClassificationModification
-from classification.models.clinical_context_models import ClinicalContext, DiscordanceLevel, DiscordanceStatus
 from classification.models.classification import Classification
+from classification.models.clinical_context_models import ClinicalContext, DiscordanceLevel, DiscordanceStatus
+from genes.hgvs import CHGVS
+from library.guardian_utils import admin_bot
+from snpdb.models import VariantAllele, Allele, GenomeBuild, UserSettings, Lab
+
+
+class AlleleOverlapClinicalGrouping:
+
+    def __init__(self, clinical_grouping: Optional[ClinicalContext], cms: List[ClassificationModification]):
+        self.cms = cms
+        self.clinical_grouping = clinical_grouping
+
+    @property
+    def _sort_value(self):
+        if clincal_grouping := self.clinical_grouping:
+            if clincal_grouping.is_default:
+                return ""
+            else:
+                return clincal_grouping.name
+        return "zzzzz"
+
+    def __lt__(self, other):
+        return self._sort_value < other._sort_value
 
 
 @total_ordering
@@ -28,29 +49,48 @@ class AlleleOverlap:
     def discordant_level(self) -> DiscordanceLevel:
         return self.discordance_status.level
 
-    @lazy
-    def discordance_score(self) -> int:
-        """
-        Return a score indicating how discordant a variant is
-        Ones with clinical context marked as discordant are the most
-        Otherwise assign a score based on how many different clinical significances are present
-        (remember that some environments don't have discordance enabled)
-        """
-
-        score = 0
-        if self.discordance_status.lab_count > 1:
-            score += 1000
-
-        level = self.discordant_level
-        if level == DiscordanceLevel.DISCORDANT:
-            score += 500
-        elif level == DiscordanceLevel.CONCORDANT_CONFIDENCE:
-            score += 250
-        return score
+    LEVEL_SORT_DICT = {
+        DiscordanceLevel.DISCORDANT: 4,
+        DiscordanceLevel.CONCORDANT_CONFIDENCE: 3,
+        DiscordanceLevel.CONCORDANT_DIFF_VUS: 2,
+        DiscordanceLevel.CONCORDANT_AGREEMENT: 1
+    }
 
     @lazy
-    def unique_hgvs(self):
-        return sorted({vcm.best_hgvs(self.genome_build) for vcm in self.vcms})
+    def discordance_score(self) -> Tuple:
+        """
+        Return an object appropriate for comparison sort with bigger meaning "more discordant"
+        Considers the items in the following order:
+        Discordance Level
+        Number of involved labs
+        Number of involved labs that have at least 1 shared record
+        Number of records
+        Allele ID (just for a final tie breaker)
+        """
+
+        return (
+            AlleleOverlap.LEVEL_SORT_DICT.get(self.discordant_level, 0),
+            self.discordance_status.lab_count,
+            self.discordance_status.lab_count_all,
+            len(self.vcms),
+            self.allele.id
+        )
+
+    @lazy
+    def unique_hgvses(self) -> List[CHGVS]:
+        all_chgvs = set()
+        for vcm in self.vcms:
+            all_chgvs = all_chgvs.union(vcm.classification.c_hgvs_all())
+
+        (chgvs_list := list(all_chgvs)).sort()
+        return chgvs_list
+
+    def preferred_hgvses(self):
+        genome_build = self.genome_build
+        all_hgvses: List[CHGVS] = self.unique_hgvses
+        if filtered := [hgvs for hgvs in all_hgvses if hgvs.genome_build == genome_build]:
+            return filtered
+        return all_hgvses
 
     @lazy
     def is_multiple_labs_shared(self) -> bool:
@@ -71,11 +111,24 @@ class AlleleOverlap:
         return self.allele == other.allele
 
     def __lt__(self, other: 'AlleleOverlap'):
-        score_diff = self.discordance_score - other.discordance_score
-        if score_diff == 0:
-            # fall back on allele ID just to give us consistent ordering
-            return self.allele.id < other.allele.id
-        return score_diff < 0
+        return self.discordance_score < other.discordance_score
+
+    def by_clinical_groupings(self) -> List[AlleleOverlapClinicalGrouping]:
+        by_group: Dict[ClinicalContext, List[ClassificationModification]] = defaultdict(list)
+        unshared: List[ClassificationModification] = list()
+        for cm in self.vcms:
+            if (cc := cm.classification.clinical_context) and cm.share_level_enum.is_discordant_level:
+                by_group[cc].append(cm)
+            else:
+                unshared.append(cm)
+
+        groups: List[AlleleOverlapClinicalGrouping] = list()
+        for cc, classifications in by_group.items():
+            groups.append(AlleleOverlapClinicalGrouping(clinical_grouping=cc, cms=classifications))
+        groups.sort()
+        if unshared:
+            groups.append(AlleleOverlapClinicalGrouping(clinical_grouping=None, cms=unshared))
+        return groups
 
     @staticmethod
     def overlaps_for_user(user: User) -> List['AlleleOverlap']:
@@ -140,7 +193,7 @@ class AlleleOverlap:
         return allele_and_vcs
 
 
-class OverlapCounts():
+class OverlapCounts:
 
     def __init__(self, overlaps: List[AlleleOverlap]):
         multi_lab_counts = defaultdict(lambda: 0)
@@ -161,6 +214,10 @@ class OverlapCounts():
         return self.multi_lab_counts[DiscordanceLevel.CONCORDANT_AGREEMENT]
 
     @property
+    def multi_concordant_vus(self):
+        return self.multi_lab_counts[DiscordanceLevel.CONCORDANT_DIFF_VUS]
+
+    @property
     def multi_concordant_confidence(self):
         return self.multi_lab_counts[DiscordanceLevel.CONCORDANT_CONFIDENCE]
 
@@ -173,9 +230,34 @@ class OverlapCounts():
         return self.same_lab_counts[DiscordanceLevel.CONCORDANT_AGREEMENT]
 
     @property
+    def single_concordant_vus(self):
+        return self.same_lab_counts[DiscordanceLevel.CONCORDANT_DIFF_VUS]
+
+    @property
     def single_concordant_confidence(self):
         return self.same_lab_counts[DiscordanceLevel.CONCORDANT_CONFIDENCE]
 
     @property
     def single_discordant(self):
         return self.same_lab_counts[DiscordanceLevel.DISCORDANT]
+
+
+@dataclass(frozen=True)
+class OverlapSet:
+    label: str
+    overlaps: List[AlleleOverlap]
+
+    @staticmethod
+    def as_sets(overlaps: List[AlleleOverlap]) -> List['OverlapSet']:
+        multi_overlaps: List[AlleleOverlap] = list()
+        inter_overlaps: List[AlleleOverlap] = list()
+        for overlap in overlaps:
+            if overlap.discordance_status.lab_count_all >= 2:
+                multi_overlaps.append(overlap)
+            else:
+                inter_overlaps.append(overlap)
+
+        return [
+            OverlapSet(label="Multi-Lab", overlaps=multi_overlaps),
+            OverlapSet(label="Internal", overlaps=inter_overlaps)
+        ]

@@ -3,7 +3,6 @@ from django.utils.safestring import mark_safe
 
 from snpdb.models import Trio
 
-
 register = Library()
 
 

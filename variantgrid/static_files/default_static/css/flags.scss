@@ -272,6 +272,9 @@
            background-image: url(/static/icons/flags/transcript_ver_change_rejected.svg);
         }
     }
+    &.flag-classification_not_public {
+        background-image: url(/static/icons/flags/world-ban.png);
+    }
     &.flag-settings {
         background-image: url(/static/icons/flags/settings.svg);
     }

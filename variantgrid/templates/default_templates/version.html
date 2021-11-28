@@ -17,6 +17,7 @@
                 {% else %}{{ git.branch }}
                 {% endif %}
             {% endlabelled %}
+            {% labelled label="Manual Migrations" admin_only="true" %}<a href="{% url 'manual_migrations' %}">Review Manual Migrations</a>{% endlabelled %}
         </form>
 
         {% if deployment_history %}

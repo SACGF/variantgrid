@@ -2,7 +2,6 @@ import re
 import subprocess
 
 from dateutil.parser import parse
-
 from lazy import lazy
 
 from library.utils import is_url

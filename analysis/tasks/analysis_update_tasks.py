@@ -18,7 +18,7 @@ from library.celery_utils import execute_task
 from library.log_utils import log_traceback
 
 
-@celery.task
+@celery.shared_task
 def create_and_launch_analysis_tasks(analysis_id, run_async=True):
     """ This is run in a single worker queue so that we avoid race conditions"""
     try:

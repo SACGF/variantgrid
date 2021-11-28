@@ -1,3 +1,4 @@
+import debug_toolbar
 from django.apps import apps
 from django.conf import settings
 from django.conf.urls import include, url
@@ -5,7 +6,6 @@ from django.conf.urls.static import static
 from django.contrib import admin
 from django.contrib.staticfiles.urls import staticfiles_urlpatterns
 from django.urls import path
-import debug_toolbar
 
 from variantgrid import views
 
@@ -13,7 +13,7 @@ admin.autodiscover()
 
 APPS_WITH_URLS = ["analysis", "annotation", "eventlog",
                   "expression", "flags", "genes", "pathtests", "patients", "pedigree", "ontology",
-                  "sapath", "seqauto", "snpdb", "upload", "classification", "variantopedia"]
+                  "sapath", "seqauto", "snpdb", "upload", "classification", "variantopedia", "manual"]
 
 urlpatterns = [
     path('', views.index),

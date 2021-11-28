@@ -1,8 +1,9 @@
-from typing import Dict
+from typing import Dict, Union
 
 from django import template
 from django.contrib.auth.models import User
 
+from snpdb.models import AvatarDetails
 from snpdb.models.models_user_settings import UserSettings
 
 register = template.Library()
@@ -29,25 +30,34 @@ def user(context, u: User, show_avatar=False, show_email=False, show_last_login=
         us = UserSettings.get_for_user(u)
         user_cache[u.id] = us
 
-    preferred_label = u.username
-    if u.first_name or u.last_name:
-        preferred_label = ' '.join([name for name in [u.first_name, u.last_name] if name])
-
-    avatar_url = us.avatar_url
-    avatar_color = us.avatar_color
     return {
         "user": u,
         "role": role,
-        "avatar_url": avatar_url,
-        "avatar_color": avatar_color,
-        "preferred_label": preferred_label,
+        "avatar": AvatarDetails.avatar_for(u),
         "show_email": show_email,
         "show_avatar": show_avatar,
         "show_last_login": show_last_login,
         "email_weekly": us.email_weekly_updates,
         "email_discordance": us.email_discordance_updates,
-        "display": display
+        "display": display,
     }
+
+
+@register.inclusion_tag("snpdb/tags/avatar2.html", name='avatar2', takes_context=True)
+def avatar2(context, user: Union[User, AvatarDetails] = None, size: str = 'default', show_label=False):
+    """
+    More flexible than the default tags as it takes background colour and other things we might want into account
+    """
+    avatar_details: AvatarDetails
+    if user is None:
+        avatar_details = AvatarDetails.avatar_for(context.request.user)
+    elif isinstance(user, AvatarDetails):
+        avatar_details = user
+    elif isinstance(user, User):
+        avatar_details = AvatarDetails.avatar_for(user)
+    else:
+        raise ValueError(f"Cannot render avatar for {user}")
+    return {"avatar": avatar_details, "size": size, "show_label": show_label}
 
 
 @register.inclusion_tag("snpdb/tags/settings_override.html")

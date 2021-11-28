@@ -124,12 +124,13 @@ class ClassificationChanges:
             vcm_q = vcm_q & Q(classification=classification)
             flags_q = flags_q & Q(flag__collection=classification.flag_collection_safe)
         else:
-            pass
+            # can't currently render clinical context flags
+            flags_q = flags_q & Q(flag__collection__context__id__in=['classification', 'allele'])
 
         # Variant Classification Changes
         vcm_qs = ClassificationModification.objects.filter(vcm_q) \
                      .select_related('classification', 'classification__lab',
-                                     'classification__user', 'user').order_by('-created')[:limit]
+                                     'classification__user', 'user').order_by('-created')[:limit+1]
 
         # Flag Changes
         flags_qs = FlagComment.objects.filter(
@@ -137,7 +138,7 @@ class ClassificationChanges:
         ).exclude(flag__flag_type__in=[
             classification_flag_types.classification_outstanding_edits,
             classification_flag_types.unshared_flag
-        ]).select_related('flag', 'flag__flag_type', 'flag__collection', 'resolution', 'user').order_by('-created')[:limit]
+        ]).select_related('flag', 'flag__flag_type', 'flag__collection', 'resolution', 'user').order_by('-created')[:limit+1]
 
         stitcher = IteratableStitcher(
             iterables=[

@@ -1,10 +1,11 @@
+import os
+
+from django import template
 from django.conf import settings
 from django.contrib.staticfiles import finders
-from django import template
 from django.template import Library, loader
 from django.template.base import FilterExpression
 from django.utils.safestring import SafeText
-import os
 
 from library.log_utils import report_message
 from library.utils import html_id_safe

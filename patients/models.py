@@ -1,3 +1,6 @@
+import os
+
+import nameparser
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.db import models
@@ -6,8 +9,6 @@ from django.dispatch.dispatcher import receiver
 from django.urls.base import reverse
 from django_extensions.db.models import TimeStampedModel
 from easy_thumbnails.files import get_thumbnailer
-import nameparser
-import os
 
 from annotation.models.has_phenotype_description_mixin import HasPhenotypeDescriptionMixin
 from library.django_utils import single_string_to_first_last_name_q, \

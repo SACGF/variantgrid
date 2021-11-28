@@ -1,7 +1,8 @@
-from django.conf import settings
-from django.test import TestCase
 import logging
 import os
+
+from django.conf import settings
+from django.test import TestCase
 
 from genes.canonical_transcripts.canonical_transcript_manager import CanonicalTranscriptManager
 from genes.canonical_transcripts.create_canonical_transcripts import create_canonical_transcript_collection

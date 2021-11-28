@@ -1,8 +1,9 @@
-from celery.canvas import Signature
+import random
 from collections import defaultdict
+
+from celery.canvas import Signature
 from django.db.models.query_utils import Q
 from toposort import toposort
-import random
 
 from analysis.models.nodes.analysis_node import AnalysisNode, AnalysisEdge
 

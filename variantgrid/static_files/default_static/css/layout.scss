@@ -10,9 +10,9 @@ nav.navbar {
     border-bottom: 1px solid #bbb;
 
     a.nav-link {
-        padding-top: 0px;
-        padding-bottom: 0px;
-        margin-bottom: 0px;
+        padding-top: 0;
+        padding-bottom: 0;
+        margin-bottom: 0;
         align-self: center;
         &.active {
             color: #000;
@@ -28,16 +28,20 @@ nav.navbar {
     height: 35px;
 }
 
-body {
-  overflow-y: hidden;
-}
-
 .main-content {
     // background-color: white;
     padding-bottom: 60px;
 
     overflow: auto;
     max-width: calc(100vw);
+}
+.external-content {
+    overflow: auto;
+    max-width: calc(100vw);
+    height: 100vh;
+    h3 {
+        margin-top: 30px;
+    }
 }
 
 @media screen and (min-width: 0) and (max-width: 991px) {
@@ -67,6 +71,9 @@ body {
     }
 }
 @media screen and (min-width: 992px) {
+    body {
+      overflow-y: hidden;
+    }
     .main-content {
         padding-top: 80px;
         margin-left: 170px;

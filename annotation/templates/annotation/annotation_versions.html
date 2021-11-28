@@ -37,17 +37,15 @@
                     </tbody>
                 </table>
 
-                <div class='annotation-version-history'>
-                    <h3>Variant Annotation Versions</h3>
+                <div class='mt-4'>
+                    <h4>Variant Annotation Versions</h4>
 
-                    <a href="#vep-command-{{ build_name }}" class="hover-link" data-toggle="collapse">Show VEP command...</a>
+                    <a href="#vep-command-{{ build_name }}" class="toggle-link" data-toggle="collapse">Show VEP command</a>
                     <div id="vep-command-{{ build_name }}" class="collapse">
-                        <pre class="border border-info p-2">
-                        {{ av_data.0 }}
-                        </pre>
+                        <pre class="border border-info p-2">{{ av_data.0 }}</pre>
                     </div>
-                    {% load jqgrid_tags %}
-                    {% jqgrid 'variant_annotation_version_grid' build_name search=False delete=False genome_build_name=build_name %}
+
+                    <table id="vav-{{ build_name }}" data-datatable-url="{% url 'variant_annotation_version_datatable' build_name %}" class="sticky-header responsive"></table>
                 </div>
             {% end_ui_register_tab_embedded %}
         {% endfor %}

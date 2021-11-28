@@ -399,7 +399,6 @@ const VCForm = (function() {
             linkData[SpecialEKeys.VARIANT_COORDINATE] = this.variantCoordinate();
             linkData[SpecialEKeys.C_HGVS] = this.cHGVS();
 
-
             let allLinks = vcLinks.generateLinks(linkData).map(vcLink => {return vcLink.asAnchor("bootstrap").addClass('list-group-item').addClass('list-group-item-action')});
             for (let link of allLinks) {
                 link.attr('data-placement', 'left');
@@ -774,11 +773,34 @@ const VCForm = (function() {
             appendLabelHeadingForKey(SpecialEKeys.GENOME_BUILD, true, 'Build');
 
             let variantText = this.value(SpecialEKeys.C_HGVS) || this.value(SpecialEKeys.G_HGVS) || this.value(SpecialEKeys.VARIANT_COORDINATE) || 'unknown';
+
+            let variantTooltip = [];
+            let alleleData = this.record.allele;
+            if (alleleData) {
+                let clingen = alleleData.clingen_allele_id || "<span class='no-value'>-</span>";
+                if (clingen) {
+                    variantTooltip.push(`<strong>ClinGen Canonical Allele ID</strong><br/>${clingen}`);
+                }
+
+                variantTooltip.push(`<strong>Imported ${this.value(SpecialEKeys.GENOME_BUILD)}</strong> ${variantText}`);
+
+                let allBuilds = Object.keys(alleleData.genome_builds);
+                allBuilds.sort();
+                for (let genomeBuild of allBuilds) {
+                    let buildData = alleleData.genome_builds[genomeBuild];
+                    variantTooltip.push(`<strong>Resolved ${genomeBuild}</strong> ${buildData.c_hgvs || '<span class="no-value">Could Not Resolve</span>'}`);
+                }
+            }
+
             let variantElement = null;
             let alleleVariantData = this.alleleVariantData();
             if (alleleVariantData.variant_id) {
                 let href = Urls.view_allele_from_variant(alleleVariantData.variant_id);
                 variantElement = $('<a>', {class:'hover-link', text: variantText, href:href});
+                variantElement = $('<span>', {html: [
+                    variantElement,
+                    $('<i>', {class:"fas fa-question-circle hover-detail ml-2", title:'Resolved to', 'data-content':variantTooltip.map(x => `<p>${x}</p>`).join("")})
+                ]})
             } else {
                 variantElement = $('<span>', {text: variantText});
             }
@@ -1757,8 +1779,8 @@ const VCForm = (function() {
             let BS = getStr('BS');
             let BP = getStr('BP');
             let BM = getStr('BM'); // note this aren't standard, so can't calculate anything with it
-            let BX = getStr('B?');
-            let PX = getStr('P?');
+            let BX = getStr('BX');
+            let PX = getStr('PX');
 
             let result = {
                 P: null,
@@ -2045,6 +2067,7 @@ let VCTable = (function() {
 VCTable.c_hgvs = (data, type, row) => {
     const MAX_C_HGVS_LEN = 100;
 
+    /*
     let labelFn = (chgvsValue) => {
         if (chgvsValue.type === 'imported') {
             return `<i>Imported (${chgvsValue.build})</i>`;
@@ -2052,6 +2075,7 @@ VCTable.c_hgvs = (data, type, row) => {
             return `<i>Normalised (${chgvsValue.build})</i>`;
         }
     };
+    */
 
     if (data) {
         let variant_id = data.variant_id;
@@ -2068,16 +2092,18 @@ VCTable.c_hgvs = (data, type, row) => {
                 displayChgvs = chgvsValue;
             }
         }
+
+        /*
         let tooltipLines = [];
         for (let [text, chgvsValues] of Object.entries(chgvsToValues)) {
             text = text == 'null' ? 'Cannot display' : text;
             tooltipLines.push(chgvsValues.map((val) => labelFn(val)).join(' and \n') + ' -\n' + text);
         }
-
+        */
         let dom = $('<div>');
         if (displayChgvs && displayChgvs.type !== 'normal-pref') {
-            let buildTooltip = `Cannot display normalised c.hgvs in preferred build.\nDisplaying ${labelFn(displayChgvs)} instead`;
-            tooltipLines.splice(0,0,buildTooltip);
+            // let buildTooltip = `Cannot display normalised c.hgvs in preferred build.\nDisplaying ${labelFn(displayChgvs)} instead`;
+            // tooltipLines.splice(0,0,buildTooltip);
 
             $('<span>', {class:'genome-build hover-detail', text: displayChgvs.build || ''}).appendTo(dom);
         }
@@ -2095,9 +2121,9 @@ VCTable.c_hgvs = (data, type, row) => {
                 $('<span>', {class: 'no-value', text: '-'}).appendTo(dom);
             }
         }
-        let tooltip = tooltipLines.join('<br/><br/>');
-        dom.attr('title', 'hgvs');
-        dom.attr('data-content', tooltip);
+        // let tooltip = tooltipLines.join('<br/><br/>');
+        // dom.attr('title', 'hgvs');
+        // dom.attr('data-content', tooltip);
         let p_hgvs = data.p_hgvs;
         if (p_hgvs) {
             $('<span>', {class: 'd-block mt-1 text-secondary', text: limitLength(p_hgvs)}).appendTo(dom);
@@ -2119,7 +2145,7 @@ VCTable.clinical_significance = (data, type, row) => {
     if (data && data.length) {
         return label.val;
     } else {
-        return $('<span>', {class: 'no-value', text: '-'}).prop('outerHTML');
+        return $('<span>', {class: 'no-value', text: 'Unclassified'}).prop('outerHTML');
     }
 };
 VCTable.clinical_significance_td = ( cell, cellData, rowData, rowIndex, colIndex ) => {

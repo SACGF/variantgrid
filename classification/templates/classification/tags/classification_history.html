@@ -45,7 +45,7 @@
                     {% else %}
                     <div class="submission-source {{ change_group.source }}" title="{{ change_group.source_label }}"></div>
                     {% endif %}
-                {% user change_group.user show_avatar=True display='inline' %}
+                    {% avatar2 change_group.user size='tiny' show_label=True %}
                 {% endifchanged %}
             </td>
             <td>

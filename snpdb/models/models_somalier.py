@@ -15,10 +15,10 @@ from django_extensions.db.models import TimeStampedModel
 from model_utils.managers import InheritanceManager
 
 from library.utils import execute_cmd
+from patients.models_enums import Sex
 from pedigree.ped.export_ped import write_unrelated_ped, write_trio_ped
 from snpdb.models import Sample, VCF, Cohort, Trio, SuperPopulationCode, ImportStatus
 from snpdb.models.models_enums import ProcessingStatus
-from patients.models_enums import Sex
 
 
 class AbstractSomalierModel(TimeStampedModel):

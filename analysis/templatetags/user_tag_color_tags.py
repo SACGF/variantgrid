@@ -1,6 +1,7 @@
-from collections import defaultdict
-from django import template
 import json
+from collections import defaultdict
+
+from django import template
 
 from analysis.models import VariantTag
 from analysis.models.nodes.node_counts import get_node_count_colors

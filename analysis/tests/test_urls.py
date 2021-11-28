@@ -1,11 +1,11 @@
 import os
+import unittest
 
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.test.client import Client
 from django.urls.base import reverse
 from django.utils import timezone
-import unittest
 
 from analysis.models import Analysis, SampleNode, KaryomappingAnalysis, GeneListNode, GeneListNodeGeneList
 from analysis.models.enums import SNPMatrix
@@ -15,9 +15,9 @@ from library.django_utils.unittest_utils import prevent_request_warnings, URLTes
 from library.guardian_utils import assign_permission_to_user_and_groups
 from snpdb.models import Variant
 from snpdb.models.models_cohort import Cohort, Trio, CohortSample, CohortGenotypeCollection, CohortGenotype
+from snpdb.models.models_enums import ImportStatus
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_vcf import VCF, Sample
-from snpdb.models.models_enums import ImportStatus
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_loci_and_variants_for_vcf
 
 

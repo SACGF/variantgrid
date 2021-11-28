@@ -1,9 +1,8 @@
 from django.core.management.base import BaseCommand
 from guardian.shortcuts import get_groups_with_perms, get_group_perms, assign_perm
 
-from analysis.models.models_variant_tag import VariantTag
 from analysis.models.models_analysis import Analysis
-
+from analysis.models.models_variant_tag import VariantTag
 from library.guardian_utils import assign_permission_to_user_and_groups
 
 

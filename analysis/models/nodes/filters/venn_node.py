@@ -1,13 +1,12 @@
+import logging
+import sys
+import traceback
 from typing import Optional
 
 import celery
 from django.db import models
 from django.db.models.deletion import SET_NULL, CASCADE
 from django.db.models.query_utils import Q
-import logging
-import sys
-import traceback
-
 from django.db.models.signals import post_delete
 from django.dispatch import receiver
 
@@ -234,7 +233,7 @@ def post_delete_intersection_cache(sender, instance, **kwargs):  # pylint: disab
         pass  # OK as deleted elsewhere (eg version was bumped and old ones cleaned up)
 
 
-@celery.task
+@celery.shared_task
 def venn_cache_count(vennode_cache_id):
     print(f"venn_cache_count: {vennode_cache_id}")
     try:

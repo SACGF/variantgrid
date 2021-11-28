@@ -1,10 +1,10 @@
+import re
 from typing import Optional
 
 from django.core.management import BaseCommand
 
 from classification.models import classification_flag_types, Classification
 from flags.models import Flag, FlagComment
-import re
 
 
 class Command(BaseCommand):

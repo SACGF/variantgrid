@@ -436,7 +436,7 @@ class UploadedVCFPendingAnnotation(models.Model):
     schedule_pipeline_stage_steps_celery_task = models.CharField(max_length=36, null=True)
 
     def attempt_schedule_annotation_stage_steps(self, lowest_unannotated_variant_id):
-        if self.uploaded_vcf.max_variant_id < lowest_unannotated_variant_id:
+        if self.uploaded_vcf.max_variant is None or self.uploaded_vcf.max_variant_id < lowest_unannotated_variant_id:
             logging.info("UploadedVCF %s all variants are annotated", self.uploaded_vcf)
             self.finished = timezone.now()
             self.save()
@@ -446,7 +446,7 @@ class UploadedVCFPendingAnnotation(models.Model):
             logging.info("Executing: %s", CELERY_TASK_NAME)
             args = (self.uploaded_vcf.upload_pipeline.pk, VCFPipelineStage.ANNOTATION_COMPLETE)
             result = app.send_task(CELERY_TASK_NAME, args=args)
-            self.celery_task = result.id
+            self.schedule_pipeline_stage_steps_celery_task = result.id
             self.save()
         else:
             logging.info("UploadedVCF %s still waiting for annotation", self.uploaded_vcf)

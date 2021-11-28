@@ -1,5 +1,3 @@
-import json
-
 from analysis.forms import ExpressionNodeForm
 from analysis.models.nodes.filters.expression_node import ExpressionNode
 from analysis.views.nodes.node_view import NodeView

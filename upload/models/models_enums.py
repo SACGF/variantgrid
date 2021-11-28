@@ -4,7 +4,6 @@ from django.db import models
 class UploadedFileTypes(models.TextChoices):
     BED = 'B', 'BED'
     CLINVAR = 'L', 'Clinvar'
-    CLINVAR_CITATIONS = 'T', 'Clinvar Citations'
     CUFFDIFF = 'C', 'CuffDiff'
     GENE_LIST = 'G', 'Gene List'
     GENE_COVERAGE = 'O', 'Gene Coverage'

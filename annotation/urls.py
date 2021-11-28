@@ -1,13 +1,15 @@
 from rest_framework.urlpatterns import format_suffix_patterns
 
 from annotation import views, views_rest
-from annotation.grids import TissueGeneGrid, VariantAnnotationVersionGrid, AnnotationRunColumns
+from annotation.grids import TissueGeneGrid, VariantAnnotationVersionGrid, AnnotationRunColumns, \
+    VaraintAnnotationVersionColumns
 from library.django_utils.jqgrid_view import JQGridView
-from snpdb.views.datatable_view import DatabasetableView
+from snpdb.views.datatable_view import DatabaseTableView
 from variantgrid.perm_path import perm_path
 
 urlpatterns = [
     perm_path('', views.annotation, name='annotation'),
+    perm_path('annotation_detail', views.annotation_detail, name='annotation_detail'),
     perm_path('annotation_versions', views.annotation_versions, name='annotation_versions'),
     perm_path('version_diffs', views.version_diffs, name='version_diffs'),
     perm_path('view_version_diff/<int:version_diff_id>/', views.view_version_diff, name='view_version_diff'),
@@ -26,9 +28,10 @@ urlpatterns = [
     perm_path('citations_json/<path:citations_ids_list>', views.citations_json, name='citations_json'),
     perm_path('load_cached_web_resource/<pk>', views.load_cached_web_resource, name='load_cached_web_resource'),
 
+    perm_path('annotation_version/datatable/<path:genome_build_name>/', DatabaseTableView.as_view(column_class=VaraintAnnotationVersionColumns), name='variant_annotation_version_datatable'),
     perm_path('annotation_version/grid/<genome_build_name>/<slug:op>/', JQGridView.as_view(grid=VariantAnnotationVersionGrid), name='variant_annotation_version_grid'),
 
-    perm_path('annotation_run/datatables', DatabasetableView.as_view(column_class=AnnotationRunColumns), name='annotation_run_datatable'),
+    perm_path('annotation_run/datatables', DatabaseTableView.as_view(column_class=AnnotationRunColumns), name='annotation_run_datatable'),
 
     perm_path('tissue_gene/grid/<int:human_protein_atlas_version_id>/<int:tissue_sample_id>/<min_abundance>/<slug:op>/', JQGridView.as_view(grid=TissueGeneGrid, csv_download=True), name='tissue_gene_grid'),
 ]

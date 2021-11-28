@@ -1,11 +1,13 @@
+import logging
+
 import celery
 from django.db.models.aggregates import Count
-import logging
 
 from library.guardian_utils import check_can_write
 from library.log_utils import log_traceback
 from snpdb.models import VCF, ImportStatus, Sample
-from snpdb.variant_zygosity_count import update_all_variant_zygosity_counts_for_vcf, update_all_variant_zygosity_counts_for_sample
+from snpdb.variant_zygosity_count import update_all_variant_zygosity_counts_for_vcf, \
+    update_all_variant_zygosity_counts_for_sample
 
 
 def soft_delete_vcfs(user, *vcf_ids):
@@ -25,7 +27,7 @@ def soft_delete_vcfs(user, *vcf_ids):
     remove_soft_deleted_vcfs_task.apply_async(countdown=1)  # To make sure that vcfs have been set to deleted
 
 
-@celery.task(ignore_result=True)
+@celery.shared_task(ignore_result=True)
 def remove_soft_deleted_vcfs_task():
     """ This is a clean up job so only want to run 1 copy - ie on schedule_single_worker queue
 

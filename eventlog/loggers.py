@@ -1,10 +1,10 @@
-from django.utils import timezone
 import logging
 import re
 
+from django.utils import timezone
+
 from library.enums.log_level import LogLevel
 from library.utils import import_class
-
 
 missing_mapping_re = re.compile(r'Not Found:.*\.js.*\.map')
 

@@ -1,7 +1,8 @@
-from collections import defaultdict
-from django import template
 import json
 import logging
+from collections import defaultdict
+
+from django import template
 
 from analysis.models import NodeVariant
 from analysis.models.nodes.node_utils import get_rendering_dict

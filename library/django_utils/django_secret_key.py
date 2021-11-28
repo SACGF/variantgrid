@@ -1,6 +1,6 @@
-from base64 import urlsafe_b64encode as b64encode
-import random
 import os
+import random
+from base64 import urlsafe_b64encode as b64encode
 
 random.seed()
 

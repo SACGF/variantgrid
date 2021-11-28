@@ -19,4 +19,4 @@ fi
 VARIANT_GRID_HOME="$(dirname $0)/.."
 cd ${VARIANT_GRID_HOME}
 
-bedtools intersect -wa -u -header -sorted -a stdin -b ${BED_FILE} | python3.8 manage.py stdin_to_variant_collection ${VARIANT_COLLECTION_ID}
+bedtools intersect -wa -u -header -sorted -a stdin -b ${BED_FILE} | python3 manage.py stdin_to_variant_collection ${VARIANT_COLLECTION_ID}

@@ -28,13 +28,14 @@ h3:not(:first-child):not(.popover-header), h4:not(:first-child):not(.popover-hea
 }
 // adjust the expand/collapse arrow location accordingly
 .form-control .select2-selection__arrow {
-    top: 5px !important;
+    // top: 5px !important;
+    display: none;  // is redundant to another indicator
 }
 
 /// GENERAL FORMS
 
 // make the labels look different enough from plain text
-label {
+label, form label {
     color: #555;
     font-weight: 500;
 }
@@ -95,13 +96,6 @@ td.dt-preview {
     font-family: monospace;
     font-size: 12px;
     overflow-x: hidden;
-    color: #222288;
-    cursor: pointer;
-    &:hover {
-        text-decoration: underline;
-        text-decoration-style: dotted;
-        text-decoration-color: gray;
-    }
 }
 
 // when we expand on that preview to show more details
@@ -159,12 +153,22 @@ table.dataTable td.dataTables_empty {
 table.datatable.expandable tr.even, table.datatable.expandable tr.odd {
     cursor:pointer;
 }
-.dataTables_wrapper .toolbar {
+.dataTables_wrapper {
+  .toolbar {
     display: flex;
     align-items: baseline;
+
     .custom {
-        flex-grow: 1;
+      flex-grow: 1;
     }
+  }
+  .bottom {
+    display: flex;
+    align-items: center;
+    .showing {
+      flex-grow: 1;
+    }
+  }
 }
 
 .variant-coordinate {
@@ -211,6 +215,9 @@ span.select2-container {
 //    left: -8px;
 //    // float: left;
 //}
+strong {
+  font-weight: 500;
+}
 .no-padding {
     padding: 0 0 0 0 !important;
 }
@@ -306,19 +313,39 @@ a.list-group-item-action {
       }
     }
 }
+.link-toolbar {
+    > *:not(:first-child) {
+        margin-left: 10px;
+        &::before {
+          content: '|';
+          margin-right: 10px;
+          color: grey !important;
+        }
+    }
+}
 .btn-rnd-rect {
-  width: 40px;
-  height: 40px;
-  padding: 7px 8px 7px 12px;
-  border-radius: 15px;
-  text-align: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 12px;
+  justify-content: center;
+  display: inline-flex;
+  align-items: center;
+  margin-left: 4px;
+  margin-right: 4px;
+    & i.fas {
+    margin: 0;
+  }
 }
 .btn-circle {
   width: 50px;
-  height: 50px;
-  padding: 7px 8px 7px 12px;
+  height: 32px;
   border-radius: 25px;
-  text-align: center;
+  justify-content: center;
+  display: inline-flex;
+  align-items: center;
+  & i.fas {
+    margin: 0;
+  }
 }
 
 // Undo this bootstrap so drop downs don't get cut off on classification form
@@ -370,6 +397,11 @@ a {
     opacity: 0.6;
     margin-left: 4px;
 }
+.download-link.type-csv:after {
+    // uncomment once we've differentiated the link data type enough
+    // content: "\f6dd";
+}
+
 .toggle-link:before {
     display: inline-block;
     font-style: normal;
@@ -397,6 +429,12 @@ table.sticky-header thead th {
     // top: 48px;
     top: -36px;
     z-index: 1;
+}
+table.responsive {
+  width: 100%;
+  tr.odd, tr.even {
+    cursor: pointer;
+  }
 }
 
 .container-table {
@@ -566,6 +604,15 @@ div.background-image {
     font-style: italic;
     border-color: #dddddd !important;
 }
+.loading-message {
+    margin-top: 40px; // have more of a gap at the top for the spinner to go
+    margin-bottom: 20px;
+    border-top: 60px solid transparent;
+    width: 100%;
+    text-align: center;
+    font-weight: 500;
+}
+
 .zero-value {
     color: #AAAAAA;
 }
@@ -597,6 +644,10 @@ div.background-image {
 	&:hover {
 		text-display: underline;
 	}
+}
+.card-footer .hover-link {
+    color: #66a !important;
+    font-weight: 500;
 }
 .hover-delete {
     color: #bb4444 !important;
@@ -716,10 +767,19 @@ table.as_table {
     border-radius: 10px;
     padding: 6px 6px 6px 12px;
     background-color: #eee;
+    white-space: pre-wrap;
+    display: block;
+    line-height: 150%;
 }
 .code.card-body {
   border: none;
   border-radius: 0;
+}
+
+.secret {
+  color: #444;
+  font-family: monospace;
+  letter-spacing: 2px;
 }
 
 ul.compact {
@@ -853,4 +913,29 @@ ul.compact {
   .js-comma {
     color: #888; display:inline-block;
   }
+}
+
+// annotations page
+.install-instructions {
+    min-height: 16px;
+    background-size: 16px 16px;
+    background-position: 8px 50%;
+    background-repeat: no-repeat;
+    padding: 16px 16px 16px 28px;
+    border-radius: 4px;
+    background-color: #F0D9ED !important;
+}
+
+// discordance levels from most disagreeable to least
+.overlap-discordant {
+    background-color: #ebb;
+}
+.overlap-concordant_confidence {
+    background-color: #fff3cd;
+}
+.overlap-concordant_agreement, .overlap-concordant_agreement_diff_vus {
+    background-color: #88dd88;
+}
+.overlap-single_submission, .overlap-no_entries {
+    background-color: #ccc;
 }

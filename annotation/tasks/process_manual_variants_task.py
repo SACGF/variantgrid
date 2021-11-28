@@ -1,12 +1,11 @@
+import logging
 from typing import List
 
 from django.db.models.query_utils import Q
-import logging
 
 from annotation.models import ManualVariantEntryType
 from annotation.models.models import CreatedManualVariant, ManualVariantEntry
 from genes.hgvs import get_hgvs_variant_tuple
-from library.log_utils import log_traceback
 from snpdb.clingen_allele import populate_clingen_alleles_for_variants, get_clingen_alleles_from_external_code
 from snpdb.models import Variant, VariantCoordinate
 from snpdb.models.models_enums import ImportStatus, ClinGenAlleleExternalRecordType

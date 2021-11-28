@@ -1,8 +1,9 @@
+import json
+
 from django.core.exceptions import PermissionDenied
 from django.http.response import JsonResponse, HttpResponse
 from django.urls.base import resolve, reverse
 from django.views.generic.base import View
-import json
 
 from library.jqgrid_export import grid_export_request
 from library.utils import nice_class_name

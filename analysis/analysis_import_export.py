@@ -1,12 +1,11 @@
 import json
 
+from django.contrib.auth.models import User
 from django.core.serializers import serialize
 
-from django.contrib.auth.models import User
-
+from analysis.models import Analysis, GenomeBuild, AnnotationVersion, AnalysisEdge
 from analysis.models.nodes.node_utils import reload_analysis_nodes
 from analysis.serializers import AnalysisNodeSerializer, AnalysisSerializer
-from analysis.models import Analysis, GenomeBuild, AnnotationVersion, AnalysisEdge
 
 
 def analysis_export_to_dict(analysis: Analysis) -> dict:

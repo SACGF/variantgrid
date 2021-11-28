@@ -1,29 +1,32 @@
 import operator
 from functools import reduce
-from typing import Dict, Any, List, Optional, Iterable
+from typing import Dict, Any, List, Optional
 
 from django.conf import settings
-from django.db.models import Q, Subquery, When, Case, TextField, Value, IntegerField
+from django.db.models import Q, Subquery, When, Case, TextField, Value, IntegerField, QuerySet
 from django.db.models.fields.json import KeyTextTransform, KeyTransform
 from django.db.models.functions import Lower, Cast
+from django.http import HttpRequest
 from lazy import lazy
 
-from flags.models import FlagCollection, FlagStatus
-from genes.models import Gene, Transcript, TranscriptVersion, GeneSymbol
-from ontology.models import OntologyTerm
-from snpdb.models import UserSettings, GenomeBuild, Allele, Variant, Lab
-from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
 from classification.enums import SpecialEKeys, EvidenceCategory, ShareLevel
 from classification.models import ClassificationModification, classification_flag_types, Classification, EvidenceKeyMap
+from classification.models.classification_utils import classification_gene_symbol_filter
+from flags.models import FlagCollection, FlagStatus
+from genes.models import TranscriptVersion
+from ontology.models import OntologyTerm
+from snpdb.models import UserSettings, GenomeBuild, Variant, Lab
+from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
+from uicore.json.json_types import JsonDataType
 
 ALLELE_GERMLINE_VALUES = ['germline', 'likely_germline']
 ALLELE_SOMATIC_VALUES = ['somatic', 'likely_somatic']
 ALLELE_KNOWN_VALUES = ALLELE_GERMLINE_VALUES + ALLELE_SOMATIC_VALUES
 
 
-class ClassificationColumns(DatatableConfig):
+class ClassificationColumns(DatatableConfig[ClassificationModification]):
 
-    def render_c_hgvs(self, row: Dict[str, Any]):
+    def render_c_hgvs(self, row: Dict[str, Any]) -> JsonDataType:
         values = []
         for index, genome_build in enumerate(self.genome_build_prefs):
             values.append({
@@ -50,14 +53,13 @@ class ClassificationColumns(DatatableConfig):
 
         return response
 
-    def render_condition(self, row:Dict[str, Any]):
+    def render_condition(self, row: Dict[str, Any]) -> JsonDataType:
         if cr := row['classification__condition_resolution']:
             return cr
         else:
             return {"display_text": row['published_evidence__condition__value']}
-        return resolved_condition
 
-    def classification_id(self, row: Dict[str, Any]):
+    def classification_id(self, row: Dict[str, Any]) -> JsonDataType:
         matches: Optional[Dict[str, str]] = None
         if id_filter := self.get_query_param("id_filter"):
             matches = dict()
@@ -83,7 +85,7 @@ class ClassificationColumns(DatatableConfig):
         user_settings = UserSettings.get_for_user(self.user)
         return GenomeBuild.builds_with_annotation_priority(user_settings.default_genome_build)
 
-    def __init__(self, request):
+    def __init__(self, request: HttpRequest):
         self.term_cache: Dict[str, OntologyTerm] = dict()
         super().__init__(request)
 
@@ -180,7 +182,7 @@ class ClassificationColumns(DatatableConfig):
             )
         ]
 
-    def get_initial_queryset(self):
+    def get_initial_queryset(self) -> QuerySet[ClassificationModification]:
 
         exclude_withdrawn = True
         if flags := self.get_query_json("flags"):
@@ -207,7 +209,7 @@ class ClassificationColumns(DatatableConfig):
                     output_field=TextField())
         initial_qs = initial_qs.annotate(c_hgvs=case)
 
-        # So VUS-A is actually VUS-Pathogenicness, VUS-C is VUS-Benigness
+        # So VUS-A is actually VUS-Pathogenic, VUS-C is VUS-Benign
         # so when sorting within VUS we want to do so in reverse alphabetical order
         # but when sorting outside of VUS we want alphabetical order
         # Note: Clinical Significance will first be sorted by the clinical significant int and then fall back to this
@@ -245,8 +247,8 @@ class ClassificationColumns(DatatableConfig):
     @lazy
     def id_columns(self) -> List[str]:
         keys = EvidenceKeyMap.instance()
-        return [ekey.key for ekey in keys.all_keys if '_id' in ekey.key and
-                   ekey.evidence_category in (EvidenceCategory.HEADER_PATIENT, EvidenceCategory.HEADER_TEST, EvidenceCategory.SIGN_OFF)]
+        return [e_key.key for e_key in keys.all_keys if '_id' in e_key.key and
+                e_key.evidence_category in (EvidenceCategory.HEADER_PATIENT, EvidenceCategory.HEADER_TEST, EvidenceCategory.SIGN_OFF)]
 
     def value_columns(self) -> List[str]:
         all_columns = super().value_columns()
@@ -256,8 +258,8 @@ class ClassificationColumns(DatatableConfig):
                 all_columns.append(f'published_evidence__{id_key}__value')
         return all_columns
 
-    def filter_queryset(self, qs):
-        filters = []
+    def filter_queryset(self, qs: QuerySet[ClassificationModification]) -> QuerySet[ClassificationModification]:
+        filters: List[Q] = list()
         if settings.VARIANT_CLASSIFICATION_GRID_SHOW_USERNAME:
             if user_id := self.get_query_param('user'):
                 filters.append(Q(classification__user__pk=user_id))
@@ -279,33 +281,11 @@ class ClassificationColumns(DatatableConfig):
             id_filter_q = reduce(operator.or_, ids_contain_q_list)
             filters.append(id_filter_q)
 
-        # We want to filter using the genes set via variant annotation
-        genes: Optional[Iterable[Gene]] = None
-        symbols: Optional[Iterable[str]] = None
         if gene_symbol_str := self.get_query_param("gene_symbol"):
-            gene_symbol: GeneSymbol
-            if gene_symbol := GeneSymbol.objects.filter(pk=gene_symbol_str).first():
-                genes = gene_symbol.alias_meta.genes
-                symbols = gene_symbol.alias_meta.alias_symbol_strs
-                # used to do the below, which would include genes marked as "unknown"
-                # now they wont be included, revert if this causes problems
-                # genes = Gene.objects.filter(geneversion__gene_symbol__in=gene_symbols).distinct()
-
-        if genes is not None:
-            allele_qs = Allele.objects.filter(variantallele__variant__variantannotation__gene__in=genes)
-            match_gene = Q(classification__variant__variantallele__allele__in=allele_qs)
-            evidence_q_list = []
-
-            for symbol in symbols:
-                evidence_q_list.append(Q(published_evidence__gene_symbol__value__iexact=symbol))
-
-            t_qs = Transcript.objects.filter(transcriptversion__gene_version__gene__in=genes).distinct()
-            for transcript_id, annotation_consortium in t_qs.values_list("identifier", "annotation_consortium"):
-                ekey = SpecialEKeys.ANNOTATION_CONSORTIUM_KEYS[annotation_consortium]
-                evidence_q_list.append(Q(**{f"published_evidence__{ekey}__value__startswith": transcript_id}))
-
-            match_evidence = reduce(operator.or_, evidence_q_list)
-            filters.append(match_gene | match_evidence)
+            if gene_filter := classification_gene_symbol_filter(gene_symbol_str):
+                filters.append(gene_filter)
+            else:
+                return qs.none()
 
         if settings.VARIANT_CLASSIFICATION_GRID_SHOW_ORIGIN:
             allele_origin = self.get_query_param("allele_origin")

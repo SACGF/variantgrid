@@ -3,11 +3,12 @@ import unittest
 from django.contrib.auth.models import User
 
 from annotation.fake_annotation import get_fake_annotation_version, create_fake_variants
-from library.django_utils.unittest_utils import prevent_request_warnings, URLTestCase
-from snpdb.models import GenomeBuild, Variant, ClinGenAllele, Allele, VariantAllele, AlleleOrigin, Lab, Organization
 from classification.autopopulate_evidence_keys.autopopulate_evidence_keys import \
     create_classification_for_sample_and_variant_objects
 from classification.models import EvidenceKey
+from library.django_utils.unittest_utils import prevent_request_warnings, URLTestCase
+from snpdb.models import GenomeBuild, Variant, ClinGenAllele, Allele, VariantAllele, AlleleOrigin, Lab, Organization, \
+    Country
 
 
 class Test(URLTestCase):
@@ -20,7 +21,8 @@ class Test(URLTestCase):
         cls.user_non_owner = User.objects.get_or_create(username='different_user')[0]
 
         organization = Organization.objects.get_or_create(name="Fake Org", group_name="fake_org")[0]
-        lab = Lab.objects.get_or_create(name="Fake Lab", city="Adelaide", country="Australia",
+        australia = Country.objects.get_or_create(name="Australia")[0]
+        lab = Lab.objects.get_or_create(name="Fake Lab", city="Adelaide", country=australia,
                                         organization=organization, group_name="fake_org/fake_lab")[0]
         lab.group.user_set.add(cls.user_owner)
 

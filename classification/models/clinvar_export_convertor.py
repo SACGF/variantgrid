@@ -1,28 +1,29 @@
+import json
+import re
 from re import RegexFlag
 from typing import List, Any, Mapping, TypedDict, Union
-import bs4
+
 from lazy import lazy
 
 from annotation.regexes import DbRegexes
-from classification.enums import SpecialEKeys, EvidenceKeyValueType
-from library.utils import html_to_text
-from uicore.json.validated_json import JsonMessages, JSON_MESSAGES_EMPTY, ValidatedJson
+from classification.enums import SpecialEKeys, EvidenceKeyValueType, ShareLevel
 from classification.models import ClassificationModification, EvidenceKeyMap, EvidenceKey, \
-    MultiCondition, ClinVarExport, classification_flag_types
+    MultiCondition, ClinVarExport, classification_flag_types, Classification
 from classification.models.evidence_mixin import VCDbRefDict
+from genes.hgvs import CHGVS
+from library.utils import html_to_text
 from ontology.models import OntologyTerm, OntologyService
 from snpdb.models import ClinVarKey
-import re
-import json
+from uicore.json.validated_json import JsonMessages, JSON_MESSAGES_EMPTY, ValidatedJson
 
 
 # Code in this file is responsible for converting VariantGrid formatted classifications to ClinVar JSON
-
+CLINVAR_ACCEPTED_TRANSCRIPTS = {"NM_", "NR_"}
 
 class ClinVarEvidenceKey:
     """
     Handles the basic mapping of a single field to ClinVar
-    Revolves around select/mutli-select fields having equivalents
+    Revolves around select/multi-select fields having equivalents stored in "clinvar" attribute of the EvidenceKey
     """
 
     def __init__(self, evidence_key: EvidenceKey, value_obj: Any):
@@ -107,6 +108,7 @@ class ClinVarExportConverter:
         classification_flag_types.matching_variant_warning_flag: JsonMessages.error("Classification has open variant warning flag"),
         classification_flag_types.discordant: JsonMessages.error("Classification is in discordance"),
         classification_flag_types.internal_review: JsonMessages.error("Classification is in internal review"),
+        # classification_flag_types.classification_not_public - this has special handling to include a comment
     }
 
     def __init__(self, clinvar_export_record: ClinVarExport):
@@ -157,16 +159,6 @@ class ClinVarExportConverter:
             c = self.classification_based_on.classification
             local_key = c.lab.group_name + "/" + c.lab_record_id
 
-            """
-            # Below was used when condition was literally part of the localID
-            # Important, using the umbrella term as it doesn't change
-            condition = self.clinvar_export_record.condition_resolved
-            term_ids = "_".join([term.id.replace(":", "_") for term in condition.terms])
-            if join := condition.join:
-                join = MultiCondition(join)
-                term_ids = f"{term_ids}_{join.value}"
-            """
-
             data["localID"] = local_id
             data["localKey"] = local_key
             data["observedIn"] = self.observed_in
@@ -175,8 +167,34 @@ class ClinVarExportConverter:
 
             messages = JSON_MESSAGES_EMPTY
             for flag in self.classification_based_on.classification.flag_collection.flags(only_open=True):
-                if message := ClinVarExportConverter.FLAG_TYPES_TO_MESSAGES.get(flag.flag_type):
+                if flag.flag_type == classification_flag_types.classification_not_public:
+                    message_text = "Not submitting to ClinVar as record is flagged to be excluded"
+                    if last_comment := flag.flagcomment_set.order_by('-created').first():
+                        if last_comment_text := last_comment.text:
+                            if "Not submitting to ClinVar as the record matched the following pattern(s):" in last_comment_text:
+                                message_text = last_comment_text
+                            else:
+                                message_text += " - " + last_comment_text
+                    messages += JsonMessages.error(message_text)
+
+                elif message := ClinVarExportConverter.FLAG_TYPES_TO_MESSAGES.get(flag.flag_type):
                     messages += message
+
+            # see if other shared classifications for the clinvar_key variant combo don't have a resolved condition
+            # but only if they don't have an open don't share flag
+            allele = self.clinvar_export_record.clinvar_allele.allele
+            if other_classifications_for_key := Classification.objects.filter(
+                withdrawn=False,
+                variant__in=allele.variants,
+                share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS,
+                lab__clinvar_key=self.clinvar_key
+            ).exclude(id=self.classification_based_on.id):
+                for c in other_classifications_for_key:
+                    has_condition = (resolved_condition := c.condition_resolution_obj) and len(resolved_condition.terms) >= 1
+                    if not has_condition:
+                        # make sure it doesn't have an exclude flag, no point complaining about that
+                        if not c.flag_collection_safe.get_open_flag_of_type(flag_type=classification_flag_types.classification_not_public):
+                            messages += JsonMessages.error(f"Another classification for this allele '{c.lab_record_id}' has an unresolved condition with text '{c.get(SpecialEKeys.CONDITION)}'")
 
             return ValidatedJson(data, messages)
 
@@ -185,13 +203,33 @@ class ClinVarExportConverter:
         try:
             genome_build = self.classification_based_on.get_genome_build()
             if c_hgvs := self.classification_based_on.classification.get_c_hgvs(genome_build):
-                json_data = {"variant": [{"hgvs": c_hgvs}]}
-                errors = JSON_MESSAGES_EMPTY
+                c_hgvs_obj = CHGVS(c_hgvs)
+                c_hgvs_no_gene = c_hgvs_obj.without_gene_symbol_str
 
-                if c_hgvs.startswith("ENST"):
-                    errors += JsonMessages.error("ClinVar doesn't support Ensembl transcripts")
+                variant_data = [{"hgvs": c_hgvs_no_gene}]
+                json_data = {"variant": [{"hgvs": c_hgvs_no_gene}]}
 
-                return ValidatedJson(json_data, errors)
+                hgvs_errors = JSON_MESSAGES_EMPTY
+                for accepted_transcript in CLINVAR_ACCEPTED_TRANSCRIPTS:
+                    if c_hgvs.startswith(accepted_transcript):
+                        break
+                else:
+                    hgvs_errors += JsonMessages.error(f"ClinVar only accepts transcripts starting with one of {CLINVAR_ACCEPTED_TRANSCRIPTS}")
+
+                gene_symbols = list()
+                if gene_symbol := self.value(SpecialEKeys.GENE_SYMBOL):
+                    gene_symbols.append({"symbol": gene_symbol})
+
+                json_data = {
+                    "variant": [
+                        {
+                            "hgvs": ValidatedJson(c_hgvs_no_gene,hgvs_errors),
+                            "gene": gene_symbols
+                        }
+                    ]
+                }
+
+                return json_data
             else:
                 return ValidatedJson(None, JsonMessages.error(f"No normalised c.hgvs in genome build {genome_build}"))
         except BaseException:
@@ -253,8 +291,9 @@ class ClinVarExportConverter:
             data["comment"] = "\n\n".join(comment_parts)
 
         if date_last_evaluated := self.value(SpecialEKeys.CURATION_DATE):
-            # FIXME also check validation date?
+            # FIXME fall back to other date types? or at least raising a warning
             data["dateLastEvaluated"] = date_last_evaluated
+
         if mode_of_inheritance := self.clinvar_value(SpecialEKeys.MODE_OF_INHERITANCE):
             data["modeOfInheritance"] = mode_of_inheritance.value(single=True)
         return ValidatedJson(data)
@@ -304,6 +343,6 @@ class ClinVarExportConverter:
             data["alleleOrigin"] = allele_origin
         else:
             data["alleleOrigin"] = ValidatedJson("germline", JsonMessages.info("Defaulting \"Allele origin\" to \"germline\" as no value provided"))
-        data["collectionMethod"] = "curation"  # TODO confirm hardcoded of curation
+        data["collectionMethod"] = "clinical testing"
         # numberOfIndividuals do we do anything with this?
         return ValidatedJson([data])

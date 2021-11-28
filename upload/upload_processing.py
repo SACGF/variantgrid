@@ -1,6 +1,7 @@
-from celery.result import AsyncResult
 import logging
 from typing import Tuple
+
+from celery.result import AsyncResult
 
 from eventlog.models import create_event
 from library.file_utils import name_from_filename

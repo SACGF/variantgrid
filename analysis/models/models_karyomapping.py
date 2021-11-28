@@ -1,4 +1,6 @@
+import operator
 from collections import defaultdict, Counter
+from functools import reduce
 from typing import Tuple
 
 from django.contrib.auth.models import User
@@ -7,16 +9,14 @@ from django.db.models.deletion import CASCADE
 from django.db.models.query_utils import Q
 from django.urls.base import reverse
 from django_extensions.db.models import TimeStampedModel
-from functools import reduce
-import operator
 
 from annotation.annotation_version_querysets import get_variant_queryset_for_latest_annotation_version
 from genes.models import Gene
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsAutoInitialSaveMixin
 from patients.models_enums import Zygosity
 from snpdb.models import GenomicInterval, Trio, Variant
-from snpdb.models.models_genome import Contig
 from snpdb.models.models_enums import ImportStatus
+from snpdb.models.models_genome import Contig
 
 
 class KaryotypeBins:

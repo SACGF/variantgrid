@@ -1,7 +1,7 @@
-import logging
-from typing import Dict, Optional, List, Any, Tuple
 import json
+import logging
 import os
+from typing import Dict, Optional, List, Any, Tuple
 
 
 def _get_env_variable(key: str) -> Tuple[Any, bool]:
@@ -19,15 +19,17 @@ def _get_env_variable(key: str) -> Tuple[Any, bool]:
         return None, False
 
 
-def _load_settings():
+def _settings_file():
     filename = '/etc/variantgrid/settings_config.json'
-    try:
-        value, found = _get_env_variable('SETTINGS_CONFIG')
-        if found:
-            filename = value
+    value, found = _get_env_variable('SETTINGS_CONFIG')
+    if found:
+        filename = value
+    return filename
 
-        logging.info(f'Loading config from {filename}')
-        with open(filename) as f:
+
+def _load_settings():
+    try:
+        with open(_settings_file()) as f:
             return json.load(f)
     except Exception as e:
         logging.info(f"Could not load settings_config from {filename} : {str(e)}\n")
@@ -125,7 +127,7 @@ def get_secret(key: str) -> Optional[Any]:
             logging.warning(f'Warning {key} was loaded from default_settings, migrate to settings config or env variable')
         return value
 
-    raise ValueError(f'No config value found for {key}')
+    raise ValueError(f'No config value found for {key} in settings file {_settings_file()}')
 
 
 def get_secrets(prefix: str, leafs: List[str]) -> Dict[str, Any]:

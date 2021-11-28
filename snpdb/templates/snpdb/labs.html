@@ -1,6 +1,7 @@
 {% extends "uicore/page/base.html" %}
 {% load ui_menu_bars %}
 {% load ui_utils %}
+{% load ui_tabs_builder %}
 {% load ui_help %}
 {% load js_tags %}
 {% load lab_tags %}
@@ -11,26 +12,14 @@
 <script type="text/javascript" src="{% static 'js/lib/plotly-latest.min.js' %}"></script>
 <script type="text/javascript" src="{% static 'js/plotly_helper.js' %}"></script>
 <style>
-
-    .leaflet-container {  /* map thumbnail */
-        margin-top: 50px;
-        width:  310px;
-        height: 310px;
-    }
-
-    .graph-switch {
-        position: relative;
-        top: -10px;
-        text-align: center;
-    }
-
-    .per-org {
-        display: none;
+    .carousel-control-next,
+    .carousel-control-prev,
+    .carousel-indicators {
+        filter: invert(100%);
     }
     .lab-card {
         height: 100%;
     }
-
 </style>
 <script>
     var PATHOGENIC_COLORS = [   '#777777', // other
@@ -46,33 +35,38 @@
     {%  endif %}
 
     function plotClassifications(selector, vc_data, title, width, height) {
-        for (var i=0 ; i<vc_data.length ; ++i) {
+        for (let i=0 ; i<vc_data.length ; ++i) {
             vc_data[i]["marker"] = {color : PATHOGENIC_COLORS[i]};
         }
-        var layout = defaultLayout(title, width, height);
+        let layout = defaultLayout(title, width, height);
         layout["barmode"] = 'stack';
         Plotly.newPlot(selector, vc_data, layout);
     }
 
-    function showOrg() {
-        $(".per-org").show();
-        $(".per-state").hide();
-    }
-
-    function showState() {
-        $(".per-org").hide();
-        $(".per-state").show();
+    function plotCumulativeClassifications(selector, cum_data, title, width, height) {
+        let layout = defaultLayout(title, width, height);
+        layout["xaxis"] = {"nticks": 10}; // keep under 20 dates so they don't get too crowded
+        Plotly.newPlot(selector, cum_data, layout);
     }
 
     $(document).ready(() => {
+        let graph_width = 1000;
+        let graph_height = 400;
         {% if vc_org_data %}
-            var vc_org_data = {{ vc_org_data | jsonify }};
-            plotClassifications('org-classifications-graph', vc_org_data, 'Classifications per organisation', 600, 380);
+            let vc_org_data = {{ vc_org_data | jsonify }};
+            plotClassifications('org-classifications-graph', vc_org_data, 'Allele Clinical Significance by Organisation', graph_width, graph_height);
         {% endif %}
-
-        {% if vc_state_data %}
-            var vc_state_data = {{ vc_state_data | jsonify }};
-            plotClassifications('state-classifications-graph', vc_state_data, 'Classifications per state', 600, 380);
+        {% if accumulation_by_status %}
+            let accumulation_by_status = {{ accumulation_by_status | jsonify }};
+            plotCumulativeClassifications("accumulation-status-graph", accumulation_by_status, "Cumulative Alleles by  Status", graph_width, graph_height)
+        {% endif %}
+        {% if accumulation_by_org %}
+            let accumulation_by_org = {{ accumulation_by_org | jsonify }};
+            plotCumulativeClassifications("accumulation-org-graph", accumulation_by_org, "Cumulative Alleles by Organisation", graph_width, graph_height)
+        {% endif %}
+        {% if vc_normalized_state_data_json %}
+            let vc_normalized_state_data_json = {{ vc_normalized_state_data_json | jsonify }};
+            plotClassifications('normalized-state-classifications-graph', vc_normalized_state_data_json, 'Classifications/100k Pop by State', graph_width, graph_height);
         {% endif %}
     });
 </script>
@@ -80,22 +74,32 @@
 {% block content %}
     <div class="container">
         <h3>Lab Submissions</h3>
-        <div class="admin-only">
-            <a href="{% url 'classification_accumulation_data' %}" class="hover-link download-link">Submissions status over time</a>
-        </div>
+        <p class="text-info">These graphs plot data as one point per allele. This means 10 records for the same allele will only count once.</p>
         <div class="row">
-            <div class="col-lg-8">
-                <div id='org-classifications-graph' class="per-org"></div>
-                <div id='state-classifications-graph' class="per-state"></div>
-                <div class="graph-switch">
-                    <a class="per-state hover-link" href="javascript:showOrg();">Show by organisation</a></span>
-                    <a class="per-org hover-link" href="javascript:showState();">Show by state</a></span>
-                </div>
+            <div class="col">
+
+                {% ui_register_tabs tab_set="graph_tabs" %}
+                {% if vc_org_data %}
+                    {% ui_register_tab_embedded tab_set="graph_tabs" label="Clinical Significance by Org" %}<div id='org-classifications-graph'></div>{% end_ui_register_tab_embedded %}
+                {% endif %}
+                {% if accumulation_by_status %}
+                    {% ui_register_tab_embedded tab_set="graph_tabs" label="Cumulative Alleles by Status" %}<div id='accumulation-status-graph'></div>{% end_ui_register_tab_embedded %}
+                {% endif %}
+                {% if accumulation_by_org %}
+                    {% ui_register_tab_embedded tab_set="graph_tabs" label="Cumulative Alleles by Org" %}<div id='accumulation-org-graph'></div>{% end_ui_register_tab_embedded %}
+                {% endif %}
+                {% if vc_normalized_state_data_json %}
+                    {% ui_register_tab_embedded tab_set="graph_tabs" label="Classifications/100K Pop by State" %}<div id='normalized-state-classifications-graph'></div>{% end_ui_register_tab_embedded %}
+                {% endif %}
+                {% ui_render_tabs tab_set="graph_tabs" mode="tabs" %}
+
             </div>
+            {% comment %} This just becomes a graph of Australian capital cities
             <div class="col-lg-4">
               {% load lab_location_tags %}
               {% lab_locations labs=labs involved_only=False center_lat=-33 center_long=133.7751 zoom_level=3 %}
             </div>
+           {% endcomment %}
         </div>
 
         <div class="row equal">

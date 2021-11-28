@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 
+import logging
+
 from django.core.management.base import BaseCommand
 from django.db.utils import DatabaseError
-import logging
 
 from annotation.annotation_versions import get_variant_annotation_version
 from annotation.tasks.annotation_scheduler_task import annotation_scheduler

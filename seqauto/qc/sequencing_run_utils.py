@@ -11,7 +11,6 @@ from collections import defaultdict
 from seqauto.models import SequencingRun, IlluminaFlowcellQC, ReadQ30, QCExecSummary, QCType
 from seqauto.models.models_enums import QCCompareType
 
-
 ILLUMINA_FLOWCELL_QC_COLUMNS = ["mean_cluster_density", "mean_pf_cluster_density", "total_clusters",
                                 "total_pf_clusters", "percentage_of_clusters_pf", "aligned_to_phix"]
 PAIRED_END_READS = ('R1', 'R2')

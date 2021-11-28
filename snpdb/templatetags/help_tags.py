@@ -1,9 +1,9 @@
+import os
+
 from django.conf import settings
 from django.contrib.staticfiles import finders
 from django.template import Library
 from django.utils.safestring import SafeText
-import os
-import uuid
 
 register = Library()
 

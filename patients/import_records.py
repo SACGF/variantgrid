@@ -12,10 +12,12 @@ Imports work by:
 
 """
 
+import logging
+
+import pandas as pd
 from dateutil import parser
 from django.utils import timezone
 from guardian.shortcuts import get_objects_for_user
-import logging
 
 from annotation.phenotype_matching import bulk_patient_phenotype_matching
 from library.guardian_utils import assign_permission_to_user_and_groups
@@ -24,7 +26,6 @@ from patients.models import PatientColumns, PatientRecord, Specimen, Patient, \
     PatientModification, PatientRecordOriginType
 from patients.models_enums import Sex, NucleicAcid, Mutation
 from snpdb.models import Sample
-import pandas as pd
 
 UNKNOWN_STRING = 'UNKNOWN'  # Upper
 

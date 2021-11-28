@@ -1,5 +1,6 @@
-from django.template import Library, loader
 import uuid
+
+from django.template import Library, loader
 
 from snpdb.models import Wiki
 

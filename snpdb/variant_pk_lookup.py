@@ -206,7 +206,12 @@ class VariantPKLookup(abc.ABC):
 class DBVariantPKLookup(VariantPKLookup):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.reference_seq_id = Sequence.objects.get_or_create(seq=Variant.REFERENCE_ALT)[0].pk
+        defaults = {
+            "seq_md5_hash": md5sum_str(Variant.REFERENCE_ALT),
+            "length": len(Variant.REFERENCE_ALT),
+        }
+        self.reference_seq_id = Sequence.objects.get_or_create(seq=Variant.REFERENCE_ALT,
+                                                               defaults=defaults)[0].pk
 
     def _get_locus_hash(self, contig_id, position, ref_id):
         return contig_id, position, ref_id

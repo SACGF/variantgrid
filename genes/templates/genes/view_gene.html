@@ -52,7 +52,20 @@
                                         {% else %}
                                             <td>
                                                 {% if d %}
-                                                    <a class="hover-link" href="{% url 'view_gene_symbol' d.gene_symbol %}">{{ d.gene_symbol }}</a>
+                                                    {% if d.hgnc %}
+                                                        <div>
+                                                            <a class="hover-link" href="{% url 'view_gene_symbol' d.hgnc.gene_symbol %}">{{ d.hgnc.gene_symbol }}</a>
+                                                             (<a class="hover-link" href="{{ d.hgnc.get_absolute_url }}">HGNC:{{ d.hgnc.pk }}</a>)
+                                                        </div>
+                                                        {% if d.hgnc.gene_symbol != d.gene_symbol %}
+                                                            <div>
+                                                            <a class="hover-link" href="{% url 'view_gene_symbol' d.gene_symbol %}">{{ d.gene_symbol }}</a>
+                                                            ({{ gene.get_annotation_consortium_display }})
+                                                            </div>
+                                                        {% endif %}
+                                                    {% else %}
+                                                        <a class="hover-link" href="{% url 'view_gene_symbol' d.gene_symbol %}">{{ d.gene_symbol }}</a>
+                                                    {% endif %}
                                                     {{ d.coordinate }}
                                                 {% endif %}
                                             </td>

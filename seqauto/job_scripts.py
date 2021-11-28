@@ -1,8 +1,9 @@
-from django.conf import settings
-from django.template.loader import render_to_string
 import collections
 import logging
 import os
+
+from django.conf import settings
+from django.template.loader import render_to_string
 
 from seqauto.models import SequencingFileType
 

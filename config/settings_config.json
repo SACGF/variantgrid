@@ -1,0 +1,37 @@
+{
+  "DB": {
+    "host": "localhost",
+    "name": "snpdb",
+    "user": "snpdb",
+    "password": "snpdb"
+  },
+  "CELERY": {
+    "broker_url": "amqp://guest:guest@localhost"
+  },
+  "CLINGEN_ALLELE_REGISTRY": {
+    "login": "variantgrid",
+    "password": "cl1ng3n_VG"
+  },
+  "RECAPTCHA": {
+    "public_key": null,
+    "private_key": null
+  },
+  "ROLLBAR": {
+    "access_token": "908d7bc42049497494d408f7fb9ee6a5",
+    "client_access_token": "73c2b9b06f4a433d8d1496ae72e42f1e"
+  },
+  "ENTREZ": {
+    "api_key": null,
+    "email": null
+  },
+  "SAPATH": {
+    "HELIX": {
+      "user": null,
+      "password": null
+    }
+  },
+  "SLACK": {
+    "enabled": false,
+    "admin_callback_url": null
+  }
+}

@@ -1,9 +1,9 @@
 import typing
 from enum import Enum
-
-from django.contrib.auth.models import User
 from functools import total_ordering
 from typing import List, Optional, Union
+
+from django.contrib.auth.models import User
 
 from library.guardian_utils import public_group, all_users_group
 from library.utils import ChoicesEnum
@@ -47,6 +47,7 @@ class SpecialEKeys:
     GNOMAD_OE_LOF = "gnomad_oe_lof"
     INTERNAL_SAMPLES_20X_COVERAGE = "internal_samples_100_percent_20x_gene_coverage"
     LITERATURE = "literature"
+    LRG_ID = "lrg_id"
     NUCLEIC_ACID_SOURCE = "nucleic_acid_source"
     PATIENT_ID = "patient_id"
     PHRED_LIKELIHOOD = 'phred_likelihood'
@@ -349,7 +350,9 @@ class CriteriaEvaluation:
     NOT_MET = CRITERIA_NOT_MET
     NOT_APPLICABLE = CRITERIA_NOT_APPLICABLE
 
-    BENIGN_UNSPECIFIED = 'B?'
+    # UNSPECIFIED STRENGTH HANDLING
+
+    BENIGN_UNSPECIFIED = 'BX'
     BENIGN_STANDALONE = 'BA'
     BENIGN_STRONG = 'BS'
     BENIGN_MODERATE = 'BM'  # Not a standard ACMG Strength
@@ -359,7 +362,7 @@ class CriteriaEvaluation:
     PATHOGENIC_MODERATE = 'PM'
     PATHOGENIC_STRONG = 'PS'
     PATHOGENIC_VERY_STRONG = 'PVS'
-    PATHOGENIC_UNSPECIFIED = 'P?'
+    PATHOGENIC_UNSPECIFIED = 'PX'
 
     CHOICES = (
         (BENIGN_STANDALONE, 'Benign Standalone'),

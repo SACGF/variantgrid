@@ -1,4 +1,5 @@
 from kombu import Exchange, Queue
+
 from variantgrid.settings.components.secret_settings import get_secret
 
 # Using RabbitMQ as Redis broker was re-executing long tasks (eg variant annotation)
@@ -143,4 +144,4 @@ CELERY_IMPORTS = (
 )
 
 CELERY_ALWAYS_EAGER = False  # True to execute in http server process (or Eclipse)
-CELERY_RESULT_BACKEND = BROKER_URL
+CELERY_RESULT_BACKEND = "redis://127.0.0.1:6379/1"

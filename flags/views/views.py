@@ -1,17 +1,19 @@
+import datetime
+from typing import Iterable, Dict, Any, Union, List, Optional
+
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.utils import timezone
 from django.utils.timezone import now
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from typing import Iterable, Dict, Any, Union, List, Optional
-import datetime
 
-from flags.models import Flag, FlagComment, FlagType, FlagCollection, FlagWatch
+from flags.models import Flag, FlagComment, FlagType, FlagCollection, FlagWatch, FlagPermissionLevel
 from flags.models.enums import FlagStatus
 from flags.models.models import FlagResolution, FlagTypeResolution, fetch_flag_infos
 from library.django_utils import ensure_timezone_aware
 from library.utils import empty_to_none
-from snpdb.models import Lab
+from snpdb.models import Lab, AvatarDetails
 from snpdb.models.models_user_settings import UserSettings
 
 
@@ -217,11 +219,12 @@ class FlagHelper:
         users_json = []
         for user in self.users.values():
             user_settings = UserSettings.get_for_user(user)
+            avatar = AvatarDetails.avatar_for(user)
             json_entry = {
                 'id': user.id,
-                'name': UserSettings.preferred_label_for(user),
-                'avatar': user_settings.avatar_url,
-                'color': user_settings.avatar_color,
+                'name': avatar.preferred_label,
+                'avatar': avatar.url,
+                'color': avatar.background_color,
                 'lab': self.lab_text(user)
             }
             users_json.append(json_entry)
@@ -283,6 +286,7 @@ class FlagHelper:
 
             for flag_type in self.flag_types.values():
                 resolutions = list(FlagTypeResolution.objects.filter(flag_type=flag_type).values_list('resolution__id', flat=True))
+
                 json_entry = {
                     'id': flag_type.pk,
                     'only_one': flag_type.only_one,
@@ -296,6 +300,14 @@ class FlagHelper:
                     'importance': flag_type.importance,
                     'resolutions': resolutions
                 }
+
+                # Dirty hack, that links VariantGrid settings to a specific flag type
+                # maybe replace it with a hook that can alter the information?
+                if not (settings.CLINVAR_EXPORT or {}).get("mode") and flag_type.pk == "classification_not_public":
+                    # this disables anyone from raising a new flag of this type, but wont break any existing flags
+                    json_entry["permission"] = FlagPermissionLevel.ADMIN
+                    json_entry["raise_permission"] = FlagPermissionLevel.ADMIN
+                    json_entry["comments_enabled"] = False
 
                 flag_types.append(json_entry)
             json_data['flag_types'] = flag_types

@@ -1,0 +1,5 @@
+{% load ui_utils %}
+{% if error %}<div class="text-danger">{{ 'error' | severity_icon }}{{ error }}</div>
+{% elif extension %}<div>File ending with : <span class="text-monospace">.{{ extension }}</span></div>
+{% else %}<div>{{ pattern }}</div>
+{% endif %}

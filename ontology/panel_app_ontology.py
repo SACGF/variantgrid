@@ -1,6 +1,8 @@
 from datetime import timedelta
-from django.conf import settings
 from typing import Union
+
+from django.conf import settings
+
 from genes.models import GeneSymbol, PanelAppServer
 from genes.panel_app import get_panel_app_results_by_gene_symbol_json, PANEL_APP_SEARCH_BY_GENES_BASE_PATH
 from library.cache import timed_cache
@@ -8,7 +10,6 @@ from library.log_utils import report_exc_info, report_message
 from library.utils import md5sum_str
 from ontology.models import OntologyTerm, OntologyRelation, OntologyImportSource
 from ontology.ontology_builder import OntologyBuilder, OntologyBuilderDataUpToDateException
-
 
 # increment if you change the logic of parsing ontology terms from PanelApp
 # which will then effectively nullify the cache so the new logic is run
@@ -61,7 +62,7 @@ def _update_gene_relations(gene_symbol: str):
                                             "evidence": evidence
                                         })
                                 else:
-                                    report_message("Found ontology term from PanelApp not in DB", level="error", extra_data={"target": full_id})
+                                    report_message("Found ontology term from PanelApp not in DB", level="error", extra_data={"target": full_id, "gene_symbol": str(gene_symbol)})
 
                             from annotation.regexes import db_ref_regexes, DbRegexes
                             for result in db_ref_regexes.search(phenotype_row, default_regex=DbRegexes.OMIM):

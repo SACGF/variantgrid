@@ -4,7 +4,6 @@ from unittest import mock
 from django.test import TestCase, override_settings
 
 from classification.enums import SpecialEKeys, SubmissionSource, ShareLevel
-from uicore.json.json_types import JsonObjType
 from classification.models import Classification, ClinVarExport, ClinVarExportBatch, ClinVarExportStatus, \
     ClinVarExportRequestType, ClinVarExportRequest, ClinVarExportBatchStatus
 from classification.models.clinvar_export_prepare import ClinvarAlleleExportPrepare
@@ -13,6 +12,7 @@ from classification.models.tests.test_utils import ClassificationTestUtils
 from library.guardian_utils import admin_bot
 from snpdb.models import GenomeBuild, ClinVarKey
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant, create_mock_allele
+from uicore.json.json_types import JsonObjType
 
 
 def mock_send_data(
@@ -26,13 +26,11 @@ def mock_send_data(
 
     if request_type == ClinVarExportRequestType.INITIAL_SUBMISSION:
         response_json={
-            "actions": [{
-                "id": "SUB999999-1",
-                "responses": [],
-                "status": "submitted",
-                "targetDb": "clinvar",
-                "updated": "2021-03-19T17:24:24.384085Z"
-            }]
+            "id": "SUB999999-1",
+            "responses": [],
+            "status": "submitted",
+            "targetDb": "clinvar",
+            "updated": "2021-03-19T17:24:24.384085Z"
         }
     if request_type == ClinVarExportRequestType.POLLING_SUBMISSION:
 
@@ -106,7 +104,7 @@ def mock_send_data(
                 {
                     "identifiers": {
                         "localID": "ALLELE_1",  # might need to force this ID somehow
-                        "clinvarLocalKey": "adefc5ed-7d59-4119-8b3d-07dcdc504c09_success1",
+                        "clinvarLocalKey": "instx/labby/x42",
                         "localKey": "instx/labby/x42",
                         "clinvarAccession": "SCV000839746"
                     },
@@ -128,7 +126,7 @@ def mock_send_data(
 class TestClinVarExport(TestCase):
 
     @mock.patch('classification.models.clinvar_export_sync.ClinVarExportSync._send_data', side_effect=mock_send_data)
-    @override_settings(VARIANT_CLASSIFICATION_MATCH_VARIANTS=False, CLINVAR_EXPORT={"enabled": True, "test": False, "api_key": "ABC123"})
+    @override_settings(VARIANT_CLASSIFICATION_MATCH_VARIANTS=False, CLINVAR_EXPORT={"enabled": True, "mode": "prod", "api_key": "ABC123"})
     def test_clinvar_setup(self, mocked_send_data):
 
         grch37 = GenomeBuild.get_name_or_alias("GRCh37")

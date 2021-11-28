@@ -7,9 +7,9 @@ from analysis.models import AnalysisVariable, FilterNode, FilterNodeItem, Phenot
     TissueNode, SelectedInParentNode, SampleNode, PopulationNode, PopulationNodeGnomADPopulation, GeneListNode, \
     IntersectionNode, GeneListNodeGeneList, Analysis, AlleleFrequencyNode, AllVariantsNode, TagNode, MergeNode, \
     PhenotypeNodeOntologyTerm
+from analysis.models.models_variant_tag import VariantTag
 from analysis.models.nodes.analysis_node import NodeAlleleFrequencyRange, NodeAlleleFrequencyFilter, AnalysisNode, \
     NodeWiki
-from analysis.models.models_variant_tag import VariantTag
 from genes.serializers import GeneListSerializer
 from library.django_utils import get_model_fields
 from library.django_utils.django_rest_utils import DynamicFieldsModelSerializer

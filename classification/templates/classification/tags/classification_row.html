@@ -15,7 +15,7 @@
     </td>
     <td class="gene_symbol">{{ gene_symbol | default_if_none:""}}</td>
     <td class="hgvs">
-        {% hgvs hgvs=best_hgvs show_variant_link=show_variant_link %}
+        {% c_hgvs c_hgvs %}
         {% if p_hgvs %}
             <span class="d-block mt-1 text-secondary">{{ p_hgvs }}</span>
         {% endif %}

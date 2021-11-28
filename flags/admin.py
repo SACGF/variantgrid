@@ -1,13 +1,12 @@
 from django.contrib import admin
-from django.contrib.admin import RelatedFieldListFilter, AllValuesFieldListFilter, TabularInline
+from django.contrib.admin import RelatedFieldListFilter, TabularInline
 
-from flags import models
-from flags.models import FlagStatus, Flag, FlagComment, FlagResolution, FlagTypeResolution, FlagCollection
+from flags.models import Flag, FlagComment, FlagTypeResolution, FlagCollection
 from flags.models.models import FlagType
 from snpdb.admin_utils import ModelAdminBasics, AllValuesChoicesFieldListFilter
 
 
-class FlagCommentAdmin(TabularInline):
+class FlagCommentAdminTabular(TabularInline):
     model = FlagComment
 
     def has_add_permission(self, request, obj):
@@ -18,10 +17,15 @@ class FlagCommentAdmin(TabularInline):
 class FlagAdmin(ModelAdminBasics):
     list_display = ('id', 'collection', 'flag_type', 'resolution', 'user', 'data', 'created', 'modified')
     list_filter = (('flag_type', RelatedFieldListFilter), ('resolution__status', AllValuesChoicesFieldListFilter), ('user', RelatedFieldListFilter))
-    inlines = (FlagCommentAdmin,)
+    inlines = (FlagCommentAdminTabular,)
 
     def has_add_permission(self, request):
         return False
+
+
+@admin.register(FlagComment)
+class FlagCommentAdmin(ModelAdminBasics):
+    list_display = ('id', 'flag', 'user', 'text', 'resolution', 'created', 'modified')
 
 
 class FlagTypeResolution(TabularInline):
@@ -40,11 +44,12 @@ class FlagTypeResolution(TabularInline):
 class FlagTypeAdmin(ModelAdminBasics):
     list_display = ('id', 'context', 'label', 'description', 'help_text', 'raise_permission')
     list_filter = (('context', RelatedFieldListFilter), )
-    inlines = (FlagTypeResolution,)
 
 
 class FlagInline(TabularInline):
     model = Flag
+    fields = ("id", "flag_type", "user", "resolution", "data")
+    show_change_link = True
 
     def has_add_permission(self, request, obj):
         return False

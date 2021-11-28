@@ -11,11 +11,14 @@
 
         {% if not sapath_enabled %}
             <div class="card mt-4">
-                <div class="card-header">XX, 2021</div>
+                <div class="card-header">August 24, 2021</div>
                 <div class="card-body">
                     <ul>
                         <li>Search works for ontology terms</li>
                         <li>Ontology term page shows classifications and patients linked to term</li>
+                        {% if site_name == 'Shariant' %}
+                            <li>ClinVar Export introduced</li>
+                        {% endif %}
                     </ul>
                 </div>
             </div>

@@ -1,5 +1,6 @@
-from django.conf import settings
 import logging
+
+from django.conf import settings
 
 from pedigree.ped.import_ped import import_ped, automatch_pedigree_samples
 from upload.models import UploadedPedFile

@@ -1,6 +1,12 @@
+import collections
+import logging
+import re
+from typing import Optional, Pattern, Tuple, Iterable, Set, Union
+
+import django.dispatch
 from django.conf import settings
 from django.contrib.auth.models import User
-from django.db import models
+from django.db import models, IntegrityError
 from django.db.models import Value as V, QuerySet, F
 from django.db.models.deletion import CASCADE, DO_NOTHING
 from django.db.models.fields import TextField
@@ -12,10 +18,6 @@ from django.urls.base import reverse
 from django_extensions.db.models import TimeStampedModel
 from lazy import lazy
 from model_utils.managers import InheritanceManager
-from typing import Optional, Pattern, Tuple, Iterable, Set
-import collections
-import django.dispatch
-import re
 
 from flags.models import FlagCollection, flag_collection_extra_info_signal, FlagInfos
 from flags.models.models import FlagsMixin, FlagTypeContext
@@ -25,13 +27,12 @@ from library.utils import md5sum_str
 from snpdb.models import Wiki
 from snpdb.models.flag_types import allele_flag_types
 from snpdb.models.models_clingen_allele import ClinGenAllele
-from snpdb.models.models_genome import Contig, GenomeBuild, GenomeBuildContig
 from snpdb.models.models_enums import AlleleConversionTool, AlleleOrigin, ProcessingStatus
+from snpdb.models.models_genome import Contig, GenomeBuild, GenomeBuildContig
 
-LOCUS_PATTERN = re.compile(r"^([^:]+):(\d+)[,\s]*([GATC]+)$")
+LOCUS_PATTERN = re.compile(r"^([^:]+):(\d+)[,\s]*([GATC]+)$", re.IGNORECASE)
 LOCUS_NO_REF_PATTERN = r"^([^:]+):(\d+)$"
-VARIANT_PATTERN = re.compile(r"^([^:]+):(\d+)[,\s]*([GATC]+)>([GATC]+)$")
-REF_VARIANT_PATTERN = re.compile(r"^([^:]+):(\d+)[,\s]*([GATC]+)>= \(ref\)$")
+VARIANT_PATTERN = re.compile(r"^([^:]+):(\d+)[,\s]*([GATC]+)>(=|[GATC]+)$", re.IGNORECASE)
 
 allele_validate_signal = django.dispatch.Signal(providing_args=["allele"])
 
@@ -91,7 +92,8 @@ class Allele(FlagsMixin, models.Model):
             return va.variant
         raise ValueError(f'Could not find any variants in allele {self.id}')
 
-    def get_liftover_variant_tuple(self, genome_build: GenomeBuild) -> Tuple[str, 'VariantCoordinate']:
+    def get_liftover_tuple(self, genome_build: GenomeBuild) -> Tuple[AlleleConversionTool,
+                                                                     Union[int, 'VariantCoordinate']]:
         """ Used by to write VCF coordinates during liftover. Can be slow (API call)
             If you know a VariantAllele exists for your build, use variant_for_build(genome_build).as_tuple() """
 
@@ -103,8 +105,8 @@ class Allele(FlagsMixin, models.Model):
         for variant_allele in self.variantallele_set.all():
             if variant_allele.variant.locus.contig_id in genome_build_contigs:
                 conversion_tool = AlleleConversionTool.SAME_CONTIG
-                variant_tuple = variant_allele.variant.as_tuple()
-                return conversion_tool, variant_tuple
+                # Return variant_id so we can create it directly
+                return conversion_tool, variant_allele.variant_id
 
         conversion_tool = None
         g_hgvs = None
@@ -130,7 +132,7 @@ class Allele(FlagsMixin, models.Model):
 
         return conversion_tool, variant_tuple
 
-    def merge(self, conversion_tool, other_allele: "Allele"):
+    def merge(self, conversion_tool, other_allele: "Allele") -> bool:
         """ Merge other_allele into this allele """
 
         if self == other_allele:
@@ -167,7 +169,17 @@ class Allele(FlagsMixin, models.Model):
                 other_fc.classification_set.update(flag_collection=self.flag_collection)
             existing_allele_cc_names = self.clinicalcontext_set.values_list("name", flat=True)
             other_allele.clinicalcontext_set.exclude(name__in=existing_allele_cc_names).update(allele=self)
-            other_allele.variantallele_set.update(allele=self, conversion_tool=conversion_tool)
+            for va in other_allele.variantallele_set.all():
+                try:
+                    va.allele = self
+                    va.conversion_tool = conversion_tool
+                    va.save()
+                except IntegrityError:
+                    logging.warning("VariantAllele exists with allele/build/variant of %s/%s/%s - deleting this one",
+                                    va.allele, va.genome_build, va.variant)
+                    va.delete()
+
+        return can_merge
 
     @property
     def build_names(self) -> str:
@@ -376,6 +388,10 @@ class Variant(models.Model):
         contig = locus.contig
         return VariantCoordinate(chrom=contig.name, pos=locus.position, ref=locus.ref.seq, alt=self.alt.seq)
 
+    @staticmethod
+    def is_ref_alt_reference(ref, alt):
+        return ref == alt or alt == '.'
+
     @property
     def is_reference(self) -> bool:
         return self.alt.seq == self.REFERENCE_ALT
@@ -387,8 +403,20 @@ class Variant(models.Model):
         return self.alt.is_standard_sequence()
 
     @property
+    def is_indel(self) -> bool:
+        return self.alt.seq != Variant.REFERENCE_ALT and self.locus.ref.length != self.alt.length
+
+    @property
+    def is_insertion(self) -> bool:
+        return self.alt.seq != Variant.REFERENCE_ALT and self.locus.ref.length < self.alt.length
+
+    @property
     def is_deletion(self) -> bool:
         return self.alt.seq != Variant.REFERENCE_ALT and self.locus.ref.length > self.alt.length
+
+    @property
+    def can_have_clingen_allele(self) -> bool:
+        return self.is_standard_variant or self.is_reference
 
     @property
     def can_have_annotation(self) -> bool:
@@ -455,9 +483,9 @@ class Variant(models.Model):
 
     @staticmethod
     def clean_variant_fields(chrom, position, ref, alt, want_chr):
-        ref = ref.upper()
-        alt = alt.upper()
-        if ref == alt:
+        ref = ref.strip().upper()
+        alt = alt.strip().upper()
+        if Variant.is_ref_alt_reference(ref, alt):
             alt = Variant.REFERENCE_ALT
         chrom = format_chrom(chrom, want_chr)
         return chrom, position, ref, alt

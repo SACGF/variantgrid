@@ -1,4 +1,5 @@
 from django.test.testcases import TestCase
+
 from genes.hgvs import CHGVS, CHGVSDiff
 
 

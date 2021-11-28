@@ -4,7 +4,6 @@ from seqauto import models
 from seqauto.models import SequencingRun, IlluminaFlowcellQC, Fastq, FastQC, \
     UnalignedReads, BamFile, Flagstats, VCFFile, QC, QCExecSummary, SeqAutoRun
 
-
 # Register your models here.
 admin.site.register(models.Sequencer)
 admin.site.register(models.SequencerModel)

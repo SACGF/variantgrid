@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 
+import logging
+
 import cyvcf2
 from django.core.management.base import BaseCommand
-import logging
 
 from analysis.models.enums import NodeStatus
 from analysis.vcf_files.bulk_vcf_count_inserter import BulkVCFCountInserter

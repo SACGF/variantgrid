@@ -5,8 +5,9 @@
 
 """
 
-from django.core.management.base import BaseCommand
 import logging
+
+from django.core.management.base import BaseCommand
 
 from seqauto.models import IlluminaFlowcellQC
 from snpdb.models import DataState

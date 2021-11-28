@@ -1,7 +1,12 @@
+import logging
+import re
+from typing import Dict, Optional, Tuple
+
 from django.conf import settings
 from django.db import models
 from django_extensions.db.models import TimeStampedModel
-import re
+from lazy import lazy
+from pyhgvs import HGVSName
 
 from snpdb.models.models_enums import SequenceRole
 from snpdb.models.models_genome import GenomeBuild, Contig
@@ -18,10 +23,21 @@ class ClinGenAllele(TimeStampedModel):
     CLINGEN_ALLELE_CODE_PATTERN = re.compile(r"^CA(\d+)")
     CLINGEN_ALLELE_MAX_REPRESENTATION_SIZE = 10000
 
-    class ClinGenBuildNotInResponseError(ValueError):
+    class ClinGenAlleleRegistryException(ValueError):
+        """ Base exception """
+
+    class ClinGenBuildNotInResponseError(ClinGenAlleleRegistryException):
         pass
 
-    class ClinGenNonChromosomeLiftoverError(ValueError):
+    class ClinGenNonChromosomeLiftoverError(ClinGenAlleleRegistryException):
+        pass
+
+    class ClinGenMissingAlleleID(ClinGenAlleleRegistryException):
+        """ Coordinate is not yet assigned ID and stored on server """
+        pass
+
+    class ClinGenHGVSReferenceBaseUnavailableError(ClinGenAlleleRegistryException):
+        """ HGVS doesn't have reference """
         pass
 
     @staticmethod
@@ -35,8 +51,7 @@ class ClinGenAllele(TimeStampedModel):
         url_id = api_response["@id"]
         if m := ClinGenAllele.CLINGEN_ALLELE_URL_PATTERN.match(url_id):
             return int(m.group(1))
-        msg = f"Couldn't retrieve ClinGen AlleleID from @id '{url_id}'"
-        raise ValueError(msg)
+        raise ClinGenAllele.ClinGenMissingAlleleID(f"Couldn't retrieve ClinGen AlleleID from @id '{url_id}'")
 
     @staticmethod
     def get_id_from_code(code):
@@ -49,24 +64,104 @@ class ClinGenAllele(TimeStampedModel):
     def looks_like_id(code):
         return ClinGenAllele.get_id_from_code(code) >= 0
 
-    def get_p_hgvs(self, transcript_id, match_version=True):
-        if not match_version:
-            transcript_id = ClinGenAllele._strip_transcript_version(transcript_id)
-
-        transcript_alleles = self.api_response.get("transcriptAlleles")
-        if transcript_alleles:
+    @lazy
+    def transcript_alleles_by_transcript_accession(self) -> Dict[str, Dict]:
+        ta_by_tv = {}
+        if transcript_alleles := self.api_response.get("transcriptAlleles"):
             for ta in transcript_alleles:
                 for t_hgvs in ta["hgvs"]:
-                    hgvs_transcript = t_hgvs.split(":")[0]
-                    if not match_version:
-                        hgvs_transcript = ClinGenAllele._strip_transcript_version(hgvs_transcript)
-                    if transcript_id == hgvs_transcript:
-                        protein_effect = ta.get("proteinEffect")
-                        if protein_effect:
-                            p_hgvs = protein_effect.get("hgvs")
-                            if p_hgvs:
-                                return p_hgvs
+                    transcript_accession = t_hgvs.split(":")[0]
+                    ta_by_tv[transcript_accession] = ta
+        return ta_by_tv
+
+    @lazy
+    def transcript_alleles_by_transcript(self) -> Dict[str, Dict]:
+        """ Version stripped off """
+        ta_by_t = {}
+        for transcript_accession, ta in self.transcript_alleles_by_transcript_accession.items():
+            transcript_id = ClinGenAllele._strip_transcript_version(transcript_accession)
+            ta_by_t[transcript_id] = ta
+        return ta_by_t
+
+    def _get_transcript_allele(self, transcript_accession, match_version=True) -> Optional[Dict]:
+        if match_version:
+            ta = self.transcript_alleles_by_transcript_accession.get(transcript_accession)
+        else:
+            transcript_id = ClinGenAllele._strip_transcript_version(transcript_accession)
+            ta = self.transcript_alleles_by_transcript.get(transcript_id)
+        return ta
+
+    def get_p_hgvs(self, transcript_accession, match_version=True):
+        if ta := self._get_transcript_allele(transcript_accession, match_version):
+            if protein_effect := ta.get("proteinEffect"):
+                if p_hgvs := protein_effect.get("hgvs"):
+                    return p_hgvs
         return None
+
+    def get_c_hgvs_name(self, transcript_accession) -> Optional[HGVSName]:
+        """ c.HGVS has reference bases on it """
+        from genes.models import TranscriptVersionSequenceInfo
+
+        hgvs_name = None
+        raw_hgvs_string, t_data = self._get_raw_hgvs_and_data(transcript_accession)
+        if raw_hgvs_string:  # Has for this transcript version
+            hgvs_name = HGVSName(raw_hgvs_string)
+            # Sometimes ClinGen return "n." on NM transcripts - reported as a bug 22/9/21
+            if hgvs_name.kind == "n":
+                if transcript_accession.startswith("NM_") or "proteinEffect" in t_data:
+                    hgvs_name.kind = 'c'
+
+            if not hgvs_name.gene:  # Ref/Ens HGVSs have transcript no gene, LRG is set as gene
+                hgvs_name.gene = t_data.get("geneSymbol")
+
+            if hgvs_name.mutation_type in {"dup", "del", "delins"}:
+                # We want to add reference bases onto HGVS but ClinGen reference sequence is wrong (see issue #493)
+                coord = t_data["coordinates"][0]
+                if "startIntronOffset" in coord:
+                    # We have to accept these - as we get so many but we can't add on the bases
+                    msg = "A coding DNA reference sequence does not contain intron or 5' and 3' gene "\
+                          "flanking sequences and can therefore not be used as a reference to describe " \
+                          "variants in these regions"
+                    if settings.CLINGEN_ALLELE_REGISTRY_REQUIRE_REF_ALLELE:
+                        raise ClinGenAllele.ClinGenHGVSReferenceBaseUnavailableError(msg)
+                    else:
+                        logging.warning(msg)
+                elif transcript_accession.startswith("LRG_"):
+                    logging.warning("Don't have sequence for LRGs, relying on ClinGenAlleleRegistry reference "
+                                    "bases which may be wrong")
+                else:
+                    from genes.models import NoTranscript
+
+                    try:
+                        tvsi = TranscriptVersionSequenceInfo.get(transcript_accession)
+                        if hgvs_name.mutation_type == "dup":
+                            ref_end = coord["end"]
+                            ref_start = ref_end - len(coord["allele"])
+                        else:
+                            ref_start = coord["start"]
+                            ref_end = coord["end"]
+                        hgvs_name.ref_allele = tvsi.sequence[ref_start:ref_end]
+                    except NoTranscript as e_no_transcript:
+                        if settings.CLINGEN_ALLELE_REGISTRY_REQUIRE_REF_ALLELE:
+                            raise ClinGenAllele.ClinGenHGVSReferenceBaseUnavailableError() from e_no_transcript
+                        else:
+                            logging.warning(e_no_transcript)
+        return hgvs_name
+
+    def _get_raw_hgvs_and_data(self, transcript_accession, match_version=True) -> Tuple[Optional[str],
+                                                                                        Optional[Dict]]:
+        if ta := self._get_transcript_allele(transcript_accession, match_version):
+            transcript_id = ClinGenAllele._strip_transcript_version(transcript_accession)
+            for t_hgvs in ta["hgvs"]:
+                hgvs_transcript_accession = t_hgvs.split(":")[0]
+                if match_version:
+                    if transcript_accession == hgvs_transcript_accession:
+                        return t_hgvs, ta
+                else:
+                    hgvs_transcript_id = ClinGenAllele._strip_transcript_version(hgvs_transcript_accession)
+                    if transcript_id == hgvs_transcript_id:
+                        return t_hgvs, ta
+        return None, None
 
     @staticmethod
     def filtered_genomic_alleles(genomic_alleles, genome_build: GenomeBuild):
@@ -123,7 +218,9 @@ class ClinGenAllele(TimeStampedModel):
 
     @staticmethod
     def format_clingen_allele(pk):
-        return f"CA{pk:06}"
+        if pk:
+            return f"CA{pk:06}"
+        return "Unregistered Allele"
 
     def __str__(self):
         """ ClinGen has minimum length of 6 (0 padded) but can go longer """

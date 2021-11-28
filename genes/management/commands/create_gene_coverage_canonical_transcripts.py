@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 
-from django.core.management.base import BaseCommand
 import logging
+
+from django.core.management.base import BaseCommand
 
 from genes.models import GeneCoverageCanonicalTranscript, GeneCoverageCollection
 from genes.tasks.gene_coverage_tasks import create_canonical_gene_coverage_for_enrichment_kit

@@ -5,10 +5,10 @@ from django.test import TestCase
 
 from classification.enums import SubmissionSource, \
     SpecialEKeys, ShareLevel
-from classification.models.tests.test_utils import ClassificationTestUtils
 from classification.models.classification import Classification, ClassificationModification
 from classification.models.classification_patcher import patch_merge_age_units, patch_fuzzy_age
 from classification.models.classification_utils import PatchMeta
+from classification.models.tests.test_utils import ClassificationTestUtils
 
 
 class ClassificationTestCaseAge(TestCase):
@@ -25,7 +25,7 @@ class ClassificationTestCaseAge(TestCase):
         :return:
         """
         lab, user = ClassificationTestUtils.lab_and_user()
-        user2 = User.objects.filter(username='joejoe2').get()
+        user2 = User.objects.get(username='joejoe2')
         vc = Classification.create(
             user=user,
             lab=lab,
@@ -71,7 +71,7 @@ class ClassificationTestCaseAge(TestCase):
         Test converting age to a range of 10
         """
         lab, user = ClassificationTestUtils.lab_and_user()
-        user2 = User.objects.filter(username='joejoe2').get()
+        user2 = User.objects.get(username='joejoe2')
         vc = Classification.create(
             user=user,
             lab=lab,

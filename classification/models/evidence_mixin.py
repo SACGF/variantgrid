@@ -1,14 +1,16 @@
+import re
 from functools import total_ordering
 from typing import Dict, Any, Mapping, Optional, Union, List, TypedDict
+
+from django.conf import settings
 from lazy import lazy
+
 from annotation.models import Citation, CitationSource
+from classification.enums import SpecialEKeys, CriteriaEvaluation
 from genes.hgvs import CHGVS, PHGVS
 from library.log_utils import report_message
 from library.utils import empty_to_none
 from snpdb.models import GenomeBuild
-from classification.enums import SpecialEKeys, CriteriaEvaluation
-from django.conf import settings
-import re
 
 
 class VCDbRefDict(TypedDict, total=False):
@@ -45,6 +47,10 @@ VCPatch = Dict[str, VCPatchValue]
 @total_ordering
 class CriteriaStrength:
 
+    def __init__(self, ekey: 'EvidenceKey', strength: Optional[str]):
+        self.ekey = ekey
+        self.strength = strength or ekey.default_crit_evaluation
+
     @property
     def strength_value(self) -> int:
         try:
@@ -52,20 +58,31 @@ class CriteriaStrength:
         except:
             return 0
 
-    def __init__(self, ekey: 'EvidenceKey', strength: Optional[str]):
-        self.ekey = ekey
-        self.strength = strength or ekey.default_crit_evaluation
-
     def __str__(self) -> str:
-        if self.ekey.namespace:
-            return f'{self.ekey.pretty_label}_{self.strength}'
-        if self.ekey.default_crit_evaluation == self.strength:
-            return self.ekey.pretty_label
-        criteria_first_letter = self.ekey.key[0].upper()
+
+        # just need special handling of X
+        def strength_suffix(strength:str):
+            if strength == "X":
+                return "unspecified"
+            elif strength.endswith("X"):
+                return strength[0] + "_unspecified"
+            return strength
+
+        # Make sure criteria are in camel case so removing spaces still leaves it readable
+        pretty_label = self.ekey.pretty_label.replace(" ", "")
         suffix = self.strength
-        if criteria_first_letter in {'B', 'P'} and suffix[0] == criteria_first_letter:
+
+        matches_direction = False
+        if not self.ekey.namespace:
+            if self.ekey.default_crit_evaluation == self.strength:
+                return pretty_label
+            criteria_first_letter = self.ekey.key[0].upper()
+            matches_direction = criteria_first_letter == suffix[0]
+
+        if matches_direction:
             suffix = suffix[1:]
-        return f'{self.ekey.pretty_label}_{suffix}'
+
+        return f"{pretty_label}_{strength_suffix(suffix)}"
 
     def __eq__(self, other) -> bool:
         if not isinstance(other, CriteriaStrength):
@@ -120,8 +137,16 @@ class EvidenceMixin:
         return value
 
     def get_genome_build(self) -> GenomeBuild:
-        build_name = self[SpecialEKeys.GENOME_BUILD]
-        return GenomeBuild.get_name_or_alias(build_name)
+        build_name: str
+        try:
+            build_name = self[SpecialEKeys.GENOME_BUILD]
+        except KeyError:
+            raise ValueError("Classification does not have a value for genome build")
+
+        try:
+            return GenomeBuild.get_name_or_alias(build_name)
+        except GenomeBuild.DoesNotExist:
+            raise ValueError(f"Unsupported GenomeBuild {build_name}")
 
     @lazy
     def db_refs(self) -> List[Dict]:
@@ -183,6 +208,7 @@ class EvidenceMixin:
 
         for transcript_key in settings.VARIANT_ANNOTATION_TRANSCRIPT_PREFERENCES:
             transcript_key = {
+                'lrg_identifier': SpecialEKeys.LRG_ID,
                 'refseq_transcript_accession': SpecialEKeys.REFSEQ_TRANSCRIPT_ID,
                 'ensembl_transcript_accession': SpecialEKeys.ENSEMBL_TRANSCRIPT_ID
             }.get(transcript_key)
@@ -253,7 +279,7 @@ class EvidenceMixin:
         return clean
 
     @staticmethod
-    def patch_with(target: dict, patch: dict):
+    def patch_with(target: dict, patch: dict, tidy_nones=False):
         """
         Update the evidence with normalised patch values.
         """
@@ -272,3 +298,12 @@ class EvidenceMixin:
                         existing.pop(sub_key, None)
                     else:
                         existing[sub_key] = sub_value
+
+        if tidy_nones:
+            for key in patch.keys():
+                if (blob := target.get(key)) and isinstance(blob, dict):
+                    for value in blob.values():
+                        if value is not None:
+                            break
+                    else:
+                        target.pop(key, None)

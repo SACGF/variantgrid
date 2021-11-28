@@ -1,8 +1,8 @@
 {% if hgvs.is_fallback %}
-<span class="genome-build hover-detail" title="{{hgvs.message}}">{{ hgvs.genome_build.name }}</span>&#32;
+    <span class="genome-build hover-detail" title="{{hgvs.message}}">{{ hgvs.genome_build.name }}</span>&#32;
 {% endif %}
 {% if hgvs.variant and show_variant_link %}
-<a class="hover-link variant-coordinate" href="{% url 'view_allele_from_variant' hgvs.variant.id %}">{{ hgvs.hgvs }}</a>
+    <a class="hover-link variant-coordinate" href="{% url 'view_allele_from_variant' hgvs.variant.id %}">{{ hgvs.hgvs }}</a>
 {% else %}
     <span class="variant-coordinate">{{ hgvs.hgvs }}</span>
 {% endif %}

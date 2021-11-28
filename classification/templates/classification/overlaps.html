@@ -1,50 +1,8 @@
 {% extends "uicore/page/base.html" %}
-{% load classification_tags %}
 {% load ui_menu_bars %}
 {% load ui_help %}
 {% block title %}Overlaps{% endblock %}
 {% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
-{% block head %}
-    <style>
-    span.cs {
-        margin-right: 4px;
-    }
-    td {
-        min-width: 200px;
-    }
-    td img {
-        margin-left: 4px;
-        margin-right: 4px;
-    }
-    .overlap {
-        display: block;
-        padding: 4px 0 4px 8px;
-        border-radius: 4px;
-        background-color: gray;
-        color: white;
-        font-weight: bold;
-        margin-bottom: 8px;
-        text-align: center;
-    }
-    .overlap.level-DISCORDANT {
-        background-color: #dd8888;
-    }
-    .overlap.level-CONCORDANT_CONFIDENCE {
-        background-color: #22bb22;
-    }
-    .overlap.level-CONCORDANT_AGREEMENT {
-        background-color: #449944;
-    }
-    .sig-level-A, .sig-level-D {
-        opacity: 0.4;
-    }
-    </style>
-    <script>
-    $(document).ready(() => {
-        Flags.instance.init({userId: '{{user.id}}'});
-    });
-    </script>
-{% endblock %}
 {% block content %}
 <div class="container">
     {% page_help page_id='classification/overlaps_help' title='Classification Overlaps' %}
@@ -55,71 +13,9 @@
         {% for lab in labs %}<span class="comma-sep">{{ lab }}</span>{% endfor %}
         {% endif %}
     </p>
-    <h5>Overlap Counts</h5>
-    <table class="table">
-        <thead>
-            <tr>
-                <th></th>
-                <th class="text-center">Concordant <span class="hover-detail" data-toggle="tooltip" title="This counts classifications in agreement<br/>e.g. Benign vs Benign, VUS vs VUS, etc">Agreement</span></th>
-                <th class="text-center">Concordant <span class="hover-detail" data-toggle="tooltip" title="This counts<br/>Likely Benign vs Benign and<br/>Likely Pathogenic vs Pathogenic">Confidence Level</span></th>
-                <th class="text-center">Discordant</th>
-            </tr>
-        </thead>
-        <tbody>
-            <tr>
-                <th>Involving another lab</th>
-                <td class="text-center">{{ overlap_counts.multi_concordant_agreement }}</td>
-                <td class="text-center">{{ overlap_counts.multi_concordant_confidence }}</td>
-                <td class="text-center">{{ overlap_counts.multi_discordant }}</td>
-            </tr>
-            <tr>
-                <th>Involving only your lab</th>
-                <td class="text-center">{{ overlap_counts.single_concordant_agreement }}</td>
-                <td class="text-center">{{ overlap_counts.single_concordant_confidence }}</td>
-                <td class="text-center">{{ overlap_counts.single_discordant }}</td>
-            </tr>
-        </tbody>
-    </table>
-
-    {% if overlaps %}
-    <div class="mt-5">
-        <p class="text-info">Note that records that are unshared or classified as Drug Response or Artefact are not used for calculations.</p>
-        <h5>Overlap Records</h5>
-        <table class="table">
-            <thead>
-            <tr>
-                <th style="width:33%">Variants</th>
-                <th style="width:33%">Clinical Groupings</th>
-                <th style="width:33%">Classifications</th>
-            </tr>
-            </thead>
-            {% for overlap in overlaps %}
-            <tr>
-                <td class="variants">
-                {% for hgvs in overlap.unique_hgvs %}
-                    {% hgvs hgvs %}<br/>
-                {% endfor %}
-                </td>
-                <td>
-                    {% if overlap.is_multiple_labs_shared %}<div class="overlap multi-lab level-{{ overlap.discordant_level.name }}">Multi-lab: {{ overlap.discordant_level.label }}</div>
-                    {% elif overlap.is_multi_shared and overlap.discordant_level.name != 'CONCORDANT_AGREEMENT' %}<div class="overlap single-lab level-{{ overlap.discordant_level.name }}">Single-lab: {{ overlap.discordant_level.label }}</div>{% endif %}
-                    {% for cc in overlap.ccs %}
-                    {% clinical_context cc user %}<br/>
-                    {% endfor %}
-                    </div>
-                </td>
-                <td style="padding:8px 0 4px 8px">
-                    <a href="{% url 'classification_diff' %}?allele={{ overlap.allele.id }}" class="hover-link">Show Diffs</a><br/><br/>
-                    {%  for vcm in overlap.vcms %}
-                        <div class="my-1">{% classification_quick vcm %}</div>
-                    {%  endfor %}
-                </td>
-            </tr>
-            {% endfor %}
-        </table>
+    <div data-toggle="ajax" href="{% url 'overlaps_detail' %}">
+        <div class="loading-message">Loading Overlaps, this may take a while.</div>
     </div>
-    {% else %}
-        <div class="no-value">No Records</div>
-    {% endif %}
+
 </div>
 {% endblock %}

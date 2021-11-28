@@ -1,10 +1,10 @@
 from typing import Optional
 
+import numpy as np
 from django.db.models import Q
 from lazy import lazy
 
 from library.utils import sha1_str
-import numpy as np
 from snpdb.graphs.graphcache import CacheableGraph
 from snpdb.models import Sample, Variant
 

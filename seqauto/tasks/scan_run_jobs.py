@@ -1,9 +1,10 @@
-from django.conf import settings
-from django.utils import timezone
-import celery
 import logging
 import os
 import subprocess
+
+import celery
+from django.conf import settings
+from django.utils import timezone
 
 from library.file_utils import name_from_filename, mk_path
 from library.log_utils import get_traceback
@@ -45,7 +46,7 @@ def scan_resources(seqauto_run, seqauto_scripts):
     #shutil.rmtree(scan_resources_dir)
 
 
-@celery.task(track_started=True)
+@celery.shared_task(track_started=True)
 def scan_run_jobs(only_process_file_types=None, only_launch_file_types=None, run_launch_script=None, fake_data=None):
     if run_launch_script is None:
         run_launch_script = settings.SEQAUTO_SCAN_RUN_SCRIPTS

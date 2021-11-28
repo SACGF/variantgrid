@@ -1,5 +1,5 @@
-from django import template
 import markdown
+from django import template
 
 from library import tag_utils
 from library.tag_utils import get_passed_objects

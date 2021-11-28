@@ -1,6 +1,6 @@
-from annotation import models
 from django.contrib import admin
 
+from annotation import models
 
 admin.site.register(models.AnnotationRun)
 admin.site.register(models.AnnotationVersion)

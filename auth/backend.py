@@ -1,7 +1,9 @@
+import json
+
 from django.conf import settings
+from django.contrib import messages
 from django.contrib.auth.models import Group, User
 from mozilla_django_oidc.auth import OIDCAuthenticationBackend
-import json
 
 from snpdb.models import UserSettingsOverride
 
@@ -47,6 +49,7 @@ class VariantGridOIDCAuthenticationBackend(OIDCAuthenticationBackend):
         user.is_active = True
         if settings.OIDC_REQUIRED_GROUP and settings.OIDC_REQUIRED_GROUP not in claims['groups']:
             user.is_active = False
+            messages.add_message(self.request, messages.ERROR, "This account is not authorised for this environment.")
         else:
             user.is_active = True
 
@@ -58,7 +61,9 @@ class VariantGridOIDCAuthenticationBackend(OIDCAuthenticationBackend):
 
         if not associations and not variant_grid_groups:
             str_groups = json.dumps(oauth_groups)
-            raise ValueError(f'Could not find any valid groups in {str_groups}')
+            messages.add_message(self.request, messages.ERROR, "This account doesn't belong to any labs.")
+            return None
+            # raise ValueError(f'Could not find any valid groups in {str_groups}')
 
         # everyone with a login is considered part of the public group
         groups = set()
@@ -67,12 +72,18 @@ class VariantGridOIDCAuthenticationBackend(OIDCAuthenticationBackend):
 
         # currently only variantgrid permission
         is_super_user = False
+        is_bot = False
         for vg in variant_grid_groups:
             permission = '/'.join(vg)
             if permission == 'admin':
                 is_super_user = True
             elif permission == 'bot':
                 groups.add('variantgrid/bot')
+                is_bot = True
+
+        if settings.MAINTENANCE_MODE and (not is_super_user or is_bot):
+            messages.add_message(self.request, messages.ERROR, "Non-administrator logins have temporary been disabled.")
+            return None
 
         user.is_superuser = is_super_user
         user.is_staff = is_super_user

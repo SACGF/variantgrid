@@ -2,16 +2,14 @@ from django.conf import settings
 from django.http import HttpRequest
 from django.http.response import HttpResponseRedirect, HttpResponse
 from django.shortcuts import render
-from django.utils.timezone import now
 
-from library.log_utils import report_event
-from snpdb.models.models_user_settings import UserSettings
 from classification.enums.discordance_enums import ContinuedDiscordanceReason, \
     DiscordanceReportResolution
 from classification.models import ClassificationModification, DiscordanceReportClassification
 from classification.models.discordance_models import DiscordanceReport, \
     DiscordanceActionsLog
 from classification.views.classification_export_csv import ExportFormatterCSV
+from snpdb.models.models_user_settings import UserSettings
 
 
 def discordance_report_view(request: HttpRequest, report_id: int) -> HttpResponse:

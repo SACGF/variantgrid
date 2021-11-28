@@ -3,7 +3,7 @@ import uuid
 from collections import defaultdict
 from dataclasses import dataclass
 from itertools import combinations
-from typing import Tuple, List, Optional, Dict, Set, Iterable, Union
+from typing import Tuple, List, Optional, Dict, Set, Iterable, Union, Any
 
 from django.conf import settings
 from django.contrib import messages
@@ -32,10 +32,12 @@ from classification.views.classification_datatables import ClassificationColumns
 from genes.custom_text_gene_list import create_custom_text_gene_list
 from genes.forms import GeneListForm, NamedCustomGeneListForm, UserGeneListForm, CustomGeneListForm, \
     GeneSymbolForm, GeneAnnotationReleaseGenomeBuildForm
+from genes.hgvs import HGVSMatcher
 from genes.models import GeneInfo, CanonicalTranscriptCollection, GeneListCategory, \
     GeneList, GeneCoverageCollection, GeneCoverageCanonicalTranscript, \
     CustomTextGeneList, Transcript, Gene, TranscriptVersion, GeneSymbol, GeneCoverage, \
-    PfamSequenceIdentifier, PanelAppServer, SampleGeneList, HGNC, GeneVersion
+    PfamSequenceIdentifier, PanelAppServer, SampleGeneList, HGNC, GeneVersion, TranscriptVersionSequenceInfo, \
+    NoTranscript
 from genes.models_enums import AnnotationConsortium
 from genes.serializers import SampleGeneListSerializer
 from library.constants import MINUTE_SECS
@@ -87,10 +89,16 @@ def view_gene(request, gene_id):
     transcript_versions_by_id_and_build = defaultdict(lambda: defaultdict(OrderedSet))
     transcript_genome_build_ids = set()
     transcript_biotype = defaultdict(set)
+    transcript_chroms = set()
     for tv in TranscriptVersion.objects.filter(gene_version__gene=gene).order_by("transcript_id", "version"):
         transcript_genome_build_ids.add(tv.genome_build_id)
         transcript_versions_by_id_and_build[tv.transcript_id][tv.genome_build_id].add(tv)
         transcript_biotype[tv.transcript_id].add(tv.biotype)
+        transcript_chroms.update(tv.get_chromosomes())
+
+    if len(transcript_chroms) > 1:
+        other_chroms_msg = f"Gene has transcripts that maps to multiple chromosomes ({', '.join(transcript_chroms)})"
+        messages.add_message(request, messages.WARNING, other_chroms_msg)
 
     transcript_genome_build_ids = sorted(transcript_genome_build_ids)
     transcript_versions = []  # ID, biotype, [[GRCh37 versions...], [GRCh38 versions]]
@@ -336,35 +344,66 @@ def view_classifications(request, gene_symbol: str, genome_build_name: str):
     })
 
 
+@dataclass(frozen=True)
+class GenomeBuildGenes:
+    genome_build: GenomeBuild
+    genes: List[Gene]
+
+
+@dataclass(frozen=True)
+class TranscriptVersionDetails:
+    tv: Optional[TranscriptVersion]
+    version: int  # redundant to tv if provided
+    genome_build: GenomeBuild  # redundant to tv if provided
+    hgvs_method: Any
+
+
 def view_transcript(request, transcript_id):
     transcript = get_object_or_404(Transcript, pk=transcript_id)
 
-    gene_by_build = defaultdict(set)
+    gene_by_build: Dict[GenomeBuild, Set[Gene]] = defaultdict(set)
     transcripts_versions_by_build = defaultdict(dict)
 
-    versions = set()
+    versions: Set[int] = set()
+    transcript_chroms = set()
     for tv in transcript.transcriptversion_set.order_by("version"):
-        genome_build_id = tv.genome_build.pk
-        gene_by_build[genome_build_id].add(tv.gene)
+        gene_by_build[tv.genome_build].add(tv.gene)
         version = tv.version or 0  # 0 = unknown
-        transcripts_versions_by_build[genome_build_id][version] = tv
+        transcripts_versions_by_build[tv.genome_build][version] = tv
         versions.add(version)
+        transcript_chroms.update(tv.get_chromosomes())
 
-    genome_build_ids = sorted(gene_by_build.keys())
-    build_genes = [gene_by_build.get(genome_build_id) for genome_build_id in genome_build_ids]
-    transcript_versions = []
+    genome_builds = sorted(gene_by_build.keys())
+    genome_build_genes = [GenomeBuildGenes(genome_build, sorted(gene_by_build.get(genome_build))) for genome_build in genome_builds]
+    transcript_version_details: List[TranscriptVersionDetails] = list()
+
+    build_genes: List[GenomeBuild] = [gene_by_build.get(genome_build) for genome_build in genome_builds]
+    build_matcher = {genome_build: HGVSMatcher(genome_build) for genome_build in genome_builds}
     for version in sorted(versions):
-        data = [version]
-        for genome_build_id in genome_build_ids:
-            tv = transcripts_versions_by_build.get(genome_build_id, {}).get(version)
-            data.append(tv)
+        transcript_accession = f"{transcript}.{version}"
+        for genome_build in genome_builds:
+            tv = transcripts_versions_by_build.get(genome_build, {}).get(version)
+            matcher = build_matcher[genome_build]
+            hgvs_method = matcher.filter_best_transcripts_and_method_by_accession(transcript_accession)
 
-        transcript_versions.append(data)
+            transcript_version_details.append(
+                TranscriptVersionDetails(
+                    tv=tv,
+                    genome_build=genome_build,
+                    version=version,
+                    hgvs_method=hgvs_method
+                )
+            )
 
-    context = {"transcript": transcript,
-               "genome_build_ids": genome_build_ids,
-               "build_genes": build_genes,
-               "transcript_versions": transcript_versions}
+    if len(transcript_chroms) > 1:
+        other_chroms_msg = f"Transcript maps to multiple chromosomes ({', '.join(transcript_chroms)})"
+        messages.add_message(request, messages.WARNING, other_chroms_msg)
+
+    context = {
+        "transcript": transcript,
+        "genome_build_genes": genome_build_genes,
+        "transcript_version_details": transcript_version_details
+    }
     return render(request, "genes/view_transcript.html", context)
 
 
@@ -372,43 +411,73 @@ def view_transcript_version(request, transcript_id, version):
     transcript = Transcript.objects.filter(pk=transcript_id).first()
     if not transcript:
         return render(request, "genes/view_transcript.html", {'transcript_id': transcript_id})
+
+    accession = TranscriptVersion.get_accession(transcript_id, version)
+    no_transcript_message = ""
+    try:
+        # Call this before retrieving TranscriptVersions - as it will retrieve it and set alignment_gap
+        # if lengths are different
+        tv_sequence_info = TranscriptVersionSequenceInfo.get(accession)
+    except NoTranscript as e:
+        tv_sequence_info = None
+        no_transcript_message = str(e)
+
     tv_set = transcript.transcriptversion_set.filter(version=version)
     tv: TranscriptVersion = tv_set.first()
     data = transcript.transcriptversion_set.aggregate(Count("version", distinct=True))
     version_count = data["version__count"]
 
-    context = {"accession": TranscriptVersion.get_accession(transcript_id, version),
+    context = {"accession": accession,
                "transcript": transcript,
+               "tv_sequence_info": tv_sequence_info,
+               "no_transcript_message": no_transcript_message,
                "version_count": version_count}
 
-    if not tv:
-        return render(request, "genes/view_transcript_version.html", context)
+    poly_a_tail = 0
+    if tv:
+        transcript_versions_by_build = {}
+        builds_missing_data = set()
+        alignment_gap = False
+        transcript_chroms = set()
 
-    accession = tv.accession
-    transcript_versions_by_build = {}
-    builds_missing_data = set()
-    for tv in tv_set.order_by("genome_build__name"):
-        genome_build_id = tv.genome_build.pk
-        transcript_versions_by_build[genome_build_id] = tv
-        if not tv.has_valid_data:
-            builds_missing_data.add(tv.genome_build)
+        for tv in tv_set.order_by("genome_build__name"):
+            if tv_sequence_info:
+                poly_a_tail = max(poly_a_tail, tv.sequence_poly_a_tail)
+            genome_build_id = tv.genome_build.pk
+            alignment_gap |= tv.alignment_gap
+            transcript_chroms.update(tv.get_chromosomes())
+            transcript_versions_by_build[genome_build_id] = tv
+            if not tv.has_valid_data:
+                builds_missing_data.add(tv.genome_build)
 
-    differences = []
-    if builds_missing_data:
-        builds = ', '.join([str(b) for b in builds_missing_data])
-        msg = f"Transcripts in builds {builds} missing data, no difference comparison possible"
-        messages.add_message(request, messages.WARNING, msg)
-    else:
-        for a, b in combinations(transcript_versions_by_build.keys(), 2):
-            t_a = transcript_versions_by_build[a]
-            t_b = transcript_versions_by_build[b]
-            diff = t_a.get_differences(t_b)
-            if diff:
-                differences.append(((a, b), diff))
+        if len(transcript_chroms) > 1:
+            other_chroms_msg = f"Transcript version maps to multiple chromosomes ({', '.join(transcript_chroms)})"
+            messages.add_message(request, messages.WARNING, other_chroms_msg)
 
-    context = {**context, **{"accession": accession,
-                             "transcript_versions_by_build": transcript_versions_by_build,
-                             "differences": differences}}
+        differences = []
+        if builds_missing_data:
+            builds = ', '.join([str(b) for b in builds_missing_data])
+            msg = f"Transcripts in builds {builds} missing data, no difference comparison possible"
+            messages.add_message(request, messages.WARNING, msg)
+        else:
+            for a, b in combinations(transcript_versions_by_build.keys(), 2):
+                t_a = transcript_versions_by_build[a]
+                t_b = transcript_versions_by_build[b]
+                diff = t_a.get_differences(t_b)
+                if diff:
+                    differences.append(((a, b), diff))
+
+        context = {**context, **{"accession": accession,
+                                 "transcript_versions_by_build": transcript_versions_by_build,
+                                 "differences": differences,
+                                 "alignment_gap": alignment_gap}}
+
+    if tv_sequence_info:
+        if poly_a_tail:
+            sequence_length = f"{tv_sequence_info.length - poly_a_tail} (w/{poly_a_tail}bp polyA tail)"
+        else:
+            sequence_length = tv_sequence_info.length
+        context["sequence_length"] = sequence_length
     return render(request, "genes/view_transcript_version.html", context)
 
 

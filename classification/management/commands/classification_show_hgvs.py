@@ -1,8 +1,8 @@
 from django.core.management.base import BaseCommand
 
+from classification.models.classification import Classification
 from genes.hgvs import HGVSMatcher
 from snpdb.models.models_genome import GenomeBuild
-from classification.models.classification import Classification
 
 
 class Command(BaseCommand):

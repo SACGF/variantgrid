@@ -2,7 +2,9 @@ import copy
 import json
 from dataclasses import dataclass, field
 from typing import List, Iterator, Union
+
 from lazy import lazy
+
 from uicore.json.json_types import JsonDataType
 
 

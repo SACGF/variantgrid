@@ -1,4 +1,5 @@
 from typing import Optional, List, Union
+
 from django import template
 from django.db.models import QuerySet
 
@@ -26,6 +27,6 @@ def count(items: Union[List, QuerySet, int], singular: str, plural: Optional[str
     if item_count == 1:
         return f'{singular}'
     else:
-        if not plural:
+        if plural is None:
             plural = f'{singular}s'
         return f'{item_count} {plural}'

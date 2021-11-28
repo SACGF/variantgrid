@@ -1,6 +1,10 @@
+import datetime
+from collections import defaultdict
 from functools import total_ordering, reduce
 from operator import __and__
+from typing import Tuple, List, Optional, Union, Dict, Iterable, Any, TypeVar
 
+import django.dispatch
 from django.contrib.auth.models import User
 from django.db import models, transaction
 from django.db.models import Q
@@ -9,11 +13,7 @@ from django.db.models.expressions import Subquery
 from django.db.models.query import QuerySet
 from django.utils.timezone import now
 from django_extensions.db.models import TimeStampedModel
-from collections import defaultdict
 from lazy import lazy
-from typing import Tuple, List, Optional, Union, Dict, Iterable, Any
-import datetime
-import django.dispatch
 
 from flags.models.enums import FlagStatus
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
@@ -175,6 +175,9 @@ class Flag(TimeStampedModel):
         )
         flag_comment_action.send(sender=Flag, flag_comment=fc, old_resolution=old_resolution)
 
+    def __str__(self):
+        return f"{self.flag_type} ({self.resolution})"
+
 
 class FlagInfos:
 
@@ -218,6 +221,7 @@ class FlagInfos:
 class FlagCollection(models.Model, GuardianPermissionsMixin):
     ADMIN_PERMISSION = 'admin_flagcollection'
     Q_OPEN_FLAGS = Q(resolution__status=FlagStatus.OPEN)
+    REOPEN_IF_CLOSED_BY_BOT = 'reopen-if-bot'
 
     context = models.ForeignKey(FlagTypeContext, on_delete=PROTECT)
 
@@ -299,21 +303,31 @@ class FlagCollection(models.Model, GuardianPermissionsMixin):
             qs = qs.filter(FlagCollection.Q_OPEN_FLAGS)
         return qs
 
+    QST = TypeVar("QST", bound='FlagsMixin')
+
     @staticmethod
-    def filter_for_open_flags(qs: QuerySet['FlagsMixin'], flag_types: Optional[List[FlagType]] = None, exclude_flag_types: Optional[List[FlagType]] = None) -> QuerySet:
+    def filter_for_open_flags(qs: QuerySet[QST], flag_types: Optional[List[FlagType]] = None) -> QuerySet[QST]:
+        """
+        @deprecated use filter_for_flags
+        """
+        return FlagCollection.filter_for_flags(qs=qs, flag_types=flag_types, open_only=True)
+
+    @staticmethod
+    def filter_for_flags(qs: QuerySet[QST], flag_types: Optional[List[FlagType]] = None, open_only: bool = True) -> QuerySet[QST]:
         """
         Takes the QuerySet and returns a filtered version where the item contain at least one of the provided flag_types
         e.g. if you passed in a QuerySet of Alleles and a missing 38 flag type, the resulting QuerySet will still be Alleles
+        @param qs A QuerySet of models that have FlaxMixin
         @param flag_types if provided one of these flag types have to be included (otherwise any open flag can be included)
-        @param exclude_flag_types if provided then these flags can't be included (typically used with withdrawn)
+        @param open_only if True (default) closed flags will be ignored
         """
-        open_flag_collections = Flag.objects.filter(FlagCollection.Q_OPEN_FLAGS)
+        flag_collections = Flag.objects.all()
+        if open_only:
+            flag_collections = flag_collections.filter(FlagCollection.Q_OPEN_FLAGS)
         if flag_types:
-            open_flag_collections = open_flag_collections.filter(flag_type__in=flag_types)
-        if exclude_flag_types:
-            open_flag_collections = open_flag_collections.exclude(flag_type__in=exclude_flag_types)
+            flag_collections = flag_collections.filter(flag_type__in=flag_types)
 
-        return qs.filter(flag_collection__in=Subquery(open_flag_collections.values('collection')))
+        return qs.filter(flag_collection__in=Subquery(flag_collections.values('collection')))
 
     @staticmethod
     def filter_for_starred(qs: QuerySet, user: User) -> QuerySet:
@@ -396,6 +410,7 @@ class FlagCollection(models.Model, GuardianPermissionsMixin):
             user_private: bool = False,
             permission_check: bool = True,
             reopen: bool = False,
+            reopen_if_bot_closed: bool = False,
             add_comment_if_open: bool = False,
             data: Optional[dict] = None,
             close_other_data: bool = False,
@@ -408,6 +423,7 @@ class FlagCollection(models.Model, GuardianPermissionsMixin):
         :param user_private: (Not currently used)
         :param permission_check: Should we check to see if the user has permission to open the flag
         :param reopen: If True will re-open a closed flag (if there is one) rather than create a new flag. Will be treated as True for only_one types of flags.
+        :param reopen_if_bot_closed: If True, and there's an existing flag that was closed by admin_bot, act as if reopen=True
         :param add_comment_if_open: If re-opening a closed flag, should the comment still be added?
         :param data: data for the flag, when looking for existing flags we check to see if they have this data.
         :param close_other_data: If we find a flag of the same type that has data different to the data provided, close it
@@ -442,6 +458,11 @@ class FlagCollection(models.Model, GuardianPermissionsMixin):
 
         existing = relevant_qs.first()
         if existing:
+            if not reopen and reopen_if_bot_closed:
+                # see if existing is closed, and was last closed by a bot
+                if FlagComment.last(existing).user == admin_bot():
+                    reopen = True
+
             if reopen:
                 resolution = existing.flag_type.resolution_for_status(FlagStatus.OPEN)
                 existing.flag_action(user=user, resolution=resolution, comment=comment, permission_check=permission_check)
@@ -558,7 +579,7 @@ class FlagsMixin(models.Model):
             return FlagPermissionLevel.USERS if self.can_view(user) else FlagPermissionLevel.NO_PERM
         return FlagPermissionLevel.USERS
 
-    def flags_of_type(self, flag_type: FlagType) -> QuerySet:
+    def flags_of_type(self, flag_type: FlagType) -> QuerySet[Flag]:
         if not self.flag_collection:
             return Flag.objects.none()
         return Flag.objects.filter(collection=self.flag_collection, flag_type=flag_type)

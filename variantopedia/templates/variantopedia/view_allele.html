@@ -8,11 +8,6 @@
 {% block submenu %}{% menu_bar_data %}{% endblock submenu %}
 {% block head %}
 <script>
-    function showAlleleMergeLog() {
-        $("#show-allele-merge-log-link").hide();
-        $("#allele-merge-log").show();
-    }
-
     $(document).ready(function() {
         Flags.instance.init({userId: '{{user.id}}', filter:'#allele-card'});
 
@@ -60,53 +55,40 @@
                             {% labelled label="ClinGen Canonical Allele ID" hint="chunky" %}
                                 <a class="hover-link" href="{{ allele.clingen_allele.human_url }}">{{ allele.clingen_allele }}</a>
                             {% endlabelled %}
-                            {% if user.is_superuser %}
-                                <a class="modal-link mb-4 d-inline-block" data-toggle="modal" href="#api-response">Show API response</a>
-                                <div id="api-response" class="modal" tabindex="-1">
-                                    <div class="modal-dialog modal-dialog-scrollable modal-xl">
-                                        <div class="modal-content">
-                                            <div class="modal-header">
-                                                <h5 class="modal-title">API Response</h5>
-                                                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                                                  <span aria-hidden="true">&times;</span>
-                                                </button>
-                                            </div>
-                                            {% code_json allele.clingen_allele.api_response css_class="modal-body" %}
-                                        </div>
-                                    </div>
-                                </div>
-                                {% if allele_merge_log_qs.exists %}
-                                <div id="allele-merge-log-container">
-                                    <label><span class="admin-only">Allele Merge Log</span></label>
-                                    <a id='show-allele-merge-log-link' class="hover-link" href="javascript:showAlleleMergeLog()">Show Allele Merge Log</a>
-                                    <div id="allele-merge-log" style="display: none">
-                                        <table>
-                                                <tr>
-                                                    <th>Date</th>
-                                                    <th>Conversion Tool</th>
-                                                    <th>Status</th>
-                                                    <th>Message</th>
-                                                    <th>Other Allele</th>
-                                                </tr>
-                                            {% for amr in allele_merge_log_qs %}
-                                                <tr>
-                                                    <td>{{ amr.created }}</td>
-                                                    <td>{{ amr.get_conversion_tool_display }}</td>
-                                                    <td>{{ amr.success|yesno:"Success,Failure" }}
-                                                    <td>{{ amr.message }}</td>
-                                                    <td>
-                                                        {% if allele == amr.old_allele %}
-                                                            <a href="{% url 'view_allele' amr.new_allele.pk %}">{{ amr.new_allele }}</a>
-                                                        {% else %}
-                                                            <a href="{% url 'view_allele' amr.old_allele.pk %}">{{ amr.old_allele }}</a>
-                                                        {% endif %}
-                                                    </td>
-                                                </tr>
-                                            {% endfor %}
-                                        </table>
-                                    </div>
-                                </div>
-                                {% endif %}
+                            {% modal label="API Response" admin_only=True %}
+                                {% code_json allele.clingen_allele.api_response css_class="modal-body" %}
+                            {% endmodal %}
+                            {% if allele_merge_log_qs.exists %}
+                                {% modal label="Allele Merge Log" admin_only=True %}
+                                    <table class="table">
+                                        <thead>
+                                            <tr>
+                                                <th>Date</th>
+                                                <th>Conversion Tool</th>
+                                                <th>Status</th>
+                                                <th>Message</th>
+                                                <th>Other Allele</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                        {% for amr in allele_merge_log_qs %}
+                                            <tr>
+                                                <td class="text-center">{{ amr.created }}</td>
+                                                <td class="text-center">{{ amr.get_conversion_tool_display }}</td>
+                                                <td class="text-center">{{ amr.success|yesno:"Success,Failure" }}
+                                                <td class="text-center">{{ amr.message }}</td>
+                                                <td class="text-center">
+                                                    {% if allele == amr.old_allele %}
+                                                        <a href="{% url 'view_allele' amr.new_allele.pk %}">{{ amr.new_allele }}</a>
+                                                    {% else %}
+                                                        <a href="{% url 'view_allele' amr.old_allele.pk %}">{{ amr.old_allele }}</a>
+                                                    {% endif %}
+                                                </td>
+                                            </tr>
+                                        {% endfor %}
+                                        </tbody>
+                                    </table>
+                                {% endmodal %}
                             {% endif %}
                         {% elif allele.clingen_error %}
                             {% labelled hint="tiny" label="ClinGen Canonical Allele ID" %}

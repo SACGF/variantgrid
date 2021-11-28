@@ -18,4 +18,4 @@ echo "Install python libraries"
 python3 -m pip install --upgrade pip
 python3 -m pip install numpy HTSeq Cython
 #python3 -m pip install -r requirements-dev.txt
-python3 -m pip install -r requirements.txt
+python3 -m pip install -r variantgrid/requirements.txt

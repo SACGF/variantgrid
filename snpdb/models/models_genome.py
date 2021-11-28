@@ -1,11 +1,11 @@
-from django.conf import settings
-from django.db import models
-from django.db.models.deletion import CASCADE
-from django.db.models.query_utils import Q
 import itertools
 import os
 from typing import Dict, Optional, List
 
+from django.conf import settings
+from django.db import models
+from django.db.models.deletion import CASCADE
+from django.db.models.query_utils import Q
 from lazy import lazy
 
 from genes.models_enums import AnnotationConsortium
@@ -93,6 +93,15 @@ class GenomeBuild(models.Model, SortMetaOrderingMixin):
             if values.get("enabled"):
                 enabled_annotation.append(build_name)
         return GenomeBuild.objects.filter(name__in=enabled_annotation)
+
+    @staticmethod
+    @timed_cache(ttl=60)
+    def builds_with_annotation_cached() -> List['GenomeBuild']:
+        enabled_annotation = []
+        for build_name, values in settings.ANNOTATION.items():
+            if values.get("enabled"):
+                enabled_annotation.append(build_name)
+        return list(GenomeBuild.objects.filter(name__in=enabled_annotation))
 
     @staticmethod
     def builds_with_annotation_priority(priority: 'GenomeBuild') -> List['GenomeBuild']:

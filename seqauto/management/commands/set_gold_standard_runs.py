@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
-import re
 
-from django.conf import settings
-from django.core.management.base import BaseCommand
 import logging
 import os
 
+from django.core.management.base import BaseCommand
+
 from library.file_utils import file_to_array
-from seqauto.illumina.illumina_sequencers import SEQUENCING_RUN_REGEX
 from seqauto.models import EnrichmentKit, SequencingRun, GoldReference, ImportStatus
 from seqauto.tasks.gold_summary_tasks import calculate_gold_summary
 

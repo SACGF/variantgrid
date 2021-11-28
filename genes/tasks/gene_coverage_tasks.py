@@ -1,8 +1,9 @@
+import logging
+import time
+
 import celery
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models.query_utils import Q
-import logging
-import time
 
 from genes.canonical_transcripts.canonical_transcript_manager import CanonicalTranscriptManager
 from genes.gene_matching import GeneSymbolMatcher
@@ -11,7 +12,7 @@ from seqauto.models import EnrichmentKit
 from snpdb.models import DataState
 
 
-@celery.task
+@celery.shared_task
 def reload_gene_coverage_collection(gene_coverage_collection_id):
     logging.info("reload_gene_coverage_collection(%s) START", gene_coverage_collection_id)
 
@@ -46,7 +47,7 @@ def reload_gene_coverage_collection(gene_coverage_collection_id):
 # TODO: This is only needed to migrate existing data - it just takes hours so want to spread across celery tasks
 # Once all environments https://github.com/SACGF/variantgrid/wiki/Upgrade_Notes have this applied:
 # https://github.com/SACGF/variantgrid/issues/1216#issuecomment-440561628 delete this task etc.
-@celery.task
+@celery.shared_task
 def create_canonical_gene_coverage_for_enrichment_kit(enrichment_kit_id):
     #logging.info("create_canonical_gene_coverage_for_enrichment_kit %s", enrichment_kit_id)
 

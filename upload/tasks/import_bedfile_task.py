@@ -1,8 +1,9 @@
+import logging
 from typing import Optional
 
 from django.contrib.auth.models import User
 from guardian.shortcuts import assign_perm
-import logging
+
 from library.genomics.bed_file import BedFileReader
 from snpdb.models import GenomicIntervalsCollection, ImportStatus, GenomicIntervalsCategory, GenomeBuild
 from upload.models import UploadedBed

@@ -3,10 +3,8 @@
 {% load static %}
 {% load js_tags %}
 {% load compress %}
-{% load datatable_tags %}
 {% load ui_help %}
 {% load ui_menu_bars %}
-
 {% block title %}Classifications{% endblock %}
 {% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
 {% block head %}
@@ -130,13 +128,9 @@
             debouncedFilterGrid();
         });
 
-        EKeys.load().then(() => {
-            {% datatable_definition table_config=datatable_config table_id='vc-datatable' url='classification_datatables' data='classificationFilter' %}
-
-            let vcDatatable = $('#vc-datatable');
-            vcDatatable.on('draw.dt', () => {
-                Flags.instance.init({userId: '{{user.id}}'});
-            });
+        let vcDatatable = $('#vc-datatable');
+        vcDatatable.on('draw.dt', () => {
+            Flags.instance.init({userId: '{{user.id}}'});
         });
     });
 </script>
@@ -156,15 +150,20 @@
 
         {% page_help_embedded title="Classification Listing" %}
             {% if labs.count > 0 and can_create_classification %}
-            <p>
-            Create a new Variant Classification by entering a HGVS sequence in the box below, on the variant details page or inside an analysis by tagging it as RequiresClassification.
+                <p>
+                Create a new Variant Classification by entering a HGVS sequence in the box below, on the variant details page or inside an analysis by tagging it as RequiresClassification.
+                </p>
             {% endif %}
             <p>
-            Export the grid below by clicking the CSV or Redcap buttons on the bottom left of the grid.<br/>
+            Export the grid below by clicking the CSV {% if VARIANT_CLASSIFICATION_REDCAP_EXPORT %} or Redcap {% endif %}buttons on the bottom left of the grid.<br/>
             The export will be using your default genome build.<br/>
-            <p>
-            You can import into REDCap using this  <a href="/classification/redcap_data_dictionary.csv">data definition</a>.<br/>
-            Records will only be included in REDCap downloads if they have a value for <b>redcap_record_id</b>.
+            </p>
+            {% if VARIANT_CLASSIFICATION_REDCAP_EXPORT %}
+                <p>
+                You can import into REDCap using this  <a href="/classification/redcap_data_dictionary.csv">data definition</a>.<br/>
+                Records will only be included in REDCap downloads if they have a value for <b>redcap_record_id</b>.
+                </p>
+            {% endif %}
         {% end_page_help_embedded %}
     </div>
     <div class="container-table">
@@ -222,11 +221,13 @@
         </div>
         <div class="row">
             <div class="col">
-                {% datatable datatable_config 'vc-datatable' class_name='classification-table sticky-header' %}
+                <table id="vc-datatable" data-datatable-url="{% url 'classification_datatables' %}" data-datatable-data='classificationFilter' class="sticky-header classification-table"></table>
                 <div>
                 Download as
-                    <a class='hover-link download-link' href="javascript:downloadAs('csv')">CSV</a>,
+                    <a class='hover-link download-link' href="javascript:downloadAs('csv')">CSV</a>
+                    {% if VARIANT_CLASSIFICATION_REDCAP_EXPORT %},
                     <a class='hover-link download-link' href="javascript:downloadAs('redcap')">REDCap</a>
+                    {% endif %}
                 </div>
             </div>
         </div>

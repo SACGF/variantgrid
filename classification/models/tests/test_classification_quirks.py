@@ -2,8 +2,8 @@ from django.test import TestCase
 
 from classification.enums import SubmissionSource, CriteriaEvaluation, ValidationCode, SpecialEKeys
 from classification.models import VCDataDict, EvidenceKeyMap
-from classification.models.tests.test_utils import ClassificationTestUtils
 from classification.models.classification import Classification
+from classification.models.tests.test_utils import ClassificationTestUtils
 from classification.views.classification_view import ClassificationView
 
 

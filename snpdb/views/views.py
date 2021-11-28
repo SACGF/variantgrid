@@ -1,8 +1,11 @@
 import itertools
+import json
+import logging
+from collections import OrderedDict, defaultdict
 from typing import Iterable
 
+import pandas as pd
 from celery.result import AsyncResult
-from collections import OrderedDict, defaultdict
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.models import User, Group
@@ -19,8 +22,6 @@ from django.views.decorators.vary import vary_on_cookie
 from django_messages.models import Message
 from global_login_required import login_not_required
 from guardian.shortcuts import get_objects_for_group, get_objects_for_user
-import json
-import logging
 from termsandconditions.decorators import terms_required
 
 from analysis.analysis_templates import get_sample_analysis
@@ -32,7 +33,11 @@ from annotation.models import AnnotationVersion
 from annotation.models.models import ManualVariantEntryCollection, VariantAnnotationVersion
 from annotation.models.models_gene_counts import GeneValueCountCollection, \
     GeneCountType, SampleAnnotationVersionVariantSource, CohortGeneCounts
+from classification.classification_stats import get_grouped_classification_counts
 from classification.models.clinvar_export_sync import clinvar_export_sync
+from classification.views.classification_accumulation_graph import get_accumulation_graph_data, \
+    AccumulationReportMode
+from classification.views.classification_datatables import ClassificationColumns
 from genes.custom_text_gene_list import create_custom_text_gene_list
 from genes.forms import CustomGeneListForm, UserGeneListForm, GeneAndTranscriptForm
 from genes.models import GeneListCategory, CustomTextGeneList, GeneList
@@ -41,8 +46,6 @@ from library.django_utils import add_save_message, get_model_fields, set_form_re
 from library.guardian_utils import assign_permission_to_user_and_groups, DjangoPermission
 from library.keycloak import Keycloak
 from library.utils import full_class_name, import_class, rgb_invert
-import pandas as pd
-
 from ontology.models import OntologyTerm
 from patients.forms import PatientForm
 from patients.models import Patient, Clinician
@@ -51,7 +54,7 @@ from snpdb import forms
 from snpdb.bam_file_path import get_example_replacements
 from snpdb.forms import SampleChoiceForm, VCFChoiceForm, \
     UserSettingsOverrideForm, UserForm, UserContactForm, SampleForm, TagForm, SettingsInitialGroupPermissionForm, \
-    OrganizationForm, LabForm, LabUserSettingsOverrideForm, OrganizationUserSettingsOverrideForm, ProjectChoiceForm
+    OrganizationForm, LabForm, LabUserSettingsOverrideForm, OrganizationUserSettingsOverrideForm
 from snpdb.graphs import graphcache
 from snpdb.graphs.allele_frequency_graph import AlleleFrequencyHistogramGraph
 from snpdb.graphs.chromosome_density_graph import SampleChromosomeDensityGraph
@@ -64,13 +67,11 @@ from snpdb.models import CachedGeneratedFile, VariantGridColumn, UserSettings, \
     get_igv_data, SampleLocusCount, UserContact, Tag, Wiki, Organization, GenomeBuild, \
     Trio, AbstractNodeCountSettings, CohortGenotypeCollection, UserSettingsOverride, NodeCountSettingsCollection, Lab, \
     LabUserSettingsOverride, OrganizationUserSettingsOverride, LabHead, SomalierRelatePairs, \
-    VariantZygosityCountCollection, VariantZygosityCountForVCF, ClinVarKey
+    VariantZygosityCountCollection, VariantZygosityCountForVCF, ClinVarKey, AvatarDetails, State
 from snpdb.models.models_enums import ProcessingStatus, ImportStatus, BuiltInFilters
 from snpdb.tasks.soft_delete_tasks import soft_delete_vcfs
 from snpdb.utils import LabNotificationBuilder
 from upload.uploaded_file_type import retry_upload_pipeline
-from classification.classification_stats import get_grouped_classification_counts
-from classification.views.classification_datatables import ClassificationColumns
 
 
 @terms_required
@@ -562,6 +563,7 @@ def view_user_settings(request):
         'override_source': override_source,
         'override_values': override_values,
         'labs_by_group_name': labs_by_group_name,
+        'avatar_details': AvatarDetails.avatar_for(user)
     }
     return render(request, 'snpdb/settings/view_user_settings.html', context)
 
@@ -1274,11 +1276,21 @@ def labs(request):
         state_field = "lab__state"
         show_unclassified = True
 
-    vc_org_data_json = get_grouped_classification_counts(request.user, org_field, max_groups=15,
-                                                         field_labels=name_to_short_name,
-                                                         show_unclassified=show_unclassified)
-    vc_state_data_json = get_grouped_classification_counts(request.user, state_field, max_groups=15,
-                                                           show_unclassified=show_unclassified)
+    vc_org_data_json = get_grouped_classification_counts(
+        user=request.user,
+        field=org_field,
+        max_groups=15,
+        field_labels=name_to_short_name,
+        show_unclassified=show_unclassified,
+        allele_level=True)
+
+    """
+    vc_state_data_json = get_grouped_classification_counts(
+        user=request.user,
+        field=state_field,
+        max_groups=15,
+        show_unclassified=show_unclassified)
+    """
     active_organizations = Organization.objects.filter(active=True).order_by('name')
     organization_labs = {}
     for org in active_organizations:
@@ -1294,9 +1306,29 @@ def labs(request):
         "labs": lab_list,
         "shared_classifications": settings.VARIANT_CLASSIFICATION_STATS_USE_SHARED,
         "vc_org_data": vc_org_data_json,
-        "vc_state_data": vc_state_data_json,
+        # "vc_state_data": vc_state_data_json,
         "show_unclassified": show_unclassified,
     }
+
+    graph_data = get_accumulation_graph_data(mode=AccumulationReportMode.Allele)
+    context["accumulation_by_status"] = graph_data["status"]
+    if request.user.is_superuser:
+        # TODO, do we really need to hide this graph away?
+        context["accumulation_by_org"] = graph_data["org"]
+
+        state_pop_multiplier = {}
+        for state in State.objects.filter(population__gt=0):
+            state_pop_multiplier[state.name] = 100_000 / state.population
+
+        vc_normalized_state_data_json = get_grouped_classification_counts(
+            user=request.user,
+            field=state_field,
+            max_groups=15,
+            show_unclassified=show_unclassified,
+            norm_factor=state_pop_multiplier)
+
+        context["vc_normalized_state_data_json"] = vc_normalized_state_data_json
+
     return render(request, "snpdb/labs.html", context)
 
 

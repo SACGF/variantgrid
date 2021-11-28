@@ -1,8 +1,8 @@
+import re
 import uuid
 from typing import Any
 
 from django.template import Library
-import re
 
 register = Library()
 

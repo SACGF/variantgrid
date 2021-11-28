@@ -1,19 +1,19 @@
+import time
 from datetime import datetime
-from dateutil import tz
 from typing import Optional, Dict
 
 import ijson
 import requests
-import time
+from dateutil import tz
 
+from classification.models.evidence_key import EvidenceKeyMap
+from classification.views.classification_view import BulkInserter
 from library.guardian_utils import admin_bot
 from library.oauth import OAuthConnector
 from library.utils import make_json_safe_in_place, batch_iterator
-from snpdb.models.models import Lab, Organization
+from snpdb.models.models import Lab, Organization, Country
 from sync.models.enums import SyncStatus
 from sync.models.models import SyncDestination, SyncRun
-from classification.models.evidence_key import EvidenceKeyMap
-from classification.views.classification_view import BulkInserter
 
 
 def sync_shariant_download(sync_destination: SyncDestination, full_sync: bool = False) -> SyncRun:
@@ -84,12 +84,13 @@ def sync_shariant_download(sync_destination: SyncDestination, full_sync: bool = 
         if not lab:
             parts = lab_group_name.split('/')
             org, _ = Organization.objects.get_or_create(group_name=parts[0], defaults={"name": parts[0]})
+            australia, _ = Country.objects.get_or_create(name='Australia')
             lab = Lab.objects.create(
                 group_name=lab_group_name,
                 name=meta.get('lab_name'),
                 organization=org,
                 city='Unknown',
-                country='Australia',
+                country=australia,
                 external=True,
             )
 

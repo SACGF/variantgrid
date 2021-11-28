@@ -1,9 +1,11 @@
+import mimetypes
+
+import pandas as pd
 from django.conf import settings
 from django.http.response import HttpResponse, JsonResponse
 from django.shortcuts import render, get_object_or_404
 from django.views.decorators.http import require_POST
 from jfu.http import upload_receive, UploadResponse, JFUResponse
-import mimetypes
 
 from annotation.models.models_phenotype_match import TextPhenotypeMatch
 from annotation.phenotype_matching import create_phenotype_description
@@ -19,7 +21,6 @@ from patients.forms import PatientSearchForm, PatientContactForm
 from patients.models import PatientColumns, PatientRecords, Patient, PatientModification, PatientRecordOriginType, \
     PatientAttachment
 from snpdb.models import Sample
-import pandas as pd
 
 
 def view_patient(request, patient_id):

@@ -429,17 +429,15 @@ $(document).ready(function() {
     if (variantAllele) {
         populateVariantAllele(variantAllele);
     } else {
-    {% if variant.can_have_annotation %}
+    {% if variant.can_have_clingen_allele %}
         // Use Ajax to create + retrieve ClinGenAllele
         let variantAlleleForVariantUrl = "{% url 'variant_allele_for_variant' variant.pk genome_build.pk %}";
         $.ajax(variantAlleleForVariantUrl, {
             suppressErrors: true,
-
-
             success: populateVariantAllele
         });
     {% else %}
-        // reference - just show basics
+        // Can't retrieve, just show basics
         let variantString = "{{ variant|safe }}";
         let linkData = {variant_string: variantString, variant_coordinate: variantString};
         populateVariantAllele({link_data: linkData});

@@ -1,13 +1,14 @@
-from django.db.models.expressions import OrderBy, RawSQL
-from typing import List
 import csv
 import io
 import re
+from typing import List
+
+from django.db.models.expressions import OrderBy, RawSQL
 
 from classification.enums.classification_enums import EvidenceKeyValueType
+from classification.models.classification import Classification
 from classification.models.evidence_key import EvidenceKeyMap, \
     EvidenceKey
-from classification.models.classification import Classification
 from classification.views.classification_export_utils import ExportFormatter, \
     KeyValueFormatter, UsedKeyTracker
 
@@ -66,9 +67,9 @@ class RedcapDefinition:
 
     @staticmethod
     def safe_key(key: str) -> str:
-        #redcap has a limit of 26 characters for a key
-        #we prefix vc_ bringing that down to 23
-        #we can suffix with _1, _2, ... _10 and notes _n1 to _n10 bringing that down to 19
+        # redcap has a limit of 26 characters for a key
+        # we prefix vc_ bringing that down to 23
+        # we can suffix with _1, _2, ... _10 and notes _n1 to _n10 bringing that down to 19
         return key[:19]
 
     def row(self):

@@ -1,7 +1,5 @@
 import re
-from collections import defaultdict
 from datetime import datetime
-from typing import Dict
 
 from django.conf import settings
 from django.db import transaction
@@ -9,30 +7,38 @@ from django.http.request import HttpRequest
 from django.shortcuts import render, redirect, get_object_or_404
 from requests.models import Response
 
+from classification.models import ClassificationRef, ClinicalContextRecalcTrigger
+from classification.models.allele_overlap import AlleleOverlap, OverlapCounts, OverlapSet
+from classification.models.classification import Classification
+from classification.models.clinical_context_models import ClinicalContext
+from classification.models.flag_types import classification_flag_types
 from library.django_utils import require_superuser
 from snpdb.models import Allele, Lab
 from snpdb.models.models_variant import Variant
-from classification.models import ClassificationRef
-from classification.models.allele_overlap import AlleleOverlap, DiscordanceLevel, OverlapCounts
-from classification.models.clinical_context_models import ClinicalContext
-from classification.models.flag_types import classification_flag_types
-from classification.models.classification import Classification
 
 
 def view_overlaps(request: HttpRequest) -> Response:
     user = request.user
     labs = set(Lab.valid_labs_qs(user))
 
+    context = {
+        "labs": labs
+    }
+
+    return render(request, "classification/overlaps.html", context)
+
+
+def view_overlaps_detail(request: HttpRequest) -> Response:
+    user = request.user
     allele_and_vcs = AlleleOverlap.overlaps_for_user(user)
     overlap_counts = OverlapCounts(allele_and_vcs)
 
     context = {
-        "overlaps": allele_and_vcs,
-        "labs": labs,
+        "overlap_sets": OverlapSet.as_sets(allele_and_vcs),
         "overlap_counts": overlap_counts
     }
 
-    return render(request, "classification/overlaps.html", context)
+    return render(request, "classification/overlaps_detail.html", context)
 
 
 # POST only
@@ -78,7 +84,7 @@ def post_clinical_context(request: HttpRequest) -> Response:
                 )
 
     for cc in affected_ccs:
-        cc.recalc_and_save(cause='Record(s) moved between clinical groupings')
+        cc.recalc_and_save(cause='Record(s) moved between clinical groupings', cause_code=ClinicalContextRecalcTrigger.CLINICAL_GROUPING_SET)
 
     #pretend to do something
     return redirect(came_from_obj)

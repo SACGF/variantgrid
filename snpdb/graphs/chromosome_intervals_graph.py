@@ -1,13 +1,13 @@
-from collections import defaultdict
-from django.conf import settings
 import logging
+from collections import defaultdict
+
+import numpy as np
 
 from library.genomics import format_chrom
 from library.graphs.chromosomes_graph import plot_chromosomes
 from library.utils import sha1_str
 from snpdb import models
 from snpdb.graphs.graphcache import CacheableGraph
-import numpy as np
 
 MIN_BAR_WIDTH = 1000  # Use points if below this
 BAR_LINE_WIDTH = 11

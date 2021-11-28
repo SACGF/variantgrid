@@ -1,5 +1,5 @@
-from collections import defaultdict
 import logging
+from collections import defaultdict
 from operator import itemgetter
 
 from library.file_utils import get_extension_without_gzip

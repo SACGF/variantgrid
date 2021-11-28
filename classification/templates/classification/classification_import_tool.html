@@ -21,7 +21,7 @@
         let delete_mode = $('#delete').prop('checked');
         let publish = $('#publish').val();
         let data = $('#data').val().trim();
-        if (data.length == 0) {
+        if (data.length === 0) {
             data = '{}';
         }
         let genome_build = $('#genome_build option:selected').val();
@@ -82,16 +82,16 @@
                 envelope["publish"] = publish;
             }
         }
-        let envelope_text = JSON.stringify(envelope, null, 4);
+        let prettyHtml = formatJson(envelope);
         let previewDom =  $('#request_preview');
-        previewDom.text(envelope_text);
+        previewDom.html(prettyHtml);
         
         if (!valid) {
             previewDom.addClass('invalid');
         } else {
             previewDom.removeClass('invalid');
         }
-        return [envelope_text, valid]
+        return [JSON.stringify(envelope), valid]
     }
 
     function run() {
@@ -113,7 +113,7 @@
                 $('#response_preview').text(text || `An error occurred ${status}`);
             },
             success: (record) => {
-                $('#response_preview').text(JSON.stringify(record, null, 4));
+                $('#response_preview').html(formatJson(record));
                 let link = null;
                 if (record.meta && record.meta.id) {
                     let id = record.meta.id;
@@ -133,7 +133,6 @@
     }
     
     $(document).ready(() => {
-        let now = new Date();
         $('#record_id').val('test_' + Math.floor(Date.now() / 1000));
         $('#import-fields input, #import-fields select, #import-fields textarea').change(() => {
            generateRequest(); 
@@ -182,17 +181,16 @@
     });
 </script>
 <style>
-div.json {
-    height: 400px;
-    font-family: monospace;
-    border: 1px solid #dddddd;
-    padding: 8px;
-    white-space: pre;
-    font-size: 12px;
-    overflow-y: scroll;
-}
 .invalid {
     color: gray;
+}
+div.json {
+    height: 400px;
+    border: 1px solid #dddddd;
+    border-radius: 4px;
+    padding: 8px;
+    overflow: auto;
+    font-size: 12px;
 }
 #data {
     width: 400px;
@@ -210,7 +208,7 @@ div.json {
         {% labelled label="Toggles" %}
             <div class="form-check">
                 <label class="form-check-label">
-                    <input type="checkbox" id="test" checked="true" class="form-check-input" />
+                    <input type="checkbox" id="test" checked="checked" class="form-check-input" />
                     Test Mode
                 </label>
             </div>
@@ -239,7 +237,7 @@ div.json {
                 <option value="public">3rd Party Databases</option>
             </select>
         {% endlabelled %}
-        {% labelled label="c.hgvs" %}
+        {% labelled label="c.HGVS" %}
             <input id="c_hgvs" type="text" placeholder="transcript.ver(gene)c.xxxx" class="form-control" />
         {% endlabelled %}
         {% labelled label="Genome Build" %}
@@ -272,7 +270,7 @@ div.json {
                 </div>
             </div>
         {% endfor %}
-        {% labelled label="JSON custom data" %}
+        {% labelled label="JSON Custom Data" %}
             <textarea id="data" style="font-family:monospace" class="form-control w-100">{}</textarea>
         {% endlabelled %}
 
@@ -282,17 +280,19 @@ div.json {
             {% endlabelled %}
         </div>
     </form>
-    <div class="row" id="preview">
+    <div class="row no-gutters" id="preview">
         <div class="col-md-5">
             <label>Request Preview</label>
-            <div id="request_preview" class="json"></div>
+            <div id="request_preview"></div>
         </div>
-        <div class="col-md-2 align-self-center">
-            <button class="btn btn-primary w-100" onclick="run()">&gt; Import &gt;</button>
+        <div class="col-md-1 align-self-center">
+            <div class="mx-2">
+                <button class="btn btn-primary w-100" onclick="run()"><i class="fas fa-chevron-right"></i>Import</button>
+            </div>
         </div>
-        <div class="col-md-5">
+        <div class="col-md-6">
             <label>Response</label>
-            <div id="response_preview" class="json"></div>
+            <div id="response_preview" class=""></div>
         </div>
     </div>
 

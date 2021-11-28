@@ -2,11 +2,11 @@
 Uploaded VCFs are first passed through this command to fix things that will cause VT to die (eg bad contigs)
 """
 import re
+import sys
 from collections import Counter
 
 from django.conf import settings
 from django.core.management.base import BaseCommand
-import sys
 
 from snpdb.models import GenomeBuild, GenomeFasta
 

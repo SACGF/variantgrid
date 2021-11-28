@@ -1,5 +1,5 @@
-from collections import defaultdict
 import re
+from collections import defaultdict
 
 from library.utils import FLOAT_REGEX
 from seqauto.models.models_enums import SequencerRead, PairedEnd

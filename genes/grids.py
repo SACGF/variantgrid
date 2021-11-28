@@ -184,7 +184,6 @@ def _get_gene_fields():
 class GenesGrid(JqGridUserRowConfig):
     model = ReleaseGeneVersion
     caption = "Gene Release"
-    fields = _get_gene_fields()
     colmodel_overrides = {
         'gene_version__gene_symbol__symbol': {'formatter': 'geneSymbolLink'},
         "gene_version__hgnc__gene_symbol__symbol": {"label": "HGNC Symbol"},
@@ -192,6 +191,7 @@ class GenesGrid(JqGridUserRowConfig):
 
     def __init__(self, user, genome_build_name, **kwargs):
         extra_filters = kwargs.pop("extra_filters", None)
+        self.fields = _get_gene_fields()
         super().__init__(user)
         queryset = self.model.objects.all()
         genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
@@ -203,7 +203,7 @@ class GenesGrid(JqGridUserRowConfig):
         if extra_filters:
             gene_annotation_release_id = extra_filters["gene_annotation_release_id"]
             if column := extra_filters.get("column"):
-                if column in GenesGrid.fields:
+                if column in self.fields:
                     is_null = extra_filters.get("is_null", False)
                     kwargs = {f"{column}__isnull": is_null}
                     queryset = queryset.filter(**kwargs)

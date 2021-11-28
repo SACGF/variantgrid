@@ -141,7 +141,7 @@ class ClinVar(models.Model):
 
 
 class ClinVarCitationsCollection(models.Model):
-    pass
+    cached_web_resource = models.ForeignKey('CachedWebResource', null=True, on_delete=CASCADE)
 
 
 class Citation(models.Model):

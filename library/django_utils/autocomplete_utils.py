@@ -1,10 +1,11 @@
 """
 @see https://django-autocomplete-light.readthedocs.io/en/master/
 """
+import operator
+from functools import reduce
+
 from dal import autocomplete
 from django.db.models.query_utils import Q
-from functools import reduce
-import operator
 
 
 class AutocompleteView(autocomplete.Select2QuerySetView):

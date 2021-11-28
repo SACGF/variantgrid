@@ -4,38 +4,34 @@
 
 {% for ccg in clinical_contexts %}
     {% with discordance_status=ccg.calculate_discordance_status %}
-    {% if ccg.latest_report and ccg.latest_report.resolution != 'C' %}
-        <div class="my-1 alert alert-danger">
+        <div class="my-1 alert overlap-{{ discordance_status.level.value }}">
+        {% if ccg.latest_report and ccg.latest_report.resolution != 'C' %}
             <a href="{% url 'discordance_report' ccg.latest_report.id %}">{% if not ccg.is_default %}<span class="font-weight-bold">{{ ccg.name }}</span> {% endif %}
                 Status :
                 {% if discordance_status.lab_count == 1 %}Single Lab, {% endif %}
                 {{ ccg.latest_report.resolution_text }} (Click for Discordance Report)</a>
-        </div>
-    {% else %}
-        <div class="my-1 alert alert-{{ discordance_status.level.bs_status }}">
-            {% if not ccg.is_default %}<span class="font-weight-bold">{{ ccg.name }}</span> {% endif %}Status :
-            {% if discordance_status.counted_classifications == 1 %}Single Submission
-            {% else %}
+        {% else %}
+                {% if not ccg.is_default %}<span class="font-weight-bold">{{ ccg.name }}</span> {% endif %}Status :
                 {% if discordance_status.lab_count == 1 %}Single Lab, {% endif %}
                 <span>{{ discordance_status.level.label }}</span>
-            {% endif %}
+        {% endif %}
         </div>
-    {% endif %}
     {% endwith %}
 {% endfor %}
 {% if diff_latest or diff_all %}
-    <div class="btn-toolbar mb-4">
-    {% if diff_latest %}
-        <a class="btn btn-outline-primary" href="{% url 'classification_diff' %}?cids={{ diff_latest }}">Diff Latest</a>
-    {% endif %}
-    {% if diff_all %}
-        <a class="btn btn-outline-primary" href="{% url 'classification_diff' %}?cids={{ diff_all }}">Diff All</a>
-    {% endif %}
-    {% comment %}<a class="btn btn-outline-secondary" href="#">TODO Download CSV</a>{% endcomment %}
+    <div data-toolbar="#{{ table_id }}" class="link-toolbar">
+        {% if diff_latest %}
+            <a class="hover-link" href="{% url 'classification_diff' %}?cids={{ diff_latest }}">Show Diff Latest</a>
+        {% endif %}
+        {% if diff_all %}
+            <a class="hover-link" href="{% url 'classification_diff' %}?cids={{ diff_all }}">Show Diff All</a>
+        {% endif %}
+        {% comment %}<a class="btn btn-outline-secondary" href="#">TODO Download CSV</a>{% endcomment %}
     </div>
 {% endif %}
 {% if classification_groups %}
-<table class="table sticky-header" id="{{ table_id }}" width="100%">
+<div class="mt-4"></div>
+<table class="table sticky-header w-100" id="{{ table_id }}">
     <thead>
         <tr>
             <th>Lab</th>
@@ -46,7 +42,7 @@
             <th><span class="text-secondary">Latest</span><br/>ACMG</th>
             <th><span class="text-secondary">Latest</span><br/>Curated</th>
             <th>Sort Column (hidden)</th>
-            <th><span class="text-secondary">Latest</span> Imported as</th>
+            <th><span class="text-secondary">Latest</span> c.HGVS</th>
             <th>Allele</th>
             <th>Gene Symbol</th>
             <th>Records</th>
@@ -59,11 +55,17 @@
     </tbody>
 </table>
 <script>$(document).ready(() => {
-    var table = $('#{{ table_id }}').DataTable({
+    var tableDom = $('#{{ table_id }}')
+    var table = tableDom.DataTable({
         order: [1, "asc"],
-        dom: '<"top"><"toolbar"<"custom">f>rt<"bottom"ilp><"clear">',
+        dom: '<"top"><"toolbar"<"custom">f>rt<"bottom"<"showing"il>p><"clear">',
         "orderFixed": {
             post: [7, "desc"]
+        },
+        pagingType: "input",
+        classes: {
+            'sPageButton': 'btn btn-outline-primary btn-rnd-rect',
+            'sPageButtonDisabled': 'disabled'
         },
         pageLength: 50,
         responsive: {
@@ -96,6 +98,7 @@
             Flags.instance.init({userId: '{{user.id}}', forceRender: true, filter:'.child', flagGroup:'classifications'});
         },1);
     });
+    $(`[data-toolbar="#{{table_id}}"]`).detach().appendTo(tableDom.closest('.dataTables_wrapper').find('.toolbar .custom'));
 })
 </script>
 {% else %}

@@ -5,9 +5,9 @@ from django.db import models
 from django.db.models import CASCADE, SET_NULL, PROTECT
 from django_extensions.db.models import TimeStampedModel
 
+from analysis.models.enums import TagLocation
 from analysis.models.models_analysis import Analysis
 from analysis.models.nodes.analysis_node import AnalysisNode
-from analysis.models.enums import TagLocation
 from annotation.annotation_version_querysets import get_variant_queryset_for_latest_annotation_version
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsAutoInitialSaveMixin
 from snpdb.models import Variant, GenomeBuild, Tag, VariantAllele

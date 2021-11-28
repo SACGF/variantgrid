@@ -1,6 +1,7 @@
-from django.core.management.base import BaseCommand, CommandError
 import logging
 import os
+
+from django.core.management.base import BaseCommand, CommandError
 
 from upload.models import UploadedFileTypes, UploadPipeline
 from upload.uploaded_file_type import retry_upload_pipeline

@@ -1,9 +1,9 @@
 import gzip
-from hashlib import md5
 import logging
 import os
-from pathlib import Path
 import subprocess
+from hashlib import md5
+from pathlib import Path
 
 
 def file_or_filename(f, mode='r'):

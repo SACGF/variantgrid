@@ -1,26 +1,24 @@
 import json
-from logging import StreamHandler
 import logging
+import re
 import socket
-import markdown
-from typing import Dict, Optional, List, Tuple, Any, Union
-
-import requests
-import rollbar
 import sys
 import traceback
-import re
+from logging import StreamHandler
+from typing import Dict, Optional, List, Tuple, Any, Union
 
+import markdown
+import requests
+import rollbar
 from django.conf import settings
-from django.utils import timezone
-
 from django.contrib.auth.models import User
+from django.utils import timezone
 from markdown import markdown
 from rest_framework.request import Request
+from threadlocals.threadlocals import get_current_request, get_current_user
 
 from eventlog.models import Event
 from library.enums.log_level import LogLevel
-from threadlocals.threadlocals import get_current_request
 
 
 def report_event(name: str, request: Request = None, extra_data: Dict = None):
@@ -28,6 +26,9 @@ def report_event(name: str, request: Request = None, extra_data: Dict = None):
                            level='info',
                            request=request,
                            extra_data=extra_data)
+
+    if request is None:
+        request = get_current_request()
 
     user: User = None
     details = None
@@ -42,7 +43,7 @@ def report_event(name: str, request: Request = None, extra_data: Dict = None):
             except:
                 details = "(error saving extra_data)"
     elif request:
-        details = json.dumps(request.query_params.dict())
+        details = json.dumps({**request.POST.dict(), **request.GET.dict()})
 
     Event.objects.create(user=user,
                          app_name='event',  # could potentially look at the stack trace
@@ -62,7 +63,11 @@ def report_message(message: str, level: str = 'warning', request=None, extra_dat
     @param extra_data a JSON-isable dictionary of extra information
     @param persist_name Should this message be kept permanently, if so give it a name
     """
-    print(message)
+    print_message = message
+    if extra_data and (target := extra_data.get('target')):
+        print_message = message + " : " + str(target)
+    print(print_message)
+
     if not request:
         request = get_current_request()
     rollbar.report_message(message=message,
@@ -71,10 +76,11 @@ def report_message(message: str, level: str = 'warning', request=None, extra_dat
                            extra_data=extra_data)
 
 
-def report_exc_info(extra_data=None, request=None):
+def report_exc_info(extra_data=None, request=None, report_externally=True):
     if not request:
         request = get_current_request()
-    rollbar.report_exc_info(extra_data=extra_data, request=request)
+    if report_externally:
+        rollbar.report_exc_info(extra_data=extra_data, request=request)
     exc_info = sys.exc_info()
     if exc_info:
         print(exc_info)
@@ -276,6 +282,12 @@ class NotificationBuilder:
 
     def send(self):
         self.sent = True
+        Event.objects.create(user=get_current_user(),
+                             app_name='event',  # could potentially look at the stack trace
+                             name=self.message,
+                             date=timezone.now(),
+                             details=self.as_text(),
+                             severity=LogLevel.INFO)
         send_notification(message=self.message, blocks=self.as_slack(), emoji=self.emoji, slack_webhook_url=self.webhook_url)
 
     def __del__(self):
@@ -291,6 +303,8 @@ def send_notification(
         slack_webhook_url: Optional[str] = None):
     """
     Sends a message to your notification service, currently Slack centric.
+    Best practise is to use a NotificationBuilder with send() rather than calling send_notification directly
+
     If Slack is not configured, this will do nothing.
     @param message The message to send, (if also sending blocks just have message as a summary, wont be displayed)
     @param blocks See https://api.slack.com/messaging/webhooks#advanced_message_formatting
@@ -325,9 +339,9 @@ def send_notification(
             sent = True
         except:
             report_exc_info()
-    if not sent:
-        print("Slack not enabled, did not send message")
-        print(message)
+    else:
+        # fallback to Rollbar if Slack isn't configured
+        report_event(name=message)
 
 
 def console_logger():

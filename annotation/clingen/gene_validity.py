@@ -1,14 +1,14 @@
-from dateutil import parser
-from io import StringIO
 import logging
+from io import StringIO
+
+import pandas as pd
 import requests
+from dateutil import parser
 
 from annotation.models import DiseaseValidity
 from annotation.models.models import GeneDiseaseValidity, GeneDiseaseCurator
 from annotation.models.models_enums import ClinGenClassification
 from library.utils import invert_dict
-import pandas as pd
-
 from ontology.models import OntologyTerm, OntologyService
 
 

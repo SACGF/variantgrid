@@ -2,25 +2,23 @@ import collections
 import datetime
 from typing import List
 
+import celery
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.db.models import QuerySet
+from django.http.request import HttpRequest
+from django.http.response import HttpResponse
 from django.template.loader import render_to_string
 from django.utils.timesince import timesince
 from lazy import lazy
 
+from classification.enums.discordance_enums import DiscordanceReportResolution
+from classification.models import Classification, classification_flag_types, \
+    DiscordanceReportClassification, DiscordanceReport
 from email_manager.models import EmailLog
 from flags.models import FlagCollection
 from library.log_utils import report_exc_info, report_message
 from snpdb.models import Lab, UserSettings
-from classification.enums import ShareLevel
-from classification.enums.discordance_enums import DiscordanceReportResolution
-from classification.models import Classification, classification_flag_types, \
-    DiscordanceReportClassification, DiscordanceReport
-import celery
-from django.http.request import HttpRequest
-from django.http.response import HttpResponse
-
 
 EmailOutput = collections.namedtuple('EmailOutput', 'subject html text')
 
@@ -94,7 +92,7 @@ class EmailSummaryData:
         return False
 
 
-@celery.task
+@celery.shared_task
 def send_summary_emails():
     report_message("Attempting to send weekly summary emails", level="info")
     for user in User.objects.filter(is_active=True):
