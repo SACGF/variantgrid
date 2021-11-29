@@ -26,10 +26,10 @@ class UploadStepsGrid(JqGridUserRowConfig):
 class UploadPipelineSkippedAnnotationGrid(JqGridUserRowConfig):
     model = Variant
     caption = 'Skipped Annotation'
-    fields = ["id", "variantannotation__vep_skipped_reason", "variantannotation__annotation_run"]
+    fields = ["id", "variantannotation__vep_skipped_reason", "variantannotation__annotation_run_id"]
 
     colmodel_overrides = {"id": {"hidden": True},
-                          "variantannotation__annotation_run": {'formatter': 'formatAnnotationRunLink'}}
+                          "variantannotation__annotation_run_id": {'formatter': 'formatAnnotationRunLink'}}
 
     def __init__(self, user, upload_pipeline_id):
         super().__init__(user)

@@ -633,15 +633,6 @@ class VCFSkippedContig(models.Model):
     num_skipped = models.IntegerField()
 
 
-class VCFSkippedGVCFNonVarBlocks(VCFImportInfo):
-    has_more_details = True
-    num_skipped = models.IntegerField()
-
-    @property
-    def message(self):
-        return f"{self.num_skipped} gVCF non-variant blocks skipped (we only store reference variants and genotype calls at variant sites)"
-
-
 class UploadSettings(models.Model):
     user = models.OneToOneField(User, on_delete=CASCADE)
     time_filter_method = models.CharField(max_length=1, choices=TimeFilterMethod.choices, default=TimeFilterMethod.RECORDS)
