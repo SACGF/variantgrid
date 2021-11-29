@@ -359,6 +359,7 @@ class Searcher:
                     message="Search Error",
                     extra_data={
                         'target': f"\"{self.search_string}\" - (Variant) - {e}",
+                        'search_string': self.search_string,
                         'classify': self.classify,
                         'genome_build_id': genome_build.name if genome_build else None
                     }
@@ -417,6 +418,7 @@ class Searcher:
                         message="Search Error",
                         extra_data={
                             'target': f"\"{self.search_string}\" - ({search_type}) - {e}",
+                            'search_string': self.search_string,
                             'classify': self.classify,
                             'genome_build_id': genome_build.name if genome_build else None
                         }
