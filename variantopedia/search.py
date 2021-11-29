@@ -24,7 +24,7 @@ from genes.hgvs import HGVSMatcher
 from genes.models import TranscriptVersion, Transcript, MissingTranscript, Gene, GeneSymbol, GeneSymbolAlias
 from genes.models_enums import AnnotationConsortium
 from library.genomics import format_chrom
-from library.log_utils import report_exc_info
+from library.log_utils import report_exc_info, report_message
 from library.utils import clean_string
 from ontology.models import OntologyTerm, OntologyService
 from patients.models import ExternalPK, Patient
@@ -354,13 +354,14 @@ class Searcher:
                 variant_qs = get_visible_variants(self.user, genome_build)
                 searches = self.genome_build_searches
             except Exception as e:
-                report_exc_info(
+                # okay that we lose the exception data since we have the search string, should be easy to re-create
+                report_message(
+                    message="Search Error",
                     extra_data={
-                        'search_string': self.search_string,
+                        'target': f"\"{self.search_string}\" - (Variant) - {e}",
                         'classify': self.classify,
                         'genome_build_id': genome_build.name if genome_build else None
-                    },
-                    report_externally=False
+                    }
                 )
                 results.append_error(("variants", e, genome_build))
                 return results
@@ -412,14 +413,13 @@ class Searcher:
                             results.append_result(sr)
 
                 except Exception as e:
-                    report_exc_info(
+                    report_message(
+                        message="Search Error",
                         extra_data={
-                            'search_string': self.search_string,
-                            'search_type': search_type,
+                            'target': f"\"{self.search_string}\" - ({search_type}) - {e}",
                             'classify': self.classify,
                             'genome_build_id': genome_build.name if genome_build else None
-                        },
-                        report_externally=False
+                        }
                     )
                     results.append_error((search_type, e, genome_build))
         return results
