@@ -583,20 +583,20 @@ def evidence_keys(request: HttpRequest) -> HttpResponse:
 def classification_graphs(request):
     if settings.VARIANT_CLASSIFICATION_STATS_USE_SHARED:
         show_unclassified = False
-        visibility = "shared & matched to a variant"
-        evidence_field = "published_evidence"
+        visibility = "shared & matched to an allele"
     else:
         show_unclassified = True
         visibility = f"visible to {request.user.username}"
-        evidence_field = "evidence"
-    classification_counts = get_classification_counts(request.user, show_unclassified=show_unclassified)
+    classification_counts = get_classification_counts(request.user, show_unclassified=show_unclassified, unique_alleles=True)
 
+    evidence_field = "published_evidence"
     vc_gene_data = get_grouped_classification_counts(
         user=request.user,
         field=evidence_field,
         evidence_key="gene_symbol",
         max_groups=15,
-        show_unclassified=show_unclassified)
+        show_unclassified=show_unclassified,
+        allele_level=True)
 
     acmg_by_significance = get_criteria_counts(request.user, evidence_field)
     context = {
@@ -678,7 +678,7 @@ def clin_sig_change_data(request):
                             'created'):
                         discordance_dates.append(discordance.created)
 
-                    if allele := source.variant.allele:
+                    if allele := source.allele:
                         cl: Classification
                         for cl in Classification.objects.filter(variant__in=allele.variants):
                             if cl.lab != source.lab and cl.created < flag.created:

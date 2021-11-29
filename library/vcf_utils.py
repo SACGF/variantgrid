@@ -73,7 +73,8 @@ def write_vcf_from_tuples(vcf_filename, variant_tuples, tuples_have_id_field=Fal
 
 def cyvcf2_gt_types(genotypes):
     """ Work around for strict_gt=True not working on phased genotypes
-        ie issue https://github.com/brentp/cyvcf2/issues/198 """
+        ie issue https://github.com/brentp/cyvcf2/issues/198 (strict_gt=True doesn't affect phased genotypes)
+        and https://github.com/brentp/cyvcf2/issues/227 (mixed diploid/haploid incorrect zygosity call) """
     HOM_REF = 0
     HET = 1
     UNKNOWN = 2

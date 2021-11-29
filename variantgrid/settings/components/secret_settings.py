@@ -20,19 +20,20 @@ def _get_env_variable(key: str) -> Tuple[Any, bool]:
 
 
 def _settings_file():
-    filename = '/etc/variantgrid/settings_config.json'
     value, found = _get_env_variable('SETTINGS_CONFIG')
     if found:
-        filename = value
-    return filename
+        return value
+    else:
+        return '/etc/variantgrid/settings_config.json'
 
 
 def _load_settings():
+    settings_file = _settings_file()
     try:
-        with open(_settings_file()) as f:
+        with open(settings_file) as f:
             return json.load(f)
     except Exception as e:
-        logging.info(f"Could not load settings_config from {filename} : {str(e)}\n")
+        logging.info(f"Could not load settings_config from {settings_file} : {str(e)}\n")
         return {}
 
 

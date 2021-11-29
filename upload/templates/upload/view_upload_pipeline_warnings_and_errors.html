@@ -43,23 +43,6 @@ $(document).ready(function() {
         </table>
     {% endif %}
 
-    {% if vcf_skipped_gvcf_non_var_blocks %}
-        <h3>Skipped gVCF non-var block records</h3>
-        <div>
-        <p>
-        VariantGrid does not support gVCF-specific information, and we <b>skipped {{ vcf_skipped_gvcf_non_var_blocks.num_skipped }} non-var block records.</b>
-        
-        <p>
-        A problem with normal VCF files is knowing whether the lack of a variant entry is due to the sample having no mutation (reference base at that locus), or no coverage over that position.  
-
-        <p>
-        gVCF fix this issue by storing read information for all sites, not just variant calls. We don't currently make use of this information, and the amount of data is very large, so we don't store it. 
-
-        <p>
-        For more information about gVCFs, please see: <a href='https://gatkforums.broadinstitute.org/gatk/discussion/4017/what-is-a-gvcf-and-how-is-it-different-from-a-regular-vcf'>What is a GVCF and how is it different from a 'regular' VCF?</a>.
-        </div>
-    {% endif %}
-
     {% if skipped_annotation %}
     <div>
         <h3>Skipped annotation</h3>

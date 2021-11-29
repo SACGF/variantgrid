@@ -23,7 +23,7 @@ from library.log_utils import log_traceback
 from snpdb.models import VCF
 from upload import forms, upload_processing, upload_stats
 from upload.models import UploadPipeline, UploadedFile, ProcessingStatus, UploadedFileTypes, \
-    UploadSettings, ImportSource, UploadStep, VCFSkippedContigs, VCFSkippedGVCFNonVarBlocks, \
+    UploadSettings, ImportSource, UploadStep, VCFSkippedContigs, \
     VCFImportInfo, SimpleVCFImportInfo, ModifiedImportedVariant, TimeFilterMethod
 from upload.uploaded_file_type import get_upload_data_for_uploaded_file, \
     get_uploaded_file_type, get_url_and_data_for_uploaded_file_data, \
@@ -276,16 +276,24 @@ def view_upload_pipeline_warnings_and_errors(request, upload_pipeline_id):
 
     contigs_import = get_build_contigs()
     has_miv = ModifiedImportedVariant.objects.filter(import_info__upload_step__upload_pipeline=upload_pipeline).exists()
-    skipped_annotation = SimpleVCFImportInfo.objects.filter(type=SimpleVCFImportInfo.ANNOTATION_SKIPPED).first()
+    skipped_annotation = SimpleVCFImportInfo.objects.filter(upload_step__upload_pipeline=upload_pipeline,
+                                                            type=SimpleVCFImportInfo.ANNOTATION_SKIPPED).first()
 
-    vcf_skipped_gvcf_non_var_blocks = VCFSkippedGVCFNonVarBlocks.objects.filter(upload_step__upload_pipeline=upload_pipeline).first()
+    for vii in upload_pipeline.get_errors(hide_accepted=False):
+        msg = f"Error: {vii.message}"
+        messages.add_message(request, messages.ERROR, msg, extra_tags='import-message')
 
-    context = {'upload_pipeline': upload_pipeline,
-               'skipped_contigs': skipped_contigs,
-               "has_modified_imported_variants": has_miv,
-               "skipped_annotation": skipped_annotation,
-               'contigs_import': contigs_import,
-               'vcf_skipped_gvcf_non_var_blocks': vcf_skipped_gvcf_non_var_blocks}
+    for vii in upload_pipeline.get_warnings(hide_accepted=False):
+        msg = f"Warning: {vii.message}"
+        messages.add_message(request, messages.WARNING, msg, extra_tags='import-message')
+
+    context = {
+        'upload_pipeline': upload_pipeline,
+        'skipped_contigs': skipped_contigs,
+        "has_modified_imported_variants": has_miv,
+        "skipped_annotation": skipped_annotation,
+        'contigs_import': contigs_import,
+    }
     return render(request, 'upload/view_upload_pipeline_warnings_and_errors.html', context)
 
 

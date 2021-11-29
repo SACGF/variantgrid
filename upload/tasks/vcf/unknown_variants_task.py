@@ -10,7 +10,7 @@ from library.file_utils import name_from_filename, mk_path
 from snpdb import variant_collection
 from snpdb.models import Variant
 from snpdb.variant_pk_lookup import VariantPKLookup
-from upload.models import UploadStep, UploadStepTaskType, VCFPipelineStage, VCFSkippedGVCFNonVarBlocks
+from upload.models import UploadStep, UploadStepTaskType, VCFPipelineStage
 from upload.tasks.vcf.import_vcf_step_task import ImportVCFStepTask
 from upload.vcf import sql_copy_files
 from variantgrid.celery import app
@@ -43,9 +43,6 @@ class BulkUnknownVariantInserter:
         self.executor = ThreadPoolExecutor(max_workers=1)
         self.child_futures = []
         self.variant_pk_lookup = VariantPKLookup.factory(upload_step.genome_build)
-        # Settings
-        self.store_gvcf_non_var_blocks = settings.VCF_IMPORT_STORE_GVCF_NON_VAR_BLOCKS
-        self.num_skipped_gvcf_non_var_blocks = 0
 
     def process_vcf_line(self, line):
         columns = line.split("\t")
@@ -59,10 +56,6 @@ class BulkUnknownVariantInserter:
         position = columns[1]
         ref = columns[3].strip().upper()
         alt = columns[4].strip().upper()
-        if self.store_gvcf_non_var_blocks is False:
-            if alt == "<NON_REF>":
-                self.num_skipped_gvcf_non_var_blocks += 1
-                return  # Skip
 
         if Variant.is_ref_alt_reference(ref, alt):
             alt = Variant.REFERENCE_ALT
@@ -76,10 +69,6 @@ class BulkUnknownVariantInserter:
         # Make sure all child threads returned ok
         for f in self.child_futures:
             f.result()
-
-        if self.num_skipped_gvcf_non_var_blocks:
-            VCFSkippedGVCFNonVarBlocks.objects.create(upload_step=self.upload_step,
-                                                      num_skipped=self.num_skipped_gvcf_non_var_blocks)
 
     def batch_process_check(self, insert_all=False):
         if insert_all:

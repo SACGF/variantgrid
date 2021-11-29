@@ -19,13 +19,13 @@
 
     </style>
     <script>
-        var PATHOGENIC_COLORS = [   '#777777', // other
-                                    '#00aa00', // Benign
-                                    '#aaeeaa', // Likely benign
-                                    '#ffd92a', // VUS
-                                    '#eeaaaa', // Likely pathogenic
-                                    '#ee3333', // pathogenic
-                                    ];
+        var PATHOGENIC_COLORS = ['#666666', // other
+                                '#7777ff', // Benign
+                                '#aaaaff', // Likely benign
+                                '#cccccc', // VUS
+                                '#ffaaaa', // Likely pathogenic
+                                '#ff7777', // pathogenic
+                                ];
 
         var PATHOGENIC_LABELS = [   'Other',
                                     'Benign',
@@ -97,8 +97,8 @@
         }
 
         $(document).ready(() => {
-            plotGeneClassifications('gene-classifications-graph', 'Gene Classifications');
-            plotClassificationPie('classifications-graph', 'Classifications');
+            plotGeneClassifications('gene-classifications-graph', 'Unique Classified Alleles by Gene');
+            plotClassificationPie('classifications-graph', 'Unique Classified Alleles');
             plotCriteriaGraphs();
         });
 
@@ -119,7 +119,7 @@
         {% endif %}
 
         <div class="my-4">
-            <p class="text-info">Graphs based on records that are {{ visibility }}.</p>
+            <p class="text-info">Graphs based on records that are {{ visibility }}.<br/>Multiple classifications for the same allele are only counted once.</p>
             <div class="row">
                 <div id='classifications-graph' class="col-lg-6"></div>
                 <div id='gene-classifications-graph' class="col-lg-4"></div>
