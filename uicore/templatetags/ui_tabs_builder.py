@@ -18,6 +18,7 @@ class TabBuilderTab:
     label: str
     badge: Optional[int] = None
     badge_status: Optional[str] = None
+    admin_only: Optional[bool] = None
     url: Optional[str] = None
     resolved_url: Optional[str] = None
     param: Any = None
@@ -134,6 +135,7 @@ def ui_register_tab_embedded(parser, token):
         nodelist,
         tab_set=kwargs.get('tab_set'),
         label=kwargs.get('label'),
+        admin_only=kwargs.get('admin_only'),
         badge=kwargs.get('badge'),
         badge_status=kwargs.get('badge_status')
     )
@@ -144,15 +146,18 @@ class LocalTabContent(template.Node):
                  nodelist,
                  tab_set: FilterExpression,
                  label: FilterExpression,
+                 admin_only: FilterExpression,
                  badge: FilterExpression,
                  badge_status: FilterExpression):
         self.nodelist = nodelist
         self.tab_set = tab_set
         self.label = label
+        self.admin_only = admin_only
         self.badge = badge
         self.badge_status = badge_status
 
     def render(self, context):
+        admin_only = TagUtils.value_bool(context, self.admin_only)
         tab_set = TagUtils.value_str(context, self.tab_set)
         label = TagUtils.value_str(context, self.label)
         badge = TagUtils.value_int(context, self.badge)
@@ -174,13 +179,16 @@ class LocalTabContent(template.Node):
         tab_number = len(builder.tabs)
         content: str = self.nodelist.render(context)
 
+        if admin_only and not context.request.user.is_superuser:
+            return
+
         if check_active_tab(tab_set, tab_id, context.request):
             builder.active_tab = tab_number
 
         if content.startswith('/'):
-            builder.tabs.append(TabBuilderTab(tab_builder=builder, tab_number=tab_number,
+            builder.tabs.append(TabBuilderTab(tab_builder=builder, tab_number=tab_number, admin_only=admin_only,
                                               tab_id=tab_id, label=label, badge=badge, badge_status=badge_status, resolved_url=content))
         else:
-            builder.tabs.append(TabBuilderTab(tab_builder=builder, tab_number=tab_number,
+            builder.tabs.append(TabBuilderTab(tab_builder=builder, tab_number=tab_number, admin_only=admin_only,
                                               tab_id=tab_id, label=label, badge=badge, badge_status=badge_status, content=content))
         return ""

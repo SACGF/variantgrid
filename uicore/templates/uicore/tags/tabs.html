@@ -5,7 +5,7 @@
             {% for tab in tab_builder.tabs %}
                 <div class="card">
                     <div class="card-header hover-link" data-toggle="collapse" data-target="#{{ tab.tab_id }}" aria-expanded="true">
-                        {{ tab.label }}{{ tab.badge | badge:tab.badge_status }}
+                        {% if tab.admin_only %}<i class="fas fa-key"></i>{% endif %}{{ tab.label }}{{ tab.badge | badge:tab.badge_status }}
                     </div>
                     <div id="{{ tab.tab_id }}" class="collapse {% if tab.active %}show{% endif %}" data-parent="#{{ id }}">
                   <div class="card-body">
@@ -54,7 +54,7 @@
                                 data-href="{{ tab.resolved_url }}">{{ tab.label }}{{ tab.badge | badge:tab.badge_status }}
                            {% else %}
                                {% if tab.url %}data-href="{% if tab.param %}{% url tab.url tab.param %}{% else %}{% url tab.url %}{% endif %}"{% endif %}>
-                               {{ tab.label }}{{ tab.badge | badge:tab.badge_status }}
+                               {% if tab.admin_only %}<i class="fas fa-key"></i>{% endif %}{{ tab.label }}{{ tab.badge | badge:tab.badge_status }}
                            {% endif %}
                         </a>
                     </li>
