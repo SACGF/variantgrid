@@ -2387,16 +2387,10 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
             qs = qs.select_related('classification', 'classification__lab', 'classification__variant',
                                    'classification__user')
             qs = qs.filter(is_last_published=True)
-            return qs
-        qs = qs.values_list('id', 'classification')
+        else:
+            qs = qs.filter(is_last_edited=True)
 
-        seen_classifications = set()
-        latest_version_ids = set()
-        for vcm_id, vc_id in qs:
-            if vc_id not in seen_classifications:
-                latest_version_ids.add(vcm_id)
-                seen_classifications.add(vc_id)
-        return ClassificationModification.objects.filter(id__in=latest_version_ids, **kwargs)
+        return qs
 
     def is_edit_appendable(self, user: User, source: SubmissionSource) -> bool:
         """

@@ -1,10 +1,11 @@
 import operator
 from collections import Counter, defaultdict
-from typing import Dict, List, Optional, Set
+from typing import Dict, List, Optional, Set, Any, Iterable, Union
 
 import numpy as np
 from django.conf import settings
 from django.contrib.auth.models import User
+from django.db.models import QuerySet
 
 from classification.enums import ClinicalSignificance
 from classification.enums.classification_enums import CriteriaEvaluation
@@ -14,9 +15,17 @@ from library.django_utils import get_field_counts
 from snpdb.models import Lab
 
 
-def get_classification_counts(user: User, show_unclassified=True) -> Dict[str, int]:
+def get_classification_counts(user: User, show_unclassified=True, unique_alleles=False) -> Dict[str, int]:
     qs = get_visible_classifications_qs(user)
-    field_counts = get_field_counts(qs, "clinical_significance")
+
+    field_counts: Dict[str, int]
+    if unique_alleles:
+        keys = set(ClinicalSignificance.LABELS.keys())
+        if not show_unclassified:
+            keys.remove(None)
+        field_counts = get_classification_counts_allele(qs, "clinical_significance", possible_values=keys)
+    else:
+        field_counts = get_field_counts(qs, "clinical_significance")
 
     # Add all entries as empty so colors are in the right order in graph.
     classification_counts = {}
@@ -30,19 +39,40 @@ def get_classification_counts(user: User, show_unclassified=True) -> Dict[str, i
     return classification_counts
 
 
-def get_visible_classifications_qs(user: User):
-    if settings.VARIANT_CLASSIFICATION_STATS_USE_SHARED:
-        qs = ClassificationModification.latest_for_user(
-            user,
-            published=True,
-            exclude_withdrawn=True,
-            shared_only=True,
-            clinical_significance__isnull=False
-        ).exclude(classification__variant__isnull=True)
-    else:
-        qs = Classification.filter_for_user(user)
+def get_classification_counts_allele(qs: QuerySet[ClassificationModification], field: str, possible_values: Iterable[Any]) -> Dict[Any, int]:
+    counts: Dict[Any, int] = dict()
 
-    return qs
+    # django doesn't support query set annotations and distinct() at the same time, so have to do this as multiple requests
+    qs = qs.order_by('classification__allele_id', '-created').distinct('classification__allele_id')
+    for possible_value in possible_values:
+        count: int
+        if possible_value is None:
+            count = qs.filter(**{f'{field}__isnull': True}).count()
+        else:
+            count = qs.filter(**{field: possible_value}).count()
+        # use 0 for key for unclassified
+        counts[possible_value] = count
+    return counts
+
+
+
+def get_visible_classifications_qs(user: User) -> QuerySet[ClassificationModification]:
+    # now excludes external labs (don't want to report on Shariant only data within SA Path for example)
+
+    shared = settings.VARIANT_CLASSIFICATION_STATS_USE_SHARED
+    kwargs = {"classification__lab__external": False}
+    if shared:
+        kwargs["clinical_significance__isnull"] = False
+    else:
+        kwargs["classification__variant__isnull"] = False
+
+    return ClassificationModification.latest_for_user(
+        user,
+        exclude_withdrawn=True,
+        published=shared,
+        shared_only=shared,
+        **kwargs,
+    )
 
 
 def get_grouped_classification_counts(user: User,
@@ -67,18 +97,14 @@ def get_grouped_classification_counts(user: User,
     if evidence_key and field_labels:
         raise ValueError("Can't supply both 'evidence_key' and 'field_labels'")
 
-    vc_qs = get_visible_classifications_qs(user)
-    values_qs = vc_qs.values_list("clinical_significance", field, "classification__variant")
+    vc_qs = get_visible_classifications_qs(user).order_by('-modified')
+    values_qs = vc_qs.values_list("clinical_significance", field, "classification__allele")
 
     counts = Counter()
     classification_counts = defaultdict(Counter)
-    seen_variants: Set[int] = set()
+    seen_alleles: Dict[str, Set[int]] = defaultdict(set)
 
-    for clinical_significance, field, variant in values_qs:
-        if allele_level:
-            if variant in seen_variants:
-                continue
-            seen_variants.add(variant)
+    for clinical_significance, field, allele in values_qs:
 
         if evidence_key:
             # field will either be evidence or published evidence
@@ -89,6 +115,12 @@ def get_grouped_classification_counts(user: User,
             value = field
 
         if value is not None:
+            if allele_level:
+                seen_set = seen_alleles[value]
+                if allele is None or allele in seen_set:
+                    continue
+                seen_set.add(allele)
+
             counts[value] += 1
             classification_counts[clinical_significance][value] += 1
 
@@ -181,12 +213,8 @@ def get_criteria_counts(user: User, evidence_field: str) -> Dict[str, List[Dict]
 
 
 def get_lab_gene_counts(user: User, lab: Lab):
-    if settings.VARIANT_CLASSIFICATION_STATS_USE_SHARED:
-        evidence_field = "published_evidence"
-        lab_field = "classification__lab"
-    else:
-        evidence_field = "evidence"
-        lab_field = "lab"
+    evidence_field = "published_evidence"
+    lab_field = "classification__lab"
 
     gene_symbol_field = f"{evidence_field}__gene_symbol__value"
     kwargs = {gene_symbol_field + "__isnull": False, lab_field: lab}

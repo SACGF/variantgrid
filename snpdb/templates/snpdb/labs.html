@@ -22,12 +22,14 @@
     }
 </style>
 <script>
-    var PATHOGENIC_COLORS = [   '#777777', // other
-                                '#00aa00', // Benign
-                                '#aaeeaa', // Likely benign
-                                '#ffd92a', // VUS
-                                '#eeaaaa', // Likely pathogenic
-                                '#ee3333', // pathogenic
+    // updated the colors to match the classification table
+    // but make pathogenic reder and VUS darker to stand out more
+    var PATHOGENIC_COLORS = [   '#666666', // other
+                                '#7777ff', // Benign
+                                '#aaaaff', // Likely benign
+                                '#cccccc', // VUS
+                                '#ffaaaa', // Likely pathogenic
+                                '#ff7777', // pathogenic
                                 ];
 
     {%  if show_unclassified %}
@@ -36,7 +38,9 @@
 
     function plotClassifications(selector, vc_data, title, width, height) {
         for (let i=0 ; i<vc_data.length ; ++i) {
-            vc_data[i]["marker"] = {color : PATHOGENIC_COLORS[i]};
+            vc_data[i]["marker"] = {
+                color: PATHOGENIC_COLORS[i],
+            };
         }
         let layout = defaultLayout(title, width, height);
         layout["barmode"] = 'stack';
@@ -58,7 +62,7 @@
         {% endif %}
         {% if accumulation_by_status %}
             let accumulation_by_status = {{ accumulation_by_status | jsonify }};
-            plotCumulativeClassifications("accumulation-status-graph", accumulation_by_status, "Cumulative Alleles by  Status", graph_width, graph_height)
+            plotCumulativeClassifications("accumulation-status-graph", accumulation_by_status, "Cumulative Alleles by Status (stacked)", graph_width, graph_height)
         {% endif %}
         {% if accumulation_by_org %}
             let accumulation_by_org = {{ accumulation_by_org | jsonify }};
@@ -66,7 +70,7 @@
         {% endif %}
         {% if vc_normalized_state_data_json %}
             let vc_normalized_state_data_json = {{ vc_normalized_state_data_json | jsonify }};
-            plotClassifications('normalized-state-classifications-graph', vc_normalized_state_data_json, 'Classifications/100k Pop by State', graph_width, graph_height);
+            plotClassifications('normalized-state-classifications-graph', vc_normalized_state_data_json, 'Alleles/100k Pop by State', graph_width, graph_height);
         {% endif %}
     });
 </script>
@@ -74,7 +78,7 @@
 {% block content %}
     <div class="container">
         <h3>Lab Submissions</h3>
-        <p class="text-info">These graphs plot data as one point per allele. This means 10 records for the same allele will only count once.</p>
+        <p class="text-info">Multiple classifications for the same allele are only counted once.</p>
         <div class="row">
             <div class="col">
 
@@ -86,10 +90,10 @@
                     {% ui_register_tab_embedded tab_set="graph_tabs" label="Cumulative Alleles by Status" %}<div id='accumulation-status-graph'></div>{% end_ui_register_tab_embedded %}
                 {% endif %}
                 {% if accumulation_by_org %}
-                    {% ui_register_tab_embedded tab_set="graph_tabs" label="Cumulative Alleles by Org" %}<div id='accumulation-org-graph'></div>{% end_ui_register_tab_embedded %}
+                    {% ui_register_tab_embedded tab_set="graph_tabs" label="Cumulative Alleles by Org" admin_only=True %}<div id='accumulation-org-graph'></div>{% end_ui_register_tab_embedded %}
                 {% endif %}
                 {% if vc_normalized_state_data_json %}
-                    {% ui_register_tab_embedded tab_set="graph_tabs" label="Classifications/100K Pop by State" %}<div id='normalized-state-classifications-graph'></div>{% end_ui_register_tab_embedded %}
+                    {% ui_register_tab_embedded tab_set="graph_tabs" label="Alleles/100K Pop by State" admin_only=True %}<div id='normalized-state-classifications-graph'></div>{% end_ui_register_tab_embedded %}
                 {% endif %}
                 {% ui_render_tabs tab_set="graph_tabs" mode="tabs" %}
 

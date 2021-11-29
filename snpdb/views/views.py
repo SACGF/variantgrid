@@ -1267,14 +1267,9 @@ def labs(request):
     short_names_qs = Organization.objects.filter(short_name__isnull=False)
     name_to_short_name = dict(short_names_qs.values_list("name", "short_name"))
 
-    if settings.VARIANT_CLASSIFICATION_STATS_USE_SHARED:
-        org_field = "classification__lab__organization__name"
-        state_field = "classification__lab__state"
-        show_unclassified = False
-    else:
-        org_field = "lab__organization__name"
-        state_field = "lab__state"
-        show_unclassified = True
+    org_field = "classification__lab__organization__name"
+    state_field = "classification__lab__state"
+    show_unclassified = not settings.VARIANT_CLASSIFICATION_STATS_USE_SHARED
 
     vc_org_data_json = get_grouped_classification_counts(
         user=request.user,
@@ -1325,7 +1320,8 @@ def labs(request):
             field=state_field,
             max_groups=15,
             show_unclassified=show_unclassified,
-            norm_factor=state_pop_multiplier)
+            norm_factor=state_pop_multiplier,
+            allele_level=True)
 
         context["vc_normalized_state_data_json"] = vc_normalized_state_data_json
 
