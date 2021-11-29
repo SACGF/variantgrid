@@ -431,6 +431,8 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
 
     # Variant is created/linked from initial GenomeBuild - discordance is against Allele
     variant = models.ForeignKey(Variant, null=True, on_delete=PROTECT)  # Null as might not match this
+    # try to migrate more code to use allele
+    allele = models.ForeignKey(Allele, null=True, on_delete=PROTECT)
     chgvs_grch37 = models.TextField(blank=True, null=True)
     chgvs_grch38 = models.TextField(blank=True, null=True)
 
@@ -673,6 +675,8 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             self.chgvs_grch38 = None
             self.chgvs_grch38_full = None
 
+        self.update_allele()
+
         # if we had a previously opened flag match warning - don't re-open
         if variant:
             if not self.id:
@@ -682,7 +686,9 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             # record the fact that we did match
             flag_collection = self.flag_collection_safe
 
-            self.save()
+            self.save()  # we should be done changing values at this point
+            # though we may modify flags (which are external objects)
+
             if not self.lab.external:
                 # don't re-raise flags on external classifications,
                 # they would have already been raised in the external system and resolved there
@@ -746,14 +752,21 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 else:
                     flag_collection.close_open_flags_of_type(classification_flag_types.matching_variant_warning_flag)
 
-        if variant and variant.allele:
-            allele: Allele = variant.allele
+        if allele := self.allele:
             # now that everything's saved - see if 37 rep != 38 rep
             # but note that the liftover might not be complete (if there is a liftover happening
             # validation will be called again anyway)
             allele.validate(liftover_complete=False)
 
         return max_length
+
+    def update_allele(self):
+        # Updates the allele based off the variant
+        # Warning, does not call save()
+        allele: Optional[Allele] = None
+        if variant := self.variant:
+            allele = variant.allele
+        self.allele = allele
 
     @transaction.atomic()
     def set_variant(self, variant: Variant = None, message: str = None, failed: bool = False):
@@ -767,6 +780,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         If there is no variant and failed = True, any classification_import will be unset
         """
         self.variant = variant
+        self.update_allele()
 
         # don't want to be considered as part of the import anymore
         # as we've failed matching somewhere along the line
