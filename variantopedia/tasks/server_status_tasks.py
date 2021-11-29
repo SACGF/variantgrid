@@ -23,7 +23,7 @@ def notify_server_status():
     notify_server_status_now()
 
 
-def notify_server_status_now():
+def notify_server_status_now(detailed: bool = True):
     dashboard_notices = get_dashboard_notices(admin_bot(), days_ago=1)
     url = get_url_from_view_path(reverse('server_status')) + '?activeTab=server_status_activity_detail_1'
 
@@ -74,45 +74,47 @@ def notify_server_status_now():
     if zeros:
         lines.append(f":open_file_folder: 0 : {', '.join(zeros)}")
 
-    overall_lines = list()
-    for _, message in get_disk_messages(info_messages=True):
-        overall_lines.append(f":floppy_disk: {message}")
-    if not overall_lines:
-        overall_lines.append(f":floppy_disk: _Disk Usage Unknown_")
-
-    total_shared = Classification.dashboard_total_shared_classifications()
-    total_unshared = Classification.dashboard_total_unshared_classifications()
-    total = total_unshared + total_shared
-    if total:
-        percent_shared = 100.0 * float(total_shared) / float(total)
-        overall_lines.append(
-            f":blue_book: {total:,} : Classifications - {int(percent_shared)}% shared"
-        )
-
-    def emoji_for_age(days: int):
-        if days <= 60:
-            return ":smile:"
-        if days <= 120:
-            return ":neutral_face:"
-        if days <= 180:
-            return ":cry:"
-        return ":rage:"
-
-    annotation_ages = list()
-    # others we might want to check date of
-    right_now = now()
-    for context, label in [("mondo_file", "MONDO"), ("omim_file", "OMIM")]:
-        last_import = OntologyImport.objects.filter(context=context).order_by('-created').first()
-        time_delta = right_now - last_import.created
-        annotation_ages.append(f"{emoji_for_age(time_delta.days)} {time_delta.days} days old : {label}")
-
-    overall_lines.extend(annotation_ages)
-
-    # TODO add other important annotation ages like ClinVar
-
     nb.add_header("Health Check")
     nb.add_markdown(f"*In the <{url}|last 24 hours>*")
     nb.add_markdown("\n".join(lines), indented=True)
-    nb.add_markdown("*Overall*")
-    nb.add_markdown("\n".join(overall_lines), indented=True)
+
+    if detailed:
+        overall_lines = list()
+        for _, message in get_disk_messages(info_messages=True):
+            overall_lines.append(f":floppy_disk: {message}")
+        if not overall_lines:
+            overall_lines.append(f":floppy_disk: _Disk Usage Unknown_")
+
+        total_shared = Classification.dashboard_total_shared_classifications()
+        total_unshared = Classification.dashboard_total_unshared_classifications()
+        total = total_unshared + total_shared
+        if total:
+            percent_shared = 100.0 * float(total_shared) / float(total)
+            overall_lines.append(
+                f":blue_book: {total:,} : Classifications - {int(percent_shared)}% shared"
+            )
+
+        def emoji_for_age(days: int):
+            if days <= 60:
+                return ":smile:"
+            if days <= 120:
+                return ":neutral_face:"
+            if days <= 180:
+                return ":cry:"
+            return ":rage:"
+
+        annotation_ages = list()
+        # others we might want to check date of
+        right_now = now()
+        for context, label in [("mondo_file", "MONDO"), ("omim_file", "OMIM")]:
+            if last_import := OntologyImport.objects.filter(context=context).order_by('-created').first():
+                time_delta = right_now - last_import.created
+                annotation_ages.append(f"{emoji_for_age(time_delta.days)} {time_delta.days} days old : {label}")
+
+        overall_lines.extend(annotation_ages)
+
+    # TODO add other important annotation ages like ClinVar
+
+        nb.add_markdown("*Overall*")
+        nb.add_markdown("\n".join(overall_lines), indented=True)
     nb.send()
