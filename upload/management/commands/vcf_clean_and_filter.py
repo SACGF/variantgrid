@@ -38,6 +38,9 @@ class Command(BaseCommand):
         skipped_contigs = Counter()
         skipped_records = Counter()
 
+        ref_standard_bases_pattern = re.compile("[GATC]")
+        alt_standard_bases_pattern = re.compile("[GATC,]")  # Can be multi-alts
+
         skip_patterns = {}
         if skip_regex := getattr(settings, "VCF_IMPORT_SKIP_RECORD_REGEX", {}):
             for name, regex in skip_regex.items():
@@ -58,6 +61,25 @@ class Command(BaseCommand):
 
                 if skip_patterns:
                     if skip_reason := self._check_skip_line(skip_patterns, line):
+                        skipped_records[skip_reason] += 1
+                        continue
+
+                # Check ref / alt bases are ok
+                if settings.VARIANT_STANDARD_BASES_ONLY:
+                    _, _, ref, alt, _ = rest_of_line.split("\t", 4)
+                    if ref_standard_bases_pattern.sub("", ref):
+                        if ref.startswith("<") and ref.endswith(">"):
+                            skip_reason = f"REF = {ref}"
+                        else:
+                            skip_reason = "non-standard bases in REF sequence"
+                        skipped_records[skip_reason] += 1
+                        continue
+
+                    if alt_standard_bases_pattern.sub("", alt):
+                        if alt.startswith("<") and alt.endswith(">"):
+                            skip_reason = f"ALT = {alt}"
+                        else:
+                            skip_reason = "non-standard bases in ALT sequence"
                         skipped_records[skip_reason] += 1
                         continue
 
