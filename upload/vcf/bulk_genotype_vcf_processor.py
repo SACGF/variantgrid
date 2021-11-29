@@ -40,7 +40,8 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
     # v15. Any genotype as '.' -> unknown zygosity
     # v16. Don't insert a reference variant for each unknown ALT (only if provided) - version never deployed
     # v17. Use refactored RedisVariantPKLookup
-    VCF_IMPORTER_VERSION = 17  # Change this if you make a major change to the code.
+    # v18. Handle Mixed diploid/haploid calls eg male chrX GT=1 - see https://github.com/brentp/cyvcf2/issues/227
+    VCF_IMPORTER_VERSION = 18  # Change this if you make a major change to the code.
     # Need to distinguish between no entry and 0, can't use None w/postgres command line inserts
     DEFAULT_AD_FIELD = 'AD'  # What CyVCF2 uses
     # GL = Genotype Likelihood - used by freeBayes v1.2.0: log10-scaled likelihoods of the data given the called
@@ -189,8 +190,12 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
                     return self.EMPTY_PL_ARRAY
 
                 pl[missing] = CohortGenotype.MISSING_NUMBER_VALUE  # Handle individual PL array entry missing
-                pl_index_lookup = BulkGenotypeVCFProcessor.CYVCF_PL_INDEX_FOR_PLOIDY[variant.ploidy]
-                for i, gt in enumerate(gt_types):
+                for i, (gt, genotype) in enumerate(zip(gt_types, variant.genotypes)):
+                    # CyVCF2 genotypes entry for sample is eg [0, 1, True] (last element = is phased)
+                    # Handle case where PL is not variant.ploidy + 1 - eg where male chrX given as haploid, ie GT=1
+                    # see https://github.com/brentp/cyvcf2/issues/227
+                    ploidy = len(genotype) - 1
+                    pl_index_lookup = BulkGenotypeVCFProcessor.CYVCF_PL_INDEX_FOR_PLOIDY[ploidy]
                     pl_index = pl_index_lookup[gt]
                     pl_value = int(pl[i][pl_index])
                     phred_likelihood.append(pl_value)
