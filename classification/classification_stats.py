@@ -1,6 +1,6 @@
 import operator
 from collections import Counter, defaultdict
-from typing import Dict, List, Optional, Set, Any, Iterable, Union
+from typing import Dict, List, Optional, Set, Any, Iterable
 
 import numpy as np
 from django.conf import settings

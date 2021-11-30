@@ -16,7 +16,6 @@ from ontology.models import OntologyTerm, OntologyService
 from snpdb.models import ClinVarKey
 from uicore.json.validated_json import JsonMessages, JSON_MESSAGES_EMPTY, ValidatedJson
 
-
 # Code in this file is responsible for converting VariantGrid formatted classifications to ClinVar JSON
 CLINVAR_ACCEPTED_TRANSCRIPTS = {"NM_", "NR_"}
 
@@ -184,10 +183,10 @@ class ClinVarExportConverter:
             # but only if they don't have an open don't share flag
             allele = self.clinvar_export_record.clinvar_allele.allele
             if other_classifications_for_key := Classification.objects.filter(
-                withdrawn=False,
-                variant__in=allele.variants,
-                share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS,
-                lab__clinvar_key=self.clinvar_key
+                    withdrawn=False,
+                    variant__in=allele.variants,
+                    share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS,
+                    lab__clinvar_key=self.clinvar_key
             ).exclude(id=self.classification_based_on.id):
                 for c in other_classifications_for_key:
                     has_condition = (resolved_condition := c.condition_resolution_obj) and len(resolved_condition.terms) >= 1
@@ -223,7 +222,7 @@ class ClinVarExportConverter:
                 json_data = {
                     "variant": [
                         {
-                            "hgvs": ValidatedJson(c_hgvs_no_gene,hgvs_errors),
+                            "hgvs": ValidatedJson(c_hgvs_no_gene, hgvs_errors),
                             "gene": gene_symbols
                         }
                     ]

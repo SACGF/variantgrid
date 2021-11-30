@@ -13,7 +13,7 @@ clingen_post_save_handler = CachedWebResource.named_handler_factory(settings.CAC
 
 
 clinvar_citations_post_save_handler = CachedWebResource.named_handler_factory(settings.CACHED_WEB_RESOURCE_CLINVAR_CITATIONS,
-                                                                    ClinVarCitationsWebResourceTask)
+                                                                              ClinVarCitationsWebResourceTask)
 
 
 def gene_counts_classification_publish_handler(sender, classification, **kwargs):  # pylint: disable=unused-argument

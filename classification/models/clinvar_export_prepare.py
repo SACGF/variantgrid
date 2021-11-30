@@ -157,6 +157,6 @@ class ClinvarAlleleExportPrepare:
             combined_log.append(f"{len(classifications_no_conditions)} shared classifications for allele don't have resolved conditions")
 
         if len(combined_log) == 0:
-            combined_log.append(f"No new or old ClinVarKeys associated with this Allele")
+            combined_log.append("No new or old ClinVarKeys associated with this Allele")
 
         return combined_log

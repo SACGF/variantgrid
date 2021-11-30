@@ -437,7 +437,7 @@ def boolean(test: bool) -> str:
 def value(value: Any) -> str:
     if isinstance(value, bool):
         return boolean(value)
-    if value == '' or value == 0 or value == '-':
+    if value in ('', 0, '-'):
         return SafeString(f'<span class="no-value">{value}</span>')
     elif isinstance(value, int):
         return f'{value:,}'

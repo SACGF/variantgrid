@@ -127,7 +127,7 @@ class VaraintAnnotationVersionColumns(DatatableConfig[VariantAnnotationVersion])
             RichColumn(key="assembly", orderable=True, detail=True),
             RichColumn(key="gencode", label="GENCODE", orderable=True, detail=True),
             RichColumn(key="genebuild", label="GeneBuild", orderable=True, detail=True),
-            RichColumn(key="gnomad", label="gnomAD", orderable=True,  detail=True),
+            RichColumn(key="gnomad", label="gnomAD", orderable=True, detail=True),
             RichColumn(key="refseq", orderable=True, detail=True),
             RichColumn(key="regbuild", label="Regulatory Build", orderable=True, detail=True),
             RichColumn(key="sift", orderable=True, detail=True),

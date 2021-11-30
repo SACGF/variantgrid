@@ -390,7 +390,7 @@ class Variant(models.Model):
 
     @staticmethod
     def is_ref_alt_reference(ref, alt):
-        return ref == alt or alt == '.'
+        return alt in (ref, '.')
 
     @property
     def is_reference(self) -> bool:

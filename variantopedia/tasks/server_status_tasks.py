@@ -83,7 +83,7 @@ def notify_server_status_now(detailed: bool = True):
         for _, message in get_disk_messages(info_messages=True):
             overall_lines.append(f":floppy_disk: {message}")
         if not overall_lines:
-            overall_lines.append(f":floppy_disk: _Disk Usage Unknown_")
+            overall_lines.append(":floppy_disk: _Disk Usage Unknown_")
 
         total_shared = Classification.dashboard_total_shared_classifications()
         total_unshared = Classification.dashboard_total_unshared_classifications()

@@ -109,7 +109,7 @@ class ClinVarExportSync:
         }
 
         if json_data:
-            response= requests.request(
+            response = requests.request(
                 url=url,
                 method="POST",
                 headers=headers,
@@ -242,13 +242,16 @@ class ClinVarExportSync:
                     if new_status:
                         clinvar_export_submission.status = new_status
                     else:
-                        report_message(f"ClinVarExportSubmission - could not determine status", level='error', extra_data={"target": clinvar_export_submission.pk})
+                        report_message("ClinVarExportSubmission - could not determine status",
+                                       level='error', extra_data={"target": clinvar_export_submission.pk})
                     clinvar_export_submission.save()
                 else:
-                    report_message(f"ClinVarExportRequest - could not find localKey", level='error', extra_data={"target": clinvar_request.pk, "localKey": local_key})
+                    report_message("ClinVarExportRequest - could not find localKey",
+                                   level='error', extra_data={"target": clinvar_request.pk, "localKey": local_key})
 
             if not submission_json:
-                report_message(f"Expected submissions in ClinVarRequest", level='error', extra_data={"target": clinvar_request.pk})
+                report_message("Expected submissions in ClinVarRequest",
+                               level='error', extra_data={"target": clinvar_request.pk})
 
             clinvar_request.submission_batch.status = ClinVarExportBatchStatus.SUBMITTED if success_count > 0 else ClinVarExportBatchStatus.REJECTED
             clinvar_request.submission_batch.save()

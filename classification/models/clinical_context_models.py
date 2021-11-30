@@ -76,7 +76,7 @@ class DiscordanceLevel(str, Enum):
 
     @property
     def css_class(self) -> str:
-        if self == DiscordanceLevel.CONCORDANT_AGREEMENT or self == DiscordanceLevel.CONCORDANT_DIFF_VUS:
+        if self in (DiscordanceLevel.CONCORDANT_AGREEMENT, DiscordanceLevel.CONCORDANT_DIFF_VUS):
             return "overlap-agreement"
         if self == DiscordanceLevel.CONCORDANT_CONFIDENCE:
             return "overlap-confidence"
@@ -241,7 +241,7 @@ class ClinicalContext(FlagsMixin, TimeStampedModel):
                 )
 
             if is_significance_change and (old_status or new_status == ClinicalContextStatus.DISCORDANT):
-                report_message(f'Allele ID clinical grouping change', extra_data={
+                report_message('Allele ID clinical grouping change', extra_data={
                     'target': f'Allele ID {self.allele_id} {old_status} -> {new_status}'
                 })
 

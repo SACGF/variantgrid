@@ -103,10 +103,10 @@ def server_status(request):
         action = request.POST.get('action')
         if action == 'Test Slack':
             notify_server_status_now()
-            messages.add_message(request, level=messages.INFO, message=f"Slack should have been sent the health check.")
+            messages.add_message(request, level=messages.INFO, message="Slack should have been sent the health check.")
         elif action == 'Test Rollbar':
             report_message("Testing Rollbar", level='error')
-            messages.add_message(request, level=messages.INFO, message=f"Rollbar should have been sent an error.")
+            messages.add_message(request, level=messages.INFO, message="Rollbar should have been sent an error.")
         elif action == 'Test Message Branding':
             messages.success(request, "Success message")
             messages.info(request, "Info message")

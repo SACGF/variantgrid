@@ -61,7 +61,7 @@ class CriteriaStrength:
     def __str__(self) -> str:
 
         # just need special handling of X
-        def strength_suffix(strength:str):
+        def strength_suffix(strength: str):
             if strength == "X":
                 return "unspecified"
             elif strength.endswith("X"):

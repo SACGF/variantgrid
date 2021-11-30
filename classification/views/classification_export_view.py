@@ -37,7 +37,6 @@ from snpdb.models.models import Lab, Organization
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_user_settings import UserSettings
 
-
 ALISSA_ACCEPTED_TRANSCRIPTS = {"NM_", "NR_"}
 
 

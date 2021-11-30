@@ -233,7 +233,7 @@ class OntologyMatching:
 
         return mondo
 
-    def add_error(self, error:str):
+    def add_error(self, error: str):
         self.errors.append(error)
 
     def populate_relationships(self):

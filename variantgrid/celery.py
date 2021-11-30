@@ -92,7 +92,7 @@ if settings.HEARTBEAT_URL:
 
 @app.task(bind=True)
 def debug_task(self):
-    logging.info(('Request: {0!r}'.format(self.request)))
+    logging.info('Request: %r', self.request)
 
 
 @app.task(bind=True)
