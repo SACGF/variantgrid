@@ -363,14 +363,15 @@ def search(request):
                 return redirect(preferred_result.record)
 
             # Attempt to give hints on why nothing was found
-            if search_results.search_errors:
-                for search_type, e, genome_build in search_results.search_errors:
-                    if genome_build:
-                        messages.add_message(request, messages.ERROR, f"{search_type}: {e} ({genome_build})")
-                    else:
-                        messages.add_message(request, messages.ERROR, f"{search_type}: {e}")
+            for search_error, genome_builds in search_results.search_errors.items():
+                text = f"{search_error.search_type}: {search_error.error}"
+                if genome_builds:
+                    genome_builds_str = ", ".join(gb.name for gb in sorted(genome_builds))
+                    text += f" ({genome_builds_str})"
+                messages.add_message(request, messages.ERROR, text)
 
         except Exception as e:
+            raise
             report_exc_info(extra_data={
                 'search_string': search_string,
                 'classify': classify
