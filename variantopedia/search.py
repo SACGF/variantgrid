@@ -5,7 +5,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from functools import reduce
 from itertools import zip_longest
-from typing import Set, Iterable, Union, Optional, Match, List, Any, Tuple, Dict
+from typing import Set, Iterable, Union, Optional, Match, List, Any, Dict
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -25,7 +25,7 @@ from genes.hgvs import HGVSMatcher
 from genes.models import TranscriptVersion, Transcript, MissingTranscript, Gene, GeneSymbol, GeneSymbolAlias
 from genes.models_enums import AnnotationConsortium
 from library.genomics import format_chrom
-from library.log_utils import report_exc_info, report_message
+from library.log_utils import report_message
 from library.utils import clean_string
 from ontology.models import OntologyTerm, OntologyService
 from patients.models import ExternalPK, Patient
@@ -268,7 +268,6 @@ class SearchResults:
                     'genome_builds': genome_build_str
                 }
             )
-
 
     @property
     def non_debug_results(self):

@@ -50,7 +50,7 @@ from variantopedia import forms
 from variantopedia.interesting_nearby import get_nearby_qs, get_method_summaries, get_nearby_summaries
 from variantopedia.search import search_data, SearchResults
 from variantopedia.server_status import get_dashboard_notices
-from variantopedia.tasks.server_status_tasks import notify_server_status, notify_server_status_now
+from variantopedia.tasks.server_status_tasks import notify_server_status_now
 
 
 def variants(request):

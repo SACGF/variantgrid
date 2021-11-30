@@ -55,7 +55,6 @@ def get_classification_counts_allele(qs: QuerySet[ClassificationModification], f
     return counts
 
 
-
 def get_visible_classifications_qs(user: User) -> QuerySet[ClassificationModification]:
     # now excludes external labs (don't want to report on Shariant only data within SA Path for example)
 
