@@ -75,4 +75,3 @@ def _update_gene_relations(gene_symbol: str):
             pass
     except ValueError:
         report_exc_info()
-        pass

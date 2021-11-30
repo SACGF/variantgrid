@@ -738,7 +738,6 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
 
     def _load(self):
         """ Override to do anything interesting """
-        pass
 
     def load(self):
         """ load is called after parents are run """
@@ -832,7 +831,6 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
 
     def adjust_cloned_parents(self, old_new_map):
         """ If you need to do something with old/new parents """
-        pass
 
     def save_clone(self):
         node_id = self.pk

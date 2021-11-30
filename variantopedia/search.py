@@ -563,8 +563,8 @@ def _search_hgvs_using_gene_symbol(gene_symbol, search_messages,
                     results_by_record[result.record].append(result)
                     transcript_accessions_by_record[result.record].append(transcript_version.accession)
             except Exception as e:
+                # Just swallow all these errors
                 logging.warning(e)
-                pass  # Just swallow all these errors
 
     for record, results_for_record in results_by_record.items():
         unique_messages = {m: True for m in search_messages}  # Use dict for uniqueness

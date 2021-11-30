@@ -86,7 +86,6 @@ class ClinVarConsolidatingMerger(ConsolidatingMerger[ClinVarExport, Classificati
             if established.classification_based_on is None:
                 self.log.append(f"No change to existing export record for {established.condition_resolved.summary} : None")
                 # no change
-                pass
             else:
                 self.log.append(f"Updating export record for {established.condition_resolved.summary} : None")
                 established.update_classification(None)

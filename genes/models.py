@@ -2017,7 +2017,6 @@ class AbstractGeneCoverage(models.Model):
 class GeneCoverage(AbstractGeneCoverage):
     """ We attempt to match transcript from refseq_transcript_id then if that fails,
         match on gene. So it's possible to have a gene match but no transcript """
-    pass
 
 
 class GeneCoverageCanonicalTranscript(AbstractGeneCoverage):

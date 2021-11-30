@@ -6,7 +6,6 @@ from rollbar.contrib.django.middleware import RollbarNotifierMiddleware
 
 class RollbarIgnoreException(Exception):
     """ Throw an error that subclasses this for Rollbar to ignore """
-    pass
 
 
 class CustomRollbarNotifierMiddleware(RollbarNotifierMiddleware):
