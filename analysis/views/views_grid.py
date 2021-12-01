@@ -112,10 +112,15 @@ def replace_transcripts_iterator(grid, ctc: CanonicalTranscriptCollection, items
             if tf in transcript_fields:
                 transcript_replace_fields[transcript_prefix + suffix] = f
 
+    # This seems to only return the rows we're after but it's very slow. Perhaps make an inner query of
+    # variant then directly pull it off the variant transcript annotation objects
     transcript_values = grid.get_values_queryset(field_names=transcript_replace_fields.keys())
     ct_qs = ctc.canonicaltranscript_set
     transcript_versions = ct_qs.values_list("transcript_version", flat=True)
     transcript_values = transcript_values.filter(varianttranscriptannotation__transcript_version__in=transcript_versions)
+    logging.info("SQL query:")
+    logging.info(f"{transcript_values.count()}")
+    logging.info(str(transcript_values.query))
 
     # Read into a massive dictionary
     transcript_items_by_id = {}
@@ -141,6 +146,8 @@ def replace_transcripts_iterator(grid, ctc: CanonicalTranscriptCollection, items
 def node_grid_export(request):
     node = _node_from_request(request)
     export_type = request.GET["export_type"]
+    use_canonical_transcripts = request.GET.get("use_canonical_transcripts")
+
     node = _node_from_request(request)
     grid_kwargs = {}
     if export_type == 'vcf':
@@ -158,12 +165,13 @@ def node_grid_export(request):
     sample_ids = grid.node.get_sample_ids()
     _, _, items = grid.get_items(request)
 
-    # TODO: How to work out whether to do this (Haem only, but they will upload stuff)?
-    replace_transcripts = False
-    if replace_transcripts:
-        ctc = CanonicalTranscriptCollection.objects.get(enrichmentkit__name='idt_haem')
-        basename += f"_{ctc}"
-        items = replace_transcripts_iterator(grid, ctc, items)
+    if use_canonical_transcripts:
+        # Whether to use it or not is set server-side. Just use client to see what they wanted
+        if ctc := node.analysis.canonical_transcript_collection:
+            basename += f"_{ctc}"
+            items = replace_transcripts_iterator(grid, ctc, items)
+        else:
+            logging.warning("Grid request had 'use_canonical_transcripts' but analysis did not.")
 
     items = format_items_iterator(grid.node.analysis, sample_ids, items)
 

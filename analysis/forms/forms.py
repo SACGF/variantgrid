@@ -132,8 +132,8 @@ class AnalysisForm(forms.ModelForm, ROFormMixin):
     class Meta:
         fields = ("user", 'genome_build',
                   "name", "description", "analysis_type",
-                  "custom_columns_collection", "default_sort_by_column", "show_igv_links",
-                  "annotation_version", "lock_input_sources")
+                  "custom_columns_collection", "default_sort_by_column", "canonical_transcript_collection",
+                  "show_igv_links", "annotation_version", "lock_input_sources")
         read_only = ('user', 'genome_build')
         model = Analysis
         widgets = {'name': TextInput(),
