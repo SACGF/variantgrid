@@ -1,16 +1,20 @@
+from datetime import timedelta
 from random import randint
+from typing import Optional
 
 import celery
 from django.conf import settings
 from django.urls import reverse
 from django.utils.timezone import now
 
+from annotation.models import ClinVarVersion
 from classification.models import Classification
 from library.django_utils import get_url_from_view_path
 from library.guardian_utils import admin_bot
 from library.log_utils import NotificationBuilder
 from library.utils import pretty_label, count
 from ontology.models import OntologyImport
+from snpdb.models import GenomeBuild
 from variantgrid.perm_path import get_visible_url_names
 from variantgrid.tasks.server_monitoring_tasks import get_disk_messages
 from variantopedia.server_status import get_dashboard_notices
@@ -94,22 +98,48 @@ def notify_server_status_now(detailed: bool = True):
                 f":blue_book: {total:,} : Classifications - {int(percent_shared)}% shared"
             )
 
-        def emoji_for_age(days: int):
+        def emoji_for_age(age: timedelta) -> str:
+            days = age.days
             if days <= 60:
                 return ":smile:"
             if days <= 120:
                 return ":neutral_face:"
             if days <= 180:
                 return ":cry:"
-            return ":rage:"
+            if days <= 365:
+                return ":rage:"
+            return ":head_explode:"
+
+        def message_for_annotation(annotation_name: str, age: timedelta) -> Optional[str]:
+            days = age.days
+
+            # this is the window where we've seen that the annotations have been updated
+            # and not old enough for us to worry about again yet
+            if 2 <= age.days <= 59:
+                return None
+            return f"{emoji_for_age(age)} {age.days} day{'s' if age.days != 1 else ''} old : {annotation_name}"
 
         annotation_ages = list()
         # others we might want to check date of
         right_now = now()
-        for context, label in [("mondo_file", "MONDO"), ("omim_file", "OMIM")]:
-            if last_import := OntologyImport.objects.filter(context=context).order_by('-created').first():
-                time_delta = right_now - last_import.created
-                annotation_ages.append(f"{emoji_for_age(time_delta.days)} {time_delta.days} days old : {label}")
+
+        # when we have an array, only report on the first instance that's been imported
+        # e.g. if we import OMIM directly from OMIM, we don't care how old the biomart omim file is
+        for contexts in [("mondo_file", "MONDO"), [("omim_file", "OMIM"), ("biomart_omim_aliases", "OMIM - via biomart")], ("hpo_file", "HPO"), ("gencc_file", "GenCC")]:
+            if not isinstance(contexts, list):
+                contexts = [contexts]
+            for context, label in contexts:
+                if last_import := OntologyImport.objects.filter(context=context).order_by('-created').first():
+                    time_delta = right_now - last_import.created
+                    if message := message_for_annotation(label, time_delta):
+                        annotation_ages.append(message)
+                    break
+
+        for genome_build in [GenomeBuild.grch37(), GenomeBuild.grch38()]:
+            if latest_clinvar := ClinVarVersion.objects.filter(genome_build=genome_build).order_by('-annotation_date').first():
+                time_delta = right_now - latest_clinvar.annotation_date
+                if message := message_for_annotation(f"ClinVar {genome_build}", time_delta):
+                    annotation_ages.append(message)
 
         overall_lines.extend(annotation_ages)
 
