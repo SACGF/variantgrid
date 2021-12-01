@@ -108,7 +108,7 @@ def notify_server_status_now(detailed: bool = True):
                 return ":cry:"
             if days <= 365:
                 return ":rage:"
-            return ":head_explode:"
+            return ":exploding_head:"
 
         def message_for_annotation(annotation_name: str, age: timedelta) -> Optional[str]:
             days = age.days
