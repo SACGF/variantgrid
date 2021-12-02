@@ -61,12 +61,12 @@ SOMALIER["annotation_base_dir"] = os.path.join(ANNOTATION_REFERENCE_BASE_DIR, "s
 UPLOAD_ENABLED = True
 
 USER_CREATE_ORG_LABS = {
-    "unknown": "user_group_%(username)s",
+    "unknown": "unknown",
 }
 
 USER_CREATE_ORG_MESSAGE = {
     "unknown": "Users must belong to a lab and organisation to perform classifications, and share data with others. "
-               "Because we don't know who you are yet, we've assinged you to 'Unknown', with your own lab. If you want "
+               "Because we don't know who you are yet, we've assinged you to 'Unknown'. If you want "
                "to properly set things up, please contact david.lawrence@"
                "sa.gov.au (using your institutional email). Thanks!",
 }
