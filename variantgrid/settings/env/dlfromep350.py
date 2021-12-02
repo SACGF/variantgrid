@@ -68,7 +68,7 @@ SOMALIER["annotation_base_dir"] = os.path.join(ANNOTATION_REFERENCE_BASE_DIR, "s
 COMPRESS_ENABLED = False
 
 _SHARIANT_MODE = False
-_SAPATHOLOGY_MODE = False
+_SAPATHOLOGY_MODE = True
 _RUNX1_MODE = False
 
 if _SHARIANT_MODE:

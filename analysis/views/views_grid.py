@@ -94,26 +94,29 @@ def format_items_iterator(analysis, sample_ids, items):
 def replace_transcripts_iterator(grid, ctc: CanonicalTranscriptCollection, items):
     """ This uses a large amount of RAM - reading a whole  """
 
-    transcript_variant_id_field = "varianttranscriptannotation__variant_id"
+    variant_transcript_annotation_variant_id_field = "variant_id"
 
     # Work out what fields
-    transcript_replace_fields = {transcript_variant_id_field: "id"}
+    transcript_replace_fields = {variant_transcript_annotation_variant_id_field: "id"}
 
     transcript_fields = set(get_model_fields(VariantTranscriptAnnotation, ignore_fields=["id", "version", "variant"]))
     annotation_prefix = "variantannotation__"
-    transcript_prefix = "varianttranscriptannotation__"
     annotation_prefix_len = len(annotation_prefix)
     for f in grid.get_field_names():
         if f.startswith(annotation_prefix):
             suffix = f[annotation_prefix_len:]
             tf = suffix.split("__", 1)[0]
             if tf in transcript_fields:
-                transcript_replace_fields[transcript_prefix + suffix] = f
+                transcript_replace_fields[suffix] = f
 
-    transcript_values = grid.get_values_queryset(field_names=transcript_replace_fields.keys())
+    # We only need things from VariantTranscriptAnnotation - so join there directly
+    variants_qs = grid.get_values_queryset(field_names=["id"])
+    version = grid.node.analysis.annotation_version.variant_annotation_version
     ct_qs = ctc.canonicaltranscript_set
     transcript_versions = ct_qs.values_list("transcript_version", flat=True)
-    transcript_values = transcript_values.filter(varianttranscriptannotation__transcript_version__in=transcript_versions)
+    vta_qs = VariantTranscriptAnnotation.objects.filter(version=version, variant__in=variants_qs,
+                                                        transcript_version__in=transcript_versions)
+    transcript_values = vta_qs.values(*transcript_replace_fields.keys())
 
     # Read into a massive dictionary
     transcript_items_by_id = {}
@@ -138,6 +141,8 @@ def replace_transcripts_iterator(grid, ctc: CanonicalTranscriptCollection, items
 
 def node_grid_export(request):
     export_type = request.GET["export_type"]
+    use_canonical_transcripts = request.GET.get("use_canonical_transcripts")
+
     node = _node_from_request(request)
     grid_kwargs = {}
     if export_type == 'vcf':
@@ -155,12 +160,13 @@ def node_grid_export(request):
     sample_ids = grid.node.get_sample_ids()
     _, _, items = grid.get_items(request)
 
-    # TODO: How to work out whether to do this (Haem only, but they will upload stuff)?
-    replace_transcripts = False
-    if replace_transcripts:
-        ctc = CanonicalTranscriptCollection.objects.get(enrichmentkit__name='idt_haem')
-        basename += f"_{ctc}"
-        items = replace_transcripts_iterator(grid, ctc, items)
+    if use_canonical_transcripts:
+        # Whether to use it or not is set server-side. Just use client to see what they wanted
+        if ctc := node.analysis.canonical_transcript_collection:
+            basename += f"_{ctc}"
+            items = replace_transcripts_iterator(grid, ctc, items)
+        else:
+            logging.warning("Grid request had 'use_canonical_transcripts' but analysis did not.")
 
     items = format_items_iterator(grid.node.analysis, sample_ids, items)
 
