@@ -105,19 +105,17 @@ function enhanceAndMonitor() {
         // input with button at the end, have it so if you hit enter in the input, the button activates
         {test: '.input-group-append',
             func: (node) => {
-                // if (!node.closest('form')) { // if we're in a form, don't need to hit the button
-                    node.closest('.input-group').find('input').keyup(function (event) {
-                        if (event.which === 13) {
-                            let button = $(this).closest('.input-group').find('.input-group-append .btn');
-                            if (button.length) {
-                                event.preventDefault();
-                                event.Event.stopImmediatePropagation();
-                                button.click();
-                                return false;
-                            }
+                node.closest('.input-group').find('input').keydown(function (event) {
+                    if (event.which === 13) {
+                        let button = $(this).closest('.input-group').find('.input-group-append .btn');
+                        if (button.length) {
+                            event.preventDefault();
+                            event.stopImmediatePropagation();
+                            button.click();
+                            return false;
                         }
-                    });
-                // }
+                    }
+                });
             }
         },
         // timestamps
