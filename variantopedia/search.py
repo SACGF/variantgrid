@@ -14,7 +14,7 @@ from django.db.models import QuerySet
 from django.db.models.query_utils import Q
 from django.urls.base import reverse
 from lazy import lazy
-from pyhgvs import HGVSName
+from pyhgvs import HGVSName, InvalidHGVSName
 
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
 from annotation.manual_variant_entry import check_can_create_variants, CreateManualVariantForbidden
@@ -292,7 +292,7 @@ class Searcher:
         HAS_ALPHA_PATTERN = r"[a-zA-Z]"
         NO_WHITESPACE = r"^\S+$"
         NOT_WHITESPACE = r"\S+"
-        HGVS_UNCLEANED_PATTERN = r"[cnmg].*\d+"  # Bare bones match - may be able to fix it...
+        HGVS_UNCLEANED_PATTERN = r"[^:]([cnmg]\.|:[cnmg]).*\d+"  # Bare bones match - may be able to fix it...
         COSMIC_PATTERN = re.compile(r"^COS[MV](\d+)$")  # Old or new
 
         self.genome_build_searches = [
@@ -611,10 +611,14 @@ def search_hgvs(search_string: str, user: User, genome_build: GenomeBuild, varia
                     search_messages.append(f"Warning: Cleaned '{search_string}' => '{hgvs_string}'")
                 variant_tuple, used_transcript_accession, method = hgvs_matcher.get_variant_tuple_used_transcript_and_method(hgvs_string)
             except (ValueError, NotImplementedError):
-                if gene_symbol := hgvs_matcher.get_gene_symbol_if_no_transcript(hgvs_string):
-                    if results := _search_hgvs_using_gene_symbol(gene_symbol, search_messages,
-                                                                 hgvs_string, user, genome_build, variant_qs):
-                        return results
+                try:
+                    if gene_symbol := hgvs_matcher.get_gene_symbol_if_no_transcript(hgvs_string):
+                        if results := _search_hgvs_using_gene_symbol(gene_symbol, search_messages,
+                                                                     hgvs_string, user, genome_build, variant_qs):
+                            return results
+                except InvalidHGVSName as e:
+                    # might just not be a HGVS name at all
+                    pass
 
                 if classify:
                     search_message = f"Error reading HGVS: '{original_error}'"
