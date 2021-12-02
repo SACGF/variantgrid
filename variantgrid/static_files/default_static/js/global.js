@@ -110,9 +110,8 @@ function enhanceAndMonitor() {
                         let button = $(this).closest('.input-group').find('.input-group-append .btn');
                         if (button.length) {
                             event.preventDefault();
-                            event.stopImmediatePropagation();
+                            event.stopPropagation();
                             button.click();
-                            return false;
                         }
                     }
                 });
