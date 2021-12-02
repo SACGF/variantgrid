@@ -1,12 +1,10 @@
 from typing import Optional
 
-from django.http import StreamingHttpResponse, HttpResponse
+from django.http import HttpResponse
 from django.template import engines
-import re
 
 from annotation.citations import get_citations
-from snpdb.models import Organization
-from classification.enums.classification_enums import SpecialEKeys
+from snpdb.models import GenomeBuild, Organization
 from classification.models.evidence_key import EvidenceKeyMap
 from classification.models.classification import ClassificationModification, \
     Classification
