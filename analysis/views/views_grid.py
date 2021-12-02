@@ -96,31 +96,29 @@ def format_items_iterator(analysis, sample_ids, items):
 def replace_transcripts_iterator(grid, ctc: CanonicalTranscriptCollection, items):
     """ This uses a large amount of RAM - reading a whole  """
 
-    transcript_variant_id_field = "varianttranscriptannotation__variant_id"
+    variant_transcript_annotation_variant_id_field = "variant_id"
 
     # Work out what fields
-    transcript_replace_fields = {transcript_variant_id_field: "id"}
+    transcript_replace_fields = {variant_transcript_annotation_variant_id_field: "id"}
 
     transcript_fields = set(get_model_fields(VariantTranscriptAnnotation, ignore_fields=["id", "version", "variant"]))
     annotation_prefix = "variantannotation__"
-    transcript_prefix = "varianttranscriptannotation__"
     annotation_prefix_len = len(annotation_prefix)
     for f in grid.get_field_names():
         if f.startswith(annotation_prefix):
             suffix = f[annotation_prefix_len:]
             tf = suffix.split("__", 1)[0]
             if tf in transcript_fields:
-                transcript_replace_fields[transcript_prefix + suffix] = f
+                transcript_replace_fields[suffix] = f
 
-    # This seems to only return the rows we're after but it's very slow. Perhaps make an inner query of
-    # variant then directly pull it off the variant transcript annotation objects
-    transcript_values = grid.get_values_queryset(field_names=transcript_replace_fields.keys())
+    # We only need things from VariantTranscriptAnnotation - so join there directly
+    variants_qs = grid.get_values_queryset(field_names=["id"])
+    version = grid.node.analysis.annotation_version.variant_annotation_version
     ct_qs = ctc.canonicaltranscript_set
     transcript_versions = ct_qs.values_list("transcript_version", flat=True)
-    transcript_values = transcript_values.filter(varianttranscriptannotation__transcript_version__in=transcript_versions)
-    logging.info("SQL query:")
-    logging.info(f"{transcript_values.count()}")
-    logging.info(str(transcript_values.query))
+    vta_qs = VariantTranscriptAnnotation.objects.filter(version=version, variant__in=variants_qs,
+                                                        transcript_version__in=transcript_versions)
+    transcript_values = vta_qs.values(*transcript_replace_fields.keys())
 
     # Read into a massive dictionary
     transcript_items_by_id = {}
