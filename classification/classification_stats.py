@@ -1,6 +1,6 @@
 import operator
 from collections import Counter, defaultdict
-from typing import Dict, List, Optional, Set, Any, Iterable, Union
+from typing import Dict, List, Optional, Set, Any, Iterable
 
 import numpy as np
 from django.conf import settings
@@ -53,7 +53,6 @@ def get_classification_counts_allele(qs: QuerySet[ClassificationModification], f
         # use 0 for key for unclassified
         counts[possible_value] = count
     return counts
-
 
 
 def get_visible_classifications_qs(user: User) -> QuerySet[ClassificationModification]:

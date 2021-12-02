@@ -13,7 +13,7 @@ from library.unit_percent import format_af
 from ontology.models import OntologyService
 from patients.models import Patient
 from patients.models_enums import Zygosity
-from snpdb.models import Variant, Sample, Locus, CohortGenotypeCollection, GenomeBuild, VCF, CohortGenotype
+from snpdb.models import Variant, Sample, Locus, CohortGenotypeCollection, GenomeBuild, CohortGenotype
 
 
 class VariantSampleInformation:

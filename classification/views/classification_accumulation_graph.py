@@ -1,4 +1,3 @@
-import pandas as pd
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime
@@ -6,6 +5,7 @@ from enum import IntEnum, Enum
 from functools import total_ordering
 from typing import Dict, List, Any, Optional, Tuple, Set, Union
 
+import pandas as pd
 from dateutil import relativedelta
 from django.http import StreamingHttpResponse
 

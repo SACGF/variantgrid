@@ -5,7 +5,6 @@ from library.django_utils.rollbar_middleware import RollbarIgnoreException
 
 class CeleryTasksObsoleteException(RollbarIgnoreException):
     """ Throw this in a celery task to kill dependent jobs, but not report to rollbar """
-    pass
 
 
 class NonFatalNodeError(Exception):

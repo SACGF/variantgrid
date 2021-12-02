@@ -402,6 +402,17 @@ class SettingsInitialGroupPermission(models.Model):
         SettingsInitialGroupPermission.objects.get_or_create(settings=global_settings,
                                                              group=group, read=True, write=False)
 
+    def __str__(self):
+        description = f"({self.settings}) {self.group}: "
+        if self.read or self.write:
+            if self.read:
+                description += "r"
+            if self.write:
+                description += "w"
+        else:
+            description += "(no access)"
+        return description
+
 
 class NodeCountSettingsCollection(models.Model):
     # Need this object to distinguish empty counts vs not yet configured

@@ -19,28 +19,24 @@ class ConsolidatingMerger(Generic[EstablishedType, CandidateType]):
         """
         Groups already associated with this bit of data that need to be migrated with the data from new_groups
         """
-        pass
 
     @abstractmethod
     def combine_candidates_if_possible(self, candidate_1: CandidateType, candidate_2: CandidateType) -> Optional[CandidateType]:
         """
         @returns returns the combined candidate IF the candidates can be consolidated into one, otherwise returns None
         """
-        pass
 
     @abstractmethod
     def merge_into_established_if_possible(self, established: EstablishedType, new_candidate: Optional[CandidateType]) -> bool:
         """
         Maps an existing group to a condition group
         """
-        pass
 
     @abstractmethod
     def establish_new_candidate(self, new_candidate: CandidateType):
         """
         A candidate (that doesn't match any existing retrieve_established data) to be retrieve_established
         """
-        pass
 
     def add_new_candidate(self, candidate: CandidateType):
         """

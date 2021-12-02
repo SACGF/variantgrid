@@ -835,16 +835,16 @@ def export_column(label: Optional[str] = None, sub_data: Optional[Type] = None):
 class ExportRow:
 
     @staticmethod
-    def get_export_methods(cls):
-        if not hasattr(cls, 'export_methods'):
-            export_methods = [func for _, func in inspect.getmembers(cls, lambda x: getattr(x, 'is_export', False))]
+    def get_export_methods(klass):
+        if not hasattr(klass, 'export_methods'):
+            export_methods = [func for _, func in inspect.getmembers(klass, lambda x: getattr(x, 'is_export', False))]
             export_methods.sort(key=lambda x: x.line_number)
 
-            cls.export_methods = export_methods
+            klass.export_methods = export_methods
 
-            if not cls.export_methods:
-                raise ValueError(f"ExportRow class {cls} has no @export_columns")
-        return cls.export_methods
+            if not klass.export_methods:
+                raise ValueError(f"ExportRow class {klass} has no @export_columns")
+        return klass.export_methods
 
     @classmethod
     def _data_generator(cls, data: Iterable[Any]) -> Iterator[Any]:
@@ -875,11 +875,11 @@ class ExportRow:
             for row_data in cls._data_generator(data):
                 yield (', ' if not first_row else '') + json.dumps(row_data.to_json())
                 first_row = False
-            yield f']}}'
+            yield ']}}'
         except:
             from library.log_utils import report_exc_info
             report_exc_info(extra_data={"activity": "Exporting"})
-            yield f"\"error\"** File terminated due to error"
+            yield "\"error\"** File terminated due to error"
             raise
 
     @classmethod

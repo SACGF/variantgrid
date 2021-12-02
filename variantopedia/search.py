@@ -2,9 +2,10 @@ import logging
 import operator
 import re
 from collections import defaultdict
+from dataclasses import dataclass
 from functools import reduce
 from itertools import zip_longest
-from typing import Set, Iterable, Union, Optional, Match, List, Any
+from typing import Set, Iterable, Union, Optional, Match, List, Any, Dict
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -13,7 +14,7 @@ from django.db.models import QuerySet
 from django.db.models.query_utils import Q
 from django.urls.base import reverse
 from lazy import lazy
-from pyhgvs import HGVSName
+from pyhgvs import HGVSName, InvalidHGVSName
 
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
 from annotation.manual_variant_entry import check_can_create_variants, CreateManualVariantForbidden
@@ -24,7 +25,7 @@ from genes.hgvs import HGVSMatcher
 from genes.models import TranscriptVersion, Transcript, MissingTranscript, Gene, GeneSymbol, GeneSymbolAlias
 from genes.models_enums import AnnotationConsortium
 from library.genomics import format_chrom
-from library.log_utils import report_exc_info
+from library.log_utils import report_message
 from library.utils import clean_string
 from ontology.models import OntologyTerm, OntologyService
 from patients.models import ExternalPK, Patient
@@ -129,7 +130,6 @@ def search_data(user: User, search_string: str, classify: bool) -> 'SearchResult
                         result - has string representation to display
                                  get_absolute_url() link or to load if only result
         search_types: list of what we searched due to regex match
-        search_errors: list of (search_type, exception, genome_build)
     """
     searcher = Searcher(user=user, search_string=search_string, classify=classify)
     return searcher.search()
@@ -216,13 +216,20 @@ class SearchResult:
         return False
 
 
+@dataclass(frozen=True)
+class SearchError:
+    search_type: str
+    error: Any
+
+
 class SearchResults:
 
-    def __init__(self, genome_build_preferred: Optional[GenomeBuild] = None):
+    def __init__(self, search_string: str, genome_build_preferred: Optional[GenomeBuild] = None):
+        self.search_string = search_string
         self.genome_build_preferred = genome_build_preferred
-        self.results: List[SearchResult] = []
+        self.results: List[SearchResult] = list()
         self.search_types: Set[str] = set()
-        self.search_errors: List = []
+        self.search_errors: Dict[SearchError, Set[GenomeBuild]] = defaultdict(set)
 
     def append_search_type(self, search_type: str):
         self.search_types.add(search_type)
@@ -230,11 +237,15 @@ class SearchResults:
     def append_result(self, result: Any):
         self.results.append(result)
 
-    def append_error(self, error: Any):
-        self.search_errors.append(error)
+    def append_error(self, search_type: str, error: Any, genome_build: Optional[GenomeBuild] = None):
+        genome_builds = self.search_errors[SearchError(search_type=search_type, error=str(error))]
+        if genome_build:
+            genome_builds.add(genome_build)
 
     def extend(self, other: 'SearchResults'):
-        self.search_errors.extend(other.search_errors)
+        for search_error, genome_builds in other.search_errors.items():
+            self.search_errors[search_error].update(genome_builds)
+
         self.results.extend(other.results)
         self.search_types = self.search_types.union(other.search_types)
 
@@ -246,6 +257,17 @@ class SearchResults:
         for result in self.results:
             result.apply_search_score(preferred_genome_build=self.genome_build_preferred)
         self.results.sort(reverse=True)
+
+        for search_error, genome_builds in self.search_errors.items():
+            genome_build_str = ", ".join(gb.name if gb else '-' for gb in sorted(genome_builds))
+            report_message(
+                message="Search Error",
+                extra_data={
+                    'target': f"\"{self.search_string}\"\n{search_error.search_type}: {search_error.error}",
+                    'search_string': self.search_string,
+                    'genome_builds': genome_build_str
+                }
+            )
 
     @property
     def non_debug_results(self):
@@ -265,12 +287,12 @@ class Searcher:
                             result - has string representation to display
                                      get_absolute_url() link or to load if only result
             search_types: list of what we searched due to regex match
-            search_errors: list of (search_type, exception, genome_build)
+            search_errors: dict of SearchError to genome_buld where the error occured
         """
         HAS_ALPHA_PATTERN = r"[a-zA-Z]"
         NO_WHITESPACE = r"^\S+$"
         NOT_WHITESPACE = r"\S+"
-        HGVS_UNCLEANED_PATTERN = r"[cnmg].*\d+"  # Bare bones match - may be able to fix it...
+        HGVS_UNCLEANED_PATTERN = r"[^:]([cnmg]\.|:[cnmg]).*\d+"  # Bare bones match - may be able to fix it...
         COSMIC_PATTERN = re.compile(r"^COS[MV](\d+)$")  # Old or new
 
         self.genome_build_searches = [
@@ -329,7 +351,7 @@ class Searcher:
         self.genome_build_all = GenomeBuild.builds_with_annotation()
 
     def search(self) -> SearchResults:
-        search_results = SearchResults(genome_build_preferred=self.genome_build_preferred)
+        search_results = SearchResults(search_string=self.search_string, genome_build_preferred=self.genome_build_preferred)
 
         # do genome build agnostic search
         search_results.extend(self.search_within(genome_build=None))
@@ -348,21 +370,23 @@ class Searcher:
         """
         variant_qs: Optional[QuerySet]
         searches: List[Any]
-        results = SearchResults(genome_build_preferred=genome_build)
+        results = SearchResults(search_string=self.search_string, genome_build_preferred=genome_build)
         if genome_build:
             try:
                 variant_qs = get_visible_variants(self.user, genome_build)
                 searches = self.genome_build_searches
             except Exception as e:
-                report_exc_info(
+                # okay that we lose the exception data since we have the search string, should be easy to re-create
+                report_message(
+                    message="Search Error",
                     extra_data={
+                        'target': f"\"{self.search_string}\"\nVariant: {e}",
                         'search_string': self.search_string,
                         'classify': self.classify,
                         'genome_build_id': genome_build.name if genome_build else None
-                    },
-                    report_externally=False
+                    }
                 )
-                results.append_error(("variants", e, genome_build))
+                results.append_error("variants", e, genome_build)
                 return results
         else:
             variant_qs = None
@@ -387,7 +411,7 @@ class Searcher:
                     if build_results is not None:
                         result_count = len(build_results)
                         if len(build_results) > MAX_RESULTS_PER_TYPE:
-                            results.append_error((search_type, f"Found {result_count:,} matches, limiting to {MAX_RESULTS_PER_TYPE}", genome_build))
+                            results.append_error(search_type, f"Found {result_count:,} matches, limiting to {MAX_RESULTS_PER_TYPE}", genome_build)
                             build_results = build_results[0:MAX_RESULTS_PER_TYPE]
 
                         for sr in build_results:
@@ -412,16 +436,7 @@ class Searcher:
                             results.append_result(sr)
 
                 except Exception as e:
-                    report_exc_info(
-                        extra_data={
-                            'search_string': self.search_string,
-                            'search_type': search_type,
-                            'classify': self.classify,
-                            'genome_build_id': genome_build.name if genome_build else None
-                        },
-                        report_externally=False
-                    )
-                    results.append_error((search_type, e, genome_build))
+                    results.append_error(search_type, e, genome_build)
         return results
 
 
@@ -548,8 +563,8 @@ def _search_hgvs_using_gene_symbol(gene_symbol, search_messages,
                     results_by_record[result.record].append(result)
                     transcript_accessions_by_record[result.record].append(transcript_version.accession)
             except Exception as e:
+                # Just swallow all these errors
                 logging.warning(e)
-                pass  # Just swallow all these errors
 
     for record, results_for_record in results_by_record.items():
         unique_messages = {m: True for m in search_messages}  # Use dict for uniqueness
@@ -596,10 +611,14 @@ def search_hgvs(search_string: str, user: User, genome_build: GenomeBuild, varia
                     search_messages.append(f"Warning: Cleaned '{search_string}' => '{hgvs_string}'")
                 variant_tuple, used_transcript_accession, method = hgvs_matcher.get_variant_tuple_used_transcript_and_method(hgvs_string)
             except (ValueError, NotImplementedError):
-                if gene_symbol := hgvs_matcher.get_gene_symbol_if_no_transcript(hgvs_string):
-                    if results := _search_hgvs_using_gene_symbol(gene_symbol, search_messages,
-                                                                 hgvs_string, user, genome_build, variant_qs):
-                        return results
+                try:
+                    if gene_symbol := hgvs_matcher.get_gene_symbol_if_no_transcript(hgvs_string):
+                        if results := _search_hgvs_using_gene_symbol(gene_symbol, search_messages,
+                                                                     hgvs_string, user, genome_build, variant_qs):
+                            return results
+                except InvalidHGVSName as e:
+                    # might just not be a HGVS name at all
+                    pass
 
                 if classify:
                     search_message = f"Error reading HGVS: '{original_error}'"

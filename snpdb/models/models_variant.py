@@ -390,7 +390,7 @@ class Variant(models.Model):
 
     @staticmethod
     def is_ref_alt_reference(ref, alt):
-        return ref == alt or alt == '.'
+        return alt in (ref, '.')
 
     @property
     def is_reference(self) -> bool:
@@ -581,7 +581,6 @@ class AlleleSource(models.Model):
 
     def liftover_complete(self, genome_build: GenomeBuild):
         """ This is called at the end of a liftover pipeline (once per build) """
-        pass
 
 
 class VariantAlleleSource(AlleleSource):

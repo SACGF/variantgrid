@@ -438,7 +438,6 @@ class DiscordanceReportAdmin(ModelAdminBasics):
 @admin.register(UploadedFileLab)
 class UploadedFileLabAdmin(ModelAdminBasics):
     list_display = ("pk", "lab", "created", "url", "status", "comment")
-    pass
 
     def is_readonly_field(self, f) -> bool:
         if f.name in ("url", "filename"):

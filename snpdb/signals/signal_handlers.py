@@ -1,8 +1,10 @@
 from django.conf import settings
 from django.contrib.auth.models import Group
 from django.db import transaction
+from django_messages.models import Message
 
 from analysis.tasks.karyomapping_tasks import create_genome_karyomapping_for_trio
+from library.guardian_utils import admin_bot
 from snpdb.models import UserDataPrefix, SettingsInitialGroupPermission, Organization, Lab
 from snpdb.tasks.vcf_bed_file_task import create_backend_vcf_bed_intersections
 
@@ -25,6 +27,8 @@ def user_post_save_handler(sender, instance, **kwargs):
 
         org_labs = getattr(settings, "USER_CREATE_ORG_LABS", None)
         if org_labs:
+            org_message = getattr(settings, "USER_CREATE_ORG_MESSAGE", {})
+
             for org_group_name, lab_pattern in org_labs.items():
                 organization = Organization.objects.get(group_name=org_group_name)
                 lab_name = lab_pattern % instance.__dict__
@@ -32,6 +36,12 @@ def user_post_save_handler(sender, instance, **kwargs):
                 lab, _ = Lab.objects.get_or_create(name=lab_name, organization=organization, group_name=lab_group_name)
                 add_user_to_group(organization.group_name)
                 add_user_to_group(lab_group_name)
+
+                if message := org_message.get(org_group_name):
+                    Message.objects.create(subject="Your initial lab / organisation",
+                                           body=message,
+                                           sender=admin_bot(),
+                                           recipient=instance)
 
 
 def group_post_save_handler(sender, instance, **kwargs):

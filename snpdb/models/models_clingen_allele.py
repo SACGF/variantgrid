@@ -34,11 +34,9 @@ class ClinGenAllele(TimeStampedModel):
 
     class ClinGenMissingAlleleID(ClinGenAlleleRegistryException):
         """ Coordinate is not yet assigned ID and stored on server """
-        pass
 
     class ClinGenHGVSReferenceBaseUnavailableError(ClinGenAlleleRegistryException):
         """ HGVS doesn't have reference """
-        pass
 
     @staticmethod
     def _strip_transcript_version(transcript_id):

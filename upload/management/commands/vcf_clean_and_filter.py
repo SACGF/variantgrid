@@ -39,7 +39,7 @@ class Command(BaseCommand):
         skipped_records = Counter()
 
         ref_standard_bases_pattern = re.compile("[GATC]")
-        alt_standard_bases_pattern = re.compile("[GATC,]")  # Can be multi-alts
+        alt_standard_bases_pattern = re.compile("[GATC,\.]")  # Can be multi-alts, or "." for reference
 
         skip_patterns = {}
         if skip_regex := getattr(settings, "VCF_IMPORT_SKIP_RECORD_REGEX", {}):

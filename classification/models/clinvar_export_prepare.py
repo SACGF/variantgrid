@@ -86,7 +86,6 @@ class ClinVarConsolidatingMerger(ConsolidatingMerger[ClinVarExport, Classificati
             if established.classification_based_on is None:
                 self.log.append(f"No change to existing export record for {established.condition_resolved.summary} : None")
                 # no change
-                pass
             else:
                 self.log.append(f"Updating export record for {established.condition_resolved.summary} : None")
                 established.update_classification(None)
@@ -158,6 +157,6 @@ class ClinvarAlleleExportPrepare:
             combined_log.append(f"{len(classifications_no_conditions)} shared classifications for allele don't have resolved conditions")
 
         if len(combined_log) == 0:
-            combined_log.append(f"No new or old ClinVarKeys associated with this Allele")
+            combined_log.append("No new or old ClinVarKeys associated with this Allele")
 
         return combined_log

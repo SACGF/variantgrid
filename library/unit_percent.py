@@ -1,8 +1,6 @@
 from functools import partial
 from typing import List
 
-from django.conf import settings
-
 
 def convert_from_percent_to_unit(percent, missing_value=None):
     if percent != missing_value:

@@ -83,12 +83,10 @@ class UploadedFile(TimeStampedModel):
 
 class PipelineFailedJobTerminateEarlyException(Exception):
     """ Throw this if pipeline fails elsewhere, and want to exit early but not log exception """
-    pass
 
 
 class SkipUploadStepException(Exception):
     """ Throw this to set task to skipped """
-    pass
 
 
 class UploadPipeline(models.Model):

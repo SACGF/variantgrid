@@ -25,7 +25,7 @@ def mock_send_data(
     response_json = None
 
     if request_type == ClinVarExportRequestType.INITIAL_SUBMISSION:
-        response_json={
+        response_json = {
             "id": "SUB999999-1",
             "responses": [],
             "status": "submitted",
@@ -36,7 +36,7 @@ def mock_send_data(
 
         poll_count = batch.clinvarexportrequest_set.filter(request_type=ClinVarExportRequestType.POLLING_SUBMISSION).count()
         if poll_count == 0:
-            response_json={
+            response_json = {
                 "actions": [
                     {
                         "id": "SUB999999-1",
@@ -64,7 +64,7 @@ def mock_send_data(
                 ]
             }
         else:
-            response_json={
+            response_json = {
                 "actions": [
                     {
                         "id": "SUB999999-1",
@@ -165,7 +165,7 @@ class TestClinVarExport(TestCase):
         c.condition_resolution = {"sort_text": "ataxia-telangiectasia with generalized skin pigmentation and early death",
                                   "display_text": "MONDO:0008841 ataxia-telangiectasia with generalized skin pigmentation and early death",
                                   "resolved_join": None,
-                                  "resolved_terms": [{"name": "ataxia-telangiectasia with generalized skin pigmentation and early death","term_id": "MONDO:0008841"}]}
+                                  "resolved_terms": [{"name": "ataxia-telangiectasia with generalized skin pigmentation and early death", "term_id": "MONDO:0008841"}]}
         c.save()
 
         export_prepare = ClinvarAlleleExportPrepare(allele=allele)

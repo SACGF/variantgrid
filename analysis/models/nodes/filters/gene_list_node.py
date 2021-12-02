@@ -170,8 +170,8 @@ class GeneListNode(AncestorSampleMixin, GeneCoverageMixin, AnalysisNode):
             try:
                 sample_gene_list = self.sample.activesamplegenelist.sample_gene_list
             except ActiveSampleGeneList.DoesNotExist:
+                # Will have to select manually
                 logging.warning("%s - couldn't set active gene list", self.node_version)
-                pass  # Will have to select manually
         self.sample_gene_list = sample_gene_list
 
     def _load(self):

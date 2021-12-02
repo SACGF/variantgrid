@@ -69,7 +69,7 @@ def create_liftover_pipelines(user: User, allele_source: AlleleSource,
 
 
 VCF_ROW = Tuple[str, int, int, str, str]
-LIFTOVER_TUPLE = List[Union[Tuple[int,int], VCF_ROW]]
+LIFTOVER_TUPLE = List[Union[Tuple[int, int], VCF_ROW]]
 
 
 def _get_build_liftover_tuples(allele_source: AlleleSource, inserted_genome_build: GenomeBuild,

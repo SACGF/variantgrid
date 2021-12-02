@@ -50,7 +50,7 @@ from variantopedia import forms
 from variantopedia.interesting_nearby import get_nearby_qs, get_method_summaries, get_nearby_summaries
 from variantopedia.search import search_data, SearchResults
 from variantopedia.server_status import get_dashboard_notices
-from variantopedia.tasks.server_status_tasks import notify_server_status, notify_server_status_now
+from variantopedia.tasks.server_status_tasks import notify_server_status_now
 
 
 def variants(request):
@@ -103,10 +103,10 @@ def server_status(request):
         action = request.POST.get('action')
         if action == 'Test Slack':
             notify_server_status_now()
-            messages.add_message(request, level=messages.INFO, message=f"Slack should have been sent the health check.")
+            messages.add_message(request, level=messages.INFO, message="Slack should have been sent the health check.")
         elif action == 'Test Rollbar':
             report_message("Testing Rollbar", level='error')
-            messages.add_message(request, level=messages.INFO, message=f"Rollbar should have been sent an error.")
+            messages.add_message(request, level=messages.INFO, message="Rollbar should have been sent an error.")
         elif action == 'Test Message Branding':
             messages.success(request, "Success message")
             messages.info(request, "Info message")
@@ -363,14 +363,15 @@ def search(request):
                 return redirect(preferred_result.record)
 
             # Attempt to give hints on why nothing was found
-            if search_results.search_errors:
-                for search_type, e, genome_build in search_results.search_errors:
-                    if genome_build:
-                        messages.add_message(request, messages.ERROR, f"{search_type}: {e} ({genome_build})")
-                    else:
-                        messages.add_message(request, messages.ERROR, f"{search_type}: {e}")
+            for search_error, genome_builds in search_results.search_errors.items():
+                text = f"{search_error.search_type}: {search_error.error}"
+                if genome_builds:
+                    genome_builds_str = ", ".join(gb.name for gb in sorted(genome_builds))
+                    text += f" ({genome_builds_str})"
+                messages.add_message(request, messages.ERROR, text)
 
         except Exception as e:
+            raise
             report_exc_info(extra_data={
                 'search_string': search_string,
                 'classify': classify

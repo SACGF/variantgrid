@@ -83,12 +83,10 @@ class ClassificationProcessError(Exception):
     Use to report critical errors that an API user should be able to see
     e.g. referring to a non existent lab
     """
-    pass
 
 
 class CreateNoClassificationForbidden(PermissionDenied):
     """ Used if settings prevent creating classifications not linked to a variant """
-    pass
 
 
 class ClassificationImport(models.Model):

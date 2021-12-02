@@ -13,7 +13,6 @@ from rest_framework.response import Response
 from rest_framework.status import HTTP_200_OK, HTTP_400_BAD_REQUEST, \
     HTTP_500_INTERNAL_SERVER_ERROR
 from rest_framework.views import APIView
-from threadlocals.threadlocals import get_current_user
 
 from classification.classification_stats import get_lab_gene_counts
 from classification.enums import SubmissionSource, ShareLevel, ClinicalSignificance
@@ -360,11 +359,12 @@ class BulkInserter:
 
         debug_timer.tick("Setup Async Variant Matching")
 
-        if count := self.record_count:
+        if self.record_count > 1:
             time_taken = now() - self.start
             total_time = time_taken.total_seconds()
-            time_per_record = total_time / count
-            create_event(user=self.user, name="classification_import", details=f"{count} records imported {self.new_record_count} new, avg record processing {time_per_record:.3f}s\n{debug_timer}")
+            time_per_record = total_time / self.record_count
+            create_event(user=self.user, name="classification_import",
+                         details=f"{self.record_count} records imported {self.new_record_count} new, avg record processing {time_per_record:.3f}s\n{debug_timer}")
 
 
 class ClassificationView(APIView):

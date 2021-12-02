@@ -28,7 +28,7 @@ def classification_created(sender, instance, created, raw, using, update_fields,
 
 
 @receiver(classification_post_publish_signal, sender=Classification)
-def published(sender, classification, previously_published, newly_published, user, debug_timer: DebugTimer,  **kwargs):  # pylint: disable=unused-argument
+def published(sender, classification, previously_published, newly_published, user, debug_timer: DebugTimer, **kwargs):  # pylint: disable=unused-argument
 
     if classification.share_level_enum.index > ShareLevel.INSTITUTION.index:
         classification.flag_collection_safe.close_open_flags_of_type(
