@@ -102,19 +102,22 @@ function enhanceAndMonitor() {
         {test: '.nav-tabs a[data-href][data-toggle="tab"]',
             func: (node) => {node.on('shown.bs.tab', function(e) {loadAjaxTab($(this));});}
         },
-        // input with button at the end, have it so if you hit enter in the input, hte button activates
+        // input with button at the end, have it so if you hit enter in the input, the button activates
         {test: '.input-group-append',
             func: (node) => {
-                node.closest('.input-group').find('input').keyup(function (event) {
-                    if (event.which === 13) {
-                        let button = $(this).closest('.input-group').find('.input-group-append .btn');
-                        if (button.length) {
-                            event.preventDefault();
-                            event.stopPropagation();
-                            button.click();
+                // if (!node.closest('form')) { // if we're in a form, don't need to hit the button
+                    node.closest('.input-group').find('input').keyup(function (event) {
+                        if (event.which === 13) {
+                            let button = $(this).closest('.input-group').find('.input-group-append .btn');
+                            if (button.length) {
+                                event.preventDefault();
+                                event.Event.stopImmediatePropagation();
+                                button.click();
+                                return false;
+                            }
                         }
-                    }
-                });
+                    });
+                // }
             }
         },
         // timestamps
