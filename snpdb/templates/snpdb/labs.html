@@ -64,9 +64,9 @@
             let accumulation_by_status = {{ accumulation_by_status | jsonify }};
             plotCumulativeClassifications("accumulation-status-graph", accumulation_by_status, "Cumulative Alleles by Status (stacked)", graph_width, graph_height)
         {% endif %}
-        {% if accumulation_by_org %}
-            let accumulation_by_org = {{ accumulation_by_org | jsonify }};
-            plotCumulativeClassifications("accumulation-org-graph", accumulation_by_org, "Cumulative Alleles by Organisation", graph_width, graph_height)
+        {% if accumulation_by_lab %}
+            let accumulation_by_org = {{ accumulation_by_lab | jsonify }};
+            plotCumulativeClassifications("accumulation-lab-graph", accumulation_by_org, "Cumulative Alleles by Lab", graph_width, graph_height)
         {% endif %}
         {% if vc_normalized_state_data_json %}
             let vc_normalized_state_data_json = {{ vc_normalized_state_data_json | jsonify }};
@@ -89,8 +89,8 @@
                 {% if accumulation_by_status %}
                     {% ui_register_tab_embedded tab_set="graph_tabs" label="Cumulative Alleles by Status" %}<div id='accumulation-status-graph'></div>{% end_ui_register_tab_embedded %}
                 {% endif %}
-                {% if accumulation_by_org %}
-                    {% ui_register_tab_embedded tab_set="graph_tabs" label="Cumulative Alleles by Org" admin_only=True %}<div id='accumulation-org-graph'></div>{% end_ui_register_tab_embedded %}
+                {% if accumulation_by_lab %}
+                    {% ui_register_tab_embedded tab_set="graph_tabs" label="Cumulative Alleles by Lab" admin_only=True %}<div id='accumulation-lab-graph'></div>{% end_ui_register_tab_embedded %}
                 {% endif %}
                 {% if vc_normalized_state_data_json %}
                     {% ui_register_tab_embedded tab_set="graph_tabs" label="Alleles/100K Pop by State" admin_only=True %}<div id='normalized-state-classifications-graph'></div>{% end_ui_register_tab_embedded %}

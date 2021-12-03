@@ -24,7 +24,7 @@ class ClassificationSummary:
     classification_id: int
     clinical_significance: Optional[str]
     withdrawn: Optional[bool] = None
-    org_name: Optional[str] = None
+    lab_name: Optional[str] = None
 
     def __lt__(self, other):
         return self.at < other.at
@@ -41,7 +41,7 @@ class ClassificationSummary:
             classification_id=self.classification_id,
             clinical_significance=self.clinical_significance or older.clinical_significance,
             withdrawn=self.withdrawn if self.withdrawn is not None else older.withdrawn,
-            org_name=self.org_name or older.org_name
+            lab_name=self.lab_name or older.lab_name
         )
 
 
@@ -102,13 +102,13 @@ class AlleleSummary:
         return len(self.not_withdrawn)
 
     @property
-    def multi_org(self) -> int:
+    def multi_lab(self) -> int:
         if len(self.not_withdrawn) <= 1:
             return False
-        orgs = set()
+        labs = set()
         for summary in self.not_withdrawn:
-            orgs.add(summary.org_name)
-            if len(orgs) > 1:
+            labs.add(summary.lab_name)
+            if len(labs) > 1:
                 return True
         return False
 
@@ -119,7 +119,7 @@ class AlleleSummary:
         count = len(self.not_withdrawn)
         if count == 0:
             return AlleleStatus.Empty
-        elif not self.multi_org:
+        elif not self.multi_lab:
             return AlleleStatus.Single
         else:
             all_values = set()
@@ -165,7 +165,7 @@ class ClassificationAccumulationGraph:
                     allele_summary.reset()
 
                     for summary in allele_summary.not_withdrawn:
-                        counts[summary.org_name] = counts[summary.org_name] + 1
+                        counts[summary.lab_name] = counts[summary.lab_name] + 1
 
                 elif self.mode == AccumulationReportMode.Allele:
                     if status != AlleleStatus.Empty and allele_summary.classification_count():
@@ -173,12 +173,12 @@ class ClassificationAccumulationGraph:
 
                     allele_summary.reset()
 
-                    involved_orgs: Set[str] = set()
+                    involved_labs: Set[str] = set()
                     for summary in allele_summary.not_withdrawn:
-                        involved_orgs.add(summary.org_name)
+                        involved_labs.add(summary.lab_name)
 
-                    for org in involved_orgs:
-                        counts[org] += 1
+                    for lab in involved_labs:
+                        counts[lab] += 1
 
             return ClassificationAccumulationGraph._SummarySnapshot(at=at, counts=counts)
 
@@ -204,7 +204,7 @@ class ClassificationAccumulationGraph:
             status, created, flag_collection_id = value_tuple
             if flag_collection_id not in flag_collection_id_to_allele_classification:
                 if classification_match := Classification.objects \
-                        .values_list("variant__variantallele__allele_id", "id", "lab__organization__name") \
+                        .values_list("variant__variantallele__allele_id", "id", "lab__name") \
                         .filter(lab__external=False) \
                         .filter(flag_collection_id=flag_collection_id) \
                         .filter(share_level__in=self.share_levels) \
@@ -213,12 +213,12 @@ class ClassificationAccumulationGraph:
                 else:
                     flag_collection_id_to_allele_classification[flag_collection_id] = (0, 0, None)
 
-            allele_id, classification_id, org_name = flag_collection_id_to_allele_classification[flag_collection_id]
+            allele_id, classification_id, lab_name = flag_collection_id_to_allele_classification[flag_collection_id]
 
             withdrawn = status == 'O'
 
             return ClassificationSummary(allele_id=allele_id, classification_id=classification_id, at=created,
-                                         clinical_significance=None, withdrawn=withdrawn, org_name=org_name)
+                                         clinical_significance=None, withdrawn=withdrawn, lab_name=lab_name)
 
         return IterableTransformer(flag_qs, transformer)
 
@@ -231,12 +231,12 @@ class ClassificationAccumulationGraph:
             "created").values_list("classification_id", "created",
                                             "published_evidence__clinical_significance__value",
                                             "classification__variant__variantallele__allele_id",
-                                            "classification__lab__organization__name")
+                                            "classification__lab__name")
 
         def classification_transformer(results_tuple):
-            c_id, created, clinical_significance, allele_id, org_name = results_tuple
+            c_id, created, clinical_significance, allele_id, lab_name = results_tuple
             return ClassificationSummary(allele_id=allele_id, classification_id=c_id, at=created,
-                                         clinical_significance=clinical_significance, org_name=org_name)
+                                         clinical_significance=clinical_significance, lab_name=lab_name)
 
         return IterableTransformer(cm_qs_summary, classification_transformer)
 
@@ -281,23 +281,23 @@ def _iter_report_list(
     cag = ClassificationAccumulationGraph(mode=mode, shared_only=shared_only)
     report_data = cag.report()
 
-    valid_orgs = set()
+    valid_labs = set()
     for row in report_data:
         for key in [key for key in row.counts.keys() if isinstance(key, str)]:
-            valid_orgs.add(key)
+            valid_labs.add(key)
 
-    org_list = list(valid_orgs)
-    org_list.sort()
+    lab_list = list(valid_labs)
+    lab_list.sort()
 
     header = ["Date"] + [allele_status_data[status].label for status in allele_status_report]
-    header.extend(org_list)
+    header.extend(lab_list)
 
     yield header
     for row in report_data:
         row_date = [row.at.strftime('%Y-%m-%d')]
         for status in allele_status_report:
             row_date.append(row.counts.get(status, 0))
-        row_date.extend([row.counts.get(org, 0) for org in org_list])
+        row_date.extend([row.counts.get(lab, 0) for lab in lab_list])
         yield row_date
 
 
@@ -319,18 +319,18 @@ def get_accumulation_graph_data(mode: AccumulationReportMode = AccumulationRepor
     header = data[0]
     rows = data[1:]
     df = pd.DataFrame(rows, columns=header)
-    orgs = df.columns[6:]
+    labs = df.columns[6:]
     statuses = df.columns[1:5]
     dates = df["Date"].tolist()
 
-    by_org = list()
+    by_lab = list()
     by_status = list()
 
-    for org in orgs:
-        by_org.append({
+    for lab in labs:
+        by_lab.append({
             "x": dates,
-            "y": df[org].tolist(),
-            "name": org
+            "y": df[lab].tolist(),
+            "name": lab
         })
 
     for status in allele_status_report[1:]:
@@ -346,9 +346,9 @@ def get_accumulation_graph_data(mode: AccumulationReportMode = AccumulationRepor
             "stackgroup": "one"
         })
 
-    by_org.sort(key=lambda t: t["y"][-1], reverse=True)
+    by_lab.sort(key=lambda t: t["y"][-1], reverse=True)
 
     return {
-        "org": by_org,
+        "lab": by_lab,
         "status": by_status
     }

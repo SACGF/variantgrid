@@ -1309,7 +1309,7 @@ def labs(request):
     context["accumulation_by_status"] = graph_data["status"]
     if request.user.is_superuser:
         # TODO, do we really need to hide this graph away?
-        context["accumulation_by_org"] = graph_data["org"]
+        context["accumulation_by_lab"] = graph_data["lab"]
 
         state_pop_multiplier = {}
         for state in State.objects.filter(population__gt=0):
