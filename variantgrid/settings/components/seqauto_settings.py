@@ -57,15 +57,6 @@ SEQAUTO_VCF_PATTERN = "gatk_per_sample/%(sample_name)s.gatk.hg38.vcf.gz"
 # If the sequencing run name ends with '_FFPE' we'll add "_ffpe" onto the end of the kit name
 SEQAUTO_COMBINED_VCF_PATTERNS_FOR_KIT = {
     "default": ["%(sequencing_run)s.gatk.hg38.vcf.gz"],
-    "idt_haem": [
-        "%(sequencing_run)s.vardict.hg38.vcf.gz",
-    ],
-    "idt_gmp_focus_ffpe": [
-        "%(sequencing_run)s.vardict.hg38.vcf.gz",
-    ],
-    "idt_rhampseq_ffpe_onco": [
-        "%(sequencing_run)s.vardict.hg38.vcf.gz",
-    ],
 }
 
 SEQAUTO_GOI_LIST_PATTERN = "%(sequencing_run)s_%(sample_name)s.txt"
