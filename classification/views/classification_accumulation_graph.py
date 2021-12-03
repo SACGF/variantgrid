@@ -235,6 +235,9 @@ class ClassificationAccumulationGraph:
 
         def classification_transformer(results_tuple):
             c_id, created, clinical_significance, allele_id, lab_name = results_tuple
+            if clinical_significance and clinical_significance.startswith('VUS'):
+                clinical_significance = 'VUS'
+
             return ClassificationSummary(allele_id=allele_id, classification_id=c_id, at=created,
                                          clinical_significance=clinical_significance, lab_name=lab_name)
 
