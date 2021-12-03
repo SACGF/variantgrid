@@ -62,7 +62,10 @@ SEQAUTO_COMBINED_VCF_PATTERNS_FOR_KIT = {
     ],
     "idt_gmp_focus_ffpe": [
         "%(sequencing_run)s.vardict.hg38.vcf.gz",
-    ]
+    ],
+    "idt_rhampseq_ffpe_onco": [
+        "%(sequencing_run)s.vardict.hg38.vcf.gz",
+    ],
 }
 
 SEQAUTO_GOI_LIST_PATTERN = "%(sequencing_run)s_%(sample_name)s.txt"
