@@ -7,7 +7,6 @@ import django.db.models.deletion
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('genes', '0048_one_off_upgrade_pyhgvs'),
         ('analysis', '0050_auto_20210622_1459'),
     ]
 
