@@ -304,6 +304,8 @@ COMPANY = None  # Used for gene list categories
 
 GENERATED_DIR = os.path.join(MEDIA_ROOT, 'generated')
 
+HGVS_MAX_REF_ALLELE_LENGTH = 10  # Set to 0 for "del" instead of "delC" etc
+
 PATIENTS_READ_ONLY_SHOW_AGE_NOT_DOB = False
 IMPORT_PROCESSING_DIR = os.path.join(PRIVATE_DATA_ROOT, 'import_processing')
 
@@ -397,7 +399,7 @@ VARIANT_CLASSIFICATION_AUTO_POPULATE_P_HGVS_SYNONYMOUS_SPLICE_CHANGE_TO_UNKNOWN 
 
 VARIANT_CLASSIFICATION_FILE_ATTACHMENTS = True  # allow users to attach files to classifications
 
-VARIANT_CLASSIFICATION_MAX_FULL_ALLELE_LENGTH = 100  # Used for MVL export, for general display limit is 10
+VARIANT_CLASSIFICATION_MAX_REFERENCE_LENGTH = 100  # Used for MVL export, general display use HGVS_MAX_REF_ALLELE_LENGTH
 
 
 

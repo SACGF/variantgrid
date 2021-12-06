@@ -329,15 +329,15 @@ class HGVSNameExtra:
         copy = HGVSName(**params)
         return copy
 
-    def format(self, max_allele_length=10) -> Optional[str]:
+    def format(self, max_ref_length=settings.HGVS_MAX_REF_ALLELE_LENGTH) -> Optional[str]:
         # would be better practise to throw an error if we couldn't generate
         # but this keeps existing behaviour
         if not self._hgvs_name:
             return None
 
-        if HGVSMatcher.can_shrink_long_ref(self._hgvs_name):
+        if HGVSMatcher.can_shrink_long_ref(self._hgvs_name, max_ref_length=max_ref_length):
             hgvs_name = self._safe()
-            HGVSMatcher.format_hgvs_remove_long_ref(hgvs_name, max_allele_length=max_allele_length)
+            HGVSMatcher.format_hgvs_remove_long_ref(hgvs_name, max_ref_length=max_ref_length)
             return hgvs_name.format()
         return self._hgvs_name.format()
 
@@ -446,13 +446,13 @@ class HGVSMatcher:
         return transcript_id
 
     @staticmethod
-    def can_shrink_long_ref(hgvs_name, max_allele_length=10) -> bool:
+    def can_shrink_long_ref(hgvs_name, max_ref_length=10) -> bool:
         SHRINKABLE_MUTATION_TYPES = {"del", "dup"}  # "delins" in more complicated than just removing ref_allele as alt_allele can be massive too
         return hgvs_name.mutation_type in SHRINKABLE_MUTATION_TYPES and \
-               len(hgvs_name.ref_allele) > max_allele_length
+               len(hgvs_name.ref_allele) > max_ref_length
 
     @staticmethod
-    def format_hgvs_remove_long_ref(hgvs_name, max_allele_length=10):
+    def format_hgvs_remove_long_ref(hgvs_name, max_ref_length=10):
         """ Similar to pyhgvs.variant_to_hgvs_name but only for dels, delins and dups and we don't specify length
 
             From a Facebook post:
@@ -462,7 +462,7 @@ class HGVSMatcher:
             nucleotides, can be deduced from the variant description. HGVS thus suggests to use c.7432-2025_7536+372del.
         """
 
-        if HGVSMatcher.can_shrink_long_ref(hgvs_name, max_allele_length=max_allele_length):
+        if HGVSMatcher.can_shrink_long_ref(hgvs_name, max_ref_length=max_ref_length):
             hgvs_name.ref_allele = ""
 
     def variant_to_hgvs_extra(self, variant: Variant, transcript_name=None) -> HGVSNameExtra:
@@ -486,9 +486,9 @@ class HGVSMatcher:
                                                 transcript, max_allele_length=sys.maxsize)
         return HGVSNameExtra(hgvs_name)
 
-    def variant_to_hgvs(self, variant: Variant, transcript_name=None, max_allele_length=10) -> Optional[str]:
+    def variant_to_hgvs(self, variant: Variant, transcript_name=None, max_ref_length=10) -> Optional[str]:
         """ returns c.HGVS is transcript provided, g.HGVS if no transcript"""
-        return self.variant_to_hgvs_extra(variant=variant, transcript_name=transcript_name).format(max_allele_length=max_allele_length)
+        return self.variant_to_hgvs_extra(variant=variant, transcript_name=transcript_name).format(max_ref_length=max_ref_length)
 
     def variant_to_g_hgvs(self, variant: Variant):
         g_hgvs = self.variant_to_hgvs(variant)
