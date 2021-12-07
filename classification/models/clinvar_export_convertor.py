@@ -143,6 +143,40 @@ class ClinVarExportConverter:
         else:
             return value
 
+    @staticmethod
+    def citation_to_json(citation: VCDbRefDict) -> ClinVarCitation:
+        citation: ClinVarCitation = {
+            "db": ClinVarExportConverter.CITATION_DB_MAPPING.get(citation.get("db")),
+            "id": citation.id
+        }
+        return citation
+
+    @staticmethod
+    def condition_to_json(condition: OntologyTerm) -> ValidatedJson:
+        # supported "OMIM", "MedGen", "Orphanet", "MeSH", "HP", "MONDO"
+        messages = JSON_MESSAGES_EMPTY
+        if condition.ontology_service not in (
+        OntologyService.OMIM, OntologyService.ORPHANET, OntologyService.HPO, OntologyService.MONDO):
+            messages += JsonMessages.error(f"Ontology \"{condition.ontology_service}\" is not supported by ClinVar")
+
+        """
+        # Examples
+        OMIM and 100800
+        MeSH and D000130
+        Orphanet and ORPHA155
+        MedGen and C0001080
+        Mondo and MONDO:0015263
+        """
+
+        id_part = condition.id
+        if condition.ontology_service == OntologyService.OMIM:
+            id_part = str(condition.index)
+
+        return ValidatedJson({
+            "db": condition.ontology_service,
+            "id": id_part
+        }, messages)
+
     @lazy
     def as_validated_json(self) -> ValidatedJson:
         data = dict()
@@ -269,13 +303,7 @@ class ClinVarExportConverter:
     def json_clinical_significance(self) -> ValidatedJson:
         data = dict()
         if citations := self.citation_refs:
-            def citation_to_json(citation: VCDbRefDict) -> ClinVarCitation:
-                citation: ClinVarCitation = {
-                    "db": ClinVarExportConverter.CITATION_DB_MAPPING.get(citation.get("db")),
-                    "id": str(citation.get("idx"))  # TODO confirm this is the kind of ID they want, not the prefixed one?
-                }
-                return citation
-            data["citation"] = [citation_to_json(citation) for citation in citations]
+            data["citation"] = [ClinVarExportConverter.citation_to_json(citation) for citation in citations]
         data["clinicalSignificanceDescription"] = self.clinvar_value(SpecialEKeys.CLINICAL_SIGNIFICANCE).value(single=True)
 
         comment_parts: List[str] = list()
