@@ -338,18 +338,8 @@ class ClinVarExportConverter:
                     if join != MultiCondition.CO_OCCURRING:
                         messages += JsonMessages.error("ClinVar API only supports Co-occurring for multiple messages")
 
-            def condition_to_json(condition: OntologyTerm) -> ValidatedJson:
-                # supported "OMIM", "MedGen", "Orphanet", "MeSH", "HP", "MONDO"
-                messages = JSON_MESSAGES_EMPTY
-                if condition.ontology_service not in (OntologyService.OMIM, OntologyService.ORPHANET, OntologyService.HPO, OntologyService.MONDO):
-                    messages += JsonMessages.error(f"Ontology \"{condition.ontology_service}\" is not supported by ClinVar")
-                return ValidatedJson({
-                    "db": condition.ontology_service,
-                    "id": condition.id
-                }, messages)
-
             for condition in conditions.terms:
-                condition_list.append(condition_to_json(condition))
+                condition_list.append(ClinVarExportConverter.condition_to_json(condition))
         else:
             messages += JsonMessages.error("No standard condition terms")
         return ValidatedJson(data, messages)
