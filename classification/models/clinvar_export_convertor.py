@@ -147,7 +147,7 @@ class ClinVarExportConverter:
     def citation_to_json(citation: VCDbRefDict) -> ClinVarCitation:
         citation: ClinVarCitation = {
             "db": ClinVarExportConverter.CITATION_DB_MAPPING.get(citation.get("db")),
-            "id": citation['id']
+            "id": citation['id'].replace(' ', '')
         }
         return citation
 
