@@ -149,7 +149,7 @@ class GeneSymbol(models.Model):
     @staticmethod
     def cast(symbol: Union[str, 'GeneSymbol']) -> 'GeneSymbol':
         if isinstance(symbol, str):
-            return GeneSymbol.objects.first(symbol=symbol)
+            return GeneSymbol.objects.filter(symbol=symbol).first()
         return symbol
 
     @property
