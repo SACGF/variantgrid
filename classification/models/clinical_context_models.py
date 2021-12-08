@@ -234,7 +234,7 @@ class ClinicalContext(FlagsMixin, TimeStampedModel):
 
                 nb = NotificationBuilder("PENDING: ClinicalContext changed)")
                 nb.add_markdown(
-                    f"PENDING: ClinicalGrouping for allele <{allele_url}|{allele_url}> would change from {old_status} -> {new_status} but marked as pending due to {ongoing_import}")
+                    f":clock1: ClinicalGrouping for allele <{allele_url}|{allele_url}> would change from {old_status} -> {new_status} but marked as pending due to {ongoing_import}")
                 nb.send()
 
         else:
@@ -244,7 +244,7 @@ class ClinicalContext(FlagsMixin, TimeStampedModel):
             if self.pending_status and ongoing_import:
                 nb = NotificationBuilder("PENDING: ClinicalContext changed-back")
                 nb.add_markdown(
-                    f"PENDING: ClinicalGrouping for allele <{allele_url}|{allele_url}> changed back from {self.pending_status} -> {new_status} within {ongoing_import}, no notifications sent")
+                    f":clock430: ClinicalGrouping for allele <{allele_url}|{allele_url}> changed back from {self.pending_status} -> {new_status} within {ongoing_import}, no notifications sent")
                 nb.send()
 
             self.pending_cause = None
@@ -255,6 +255,13 @@ class ClinicalContext(FlagsMixin, TimeStampedModel):
         if ongoing_import:
             # don't send out any signals if calculation is delayed, we don't want to trigger anything until we complete
             return
+
+        if settings.DISCORDANCE_ENABLED and is_significance_change:
+            nb = NotificationBuilder("ClinicalContext changed")
+            nb.add_markdown(
+                f":fire_engine: ClinicalGrouping for allele <{allele_url}|{allele_url}> changed from {old_status} -> {new_status} "
+                f"lab notifications should follow")
+            nb.send()
 
         clinical_context_signal.send(sender=ClinicalContext, clinical_context=self, status=new_status, is_significance_change=is_significance_change, cause=cause)
         # might be worth checking to see if the clinical context has changed against post signal
@@ -270,13 +277,6 @@ class ClinicalContext(FlagsMixin, TimeStampedModel):
                 self.flag_collection_safe.close_open_flags_of_type(
                     flag_type=classification_flag_types.clinical_context_discordance
                 )
-
-            if is_significance_change:
-                nb = NotificationBuilder("ClinicalContext changed")
-                nb.add_markdown(
-                    f"LIVE: ClinicalGrouping for allele <{allele_url}|{allele_url}> changed from {old_status} -> {new_status} "
-                    f"lab notifications should follow")
-                nb.send()
 
         else:
             self.flag_collection_safe.close_open_flags_of_type(
