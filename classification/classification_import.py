@@ -155,6 +155,7 @@ def reattempt_variant_matching(user: User, queryset: QuerySet[Classification]) -
 
         for vc_import in imports_by_genome.values():
             process_classification_import(vc_import, ImportSource.API)
+        ClassificationImportRun.record_classification_import("admin-variant-rematch", valid_record_count)
 
     finally:
         # got to give time for variant matching to complete, a bit hacky

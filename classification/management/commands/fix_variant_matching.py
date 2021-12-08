@@ -71,7 +71,6 @@ class Command(BaseCommand):
         user = admin_bot()
 
         # setup a temporary import so discordance notifications are not sent out
-        ClassificationImportRun.record_classification_import("variant_rematching", 0)
         try:
             batch: List[Classification] = list()
             for c in qs:
@@ -89,11 +88,12 @@ class Command(BaseCommand):
                     batch = list()
                     print(f"Handled {row_count}")
 
+
             self.handle_batch(batch)
             print(f"Handled {row_count}")
             self.report_unmatched()
-        finally:
             sleep(10)  # give time for variant matching to complete
+        finally:
             ClassificationImportRun.record_classification_import("variant_rematching", 0, is_complete=True)
 
     def sleep_for_delay(self):
@@ -111,6 +111,7 @@ class Command(BaseCommand):
         print("Finished update c.hgvs")
 
     def handle_batch(self, batch: List[Classification]):
+        ClassificationImportRun.record_classification_import("variant_rematching", len(batch))
         user = admin_bot()
         if batch:
             imports_by_genome: Dict[int, ClassificationImport] = dict()
