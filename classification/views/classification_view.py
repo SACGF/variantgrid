@@ -432,7 +432,7 @@ class ClassificationView(APIView):
                 records = data.get('records')
                 complete_identifier = None
                 if import_id := data.get('import_id'):
-                    # prefix import_id with username, so users can't overwrite each otehr
+                    # prefix import_id with username, so users can't overwrite each other
                     import_id = f"{user.username}#{import_id}"
                     status = data.get('status')
                     completed = status == 'complete'

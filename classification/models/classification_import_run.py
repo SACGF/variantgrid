@@ -24,7 +24,7 @@ class ClassificationImportRun(TimeStampedModel):
     status = models.TextField(choices=ClassificationImportRunStatus.choices, default=ClassificationImportRunStatus.ONGOING)
 
     @staticmethod
-    def record_classification_import(identifier: str, add_row_count: int, is_complete: bool = False):
+    def record_classification_import(identifier: str, add_row_count: int = 0, is_complete: bool = False):
         """
         :param identifier: An identifier for the import - when importing more up to date versions of the same file, try to re-use the same identifier
         :param add_row_count: How many rows just got added
