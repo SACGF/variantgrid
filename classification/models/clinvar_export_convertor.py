@@ -145,9 +145,16 @@ class ClinVarExportConverter:
 
     @staticmethod
     def citation_to_json(citation: VCDbRefDict) -> ClinVarCitation:
+        db = ClinVarExportConverter.CITATION_DB_MAPPING.get(citation.get("db"))
+        id_part = citation['id'].replace(' ', '')
+        if db == "PubMed":
+            # Special support for PubMed to be PMID
+            # (at some point should fix that in the citation JSON)
+            id_part = f"PMID:{citation['idx']}"
+
         citation: ClinVarCitation = {
-            "db": ClinVarExportConverter.CITATION_DB_MAPPING.get(citation.get("db")),
-            "id": citation['id'].replace(' ', '')
+            "db": db,
+            "id": id_part
         }
         return citation
 
@@ -278,7 +285,7 @@ class ClinVarExportConverter:
         acmg_criteria = {
             "citation": {
                 "db": "PubMed",
-                "id": "PubMed:25741868"
+                "id": "PMID:25741868"
             },
             "method": EvidenceKeyMap.cached_key(SpecialEKeys.ASSERTION_METHOD).pretty_value("acmg")
         }
