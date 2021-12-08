@@ -66,12 +66,12 @@
 
         {% lab_picker view_name="condition_matchings_lab" selected_lab=selected_lab %}
 
-        {% labelled hint="tiny" label="Shared Classifications w Standard Condition" %}
+        {% labelled hint="tiny" label="Classifications w Standard Condition" %}
             {% if matched_condition_count > 0 %}{{ 'success' | severity_icon }}{% endif %} {{ matched_condition_count }}
         {% endlabelled %}
-        {% labelled hint="tiny" label="Shared Classifications w/out Standard Condition" %}
+        {% labelled hint="tiny" label="Classifications w/out Standard Condition" %}
             {% if missing_condition_count %}
-                <span class="hover-detail" title="Shared classifications require a standard condition to be exported to ClinVar">
+                <span class="hover-detail" title="Classifications require a standard condition to be exported to ClinVar">
                     {{ 'warning' | severity_icon }} {{ missing_condition_count }}
                 </span>
             {% else %}0 {{ 'success' | severity_icon }}{% endif %}
