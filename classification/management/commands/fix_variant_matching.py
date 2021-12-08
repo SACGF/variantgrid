@@ -8,6 +8,7 @@ from django.db.models import Q
 from classification.classification_import import process_classification_import
 from classification.enums import SpecialEKeys
 from classification.models import Classification, ClassificationImport
+from classification.models.classification_import_run import ClassificationImportRun
 from library.guardian_utils import admin_bot
 from snpdb.models import ImportSource
 
@@ -68,25 +69,30 @@ class Command(BaseCommand):
 
         user = admin_bot()
 
-        batch: List[Classification] = list()
-        for c in qs:
-            if import_keys is not None:
-                import_key = f"{c.get(SpecialEKeys.GENOME_BUILD) or ''}#{c.get(SpecialEKeys.C_HGVS) or ''}"
-                if import_key not in import_keys:
-                    continue
+        # setup a temporary import so discordance notifications are not sent out
+        ClassificationImportRun.record_classification_import("variant_rematching", 0)
+        try:
+            batch: List[Classification] = list()
+            for c in qs:
+                if import_keys is not None:
+                    import_key = f"{c.get(SpecialEKeys.GENOME_BUILD) or ''}#{c.get(SpecialEKeys.C_HGVS) or ''}"
+                    if import_key not in import_keys:
+                        continue
 
-            c.revalidate(user=user)
-            batch.append(c)
-            row_count += 1
+                c.revalidate(user=user)
+                batch.append(c)
+                row_count += 1
 
-            if len(batch) >= batch_size:
-                self.handle_batch(batch)
-                batch = list()
-                print(f"Handled {row_count}")
+                if len(batch) >= batch_size:
+                    self.handle_batch(batch)
+                    batch = list()
+                    print(f"Handled {row_count}")
 
-        self.handle_batch(batch)
-        print(f"Handled {row_count}")
-        self.report_unmatched()
+            self.handle_batch(batch)
+            print(f"Handled {row_count}")
+            self.report_unmatched()
+        finally:
+            ClassificationImportRun.record_classification_import("variant_rematching", 0, is_complete=True)
 
     def sleep_for_delay(self):
         time.sleep(10)

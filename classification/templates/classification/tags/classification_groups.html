@@ -5,6 +5,7 @@
 {% for ccg in clinical_contexts %}
     {% with discordance_status=ccg.calculate_discordance_status %}
         <div class="my-1 alert overlap-{{ discordance_status.level.value }}">
+        {% if ccg.pending_status %}(Pending) {% endif %}
         {% if ccg.latest_report and ccg.latest_report.resolution != 'C' %}
             <a href="{% url 'discordance_report' ccg.latest_report.id %}">{% if not ccg.is_default %}<span class="font-weight-bold">{{ ccg.name }}</span> {% endif %}
                 Status :
