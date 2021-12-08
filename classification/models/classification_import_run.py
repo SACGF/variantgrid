@@ -8,6 +8,7 @@ from django.utils.timezone import now
 from model_utils.models import TimeStampedModel
 from django.db import models
 
+from library.log_utils import NotificationBuilder
 
 classification_imports_complete_signal = dispatch.Signal()
 
@@ -46,6 +47,9 @@ class ClassificationImportRun(TimeStampedModel):
         if existing := ClassificationImportRun.objects.filter(identifier=identifier, status=ClassificationImportRunStatus.ONGOING).first():
             return existing
         else:
+            nb = NotificationBuilder("Import started")
+            nb.add_markdown(f":golfer: Import started {identifier}")
+            nb.send()
             return ClassificationImportRun(identifier=identifier)
 
     @staticmethod
@@ -66,5 +70,11 @@ class ClassificationImportRun(TimeStampedModel):
 @receiver(post_save, sender=ClassificationImportRun)
 def outstanding_import_check(sender, instance: ClassificationImportRun, **kwargs):
     if instance.status != ClassificationImportRunStatus.ONGOING:
-        if not ClassificationImportRun.ongoing_import():
+        ongoing_imports = bool(ClassificationImportRun.ongoing_import())
+
+        nb = NotificationBuilder("Import started")
+        emoji = ":golf:" if instance.status == ClassificationImportRunStatus.COMPLETED else ":skunk:"
+        nb.add_markdown(f"{emoji} Import {instance.get_status_display()} {instance.identifier}{' ongoing imports.' if ongoing_imports else ''}")
+        nb.send()
+        if not ongoing_imports:
             classification_imports_complete_signal.send(sender=ClassificationImportRun)
