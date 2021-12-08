@@ -99,8 +99,8 @@ class ClassificationModificationAdmin(admin.TabularInline):
 
 @admin.register(ClassificationImportRun)
 class ClassificationImportRunAdmin(ModelAdminBasics):
-    list_display = ['id', 'identifier', 'status', 'created_detailed', 'modified_detailed']
-    list_filter = (('status', AllValuesChoicesFieldListFilter))
+    list_display = ['id', 'identifier', 'row_count', 'status', 'created_detailed', 'modified_detailed']
+    list_filter = (('status', AllValuesChoicesFieldListFilter), )
 
     @admin_list_column(short_description="Created", order_field="created")
     def created_detailed(self, obj: ClassificationImportRun):
