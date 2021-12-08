@@ -211,6 +211,7 @@ class ClinicalContext(FlagsMixin, TimeStampedModel):
         old_status = self.status
         new_status = self.calculate_status()
         is_significance_change = old_status != new_status
+        allele_url = get_url_from_view_path(self.allele.get_absolute_url())
 
         ongoing_import = ClassificationImportRun.ongoing_import()
 
@@ -231,10 +232,9 @@ class ClinicalContext(FlagsMixin, TimeStampedModel):
                 self.pending_cause = cause
                 self.pending_status = new_status
 
-                allele_url = get_url_from_view_path(self.allele.get_absolute_url())
-                nb = NotificationBuilder("PENDING: ClinicalContext changed (delayed due to ongoing import)")
+                nb = NotificationBuilder("PENDING: ClinicalContext changed)")
                 nb.add_markdown(
-                    f"ClinicalGrouping for allele <{allele_url}|{allele_url}> would change from {old_status} -> {new_status} but marked as pending due to {ongoing_import}")
+                    f"PENDING: ClinicalGrouping for allele <{allele_url}|{allele_url}> would change from {old_status} -> {new_status} but marked as pending due to {ongoing_import}")
                 nb.send()
 
         else:
@@ -242,10 +242,9 @@ class ClinicalContext(FlagsMixin, TimeStampedModel):
             # wipe out the old values
             self.status = new_status
             if self.pending_status and ongoing_import:
-                allele_url = get_url_from_view_path(self.allele.get_absolute_url())
-                nb = NotificationBuilder("PENDING: ClinicalContext changed-back (delayed due to ongoing import)")
+                nb = NotificationBuilder("PENDING: ClinicalContext changed-back")
                 nb.add_markdown(
-                    f"ClinicalGrouping for allele <{allele_url}|{allele_url}> changed back from {self.pending_status} -> {new_status} within {ongoing_import}, no notifications sent")
+                    f"PENDING: ClinicalGrouping for allele <{allele_url}|{allele_url}> changed back from {self.pending_status} -> {new_status} within {ongoing_import}, no notifications sent")
                 nb.send()
 
             self.pending_cause = None
