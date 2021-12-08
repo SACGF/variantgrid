@@ -212,15 +212,7 @@ class ClinicalContext(FlagsMixin, TimeStampedModel):
         new_status = self.calculate_status()
         is_significance_change = old_status != new_status
 
-        delayed = ClassificationImportRun.ongoing_imports()
-
-        if delayed:
-            if is_significance_change:
-                allele_url = get_url_from_view_path(self.allele.get_absolute_url())
-                nb = NotificationBuilder("ClinicalContext changed (muted due to variant matching)")
-                nb.add_markdown(f"ClinicalGrouping for allele <{allele_url}|{allele_url}> would change from {old_status} -> {new_status} but ignoring due to variant re-matching")
-                nb.send()
-            return
+        ongoing_import = ClassificationImportRun.ongoing_import()
 
         self.last_evaluation = {
             "date": now().timestamp(),
@@ -228,12 +220,12 @@ class ClinicalContext(FlagsMixin, TimeStampedModel):
             "considers_vcms": [vcm.id_str for vcm in self.classification_modifications],
             "old_status": old_status,
             "new_status": new_status,
-            "delayed": delayed
+            "delayed": ongoing_import
         }
 
         cause = self.pending_cause or cause
 
-        if delayed and self.status != new_status:
+        if ongoing_import and self.status != new_status:
             if new_status != self.pending_status:
                 # only update the cause if we're going to end up with a new status
                 self.pending_cause = cause
@@ -242,7 +234,7 @@ class ClinicalContext(FlagsMixin, TimeStampedModel):
                 allele_url = get_url_from_view_path(self.allele.get_absolute_url())
                 nb = NotificationBuilder("ClinicalContext changed (delayed due to ongoing import)")
                 nb.add_markdown(
-                    f"ClinicalGrouping for allele <{allele_url}|{allele_url}> would change from {old_status} -> {new_status} but ignoring due to variant re-matching")
+                    f"ClinicalGrouping for allele <{allele_url}|{allele_url}> would change from {old_status} -> {new_status} but marked as pending due to {ongoing_import}")
                 nb.send()
 
         else:
@@ -253,7 +245,7 @@ class ClinicalContext(FlagsMixin, TimeStampedModel):
                 allele_url = get_url_from_view_path(self.allele.get_absolute_url())
                 nb = NotificationBuilder("ClinicalContext changed-back (delayed due to ongoing import)")
                 nb.add_markdown(
-                    f"ClinicalGrouping for allele <{allele_url}|{allele_url}> changed back from {self.pending_status} -> {new_status} within an import, no notifications sent")
+                    f"ClinicalGrouping for allele <{allele_url}|{allele_url}> changed back from {self.pending_status} -> {new_status} within {ongoing_import}, no notifications sent")
                 nb.send()
 
             self.pending_cause = None
@@ -261,7 +253,7 @@ class ClinicalContext(FlagsMixin, TimeStampedModel):
 
         self.save()
 
-        if delayed:
+        if ongoing_import:
             # don't send out any signals if calculation is delayed, we don't want to trigger anything until we complete
             return
 

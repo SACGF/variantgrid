@@ -1,11 +1,13 @@
 import os
 from collections import defaultdict
+from time import sleep
 from typing import List, Dict, Tuple
 
 from django.contrib.auth.models import User
 from django.db.models import QuerySet
 
 from classification.models.classification import ClassificationImport, Classification
+from classification.models.classification_import_run import ClassificationImportRun
 from classification.tasks.classification_import_process_variants_task import ClassificationImportProcessVariantsTask
 from library.django_utils.django_file_utils import get_import_processing_dir
 from library.utils import full_class_name
@@ -133,23 +135,30 @@ def reattempt_variant_matching(user: User, queryset: QuerySet[Classification]) -
     valid_record_count = 0
     imports_by_genome: Dict[int, ClassificationImport] = dict()
 
-    for vc in qs:
-        try:
-            vc.revalidate(user=user)
-            genome_build = vc.get_genome_build()
-            if genome_build.pk not in imports_by_genome:
-                imports_by_genome[genome_build.pk] = ClassificationImport.objects.create(user=user,
-                                                                                         genome_build=genome_build)
-            vc_import = imports_by_genome[genome_build.pk]
-            vc.set_variant(variant=None, message='Admin has re-triggered variant matching')
-            vc.classification_import = vc_import
-            vc.save()
-            valid_record_count += 1
+    ClassificationImportRun.record_classification_import("admin-variant-rematch")
+    try:
+        for vc in qs:
+            try:
+                vc.revalidate(user=user)
+                genome_build = vc.get_genome_build()
+                if genome_build.pk not in imports_by_genome:
+                    imports_by_genome[genome_build.pk] = ClassificationImport.objects.create(user=user,
+                                                                                             genome_build=genome_build)
+                vc_import = imports_by_genome[genome_build.pk]
+                vc.set_variant(variant=None, message='Admin has re-triggered variant matching')
+                vc.classification_import = vc_import
+                vc.save()
+                valid_record_count += 1
 
-        except BaseException:
-            invalid_record_count += 1
+            except BaseException:
+                invalid_record_count += 1
 
-    for vc_import in imports_by_genome.values():
-        process_classification_import(vc_import, ImportSource.API)
+        for vc_import in imports_by_genome.values():
+            process_classification_import(vc_import, ImportSource.API)
+
+    finally:
+        # got to give time for variant matching to complete, a bit hacky
+        sleep(10)
+        ClassificationImportRun.record_classification_import("admin-variant-rematch", is_complete=True)
 
     return valid_record_count, invalid_record_count

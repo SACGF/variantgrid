@@ -1,4 +1,6 @@
 from datetime import timedelta
+from typing import Optional
+
 from django.db.models.signals import post_save
 from django import dispatch
 from django.dispatch import receiver
@@ -54,13 +56,15 @@ class ClassificationImportRun(TimeStampedModel):
             unfinished.save()
 
     @staticmethod
-    def ongoing_imports():
+    def ongoing_import() -> Optional[str]:
         # should this check to see if there are any abandoned imports
-        return ClassificationImportRun.objects.filter(status=ClassificationImportRunStatus.ONGOING).exists()
+        if ongoing := ClassificationImportRun.objects.filter(status=ClassificationImportRunStatus.ONGOING).first():
+            return ongoing.identifier or "ongoing-import"
+        return None
 
 
 @receiver(post_save, sender=ClassificationImportRun)
 def outstanding_import_check(sender, instance: ClassificationImportRun, **kwargs):
     if instance.status != ClassificationImportRunStatus.ONGOING:
-        if not ClassificationImportRun.ongoing_imports():
+        if not ClassificationImportRun.ongoing_import():
             classification_imports_complete_signal.send(sender=ClassificationImportRun)

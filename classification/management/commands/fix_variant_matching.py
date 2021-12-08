@@ -1,5 +1,6 @@
 import csv
 import time
+from time import sleep
 from typing import List, Dict, Optional, Set
 
 from django.core.management import BaseCommand
@@ -92,6 +93,7 @@ class Command(BaseCommand):
             print(f"Handled {row_count}")
             self.report_unmatched()
         finally:
+            sleep(10)  # give time for variant matching to complete
             ClassificationImportRun.record_classification_import("variant_rematching", 0, is_complete=True)
 
     def sleep_for_delay(self):
