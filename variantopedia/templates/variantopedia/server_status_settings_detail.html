@@ -48,7 +48,7 @@
                     {% labelled hint="tiny" label="Enabled" %}{{ settings.DISCORDANCE_ENABLED }}{% endlabelled hint="tiny" %}
                     {% if settings.DISCORDANCE_ENABLED %}
                         {% labelled hint="tiny" label="Discordance Email" %}{{ settings.DISCORDANCE_EMAIL }}{% endlabelled hint="tiny" %}
-                        {% labelled hint="tiny" label="Discordance Delayed Due to Import" %}{{ ongoing_import | boolean }}{% endlabelled %}
+                        {% labelled hint="tiny" label="Ongoing Imports" %}{{ ongoing_imports | default_if_none:'None' }}{% endlabelled %}
                     {% endif %}
                 </div>
             </div>

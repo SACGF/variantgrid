@@ -213,7 +213,7 @@ class ClinicalContext(FlagsMixin, TimeStampedModel):
         is_significance_change = old_status != new_status
         allele_url = get_url_from_view_path(self.allele.get_absolute_url())
 
-        ongoing_import = ClassificationImportRun.ongoing_import()
+        ongoing_import = ClassificationImportRun.ongoing_imports()
 
         self.last_evaluation = {
             "date": now().timestamp(),

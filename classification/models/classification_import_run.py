@@ -60,21 +60,22 @@ class ClassificationImportRun(TimeStampedModel):
             unfinished.save()
 
     @staticmethod
-    def ongoing_import() -> Optional[str]:
+    def ongoing_imports() -> Optional[str]:
         # should this check to see if there are any abandoned imports
-        if ongoing := ClassificationImportRun.objects.filter(status=ClassificationImportRunStatus.ONGOING).first():
-            return ongoing.identifier or "ongoing-import"
+        if ongoings := list(ClassificationImportRun.objects.filter(status=ClassificationImportRunStatus.ONGOING).order_by('-created')):
+            return ", ".join(ongoing.identifier for ongoing in ongoings) or "ongoing-import"
         return None
 
 
 @receiver(post_save, sender=ClassificationImportRun)
 def outstanding_import_check(sender, instance: ClassificationImportRun, **kwargs):
     if instance.status != ClassificationImportRunStatus.ONGOING:
-        ongoing_imports = bool(ClassificationImportRun.ongoing_import())
+        ongoing_imports = ClassificationImportRun.ongoing_imports()
 
         nb = NotificationBuilder("Import started")
         emoji = ":golf:" if instance.status == ClassificationImportRunStatus.COMPLETED else ":skunk:"
-        nb.add_markdown(f"{emoji} Import {instance.get_status_display()} {instance.identifier}{' ongoing imports.' if ongoing_imports else ''}")
+        ongoing_message = f" ongoing imports {ongoing_imports}" if ongoing_imports else ""
+        nb.add_markdown(f"{emoji} Import {instance.get_status_display()} {instance.identifier} {instance.row_count} rows{ongoing_message if ongoing_imports else ''}")
         nb.send()
         if not ongoing_imports:
             classification_imports_complete_signal.send(sender=ClassificationImportRun)
