@@ -48,7 +48,7 @@ class ClassificationImportRun(TimeStampedModel):
             return existing
         else:
             nb = NotificationBuilder("Import started")
-            nb.add_markdown(f":golfer: Import started {identifier}")
+            nb.add_markdown(f":golfer: Import Started {identifier}")
             nb.send()
             return ClassificationImportRun(identifier=identifier)
 
