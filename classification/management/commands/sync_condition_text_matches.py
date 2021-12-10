@@ -16,7 +16,7 @@ class Command(BaseCommand):
         parser.add_argument('--reset', action='store_true', default=False)
         parser.add_argument('--clear', action='store_true', default=False)
         parser.add_argument('--classifications', action='store_true', default=False)
-        parser.add_argument('--orphans', actions='store_true', default=False)
+        parser.add_argument('--orphans', action='store_true', default=False)
 
     def handle(self, *args, **options):
         if options["classifications"]:
