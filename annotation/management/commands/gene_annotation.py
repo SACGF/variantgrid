@@ -81,9 +81,9 @@ class Command(BaseCommand):
         # The various annotations are for different genes, so group kwargs by gene
         annotation_by_gene = defaultdict(dict)
         for hgnc_ot in OntologyTerm.objects.filter(ontology_service=OntologyService.HGNC):
-            omim_snake = OntologySnake.terms_for_gene_symbol(hgnc_ot.name, OntologyService.OMIM)
+            omim_snake = OntologySnake.terms_for_gene_symbol(hgnc_ot.name, OntologyService.OMIM, max_depth=0)
             omim_terms = self.TERM_JOIN_STRING.join((str(lt) for lt in omim_snake.leafs()))
-            hpo_snake = OntologySnake.terms_for_gene_symbol(hgnc_ot.name, OntologyService.HPO)
+            hpo_snake = OntologySnake.terms_for_gene_symbol(hgnc_ot.name, OntologyService.HPO, max_depth=0)
             hpo_terms = self.TERM_JOIN_STRING.join((str(lt) for lt in hpo_snake.leafs()))
 
             if not (omim_terms or hpo_terms):

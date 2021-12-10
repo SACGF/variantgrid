@@ -518,6 +518,7 @@ class OntologySnake:
 
     @staticmethod
     def terms_for_gene_symbol(gene_symbol: Union[str, GeneSymbol], desired_ontology: OntologyService, max_depth=1) -> 'OntologySnakes':
+        """ max_depth: How many steps in snake path to go through """
         # TODO, do this with hooks
         from ontology.panel_app_ontology import update_gene_relations
         update_gene_relations(gene_symbol)
