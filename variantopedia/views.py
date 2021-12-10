@@ -224,7 +224,7 @@ def server_status_activity(request, days_ago: int):
 def server_status_settings(request):
     return render(request, "variantopedia/server_status_settings_detail.html", {
         "settings": settings,
-        "ongoing_import": ClassificationImportRun.ongoing_import()
+        "ongoing_imports": ClassificationImportRun.ongoing_imports()
     })
 
 
