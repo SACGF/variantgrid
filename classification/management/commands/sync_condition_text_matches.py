@@ -26,6 +26,7 @@ class Command(BaseCommand):
             return
         if options["orphans"]:
             print("Removing orphans")
+            total_deleted = 0
             for ct in ConditionText.objects.all():
                 classifications_for_gene_symbol: Dict[str, int] = defaultdict(int)
                 for ctm in list(ct.conditiontextmatch_set.all()):
@@ -36,7 +37,9 @@ class Command(BaseCommand):
                             classifications_for_gene_symbol[gene_symbol] += 0  # register that we have the gene symbol
                 for gene_symbol, count in classifications_for_gene_symbol.items():
                     if count == 0:
-                        ct.conditiontextmatch_set.filter(gene_symbol=gene_symbol).delete()
+                        _, delete_count = ct.conditiontextmatch_set.filter(gene_symbol=gene_symbol).delete()
+                        total_deleted += delete_count
+                print(f"Total deleted - {total_deleted}")
             return
 
         if options["reset"]:
