@@ -958,17 +958,13 @@ class AnnotationVersion(models.Model):
     def get_human_protein_atlas_annotation(self):
         return HumanProteinAtlasAnnotation.objects.filter(version=self.human_protein_atlas_version)
 
-    @property
-    def long_description(self):
+    def __str__(self):
         sub_versions = [f"Variant: {self.variant_annotation_version}",
                         f"Gene: {self.gene_annotation_version}",
                         f"ClinVar: {self.clinvar_version}",
                         f"HPA: {self.human_protein_atlas_version}"]
         sub_versions_str = ", ".join(sub_versions)
-        return f"{self}. {sub_versions_str}"
-
-    def __str__(self):
-        return f"{self.pk} ({self.annotation_date.date()})"
+        return f"{self.pk} ({self.annotation_date.date()}). {sub_versions_str}"
 
 
 class CachedWebResource(TimeStampedModel):
