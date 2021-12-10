@@ -14,8 +14,9 @@ from classification.models import EvidenceKey, EvidenceKeyMap, DiscordanceReport
     send_discordance_notification, ClinicalContext, ClassificationReportTemplate, ClassificationModification, \
     UploadedFileLab, ClinicalContextRecalcTrigger
 from classification.models.classification import Classification
+from classification.models.classification_import_run import ClassificationImportRun
 from library.guardian_utils import admin_bot
-from snpdb.admin_utils import ModelAdminBasics, admin_action, admin_list_column
+from snpdb.admin_utils import ModelAdminBasics, admin_action, admin_list_column, AllValuesChoicesFieldListFilter
 from snpdb.models import GenomeBuild, Lab
 
 
@@ -94,6 +95,20 @@ class ClassificationModificationAdmin(admin.TabularInline):
 
     def has_change_permission(self, request, obj=None):
         return False
+
+
+@admin.register(ClassificationImportRun)
+class ClassificationImportRunAdmin(ModelAdminBasics):
+    list_display = ['id', 'identifier', 'row_count', 'status', 'created_detailed', 'modified_detailed']
+    list_filter = (('status', AllValuesChoicesFieldListFilter), )
+
+    @admin_list_column(short_description="Created", order_field="created")
+    def created_detailed(self, obj: ClassificationImportRun):
+        return obj.created.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+
+    @admin_list_column(short_description="Modified", order_field="modified")
+    def modified_detailed(self, obj: ClassificationImportRun):
+        return obj.modified.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
 
 
 @admin.register(Classification)
@@ -247,7 +262,7 @@ class ClassificationAdmin(ModelAdminBasics):
 
 @admin.register(ClinicalContext)
 class ClinicalContextAdmin(ModelAdminBasics):
-    list_display = ('id', 'allele', 'name', 'status', 'modified',)
+    list_display = ('id', 'allele', 'name', 'status', 'modified', 'pending_cause', 'pending_status')
     search_fields = ('id', 'allele__pk', 'name')
 
     def get_form(self, request, obj=None, **kwargs):

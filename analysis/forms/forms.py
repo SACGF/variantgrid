@@ -151,7 +151,7 @@ class AnalysisForm(forms.ModelForm, ROFormMixin):
                     del self.fields[f]
 
         annotation_version_qs = AnnotationVersion.objects.filter(genome_build=self.instance.genome_build)
-        self.fields['annotation_version'].queryset = annotation_version_qs
+        self.fields['annotation_version'].queryset = annotation_version_qs.order_by("-pk")
         self.fields['custom_columns_collection'].queryset = CustomColumnsCollection.filter_for_user(user)
 
     def clean_custom_columns_collection(self):

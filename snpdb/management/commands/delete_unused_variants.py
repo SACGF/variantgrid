@@ -1,8 +1,8 @@
 import numpy as np
 from django.core.management.base import BaseCommand
 
-from annotation.models import AnnotationRangeLock, VariantAnnotation
-from snpdb.models import Variant, VariantZygosityCount
+from annotation.models import AnnotationRangeLock, VariantAnnotation, VariantTranscriptAnnotation
+from snpdb.models import Variant, VariantZygosityCount, VariantCollectionRecord
 
 
 class Command(BaseCommand):
@@ -29,35 +29,36 @@ class Command(BaseCommand):
         total_deleted = 0
         for i, range_lock in enumerate(arl_qs.order_by("max_variant")):
             perc = 100 * i / total
-            print(f"{perc:.2f}% done - doing step: {range_lock}")
+            print(f"{perc:.2f}% done - doing range lock {range_lock.pk}: {range_lock}")
 
             linspace = np.linspace(range_lock.min_variant_id, range_lock.max_variant_id, steps + 1).astype(int)
             for s in range(steps):
                 start = linspace[s]
                 end = linspace[s+1]
-                print(f"{start} - {end} ({end-start})")
+                num = end - start
+                if num == 0:
+                    continue
+                print(f"{start} - {end} ({num})")
                 # Skip the range lock min/max variant as that's protected so can't delete anyway
-                # Also need to avoid deleting those that are are within range in another build
+                # Also need to avoid deleting those that are within range in another build
                 variants_in_range_qs = Variant.objects.filter(pk__gt=start, pk__lt=end)
                 unused_variants_qs = variants_in_range_qs.filter(classification__isnull=True,
                                                                  clinvar__isnull=True,
                                                                  varianttag__isnull=True,
                                                                  variantallele__isnull=True,
                                                                  cohortgenotype__isnull=True,
-                                                                 variantcollectionrecord__isnull=True,
                                                                  min_variant__isnull=True,
                                                                  max_variant__isnull=True)
+
+                # If there is a VariantCollectionRecord, but no sample, the analysis won't work anyway
+                unused_variant_ids = list(unused_variants_qs.values_list("pk", flat=True))
+                for klass in [VariantCollectionRecord, VariantZygosityCount, VariantAnnotation, VariantTranscriptAnnotation]:
+                    qs = klass.objects.filter(variant_id__gt=start, variant_id__lt=end, variant_id__in=unused_variant_ids)
+                    num_deleted = qs._raw_delete(qs.db)
+                    print(f"{klass}: deleted {num_deleted} records")
+
                 variants_deleted = unused_variants_qs._raw_delete(unused_variants_qs.db)
                 print(f"{variants_deleted=}")
-                vzc_qs = VariantZygosityCount.objects.filter(variant_id__gt=start, variant_id__lt=end)
-                vzc_qs = vzc_qs.exclude(variant__in=variants_in_range_qs)
-                zygosity_count_deleted = vzc_qs._raw_delete(vzc_qs.db)
-                print(f"{zygosity_count_deleted=}")
-
-                va_qs = VariantAnnotation.objects.filter(variant_id__gt=start, variant_id__lt=end)
-                va_qs = va_qs.exclude(variant__in=variants_in_range_qs)
-                annotation_deleted = va_qs._raw_delete(va_qs.db)
-                print(f"{annotation_deleted=}")
                 total_deleted += variants_deleted
 
         print(f"Total deleted: {total_deleted}")

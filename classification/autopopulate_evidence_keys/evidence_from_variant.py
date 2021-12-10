@@ -309,6 +309,7 @@ def get_evidence_fields_from_preferred_transcript(
 
     data = transcript_autopopulate(transcript_version)
     data[SpecialEKeys.GENE_SYMBOL] = transcript_version.gene_version.gene_symbol_id
+    transcript_data = {}
 
     # Populate from TranscriptVersion data 1st (so can overwrite later)
     if variant:
@@ -344,17 +345,6 @@ def get_evidence_fields_from_preferred_transcript(
                 data[SpecialEKeys.SEARCH_TERMS] = variant_annotation.get_search_terms()
                 if settings.ANNOTATION_PUBMED_SEARCH_TERMS_ENABLED:
                     data[SpecialEKeys.PUBMED_SEARCH_TERMS] = variant_annotation.get_pubmed_search_terms()
-
-            # If we have a synonymous protein change, but a molecular consequence of splicing, change the "=" into "?"
-            if settings.VARIANT_CLASSIFICATION_AUTO_POPULATE_P_HGVS_SYNONYMOUS_SPLICE_CHANGE_TO_UNKNOWN:
-                p_hgvs = data[SpecialEKeys.P_HGVS]
-                if p_hgvs and "=" in p_hgvs and "splice" in transcript_data.get("consequence", ""):
-                    prefix, allele = p_hgvs.split(":", 1)
-                    p_hgvs = {
-                        "value": f"{prefix}:p.?",
-                        "note": f"Was: '{allele}', changed to ? due to molecular consequence of splicing",
-                    }
-                data[SpecialEKeys.P_HGVS] = p_hgvs
         except:
             log_traceback()
 
@@ -371,6 +361,17 @@ def get_evidence_fields_from_preferred_transcript(
     p_hgvs = data[SpecialEKeys.P_HGVS]
     if not p_hgvs and clingen_allele:
         data[SpecialEKeys.P_HGVS] = clingen_allele.get_p_hgvs(transcript_version.accession, match_version=False)
+
+    # If we have a synonymous protein change, but a molecular consequence of splicing, change the "=" into "?"
+    if settings.VARIANT_CLASSIFICATION_AUTO_POPULATE_P_HGVS_SYNONYMOUS_SPLICE_CHANGE_TO_UNKNOWN:
+        p_hgvs = data[SpecialEKeys.P_HGVS]
+        if p_hgvs and "=" in p_hgvs and "splice" in transcript_data.get("consequence", ""):
+            prefix, allele = p_hgvs.split(":", 1)
+            p_hgvs = {
+                "value": f"{prefix}:p.?",
+                "note": f"Was: '{allele}', changed to ? due to molecular consequence of splicing",
+            }
+        data[SpecialEKeys.P_HGVS] = p_hgvs
 
     gene_symbol_id = transcript_version.gene_version.gene_symbol_id
     gnomad_oe_lof_summary = get_gnomad_oe_lof_summary(transcript_version)

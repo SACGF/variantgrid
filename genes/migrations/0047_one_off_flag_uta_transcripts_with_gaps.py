@@ -223,7 +223,7 @@ def _one_off_flag_uta_transcripts_with_gaps(apps, schema_editor):
         if accession in UTA_TRANSCRIPTS_WITH_GAPS:
             if "error" in tv.data:
                 del tv.data["error"]  # Was manually set in Shariant envs
-            tv.data["alignent_gap_error"] = "Incorrectly converted UTA/UCSC transcript is missing alignment info"
+            tv.data["alignent_gap_error"] = "UTA/UCSC transcript is missing alignment info"
             tv.save()
 
 

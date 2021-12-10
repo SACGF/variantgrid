@@ -1,5 +1,6 @@
 import csv
 import time
+from time import sleep
 from typing import List, Dict, Optional, Set
 
 from django.core.management import BaseCommand
@@ -8,6 +9,7 @@ from django.db.models import Q
 from classification.classification_import import process_classification_import
 from classification.enums import SpecialEKeys
 from classification.models import Classification, ClassificationImport
+from classification.models.classification_import_run import ClassificationImportRun
 from library.guardian_utils import admin_bot
 from snpdb.models import ImportSource
 
@@ -68,25 +70,31 @@ class Command(BaseCommand):
 
         user = admin_bot()
 
-        batch: List[Classification] = list()
-        for c in qs:
-            if import_keys is not None:
-                import_key = f"{c.get(SpecialEKeys.GENOME_BUILD) or ''}#{c.get(SpecialEKeys.C_HGVS) or ''}"
-                if import_key not in import_keys:
-                    continue
+        # setup a temporary import so discordance notifications are not sent out
+        try:
+            batch: List[Classification] = list()
+            for c in qs:
+                if import_keys is not None:
+                    import_key = f"{c.get(SpecialEKeys.GENOME_BUILD) or ''}#{c.get(SpecialEKeys.C_HGVS) or ''}"
+                    if import_key not in import_keys:
+                        continue
 
-            c.revalidate(user=user)
-            batch.append(c)
-            row_count += 1
+                c.revalidate(user=user)
+                batch.append(c)
+                row_count += 1
 
-            if len(batch) >= batch_size:
-                self.handle_batch(batch)
-                batch = list()
-                print(f"Handled {row_count}")
+                if len(batch) >= batch_size:
+                    self.handle_batch(batch)
+                    batch = list()
+                    print(f"Handled {row_count}")
 
-        self.handle_batch(batch)
-        print(f"Handled {row_count}")
-        self.report_unmatched()
+
+            self.handle_batch(batch)
+            print(f"Handled {row_count}")
+            self.report_unmatched()
+            sleep(10)  # give time for variant matching to complete
+        finally:
+            ClassificationImportRun.record_classification_import("variant_rematching", 0, is_complete=True)
 
     def sleep_for_delay(self):
         time.sleep(10)
@@ -103,6 +111,7 @@ class Command(BaseCommand):
         print("Finished update c.hgvs")
 
     def handle_batch(self, batch: List[Classification]):
+        ClassificationImportRun.record_classification_import("variant_rematching", len(batch))
         user = admin_bot()
         if batch:
             imports_by_genome: Dict[int, ClassificationImport] = dict()

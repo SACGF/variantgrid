@@ -34,7 +34,7 @@
     <div id="build-{{ build_name }}-details" class="card mt-4">
         <div class="card-header">{{ build_name }}</div>
         <div class="card-body">
-            {% labelled label="Latest" %}<a class="hover-link" href="{% url 'annotation_versions' %}">{{ details.latest.long_description }}</a>{% endlabelled %}
+            {% labelled label="Latest" %}<a class="hover-link" href="{% url 'annotation_versions' %}">{{ details.latest }}</a>{% endlabelled %}
             {% labelled label="Genome Fasta" %}
                 {% if details.reference_fasta %}
                     {{ details.reference_fasta }}

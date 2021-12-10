@@ -21,6 +21,7 @@ from analysis.serializers import VariantTagSerializer
 from annotation.models import AnnotationRun, AnnotationVersion, ClassificationModification, Classification, ClinVar, \
     VariantAnnotationVersion, VariantAnnotation
 from annotation.transcripts_annotation_selections import VariantTranscriptSelections
+from classification.models.classification_import_run import ClassificationImportRun
 from eventlog.models import create_event
 from genes.hgvs import HGVSMatcher
 from genes.models import CanonicalTranscriptCollection, GeneSymbol
@@ -221,7 +222,10 @@ def server_status_activity(request, days_ago: int):
 
 @require_superuser
 def server_status_settings(request):
-    return render(request, "variantopedia/server_status_settings_detail.html", {"settings": settings})
+    return render(request, "variantopedia/server_status_settings_detail.html", {
+        "settings": settings,
+        "ongoing_imports": ClassificationImportRun.ongoing_imports()
+    })
 
 
 @dataclass

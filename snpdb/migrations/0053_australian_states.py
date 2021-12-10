@@ -9,7 +9,7 @@ def _create_australian_states(apps, schema_editor):
     State = apps.get_model("snpdb", "State")
 
     # Data taken on 22 Nove 2021 from:
-    # https://www.abs.gov.au/statistics/people/population/national-state-and-territory-population/latest-release
+    # https://www.abs.gov.au/statistics/people/population/national-state-and-territory-population/latest-release#states-and-territories
     australia, _ = Country.objects.get_or_create(name='Australia', short_name='Aus', population=25_704_300)
 
     AU_STATES = [

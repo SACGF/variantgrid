@@ -39,7 +39,7 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
                                                   default=CustomColumnsCollection.get_system_default_id,
                                                   on_delete=SET_DEFAULT)
     default_sort_by_column = models.ForeignKey(CustomColumn, null=True, blank=True, on_delete=SET_NULL)
-    canonical_transcript_collection = models.ForeignKey(CanonicalTranscriptCollection, null=True, on_delete=SET_NULL)
+    canonical_transcript_collection = models.ForeignKey(CanonicalTranscriptCollection, null=True, blank=True, on_delete=SET_NULL)
     show_igv_links = models.BooleanField(default=True)
     analysis_panel_fraction = models.FloatField(default=0.25)
     annotation_version = models.ForeignKey(AnnotationVersion, null=True, on_delete=SET_NULL)

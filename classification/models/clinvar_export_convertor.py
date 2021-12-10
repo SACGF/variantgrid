@@ -143,6 +143,49 @@ class ClinVarExportConverter:
         else:
             return value
 
+    @staticmethod
+    def citation_to_json(citation: VCDbRefDict) -> ClinVarCitation:
+        db = ClinVarExportConverter.CITATION_DB_MAPPING.get(citation.get("db"))
+        id_part = citation['id'].replace(' ', '')
+        if db == "PubMed":
+            # Special support for PubMed to be PMID
+            # (at some point should fix that in the citation JSON)
+            id_part = f"PMID:{citation['idx']}"
+
+        citation: ClinVarCitation = {
+            "db": db,
+            "id": id_part
+        }
+        return citation
+
+    @staticmethod
+    def condition_to_json(condition: OntologyTerm) -> ValidatedJson:
+        # supported "OMIM", "MedGen", "Orphanet", "MeSH", "HP", "MONDO"
+        messages = JSON_MESSAGES_EMPTY
+        if condition.ontology_service not in (
+        OntologyService.OMIM, OntologyService.ORPHANET, OntologyService.HPO, OntologyService.MONDO):
+            messages += JsonMessages.error(f"Ontology \"{condition.ontology_service}\" is not supported by ClinVar")
+
+        """
+        # Examples
+        OMIM and 100800
+        MeSH and D000130
+        Orphanet and ORPHA155
+        MedGen and C0001080
+        Mondo and MONDO:0015263
+        """
+
+        id_part = condition.id
+        if condition.ontology_service == OntologyService.OMIM:
+            id_part = str(condition.index)  # OMIM is not 0 prefixed
+        elif condition.ontology_service == OntologyService.ORPHANET:
+            id_part = f"ORPHA{str(condition.index)}"  # ORPHA is not 0 prefixed
+
+        return ValidatedJson({
+            "db": condition.ontology_service,
+            "id": id_part
+        }, messages)
+
     @lazy
     def as_validated_json(self) -> ValidatedJson:
         data = dict()
@@ -242,7 +285,7 @@ class ClinVarExportConverter:
         acmg_criteria = {
             "citation": {
                 "db": "PubMed",
-                "id": "PubMed:25741868"
+                "id": "PMID:25741868"
             },
             "method": EvidenceKeyMap.cached_key(SpecialEKeys.ASSERTION_METHOD).pretty_value("acmg")
         }
@@ -269,13 +312,7 @@ class ClinVarExportConverter:
     def json_clinical_significance(self) -> ValidatedJson:
         data = dict()
         if citations := self.citation_refs:
-            def citation_to_json(citation: VCDbRefDict) -> ClinVarCitation:
-                citation: ClinVarCitation = {
-                    "db": ClinVarExportConverter.CITATION_DB_MAPPING.get(citation.get("db")),
-                    "id": str(citation.get("idx"))  # TODO confirm this is the kind of ID they want, not the prefixed one?
-                }
-                return citation
-            data["citation"] = [citation_to_json(citation) for citation in citations]
+            data["citation"] = [ClinVarExportConverter.citation_to_json(citation) for citation in citations]
         data["clinicalSignificanceDescription"] = self.clinvar_value(SpecialEKeys.CLINICAL_SIGNIFICANCE).value(single=True)
 
         comment_parts: List[str] = list()
@@ -310,18 +347,8 @@ class ClinVarExportConverter:
                     if join != MultiCondition.CO_OCCURRING:
                         messages += JsonMessages.error("ClinVar API only supports Co-occurring for multiple messages")
 
-            def condition_to_json(condition: OntologyTerm) -> ValidatedJson:
-                # supported "OMIM", "MedGen", "Orphanet", "MeSH", "HP", "MONDO"
-                messages = JSON_MESSAGES_EMPTY
-                if condition.ontology_service not in (OntologyService.OMIM, OntologyService.ORPHANET, OntologyService.HPO, OntologyService.MONDO):
-                    messages += JsonMessages.error(f"Ontology \"{condition.ontology_service}\" is not supported by ClinVar")
-                return ValidatedJson({
-                    "db": condition.ontology_service,
-                    "id": condition.id
-                }, messages)
-
             for condition in conditions.terms:
-                condition_list.append(condition_to_json(condition))
+                condition_list.append(ClinVarExportConverter.condition_to_json(condition))
         else:
             messages += JsonMessages.error("No standard condition terms")
         return ValidatedJson(data, messages)

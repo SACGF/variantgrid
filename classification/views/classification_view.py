@@ -20,6 +20,7 @@ from classification.models import ClassificationRef, ClassificationImport, \
     ClassificationJsonParams, PatchMeta, Classification
 from classification.models.classification import ClassificationProcessError, \
     ClassificationModification
+from classification.models.classification_import_run import ClassificationImportRun
 from classification.models.classification_patcher import patch_merge_age_units, patch_fuzzy_age
 from classification.models.evidence_mixin import EvidenceMixin, VCStore
 from classification.models.flag_types import classification_flag_types
@@ -414,7 +415,7 @@ class ClassificationView(APIView):
         if not settings.UPLOAD_ENABLED:
             raise PermissionDenied("Uploads are currently disabled (settings.UPLOAD_ENABLED=False)")
 
-        user = request.user
+        user: User = request.user
         record_id = empty_to_none(kwargs.get('record_id', None))
 
         importer = BulkInserter(user=user, api_version=self.api_version)
@@ -427,11 +428,34 @@ class ClassificationView(APIView):
 
         else:
             if isinstance(data.get('records'), list):
-                json_data = []
-                for record_data in data.get('records'):
+
+                records = data.get('records')
+                complete_identifier = None
+                if import_id := data.get('import_id'):
+                    # prefix import_id with username, so users can't overwrite each other
+                    import_id = f"{user.username}#{import_id}"
+                    status = data.get('status')
+                    completed = status == 'complete'
+                    if completed:
+                        complete_identifier = import_id
+
+                    # record the import
+                    ClassificationImportRun.record_classification_import(
+                        identifier=import_id,
+                        add_row_count=len(records))
+
+                per_json_data = list()
+                for record_data in records:
                     result = importer.insert(record_data)
-                    json_data.append(result)
-                json_data = {"results": json_data}
+                    per_json_data.append(result)
+                json_data = {"results": per_json_data}
+
+                if complete_identifier:
+                    # have to mark is_complete=True at the end after import has run
+                    ClassificationImportRun.record_classification_import(
+                        identifier=import_id,
+                        is_complete=True)
+
             else:
                 json_data = importer.insert(data, record_id)
                 if 'fatal_error' in json_data:

@@ -93,7 +93,7 @@
             {% end_ui_register_tab_embedded %}
 
             {% if clinvar_export_enabled %}
-                {% ui_register_tab_embedded tab_set="classification_issues" label="Exlcude from ClinVar" badge=counts.classifications.clinvar_exclude %}
+                {% ui_register_tab_embedded tab_set="classification_issues" label="Exclude from ClinVar" badge=counts.classifications.clinvar_exclude %}
                     <table id="classifications-exclude-clinvar" data-datatable-url="{% url 'classification_datatables' %}" class="sticky-header classification-table" data-datatable-data="classificationExcludeClinVar"></table>
                 {% end_ui_register_tab_embedded %}
             {% endif %}

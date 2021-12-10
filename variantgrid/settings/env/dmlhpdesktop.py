@@ -114,6 +114,8 @@ elif _SAPATHOLOGY_MODE:
     if os.path.exists(SAPATHOLOGY_TEMPLATES_DIR):
         TEMPLATES[0]["DIRS"].insert(0, SAPATHOLOGY_TEMPLATES_DIR)
 
+    HGVS_MAX_REF_ALLELE_LENGTH = 0  # Set to 0 for "del" instead of "delC" etc
+
     INITIAL_USER_DATA_PREFIX_KWARGS = {"prefix": '/tau',
                                        "replacement": '\\\\frgeneseq01.imvs.sa.gov.au\\tau'}
 

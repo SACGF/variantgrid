@@ -56,12 +56,14 @@ def condition_matchings_view(request, lab_id: Optional[int] = None):
         selected_lab = UserSettings.get_for_user(request.user).default_lab_safe()
         return redirect(reverse('condition_matchings_lab', kwargs={'lab_id': selected_lab.pk}))
 
-    missing_condition_count = Classification.objects.filter(withdrawn=False, lab_id=selected_lab,
-                                                      share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS,
-                                                      condition_resolution__isnull=True).count()
+    # no longer restrict to shared only
+    relevant_records = Classification.objects.filter(withdrawn=False, lab_id=selected_lab)
+    missing_condition_count = relevant_records.filter(condition_resolution__isnull=True).count()
+    matched_condition_count = relevant_records.filter(condition_resolution__isnull=False).count()
 
     return render(request, 'classification/condition_matchings.html', context={
         'selected_lab': selected_lab,
+        'matched_condition_count': matched_condition_count,
         'missing_condition_count': missing_condition_count
     })
 
