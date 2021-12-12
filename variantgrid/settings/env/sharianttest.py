@@ -11,6 +11,7 @@ from variantgrid.settings.env.shariant import *  # pylint: disable=wildcard-impo
 
 # import all the base settings #
 SITE_ID = 6
+SLACK['emoji'] = ':mouse:'
 
 URLS_NAME_REGISTER.update({
     "condition_aliases": False,

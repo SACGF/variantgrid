@@ -29,6 +29,7 @@ DISCORDANCE_EMAIL = None  # 'discordance@shariant.org.au'
 ACCOUNTS_EMAIL = 'accounts@shariant.org.au'
 DEBUG = True
 ROLLBAR['enabled'] = False
+SLACK['emoji'] = ':technologist:'
 
 AUTHENTICATION_BACKENDS = (
     'auth.backend.VariantGridOIDCAuthenticationBackend',

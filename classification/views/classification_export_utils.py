@@ -585,8 +585,8 @@ class ExportFormatter(BaseExportFormatter):
         body_parts.append(f"Filename : *{self.filename()}*")
         body_parts.append(f"Rows Downloaded : *{row_count}*")
 
-        nb = NotificationBuilder(message="Classification Download", emoji=":arrow_down:")\
-            .add_header("Classification Download Completed")\
+        nb = NotificationBuilder(message="Classification Download")\
+            .add_header(":arrow_down: Classification Download Completed")\
             .add_markdown("\n".join(body_parts), indented=True)
         if request := get_current_request():
             for key, value in request.GET.items():

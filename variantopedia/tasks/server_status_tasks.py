@@ -1,4 +1,4 @@
-from datetime import timedelta
+from collections import defaultdict
 from random import randint
 from typing import Optional
 
@@ -31,8 +31,8 @@ def notify_server_status_now(detailed: bool = True):
     dashboard_notices = get_dashboard_notices(admin_bot(), days_ago=1)
     url = get_url_from_view_path(reverse('server_status')) + '?activeTab=server_status_activity_detail_1'
 
-    emoji = ":male-doctor:" if randint(0, 1) else ":female-doctor:"
-    nb = NotificationBuilder(message="Health Check", emoji=emoji)
+    heading_emoji = ":male-doctor:" if randint(0, 1) else ":female-doctor:"
+    nb = NotificationBuilder(message="Health Check")
 
     keys = set(dashboard_notices.keys())
     keys.discard('events')
@@ -66,7 +66,7 @@ def notify_server_status_now(detailed: bool = True):
 
         if count_display:
             count_display = f"*{count_display}*"
-        elif not 'active_users' in key:
+        elif 'active_users' not in key:
             zeros.append(pretty_label(key))
             continue
 
@@ -78,7 +78,7 @@ def notify_server_status_now(detailed: bool = True):
     if zeros:
         lines.append(f":open_file_folder: 0 : {', '.join(zeros)}")
 
-    nb.add_header("Health Check")
+    nb.add_header(f"{heading_emoji} Health Check")
     nb.add_markdown(f"*In the <{url}|last 24 hours>*")
     nb.add_markdown("\n".join(lines), indented=True)
 
@@ -98,8 +98,7 @@ def notify_server_status_now(detailed: bool = True):
                 f":blue_book: {total:,} : Classifications - {int(percent_shared)}% shared"
             )
 
-        def emoji_for_age(age: timedelta) -> str:
-            days = age.days
+        def emoji_for_age(days: int) -> str:
             if days <= 60:
                 return ":smile:"
             if days <= 120:
@@ -110,14 +109,12 @@ def notify_server_status_now(detailed: bool = True):
                 return ":rage:"
             return ":exploding_head:"
 
-        def message_for_annotation(annotation_name: str, age: timedelta) -> Optional[str]:
-            days = age.days
-
+        def message_for_annotation(annotation_name: str, days: int) -> Optional[str]:
             # this is the window where we've seen that the annotations have been updated
             # and not old enough for us to worry about again yet
-            if 2 <= age.days <= 59:
+            if 2 <= days <= 59:
                 return None
-            return f"{emoji_for_age(age)} {age.days} day{'s' if age.days != 1 else ''} old : {annotation_name}"
+            return f"{emoji_for_age(days)} {days} day{'s' if days != 1 else ''} old : {annotation_name}"
 
         annotation_ages = list()
         # others we might want to check date of
@@ -125,21 +122,26 @@ def notify_server_status_now(detailed: bool = True):
 
         # when we have an array, only report on the first instance that's been imported
         # e.g. if we import OMIM directly from OMIM, we don't care how old the biomart omim file is
+
+        age_days_to_annotations = defaultdict(list)
         for contexts in [("mondo_file", "MONDO"), [("omim_file", "OMIM"), ("biomart_omim_aliases", "OMIM - via biomart")], ("hpo_file", "HPO"), ("gencc_file", "GenCC")]:
             if not isinstance(contexts, list):
                 contexts = [contexts]
             for context, label in contexts:
                 if last_import := OntologyImport.objects.filter(context=context).order_by('-created').first():
                     time_delta = right_now - last_import.created
-                    if message := message_for_annotation(label, time_delta):
-                        annotation_ages.append(message)
+                    age_days_to_annotations[time_delta.days].append(label)
                     break
 
         for genome_build in [GenomeBuild.grch37(), GenomeBuild.grch38()]:
             if latest_clinvar := ClinVarVersion.objects.filter(genome_build=genome_build).order_by('-annotation_date').first():
                 time_delta = right_now - latest_clinvar.annotation_date
-                if message := message_for_annotation(f"ClinVar {genome_build}", time_delta):
-                    annotation_ages.append(message)
+                age_days_to_annotations[time_delta.days].append(f"ClinVar {genome_build}")
+
+        for days in sorted(age_days_to_annotations.keys()):
+            annotations = age_days_to_annotations[days]
+            if message := message_for_annotation(", ".join(sorted(annotations)), days):
+                annotation_ages.append(message)
 
         overall_lines.extend(annotation_ages)
 
