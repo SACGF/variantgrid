@@ -46,6 +46,7 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
     lock_input_sources = models.BooleanField(default=False)
     visible = models.BooleanField(default=True)
     template_type = models.CharField(max_length=1, choices=AnalysisTemplateType.choices, null=True, blank=True)
+    node_queryset_filter_contigs = models.BooleanField(default=False)
 
     def __str__(self):
         name = self.name or f"Analysis {self.pk}"

@@ -1,3 +1,4 @@
+import time
 from abc import ABC, abstractmethod
 from typing import Optional, List, Set, Tuple
 
@@ -10,7 +11,7 @@ from analysis.models.enums import TrioInheritance, NodeErrorSource, AnalysisTemp
 from analysis.models.nodes.sources import AbstractCohortBasedNode
 from annotation.models.models import VariantTranscriptAnnotation
 from patients.models_enums import Zygosity, Sex
-from snpdb.models import Trio, Sample
+from snpdb.models import Trio, Sample, Contig
 
 
 class AbstractTrioInheritance(ABC):
@@ -57,6 +58,10 @@ class AbstractTrioInheritance(ABC):
     @abstractmethod
     def get_method(self) -> str:
         pass
+
+    def get_contigs(self) -> Optional[Set[Contig]]:
+        """ None means we don't know """
+        return None
 
 
 class SimpleTrioInheritance(AbstractTrioInheritance):
@@ -105,6 +110,9 @@ class XLinkedRecessive(SimpleTrioInheritance):
     def get_method(self) -> str:
         return super().get_method() + " and contig name = 'X'"
 
+    def get_contigs(self) -> Optional[Set[Contig]]:
+        return set(self.node.trio.genome_build.contigs.filter(name='X'))
+
 
 class CompHet(AbstractTrioInheritance):
     def _mum_but_not_dad(self):
@@ -113,7 +121,8 @@ class CompHet(AbstractTrioInheritance):
     def _dad_but_not_mum(self):
         return self.NO_VARIANT, {Zygosity.HET}, {Zygosity.HET}
 
-    def get_q(self) -> Q:
+    def _get_parent_comp_het_q_and_two_hit_genes(self):
+        start = time.time()
         cohort_genotype_collection = self.node.trio.cohort.cohort_genotype_collection
 
         parent = self.node.get_single_parent()
@@ -134,7 +143,13 @@ class CompHet(AbstractTrioInheritance):
         parent_genes_qs = parent.get_queryset(q_in_genes, extra_annotation_kwargs=annotation_kwargs)
         parent_genes_qs = parent_genes_qs.values_list("varianttranscriptannotation__gene")
         two_hits = parent_genes_qs.annotate(gene_count=Count("pk")).filter(gene_count__gte=2)
-        two_hit_genes = set(two_hits.values_list("varianttranscriptannotation__gene", flat=True))
+        two_hit_genes = set(two_hits.values_list("varianttranscriptannotation__gene", flat=True).distinct())
+        end = time.time()
+        print(f"Time taken: {end-start} secs")
+        return parent, comp_het_q, two_hit_genes
+
+    def get_q(self) -> Q:
+        parent, comp_het_q, two_hit_genes = self._get_parent_comp_het_q_and_two_hit_genes()
         comp_het_genes = VariantTranscriptAnnotation.get_overlapping_genes_q(two_hit_genes)
         return parent.get_q() & comp_het_q & comp_het_genes
 
@@ -144,6 +159,12 @@ class CompHet(AbstractTrioInheritance):
         mum2, dad2, _ = self._dad_but_not_mum()
         dad_but_not_mum = self.get_zygosities_method(mum2, dad2, set())
         return f"Proband: HET, and >=2 hits from genes where ({mum_but_not_dad}) OR ({dad_but_not_mum})"
+
+    def get_contigs(self) -> Optional[Set[Contig]]:
+        _, _, two_hit_genes = self._get_parent_comp_het_q_and_two_hit_genes()
+        contig_qs = Contig.objects.filter(transcriptversion__genome_build=self.node.trio.genome_build,
+                                          transcriptversion__gene_version__gene__in=two_hit_genes)
+        return set(contig_qs.distinct())
 
 
 class TrioNode(AbstractCohortBasedNode):
@@ -215,6 +236,15 @@ class TrioNode(AbstractCohortBasedNode):
             q &= inheritance.get_q()
             q &= self.get_vcf_locus_filters_q()
         return q
+
+    def _get_node_contigs(self) -> Optional[Set[Contig]]:
+        node_contigs = None
+        if self.trio:
+            inheritance = self._inheritance_factory()
+            node_contigs = inheritance.get_contigs()
+            print("TRIO NODE COTIGS!!!")
+        return node_contigs
+
 
     def _get_method_summary(self):
         if self._get_cohort():

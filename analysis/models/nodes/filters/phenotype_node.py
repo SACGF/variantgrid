@@ -1,7 +1,7 @@
 import logging
 import operator
 from functools import reduce
-from typing import Optional, Tuple, List
+from typing import Optional, Set, Tuple, List
 
 from django.db import models
 from django.db.models.deletion import SET_NULL, CASCADE
@@ -13,6 +13,7 @@ from annotation.models import VariantTranscriptAnnotation, OntologyTerm
 from genes.models import GeneSymbol
 from ontology.models import OntologySnake
 from patients.models import Patient
+from snpdb.models import Contig
 
 
 class PhenotypeNode(AnalysisNode):
@@ -118,6 +119,13 @@ class PhenotypeNode(AnalysisNode):
             q = None
         return q
 
+    def _get_node_contigs(self) -> Optional[Set[Contig]]:
+        genes = self._get_genes()
+        contig_qs = Contig.objects.filter(transcriptversion__genome_build=self.analysis.genome_build,
+                                          transcriptversion__gene_version__gene__in=genes)
+        node_contigs = set(contig_qs.distinct())
+        return node_contigs
+
     def _get_method_summary(self):
         if self.modifies_parents():
             method_list = self._short_and_long_descriptions[1]
@@ -176,8 +184,7 @@ class PhenotypeNode(AnalysisNode):
                 else:
                     name = ','.join(short_descriptions)
 
-                num_genes = self.get_gene_qs().count()
-                if num_genes:
+                if num_genes := self.get_gene_symbols_qs().count():
                     name += f" ({num_genes} genes)"
         return name
 
