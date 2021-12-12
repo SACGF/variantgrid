@@ -260,18 +260,6 @@ class NotificationBuilder:
                 slack_blocks.append(slack_bit)
             elif isinstance(slack_bit, list):
                 slack_blocks += slack_bit
-
-        env_name = socket.gethostname().lower().split('.')[0].replace('-', '')
-        slack_blocks.append({
-            "type": "context",
-            "elements": [
-                {
-                    "type": "plain_text",
-                    "text": env_name,
-                    "emoji": False
-                }
-            ]
-        })
         return slack_blocks
 
     def as_html(self):
@@ -308,7 +296,7 @@ def send_notification(
     If Slack is not configured, this will do nothing.
     @param message The message to send, (if also sending blocks just have message as a summary, wont be displayed)
     @param blocks See https://api.slack.com/messaging/webhooks#advanced_message_formatting
-    @param username The username that will appear in Slack
+    @param username The username that will appear in Slack, DEPRECATED - not used
     @param emoji The emoji that will
     @param slack_webhook_url Provide the slack URL, if not provided will get from settings (if enabled)
     """
@@ -319,8 +307,12 @@ def send_notification(
                 slack_webhook_url = slack.get('admin_callback_url')
 
     if slack_webhook_url:
+        env_name = socket.gethostname().lower().split('.')[0].replace('-', '')
+        site_name = settings.SITE_NAME
+        username = f"{site_name} ({env_name})"
+
         data = {
-            "username": (settings.SITE_NAME + (f" {username}" if username else "")).strip(),
+            "username": username,
             "text": message,
             "icon_emoji": emoji
         }
