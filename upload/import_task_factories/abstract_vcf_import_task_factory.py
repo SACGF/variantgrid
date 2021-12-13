@@ -20,7 +20,7 @@ class AbstractVCFImportTaskFactory(ImportTaskFactory):
         return self.sort_order
 
     def get_possible_extensions(self):
-        return ['vcf']
+        return ['vcf', 'vcf.gz']
 
     @abstractmethod
     def get_create_data_from_vcf_header_task_class(self):

@@ -9,12 +9,16 @@ from upload.tasks.vcf.genotype_vcf_tasks import reload_vcf_task
 from upload.upload_processing import process_upload_pipeline
 
 
-def get_import_task_factory_from_extension(user, filename, file_extension):
+def get_import_tasks_by_extension():
     possible_tasks = defaultdict(list)
     for itf in get_import_task_factories():
         for ext in itf.get_possible_extensions():
             possible_tasks[ext].append(itf)
+    return possible_tasks
 
+
+def get_import_task_factory_from_extension(user, filename, file_extension):
+    possible_tasks = get_import_tasks_by_extension()
     possible_for_extension = possible_tasks[file_extension]
 
     tasks = []
