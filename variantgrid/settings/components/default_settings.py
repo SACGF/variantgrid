@@ -166,7 +166,7 @@ ANNOTATION_VEP_CODE_DIR = os.path.join(ANNOTATION_VEP_BASE_DIR, "ensembl-vep")
 ANNOTATION_VEP_CACHE_DIR = os.path.join(ANNOTATION_VEP_BASE_DIR, "vep_cache")
 # @see https://asia.ensembl.org/info/docs/tools/vep/script/vep_options.html#opt_pick_order
 ANNOTATION_VEP_PICK_ORDER = None
-ANNOTATION_VEP_DISTANCE = None  # VEP --distance arg (default=5000) - how far up/down to assign to a transcript
+ANNOTATION_VEP_DISTANCE = 5000  # VEP --distance arg (default=5000) - how far up/downstream to assign to a transcript
 
 _ANNOTATION_FASTA_BASE_DIR = os.path.join(ANNOTATION_BASE_DIR, "fasta")
 

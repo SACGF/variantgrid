@@ -14,6 +14,7 @@
 {% load gene_disease_tags %}
 {% load gnomad_gene_constraint_tags %}
 {% load panel_app_tags %}
+{% load settings_tags %}
 {% block title %}{{ gene_symbol }}{% endblock title %}
 {% block submenu %}{% menu_bar_data %}{% endblock %}
 
@@ -148,13 +149,11 @@
         {% genome_build_url_arg genome_build 'view_gene_symbol_genome_build' gene_symbol=gene_symbol %}
 
         <h3>Gene Symbol : {{ gene_symbol }}</h3>
-        {% if show_annotation %}
-            {% page_help_embedded page_id='genes/view_gene_symbol_help' title='View Gene Symbol' %}
-                <p>Columns in the grid are from your <a href="/snpdb/settings">User Settings</a>,
-                    minus the gene level annotation (this appears in the <a data-toggle="collapse" href="#full-gene-info">full summary...</a>)
-                <p>The 2nd column: 'Sample Count' shows the number of samples which have this variant. A hotspot graph shows variants from this gene if any appear in samples.
-            {% end_page_help_embedded %}
-        {% endif %}
+        {% page_help_embedded page_id='genes/view_gene_symbol_help' title='Gene Symbol' %}
+            <p>
+            This page shows records associated with any transcript in the gene, including {% settings_value 'ANNOTATION_VEP_DISTANCE' %}bp up or downstream.
+            </p>
+        {% end_page_help_embedded %}
 
         <div class="card">
             <div class="card-header">Gene Symbol {{  gene_symbol }} could refer to:</div>
@@ -401,6 +400,11 @@
             {% endif %}
 
             {% if has_variants %}
+                {% page_help_embedded page_id='genes/view_gene_symbol_help' title='Gene Symbol Variants' %}
+                    <p>Columns in the grid are from your <a href="/snpdb/settings">User Settings</a>, minus the gene level annotation.
+                    <p>The 2nd column: 'Sample Count' shows the number of samples which have this variant. A hotspot graph shows variants from this gene if any appear in samples.
+                {% end_page_help_embedded %}
+
                 <a class='hover-link' id='show-filter-link' href="javascript:showFilter()">Filter grid...</a>
                 <span class="hidden">
                     <span class="filter-message" id="gene-variants-grid-filtering-message"></span>
