@@ -22,12 +22,14 @@ KEYCLOAK_SYNC_DETAILS = get_keycloak_sync_secrets()
 # CLINVAR_EXPORT = get_clinvar_export_secrets()
 
 # import all the base settings #
+CELERY_ENABLED=False
 VARIANT_CLASSIFICATION_NEW_GROUPING = True
 DISCORDANCE_ENABLED = True
 DISCORDANCE_EMAIL = None  # 'discordance@shariant.org.au'
 ACCOUNTS_EMAIL = 'accounts@shariant.org.au'
 DEBUG = True
 ROLLBAR['enabled'] = False
+SLACK['emoji'] = ':technologist:'
 
 AUTHENTICATION_BACKENDS = (
     'auth.backend.VariantGridOIDCAuthenticationBackend',
@@ -54,7 +56,7 @@ REST_FRAMEWORK = {
 MAINTENANCE_MODE = False
 OIDC_DRF_AUTH_BACKEND = 'auth.backend.VariantGridOIDCAuthenticationBackend'
 USE_OIDC = True
-OIDC_REQUIRED_GROUP = '/variantgrid/shariant_productionz'
+# OIDC_REQUIRED_GROUP = '/variantgrid/shariant_productionz'
 LOGIN_URL = '/oidc_login/'
 
 OIDC_RP_SIGN_ALGO = 'RS256'
@@ -300,6 +302,9 @@ URLS_NAME_REGISTER.update({  # Disable selected snpdb urls
     "jfu_upload": False,
     "jfu_delete": False,
     "download_uploaded_file": False,
+
+    "condition_matchings": True,
+    "condition_match_test": True
 })
 
 # mimic shariant

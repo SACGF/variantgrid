@@ -42,7 +42,7 @@ def send_discordance_notification(discordance_report: DiscordanceReport):
         notification.send()
 
     labs_notified = ", ".join(sorted([lab.name for lab in all_labs]))
-    NotificationBuilder(message=f"Discordance Notification <{report_url}> sent to {labs_notified}", emoji=":email:")\
+    NotificationBuilder(message=f"Discordance Notification <{report_url}> sent to {labs_notified}")\
         .add_markdown(f":fire_engine: :email: Discordance Notification <{report_url}> sent to {labs_notified}").send()
 
 

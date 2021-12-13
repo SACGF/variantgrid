@@ -287,7 +287,8 @@ URLS_NAME_REGISTER.update({  # Disable selected snpdb urls
     "condition_aliases": True,
     "clinvar_exports": True,
     "condition_matchings": True,
-    "condition_match_test": True
+    "condition_match_test": True,
+    "clinvar_key_summary": True
 })
 
 # mimic shariant
