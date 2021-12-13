@@ -20,8 +20,8 @@ class Command(BaseCommand):
                 # print(report)
             print(f"Completed {count}")
 
-        elif options["mondo"]:
-            for clinvar_export in ClinVarExport.objects.filter(condition__term_id__startswith="OMIM"):
+        if options["mondo"]:
+            for clinvar_export in ClinVarExport.objects.filter(condition__display_text__istartswith="OMIM"):
                 omim_condition = clinvar_export.condition_resolved
                 mondo_condition = omim_condition.as_mondo_if_possible()
                 if mondo_condition.mondo_term:
