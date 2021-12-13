@@ -2,14 +2,14 @@ import itertools
 import json
 import logging
 from collections import OrderedDict, defaultdict
-from typing import Iterable
+from typing import Iterable, Tuple
 
 import pandas as pd
 from celery.result import AsyncResult
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.models import User, Group
-from django.core.exceptions import PermissionDenied, ImproperlyConfigured
+from django.core.exceptions import PermissionDenied, ImproperlyConfigured, ObjectDoesNotExist
 from django.db.utils import IntegrityError
 from django.forms.models import inlineformset_factory, ALL_FIELDS
 from django.forms.widgets import TextInput
@@ -29,7 +29,9 @@ from analysis.forms import AnalysisOutputNodeChoiceForm
 from analysis.models import AnalysisTemplate, SampleStats, SampleStatsPassingFilter
 from annotation.forms import GeneCountTypeChoiceForm
 from annotation.manual_variant_entry import create_manual_variants, can_create_variants
-from annotation.models import AnnotationVersion
+from annotation.models import AnnotationVersion, SampleVariantAnnotationStats, SampleGeneAnnotationStats, \
+    SampleClinVarAnnotationStats, SampleVariantAnnotationStatsPassingFilter, SampleGeneAnnotationStatsPassingFilter, \
+    SampleClinVarAnnotationStatsPassingFilter
 from annotation.models.models import ManualVariantEntryCollection, VariantAnnotationVersion
 from annotation.models.models_gene_counts import GeneValueCountCollection, \
     GeneCountType, SampleAnnotationVersionVariantSource, CohortGeneCounts
@@ -285,6 +287,63 @@ def get_patient_upload_csv_for_vcf(request, pk):
     return get_patient_upload_csv(filename, sample_qs)
 
 
+def _sample_stats(sample) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    annotation_version = AnnotationVersion.latest(sample.genome_build)
+    STATS = {
+        "Total": (SampleStats, SampleStatsPassingFilter, set()),
+        "dbSNP": (SampleVariantAnnotationStats, SampleVariantAnnotationStatsPassingFilter, {"variant_annotation_version"}),
+        "OMIM pheno": (SampleGeneAnnotationStats, SampleGeneAnnotationStatsPassingFilter, {"gene_annotation_version"}),
+        "ClinVar LP/P": (SampleClinVarAnnotationStats, SampleClinVarAnnotationStatsPassingFilter, {"clinvar_version"})
+    }
+
+    VARIANT_CLASS = ["variant", "snp", "insertions", "deletions"]
+    ZYGOSITY = ["ref", "het", "hom", "unk"]
+
+    variant_class_data = {}
+    zygosity_data = {}
+    for name, (stats_klass, stats_passing_filters_klass, shared_fields) in STATS.items():
+        kwargs = {"sample": sample}
+        for sf in shared_fields:
+            kwargs[sf] = getattr(annotation_version, sf)
+
+        objs = {}
+        try:
+            objs[name] = stats_klass.objects.get(**kwargs)
+        except ObjectDoesNotExist:
+            pass
+
+        try:
+            objs[f"{name} PASS filters"] = stats_passing_filters_klass.objects.get(**kwargs)
+        except ObjectDoesNotExist:
+            pass
+
+        for n, o in objs.items():
+            obj_variant_class_data = {}
+            for field in get_model_fields(o):
+                for k in VARIANT_CLASS:
+                    if field.startswith(k):
+                        obj_variant_class_data[k] = getattr(o, field)
+                        break
+            if obj_variant_class_data:
+                variant_class_data[n] = obj_variant_class_data
+
+            obj_zygosity_data = {}
+            for field in get_model_fields(o):
+                for k in ZYGOSITY:
+                    if field.startswith(k):
+                        obj_zygosity_data[k] = getattr(o, field)
+                        break
+            if obj_zygosity_data:
+                zygosity_data[n] = obj_zygosity_data
+
+    sample_stats_variant_class_df = pd.DataFrame.from_dict(variant_class_data).reindex(VARIANT_CLASS)
+    total = sample_stats_variant_class_df["Total"]
+    sample_stats_variant_class_df["Total %"] = 100 * total / total["variant"]
+
+    sample_stats_zygosity_df = pd.DataFrame.from_dict(zygosity_data).reindex(ZYGOSITY)
+    return sample_stats_variant_class_df, sample_stats_zygosity_df
+
+
 def view_sample(request, sample_id):
     sample = Sample.get_for_user(request.user, sample_id)
     has_write_permission = sample.can_write(request.user)
@@ -310,15 +369,20 @@ def view_sample(request, sample_id):
     if settings.SOMALIER.get("enabled"):
         related_samples = SomalierRelatePairs.get_for_sample(sample).order_by("relate")
 
-    context = {'sample': sample,
-               'samples': [sample],
-               'sample_locus_count': sample_locus_count,
-               'form': form,
-               'patient_form': patient_form,
-               'cohorts': cohorts,
-               'has_write_permission': has_write_permission,
-               'igv_data': igv_data,
-               "related_samples": related_samples}
+    sample_stats_variant_class_df, sample_stats_zygosity_df = _sample_stats(sample)
+    context = {
+        'sample': sample,
+        'samples': [sample],
+        'sample_locus_count': sample_locus_count,
+        'form': form,
+        'patient_form': patient_form,
+        'cohorts': cohorts,
+        'has_write_permission': has_write_permission,
+        'igv_data': igv_data,
+        "sample_stats_variant_class_df": sample_stats_variant_class_df,
+        "sample_stats_zygosity_df": sample_stats_zygosity_df,
+        "related_samples": related_samples
+    }
     return render(request, 'snpdb/data/view_sample.html', context)
 
 

@@ -59,7 +59,7 @@ def require_superuser(f):
     return wrapper
 
 
-def get_model_fields(model, ignore_fields=None):
+def get_model_fields(model, ignore_fields=None) -> List[str]:
     ignore_fields = set(ignore_fields or [])
     return [f.name for f in model._meta.fields if f.name not in ignore_fields]
 

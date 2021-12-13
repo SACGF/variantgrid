@@ -5,6 +5,7 @@
 {% load help_tags %}
 {% load js_tags %}
 {% load vcf_import_info_tags %}
+{% load text_tags %}
 {% load tz %}
 
 {% block title %}{{ sample.name }}{% endblock %}
@@ -175,79 +176,36 @@ $(document).ready(function() {
         </div>
     {% if sample.samplestats.import_status == 'S' %}
         <div id="sample-stats">
-            <table>
-            <tr><th> <th> <th> Total %
-                {% if sample.samplestatspassingfilter %}
-                <th> (Pass Filters) </tr>
-                {% endif %}
-            <tr><th>Total
-                <td> {{ sample.samplestats.total_count }}
-                <td>100.0
-                {% if sample.samplestatspassingfilter %}
-                <td>({{ sample.samplestatspassingfilter.total_count }})
-                {% endif %}
-            <tr><td>&nbsp;</td>
-            <tr><th>SNPs		<td>{{ sample.samplestats.snp_count }}
-                                <td>{{ sample.samplestats.snp_percent | floatformat }}
-                                {% if sample.samplestatspassingfilter %}
-                                <td>({{ sample.samplestatspassingfilter.snp_count }})
-                                {% endif %}
-            <tr><th>Insertions	<td>{{ sample.samplestats.insertions_count }}
-                                <td>{{ sample.samplestats.insertions_percent | floatformat }}
-                                {% if sample.samplestatspassingfilter %}
-                                <td>({{ sample.samplestatspassingfilter.insertions_count }})
-                                {% endif %}
-            <tr><th>Deletions	<td>{{ sample.samplestats.deletions_count }}
-                                <td>{{ sample.samplestats.deletions_percent | floatformat }}
-                                {% if sample.samplestatspassingfilter %}
-                                <td>({{ sample.samplestatspassingfilter.deletions_count }})
-                                {% endif %}
-            </table>
+        {% if not sample_stats_variant_class_df.empty %}
+            <h3>Variant Class</h3>
+            {% render_dataframe sample_stats_variant_class_df 1 %}
+        {% endif %}
 
+        {% if not sample_stats_zygosity_df.empty %}
             <h3>Zygosity</h3>
+            {% render_dataframe sample_stats_zygosity_df 1 %}
+        {% endif %}
+
+        {% if sample_locus_count %}
+            <h3>Ploidy</h3>
             <table>
-            <tr><td>      <th>Count
-                                    {% if sample.samplestatspassingfilter %}
-                                    <th> (Pass Filters) </tr>
-                                    {% endif %}
-            <tr><th>Ref           <td>{{ sample.samplestats.ref_count }}
-                                    {% if sample.samplestatspassingfilter %}
-                                    <td>({{ sample.samplestatspassingfilter.ref_count }})
-                                    {% endif %}
-            <tr><th>Het	          <td>{{ sample.samplestats.het_count }}
-                                    {% if sample.samplestatspassingfilter %}
-                                    <td>({{ sample.samplestatspassingfilter.het_count }})
-                                    {% endif %}
-            <tr><th>Hom           <td>{{ sample.samplestats.hom_count }}
-                                    {% if sample.samplestatspassingfilter %}
-                                    <td>({{ sample.samplestatspassingfilter.hom_count }})
-                                    {% endif %}
-            <tr><th>Unk           <td>{{ sample.samplestats.unk_count }}
-                                    {% if sample.samplestatspassingfilter %}
-                                    <td>({{ sample.samplestatspassingfilter.unk_count }})
-                                    {% endif %}
+                <tr><th>Locus Count <th> Count
+                {% for slc in sample_locus_count %}
+                    <tr><td>{{ slc.locus_count }}
+                            {% if slc.locus_count == 1 %}
+                                (HOM)
+                            {% elif slc.locus_count == 2 %}
+                                (HET)
+                            {% endif %}
+                        <td>{{ slc.count }}
+                {% endfor %}
             </table>
+        {% endif %}
 
-            {% if sample_locus_count %}
-                <h3>Ploidy</h3>
-                <table>
-                    <tr><th>Locus Count <th> Count
-                    {% for slc in sample_locus_count %}
-                        <tr><td>{{ slc.locus_count }}
-                                {% if slc.locus_count == 1 %}
-                                    (HOM)
-                                {% elif slc.locus_count == 2 %}
-                                    (HET)
-                                {% endif %}
-                            <td>{{ slc.count }}
-                    {% endfor %}
-                </table>
-            {% endif %}
-
-            {% if sex_guess %}
-            <h3>Sex</h3>
-            {{ sample.samplestats.chrx_sex_guess }} (chrX Hom: {{ sample.samplestats.x_hom_count }}, Het: {{ sample.samplestats.x_het_count }})
-            {% endif %}
+        {% if sex_guess %}
+        <h3>Sex</h3>
+        {{ sample.samplestats.chrx_sex_guess }} (chrX Hom: {{ sample.samplestats.x_hom_count }}, Het: {{ sample.samplestats.x_het_count }})
+        {% endif %}
         </div>
 	{% endif %}
 

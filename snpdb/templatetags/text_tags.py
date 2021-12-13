@@ -74,22 +74,21 @@ class NodeTextDescriptionTag(template.Node):
 
 class PandasDataFrameTableTag(template.Node):
 
-    def __init__(self, df, significant_figures=None):
+    def __init__(self, df, significant_figures=None, border="0"):
         self.df_variable = template.Variable(df)
-        if significant_figures is not None:
-            self.significant_figures_variable = template.Variable(significant_figures)
-        else:
-            self.significant_figures_variable = None
+        self.significant_figures = template.Variable(significant_figures)
+        self.border = template.Variable(border)
 
     def render(self, context):
         try:
             df = self.df_variable.resolve(context)
-            kwargs = {}
-            if self.significant_figures_variable is not None:
-                significant_figures = self.significant_figures_variable.resolve(context)
-                if significant_figures is not None:
-                    format_string = "%%.%df" % significant_figures
-                    kwargs['float_format'] = lambda f: format_string % f
+            significant_figures = self.significant_figures.resolve(context)
+            border = self.border.resolve(context)
+            kwargs = {"border": border}
+
+            if significant_figures is not None:
+                format_string = "%%.%df" % significant_figures
+                kwargs['float_format'] = lambda f: format_string % f
             return df.to_html(**kwargs)
         except template.VariableDoesNotExist:
             return ''
