@@ -275,6 +275,7 @@ def view_vcf(request, vcf_id):
         'patient_form': PatientForm(user=request.user),  # blank
         'has_write_permission': has_write_permission,
         'can_download_vcf': (not settings.VCF_DOWNLOAD_ADMIN_ONLY) or request.user.is_superuser,
+        'can_view_upload_pipeline': vcf.uploadedvcf.uploaded_file.can_view(request.user),
         "variant_zygosity_count_collections": variant_zygosity_count_collections,
     }
     return render(request, 'snpdb/data/view_vcf.html', context)

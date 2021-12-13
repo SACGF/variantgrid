@@ -468,7 +468,7 @@ $(document).ready(function() {
     <div id="vcf-info">
         <fieldset class="form-fields">
             {% if vcf.uploadedvcf.uploaded_file.uploadpipeline %}
-                {% if url_name_visible.view_upload_pipeline %}
+                {% if url_name_visible.view_upload_pipeline and can_view_upload_pipeline %}
                 <p>
                     <label>Processing</label>
                     <span><a href="{% url 'view_upload_pipeline' vcf.uploadedvcf.uploaded_file.uploadpipeline.pk %}">View upload processing</a></span>
