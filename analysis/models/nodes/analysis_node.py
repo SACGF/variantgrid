@@ -33,7 +33,7 @@ from library.django_utils import thread_safe_unique_together_get_or_create
 from library.log_utils import report_event
 from library.utils import format_percent
 from snpdb.models import BuiltInFilters, Sample, Variant, VCFFilter, Wiki, Cohort, VariantCollection, \
-    ProcessingStatus, GenomeBuild, AlleleSource, Contig, SequenceRole
+    ProcessingStatus, GenomeBuild, AlleleSource, Contig
 from snpdb.variant_collection import write_sql_to_variant_collection
 from variantgrid.celery import app
 

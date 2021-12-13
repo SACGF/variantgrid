@@ -73,7 +73,7 @@ class PhenotypeNode(AnalysisNode):
         if self.accordion_panel == self.PANEL_PATIENT and self.patient:
             gene_symbols_qs = self.patient.get_gene_symbols()
         else:
-            gene_symbols_qs = OntologySnake.gene_symbols_for_terms(self.get_ontology_term_ids())
+            gene_symbols_qs = OntologySnake.cached_gene_symbols_for_terms_tuple(tuple(self.get_ontology_term_ids()))
         return gene_symbols_qs
 
     def get_ontology_term_ids(self):
@@ -120,11 +120,9 @@ class PhenotypeNode(AnalysisNode):
         return q
 
     def _get_node_contigs(self) -> Optional[Set[Contig]]:
-        genes = self._get_genes()
         contig_qs = Contig.objects.filter(transcriptversion__genome_build=self.analysis.genome_build,
-                                          transcriptversion__gene_version__gene__in=genes)
-        node_contigs = set(contig_qs.distinct())
-        return node_contigs
+                                          transcriptversion__gene_version__gene__in=self.get_gene_qs())
+        return set(contig_qs.distinct())
 
     def _get_method_summary(self):
         if self.modifies_parents():

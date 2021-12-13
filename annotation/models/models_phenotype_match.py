@@ -1,3 +1,4 @@
+import time
 from typing import List
 
 from django.contrib.auth.models import User
@@ -44,11 +45,14 @@ class PhenotypeDescription(models.Model):
 
     def get_ontology_term_ids(self) -> List[OntologyTerm]:
         ot_qs = self.textphenotypesentence_set.filter(text_phenotype__textphenotypematch__ontology_term__isnull=False)
+        # Sort so can be cached
+        ot_qs = ot_qs.order_by("text_phenotype__textphenotypematch__ontology_term_id")
         return ot_qs.values_list("text_phenotype__textphenotypematch__ontology_term_id", flat=True)
 
     def get_gene_symbols(self) -> QuerySet:
-        ontology_term_ids = self.get_ontology_term_ids()
-        return OntologySnake.gene_symbols_for_terms(ontology_term_ids)
+        terms = tuple(self.get_ontology_term_ids())
+        gene_symbols = OntologySnake.cached_gene_symbols_for_terms_tuple(terms)
+        return gene_symbols
 
     def __str__(self):
         text = self.original_text[:50]
@@ -113,19 +117,20 @@ class TextPhenotypeMatch(models.Model):
         if self.match_type == PhenotypeMatchTypes.GENE:
             gene_symbols = [self.gene_symbol_id]
         else:
-            gene_symbols_qs = OntologySnake.gene_symbols_for_terms([self.ontology_term_id])
+            gene_symbols_qs = OntologySnake.cached_gene_symbols_for_terms_tuple((self.ontology_term.pk,))
             gene_symbols = list(gene_symbols_qs.values_list("symbol", flat=True))
 
         string = str(self.record)
-
-        return {"accession": string,
-                "gene_symbols": gene_symbols,
-                "match": string,
-                "match_type": self.match_type,
-                "name": self.record.name,
-                "offset_start": self.offset_start,
-                "offset_end": self.offset_end,
-                "pk": self.record.pk}
+        return {
+            "accession": string,
+            "gene_symbols": gene_symbols,
+            "match": string,
+            "match_type": self.match_type,
+            "name": self.record.name,
+            "offset_start": self.offset_start,
+            "offset_end": self.offset_end,
+            "pk": self.record.pk,
+        }
 
     @property
     def record(self):

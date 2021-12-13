@@ -237,7 +237,7 @@ class PhenotypeNodeView(NodeView):
     def _get_no_gene_warnings(label: str, terms) -> Optional[str]:
         terms_without_genes = set()
         for ontology_term in terms:
-            if not OntologySnake.gene_symbols_for_terms([ontology_term]):
+            if not OntologySnake.cached_gene_symbols_for_terms_tuple((ontology_term,)).exists():
                 terms_without_genes.add(str(ontology_term))
         warning = None
         if terms_without_genes:

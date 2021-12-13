@@ -1,8 +1,13 @@
+"""
+A series of models that currently stores the combination of MONDO, OMIM, HPO & HGNC.
+(Note that HGNC is included just to model relationships, please use GeneSymbol for all your GeneSymbol needs).
+"""
 import functools
 import re
 from dataclasses import dataclass
 from typing import Optional, List, Dict, Set, Union, Tuple, Iterable
 
+from cache_memoize import cache_memoize
 from django.contrib.postgres.fields import ArrayField
 from django.db import models
 from django.db.models import PROTECT, CASCADE, QuerySet, Q
@@ -12,13 +17,11 @@ from model_utils.models import TimeStampedModel, now
 
 from genes.models import GeneSymbol
 from library.cache import timed_cache
+from library.constants import DAY_SECS
 from library.log_utils import report_exc_info
 from library.utils import Constant
 
-"""
-A series of models that currently stores the combination of MONDO, OMIM, HPO & HGNC.
-(Note that HGNC is included just to model relationships, please use GeneSymbol for all your GeneSymbol needs).
-"""
+
 class OntologyImportSource:
     PANEL_APP_AU = "PAAU"
     MONDO = "MONDO"
@@ -583,7 +586,14 @@ class OntologySnake:
         return OntologySnake.snake_from(term=gene_ontology, to_ontology=desired_ontology, max_depth=max_depth)
 
     @staticmethod
+    @cache_memoize(DAY_SECS)
+    def cached_gene_symbols_for_terms_tuple(terms_tuple: Tuple[OntologyTerm]) -> QuerySet:
+        """ Slightly restricted signature so we can cache it """
+        return OntologySnake.gene_symbols_for_terms(terms_tuple)
+
+    @staticmethod
     def gene_symbols_for_terms(terms: OntologyList) -> QuerySet:
+        """ This is uncached, see also: cached_gene_symbols_for_terms """
         gene_symbol_names = set()
         for term in terms:
             if isinstance(term, str):

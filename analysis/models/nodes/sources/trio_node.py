@@ -2,6 +2,7 @@ import time
 from abc import ABC, abstractmethod
 from typing import Optional, List, Set, Tuple
 
+from cache_memoize import cache_memoize
 from django.db import models
 from django.db.models import Count
 from django.db.models.deletion import SET_NULL
@@ -10,6 +11,7 @@ from django.db.models.query_utils import Q
 from analysis.models.enums import TrioInheritance, NodeErrorSource, AnalysisTemplateType
 from analysis.models.nodes.sources import AbstractCohortBasedNode
 from annotation.models.models import VariantTranscriptAnnotation
+from library.constants import DAY_SECS
 from patients.models_enums import Zygosity, Sex
 from snpdb.models import Trio, Sample, Contig
 
@@ -121,8 +123,8 @@ class CompHet(AbstractTrioInheritance):
     def _dad_but_not_mum(self):
         return self.NO_VARIANT, {Zygosity.HET}, {Zygosity.HET}
 
+    @cache_memoize(DAY_SECS, args_rewrite=lambda s: (s.node.pk, s.node.version))
     def _get_parent_comp_het_q_and_two_hit_genes(self):
-        start = time.time()
         cohort_genotype_collection = self.node.trio.cohort.cohort_genotype_collection
 
         parent = self.node.get_single_parent()
@@ -144,8 +146,6 @@ class CompHet(AbstractTrioInheritance):
         parent_genes_qs = parent_genes_qs.values_list("varianttranscriptannotation__gene")
         two_hits = parent_genes_qs.annotate(gene_count=Count("pk")).filter(gene_count__gte=2)
         two_hit_genes = set(two_hits.values_list("varianttranscriptannotation__gene", flat=True).distinct())
-        end = time.time()
-        print(f"Time taken: {end-start} secs")
         return parent, comp_het_q, two_hit_genes
 
     def get_q(self) -> Q:
@@ -242,9 +242,7 @@ class TrioNode(AbstractCohortBasedNode):
         if self.trio:
             inheritance = self._inheritance_factory()
             node_contigs = inheritance.get_contigs()
-            print("TRIO NODE COTIGS!!!")
         return node_contigs
-
 
     def _get_method_summary(self):
         if self._get_cohort():

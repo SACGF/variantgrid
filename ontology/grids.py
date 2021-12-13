@@ -18,11 +18,11 @@ class AbstractOntologyGenesGrid(DataFrameJqGrid, abc.ABC):
         hpo_qs, omim_qs = OntologyTerm.split_hpo_and_omim(self._get_ontology_term_ids())
         gene_terms_set = defaultdict(lambda: defaultdict(set))
         for hpo in hpo_qs:
-            for gene in OntologySnake.gene_symbols_for_terms([hpo]):
+            for gene in OntologySnake.cached_gene_symbols_for_terms_tuple((hpo,)):
                 gene_terms_set[gene.symbol]["hpo"].add(str(hpo))
 
         for omim in omim_qs:
-            for gene in OntologySnake.gene_symbols_for_terms([omim]):
+            for gene in OntologySnake.cached_gene_symbols_for_terms_tuple((omim,)):
                 gene_terms_set[gene.symbol]["omim"].add(str(omim))
 
         gene_dict = {k: {t: ", ".join(sorted(term_set)) for t, term_set in v.items()} for k, v in gene_terms_set.items()}

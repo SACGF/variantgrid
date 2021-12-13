@@ -9,6 +9,7 @@ Django
 django_admin_json_editor
 django_autocomplete_light==3.5.1
 django-avatar
+django-cache-memoize
 django-compressor
 django-dag
 django-recaptcha
