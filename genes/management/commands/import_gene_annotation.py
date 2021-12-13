@@ -222,10 +222,12 @@ class Command(BaseCommand):
             gene_version_id = gene_version_ids_by_accession[tv_data.pop("gene_version")]
             import_source = self._get_import_source_by_url(genome_build, annotation_consortium, tv_data.pop("url"))
             del tv_data["gene_name"]  # We'll put in symbol from related data gene_version.gene_symbol
+            contig = genome_build.chrom_contig_mappings[tv_data["chrom"]]
             transcript_version = TranscriptVersion(transcript_id=transcript_id,
                                                    version=version,
                                                    gene_version_id=gene_version_id,
                                                    genome_build=genome_build,
+                                                   contig=contig,
                                                    import_source=import_source,
                                                    biotype=tv_data.pop("biotype"),
                                                    data=tv_data)
@@ -251,7 +253,7 @@ class Command(BaseCommand):
         if modified_transcript_versions:
             logging.info("Updating %d transcript versions", len(modified_transcript_versions))
             TranscriptVersion.objects.bulk_update(modified_transcript_versions,
-                                                  ["gene_version_id", "import_source", "biotype", "data"],
+                                                  ["gene_version_id", "import_source", "biotype", "data", "contig"],
                                                   batch_size=self.BATCH_SIZE)
 
         if new_genes and annotation_consortium == AnnotationConsortium.REFSEQ:
