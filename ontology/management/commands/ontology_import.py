@@ -54,6 +54,7 @@ Rework it so we can keep a cache of everything already updated or created this r
 ID_OBO = re.compile("^http://purl[.]obolibrary[.]org/obo/([A-Z]+)_([0-9]+)$")
 ID_IDENTIFIERS = re.compile("http://identifiers[.]org/([A-Za-z]+)/([0-9]+)$")
 ID_STRAIGHT = re.compile("^([A-Z]+):([0-9]+)$")
+OMIM_URL = re.compile("^https://(omim)[.]org/entry/([0-9]+)$")
 
 
 @dataclass
@@ -62,7 +63,7 @@ class TermId:
     index: str = None
 
     def __init__(self, qualified_ref: str):
-        for pattern in [ID_OBO, ID_IDENTIFIERS, ID_STRAIGHT]:
+        for pattern in [ID_OBO, ID_IDENTIFIERS, ID_STRAIGHT, OMIM_URL]:
             if match := pattern.match(qualified_ref):
                 self.type = match[1].upper()
                 self.index = match[2]
@@ -83,7 +84,7 @@ def load_mondo(filename: str, force: bool):
         context="mondo_file",
         import_source=OntologyService.MONDO,
         force_update=force,
-        processor_version=12)
+        processor_version=13)
 
     ontology_builder.ensure_hash_changed(data_hash=file_hash)  # don't re-import if hash hasn't changed
 
