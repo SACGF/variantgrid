@@ -29,7 +29,7 @@ from library.django_utils import require_superuser, highest_pk, get_field_counts
 from library.enums.log_level import LogLevel
 from library.git import Git
 from library.guardian_utils import admin_bot
-from library.log_utils import report_exc_info, log_traceback, report_message
+from library.log_utils import report_exc_info, log_traceback, report_message, slack_bot_username
 from pathtests.models import cases_for_user
 from patients.models import ExternalPK, Clinician
 from seqauto.models import VCFFromSequencingRun, get_20x_gene_coverage
@@ -222,8 +222,12 @@ def server_status_activity(request, days_ago: int):
 
 @require_superuser
 def server_status_settings(request):
+    slack_emoji = (settings.SLACK or {}).get('emoji') or ':dna:'
+    slack_username = f"{slack_emoji} {slack_bot_username()}"
+
     return render(request, "variantopedia/server_status_settings_detail.html", {
         "settings": settings,
+        "slack_bot_username": slack_username,
         "ongoing_imports": ClassificationImportRun.ongoing_imports()
     })
 

@@ -51,5 +51,5 @@ def warn_low_disk_space():
 @celery.shared_task
 def heartbeat():
     if settings.HEARTBEAT_URL:
-        r = requests.get(settings.HEARTBEAT_URL)
+        _ = requests.get(settings.HEARTBEAT_URL)
         # we're not overly concerned with the response
