@@ -23,7 +23,7 @@ from classification.models.flag_types import classification_flag_types
 from flags.models.models import FlagsMixin, FlagCollection, FlagTypeContext, \
     flag_collection_extra_info_signal, FlagInfos
 from library.django_utils import get_url_from_view_path
-from library.log_utils import report_message, NotificationBuilder
+from library.log_utils import NotificationBuilder
 from snpdb.models import Variant, Lab
 from snpdb.models.models_variant import Allele
 

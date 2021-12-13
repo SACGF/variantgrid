@@ -88,7 +88,6 @@ class Command(BaseCommand):
                     batch = list()
                     print(f"Handled {row_count}")
 
-
             self.handle_batch(batch)
             print(f"Handled {row_count}")
             self.report_unmatched()

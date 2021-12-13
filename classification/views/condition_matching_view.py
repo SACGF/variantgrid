@@ -8,7 +8,6 @@ from guardian.shortcuts import get_objects_for_user
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from classification.enums import ShareLevel
 from classification.models import ConditionTextMatch, ConditionText, update_condition_text_match_counts, MultiCondition, \
     ConditionMatchingSuggestion, condition_matching_suggestions, Classification
 from library.utils import empty_to_none
