@@ -1,12 +1,13 @@
 from django.http.response import Http404
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
-from rest_framework.generics import ListAPIView
+from rest_framework.generics import ListAPIView, RetrieveAPIView
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from annotation.models.models import DiseaseValidity, VariantAnnotationVersion
-from annotation.serializers import VariantAnnotationSerializer, DiseaseValiditySerializer
+from annotation.models.models import DiseaseValidity, VariantAnnotationVersion, ManualVariantEntryCollection
+from annotation.serializers import VariantAnnotationSerializer, DiseaseValiditySerializer, \
+    ManualVariantEntryCollectionSerializer
 from library.constants import WEEK_SECS
 from snpdb.models import GenomeBuild, Variant
 
@@ -35,3 +36,11 @@ class VariantAnnotationView(APIView):
         va = variant.variantannotation_set.get(version=vav)
         serializer = VariantAnnotationSerializer(va)
         return Response(serializer.data)
+
+
+class ManualVariantEntryCollectionView(RetrieveAPIView):
+    serializer_class = ManualVariantEntryCollectionSerializer
+    lookup_field = 'pk'
+
+    def get_queryset(self):
+        return ManualVariantEntryCollection.objects.filter(user=self.request.user)
