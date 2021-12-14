@@ -31,11 +31,10 @@ from ontology.models import OntologyTerm, OntologyService
 from patients.models import ExternalPK, Patient
 from seqauto.illumina.illumina_sequencers import SEQUENCING_RUN_REGEX
 from seqauto.models import SequencingRun, Experiment
-from snpdb.clingen_allele import get_clingen_allele, get_clingen_alleles_from_external_code
+from snpdb.clingen_allele import get_clingen_allele
 from snpdb.models import VARIANT_PATTERN, LOCUS_PATTERN, LOCUS_NO_REF_PATTERN, DBSNP_PATTERN, Allele, Contig, \
     ClinGenAllele, GenomeBuild, Sample, Variant, Sequence, VariantCoordinate, UserSettings, Organization, Lab, VCF, \
     DbSNP
-from snpdb.models.models_enums import ClinGenAlleleExternalRecordType
 from upload.models import ModifiedImportedVariant
 from variantgrid.perm_path import get_visible_url_names
 from variantopedia.models import SearchTypes
