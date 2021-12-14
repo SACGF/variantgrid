@@ -1,5 +1,6 @@
 from library.jqgrid_user_row_config import JqGridUserRowConfig
 from pedigree.models import PedFile, Pedigree
+from snpdb.models import UserGridConfig
 
 
 class PedFilesGrid(JqGridUserRowConfig):
@@ -36,5 +37,9 @@ class PedigreeGrid(JqGridUserRowConfig):
 
     def __init__(self, user):
         super().__init__(user)
-        queryset = self.model.filter_for_user(user)
+        user_grid_config = UserGridConfig.get(user, self.caption)
+        if user_grid_config.show_group_data:
+            queryset = self.model.filter_for_user(user)
+        else:
+            queryset = self.model.objects.filter(user=user)
         self.queryset = queryset.values(*self.get_field_names())

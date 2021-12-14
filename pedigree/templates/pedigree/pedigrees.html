@@ -51,6 +51,7 @@
         {% ui_render_tabs tab_set="pedigree-tabs" css="mb-2" %}
 
         {% load jqgrid_tags %}
+        {% user_data_grid_filter 'pedigree' 'Pedigrees' %}
         {% jqgrid 'pedigree_grid' 'pedigree' search=True delete=True gbox_id='pedigree-grid-filter-container' %}
 	</div>
 {% endblock content %}
