@@ -29,12 +29,13 @@ from library.log_utils import report_message
 from library.utils import clean_string
 from ontology.models import OntologyTerm, OntologyService
 from patients.models import ExternalPK, Patient
+from pedigree.models import Pedigree
 from seqauto.illumina.illumina_sequencers import SEQUENCING_RUN_REGEX
 from seqauto.models import SequencingRun, Experiment
 from snpdb.clingen_allele import get_clingen_allele
 from snpdb.models import VARIANT_PATTERN, LOCUS_PATTERN, LOCUS_NO_REF_PATTERN, DBSNP_PATTERN, Allele, Contig, \
     ClinGenAllele, GenomeBuild, Sample, Variant, Sequence, VariantCoordinate, UserSettings, Organization, Lab, VCF, \
-    DbSNP
+    DbSNP, Cohort
 from upload.models import ModifiedImportedVariant
 from variantgrid.perm_path import get_visible_url_names
 from variantopedia.models import SearchTypes
@@ -296,10 +297,12 @@ class Searcher:
         COSMIC_PATTERN = re.compile(r"^COS[MV](\d+)$")  # Old or new
 
         self.genome_build_searches = [
+            (SearchTypes.COHORT, NOT_WHITESPACE, search_cohort),
             (SearchTypes.DBSNP, DBSNP_PATTERN, search_dbsnp),
             (SearchTypes.HGVS, HGVS_UNCLEANED_PATTERN, search_hgvs),
             (SearchTypes.LOCUS, LOCUS_PATTERN, search_locus),
             (SearchTypes.LOCUS, LOCUS_NO_REF_PATTERN, search_locus),
+            (SearchTypes.PEDIGREE, NOT_WHITESPACE, search_pedigree),
             (SearchTypes.SAMPLE, NOT_WHITESPACE, search_sample),
             (SearchTypes.VCF, NOT_WHITESPACE, search_vcf),
             (SearchTypes.VARIANT, VARIANT_PATTERN, search_variant),
@@ -712,6 +715,16 @@ def search_locus(search_string: str, genome_build: GenomeBuild, variant_qs: Quer
 def search_sample(search_string: str, user: User, genome_build: GenomeBuild, **kwargs) -> Iterable[Sample]:
     return Sample.filter_for_user(user).filter(name__icontains=search_string,
                                                vcf__genome_build=genome_build)
+
+
+def search_cohort(search_string: str, user: User, genome_build: GenomeBuild, **kwargs) -> Iterable[Sample]:
+    return Cohort.filter_for_user(user).filter(name__icontains=search_string,
+                                               genome_build=genome_build)
+
+
+def search_pedigree(search_string: str, user: User, genome_build: GenomeBuild, **kwargs) -> Iterable[Sample]:
+    return Pedigree.filter_for_user(user).filter(name__icontains=search_string,
+                                                 cohort__genome_build=genome_build)
 
 
 def search_vcf(search_string: str, user: User, genome_build: GenomeBuild, **kwargs) -> Iterable[Sample]:

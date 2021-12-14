@@ -120,11 +120,17 @@
                             <br/>or for a dedicated MONDO search <a class="external-link" href="https://www.ebi.ac.uk/ols/ontologies/mondo">OLS Ontology Search</a>
                         {% endlabelled %}
                         {% if url_name_visible.patients %}
+                            {% labelled label="Cohort" %}
+                                case insensitive search match in name
+                            {% endlabelled %}
                             {% labelled label="Sample" %}
                                 case insensitive search match in name
                             {% endlabelled %}
                             {% labelled label="Patients" %}
                                 <span class="example">Last, First</span> or <span class="example">First</span> or <span class="example">Last</span>
+                            {% endlabelled %}
+                            {% labelled label="Pedigree" %}
+                                case insensitive search match in name
                             {% endlabelled %}
                         {% endif %}
                         {% if url_name_visible.sequencing_data %}
