@@ -33,7 +33,8 @@ from seqauto.illumina.illumina_sequencers import SEQUENCING_RUN_REGEX
 from seqauto.models import SequencingRun, Experiment
 from snpdb.clingen_allele import get_clingen_allele, get_clingen_alleles_from_external_code
 from snpdb.models import VARIANT_PATTERN, LOCUS_PATTERN, LOCUS_NO_REF_PATTERN, DBSNP_PATTERN, Allele, Contig, \
-    ClinGenAllele, GenomeBuild, Sample, Variant, Sequence, VariantCoordinate, UserSettings, Organization, Lab, VCF
+    ClinGenAllele, GenomeBuild, Sample, Variant, Sequence, VariantCoordinate, UserSettings, Organization, Lab, VCF, \
+    DbSNP
 from snpdb.models.models_enums import ClinGenAlleleExternalRecordType
 from upload.models import ModifiedImportedVariant
 from variantgrid.perm_path import get_visible_url_names
@@ -464,16 +465,24 @@ def search_cosmic(search_string: str, user: User, variant_qs: QuerySet, **kwargs
 
 
 def search_dbsnp(search_string, user, genome_build: GenomeBuild, variant_qs: QuerySet, **kwargs) -> VARIANT_SEARCH_RESULTS:
-    results = variant_qs.filter(variantannotation__dbsnp_rs_id=search_string)
-    if not results.exists():
-        cmv_list = []
-        for clingen_allele in get_clingen_alleles_from_external_code(ClinGenAlleleExternalRecordType.DBSNP_ID, search_string):
-            variant_string = clingen_allele.get_variant_string(genome_build)
-            search_message = f"'{search_string}' resolved to ClinGenAllele {clingen_allele} coordinate '{variant_string}'"
-            cmv_list.append(SearchResult(CreateManualVariant(genome_build, variant_string), message=search_message))
-        return cmv_list
+    # Do via API as a full table scan takes way too long with big data
+    dbsnp = DbSNP.get(search_string)
 
-    return results
+    matcher = HGVSMatcher(genome_build)
+    search_results = []
+    for data in dbsnp.get_alleles_for_genome_build(genome_build):
+        if hgvs_string := data.get("hgvs"):
+            dbsnp_message = f"dbSNP '{search_string}' resolved to '{hgvs_string}'"
+            variant_tuple = matcher.get_variant_tuple(hgvs_string)
+            results = get_results_from_variant_tuples(variant_qs, variant_tuple)
+            if results.exists():
+                for r in results:
+                    search_results.append(SearchResult(r, message=dbsnp_message))
+            else:
+                variant_string = Variant.format_tuple(*variant_tuple)
+                search_results.append(SearchResult(CreateManualVariant(genome_build, variant_string),
+                                                   message=dbsnp_message))
+    return search_results
 
 
 def search_gene_symbol(search_string: str, **kwargs) -> Iterable[Union[GeneSymbol, GeneSymbolAlias]]:
