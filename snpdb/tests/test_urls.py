@@ -35,7 +35,7 @@ class Test(URLTestCase):
         cls.sample = cls.vcf.sample_set.first()
 
         # Auto cohorts don't show on list
-        cls.cohort2 = Cohort.objects.create(name="blah cohort", vcf=None, genome_build=grch37,
+        cls.cohort2 = Cohort.objects.create(name="blah cohort", user=cls.user_owner, vcf=None, genome_build=grch37,
                                             import_status=ImportStatus.SUCCESS)
         assign_permission_to_user_and_groups(cls.user_owner, cls.cohort2)
 

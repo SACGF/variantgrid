@@ -25,7 +25,7 @@ class PedFilesGrid(JqGridUserRowConfig):
 class PedigreeGrid(JqGridUserRowConfig):
     model = Pedigree
     caption = 'Pedigrees'
-    fields = ["id", "name", "user__username"]
+    fields = ["id", "name", "user__username", "modified"]
     colmodel_overrides = {
         'id': {"hidden": True},
         "name": {'formatter': 'linkFormatter',
@@ -38,8 +38,7 @@ class PedigreeGrid(JqGridUserRowConfig):
     def __init__(self, user):
         super().__init__(user)
         user_grid_config = UserGridConfig.get(user, self.caption)
-        if user_grid_config.show_group_data:
-            queryset = self.model.filter_for_user(user)
-        else:
-            queryset = self.model.objects.filter(user=user)
+        queryset = self.model.filter_for_user(user)
+        if not user_grid_config.show_group_data:
+            queryset = queryset.filter(user=user)
         self.queryset = queryset.values(*self.get_field_names())

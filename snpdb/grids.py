@@ -218,7 +218,7 @@ class CohortSampleListGrid(JqGridUserRowConfig):
 class CohortListGrid(JqGridUserRowConfig):
     model = Cohort
     caption = 'Cohorts'
-    fields = ["id", "name", "import_status", "modified", "sample_count"]
+    fields = ["id", "name", "import_status", "user__username", "modified", "sample_count"]
     colmodel_overrides = {
         'id': {"hidden": True},
         "name": {'formatter': 'linkFormatter',
@@ -230,7 +230,10 @@ class CohortListGrid(JqGridUserRowConfig):
 
     def __init__(self, user):
         super().__init__(user)
-        queryset = Cohort.filter_for_user(user, success_status_only=False).order_by("-pk")
+        user_grid_config = UserGridConfig.get(user, self.caption)
+        queryset = self.model.filter_for_user(user, success_status_only=False)
+        if not user_grid_config.show_group_data:
+            queryset = queryset.filter(user=user)
         queryset = queryset.filter(vcf__isnull=True)  # Don't show auto-cohorts
 
         self.queryset = queryset.values(*self.get_field_names())
@@ -241,7 +244,7 @@ class CohortListGrid(JqGridUserRowConfig):
 class TriosListGrid(JqGridUserRowConfig):
     model = Trio
     caption = 'Trios'
-    fields = ["id", "name", "mother__sample__name", "mother_affected",
+    fields = ["id", "name", "user__username", "modified", "mother__sample__name", "mother_affected",
               "father__sample__name", "father_affected", "proband__sample__name"]
     colmodel_overrides = {
         'id': {'formatter': 'linkFormatter',
@@ -256,7 +259,10 @@ class TriosListGrid(JqGridUserRowConfig):
 
     def __init__(self, user):
         super().__init__(user)
-        queryset = Trio.filter_for_user(user)
+        user_grid_config = UserGridConfig.get(user, self.caption)
+        queryset = self.model.filter_for_user(user)
+        if not user_grid_config.show_group_data:
+            queryset = queryset.filter(user=user)
         self.queryset = queryset.values(*self.get_field_names())
         self.extra_config.update({'sortname': "pk",
                                   'sortorder': "desc"})

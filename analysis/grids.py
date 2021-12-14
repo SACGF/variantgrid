@@ -367,10 +367,9 @@ class AnalysesGrid(JqGridUserRowConfig):
             genome_build_colmodel['hidden'] = True
             self._overrides['genome_build'] = genome_build_colmodel
         user_grid_config = UserGridConfig.get(user, self.caption)
-        if user_grid_config.show_group_data:
-            qs = Analysis.filter_for_user(user)
-        else:
-            qs = Analysis.objects.filter(user=user)
+        qs = Analysis.filter_for_user(user)
+        if not user_grid_config.show_group_data:
+            qs = qs.filter(user=user)
         qs = qs.filter(genome_build__in=self.genome_builds)
         qs = qs.filter(visible=True, template_type__isnull=True)  # Hide templates
         q_last_lock = Q(analysislock=F("last_lock")) | Q(analysislock__isnull=True)
@@ -518,10 +517,9 @@ class KaromappingAnalysesGrid(JqGridUserRowConfig):
         super().__init__(user)
 
         user_grid_config = UserGridConfig.get(user, self.caption)
-        if user_grid_config.show_group_data:
-            queryset = KaryomappingAnalysis.filter_for_user(user)
-        else:
-            queryset = KaryomappingAnalysis.objects.filter(user=user)
+        queryset = KaryomappingAnalysis.filter_for_user(user)
+        if not user_grid_config.show_group_data:
+            queryset = queryset.filter(user=user)
         self.queryset = queryset.values(*self.get_field_names())
         self.extra_config.update({'sortname': 'modified', 'sortorder': 'desc'})
 

@@ -17,7 +17,7 @@ class CohortGenotypeTestCase(TestCase):
 
     def test_sub_cohort(self):
         """ Create a cohort which should be a sub-cohort of trio1 """
-        cohort = Cohort.objects.create(name="sub_cohort", genome_build=self.grch37)
+        cohort = Cohort.objects.create(name="sub_cohort", user=self.user_owner, genome_build=self.grch37)
         samples = list(self.trio1.get_samples())
         cohort.add_sample(samples[0].pk)
         cohort.add_sample(samples[1].pk)
@@ -26,7 +26,7 @@ class CohortGenotypeTestCase(TestCase):
 
     def test_not_sub_cohort(self):
         """ Create a cohort which is NOT a sub-cohort """
-        cohort = Cohort.objects.create(name="not_a_sub_cohort", genome_build=self.grch37)
+        cohort = Cohort.objects.create(name="not_a_sub_cohort", user=self.user_owner, genome_build=self.grch37)
         samples = list(self.trio1.get_samples())
         cohort.add_sample(samples[0].pk)
         cohort.add_sample(samples[1].pk)
@@ -40,7 +40,7 @@ class CohortGenotypeTestCase(TestCase):
     def test_cohort_genotype_packed_field_index(self):
         """ Add/Remove CohortSamples - ensure cohort_genotype_packed_field_index stays in range """
         # Add samples from multiple parent cohorts - to ensure it's not a sub cohort
-        cohort = Cohort.objects.create(name="not_a_sub_cohort", genome_build=self.grch37)
+        cohort = Cohort.objects.create(name="not_a_sub_cohort", user=self.user_owner, genome_build=self.grch37)
         samples = list(self.trio1.get_samples())
         samples2 = list(self.trio2.get_samples())
         cohort.add_sample(samples[0].pk)

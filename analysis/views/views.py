@@ -214,6 +214,7 @@ def trio_wizard(request, cohort_id, sample1_id, sample2_id, sample3_id):
             sample_names = "/".join((mother_cs.name, father_cs.name, proband_cs.name))
             trio_name = f"{sample_names} from {cohort}"
             trio, _ = Trio.objects.get_or_create(cohort=cohort,
+                                                 user=request.user,
                                                  mother=mother_cs,
                                                  mother_affected=mother_affected,
                                                  father=father_cs,

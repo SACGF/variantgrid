@@ -33,6 +33,7 @@
         {% ui_render_tabs tab_set="cohort-tabs" css="mb-2" %}
 
         {% load jqgrid_tags %}
+        {% user_data_grid_filter 'cohort' 'Cohorts' %}
         {% jqgrid 'cohort_grid' 'cohort' search=True gbox_id='cohort-grid-filter-container' delete=True %}
     </div>
 

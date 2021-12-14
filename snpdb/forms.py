@@ -419,15 +419,16 @@ class CreateCohortForm(BaseModelForm):
 
     class Meta:
         model = models.Cohort
-        fields = ['name', "genome_build"]
-        widgets = {'name': TextInput()}
+        fields = ['user', 'name', "genome_build"]
+        widgets = {'user': HiddenInput(),
+                   'name': TextInput()}
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['genome_build'].choices = GenomeBuild.get_choices()
 
 
-class CohortForm(BaseModelForm):
+class CohortForm(forms.ModelForm):
 
     class Meta:
         model = models.Cohort

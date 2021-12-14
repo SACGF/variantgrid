@@ -2,6 +2,7 @@ import logging
 from typing import List, Dict
 
 import celery
+from django.contrib.auth.models import User
 from django.contrib.postgres.fields.array import ArrayField
 from django.core.exceptions import PermissionDenied
 from django.db import models
@@ -20,7 +21,8 @@ from lazy import lazy
 from library.django_utils import SortByPKMixin
 from library.django_utils.django_partition import RelatedModelsPartitionModel
 from library.django_utils.django_postgres import PostgresRealField
-from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
+from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin, \
+    GuardianPermissionsAutoInitialSaveMixin
 from library.guardian_utils import DjangoPermission, assign_permission_to_user_and_groups
 from library.utils import invert_dict
 from patients.models_enums import Zygosity
@@ -30,7 +32,7 @@ from snpdb.models.models_variant import Variant
 from snpdb.models.models_vcf import VCF, Sample
 
 
-class Cohort(SortByPKMixin, TimeStampedModel):
+class Cohort(GuardianPermissionsAutoInitialSaveMixin, SortByPKMixin, TimeStampedModel):
     """ Cohort - a collection of samples
 
         We pack data from all of the samples (zygosity, allele_depth, read_depth, genotype_quality, phred_likelihood) into 1 row
@@ -42,6 +44,7 @@ class Cohort(SortByPKMixin, TimeStampedModel):
 
         Data is stored in CohortGenotype rows, which are partitioned by CohortGenotypeCollection """
     name = models.TextField()
+    user = models.ForeignKey(User, null=True, on_delete=CASCADE)
     version = models.IntegerField(null=False, default=0)
     import_status = models.CharField(max_length=1, choices=ImportStatus.choices, default=ImportStatus.CREATED)
     genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)
@@ -55,10 +58,6 @@ class Cohort(SortByPKMixin, TimeStampedModel):
         if self.vcf:
             return self.vcf.has_genotype
         return True  # Created cohorts must contain genotype
-
-    def can_write(self, user):
-        write_perm = DjangoPermission.perm(self, DjangoPermission.WRITE)
-        return user.has_perm(write_perm, self)
 
     def increment_version(self):
         # Check if any samples not in parent cohort (can no longer be a sub cohort)
@@ -178,10 +177,10 @@ class Cohort(SortByPKMixin, TimeStampedModel):
     def create_sub_cohort(self, user, sample_list):
         sub_cohort_name = f"{self.name} sub cohort"
         sub_cohort = Cohort.objects.create(name=sub_cohort_name,
+                                           user=user,
                                            parent_cohort=self,
                                            import_status=self.import_status,
                                            genome_build=self.genome_build)
-        assign_permission_to_user_and_groups(user, sub_cohort)
 
         sample_index = {cs.sample: cs.cohort_genotype_packed_field_index for cs in self.cohortsample_set.all()}
         for i, sample in enumerate(sample_list):
@@ -476,10 +475,11 @@ class CohortGenotype(models.Model):
         return sample_genotypes
 
 
-class Trio(GuardianPermissionsMixin, SortByPKMixin, models.Model):
+class Trio(GuardianPermissionsAutoInitialSaveMixin, SortByPKMixin, TimeStampedModel):
     """ A simple pedigree used frequently for Mendellian disease (TrioNode in analysis)
         and karyomapping """
     name = models.TextField(blank=True)
+    user = models.ForeignKey(User, null=True, on_delete=CASCADE)
     cohort = models.ForeignKey(Cohort, on_delete=CASCADE)
     mother = models.ForeignKey(CohortSample, related_name='trio_mother', on_delete=CASCADE)
     mother_affected = models.BooleanField(default=False)

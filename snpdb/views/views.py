@@ -959,13 +959,12 @@ def igv_integration(request):
 
 def cohorts(request):
     user_settings = UserSettings.get_for_user(request.user)
-    initial = {'genome_build': user_settings.default_genome_build}
+    initial = {'user': request.user, 'genome_build': user_settings.default_genome_build}
     form = forms.CreateCohortForm(request.POST or None, initial=initial)
     if request.method == "POST":
         valid = form.is_valid()
         if valid:
             cohort = form.save()
-            assign_permission_to_user_and_groups(request.user, cohort)
             return HttpResponseRedirect(reverse('view_cohort', kwargs={'cohort_id': cohort.pk}))
         else:
             add_save_message(request, valid, "Cohort", created=True)
