@@ -73,6 +73,7 @@ from snpdb.models import CachedGeneratedFile, VariantGridColumn, UserSettings, \
 from snpdb.models.models_enums import ProcessingStatus, ImportStatus, BuiltInFilters
 from snpdb.tasks.soft_delete_tasks import soft_delete_vcfs
 from snpdb.utils import LabNotificationBuilder
+from upload.models import UploadedVCF
 from upload.uploaded_file_type import retry_upload_pipeline
 
 
@@ -264,6 +265,12 @@ def view_vcf(request, vcf_id):
         vzc_vcf = VariantZygosityCountForVCF.objects.filter(vcf=vcf, collection=vzcc).first()
         variant_zygosity_count_collections[vzcc] = vzc_vcf
 
+
+    try:
+        can_view_upload_pipeline = vcf.uploadedvcf.uploaded_file.can_view(request.user)
+    except UploadedVCF.DoesNotExist:
+        can_view_upload_pipeline = False
+
     context = {
         'vcf': vcf,
         'sample_stats_het_hom_count': sample_stats_het_hom_count,
@@ -275,7 +282,7 @@ def view_vcf(request, vcf_id):
         'patient_form': PatientForm(user=request.user),  # blank
         'has_write_permission': has_write_permission,
         'can_download_vcf': (not settings.VCF_DOWNLOAD_ADMIN_ONLY) or request.user.is_superuser,
-        'can_view_upload_pipeline': vcf.uploadedvcf.uploaded_file.can_view(request.user),
+        'can_view_upload_pipeline': can_view_upload_pipeline,
         "variant_zygosity_count_collections": variant_zygosity_count_collections,
     }
     return render(request, 'snpdb/data/view_vcf.html', context)
@@ -338,8 +345,9 @@ def _sample_stats(sample) -> Tuple[pd.DataFrame, pd.DataFrame]:
                 zygosity_data[n] = obj_zygosity_data
 
     sample_stats_variant_class_df = pd.DataFrame.from_dict(variant_class_data).reindex(VARIANT_CLASS)
-    total = sample_stats_variant_class_df["Total"]
-    sample_stats_variant_class_df["Total %"] = 100 * total / total["variant"]
+    if "Total" in sample_stats_variant_class_df.columns:
+        total = sample_stats_variant_class_df["Total"]
+        sample_stats_variant_class_df["Total %"] = 100 * total / total["variant"]
 
     sample_stats_zygosity_df = pd.DataFrame.from_dict(zygosity_data).reindex(ZYGOSITY)
     return sample_stats_variant_class_df, sample_stats_zygosity_df
