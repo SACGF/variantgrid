@@ -1,9 +1,10 @@
 from rest_framework import serializers
 
+from annotation.models import AnnotationStatus
 from annotation.models.models import VariantAnnotationVersion, VariantAnnotation, DiseaseValidity, \
     ManualVariantEntryCollection
 from ontology.serializers import OntologyTermSerializer
-from snpdb.serializers import VariantSerializer
+from snpdb.serializers import VariantSerializer, TimestampField
 
 
 class DiseaseValiditySerializer(serializers.ModelSerializer):
@@ -39,23 +40,40 @@ class ManualVariantEntryCollectionSerializer(serializers.ModelSerializer):
     first_entry_text = serializers.SerializerMethodField()
     first_variant_id = serializers.SerializerMethodField()
     first_variant_annotation_status = serializers.SerializerMethodField()
+    created = TimestampField()
+    is_ready = serializers.SerializerMethodField()
 
     class Meta:
         model = ManualVariantEntryCollection
-        fields = ('created', 'import_status', 'first_entry_text', 'first_variant_id', 'first_variant_annotation_status')
+        fields = '__all__'
 
-    def get_first_entry_text(self, obj):
+    def get_first_entry_text(self, obj: ManualVariantEntryCollection):
         entry_text = None
-        if mve := obj.manualvariantentry_set.all().order_by("pk").first():
+        if mve := obj.first_entry:
             entry_text = mve.entry_text
         return entry_text
 
-    def get_first_variant_id(self, obj):
+    def get_first_variant_id(self, obj: ManualVariantEntryCollection):
         variant_id = None
-        if mve := obj.manualvariantentry_set.all().order_by("pk").first():
-            if cve := mve.unique_created_variants.filter(variant__isnull=False).order_by("variant_id").first():
-                variant_id = cve.variant_id
+        if variant := obj.first_variant:
+            variant_id = variant.pk
         return variant_id
 
-    def get_first_variant_annotation_status(self, obj):
-        return "unknown"
+    def get_first_variant_annotation_status(self, obj: ManualVariantEntryCollection):
+        annotation_status = "Creating Variant"
+        if obj.first_variant:
+            annotation_status = "Variant Created"
+
+        if ar := obj.first_variant_annotation_run():
+            annotation_status = ar.get_status_display()
+        return annotation_status
+
+    def get_is_ready(self, obj: ManualVariantEntryCollection):
+        ready = False
+        if variant := obj.first_variant:
+            if variant.is_reference:
+                ready = True  # Won't be annotated
+
+        if ar := obj.first_variant_annotation_run():
+            ready = ar.status == AnnotationStatus.FINISHED
+        return ready

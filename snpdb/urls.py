@@ -48,6 +48,7 @@ urlpatterns = [
     perm_path('sample_permissions_tab/<int:sample_id>', views.sample_permissions_tab, name='sample_permissions_tab'),
     perm_path('messages_bulk_delete', views.messages_bulk_delete, name='messages_bulk_delete'),
     perm_path('manual_variant_entry', views.manual_variant_entry, name='manual_variant_entry'),
+    perm_path('watch_manual_variant_entry/<int:pk>', views.watch_manual_variant_entry, name='watch_manual_variant_entry'),
     perm_path('group_permissions/<class_name>/<int:primary_key>', views.group_permissions, name='group_permissions'),
     perm_path('group_permissions_object_delete/<class_name>/<int:primary_key>', views.group_permissions_object_delete, name='group_permissions_object_delete'),
     perm_path('group_permissions/bulk/<class_name>', views.bulk_group_permissions, name='bulk_group_permissions'),

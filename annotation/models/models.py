@@ -4,7 +4,7 @@ import os
 import re
 from collections import defaultdict
 from datetime import datetime, timedelta
-from typing import List
+from typing import List, Optional
 
 from Bio import Entrez
 from Bio.Data.IUPACData import protein_letters_1to3
@@ -785,6 +785,30 @@ class ManualVariantEntryCollection(models.Model):
     created = models.DateTimeField(auto_now_add=True)
     import_status = models.CharField(max_length=1, choices=ImportStatus.choices, default=ImportStatus.CREATED)
     celery_task = models.CharField(max_length=36, null=True)
+
+    @lazy
+    def first_entry(self) -> Optional['ManualVariantEntry']:
+        """ Often a user will enter a single variant into search and then wait for it to be created/annotated
+            We have the "first" one to deal with this """
+        return self.manualvariantentry_set.all().order_by("pk").first()
+
+    @lazy
+    def first_variant(self) -> Optional['Variant']:
+        variant = None
+        if mve := self.first_entry:
+            if cve := mve.unique_created_variants.filter(variant__isnull=False).order_by("variant_id").first():
+                variant = cve.variant
+        return variant
+
+    def first_variant_annotation_run(self) -> Optional['AnnotationRun']:
+        annotation_run = None
+        if mve := self.first_entry:
+            if variant := self.first_variant:
+                ar_qs = AnnotationRun.objects.filter(annotation_range_lock__version__genome_build=mve.genome_build,
+                                                     annotation_range_lock__min_variant__gte=variant.pk,
+                                                     annotation_range_lock__max_variant__lte=variant.pk)
+                annotation_run = ar_qs.first()
+        return annotation_run
 
     @staticmethod
     def get_for_user(user, mvec_id):

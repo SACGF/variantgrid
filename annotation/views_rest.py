@@ -43,4 +43,5 @@ class ManualVariantEntryCollectionView(RetrieveAPIView):
     lookup_field = 'pk'
 
     def get_queryset(self):
-        return ManualVariantEntryCollection.objects.filter(user=self.request.user)
+        # Doesn't need any security as they're just variants
+        return ManualVariantEntryCollection.objects.all()

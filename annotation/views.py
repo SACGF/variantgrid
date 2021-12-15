@@ -462,8 +462,8 @@ def view_annotation_version_details(request, annotation_version_id):
 
 def create_manual_variant_entry_from_text(request, genome_build_name, variants_text):
     genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
-    create_manual_variants(request.user, genome_build, variants_text)
-    return redirect('manual_variant_entry')
+    mvec = create_manual_variants(request.user, genome_build, variants_text)
+    return redirect('watch_manual_variant_entry', pk=mvec.pk)
 
 
 # TODO when possible remove the citations_tab.html in favour of vc_citations.js

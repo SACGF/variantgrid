@@ -363,8 +363,8 @@ function variantDetailsAddVariantTag(variantTagData) {
         analysisTd = `<td><a class='hover-link' href="${analysisUrl}">${variantTagData.analysis.name}</a></td>`;
     }
     let userTd = `<td><span title="${variantTagData.user.first_name} ${variantTagData.user.last_name}">${variantTagData.user.username}</span></td>`;
-    let createdTd = $("<td/>").append(createTimestampDom(variantTagData.seconds_since_epoch, false));
-    let timeAgoTd = $("<td/>").append(createTimestampDom(variantTagData.seconds_since_epoch, true));
+    let createdTd = $("<td/>").append(createTimestampDom(variantTagData.created, false));
+    let timeAgoTd = $("<td/>").append(createTimestampDom(variantTagData.created, true));
     tagRow.append(tagTd);
     tagRow.append(analysisTd);
     tagRow.append(userTd);

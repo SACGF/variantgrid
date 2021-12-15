@@ -1,0 +1,79 @@
+{% extends "uicore/page/base.html" %}
+{% load js_tags %}
+{% load crispy_forms_field %}
+{% load ui_menu_bars %}
+{% load ui_utils %}
+{% block title %}Manual Variant Entry{% endblock %}
+{% block head %}
+    <style>
+    .glowing {
+            animation: glow 1s infinite alternate;
+    }
+    @keyframes glow {
+          from {
+            box-shadow: 0 0 5px -5px #ccf;
+          }
+          to {
+            box-shadow: 0 0 5px 5px #ccf;
+          }
+    }
+    </style>
+    <script>
+        function populatePage(data) {
+            console.log(data);
+            $("#variant-status").text(data["first_variant_annotation_status"]);
+            $("#created-date").empty().append(createTimestampDom(data["created"], true));
+        }
+
+        function handleMVECData(data) {
+            if (data["is_ready"]) {
+                let variantUrl = Urls.view_variant(data["first_variant_id"]);
+                window.location.replace(variantUrl);
+            }
+            // if we can redirect - do so
+            // otherwise populate screen
+            populatePage(data);
+            setTimeout(pollServer, 2000);
+        }
+
+        function pollServer() {
+            $.ajax({
+                url: Urls.api_manual_variant_entry_collection({{ mvec.pk }}),
+                success: handleMVECData,
+                error: function() {
+                    $("#glowing-cloud").remove();
+                    $("#variant-status").text("Error contacting server - please reload page.");
+                }
+            });
+        }
+
+        $(document).ready(function() {
+            handleMVECData({{ initial_json|safe }});
+        });
+
+    </script>
+{% endblock %}
+{% block submenu %}
+    {% menu_bar_variants %}
+{% endblock %}
+{% block content %}
+    <h3>Checking status of new variant...</h3>
+    <div class="container">
+
+        <div>
+            {% labelled label="Coordinate" %}
+                <div>{{ mvec.first_entry.entry_text }} ({{ mvec.genome_build }})</div>
+            {% endlabelled %}
+            {% labelled label="Status" %}
+                <div>
+                    <i id="glowing-cloud" class="fas fa-cloud glowing"></i>
+                    <span id="variant-status"></span>
+                </div>
+            {% endlabelled %}
+            {% labelled label="Created" %}
+                <div id="created-date"></div>
+            {% endlabelled %}
+            <div id="polling-spinner"></div>
+        </div>
+    </div>
+{% endblock %}

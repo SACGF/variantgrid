@@ -35,6 +35,7 @@ from annotation.models import AnnotationVersion, SampleVariantAnnotationStats, S
 from annotation.models.models import ManualVariantEntryCollection, VariantAnnotationVersion
 from annotation.models.models_gene_counts import GeneValueCountCollection, \
     GeneCountType, SampleAnnotationVersionVariantSource, CohortGeneCounts
+from annotation.serializers import ManualVariantEntryCollectionSerializer
 from classification.classification_stats import get_grouped_classification_counts
 from classification.models.clinvar_export_sync import clinvar_export_sync
 from classification.views.classification_accumulation_graph import get_accumulation_graph_data, \
@@ -540,6 +541,16 @@ def manual_variant_entry(request):
     context = {"form": form,
                "mvec_qs": mvec_qs}
     return render(request, 'snpdb/data/manual_variant_entry.html', context=context)
+
+
+def watch_manual_variant_entry(request, pk):
+    mvec = ManualVariantEntryCollection.get_for_user(request.user, pk)
+    # TODO: Quick redirect to variant if it's already ready
+
+    mvec_data = ManualVariantEntryCollectionSerializer(mvec).data
+    context = {"mvec": mvec,
+               "initial_json": json.dumps(mvec_data)}
+    return render(request, 'snpdb/data/watch_manual_variant_entry.html', context=context)
 
 
 @require_POST
