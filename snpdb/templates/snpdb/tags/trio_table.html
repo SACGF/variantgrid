@@ -14,13 +14,40 @@
         <td><a href="{% url 'view_cohort' trio.cohort.pk %}">{{ trio.cohort }}</a></td>
     </tr>
     <tr><th>Mother:</th>
-        <td><a href="{% url 'view_sample' trio.mother.sample.pk %}">{{ trio.mother_details }}</a></td>
+        <td>
+            <div class="display-flex flex-row">
+                <div class="icon24 sample-icon"></div>
+                <a href="{% url 'view_sample' trio.mother.sample.pk %}">{{ trio.mother_details }}</a>
+                {% if trio.mother.sample.patient %}
+                    <div class="icon24 patient-icon"></div>
+                    <a href="{% url 'view_patient' trio.mother.sample.patient_id %}">{{ trio.mother.sample.patient }}</a>
+                {% endif %}
+            </div>
+        </td>
     </tr>
     <tr><th>Father:</th>
-        <td><a href="{% url 'view_sample' trio.father.sample.pk %}">{{ trio.father_details }}</a></td>
+        <td>
+            <div class="display-flex flex-row">
+                <div class="icon24 sample-icon"></div>
+                <a href="{% url 'view_sample' trio.father.sample.pk %}">{{ trio.father_details }}</a>
+                {% if trio.father.sample.patient %}
+                    <div class="icon24 patient-icon"></div>
+                    <a href="{% url 'view_patient' trio.father.sample.patient_id %}">{{ trio.father.sample.patient }}</a>
+                {% endif %}
+            </div>
+        </td>
     </tr>
     <tr><th>Proband:</th>
-        <td><a href="{% url 'view_sample' trio.proband.sample.pk %}">{{ trio.proband }}</a></td>
+        <td>
+            <div class="display-flex flex-row">
+                <div class="icon24 sample-icon"></div>
+                <a href="{% url 'view_sample' trio.proband.sample.pk %}">{{ trio.proband }}</a>
+                {% if trio.proband.sample.patient %}
+                    <div class="icon24 patient-icon"></div>
+                    <a href="{% url 'view_patient' trio.proband.sample.patient_id %}">{{ trio.proband.sample.patient }}</a>
+                {% endif %}
+            </div>
+        </td>
     </tr>
 
 {% if trio.genomekaryomappingcounts  %}

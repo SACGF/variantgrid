@@ -5,7 +5,14 @@
 {% for cs in cohort.cohortsample_set.all %}
 <tr>
     <td><input class='sample-select' sample_id='{{ cs.sample.pk }}' type='checkbox' />
-    <td><a href="{% url 'view_sample' cs.sample.pk %}">{{ cs.sample }}</a>
+    <td>
+        <div class="left icon32 sample-icon"></div>
+        <a href="{% url 'view_sample' cs.sample.pk %}">{{ cs.sample }}</a>
+    <td>
+        {% if cs.sample.patient %}
+            <div class="left icon32 patient-icon"></div>
+            <a href="{% url 'view_patient' cs.sample.patient_id %}">{{ cs.sample.patient }}</a>
+        {% endif %}
 </tr>
 {% endfor %}
 </table>
