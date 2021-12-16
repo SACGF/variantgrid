@@ -782,7 +782,17 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
         for label, count in label_counts.items():
             NodeCount.objects.create(node_version=node_version, label=label, count=count)
 
-        return NodeStatus.READY, label_counts[BuiltInFilters.TOTAL]
+        total_count = label_counts[BuiltInFilters.TOTAL]
+
+        # Single parent nodes should always reduce the number of variants - run a check to make sure the
+        # query wasn't bad and returned more results than it should have
+        parents = list(self.get_non_empty_parents())
+        if len(parents) == 1:
+            parent = parents[0]
+            if parent.count < total_count:
+                raise ValueError(f"Single parent node {self}(pk={self.pk}) had count={total_count} > {parent=}(pk={parent.pk}) count={parent.count=}")
+
+        return NodeStatus.READY, total_count
 
     def _load(self):
         """ Override to do anything interesting """
