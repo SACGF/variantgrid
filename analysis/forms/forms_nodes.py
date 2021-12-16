@@ -544,8 +544,9 @@ class PopulationNodeForm(BaseNodeForm):
 
     class Meta:
         model = PopulationNode
-        fields = ('percent', 'group_operation', 'gnomad_af', 'gnomad_popmax_af', 'af_1kg', 'af_uk10k', 'topmed_af', 'gnomad_hom_alt_max',
-                  'zygosity', 'use_internal_counts', 'max_samples', 'internal_percent', 'keep_internally_classified_pathogenic')
+        fields = ('percent', 'group_operation', 'gnomad_af', 'gnomad_popmax_af', 'af_1kg', 'af_uk10k', 'topmed_af',
+                  'gnomad_hom_alt_max', 'show_gnomad_filtered', 'zygosity', 'use_internal_counts', 'max_samples',
+                  'internal_percent', 'keep_internally_classified_pathogenic')
         widgets = {'gnomad_hom_alt_max': WIDGET_INTEGER_MIN_0,
                    'max_samples': WIDGET_INTEGER_MIN_1}
 
