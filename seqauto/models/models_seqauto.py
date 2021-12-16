@@ -109,7 +109,7 @@ class SeqAutoRecord(TimeStampedModel):
     sequencing_run = models.ForeignKey("SequencingRun", null=True, on_delete=CASCADE)
     # Stores stat st_mtime - time of last modification - only used for classes that can reload
     file_last_modified = models.FloatField(default=0.0)
-    hash = models.TextField()  # Not used for everything
+    hash = models.TextField(blank=True)  # Not used for everything
     is_valid = models.BooleanField(default=False)  # Set in save
     data_state = models.CharField(max_length=1, choices=DataState.choices)
 
@@ -178,12 +178,12 @@ class SequencingRun(SeqAutoRecord):
     bad = models.BooleanField(default=False)
     hidden = models.BooleanField(default=False)
     legacy = models.BooleanField(default=False)  # Don't update it with scans (eg to say file missing)
-    experiment = models.ForeignKey(Experiment, null=True, on_delete=SET_NULL)
+    experiment = models.ForeignKey(Experiment, null=True, blank=True, on_delete=SET_NULL)
     # Sequencing Run can be all one enrichment_kit, or SequencingSample can have own enrichment_kits
-    enrichment_kit = models.ForeignKey(EnrichmentKit, null=True, on_delete=CASCADE)
+    enrichment_kit = models.ForeignKey(EnrichmentKit, null=True, blank=True, on_delete=CASCADE)
     has_basecalls = models.BooleanField(default=False)
     has_interop = models.BooleanField(default=False)  # Quality, Index and Tile
-    fake_data = models.ForeignKey(FakeData, null=True, on_delete=CASCADE)
+    fake_data = models.ForeignKey(FakeData, null=True, blank=True, on_delete=CASCADE)
 
     def _validate(self):
         sample_sheet_changed_code = "sample_sheet_changed"
