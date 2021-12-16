@@ -564,9 +564,12 @@ def variant_sample_information(request, variant_id, genome_build_name):
     genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
     vsi = VariantSampleInformation(request.user, variant, genome_build)
 
-    context = {"variant": variant,
-               "vsi": vsi,
-               "visible_rows": vsi.visible_rows}
+    context = {
+        "variant": variant,
+        "vsi": vsi,
+        "visible_rows": vsi.visible_rows,
+        "has_samples_in_other_builds": Sample.objects.exclude(vcf__genome_build=genome_build).exists(),
+    }
     return render(request, "variantopedia/variant_sample_information.html", context)
 
 
