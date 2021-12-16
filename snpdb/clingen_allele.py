@@ -62,6 +62,10 @@ class ClinGenAlleleAPIException(ClinGenAllele.ClinGenAlleleRegistryException):
     """ API returned 200 OK, but was an error """
 
 
+class ClinGenAlleleTooLargeException(ClinGenAllele.ClinGenAlleleRegistryException):
+    """ Too big for ClinGen Allele Registry  """
+
+
 class ClinGenAlleleRegistryAPI:
     """ Manages API connections to ClinGen Allele Registry
         This has been overridden by mock_clingen_api for unit testing """
@@ -270,7 +274,7 @@ def populate_clingen_alleles_for_variants(genome_build: GenomeBuild, variants,
 
 
 def get_variant_allele_for_variant(genome_build: GenomeBuild, variant: Variant,
-                                   clingen_api: ClinGenAlleleRegistryAPI = None) -> VariantAllele:
+                                   clingen_api: ClinGenAlleleRegistryAPI = None) -> Optional[VariantAllele]:
     """ Retrieves from DB or calls API then caches in DB
         Successful calls link variants in all builds (that exist)
         errors are only stored on the requesting build """
@@ -279,15 +283,21 @@ def get_variant_allele_for_variant(genome_build: GenomeBuild, variant: Variant,
         msg = f"No ClinGenAllele for variant: {variant}"
         raise ClinGenAlleleAPIException(msg)
 
+    va = None
     try:
         va = VariantAllele.objects.get(variant=variant, genome_build=genome_build)
         if va.needs_clingen_call():
             va = variant_allele_clingen(genome_build, variant, existing_variant_allele=va, clingen_api=clingen_api)
-
+    except ClinGenAlleleTooLargeException:
+        pass  # Got the allele, have to accept can't get ClinGen
     except VariantAllele.DoesNotExist:
         if settings.CLINGEN_ALLELE_REGISTRY_LOGIN:
-            va = variant_allele_clingen(genome_build, variant, clingen_api=clingen_api)
-        else:
+            try:
+                va = variant_allele_clingen(genome_build, variant, clingen_api=clingen_api)
+            except ClinGenAlleleTooLargeException:
+                pass  # only recoverable exception
+
+        if va is None:
             logging.debug("Not using ClinGen")
             allele = Allele.objects.create()
             va = VariantAllele.objects.create(variant_id=variant.pk,
@@ -311,7 +321,7 @@ def variant_allele_clingen(genome_build, variant, existing_variant_allele=None,
     max_size = ClinGenAllele.CLINGEN_ALLELE_MAX_REPRESENTATION_SIZE
     if ca_rep_size > max_size:
         msg = f"Representation has size {ca_rep_size} which exceeds ClinGen max of {max_size}"
-        raise ClinGenAlleleAPIException(msg)
+        raise ClinGenAlleleTooLargeException(msg)
 
     try:
         api_response = get_single_element(list(clingen_api.hgvs_put([g_hgvs])))
