@@ -89,12 +89,20 @@ def analysis_templates(request):
 def get_analysis_settings(user, analysis):
     user_settings = UserSettings.get_for_user(user)
     igv_data = get_igv_data(user, genome_build=analysis.genome_build)
-    analysis_settings = {"annotation_version": analysis.annotation_version_id,
-                         "node_count_types": analysis.get_node_count_types(),
-                         "show_igv_links": analysis.show_igv_links,
-                         "igv_data": igv_data,
-                         "open_variant_details_in_new_window": user_settings.variant_link_in_analysis_opens_new_tab,
-                         "genome_build": str(analysis.genome_build)}
+    if analysis.canonical_transcript_collection:
+        canonical_transcript_collection = str(analysis.canonical_transcript_collection)
+    else:
+        canonical_transcript_collection = ""
+
+    analysis_settings = {
+        "annotation_version": analysis.annotation_version_id,
+        "node_count_types": analysis.get_node_count_types(),
+        "canonical_transcript_collection": canonical_transcript_collection,
+        "show_igv_links": analysis.show_igv_links,
+        "igv_data": igv_data,
+        "open_variant_details_in_new_window": user_settings.variant_link_in_analysis_opens_new_tab,
+        "genome_build": str(analysis.genome_build),
+    }
     return analysis_settings
 
 
@@ -238,7 +246,8 @@ def stand_alone_analysis_editor_and_grid(request, analysis_id):
 
 def analysis_templates_list(request, pk):
     analysis_template = AnalysisTemplate.get_for_user(request.user, pk)
-    context = {"analysis_template": analysis_template}
+    context = {"analysis_template": analysis_template,
+               "analysis_template_versions": analysis_template.analysistemplateversion_set.order_by("-pk")}
     return render(request, 'analysis/analysis_templates_list.html', context)
 
 

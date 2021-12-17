@@ -62,6 +62,96 @@
         {% else %}
 
             <!-- For SA Path, show all as one big VG3 upgrade -->
+            <div class="card mt-4">
+                <div class="card-header">HotFixes</div>
+
+                <div class="card-body">
+                    <h4>HotFix 7 (Deployed XX December 2021)</h4>
+                    <ul>
+                        <li><a href="https://github.com/SACGF/variantgrid/issues/435">435 - Order analysis template versions</a></li>
+                        <li><a href="https://github.com/SACGF/variantgrid/issues/460">460 - Analysis CSV export AF as percentage</a> - grid CSV export AF matches grid</li>
+                        <li><a href="https://github.com/SACGF/variantgrid/issues/465">465 - Reference Variants linked together into 1 Allele</a></li>
+                        <li><a href="https://github.com/SACGF/variantgrid/issues/466">466 - Single record report - coordinates still hg19</a></li>
+                        <li><a href="https://github.com/SACGF/variantgrid/issues/467">467 - Reference Variant inserted with alt='.'</a></li>
+                        <li><a href="https://github.com/SACGF/variantgrid/issues/475">475 - Handle Ensembl/RefSeq API being down</a> - HGVS search was broken if Ensembl/RefSeq was down</li>
+                        <li><a href="https://github.com/SACGF/variantgrid/issues/476">476 - Phenotype node terms in node doc</a> - shows terms used</li>
+                        <li><a href="https://github.com/SACGF/variantgrid/issues/477">477 - Strip invisible characters in search</a> - handle copy/paste from MS Word/Excel breaking search</li>
+                        <li><a href="https://github.com/SACGF/variantgrid/issues/479">479 - Can't modify tags</a> - Fix permissions issue from copying from VG2->VG3</li>
+                        <li><a href="https://github.com/SACGF/variantgrid/issues/482">482 - PhenotypeNode - warn if HPO terms have no associated genes</a></li>
+                        <li><a href="https://github.com/SACGF/variantgrid/issues/497">498 - Analysis Grid export CSV sorted same as grid</a></li>
+                        <li><a href="https://github.com/SACGF/variantgrid/issues/498">498 - HGVS del show/hide setting</a> - SA Path now generates HGVS with "del" rather than "delCC"</li>
+                        <li><a href="https://github.com/SACGF/variantgrid/issues/503">503 - HGVS p. nomeclature</a> - change from p= to p? if canonical splicing change</li>
+                        <li><a href="https://github.com/SACGF/variantgrid/issues/513">513 - Data - sample autocomplete forwards genome build, restricting search to 1 build</a> - some 37 samples weren't appearing in autocomplete</li>
+                        <li><a href="https://github.com/SACGF/variantgrid/issues/516">516 - New Feature: Export CSV w/Canonical transcript</a> - RHAMPseq new feature - export CSV using canonical transcripts</li>
+                        <li><a href="https://github.com/SACGF/variantgrid/issues/522">522 - Gene classification grid can show other transcritps that have the same start code ie NM_1 shows NM_123</a> - occasionally showed classifications that weren't in that gene</li>
+                        <li><a href="https://github.com/SACGF/variantgrid/issues/526">526 - Trusight VCF - don't insert strange variants - ie handle INS</a> - strip CNV data from Trusight VCFs</li>
+                        <li><a href="https://github.com/SACGF/variantgrid_private/issues/3046">VGP3046 - variant matching getting stuck</a> - Shariant backend improvement for when there are many classifications per variant</li>
+                        <li><a href="https://github.com/SACGF/variantgrid_private/issues/3184">VGP3184 - Trusight VCF upload failure due to ploidy</a> - handle haploid genotype calls on chrX for male properly</li>
+                        <li><a href="https://github.com/SACGF/variantgrid_sapath/issues/208">SAP208 - ClinVar update</a> - Fix for latest ClinVar to allow update</li>
+                        <li><a href="https://github.com/SACGF/variantgrid_sapath/issues/213">SAP213 - Auto load VarDict gmp focus FFPE</a> if sequencing run ends in "FFPE" then load VarDict</li>
+                        <li><a href="https://github.com/SACGF/variantgrid_sapath/issues/218">SAP218 - Fix for variant_type exporting</a> - Shariant sync backend fix</li>
+                        <li><a href="https://github.com/SACGF/variantgrid_sapath/issues/220">SAP220 - Missing sequencing data</a> - Handle exactly the same sample name being re-used across different sequencing runs</li>
+                        <li><a href="https://github.com/SACGF/variantgrid_sapath/issues/223">SAP223 - Hitting enter double submits forms</a></li>
+                    </ul>
+                </div>
+
+                <div class="card-body">
+                    <h4>HotFix 6 (Deployed August 17th, 2021)</h4>
+                    <ul>
+                        <li><a href="https://github.com/SACGF/variantgrid/issues/455">455 - ClinGenAllele Registry - DataError: integer out of range</a></li>
+                    </ul>
+                </div>
+
+
+                <div class="card-body">
+                    <h4>HotFix 5 (Deployed Aug. 4, 2021)</h4>
+                    <ul>
+                        <li><a href="https://github.com/SACGF/variantgrid/issues/148">148 - Handle ClinGen API failure</a> - Will retry if error due to ClinGen Allele server being down (but not if ClinGen returned error for that Allele)</li>
+                        <li><a href="https://github.com/SACGF/variantgrid/issues/318">318 - Safety of Node Q Cache</a> - Cache caused errors if VCF reloaded</li>
+                        <li><a href="https://github.com/SACGF/variantgrid/issues/439">439 - Legacy data - reloading old VCFs doesn't reset allele_frequency_percent</a> - Fix for reloaded legacy GRCh37 VCFs (was showing wrong AF)</li>
+                        <li><a href="https://github.com/SACGF/variantgrid/issues/450">450 - CSV Exon conversion</a> - intron/exon "2/3" turned to date in Excel, converted to "2 of 3" via formatter</li>
+                        <li><a href="https://github.com/SACGF/variantgrid_sapath/issues/164">SAP164 - TSO500 import</a> - Skipped CSV and fusion records in VCF (raising warnings) to support TSO500 which was dropping variants due to invalid (unsorted) VCF</li>
+                    </ul>
+                </div>
+
+
+                <div class="card-body">
+                    <h4>HotFix 4 (Deployed July 12, 2021)</h4>
+                    <ul>
+                        <li><a href="https://github.com/SACGF/variantgrid/issues/377">377 - NodeVersion IntegrityError - race condition</a> - caused no issue, but reported lots of errors in rollbar</li>
+                        <li><a href="https://github.com/SACGF/variantgrid/issues/402">402 - MT variants - VariantAllele MultipleObjectsReturned</a> - issue due to GRCh37/38 sharing MT contig</li>
+                        <li><a href="https://github.com/SACGF/variantgrid/issues/417">417 - Tagging in analysis after opening variant details in same window</a></li>
+                        <li><a href="https://github.com/SACGF/variantgrid/issues/430">430 - VCF import - already normalized file</a> - rare VCF import error
+                        <li><a href="https://github.com/SACGF/variantgrid/issues/431">431 - AnalysisNode.save in celery race condition</a> - could cause issues given rapid node changes under heavy server load</li>
+                        <li><a href="https://github.com/SACGF/variantgrid_sapath/issues/185">SAP-185 - AF represented as both NaN and NULL</a> - displayed missing VCF data inconsistently
+                        <li><a href="https://github.com/SACGF/variantgrid_sapath/issues/194">SAP-194 - GOI analysis - warning, prevent error</a> - Prevent running analyses that use GOIs on samples without them</li>
+                    </ul>
+                </div>
+
+
+                <div class="card-body">
+                    <h4>HotFix 3 (Deployed July 7, 2021)</h4>
+                    <ul>
+                        <li><a href="https://github.com/SACGF/variantgrid/issues/428">428 - VCF import - Sample Stats error in VCF w/o filters</a> -  Fix issue caused by SAP-193 (previous HF)</li>
+                    </ul>
+                </div>
+
+                <div class="card-body">
+                    <h4>HotFix 2 (Deployed July 5, 2021)</h4>
+                    <ul>
+                        <li><a href="https://github.com/SACGF/variantgrid_sapath/issues/193">SAP-193 - PASS filters sample stats were wrong</a> - fixed going forward. Existing PASS counts deleted (were just used as a cache)</li>
+                        <li><a href="https://github.com/SACGF/variantgrid_sapath/issues/197">SAP-197 - Finalise SA Path changelog</a></li>
+                    </ul>
+                </div>
+
+                <div class="card-body">
+                    <h4>HotFix 1 ( Deployed June 25, 2021)</h4>
+                    <ul>
+                        <li><a href="https://github.com/SACGF/variantgrid/issues/410">410 - Can't add sample gene list to analysis variables</a> - Couldn't edit GOI template</li>
+                        <li><a href="https://github.com/SACGF/variantgrid/issues/415">415 - Can't delete analysis templates from grid</a></li>
+                    </ul>
+                </div>
+            </div>
 
             <div class="card mt-4">
                 <div class="card-header">VariantGrid 3.0</div>

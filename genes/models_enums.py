@@ -5,6 +5,12 @@ class AnnotationConsortium(models.TextChoices):
     REFSEQ = "R", "RefSeq"
     ENSEMBL = "E", "Ensembl"
 
+    @staticmethod
+    def get_from_transcript_accession(transcript_accession: str):
+        if transcript_accession.startswith("ENST"):
+            return AnnotationConsortium.ENSEMBL
+        return AnnotationConsortium.REFSEQ
+
 
 class HGNCStatus(models.TextChoices):
     APPROVED = 'A', 'Approved'

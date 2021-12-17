@@ -293,16 +293,16 @@ VCF_IMPORT_DELETE_TEMP_FILES_ON_SUCCESS = not DEBUG
 VCF_IMPORT_CREATE_COHORT_FROM_MULTISAMPLE_VCFS = True
 VCF_IMPORT_NO_DNA_CONTROL_SAMPLE_REGEX = None
 VCF_IMPORT_FILE_SPLIT_ROWS = 50000
-VCF_IMPORT_STORE_GVCF_NON_VAR_BLOCKS = False
 VCF_IMPORT_VT_COMMAND = "vt"  # Needs to be installed and in path
 VCF_IMPORT_SKIP_RECORD_REGEX = {
-    "CNV": "<CNV>",
     "Fusion": "VARTYPE=fusion",
 }
 
 COMPANY = None  # Used for gene list categories
 
 GENERATED_DIR = os.path.join(MEDIA_ROOT, 'generated')
+
+HGVS_MAX_REF_ALLELE_LENGTH = 10  # Set to 0 for "del" instead of "delC" etc
 
 PATIENTS_READ_ONLY_SHOW_AGE_NOT_DOB = False
 IMPORT_PROCESSING_DIR = os.path.join(PRIVATE_DATA_ROOT, 'import_processing')
@@ -367,6 +367,7 @@ ANALYSIS_TEMPLATES_AUTO_SAMPLE = "Sample tab auto analysis"
 ANALYSIS_WARN_IF_NO_QC_GENE_LIST_MESSAGE = None  # disabled by default
 ANALYSIS_NODE_CACHE_Q = True  # So can turn off in unit tests
 
+VARIANT_ALLELE_FREQUENCY_CLIENT_SIDE_PERCENT = True  # For analysis Grid/CSV export. VCF export is always unit
 VARIANT_STANDARD_BASES_ONLY = True  # True to reject anything other than A, C, G, T
 VARIANT_SHOW_CANONICAL_HGVS = True
 
@@ -391,9 +392,14 @@ VARIANT_CLASSIFICATION_WEB_FORM_CREATE = True
 VARIANT_CLASSIFICATION_WEB_FORM_CREATE_BY_NON_ADMIN = True
 VARIANT_CLASSIFICATION_WEB_FORM_CREATE_ALLOW_NO_VARIANT = True  # Can create purely from HGVS
 
+# If change is synonymous, and molecular consequence is splicing, then change from p.= to p.?
+VARIANT_CLASSIFICATION_AUTO_POPULATE_P_HGVS_SYNONYMOUS_SPLICE_CHANGE_TO_UNKNOWN = False
+
 VARIANT_CLASSIFICATION_FILE_ATTACHMENTS = True  # allow users to attach files to classifications
 
-VARIANT_CLASSIFICATION_MAX_FULL_ALLELE_LENGTH = 100  # Used for MVL export, for general display limit is 10
+VARIANT_CLASSIFICATION_MAX_REFERENCE_LENGTH = 100  # Used for MVL export, general display use HGVS_MAX_REF_ALLELE_LENGTH
+
+
 
 PATHOLOGY_TESTS_ENABLED = False
 PATHOLOGY_TEST_REQUESTS_REDIRECT_URL = None

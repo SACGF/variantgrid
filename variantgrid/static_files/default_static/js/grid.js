@@ -2,11 +2,12 @@ function getGrid(nodeId, unique_code) {
 	return $("#grid-" + nodeId, "#" + unique_code);
 }
 
-function export_grid(nodeId, unique_code, export_type) {
+function export_grid(nodeId, unique_code, export_type, use_canonical_transcripts) {
 	let grid = getGrid(nodeId, unique_code);
 	let gridParam = grid.jqGrid('getGridParam', 'postData');
 	gridParam['rows'] = 0; // no pagination
 	gridParam['export_type'] = export_type;
+	gridParam['use_canonical_transcripts'] = use_canonical_transcripts;
 
 	let querystring = EncodeQueryData(gridParam);
 	let url = Urls.node_grid_export() + "?" + querystring;
@@ -647,6 +648,32 @@ function setupGrid(config_url, nodeId, versionId, unique_code, gridComplete, gri
 
 				setRowChangeCallbacks(grid, data["caption"])
 
+                grid.jqGrid(
+		            'navButtonAdd', pagerId, {
+		            caption : "CSV",
+		            buttonicon : "ui-icon-arrowthickstop-1-s",
+		            onClickButton : function() {
+		            	export_grid(nodeId, unique_code, 'csv');
+		            },
+		            title : "Download as CSV",
+		            cursor : "pointer"
+		        });
+
+                const aWin = getAnalysisWindow();
+                if (aWin.ANALYSIS_SETTINGS && aWin.ANALYSIS_SETTINGS.canonical_transcript_collection) {
+                    const ctc = aWin.ANALYSIS_SETTINGS.canonical_transcript_collection
+                    grid.jqGrid(
+                        'navButtonAdd', pagerId, {
+                        caption : "Canonical transcript CSV",
+                        buttonicon : "ui-icon-arrowthickstop-1-s",
+                        onClickButton : function() {
+                            export_grid(nodeId, unique_code, 'csv', true);
+                        },
+                        title : "Download CSV using transcripts from " + ctc,
+                        cursor : "pointer"
+                    });
+                }
+
 		        grid.jqGrid(
 		            'navButtonAdd', pagerId, {
 		            caption : "VCF",
@@ -654,20 +681,9 @@ function setupGrid(config_url, nodeId, versionId, unique_code, gridComplete, gri
 		            onClickButton : function() {
 		            	export_grid(nodeId, unique_code, 'vcf');
 		            },
-		            position : "first",
 		            title : "Download as VCF",
 		            cursor : "pointer"
-	        	}).jqGrid(
-		            'navButtonAdd', pagerId, {
-		            caption : "CSV",
-		            buttonicon : "ui-icon-arrowthickstop-1-s",
-		            onClickButton : function() {
-		            	export_grid(nodeId, unique_code, 'csv');
-		            },
-		            position : "first",
-		            title : "Download as CSV",
-		            cursor : "pointer"
-		        });
+	        	});
 			}
 	    });
 	});

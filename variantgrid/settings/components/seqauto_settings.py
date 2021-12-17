@@ -54,9 +54,6 @@ SEQAUTO_BAM_PATTERN = "%(sample_name)s.hg38.bam"
 SEQAUTO_VCF_PATTERN = "gatk_per_sample/%(sample_name)s.gatk.hg38.vcf.gz"
 SEQAUTO_COMBINED_VCF_PATTERNS_FOR_KIT = {
     "default": ["%(sequencing_run)s.gatk.hg38.vcf.gz"],
-    "idt_haem": [
-        "%(sequencing_run)s.vardict.hg38.vcf.gz",
-    ],
 }
 
 SEQAUTO_GOI_LIST_PATTERN = "%(sequencing_run)s_%(sample_name)s.txt"

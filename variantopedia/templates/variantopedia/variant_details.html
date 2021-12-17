@@ -703,10 +703,10 @@ function applyVariantValues() {
                                 {% endif %}
                                 {% labelled id='gnomad_popmax' label='gnomAD Pop Max' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_popmax_af|format_unit_as_percent }} ({{ variant_annotation.get_gnomad_popmax_display }}) {% endlabelled %}
 
-                                {% if variant_annotation.gnomad_flag %}
-                                    {% labelled label="gnomAD Is Flagged" label_css="gnomad-flagged-label gnomad-flagged" hint="tiny" %}{{ variant_annotation.gnomad_flag }}{% endlabelled %}
+                                {% if variant_annotation.gnomad_filtered %}
+                                    {% labelled label="gnomAD Is Filtered" label_css="gnomad-filtered" hint="tiny" %}{{ variant_annotation.gnomad_filtered }}{% endlabelled %}
                                 {% else %}
-                                    {% labelled label="gnomAD Is Flagged" label_css="gnomad-flagged-label" hint="tiny" %}{% endlabelled %}
+                                    {% labelled label="gnomAD Is Filtered" hint="tiny" %}{% endlabelled %}
                                 {% endif %}
 
                                 {% labelled id='gnomad_total_homozygotes' label='gnomAD Total Homozygotes' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_hom_alt }}{% endlabelled %}

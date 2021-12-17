@@ -7,7 +7,7 @@ function setupTooltips() {
 
     // when hitting enter on an input that has an input-group-append button
     // automatically trigger the button
-    $('.input-group-append').closest('.input-group').find('input').keyup(function(event) {
+    $('.input-group-append').closest('.input-group').find('input').keydown(function(event) {
         if (event.which === 13) {
             let button = $(this).closest('.input-group').find('.input-group-append .btn');
             if (button.length) {

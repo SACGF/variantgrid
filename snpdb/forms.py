@@ -56,9 +56,11 @@ class GenomeBuildAutocompleteForwardMixin:
     def __init__(self, *args, **kwargs):
         genome_build = kwargs.pop("genome_build", None)
         super().__init__(*args, **kwargs)
-        if genome_build:
-            for f in self.genome_build_fields:
-                self.fields[f].widget.forward.append(forward.Const(genome_build.pk, "genome_build_id"))
+        for f in self.genome_build_fields:
+            widget_forward = []
+            if genome_build:
+                widget_forward.append(forward.Const(genome_build.pk, "genome_build_id"))
+            self.fields[f].widget.forward = widget_forward
 
 
 class UserSelectForm(forms.Form):

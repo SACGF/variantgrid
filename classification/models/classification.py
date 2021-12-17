@@ -525,13 +525,13 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 max_length = max(c_hgvs_name.ref_lengths(), max_length)
                 self.chgvs_grch37 = c_hgvs_name.format()
                 self.chgvs_grch37_full = c_hgvs_name.format(
-                    max_allele_length=settings.VARIANT_CLASSIFICATION_MAX_FULL_ALLELE_LENGTH)
+                    max_ref_length=settings.VARIANT_CLASSIFICATION_MAX_REFERENCE_LENGTH)
             if GenomeBuild.grch38().is_annotated:
                 c_hgvs_name = self._generate_c_hgvs_extra(genome_build=GenomeBuild.grch38())
                 max_length = max(c_hgvs_name.ref_lengths(), max_length)
                 self.chgvs_grch38 = c_hgvs_name.format()
                 self.chgvs_grch38_full = c_hgvs_name.format(
-                    max_allele_length=settings.VARIANT_CLASSIFICATION_MAX_FULL_ALLELE_LENGTH)
+                    max_ref_length=settings.VARIANT_CLASSIFICATION_MAX_REFERENCE_LENGTH)
         else:
             self.chgvs_grch37 = None
             self.chgvs_grch37_full = None

@@ -8,6 +8,7 @@ from django.db.models.fields.json import KeyTextTransform, KeyTransform
 from django.db.models.functions import Lower, Cast
 from lazy import lazy
 
+from classification.models.classification_utils import classification_gene_symbol_filter
 from flags.models import FlagCollection, FlagStatus
 from genes.models import Gene, Transcript, TranscriptVersion, GeneSymbol
 from ontology.models import OntologyTerm
@@ -280,29 +281,12 @@ class ClassificationDatatableConfig(DatatableConfig):
         genes: Optional[Iterable[Gene]] = None
         symbols: Optional[Iterable[str]] = None
         if gene_symbol_str := self.get_query_param("gene_symbol"):
-            gene_symbol: GeneSymbol
-            if gene_symbol := GeneSymbol.objects.filter(pk=gene_symbol_str).first():
-                genes = gene_symbol.alias_meta.genes
-                symbols = gene_symbol.alias_meta.alias_symbol_strs
-                # used to do the below, which would include genes marked as "unknown"
-                # now they wont be included, revert if this causes problems
-                # genes = Gene.objects.filter(geneversion__gene_symbol__in=gene_symbols).distinct()
-
-        if genes is not None:
-            allele_qs = Allele.objects.filter(variantallele__variant__variantannotation__gene__in=genes)
-            match_gene = Q(classification__variant__variantallele__allele__in=allele_qs)
-            evidence_q_list = []
-
-            for symbol in symbols:
-                evidence_q_list.append(Q(published_evidence__gene_symbol__value__iexact=symbol))
-
-            t_qs = Transcript.objects.filter(transcriptversion__gene_version__gene__in=genes).distinct()
-            for transcript_id, annotation_consortium in t_qs.values_list("identifier", "annotation_consortium"):
-                ekey = SpecialEKeys.ANNOTATION_CONSORTIUM_KEYS[annotation_consortium]
-                evidence_q_list.append(Q(**{f"published_evidence__{ekey}__value__startswith": transcript_id}))
-
-            match_evidence = reduce(operator.or_, evidence_q_list)
-            filters.append(match_gene | match_evidence)
+            # SA Path wasn't calling classification_gene_symbol_filter - Manually patched back only lines in this block
+            # from d91ed4c0d95cb22935f59a408334972971e9d66f - "remove code duplication" so we call it
+            if gene_filter := classification_gene_symbol_filter(gene_symbol_str):
+                filters.append(gene_filter)
+            else:
+                return qs.none()
 
         if settings.VARIANT_CLASSIFICATION_GRID_SHOW_ORIGIN:
             allele_origin = self.get_query_param("allele_origin")

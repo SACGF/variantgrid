@@ -20,6 +20,7 @@ from genes.models import TranscriptVersion, Transcript, MissingTranscript, Gene,
 from genes.models_enums import AnnotationConsortium
 from library.genomics import format_chrom
 from library.log_utils import report_exc_info
+from library.utils import clean_string
 from ontology.models import OntologyTerm
 from patients.models import ExternalPK, Patient
 from seqauto.illumina.illumina_sequencers import SEQUENCING_RUN_REGEX
@@ -297,7 +298,7 @@ class Searcher:
         # if user can only see variants with classifications, then they def shouldn't be able to classify new variants
         self.can_create = True
         self.user = user
-        self.search_string = search_string.strip()
+        self.search_string = clean_string(search_string)
         self.classify = classify
 
         if settings.SEARCH_VARIANT_REQUIRE_CLASSIFICATION_FOR_NON_ADMIN and not user.is_superuser:

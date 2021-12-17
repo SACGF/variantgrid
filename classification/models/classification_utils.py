@@ -288,7 +288,14 @@ def classification_gene_symbol_filter(gene_symbol: Union[str, GeneSymbol]) -> Q:
             t_qs = Transcript.objects.filter(transcriptversion__gene_version__gene__in=genes).distinct()
             for transcript_id, annotation_consortium in t_qs.values_list("identifier", "annotation_consortium"):
                 e_key = SpecialEKeys.ANNOTATION_CONSORTIUM_KEYS[annotation_consortium]
-                evidence_q_list.append(Q(**{f"published_evidence__{e_key}__value__startswith": transcript_id}))
+                # We want to match transcript versions (ie X should match X, X.1, X.2 etc)
+                # This is quick but wrong - startswith=NM_001099 wrongly matches NM_00109911
+                q_transcript_startswith = Q(**{f"published_evidence__{e_key}__value__startswith": transcript_id})
+                # This regex correctly handles transcripts but is very slow (10x previous query)
+                regex = rf"^{transcript_id}(\.\d+)?$"
+                q_regex = Q(**{f"published_evidence__{e_key}__value__regex": regex})
+                # Run both quick startwith and regex queries (only slightly slower than original startswith)
+                evidence_q_list.append(q_transcript_startswith & q_regex)
 
             match_evidence = reduce(operator.or_, evidence_q_list)
         else:

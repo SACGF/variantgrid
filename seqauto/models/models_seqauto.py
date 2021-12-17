@@ -538,10 +538,9 @@ class Fastq(SeqAutoRecord):
     read = models.CharField(max_length=2, choices=PairedEnd.choices)
 
     def get_common_pair_name_and_read(self):
-        name = os.path.basename(self.path)
+        """ Need a way to group R1/R2 FastQs together (using globally unique key - ie shared path prefix)  """
         regex_pattern = "(.+)_(R[12])(_001)?.fastq.gz"
-
-        m = re.match(regex_pattern, name)
+        m = re.match(regex_pattern, self.path)
         if not m:
             msg = f"FastQ path '{self.path}' does not match regex pattern '{regex_pattern}'"
             raise ValueError(msg)
