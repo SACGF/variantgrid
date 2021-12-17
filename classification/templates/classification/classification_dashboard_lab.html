@@ -1,0 +1,29 @@
+{% extends "uicore/page/base.html" %}
+{% load crispy_forms_tags %}
+{% load static %}
+{% load js_tags %}
+{% load english_tags %}
+{% load compress %}
+{% load ui_help %}
+{% load ui_utils %}
+{% load ui_menu_bars %}
+{% load ui_tabs_builder %}
+{% load lab_tags %}
+{% block title %}Classification Dashboard{% endblock %}
+{% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
+{% block content %}
+<div class="container">
+    {% lab_picker view_name="classification_dashboard_lab" selected_lab=lab %}
+
+    <h4>Shared Classification Graph</h4>
+    <div>Graph goes here</div>
+
+    The lab {{ lab }} is:
+    {% labelled label="Shared Classifications" %}-{% endlabelled %}
+    {% labelled label="Unique Classified Alleles" %}-{% endlabelled %}
+    {% labelled label="Uploaded to Clinvar" %}-{% endlabelled %}
+
+    {% labelled label="Classifications Involved in Discordances" %}-{% endlabelled %}
+    {% labelled label="Classifications w Outstanding Condition Text" %}-{% endlabelled %}
+</div>
+{% endblock content %}

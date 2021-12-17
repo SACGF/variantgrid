@@ -1,0 +1,104 @@
+{% extends "uicore/page/base.html" %}
+{% load crispy_forms_tags %}
+{% load static %}
+{% load js_tags %}
+{% load english_tags %}
+{% load compress %}
+{% load ui_help %}
+{% load ui_utils %}
+{% load ui_menu_bars %}
+{% load ui_tabs_builder %}
+{% block title %}Classification Issues{% endblock %}
+{% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
+{% block head %}
+    <script>
+        function classificationDiscordant(data) {
+            data.flags = JSON.stringify(['classification_discordant']);
+            data.my_labs = "true";
+        }
+        function classificationMatchingVariant(data) {
+            data.flags = JSON.stringify(['classification_matching_variant', 'classification_matching_variant_warning', 'classification_transcript_version_change']);
+            data.my_labs = "true";
+        }
+        function classificationComments(data) {
+            data.flags = JSON.stringify(['classification_suggestion', 'classification_internal_review', 'classification_significance_change']);
+            data.my_labs = "true";
+        }
+        function classificationUnshared(data) {
+            data.flags = JSON.stringify(['classification_unshared']);
+            data.my_labs = "true";
+        }
+        function classificationWithdrawn(data) {
+            data.flags = JSON.stringify(['classification_withdrawn']);
+            data.my_labs = "true";
+        }
+        function classificationExcludeClinVar(data) {
+            data.flags = JSON.stringify(['classification_not_public']);
+            data.my_labs = "true";
+        }
+        $(document).ready(() => {
+            $('a[data-toggle="tab"]').on('shown.bs.tab', function (event) {
+                Flags.instance.init({userId: '{{user.id}}', filter: '.active', forceRender: true});
+            });
+            $('.dataTable').on('draw.dt', () => {
+                Flags.instance.init({userId: '{{user.id}}', filter: '.active', forceRender: true});
+            });
+        });
+    </script>
+{% endblock %}
+
+{% block content %}
+    <div class="container-table" id="dashboard-links">
+        {% page_help_embedded page_id='classification/issues_help' title='Classification Issues' %}
+            <p>
+                This page will list all classifications belonging to your lab/s that have flags raised against them.<br/>
+                Each classification flag indicates that there is an action that needs to be performed against the classification.<br/>
+                Clicking on each flag will give you instructions on what needs to be done to resolve it.
+            </p>
+            <p>
+                Flags range from issues with variant matching, to discordances or suggestions.<br/>
+            </p>
+        {% end_page_help_embedded %}
+        {% labelled row_css="my-4" label="Email Preview" admin_only=True %}
+            <div class="link-toolbar">
+                <a class="download-link type-csv" href="{% url 'summary_email_html' %}">HTML</a>
+                <a class="download-link type-json" href="{% url 'summary_email_text' %}">TEXT</a>
+            </div>
+        {% endlabelled %}
+
+        {% labelled label="Showing Issues for Your Labs" %}{% for lab in labs %}{% if not forloop.first %}, {% endif %}{{ lab }}{% endfor %}{% endlabelled %}
+        <a class="download-link type-csv" href="{% url 'classification_dashboard_download' %}">Download all issues requiring action</a>
+
+        <p class="text-info">For instructions on how to fix the outstanding actions, click on the icons in the flag column for each classification.</p>
+
+        <div class="mt-4">
+            {% ui_register_tab_embedded tab_set="classification_issues" label="Discordance" badge=counts.classifications.discordant %}
+                <table id="classifications-discordant" data-datatable-url="{% url 'classification_datatables' %}" class="sticky-header classification-table" data-datatable-data="classificationDiscordant"></table>
+            {% end_ui_register_tab_embedded %}
+
+            {% ui_register_tab_embedded tab_set="classification_issues" label="Suggestion/Internal Review/Clin Change" badge=counts.classifications.comments %}
+                <table id="classifications-comment" data-datatable-url="{% url 'classification_datatables' %}" class="sticky-header classification-table" data-datatable-data="classificationComments"></table>
+            {% end_ui_register_tab_embedded %}
+
+            {% ui_register_tab_embedded tab_set="classification_issues" label="Variant Matching Issues" badge=counts.classifications.variant_matching %}
+                <table id="classifications-matching" data-datatable-url="{% url 'classification_datatables' %}" class="sticky-header classification-table" data-datatable-data="classificationMatchingVariant"></table>
+            {% end_ui_register_tab_embedded %}
+
+            {% ui_register_tab_embedded tab_set="classification_issues" label="Unshared" badge=counts.classifications.unshared %}
+                <table id="classifications-unshared" data-datatable-url="{% url 'classification_datatables' %}" class="sticky-header classification-table" data-datatable-data="classificationUnshared"></table>
+            {% end_ui_register_tab_embedded %}
+
+            {% ui_register_tab_embedded tab_set="classification_issues" label="Withdrawn" badge=counts.classifications.withdrawn %}
+                <table id="classifications-withdrawn" data-datatable-url="{% url 'classification_datatables' %}" class="sticky-header classification-table" data-datatable-data="classificationWithdrawn"></table>
+            {% end_ui_register_tab_embedded %}
+
+            {% if clinvar_export_enabled %}
+                {% ui_register_tab_embedded tab_set="classification_issues" label="Exclude from ClinVar" badge=counts.classifications.clinvar_exclude %}
+                    <table id="classifications-exclude-clinvar" data-datatable-url="{% url 'classification_datatables' %}" class="sticky-header classification-table" data-datatable-data="classificationExcludeClinVar"></table>
+                {% end_ui_register_tab_embedded %}
+            {% endif %}
+
+            {% ui_render_tabs tab_set="classification_issues" %}
+        </div>
+    </div>
+{% endblock %}
