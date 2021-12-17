@@ -635,6 +635,18 @@ function setupGrid(config_url, nodeId, versionId, unique_code, gridComplete, gri
 				    gridCompleteExtra();
 				};
 				data["loadError"] = gridLoadError;
+                data["loadComplete"] = function(data) {
+                    if (data.non_fatal) {
+                        // console.log("jQGrid: Non fatal node error...");
+                        // console.log(data);
+                        if (data.deleted_nodes) {
+                            deleteNodesFromDOM(data.deleted_nodes, []);
+                            if (data.message) {
+                                $("#node-editor-container").text(data.message)
+                            }
+                        }
+                    }
+                }
 
                 const grid = getGrid(nodeId, unique_code);
                 grid.jqGrid(data).navGrid(pagerId,
