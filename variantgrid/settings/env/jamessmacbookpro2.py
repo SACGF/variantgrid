@@ -27,6 +27,7 @@ ACCOUNTS_EMAIL = 'accounts@shariant.org.au'
 DEBUG = True
 ROLLBAR['enabled'] = False
 
+"""
 AUTHENTICATION_BACKENDS = (
     'auth.backend.VariantGridOIDCAuthenticationBackend',
     'django.contrib.auth.backends.ModelBackend',  # default
@@ -49,10 +50,9 @@ REST_FRAMEWORK = {
     ],
 }
 
-MAINTENANCE_MODE = False
 OIDC_DRF_AUTH_BACKEND = 'auth.backend.VariantGridOIDCAuthenticationBackend'
 USE_OIDC = True
-# OIDC_REQUIRED_GROUP = '/variantgrid/shariant_production'
+OIDC_REQUIRED_GROUP = '/variantgrid/shariant_production'
 LOGIN_URL = '/oidc_login/'
 
 OIDC_RP_SIGN_ALGO = 'RS256'
@@ -82,12 +82,11 @@ VARIANT_CLASSIFICATION_GRID_SHOW_USERNAME = True
 # Overwrite settings for your system below
 ALLOWED_HOSTS = ["*"]
 
-if DB_FILE == 'local_login':
-    INTERNAL_IPS = [
-        '127.0.0.1',
-        '10.211.55.2'
-    ]
-"""
+INTERNAL_IPS = [
+    '127.0.0.1',
+    '10.211.55.2'
+]
+
 ANNOTATION_ENTREZ_EMAIL = 'James.Andrews@sa.gov.au'
 
 ANNOTATION_BASE_DIR = "/Users/jamesandrews/Projects/VariantGrid/data/annotation"
