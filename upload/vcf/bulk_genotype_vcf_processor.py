@@ -13,7 +13,7 @@ from library.postgres_utils import postgres_arrays
 import numpy as np
 
 from library.utils import double_quote
-from library.vcf_utils import VCFConstant, cyvcf2_gt_types
+from library.vcf_utils import VCFConstant
 from patients.models_enums import Zygosity
 from snpdb.models import CohortGenotype
 from snpdb.models.models_enums import ProcessingStatus
@@ -42,7 +42,8 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
     # v16. Don't insert a reference variant for each unknown ALT (only if provided) - version never deployed
     # v17. Use refactored RedisVariantPKLookup
     # v18. Handle Mixed diploid/haploid calls eg male chrX GT=1 - see https://github.com/brentp/cyvcf2/issues/227
-    VCF_IMPORTER_VERSION = 18  # Change this if you make a major change to the code.
+    # v19. Go back to using CyVCF code as of version >= 0.30.14
+    VCF_IMPORTER_VERSION = 19  # Change this if you make a major change to the code.
     # Need to distinguish between no entry and 0, can't use None w/postgres command line inserts
     DEFAULT_AD_FIELD = 'AD'  # What CyVCF2 uses
     # GL = Genotype Likelihood - used by freeBayes v1.2.0: log10-scaled likelihoods of the data given the called
@@ -253,17 +254,10 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
         self.locus_modified_imported_variants = []
         self.locus_ad_sum.fill(0)
 
-    def process_entry(self, variant):
+    def process_entry(self, variant: cyvcf2.Variant):
         # Pre-processed by vcf_filter_unknown_contigs so only recognised contigs present
         ref, alt = self.get_ref_alt(variant)
         locus_tuple = (variant.CHROM, variant.POS, ref)
-
-        # Calculate own gt_types, see https://github.com/brentp/cyvcf2/issues/198
-        gt_types = cyvcf2_gt_types(variant.genotypes)
-        ref_count = np.count_nonzero(gt_types == 0)
-        het_count = np.count_nonzero(gt_types == 1)
-        unk_count = np.count_nonzero(gt_types == 2)
-        hom_count = np.count_nonzero(gt_types == 3)
 
         # These ADs come out with empty value as -1 - that's what we want to store
         ref_allele_depth, alt_allele_depth = self.get_ref_alt_allele_depth(variant)
@@ -281,7 +275,7 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
 
         read_depth_str = self.get_format_array_str(variant, self.vcf.read_depth_field, as_type=int)
         genotype_quality_str = self.get_format_array_str(variant, self.vcf.genotype_quality_field, as_type=int)
-        phred_likelihood_str = self.get_phred_likelihood_str(variant, gt_types)
+        phred_likelihood_str = self.get_phred_likelihood_str(variant, variant.gt_types)
         samples_filters_str = self.get_samples_filters_str(variant)
 
         if self.last_locus_tuple:
@@ -289,13 +283,13 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
                 self.finished_locus()
 
         alt_hash = self.variant_pk_lookup.get_variant_coordinate_hash(variant.CHROM, variant.POS, ref, alt)
-        alt_zygosity = [BulkGenotypeVCFProcessor.ALT_CYVCF_GT_ZYGOSITIES[i] for i in gt_types]
+        alt_zygosity = [BulkGenotypeVCFProcessor.ALT_CYVCF_GT_ZYGOSITIES[i] for i in variant.gt_types]
         alt_allele_depth_str = postgres_arrays(alt_allele_depth)
 
-        cohort_gt = [str(ref_count),
-                     str(het_count),
-                     str(hom_count),
-                     str(unk_count),
+        cohort_gt = [str(variant.num_hom_ref),
+                     str(variant.num_het),
+                     str(variant.num_hom_alt),
+                     str(variant.num_unknown),
                      ''.join(alt_zygosity),
                      alt_allele_depth_str,
                      allele_frequency_str,

@@ -894,7 +894,10 @@ class SampleSheetCombinedVCFFile(SeqAutoRecord):
         enrichment_kit = sample_sheet.sequencing_run.enrichment_kit
         pattern_list = None
         if enrichment_kit:
-            pattern_list = settings.SEQAUTO_COMBINED_VCF_PATTERNS_FOR_KIT.get(enrichment_kit.name)
+            kit_name = enrichment_kit.name
+            if sample_sheet.sequencing_run.name.endswith("_FFPE"):
+                kit_name += "_ffpe"
+            pattern_list = settings.SEQAUTO_COMBINED_VCF_PATTERNS_FOR_KIT.get(kit_name)
 
         if pattern_list is None:
             pattern_list = settings.SEQAUTO_COMBINED_VCF_PATTERNS_FOR_KIT["default"]

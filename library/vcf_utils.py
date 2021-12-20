@@ -66,48 +66,6 @@ def write_vcf_from_tuples(vcf_filename, variant_tuples, tuples_have_id_field=Fal
             f.write(line + "\n")
 
 
-def cyvcf2_gt_types(genotypes):
-    """ Work around for strict_gt=True not working on phased genotypes
-        ie issue https://github.com/brentp/cyvcf2/issues/198 (strict_gt=True doesn't affect phased genotypes)
-        and https://github.com/brentp/cyvcf2/issues/227 (mixed diploid/haploid incorrect zygosity call) """
-    HOM_REF = 0
-    HET = 1
-    UNKNOWN = 2
-    HOM_ALT = 3
-
-    gt_types = []
-    for genotype in genotypes:
-        ploidy = len(genotype) - 1  # Last entry is True/False for phasing
-        if ploidy == 1:
-            a1 = genotype[0]
-            if a1 == -1:
-                gt = UNKNOWN
-            elif a1 == 0:
-                gt = HOM_REF
-            elif a1 == 1:
-                gt = HOM_ALT
-            else:
-                raise ValueError(f"Unknown haploid genotype of {a1}")
-        elif ploidy == 2:
-            a1 = genotype[0]
-            a2 = genotype[1]
-
-            if a1 == -1 or a2 == -1:  # Strict - any . => Unknown
-                gt = UNKNOWN
-            else:
-                if a1 == a2:
-                    if a1 == 0:
-                        gt = HOM_REF
-                    else:
-                        gt = HOM_ALT
-                else:
-                    gt = HET
-        else:
-            raise ValueError(f"Can't handle plodiy of {ploidy}")
-        gt_types.append(gt)
-    return np.array(gt_types)
-
-
 def get_variant_caller_and_version_from_vcf(filename) -> Tuple[str, str]:
     variant_caller = None
     version = None
