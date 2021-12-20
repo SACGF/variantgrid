@@ -1,4 +1,5 @@
-from typing import Dict, Optional
+from socket import socket
+from typing import Dict, Optional, Iterable, List, TypeVar, Union
 
 from django.db.models.query_utils import Q
 import json
@@ -6,7 +7,7 @@ import requests
 
 from library.guardian_utils import admin_bot
 from library.oauth import OAuthConnector
-from library.utils import batch_iterator
+
 from sync.models.enums import SyncStatus
 from sync.models.models import SyncDestination, SyncRun
 from sync.models.models_classification_sync import ClassificationModificationSyncRecord
@@ -16,7 +17,8 @@ from classification.models import EvidenceKeyMap
 from classification.models.classification import ClassificationModification
 from classification.models.classification_utils import ClassificationJsonParams
 
-SHARIANT_PRIVATE_FIELDS = ['patient_id', 'family_id', 'sample_id', 'patient_summary', 'internal_use']
+# add variant_type to private fields as the key has been deprecated
+SHARIANT_PRIVATE_FIELDS = ['patient_id', 'family_id', 'sample_id', 'patient_summary', 'internal_use', 'variant_type']
 
 
 def insert_nones(data: Dict) -> Dict:
@@ -25,6 +27,35 @@ def insert_nones(data: Dict) -> Dict:
         if key not in data:
             data[key] = None
     return data
+
+
+T = TypeVar("T")
+
+
+def batch_iterator_end(iterable: Iterable[T], batch_size: int = 10) -> Iterable[Union[List[T], bool]]:
+    """
+    Creates an iterator of list of T from an iterator of T, as well as providing a boolean to indicate if
+    this is the final batch
+    :param iterable: Iteratble of T
+    :param batch_size: Max number of items allowed in a batch (all but the last batch should be this size)
+    :return: Union of list of T, and a boolean True if the batch is final, False otherwise
+    """
+    batch = []
+    pending_batch = None
+    for record in iterable:
+        if pending_batch:
+            yield pending_batch, False
+            pending_batch = None
+
+        batch.append(record)
+        if len(batch) >= batch_size:
+            pending_batch = batch
+            batch = []
+
+    if pending_batch:
+        yield pending_batch, True
+    if batch:
+        yield batch, True
 
 
 def sync_shariant_upload(sync_destination: SyncDestination, full_sync: bool = False, max_rows: Optional[int] = None) -> SyncRun:
@@ -67,6 +98,7 @@ def sync_shariant_upload(sync_destination: SyncDestination, full_sync: bool = Fa
         data = historical_converter.to_shariant(vcm, data)
         formatted_json['data'] = data
         formatted_json['publish'] = share_level
+        formatted_json['delete'] = raw_json.get('withdrawn', False)
 
         return formatted_json
 
@@ -111,11 +143,18 @@ def sync_shariant_upload(sync_destination: SyncDestination, full_sync: bool = Fa
         if max_rows is not None:
             qs = qs[:max_rows]
 
+        site_name = socket.gethostname().lower().split('.')[0].replace('-', '')
         try:
-            for batch in batch_iterator(qs, batch_size=50):
-
-                json_to_send = {"records": [classification_to_json(vcm) for vcm in batch]}
-                print(json.dumps(json_to_send))
+            for batch, finished in batch_iterator_end(qs, batch_size=50):
+                # providing import_id and status:complete when we're done lets Shariant know
+                # when the upload has been completed
+                json_to_send = {
+                    "records": [classification_to_json(vcm) for vcm in batch],
+                    "import_id": site_name
+                }
+                if finished:
+                    json_to_send["status"] = "complete"
+                # print(json.dumps(json_to_send))
                 auth = shariant.auth()
 
                 response = requests.post(
@@ -134,6 +173,7 @@ def sync_shariant_upload(sync_destination: SyncDestination, full_sync: bool = Fa
             run.status = SyncStatus.SUCCESS
             run.save()
         finally:
+
             # bit of a hack so I can let the exception just fall through to rollbar
             # while still updating the status of the run
             if run.status == SyncStatus.IN_PROGRESS:
