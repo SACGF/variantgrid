@@ -19,6 +19,7 @@ def _test_old_version(apps):
 
     return needs_upgrade
 
+
 class Migration(migrations.Migration):
 
     dependencies = [
