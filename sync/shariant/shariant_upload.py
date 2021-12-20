@@ -1,4 +1,4 @@
-from socket import socket
+import socket
 from typing import Dict, Optional, Iterable, List, TypeVar, Union
 
 from django.db.models.query_utils import Q
@@ -87,6 +87,7 @@ def sync_shariant_upload(sync_destination: SyncDestination, full_sync: bool = Fa
         for dont_share in SHARIANT_PRIVATE_FIELDS:
             data.pop(dont_share, None)
 
+        # no need to screw around with owner
         user = data.get('owner', {}).get('value')
         if not user:
             user = vcm.user.username
