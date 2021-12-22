@@ -11,7 +11,7 @@ class AnnotationConfig(AppConfig):
         from Bio import Entrez
         from django.conf import settings
         from annotation.models import CachedWebResource
-        from annotation.signals import clingen_post_save_handler, clinvar_citations_post_save_handler
+        from annotation.signals import clinvar_citations_post_save_handler
         # pylint: enable=import-outside-toplevel
 
         # Entrez wants both email and API key
@@ -20,7 +20,6 @@ class AnnotationConfig(AppConfig):
         if entrez_email := getattr(settings, "ANNOTATION_ENTREZ_EMAIL", None):
             Entrez.email = entrez_email
 
-        post_save.connect(clingen_post_save_handler, sender=CachedWebResource)
         post_save.connect(clinvar_citations_post_save_handler, sender=CachedWebResource)
 
         try:

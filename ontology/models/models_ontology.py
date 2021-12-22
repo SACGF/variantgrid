@@ -3,6 +3,7 @@ A series of models that currently stores the combination of MONDO, OMIM, HPO & H
 (Note that HGNC is included just to model relationships, please use GeneSymbol for all your GeneSymbol needs).
 """
 import functools
+import operator
 import re
 from dataclasses import dataclass
 from typing import Optional, List, Dict, Set, Union, Tuple, Iterable
@@ -134,6 +135,29 @@ class OntologyRelation:
     "http://purl.obolibrary.org/obo/RO_0004027": "disease has inflammation site",
     "http://purl.obolibrary.org/obo/RO_0004030": "disease arises from structure"
     """
+
+
+class GeneDiseaseClassification(models.TextChoices):
+    # @see https://thegencc.org/faq.html#validity-termsdelphi-survey - where sort order comes from
+    # Not using eg "GENCC:100009" (= Supportive) as that has different sort order than page above
+    REFUTED = "1", "Refuted Evidence"
+    NO_KNOWN = "2", "No Known Disease Relationship"
+    ANIMAL = "3", "Animal Model Only"
+    DISPUTED = "4", "Disputed Evidence"
+    LIMITED = "5", "Limited"
+    SUPPORTIVE = "6", "Supportive"
+    MODERATE = "7", "Moderate"
+    STRONG = "8", "Strong"
+    DEFINITIVE = "9", "Definitive"
+
+    @staticmethod
+    def get_above_min(min_classification: 'GeneDiseaseClassification') -> List[str]:
+        classifications = []
+        for e in reversed(GeneDiseaseClassification):
+            classifications.append(e.label)
+            if e.value == min_classification:
+                break
+        return classifications
 
 
 class OntologyImport(TimeStampedModel):
@@ -339,6 +363,9 @@ class OntologyTermRelation(TimeStampedModel):
     def __str__(self):
         return f"{self.source_term} -> ({self.relation}) -> {self.dest_term}"
 
+    def __lt__(self, other):
+        return self.source_term < other.source_term
+
     def other_end(self, term: OntologyTerm) -> OntologyTerm:
         """
         Given a relationship is between two terms, return the other one
@@ -423,7 +450,7 @@ class OntologySnake:
                  paths: Optional[List[OntologyTermRelation]] = None):
         self.source_term = source_term
         self.leaf_term = leaf_term or source_term
-        self.paths = paths or list()
+        self.paths = paths or []
 
     def snake_step(self, relationship: OntologyTermRelation) -> 'OntologySnake':
         """
@@ -435,7 +462,7 @@ class OntologySnake:
         return OntologySnake(source_term=self.source_term, leaf_term=new_leaf, paths=new_paths)
 
     def show_steps(self) -> List[OntologySnakeStep]:
-        steps: List[OntologySnakeStep] = list()
+        steps: List[OntologySnakeStep] = []
         node = self.source_term
         for path in self.paths:
             node = path.other_end(node)
@@ -474,15 +501,15 @@ class OntologySnake:
 
         seen: Set[OntologyTerm] = {descendant, }
         new_snakes: List[OntologySnake] = list([OntologySnake(source_term=descendant)])
-        valid_snakes: List[OntologySnake] = list()
+        valid_snakes: List[OntologySnake] = []
         level = 0
         while new_snakes:
             level += 1
-            snakes_by_leaf: Dict[OntologyTerm, OntologySnake] = dict()
+            snakes_by_leaf: Dict[OntologyTerm, OntologySnake] = {}
             for snake in new_snakes:
                 snakes_by_leaf[snake.leaf_term] = snake
 
-            new_snakes: List[OntologySnake] = list()
+            new_snakes: List[OntologySnake] = []
             for relationship in OntologyTermRelation.objects\
                     .filter(source_term__in=snakes_by_leaf.keys(), relation=OntologyRelation.IS_A)\
                     .exclude(dest_term__in=seen)\
@@ -498,12 +525,14 @@ class OntologySnake:
             if valid_snakes:
                 return valid_snakes
             if level >= max_levels:
-                return list()
-        return list()
+                return []
+        return []
 
     # TODO only allow EXACT between two anythings that aren't Gene Symbols
     @staticmethod
-    def snake_from(term: OntologyTerm, to_ontology: OntologyService, max_depth: int = 1) -> 'OntologySnakes':
+    def snake_from(term: OntologyTerm, to_ontology: OntologyService,
+                   min_classification: GeneDiseaseClassification = GeneDiseaseClassification.STRONG,
+                   max_depth: int = 1) -> 'OntologySnakes':
         """
         Returns the smallest snake/paths from source term to the desired OntologyService
         Ignores IS_A paths
@@ -514,16 +543,21 @@ class OntologySnake:
         seen: Set[OntologyTerm] = set()
         seen.add(term)
         new_snakes: List[OntologySnake] = list([OntologySnake(source_term=term)])
-        valid_snakes: List[OntologySnake] = list()
+        valid_snakes: List[OntologySnake] = []
 
-        best_relationships = ~Q(relation__in={OntologyRelation.IS_A, OntologyRelation.EXACT_SYNONYM, OntologyRelation.RELATED_SYNONYM})
+        gencc_classifications = GeneDiseaseClassification.get_above_min(min_classification)
+        relation_q_list = [
+            ~Q(relation__in={OntologyRelation.IS_A, OntologyRelation.EXACT_SYNONYM, OntologyRelation.RELATED_SYNONYM}),
+            ~Q(relation=OntologyRelation.RELATED) | Q(extra__strongest_classification__in=gencc_classifications),
+        ]
+        q_relation = functools.reduce(operator.and_, relation_q_list)
 
         iteration = -1
         while new_snakes:
             iteration += 1
             snakes: List[OntologySnake] = list(new_snakes)
-            new_snakes: List[OntologySnake] = list()
-            by_leafs: Dict[OntologyTerm, OntologySnake] = dict()
+            new_snakes: List[OntologySnake] = []
+            by_leafs: Dict[OntologyTerm, OntologySnake] = {}
             for snake in snakes:
                 if existing := by_leafs.get(snake.leaf_term):
                     if len(snake.paths) < len(existing.paths):
@@ -532,8 +566,8 @@ class OntologySnake:
                     by_leafs[snake.leaf_term] = snake
             all_leafs = by_leafs.keys()
 
-            outgoing = OntologyTermRelation.objects.filter(source_term__in=all_leafs).exclude(dest_term__in=seen).filter(best_relationships).select_related("source_term", "dest_term")
-            incoming = OntologyTermRelation.objects.filter(dest_term__in=all_leafs).exclude(source_term__in=seen).filter(best_relationships).select_related("source_term", "dest_term")
+            outgoing = OntologyTermRelation.objects.filter(source_term__in=all_leafs).exclude(dest_term__in=seen).filter(q_relation).select_related("source_term", "dest_term")
+            incoming = OntologyTermRelation.objects.filter(dest_term__in=all_leafs).exclude(source_term__in=seen).filter(q_relation).select_related("source_term", "dest_term")
             if to_ontology == OntologyService.HGNC:
                 outgoing = outgoing.exclude(dest_term__ontology_service=OntologyService.HPO)
                 incoming = incoming.exclude(source_term__ontology_service=OntologyService.HPO)
@@ -565,9 +599,14 @@ class OntologySnake:
         update_gene_relations(gene_symbol)
         terms = set()
 
-        mondos = OntologyTermRelation.objects.filter(dest_term=gene_ontology, source_term__ontology_service=OntologyService.MONDO).values_list("source_term_id", flat=True)
-        terms = terms.union(set(mondos))
-        omim_ids = OntologyTermRelation.objects.filter(dest_term=gene_ontology, source_term__ontology_service=OntologyService.OMIM).values_list("source_term_id", flat=True)
+        gencc_classifications = GeneDiseaseClassification.get_above_min(GeneDiseaseClassification.STRONG)
+        q_relation = ~Q(relation=OntologyRelation.RELATED) | Q(extra__strongest_classification__in=gencc_classifications)
+
+        mondos = OntologyTermRelation.objects.filter(q_relation, dest_term=gene_ontology,
+                                                     source_term__ontology_service=OntologyService.MONDO)
+        terms = terms.union(set(mondos.values_list("source_term_id", flat=True)))
+        omim_ids = OntologyTermRelation.objects.filter(q_relation, dest_term=gene_ontology,
+                                                       source_term__ontology_service=OntologyService.OMIM).values_list("source_term_id", flat=True)
         if omim_ids:
             # relationships are always MONDO -> OMIM, and MONDO -> HGNC, OMIM -> HGNC
             via_omim_mondos = OntologyTermRelation.objects.filter(source_term__ontology_service=OntologyService.MONDO, dest_term_id__in=omim_ids).exclude(relation__in={OntologyRelation.EXACT_SYNONYM, OntologyRelation.RELATED_SYNONYM}).values_list("source_term_id", flat=True)
@@ -634,6 +673,11 @@ class OntologySnake:
             report_exc_info()
             return False
 
+    @staticmethod
+    def gene_disease_relations(gene_symbol: Union[str, GeneSymbol]) -> List[OntologyTermRelation]:
+        snake = OntologySnake.terms_for_gene_symbol(gene_symbol, OntologyService.MONDO, max_depth=0)
+        return snake.leaf_relations(ontology_relation=OntologyRelation.RELATED)
+
 
 class OntologySnakes:
 
@@ -651,3 +695,9 @@ class OntologySnakes:
 
     def leafs(self) -> List[OntologyTerm]:
         return list(sorted({snake.leaf_term for snake in self}))
+
+    def leaf_relations(self, ontology_relation: str = None) -> List[OntologyTermRelation]:
+        relations = {snake.leaf_relationship for snake in self}
+        if ontology_relation:
+            relations = {otr for otr in relations if otr.relation == ontology_relation}
+        return list(sorted(relations))

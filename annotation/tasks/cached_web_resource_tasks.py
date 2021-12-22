@@ -3,7 +3,6 @@ import logging
 from celery.app.task import Task
 
 from annotation.clingen.clinvar_citations import store_clinvar_citations_from_web
-from annotation.clingen.gene_validity import store_clingen_gene_validity_curations_from_web
 from annotation.models.models import CachedWebResource
 from library.log_utils import get_traceback
 from snpdb.models.models_enums import ImportStatus
@@ -33,17 +32,10 @@ class CachedWebResourceTask(Task):
         cached_web_resource.save()
 
 
-class ClinGenValidityCurationsWebResourceTask(CachedWebResourceTask):
-
-    def _load_cached_web_resource(self, cached_web_resource):
-        store_clingen_gene_validity_curations_from_web(cached_web_resource)
-
-
 class ClinVarCitationsWebResourceTask(CachedWebResourceTask):
 
     def _load_cached_web_resource(self, cached_web_resource):
         store_clinvar_citations_from_web(cached_web_resource)
 
 
-ClinGenValidityCurationsWebResourceTask = app.register_task(ClinGenValidityCurationsWebResourceTask())  # @UndefinedVariable
 ClinVarCitationsWebResourceTask = app.register_task(ClinVarCitationsWebResourceTask())

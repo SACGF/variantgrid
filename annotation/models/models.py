@@ -24,14 +24,14 @@ from annotation.external_search_terms import get_variant_search_terms, get_varia
 from annotation.models.damage_enums import Polyphen2Prediction, FATHMMPrediction, MutationTasterPrediction, \
     SIFTPrediction, PathogenicityImpact, MutationAssessorPrediction
 from annotation.models.models_enums import HumanProteinAtlasAbundance, AnnotationStatus, CitationSource, \
-    ClinGenClassification, VariantClass, ColumnAnnotationCategory, VEPPlugin, \
-    VEPCustom, ClinVarReviewStatus, VEPSkippedReason, ManualVariantEntryType
+    VariantClass, ColumnAnnotationCategory, VEPPlugin, VEPCustom, ClinVarReviewStatus, VEPSkippedReason, \
+    ManualVariantEntryType
 from genes.models import GeneSymbol, Gene, TranscriptVersion, Transcript, GeneAnnotationRelease, UniProt
 from genes.models_enums import AnnotationConsortium
 from library.django_utils import object_is_referenced
 from library.django_utils.django_partition import RelatedModelsPartitionModel
 from library.utils import invert_dict
-from ontology.models import OntologyTerm, OntologyImport
+from ontology.models import OntologyImport
 from patients.models_enums import GnomADPopulation
 from snpdb.models import GenomeBuild, Variant, VariantGridColumn, Q, VCF, DBSNP_PATTERN, VARIANT_PATTERN
 from snpdb.models.models_enums import ImportStatus
@@ -1014,32 +1014,6 @@ class CachedWebResource(TimeStampedModel):
         return handler
 
 
-class GeneDiseaseCurator(models.Model):
-    name = models.TextField(primary_key=True)
-    css_class = models.TextField(blank=True)
-    user = models.ForeignKey(User, null=True, on_delete=SET_NULL)
-    cached_web_resource = models.ForeignKey(CachedWebResource, null=True, on_delete=CASCADE)  # If from web
-
-    def __str__(self):
-        return self.name
-
-
-class DiseaseValidity(models.Model):
-    gene_disease_curator = models.ForeignKey(GeneDiseaseCurator, on_delete=CASCADE)
-    text_phenotype = models.TextField(blank=True)
-    sop = models.TextField(blank=True)  # ClinGen Gene Clinical Validity SOP
-    ontology_term = models.ForeignKey(OntologyTerm, null=True, on_delete=SET_NULL)
-    classification = models.CharField(max_length=1, choices=ClinGenClassification.choices)
-    date = models.DateField(null=True)
-    validity_summary_url = models.TextField()
-
-
-# Because there can be multiple Ensembl Genes for a symbol, link those via a FK
-class GeneDiseaseValidity(models.Model):
-    gene_symbol = models.ForeignKey(GeneSymbol, on_delete=CASCADE)
-    disease_validity = models.ForeignKey(DiseaseValidity, on_delete=CASCADE)
-
-
 class GeneSymbolCitation(models.Model):
     gene_symbol = models.ForeignKey(GeneSymbol, on_delete=CASCADE)
     citation = models.ForeignKey(Citation, on_delete=CASCADE)
@@ -1070,11 +1044,6 @@ class GeneSymbolPubMedCount(TimeStampedModel):
 
     def __str__(self):
         return f"{self.gene_symbol_id}: {self.count}"
-
-
-class GeneDiseaseValidityEvidence(models.Model):
-    gene_disease = models.ForeignKey(GeneDiseaseValidity, on_delete=CASCADE)
-    citation = models.ForeignKey(Citation, null=True, on_delete=CASCADE)
 
 
 class MutationalSignatureInfo(models.Model):
