@@ -22,6 +22,14 @@ def _one_off_transcript_version_contig(apps, schema_editor):
     Contig = apps.get_model("snpdb", "Contig")
     TranscriptVersion = apps.get_model("genes", "TranscriptVersion")
 
+    bad_tvs = TranscriptVersion.objects.filter(data__chrom__isnull=True)
+    if num_bad_tvs := bad_tvs.count():
+        print(f"Deleting {num_bad_tvs} legacy TranscriptVersion records missing 'chrom' entries")
+        _, deleted = bad_tvs.delete()
+        deleted.pop("genes.TranscriptVersion", None)  # Expected
+        if deleted:
+            raise ValueError(f"Unexpected CASCADE deletion from removing bad TranscriptVersion records: {deleted=}")
+
     for genome_build in GenomeBuild.objects.all():
         contigs = Contig.objects.filter(genomebuildcontig__genome_build=genome_build)
         chrom_contig_mappings = _get_chrom_contig_mappings(contigs)
