@@ -251,8 +251,9 @@ MUTATIONAL_SIGNATURE_DATA_DIR = os.path.join(VG_REFERENCE_DIR, "mutational_signa
 MUTATIONAL_SIGNATURE_DATA_FILE = os.path.join(MUTATIONAL_SIGNATURE_DATA_DIR, "signatures_probabilities.sorted.txt")
 MUTATIONAL_SIGNATURE_INFO_FILE = os.path.join(MUTATIONAL_SIGNATURE_DATA_DIR, "signature_analysis_data.formatted.txt")
 
-CACHED_WEB_RESOURCE_CLINGEN_DISEASE_VALIDITY = "ClinGenDiseaseValidity"
+# These need to be able to be passed to URLS so no slashes
 CACHED_WEB_RESOURCE_CLINVAR_CITATIONS = "ClinVarCitations"
+CACHED_WEB_RESOURCE_GENCC = "GenCC Gene Disease Relationships"
 CACHED_WEB_RESOURCE_GNOMAD_GENE_CONSTRAINT = "GnomADGeneConstraint"
 CACHED_WEB_RESOURCE_HGNC = "HGNC"
 CACHED_WEB_RESOURCE_LRG_REF_SEQ_GENE = "LRGRefSeqGene"
@@ -273,7 +274,7 @@ ANNOTATION_CACHED_WEB_RESOURCES = [
     CACHED_WEB_RESOURCE_REFSEQ_GENE_SUMMARY,
     CACHED_WEB_RESOURCE_REFSEQ_GENE_INFO,
     CACHED_WEB_RESOURCE_UNIPROT,
-    CACHED_WEB_RESOURCE_CLINGEN_DISEASE_VALIDITY,
+    CACHED_WEB_RESOURCE_GENCC,
     CACHED_WEB_RESOURCE_CLINVAR_CITATIONS,
 ]
 
@@ -322,7 +323,9 @@ LIFTOVER_NCBI_REMAP_ENABLED = False
 LIFTOVER_NCBI_REMAP_PERLBREW_RUNNER_SCRIPT = None  # os.path.join(BASE_DIR, "scripts", "perlbrew_runner.sh")
 
 PANEL_APP_CACHE_DAYS = 7  # Automatically re-check after this time
-PANEL_APP_CHECK_ENABLED = False
+GENE_RELATION_PANEL_APP_LIVE_UPDATE = False  # Use GenCC cached result if False, poll panel app if True
+
+# "PanelApp Australia"
 
 # Non-authenticated (no login) sample gene matrix
 PUBLIC_SAMPLE_GENE_MATRIX_GENOME_BUILD = None  # Must be set if system has multiple genome builds

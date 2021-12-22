@@ -1,13 +1,15 @@
 import urllib
 
+from rest_framework.generics import ListAPIView
 from rest_framework.response import Response
 from rest_framework.status import HTTP_200_OK
 from rest_framework.views import APIView
 
 from genes.models import GeneListGeneSymbol, create_fake_gene_list
 from genes.serializers import GeneListGeneSymbolSerializer
-from ontology.models import OntologyTerm, OntologySnake
+from ontology.models import OntologyTerm, OntologyRelation, OntologySnake
 from ontology.ontology_matching import OntologyMatching
+from ontology.serializers import OntologyTermRelationSerializer
 
 
 class SearchMondoText(APIView):
@@ -46,4 +48,13 @@ class OntologyTermGeneListView(APIView):
                 "import_status": "S",
                 "genelistgenesymbol_set": genelistgenesymbol_set,
                 "can_write": False}
+        return Response(data)
+
+
+#@method_decorator(cache_page(WEEK_SECS), name='get')
+class GeneDiseaseRelationshipView(APIView):
+    def get(self, request, *args, **kwargs):
+        data = []
+        for otr in OntologySnake.gene_disease_relations(self.kwargs['gene_symbol']):
+            data.append(OntologyTermRelationSerializer(otr).data)
         return Response(data)

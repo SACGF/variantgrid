@@ -1,23 +1,8 @@
 from rest_framework import serializers
 
 from annotation.models import AnnotationStatus
-from annotation.models.models import VariantAnnotationVersion, VariantAnnotation, DiseaseValidity, \
-    ManualVariantEntryCollection
-from ontology.serializers import OntologyTermSerializer
+from annotation.models.models import VariantAnnotationVersion, VariantAnnotation, ManualVariantEntryCollection
 from snpdb.serializers import VariantSerializer, TimestampField
-
-
-class DiseaseValiditySerializer(serializers.ModelSerializer):
-    ontology_term = OntologyTermSerializer()
-    classification = serializers.SerializerMethodField()
-    gene_disease_curator = serializers.StringRelatedField()
-
-    class Meta:
-        model = DiseaseValidity
-        fields = '__all__'
-
-    def get_classification(self, obj):
-        return obj.get_classification_display()
 
 
 class VariantAnnotationVersionSerializer(serializers.ModelSerializer):

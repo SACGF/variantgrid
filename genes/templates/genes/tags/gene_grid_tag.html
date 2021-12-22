@@ -89,8 +89,8 @@ table#gene-grid tr {
     background-image: url({% static 'icons/lock.gif' %});
 }
 
-.clingen-icon {
-    background-image: url({% static 'images/clingen.jpeg' %});
+.gencc-icon {
+    background-image: url({% static 'images/gencc-logo-standard.jpg' %});
 }
 
 .gene-icons-container {
@@ -122,7 +122,7 @@ table#gene-grid tr {
 .disease-name {
 }
 
-table#gene-grid .clingen {
+table#gene-grid .gene-disease {
     width: 400px;
 }
 
@@ -154,6 +154,11 @@ table#gene-grid.color-coverage td.sub-column.coverage-none {
 .classification-count-summary {
     display: none;
 }
+
+.gene-disease-classification {
+    font-weight: bold;
+}
+
 </style>
 <script>
 /* evidenceColumns/enrichmentKits/pathologyTestVersions/geneLists are the 1
@@ -203,9 +208,9 @@ let symbolGeneIdentifierRequestsByReleaseId = {}; // values = { genes : request 
 
 
 const EVIDENCE_COLUMN_INFO = {
-    "clingen": {
-        "icon": "clingen-icon",
-        "initFunc": clinGenCellInit,
+    "gene-disease": {
+        "icon": "gencc-icon",
+        "initFunc": geneDiseaseRelationshipCellInit,
     },
 {% for server in panel_app_servers %}
     "panelapp-{{ server.pk }}": {
@@ -1561,44 +1566,57 @@ function emptyGeneHoverHandler(geneContainer, recordId, className, gene, addFunc
 }
 
 
-function clinGenCellInit(cell, gene_symbol) {
-    let clinGenDiv = $("<div />").addClass("loading icon16");
-    cell.append(clinGenDiv);
+function geneDiseaseRelationshipCellInit(cell, gene_symbol) {
+    let geneDiseaseDiv = $("<div />").addClass("loading icon16");
+    cell.append(geneDiseaseDiv);
     // make API call and when done - replace with this
     $.ajax({
         type: "GET",
-        url: Urls.api_view_gene_disease_validity(gene_symbol),
-        success: function(diseaseValidityList) {
+        url: Urls.api_view_gene_disease_relationship(gene_symbol),
+        success: function(diseaseRelationshipList) {
             let newDiv = $("<div />");
-            if (diseaseValidityList) {
-                for (let i=0 ; i<diseaseValidityList.length ; ++i) {
-                    let diseaseValidity = diseaseValidityList[i];
-                    let classification = diseaseValidity["classification"];
-                    let date = diseaseValidity["date"];
-                    let gene_validity_summary_url = diseaseValidity["gene_validity_summary_url"];
-                    let ontologyTerm = diseaseValidity["ontology_term"];
-                    let diseaseName = ontologyTerm["name"];
-                    let diseaseDescription = ontologyTerm["definition"];
-                    let diseaseSpan = $("<span />").addClass("disease-name").text(diseaseName + ":");
-                    diseaseSpan.attr("title", diseaseDescription);
-                    let dvSpan = $("<span />").addClass("disease-validity");
-                    dvSpan.append(diseaseSpan);
-                    let a = $("<a />").attr("href", gene_validity_summary_url);
-                    let classificationSpan = $("<span />")
-                        .addClass("disease-classification")
-                        .text(classification)
-                        .attr("title", date);
-                    a.append(classificationSpan);
-                    dvSpan.append(a);
-                    dvSpan.append(". ");
-                    newDiv.append(dvSpan);
+            if (diseaseRelationshipList) {
+                for (let i=0 ; i<diseaseRelationshipList.length ; ++i) {
+                    let diseaseRelationship = diseaseRelationshipList[i];
+                    let ontologyTerm = diseaseRelationship["source_term"];
+                    let diseaseLink = $("<a />", {href: ontologyTerm["absolute_url"], target: "_blank"})
+                        .addClass("disease-name")
+                        .text(ontologyTerm["name"])
+                        .attr("title", ontologyTerm["definition"]);
+                    let dv = $("<div />").addClass("disease-validity");
+                    dv.append(diseaseLink);
+                    newDiv.append(dv);
+
+                    // Data is grouped and put into extra.sources
+                    let listGroup = $("<ul />", {class: "list-group"});
+                    let sources = diseaseRelationship["extra"]["sources"];
+                    for (let j=0; j<sources.length ; ++j) {
+                        let src = sources[j];
+                        let classification = $("<span />")
+                            .addClass("gene-disease-classification")
+                            .text(src["mode_of_inheritance"]);
+
+                        let classificationSummary = $("<span />").attr("title", src["evaluated_date"]);
+                        classificationSummary.append(classification);
+                        classificationSummary.append(" (" + src["gencc_classification"] + ") by " + src["submitter"]);
+
+                        if (src["public_report_url"]) {
+                            let reportLink = $("<a />").attr("href", src["public_report_url"]);
+                            reportLink.append(classificationSummary);
+                            classificationSummary = reportLink;
+                        }
+                        let li = $("<li/>", {class: "list-group-item"});
+                        li.append(classificationSummary);
+                        listGroup.append(li)
+                    }
+                    newDiv.append(listGroup);
                 }
             }
-            clinGenDiv.replaceWith(newDiv);
+            geneDiseaseDiv.replaceWith(newDiv);
         },
         error: function() {
             let newDiv = $("<div />").text("Failed...");          
-            clinGenDiv.replaceWith(newDiv);
+            geneDiseaseDiv.replaceWith(newDiv);
         }
     });
 }
@@ -2220,8 +2238,8 @@ $(document).ready(function() {
         {% labelled %}
             <div class="form-check">
             <label class="form-check-label">
-                <input id="clingen-evidence-checkbox" class='form-check-input evidence-checkbox' type='checkbox' evidence_type="clingen" />
-                <div class="column-icon clingen-icon"></div>
+                <input id="gene-disease-checkbox" class='form-check-input evidence-checkbox' type='checkbox' evidence_type="gene-disease" />
+                <div class="column-icon gencc-icon"></div>
             </label>
             </div>
         {% endlabelled %}

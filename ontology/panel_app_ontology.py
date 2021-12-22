@@ -24,7 +24,7 @@ def update_gene_relations(gene_symbol: Union[GeneSymbol, str]):
 
 @timed_cache(size_limit=2, ttl=10, quick_key_access=True)
 def _update_gene_relations(gene_symbol: str):
-    if not settings.PANEL_APP_CHECK_ENABLED:
+    if not settings.GENE_RELATION_PANEL_APP_LIVE_UPDATE:
         return
 
     # note that we only check PanelApp here, as other imports are done by file
