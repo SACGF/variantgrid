@@ -1,6 +1,5 @@
 import logging
 import time
-from itertools import chain
 from typing import List, Optional, Iterable
 
 import nltk

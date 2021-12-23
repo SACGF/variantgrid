@@ -74,27 +74,17 @@ class PhenotypeMatcher:
                     'wants', 'was', 'with'}
 
     def __init__(self):
-        # Start with synonyms so they're overwritten by HPO
-        hpo_qs = OntologyTerm.objects.filter(ontology_service=OntologyService.HPO)
-        hpo_pks = {}
-        for pk, name, aliases in hpo_qs.values_list('pk', 'name', "aliases"):
-            for alias in aliases + [name]:
-                k = alias.lower().replace(",", "")
-                hpo_pks[k] = pk
-
-        self._break_up_hpo_terms(hpo_pks)
-        hpo_word_lookup = self._create_word_lookups(hpo_pks)
-
-        omim_pks = self._get_omim_pks_by_term()
-        omim_word_lookup = self._create_word_lookups(omim_pks)
-
-        hpo_single_words_by_length = self._get_single_words_by_length(hpo_pks, 5)
-        omim_single_words_by_length = self._get_single_words_by_length(omim_pks, 5)
-
-        self.ontology = {
-            OntologyService.HPO: (hpo_pks, hpo_single_words_by_length, hpo_word_lookup),
-            OntologyService.OMIM: (omim_pks, omim_single_words_by_length, omim_word_lookup),
+        ONTOLOGY_PK = {
+            OntologyService.HPO: self._get_ontology_pks_by_term(OntologyService.HPO),
+            OntologyService.MONDO: self._get_ontology_pks_by_term(OntologyService.MONDO),
+            OntologyService.OMIM: self._get_omim_pks_by_term(),  # Special case
         }
+        self.ontology = {}
+        for ontology_service, terms_by_pk in ONTOLOGY_PK.items():
+            self._break_up_terms(terms_by_pk)
+            word_lookup = self._create_word_lookups(terms_by_pk)
+            single_words_by_length = self._get_single_words_by_length(terms_by_pk, 5)
+            self.ontology[ontology_service] = (terms_by_pk, single_words_by_length, word_lookup)
 
         hgnc_aliases = {}
         hgnc_names = {}
@@ -106,6 +96,8 @@ class PhenotypeMatcher:
         self.hgnc_records = hgnc_aliases  # Aliases first so they get overwritten
         self.hgnc_records.update(hgnc_names)  # Overwrite with assigned names
 
+        hpo_pks = self.ontology[OntologyService.HPO][0]
+        omim_pks = self.ontology[OntologyService.OMIM][0]
         special_case_lookups = self._get_special_case_lookups(hpo_pks, omim_pks, self.hgnc_records)
         self.hardcoded_lookups, self.case_insensitive_lookups, self.disease_families = special_case_lookups
 
@@ -286,7 +278,7 @@ class PhenotypeMatcher:
         return words_by_length
 
     @staticmethod
-    def _break_up_hpo_terms(hpo_pks):
+    def _break_up_terms(hpo_pks):
         """ or could be alias """
 
         new_entries = {}
@@ -319,6 +311,16 @@ class PhenotypeMatcher:
         hpo_pks.update(new_entries)
 
     @staticmethod
+    def _get_ontology_pks_by_term(ontology_service: OntologyService) -> Dict[str, str]:
+        ot_pks = {}
+        ontology_term_qs = OntologyTerm.objects.filter(ontology_service=ontology_service)
+        for pk, name, aliases in ontology_term_qs.values_list('pk', 'name', "aliases"):
+            for term in filter(is_not_none, aliases + [name]):
+                k = term.lower().replace(",", "")
+                ot_pks[k] = pk
+        return ot_pks
+
+    @staticmethod
     def _get_omim_pks_by_term():
         """ Create entries for UNIQUE ';' separated terms
             ie "BECKWITH-WIEDEMANN SYNDROME; BWS" => "BECKWITH-WIEDEMANN" and "BECKWITH-WIEDEMANN SYNDROME" and "BWS" """
@@ -345,7 +347,7 @@ class PhenotypeMatcher:
                         pass
 
         for pk, name, aliases in omim_qs.values_list("pk", "name", "aliases"):
-            for term in filter(is_not_none, [name] + aliases):
+            for term in filter(is_not_none, aliases + [name]):
                 # Remove commas, as phenotype to match will have that done also
                 term = term.strip().lower().replace(",", "")
                 omim_pks_by_term[term] = pk
