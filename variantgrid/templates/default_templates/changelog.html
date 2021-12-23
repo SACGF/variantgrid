@@ -11,10 +11,25 @@
 
         {% if not sapath_enabled %}
             <div class="card mt-4">
+                <div class="card-header">December X, 2021</div>
+                <div class="card-body">
+                    <ul>
+                        <li>Analysis - gene / ontology term links only use direct links (was previously using indirect links)</li>
+                        <li>Analysis - pop node, can exclude filtered by gnomAD</li>
+                        <li>Search - dbSNP lookup is faster, can search for cohort/pedigree</li>
+                        <li>Data - add user to pedigree/cohort to make it easier to find</li>
+                        <li>Manual variant entry - improved user experience creating novel variants via search</li>
+                        <li>Gene/Disease - use GenCC (includes ClinGen) instead of just ClinGen on Gene page, Gene Grid column</li>
+                        <li>Bug fixes</li>
+                    </ul>
+                </div>
+            </div>
+
+
+            <div class="card mt-4">
                 <div class="card-header">November 30, 2021</div>
                 <div class="card-body">
                     <ul>
-                        <li>Bug fixes</li>
                         <li>Analysis - export CSV now matches grid (previously only grid but not CSV had allele frequency as percent and was sorted)</li>
                         <li>Analysis - Phenotype node now shows a warning if ontology term doesn't map to genes</li>
                         <li>HGVS - Correctly handle RefSeq gapped alignments, update gene annotation</li>
@@ -22,6 +37,7 @@
                         <li>ClinVar - update to latest version</li>
                         <li>Samples page (data) - filter for variant type. Fix autocompletes sometimes not searching all builds</li>
                         <li>VCF import - support DRAGEN VCFs - filters out non-standard variants like CNVs etc - show warnings of # skipped</li>
+                        <li>Bug fixes</li>
                     </ul>
                 </div>
             </div>
