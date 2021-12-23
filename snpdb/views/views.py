@@ -46,7 +46,7 @@ from genes.forms import CustomGeneListForm, UserGeneListForm, GeneAndTranscriptF
 from genes.models import GeneListCategory, CustomTextGeneList, GeneList
 from library.constants import WEEK_SECS, HOUR_SECS
 from library.django_utils import add_save_message, get_model_fields, set_form_read_only
-from library.guardian_utils import assign_permission_to_user_and_groups, DjangoPermission
+from library.guardian_utils import DjangoPermission
 from library.keycloak import Keycloak
 from library.utils import full_class_name, import_class, rgb_invert
 from ontology.models import OntologyTerm
@@ -1228,24 +1228,22 @@ def sample_gene_matrix(request, variant_annotation_version, samples, gene_list,
 
             if sample.patient:
                 try:
-                    # Check you have Patient permissions
-                    patient = Patient.get_for_user(request.user, sample.patient.pk)
-
-                    def format_ontology(ontology_term):
-                        return f"<div title='{ontology_term}'>{ontology_term.name}</div>"
-
-                    hpo, omim = OntologyTerm.split_hpo_and_omim(patient.get_ontology_term_ids())
-                    hpo_text = " ".join(map(format_ontology, hpo))
-                    omim_text = " ".join(map(format_ontology, omim))
-
                     try:
                         age = sample.specimen.age_at_collection_date
                     except:
                         age = None
-
                     text_df.loc["Age", sample_name] = age or ''
-                    text_df.loc["HPO", sample_name] = hpo_text
-                    text_df.loc["OMIM", sample_name] = omim_text
+
+                    # Check you have Patient permissions
+                    patient = Patient.get_for_user(request.user, sample.patient.pk)
+                    terms_dict = OntologyTerm.split_hpo_omim_mondo_as_dict(patient.get_ontology_term_ids())
+
+                    def format_ontology(ontology_term):
+                        return f"<div title='{ontology_term}'>{ontology_term.name}</div>"
+
+                    for ontology_name, terms_qs in terms_dict.items():
+                        ontology_text = " ".join(map(format_ontology, terms_qs))
+                        text_df.loc[ontology_name, sample_name] = ontology_text
                 except PermissionDenied:
                     pass
                 except Patient.DoesNotExist:

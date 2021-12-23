@@ -206,29 +206,25 @@ class PhenotypeNodeView(NodeView):
         form_initial = super()._get_form_initial()
         # These are the ones added manually, not the ones currently selected in the node (could be patient)
         ontology_terms = self.object.phenotypenodeontologyterm_set.all().values_list("ontology_term", flat=True)
-        hpo, omim = OntologyTerm.split_hpo_and_omim(ontology_terms)
-        form_initial["hpo"] = hpo
-        form_initial["omim"] = omim
+        terms_dict = OntologyTerm.split_hpo_omim_mondo_as_dict(ontology_terms)
+        form_initial.update({k.lower(): v for k, v in terms_dict.items()})
         return form_initial
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
 
         node = self.object
-        patient_hpo = []
-        patient_omim = []
         patient = node.patient
         if patient:
             ontology_term_ids = patient.get_ontology_term_ids()
-            patient_hpo, patient_omim = OntologyTerm.split_hpo_and_omim(ontology_term_ids)
+            terms_dict = OntologyTerm.split_hpo_omim_mondo_as_dict(ontology_term_ids)
+            context.update({f"patient_{k.lower()}" for k, v in terms_dict.items()})
 
         patient_queryset = node.get_patients_qs()
         has_patients = patient_queryset.exists()
 
         context.update({
             'has_patients': has_patients,
-            "patient_hpo": patient_hpo,
-            "patient_omim": patient_omim,
             "node_warnings": self._get_node_warnings(),
         })
         return context
@@ -250,8 +246,8 @@ class PhenotypeNodeView(NodeView):
 
         # This uses the same method as gene filter (special_case_gene_symbols_for_hpo_and_omim) though with individual
         # calls per term so that it matches what gene filters is doing
-        hpo_qs, omim_qs = OntologyTerm.split_hpo_and_omim(self.object.get_ontology_term_ids())
-        for label, terms in {"HPO": hpo_qs, "OMIM": omim_qs}.items():
+        terms_dict = OntologyTerm.split_hpo_omim_mondo_as_dict(self.object.get_ontology_term_ids())
+        for label, terms in terms_dict.items():
             if w := self._get_no_gene_warnings(label, terms):
                 node_warnings.append(w)
         return node_warnings

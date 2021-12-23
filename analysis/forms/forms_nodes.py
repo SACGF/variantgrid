@@ -504,6 +504,11 @@ class PhenotypeNodeForm(BaseNodeForm):
                                          widget=ModelSelect2Multiple(url='hpo_autocomplete',
                                                                      attrs={'data-placeholder': 'HPO...'}))
 
+    mondo = forms.ModelMultipleChoiceField(required=False,
+                                           queryset=OntologyTerm.objects.all(),
+                                           widget=ModelSelect2Multiple(url='mondo_autocomplete',
+                                                                       attrs={'data-placeholder': 'MONDO...'}))
+
     class Meta:
         model = PhenotypeNode
         exclude = ANALYSIS_NODE_FIELDS
@@ -521,14 +526,10 @@ class PhenotypeNodeForm(BaseNodeForm):
 
         # TODO: I'm sure there's a way to get Django to handle this via save_m2m()
         ontology_term_set = self.instance.phenotypenodeontologyterm_set
-
         ontology_term_set.all().delete()
-
-        for ontology_term in self.cleaned_data["omim"]:
-            ontology_term_set.create(ontology_term=ontology_term)
-
-        for ontology_term in self.cleaned_data["hpo"]:
-            ontology_term_set.create(ontology_term=ontology_term)
+        for ontology_field in ["omim", "hpo", "mondo"]:
+            for ot in self.cleaned_data[ontology_field]:
+                ontology_term_set.create(ontology_term=ot)
 
         if commit:
             node.save()

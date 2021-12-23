@@ -335,10 +335,16 @@ class OntologyTerm(TimeStampedModel):
         return OntologyService.URLS[self.ontology_service].replace("${1}", self.padded_index)
 
     @staticmethod
-    def split_hpo_and_omim(ontology_term_ids: Iterable[str]) -> Tuple[QuerySet, QuerySet]:
-        hpo = OntologyTerm.objects.filter(pk__in=ontology_term_ids, ontology_service=OntologyService.HPO)
-        omim = OntologyTerm.objects.filter(pk__in=ontology_term_ids, ontology_service=OntologyService.OMIM)
-        return hpo, omim
+    def split_hpo_omim_mondo(ontology_term_ids: Iterable[str]) -> Tuple[QuerySet, QuerySet, QuerySet]:
+        hpo_qs = OntologyTerm.objects.filter(pk__in=ontology_term_ids, ontology_service=OntologyService.HPO)
+        omim_qs = OntologyTerm.objects.filter(pk__in=ontology_term_ids, ontology_service=OntologyService.OMIM)
+        mondo_qs = OntologyTerm.objects.filter(pk__in=ontology_term_ids, ontology_service=OntologyService.MONDO)
+        return hpo_qs, omim_qs, mondo_qs
+
+    @staticmethod
+    def split_hpo_omim_mondo_as_dict(ontology_term_ids: Iterable[str]) -> Dict[str, QuerySet]:
+        hpo_qs, omim_qs, mondo_qs = OntologyTerm.split_hpo_omim_mondo(ontology_term_ids)
+        return {"HPO": hpo_qs, "OMIM": omim_qs, "MONDO": mondo_qs}
 
 
 class OntologyTermRelation(TimeStampedModel):

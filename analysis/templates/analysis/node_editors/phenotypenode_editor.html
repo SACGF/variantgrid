@@ -68,17 +68,27 @@
             <li>
                 <h3>Custom Fields</h3>
                 <table>
-                <tr>
-                <th class='hpo'>Phenotype:</th>
-                <td class='hpo'> {{ form.hpo }}</td>
-                <td id='phenotypes-list'>
-                </td>
-                <tr>
-                <th class='omim'>OMIM:</th>
-                <td class='omim'> {{ form.omim }}</td>
-                <td id='omim-list'>
-                </td>
-                <tr><th>Free Text:</th><td> {{ form.text_phenotype }}</td><td><i>Matches at least one word to RefSeq Gene Summary, OMIM terms, HPO terms, or UniProt Function (case insensitive)</i></td>
+                    <tr>
+                        <th class='hpo'>Phenotype:</th>
+                        <td class='hpo'> {{ form.hpo }}</td>
+                        <td id='phenotypes-list'></td>
+                    </tr>
+                    <tr>
+                        <th class='omim'>OMIM:</th>
+                        <td class='omim'> {{ form.omim }}</td>
+                        <td id='omim-list'></td>
+                    </tr>
+                    <tr>
+                        <th class='mondo'>MONDO:</th>
+                        <td class='mondo'> {{ form.mondo }}</td>
+                        <td id='mondo-list'></td>
+                    </tr>
+                    <tr>
+                        <th>Free Text:</th>
+                        <td> {{ form.text_phenotype }}</td>
+                        <td><i>Matches at least one word to RefSeq Gene Summary, OMIM terms, HPO terms, or UniProt
+                            Function (case insensitive)</i></td>
+                    </tr>
                 </table>
             </li>
 			<li>
@@ -106,6 +116,16 @@
 						</p>
 					{% else %}
 						This patient has no OMIM terms
+					{% endif %}
+					{% if patient_mondo %}
+						<p>
+						<b>MONDO:</b>
+						{% for mondo in patient_mondo %}
+							{{ mondo }}
+						{% endfor %}
+						</p>
+					{% else %}
+						This patient has no MONDO terms
 					{% endif %}
 					</div>
 		        {% endif %}

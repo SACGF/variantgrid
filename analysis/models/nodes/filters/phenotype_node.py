@@ -143,23 +143,15 @@ class PhenotypeNode(AnalysisNode):
         short_descriptions = []
 
         ontology_terms = self.phenotypenodeontologyterm_set.values_list("ontology_term", flat=True)
-        hpo_list, omim_list = OntologyTerm.split_hpo_and_omim(ontology_terms)
+        terms_dict = OntologyTerm.split_hpo_omim_mondo_as_dict(ontology_terms)
+        for ontology_name, ontology_list in terms_dict.items():
+            ontology_strings = []
+            for ot in ontology_list:
+                ontology_strings.append(str(ot))
 
-        phenotypes = []
-        for hpo in hpo_list:
-            phenotypes.append(str(hpo))
-
-        if phenotypes:
-            long_descriptions.append("Phenotype: %s" % ', '.join(phenotypes))
-            short_descriptions.append(f"{len(phenotypes)} HPO")
-
-        omims = []
-        for omim in omim_list:
-            omims.append(str(omim))
-
-        if omims:
-            long_descriptions.append("OMIM %s" % ', '.join(omims))
-            short_descriptions.append(f"{len(omims)} OMIM")
+            if ontology_strings:
+                long_descriptions.append(f"{ontology_name}: {', '.join(ontology_strings)}")
+                short_descriptions.append(f"{len(ontology_strings)} {ontology_name}")
 
         if self.text_phenotype:
             tp_description = f"Text: {self.text_phenotype}"

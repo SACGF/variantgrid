@@ -704,12 +704,13 @@ table.as_table {
 }
 
 // term matches
-.hp, .hpo, .omim, .gene {
+.hp, .hpo, .omim, .mondo .gene {
   border: 3px solid white;
   margin: 0 4px 0 4px;
   border-radius: 3px;
   padding: 0 4px 0 4px;
 }
+
 .hp, .hpo {
   background-color: #FF8C00;
   border-color: #FF8C00;
@@ -719,6 +720,12 @@ table.as_table {
   border-color: #22529e;
   color: #ddd;
 }
+
+.mondo {
+  background-color: #cce34c;
+  border-color: #cce34c;
+}
+
 .gene {
   background-color: #99CD83;
   border-color: #99CD83;
