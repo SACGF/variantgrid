@@ -31,7 +31,6 @@ class Test(URLTestCase):
         _ = OntologyTerm.objects.get_or_create(id="HGNC:10471", name=cls.gene_symbol, from_import=ontology_import,
                                                index=index, ontology_service=OntologyService.HGNC)[0]
 
-
     def testUrls(self):
         """ No permissions to test """
         URL_NAMES_AND_KWARGS = [

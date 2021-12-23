@@ -18,7 +18,6 @@ class OntologyTermSerializer(serializers.ModelSerializer):
         return obj.get_absolute_url()
 
 
-
 class OntologyTermRelationSerializer(serializers.ModelSerializer):
     source_term = OntologyTermSerializer()
     dest_term = OntologyTermSerializer()

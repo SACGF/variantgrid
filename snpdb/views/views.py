@@ -266,7 +266,6 @@ def view_vcf(request, vcf_id):
         vzc_vcf = VariantZygosityCountForVCF.objects.filter(vcf=vcf, collection=vzcc).first()
         variant_zygosity_count_collections[vzcc] = vzc_vcf
 
-
     try:
         can_view_upload_pipeline = vcf.uploadedvcf.uploaded_file.can_view(request.user)
     except UploadedVCF.DoesNotExist:

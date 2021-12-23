@@ -10,4 +10,3 @@ class OntologyConfig(AppConfig):
         from ontology.signals import gencc_post_save_handler
 
         post_save.connect(gencc_post_save_handler, sender=CachedWebResource)
-
