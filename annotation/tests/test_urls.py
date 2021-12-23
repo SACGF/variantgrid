@@ -44,10 +44,6 @@ class Test(URLTestCase):
         cls.pubmed_citations = "&".join((str(c) for c in Citation.objects.all().values_list("citation_id", flat=True)[:2]))
         cls.citations_ids_list = "/".join((str(c) for c in Citation.objects.all().values_list("pk", flat=True)[:2]))
         cls.citations_ids_list_pubmed = pubmed_citation
-        transcript_version = create_fake_transcript_version(cls.grch37)
-
-        cls.gene_id = transcript_version.gene_version.gene_id
-        cls.gene_symbol = transcript_version.gene_version.gene_symbol
 
     def testUrls(self):
         """ No permissions to test """
@@ -66,7 +62,6 @@ class Test(URLTestCase):
             ("citations_tab", {"citations_ids_list": self.citations_ids_list}, 200),
             ("citations_json", {"citations_ids_list": self.citations_ids_list_pubmed}, 200),
             # API
-            ("api_view_gene_disease_validity", {"gene_symbol": self.gene_symbol}, 200),
             ("api_variant_annotation", {"genome_build_name": self.grch37.name, "variant_string": self.variant_string}, 200),
         ]
         self._test_urls(URL_NAMES_AND_KWARGS, self.user)
