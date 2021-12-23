@@ -140,7 +140,7 @@ function clearAutoCompletes(leave_autcomplete_term_type) {
     const AUTOCOMPLETE_IDS = {
         'HP': 'id_hpo_synonym',
         'OMIM': 'id_mim_morbid_alias',
-        'gene': 'id_gene',
+        'HGNC': 'id_gene',
     };
 
     ignoreAutcompleteChangeEvent = true;
@@ -222,8 +222,8 @@ $(document).ready(function() {
         omimFormatter: function (omim_terms) {
             return getTermLinks('OMIM', omim_terms);
         },
-        geneFormatter: function (genes) {
-            return getTermLinks('gene', genes);
+        hgncFormatter: function (genes) {
+            return getTermLinks('HGNC', genes);
         },
     });
 
@@ -270,9 +270,9 @@ $(document).ready(function() {
             const regex = "OMIM:\\d+ ([^\\(]*)";
             searchForText('OMIM', regex, this);
         });
-        $('#id_gene_symbol').change(function () {
-            const regex = "(.*)";
-            searchForText('gene', regex, this);
+        $('#id_hgnc').change(function () {
+            const regex = "HGNC:\\d+ ([^\\(]*)";
+            searchForText('HGNC', regex, this);
         });
     }
 
@@ -392,8 +392,8 @@ $(document).ready(function() {
                     <tr><td class='hpo'> {{ hpo_form.hpo }}
                     <tr><td><div class='ontology-label omim w-100'>OMIM</div>
                     <tr><td class='omim'> {{ omim_form.omim }}
-                    <tr><td><div class='ontology-label gene w-100'>Genes</div>
-                    <tr><td class='gene'> {{ gene_symbol_form.gene_symbol }}
+                    <tr><td><div class='ontology-label hgnc w-100'>Genes/HGNC</div>
+                    <tr><td class='hgnc'> {{ hgnc_form.hgnc }}
                     <!-- Only need 1 media for entire page -->
                     {{ hpo_form.media }} 
                 </table>

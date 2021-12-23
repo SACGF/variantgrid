@@ -46,6 +46,12 @@ class OMIMAutocompleteView(AbstractOntologyTermAutocompleteView):
 
 
 @method_decorator(cache_page(HOUR_SECS), name='dispatch')
+class HGNCAutocompleteView(AbstractOntologyTermAutocompleteView):
+    def _get_ontology_service(self):
+        return OntologyService.HGNC
+
+
+@method_decorator(cache_page(HOUR_SECS), name='dispatch')
 class MONDOAutocompleteView(AbstractOntologyTermAutocompleteView):
     def _get_ontology_service(self):
         return OntologyService.MONDO

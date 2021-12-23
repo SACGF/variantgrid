@@ -704,7 +704,7 @@ table.as_table {
 }
 
 // term matches
-.hp, .hpo, .omim, .mondo .gene {
+.hp, .hpo, .omim, .mondo .hgnc {
   border: 3px solid white;
   margin: 0 4px 0 4px;
   border-radius: 3px;
@@ -715,6 +715,7 @@ table.as_table {
   background-color: #FF8C00;
   border-color: #FF8C00;
 }
+
 .omim {
   background-color: #22529e;
   border-color: #22529e;
@@ -726,7 +727,7 @@ table.as_table {
   border-color: #cce34c;
 }
 
-.gene {
+.hgnc {
   background-color: #99CD83;
   border-color: #99CD83;
 }

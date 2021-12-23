@@ -16,3 +16,11 @@ class HPOForm(forms.Form):
                                  required=False,
                                  widget=autocomplete.ModelSelect2(url='hpo_autocomplete',
                                                                   attrs={'data-placeholder': 'HPO...'}))
+
+
+class HGNCForm(forms.Form):
+    hgnc = forms.ModelChoiceField(queryset=OntologyTerm.objects.all(),
+                                  required=False,
+                                  widget=autocomplete.ModelSelect2(url='hgnc_autocomplete',
+                                                                   attrs={'data-placeholder': 'Gene/HGNC...'}))
+

@@ -4,10 +4,7 @@ from collections import defaultdict
 from typing import List, Dict, Tuple, Any, Optional
 
 import Levenshtein
-from django.db.models.functions import Lower
 
-from annotation.models.models_phenotype_match import PhenotypeMatchTypes
-from genes.models import GeneSymbol
 from library.log_utils import log_traceback
 from library.utils import is_not_none
 from ontology.models import OntologyTerm, OntologyService
@@ -19,20 +16,32 @@ OntologyResults = Tuple[str, List[CodePK]]
 HPO_PATTERN = re.compile(r"HP:(\d{7})$")
 HPO_TYPO_PATTERN = re.compile(r"HPO:(\d{7})$")
 OMIM_PATTERN = re.compile(r"OMIM:(\d+)$")
+MONDO_PATTERN = re.compile(r"MONDO:(\d+)$")
+HGNC_PATTERN = re.compile(r"HGNC:(\d+)$")
 
 MIN_MATCH_LENGTH = 3
 MIN_LENGTH_SINGLE_WORD_FUZZY_MATCH = 5
 
 
+def load_by_id(accession, ontology_service: OntologyService) -> OntologyResults:
+    pk = OntologyService.index_to_id(ontology_service, accession)
+    return ontology_service, [pk]
+
+
+def load_hgnc_by_id(accession) -> OntologyResults:
+    return load_by_id(accession, OntologyService.HGNC)
+
+
+def load_hpo_by_id(accession) -> OntologyResults:
+    return load_by_id(accession, OntologyService.HPO)
+
+
+def load_mondo_by_id(accession) -> OntologyResults:
+    return load_by_id(accession, OntologyService.MONDO)
+
+
 def load_omim_by_id(accession) -> OntologyResults:
-    pk = OntologyService.index_to_id(OntologyService.OMIM, accession)
-    return PhenotypeMatchTypes.OMIM, [pk]
-
-
-def load_hpo_by_id(hpo_id) -> OntologyResults:
-    pk = OntologyService.index_to_id(OntologyService.HPO, hpo_id)
-    hpo = OntologyTerm.objects.get(pk=pk)
-    return PhenotypeMatchTypes.HPO, [hpo.pk]
+    return load_by_id(accession, OntologyService.OMIM)
 
 
 class SkipAllPhenotypeMatchException(Exception):
@@ -67,83 +76,91 @@ class PhenotypeMatcher:
     def __init__(self):
         # Start with synonyms so they're overwritten by HPO
         hpo_qs = OntologyTerm.objects.filter(ontology_service=OntologyService.HPO)
-        self.hpo_pks = {}
+        hpo_pks = {}
         for pk, name, aliases in hpo_qs.values_list('pk', 'name', "aliases"):
-            for alias in [name] + aliases:
+            for alias in aliases + [name]:
                 k = alias.lower().replace(",", "")
-                self.hpo_pks[k] = pk
+                hpo_pks[k] = pk
 
-        self._break_up_hpo_terms(self.hpo_pks)
-        self.hpo_word_lookup = self._create_word_lookups(self.hpo_pks)
+        self._break_up_hpo_terms(hpo_pks)
+        hpo_word_lookup = self._create_word_lookups(hpo_pks)
 
-        self.omim_pks = self._get_omim_pks_by_term()
-        self.omim_word_lookup = self._create_word_lookups(self.omim_pks)
+        omim_pks = self._get_omim_pks_by_term()
+        omim_word_lookup = self._create_word_lookups(omim_pks)
 
-        self.gene_symbol_records = dict(GeneSymbol.objects.annotate(lower=Lower("pk")).values_list("lower", "pk"))
-        self.hpo_single_words_by_length = self._get_single_words_by_length(self.hpo_pks, 5)
-        self.omim_single_words_by_length = self._get_single_words_by_length(self.omim_pks, 5)
-        special_case_lookups = self._get_special_case_lookups(self.hpo_pks, self.omim_pks, self.gene_symbol_records)
+        hpo_single_words_by_length = self._get_single_words_by_length(hpo_pks, 5)
+        omim_single_words_by_length = self._get_single_words_by_length(omim_pks, 5)
+
+        self.ontology = {
+            OntologyService.HPO: (hpo_pks, hpo_single_words_by_length, hpo_word_lookup),
+            OntologyService.OMIM: (omim_pks, omim_single_words_by_length, omim_word_lookup),
+        }
+
+        hgnc_aliases = {}
+        hgnc_names = {}
+        hgnc_qs = OntologyTerm.objects.filter(ontology_service=OntologyService.HGNC)
+        for pk, name, aliases in hgnc_qs.values_list("pk", "name", "aliases"):
+            for alias in aliases:
+                hgnc_aliases[alias] = pk
+            hgnc_names[name] = pk
+        self.hgnc_records = hgnc_aliases  # Aliases first so they get overwritten
+        self.hgnc_records.update(hgnc_names)  # Overwrite with assigned names
+
+        special_case_lookups = self._get_special_case_lookups(hpo_pks, omim_pks, self.hgnc_records)
         self.hardcoded_lookups, self.case_insensitive_lookups, self.disease_families = special_case_lookups
 
-    def get_matches(self, words_and_spans_subset) -> Tuple[List, List, List]:
+    def get_matches(self, words_and_spans_subset) -> List[str]:
         words = [ws[0] for ws in words_and_spans_subset]
         text = ' '.join(words)
         lower_text = text.lower()
 
-        hpo_list = []
-        omim_list = []
-        gene_symbols = []
+        ontology_term_ids: List[str] = []
         special_case_match = self._get_special_case_match(text)
         if any(special_case_match):
-            hpo_list, omim_list, gene_symbols = special_case_match
+            ontology_term_ids = special_case_match
         else:
             if len(lower_text) < MIN_MATCH_LENGTH:
-                return [], [], []
+                return []
 
             if self._skip_word(lower_text):
-                return [], [], []
+                return []
 
-            hpo = self.hpo_pks.get(lower_text)
-            omim = self.omim_pks.get(lower_text)
-            if not any([hpo, omim]):
-                if len(words) == 1:
-                    w = words[0]
-                    if len(w) >= MIN_LENGTH_SINGLE_WORD_FUZZY_MATCH:
-                        hpo = self.get_id_from_single_word_fuzzy_match(self.hpo_single_words_by_length, lower_text)
-                        omim = self.get_id_from_single_word_fuzzy_match(self.omim_single_words_by_length, lower_text)
-                else:
-                    lower_words = [w.lower() for w in words]
-                    distance = self.calculate_match_distance(lower_words)
-                    hpo = self.get_id_from_multi_word_fuzzy_match(self.hpo_word_lookup, lower_words, lower_text,
-                                                                  distance=distance)
-                    omim = self.get_id_from_multi_word_fuzzy_match(self.omim_word_lookup, lower_words,
-                                                                   lower_text, distance=distance)
+            for _, (term_pks, single_words_by_length, word_lookup) in self.ontology.items():
+                ontology_term_id = term_pks.get(lower_text)
+                if not ontology_term_id:
+                    if len(words) == 1:
+                        w = words[0]
+                        if len(w) >= MIN_LENGTH_SINGLE_WORD_FUZZY_MATCH:
+                            ontology_term_id = self.get_id_from_single_word_fuzzy_match(single_words_by_length,
+                                                                                        lower_text)
+                    else:
+                        lower_words = [w.lower() for w in words]
+                        distance = self.calculate_match_distance(lower_words)
+                        ontology_term_id = self.get_id_from_multi_word_fuzzy_match(word_lookup, lower_words, lower_text,
+                                                                                   distance=distance)
+
+                if ontology_term_id:
+                    ontology_term_ids.append(ontology_term_id)
 
             if len(words) == 1:
                 # Don't do fuzzy for genes as likely to get false positives
-                if gene_symbol := self.gene_symbol_records.get(lower_text):
-                    gene_symbols.append(gene_symbol)
+                if hgnc := self.hgnc_records.get(lower_text):
+                    ontology_term_ids.append(hgnc)
 
-            if hpo:
-                hpo_list.append(hpo)
+        return ontology_term_ids
 
-            if omim:
-                omim_list.append(omim)
-
-        return hpo_list, omim_list, gene_symbols
-
-    def _get_special_case_match(self, text) -> Tuple[List[CodePK], List[CodePK], List[CodePK]]:
-        hpo_list = []
-        omim_alias_list = []
-        gene_symbols = []
+    def _get_special_case_match(self, text) -> List[str]:
+        ontology_term_ids = []
 
         hl = self.hardcoded_lookups.get(text)
         if not hl:
             # Lookup accessions in form of: HP:0000362, OMIM:607196
 
             PATTERNS = [
+                (HGNC_PATTERN, load_hgnc_by_id),
                 (HPO_PATTERN, load_hpo_by_id),
                 (HPO_TYPO_PATTERN, load_hpo_by_id),
+                (MONDO_PATTERN, load_mondo_by_id),
                 (OMIM_PATTERN, load_omim_by_id),
             ]
 
@@ -163,13 +180,8 @@ class PhenotypeMatcher:
         if hl:
             func, arg = hl
             try:
-                match_type, records = func(arg)
-                if match_type == PhenotypeMatchTypes.HPO:
-                    hpo_list.extend(records)
-                elif match_type == PhenotypeMatchTypes.OMIM:
-                    omim_alias_list.extend(records)
-                elif match_type == PhenotypeMatchTypes.GENE:
-                    gene_symbols.extend(records)
+                _, records = func(arg)
+                ontology_term_ids.extend(records)
 
                 # logging.info("Got exact: %s => %s", text, records)
             except Exception as e:
@@ -178,7 +190,7 @@ class PhenotypeMatcher:
                 log_traceback()
         #            raise ValueError(msg)
 
-        return hpo_list, omim_alias_list, gene_symbols
+        return ontology_term_ids
 
     @classmethod
     def _skip_word(cls, lower_text):
@@ -347,22 +359,22 @@ class PhenotypeMatcher:
     def _get_special_case_lookups(hpo_pks, omim_pks, gene_symbol_records) -> Tuple[Dict, Dict, Dict]:
         def load_omim_by_name(description: str) -> OntologyResults:
             omim_pk = omim_pks[description.lower()]
-            return PhenotypeMatchTypes.OMIM, [omim_pk]
+            return OntologyService.OMIM, [omim_pk]
 
         def load_hpo_by_name(hpo_name) -> OntologyResults:
             hpo_pk = hpo_pks[hpo_name.lower()]
-            return PhenotypeMatchTypes.HPO, [hpo_pk]
+            return OntologyService.HPO, [hpo_pk]
 
         def load_hpo_list_by_names(hpo_name_list) -> OntologyResults:
             hpo_list: List[CodePK] = list()
             for hpo_name in hpo_name_list:
                 _, hpo = load_hpo_by_name(hpo_name)
                 hpo_list.extend(hpo)
-            return PhenotypeMatchTypes.HPO, hpo_list
+            return OntologyService.HPO, hpo_list
 
         def load_gene_by_name(gene_symbol: str) -> OntologyResults:
             gene_symbol_id = gene_symbol_records[gene_symbol.lower()]
-            return PhenotypeMatchTypes.GENE, [gene_symbol_id]
+            return OntologyService.HGNC, [gene_symbol_id]
 
         def load_genes_by_name(gene_symbols_list: List[str]) -> OntologyResults:
             genes_list = []
@@ -370,15 +382,15 @@ class PhenotypeMatcher:
                 _, genes = load_gene_by_name(gene_symbol)
                 genes_list.extend(genes)
 
-            return PhenotypeMatchTypes.GENE, genes_list
+            return OntologyService.HGNC, genes_list
 
         omim_qs = OntologyTerm.objects.filter(ontology_service=OntologyService.OMIM)
 
         def load_omim_pks_containing_name(name: str) -> OntologyResults:
-            return PhenotypeMatchTypes.OMIM, omim_qs.filter(name__icontains=name).values_list("pk", flat=True)
+            return OntologyService.OMIM, omim_qs.filter(name__icontains=name).values_list("pk", flat=True)
 
         def load_omim_pks_containing_alias_name(name) -> OntologyResults:
-            return PhenotypeMatchTypes.OMIM, omim_qs.filter(aliases__icontains=name).values_list("pk", flat=True)
+            return OntologyService.OMIM, omim_qs.filter(aliases__icontains=name).values_list("pk", flat=True)
 
         ABSENT_FOREARM = (load_hpo_by_name, 'absent forearm')
         ABNORMAL_BRAIN = (load_hpo_by_name, "Abnormality of brain morphology")

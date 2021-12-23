@@ -89,9 +89,9 @@ function setProbandPhenoText() {
                 $("#proband-text").html("Using proband phenotypes:");
                 for (var m=0 ; m<results.length ; ++m) {
                     var result = results[m]
-                    var resultType = result["match_type"];
+                    var ontologyService = result["ontology_service"];
                     var resultMatch = result["match"];
-                    if (!displayedTerms.has(resultMatch) && (resultType == 'H' || resultType == 'O')) {
+                    if (!displayedTerms.has(resultMatch) && (ontologyService == 'HPO' || ontologyService == 'OMIM')) {
                         pp.append($("<li>" + resultMatch + "</li>"));
                         displayedTerms.add(resultMatch);
                     }

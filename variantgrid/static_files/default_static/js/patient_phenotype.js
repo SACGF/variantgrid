@@ -1,5 +1,3 @@
-var TERM_CLASSES = {"H" : "hpo", "O" : "omim", "G" : "gene"};  
-
 function displayPhenotypeMatches(descriptionBox, phenotypeText, phenotypeMatches) {
     function compareByStart(a,b) {
       if (a.offset_start < b.offset_start)
@@ -24,8 +22,7 @@ function displayPhenotypeMatches(descriptionBox, phenotypeText, phenotypeMatches
             let pm = phenotypeMatches[j];
             if (pm.offset_start <= i) {
                 sliceEnd = j + 1;
-                const termClass = TERM_CLASSES[pm.match_type];
-                phenotypeHTML += `<span title='${pm.match}' class='term-match ${termClass}'>`;
+                phenotypeHTML += `<span title='${pm.match}' class='ontology-service ${pm.ontology_service}'>`;
             } else {
                 break;
             }
@@ -52,7 +49,7 @@ function displayPhenotypeMatches(descriptionBox, phenotypeText, phenotypeMatches
     }
     
     descriptionBox.html(phenotypeHTML);
-    $(".term-match", descriptionBox);
+    $(".term-match-ontology-service", descriptionBox);
 }
 
 
@@ -62,9 +59,8 @@ function phenotypeMatchesToJqGridData(phenotypeMatches) {
     for (let i=0 ; i<phenotypeMatches.length ; ++i) {
         const pm = phenotypeMatches[i];
         if (!accessionSet.has(pm.accession)) {
-            const termType = TERM_CLASSES[pm.match_type];
             const row = {
-                'term_type': termType,
+                'ontology_service': pm.ontology_service,
                 'accession': pm.accession,
                 'name': pm.name,
                 'gene_symbols': pm.gene_symbols.join(', '),

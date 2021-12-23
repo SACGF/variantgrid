@@ -4,7 +4,7 @@ from django.db.models.aggregates import Count
 from django.db.models.query_utils import Q
 from django.shortcuts import get_object_or_404
 
-from annotation.models.models_phenotype_match import PATIENT_GENE_SYMBOL_PATH, PATIENT_ONTOLOGY_TERM_PATH
+from annotation.models.models_phenotype_match import PATIENT_ONTOLOGY_TERM_PATH
 from library.django_utils import get_model_fields
 from library.jqgrid_user_row_config import JqGridUserRowConfig
 from ontology.grids import AbstractOntologyGenesGrid
@@ -29,13 +29,10 @@ class PatientListGrid(JqGridUserRowConfig):
 
             # We need to filter to a sub patients list NOT just to certain terms, so that StringAgg will
             # return all the terms for that person
-            if term_type in ('HP', 'OMIM'):
+            if term_type in ('HP', 'OMIM', 'HGNC'):
                 ontology_service = OntologyService(term_type)
                 ontology_term = OntologyTerm.objects.get(name=value, ontology_service=ontology_service)
                 patient_id_q = Q(**{PATIENT_ONTOLOGY_TERM_PATH: ontology_term})
-            elif term_type == 'gene':
-                # Match to gene_symbol as there may be multiple with that symbol
-                patient_id_q = Q(**{PATIENT_GENE_SYMBOL_PATH: value})
             else:
                 msg = f"Unknown term type '{term_type}'"
                 raise ValueError(msg)
@@ -46,6 +43,7 @@ class PatientListGrid(JqGridUserRowConfig):
         ontology_path = f"{PATIENT_ONTOLOGY_TERM_PATH}__name"
         q_hpo = Q(**{f"{PATIENT_ONTOLOGY_TERM_PATH}__ontology_service": OntologyService.HPO})
         q_omim = Q(**{f"{PATIENT_ONTOLOGY_TERM_PATH}__ontology_service": OntologyService.OMIM})
+        q_hgnc = Q(**{f"{PATIENT_ONTOLOGY_TERM_PATH}__ontology_service": OntologyService.HGNC})
         # Add sample_count to queryset
         annotation_kwargs = {"reference_id": StringAgg("specimen__reference_id", ',',
                                                        distinct=True, output_field=TextField()),
@@ -53,8 +51,8 @@ class PatientListGrid(JqGridUserRowConfig):
                                               filter=q_hpo, distinct=True, output_field=TextField()),
                              "omim": StringAgg(ontology_path, '|',
                                                filter=q_omim, distinct=True, output_field=TextField()),
-                             "genes": StringAgg(PATIENT_GENE_SYMBOL_PATH, '|',
-                                                distinct=True, output_field=TextField()),
+                             "hgnc": StringAgg(ontology_path, '|',
+                                               filter=q_hgnc, distinct=True, output_field=TextField()),
                              "sample_count": Count("sample", distinct=True),
                              "samples": StringAgg("sample__name", ", ", distinct=True, output_field=TextField())}
         queryset = queryset.annotate(**annotation_kwargs)
@@ -70,7 +68,7 @@ class PatientListGrid(JqGridUserRowConfig):
             {'index': 'reference_id', 'name': 'reference_id', 'label': 'Specimen ReferenceIDs'},
             {'index': 'hpo', 'name': 'hpo', 'label': 'HPO', 'classes': 'no-word-wrap', 'formatter': 'hpoFormatter'},
             {'index': 'omim', 'name': 'omim', 'label': 'OMIM', 'classes': 'no-word-wrap', 'formatter': 'omimFormatter'},
-            {'index': 'genes', 'name': 'genes', 'label': 'Genes', 'classes': 'no-word-wrap', 'formatter': 'geneFormatter'},
+            {'index': 'hgnc', 'name': 'hgnc', 'label': 'Genes', 'classes': 'no-word-wrap', 'formatter': 'hgncFormatter'},
             {'index': 'sample_count', 'name': 'sample_count', 'label': '# samples', 'sorttype': 'int', 'width': '30px'},
             {'index': 'samples', 'name': 'samples', 'label': 'Samples'},
         ]
