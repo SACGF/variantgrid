@@ -622,13 +622,15 @@ class OntologySnake:
         return set()
 
     @staticmethod
-    def terms_for_gene_symbol(gene_symbol: Union[str, GeneSymbol], desired_ontology: OntologyService, max_depth=1) -> 'OntologySnakes':
+    def terms_for_gene_symbol(gene_symbol: Union[str, GeneSymbol], desired_ontology: OntologyService,
+                              max_depth=1, min_classification: GeneDiseaseClassification = None) -> 'OntologySnakes':
         """ max_depth: How many steps in snake path to go through """
         # TODO, do this with hooks
         from ontology.panel_app_ontology import update_gene_relations
         update_gene_relations(gene_symbol)
         gene_ontology = OntologyTerm.get_gene_symbol(gene_symbol)
-        return OntologySnake.snake_from(term=gene_ontology, to_ontology=desired_ontology, max_depth=max_depth)
+        return OntologySnake.snake_from(term=gene_ontology, to_ontology=desired_ontology,
+                                        max_depth=max_depth, min_classification=min_classification)
 
     @staticmethod
     @cache_memoize(DAY_SECS)
@@ -680,8 +682,10 @@ class OntologySnake:
             return False
 
     @staticmethod
-    def gene_disease_relations(gene_symbol: Union[str, GeneSymbol]) -> List[OntologyTermRelation]:
-        snake = OntologySnake.terms_for_gene_symbol(gene_symbol, OntologyService.MONDO, max_depth=0)
+    def gene_disease_relations(gene_symbol: Union[str, GeneSymbol],
+                               min_classification: GeneDiseaseClassification = None) -> List[OntologyTermRelation]:
+        snake = OntologySnake.terms_for_gene_symbol(gene_symbol, OntologyService.MONDO,
+                                                    max_depth=0, min_classification=min_classification)
         return snake.leaf_relations(ontology_relation=OntologyRelation.RELATED)
 
 

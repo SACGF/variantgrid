@@ -180,7 +180,7 @@ class PhenotypeNode(AnalysisNode):
 
     @staticmethod
     def get_help_text() -> str:
-        return "Filter to gene lists based on ontology keywords (HPO/OMIM)"
+        return "Filter to gene lists based on ontology keywords (HPO/OMIM/MONDO)"
 
     def save_clone(self):
         phenotype_ontology_terms = list(self.phenotypenodeontologyterm_set.all())

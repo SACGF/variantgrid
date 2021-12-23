@@ -18,9 +18,7 @@
                                             <b>{{ src.mode_of_inheritance }}</b> ({{ src.gencc_classification }}) by {{ src.submitter }} on {{ src.evaluated_date }}
                                         </a>
                                     {% else %}
-                                        <span title="{{ src.evaluated_date }}">
-                                            <b>{{ src.mode_of_inheritance }}</b> ({{ src.gencc_classification }}) by {{ src.submitter }} on {{ src.evaluated_date }}
-                                        </span>
+                                        <b>{{ src.mode_of_inheritance }}</b> ({{ src.gencc_classification }}) by {{ src.submitter }} on {{ src.evaluated_date }}
                                     {% endif %}
                                 </li>
                             {% endfor %}
