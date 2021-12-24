@@ -7,7 +7,6 @@ from annotation.fake_annotation import get_fake_annotation_version, create_fake_
     create_fake_variant_annotation
 from annotation.models import HumanProteinAtlasAbundance, HumanProteinAtlasTissueSample, \
     ClinVar, Citation, CitationSource
-from annotation.tests.test_data_fake_genes import create_fake_transcript_version
 from library.django_utils.unittest_utils import URLTestCase
 from snpdb.models import Variant
 from snpdb.models.models_genome import GenomeBuild

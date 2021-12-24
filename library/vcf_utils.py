@@ -4,7 +4,6 @@ import re
 from collections import defaultdict
 from typing import Tuple
 
-import numpy as np
 import vcf
 
 from snpdb.models import Variant

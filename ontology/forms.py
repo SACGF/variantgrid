@@ -23,4 +23,3 @@ class HGNCForm(forms.Form):
                                   required=False,
                                   widget=autocomplete.ModelSelect2(url='hgnc_autocomplete',
                                                                    attrs={'data-placeholder': 'Gene/HGNC...'}))
-
