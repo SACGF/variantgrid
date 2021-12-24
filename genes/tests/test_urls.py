@@ -3,6 +3,7 @@ import unittest
 import uuid
 
 from django.contrib.auth.models import User
+from django.utils import timezone
 
 from annotation.fake_annotation import get_fake_annotation_version
 from annotation.models import CachedWebResource
@@ -11,6 +12,7 @@ from genes.models import CanonicalTranscriptCollection, GeneCoverageCollection, 
     GeneListCategory, Gene, CanonicalTranscript, GeneListGeneSymbol, PanelAppServer
 from genes.models_enums import AnnotationConsortium
 from library.django_utils.unittest_utils import URLTestCase, prevent_request_warnings
+from ontology.models import OntologyService, OntologyImport, OntologyTerm
 from snpdb.models import ImportStatus, DataState
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.tests.test_data import create_fake_trio
@@ -32,6 +34,12 @@ class Test(URLTestCase):
         cls.transcript = cls.transcript_version.transcript
         cls.gene = cls.transcript_version.gene_version.gene
         cls.gene_symbol = cls.transcript_version.gene_version.gene_symbol
+
+        # Need HGNC for RUNX1 for gene_disease_tags on gene symbol page
+        ontology_import = OntologyImport.objects.get_or_create(import_source="fake", processed_date=timezone.now())[0]
+        _ = OntologyTerm.objects.get_or_create(id="HGNC:10471", name=cls.gene_symbol, from_import=ontology_import,
+                                               index=1, ontology_service=OntologyService.HGNC)[0]
+
         cls.uncovered_gene = Gene.objects.get_or_create(identifier="fake_gene",
                                                         annotation_consortium=AnnotationConsortium.ENSEMBL)[0]
 

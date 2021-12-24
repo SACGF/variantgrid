@@ -39,9 +39,9 @@ def _new_gene_annotation_columns(apps, schema_editor):
         {'info_id': 'MONDO_TERMS', 'column_id': 'mondo_terms', 'number': None, 'type': 'S',
          'description': 'MONDO terms associated with gene'},
         {'info_id': 'GENE_DISEASE_SUPPORTIVE_OR_BELOW', 'column_id': 'gene_disease_supportive_or_below', 'number': None, 'type': 'S',
-         'description': 'GenCC gene/disease classifications of Supportive/Limited, joined with " | "'},
+         'description': 'GenCC gene/disease classifications of Supportive/Limited. Joined with |'},
         {'info_id': 'GENE_DISEASE_MODERATE_OR_ABOVE', 'column_id': 'gene_disease_moderate_or_above', 'number': None, 'type': 'S',
-         'description': 'GenCC gene/disease classifications >= Moderate, joined with " | "'},
+         'description': 'GenCC gene/disease classifications >= Moderate. Joined with |'},
     ]
 
     bulk_insert_class_data(apps, "snpdb", [("VariantGridColumn", NEW_VARIANT_GRID_COLUMNS)])
