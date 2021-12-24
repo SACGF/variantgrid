@@ -240,6 +240,9 @@ class GeneAnnotation(models.Model):
     gene = models.ForeignKey(Gene, on_delete=CASCADE)
     hpo_terms = models.TextField(null=True)
     omim_terms = models.TextField(null=True)
+    mondo_terms = models.TextField(null=True)
+    gene_disease_moderate_or_above = models.TextField(null=True)
+    gene_disease_supportive_or_below = models.TextField(null=True)
     gnomad_oe_lof = models.FloatField(null=True)  # Copied from genes.GnomADGeneConstraint
 
     class Meta:

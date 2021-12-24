@@ -13,13 +13,27 @@
             <div class="card-header">December X, 2021</div>
             <div class="card-body">
                 <ul>
-                    <li>Analysis - gene / ontology term links only use direct links (was previously using indirect links)</li>
                     <li>Analysis - pop node, can exclude filtered by gnomAD</li>
+                    <li>Analysis - PhenotypeNode can now use MONDO</li>
+                    <li>Analysis - Gene annotation column changes:
+                        <ul>
+                            <li>omim/hpo terms now only use direct links (was too broad due to indirect links)</li>
+                            <li>New column "MONDO terms"</li>
+                            <li>New MOI columns: eg for GATA2 they would be:
+                                <div>
+                                    <b>Gene/Disease Supportive or below:</b> <i>monocytopenia with susceptibility to infections=Autosomal dominant (Supportive: Orphanet)</i>
+                                </div>
+                                <div>
+                                    <b>Gene/Disease Moderate or above:</b> <i>deafness-lymphedema-leukemia syndrome=Autosomal dominant (Definitive: TGMI|G2P Strong: Genomics England PanelApp)|acute myeloid leukemia=Autosomal dominant (Strong: Genomics England PanelApp)|myelodysplastic syndrome=Autosomal dominant (Strong: Genomics England PanelApp)|GATA2 deficiency with susceptibility to MDS/AML=Autosomal dominant (Definitive: ClinGen)</i>
+                                </div>
+                            </li>
+                        </ul>
+                    </li>
+                    <li>Patients - phenotype text also matched for MONDO terms</li>
                     <li>Search - dbSNP lookup is faster, can search for cohort/pedigree</li>
                     <li>Data - add user to pedigree/cohort to make it easier to find</li>
                     <li>Manual variant entry - improved user experience creating novel variants via search</li>
                     <li>Gene/Disease - use GenCC (includes ClinGen) instead of just ClinGen on Gene page, Gene Grid column</li>
-                    <li>Ontology - Patients and PhenotypeNode can now use MONDO</li>
                     <li>Bug fixes</li>
                 </ul>
             </div>
