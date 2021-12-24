@@ -9,7 +9,7 @@ from annotation.models import GeneAnnotationVersion, OntologyImport, OntologyTer
 from genes.gene_matching import GeneMatcher
 from genes.models import GeneAnnotationRelease, GnomADGeneConstraint
 from library.django_utils.django_file_utils import get_import_processing_filename
-from ontology.models import OntologyService, OntologySnake, GeneDiseaseClassification
+from ontology.models import OntologyService, OntologySnake, GeneDiseaseClassification, OntologyTermRelation
 from upload.vcf.sql_copy_files import write_sql_copy_csv, sql_copy_csv
 
 
@@ -65,12 +65,17 @@ class Command(BaseCommand):
 
     @staticmethod
     def _validate_has_required_data():
-        for ontology_service in [OntologyService.OMIM, OntologyService.HPO, OntologyService.HGNC]:
+        for ontology_service in [OntologyService.OMIM, OntologyService.HPO,
+                                 OntologyService.MONDO, OntologyService.HGNC]:
             if not OntologyTerm.objects.filter(ontology_service=ontology_service).exists():
                 raise ValueError(f"No {ontology_service.label} records - please import first")
 
         if not GnomADGeneConstraint.objects.exists():
             raise ValueError("You need to import gnomAD Gene Constraints (see annotation page)")
+
+        otr_qs = OntologyTermRelation.objects.filter(extra__strongest_classification__isnull=False)
+        if not otr_qs.exists():
+            raise ValueError("You need to import GenCC gene/disease curation (see annotation page)")
 
     def _add_new_columns_to_existing(self):
         """ As we only added not changed columns, can just populate existing annotation """
