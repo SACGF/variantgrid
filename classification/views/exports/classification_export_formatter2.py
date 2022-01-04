@@ -80,6 +80,7 @@ class TranscriptStrategy(str, Enum):
     REFSEQ = "refseq"
 
 
+@dataclass
 class ClassificationFilter:
     user: User
     genome_build: GenomeBuild
