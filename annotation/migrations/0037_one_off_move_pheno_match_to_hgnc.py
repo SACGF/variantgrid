@@ -22,9 +22,12 @@ def _one_off_move_pheno_match_to_hgnc(apps, schema_editor):
                 tpm.save()
             else:
                 missing_genes.add(gene_symbol)
+                tpm.delete()
+
         print(f"Changed {matched} records from gene symbol -> HGNC Ontology")
         if missing_genes:
-            print(f"Warning: Could not match gene symbols -> HGNC for: {', '.join(missing_genes)}")
+            print(f"Warning: Could not convert TextPhenotypeMatch gene symbols -> HGNC for: {', '.join(missing_genes)}."
+                  "This is not critical, if you want you can edit it and re/match or run 'match_patient_phenotypes'")
 
 
 class Migration(migrations.Migration):

@@ -28,6 +28,6 @@ class Migration(migrations.Migration):
 
     operations = [
         ManualOperation.operation_other(args=[
-            'Update cyvcf2 library - sudo python3 -m pip install --force --upgrade numpy "cyvcf2>=0.30.14"'],
+            "Update cyvcf2 library - sudo python3 -m pip install --force --upgrade numpy 'cyvcf2>=0.30.14'"],
             test=_test_old_version),
     ]
