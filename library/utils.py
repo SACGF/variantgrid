@@ -856,11 +856,12 @@ class ExportRow:
             yield row_data
 
     @classmethod
-    def csv_generator(cls, data: Iterable[Any]) -> Iterator[str]:
+    def csv_generator(cls, data: Iterable[Any], delimiter=',', include_header=True) -> Iterator[str]:
         try:
-            yield delimited_row(cls.csv_header())
+            if include_header:
+                yield delimited_row(cls.csv_header(), delimiter=delimiter)
             for row_data in cls._data_generator(data):
-                yield delimited_row(row_data.to_csv())
+                yield delimited_row(row_data.to_csv(), delimiter=delimiter)
         except:
             from library.log_utils import report_exc_info
             report_exc_info(extra_data={"activity": "Exporting"})
