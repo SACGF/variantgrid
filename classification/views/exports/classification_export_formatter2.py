@@ -5,19 +5,22 @@ from enum import Enum
 from io import StringIO
 from typing import Optional, Set, Union, List, Iterator, Dict, Tuple, Type, Iterable
 from django.conf import settings
+from django.contrib.auth.models import User
 from django.db.models import QuerySet, Q
 from django.utils.timezone import now
 from pytz import timezone
 from cyvcf2.cyvcf2 import defaultdict
 from django.http import HttpRequest, HttpResponse, StreamingHttpResponse
-from django_messages.admin import User
 from guardian.shortcuts import get_objects_for_user
 from lazy import lazy
+from threadlocals.threadlocals import get_current_request
 
 from classification.enums import ShareLevel
 from classification.models import ClassificationModification, classification_flag_types, Classification
 from flags.models import Flag, FlagStatus, FlagComment, FlagsMixin
 from genes.hgvs import CHGVS
+from library.guardian_utils import bot_group
+from library.log_utils import NotificationBuilder
 from snpdb.models import Lab, Organization, GenomeBuild, allele_flag_types, Allele
 
 
@@ -321,6 +324,8 @@ class ClassificationExportFormatter2:
 
     def __init__(self, filter: ClassificationFilter):
         self.filter = filter
+        self.row_count = 0
+        self.file_count = 0
 
     def filename(self, part: Optional[int] = None, extension_override: Optional[str] = None):
         # FIXME only include genome_build if it's relevant to the file format (e.g. not JSON)
@@ -336,11 +341,13 @@ class ClassificationExportFormatter2:
             response = HttpResponse(content_type='application/zip')
             with zipfile.ZipFile(response, 'w') as zf:
                 for index, entry in enumerate(self.yield_files()):
+                    self.file_count += 1
                     # can we be more efficient than converting StringIO to a string to be converted back into bytes?
                     zf.writestr(self.filename(part=index), str(entry.file.getvalue()))
             response['Content-Disposition'] = f'attachment; filename="{self.filename(extension_override="zip")}"'
             return response
         else:
+            self.file_count = 1
             # can stream in single file
             response = StreamingHttpResponse(self.yield_file(), self.content_type())
             response['Content-Disposition'] = f'attachment; filename="{self.filename()}"'
@@ -369,6 +376,7 @@ class ClassificationExportFormatter2:
         if fw:
             fw.write(self.footer(), count=False)
             yield fw
+        self.report_stats()
 
     def yield_file(self) -> Iterator[str]:
         """
@@ -378,9 +386,11 @@ class ClassificationExportFormatter2:
             yield header
         for allele_data in self.filter.allele_data_filtered():
             for row in self.row(allele_data):
+                self.row_count += 1
                 yield row
         for footer in self.footer():
             yield footer
+        self.report_stats()
 
     def extension(self) -> str:
         raise NotImplementedError("extension not implemented")
@@ -393,3 +403,26 @@ class ClassificationExportFormatter2:
 
     def footer(self) -> List[str]:
         return list()
+
+    def report_stats(self):
+        # don't report bots downloading
+        if self.user.groups.filter(name=bot_group().name):
+            return
+        end = datetime.utcnow()
+        row_count = self.row_count
+
+        body_parts = [f":simple_smile: {self.filter.user}"]
+        if request := get_current_request():
+            body_parts.append(f"URL : `{request.path_info}`")
+        body_parts.append(f"Rows Downloaded : *{row_count}*")
+        if self.file_count > 1:
+            body_parts.append(f"File Count : *{self.file_count}*")
+
+        nb = NotificationBuilder(message="Classification Download")\
+            .add_header(":arrow_down: Classification Download Completed")\
+            .add_markdown("\n".join(body_parts), indented=True)
+        if request := get_current_request():
+            for key, value in request.GET.items():
+                nb.add_field(key, value)
+        nb.add_field("Duration", str((end - self.started).seconds) + " seconds")
+        nb.send()

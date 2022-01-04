@@ -142,14 +142,15 @@ class MVLEntry(ExportRow):
 
     @lazy
     def variant_anchor_tag(self):
-        v = Allele.objects.get(pk=self._cm.classification.allele_id).variant_for_build(self.mvl_data.data.source.source.genome_build)
-        url = v.get_absolute_url()
-        url = get_url_from_view_path(url) + f'?refer=mvl&seen={self.data.source.source.date_str}'
-        return f'<a href="{url}" target="_blank">Click here for up-to-date classifications on this variant.</a>'
-        # restore this after a comparison
-        # url = reverse('view_allele', kwargs={'pk': self._cm.classification.allele_id})
+        # if we want to produce the same URLs as before for comparison, at the cost of a lot of speed
+        # v = Allele.objects.get(pk=self._cm.classification.allele_id).variant_for_build(self.mvl_data.data.source.source.genome_build)
+        # url = v.get_absolute_url()
         # url = get_url_from_view_path(url) + f'?refer=mvl&seen={self.data.source.source.date_str}'
         # return f'<a href="{url}" target="_blank">Click here for up-to-date classifications on this variant.</a>'
+        # restore this after a comparison
+        url = reverse('view_allele', kwargs={'pk': self._cm.classification.allele_id})
+        url = get_url_from_view_path(url) + f'?refer=mvl&seen={self.data.source.source.date_str}'
+        return f'<a href="{url}" target="_blank">Click here for up-to-date classifications on this variant.</a>'
 
     @lazy
     def groups(self) -> ClassificationGroups:
