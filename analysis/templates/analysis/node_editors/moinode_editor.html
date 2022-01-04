@@ -1,0 +1,159 @@
+{% extends "analysis/node_editors/grid_editor_gene_tab.html" %}
+{% load static %}
+{% load js_tags %}
+{% block style %}
+{% load jqgrid_tags %}
+
+#gene-lists-container {
+    width: 100%;
+    height: 100%;
+}
+
+{% endblock style %}
+{% block docreadyjs %}
+	var moiNodeForm = $("form#moi-node");
+    accordionForm(moiNodeForm);
+    ajaxForm(moiNodeForm);
+
+    function setupCollapse(selector) {
+        let allMessage = $(selector + "-all-message");
+        $(selector).on('shown.bs.collapse', function() {
+            allMessage.hide();
+        }).on('hide.bs.collapse', function() {
+            allMessage.show();
+            $("input[type=checkbox]", this).prop("checked", true);
+        });
+    }
+
+    setupCollapse("#moi-inheritance");
+    setupCollapse("#moi-submitters");
+
+    $("#moi-dates").on('shown.bs.collapse', function() {
+        $("#moi-dates-all-message").hide();
+    }).on('hide.bs.collapse', function() {
+        $("#moi-dates-all-message").show();
+        $("input", this).val("");
+    });
+
+{% endblock docreadyjs %}
+
+{% block inlinejs %}
+    {{ block.super }}
+
+    function addDownloadLink(grid, pagerId, url) {
+        var download_grid = function() {
+                window.location = url;
+        };
+
+        grid.jqGrid('navButtonAdd', pagerId, {
+                    caption : "Download",
+                    buttonicon : "ui-icon-arrowthickstop-1-s",
+                    onClickButton : download_grid,
+                    position : "first",
+                    title : "Export",
+                    cursor : "pointer"
+        });
+    }
+{% endblock inlinejs%}
+
+{% block gene_list_grid %}
+
+{% jqgrid 'node_ontology_genes_grid' 'node-ontology-genes' search=False download_grid_json_as_csv=True node_id=node.pk version=node.version %}
+
+{% endblock gene_list_grid %}
+
+
+{% block content %}
+<style>
+	#id_percent {
+		width: 100px;
+	}
+</style>
+<div>
+	<form id="moi-node" method="post" action="{{ request.path }}">
+        {% csrf_token %}
+        {% for hidden in form.hidden_fields %}
+            {{ hidden }}
+        {% endfor %}
+
+		<ul class="accordion">
+            <li>
+                <h3>Custom Disease</h3>
+                <div>
+                    {{ form.mondo }}
+                </div>
+            </li>
+			<li>
+	        <h3>From Patient</h3>
+	        <div>
+				Patient: {{ form.patient }}
+		        {% if node.patient %}
+		        	<div id='patient-details'>
+					{% if patient_mondo %}
+						<p>
+						<b>MONDO:</b>
+						{% for mondo in patient_mondo %}
+							{{ mondo }}
+						{% endfor %}
+						</p>
+					{% else %}
+						This patient has no MONDO terms
+					{% endif %}
+					</div>
+		        {% endif %}
+	        </div>
+	        </li>
+		</ul>
+
+        <div>
+            <div>
+                {{ form.min_classification.label }}{{ form.min_classification }}
+            </div>
+            <div>
+                <span id="moi-inheritance-all-message">
+                    Any mode of inheritance
+                </span>
+                <a class="hover-link" data-toggle="collapse" href="#moi-inheritance">Toggle Mode of Inheritance...</a>
+                <div id="moi-inheritance" class="collapse hide">
+                    <h3>Inheritance</h3>
+                    <ul>
+                        {% for field in form.get_moi_fields %}
+                            <li>{{ field }} {{ field.label }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+            <div>
+                <span id="moi-submitters-all-message">
+                    Any submitter
+                </span>
+                <a class="hover-link" data-toggle="collapse" href="#moi-submitters">Toggle Submitters...</a>
+                <div id="moi-submitters" class="collapse hide">
+                    <h3>Submitters</h3>
+                    <ul>
+                    {% for field in form.get_submitter_fields %}
+                        <li>{{ field }} {{ field.label }}</li>
+                    {% endfor %}
+                    </ul>
+                </div>
+            </div>
+            <div>
+                <span id="moi-dates-all-message">
+                    Any Dates
+                </span>
+                <a class="hover-link" data-toggle="collapse" href="#moi-dates">Toggle Dates...</a>
+                <div id="moi-dates" class="collapse hide">
+                    {{ form.min_date.label }}{{ form.min_date }}
+                    {{ form.max_date.label }}{{ form.max_date }}
+                </div>
+            </div>
+        </div>
+
+        {% if has_write_permission %}
+	    	<button id='moi-node-save' class="btn btn-primary">save</button>
+        {% endif %}
+    {{ form.media }}
+	</form>
+</div>
+
+{% endblock content %}

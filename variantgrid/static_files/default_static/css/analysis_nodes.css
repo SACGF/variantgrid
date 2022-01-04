@@ -186,6 +186,10 @@ ul.customicons .ui-icon {
     background-image: url(/static/images/node_icons/checklist_icon.png);
 }
 
+.ui-icon.MOINode {
+    background-image: url(/static/images/node_icons/moi.svg);
+}
+
 .ui-icon.PopulationNode { 
     background-image: url(/static/images/node_icons/population_node.png);
 }
@@ -265,6 +269,10 @@ ul.customicons .ui-icon {
 
 .node-overlay.AllVariantsNode {
     background-image: url(/static/icons/database-1-1.png);
+}
+
+.node-overlay.MOINode {
+    background-image: url(/static/images/node_icons/moi.svg);
 }
 
 .node-overlay.PedigreeNode {

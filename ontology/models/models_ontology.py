@@ -18,7 +18,7 @@ from model_utils.models import TimeStampedModel, now
 
 from genes.models import GeneSymbol
 from library.cache import timed_cache
-from library.constants import DAY_SECS
+from library.constants import DAY_SECS, WEEK_SECS
 from library.log_utils import report_exc_info
 from library.utils import Constant
 
@@ -432,6 +432,23 @@ class OntologyTermRelation(TimeStampedModel):
         items = list(OntologyTermRelation.objects.filter(Q(source_term=term) | Q(dest_term=term)).select_related("source_term", "dest_term", "from_import"))
         items.sort(key=functools.cmp_to_key(sort_relationships))
         return items
+
+    @staticmethod
+    def gene_disease_relations() -> QuerySet:
+        return OntologyTermRelation.objects.filter(relation=OntologyRelation.RELATED,
+                                                   extra__strongest_classification__isnull=False)
+
+    @staticmethod
+    @cache_memoize(WEEK_SECS)
+    def moi_and_submitters() -> Tuple[List[str], List[str]]:
+        """ Cached lists of MOI/Submitters from GenCC gene/disease extra JSON """
+        moi = set()
+        submitters = set()
+        for extra in OntologyTermRelation.gene_disease_relations().values_list("extra", flat=True):
+            for source in extra["sources"]:
+                moi.add(source["mode_of_inheritance"])
+                submitters.add(source["submitter"])
+        return list(sorted(moi)), list(sorted(submitters))
 
 
 @dataclass

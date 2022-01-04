@@ -1,15 +1,17 @@
 import json
+from typing import List
 
 from dal import autocomplete, forward
 from dal_select2.widgets import ModelSelect2Multiple
 from django import forms
 from django.forms.models import fields_for_model
 from django.forms.widgets import TextInput, HiddenInput
+from django.utils.text import slugify
 from django_starfield import Stars
 from guardian.shortcuts import get_objects_for_user
 
 from analysis import models
-from analysis.models import AnalysisNode, AnalysisTemplateType, Analysis
+from analysis.models import AnalysisNode, AnalysisTemplateType, Analysis, MOINode
 from analysis.models.nodes.analysis_node import NodeVCFFilter, NodeAlleleFrequencyFilter
 from analysis.models.nodes.filters.damage_node import DamageNode
 from analysis.models.nodes.filters.expression_node import ExpressionNode
@@ -35,7 +37,7 @@ from genes.hgvs import get_hgvs_variant_tuple, get_hgvs_variant
 from genes.models import GeneListCategory, CustomTextGeneList, GeneList, PanelAppPanel
 from library.forms import NumberInput
 from library.utils import md5sum_str
-from ontology.models import OntologyTerm
+from ontology.models import OntologyTerm, OntologyTermRelation
 from patients.models_enums import GnomADPopulation
 from snpdb.forms import GenomeBuildAutocompleteForwardMixin
 from snpdb.models import GenomicInterval, ImportStatus, Sample, VCFFilter, Tag
@@ -476,6 +478,72 @@ class MergeNodeForm(BaseNodeForm):
     class Meta:
         model = MergeNode
         exclude = ANALYSIS_NODE_FIELDS
+
+
+class MOINodeForm(BaseNodeForm):
+    mondo = forms.ModelMultipleChoiceField(required=False,
+                                           queryset=OntologyTerm.objects.all(),
+                                           widget=ModelSelect2Multiple(url='mondo_autocomplete',
+                                                                       attrs={'data-placeholder': 'Curated MONDO disease...'},
+                                                                       forward=(forward.Const(True, 'gene_disease'),)))
+
+    class Meta:
+        model = MOINode
+        exclude = ANALYSIS_NODE_FIELDS
+        widgets = {
+            'min_date': TextInput(attrs={'class': 'date-picker', 'placeholder': 'Min Date'}),
+            'max_date': TextInput(attrs={'class': 'date-picker', 'placeholder': 'Max Date'}),
+            'accordion_panel': HiddenInput(),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        # Dynamically add fields
+        moi_list, submitters = OntologyTermRelation.moi_and_submitters()
+        for moi in moi_list:
+            self.fields[f"moi_{slugify(moi)}"] = forms.BooleanField(required=False, label=moi)
+
+        for submitter in submitters:
+            self.fields[f"submitter_{slugify(submitter)}"] = forms.BooleanField(required=False, label=submitter)
+
+    def save(self, commit=True):
+        node = super().save(commit=False)
+
+        ontology_term_set = self.instance.moinodeontologyterm_set
+        ontology_term_set.all().delete()
+        for ot in self.cleaned_data["mondo"]:
+            ontology_term_set.create(ontology_term=ot)
+
+        moi_list, submitters = OntologyTermRelation.moi_and_submitters()
+        RELATED = [
+            ("moinodemodeofinheritance_set", "mode_of_inheritance", [f"moi_{slugify(f)}" for f in moi_list]),
+            ("moinodesubmitter_set", "submitter", [f"submitter_{slugify(f)}" for f in submitters]),
+        ]
+        for (relation, fk, fields) in RELATED:
+            # If ALL of them are set, then don't worry about setting any
+            data = {field: self.cleaned_data[field] for field in fields}
+            if all(data.values()):
+                print("All are set!")
+            else:
+                print("Need to save them all")
+
+        if commit:
+            node.save()
+        return node
+
+    def _get_fields_with_prefix(self, prefix) -> List[str]:
+        fields = []
+        for field_name in self.fields:
+            if field_name.startswith(prefix):
+                fields.append(self[field_name])
+        return fields
+
+    def get_moi_fields(self) -> List[str]:
+        return self._get_fields_with_prefix("moi_")
+
+    def get_submitter_fields(self) -> List[str]:
+        return self._get_fields_with_prefix("submitter_")
 
 
 class PedigreeNodeForm(GenomeBuildAutocompleteForwardMixin, VCFSourceNodeForm):

@@ -8,8 +8,9 @@ from analysis.exceptions import NonFatalNodeError
 from analysis.forms.forms_nodes import AllVariantsNodeForm, BuiltInFilterNodeForm, \
     ClassificationsNodeForm, DamageNodeForm, FilterNodeForm, IntersectionNodeForm, \
     PedigreeNodeForm, PhenotypeNodeForm, PopulationNodeForm, TagNodeForm, TissueNodeForm, TrioNodeForm, \
-    VennNodeForm, ZygosityNodeForm, CohortNodeForm, AlleleFrequencyNodeForm, SelectedInParentNodeForm, MergeNodeForm
-from analysis.models import TagNode, OntologyTerm
+    VennNodeForm, ZygosityNodeForm, CohortNodeForm, AlleleFrequencyNodeForm, SelectedInParentNodeForm, MergeNodeForm, \
+    MOINodeForm
+from analysis.models import TagNode, OntologyTerm, MOINode
 from analysis.models.enums import SetOperations
 from analysis.models.nodes.filters.allele_frequency_node import AlleleFrequencyNode
 from analysis.models.nodes.filters.built_in_filter_node import BuiltInFilterNode
@@ -186,6 +187,22 @@ class IntersectionNodeView(NodeView):
 class MergeNodeView(NodeView):
     model = MergeNode
     form_class = MergeNodeForm
+
+
+class MOINodeView(NodeView):
+    model = MOINode
+    form_class = MOINodeForm
+
+    def _get_form_initial(self):
+        form_initial = super()._get_form_initial()
+        #form_initial.update({k.lower(): v for k, v in terms_dict.items()})
+        return form_initial
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update({
+        })
+        return context
 
 
 class PedigreeNodeView(NodeView):
