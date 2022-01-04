@@ -326,6 +326,7 @@ class ClassificationExportFormatter2:
         self.filter = filter
         self.row_count = 0
         self.file_count = 0
+        self.started = datetime.utcnow()
 
     def filename(self, part: Optional[int] = None, extension_override: Optional[str] = None):
         # FIXME only include genome_build if it's relevant to the file format (e.g. not JSON)
@@ -364,6 +365,7 @@ class ClassificationExportFormatter2:
 
         for allele_data in self.filter.allele_data_filtered():
             to_rows = self.row(allele_data)
+            self.row_count += len(to_rows)
             if not fw or (self.filter.row_limit and fw.row_count + len(to_rows) > self.filter.row_limit):
                 if fw:
                     fw.write(self.footer(), count=False)
@@ -406,12 +408,13 @@ class ClassificationExportFormatter2:
 
     def report_stats(self):
         # don't report bots downloading
-        if self.user.groups.filter(name=bot_group().name):
+        user = self.filter.user
+        if user.groups.filter(name=bot_group().name):
             return
         end = datetime.utcnow()
         row_count = self.row_count
 
-        body_parts = [f":simple_smile: {self.filter.user}"]
+        body_parts = [f":simple_smile: {user.username}"]
         if request := get_current_request():
             body_parts.append(f"URL : `{request.path_info}`")
         body_parts.append(f"Rows Downloaded : *{row_count}*")
