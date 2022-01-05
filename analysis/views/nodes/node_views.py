@@ -236,7 +236,7 @@ class PhenotypeNodeView(NodeView):
         if patient:
             ontology_term_ids = patient.get_ontology_term_ids()
             terms_dict = OntologyTerm.split_hpo_omim_mondo_as_dict(ontology_term_ids)
-            context.update({f"patient_{k.lower()}" for k, v in terms_dict.items()})
+            context.update({f"patient_{k.lower()}": v for k, v in terms_dict.items()})
 
         patient_queryset = node.get_patients_qs()
         has_patients = patient_queryset.exists()
