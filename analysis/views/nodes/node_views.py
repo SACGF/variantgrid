@@ -195,7 +195,8 @@ class MOINodeView(NodeView):
 
     def _get_form_initial(self):
         form_initial = super()._get_form_initial()
-        #form_initial.update({k.lower(): v for k, v in terms_dict.items()})
+        form_initial["mondo"] = self.object.moinodeontologyterm_set.values_list("ontology_term", flat=True)
+        # There is also setting of other form initial from models in the form __init__ method
         return form_initial
 
     def get_context_data(self, **kwargs):

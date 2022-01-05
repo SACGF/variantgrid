@@ -23,6 +23,10 @@
             allMessage.show();
             $("input[type=checkbox]", this).prop("checked", true);
         });
+        // If any are not checked, then expand
+        if ($("input[type=checkbox]:checkbox:not(:checked)", selector).length) {
+            $(selector).collapse('toggle');
+        }
     }
 
     setupCollapse("#moi-inheritance");
@@ -34,6 +38,14 @@
         $("#moi-dates-all-message").show();
         $("input", this).val("");
     });
+
+    let hasDates = $('#moi-dates input[type="text"]').filter(function () {
+        return this.value.length > 0
+    }).length;
+    if (hasDates) {
+        $("#moi-dates").collapse('toggle');
+    }
+
 
 {% endblock docreadyjs %}
 

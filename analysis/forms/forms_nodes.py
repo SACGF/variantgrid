@@ -497,36 +497,68 @@ class MOINodeForm(BaseNodeForm):
         }
 
     def __init__(self, *args, **kwargs):
+        """ We save data as the raw fields, only slugify in the form """
         super().__init__(*args, **kwargs)
 
         # Dynamically add fields
         moi_list, submitters = OntologyTermRelation.moi_and_submitters()
-        for moi in moi_list:
-            self.fields[f"moi_{slugify(moi)}"] = forms.BooleanField(required=False, label=moi)
+        moi_initial = {}
+        moi_related = self.instance.moinodemodeofinheritance_set
+        if moi_related.exists():
+            for moi_moi in moi_related.values_list("mode_of_inheritance", flat=True):
+                moi_initial[moi_moi] = True
 
+        for moi in moi_list:
+            field = f"moi_{slugify(moi)}"
+            field_kwargs = {}
+            if moi_initial:  # Some set
+                fi = moi_initial.get(moi, False)
+            else:
+                fi = True  # All set
+            field_kwargs["initial"] = fi
+            print(f"{moi=} {field=} {field_kwargs=}")
+            self.fields[field] = forms.BooleanField(required=False, label=moi, **field_kwargs)
+
+        submitter_initial = {}
+        submitter_related = self.instance.moinodesubmitter_set
+        if submitter_related.exists():
+            for submitter in submitter_related.values_list("submitter", flat=True):
+                submitter_initial[submitter] = True
         for submitter in submitters:
-            self.fields[f"submitter_{slugify(submitter)}"] = forms.BooleanField(required=False, label=submitter)
+            field = f"submitter_{slugify(submitter)}"
+            field_kwargs = {}
+            if submitter_initial:  # Some set
+                fi = submitter_initial.get(submitter, False)
+            else:
+                fi = True  # All set
+            field_kwargs["initial"] = fi
+            print(f"{submitter=} {field=} {field_kwargs=}")
+            self.fields[field] = forms.BooleanField(required=False, label=submitter, **field_kwargs)
 
     def save(self, commit=True):
         node = super().save(commit=False)
 
         ontology_term_set = self.instance.moinodeontologyterm_set
-        ontology_term_set.all().delete()
+        ontology_term_set.all().delete()  # Clear existing
         for ot in self.cleaned_data["mondo"]:
             ontology_term_set.create(ontology_term=ot)
 
         moi_list, submitters = OntologyTermRelation.moi_and_submitters()
         RELATED = [
-            ("moinodemodeofinheritance_set", "mode_of_inheritance", [f"moi_{slugify(f)}" for f in moi_list]),
-            ("moinodesubmitter_set", "submitter", [f"submitter_{slugify(f)}" for f in submitters]),
+            ("moinodemodeofinheritance_set", "mode_of_inheritance", "moi_", moi_list),
+            ("moinodesubmitter_set", "submitter", "submitter_", submitters),
         ]
-        for (relation, fk, fields) in RELATED:
+        for (relation, fk, prefix, fields) in RELATED:
+            related_set = getattr(node, relation)
+            related_set.all().delete()  # Clear existing
             # If ALL of them are set, then don't worry about setting any
-            data = {field: self.cleaned_data[field] for field in fields}
-            if all(data.values()):
-                print("All are set!")
-            else:
-                print("Need to save them all")
+            data = {}
+            for field in fields:
+                data[field] = self.cleaned_data[prefix + slugify(field)]
+            if not all(data.values()):
+                for key, value in data.items():
+                    if value:
+                        related_set.create(**{fk: key})
 
         if commit:
             node.save()
