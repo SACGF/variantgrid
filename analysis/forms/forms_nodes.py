@@ -500,6 +500,9 @@ class MOINodeForm(BaseNodeForm):
         """ We save data as the raw fields, only slugify in the form """
         super().__init__(*args, **kwargs)
 
+        # Restrict sample to ancestors
+        self.fields['sample'].queryset = Sample.objects.filter(pk__in=self.instance.get_sample_ids())
+
         # Dynamically add fields
         moi_list, submitters = OntologyTermRelation.moi_and_submitters()
         moi_initial = {}
@@ -516,7 +519,6 @@ class MOINodeForm(BaseNodeForm):
             else:
                 fi = True  # All set
             field_kwargs["initial"] = fi
-            print(f"{moi=} {field=} {field_kwargs=}")
             self.fields[field] = forms.BooleanField(required=False, label=moi, **field_kwargs)
 
         submitter_initial = {}
@@ -532,7 +534,6 @@ class MOINodeForm(BaseNodeForm):
             else:
                 fi = True  # All set
             field_kwargs["initial"] = fi
-            print(f"{submitter=} {field=} {field_kwargs=}")
             self.fields[field] = forms.BooleanField(required=False, label=submitter, **field_kwargs)
 
     def save(self, commit=True):
@@ -782,5 +783,5 @@ class ZygosityNodeForm(BaseNodeForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        samples_queryset = Sample.objects.filter(pk__in=self.instance.get_sample_ids())
-        self.fields['sample'].queryset = samples_queryset
+        # Restrict samples to ancestors
+        self.fields['sample'].queryset = Sample.objects.filter(pk__in=self.instance.get_sample_ids())

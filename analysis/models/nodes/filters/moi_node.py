@@ -9,18 +9,21 @@ from django.db.models.query_utils import Q
 from lazy import lazy
 
 from analysis.models.nodes.analysis_node import AnalysisNode
+from analysis.models.nodes.cohort_mixin import AncestorSampleMixin
 from annotation.models import VariantTranscriptAnnotation, OntologyTerm
 from genes.models import GeneSymbol
 from ontology.models import GeneDiseaseClassification, OntologyTermRelation
-from patients.models import Patient
-from snpdb.models import Contig
+from snpdb.models import Contig, Sample
 
 
-class MOINode(AnalysisNode):
+class MOINode(AncestorSampleMixin, AnalysisNode):
     PANEL_CUSTOM = 0
     PANEL_PATIENT = 1
 
-    patient = models.ForeignKey(Patient, null=True, blank=True, on_delete=SET_NULL)
+    # Sample isn't mandatory, but if you supply it, you can use the zygosity
+    # Probably want to be able to swap the panel out if sample changes as per cohort node and the zyg filter
+    sample = models.ForeignKey(Sample, null=True, blank=True, on_delete=SET_NULL)
+    require_zygosity = models.BooleanField(default=True)
     min_classification = models.CharField(max_length=1, choices=GeneDiseaseClassification.choices,
                                           default=GeneDiseaseClassification.MODERATE)
     min_date = models.DateField(null=True, blank=True)
@@ -29,46 +32,7 @@ class MOINode(AnalysisNode):
 
     @property
     def use_patient(self):
-        # To support legacy template code after refactor to using accordian_panel
         return self.accordion_panel == self.PANEL_PATIENT
-
-    def get_patients_qs(self):
-        samples = set()
-
-        node_ids = [n.pk for n in self.analysisnode_ptr.get_roots()]
-        roots = AnalysisNode.objects.filter(pk__in=node_ids).select_subclasses()
-        for node in roots:
-            samples.update(node.get_samples())
-
-        return Patient.filter_for_user(self.analysis.user).filter(sample__in=samples)
-
-    def handle_ancestor_input_samples_changed(self):
-        """ Auto-set to single patient ancestor (or remove if no longer ancestor) """
-
-        patients = set(self.get_patients_qs())
-
-        modified = False
-        is_new = self.version == 0
-        if not is_new:  # Being set in analysis template
-            # may have been moved/copied into a different DAG without current patient as ancestor
-            if self.patient and self.patient not in patients:
-                self.patient = None
-                modified = True
-
-        if self.patient is None:
-            if proband_sample := self.get_proband_sample():
-                if proband_patient := proband_sample.patient:
-                    patients = [proband_patient]  # Set below
-
-            if len(patients) == 1:
-                self.patient = patients.pop()
-                if is_new:
-                    self.accordion_panel = self.PANEL_PATIENT
-                modified = True
-
-        if modified:
-            print("Modified so set appearance dirty")
-            self.appearance_dirty = True
 
     def modifies_parents(self):
         return bool(self.get_ontology_term_ids())
@@ -94,8 +58,9 @@ class MOINode(AnalysisNode):
         """ """
         ontology_term_ids = []
         if self.accordion_panel == self.PANEL_PATIENT:
-            if self.patient:
-                ontology_term_ids = self.patient.get_ontology_term_ids()
+            if self.sample:
+                if patient := self.sample.patient:
+                    ontology_term_ids = patient.get_ontology_term_ids()
         else:
             ontology_term_ids = self.moinodeontologyterm_set.values_list("ontology_term", flat=True)
         return ontology_term_ids
@@ -148,8 +113,10 @@ class MOINode(AnalysisNode):
         MAX_NAME_LENGTH = 50
         name = ''
         if self.modifies_parents():
-            if self.accordion_panel == self.PANEL_PATIENT and self.patient:
-                name = f"{self.patient} patient mondo"
+            if self.accordion_panel == self.PANEL_PATIENT:
+                if self.sample:
+                    if patient := self.sample.patient:
+                        name = f"{patient} patient mondo"
             else:
                 short_descriptions, long_descriptions = self._short_and_long_descriptions
 

@@ -26,7 +26,9 @@ from analysis.views.analysis_permissions import get_analysis_or_404, get_node_su
     get_node_subclass_or_non_fatal_exception
 from analysis.views.node_json_view import NodeJSONPostView
 from library.django_utils import require_superuser
-from snpdb.models import Tag, BuiltInFilters, GenomeBuild
+from ontology.models import OntologyTermRelation, OntologyTerm
+from ontology.serializers import OntologyTermSerializer
+from snpdb.models import Tag, BuiltInFilters, GenomeBuild, Sample
 from snpdb.tasks.clingen_tasks import populate_clingen_alleles_from_allele_source
 
 
@@ -298,6 +300,23 @@ def create_selected_child(request, node_id):
 
     data = get_rendering_dict(selected_node)
     data["node_id"] = node.get_css_id()
+    return JsonResponse(data)
+
+
+def sample_patient_gene_disease(request, sample_id):
+    """ For a sample, return patient MONDO terms that are associated with gene/disease
+        Used by MOI Node """
+    sample = Sample.get_for_user(request.user, sample_id)
+    data = {
+        "patient_id": sample.patient_id
+    }
+    if sample.patient:
+        all_terms = OntologyTerm.objects.filter(pk__in=sample.patient.get_ontology_term_ids())
+        gene_disease_qs = OntologyTermRelation.gene_disease_relations()
+        gene_disease_terms = all_terms.filter(subject__in=gene_disease_qs).distinct()
+        data["patient"] = str(sample.patient)
+        data["terms"] = [OntologyTermSerializer(t).data for t in gene_disease_terms]
+
     return JsonResponse(data)
 
 

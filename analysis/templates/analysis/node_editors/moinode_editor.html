@@ -15,6 +15,8 @@
     accordionForm(moiNodeForm);
     ajaxForm(moiNodeForm);
 
+    $("#id_sample", moiNodeForm).change(changeSample);
+
     function setupCollapse(selector) {
         let allMessage = $(selector + "-all-message");
         $(selector).on('shown.bs.collapse', function() {
@@ -52,6 +54,60 @@
 {% block inlinejs %}
     {{ block.super }}
 
+    function noPatientTerms(accordion, patientDiv) {
+        // clear and close
+        accordion.accordion({active: 0});
+        patientDiv.empty();
+    }
+
+    function termsUl(terms) {
+        let ul = $("<ul/>");
+        for (let i=0 ; i<terms.length ; i++) {
+            let term = terms[i];
+            let li = $("<li/>");
+            let termText = term["id"] + " " + term["name"];
+            let termLink = $("<a/>", {href: term["absolute_url"], target: "_blank"}).text(termText);
+            li.append(termLink);
+            ul.append(li);
+        }
+        return ul;
+    }
+
+    function changeSample() {
+        let sampleId = $("#id_sample", "form#moi-node").val();
+        let accordion = $("#moi-terms-accordion");
+        let patientDiv = $("#moi-patient");
+        patientDiv.empty();
+
+        if (sampleId) {
+            $.ajax({
+                type: "GET",
+                url: Urls.sample_patient_gene_disease(sampleId),
+                success: function(data) {
+                    console.log(data);
+                    if (!data["patient_id"]) {
+                        accordion.accordion({active: 0});
+                        patientDiv.text("Sample is not assigned to a patient.");
+                        return;
+                    }
+                    let patientName = $("<span/>").append($("<b/>").text("Patient: ")).append(data["patient"]);
+                    patientDiv.append(patientName);
+
+                    let terms = data["terms"];
+                    if (terms.length) {
+                        patientDiv.append(termsUl(terms));
+                        accordion.accordion({active: 1});
+                    } else {
+                        patientDiv.append("This patient has no MONDO terms associated with gene/disease classification");
+                    }
+                }
+            });
+        } else {
+            accordion.accordion({active: 0});
+            patientDiv.text("No sample selected");
+        }
+    }
+
     function addDownloadLink(grid, pagerId, url) {
         var download_grid = function() {
                 window.location = url;
@@ -88,7 +144,12 @@
             {{ hidden }}
         {% endfor %}
 
-		<ul class="accordion">
+		<div>
+            <b>Sample:</b> {{ form.sample }}
+            <b>Require Exact Zygosity Calls:</b> {{ form.require_zygosity }}{{ form.require_zygosity.errors }}
+        </div>
+
+		<ul id="moi-terms-accordion" class="accordion">
             <li>
                 <h3>Custom Disease</h3>
                 <div>
@@ -96,24 +157,8 @@
                 </div>
             </li>
 			<li>
-	        <h3>From Patient</h3>
-	        <div>
-				Patient: {{ form.patient }}
-		        {% if node.patient %}
-		        	<div id='patient-details'>
-					{% if patient_mondo %}
-						<p>
-						<b>MONDO:</b>
-						{% for mondo in patient_mondo %}
-							{{ mondo }}
-						{% endfor %}
-						</p>
-					{% else %}
-						This patient has no MONDO terms
-					{% endif %}
-					</div>
-		        {% endif %}
-	        </div>
+                <h3>From Patient</h3>
+                <div id="moi-patient"></div>
 	        </li>
 		</ul>
 
