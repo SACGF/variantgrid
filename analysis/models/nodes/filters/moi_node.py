@@ -1,5 +1,6 @@
 import logging
 import operator
+from datetime import date
 from functools import reduce
 from typing import Optional, Set, Tuple, List
 
@@ -38,13 +39,42 @@ class MOINode(AncestorSampleMixin, AnalysisNode):
         return bool(self.get_ontology_term_ids())
 
     def get_gene_disease_relations(self) -> List[OntologyTermRelation]:
+        """ Filtered by node settings """
         gene_disease_relations = []
-        ontology_terms = self.get_ontology_term_ids()
+        ontology_terms = self._get_all_ontology_term_ids()
         gene_disease_qs = OntologyTermRelation.gene_disease_relations()
         gene_disease_qs = gene_disease_qs.filter(source_term__in=ontology_terms)
-        # TODO: all the various filters on extra
+
+        valid_classifications = set(GeneDiseaseClassification.get_above_min(self.min_classification))
+        mode_of_inheritance = set(self.moinodemodeofinheritance_set.all().values_list("mode_of_inheritance", flat=True))
+        submitters = set(self.moinodesubmitter_set.all().values_list("submitter", flat=True))
+
         for otr in gene_disease_qs:
-            gene_disease_relations.append(otr)
+            # Only include the sources that match, so we can use that to build docs / grids
+            filtered_sources = []
+            for source in otr.extra["sources"]:
+                if source["gencc_classification"] not in valid_classifications:
+                    continue
+                if mode_of_inheritance:
+                    if source["mode_of_inheritance"] not in mode_of_inheritance:
+                        continue
+                if submitters:
+                    if source["submitter"] not in submitters:
+                        continue
+                if self.min_date or self.max_date:
+                    evaluated_date = date.fromisoformat(source["evaluated_date"])
+                    if self.min_date and self.min_date > evaluated_date:
+                        continue
+                    if self.max_date and self.max_date < evaluated_date:
+                        continue
+                filtered_sources.append(source)
+
+            if filtered_sources:
+                otr.extra["sources"] = filtered_sources
+                # Override the save method, so it can't be saved by accident
+                otr.save = None
+                gene_disease_relations.append(otr)
+
         return gene_disease_relations
 
     def get_gene_symbols_qs(self):
@@ -54,8 +84,8 @@ class MOINode(AncestorSampleMixin, AnalysisNode):
         gene_symbols_qs = GeneSymbol.objects.filter(symbol__in=hgnc_names)
         return gene_symbols_qs
 
-    def get_ontology_term_ids(self):
-        """ """
+    def _get_all_ontology_term_ids(self):
+        """ Returns all terms (not filtered by any settings) """
         ontology_term_ids = []
         if self.accordion_panel == self.PANEL_PATIENT:
             if self.sample:
@@ -64,6 +94,10 @@ class MOINode(AncestorSampleMixin, AnalysisNode):
         else:
             ontology_term_ids = self.moinodeontologyterm_set.values_list("ontology_term", flat=True)
         return ontology_term_ids
+
+    def get_ontology_term_ids(self):
+        """ For node gene / terms grid """
+        return [otr.source_term for otr in self.get_gene_disease_relations()]
 
     def get_gene_qs(self):
         gene_symbols_qs = self.get_gene_symbols_qs()

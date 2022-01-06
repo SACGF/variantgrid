@@ -5,6 +5,7 @@ A series of models that currently stores the combination of MONDO, OMIM, HPO & H
 import functools
 import operator
 import re
+from collections import defaultdict
 from dataclasses import dataclass
 from typing import Optional, List, Dict, Set, Union, Tuple, Iterable
 
@@ -367,7 +368,13 @@ class OntologyTermRelation(TimeStampedModel):
     # as in we can have multiple copies, up to code to try to not duplicate
 
     def __str__(self):
-        return f"{self.source_term} -> ({self.relation}) -> {self.dest_term}"
+        name = f"{self.source_term} -> ({self.relation}) -> {self.dest_term}"
+        # Add extra info for gene/disease
+        if self.relation == OntologyRelation.RELATED and "strongest_classification" in self.extra:
+            moi_classifications = self.get_gene_disease_moi_classifications()
+            all_classifications = reversed(GeneDiseaseClassification.labels)
+            name += ". Gene/Disease: " + ", ".join(self.get_moi_summary(moi_classifications, all_classifications))
+        return name
 
     def __lt__(self, other):
         return self.source_term < other.source_term
@@ -432,6 +439,32 @@ class OntologyTermRelation(TimeStampedModel):
         items = list(OntologyTermRelation.objects.filter(Q(source_term=term) | Q(dest_term=term)).select_related("source_term", "dest_term", "from_import"))
         items.sort(key=functools.cmp_to_key(sort_relationships))
         return items
+
+    # Gene / Disease classifications
+    def get_gene_disease_moi_classifications(self):
+        sources = self.extra.get("sources")
+        if not sources:
+            raise ValueError("Extra does not contain 'sources' - only call this on gene/disease classifications")
+
+        moi_classifications = defaultdict(lambda: defaultdict(set))
+        for source in sources:
+            moi = source["mode_of_inheritance"]
+            classification = source["gencc_classification"]
+            submitter = source["submitter"]
+            moi_classifications[moi][classification].add(submitter)
+        return moi_classifications
+
+    @staticmethod
+    def get_moi_summary(moi_classifications, valid_classifications) -> List[str]:
+        moi_summary = []
+        for moi, classifications in moi_classifications.items():
+            classification_submitters = []
+            for classification in valid_classifications:
+                if submitters := classifications.get(classification):
+                    classification_submitters.append(f"{classification}: {'/'.join(sorted(submitters))}")
+            if classification_submitters:
+                moi_summary.append(f"{moi} ({' '.join(classification_submitters)})")
+        return moi_summary
 
     @staticmethod
     def gene_disease_relations() -> QuerySet:

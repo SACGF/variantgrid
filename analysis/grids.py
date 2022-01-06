@@ -1,3 +1,4 @@
+from collections import defaultdict
 from typing import Dict, List, Tuple
 
 import pandas as pd
@@ -18,6 +19,7 @@ from library.pandas_jqgrid import DataFrameJqGrid
 from library.unit_percent import get_allele_frequency_formatter
 from library.utils import md5sum_str
 from ontology.grids import AbstractOntologyGenesGrid
+from ontology.models import OntologyTermRelation, GeneDiseaseClassification
 from patients.models_enums import Zygosity
 from snpdb.grid_columns.custom_columns import get_custom_column_fields_override_and_sample_position, \
     get_variantgrid_extra_alias_and_select_columns
@@ -537,3 +539,29 @@ class NodeOntologyGenesGrid(AbstractOntologyGenesGrid):
 
     def _get_ontology_term_ids(self):
         return self.node.get_ontology_term_ids()
+
+
+class NodeGeneDiseaseClassificationGenesGrid(DataFrameJqGrid):
+    def __init__(self, user, node_id, version):
+        super().__init__()
+        self.node = get_node_subclass_or_404(user, node_id, version=version)
+
+    def _get_ontology_term_relations(self) -> List[OntologyTermRelation]:
+        return self.node.get_gene_disease_relations()
+
+    def get_dataframe(self):
+        gene_data = defaultdict(dict)
+        valid_classifications = list(reversed(GeneDiseaseClassification.labels))
+        columns = {}
+        for otr in self._get_ontology_term_relations():
+            moi_classifications = otr.get_gene_disease_moi_classifications()
+            gene_symbol = otr.dest_term.name
+            summary = ", ".join(otr.get_moi_summary(moi_classifications, valid_classifications))
+            column = str(otr.source_term)
+            columns[column] = True
+            gene_data[gene_symbol][column] = summary
+
+        self._overrides.update({column: {"width": 500} for column in columns})
+
+        df = pd.DataFrame.from_dict(gene_data, orient='index')
+        return df.sort_index()

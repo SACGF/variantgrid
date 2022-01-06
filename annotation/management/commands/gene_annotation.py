@@ -129,31 +129,9 @@ class Command(BaseCommand):
         for otr in OntologySnake.gene_disease_relations(gene_symbol,
                                                         min_classification=GeneDiseaseClassification.LIMITED):
             disease = otr.source_term.name
-            moi_classifications = defaultdict(lambda: defaultdict(set))
-            for source in otr.extra["sources"]:
-                moi = source["mode_of_inheritance"]
-                classification = source["gencc_classification"]
-                submitter = source["submitter"]
-                moi_classifications[moi][classification].add(submitter)
-
-            moi_supportive_or_below = []
-            moi_moderate_or_above = []
-            for moi, classifications in moi_classifications.items():
-                classification_submitters_supportive_or_below = []
-                for classification in supportive_or_below:
-                    if submitters := classifications.get(classification):
-                        classification_submitters = f"{classification}: {'/'.join(sorted(submitters))}"
-                        classification_submitters_supportive_or_below.append(classification_submitters)
-                if classification_submitters_supportive_or_below:
-                    moi_supportive_or_below.append(f"{moi} ({' '.join(classification_submitters_supportive_or_below)})")
-
-                classification_submitters_moderate_or_above = []
-                for classification in moderate_or_above:
-                    if submitters := classifications.get(classification):
-                        classification_submitters = f"{classification}: {'/'.join(sorted(submitters))}"
-                        classification_submitters_moderate_or_above.append(classification_submitters)
-                if classification_submitters_moderate_or_above:
-                    moi_moderate_or_above.append(f"{moi} ({' '.join(classification_submitters_moderate_or_above)})")
+            moi_classifications = otr.get_gene_disease_moi_classifications()
+            moi_supportive_or_below = otr.get_moi_summary(moi_classifications, supportive_or_below)
+            moi_moderate_or_above = otr.get_moi_summary(moi_classifications, moderate_or_above)
 
             if moi_supportive_or_below:
                 diseases_supportive_or_below.append(f"{disease}={', '.join(sorted(moi_supportive_or_below))}")

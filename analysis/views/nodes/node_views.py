@@ -31,6 +31,7 @@ from analysis.models.nodes.sources.cohort_node import CohortNode
 from analysis.models.nodes.sources.pedigree_node import PedigreeNode
 from analysis.models.nodes.sources.trio_node import TrioNode
 from analysis.views.nodes.node_view import NodeView
+from analysis.views.views_json import get_sample_patient_gene_disease_data
 from classification.models.classification import Classification
 from classification.views.classification_datatables import ClassificationColumns
 from library.django_utils import highest_pk
@@ -201,8 +202,8 @@ class MOINodeView(NodeView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context.update({
-        })
+        if self.object.sample:
+            context["sample_patient_gene_disease"] = get_sample_patient_gene_disease_data(self.object.sample)
         return context
 
 

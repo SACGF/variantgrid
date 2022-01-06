@@ -303,10 +303,7 @@ def create_selected_child(request, node_id):
     return JsonResponse(data)
 
 
-def sample_patient_gene_disease(request, sample_id):
-    """ For a sample, return patient MONDO terms that are associated with gene/disease
-        Used by MOI Node """
-    sample = Sample.get_for_user(request.user, sample_id)
+def get_sample_patient_gene_disease_data(sample: Sample):
     data = {
         "patient_id": sample.patient_id
     }
@@ -315,8 +312,16 @@ def sample_patient_gene_disease(request, sample_id):
         gene_disease_qs = OntologyTermRelation.gene_disease_relations()
         gene_disease_terms = all_terms.filter(subject__in=gene_disease_qs).distinct()
         data["patient"] = str(sample.patient)
+        data["total_terms"] = all_terms.count()
         data["terms"] = [OntologyTermSerializer(t).data for t in gene_disease_terms]
+    return data
 
+
+def sample_patient_gene_disease(request, sample_id):
+    """ For a sample, return patient MONDO terms that are associated with gene/disease
+        Used by MOI Node """
+    sample = Sample.get_for_user(request.user, sample_id)
+    data = get_sample_patient_gene_disease_data(sample)
     return JsonResponse(data)
 
 

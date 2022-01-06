@@ -48,17 +48,13 @@
         $("#moi-dates").collapse('toggle');
     }
 
+    // Initial setup from loading config
+    populateMOIPatient({{ node.sample_id|jsonify }}, {{ sample_patient_gene_disease|jsonify }});
 
 {% endblock docreadyjs %}
 
 {% block inlinejs %}
     {{ block.super }}
-
-    function noPatientTerms(accordion, patientDiv) {
-        // clear and close
-        accordion.accordion({active: 0});
-        patientDiv.empty();
-    }
 
     function termsUl(terms) {
         let ul = $("<ul/>");
@@ -73,38 +69,63 @@
         return ul;
     }
 
+    function disableAccordion(accordion) {
+        accordion.accordion({active: 0});
+        $("h3#moi-accordion-patient-control", accordion).addClass("ui-state-disabled");
+    }
+
+    function populateMOIPatient(sampleId, data, changed) {
+        let accordion = $("#moi-terms-accordion");
+        let patientInfo = $("#moi-patient-info");
+        let patientTerms = $("#moi-patient-terms");
+        patientInfo.empty();
+        patientTerms.empty();
+
+        if (sampleId) {
+            if (!data["patient_id"]) {
+                disableAccordion(accordion);
+                patientInfo.text("Sample is not assigned to a patient.");
+                return;
+            }
+            let totalTerms = data["total_terms"];
+            let patientText = data["patient"];
+            if (totalTerms) {
+                patientText += " with " + totalTerms + " total ontology terms";
+                let terms = data["terms"];
+                if (terms.length) {
+                    patientText += " of which " + terms.length + " are MONDO gene/disease classification terms usable by this node.";
+                    patientTerms.append(termsUl(terms));
+                    if (changed) {
+                        accordion.accordion({active: 1});
+                    }
+                    $("h3#moi-accordion-patient-control", accordion).removeClass("ui-state-disabled");
+                } else {
+                    disableAccordion(accordion);
+                    patientText += ". No MONDO terms with gene/disease classification terms";
+                }
+            } else {
+                disableAccordion(accordion);
+                patientText += " with no ontology terms";
+            }
+            patientInfo.append(patientText);
+        } else {
+            disableAccordion(accordion);
+            patientInfo.text("No sample selected");
+        }
+    }
+
     function changeSample() {
         let sampleId = $("#id_sample", "form#moi-node").val();
-        let accordion = $("#moi-terms-accordion");
-        let patientDiv = $("#moi-patient");
-        patientDiv.empty();
-
         if (sampleId) {
             $.ajax({
                 type: "GET",
                 url: Urls.sample_patient_gene_disease(sampleId),
                 success: function(data) {
-                    console.log(data);
-                    if (!data["patient_id"]) {
-                        accordion.accordion({active: 0});
-                        patientDiv.text("Sample is not assigned to a patient.");
-                        return;
-                    }
-                    let patientName = $("<span/>").append($("<b/>").text("Patient: ")).append(data["patient"]);
-                    patientDiv.append(patientName);
-
-                    let terms = data["terms"];
-                    if (terms.length) {
-                        patientDiv.append(termsUl(terms));
-                        accordion.accordion({active: 1});
-                    } else {
-                        patientDiv.append("This patient has no MONDO terms associated with gene/disease classification");
-                    }
+                    populateMOIPatient(sampleId, data, true);
                 }
             });
         } else {
-            accordion.accordion({active: 0});
-            patientDiv.text("No sample selected");
+            populateMOIPatient(null, {});
         }
     }
 
@@ -126,7 +147,7 @@
 
 {% block gene_list_grid %}
 
-{% jqgrid 'node_ontology_genes_grid' 'node-ontology-genes' search=False download_grid_json_as_csv=True node_id=node.pk version=node.version %}
+{% jqgrid 'node_gene_disease_classification_genes_grid' 'node-ontology-genes' search=False download_grid_json_as_csv=True node_id=node.pk version=node.version %}
 
 {% endblock gene_list_grid %}
 
@@ -144,9 +165,19 @@
             {{ hidden }}
         {% endfor %}
 
+        <div>
+            Sample is optional, and used to also apply a zygosity filter.
+        </div>
 		<div>
             <b>Sample:</b> {{ form.sample }}
             <b>Require Exact Zygosity Calls:</b> {{ form.require_zygosity }}{{ form.require_zygosity.errors }}
+        </div>
+
+        <div>
+            <b>Patient:</b>
+            <span id="moi-patient-info">
+                <!-- Populated via populateMOIPatient -->
+            </span>
         </div>
 
 		<ul id="moi-terms-accordion" class="accordion">
@@ -157,8 +188,10 @@
                 </div>
             </li>
 			<li>
-                <h3>From Patient</h3>
-                <div id="moi-patient"></div>
+                <h3 id="moi-accordion-patient-control">From Patient</h3>
+                <div id="moi-patient-terms">
+                    <!-- Populated via populateMOIPatient -->
+                </div>
 	        </li>
 		</ul>
 
