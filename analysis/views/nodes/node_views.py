@@ -8,8 +8,9 @@ from analysis.exceptions import NonFatalNodeError
 from analysis.forms.forms_nodes import AllVariantsNodeForm, BuiltInFilterNodeForm, \
     ClassificationsNodeForm, DamageNodeForm, FilterNodeForm, IntersectionNodeForm, \
     PedigreeNodeForm, PhenotypeNodeForm, PopulationNodeForm, TagNodeForm, TissueNodeForm, TrioNodeForm, \
-    VennNodeForm, ZygosityNodeForm, CohortNodeForm, AlleleFrequencyNodeForm, SelectedInParentNodeForm, MergeNodeForm
-from analysis.models import TagNode, OntologyTerm
+    VennNodeForm, ZygosityNodeForm, CohortNodeForm, AlleleFrequencyNodeForm, SelectedInParentNodeForm, MergeNodeForm, \
+    MOINodeForm
+from analysis.models import TagNode, OntologyTerm, MOINode
 from analysis.models.enums import SetOperations
 from analysis.models.nodes.filters.allele_frequency_node import AlleleFrequencyNode
 from analysis.models.nodes.filters.built_in_filter_node import BuiltInFilterNode
@@ -30,6 +31,7 @@ from analysis.models.nodes.sources.cohort_node import CohortNode
 from analysis.models.nodes.sources.pedigree_node import PedigreeNode
 from analysis.models.nodes.sources.trio_node import TrioNode
 from analysis.views.nodes.node_view import NodeView
+from analysis.views.views_json import get_sample_patient_gene_disease_data
 from classification.models.classification import Classification
 from classification.views.classification_datatables import ClassificationColumns
 from library.django_utils import highest_pk
@@ -188,6 +190,23 @@ class MergeNodeView(NodeView):
     form_class = MergeNodeForm
 
 
+class MOINodeView(NodeView):
+    model = MOINode
+    form_class = MOINodeForm
+
+    def _get_form_initial(self):
+        form_initial = super()._get_form_initial()
+        form_initial["mondo"] = self.object.moinodeontologyterm_set.values_list("ontology_term", flat=True)
+        # There is also setting of other form initial from models in the form __init__ method
+        return form_initial
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        if self.object.sample:
+            context["sample_patient_gene_disease"] = get_sample_patient_gene_disease_data(self.object.sample)
+        return context
+
+
 class PedigreeNodeView(NodeView):
     model = PedigreeNode
     form_class = PedigreeNodeForm
@@ -218,7 +237,7 @@ class PhenotypeNodeView(NodeView):
         if patient:
             ontology_term_ids = patient.get_ontology_term_ids()
             terms_dict = OntologyTerm.split_hpo_omim_mondo_as_dict(ontology_term_ids)
-            context.update({f"patient_{k.lower()}" for k, v in terms_dict.items()})
+            context.update({f"patient_{k.lower()}": v for k, v in terms_dict.items()})
 
         patient_queryset = node.get_patients_qs()
         has_patients = patient_queryset.exists()
