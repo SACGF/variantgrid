@@ -2,12 +2,11 @@ import operator
 from collections import defaultdict
 from datetime import date
 from functools import reduce
-from typing import Optional, Set, Tuple, List
+from typing import Optional, Set, List
 
 from django.db import models
 from django.db.models.deletion import SET_NULL, CASCADE
 from django.db.models.query_utils import Q
-from lazy import lazy
 
 from analysis.models.nodes.analysis_node import AnalysisNode
 from analysis.models.nodes.cohort_mixin import AncestorSampleMixin
@@ -193,7 +192,6 @@ class MOINode(AncestorSampleMixin, AnalysisNode):
         return method_summary
 
     def get_node_name(self):
-        MAX_NAME_LENGTH = 50
         name = ''
         if self.modifies_parents():
             # TODO: Show terms, tell how it got them
@@ -206,7 +204,7 @@ class MOINode(AncestorSampleMixin, AnalysisNode):
 
     def save_clone(self):
         ontology_term_list = list(self.moinodeontologyterm_set.all())
-        moi_list= list(self.moinodemodeofinheritance_set.all())
+        moi_list = list(self.moinodemodeofinheritance_set.all())
         submitter_list = list(self.moinodesubmitter_set.all())
         copy = super().save_clone()
 
