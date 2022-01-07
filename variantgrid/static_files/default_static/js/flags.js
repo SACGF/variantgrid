@@ -864,7 +864,7 @@ let Flags = (function () {
                     This classification is not yet linked to a variant
                     <ol><li>If this has a status of In Progress we should match it to a variant shortly, no action required.</li>
                     <li>If this has a status of Matching Failed we were unable to normalise the variant provided based on the c.hgvs and genome build values.
-                    Please contact Shariant support for help in resolving this.</li></ol></div>
+                    Please click the bug icon in the top menu bar or contact support for help in resolving this.</li></ol></div>
                     `);
                 } else if (this.flag_type === 'classification_matching_variant_warning') {
                     return $(`<div>

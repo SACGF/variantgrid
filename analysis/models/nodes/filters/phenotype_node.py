@@ -1,7 +1,7 @@
 import logging
 import operator
 from functools import reduce
-from typing import Optional, Tuple, List
+from typing import Optional, Set, Tuple, List
 
 from django.db import models
 from django.db.models.deletion import SET_NULL, CASCADE
@@ -13,6 +13,7 @@ from annotation.models import VariantTranscriptAnnotation, OntologyTerm
 from genes.models import GeneSymbol
 from ontology.models import OntologySnake
 from patients.models import Patient
+from snpdb.models import Contig
 
 
 class PhenotypeNode(AnalysisNode):
@@ -72,7 +73,7 @@ class PhenotypeNode(AnalysisNode):
         if self.accordion_panel == self.PANEL_PATIENT and self.patient:
             gene_symbols_qs = self.patient.get_gene_symbols()
         else:
-            gene_symbols_qs = OntologySnake.gene_symbols_for_terms(self.get_ontology_term_ids())
+            gene_symbols_qs = OntologySnake.cached_gene_symbols_for_terms_tuple(tuple(self.get_ontology_term_ids()))
         return gene_symbols_qs
 
     def get_ontology_term_ids(self):
@@ -118,6 +119,11 @@ class PhenotypeNode(AnalysisNode):
             q = None
         return q
 
+    def _get_node_contigs(self) -> Optional[Set[Contig]]:
+        contig_qs = Contig.objects.filter(transcriptversion__genome_build=self.analysis.genome_build,
+                                          transcriptversion__gene_version__gene__in=self.get_gene_qs())
+        return set(contig_qs.distinct())
+
     def _get_method_summary(self):
         if self.modifies_parents():
             method_list = self._short_and_long_descriptions[1]
@@ -137,23 +143,15 @@ class PhenotypeNode(AnalysisNode):
         short_descriptions = []
 
         ontology_terms = self.phenotypenodeontologyterm_set.values_list("ontology_term", flat=True)
-        hpo_list, omim_list = OntologyTerm.split_hpo_and_omim(ontology_terms)
+        terms_dict = OntologyTerm.split_hpo_omim_mondo_as_dict(ontology_terms)
+        for ontology_name, ontology_list in terms_dict.items():
+            ontology_strings = []
+            for ot in ontology_list:
+                ontology_strings.append(str(ot))
 
-        phenotypes = []
-        for hpo in hpo_list:
-            phenotypes.append(str(hpo))
-
-        if phenotypes:
-            long_descriptions.append("Phenotype: %s" % ', '.join(phenotypes))
-            short_descriptions.append(f"{len(phenotypes)} HPO")
-
-        omims = []
-        for omim in omim_list:
-            omims.append(str(omim))
-
-        if omims:
-            long_descriptions.append("OMIM %s" % ', '.join(omims))
-            short_descriptions.append(f"{len(omims)} OMIM")
+            if ontology_strings:
+                long_descriptions.append(f"{ontology_name}: {', '.join(ontology_strings)}")
+                short_descriptions.append(f"{len(ontology_strings)} {ontology_name}")
 
         if self.text_phenotype:
             tp_description = f"Text: {self.text_phenotype}"
@@ -176,14 +174,13 @@ class PhenotypeNode(AnalysisNode):
                 else:
                     name = ','.join(short_descriptions)
 
-                num_genes = self.get_gene_qs().count()
-                if num_genes:
+                if num_genes := self.get_gene_symbols_qs().count():
                     name += f" ({num_genes} genes)"
         return name
 
     @staticmethod
     def get_help_text() -> str:
-        return "Filter to gene lists based on ontology keywords (HPO/OMIM)"
+        return "Filter to gene lists based on ontology keywords (HPO/OMIM/MONDO)"
 
     def save_clone(self):
         phenotype_ontology_terms = list(self.phenotypenodeontologyterm_set.all())

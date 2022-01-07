@@ -1449,7 +1449,7 @@ span.cs- { background-color: #f0f0f0 }
 
 // colours
 
-.gene {
+.hgnc {
     background-color: #99CD83;
 }
 
@@ -1459,6 +1459,10 @@ span.cs- { background-color: #f0f0f0 }
 
 .omim {
     background-color: #22529e;
+}
+
+.mondo {
+    background-color: #cce34c;
 }
 
 .sequencer-name-text {
@@ -1472,6 +1476,7 @@ span.cs- { background-color: #f0f0f0 }
     max-width: 534px;
     flex-direction: column;
 }
+
 .citation {
     a {
         color: #222288;

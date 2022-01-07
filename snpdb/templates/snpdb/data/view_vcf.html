@@ -249,7 +249,7 @@ $(document).ready(function() {
         const parentRow = $(this).parents("tr");
         const sampleNameCell = $(".sample-name", parentRow);
         const sampleName = $("input", sampleNameCell).val();
-        addCreatePatientButton(dialog, $(this), sampleName);
+        addCreatePatientButton(dialog, $(this), sampleName, ".sample-patient");
     });
 
     drawZygosityGraphs();
@@ -396,8 +396,11 @@ $(document).ready(function() {
                 <tr class="sample-row"> 
                     {{ form.id }}
                     <td>
-                        <input class='sample-select' sample_id='{{ form.id.value }}' type='checkbox' />
-                        <a href="{% url 'view_sample' form.id.value %}">Sample {{ form.id.value }}</a>
+                        <div class="display-flex flex-row">
+                            <input class='sample-select' sample_id='{{ form.id.value }}' type='checkbox' />
+                            <div class="icon24 sample-icon"></div>
+                            <a href="{% url 'view_sample' form.id.value %}">Sample {{ form.id.value }}</a>
+                        </div>
                     </td>
                 {% if vcf.import_status == 'S' %}
                     <td>
@@ -419,6 +422,7 @@ $(document).ready(function() {
                     <td class="sample-name">{{ form.name }}{{ form.name.errors }}</td>
                     <td>
                         <div class="sample-patient display-flex">
+                            <div class="icon24 patient-icon"></div>
                             <div class="flex-grow">
                             {{ form.patient }}{{ form.patient.errors }}
                             </div>
@@ -468,7 +472,7 @@ $(document).ready(function() {
     <div id="vcf-info">
         <fieldset class="form-fields">
             {% if vcf.uploadedvcf.uploaded_file.uploadpipeline %}
-                {% if url_name_visible.view_upload_pipeline %}
+                {% if url_name_visible.view_upload_pipeline and can_view_upload_pipeline %}
                 <p>
                     <label>Processing</label>
                     <span><a href="{% url 'view_upload_pipeline' vcf.uploadedvcf.uploaded_file.uploadpipeline.pk %}">View upload processing</a></span>

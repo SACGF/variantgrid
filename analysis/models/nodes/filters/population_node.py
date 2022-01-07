@@ -26,6 +26,7 @@ class PopulationNode(AnalysisNode):
     gnomad_af = models.BooleanField(default=True)
     gnomad_popmax_af = models.BooleanField(default=False)
     gnomad_hom_alt_max = models.IntegerField(null=True, blank=True)
+    show_gnomad_filtered = models.BooleanField(default=True)
     af_1kg = models.BooleanField(default=True)
     af_uk10k = models.BooleanField(default=True)
     topmed_af = models.BooleanField(default=False)
@@ -46,7 +47,8 @@ class PopulationNode(AnalysisNode):
         return self.percent != self.EVERYTHING
 
     def modifies_parents(self):
-        return any([self.filtering_by_population, self.gnomad_hom_alt_max, self.use_internal_counts])
+        return any([self.filtering_by_population, self.use_internal_counts,
+                    self.gnomad_hom_alt_max, not self.show_gnomad_filtered])
 
     def _get_node_q(self) -> Optional[Q]:
         and_q = []
@@ -81,6 +83,11 @@ class PopulationNode(AnalysisNode):
             q_hom_alt_lt = Q(variantannotation__gnomad_hom_alt__lte=self.gnomad_hom_alt_max)
             q_hom_alt_null = Q(variantannotation__gnomad_hom_alt__isnull=True)
             and_q.append(q_hom_alt_lt | q_hom_alt_null)
+
+        if not self.show_gnomad_filtered:
+            q_gnomad_filtered = Q(variantannotation__gnomad_filtered=False)
+            q_gnomad_filtered_null = Q(variantannotation__gnomad_filtered__isnull=True)
+            and_q.append(q_gnomad_filtered | q_gnomad_filtered_null)
 
         # Internal filters
         if self.use_internal_counts:
@@ -138,6 +145,12 @@ class PopulationNode(AnalysisNode):
             for gnomad_pop in self.populationnodegnomadpopulation_set.all():
                 field = VariantAnnotation.get_gnomad_population_field(gnomad_pop.population)
                 filters.append('%s <= %g' % (field, max_allele_frequency))
+
+            if self.gnomad_hom_alt_max is not None:
+                filters.append(f"gnomad_hom_alt_max <= {self.gnomad_hom_alt_max}")
+
+            if not self.show_gnomad_filtered:
+                filters.append("Removing gnomAD filtered")
 
             method_summary = ', '.join(filters)
         else:

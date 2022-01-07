@@ -1096,7 +1096,7 @@ div#content {
     background-color: #5cb85c;
 }
 
-.gnomad-flagged {
+.gnomad-filtered {
     background-color: #f0ad4e;
 }
 .sequencer {
@@ -1274,7 +1274,7 @@ a.clinical-context {
 
 // colours
 
-.gene {
+.hgnc {
     background-color: #99CD83;
 }
 
@@ -1284,6 +1284,10 @@ a.clinical-context {
 
 .omim {
     background-color: #22529e;
+}
+
+.mondo {
+    background-color: #cce34c;
 }
 
 .sequencer-name-text {
@@ -1334,6 +1338,7 @@ a.clinical-context {
     max-width: 534px;
     flex-direction: column;
 }
+
 .citation {
     a {
         color: #222288;

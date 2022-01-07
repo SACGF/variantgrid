@@ -455,9 +455,11 @@ class HGVSMatcher:
 
     @staticmethod
     def _transcript_position(transcript_version, kind: str, cdna_coord: pyhgvs.CDNACoord) -> int:
+        """ One based (like cDNA coords) """
         if kind == 'c':
             if cdna_coord.landmark == pyhgvs.CDNA_START_CODON:
-                offset = transcript_version.fivep_utr_length
+                # coord is negative for 5'UTR and there is no cDNA position 0
+                offset = transcript_version.fivep_utr_length + 1
             elif cdna_coord.landmark == pyhgvs.CDNA_STOP_CODON:
                 offset = transcript_version.fivep_utr_length + transcript_version.coding_length
             else:

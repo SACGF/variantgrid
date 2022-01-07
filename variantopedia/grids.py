@@ -173,10 +173,9 @@ class TaggedVariantGrid(AbstractVariantGrid):
 
         genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
         user_grid_config = UserGridConfig.get(user, self.caption)
-        if user_grid_config.show_group_data:
-            tags_qs = VariantTag.filter_for_user(user)
-        else:
-            tags_qs = VariantTag.objects.filter(user=user)
+        tags_qs = VariantTag.filter_for_user(user)
+        if not user_grid_config.show_group_data:
+            tags_qs = tags_qs.filter(user=user)
 
         tag_ids = []
         if extra_filters:

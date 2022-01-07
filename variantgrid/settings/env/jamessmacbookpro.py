@@ -287,7 +287,8 @@ URLS_NAME_REGISTER.update({  # Disable selected snpdb urls
     "condition_aliases": True,
     "clinvar_exports": True,
     "condition_matchings": True,
-    "condition_match_test": True
+    "condition_match_test": True,
+    "clinvar_key_summary": True
 })
 
 # mimic shariant
@@ -306,4 +307,4 @@ SITE_MESSAGE = "This is the setting site message"
 VARIANT_CLASSIFICATION_MATCH_VARIANTS = False
 
 PREFER_ALLELE_LINKS = True
-PANEL_APP_CHECK_ENABLED = True
+GENE_RELATION_PANEL_APP_LIVE_UPDATE = True

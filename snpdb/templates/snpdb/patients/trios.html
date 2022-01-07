@@ -11,5 +11,6 @@
 	</div>
 
 	{% load jqgrid_tags %}
-	{% jqgrid 'trio_grid' 'cohort' search=True gbox_id='trio-grid-filter-container' delete=True %}
+    {% user_data_grid_filter 'trio' 'Trios' %}
+	{% jqgrid 'trio_grid' 'trio' search=True gbox_id='trio-grid-filter-container' delete=True %}
 {% endblock %}

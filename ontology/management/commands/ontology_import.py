@@ -10,11 +10,11 @@ import pandas as pd
 import pronto
 from django.core.management import BaseCommand
 from model_utils.models import now
-from pandas import DataFrame, isna
 
 from annotation.models.models_enums import HPOSynonymScope
 from genes.models import HGNC
 from library.file_utils import file_md5sum
+from ontology.gencc import load_gencc
 from ontology.models import OntologyService, OntologyRelation, OntologyTerm, OntologyImportSource, OntologyImport, \
     OntologyTermRelation
 from ontology.ontology_builder import OntologyBuilder, OntologyBuilderDataUpToDateException
@@ -54,6 +54,7 @@ Rework it so we can keep a cache of everything already updated or created this r
 ID_OBO = re.compile("^http://purl[.]obolibrary[.]org/obo/([A-Z]+)_([0-9]+)$")
 ID_IDENTIFIERS = re.compile("http://identifiers[.]org/([A-Za-z]+)/([0-9]+)$")
 ID_STRAIGHT = re.compile("^([A-Z]+):([0-9]+)$")
+OMIM_URL = re.compile("^https://(omim)[.]org/entry/([0-9]+)$")
 
 
 @dataclass
@@ -62,7 +63,7 @@ class TermId:
     index: str = None
 
     def __init__(self, qualified_ref: str):
-        for pattern in [ID_OBO, ID_IDENTIFIERS, ID_STRAIGHT]:
+        for pattern in [ID_OBO, ID_IDENTIFIERS, ID_STRAIGHT, OMIM_URL]:
             if match := pattern.match(qualified_ref):
                 self.type = match[1].upper()
                 self.index = match[2]
@@ -83,7 +84,7 @@ def load_mondo(filename: str, force: bool):
         context="mondo_file",
         import_source=OntologyService.MONDO,
         force_update=force,
-        processor_version=12)
+        processor_version=13)
 
     ontology_builder.ensure_hash_changed(data_hash=file_hash)  # don't re-import if hash hasn't changed
 
@@ -275,60 +276,6 @@ def load_mondo(filename: str, force: bool):
     ontology_builder.complete()
     ontology_builder.report()
     print("Committing...")
-
-
-def load_gencc(filename: str, force: bool):
-    ontology_builder = OntologyBuilder(
-        filename=filename,
-        context="gencc_file",
-        import_source="gencc",
-        processor_version=2,
-        force_update=force)
-
-    file_hash = file_md5sum(filename)
-    ontology_builder.ensure_hash_changed(data_hash=file_hash)  # don't re-import if hash hasn't changed
-    print("About to load gencc")
-
-    gencc_df: DataFrame = pd.read_csv(filename, sep=",")
-    # only want strong and definitive relationships
-    gencc_df = gencc_df[gencc_df.classification_title.isin(["Definitive", "Strong"])]
-    # Exclude PanelApp Australia from here
-    # gencc_df = gencc_df[~gencc_df.isin(["PanelApp Australia"])]  # this still caused the rows to exist but a blank gencc??!!
-    gencc_df = gencc_df.sort_values(by=["gene_curie", "disease_curie"])
-    gencc_grouped = gencc_df.groupby(["gene_curie", "disease_curie"])
-
-    for group_name, df_group in gencc_grouped:
-        gene_id = df_group["gene_curie"].iloc[0]
-        mondo_id = df_group["disease_curie"].iloc[0]
-        gene_symbol = df_group["gene_symbol"].iloc[0]
-        sources = []
-
-        for row_index, row in df_group.iterrows():
-            classification_title = row["classification_title"]
-            moi_title = row["moi_title"]
-            submitter_title = row["submitter_title"]
-            if submitter_title != "PanelApp Australia":
-                sources.append({
-                    "submitter": submitter_title if not isna(submitter_title) else None,
-                    "gencc_classification": classification_title if not isna(classification_title) else None,
-                    "mode_of_inheritance":  moi_title if not isna(moi_title) else None,
-                })
-
-        if sources:
-            ontology_builder.add_term(
-                term_id=gene_id,
-                name=gene_symbol,
-                definition=None,
-                primary_source=False
-            )
-            ontology_builder.add_ontology_relation(
-                source_term_id=mondo_id,
-                dest_term_id=gene_id,
-                relation=OntologyRelation.RELATED,
-                extra={"sources": sources}
-            )
-
-    ontology_builder.complete()
 
 
 def load_hpo(filename: str, force: bool):
@@ -618,7 +565,8 @@ class Command(BaseCommand):
 
         if filename := options.get("gencc"):
             try:
-                load_gencc(filename, force=force)
+                file_hash = file_md5sum(filename)
+                load_gencc(filename, file_hash, force=force)
             except OntologyBuilderDataUpToDateException:
                 print("GenCC File hash is the same as last import")
 

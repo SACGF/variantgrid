@@ -6,6 +6,7 @@ from .filter_node import *
 from .gene_list_node import *
 from .intersection_node import *
 from .merge_node import *
+from .moi_node import *
 from .phenotype_node import *
 from .population_node import *
 from .selected_in_parent_node import *

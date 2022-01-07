@@ -42,7 +42,7 @@ function setupCreatePatientDialog() {
     return dialog;
 }
 
-function addCreatePatientButton(dialog, patientSelect, sampleName) {
+function addCreatePatientButton(dialog, patientSelect, sampleName, parentSelect) {
     const form = dialog.find("form");
     const createPatientButton = $("<div/>")
         .addClass("click-to-add-button flex-row")
@@ -68,7 +68,7 @@ function addCreatePatientButton(dialog, patientSelect, sampleName) {
         dialog.dialog("open");
     });
 
-    const parent = patientSelect.parents(".sample-patient");
+    const parent = patientSelect.parents(parentSelect);
     parent.append(createPatientButton);
 }
 </script>

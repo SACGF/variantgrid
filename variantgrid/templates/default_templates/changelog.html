@@ -9,46 +9,74 @@
     <div class="container">
         <h3>Changelog</h3>
 
-        {% if not sapath_enabled %}
-            <div class="card mt-4">
-                <div class="card-header">November 30, 2021</div>
-                <div class="card-body">
-                    <ul>
-                        <li>Bug fixes</li>
-                        <li>Analysis - export CSV now matches grid (previously only grid but not CSV had allele frequency as percent and was sorted)</li>
-                        <li>Analysis - Phenotype node now shows a warning if ontology term doesn't map to genes</li>
-                        <li>HGVS - Correctly handle RefSeq gapped alignments, update gene annotation</li>
-                        <li>HGVS - support LRG + non-coding transcripts</li>
-                        <li>ClinVar - update to latest version</li>
-                        <li>Samples page (data) - filter for variant type. Fix autocompletes sometimes not searching all builds</li>
-                        <li>VCF import - support DRAGEN VCFs - filters out non-standard variants like CNVs etc - show warnings of # skipped</li>
-                    </ul>
-                </div>
+        <div class="card mt-4">
+            <div class="card-header">December X, 2021</div>
+            <div class="card-body">
+                <ul>
+                    <li>Analysis - pop node, can exclude filtered by gnomAD</li>
+                    <li>Analysis - PhenotypeNode can now use MONDO</li>
+                    <li>Analysis - Gene annotation column changes:
+                        <ul>
+                            <li>omim/hpo terms now only use direct links (was too broad due to indirect links)</li>
+                            <li>New column "MONDO terms"</li>
+                            <li>New MOI columns: eg for GATA2 they would be:
+                                <div>
+                                    <b>Gene/Disease Supportive or below:</b> <i>monocytopenia with susceptibility to infections=Autosomal dominant (Supportive: Orphanet)</i>
+                                </div>
+                                <div>
+                                    <b>Gene/Disease Moderate or above:</b> <i>deafness-lymphedema-leukemia syndrome=Autosomal dominant (Definitive: TGMI|G2P Strong: Genomics England PanelApp)|acute myeloid leukemia=Autosomal dominant (Strong: Genomics England PanelApp)|myelodysplastic syndrome=Autosomal dominant (Strong: Genomics England PanelApp)|GATA2 deficiency with susceptibility to MDS/AML=Autosomal dominant (Definitive: ClinGen)</i>
+                                </div>
+                            </li>
+                        </ul>
+                    </li>
+                    <li>Patients - phenotype text also matched for MONDO terms</li>
+                    <li>Search - dbSNP lookup is faster, can search for cohort/pedigree</li>
+                    <li>Data - add user to pedigree/cohort to make it easier to find</li>
+                    <li>Manual variant entry - improved user experience creating novel variants via search</li>
+                    <li>Gene/Disease - use GenCC (includes ClinGen) instead of just ClinGen on Gene page, Gene Grid column</li>
+                    <li>Bug fixes</li>
+                </ul>
             </div>
+        </div>
 
-            <div class="card mt-4">
-                <div class="card-header">August 24, 2021</div>
-                <div class="card-body">
-                    <ul>
-                        <li>Search works for ontology terms</li>
-                        <li>Ontology term page shows classifications and patients linked to term</li>
-                        {% if site_name == 'Shariant' %}
-                            <li>ClinVar Export introduced</li>
-                        {% endif %}
-                    </ul>
-                </div>
+
+        <div class="card mt-4">
+            <div class="card-header">November 30, 2021</div>
+            <div class="card-body">
+                <ul>
+                    <li>Analysis - export CSV now matches grid (previously only grid but not CSV had allele frequency as percent and was sorted)</li>
+                    <li>Analysis - Phenotype node now shows a warning if ontology term doesn't map to genes</li>
+                    <li>HGVS - Correctly handle RefSeq gapped alignments, update gene annotation</li>
+                    <li>HGVS - support LRG + non-coding transcripts</li>
+                    <li>ClinVar - update to latest version</li>
+                    <li>Samples page (data) - filter for variant type. Fix autocompletes sometimes not searching all builds</li>
+                    <li>VCF import - support DRAGEN VCFs - filters out non-standard variants like CNVs etc - show warnings of # skipped</li>
+                    <li>Bug fixes</li>
+                </ul>
             </div>
+        </div>
 
-            <div class="card mt-4">
-                <div class="card-header">April 12, 2021</div>
-                <div class="card-body">
-                    <ul>
-                        <li>Allele Frequency - now in range 0-1 (not percent) - and uses values in VCF if provided.</li>
-                        <li>Variant Tags can be added/removed from variant details page</li>
-                    </ul>
-                </div>
+        <div class="card mt-4">
+            <div class="card-header">August 24, 2021</div>
+            <div class="card-body">
+                <ul>
+                    <li>Search works for ontology terms</li>
+                    <li>Ontology term page shows classifications and patients linked to term</li>
+                    {% if site_name == 'Shariant' %}
+                        <li>ClinVar Export introduced</li>
+                    {% endif %}
+                    <li>Allele Frequency - now in range 0-1 (not percent) - and uses values in VCF if provided.</li>
+                    <li>Variant Tags can be added/removed from variant details page</li>
+                </ul>
             </div>
+        </div>
 
+
+        <a data-toggle="collapse" href="#older-changelog" aria-expanded="false">
+            Show/hide older changes...
+        </a>
+
+        <div id="older-changelog" class="collapse">
             <div class="card mt-4">
                 <div class="card-header">March 10, 2021</div>
                 <div class="card-body">
@@ -88,105 +116,7 @@
                 </div>
             </div>
 
-        {% else %}
-
-            <!-- For SA Path, show all as one big VG3 upgrade -->
-
-            <div class="card mt-4">
-                <div class="card-header">VariantGrid 3.0</div>
-                <div class="card-body">
-                    <h4>General</h4>
-                    <ul>
-                        <li>Cleaner appearance, mobile friendly</li>
-                        <li>Support for multiple genome builds (GRCh37 and GRCh38)</li>
-                        {% if sapath_enabled %}
-                        <li>Logins now use Windows/HAD user/passwords</li>
-                        {% endif %}
-                    </ul>
-
-                    <h4>Analysis</h4>
-                    <ul>
-                        <li>Users can create/modify their own analysis templates</li>
-                        <li>Show tags from other analyses</li>
-                        <li>Tags liftover between genome builds</li>
-                        <li>Node editor forms catch errors before saving</li>
-                        <li>Analyses can be locked (via analysis settings) and set to read-only</li>
-                        <li>DamageNode renamed to EffectNode - has "3 out of 4 damage prediction programs", splicing, domain, literature filters</li>
-                        <li>Trio - comp. het. Zygosities fix - 1 from each parent. Handle overlapping genes</li>
-                        <li>GeneListNode - filter to PanelApp panels (UK and Aus)</li>
-                        <li>FilterNode has case-insensitive search</li>
-                    </ul>
-
-                    <h4>Annotation</h4>
-                    <ul>
-                        <li>Now uses VEP - see <a class="hover-link" href="{% url 'view_annotation_descriptions' %}">column descriptions</a> and <a class="hover-link" href="{% url 'about_new_vep_columns' %}">column changes</a></li>
-                        <li>Support for RefSeq transcripts / annotations</li>
-                        <li>Genes/Transcripts are versioned</li>
-                        <li>GeneList symbol matching done against a release (symbols change over time)</li>
-                        <li>Ontology (OMIM/HPO) updates</li>
-                    </ul>
-
-                    <h4>Classification</h4>
-                    <ul>
-                        <li>Added several new Quick Links</li>
-                        <li>Classifications imported from other Australian labs via Shariant</li>
-                    </ul>
-
-                    <h4>Gene Grid</h4>
-                    <ul>
-                        <li>Shows what GeneID is matched for a Gene Annotation Release</li>
-                        <li>Added PanelApp Australia</li>
-                        <li>Can delete unmatched symbol</li>
-                    </ul>
-
-                    <h4>Gene Page</h4>
-                    <ul>
-                        <li>Hotspot graphs</li>
-                        <li>PanelApp</li>
-                    </ul>
-
-                    <h4>Lab / Organization Pages</h4>
-                    <ul>
-                        <li>Activity overview</li>
-                        <li>Admins can change default settings for orgs/labs</li>
-                    </ul>
-
-                    <h4>Sample / VCF</h4>
-                    <ul>
-                        <li>Sample GeneList</li>
-                        <!-- <li><a class="hover-link" target="_blank" href="https://genomemedicine.biomedcentral.com/articles/10.1186/s13073-020-00761-2">Somalier</a> - tool to check sample relatedness</li> -->
-                        <li>Allele Frequency - now in range 0-1 (not percent) - and uses values in VCF if provided.</li>
-                        <li>Internal DB zygosity counts - Somatic not added by default. Button to add/remove VCF from counts</li>
-                    </ul>
-
-                    <h4>Search</h4>
-                    <ul>
-                        <li>Gene Symbol search works across aliases and other genome builds</li>
-                    </ul>
-
-                    <h4>Settings</h4>
-                    <ul>
-                        <li>Custom columns can be shared with other users</li>
-                        <li>Settings can be set at Organisation (ie SA Path-wide)/Lab/User level</li>
-                    </ul>
-
-                    <h4>Tagging</h4>
-                    <ul>
-                        <li>Tags grouped together by variant</li>
-                        <li>Variant Tags can be added/removed from variant details page</li>
-                    </ul>
-
-                    <h4>Variant Details</h4>
-                    <ul>
-                        <li>Cleaned and re-arranged page</li>
-                        <li>Nearby Variants + Classifications</li>
-                        <li>Allele Frequency Histogram</li>
-                        <li>Samples with variant grid loads much faster</li>
-                    </ul>
-                </div>
-            </div>
-
-        {% endif %}
+        </div>
 
     </div>
 {% endblock content %}

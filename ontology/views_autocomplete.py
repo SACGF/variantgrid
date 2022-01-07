@@ -43,3 +43,21 @@ class HPOAutocompleteView(AbstractOntologyTermAutocompleteView):
 class OMIMAutocompleteView(AbstractOntologyTermAutocompleteView):
     def _get_ontology_service(self):
         return OntologyService.OMIM
+
+
+@method_decorator(cache_page(HOUR_SECS), name='dispatch')
+class HGNCAutocompleteView(AbstractOntologyTermAutocompleteView):
+    def _get_ontology_service(self):
+        return OntologyService.HGNC
+
+
+@method_decorator(cache_page(HOUR_SECS), name='dispatch')
+class MONDOAutocompleteView(AbstractOntologyTermAutocompleteView):
+    def _get_ontology_service(self):
+        return OntologyService.MONDO
+
+    def get_user_queryset(self, user):
+        qs = super().get_user_queryset(user)
+        if self.forwarded.get('gene_disease'):
+            qs = qs.filter(subject__extra__strongest_classification__isnull=False).distinct()
+        return qs

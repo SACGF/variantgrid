@@ -21,7 +21,9 @@ def create_fake_transcript_version(genome_build: GenomeBuild,
                       [34880556, 34880713], [34886842, 34887096], [34892924, 34892963], [35048841, 35049344]],
             'start': 34787801, 'strand': '-', 'cds_end': 35048899, 'cds_start': 34792134}
 
+    contig = genome_build.chrom_contig_mappings[data["chrom"]]
     transcript_version, _ = TranscriptVersion.objects.get_or_create(transcript=transcript, gene_version=gene_version,
+                                                                    contig=contig,
                                                                     version=7, genome_build=genome_build,
                                                                     import_source=import_source, data=data)
 

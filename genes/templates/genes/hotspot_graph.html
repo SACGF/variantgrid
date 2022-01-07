@@ -248,8 +248,8 @@
                 let hotspot_graph_click_func = $(myPlot).attr("hotspot_graph_click_func");
                 if (typeof (hotspot_graph_click_func) != 'undefined') {
                     let barClicked = data.points[0];
-                    let i = barClicked.data.x.indexOf(barClicked.x);
-                    let text = barClicked.data.text[i];
+                    let i = barClicked.data.x.indexOf(String(barClicked.x));
+                    let text = "Hotspot click " + barClicked.data.text[i];
                     eval(hotspot_graph_click_func + "('{{ transcript_version.pk }}', text, barClicked.x);");
                 }
             });

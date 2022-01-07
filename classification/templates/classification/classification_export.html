@@ -86,6 +86,10 @@
         if (benchmark.length) {
             params.benchmark = 'true';
         }
+        let newMode = $("input[name='new-mode']:checked");
+        if (newMode.length) {
+            params.new_mode = 'true';
+        }
 
         let paramParts = [];
         for (let [key, value] of Object.entries(params)) {
@@ -207,7 +211,13 @@
         <div class="form-check">
             <label class="form-check-label">
                 <input id="benchmark" name="benchmark" value="true" type="checkbox" class="form-check-input" />
-                {{ org.name }}
+            </label>
+        </div>
+    {% endlabelled %}
+    {% labelled label="Run New Export Code (MVL Only - for now)" admin_only=True %}
+        <div class="form-check">
+            <label class="form-check-label">
+                <input id="new-mode" name="new-mode" value="true" type="checkbox" class="form-check-input" />
             </label>
         </div>
     {% endlabelled %}

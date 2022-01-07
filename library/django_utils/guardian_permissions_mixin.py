@@ -94,4 +94,7 @@ class GuardianPermissionsAutoInitialSaveMixin(GuardianPermissionsMixin):
         if assign_permissions is None:
             assign_permissions = initial_save
         if assign_permissions:
-            assign_permission_to_user_and_groups(self.user, self)
+            if user := getattr(self, "user", None):
+                assign_permission_to_user_and_groups(user, self)
+            else:
+                raise ValueError(f"{self} tried to set permissions without a user")

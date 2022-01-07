@@ -29,12 +29,13 @@ from library.log_utils import report_message
 from library.utils import clean_string
 from ontology.models import OntologyTerm, OntologyService
 from patients.models import ExternalPK, Patient
+from pedigree.models import Pedigree
 from seqauto.illumina.illumina_sequencers import SEQUENCING_RUN_REGEX
 from seqauto.models import SequencingRun, Experiment
-from snpdb.clingen_allele import get_clingen_allele, get_clingen_alleles_from_external_code
+from snpdb.clingen_allele import get_clingen_allele
 from snpdb.models import VARIANT_PATTERN, LOCUS_PATTERN, LOCUS_NO_REF_PATTERN, DBSNP_PATTERN, Allele, Contig, \
-    ClinGenAllele, GenomeBuild, Sample, Variant, Sequence, VariantCoordinate, UserSettings, Organization, Lab, VCF
-from snpdb.models.models_enums import ClinGenAlleleExternalRecordType
+    ClinGenAllele, GenomeBuild, Sample, Variant, Sequence, VariantCoordinate, UserSettings, Organization, Lab, VCF, \
+    DbSNP, Cohort
 from upload.models import ModifiedImportedVariant
 from variantgrid.perm_path import get_visible_url_names
 from variantopedia.models import SearchTypes
@@ -296,10 +297,12 @@ class Searcher:
         COSMIC_PATTERN = re.compile(r"^COS[MV](\d+)$")  # Old or new
 
         self.genome_build_searches = [
+            (SearchTypes.COHORT, NOT_WHITESPACE, search_cohort),
             (SearchTypes.DBSNP, DBSNP_PATTERN, search_dbsnp),
             (SearchTypes.HGVS, HGVS_UNCLEANED_PATTERN, search_hgvs),
             (SearchTypes.LOCUS, LOCUS_PATTERN, search_locus),
             (SearchTypes.LOCUS, LOCUS_NO_REF_PATTERN, search_locus),
+            (SearchTypes.PEDIGREE, NOT_WHITESPACE, search_pedigree),
             (SearchTypes.SAMPLE, NOT_WHITESPACE, search_sample),
             (SearchTypes.VCF, NOT_WHITESPACE, search_vcf),
             (SearchTypes.VARIANT, VARIANT_PATTERN, search_variant),
@@ -464,16 +467,24 @@ def search_cosmic(search_string: str, user: User, variant_qs: QuerySet, **kwargs
 
 
 def search_dbsnp(search_string, user, genome_build: GenomeBuild, variant_qs: QuerySet, **kwargs) -> VARIANT_SEARCH_RESULTS:
-    results = variant_qs.filter(variantannotation__dbsnp_rs_id=search_string)
-    if not results.exists():
-        cmv_list = []
-        for clingen_allele in get_clingen_alleles_from_external_code(ClinGenAlleleExternalRecordType.DBSNP_ID, search_string):
-            variant_string = clingen_allele.get_variant_string(genome_build)
-            search_message = f"'{search_string}' resolved to ClinGenAllele {clingen_allele} coordinate '{variant_string}'"
-            cmv_list.append(SearchResult(CreateManualVariant(genome_build, variant_string), message=search_message))
-        return cmv_list
+    # Do via API as a full table scan takes way too long with big data
+    dbsnp = DbSNP.get(search_string)
 
-    return results
+    matcher = HGVSMatcher(genome_build)
+    search_results = []
+    for data in dbsnp.get_alleles_for_genome_build(genome_build):
+        if hgvs_string := data.get("hgvs"):
+            dbsnp_message = f"dbSNP '{search_string}' resolved to '{hgvs_string}'"
+            variant_tuple = matcher.get_variant_tuple(hgvs_string)
+            results = get_results_from_variant_tuples(variant_qs, variant_tuple)
+            if results.exists():
+                for r in results:
+                    search_results.append(SearchResult(r, message=dbsnp_message))
+            else:
+                variant_string = Variant.format_tuple(*variant_tuple)
+                search_results.append(SearchResult(CreateManualVariant(genome_build, variant_string),
+                                                   message=dbsnp_message))
+    return search_results
 
 
 def search_gene_symbol(search_string: str, **kwargs) -> Iterable[Union[GeneSymbol, GeneSymbolAlias]]:
@@ -704,6 +715,16 @@ def search_locus(search_string: str, genome_build: GenomeBuild, variant_qs: Quer
 def search_sample(search_string: str, user: User, genome_build: GenomeBuild, **kwargs) -> Iterable[Sample]:
     return Sample.filter_for_user(user).filter(name__icontains=search_string,
                                                vcf__genome_build=genome_build)
+
+
+def search_cohort(search_string: str, user: User, genome_build: GenomeBuild, **kwargs) -> Iterable[Sample]:
+    return Cohort.filter_for_user(user).filter(name__icontains=search_string,
+                                               genome_build=genome_build)
+
+
+def search_pedigree(search_string: str, user: User, genome_build: GenomeBuild, **kwargs) -> Iterable[Sample]:
+    return Pedigree.filter_for_user(user).filter(name__icontains=search_string,
+                                                 cohort__genome_build=genome_build)
 
 
 def search_vcf(search_string: str, user: User, genome_build: GenomeBuild, **kwargs) -> Iterable[Sample]:

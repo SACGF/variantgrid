@@ -1,0 +1,249 @@
+{% extends "analysis/node_editors/grid_editor_gene_tab.html" %}
+{% load static %}
+{% load js_tags %}
+{% block style %}
+{% load jqgrid_tags %}
+
+#gene-lists-container {
+    width: 100%;
+    height: 100%;
+}
+
+{% endblock style %}
+{% block docreadyjs %}
+	var moiNodeForm = $("form#moi-node");
+    accordionForm(moiNodeForm);
+    ajaxForm(moiNodeForm);
+
+    $("#id_sample", moiNodeForm).change(changeSample);
+
+    function setupCollapse(selector) {
+        let allMessage = $(selector + "-all-message");
+        $(selector).on('shown.bs.collapse', function() {
+            allMessage.hide();
+        }).on('hide.bs.collapse', function() {
+            allMessage.show();
+            $("input[type=checkbox]", this).prop("checked", true);
+        });
+        // If any are not checked, then expand
+        if ($("input[type=checkbox]:checkbox:not(:checked)", selector).length) {
+            $(selector).collapse('toggle');
+        }
+    }
+
+    setupCollapse("#moi-inheritance");
+    setupCollapse("#moi-submitters");
+
+    $("#moi-dates").on('shown.bs.collapse', function() {
+        $("#moi-dates-all-message").hide();
+    }).on('hide.bs.collapse', function() {
+        $("#moi-dates-all-message").show();
+        $("input", this).val("");
+    });
+
+    let hasDates = $('#moi-dates input[type="text"]').filter(function () {
+        return this.value.length > 0
+    }).length;
+    if (hasDates) {
+        $("#moi-dates").collapse('toggle');
+    }
+
+    // Initial setup from loading config
+    populateMOIPatient({{ node.sample_id|jsonify }}, {{ sample_patient_gene_disease|jsonify }});
+
+{% endblock docreadyjs %}
+
+{% block inlinejs %}
+    {{ block.super }}
+
+    function termsUl(terms) {
+        let ul = $("<ul/>");
+        for (let i=0 ; i<terms.length ; i++) {
+            let term = terms[i];
+            let li = $("<li/>");
+            let termText = term["id"] + " " + term["name"];
+            let termLink = $("<a/>", {href: term["absolute_url"], target: "_blank"}).text(termText);
+            li.append(termLink);
+            ul.append(li);
+        }
+        return ul;
+    }
+
+    function disableAccordion(accordion) {
+        accordion.accordion({active: 0});
+        $("h3#moi-accordion-patient-control", accordion).addClass("ui-state-disabled");
+    }
+
+    function populateMOIPatient(sampleId, data, changed) {
+        let accordion = $("#moi-terms-accordion");
+        let patientInfo = $("#moi-patient-info");
+        let patientTerms = $("#moi-patient-terms");
+        patientInfo.empty();
+        patientTerms.empty();
+
+        if (sampleId) {
+            if (!data["patient_id"]) {
+                disableAccordion(accordion);
+                patientInfo.text("Sample is not assigned to a patient.");
+                return;
+            }
+            let totalTerms = data["total_terms"];
+            let patientText = data["patient"];
+            if (totalTerms) {
+                patientText += " with " + totalTerms + " total ontology terms";
+                let terms = data["terms"];
+                if (terms.length) {
+                    patientText += " of which " + terms.length + " are MONDO gene/disease classification terms usable by this node.";
+                    patientTerms.append(termsUl(terms));
+                    if (changed) {
+                        accordion.accordion({active: 1});
+                    }
+                    $("h3#moi-accordion-patient-control", accordion).removeClass("ui-state-disabled");
+                } else {
+                    disableAccordion(accordion);
+                    patientText += ". No MONDO terms with gene/disease classification terms";
+                }
+            } else {
+                disableAccordion(accordion);
+                patientText += " with no ontology terms";
+            }
+            patientInfo.append(patientText);
+        } else {
+            disableAccordion(accordion);
+            patientInfo.text("No sample selected");
+        }
+    }
+
+    function changeSample() {
+        let sampleId = $("#id_sample", "form#moi-node").val();
+        if (sampleId) {
+            $.ajax({
+                type: "GET",
+                url: Urls.sample_patient_gene_disease(sampleId),
+                success: function(data) {
+                    populateMOIPatient(sampleId, data, true);
+                }
+            });
+        } else {
+            populateMOIPatient(null, {});
+        }
+    }
+
+    function addDownloadLink(grid, pagerId, url) {
+        var download_grid = function() {
+                window.location = url;
+        };
+
+        grid.jqGrid('navButtonAdd', pagerId, {
+                    caption : "Download",
+                    buttonicon : "ui-icon-arrowthickstop-1-s",
+                    onClickButton : download_grid,
+                    position : "first",
+                    title : "Export",
+                    cursor : "pointer"
+        });
+    }
+{% endblock inlinejs%}
+
+{% block gene_list_grid %}
+
+{% jqgrid 'node_gene_disease_classification_genes_grid' 'node-ontology-genes' search=False download_grid_json_as_csv=True node_id=node.pk version=node.version %}
+
+{% endblock gene_list_grid %}
+
+
+{% block content %}
+<style>
+	#id_percent {
+		width: 100px;
+	}
+</style>
+<div>
+	<form id="moi-node" method="post" action="{{ request.path }}">
+        {% csrf_token %}
+        {% for hidden in form.hidden_fields %}
+            {{ hidden }}
+        {% endfor %}
+
+        <div>
+            Sample is optional, and used to also apply a zygosity filter.
+        </div>
+		<div>
+            <b>Sample:</b> {{ form.sample }}
+            <b>Require Exact Zygosity Calls:</b> {{ form.require_zygosity }}{{ form.require_zygosity.errors }}
+        </div>
+
+        <div>
+            <b>Patient:</b>
+            <span id="moi-patient-info">
+                <!-- Populated via populateMOIPatient -->
+            </span>
+        </div>
+
+		<ul id="moi-terms-accordion" class="accordion">
+            <li>
+                <h3>Custom Disease</h3>
+                <div>
+                    {{ form.mondo }}
+                </div>
+            </li>
+			<li>
+                <h3 id="moi-accordion-patient-control">From Patient</h3>
+                <div id="moi-patient-terms">
+                    <!-- Populated via populateMOIPatient -->
+                </div>
+	        </li>
+		</ul>
+
+        <div>
+            <div>
+                {{ form.min_classification.label }}{{ form.min_classification }}
+            </div>
+            <div>
+                <span id="moi-inheritance-all-message">
+                    Any mode of inheritance
+                </span>
+                <a class="hover-link" data-toggle="collapse" href="#moi-inheritance">Toggle Mode of Inheritance...</a>
+                <div id="moi-inheritance" class="collapse hide">
+                    <h3>Inheritance</h3>
+                    <ul>
+                        {% for field in form.get_moi_fields %}
+                            <li>{{ field }} {{ field.label }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+            <div>
+                <span id="moi-submitters-all-message">
+                    Any submitter
+                </span>
+                <a class="hover-link" data-toggle="collapse" href="#moi-submitters">Toggle Submitters...</a>
+                <div id="moi-submitters" class="collapse hide">
+                    <h3>Submitters</h3>
+                    <ul>
+                    {% for field in form.get_submitter_fields %}
+                        <li>{{ field }} {{ field.label }}</li>
+                    {% endfor %}
+                    </ul>
+                </div>
+            </div>
+            <div>
+                <span id="moi-dates-all-message">
+                    Any Evaluated Date
+                </span>
+                <a class="hover-link" data-toggle="collapse" href="#moi-dates">Toggle Evaluated Date...</a>
+                <div id="moi-dates" class="collapse hide">
+                    {{ form.min_date.label }}{{ form.min_date }}
+                    {{ form.max_date.label }}{{ form.max_date }}
+                </div>
+            </div>
+        </div>
+
+        {% if has_write_permission %}
+	    	<button id='moi-node-save' class="btn btn-primary">save</button>
+        {% endif %}
+    {{ form.media }}
+	</form>
+</div>
+
+{% endblock content %}

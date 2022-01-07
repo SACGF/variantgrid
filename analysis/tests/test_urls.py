@@ -41,7 +41,8 @@ class Test(URLTestCase):
 
         mother_sample = Sample.objects.create(name="mother", vcf=cls.vcf)
         father_sample = Sample.objects.create(name="father", vcf=cls.vcf)
-        cls.cohort = Cohort.objects.create(name="test_urls_cohort", vcf=cls.vcf, genome_build=grch37,
+        cls.cohort = Cohort.objects.create(name="test_urls_cohort", user=cls.user_owner,
+                                           vcf=cls.vcf, genome_build=grch37,
                                            import_status=ImportStatus.SUCCESS)
 
         proband_cs = CohortSample.objects.create(cohort=cls.cohort, sample=cls.sample,
@@ -59,6 +60,7 @@ class Test(URLTestCase):
                                                              num_samples=cls.cohort.cohortsample_set.count())
 
         cls.trio = Trio.objects.create(name="test_urls_trio",
+                                       user=cls.user_owner,
                                        cohort=cls.cohort,
                                        mother=mother_cs,
                                        mother_affected=True,
@@ -82,7 +84,8 @@ class Test(URLTestCase):
                                       samples_phred_likelihood=[0, 0, 0])
 
         # Auto cohorts don't show on list
-        cls.cohort2 = Cohort.objects.create(name="blah cohort", vcf=None, genome_build=grch37,
+        cls.cohort2 = Cohort.objects.create(name="blah cohort", user=cls.user_owner,
+                                            vcf=None, genome_build=grch37,
                                             import_status=ImportStatus.SUCCESS)
         assign_permission_to_user_and_groups(cls.user_owner, cls.cohort2)
 

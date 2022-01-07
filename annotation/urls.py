@@ -37,7 +37,8 @@ urlpatterns = [
 ]
 
 rest_urlpatterns = [
-    perm_path('api/disease_validity/<gene_symbol>', views_rest.GeneDiseaseValidityView.as_view(), name='api_view_gene_disease_validity'),
+    perm_path('api/manual_variant_entry_collection/<int:pk>', views_rest.ManualVariantEntryCollectionView.as_view(),
+              name='api_manual_variant_entry_collection'),
     perm_path('api/variant_annotation/<genome_build_name>/<variant_string>', views_rest.VariantAnnotationView.as_view(), name='api_variant_annotation')
 ]
 

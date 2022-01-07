@@ -1,3 +1,4 @@
+from collections import defaultdict
 from typing import Dict, List, Tuple
 
 import pandas as pd
@@ -18,6 +19,7 @@ from library.pandas_jqgrid import DataFrameJqGrid
 from library.unit_percent import get_allele_frequency_formatter
 from library.utils import md5sum_str
 from ontology.grids import AbstractOntologyGenesGrid
+from ontology.models import OntologyTermRelation, GeneDiseaseClassification
 from patients.models_enums import Zygosity
 from snpdb.grid_columns.custom_columns import get_custom_column_fields_override_and_sample_position, \
     get_variantgrid_extra_alias_and_select_columns
@@ -367,10 +369,9 @@ class AnalysesGrid(JqGridUserRowConfig):
             genome_build_colmodel['hidden'] = True
             self._overrides['genome_build'] = genome_build_colmodel
         user_grid_config = UserGridConfig.get(user, self.caption)
-        if user_grid_config.show_group_data:
-            qs = Analysis.filter_for_user(user)
-        else:
-            qs = Analysis.objects.filter(user=user)
+        qs = Analysis.filter_for_user(user)
+        if not user_grid_config.show_group_data:
+            qs = qs.filter(user=user)
         qs = qs.filter(genome_build__in=self.genome_builds)
         qs = qs.filter(visible=True, template_type__isnull=True)  # Hide templates
         q_last_lock = Q(analysislock=F("last_lock")) | Q(analysislock__isnull=True)
@@ -518,10 +519,9 @@ class KaromappingAnalysesGrid(JqGridUserRowConfig):
         super().__init__(user)
 
         user_grid_config = UserGridConfig.get(user, self.caption)
-        if user_grid_config.show_group_data:
-            queryset = KaryomappingAnalysis.filter_for_user(user)
-        else:
-            queryset = KaryomappingAnalysis.objects.filter(user=user)
+        queryset = KaryomappingAnalysis.filter_for_user(user)
+        if not user_grid_config.show_group_data:
+            queryset = queryset.filter(user=user)
         self.queryset = queryset.values(*self.get_field_names())
         self.extra_config.update({'sortname': 'modified', 'sortorder': 'desc'})
 
@@ -539,3 +539,29 @@ class NodeOntologyGenesGrid(AbstractOntologyGenesGrid):
 
     def _get_ontology_term_ids(self):
         return self.node.get_ontology_term_ids()
+
+
+class NodeGeneDiseaseClassificationGenesGrid(DataFrameJqGrid):
+    def __init__(self, user, node_id, version):
+        super().__init__()
+        self.node = get_node_subclass_or_404(user, node_id, version=version)
+
+    def _get_ontology_term_relations(self) -> List[OntologyTermRelation]:
+        return self.node.get_gene_disease_relations()
+
+    def get_dataframe(self):
+        gene_data = defaultdict(dict)
+        valid_classifications = list(reversed(GeneDiseaseClassification.labels))
+        columns = {}
+        for otr in self._get_ontology_term_relations():
+            moi_classifications = otr.get_gene_disease_moi_classifications()
+            gene_symbol = otr.dest_term.name
+            summary = ", ".join(otr.get_moi_summary(moi_classifications, valid_classifications))
+            column = str(otr.source_term)
+            columns[column] = True
+            gene_data[gene_symbol][column] = summary
+
+        self._overrides.update({column: {"width": 500} for column in columns})
+
+        df = pd.DataFrame.from_dict(gene_data, orient='index')
+        return df.sort_index()

@@ -34,6 +34,13 @@ class DbSNP(TimeStampedModel):
             r = request(url=url, method='get')
             api_response = r.json()
             dbsnp = DbSNP.objects.create(pk=dbsnp_id, api_response=api_response)
+
+        if withdrawn_snapshot_data := dbsnp.api_response.get("withdrawn_snapshot_data"):
+            raise ValueError(f"This record was withdrawn on {withdrawn_snapshot_data['withdrawn_time']}")
+
+        if "primary_snapshot_data" not in dbsnp.api_response:
+            raise ValueError(f"Invalid record")
+
         return dbsnp
 
     @staticmethod

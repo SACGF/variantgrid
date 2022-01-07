@@ -14,7 +14,7 @@ from genes.serializers import GeneListSerializer
 from library.django_utils import get_model_fields
 from library.django_utils.django_rest_utils import DynamicFieldsModelSerializer
 from ontology.serializers import OntologyTermSerializer
-from snpdb.serializers import UserSerializer
+from snpdb.serializers import UserSerializer, TimestampField
 
 
 class NodeAlleleFrequencyRangeSerializer(serializers.ModelSerializer):
@@ -298,15 +298,12 @@ class ZygosityNodeSerializer(AnalysisNodeSerializer):
 class VariantTagSerializer(serializers.ModelSerializer):
     analysis = AnalysisSerializer()
     user = UserSerializer()
-    seconds_since_epoch = serializers.SerializerMethodField()
+    created = TimestampField()
     can_write = serializers.SerializerMethodField()
 
     class Meta:
         model = VariantTag
         fields = "__all__"
-
-    def get_seconds_since_epoch(self, obj):
-        return obj.created.timestamp()
 
     def get_can_write(self, obj):
         user = self.context['request'].user

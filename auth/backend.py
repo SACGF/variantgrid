@@ -1,5 +1,3 @@
-import json
-
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.models import Group, User
@@ -49,9 +47,9 @@ class VariantGridOIDCAuthenticationBackend(OIDCAuthenticationBackend):
         user.is_active = True
         if settings.OIDC_REQUIRED_GROUP and settings.OIDC_REQUIRED_GROUP not in claims['groups']:
             user.is_active = False
+            user.save()
             messages.add_message(self.request, messages.ERROR, "This account is not authorised for this environment.")
-        else:
-            user.is_active = True
+            return user
 
         oauth_groups = [g.split('/')[1:] for g in claims['groups']]
 
@@ -60,9 +58,10 @@ class VariantGridOIDCAuthenticationBackend(OIDCAuthenticationBackend):
         variant_grid_groups = [g[1:] for g in oauth_groups if len(g) > 1 and g[0] == 'variantgrid']
 
         if not associations and not variant_grid_groups:
-            str_groups = json.dumps(oauth_groups)
+            user.is_active = False
+            user.save()
             messages.add_message(self.request, messages.ERROR, "This account doesn't belong to any labs.")
-            return None
+            return user
             # raise ValueError(f'Could not find any valid groups in {str_groups}')
 
         # everyone with a login is considered part of the public group

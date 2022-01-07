@@ -1,5 +1,5 @@
 from analysis.grids import AnalysesGrid, NodeColumnSummaryGrid, KaromappingAnalysesGrid, AnalysisTemplatesGrid, \
-    AnalysisNodeIssuesGrid, NodeOntologyGenesGrid
+    AnalysisNodeIssuesGrid, NodeOntologyGenesGrid, NodeGeneDiseaseClassificationGenesGrid
 from analysis.views import views, views_json, views_grid, views_karyomapping, views_autocomplete
 from library.django_utils.jqgrid_view import JQGridView
 from variantgrid.perm_path import perm_path
@@ -59,6 +59,7 @@ urlpatterns = [
               name='analysis_settings_template_run_tab'),
     perm_path('analysis/<int:analysis_id>/reload/', views_json.analysis_reload, name='analysis_reload'),
     perm_path('analysis/<int:analysis_id>/input_samples/', views.analysis_input_samples, name='analysis_input_samples'),
+    perm_path('sample_patient_gene_disease/<int:sample_id>', views_json.sample_patient_gene_disease, name='sample_patient_gene_disease'),
 
     perm_path('node_graph/<int:node_id>/<int:graph_type_id>/<slug:cmap>/', views.node_graph, name='node_graph'),
     perm_path('column_summary_boxplot/<int:node_id>/<label>/<slug:variant_column>/', views.column_summary_boxplot, name='column_summary_boxplot'),
@@ -92,6 +93,9 @@ urlpatterns = [
 
     perm_path('node/ontology/genes/grid/<int:node_id>/<int:version>/<slug:op>/',
               JQGridView.as_view(grid=NodeOntologyGenesGrid), name='node_ontology_genes_grid'),
+    perm_path('node/gene_disease_classification/grid/<int:node_id>/<int:version>/<slug:op>/',
+              JQGridView.as_view(grid=NodeGeneDiseaseClassificationGenesGrid),
+              name='node_gene_disease_classification_genes_grid'),
 
     perm_path('analysis_issues', views.view_analysis_issues, name='analysis_issues'),
 

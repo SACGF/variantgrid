@@ -30,7 +30,7 @@ def report_event(name: str, request: Request = None, extra_data: Dict = None):
     if request is None:
         request = get_current_request()
 
-    user: User = None
+    user: Optional[User] = None
     details = None
     if request:
         user = request.user
@@ -61,7 +61,6 @@ def report_message(message: str, level: str = 'warning', request=None, extra_dat
     @param level The error level, error, warning, info
     @param request the web request (if available)
     @param extra_data a JSON-isable dictionary of extra information
-    @param persist_name Should this message be kept permanently, if so give it a name
     """
     print_message = message
     if extra_data and (target := extra_data.get('target')):
@@ -214,9 +213,11 @@ class NotificationBuilder:
 
     # end blocks
 
-    def __init__(self, message: str, emoji: str = ":dna:"):
+    def __init__(self, message: str):
+        """
+        :param message: WARNING, this is ignored for Slack Notifications (maybe turn into a header?)
+        """
         self.message = message
-        self.emoji = emoji
         self.blocks: List[NotificationBuilder.Block] = list()
         self.sent = False
 
@@ -252,7 +253,7 @@ class NotificationBuilder:
     def webhook_url(self) -> Optional[str]:
         return None
 
-    def as_slack(self):
+    def as_slack(self) -> List:
         slack_blocks: List = list()
         for block in self.blocks:
             slack_bit = block.as_slack()
@@ -260,18 +261,6 @@ class NotificationBuilder:
                 slack_blocks.append(slack_bit)
             elif isinstance(slack_bit, list):
                 slack_blocks += slack_bit
-
-        env_name = socket.gethostname().lower().split('.')[0].replace('-', '')
-        slack_blocks.append({
-            "type": "context",
-            "elements": [
-                {
-                    "type": "plain_text",
-                    "text": env_name,
-                    "emoji": False
-                }
-            ]
-        })
         return slack_blocks
 
     def as_html(self):
@@ -288,39 +277,49 @@ class NotificationBuilder:
                              date=timezone.now(),
                              details=self.as_text(),
                              severity=LogLevel.INFO)
-        send_notification(message=self.message, blocks=self.as_slack(), emoji=self.emoji, slack_webhook_url=self.webhook_url)
+        send_notification(message=self.message, blocks=self.as_slack(), slack_webhook_url=self.webhook_url)
 
     def __del__(self):
         if not self.sent:
             report_message(f"Created a NotificationBuilder but did not call send {self.message}")
 
 
+def slack_bot_username():
+    env_name = socket.gethostname().lower().split('.')[0].replace('-', '')
+    site_name = settings.SITE_NAME
+    if site_name.replace(' ', '').lower() == env_name:
+        return site_name
+    else:
+        return f"{site_name} ({env_name})"
+
+
 def send_notification(
         message: str,
-        blocks: Optional[Dict] = None,
-        username: Optional[str] = None,
-        emoji: str = ":dna:",
+        blocks: Optional[List] = None,
         slack_webhook_url: Optional[str] = None):
     """
     Sends a message to your notification service, currently Slack centric.
     Best practise is to use a NotificationBuilder with send() rather than calling send_notification directly
 
     If Slack is not configured, this will do nothing.
-    @param message The message to send, (if also sending blocks just have message as a summary, wont be displayed)
-    @param blocks See https://api.slack.com/messaging/webhooks#advanced_message_formatting
-    @param username The username that will appear in Slack
-    @param emoji The emoji that will
-    @param slack_webhook_url Provide the slack URL, if not provided will get from settings (if enabled)
+    :param message: appears to be IGNORED, should probably do something about that
+    :param blocks: See https://api.slack.com/messaging/webhooks#advanced_message_formatting
+    :param slack_webhook_url: Provide the slack URL, if not provided will get from settings (if enabled)
     """
     sent = False
-    if slack_webhook_url is None:
-        if slack := settings.SLACK:
+    emoji = ':dna:'
+    if slack := settings.SLACK:
+        if slack_webhook_url is None:
             if slack.get('enabled'):
                 slack_webhook_url = slack.get('admin_callback_url')
+        if env_emoji := slack.get('emoji'):
+            emoji = env_emoji
 
     if slack_webhook_url:
+        username = slack_bot_username()
+
         data = {
-            "username": (settings.SITE_NAME + (f" {username}" if username else "")).strip(),
+            "username": username,
             "text": message,
             "icon_emoji": emoji
         }

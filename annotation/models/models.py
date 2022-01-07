@@ -4,7 +4,7 @@ import os
 import re
 from collections import defaultdict
 from datetime import datetime, timedelta
-from typing import List
+from typing import List, Optional
 
 from Bio import Entrez
 from Bio.Data.IUPACData import protein_letters_1to3
@@ -24,14 +24,14 @@ from annotation.external_search_terms import get_variant_search_terms, get_varia
 from annotation.models.damage_enums import Polyphen2Prediction, FATHMMPrediction, MutationTasterPrediction, \
     SIFTPrediction, PathogenicityImpact, MutationAssessorPrediction
 from annotation.models.models_enums import HumanProteinAtlasAbundance, AnnotationStatus, CitationSource, \
-    ClinGenClassification, VariantClass, ColumnAnnotationCategory, VEPPlugin, \
-    VEPCustom, ClinVarReviewStatus, VEPSkippedReason, ManualVariantEntryType
+    VariantClass, ColumnAnnotationCategory, VEPPlugin, VEPCustom, ClinVarReviewStatus, VEPSkippedReason, \
+    ManualVariantEntryType
 from genes.models import GeneSymbol, Gene, TranscriptVersion, Transcript, GeneAnnotationRelease, UniProt
 from genes.models_enums import AnnotationConsortium
 from library.django_utils import object_is_referenced
 from library.django_utils.django_partition import RelatedModelsPartitionModel
 from library.utils import invert_dict
-from ontology.models import OntologyTerm, OntologyImport
+from ontology.models import OntologyImport
 from patients.models_enums import GnomADPopulation
 from snpdb.models import GenomeBuild, Variant, VariantGridColumn, Q, VCF, DBSNP_PATTERN, VARIANT_PATTERN
 from snpdb.models.models_enums import ImportStatus
@@ -240,6 +240,9 @@ class GeneAnnotation(models.Model):
     gene = models.ForeignKey(Gene, on_delete=CASCADE)
     hpo_terms = models.TextField(null=True)
     omim_terms = models.TextField(null=True)
+    mondo_terms = models.TextField(null=True)
+    gene_disease_moderate_or_above = models.TextField(null=True)
+    gene_disease_supportive_or_below = models.TextField(null=True)
     gnomad_oe_lof = models.FloatField(null=True)  # Copied from genes.GnomADGeneConstraint
 
     class Meta:
@@ -786,6 +789,30 @@ class ManualVariantEntryCollection(models.Model):
     import_status = models.CharField(max_length=1, choices=ImportStatus.choices, default=ImportStatus.CREATED)
     celery_task = models.CharField(max_length=36, null=True)
 
+    @lazy
+    def first_entry(self) -> Optional['ManualVariantEntry']:
+        """ Often a user will enter a single variant into search and then wait for it to be created/annotated
+            We have the "first" one to deal with this """
+        return self.manualvariantentry_set.all().order_by("pk").first()
+
+    @lazy
+    def first_variant(self) -> Optional['Variant']:
+        variant = None
+        if mve := self.first_entry:
+            if cve := mve.unique_created_variants.filter(variant__isnull=False).order_by("variant_id").first():
+                variant = cve.variant
+        return variant
+
+    def first_variant_annotation_run(self) -> Optional['AnnotationRun']:
+        annotation_run = None
+        if mve := self.first_entry:
+            if variant := self.first_variant:
+                ar_qs = AnnotationRun.objects.filter(annotation_range_lock__version__genome_build=mve.genome_build,
+                                                     annotation_range_lock__min_variant__gte=variant.pk,
+                                                     annotation_range_lock__max_variant__lte=variant.pk)
+                annotation_run = ar_qs.first()
+        return annotation_run
+
     @staticmethod
     def get_for_user(user, mvec_id):
         mvec = ManualVariantEntryCollection.objects.get(pk=mvec_id)
@@ -990,32 +1017,6 @@ class CachedWebResource(TimeStampedModel):
         return handler
 
 
-class GeneDiseaseCurator(models.Model):
-    name = models.TextField(primary_key=True)
-    css_class = models.TextField(blank=True)
-    user = models.ForeignKey(User, null=True, on_delete=SET_NULL)
-    cached_web_resource = models.ForeignKey(CachedWebResource, null=True, on_delete=CASCADE)  # If from web
-
-    def __str__(self):
-        return self.name
-
-
-class DiseaseValidity(models.Model):
-    gene_disease_curator = models.ForeignKey(GeneDiseaseCurator, on_delete=CASCADE)
-    text_phenotype = models.TextField(blank=True)
-    sop = models.TextField(blank=True)  # ClinGen Gene Clinical Validity SOP
-    ontology_term = models.ForeignKey(OntologyTerm, null=True, on_delete=SET_NULL)
-    classification = models.CharField(max_length=1, choices=ClinGenClassification.choices)
-    date = models.DateField(null=True)
-    validity_summary_url = models.TextField()
-
-
-# Because there can be multiple Ensembl Genes for a symbol, link those via a FK
-class GeneDiseaseValidity(models.Model):
-    gene_symbol = models.ForeignKey(GeneSymbol, on_delete=CASCADE)
-    disease_validity = models.ForeignKey(DiseaseValidity, on_delete=CASCADE)
-
-
 class GeneSymbolCitation(models.Model):
     gene_symbol = models.ForeignKey(GeneSymbol, on_delete=CASCADE)
     citation = models.ForeignKey(Citation, on_delete=CASCADE)
@@ -1046,11 +1047,6 @@ class GeneSymbolPubMedCount(TimeStampedModel):
 
     def __str__(self):
         return f"{self.gene_symbol_id}: {self.count}"
-
-
-class GeneDiseaseValidityEvidence(models.Model):
-    gene_disease = models.ForeignKey(GeneDiseaseValidity, on_delete=CASCADE)
-    citation = models.ForeignKey(Citation, null=True, on_delete=CASCADE)
 
 
 class MutationalSignatureInfo(models.Model):

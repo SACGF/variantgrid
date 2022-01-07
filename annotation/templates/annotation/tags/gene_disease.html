@@ -1,4 +1,4 @@
-{% if gene_symbol.genediseasevalidity_set.exists %}
+{% if gene_disease_relations %}
 {% load static %}
 <div class='gene-disease card'>
     <div class="card-header">
@@ -7,10 +7,23 @@
     <div class="card-body card-body-list">
         <div>
             <ul class='list-group'>
-                {% for dvg in gene_symbol.genediseasevalidity_set.all %}
-                    <a href='{{ dvg.disease_validity.validity_summary_url }}' class="list-group-item list-group-action">
-                        <b>{{ dvg.disease_validity.ontology_term.name }}</b> {% if dvg.disease_validity.ontology_term.definition %}({{ dvg.disease_validity.ontology_term.definition }}){% endif %} - {{ dvg.disease_validity.get_classification_display }}. ({{ dvg.disease_validity.sop }}, {{ dvg.disease_validity.date }})
-                    </a>
+                {% for gdr in gene_disease_relations %}
+                    <li class="list-group-item">
+                        <a href="{{ gdr.source_term.get_absolute_url }}" title="{{ gdr.source_term.definition }}">{{ gdr.source_term }}</a>
+                        <ul class='list-group'>
+                            {% for src in gdr.extra.sources %}
+                                <li class="list-group-item">
+                                    {% if src.public_report_url %}
+                                        <a href="{{ src.public_report_url }}">
+                                            <b>{{ src.mode_of_inheritance }}</b> ({{ src.gencc_classification }}) by {{ src.submitter }} on {{ src.evaluated_date }}
+                                        </a>
+                                    {% else %}
+                                        <b>{{ src.mode_of_inheritance }}</b> ({{ src.gencc_classification }}) by {{ src.submitter }} on {{ src.evaluated_date }}
+                                    {% endif %}
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    </li>
                 {% endfor %}
             </ul>
         </div>

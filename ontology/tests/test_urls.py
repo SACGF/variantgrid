@@ -4,8 +4,10 @@ import uuid
 from django.contrib.auth.models import User
 from django.utils import timezone
 
+from annotation.tests.test_data_fake_genes import create_fake_transcript_version
 from library.django_utils.unittest_utils import URLTestCase
 from ontology.models import OntologyImport, OntologyService, OntologyTerm
+from snpdb.models import GenomeBuild
 
 
 class Test(URLTestCase):
@@ -21,6 +23,22 @@ class Test(URLTestCase):
         index += 1
         cls.omim = OntologyTerm.objects.get_or_create(id="OMIM:000001", name=uuid.uuid4(), from_import=ontology_import,
                                                       index=index, ontology_service=OntologyService.OMIM)[0]
+
+        grch37 = GenomeBuild.get_name_or_alias("GRCh37")
+        transcript_version = create_fake_transcript_version(grch37)
+        cls.gene_symbol = transcript_version.gene_version.gene_symbol
+        index += 1
+        _ = OntologyTerm.objects.get_or_create(id="HGNC:10471", name=cls.gene_symbol, from_import=ontology_import,
+                                               index=index, ontology_service=OntologyService.HGNC)[0]
+
+    def testUrls(self):
+        """ No permissions to test """
+        URL_NAMES_AND_KWARGS = [
+            # API
+            ("api_ontology_term_gene_list", {"term": self.omim.url_safe_id}, 200),
+            ("api_view_gene_disease_relationship", {"gene_symbol": self.gene_symbol}, 200),
+        ]
+        self._test_urls(URL_NAMES_AND_KWARGS, self.user)
 
     def testAutocompleteUrls(self):
         AUTOCOMPLETE_URLS = [

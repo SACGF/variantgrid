@@ -5,13 +5,11 @@ from django.db import models
 from django.db.models import QuerySet
 from django.db.models.deletion import CASCADE, SET_NULL
 
-from genes.models import GeneSymbol
 from ontology.models import OntologyTerm, OntologySnake
 from patients.models import Patient
 
 PATIENT_TPM_PATH = "patient_text_phenotype__phenotype_description__textphenotypesentence__text_phenotype__textphenotypematch"
 PATIENT_ONTOLOGY_TERM_PATH = PATIENT_TPM_PATH + "__ontology_term"
-PATIENT_GENE_SYMBOL_PATH = PATIENT_TPM_PATH + "__gene_symbol"
 
 
 class DescriptionProcessingStatus(models.Model):
@@ -44,11 +42,14 @@ class PhenotypeDescription(models.Model):
 
     def get_ontology_term_ids(self) -> List[OntologyTerm]:
         ot_qs = self.textphenotypesentence_set.filter(text_phenotype__textphenotypematch__ontology_term__isnull=False)
+        # Sort so can be cached
+        ot_qs = ot_qs.order_by("text_phenotype__textphenotypematch__ontology_term_id")
         return ot_qs.values_list("text_phenotype__textphenotypematch__ontology_term_id", flat=True)
 
     def get_gene_symbols(self) -> QuerySet:
-        ontology_term_ids = self.get_ontology_term_ids()
-        return OntologySnake.gene_symbols_for_terms(ontology_term_ids)
+        terms = tuple(self.get_ontology_term_ids())
+        gene_symbols = OntologySnake.cached_gene_symbols_for_terms_tuple(terms)
+        return gene_symbols
 
     def __str__(self):
         text = self.original_text[:50]
@@ -85,55 +86,30 @@ class TextPhenotypeSentence(models.Model):
         return results
 
 
-class PhenotypeMatchTypes(models.Model):
-    HPO = 'H'
-    OMIM = 'O'
-    GENE = 'G'
-    CHOICES = [
-        (HPO, 'HPO'),
-        (OMIM, 'OMIM'),
-        (GENE, 'Gene'),
-    ]
-
-
 class TextPhenotypeMatch(models.Model):
-    FIELDS = {PhenotypeMatchTypes.HPO: 'ontology_term',
-              PhenotypeMatchTypes.OMIM: 'ontology_term',
-              PhenotypeMatchTypes.GENE: 'gene_symbol'}
-
     text_phenotype = models.ForeignKey(TextPhenotype, on_delete=CASCADE)
-    match_type = models.CharField(max_length=1, choices=PhenotypeMatchTypes.CHOICES)
-    ontology_term = models.ForeignKey(OntologyTerm, null=True, on_delete=CASCADE)
-    gene_symbol = models.ForeignKey(GeneSymbol, null=True, on_delete=CASCADE)
+    ontology_term = models.ForeignKey(OntologyTerm, on_delete=CASCADE)
     offset_start = models.IntegerField()
     offset_end = models.IntegerField()
 
     def to_dict(self):
         """ This is what's sent as JSON back to client for highlighting and grids """
-        if self.match_type == PhenotypeMatchTypes.GENE:
-            gene_symbols = [self.gene_symbol_id]
-        else:
-            gene_symbols_qs = OntologySnake.gene_symbols_for_terms([self.ontology_term_id])
-            gene_symbols = list(gene_symbols_qs.values_list("symbol", flat=True))
-
-        string = str(self.record)
-
-        return {"accession": string,
-                "gene_symbols": gene_symbols,
-                "match": string,
-                "match_type": self.match_type,
-                "name": self.record.name,
-                "offset_start": self.offset_start,
-                "offset_end": self.offset_end,
-                "pk": self.record.pk}
-
-    @property
-    def record(self):
-        f = TextPhenotypeMatch.FIELDS[self.match_type]
-        return getattr(self, f)
+        gene_symbols_qs = OntologySnake.cached_gene_symbols_for_terms_tuple((self.ontology_term.pk,))
+        gene_symbols = list(gene_symbols_qs.values_list("symbol", flat=True))
+        accession = str(self.ontology_term)
+        return {
+            "accession": accession,
+            "gene_symbols": gene_symbols,
+            "match": accession,
+            "ontology_service": self.ontology_term.get_ontology_service_display(),
+            "name": self.ontology_term.name,
+            "offset_start": self.offset_start,
+            "offset_end": self.offset_end,
+            "pk": self.ontology_term.pk,
+        }
 
     def __str__(self):
-        return f"{self.record} from ({self.offset_start}-{self.offset_end})"
+        return f"{self.ontology_term} from ({self.offset_start}-{self.offset_end})"
 
 
 class PatientTextPhenotype(models.Model):

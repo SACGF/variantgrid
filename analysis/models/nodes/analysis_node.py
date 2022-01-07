@@ -4,7 +4,7 @@ import operator
 from functools import reduce
 from random import random
 from time import time
-from typing import Tuple, Sequence, List, Dict, Optional
+from typing import Tuple, Sequence, List, Dict, Optional, Set
 
 from celery.canvas import Signature
 from django.conf import settings
@@ -33,7 +33,7 @@ from library.django_utils import thread_safe_unique_together_get_or_create
 from library.log_utils import report_event
 from library.utils import format_percent
 from snpdb.models import BuiltInFilters, Sample, Variant, VCFFilter, Wiki, Cohort, VariantCollection, \
-    ProcessingStatus, GenomeBuild, AlleleSource
+    ProcessingStatus, GenomeBuild, AlleleSource, Contig
 from snpdb.variant_collection import write_sql_to_variant_collection
 from variantgrid.celery import app
 
@@ -279,6 +279,18 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
             raise ValueError("get_single_parent_q called when single parent not ready!!!")
         return q
 
+    def get_single_parent_contigs(self):
+        parent = self.get_single_parent()
+        if parent.is_ready():
+            if parent.count == 0:
+                contigs = set()
+            else:
+                contigs = parent.get_contigs()
+        else:
+            # This should never happen...
+            raise ValueError("get_single_parent_contigs called when single parent not ready!!!")
+        return contigs
+
     def _get_annotation_kwargs_for_node(self) -> Dict:
         """ Override this method per-node.
             Any key/values in here MUST be consistent - as annotation_kwargs from multiple
@@ -363,16 +375,44 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
                     if node_q := self._get_node_q():
                         q &= node_q
             else:
-                q = self.q_all()
                 if node_q := self._get_node_q():
                     q = node_q
+                else:
+                    q = self.q_all()
             cache.set(cache_key, q)
         return q
+
+    def get_contigs(self) -> Set[Contig]:
+        """ A set of contigs that contain variants for the node """
+
+        cache_key = self._get_cache_key() + f"_contigs"
+        contigs: Set[Contig] = cache.get(cache_key)
+
+        if contigs is None:
+            if self.has_input():
+                contigs = self.get_parent_contigs()
+                if self.modifies_parents():
+                    node_contigs = self._get_node_contigs()
+                    if node_contigs is not None:
+                        contigs &= node_contigs
+            else:
+                node_contigs = self._get_node_contigs()
+                if node_contigs is not None:
+                    contigs = node_contigs
+                else:
+                    contigs = set(self.analysis.genome_build.contigs)
+            cache.set(cache_key, contigs)
+        return contigs
 
     def get_parent_q(self):
         if self.min_inputs == 1:
             return self.get_single_parent_q()
-        raise NotImplementedError("You need to implement a non-default 'get_parent_q' if you have more than 1 parent")
+        raise NotImplementedError("Need to implement a non-default 'get_parent_q' if you have more than 1 parent")
+
+    def get_parent_contigs(self) -> Set[Contig]:
+        if self.min_inputs == 1:
+            return self.get_single_parent_contigs()
+        raise NotImplementedError("Need to implement a non-default 'get_parent_contigs' if you have more than 1 parent")
 
     @property
     def use_cache(self):
@@ -405,6 +445,10 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
     def _get_node_q(self) -> Optional[Q]:
         raise NotImplementedError()
 
+    def _get_node_contigs(self) -> Optional[Set[Contig]]:
+        """ Return the contigs we filter for in this node. None means we don't know how to describe that """
+        return None
+
     def _get_unfiltered_queryset(self, **extra_annotation_kwargs):
         """ Unfiltered means before the get_q() is applied
             extra_annotation_kwargs is applied AFTER node's annotation kwargs
@@ -423,9 +467,13 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
         if extra_annotation_kwargs is None:
             extra_annotation_kwargs = {}
         qs = self._get_unfiltered_queryset(**extra_annotation_kwargs)
-        q = self.get_q(disable_cache=disable_cache)
+        q_list = [self.get_q(disable_cache=disable_cache)]
+        if self.analysis.node_queryset_filter_contigs:
+            q_list.append(Q(locus__contig__in=self.get_contigs()))
+
         if extra_filters_q:
-            q &= extra_filters_q
+            q_list.append(extra_filters_q)
+        q = reduce(operator.and_, q_list)
         filtered_qs = qs.filter(q)
 
         if self.queryset_requires_distinct:
@@ -734,7 +782,17 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
         for label, count in label_counts.items():
             NodeCount.objects.create(node_version=node_version, label=label, count=count)
 
-        return NodeStatus.READY, label_counts[BuiltInFilters.TOTAL]
+        total_count = label_counts[BuiltInFilters.TOTAL]
+
+        # Single parent nodes should always reduce the number of variants - run a check to make sure the
+        # query wasn't bad and returned more results than it should have
+        parents = list(self.get_non_empty_parents())
+        if len(parents) == 1:
+            parent = parents[0]
+            if parent.count < total_count:
+                raise ValueError(f"Single parent node {self}(pk={self.pk}) had count={total_count} > {parent=}(pk={parent.pk}) count={parent.count=}")
+
+        return NodeStatus.READY, total_count
 
     def _load(self):
         """ Override to do anything interesting """

@@ -632,7 +632,7 @@ table.as_table td {
   pointer-events: none;
 }
 
-.hp, .hpo, .omim, .gene {
+.hp, .hpo, .omim, .mondo .hgnc {
   border: 3px solid white;
   margin: 0 4px 0 4px;
   border-radius: 3px;
@@ -650,7 +650,12 @@ table.as_table td {
   color: #ddd;
 }
 
-.gene {
+.mondo {
+  background-color: #cce34c;
+  border-color: #cce34c;
+}
+
+.hgnc {
   background-color: #99CD83;
   border-color: #99CD83;
 }

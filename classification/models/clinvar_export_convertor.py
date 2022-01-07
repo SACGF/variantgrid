@@ -162,8 +162,8 @@ class ClinVarExportConverter:
     def condition_to_json(condition: OntologyTerm) -> ValidatedJson:
         # supported "OMIM", "MedGen", "Orphanet", "MeSH", "HP", "MONDO"
         messages = JSON_MESSAGES_EMPTY
-        if condition.ontology_service not in (
-        OntologyService.OMIM, OntologyService.ORPHANET, OntologyService.HPO, OntologyService.MONDO):
+        if condition.ontology_service not in (OntologyService.OMIM, OntologyService.ORPHANET,
+                                              OntologyService.HPO, OntologyService.MONDO):
             messages += JsonMessages.error(f"Ontology \"{condition.ontology_service}\" is not supported by ClinVar")
 
         """

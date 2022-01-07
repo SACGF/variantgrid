@@ -16,6 +16,7 @@ WEB_IP = '144.6.229.160'
 DEBUG = False
 
 ANNOTATION_ENTREZ_EMAIL = 'davmlaw@gmail.com'
+SLACK['emoji'] = ':mouse:'
 
 _BIG_DISK_BASE_DIR = "/mnt"
 ANNOTATION_REFERENCE_BASE_DIR = os.path.join(_BIG_DISK_BASE_DIR, "annotation")

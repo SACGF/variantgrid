@@ -1,7 +1,7 @@
 from rest_framework import serializers
 
 from genes.models import GeneInfo, GeneListCategory, GeneList, Gene, Transcript, GeneListGeneSymbol, \
-    GeneAnnotationRelease, SampleGeneList, ActiveSampleGeneList, GeneSymbol, TranscriptVersion, GeneVersion
+    GeneAnnotationRelease, SampleGeneList, ActiveSampleGeneList, GeneSymbol, TranscriptVersion, GeneVersion, HGNC
 from snpdb.models import Company
 from snpdb.serializers import UserSerializer, GenomeBuildSerializer
 
@@ -47,6 +47,18 @@ class TranscriptVersionSerializer(serializers.ModelSerializer):
         fields = ('transcript', 'version', 'genome_build', 'gene_version')
 
 
+class HGNCSerializer(serializers.ModelSerializer):
+    gene_symbol = GeneSymbolSerializer()
+    status = serializers.SerializerMethodField()
+
+    class Meta:
+        model = HGNC
+        fields = ('hgnc_id', 'gene_symbol', 'approved_name', 'status')
+
+    def get_status(self, obj: HGNC):
+        return obj.get_status_display()
+
+
 class GeneListCategorySerializer(serializers.ModelSerializer):
 
     class Meta:
@@ -71,7 +83,7 @@ class GeneListSerializer(serializers.ModelSerializer):
         model = GeneList
         fields = ('pk', 'category', 'name', 'user', 'import_status', 'genelistgenesymbol_set', 'can_write', 'absolute_url')
 
-    def get_can_write(self, obj):
+    def get_can_write(self, obj: GeneList):
         user = self.context['request'].user
 
         if obj.id:  # Can't check pk as may be FakeGeneList object

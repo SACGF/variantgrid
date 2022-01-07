@@ -3,8 +3,9 @@ import unittest
 from django.contrib.auth.models import User
 
 from library.django_utils.unittest_utils import URLTestCase, prevent_request_warnings
+from library.guardian_utils import assign_permission_to_user_and_groups
 from pedigree.models import PedFile, Pedigree, PedFileFamily
-from snpdb.models import ImportStatus, Cohort, assign_permission_to_user_and_groups
+from snpdb.models import ImportStatus, Cohort
 from snpdb.models.models_genome import GenomeBuild
 
 

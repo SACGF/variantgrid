@@ -23,7 +23,7 @@ from classification.models.flag_types import classification_flag_types
 from flags.models.models import FlagsMixin, FlagCollection, FlagTypeContext, \
     flag_collection_extra_info_signal, FlagInfos
 from library.django_utils import get_url_from_view_path
-from library.log_utils import report_message, NotificationBuilder
+from library.log_utils import NotificationBuilder
 from snpdb.models import Variant, Lab
 from snpdb.models.models_variant import Allele
 
@@ -211,6 +211,7 @@ class ClinicalContext(FlagsMixin, TimeStampedModel):
         old_status = self.status
         new_status = self.calculate_status()
         is_significance_change = old_status != new_status
+        is_simple_new = old_status is None and new_status == ClinicalContextStatus.CONCORDANT
         allele_url = get_url_from_view_path(self.allele.get_absolute_url())
 
         ongoing_import = ClassificationImportRun.ongoing_imports()
@@ -256,7 +257,7 @@ class ClinicalContext(FlagsMixin, TimeStampedModel):
             # don't send out any signals if calculation is delayed, we don't want to trigger anything until we complete
             return
 
-        if settings.DISCORDANCE_ENABLED and is_significance_change:
+        if settings.DISCORDANCE_ENABLED and is_significance_change and not is_simple_new:
             nb = NotificationBuilder("ClinicalContext changed")
             nb.add_markdown(
                 f":fire_engine: ClinicalGrouping for allele <{allele_url}|{allele_url}> changed from {old_status} -> {new_status} "

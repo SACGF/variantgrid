@@ -148,7 +148,7 @@ def timestamp(timestamp, time_ago: bool = False, show_seconds: bool = False):
         css_classes.append('seconds')
 
     if timestamp:
-        if not isinstance(timestamp, int) and not isinstance(timestamp, float):
+        if not isinstance(timestamp, (int, float)):
             timestamp = timestamp.timestamp()
         return {
             "timestamp": timestamp,

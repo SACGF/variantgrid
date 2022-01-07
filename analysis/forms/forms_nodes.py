@@ -1,15 +1,17 @@
 import json
+from typing import List
 
 from dal import autocomplete, forward
 from dal_select2.widgets import ModelSelect2Multiple
 from django import forms
 from django.forms.models import fields_for_model
 from django.forms.widgets import TextInput, HiddenInput
+from django.utils.text import slugify
 from django_starfield import Stars
 from guardian.shortcuts import get_objects_for_user
 
 from analysis import models
-from analysis.models import AnalysisNode, AnalysisTemplateType, Analysis
+from analysis.models import AnalysisNode, AnalysisTemplateType, Analysis, MOINode
 from analysis.models.nodes.analysis_node import NodeVCFFilter, NodeAlleleFrequencyFilter
 from analysis.models.nodes.filters.damage_node import DamageNode
 from analysis.models.nodes.filters.expression_node import ExpressionNode
@@ -35,7 +37,7 @@ from genes.hgvs import get_hgvs_variant_tuple, get_hgvs_variant
 from genes.models import GeneListCategory, CustomTextGeneList, GeneList, PanelAppPanel
 from library.forms import NumberInput
 from library.utils import md5sum_str
-from ontology.models import OntologyTerm
+from ontology.models import OntologyTerm, OntologyTermRelation
 from patients.models_enums import GnomADPopulation
 from snpdb.forms import GenomeBuildAutocompleteForwardMixin
 from snpdb.models import GenomicInterval, ImportStatus, Sample, VCFFilter, Tag
@@ -478,6 +480,105 @@ class MergeNodeForm(BaseNodeForm):
         exclude = ANALYSIS_NODE_FIELDS
 
 
+class MOINodeForm(BaseNodeForm):
+    mondo = forms.ModelMultipleChoiceField(required=False,
+                                           queryset=OntologyTerm.objects.all(),
+                                           widget=ModelSelect2Multiple(url='mondo_autocomplete',
+                                                                       attrs={'data-placeholder': 'Curated MONDO disease...'},
+                                                                       forward=(forward.Const(True, 'gene_disease'),)))
+
+    class Meta:
+        model = MOINode
+        exclude = ANALYSIS_NODE_FIELDS
+        widgets = {
+            'min_date': TextInput(attrs={'class': 'date-picker', 'placeholder': 'Min Date'}),
+            'max_date': TextInput(attrs={'class': 'date-picker', 'placeholder': 'Max Date'}),
+            'accordion_panel': HiddenInput(),
+        }
+
+    def __init__(self, *args, **kwargs):
+        """ We save data as the raw fields, only slugify in the form """
+        super().__init__(*args, **kwargs)
+
+        # Restrict sample to ancestors
+        self.fields['sample'].queryset = Sample.objects.filter(pk__in=self.instance.get_sample_ids())
+
+        # Dynamically add fields
+        moi_list, submitters = OntologyTermRelation.moi_and_submitters()
+        moi_initial = {}
+        moi_related = self.instance.moinodemodeofinheritance_set
+        if moi_related.exists():
+            for moi_moi in moi_related.values_list("mode_of_inheritance", flat=True):
+                moi_initial[moi_moi] = True
+
+        for moi in moi_list:
+            field = f"moi_{slugify(moi)}"
+            field_kwargs = {}
+            if moi_initial:  # Some set
+                fi = moi_initial.get(moi, False)
+            else:
+                fi = True  # All set
+            field_kwargs["initial"] = fi
+            self.fields[field] = forms.BooleanField(required=False, label=moi, **field_kwargs)
+
+        submitter_initial = {}
+        submitter_related = self.instance.moinodesubmitter_set
+        if submitter_related.exists():
+            for submitter in submitter_related.values_list("submitter", flat=True):
+                submitter_initial[submitter] = True
+        for submitter in submitters:
+            field = f"submitter_{slugify(submitter)}"
+            field_kwargs = {}
+            if submitter_initial:  # Some set
+                fi = submitter_initial.get(submitter, False)
+            else:
+                fi = True  # All set
+            field_kwargs["initial"] = fi
+            self.fields[field] = forms.BooleanField(required=False, label=submitter, **field_kwargs)
+
+    def save(self, commit=True):
+        node = super().save(commit=False)
+
+        ontology_term_set = self.instance.moinodeontologyterm_set
+        ontology_term_set.all().delete()  # Clear existing
+        for ot in self.cleaned_data["mondo"]:
+            ontology_term_set.create(ontology_term=ot)
+
+        moi_list, submitters = OntologyTermRelation.moi_and_submitters()
+        RELATED = [
+            ("moinodemodeofinheritance_set", "mode_of_inheritance", "moi_", moi_list),
+            ("moinodesubmitter_set", "submitter", "submitter_", submitters),
+        ]
+        for (relation, fk, prefix, fields) in RELATED:
+            related_set = getattr(node, relation)
+            related_set.all().delete()  # Clear existing
+            # If ALL of them are set, then don't worry about setting any
+            data = {}
+            for field in fields:
+                data[field] = self.cleaned_data[prefix + slugify(field)]
+            if not all(data.values()):
+                for key, value in data.items():
+                    if value:
+                        related_set.create(**{fk: key})
+
+        if commit:
+            node.save()
+        return node
+
+    def _get_fields_with_prefix(self, prefix) -> List[str]:
+        fields = []
+        for field_name in self.fields:
+            if field_name.startswith(prefix):
+                fields.append(self[field_name])
+        return fields
+
+    def get_moi_fields(self) -> List[str]:
+        return self._get_fields_with_prefix("moi_")
+
+    def get_submitter_fields(self) -> List[str]:
+        return self._get_fields_with_prefix("submitter_")
+
+
 class PedigreeNodeForm(GenomeBuildAutocompleteForwardMixin, VCFSourceNodeForm):
     genome_build_fields = ["pedigree"]
 
@@ -504,6 +605,11 @@ class PhenotypeNodeForm(BaseNodeForm):
                                          widget=ModelSelect2Multiple(url='hpo_autocomplete',
                                                                      attrs={'data-placeholder': 'HPO...'}))
 
+    mondo = forms.ModelMultipleChoiceField(required=False,
+                                           queryset=OntologyTerm.objects.all(),
+                                           widget=ModelSelect2Multiple(url='mondo_autocomplete',
+                                                                       attrs={'data-placeholder': 'MONDO...'}))
+
     class Meta:
         model = PhenotypeNode
         exclude = ANALYSIS_NODE_FIELDS
@@ -521,14 +627,10 @@ class PhenotypeNodeForm(BaseNodeForm):
 
         # TODO: I'm sure there's a way to get Django to handle this via save_m2m()
         ontology_term_set = self.instance.phenotypenodeontologyterm_set
-
         ontology_term_set.all().delete()
-
-        for ontology_term in self.cleaned_data["omim"]:
-            ontology_term_set.create(ontology_term=ontology_term)
-
-        for ontology_term in self.cleaned_data["hpo"]:
-            ontology_term_set.create(ontology_term=ontology_term)
+        for ontology_field in ["omim", "hpo", "mondo"]:
+            for ot in self.cleaned_data[ontology_field]:
+                ontology_term_set.create(ontology_term=ot)
 
         if commit:
             node.save()
@@ -544,8 +646,9 @@ class PopulationNodeForm(BaseNodeForm):
 
     class Meta:
         model = PopulationNode
-        fields = ('percent', 'group_operation', 'gnomad_af', 'gnomad_popmax_af', 'af_1kg', 'af_uk10k', 'topmed_af', 'gnomad_hom_alt_max',
-                  'zygosity', 'use_internal_counts', 'max_samples', 'internal_percent', 'keep_internally_classified_pathogenic')
+        fields = ('percent', 'group_operation', 'gnomad_af', 'gnomad_popmax_af', 'af_1kg', 'af_uk10k', 'topmed_af',
+                  'gnomad_hom_alt_max', 'show_gnomad_filtered', 'zygosity', 'use_internal_counts', 'max_samples',
+                  'internal_percent', 'keep_internally_classified_pathogenic')
         widgets = {'gnomad_hom_alt_max': WIDGET_INTEGER_MIN_0,
                    'max_samples': WIDGET_INTEGER_MIN_1}
 
@@ -680,5 +783,5 @@ class ZygosityNodeForm(BaseNodeForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        samples_queryset = Sample.objects.filter(pk__in=self.instance.get_sample_ids())
-        self.fields['sample'].queryset = samples_queryset
+        # Restrict samples to ancestors
+        self.fields['sample'].queryset = Sample.objects.filter(pk__in=self.instance.get_sample_ids())

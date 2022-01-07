@@ -11,6 +11,7 @@
         var fileUpload = $('#fileupload').fileupload({
             {% block JS_OPTS %}
           	autoUpload: true,
+            acceptFileTypes: {{ accept_file_types|default_if_none:'@'|safe }},
 			//sequentialUploads: true,
 
             {% endblock %}

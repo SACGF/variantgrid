@@ -243,9 +243,12 @@ class GenomeKaryomappingCounts(KaryotypeCounts, models.Model):
                 p_mum = 100 * mother_in_phase / phase_total
                 summary = "Proband phase: %.2f%% mum / %.2f%% dad. " % (p_mum, p_dad)
 
-                dad_phase_perc = 100 * father_in_phase / (father_in_phase + father_out_of_phase)
-                mum_phase_perc = 100 * mother_in_phase / (mother_in_phase + mother_out_of_phase)
-                summary += "Mum: %.2f%%. Dad: %.2f%%. " % (mum_phase_perc, dad_phase_perc)
+                father_total = father_in_phase + father_out_of_phase
+                mother_total = mother_in_phase + mother_out_of_phase
+                if father_total and mother_total:
+                    dad_phase_perc = 100 * father_in_phase / father_total
+                    mum_phase_perc = 100 * mother_in_phase / mother_total
+                    summary += "Mum: %.2f%%. Dad: %.2f%%. " % (mum_phase_perc, dad_phase_perc)
             else:
                 summary = "No inherited variants."
         return summary

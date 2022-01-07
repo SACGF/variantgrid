@@ -1,8 +1,9 @@
 from django.contrib.auth.models import User
 from django.utils import timezone
 
+from library.guardian_utils import assign_permission_to_user_and_groups
 from snpdb.models import CohortGenotypeCollection, Trio, CohortSample, ImportStatus, Sample, VCF, GenomeBuild, Cohort, \
-    assign_permission_to_user_and_groups, VCFFilter
+    VCFFilter
 
 
 def create_fake_trio(user: User, genome_build: GenomeBuild) -> Trio:
@@ -16,7 +17,7 @@ def create_fake_trio(user: User, genome_build: GenomeBuild) -> Trio:
 
     mother_sample = Sample.objects.create(name="mother", vcf=vcf)
     father_sample = Sample.objects.create(name="father", vcf=vcf)
-    cohort = Cohort.objects.create(name="test_urls_cohort", vcf=vcf, genome_build=genome_build,
+    cohort = Cohort.objects.create(name="test_urls_cohort", user=user, vcf=vcf, genome_build=genome_build,
                                    import_status=ImportStatus.SUCCESS)
 
     proband_cs = CohortSample.objects.create(cohort=cohort, sample=sample,
@@ -34,6 +35,7 @@ def create_fake_trio(user: User, genome_build: GenomeBuild) -> Trio:
                                             num_samples=cohort.cohortsample_set.count())
 
     trio = Trio.objects.create(name="test_urls_trio",
+                               user=user,
                                cohort=cohort,
                                mother=mother_cs,
                                mother_affected=True,

@@ -5,8 +5,8 @@ from typing import List, Optional, Iterable
 import nltk
 from django.db.models import Count
 
-from annotation.models.models_phenotype_match import PhenotypeMatchTypes, \
-    TextPhenotypeMatch, PhenotypeDescription, TextPhenotype, TextPhenotypeSentence
+from annotation.models.models_phenotype_match import TextPhenotypeMatch, PhenotypeDescription, TextPhenotype, \
+    TextPhenotypeSentence
 from annotation.phenotype_matcher import PhenotypeMatcher, SkipAllPhenotypeMatchException
 from library.utils import get_and_log_time_since, invert_dict_of_lists
 from patients.models import Patient
@@ -33,32 +33,14 @@ def get_word_combos_and_spans_sorted_by_length(words_and_spans, max_combo_length
 
 
 def get_terms_from_words(text_phenotype, words_and_spans_subset, phenotype_matcher: PhenotypeMatcher):
-    hpo_list, omim_list, gene_symbols = phenotype_matcher.get_matches(words_and_spans_subset)
-
     offset_start = words_and_spans_subset[0][1][0]
     offset_end = words_and_spans_subset[-1][1][1]
 
     results = []
-    for ontology_term_id in hpo_list:
+    for ontology_term_id in phenotype_matcher.get_matches(words_and_spans_subset):
+        print(f"{ontology_term_id=}")
         tpm = TextPhenotypeMatch.objects.create(text_phenotype=text_phenotype,
-                                                match_type=PhenotypeMatchTypes.HPO,
                                                 ontology_term_id=ontology_term_id,
-                                                offset_start=offset_start,
-                                                offset_end=offset_end)
-        results.append(tpm)
-
-    for ontology_term_id in omim_list:
-        tpm = TextPhenotypeMatch.objects.create(text_phenotype=text_phenotype,
-                                                match_type=PhenotypeMatchTypes.OMIM,
-                                                ontology_term_id=ontology_term_id,
-                                                offset_start=offset_start,
-                                                offset_end=offset_end)
-        results.append(tpm)
-
-    for gene_symbol_id in gene_symbols:
-        tpm = TextPhenotypeMatch.objects.create(text_phenotype=text_phenotype,
-                                                match_type=PhenotypeMatchTypes.GENE,
-                                                gene_symbol_id=gene_symbol_id,
                                                 offset_start=offset_start,
                                                 offset_end=offset_end)
         results.append(tpm)
@@ -356,13 +338,14 @@ def bulk_patient_phenotype_matching(patients=None):
         if num_parsed_phenotypes:
             time_per_patient = ts / num_parsed_phenotypes
             pps = 1.0 / time_per_patient
-            logging.info("%d parsed patient phenotypes - %.2f parsed per second/%.2f seconds per patient", num_parsed_phenotypes, pps, time_per_patient)
+            logging.info("%d parsed patient phenotypes - %.2f parsed per second/%.2f seconds per patient",
+                         num_parsed_phenotypes, pps, time_per_patient)
 
             total_matches = TextPhenotypeMatch.objects.count()
-            tpm_qs = TextPhenotypeMatch.objects.values("match_type")
-            tpm_qs = tpm_qs.annotate(count=Count("pk")).values_list("match_type", "count")
+            tpm_qs = TextPhenotypeMatch.objects.values("ontology_term__ontology_service")
+            tpm_qs = tpm_qs.annotate(count=Count("pk")).values_list("ontology_term__ontology_service", "count")
             logging.info("%d match types:", total_matches)
-            for match_type, count in tpm_qs:
-                logging.info("%s: %d", match_type, count)
+            for ontology_service, count in tpm_qs:
+                logging.info("%s: %d", ontology_service, count)
     else:
         logging.info("No patients")

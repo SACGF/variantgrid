@@ -57,8 +57,11 @@ class UploadedFile(TimeStampedModel):
             return self.uploaded_file.size
         return os.stat(self.get_filename()).st_size
 
+    def can_view(self, user) -> bool:
+        return user.is_superuser or self.user == user
+
     def check_can_view(self, user):
-        if not (user.is_superuser or self.user == user):
+        if not self.can_view(user):
             msg = f"You do not have permission to access UploadedFile pk={self.pk}"
             raise PermissionDenied(msg)
 

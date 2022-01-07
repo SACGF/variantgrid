@@ -115,9 +115,8 @@ class FileUploadView(View):
 
                 admin_url = get_url_from_view_path(f"/admin/classification/uploadedfilelab/{uploaded_file.pk}/change")
                 notifier = NotificationBuilder(
-                    message="File Uploaded",
-                    emoji=":file_folder:"
-                ).add_header("File Uploaded").\
+                    message="File Uploaded"
+                ).add_header(":file_folder: File Uploaded").\
                     add_field("For Lab", lab.name).\
                     add_field("By User", user.username).\
                     add_field("Path", "s3://" + bucket + "/" + file_path_within_bucket).\

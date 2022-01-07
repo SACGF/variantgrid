@@ -11,7 +11,7 @@ from django.utils.timezone import now
 from lazy import lazy
 from pytz import timezone
 
-from classification.enums import ShareLevel, SpecialEKeys
+from classification.enums import SpecialEKeys
 from classification.models import ClinVarExport, ClinVarExportBatch, ClinVarExportBatchStatus, \
     Classification, EvidenceKeyMap, ClinVarExportStatus
 from genes.hgvs import CHGVS

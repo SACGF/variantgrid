@@ -4,6 +4,7 @@ from django.contrib.auth.models import User
 from django.db import models
 from django.db.models.deletion import CASCADE
 from django.urls.base import reverse
+from model_utils.models import TimeStampedModel
 
 from library.django_utils import SortByPKMixin
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsAutoInitialSaveMixin, \
@@ -110,7 +111,7 @@ def validate(records):
     return errors_list
 
 
-class Pedigree(GuardianPermissionsAutoInitialSaveMixin, SortByPKMixin, models.Model):
+class Pedigree(GuardianPermissionsAutoInitialSaveMixin, SortByPKMixin, TimeStampedModel):
     user = models.ForeignKey(User, on_delete=CASCADE)
     name = models.TextField(blank=False)
     cohort = models.ForeignKey(Cohort, on_delete=CASCADE)

@@ -1,6 +1,7 @@
 import collections
 from collections import defaultdict
 from datetime import datetime
+from enum import Enum
 from typing import List, Union, Iterable, Optional, Dict, Tuple, Set
 
 from django.conf import settings
@@ -130,7 +131,7 @@ class UsedKeyTracker:
         return cols
 
 
-class ConflictStrategy:
+class ConflictStrategy(str, Enum):
     MOST_BENIGN = 'most_benign'
     MOST_PATHOGENIC = 'most_pathogenic'
 
@@ -585,8 +586,8 @@ class ExportFormatter(BaseExportFormatter):
         body_parts.append(f"Filename : *{self.filename()}*")
         body_parts.append(f"Rows Downloaded : *{row_count}*")
 
-        nb = NotificationBuilder(message="Classification Download", emoji=":arrow_down:")\
-            .add_header("Classification Download Completed")\
+        nb = NotificationBuilder(message="Classification Download")\
+            .add_header(":arrow_down: Classification Download Completed")\
             .add_markdown("\n".join(body_parts), indented=True)
         if request := get_current_request():
             for key, value in request.GET.items():

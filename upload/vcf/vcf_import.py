@@ -100,7 +100,8 @@ def create_cohort_genotype_collection_from_vcf(vcf: VCF, vcf_reader):
     vcf_name = vcf_name[:40]
     defaults = {"name": f"VCF: {vcf.pk} {vcf_name}",
                 "import_status": ImportStatus.IMPORTING,
-                "genome_build": vcf.genome_build}
+                "genome_build": vcf.genome_build,
+                "user": vcf.user}
     cohort, created = Cohort.objects.update_or_create(vcf=vcf, defaults=defaults)
     logging.info("Cohort: %s (created: %s) version=%d", cohort, created, cohort.version)
     if not created:

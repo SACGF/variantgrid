@@ -27,7 +27,7 @@ from upload.models import UploadPipeline, UploadedFile, ProcessingStatus, Upload
     VCFImportInfo, SimpleVCFImportInfo, ModifiedImportedVariant, TimeFilterMethod
 from upload.uploaded_file_type import get_upload_data_for_uploaded_file, \
     get_uploaded_file_type, get_url_and_data_for_uploaded_file_data, \
-    retry_upload_pipeline
+    retry_upload_pipeline, get_import_tasks_by_extension
 
 UPLOADED_FILE_CONTEXT = {UploadedFileTypes.VCF: "uploaded_vcf",
                          UploadedFileTypes.GENE_LIST: "uploaded_gene_list",
@@ -192,9 +192,12 @@ def upload(request):
             upload_settings = form.save()
 
     file_dicts_list = get_file_dicts_list(upload_settings)
+    extensions = get_import_tasks_by_extension().keys()
+    accept_file_types = f"/(\.|\/)({'|'.join(extensions)})$/i"
     context = {'existing_files': file_dicts_list,
                'form': form,
-               "upload_enabled": settings.UPLOAD_ENABLED}
+               "upload_enabled": settings.UPLOAD_ENABLED,
+               "accept_file_types": accept_file_types}
     return render(request, 'upload/upload.html', context)
 
 

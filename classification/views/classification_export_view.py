@@ -32,6 +32,7 @@ from classification.views.classification_export_report import ExportFormatterRep
 from classification.views.classification_export_utils import ConflictStrategy, \
     VCFEncoding, BaseExportFormatter
 from classification.views.classification_export_vcf import ExportFormatterVCF
+from classification.views.exports.classification_exporter import serve_export
 from library.django_utils import get_url_from_view_path
 from snpdb.models.models import Lab, Organization
 from snpdb.models.models_genome import GenomeBuild
@@ -199,6 +200,11 @@ class ClassificationApiExportView(APIView):
         return orgs
 
     def get(self, request: Request, **kwargs) -> HttpResponseBase:
+
+        if request.query_params.get('new_mode') == 'true':
+            return serve_export(request)
+
+        # deprecating all this... eventually
 
         since = None
         since_str = request.query_params.get('since', None)

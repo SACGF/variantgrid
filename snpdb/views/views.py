@@ -2,14 +2,14 @@ import itertools
 import json
 import logging
 from collections import OrderedDict, defaultdict
-from typing import Iterable
+from typing import Iterable, Tuple
 
 import pandas as pd
 from celery.result import AsyncResult
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.models import User, Group
-from django.core.exceptions import PermissionDenied, ImproperlyConfigured
+from django.core.exceptions import PermissionDenied, ImproperlyConfigured, ObjectDoesNotExist
 from django.db.utils import IntegrityError
 from django.forms.models import inlineformset_factory, ALL_FIELDS
 from django.forms.widgets import TextInput
@@ -29,10 +29,13 @@ from analysis.forms import AnalysisOutputNodeChoiceForm
 from analysis.models import AnalysisTemplate, SampleStats, SampleStatsPassingFilter
 from annotation.forms import GeneCountTypeChoiceForm
 from annotation.manual_variant_entry import create_manual_variants, can_create_variants
-from annotation.models import AnnotationVersion
+from annotation.models import AnnotationVersion, SampleVariantAnnotationStats, SampleGeneAnnotationStats, \
+    SampleClinVarAnnotationStats, SampleVariantAnnotationStatsPassingFilter, SampleGeneAnnotationStatsPassingFilter, \
+    SampleClinVarAnnotationStatsPassingFilter
 from annotation.models.models import ManualVariantEntryCollection, VariantAnnotationVersion
 from annotation.models.models_gene_counts import GeneValueCountCollection, \
     GeneCountType, SampleAnnotationVersionVariantSource, CohortGeneCounts
+from annotation.serializers import ManualVariantEntryCollectionSerializer
 from classification.classification_stats import get_grouped_classification_counts
 from classification.models.clinvar_export_sync import clinvar_export_sync
 from classification.views.classification_accumulation_graph import get_accumulation_graph_data, \
@@ -43,7 +46,7 @@ from genes.forms import CustomGeneListForm, UserGeneListForm, GeneAndTranscriptF
 from genes.models import GeneListCategory, CustomTextGeneList, GeneList
 from library.constants import WEEK_SECS, HOUR_SECS
 from library.django_utils import add_save_message, get_model_fields, set_form_read_only
-from library.guardian_utils import assign_permission_to_user_and_groups, DjangoPermission
+from library.guardian_utils import DjangoPermission
 from library.keycloak import Keycloak
 from library.utils import full_class_name, import_class, rgb_invert
 from ontology.models import OntologyTerm
@@ -71,6 +74,7 @@ from snpdb.models import CachedGeneratedFile, VariantGridColumn, UserSettings, \
 from snpdb.models.models_enums import ProcessingStatus, ImportStatus, BuiltInFilters
 from snpdb.tasks.soft_delete_tasks import soft_delete_vcfs
 from snpdb.utils import LabNotificationBuilder
+from upload.models import UploadedVCF
 from upload.uploaded_file_type import retry_upload_pipeline
 
 
@@ -262,6 +266,11 @@ def view_vcf(request, vcf_id):
         vzc_vcf = VariantZygosityCountForVCF.objects.filter(vcf=vcf, collection=vzcc).first()
         variant_zygosity_count_collections[vzcc] = vzc_vcf
 
+    try:
+        can_view_upload_pipeline = vcf.uploadedvcf.uploaded_file.can_view(request.user)
+    except UploadedVCF.DoesNotExist:
+        can_view_upload_pipeline = False
+
     context = {
         'vcf': vcf,
         'sample_stats_het_hom_count': sample_stats_het_hom_count,
@@ -273,6 +282,7 @@ def view_vcf(request, vcf_id):
         'patient_form': PatientForm(user=request.user),  # blank
         'has_write_permission': has_write_permission,
         'can_download_vcf': (not settings.VCF_DOWNLOAD_ADMIN_ONLY) or request.user.is_superuser,
+        'can_view_upload_pipeline': can_view_upload_pipeline,
         "variant_zygosity_count_collections": variant_zygosity_count_collections,
     }
     return render(request, 'snpdb/data/view_vcf.html', context)
@@ -283,6 +293,64 @@ def get_patient_upload_csv_for_vcf(request, pk):
     sample_qs = vcf.sample_set.all()
     filename = f"vcf_{pk}_patient_upload"
     return get_patient_upload_csv(filename, sample_qs)
+
+
+def _sample_stats(sample) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    annotation_version = AnnotationVersion.latest(sample.genome_build)
+    STATS = {
+        "Total": (SampleStats, SampleStatsPassingFilter, set()),
+        "dbSNP": (SampleVariantAnnotationStats, SampleVariantAnnotationStatsPassingFilter, {"variant_annotation_version"}),
+        "OMIM pheno": (SampleGeneAnnotationStats, SampleGeneAnnotationStatsPassingFilter, {"gene_annotation_version"}),
+        "ClinVar LP/P": (SampleClinVarAnnotationStats, SampleClinVarAnnotationStatsPassingFilter, {"clinvar_version"})
+    }
+
+    VARIANT_CLASS = ["variant", "snp", "insertions", "deletions"]
+    ZYGOSITY = ["ref", "het", "hom", "unk"]
+
+    variant_class_data = {}
+    zygosity_data = {}
+    for name, (stats_klass, stats_passing_filters_klass, shared_fields) in STATS.items():
+        kwargs = {"sample": sample}
+        for sf in shared_fields:
+            kwargs[sf] = getattr(annotation_version, sf)
+
+        objs = {}
+        try:
+            objs[name] = stats_klass.objects.get(**kwargs)
+        except ObjectDoesNotExist:
+            pass
+
+        try:
+            objs[f"{name} PASS filters"] = stats_passing_filters_klass.objects.get(**kwargs)
+        except ObjectDoesNotExist:
+            pass
+
+        for n, o in objs.items():
+            obj_variant_class_data = {}
+            for field in get_model_fields(o):
+                for k in VARIANT_CLASS:
+                    if field.startswith(k):
+                        obj_variant_class_data[k] = getattr(o, field)
+                        break
+            if obj_variant_class_data:
+                variant_class_data[n] = obj_variant_class_data
+
+            obj_zygosity_data = {}
+            for field in get_model_fields(o):
+                for k in ZYGOSITY:
+                    if field.startswith(k):
+                        obj_zygosity_data[k] = getattr(o, field)
+                        break
+            if obj_zygosity_data:
+                zygosity_data[n] = obj_zygosity_data
+
+    sample_stats_variant_class_df = pd.DataFrame.from_dict(variant_class_data).reindex(VARIANT_CLASS)
+    if "Total" in sample_stats_variant_class_df.columns:
+        total = sample_stats_variant_class_df["Total"]
+        sample_stats_variant_class_df["Total %"] = 100 * total / total["variant"]
+
+    sample_stats_zygosity_df = pd.DataFrame.from_dict(zygosity_data).reindex(ZYGOSITY)
+    return sample_stats_variant_class_df, sample_stats_zygosity_df
 
 
 def view_sample(request, sample_id):
@@ -310,15 +378,20 @@ def view_sample(request, sample_id):
     if settings.SOMALIER.get("enabled"):
         related_samples = SomalierRelatePairs.get_for_sample(sample).order_by("relate")
 
-    context = {'sample': sample,
-               'samples': [sample],
-               'sample_locus_count': sample_locus_count,
-               'form': form,
-               'patient_form': patient_form,
-               'cohorts': cohorts,
-               'has_write_permission': has_write_permission,
-               'igv_data': igv_data,
-               "related_samples": related_samples}
+    sample_stats_variant_class_df, sample_stats_zygosity_df = _sample_stats(sample)
+    context = {
+        'sample': sample,
+        'samples': [sample],
+        'sample_locus_count': sample_locus_count,
+        'form': form,
+        'patient_form': patient_form,
+        'cohorts': cohorts,
+        'has_write_permission': has_write_permission,
+        'igv_data': igv_data,
+        "sample_stats_variant_class_df": sample_stats_variant_class_df,
+        "sample_stats_zygosity_df": sample_stats_zygosity_df,
+        "related_samples": related_samples
+    }
     return render(request, 'snpdb/data/view_sample.html', context)
 
 
@@ -467,6 +540,16 @@ def manual_variant_entry(request):
     context = {"form": form,
                "mvec_qs": mvec_qs}
     return render(request, 'snpdb/data/manual_variant_entry.html', context=context)
+
+
+def watch_manual_variant_entry(request, pk):
+    mvec = ManualVariantEntryCollection.get_for_user(request.user, pk)
+    # TODO: Quick redirect to variant if it's already ready
+
+    mvec_data = ManualVariantEntryCollectionSerializer(mvec).data
+    context = {"mvec": mvec,
+               "initial_json": json.dumps(mvec_data)}
+    return render(request, 'snpdb/data/watch_manual_variant_entry.html', context=context)
 
 
 @require_POST
@@ -886,13 +969,12 @@ def igv_integration(request):
 
 def cohorts(request):
     user_settings = UserSettings.get_for_user(request.user)
-    initial = {'genome_build': user_settings.default_genome_build}
+    initial = {'user': request.user, 'genome_build': user_settings.default_genome_build}
     form = forms.CreateCohortForm(request.POST or None, initial=initial)
     if request.method == "POST":
         valid = form.is_valid()
         if valid:
             cohort = form.save()
-            assign_permission_to_user_and_groups(request.user, cohort)
             return HttpResponseRedirect(reverse('view_cohort', kwargs={'cohort_id': cohort.pk}))
         else:
             add_save_message(request, valid, "Cohort", created=True)
@@ -1146,24 +1228,22 @@ def sample_gene_matrix(request, variant_annotation_version, samples, gene_list,
 
             if sample.patient:
                 try:
-                    # Check you have Patient permissions
-                    patient = Patient.get_for_user(request.user, sample.patient.pk)
-
-                    def format_ontology(ontology_term):
-                        return f"<div title='{ontology_term}'>{ontology_term.name}</div>"
-
-                    hpo, omim = OntologyTerm.split_hpo_and_omim(patient.get_ontology_term_ids())
-                    hpo_text = " ".join(map(format_ontology, hpo))
-                    omim_text = " ".join(map(format_ontology, omim))
-
                     try:
                         age = sample.specimen.age_at_collection_date
                     except:
                         age = None
-
                     text_df.loc["Age", sample_name] = age or ''
-                    text_df.loc["HPO", sample_name] = hpo_text
-                    text_df.loc["OMIM", sample_name] = omim_text
+
+                    # Check you have Patient permissions
+                    patient = Patient.get_for_user(request.user, sample.patient.pk)
+                    terms_dict = OntologyTerm.split_hpo_omim_mondo_as_dict(patient.get_ontology_term_ids())
+
+                    def format_ontology(ontology_term):
+                        return f"<div title='{ontology_term}'>{ontology_term.name}</div>"
+
+                    for ontology_name, terms_qs in terms_dict.items():
+                        ontology_text = " ".join(map(format_ontology, terms_qs))
+                        text_df.loc[ontology_name, sample_name] = ontology_text
                 except PermissionDenied:
                     pass
                 except Patient.DoesNotExist:

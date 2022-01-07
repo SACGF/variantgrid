@@ -8,8 +8,9 @@ from analysis.exceptions import NonFatalNodeError
 from analysis.forms.forms_nodes import AllVariantsNodeForm, BuiltInFilterNodeForm, \
     ClassificationsNodeForm, DamageNodeForm, FilterNodeForm, IntersectionNodeForm, \
     PedigreeNodeForm, PhenotypeNodeForm, PopulationNodeForm, TagNodeForm, TissueNodeForm, TrioNodeForm, \
-    VennNodeForm, ZygosityNodeForm, CohortNodeForm, AlleleFrequencyNodeForm, SelectedInParentNodeForm, MergeNodeForm
-from analysis.models import TagNode, OntologyTerm
+    VennNodeForm, ZygosityNodeForm, CohortNodeForm, AlleleFrequencyNodeForm, SelectedInParentNodeForm, MergeNodeForm, \
+    MOINodeForm
+from analysis.models import TagNode, OntologyTerm, MOINode
 from analysis.models.enums import SetOperations
 from analysis.models.nodes.filters.allele_frequency_node import AlleleFrequencyNode
 from analysis.models.nodes.filters.built_in_filter_node import BuiltInFilterNode
@@ -30,6 +31,7 @@ from analysis.models.nodes.sources.cohort_node import CohortNode
 from analysis.models.nodes.sources.pedigree_node import PedigreeNode
 from analysis.models.nodes.sources.trio_node import TrioNode
 from analysis.views.nodes.node_view import NodeView
+from analysis.views.views_json import get_sample_patient_gene_disease_data
 from classification.models.classification import Classification
 from classification.views.classification_datatables import ClassificationColumns
 from library.django_utils import highest_pk
@@ -188,6 +190,23 @@ class MergeNodeView(NodeView):
     form_class = MergeNodeForm
 
 
+class MOINodeView(NodeView):
+    model = MOINode
+    form_class = MOINodeForm
+
+    def _get_form_initial(self):
+        form_initial = super()._get_form_initial()
+        form_initial["mondo"] = self.object.moinodeontologyterm_set.values_list("ontology_term", flat=True)
+        # There is also setting of other form initial from models in the form __init__ method
+        return form_initial
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        if self.object.sample:
+            context["sample_patient_gene_disease"] = get_sample_patient_gene_disease_data(self.object.sample)
+        return context
+
+
 class PedigreeNodeView(NodeView):
     model = PedigreeNode
     form_class = PedigreeNodeForm
@@ -206,29 +225,25 @@ class PhenotypeNodeView(NodeView):
         form_initial = super()._get_form_initial()
         # These are the ones added manually, not the ones currently selected in the node (could be patient)
         ontology_terms = self.object.phenotypenodeontologyterm_set.all().values_list("ontology_term", flat=True)
-        hpo, omim = OntologyTerm.split_hpo_and_omim(ontology_terms)
-        form_initial["hpo"] = hpo
-        form_initial["omim"] = omim
+        terms_dict = OntologyTerm.split_hpo_omim_mondo_as_dict(ontology_terms)
+        form_initial.update({k.lower(): v for k, v in terms_dict.items()})
         return form_initial
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
 
         node = self.object
-        patient_hpo = []
-        patient_omim = []
         patient = node.patient
         if patient:
             ontology_term_ids = patient.get_ontology_term_ids()
-            patient_hpo, patient_omim = OntologyTerm.split_hpo_and_omim(ontology_term_ids)
+            terms_dict = OntologyTerm.split_hpo_omim_mondo_as_dict(ontology_term_ids)
+            context.update({f"patient_{k.lower()}": v for k, v in terms_dict.items()})
 
         patient_queryset = node.get_patients_qs()
         has_patients = patient_queryset.exists()
 
         context.update({
             'has_patients': has_patients,
-            "patient_hpo": patient_hpo,
-            "patient_omim": patient_omim,
             "node_warnings": self._get_node_warnings(),
         })
         return context
@@ -237,7 +252,7 @@ class PhenotypeNodeView(NodeView):
     def _get_no_gene_warnings(label: str, terms) -> Optional[str]:
         terms_without_genes = set()
         for ontology_term in terms:
-            if not OntologySnake.gene_symbols_for_terms([ontology_term]):
+            if not OntologySnake.cached_gene_symbols_for_terms_tuple((ontology_term,)).exists():
                 terms_without_genes.add(str(ontology_term))
         warning = None
         if terms_without_genes:
@@ -250,8 +265,8 @@ class PhenotypeNodeView(NodeView):
 
         # This uses the same method as gene filter (special_case_gene_symbols_for_hpo_and_omim) though with individual
         # calls per term so that it matches what gene filters is doing
-        hpo_qs, omim_qs = OntologyTerm.split_hpo_and_omim(self.object.get_ontology_term_ids())
-        for label, terms in {"HPO": hpo_qs, "OMIM": omim_qs}.items():
+        terms_dict = OntologyTerm.split_hpo_omim_mondo_as_dict(self.object.get_ontology_term_ids())
+        for label, terms in terms_dict.items():
             if w := self._get_no_gene_warnings(label, terms):
                 node_warnings.append(w)
         return node_warnings
