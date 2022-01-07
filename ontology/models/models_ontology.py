@@ -152,7 +152,7 @@ class GeneDiseaseClassification(models.TextChoices):
     DEFINITIVE = "9", "Definitive"
 
     @staticmethod
-    def get_above_min(min_classification: 'GeneDiseaseClassification') -> List[str]:
+    def get_above_min(min_classification: str) -> List[str]:
         classifications = []
         for e in reversed(GeneDiseaseClassification):
             classifications.append(e.label)

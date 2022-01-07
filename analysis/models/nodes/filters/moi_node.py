@@ -1,5 +1,5 @@
-import logging
 import operator
+from collections import defaultdict
 from datetime import date
 from functools import reduce
 from typing import Optional, Set, Tuple, List
@@ -14,6 +14,7 @@ from analysis.models.nodes.cohort_mixin import AncestorSampleMixin
 from annotation.models import VariantTranscriptAnnotation, OntologyTerm
 from genes.models import GeneSymbol
 from ontology.models import GeneDiseaseClassification, OntologyTermRelation
+from patients.models_enums import Zygosity
 from snpdb.models import Contig, Sample
 
 
@@ -36,7 +37,7 @@ class MOINode(AncestorSampleMixin, AnalysisNode):
         return self.accordion_panel == self.PANEL_PATIENT
 
     def modifies_parents(self):
-        return bool(self.get_ontology_term_ids())
+        return bool(self.get_gene_disease_relations())
 
     def get_gene_disease_relations(self) -> List[OntologyTermRelation]:
         """ Filtered by node settings """
@@ -95,73 +96,108 @@ class MOINode(AncestorSampleMixin, AnalysisNode):
             ontology_term_ids = self.moinodeontologyterm_set.values_list("ontology_term", flat=True)
         return ontology_term_ids
 
-    def get_ontology_term_ids(self):
-        """ For node gene / terms grid """
-        return [otr.source_term for otr in self.get_gene_disease_relations()]
-
-    def get_gene_qs(self):
+    def _get_gene_qs(self):
         gene_symbols_qs = self.get_gene_symbols_qs()
         return self.analysis.gene_annotation_release.genes_for_symbols(gene_symbols_qs)
 
-    def _get_node_q(self) -> Optional[Q]:
-        qs_filters = []
-        gene_qs = self.get_gene_qs()
-        qs_filters.append(VariantTranscriptAnnotation.get_overlapping_genes_q(gene_qs))
-
-        # TODO: We want to build up a list of genes per zygosity
-        # Then do a query with that ZYG and the genes
-        # OR THEM together
-
-        if qs_filters:
-            q = reduce(operator.and_, qs_filters)
+    def _get_zygosities(self, moi: str) -> Set[str]:
+        het_or_hom = {Zygosity.HET, Zygosity.HOM_ALT}
+        recessive_zygosities = {Zygosity.HOM_ALT}
+        if self.require_zygosity:
+            dominant_zygosities = {Zygosity.HET}
         else:
-            logging.warning("MOINode %s didn't do any filtering", self)
-            q = None
+            dominant_zygosities = {Zygosity.HET, Zygosity.HOM_ALT}
+
+        MOI_ZYGOSITY_Q = {
+            'Autosomal dominant': dominant_zygosities,
+            'Autosomal dominant inheritance with maternal imprinting HP:0012275': dominant_zygosities,
+            'Autosomal dominant inheritance with paternal imprinting': dominant_zygosities,
+            'Autosomal recessive': dominant_zygosities,
+            # Digenic = A type of multifactorial inheritance governed by the simultaneous action of two gene loci.
+            'Digenic inheritance HP:0010984': het_or_hom,
+            'Mitochondrial': het_or_hom,
+            # Semidominant - A/A homozygote has a mutant phenotype
+            #                A/a heterozygote has a less severe phenotype
+            #                a/a homozygote (REF) is wild-type.
+            'Semidominant': het_or_hom,
+            'Somatic mosaicism': None,  # Could be called as anything, even Ref
+            'Unknown': het_or_hom,
+            'X-linked': het_or_hom,
+            'X-linked dominant': dominant_zygosities,
+            'X-linked recessive': recessive_zygosities,
+            'Y-linked inheritance': None,  # Anything on Y will be HOM anyway, don't want to exclude due to
+        }
+        return MOI_ZYGOSITY_Q[moi]
+
+    def _get_zygosity_q(self, moi: str) -> Optional[Q]:
+        q = None
+        if zygosities := self._get_zygosities(moi):
+            field = self.sample.get_cohort_genotype_field("zygosity")
+            q = Q(**{f"{field}__in": zygosities})
+        return q
+
+    def _get_genes_q_from_hgnc(self, hgnc_names: Set[str]):
+        gene_symbols_qs = GeneSymbol.objects.filter(symbol__in=hgnc_names)
+        gene_qs = self.analysis.gene_annotation_release.genes_for_symbols(gene_symbols_qs)
+        return VariantTranscriptAnnotation.get_overlapping_genes_q(gene_qs)
+
+    def _get_moi_genes(self):
+        moi_genes = defaultdict(set)
+        for otr in self.get_gene_disease_relations():
+            for source in otr.extra["sources"]:
+                moi_genes[source["mode_of_inheritance"]].add(otr.dest_term.name)
+        return moi_genes
+
+    def _get_node_q(self) -> Optional[Q]:
+        if self.sample:
+            moi_genes = self._get_moi_genes()
+            or_filters = []
+            for moi, hgnc_names in moi_genes.items():
+                q_genes = self._get_genes_q_from_hgnc(hgnc_names)
+                if q_zygosity := self._get_zygosity_q(moi):
+                    or_filters.append(q_zygosity & q_genes)
+                else:
+                    or_filters.append(q_genes)  # Any zygosity
+            q = reduce(operator.or_, or_filters)
+        else:
+            gene_qs = self._get_gene_qs()
+            q = VariantTranscriptAnnotation.get_overlapping_genes_q(gene_qs)
         return q
 
     def _get_node_contigs(self) -> Optional[Set[Contig]]:
         contig_qs = Contig.objects.filter(transcriptversion__genome_build=self.analysis.genome_build,
-                                          transcriptversion__gene_version__gene__in=self.get_gene_qs())
+                                          transcriptversion__gene_version__gene__in=self._get_gene_qs())
         return set(contig_qs.distinct())
 
     def _get_method_summary(self):
         if self.modifies_parents():
-            method_list = self._short_and_long_descriptions[1]
+            method_list = []
+            if self.sample:
+                moi_genes = self._get_moi_genes()
+                li_list = []
+                for moi, hgnc_names in moi_genes.items():
+                    if zygosities := self._get_zygosities(moi):
+                        zygosity = ", ".join(sorted([Zygosity.display(z) for z in zygosities]))
+                    else:
+                        zygosity = "Any Zygosity"
+                    li_list.append(f"<li>{moi} - {zygosity} - {', '.join(sorted(hgnc_names))}</li>")
 
-            genes_symbols_qs = GeneSymbol.objects.filter(geneversion__gene__in=self.get_gene_qs()).distinct()
-            genes_symbols = ', '.join(genes_symbols_qs.order_by("pk").values_list("pk", flat=True))
-            method_list.append(f"Filtering to genes: {genes_symbols}")
-            method_summary = "".join([f"<p>{s}</p>" for s in method_list])
+                method_list.append(f"<ul>{''.join(li_list)}</ul>")
+                method_summary = "".join([f"<p>{s}</p>" for s in method_list])
+            else:
+                gene_symbols = self.get_gene_symbols_qs()
+                method_summary = f"{', '.join(sorted(gene_symbols))}"
         else:
-            method_summary = 'No filters applied as no human_phenotype_ontology selected.'
+            method_summary = 'No filters applied.'
 
         return method_summary
-
-    @lazy
-    def _short_and_long_descriptions(self) -> Tuple[List[str], List[str]]:
-        long_descriptions = []
-        short_descriptions = []
-        return short_descriptions, long_descriptions
 
     def get_node_name(self):
         MAX_NAME_LENGTH = 50
         name = ''
         if self.modifies_parents():
-            if self.accordion_panel == self.PANEL_PATIENT:
-                if self.sample:
-                    if patient := self.sample.patient:
-                        name = f"{patient} patient mondo"
-            else:
-                short_descriptions, long_descriptions = self._short_and_long_descriptions
-
-                long_description = ','.join(long_descriptions)
-                if len(long_description) <= MAX_NAME_LENGTH:
-                    name = long_description
-                else:
-                    name = ','.join(short_descriptions)
-
-                if num_genes := self.get_gene_symbols_qs().count():
-                    name += f" ({num_genes} genes)"
+            # TODO: Show terms, tell how it got them
+            pass
         return name
 
     @staticmethod
@@ -169,14 +205,18 @@ class MOINode(AncestorSampleMixin, AnalysisNode):
         return "Filter to curated Gene/Disease relationships"
 
     def save_clone(self):
+        ontology_term_list = list(self.moinodeontologyterm_set.all())
+        moi_list= list(self.moinodemodeofinheritance_set.all())
+        submitter_list = list(self.moinodesubmitter_set.all())
         copy = super().save_clone()
-        for moi_ot in list(self.moinodeontologyterm_set.all()):
+
+        for moi_ot in ontology_term_list:
             copy.moinodeontologyterm_set.create(ontology_term=moi_ot.ontology_term)
 
-        for moi_moi in list(self.moinodemodeofinheritance_set.all()):
+        for moi_moi in moi_list:
             copy.moinodemodeofinheritance_set.create(mode_of_inheritance=moi_moi.mode_of_inheritance)
 
-        for moi_submitter in list(self.moinodesubmitter_set.all()):
+        for moi_submitter in submitter_list:
             copy.moinodesubmitter_set.create(submitter=moi_submitter.moi_submitter)
 
         return copy
