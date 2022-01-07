@@ -140,18 +140,18 @@ def code_shell(data: str):
 
 
 @register.inclusion_tag("uicore/tags/timestamp.html")
-def timestamp(time_stamp, time_ago: bool = False, show_seconds: bool = False):
+def timestamp(timestamp, time_ago: bool = False, show_seconds: bool = False):
     css_classes = list()
     if time_ago:
         css_classes.append('time-ago')
     if show_seconds:
         css_classes.append('seconds')
 
-    if time_stamp:
-        if not isinstance(time_stamp, (int, float)):
-            time_stamp = time_stamp.timestamp()
+    if timestamp:
+        if not isinstance(timestamp, (int, float)):
+            timestamp = timestamp.timestamp()
         return {
-            "timestamp": time_stamp,
+            "timestamp": timestamp,
             "css_class": " ".join(css_classes)
         }
     return {}
