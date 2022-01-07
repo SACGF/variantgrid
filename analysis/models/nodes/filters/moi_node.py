@@ -193,9 +193,13 @@ class MOINode(AncestorSampleMixin, AnalysisNode):
 
     def get_node_name(self):
         name = ''
-        if self.modifies_parents():
-            # TODO: Show terms, tell how it got them
-            pass
+        if ontology_term_ids := self._get_all_ontology_term_ids():
+            terms = sorted([ot.name for ot in OntologyTerm.objects.filter(pk__in=ontology_term_ids)])
+            terms_text = ", ".join(terms)
+            if self.accordion_panel == self.PANEL_PATIENT:
+                name = f"{terms_text or 'No terms'} (from patient)"
+            else:
+                name = terms_text
         return name
 
     @staticmethod
