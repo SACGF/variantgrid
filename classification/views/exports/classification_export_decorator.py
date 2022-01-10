@@ -1,6 +1,5 @@
 from typing import Callable, Dict
 from django.http import HttpRequest
-from django.http.response import HttpResponseBase
 from classification.views.exports.classification_export_formatter2 import ClassificationExportFormatter2
 
 
@@ -21,8 +20,4 @@ def classification_exporter_for_request(request: HttpRequest) -> ClassificationE
     format_type = request.query_params.get('type')
     if factory := _classification_export_registry.get(format_type):
         return factory(request)
-    raise ValueError(f"No ClassificationExportFormatter could be found for '{format_type}'")
-
-
-def serve_export(request: HttpRequest) -> HttpResponseBase:
-    return classification_exporter_for_request(request).serve()
+    raise ValueError(f"No ClassificationExportFormatter2 could be found for '{format_type}'")

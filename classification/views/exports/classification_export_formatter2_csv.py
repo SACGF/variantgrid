@@ -4,11 +4,11 @@ from typing import List
 from django.http import HttpRequest
 from lazy import lazy
 
-from classification.models import Classification, ClassificationModification
+from classification.models import Classification, ClassificationModification, EvidenceKeyMap
 from classification.views.classification_export_utils import UsedKeyTracker, KeyValueFormatter
+from classification.views.exports.classification_export_decorator import register_classification_exporter
 from classification.views.exports.classification_export_formatter2 import ClassificationExportFormatter2
 from classification.views.exports.classification_export_filter import AlleleData, ClassificationFilter
-from classification.views.exports.classification_exporter import register_classification_exporter
 from library.utils import delimited_row
 
 
@@ -31,21 +31,21 @@ class FormatDetailsCSV:
 @register_classification_exporter("csv")
 class ClassificationExportFormatter2CSV(ClassificationExportFormatter2):
 
-    def __init__(self, filter: ClassificationFilter, format: FormatDetailsCSV):
-        self.format = format
-        super().__init__(filter=filter)
+    def __init__(self, classification_filter: ClassificationFilter, format_details: FormatDetailsCSV):
+        self.format = format_details
+        super().__init__(classification_filter=classification_filter)
 
     @staticmethod
     def from_request(request: HttpRequest) -> 'ClassificationExportFormatter2CSV':
         return ClassificationExportFormatter2CSV(
-            filter=ClassificationFilter.from_request(request),
-            format=FormatDetailsCSV.from_request(request)
+            classification_filter=ClassificationFilter.from_request(request),
+            format_details=FormatDetailsCSV.from_request(request)
         )
 
     @lazy
     def used_keys(self) -> UsedKeyTracker:
-        used_keys = UsedKeyTracker(self.filter.user, self.ekeys, KeyValueFormatter(), pretty=self.format.pretty)
-        for evidence in self.filter.cms_qs().values_list('published_evidence', flat=True):
+        used_keys = UsedKeyTracker(self.classification_filter.user, EvidenceKeyMap.cached(), KeyValueFormatter(), pretty=self.format.pretty)
+        for evidence in self.classification_filter.cms_qs().values_list('published_evidence', flat=True):
             used_keys.check_evidence(evidence)
         return used_keys
 
@@ -91,7 +91,7 @@ class ClassificationExportFormatter2CSV(ClassificationExportFormatter2):
         evidence_weights = Classification.summarize_evidence_weights(vcm.evidence, self.ekeys)
         citations = ', '.join([c.ref_id() for c in vcm.citations])
 
-        full_chgvs = vc.get_c_hgvs(genome_build=self.filter.genome_build, use_full=False)
+        full_chgvs = vc.get_c_hgvs(genome_build=self.classification_filter.genome_build, use_full=False)
 
         row = [
             vc.id,

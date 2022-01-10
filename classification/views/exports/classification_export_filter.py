@@ -2,7 +2,6 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from typing import List, Type, Union, Set, Optional, Dict, Iterator
-
 from cyvcf2.cyvcf2 import defaultdict
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -12,7 +11,6 @@ from django.utils.timezone import now
 from guardian.shortcuts import get_objects_for_user
 from lazy import lazy
 from pytz import timezone
-
 from classification.enums import ShareLevel
 from classification.models import ClassificationModification, Classification, classification_flag_types
 from flags.models import FlagsMixin, Flag, FlagComment, FlagStatus

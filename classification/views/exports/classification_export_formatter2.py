@@ -6,10 +6,9 @@ from typing import Optional, List, Iterator
 from django.http.response import HttpResponseBase
 from django.http import HttpResponse, StreamingHttpResponse
 from threadlocals.threadlocals import get_current_request
-
-from classification.views.exports.classification_export_filter import AlleleData, ClassificationFilter
 from library.guardian_utils import bot_group
 from library.log_utils import NotificationBuilder
+from classification.views.exports.classification_export_filter import AlleleData, ClassificationFilter
 
 
 class FileWriter:
@@ -38,8 +37,8 @@ class ClassificationExportFormatter2(ABC):
     Extend this class to export classification data into different formats
     """
 
-    def __init__(self, filter: ClassificationFilter):
-        self.filter = filter
+    def __init__(self, classification_filter: ClassificationFilter):
+        self.classification_filter = classification_filter
         self.row_count = 0
         self.file_count = 0
         self.started = datetime.utcnow()
@@ -55,10 +54,10 @@ class ClassificationExportFormatter2(ABC):
         :param extension_override: If creating a wrapper file, e.g. "zip"
         :return: The appropriate filename
         """
-        filename_parts: List[str] = ['classifications', self.filter.date_str]
+        filename_parts: List[str] = ['classifications', self.classification_filter.date_str]
 
         if self.is_genome_build_relevant:
-            filename_parts.append(str(self.filter.genome_build))
+            filename_parts.append(str(self.classification_filter.genome_build))
 
         if part is not None:
             filename_parts.append(f"part_{part+1:02}")
@@ -71,7 +70,7 @@ class ClassificationExportFormatter2(ABC):
         """
         Start generating the data and return it in a HTTP Response
         """
-        if self.filter.row_limit:
+        if self.classification_filter.row_limit:
             response = HttpResponse(content_type='application/zip')
             with zipfile.ZipFile(response, 'w') as zf:
                 for index, entry in enumerate(self._yield_files()):
@@ -100,10 +99,10 @@ class ClassificationExportFormatter2(ABC):
         """
         fw: Optional[FileWriter] = None
 
-        for allele_data in self.filter.allele_data_filtered():
+        for allele_data in self.classification_filter.allele_data_filtered():
             to_rows = self.row(allele_data)
             self.row_count += len(to_rows)
-            if not fw or (self.filter.row_limit and fw.row_count + len(to_rows) > self.filter.row_limit):
+            if not fw or (self.classification_filter.row_limit and fw.row_count + len(to_rows) > self.classification_filter.row_limit):
                 if fw:
                     fw.write(self.footer(), count=False)
                     yield fw
@@ -123,7 +122,7 @@ class ClassificationExportFormatter2(ABC):
         """
         for header in self.header():
             yield header
-        for allele_data in self.filter.allele_data_filtered():
+        for allele_data in self.classification_filter.allele_data_filtered():
             for row in self.row(allele_data):
                 self.row_count += 1
                 yield row
@@ -166,7 +165,7 @@ class ClassificationExportFormatter2(ABC):
         """
 
         # don't report bots downloading
-        user = self.filter.user
+        user = self.classification_filter.user
         if user.groups.filter(name=bot_group().name):
             return
         end = datetime.utcnow()

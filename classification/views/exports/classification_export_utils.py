@@ -1,8 +1,5 @@
 from dataclasses import dataclass, field
 from typing import List, Dict, Tuple
-
-from cyvcf2.cyvcf2 import defaultdict
-
 from classification.models import ClassificationModification
 from classification.views.exports.classification_export_filter import AlleleData, ClassificationFilter
 from genes.hgvs import CHGVS
