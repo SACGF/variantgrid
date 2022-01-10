@@ -410,9 +410,10 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
         raise NotImplementedError("Need to implement a non-default 'get_parent_q' if you have more than 1 parent")
 
     def get_parent_contigs(self) -> Set[Contig]:
-        if self.min_inputs == 1:
-            return self.get_single_parent_contigs()
-        raise NotImplementedError("Need to implement a non-default 'get_parent_contigs' if you have more than 1 parent")
+        contigs = set()
+        for parent in self.get_non_empty_parents():
+            contigs.update(parent.get_contigs())
+        return contigs
 
     @property
     def use_cache(self):
