@@ -1,6 +1,8 @@
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
+from functools import reduce
+from operator import __or__
 from typing import List, Type, Union, Set, Optional, Dict, Iterator
 from cyvcf2.cyvcf2 import defaultdict
 from django.conf import settings
@@ -18,19 +20,59 @@ from snpdb.models import GenomeBuild, Lab, Organization, allele_flag_types, Alle
 
 
 @dataclass
+class ClassificationIssue:
+    classification: ClassificationModification
+    withdrawn = False
+    transcript_version = False
+    matching_warning = False
+    version_mismatch = False
+
+    @property
+    def message(self) -> Optional[str]:
+        messages: List[str] = list()
+        if self.withdrawn:
+            messages.append("Classification has been withdrawn")
+        if self.transcript_version:
+            messages.append("c.HGVS resolution across builds requires investigation")
+        if self.matching_warning:
+            messages.append("c.HGVS normalisation requires investigation")
+        if self.version_mismatch:
+            messages.append("c.HGVS normalisation changed transcript version number")
+        if messages:
+            return ", ".join(messages)
+        else:
+            return None
+
+    @property
+    def has_issue(self):
+        return self.withdrawn or self.transcript_version or self.matching_warning or self.version_mismatch
+
+
+@dataclass
 class AlleleData:
     """
     All the classifications for a single Allele within an export
     :var source: The source of all export data
     :var allele_id: The Allele ID that all the classifications belong to
-    :var cms: The classifications that should be exported (passed validation, not withdrawn)
+    :var all_cms: All the classifications that passed the filter, but might include rows with errors that most
+    export will want to ignore (see cms instead)
     """
     source: 'ClassificationFilter'
     allele_id: int
-    cms: List[ClassificationModification] = field(default_factory=list)
+    all_cms: List[ClassificationIssue] = field(default_factory=list)
+
+    @property
+    def cms(self) -> List[ClassificationModification]:
+        # The classifications that should be exported (passed validation, not withdrawn)
+        return [ci.classification for ci in self.all_cms if not ci.has_issue]
+
+    @property
+    def issues(self) -> List[ClassificationIssue]:
+        # All Classification Issues that actually have issues
+        return [ci for ci in self.all_cms if ci.has_issue]
 
     def __bool__(self):
-        return bool(self.cms)
+        return bool(self.all_cms)
 
 
 def flag_ids_to(model: Type[FlagsMixin], qs: Union[QuerySet[Flag], QuerySet[FlagComment]]) -> Set[int]:
@@ -88,7 +130,6 @@ class ClassificationFilter:
 
     @lazy
     def date_str(self) -> str:
-        self.user
         return now().astimezone(tz=timezone(settings.TIME_ZONE)).strftime("%Y-%m-%d")
 
     @staticmethod
@@ -186,16 +227,26 @@ class ClassificationFilter:
         return allele_to_bad_transcripts
 
     @lazy
-    def bad_classification_ids(self) -> Set[int]:
+    def transcript_version_classification_ids(self) -> Set[int]:
         """
         Returns a set of classification IDs that have flags that make us want to exclude due to errors
         :return: A set of classification IDs
         """
-        return flag_ids_to(Classification, Flag.objects.filter(
-            flag_type__in={classification_flag_types.transcript_version_change_flag,
-                           classification_flag_types.matching_variant_warning_flag},
-            resolution__status=FlagStatus.OPEN
-        ))
+        return flag_ids_to(
+            Classification,
+            Flag.objects.filter(
+                flag_type=classification_flag_types.transcript_version_change_flag,
+                resolution__status=FlagStatus.OPEN
+            ))
+
+    @lazy
+    def variant_matching_classification_ids(self) -> Set[int]:
+        return flag_ids_to(
+            Classification,
+            Flag.objects.filter(
+                flag_type=classification_flag_types.matching_variant_warning_flag,
+                resolution__status=FlagStatus.OPEN
+            ))
 
     @lazy
     def discordant_classification_ids(self) -> Set[int]:
@@ -248,31 +299,13 @@ class ClassificationFilter:
             return True
         if allele_data.allele_id in self.since_flagged_allele_ids:
             return True
-        for cm in allele_data.cms:
+        for cmi in allele_data.all_cms:
+            cm = cmi.classification
             if cm.modified >= self.since or cm.classification.modified > self.since:
                 return True
             if cm.classification_id in self.since_flagged_classification_ids:
                 return True
         return False
-
-    def filter_errors(self, allele_data: AlleleData) -> AlleleData:
-        """
-        After a since check, filter out classifications that failed validation
-        TODO: store these filtered out records for CSV export with errors
-        :param allele_data:
-        :return:
-        """
-        # can already filtered out bad AlleleIDs all together
-        # have to check individual classification ids
-        cms = [cm for cm in allele_data.cms if not cm.classification.withdrawn and cm.classification_id not in self.bad_classification_ids]
-        if bad_transcripts := self.bad_allele_transcripts.get(allele_data.allele_id):
-            cms = [cm for cm in cms if cm.transcript not in bad_transcripts]
-
-        return AlleleData(
-            source=self,
-            allele_id=allele_data.allele_id,
-            cms=cms
-        )
 
     @property
     def share_levels(self) -> Set[ShareLevel]:
@@ -324,9 +357,19 @@ class ClassificationFilter:
             acceptable_transcripts: List[Q] = [
                 Q({f'classification__{self.c_hgvs_col}__startswith': tran}) for tran in ALISSA_ACCEPTED_TRANSCRIPTS
             ]
-            cms = cms.filter(**{f'{self.c_hgvs_col}__startswith': 'NM'})
+            cms = cms.filter(reduce(__or__, acceptable_transcripts))
 
         return cms
+
+    def _record_issues(self, allele_id: int, cm: ClassificationModification) -> ClassificationIssue:
+        ci = ClassificationIssue(classification=cm)
+        ci.withdrawn = cm.classification.withdrawn
+        ci.transcript_version = cm.classification_id in self.transcript_version_classification_ids
+        ci.matching_warning = cm.classification_id in self.variant_matching_classification_ids
+        if allele_bad_transcripts := self.bad_allele_transcripts.get(allele_id):
+            ci.version_mismatch = cm.transcript in allele_bad_transcripts
+        return ci
+
 
     def _allele_data(self) -> Iterator[AlleleData]:
         """
@@ -336,11 +379,12 @@ class ClassificationFilter:
         allele_data: Optional[AlleleData] = None
         for cm in self.cms_qs():
             allele_id = cm.classification.allele_id
+            # FIXME: make an AlleleData for no Allele
             if not allele_data or allele_id != allele_data.allele_id:
                 if allele_data:
                     yield allele_data
                 allele_data = AlleleData(source=self, allele_id=allele_id)
-            allele_data.cms.append(cm)
+            allele_data.all_cms.append(self._record_issues(allele_id=allele_id, cm=cm))
 
         if allele_data:
             yield allele_data
@@ -352,5 +396,4 @@ class ClassificationFilter:
         """
         for allele_data in self._allele_data():
             if self.passes_since(allele_data):
-                if filtered := self.filter_errors(allele_data):
-                    yield filtered
+                yield allele_data

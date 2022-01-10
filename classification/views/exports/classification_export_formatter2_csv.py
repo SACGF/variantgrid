@@ -8,7 +8,8 @@ from classification.models import Classification, ClassificationModification, Ev
 from classification.views.classification_export_utils import UsedKeyTracker, KeyValueFormatter
 from classification.views.exports.classification_export_decorator import register_classification_exporter
 from classification.views.exports.classification_export_formatter2 import ClassificationExportFormatter2
-from classification.views.exports.classification_export_filter import AlleleData, ClassificationFilter
+from classification.views.exports.classification_export_filter import AlleleData, ClassificationFilter, \
+    ClassificationIssue
 from library.utils import delimited_row
 
 
@@ -32,7 +33,9 @@ class FormatDetailsCSV:
 class ClassificationExportFormatter2CSV(ClassificationExportFormatter2):
 
     def __init__(self, classification_filter: ClassificationFilter, format_details: FormatDetailsCSV):
-        self.format = format_details
+        self.format_details = format_details
+        self.errors: List[ClassificationIssue] = None
+        self.e_keys = EvidenceKeyMap.cached()
         super().__init__(classification_filter=classification_filter)
 
     @staticmethod
@@ -44,7 +47,7 @@ class ClassificationExportFormatter2CSV(ClassificationExportFormatter2):
 
     @lazy
     def used_keys(self) -> UsedKeyTracker:
-        used_keys = UsedKeyTracker(self.classification_filter.user, EvidenceKeyMap.cached(), KeyValueFormatter(), pretty=self.format.pretty)
+        used_keys = UsedKeyTracker(self.classification_filter.user, self.e_keys, KeyValueFormatter(), pretty=self.format_details.pretty)
         for evidence in self.classification_filter.cms_qs().values_list('published_evidence', flat=True):
             used_keys.check_evidence(evidence)
         return used_keys
@@ -56,6 +59,7 @@ class ClassificationExportFormatter2CSV(ClassificationExportFormatter2):
         return "csv"
 
     def header(self) -> List[str]:
+        self.errors = list()
         header = [
                  'id',
                  'lab',
@@ -75,20 +79,22 @@ class ClassificationExportFormatter2CSV(ClassificationExportFormatter2):
         return [delimited_row(header, delimiter=',')]
 
     def row(self, allele_data: AlleleData) -> List[str]:
+        # record error to report them in the footer
+        self.errors.extend(allele_data.issues)
+
         rows = []
         for vcm in allele_data.cms:
             rows += self.to_row(vcm)
         return rows
 
     def footer(self) -> List[str]:
-        # FIXME need to print out all the errors here
-        return []
+        return [self.to_row(ci.classification, message=ci.message) for ci in self.errors]
 
     def to_row(self, vcm: ClassificationModification, message=None) -> str:
         vc = vcm.classification
 
-        acmg_criteria = vcm.criteria_strength_summary(self.ekeys)
-        evidence_weights = Classification.summarize_evidence_weights(vcm.evidence, self.ekeys)
+        acmg_criteria = vcm.criteria_strength_summary(self.e_keys)
+        evidence_weights = Classification.summarize_evidence_weights(vcm.evidence, self.e_keys)
         citations = ', '.join([c.ref_id() for c in vcm.citations])
 
         full_chgvs = vc.get_c_hgvs(genome_build=self.classification_filter.genome_build, use_full=False)
@@ -101,12 +107,12 @@ class ClassificationExportFormatter2CSV(ClassificationExportFormatter2):
             vcm.created.timestamp(),
             message,
             vc.allele_id,
-            self.genome_build.name,
+            self.classification_filter.genome_build.name,
             full_chgvs,
             (vc.condition_resolution_dict or {}).get('display_text'),
             acmg_criteria,
             evidence_weights,
             citations,
-            'TRUE' if self.is_discordant(vc) else 'FALSE',
+            'TRUE' if self.classification_filter.is_discordant(vcm) else 'FALSE',
         ] + self.used_keys.row(classification_modification=vcm)
         return delimited_row(row, delimiter=',')
