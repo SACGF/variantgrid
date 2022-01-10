@@ -15,7 +15,7 @@ class CHGVSData:
     Will create one record per unique c.hgvs string within the allele*
     (c.hgvs differing in just transcript version are still bundled together)
 
-    :var source: The allele data record (TODO rename)
+    :var allele: The allele data record
     :var chgvs: The c.hgvs with the highest found transcript version
     :var different_versions: Bool indicating if multiple transcript versions were bundled together here
     :var cms: The classifications
@@ -56,5 +56,5 @@ class CHGVSData:
             if versions:
                 c_hgvs.transcript = c_hgvs.transcript + f'.{versions[0]}'
 
-            sub_datas.append(CHGVSData(source=allele_data, chgvs=c_hgvs, different_versions=len(cms) > 1, cms=cms))
+            sub_datas.append(CHGVSData(allele=allele_data, chgvs=c_hgvs, different_versions=len(cms) > 1, cms=cms))
         return sub_datas

@@ -8,6 +8,7 @@ from classification.models import Classification, ClassificationModification
 from classification.views.classification_export_utils import UsedKeyTracker, KeyValueFormatter
 from classification.views.exports.classification_export_formatter2 import ClassificationExportFormatter2
 from classification.views.exports.classification_export_filter import AlleleData, ClassificationFilter
+from classification.views.exports.classification_exporter import register_classification_exporter
 from library.utils import delimited_row
 
 
@@ -27,6 +28,7 @@ class FormatDetailsCSV:
         return FormatDetailsCSV(pretty=pretty)
 
 
+@register_classification_exporter("csv")
 class ClassificationExportFormatter2CSV(ClassificationExportFormatter2):
 
     def __init__(self, filter: ClassificationFilter, format: FormatDetailsCSV):
@@ -50,6 +52,9 @@ class ClassificationExportFormatter2CSV(ClassificationExportFormatter2):
     def content_type(self) -> str:
         return "text/csv"
 
+    def extension(self) -> str:
+        return "csv"
+
     def header(self) -> List[str]:
         header = [
                  'id',
@@ -72,36 +77,36 @@ class ClassificationExportFormatter2CSV(ClassificationExportFormatter2):
     def row(self, allele_data: AlleleData) -> List[str]:
         rows = []
         for vcm in allele_data.cms:
-            rows.append(self.to_row(vcm))
+            rows += self.to_row(vcm)
         return rows
 
     def footer(self) -> List[str]:
         # FIXME need to print out all the errors here
         return []
 
-    def to_row(self, vcm: ClassificationModification, message=None) -> list:
+    def to_row(self, vcm: ClassificationModification, message=None) -> str:
         vc = vcm.classification
 
         acmg_criteria = vcm.criteria_strength_summary(self.ekeys)
         evidence_weights = Classification.summarize_evidence_weights(vcm.evidence, self.ekeys)
         citations = ', '.join([c.ref_id() for c in vcm.citations])
 
-        full_chgvs = vc.classification.get_c_hgvs(genome_build=self.filter.genome_build, use_full=False)
+        full_chgvs = vc.get_c_hgvs(genome_build=self.filter.genome_build, use_full=False)
 
         row = [
-                  vc.id,
-                  vc.lab.name,  # row
-                  vc.lab_record_id,
-                  vcm.share_level_enum.label,
-                  vcm.created.timestamp(),
-                  message,
-                  vc.allele_id,
-                  self.genome_build.name,
-                  full_chgvs,
-                  (vc.condition_resolution_dict or {}).get('display_text'),
-                  acmg_criteria,
-                  evidence_weights,
-                  citations,
-                  'TRUE' if self.is_discordant(vc) else 'FALSE',
-              ] + self.used_keys.row(classification_modification=vcm)
-        return row
+            vc.id,
+            vc.lab.name,  # row
+            vc.lab_record_id,
+            vcm.share_level_enum.label,
+            vcm.created.timestamp(),
+            message,
+            vc.allele_id,
+            self.genome_build.name,
+            full_chgvs,
+            (vc.condition_resolution_dict or {}).get('display_text'),
+            acmg_criteria,
+            evidence_weights,
+            citations,
+            'TRUE' if self.is_discordant(vc) else 'FALSE',
+        ] + self.used_keys.row(classification_modification=vcm)
+        return delimited_row(row, delimiter=',')

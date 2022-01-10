@@ -4,7 +4,6 @@ from django.http import HttpRequest
 from django.template.loader import render_to_string
 from django.urls import reverse
 from lazy import lazy
-
 from annotation.views import simple_citation_html
 from classification.enums import SpecialEKeys
 from classification.models import ClassificationModification, EvidenceKeyMap, ClassificationGroups
@@ -12,7 +11,8 @@ from classification.views.classification_export_mvl import CitationCounter
 from classification.views.classification_export_utils import ConflictStrategy
 from classification.views.exports.classification_export_formatter2 import ClassificationExportFormatter2
 from classification.views.exports.classification_export_filter import AlleleData, ClassificationFilter
-from classification.views.exports.classification_export_formatter2_utils import CHGVSData
+from classification.views.exports.classification_export_utils import CHGVSData
+from classification.views.exports.classification_exporter import register_classification_exporter
 from library.django_utils import get_url_from_view_path
 from library.utils import delimited_row, export_column, ExportRow
 
@@ -25,9 +25,9 @@ class FormatDetailsMVL:
 
     def __init__(self):
         """
-        :ivar classification_mapping: VariantGrid -> Alissa of ekey clinical_significance
-        :ivar conflict_strategy: Alissa only allows a single classification for a variant, so if there's conflicting use this
-        :ivar is_shell: If true, just used for testing of c.hgvs imports and omits all other data (safe to share around)
+        :var classification_mapping: VariantGrid -> Alissa of ekey clinical_significance
+        :var conflict_strategy: Alissa only allows a single classification for a variant, so if there's conflicting use this
+        :var is_shell: If true, just used for testing of c.hgvs imports and omits all other data (safe to share around)
         """
         self.classification_mapping = {
             'B': 'BENIGN',
@@ -70,18 +70,18 @@ class FormatDetailsMVL:
         :param request: Request from classification_export.html
         :return: A populated FormatDetailsMVL
         """
-        formatDetails = FormatDetailsMVL()
+        format_details = FormatDetailsMVL()
 
-        formatDetails.conflict_strategy = ConflictStrategy(request.query_params.get('conflict_strategy', ConflictStrategy.MOST_PATHOGENIC))
+        format_details.conflict_strategy = ConflictStrategy(request.query_params.get('conflict_strategy', ConflictStrategy.MOST_PATHOGENIC))
         for key in ['b', 'lb', 'vus', 'lp', 'p']:
             cs_label = request.query_params.get(f'cs_{key}')
             if cs_label:
-                formatDetails.classification_mapping[key.upper()] = cs_label
+                format_details.classification_mapping[key.upper()] = cs_label
 
         if request.query_params.get('mvl_detail', 'standard') == 'shell':
-            formatDetails.is_shell = True
+            format_details.is_shell = True
 
-        return formatDetails
+        return format_details
 
 
 @dataclass
@@ -133,9 +133,9 @@ class MVLClinicalSignificance:
                 alissa_clasification = mvl_data.format.alissa_label_for(raw_classification)
 
         return MVLClinicalSignificance(
-            alissa_classification=alissa_clasification,
-            special_classifications=sorted(special_classifications),
-            all_classifications=sorted(all_classifications)
+            alissa=alissa_clasification,
+            special=sorted(special_classifications),
+            all=sorted(all_classifications)
         )
 
 
@@ -258,14 +258,15 @@ class MVLEntry(ExportRow):
         return combined_data
 
 
+@register_classification_exporter("mvl")
 class ClassificationExportFormatter2MVL(ClassificationExportFormatter2):
     """
     Exports data in the format that Agilent's Alissa can import it
     """
 
-    def __init__(self, filter: ClassificationFilter, format: FormatDetailsMVL):
-        self.format = format
-        super().__init__(filter=filter)
+    def __init__(self, classification_filter: ClassificationFilter, format_details: FormatDetailsMVL):
+        self.format_details = format_details
+        super().__init__(filter=classification_filter)
 
     @staticmethod
     def from_request(request: HttpRequest) -> 'ClassificationExportFormatter2MVL':
@@ -273,8 +274,8 @@ class ClassificationExportFormatter2MVL(ClassificationExportFormatter2):
         filter.row_limit = 9999
 
         return ClassificationExportFormatter2MVL(
-            filter=filter,
-            format=FormatDetailsMVL.from_request(request)
+            classification_filter=filter,
+            format_details=FormatDetailsMVL.from_request(request)
         )
 
     def header(self):
@@ -283,7 +284,7 @@ class ClassificationExportFormatter2MVL(ClassificationExportFormatter2):
     def row(self, allele_data: AlleleData) -> List[str]:
         c_datas = CHGVSData.split_into_c_hgvs(allele_data, use_full=True)
         return list(MVLEntry.csv_generator(
-            (MVLCHGVSData(c_data, self.format) for c_data in c_datas),
+            (MVLCHGVSData(c_data, self.format_details) for c_data in c_datas),
             delimiter='\t',
             include_header=False
         ))
