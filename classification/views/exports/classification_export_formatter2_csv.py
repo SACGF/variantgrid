@@ -6,8 +6,8 @@ from lazy import lazy
 
 from classification.models import Classification, ClassificationModification
 from classification.views.classification_export_utils import UsedKeyTracker, KeyValueFormatter
-from classification.views.exports.classification_export_formatter2 import ClassificationExportFormatter2, \
-    ClassificationFilter, AlleleData
+from classification.views.exports.classification_export_formatter2 import ClassificationExportFormatter2
+from classification.views.exports.classification_export_filter import AlleleData, ClassificationFilter
 from library.utils import delimited_row
 
 
@@ -32,6 +32,13 @@ class ClassificationExportFormatter2CSV(ClassificationExportFormatter2):
     def __init__(self, filter: ClassificationFilter, format: FormatDetailsCSV):
         self.format = format
         super().__init__(filter=filter)
+
+    @staticmethod
+    def from_request(request: HttpRequest) -> 'ClassificationExportFormatter2CSV':
+        return ClassificationExportFormatter2CSV(
+            filter=ClassificationFilter.from_request(request),
+            format=FormatDetailsCSV.from_request(request)
+        )
 
     @lazy
     def used_keys(self) -> UsedKeyTracker:
