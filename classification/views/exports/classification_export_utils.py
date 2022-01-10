@@ -1,3 +1,4 @@
+from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import List, Dict, Tuple
 from classification.models import ClassificationModification

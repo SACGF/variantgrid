@@ -26,6 +26,7 @@ class ClassificationIssue:
     transcript_version = False
     matching_warning = False
     version_mismatch = False
+    not_matched = False
 
     @property
     def message(self) -> Optional[str]:
@@ -38,6 +39,8 @@ class ClassificationIssue:
             messages.append("c.HGVS normalisation requires investigation")
         if self.version_mismatch:
             messages.append("c.HGVS normalisation changed transcript version number")
+        if self.not_matched:
+            messages.append("Unable to match c.HGVS to an allele")
         if messages:
             return ", ".join(messages)
         else:
@@ -45,7 +48,7 @@ class ClassificationIssue:
 
     @property
     def has_issue(self):
-        return self.withdrawn or self.transcript_version or self.matching_warning or self.version_mismatch
+        return self.withdrawn or self.transcript_version or self.matching_warning or self.version_mismatch or self.not_matched
 
 
 @dataclass
@@ -297,7 +300,7 @@ class ClassificationFilter:
         """
         if not self.since:
             return True
-        if allele_data.allele_id in self.since_flagged_allele_ids:
+        if allele_data.allele_id and allele_data.allele_id in self.since_flagged_allele_ids:
             return True
         for cmi in allele_data.all_cms:
             cm = cmi.classification
@@ -345,8 +348,10 @@ class ClassificationFilter:
 
         # Always safe to exclude these (unless we want them in a CSV) even with since changes
         # couldn't show these ones if we wanted to
-        cms = cms.exclude(classification__allele__isnull=True).exclude(classification__variant__isnull=True)
-        cms = cms.exclude(**{f'{self.c_hgvs_col}__isnull': True})
+
+        # FIXME maybe put this exclusion in except for CSV
+        # cms = cms.exclude(classification__allele__isnull=True).exclude(classification__variant__isnull=True)
+        # cms = cms.exclude(**{f'{self.c_hgvs_col}__isnull': True})
 
         # PERMISSION CHECK
         cms = get_objects_for_user(self.user, ClassificationModification.get_read_perm(), cms, accept_global_perms=True)
@@ -355,7 +360,7 @@ class ClassificationFilter:
         if self.transcript_strategy == TranscriptStrategy.REFSEQ:
             from classification.views.classification_export_view import ALISSA_ACCEPTED_TRANSCRIPTS
             acceptable_transcripts: List[Q] = [
-                Q({f'classification__{self.c_hgvs_col}__startswith': tran}) for tran in ALISSA_ACCEPTED_TRANSCRIPTS
+                Q(**{f'{self.c_hgvs_col}__startswith': tran}) for tran in ALISSA_ACCEPTED_TRANSCRIPTS
             ]
             cms = cms.filter(reduce(__or__, acceptable_transcripts))
 
@@ -366,8 +371,15 @@ class ClassificationFilter:
         ci.withdrawn = cm.classification.withdrawn
         ci.transcript_version = cm.classification_id in self.transcript_version_classification_ids
         ci.matching_warning = cm.classification_id in self.variant_matching_classification_ids
-        if allele_bad_transcripts := self.bad_allele_transcripts.get(allele_id):
-            ci.version_mismatch = cm.transcript in allele_bad_transcripts
+        if not allele_id:
+            ci.not_matched = True
+        else:
+            if allele_bad_transcripts := self.bad_allele_transcripts.get(allele_id):
+                ci.version_mismatch = cm.transcript in allele_bad_transcripts
+
+        if not ci.classification.classification.get_c_hgvs(self.genome_build):
+            ci.not_matched = True
+
         return ci
 
 
