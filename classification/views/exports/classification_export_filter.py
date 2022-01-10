@@ -25,7 +25,7 @@ class ClassificationIssue:
     withdrawn = False
     transcript_version = False
     matching_warning = False
-    version_mismatch = False
+    c_37_not_38 = False
     not_matched = False
 
     @property
@@ -33,14 +33,12 @@ class ClassificationIssue:
         messages: List[str] = list()
         if self.withdrawn:
             messages.append("Classification has been withdrawn")
-        if self.transcript_version:
-            messages.append("c.HGVS resolution across builds requires investigation")
-        if self.matching_warning:
-            messages.append("c.HGVS normalisation requires investigation")
-        if self.version_mismatch:
-            messages.append("c.HGVS normalisation changed transcript version number")
+        if self.transcript_version or self.matching_warning:
+            messages.append("Requires confirmation of variant match")
+        if self.c_37_not_38:
+            messages.append("transcript across genome builds requires confirmation")
         if self.not_matched:
-            messages.append("Unable to match c.HGVS to an allele")
+            messages.append("Could not liftover/normalise")
         if messages:
             return ", ".join(messages)
         else:
@@ -48,7 +46,7 @@ class ClassificationIssue:
 
     @property
     def has_issue(self):
-        return self.withdrawn or self.transcript_version or self.matching_warning or self.version_mismatch or self.not_matched
+        return self.withdrawn or self.transcript_version or self.matching_warning or self.c_37_not_38 or self.not_matched
 
 
 @dataclass
@@ -349,7 +347,8 @@ class ClassificationFilter:
         # Always safe to exclude these (unless we want them in a CSV) even with since changes
         # couldn't show these ones if we wanted to
 
-        # FIXME maybe put this exclusion in except for CSV
+        ## Let these bad records in just so they can be put into errors
+        ##
         # cms = cms.exclude(classification__allele__isnull=True).exclude(classification__variant__isnull=True)
         # cms = cms.exclude(**{f'{self.c_hgvs_col}__isnull': True})
 
@@ -375,7 +374,7 @@ class ClassificationFilter:
             ci.not_matched = True
         else:
             if allele_bad_transcripts := self.bad_allele_transcripts.get(allele_id):
-                ci.version_mismatch = cm.transcript in allele_bad_transcripts
+                ci.c_37_not_38 = cm.transcript in allele_bad_transcripts
 
         if not ci.classification.classification.get_c_hgvs(self.genome_build):
             ci.not_matched = True

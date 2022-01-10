@@ -13,12 +13,6 @@ from classification.views.exports.classification_export_filter import AlleleData
 from library.utils import delimited_row
 
 
-"""
-Doesn't have the ability to include errors without a bit of inefficient reworking of parent class.
-Not sure I want to do that
-"""
-
-
 @dataclass
 class FormatDetailsCSV:
     pretty: bool = False
