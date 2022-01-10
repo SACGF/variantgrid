@@ -12,9 +12,9 @@ def serve_export(request: HttpRequest) -> HttpResponseBase:
     if type == 'mvl':
         filter.row_limit = 9999
 
-        from classification.views.exports.classification_export_formatter2_mvl import MVLFormatDetails, \
+        from classification.views.exports.classification_export_formatter2_mvl import FormatDetailsMVL, \
             ClassificationExportFormatter2MVL
 
-        format = MVLFormatDetails.from_request(request)
+        format = FormatDetailsMVL.from_request(request)
         formatter = ClassificationExportFormatter2MVL(filter, format)
     return formatter.serve()

@@ -14,10 +14,29 @@ from classification.views.exports.classification_export_formatter2 import Classi
     ClassificationExportFormatter2, AlleleData, CHGVSData
 from library.django_utils import get_url_from_view_path
 from library.utils import delimited_row, export_column, ExportRow
-from snpdb.models import Allele
 
 
-class MVLFormatDetails:
+class FormatDetailsMVL:
+    """
+    Object to track how specific Alissa instance wants to format data.
+    Specifically some understand the term "LIKELY_BENIGN" and some "LIKELY BENIGN"
+    """
+
+    def __init__(self):
+        """
+        :ivar classification_mapping: VariantGrid -> Alissa of ekey clinical_significance
+        :ivar conflict_strategy: Alissa only allows a single classification for a variant, so if there's conflicting use this
+        :ivar is_shell: If true, just used for testing of c.hgvs imports and omits all other data (safe to share around)
+        """
+        self.classification_mapping = {
+            'B': 'BENIGN',
+            'LB': 'LIKELY_BENIGN',
+            'VUS': 'VOUS',
+            'LP': 'LIKELY_PATHOGENIC',
+            'P': 'PATHOGENIC'
+        }
+        self.conflict_strategy = ConflictStrategy.MOST_PATHOGENIC
+        self.is_shell = False
 
     RAW_SCORE = {
         'B': 1,
@@ -31,24 +50,26 @@ class MVLFormatDetails:
     }
     DEFAULT_SCORE = 3
 
-    def __init__(self):
-        self.classification_mapping = {
-            'B': 'BENIGN',
-            'LB': 'LIKELY_BENIGN',
-            'VUS': 'VOUS',
-            'LP': 'LIKELY_PATHOGENIC',
-            'P': 'PATHOGENIC'
-        }
-        self.conflict_strategy = ConflictStrategy.MOST_PATHOGENIC
-        self.is_shell = False
-
-    def alissa_label_for(self, raw_classification):
+    def alissa_label_for(self, raw_classification: str) -> str:
+        """
+        :param raw_classification: The value of the ekey clinical_significance as known by variantgrid
+        :return: the corresponding Alissa value (or Alissa's VUS for any non standard values)
+        """
         return self.classification_mapping.get(raw_classification) or \
             self.classification_mapping.get('VUS')
 
     @staticmethod
-    def from_request(request: HttpRequest) -> 'MVLFormatDetails':
-        formatDetails = MVLFormatDetails()
+    def from_request(request: HttpRequest) -> 'FormatDetailsMVL':
+        """
+        Create a MVL formatted based on the Export classification_export.html
+        Expects the following
+        cs_<b|lb|vus|lp|p> : override values for Alissa for corresponding classification
+        mvl_detail : set to 'shell' if just testing
+        conflict_strategy : most_benign / most_pathogenic
+        :param request: Request from classification_export.html
+        :return: A populated FormatDetailsMVL
+        """
+        formatDetails = FormatDetailsMVL()
 
         formatDetails.conflict_strategy = ConflictStrategy(request.query_params.get('conflict_strategy', ConflictStrategy.MOST_PATHOGENIC))
         for key in ['b', 'lb', 'vus', 'lp', 'p']:
@@ -64,12 +85,20 @@ class MVLFormatDetails:
 
 @dataclass
 class MVLEntryData:
+    """
+    Provides all the data needed to create a row in a MVL
+
+    """
     data: CHGVSData
-    format: MVLFormatDetails
+    format: FormatDetailsMVL
 
 
 @dataclass
 class MVLClassification:
+    """
+    TODO maybe rename to something else?
+    This is the equivilent of the evidence key 'clinical_significance' not "Classification"
+    """
     alissa_classification: str
     special_classifications: List[str]
     all_classifications: List[str]
@@ -87,10 +116,10 @@ class MVLClassification:
             label = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE).pretty_value(raw_classification) or 'Unclassified'
             all_classifications.add(label)
             score: int
-            if lookup_score := MVLFormatDetails.RAW_SCORE.get(raw_classification):
+            if lookup_score := FormatDetailsMVL.RAW_SCORE.get(raw_classification):
                 score = lookup_score
             else:
-                score = MVLFormatDetails.DEFAULT_SCORE
+                score = FormatDetailsMVL.DEFAULT_SCORE
                 special_classifications.add(label)
             if best_score is None or \
                     (best_score < score and strategy == ConflictStrategy.MOST_BENIGN) or \
@@ -106,6 +135,9 @@ class MVLClassification:
 
 
 class MVLEntry(ExportRow):
+    """
+    Generates a single row for Alissa
+    """
 
     def __init__(self, mvl_data: MVLEntryData):
         self.mvl_data = mvl_data
@@ -222,8 +254,11 @@ class MVLEntry(ExportRow):
 
 
 class ClassificationExportFormatter2MVL(ClassificationExportFormatter2):
+    """
+    Exports data in the format that Agilent's Alissa can import it
+    """
 
-    def __init__(self, filter: ClassificationFilter, format: MVLFormatDetails):
+    def __init__(self, filter: ClassificationFilter, format: FormatDetailsMVL):
         self.format = format
         super().__init__(filter=filter)
 

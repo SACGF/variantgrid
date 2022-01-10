@@ -1,4 +1,5 @@
 import zipfile
+from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
@@ -7,6 +8,7 @@ from typing import Optional, Set, Union, List, Iterator, Dict, Tuple, Type, Iter
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.db.models import QuerySet, Q
+from django.http.response import HttpResponseBase
 from django.utils.timezone import now
 from pytz import timezone
 from cyvcf2.cyvcf2 import defaultdict
@@ -26,6 +28,12 @@ from snpdb.models import Lab, Organization, GenomeBuild, allele_flag_types, Alle
 
 @dataclass
 class AlleleData:
+    """
+    All the classifications for a single Allele within an export
+    :var source: The source of all export data
+    :var allele_id: The Allele ID that all the classifications belong to
+    :var cms: The classifications that should be exported (passed validation, not withdrawn)
+    """
     source: 'ClassificationFilter'
     allele_id: int
     cms: List[ClassificationModification] = field(default_factory=list)
@@ -36,6 +44,16 @@ class AlleleData:
 
 @dataclass
 class CHGVSData:
+    """
+    A sub-division of AlleleData.
+    Will create one record per unique c.hgvs string within the allele*
+    (c.hgvs differing in just transcript version are still bundled together)
+
+    :var source: The allele data record (TODO rename)
+    :var chgvs: The c.hgvs with the highest found transcript version
+    :var different_versions: Bool indicating if multiple transcript versions were bundled together here
+    :var cms: The classifications
+    """
     source: AlleleData
     chgvs: CHGVS
     different_versions: bool = False
@@ -45,6 +63,12 @@ class CHGVSData:
     def split_into_c_hgvs(
             allele_data: AlleleData,
             use_full: bool) -> List['CHGVSData']:
+        """
+        Break up an AlleleData into sub CHGVSDatas
+        :param allele_data: The Alissa data to split
+        :param use_full: Should the c.hgvs use explicit bases when optional (required by Alissa)
+        :return: An array of c.hgvs based data, most often will only be 1 record
+        """
         genome_build = allele_data.source.genome_build
         cms = allele_data.cms
         by_chgvs: Dict[CHGVS, List[Tuple[ClassificationModification, int]]] = defaultdict(list)
@@ -65,7 +89,14 @@ class CHGVSData:
         return sub_datas
 
 
-def flag_ids_to(model: Type[FlagsMixin], qs: QuerySet) -> Set[int]:
+def flag_ids_to(model: Type[FlagsMixin], qs: Union[QuerySet[Flag], QuerySet[FlagComment]]) -> Set[int]:
+    """
+    Convert a qs of Flags or FlagComments to ids of Classification/Allele/etc
+    :param model: The Model to get the IDs of e.g. Classification, Allele, assumes the flag qs was for Flags that
+    correspond to the model.
+    :param qs: A QuerySet of relevant flags e.g. flags_ids_to(model: Classification, qs: ...open transcript mismatch flag...)
+    :return: A set of model IDs that are linked to the flag qs
+    """
     if qs.model == Flag:
         qs = qs.values_list('collection_id', flat=True)\
             .order_by('collection_id').distinct('collection_id')
@@ -79,12 +110,29 @@ def flag_ids_to(model: Type[FlagsMixin], qs: QuerySet) -> Set[int]:
 
 
 class TranscriptStrategy(str, Enum):
+    """
+    What transcripts are going to be included
+    :cvar ALL: Include all transcripts
+    :cvar REFSEQ: More accurately only include transcripts that Alissa supports NM/NR
+    """
     ALL = "all"
     REFSEQ = "refseq"
 
 
 @dataclass
 class ClassificationFilter:
+    """
+    Attributes:
+        user: The user performing the export
+        genome_build: The genome build the user has requested (not always relevant)
+        exclude_sources: Labs/Orgs that should be excluded
+        include_sources: If provided Labs/Orgs that should only be included
+        since: Try to optimise data so we only include alleles that have been modified since this date
+        min_share_level: Minimum share level of classifications to include
+        transcript_strategy: Which classification transcripts should be considered
+        row_limit: Max number of rows per file (data from the 1 allele will still be grouped together if formatted produces multiple lines)
+        TODO rename row_limit to indicate that it's the max per file, not
+    """
     user: User
     genome_build: GenomeBuild
     exclude_sources: Optional[Set[Union[Lab, Organization]]] = None
@@ -96,10 +144,18 @@ class ClassificationFilter:
 
     @lazy
     def date_str(self) -> str:
+        self.user
         return now().astimezone(tz=timezone(settings.TIME_ZONE)).strftime("%Y-%m-%d")
 
     @staticmethod
-    def string_to_group_name(model: Type[Union[Lab, Organization]], group_names: str) -> Set:
+    def string_to_group_name(model: Type[Union[Lab, Organization]], group_names: str) -> Union[Set[Lab], Set[Organization]]:
+        """
+        Converts comma separated group names to the org or lab objects.
+        Invalid org/lab group names will be ignored
+        :param model: Organization or Lab
+        :param group_names: e.g. "org_1, org_2" or "org_1/lab_x, org_1/lab_y"
+        :return: A set of models that matches the group names
+        """
         if not group_names:
             return set()
         parts = [gn.strip() for gn in group_names.split(',')]
@@ -109,6 +165,11 @@ class ClassificationFilter:
 
     @staticmethod
     def from_request(request: HttpRequest) -> 'ClassificationFilter':
+        """
+        Create a filter of Classification data from classification_export.html
+        :param request: Request
+        :return: Populated ClassificationFilter
+        """
         user = request.user
 
         exclude_sources = \
@@ -131,7 +192,7 @@ class ClassificationFilter:
             from classification.views.classification_export_view import parse_since
             since = parse_since(since_str)
 
-        # FIXME include row_limit into filter
+        # FIXME include row_limit into filter? right now it's hardcoded when doing MVL
 
         return ClassificationFilter(
             user=user,
@@ -146,6 +207,10 @@ class ClassificationFilter:
 
     @lazy
     def c_hgvs_col(self):
+        """
+        The classification column that represents the genome build that the user requested
+        :return: The name of the c.hgvs column to use in a Classification QS
+        """
         if self.genome_build == GenomeBuild.grch37():
             return 'classification__chgvs_grch37'
         else:
@@ -153,6 +218,10 @@ class ClassificationFilter:
 
     @lazy
     def bad_allele_transcripts(self) -> Dict[int, Set[str]]:
+        """
+        :return: A dictionary of Allele ID to a set of Transcripts for that allele which has bad flags
+        """
+
         qs = Flag.objects.filter(
             flag_type=allele_flag_types.allele_37_not_38,
             resolution__status=FlagStatus.OPEN
@@ -174,6 +243,10 @@ class ClassificationFilter:
 
     @lazy
     def bad_classification_ids(self) -> Set[int]:
+        """
+        Returns a set of classification IDs that have flags that make us want to exclude due to errors
+        :return: A set of classification IDs
+        """
         return flag_ids_to(Classification, Flag.objects.filter(
             flag_type__in={classification_flag_types.transcript_version_change_flag,
                            classification_flag_types.matching_variant_warning_flag},
@@ -182,16 +255,25 @@ class ClassificationFilter:
 
     @lazy
     def discordant_classification_ids(self) -> Set[int]:
+        """
+        Returns a set of classification IDs where the classification id discordant
+        :return: A set of classification IDs
+        """
         return flag_ids_to(Classification, Flag.objects.filter(
             flag_type=classification_flag_types.discordant,
             resolution__status=FlagStatus.OPEN
         ))
 
-    def is_discordant(self, cm: ClassificationModification):
+    def is_discordant(self, cm: ClassificationModification) -> bool:
         return cm.classification_id in self.discordant_classification_ids
 
     @lazy
     def since_classifications(self) -> Set[int]:
+        """
+        TODO rename to indicate this is a flag check only
+        Returns classification ids that have had flags change since the since date
+        :return: A set of classification Ids that have relevant flags that have changed since the since date
+        """
         return flag_ids_to(Classification, FlagComment.objects.filter(
             flag__flag_type__in={
                 classification_flag_types.classification_withdrawn,
@@ -203,6 +285,10 @@ class ClassificationFilter:
 
     @lazy
     def since_alleles(self) -> Set[int]:
+        """
+        TODO rename to indicate this is a flag check only
+        :return: A set of allele IDs that have relevant flags that have changed since the since date
+        """
         return flag_ids_to(Allele, FlagComment.objects.filter(
             flag__flag_type__in={
                 allele_flag_types.allele_37_not_38
@@ -210,7 +296,10 @@ class ClassificationFilter:
             created__gte=self.since
         ))
 
-    def passes_since(self, allele_data: AlleleData):
+    def passes_since(self, allele_data: AlleleData) -> bool:
+        """
+        Is there anything about this AlleleData that indicates it should be included since the since date
+        """
         if not self.since:
             return True
         if allele_data.allele_id in self.since_alleles:
@@ -222,7 +311,13 @@ class ClassificationFilter:
                 return True
         return False
 
-    def filter_errors(self, allele_data: AlleleData):
+    def filter_errors(self, allele_data: AlleleData) -> AlleleData:
+        """
+        After a since check, filter out classifications that failed validation
+        TODO: store these filtered out records for CSV export with errors
+        :param allele_data:
+        :return:
+        """
         # can already filtered out bad AlleleIDs all together
         # have to check individual classification ids
         cms = [cm for cm in allele_data.cms if not cm.classification.withdrawn and cm.classification_id not in self.bad_classification_ids]
@@ -236,20 +331,21 @@ class ClassificationFilter:
         )
 
     @property
-    def share_levels(self):
+    def share_levels(self) -> Set[ShareLevel]:
+        """
+        :return: A set of all ShareLevels that should be considered
+        """
         share_levels: Set[ShareLevel] = set()
         for sl in ShareLevel.ALL_LEVELS:
             if sl >= self.min_share_level:
                 share_levels.add(sl)
         return share_levels
 
-    def _allele_data(self) -> Iterator[AlleleData]:
+    def cms_qs(self) -> QuerySet[ClassificationModification]:
         """
-        Given all the parameters, as efficiently as it can,
-        :return:
+        Returns a new QuerySet of all classifications BEFORE
+        filtering for errors and since date
         """
-        print("SHARE LEVELS = ")
-        print(self.share_levels)
         cms = ClassificationModification.objects.filter(
             is_last_published=True,
             share_level__in=self.share_levels
@@ -286,8 +382,15 @@ class ClassificationFilter:
             ]
             cms = cms.filter(**{f'{self.c_hgvs_col}__startswith': 'NM'})
 
+        return cms
+
+    def _allele_data(self) -> Iterator[AlleleData]:
+        """
+        Convert the classification query set into AlleleData
+        Is not filtered at this point
+        """
         allele_data: Optional[AlleleData] = None
-        for cm in cms:
+        for cm in self.cms_qs():
             allele_id = cm.classification.allele_id
             if not allele_data or allele_id != allele_data.allele_id:
                 if allele_data:
@@ -298,7 +401,11 @@ class ClassificationFilter:
         if allele_data:
             yield allele_data
 
-    def allele_data_filtered(self):
+    def allele_data_filtered(self) -> Iterator[AlleleData]:
+        """
+        Main method of getting data out of ClassificationFilter
+        Is only AlleleData with classifications that have passed since checks and errors
+        """
         for allele_data in self._allele_data():
             if self.passes_since(allele_data):
                 if filtered := self.filter_errors(allele_data):
@@ -306,6 +413,12 @@ class ClassificationFilter:
 
 
 class FileWriter:
+    """
+    In memory file writer, used if export create a zip file with the data potentially split across
+    multiple entries
+    :var file: StringIO data to write to
+    :var row_count: How many lines have been written to this file
+    """
 
     def __init__(self):
         self.file = StringIO()
@@ -320,7 +433,10 @@ class FileWriter:
             self.row_count += len(rows)
 
 
-class ClassificationExportFormatter2:
+class ClassificationExportFormatter2(ABC):
+    """
+    Extend this class to export classification data into different formats
+    """
 
     def __init__(self, filter: ClassificationFilter):
         self.filter = filter
@@ -328,7 +444,14 @@ class ClassificationExportFormatter2:
         self.file_count = 0
         self.started = datetime.utcnow()
 
-    def filename(self, part: Optional[int] = None, extension_override: Optional[str] = None):
+    def filename(self, part: Optional[int] = None, extension_override: Optional[str] = None) -> str:
+        """
+        Generate a filename
+        :param part: If the data is being split, what index is this file (otherwise None)
+        :param extension_override: If creating a wrapper file, e.g. "zip"
+        :return: The appropriate filename
+        """
+
         # FIXME only include genome_build if it's relevant to the file format (e.g. not JSON)
         fn = f"classifications_{self.filter.date_str}_{self.filter.genome_build}"
         if part is not None:
@@ -337,7 +460,10 @@ class ClassificationExportFormatter2:
         fn += f".{extension_override or self.extension()}"
         return fn
 
-    def serve(self):
+    def serve(self) -> HttpResponseBase:
+        """
+        Start generating the data and return it in a HTTP Response
+        """
         if self.filter.row_limit:
             response = HttpResponse(content_type='application/zip')
             with zipfile.ZipFile(response, 'w') as zf:
@@ -354,8 +480,12 @@ class ClassificationExportFormatter2:
             response['Content-Disposition'] = f'attachment; filename="{self.filename()}"'
             return response
 
+    @abstractmethod
     def content_type(self) -> str:
-        return "text/csv"
+        """
+        :return: Http content type
+        """
+        pass
 
     def yield_files(self) -> Iterator[FileWriter]:
         """
@@ -382,7 +512,7 @@ class ClassificationExportFormatter2:
 
     def yield_file(self) -> Iterator[str]:
         """
-        :return: An iterator for a single streaming file
+        :return: An iterator for a single streaming file, call either this or yield_file
         """
         for header in self.header():
             yield header
@@ -394,19 +524,41 @@ class ClassificationExportFormatter2:
             yield footer
         self.report_stats()
 
+    @abstractmethod
     def extension(self) -> str:
-        raise NotImplementedError("extension not implemented")
+        """
+        Filename extension, e.g. csv, json
+        """
+        pass
 
     def header(self) -> List[str]:
+        """
+        Return rows to start each file, typically 0 to 1 line
+        :return: A list of rows to be \n at the top of each file
+        """
         return list()
 
+    @abstractmethod
     def row(self, allele_data: AlleleData) -> List[str]:
-        raise NotImplementedError("row not implemented")
+        """
+        Return the row or rows that represent this AlleleData
+        :param allele_data: All the valid classifications for an Allele
+        """
+        pass
 
     def footer(self) -> List[str]:
+        """
+        Return rows to end each file, typically 0
+        :return: A list of rows to be \n at the bottom of each file
+        """
         return list()
 
     def report_stats(self):
+        """
+        TODO rename to send_report_stats
+        Alerts Slack of download
+        """
+
         # don't report bots downloading
         user = self.filter.user
         if user.groups.filter(name=bot_group().name):

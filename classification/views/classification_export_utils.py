@@ -2,7 +2,7 @@ import collections
 from collections import defaultdict
 from datetime import datetime
 from enum import Enum
-from typing import List, Union, Iterable, Optional, Dict, Tuple, Set
+from typing import List, Union, Iterable, Optional, Dict, Tuple, Set, Any
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -78,9 +78,12 @@ class UsedKeyTracker:
         self.ordered_keys = None
 
     def check_record(self, vcm: ClassificationModification):
+        self.check_evidence(vcm.evidence)
+
+    def check_evidence(self, evidence: Dict[str, Any]):
         has_value = False
         has_note = False
-        for key, valueObj in vcm.evidence.items():
+        for key, valueObj in evidence.items():
             if isinstance(valueObj, collections.Mapping):
                 has_value = valueObj.get('value') is not None
                 has_note = valueObj.get('note') is not None
