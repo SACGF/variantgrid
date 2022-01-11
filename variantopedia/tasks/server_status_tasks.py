@@ -128,8 +128,8 @@ def notify_server_status_now(detailed: bool = True):
             if not isinstance(contexts, list):
                 contexts = [contexts]
             for context, label in contexts:
-                if last_import := OntologyImport.objects.filter(context=context).order_by('-created').first():
-                    time_delta = right_now - last_import.created
+                if last_import := OntologyImport.objects.filter(context=context).order_by('-processed_date').first():
+                    time_delta = right_now - last_import.processed_date
                     age_days_to_annotations[time_delta.days].append(label)
                     break
 
