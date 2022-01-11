@@ -12,6 +12,7 @@ django-avatar==5.0.0
 django-cache-memoize==0.1.10
 django-compressor==2.4.1
 django-dag==1.4.3
+django-datetime-utc==1.0.3
 django-recaptcha==2.0.6
 django_debug_toolbar==3.2.2
 django_downloadview==2.1.1
@@ -30,7 +31,6 @@ django_starfield==1.0.post1
 django_termsandconditions==2.0.8
 easy_thumbnails==2.7
 git+https://github.com/azavea/django-amazon-ses@a9dd749575cfaa6e1fc7c289b535cba9798b8018#egg=django-amazon-ses
-git+https://github.com/davmlaw/django-datetime-utc#egg=django-datetime-utc
 git+https://github.com/davmlaw/django-jfu#egg=django-jfu
 git+https://github.com/davmlaw/django-messages/#egg=django-messages
 git+https://github.com/SACGF/hgvs#egg=pyhgvs

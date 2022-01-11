@@ -8,11 +8,10 @@ cyvcf2>=0.30.14
 Django
 django_admin_json_editor
 django_autocomplete_light==3.5.1
-django-avatar
 django-cache-memoize
 django-compressor
 django-dag
-django-recaptcha
+django-datetime-utc
 django_debug_toolbar
 django_downloadview
 django_extensions
@@ -29,11 +28,12 @@ django-registration-redux
 djangorestframework
 django_starfield
 django_termsandconditions
-easy_thumbnails
+git+https://github.com/davmlaw/django-avatar#egg=django-avatar
+git+https://github.com/SmileyChris/easy-thumbnails.git@92060b9fd7b617cab1ac88d149dc5021d43b35c3#egg=easy-thumbnails
 git+https://github.com/azavea/django-amazon-ses@a9dd749575cfaa6e1fc7c289b535cba9798b8018#egg=django-amazon-ses
-git+https://github.com/davmlaw/django-datetime-utc#egg=django-datetime-utc
 git+https://github.com/davmlaw/django-jfu#egg=django-jfu
 git+https://github.com/davmlaw/django-messages/#egg=django-messages
+git+https://github.com/davmlaw/django-recaptcha#egg=django-recaptcha
 git+https://github.com/SACGF/hgvs#egg=pyhgvs
 HTSeq
 ijson
