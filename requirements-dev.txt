@@ -18,7 +18,6 @@ django-geojson
 django_glrm
 django_guardian
 django_htmlmin
-django_json_widget
 django-leaflet
 django_model_utils
 django-redis-cache
@@ -26,6 +25,7 @@ django-registration-redux
 djangorestframework
 django_starfield
 django_termsandconditions
+git+https://github.com/davmlaw/django-json-widget#egg=django_json_widget
 git+https://github.com/davmlaw/django-avatar#egg=django-avatar
 git+https://github.com/SmileyChris/easy-thumbnails.git@92060b9fd7b617cab1ac88d149dc5021d43b35c3#egg=easy-thumbnails
 git+https://github.com/azavea/django-amazon-ses@a9dd749575cfaa6e1fc7c289b535cba9798b8018#egg=django-amazon-ses
