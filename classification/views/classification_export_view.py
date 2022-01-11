@@ -201,7 +201,9 @@ class ClassificationApiExportView(APIView):
 
     def get(self, request: Request, **kwargs) -> HttpResponseBase:
 
-        if request.query_params.get('new_mode') == 'true':
+        file_format = request.query_params.get('type', 'csv')
+
+        if file_format in {'csv', 'mvl'} and request.query_params.get('mode') != 'old':
             return serve_export(request)
 
         # deprecating all this... eventually
@@ -216,7 +218,7 @@ class ClassificationApiExportView(APIView):
         genome_build = GenomeBuild.get_name_or_alias(build_name)
         pretty = request.query_params.get('value_format') == 'labels'
 
-        file_format = request.query_params.get('type', 'csv')
+
         conflict_strategy = request.query_params.get('conflict_strategy', ConflictStrategy.MOST_PATHOGENIC)
         encoding = request.query_params.get('encoding', VCFEncoding.BASIC)
         cs_override_labels = {}

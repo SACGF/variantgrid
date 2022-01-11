@@ -86,9 +86,9 @@
         if (benchmark.length) {
             params.benchmark = 'true';
         }
-        let newMode = $("input[name='new-mode']:checked");
-        if (newMode.length) {
-            params.new_mode = 'true';
+        let mode = $("input[name='mode-old']:checked");
+        if (mode.length) {
+            params.mode = 'old';
         }
 
         let paramParts = [];
@@ -214,10 +214,10 @@
             </label>
         </div>
     {% endlabelled %}
-    {% labelled label="Run New Export Code (MVL Only - for now)" admin_only=True %}
+    {% labelled label="Run OLD Export Code (CSV, MVL Only - for now)" admin_only=True %}
         <div class="form-check">
             <label class="form-check-label">
-                <input id="new-mode" name="new-mode" value="true" type="checkbox" class="form-check-input" />
+                <input id="mode" name="mode-old" value="old" type="checkbox" class="form-check-input" />
             </label>
         </div>
     {% endlabelled %}
