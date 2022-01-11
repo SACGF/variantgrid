@@ -72,7 +72,7 @@
 </script>
 <div>
     {% page_help page_id='seqauto/sequencing_runs_help' title='Sequencing Runs' show_title=False %}
-    <form>
+    <form id="jump-to-sequencing-run">
         {% labelled label="Jump to SequencingRun" %}
             {{ sequencing_run_form.sequencing_run }}
             {{ sequencing_run_form.media }}
@@ -80,13 +80,12 @@
     </form>
 
     <div>
-        <form>
+        <form id="filter-grid-enrichment-kit">
             <fieldset class="form-fields small">
                 <legend>Filter Grid</legend>
                 <div class="pair">
                     {% labelled label="Enrichment Kit" %}
                         {{ enrichment_kit_form.enrichment_kit }}
-                        {{ enrichment_kit_form.media }}
                     {% endlabelled %}
                 </div>
                 <div id='sequencing-runs-filter-description' class='hidden'>
