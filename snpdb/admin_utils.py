@@ -6,7 +6,7 @@ from django.contrib import admin, messages
 from django.db import models
 from django.db.models import AutoField, ForeignKey, DateTimeField
 from django.http import HttpResponse
-from django.utils.encoding import smart_text
+from django.utils.encoding import smart_str
 from django_json_widget.widgets import JSONEditorWidget
 from guardian.admin import GuardedModelAdminMixin
 
@@ -82,7 +82,7 @@ class AllValuesChoicesFieldListFilter(admin.AllValuesFieldListFilter):
             if val is None:
                 include_none = True
                 continue
-            val = smart_text(val)
+            val = smart_str(val)
             yield {
                 'selected': self.lookup_val == val,
                 'query_string': changelist.get_query_string({
