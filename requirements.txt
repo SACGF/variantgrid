@@ -43,7 +43,7 @@ mozilla_django_oidc==1.2.3
 nameparser==1.0.6
 networkx==2.4
 nltk==3.5
-numpy==1.17.4
+numpy==1.22.0
 oauthlib==3.1.0
 pandas==1.1.0
 pronto==2.4.1

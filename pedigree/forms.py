@@ -1,9 +1,9 @@
-from dal import autocomplete
 from django import forms
 from django.forms.formsets import BaseFormSet
 from django.forms.models import ALL_FIELDS, ModelForm
 from django.forms.widgets import TextInput
 
+from library.django_utils.autocomplete_utils import ModelSelect2
 from library.forms import ROFormMixin
 from pedigree.models import PedFile, PedFileFamily, Pedigree
 from snpdb.models import Cohort
@@ -28,8 +28,8 @@ class PedigreeForm(ModelForm, ROFormMixin):
 class UserCohortandPedFileFamilyForm(forms.Form):
     ped_file_family = forms.ModelChoiceField(queryset=PedFileFamily.objects.all())
     cohort = forms.ModelChoiceField(queryset=Cohort.objects.all(),
-                                    widget=autocomplete.ModelSelect2(url='cohort_autocomplete',
-                                                                     attrs={'data-placeholder': 'Cohort...'}))
+                                    widget=ModelSelect2(url='cohort_autocomplete',
+                                                        attrs={'data-placeholder': 'Cohort...'}))
 
     def __init__(self, *args, **kwargs):
         user = kwargs.pop("user")

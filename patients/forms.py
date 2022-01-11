@@ -1,8 +1,9 @@
-from dal import autocomplete, forward
+from dal import forward
 from django import forms
 from django.forms.models import inlineformset_factory, ALL_FIELDS
 from django.forms.widgets import TextInput
 
+from library.django_utils.autocomplete_utils import ModelSelect2
 from patients.models import Patient, Specimen, ExternalPK, PatientModification, \
     PatientRecordOriginType
 from patients.models_enums import PopulationGroup
@@ -89,7 +90,6 @@ class PatientForm(forms.ModelForm):
 
 
 class PatientContactForm(forms.ModelForm):
-
     class Meta:
         model = Patient
         fields = ['street_address', 'suburb', 'postcode', 'telephone']
@@ -101,8 +101,8 @@ class PatientContactForm(forms.ModelForm):
 
 class PatientSearchForm(forms.Form):
     patient = forms.ModelChoiceField(queryset=Patient.objects.all(),
-                                     widget=autocomplete.ModelSelect2(url='patient_autocomplete',
-                                                                      attrs={'data-placeholder': 'Patient...'}))
+                                     widget=ModelSelect2(url='patient_autocomplete',
+                                                         attrs={'data-placeholder': 'Patient...'}))
     family_code = forms.CharField(widget=TextInput(attrs={'placeholder': 'Family Code'}))
     phenotype = forms.CharField(widget=TextInput(attrs={'placeholder': 'Phenotype text'}))
 
@@ -121,11 +121,10 @@ PatientSpecimenFormSet = inlineformset_factory(Patient,
 
 
 def external_pk_autocomplete_form_factory(external_type):
-
     class ExternalPKNameForm(forms.Form):
         external_pk = forms.ModelChoiceField(queryset=ExternalPK.objects.all(),
-                                             widget=autocomplete.ModelSelect2(url='external_pk_autocomplete',
-                                                                              attrs={'data-placeholder': "%s..." % external_type},
-                                                                              forward=(forward.Const(external_type, 'external_type'),)))
+                                             widget=ModelSelect2(url='external_pk_autocomplete',
+                                                                 attrs={'data-placeholder': "%s..." % external_type},
+                                                                 forward=(forward.Const(external_type, 'external_type'),)))
 
     return ExternalPKNameForm()
