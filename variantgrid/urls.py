@@ -1,7 +1,7 @@
 import debug_toolbar
 from django.apps import apps
 from django.conf import settings
-from django.conf.urls import include, url
+from django.conf.urls import include
 from django.conf.urls.static import static
 from django.contrib import admin
 from django.contrib.staticfiles.urls import staticfiles_urlpatterns
@@ -26,7 +26,7 @@ urlpatterns = [
     path('keycloak_admin', views.keycloak_admin, name='keycloak_admin'),
     path('terms/', include('termsandconditions.urls')),
     path('__debug__/', include(debug_toolbar.urls)),
-    url('avatar/', include('avatar.urls')),
+    path('avatar/', include('avatar.urls')),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
 

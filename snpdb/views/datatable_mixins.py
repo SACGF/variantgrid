@@ -4,7 +4,7 @@ import logging
 from django.core.serializers.json import DjangoJSONEncoder
 from django.http import HttpResponse
 from django.utils.cache import add_never_cache_headers
-from django.utils.encoding import force_text
+from django.utils.encoding import force_str
 from django.utils.functional import Promise
 from django.views.generic.base import TemplateView
 
@@ -14,11 +14,10 @@ logger = logging.getLogger(__name__)
 
 
 class LazyEncoder(DjangoJSONEncoder):
-    """Encodes django's lazy i18n strings
-    """
+    """Encodes django's lazy i18n strings """
     def default(self, obj):
         if isinstance(obj, Promise):
-            return force_text(obj)
+            return force_str(obj)
         return super(LazyEncoder, self).default(obj)
 
 

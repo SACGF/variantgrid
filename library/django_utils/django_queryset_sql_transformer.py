@@ -27,12 +27,12 @@ def get_queryset_with_transformer_hook(klass):
     class QueryTransformerCompilerMixin:
         compiler_klass = None
 
-        def get_compiler(self, using=None, connection=None):
+        def get_compiler(self, using=None, connection=None, elide_empty=True):
             if using is None and connection is None:
                 raise ValueError("Need either using or connection")
             if using:
                 connection = connections[using]
-            return self.compiler_klass(self, connection, using)
+            return self.compiler_klass(self, connection, using)  # Don't pass elide_empty for backwards compat
 
     class TransformerUpdateQuery(QueryTransformerCompilerMixin, UpdateQuery):
         compiler_klass = TransformerSQLUpdateCompiler

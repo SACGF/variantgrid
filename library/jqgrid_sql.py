@@ -1,9 +1,9 @@
 import abc
 import logging
 
+from django.core.exceptions import FieldError
 from django.core.paginator import Paginator
 from django.db import connection
-from django.db.models.query_utils import InvalidQuery
 
 from library.database_utils import iter_dictfetchall
 from library.jqgrid_user_row_config import JqGridUserRowConfig
@@ -72,7 +72,7 @@ class JqGridSQL(JqGridUserRowConfig):
                 if sidx not in self.fields:
                     fields_comma_sep = ", ".join(sorted(self.fields))
                     msg = f"sidx '{sidx}' is not in fields '{fields_comma_sep}'"
-                    raise InvalidQuery(msg)
+                    raise FieldError(msg)
 
                 # Default to sort by column itself
                 override = self.get_override(sidx)
