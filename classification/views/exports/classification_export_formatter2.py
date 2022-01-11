@@ -31,6 +31,11 @@ class FileWriter:
         if count:
             self.row_count += len(rows)
 
+    def finish(self):
+        content = self.file.getvalue()
+        self.file.close()
+        return content
+
 
 class ClassificationExportFormatter2(ABC):
     """
@@ -70,7 +75,7 @@ class ClassificationExportFormatter2(ABC):
         """
         Start generating the data and return it in a HTTP Response
         """
-        if self.classification_filter.row_limit:
+        if self.classification_filter.rows_per_file:
             response = HttpResponse(content_type='application/zip')
             with zipfile.ZipFile(response, 'w') as zf:
                 for index, entry in enumerate(self._yield_files()):
@@ -102,7 +107,7 @@ class ClassificationExportFormatter2(ABC):
         for allele_data in self.classification_filter.allele_data_filtered():
             to_rows = self.row(allele_data)
             self.row_count += len(to_rows)
-            if not fw or (self.classification_filter.row_limit and fw.row_count + len(to_rows) > self.classification_filter.row_limit):
+            if not fw or (self.classification_filter.rows_per_file and fw.row_count + len(to_rows) > self.classification_filter.rows_per_file):
                 if fw:
                     fw.write(self.footer(), count=False)
                     yield fw
@@ -120,14 +125,21 @@ class ClassificationExportFormatter2(ABC):
         """
         :return: An iterator for a single streaming file, call either this or yield_file
         """
-        for header in self.header():
-            yield header
-        for allele_data in self.classification_filter.allele_data_filtered():
-            for row in self.row(allele_data):
-                self.row_count += 1
-                yield row
-        for footer in self.footer():
-            yield footer
+        try:
+            for header in self.header():
+                yield header
+            for allele_data in self.classification_filter.allele_data_filtered():
+
+                row_data = self.row(allele_data)
+                for row in row_data:
+                    self.row_count += 1
+                    yield row
+            for footer in self.footer():
+                yield footer
+        except:
+            yield "An error occurred generating the file"
+            raise
+
         self.send_stats()
 
     @abstractmethod

@@ -271,7 +271,7 @@ class ClassificationExportFormatter2MVL(ClassificationExportFormatter2):
     @staticmethod
     def from_request(request: HttpRequest) -> 'ClassificationExportFormatter2MVL':
         classification_filter = ClassificationFilter.from_request(request)
-        classification_filter.row_limit = 9999
+        classification_filter.rows_per_file = 9999
 
         return ClassificationExportFormatter2MVL(
             classification_filter=classification_filter,

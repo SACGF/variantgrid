@@ -127,7 +127,7 @@ class ClassificationFilter:
     since: Optional[datetime] = None
     min_share_level: ShareLevel = ShareLevel.ALL_USERS
     transcript_strategy: TranscriptStrategy = TranscriptStrategy.ALL
-    row_limit: Optional[int] = None
+    rows_per_file: Optional[int] = None
 
     @lazy
     def date_str(self) -> str:
@@ -178,7 +178,7 @@ class ClassificationFilter:
             from classification.views.classification_export_view import parse_since
             since = parse_since(since_str)
 
-        # FIXME include row_limit into filter? right now it's hardcoded when doing MVL
+        # TODO include rows_per_file into filter? right now it's hardcoded when doing MVL
 
         return ClassificationFilter(
             user=user,
@@ -188,7 +188,7 @@ class ClassificationFilter:
             min_share_level=share_level,
             transcript_strategy=transcript_strategy,
             since=since
-            # row_limit=100
+            # rows_per_file=100
         )
 
     @lazy

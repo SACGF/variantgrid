@@ -1,5 +1,6 @@
 from dataclasses import dataclass
-from typing import List
+from io import StringIO
+from typing import List, Optional
 
 from django.http import HttpRequest
 from lazy import lazy
@@ -8,8 +9,7 @@ from classification.models import Classification, ClassificationModification, Ev
 from classification.views.classification_export_utils import UsedKeyTracker, KeyValueFormatter
 from classification.views.exports.classification_export_decorator import register_classification_exporter
 from classification.views.exports.classification_export_formatter2 import ClassificationExportFormatter2
-from classification.views.exports.classification_export_filter import AlleleData, ClassificationFilter, \
-    ClassificationIssue
+from classification.views.exports.classification_export_filter import AlleleData, ClassificationFilter
 from library.utils import delimited_row
 
 
@@ -28,7 +28,7 @@ class ClassificationExportFormatter2CSV(ClassificationExportFormatter2):
 
     def __init__(self, classification_filter: ClassificationFilter, format_details: FormatDetailsCSV):
         self.format_details = format_details
-        self.errors: List[ClassificationIssue] = None
+        self.errors_io: Optional[StringIO] = None
         self.e_keys = EvidenceKeyMap.cached()
         super().__init__(classification_filter=classification_filter)
 
@@ -53,7 +53,7 @@ class ClassificationExportFormatter2CSV(ClassificationExportFormatter2):
         return "csv"
 
     def header(self) -> List[str]:
-        self.errors = list()
+        self.errors_io = StringIO()
         header = [
                  'id',
                  'lab',
@@ -74,15 +74,22 @@ class ClassificationExportFormatter2CSV(ClassificationExportFormatter2):
 
     def row(self, allele_data: AlleleData) -> List[str]:
         # record error to report them in the footer
-        self.errors.extend(allele_data.issues)
-
+        if issues := allele_data.issues:
+            for issue in issues:
+                self.errors_io.writelines(self.to_row(issue.classification, message=issue.message))
         rows = []
         for vcm in allele_data.cms:
-            rows += self.to_row(vcm)
+            rows.append(self.to_row(vcm))
+
         return rows
 
     def footer(self) -> List[str]:
-        return [self.to_row(ci.classification, message=ci.message) for ci in self.errors]
+        footer_content = self.errors_io.getvalue()
+        self.errors_io.close()
+        if footer_content:
+            return [footer_content]
+        else:
+            return []
 
     def to_row(self, vcm: ClassificationModification, message=None) -> str:
         vc = vcm.classification
