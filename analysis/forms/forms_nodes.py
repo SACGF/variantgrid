@@ -1,8 +1,7 @@
 import json
 from typing import List
 
-from dal import autocomplete, forward
-from dal_select2.widgets import ModelSelect2Multiple
+from dal import forward
 from django import forms
 from django.forms.models import fields_for_model
 from django.forms.widgets import TextInput, HiddenInput
@@ -35,6 +34,7 @@ from annotation.models import VariantAnnotation
 from genes.custom_text_gene_list import create_custom_text_gene_list
 from genes.hgvs import get_hgvs_variant_tuple, get_hgvs_variant
 from genes.models import GeneListCategory, CustomTextGeneList, GeneList, PanelAppPanel
+from library.django_utils.autocomplete_utils import ModelSelect2, ModelSelect2Multiple
 from library.forms import NumberInput
 from library.utils import md5sum_str
 from ontology.models import OntologyTerm, OntologyTermRelation
@@ -116,7 +116,6 @@ class VCFSourceNodeForm(AlleleFrequencyMixin, VCFLocusFiltersMixin, BaseNodeForm
 
 
 class AlleleFrequencyNodeForm(AlleleFrequencyMixin, BaseNodeForm):
-
     class Meta:
         model = models.AlleleFrequencyNode
         fields = ("sample",)
@@ -173,8 +172,8 @@ class AllVariantsNodeForm(BaseNodeForm):
         fields = ('max_variant', "gene_symbol", "reference", "minimum_count", "maximum_count",
                   "min_ref_count", "max_ref_count", "min_hom_count", "max_hom_count", "min_het_count", "max_het_count")
         widgets = {'max_variant': HiddenInput(),
-                   'gene_symbol': autocomplete.ModelSelect2(url='gene_symbol_autocomplete',
-                                                            attrs={'data-placeholder': 'Gene...'}),
+                   'gene_symbol': ModelSelect2(url='gene_symbol_autocomplete',
+                                               attrs={'data-placeholder': 'Gene...'}),
                    'minimum_count': WIDGET_INTEGER_MIN_0,
                    'maximum_count': WIDGET_INTEGER_MIN_1,
                    'min_ref_count': WIDGET_INTEGER_MIN_0,
@@ -186,14 +185,12 @@ class AllVariantsNodeForm(BaseNodeForm):
 
 
 class VennNodeForm(BaseNodeForm):
-
     class Meta:
         model = VennNode
-        fields = ('set_operation', )
+        fields = ('set_operation',)
 
 
 class BuiltInFilterNodeForm(BaseNodeForm):
-
     class Meta:
         model = models.BuiltInFilterNode
         fields = ("built_in_filter", "clinvar_stars_min", "cosmic_count_min")
@@ -202,7 +199,6 @@ class BuiltInFilterNodeForm(BaseNodeForm):
 
 
 class ClassificationsNodeForm(BaseNodeForm):
-
     class Meta:
         model = ClassificationsNode
         fields = ('other', 'benign', 'likely_benign', 'vus', 'likely_pathogenic', 'pathogenic')
@@ -214,8 +210,8 @@ class CohortNodeForm(VCFSourceNodeForm):
     class Meta:
         model = CohortNode
         exclude = ANALYSIS_NODE_FIELDS
-        widgets = {'cohort': autocomplete.ModelSelect2(url='cohort_autocomplete',
-                                                       attrs={'data-placeholder': 'Cohort...'}),
+        widgets = {'cohort': ModelSelect2(url='cohort_autocomplete',
+                                          attrs={'data-placeholder': 'Cohort...'}),
                    'minimum_count': WIDGET_INTEGER_MIN_0,
                    'maximum_count': WIDGET_INTEGER_MIN_1,
                    'min_ref_count': WIDGET_INTEGER_MIN_0,
@@ -273,7 +269,6 @@ class CohortNodeForm(VCFSourceNodeForm):
 
 
 class DamageNodeForm(BaseNodeForm):
-
     class Meta:
         model = DamageNode
         exclude = ANALYSIS_NODE_FIELDS
@@ -325,21 +320,25 @@ class GeneListNodeForm(BaseNodeForm):
                                                                            forward=(forward.Const(None, 'category'),)))
     panel_app_panel_aus = forms.ModelMultipleChoiceField(required=False,
                                                          queryset=PanelAppPanel.objects.all(),
-                                                         widget=autocomplete.ModelSelect2Multiple(url='panel_app_panel_aus_autocomplete',
-                                                                                                  attrs={'data-placeholder': 'Australian Genomics PanelApp panel...'}))
+                                                         widget=ModelSelect2Multiple(
+                                                             url='panel_app_panel_aus_autocomplete',
+                                                             attrs={
+                                                                 'data-placeholder': 'Australian Genomics PanelApp panel...'}))
 
     panel_app_panel_eng = forms.ModelMultipleChoiceField(required=False,
                                                          queryset=PanelAppPanel.objects.all(),
-                                                         widget=autocomplete.ModelSelect2Multiple(url='panel_app_panel_eng_autocomplete',
-                                                                                                  attrs={'data-placeholder': 'Genomics England PanelApp panel...'}))
+                                                         widget=ModelSelect2Multiple(
+                                                             url='panel_app_panel_eng_autocomplete',
+                                                             attrs={
+                                                                 'data-placeholder': 'Genomics England PanelApp panel...'}))
 
     class Meta:
         model = GeneListNode
         fields = ("pathology_test_version", "sample", "exclude", "accordion_panel")
         widgets = {
-            "pathology_test_version": autocomplete.ModelSelect2(url='pathology_test_version_autocomplete',
-                                                                attrs={'data-placeholder': 'Pathology Test...'},
-                                                                forward=(forward.Const(True, "active"),)),
+            "pathology_test_version": ModelSelect2(url='pathology_test_version_autocomplete',
+                                                   attrs={'data-placeholder': 'Pathology Test...'},
+                                                   forward=(forward.Const(True, "active"),)),
             'accordion_panel': HiddenInput(),
         }
 
@@ -365,7 +364,7 @@ class GeneListNodeForm(BaseNodeForm):
             else:
                 custom_text_gene_list = CustomTextGeneList()
 
-            #logging.debug("gene_list is currently %s", custom_text_gene_list.gene_list)
+            # logging.debug("gene_list is currently %s", custom_text_gene_list.gene_list)
             custom_text_gene_list.name = f"Node_{self.instance.pk}_custom"
             custom_text_gene_list.text = custom_gene_list_text
             custom_text_gene_list.save()
@@ -407,8 +406,8 @@ class IntersectionNodeForm(GenomeBuildAutocompleteForwardMixin, BaseNodeForm):
         model = IntersectionNode
         fields = ("genomic_intervals_collection", "hgvs_name", "accordion_panel")
         widgets = {
-            "genomic_intervals_collection": autocomplete.ModelSelect2(url='genomic_intervals_collection_autocomplete',
-                                                                      attrs={'data-placeholder': 'Genomic Intervals...'}),
+            "genomic_intervals_collection": ModelSelect2(url='genomic_intervals_collection_autocomplete',
+                                                         attrs={'data-placeholder': 'Genomic Intervals...'}),
             "hgvs_name": TextInput(attrs={'placeholder': 'HGVS...'}),
             'accordion_panel': HiddenInput(),
         }
@@ -484,7 +483,8 @@ class MOINodeForm(BaseNodeForm):
     mondo = forms.ModelMultipleChoiceField(required=False,
                                            queryset=OntologyTerm.objects.all(),
                                            widget=ModelSelect2Multiple(url='mondo_autocomplete',
-                                                                       attrs={'data-placeholder': 'Curated MONDO disease...'},
+                                                                       attrs={
+                                                                           'data-placeholder': 'Curated MONDO disease...'},
                                                                        forward=(forward.Const(True, 'gene_disease'),)))
 
     class Meta:
@@ -586,8 +586,8 @@ class PedigreeNodeForm(GenomeBuildAutocompleteForwardMixin, VCFSourceNodeForm):
         model = PedigreeNode
         exclude = ANALYSIS_NODE_FIELDS
         widgets = {
-            "pedigree": autocomplete.ModelSelect2(url='pedigree_autocomplete',
-                                                  attrs={'data-placeholder': 'Pedigree...'}),
+            "pedigree": ModelSelect2(url='pedigree_autocomplete',
+                                     attrs={'data-placeholder': 'Pedigree...'}),
             "min_ad": WIDGET_INTEGER_MIN_0,
             "min_dp": WIDGET_INTEGER_MIN_0,
             "min_gq": WIDGET_INTEGER_MIN_0,
@@ -675,8 +675,8 @@ class SampleNodeForm(GenomeBuildAutocompleteForwardMixin, VCFSourceNodeForm):
         model = SampleNode
         exclude = list(ANALYSIS_NODE_FIELDS) + ["has_gene_coverage"]
         widgets = {
-            "sample": autocomplete.ModelSelect2(url='sample_autocomplete',
-                                                attrs={'data-placeholder': 'Sample...'}),
+            "sample": ModelSelect2(url='sample_autocomplete',
+                                   attrs={'data-placeholder': 'Sample...'}),
             "min_ad": WIDGET_INTEGER_MIN_0,
             "min_dp": WIDGET_INTEGER_MIN_0,
             "min_gq": WIDGET_INTEGER_MIN_0,
@@ -740,7 +740,6 @@ class TagNodeForm(BaseNodeForm):
 
 
 class TissueNodeForm(BaseNodeForm):
-
     class Meta:
         model = TissueNode
         exclude = ANALYSIS_NODE_FIELDS
@@ -755,8 +754,8 @@ class TrioNodeForm(GenomeBuildAutocompleteForwardMixin, VCFSourceNodeForm):
         model = TrioNode
         exclude = ANALYSIS_NODE_FIELDS
         widgets = {
-            "trio": autocomplete.ModelSelect2(url='trio_autocomplete',
-                                              attrs={'data-placeholder': 'Trio...'}),
+            "trio": ModelSelect2(url='trio_autocomplete',
+                                 attrs={'data-placeholder': 'Trio...'}),
             "min_ad": WIDGET_INTEGER_MIN_0,
             "min_dp": WIDGET_INTEGER_MIN_0,
             "min_gq": WIDGET_INTEGER_MIN_0,
@@ -776,7 +775,6 @@ class TrioNodeForm(GenomeBuildAutocompleteForwardMixin, VCFSourceNodeForm):
 
 
 class ZygosityNodeForm(BaseNodeForm):
-
     class Meta:
         model = models.ZygosityNode
         fields = ("sample", "zygosity", 'exclude')

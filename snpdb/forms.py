@@ -2,7 +2,7 @@ import collections
 
 from crispy_forms.bootstrap import FieldWithButtons
 from crispy_forms.layout import Layout, Submit, Field
-from dal import autocomplete, forward
+from dal import forward
 from django import forms
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -14,6 +14,7 @@ from guardian.shortcuts import assign_perm, remove_perm
 
 from annotation.models import ManualVariantEntry
 from annotation.models.models_enums import ManualVariantEntryType
+from library.django_utils.autocomplete_utils import ModelSelect2
 from library.forms import ROFormMixin
 from library.guardian_utils import DjangoPermission
 from snpdb import models
@@ -66,8 +67,8 @@ class GenomeBuildAutocompleteForwardMixin:
 class UserSelectForm(forms.Form):
     user = forms.ModelChoiceField(queryset=User.objects.all(),
                                   required=False,
-                                  widget=autocomplete.ModelSelect2(url='username_autocomplete',
-                                                                   attrs={'data-placeholder': 'Username...'}))
+                                  widget=ModelSelect2(url='username_autocomplete',
+                                                      attrs={'data-placeholder': 'Username...'}))
 
 
 class KeycloakUserForm(BaseForm):
@@ -78,8 +79,8 @@ class KeycloakUserForm(BaseForm):
     base_fields['lab'] = forms.ModelChoiceField(
         required=True,
         queryset=Lab.objects.all(),
-        widget=autocomplete.ModelSelect2(url='lab_autocomplete',
-                                         attrs={'data-placeholder': 'Lab...'}))
+        widget=ModelSelect2(url='lab_autocomplete',
+                            attrs={'data-placeholder': 'Lab...'}))
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -96,14 +97,14 @@ class KeycloakUserForm(BaseForm):
 class LabSelectForm(forms.Form):
     lab = forms.ModelChoiceField(queryset=Lab.objects.all(),
                                  required=False,
-                                 widget=autocomplete.ModelSelect2(url='lab_autocomplete',
-                                                                  attrs={'data-placeholder': 'Lab...'}))
+                                 widget=ModelSelect2(url='lab_autocomplete',
+                                                     attrs={'data-placeholder': 'Lab...'}))
 
 
 class TagForm(forms.Form):
     tag = forms.ModelChoiceField(queryset=Tag.objects.all(),
-                                 widget=autocomplete.ModelSelect2(url='tag_autocomplete',
-                                                                  attrs={'data-placeholder': 'Tag...'}))
+                                 widget=ModelSelect2(url='tag_autocomplete',
+                                                     attrs={'data-placeholder': 'Tag...'}))
 
 
 class UserForm(BaseModelForm):
@@ -277,11 +278,11 @@ class SampleForm(forms.ModelForm, ROFormMixin):
         widgets = {'vcf_sample_name': TextInput(),
                    'name': TextInput(),
                    'bam_file_path': TextInput(),
-                   'patient': autocomplete.ModelSelect2(url='patient_autocomplete',
-                                                        attrs={'data-placeholder': 'Patient...'}),
-                   'specimen': autocomplete.ModelSelect2(url='specimen_autocomplete',
-                                                         forward=['patient'],
-                                                         attrs={'data-placeholder': 'Specimen...'})}
+                   'patient': ModelSelect2(url='patient_autocomplete',
+                                           attrs={'data-placeholder': 'Patient...'}),
+                   'specimen': ModelSelect2(url='specimen_autocomplete',
+                                            forward=['patient'],
+                                            attrs={'data-placeholder': 'Specimen...'})}
 
     def clean(self):
         cleaned_data = super().clean()
@@ -299,15 +300,15 @@ class SampleForm(forms.ModelForm, ROFormMixin):
 
 class ProjectChoiceForm(forms.Form):
     project = forms.ModelChoiceField(queryset=Project.objects.all(),
-                                     widget=autocomplete.ModelSelect2(url='project_autocomplete',
-                                                                      attrs={'data-placeholder': 'Project...'}))
+                                     widget=ModelSelect2(url='project_autocomplete',
+                                                         attrs={'data-placeholder': 'Project...'}))
 
 
 class SampleChoiceForm(GenomeBuildAutocompleteForwardMixin, BaseDeclareForm):
     genome_build_fields = ["sample"]
     sample = forms.ModelChoiceField(queryset=Sample.objects.all(),
-                                    widget=autocomplete.ModelSelect2(url='sample_autocomplete',
-                                                                     attrs={'data-placeholder': 'Sample...'}))
+                                    widget=ModelSelect2(url='sample_autocomplete',
+                                                        attrs={'data-placeholder': 'Sample...'}))
 
 
 class VariantsTypeMultipleChoiceForm(forms.Form):
@@ -318,8 +319,8 @@ class VCFChoiceForm(GenomeBuildAutocompleteForwardMixin, BaseDeclareForm):
     genome_build_fields = ["vcf"]
 
     vcf = forms.ModelChoiceField(queryset=VCF.objects.all(),
-                                 widget=autocomplete.ModelSelect2(url='vcf_autocomplete',
-                                                                  attrs={'data-placeholder': 'VCF...'}))
+                                 widget=ModelSelect2(url='vcf_autocomplete',
+                                                     attrs={'data-placeholder': 'VCF...'}))
 
 
 class BlankNullBooleanSelect(NullBooleanSelect):
@@ -343,9 +344,9 @@ class SettingsOverrideForm(BaseModelForm):
                    "tool_tips": BlankNullBooleanSelect(),
                    "node_debug_tab": BlankNullBooleanSelect(),
                    "import_messages": BlankNullBooleanSelect(),
-                   'default_sort_by_column': autocomplete.ModelSelect2(url='custom_column_autocomplete',
-                                                                       forward=['columns'],
-                                                                       attrs={'data-placeholder': 'Column...'})}
+                   'default_sort_by_column': ModelSelect2(url='custom_column_autocomplete',
+                                                          forward=['columns'],
+                                                          attrs={'data-placeholder': 'Column...'})}
         labels = {
             "email_weekly_updates": "Email Regular Updates",
             "email_discordance_updates": "Email Discordance Updates",
@@ -495,8 +496,8 @@ class ManualVariantEntryForm(forms.Form):
 
 class UserCohortForm(forms.Form):
     cohort = forms.ModelChoiceField(queryset=Cohort.objects.all(),
-                                    widget=autocomplete.ModelSelect2(url='cohort_autocomplete',
-                                                                     attrs={'data-placeholder': 'Cohort...'}))
+                                    widget=ModelSelect2(url='cohort_autocomplete',
+                                                        attrs={'data-placeholder': 'Cohort...'}))
 
 
 class CreateTagForm(forms.Form):

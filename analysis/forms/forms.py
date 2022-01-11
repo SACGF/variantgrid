@@ -2,7 +2,7 @@ import itertools
 import operator
 from collections import defaultdict
 
-from dal import autocomplete, forward
+from dal import forward
 from django import forms
 from django.forms.widgets import TextInput
 
@@ -12,6 +12,7 @@ from analysis.models.models_karyomapping import KaryomappingGene
 from analysis.models.nodes.node_types import get_nodes_by_classification
 from annotation.models.models import AnnotationVersion
 from library.django_utils import get_models_dict_by_column
+from library.django_utils.autocomplete_utils import ModelSelect2
 from library.forms import NumberInput, ROFormMixin
 from library.guardian_utils import assign_permission_to_user_and_groups
 from snpdb.forms import GenomeBuildAutocompleteForwardMixin, UserSettingsGenomeBuildMixin
@@ -20,26 +21,27 @@ from snpdb.models import CustomColumnsCollection, Sample, VariantGridColumn, Tri
 
 class AnalysisChoiceForm(forms.Form):
     analysis = forms.ModelChoiceField(queryset=Analysis.objects.all(),
-                                      widget=autocomplete.ModelSelect2(url='analysis_autocomplete',
-                                                                       attrs={'data-placeholder': 'Analysis...'}))
+                                      widget=ModelSelect2(url='analysis_autocomplete',
+                                                          attrs={'data-placeholder': 'Analysis...'}))
 
 
 class AnalysisTemplateTypeChoiceForm(forms.Form):
     analysis = forms.ModelChoiceField(queryset=Analysis.objects.all(),
-                                      widget=autocomplete.ModelSelect2(url='analysis_autocomplete',
-                                                                       attrs={'data-placeholder': 'Analysis...'},
-                                                                       forward=(forward.Const(AnalysisTemplateType.TEMPLATE, 'template_type'),)))
+                                      widget=ModelSelect2(url='analysis_autocomplete',
+                                                          attrs={'data-placeholder': 'Analysis...'},
+                                                          forward=(forward.Const(AnalysisTemplateType.TEMPLATE,
+                                                                                 'template_type'),)))
 
 
 def get_analysis_template_form_for_variables_only_of_class(class_name, autocomplete_field=True,
                                                            requires_sample_somatic=None, requires_sample_gene_list=None):
     """ Returns a AnalysisTemplateForm - with either autocomplete forwards set or hidden input """
     if autocomplete_field:
-        widget = autocomplete.ModelSelect2(url='analysis_template_autocomplete',
-                                           attrs={'data-placeholder': 'Analysis Template...'},
-                                           forward=(forward.Const(class_name, 'class_name'),
-                                                    forward.Const(requires_sample_somatic, 'requires_sample_somatic'),
-                                                    forward.Const(requires_sample_gene_list, 'requires_sample_gene_list'),))
+        widget = ModelSelect2(url='analysis_template_autocomplete',
+                              attrs={'data-placeholder': 'Analysis Template...'},
+                              forward=(forward.Const(class_name, 'class_name'),
+                                       forward.Const(requires_sample_somatic, 'requires_sample_somatic'),
+                                       forward.Const(requires_sample_gene_list, 'requires_sample_gene_list'),))
 
     else:
         widget = forms.HiddenInput()
@@ -137,9 +139,9 @@ class AnalysisForm(forms.ModelForm, ROFormMixin):
         read_only = ('user', 'genome_build')
         model = Analysis
         widgets = {'name': TextInput(),
-                   'default_sort_by_column': autocomplete.ModelSelect2(url='custom_column_autocomplete',
-                                                                       forward=['custom_columns_collection'],
-                                                                       attrs={'data-placeholder': 'Column...'})}
+                   'default_sort_by_column': ModelSelect2(url='custom_column_autocomplete',
+                                                          forward=['custom_columns_collection'],
+                                                          attrs={'data-placeholder': 'Column...'})}
 
     def __init__(self, *args, **kwargs):
         user = kwargs.pop("user")
@@ -254,8 +256,8 @@ class UserTrioForm(GenomeBuildAutocompleteForwardMixin, forms.Form):
     genome_build_fields = ["trio"]
 
     trio = forms.ModelChoiceField(queryset=Trio.objects.all(),
-                                  widget=autocomplete.ModelSelect2(url='trio_autocomplete',
-                                                                   attrs={'data-placeholder': 'Trio...'}))
+                                  widget=ModelSelect2(url='trio_autocomplete',
+                                                      attrs={'data-placeholder': 'Trio...'}))
 
 
 class UserTrioWizardForm(forms.Form):
@@ -287,8 +289,8 @@ class KaryomappingGeneForm(forms.ModelForm):
     class Meta:
         exclude = ('karyomapping_analysis',)
         model = KaryomappingGene
-        widgets = {'gene': autocomplete.ModelSelect2(url='gene_autocomplete',
-                                                     attrs={'data-placeholder': 'Gene...'}),
+        widgets = {'gene': ModelSelect2(url='gene_autocomplete',
+                                        attrs={'data-placeholder': 'Gene...'}),
                    "upstream": NumberInput(attrs={'class': 'narrow', 'min': '0', 'step': '1000'}),
                    "downstream": NumberInput(attrs={'class': 'narrow', 'min': '0', 'step': '1000'})}
 

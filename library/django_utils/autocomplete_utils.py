@@ -5,6 +5,7 @@ import operator
 from functools import reduce
 
 from dal import autocomplete
+from django import forms
 from django.db.models.query_utils import Q
 
 
@@ -34,3 +35,21 @@ class AutocompleteView(autocomplete.Select2QuerySetView):
             qs = qs.filter(q)
 
         return self.sort_queryset(qs)
+
+
+# Fix for Autocomplete light not showing if loaded via JQuery.load()
+# @see https://github.com/yourlabs/django-autocomplete-light/issues/1221
+class AutocompleteReloadMixin:
+    @property
+    def media(self):
+        m = super().media
+        m += forms.Media(js=["js/auto_complete_light_reload.js"])
+        return m
+
+
+class ModelSelect2(AutocompleteReloadMixin, autocomplete.ModelSelect2):
+    pass
+
+
+class ModelSelect2Multiple(AutocompleteReloadMixin, autocomplete.ModelSelect2Multiple):
+    pass
