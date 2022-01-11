@@ -588,7 +588,7 @@ def canonical_transcripts(request):
     return render(request, 'genes/canonical_transcripts.html', context)
 
 
-def gene_coverage_graphs(request, genome_build, gene_symbols):
+def gene_coverage_graphs(request, genome_build, gene_symbols: Iterable[str]):
     NON_KIT_NAME = "Other / No enrichment kit"
     fields = ("mean", "percent_20x")
     enrichment_kits = EnrichmentKit.get_enrichment_kits(settings.SEQAUTO_COVERAGE_ENRICHMENT_KITS)
@@ -610,18 +610,18 @@ def gene_coverage_graphs(request, genome_build, gene_symbols):
             enrichment_kit_data = get_coverage_stats(base_gene_coverage_qs, filter_q, fields)
             enrichment_kit_name = str(enrichment_kit)
             for field_name in fields:
-                field_enrichment_kit_gene_json[field_name][enrichment_kit_name][gene_symbol.symbol] = enrichment_kit_data.get(field_name, [])
+                field_enrichment_kit_gene_json[field_name][enrichment_kit_name][gene_symbol] = enrichment_kit_data.get(field_name, [])
 
         if has_non_kit_coverage:
             filter_q = Q(gene_coverage_collection__qcgenecoverage__qc__isnull=True)
             other_data = get_coverage_stats(base_gene_coverage_qs, filter_q, fields)
             for field_name in fields:
-                field_enrichment_kit_gene_json[field_name][NON_KIT_NAME][gene_symbol.symbol] = other_data.get(field_name, [])
+                field_enrichment_kit_gene_json[field_name][NON_KIT_NAME][gene_symbol] = other_data.get(field_name, [])
 
     context = {'has_coverage': has_coverage,
                'fields': fields,
                'enrichment_kits_list': enrichment_kit_names,
-               'gene_symbols': [gs.symbol for gs in gene_symbols],
+               'gene_symbols': gene_symbols,
                'field_enrichment_kit_gene': field_enrichment_kit_gene_json}
     return render(request, 'genes/coverage/gene_coverage_graphs.html', context)
 
@@ -662,13 +662,14 @@ def qc_coverage(request, genome_build_name=None):
 def gene_coverage_collection_graphs(request, genome_build_name, gene_symbol):
     gene_symbol = get_object_or_404(GeneSymbol, pk=gene_symbol)
     genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
-    return gene_coverage_graphs(request, genome_build, [gene_symbol])
+    return gene_coverage_graphs(request, genome_build, [gene_symbol.symbol])
 
 
 def qc_gene_list_coverage_graphs(request, genome_build_name, gene_list_id):
     gene_list = GeneList.get_for_user(request.user, gene_list_id)
     genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
-    return gene_coverage_graphs(request, genome_build, gene_list.get_gene_names())
+    gene_symbols = list(gene_list.get_gene_names())
+    return gene_coverage_graphs(request, genome_build, gene_symbols)
 
 
 def sample_gene_lists_tab(request, sample_id):
