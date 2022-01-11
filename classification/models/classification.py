@@ -54,13 +54,12 @@ from snpdb.models.models_variant import AlleleSource, Allele, VariantCoordinate,
 
 ChgvsKey = namedtuple('CHGVS', ['short', 'column', 'build'])
 
-classification_validation_signal = django.dispatch.Signal(providing_args=["classification", "patch_meta", "key_map"])
-classification_current_state_signal = django.dispatch.Signal(providing_args=["user"])
-classification_post_publish_signal = django.dispatch.Signal(
-    providing_args=["classification", "previously_published", "previous_share_level", "newly_published", "user", "debug_timer"])
-classification_withdraw_signal = django.dispatch.Signal(providing_args=["classification", "user"])
-classification_variant_set_signal = django.dispatch.Signal(providing_args=["classification", "variant"])
-classification_revalidate_signal = django.dispatch.Signal(providing_args=["classification"])
+classification_validation_signal = django.dispatch.Signal()  # args: "classification", "patch_meta", "key_map"
+classification_current_state_signal = django.dispatch.Signal()  # args: "user"
+classification_post_publish_signal = django.dispatch.Signal()  # args: "classification", "previously_published", "previous_share_level", "newly_published", "user", "debug_timer"
+classification_withdraw_signal = django.dispatch.Signal()  # args: "classification", "user"
+classification_variant_set_signal = django.dispatch.Signal()  # args: "classification", "variant"
+classification_revalidate_signal = django.dispatch.Signal()  # args "classification"
 
 _key_to_regex = {
     'db_rs_id': DbRegexes.SNP,

@@ -20,7 +20,7 @@ from flags.models.enums import FlagStatus
 from flags.models.models import FlagComment
 from snpdb.models import Lab
 
-discordance_change_signal = django.dispatch.Signal(providing_args=["discordance_report"])
+discordance_change_signal = django.dispatch.Signal()  # args: "discordance_report"
 
 
 class DiscordanceReport(TimeStampedModel):

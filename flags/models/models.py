@@ -21,7 +21,7 @@ from library.guardian_utils import admin_bot
 from library.log_utils import report_message
 from library.utils import empty_dict, ModelUtilsMixin, ChoicesEnum
 
-flag_collection_extra_info_signal = django.dispatch.Signal(providing_args=["flag_infos", "user"])
+flag_collection_extra_info_signal = django.dispatch.Signal()  # args: "flag_infos", "user"
 
 
 @total_ordering
@@ -119,7 +119,7 @@ class FlagTypeResolution(TimeStampedModel):
         unique_together = ('flag_type', 'resolution')
 
 
-flag_comment_action = django.dispatch.Signal(providing_args=["flag_comment", "old_resolution"])
+flag_comment_action = django.dispatch.Signal()  # args: "flag_comment", "old_resolution"
 
 
 class Flag(TimeStampedModel):

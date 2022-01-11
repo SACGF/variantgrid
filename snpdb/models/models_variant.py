@@ -34,7 +34,7 @@ LOCUS_PATTERN = re.compile(r"^([^:]+):(\d+)[,\s]*([GATC]+)$", re.IGNORECASE)
 LOCUS_NO_REF_PATTERN = r"^([^:]+):(\d+)$"
 VARIANT_PATTERN = re.compile(r"^([^:]+):(\d+)[,\s]*([GATC]+)>(=|[GATC]+)$", re.IGNORECASE)
 
-allele_validate_signal = django.dispatch.Signal(providing_args=["allele"])
+allele_validate_signal = django.dispatch.Signal()  # args: "allele"
 
 
 class Allele(FlagsMixin, models.Model):

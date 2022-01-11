@@ -27,7 +27,7 @@ from library.log_utils import NotificationBuilder
 from snpdb.models import Variant, Lab
 from snpdb.models.models_variant import Allele
 
-clinical_context_signal = django.dispatch.Signal(providing_args=["clinical_context", "status", "is_significance_change", "cause"])
+clinical_context_signal = django.dispatch.Signal()  # args: "clinical_context", "status", "is_significance_change", "cause"
 
 CS_TO_NUMBER = {
     'B': 1,
