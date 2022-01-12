@@ -87,11 +87,11 @@ def load_mondo(filename: str, force: bool):
         processor_version=13)
 
     ontology_builder.ensure_hash_changed(data_hash=file_hash)  # don't re-import if hash hasn't changed
+    ontology_builder.cache_everything()
 
     with open(filename, 'r') as json_file:
         data_file = json.load(json_file)
 
-    print("This may take a few minutes")
     node_to_hgnc_id: [str, str] = dict()
     node_to_mondo: [str, str] = dict()
 
@@ -272,10 +272,8 @@ def load_mondo(filename: str, force: bool):
                             dest_term_id=mondo_obj_id,
                             relation=OntologyRelation.IS_A
                         )
-    print("Purging old data")
-    ontology_builder.complete()
-    ontology_builder.report()
-    print("Committing...")
+
+    ontology_builder.complete(verbose=True)
 
 
 def load_hpo(filename: str, force: bool):
@@ -288,6 +286,7 @@ def load_hpo(filename: str, force: bool):
 
     file_hash = file_md5sum(filename)
     ontology_builder.ensure_hash_changed(data_hash=file_hash)  # don't re-import if hash hasn't changed
+    ontology_builder.cache_everything()
     print("About to pronto the file")
     ot = pronto.Ontology(filename)
     print("Pronto complete")
@@ -332,8 +331,7 @@ def load_hpo(filename: str, force: bool):
                 source_term_id=kid_term.id,
                 relation=OntologyRelation.IS_A
             )
-    ontology_builder.complete()
-    ontology_builder.report()
+    ontology_builder.complete(verbose=True)
     print("Committing...")
 
 
@@ -346,6 +344,7 @@ def load_phenotype_to_genes(filename: str, force: bool):
         force_update=force)
     file_hash = file_md5sum(filename)
     ontology_builder.ensure_hash_changed(data_hash=file_hash)  # don't re-import if hash hasn't changed
+    ontology_builder.cache_everything()
     df = pd.read_csv(filename, index_col=None, comment='#', sep='\t',
                      names=['hpo_id', 'hpo_name', 'entrez_gene_id', 'entrez_gene_symbol', 'status', 'source', 'omim_id'])
 
@@ -394,8 +393,7 @@ def load_phenotype_to_genes(filename: str, force: bool):
         except ValueError:
             print(f"Could not resolve gene symbol {gene_symbol} to HGNC ID")
 
-    ontology_builder.complete()
-    ontology_builder.report()
+    ontology_builder.complete(verbose=True)
 
 
 def load_biomart(filename: str, force: bool):
@@ -410,7 +408,7 @@ def load_biomart(filename: str, force: bool):
         force_update=force)
     file_hash = file_md5sum(filename)
     ontology_builder.ensure_hash_changed(data_hash=file_hash)
-
+    ontology_builder.cache_everything()
     # Create MIMMorbid from BioMart file
     mim_biomart_df = pd.read_csv(filename, sep='\t').dropna().astype({"MIM morbid accession": int})
     for expected_col in [MIM_DESCRIPTION, MIM_ACCESSION]:
@@ -434,8 +432,7 @@ def load_biomart(filename: str, force: bool):
             aliases=aliases
         )
 
-    ontology_builder.complete()
-    ontology_builder.report()
+    ontology_builder.complete(verbose=True)
 
 
 def load_omim(filename: str, force: bool):
@@ -448,6 +445,7 @@ def load_omim(filename: str, force: bool):
 
     file_hash = file_md5sum(filename)
     ontology_builder.ensure_hash_changed(data_hash=file_hash)  # don't re-import if hash hasn't changed
+    ontology_builder.cache_everything()
 
     with open(filename, "r") as csv_file:
         csv_reader = csv.reader(csv_file, delimiter='\t')
@@ -511,7 +509,6 @@ def load_omim(filename: str, force: bool):
                     relation=OntologyRelation.REPLACED
                 )
     ontology_builder.complete(purge_old_terms=True)
-    ontology_builder.report()
 
 
 def sync_hgnc():
@@ -547,8 +544,8 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument('--force', action="store_true")
-        parser.add_argument('--mondo_json', required=False)
-        parser.add_argument('--hpo_owl', required=False)
+        parser.add_argument('--mondo', required=False, help="mondo json file")
+        parser.add_argument('--hpo', required=False, help="hpo owl file")
         parser.add_argument('--omim_frequencies', required=False)  # note this is deprecated
         parser.add_argument('--phenotype_to_genes', required=False)
         parser.add_argument('--hgnc_sync', action="store_true", required=False)
@@ -582,13 +579,13 @@ class Command(BaseCommand):
             except OntologyBuilderDataUpToDateException:
                 print("BioMart File hash is the same as last import")
 
-        if filename := options.get("mondo_json"):
+        if filename := options.get("mondo"):
             try:
                 load_mondo(filename, force)
             except OntologyBuilderDataUpToDateException:
                 print("MONDO File hash is the same as last import")
 
-        if filename := options.get("hpo_owl"):
+        if filename := options.get("hpo"):
             try:
                 load_hpo(filename, force)
             except OntologyBuilderDataUpToDateException:

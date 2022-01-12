@@ -69,7 +69,7 @@ def _update_gene_relations(gene_symbol: str):
                                 if result.cregx in (DbRegexes.OMIM, DbRegexes.MONDO):
                                     add_term_if_valid(result.id_fixed)
 
-            ontology_builder.complete()
+            ontology_builder.complete(verbose=False)
 
         except OntologyBuilderDataUpToDateException:
             pass

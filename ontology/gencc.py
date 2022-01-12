@@ -43,8 +43,9 @@ def load_gencc(file_or_filename, file_hash: str, force: bool, url: str = None) -
                                        processor_version=7,
                                        force_update=force)
     ontology_builder.ensure_hash_changed(data_hash=file_hash)  # don't re-import if hash hasn't changed
-    print("About to load gencc")
+    ontology_builder.cache_everything()
 
+    print("About to load gencc")
     gencc_df: DataFrame = df_nan_to_none(read_csv(file_or_filename, sep=","))
 
     # only want strong and definitive relationships
@@ -106,5 +107,5 @@ def load_gencc(file_or_filename, file_hash: str, force: bool, url: str = None) -
                 }
             )
 
-    ontology_builder.complete()
+    ontology_builder.complete(verbose=True)
     return num_gene_disease_relationships
