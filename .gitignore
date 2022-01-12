@@ -12,3 +12,6 @@ dump.rdb
 watcherTasks.xml
 /sapath
 lint.txt
+/.idea/csv-plugin.xml
+/bin/
+/pyvenv.cfg
