@@ -271,12 +271,12 @@ python3 manage.py import_gene_annotation --annotation-consortium=RefSeq --genome
                 <div class="mt-4">
                     <b>MONDO</b><br/>mondo.json can be downloaded from Download mondo.owl from <a href="http://www.obofoundry.org/ontology/mondo.html">Monarch Disease Ontology</a> on OBO foundry.<br/>
 <code>wget http://purl.obolibrary.org/obo/mondo.json
-{{ python_command }} manage.py ontology_import --mondo_json (location of mondo.json)</code>
+{{ python_command }} manage.py ontology_import --mondo (location of mondo.json)</code>
                 </div>
                 <div class="mt-4">
                     <b>HPO</b><br/>hp.owl can be downloaded from
 <code>wget https://raw.githubusercontent.com/obophenotype/human-phenotype-ontology/master/hp.owl
-{{ python_command }} manage.py ontology_import --hpo_owl (location of hp.owl) </code>
+{{ python_command }} manage.py ontology_import --hpo (location of hp.owl) </code>
                 </div>
                 <div class="mt-4">
                     <b>OMIM</b><br/>Direct OMIM import requires a license, but will be populated via MONDO, HPO Diseases File and biomart<br/>
