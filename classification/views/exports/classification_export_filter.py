@@ -334,12 +334,12 @@ class ClassificationFilter:
             cms = cms.exclude(classification__withdrawn=True)
 
         if labs := self.include_sources:
-            cms.filter(classification__lab__in=labs)
+            cms = cms.filter(classification__lab__in=labs)
         elif self.exclude_sources:
             if exclude_orgs := [org for org in self.exclude_sources if isinstance(org, Organization)]:
-                cms.exclude(classification__lab__org__in=exclude_orgs)
+                cms = cms.exclude(classification__lab__org__in=exclude_orgs)
             if exclude_labs := [lab for lab in self.exclude_sources if isinstance(lab, Lab)]:
-                cms.exclude(classification__lab__in=exclude_labs)
+                cms = cms.exclude(classification__lab__in=exclude_labs)
 
         cms = cms.order_by('-classification__allele_id', '-classification__id')
         cms = cms.select_related('classification', 'classification__lab', 'classification__lab__organization')
