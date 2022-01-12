@@ -1,7 +1,5 @@
 from shlex import shlex
 
-import HTSeq
-
 from library import file_utils, genomics
 
 BED_DETAILS = 'bedDetail'
@@ -122,6 +120,7 @@ class BedFileReader:
         chrom = data["chrom"]
         if self.want_chr is not None:  # format chrom
             chrom = genomics.format_chrom(chrom, self.want_chr)
+        import HTSeq
         iv = HTSeq.GenomicInterval(chrom, start, end)
         name = data.get("name", "")
         score = data.get("score", 0.0)  # Using "." here causes intron to not be displayed correctly

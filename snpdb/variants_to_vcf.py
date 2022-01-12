@@ -1,8 +1,6 @@
 from collections import Counter
 from typing import Dict
 
-from bgzip import BGZipWriter
-
 from snpdb.models import VCF, Zygosity, Sample
 from snpdb.vcf_export_utils import get_vcf_header_from_contigs, get_vcf_header_lines
 
@@ -98,6 +96,7 @@ def vcf_export_to_file(vcf: VCF, exported_vcf_filename, original_qs=None, sample
     sample_zygosity_count = [Counter() for _ in samples]
 
     with open(exported_vcf_filename, "wb") as raw:
+        from bgzip import BGZipWriter
         with BGZipWriter(raw) as f:
             for line in header_lines:
                 line_bytes = (line + '\n').encode()
