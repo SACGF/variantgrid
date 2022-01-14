@@ -27,11 +27,28 @@ class ConditionTextColumns(DatatableConfig):
             RichColumn(key="classifications_count", label="Classification Count", orderable=True, default_sort=SortOrder.DESC, sort_keys=['classifications_count', '-normalized_text']),
             RichColumn(key="classifications_count_outstanding", label="Classifications Outstanding", default_sort=SortOrder.DESC, orderable=True, sort_keys=['classifications_count_outstanding', '-normalized_text'])
         ]
+        if not self.lab_id:
+            self.rich_columns.insert(
+                0,
+                RichColumn(key="lab__name", label='Lab', orderable=True, sort_keys=['lab__name', 'normalized_text'])
+            )
+
+    @property
+    def lab_id(self) -> Optional[int]:
+        if lab_id := self.get_query_param("lab_id"):
+            if lab_int := int(lab_id):  # 0 means all user labs
+                return lab_int
+        return None
 
     def get_initial_queryset(self):
         # exclude where we've auto matched and have 0 outstanding left
         cts_qs: QuerySet[ConditionText] = get_objects_for_user(self.user, ConditionText.get_read_perm(), klass=ConditionText, accept_global_perms=True)
-        cts_qs = cts_qs.filter(lab_id=self.get_query_param("lab_id"))
+
+        filter_labs = Lab.valid_labs_qs(self.user, admin_check=True)
+        if lab_id := self.lab_id:
+            filter_labs = filter_labs.filter(pk=lab_id)
+
+        cts_qs = cts_qs.filter(lab_id__in=filter_labs)
         return cts_qs
 
     def filter_queryset(self, qs: QuerySet) -> QuerySet:
@@ -48,20 +65,23 @@ class ConditionTextColumns(DatatableConfig):
 
 
 def condition_matchings_view(request, lab_id: Optional[int] = None):
-    selected_lab: Lab
+    selected_lab: Optional[Lab] = None
     if lab_id:
         selected_lab = Lab.valid_labs_qs(request.user, admin_check=True).get(pk=lab_id)
     else:
-        selected_lab = UserSettings.get_for_user(request.user).default_lab_safe()
-        return redirect(reverse('condition_matchings_lab', kwargs={'lab_id': selected_lab.pk}))
+        all_labs = Lab.valid_labs_qs(request.user, admin_check=True)
+        if len(all_labs) == 1:
+            return redirect(reverse('condition_matchings_lab', kwargs={'lab_id': all_labs[0].pk}))
 
     # no longer restrict to shared only
-    relevant_records = Classification.objects.filter(withdrawn=False, lab_id=selected_lab)
+    relevant_records = Classification.objects.filter(withdrawn=False)
+    if selected_lab:
+        relevant_records = relevant_records.filter(lab=selected_lab)
     missing_condition_count = relevant_records.filter(condition_resolution__isnull=True).count()
     matched_condition_count = relevant_records.filter(condition_resolution__isnull=False).count()
 
     return render(request, 'classification/condition_matchings.html', context={
-        'selected_lab': selected_lab,
+        'selected_lab': selected_lab.pk if selected_lab else 0,
         'matched_condition_count': matched_condition_count,
         'missing_condition_count': missing_condition_count
     })

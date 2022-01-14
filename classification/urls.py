@@ -62,7 +62,7 @@ urlpatterns = [
 
     perm_path('condition_matchings', condition_matchings_view, name='condition_matchings'),
     perm_path('condition_matchings/<int:lab_id>', condition_matchings_view, name='condition_matchings_lab'),
-    perm_path('condition_matching/datatable', DatabaseTableView.as_view(column_class=ConditionTextColumns), name='condition_text_datatable'),
+    perm_path('condition_matching/datatable/<int:lab_id>', DatabaseTableView.as_view(column_class=ConditionTextColumns), name='condition_text_datatable'),
     perm_path('condition_matching/<int:pk>', condition_matching_view, name='condition_matching'),
 
     perm_path('condition_match_test', condition_match_test_view, name='condition_match_test'),

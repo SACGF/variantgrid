@@ -62,15 +62,17 @@
 <div class="container">
     {% lab_picker view_name="classification_dashboard" selected_lab=dlab.lab_id all_option=True %}
 
-    {% labelled row_css="my-4" label="Email Preview" admin_only=True %}
-        <div class="link-toolbar">
-            <a class="download-link type-csv" href="{% url 'summary_email_html' %}">HTML</a>
-            <a class="download-link type-json" href="{% url 'summary_email_text' %}">TEXT</a>
-        </div>
-    {% endlabelled %}
+    {% if not dlab.lab_id %}
+        {% labelled row_css="my-4" label="Email Preview" admin_only=True %}
+            <div class="link-toolbar">
+                <a class="download-link type-csv" href="{% url 'summary_email_html' %}">HTML</a>
+                <a class="download-link type-json" href="{% url 'summary_email_text' %}">TEXT</a>
+            </div>
+        {% endlabelled %}
+    {% endif %}
 
     {% if use_shared %}
-            {% if dlab.shared_classifications.count %}
+        {% if dlab.shared_classifications.count %}
                 {% page_help_embedded title="Shared Classifications Over Time" %}
                 This graphs shows how many shared classifications your lab submitted over time.
             {% end_page_help_embedded %}
