@@ -14,6 +14,7 @@ from classification.models import classification_flag_types, Classification, Cla
 from classification.models.clinical_context_models import CS_TO_NUMBER
 from flags.models import FlagComment
 from library.utils import delimited_row, IteratableStitcher, IterableTransformer
+from snpdb.models import Lab
 
 
 @total_ordering
@@ -182,9 +183,10 @@ class ClassificationAccumulationGraph:
 
             return ClassificationAccumulationGraph._SummarySnapshot(at=at, counts=counts)
 
-    def __init__(self, mode: AccumulationReportMode, shared_only: bool = True):
+    def __init__(self, mode: AccumulationReportMode, shared_only: bool = True, labs: Optional[List[Lab]] = None):
         self.mode = mode
         self.shared_only = shared_only
+        self.labs = labs
 
     @property
     def share_levels(self):
@@ -193,7 +195,7 @@ class ClassificationAccumulationGraph:
         else:
             return ShareLevel.ALL_LEVELS
 
-    def withdrawn_iterable(self):
+    def withdrawn_iterable(self) -> IterableTransformer[ClassificationSummary]:
         flag_collection_id_to_allele_classification: Dict[int, Tuple[int, int, Optional[str]]] = dict()
 
         flag_qs = FlagComment.objects.filter(flag__flag_type=classification_flag_types.classification_withdrawn) \
@@ -203,12 +205,17 @@ class ClassificationAccumulationGraph:
         def transformer(value_tuple):
             status, created, flag_collection_id = value_tuple
             if flag_collection_id not in flag_collection_id_to_allele_classification:
-                if classification_match := Classification.objects \
-                        .values_list("variant__variantallele__allele_id", "id", "lab__name") \
-                        .filter(lab__external=False) \
+
+                find_class_qs = Classification.objects \
+                        .values_list("allele_id", "id", "lab__name") \
                         .filter(flag_collection_id=flag_collection_id) \
-                        .filter(share_level__in=self.share_levels) \
-                        .first():
+                        .filter(share_level__in=self.share_levels)
+                if labs := self.labs:
+                    find_class_qs = find_class_qs.filter(lab__in=labs)
+                else:
+                    find_class_qs = find_class_qs.filter(lab__external=False)
+
+                if classification_match := find_class_qs.first():
                     flag_collection_id_to_allele_classification[flag_collection_id] = classification_match
                 else:
                     flag_collection_id_to_allele_classification[flag_collection_id] = (0, 0, None)
@@ -225,13 +232,16 @@ class ClassificationAccumulationGraph:
     def classification_iterable(self):
         cm_qs_summary = ClassificationModification.objects.filter(
             published=True,
-            classification__variant__isnull=False,
-            share_level__in=self.share_levels,
-            classification__lab__external=False).order_by(
+            classification__allele__isnull=False,
+            share_level__in=self.share_levels).order_by(
             "created").values_list("classification_id", "created",
                                             "published_evidence__clinical_significance__value",
-                                            "classification__variant__variantallele__allele_id",
+                                            "classification__allele_id",
                                             "classification__lab__name")
+        if labs := self.labs:
+            cm_qs_summary = cm_qs_summary.filter(classification__lab__in=labs)
+        else:
+            cm_qs_summary = cm_qs_summary.filter(classification__lab__external=False)
 
         def classification_transformer(results_tuple):
             c_id, created, clinical_significance, allele_id, lab_name = results_tuple
@@ -250,7 +260,7 @@ class ClassificationAccumulationGraph:
         running_accum = self._RunningAccumulation(mode=self.mode)
         sub_totals: List[ClassificationAccumulationGraph._SummarySnapshot] = list()
 
-        stitcher = IteratableStitcher(
+        stitcher = IteratableStitcher[ClassificationSummary](
             iterables=[
                 self.withdrawn_iterable(),
                 self.classification_iterable()
@@ -259,7 +269,10 @@ class ClassificationAccumulationGraph:
 
         start_date = None
         next_date = None
+
+        summary: ClassificationSummary
         for summary in stitcher:
+
             if not start_date:
                 start_date = summary.at.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
                 next_date = start_date + time_delta
@@ -280,19 +293,21 @@ class ClassificationAccumulationGraph:
 
 def _iter_report_list(
         mode: AccumulationReportMode = AccumulationReportMode.Classification,
-        shared_only: bool = True):
-    cag = ClassificationAccumulationGraph(mode=mode, shared_only=shared_only)
+        shared_only: bool = True,
+        labs: Optional[List[Lab]] = None
+        ):
+
+    cag = ClassificationAccumulationGraph(mode=mode, shared_only=shared_only, labs=labs)
     report_data = cag.report()
 
     valid_labs = set()
     for row in report_data:
         for key in [key for key in row.counts.keys() if isinstance(key, str)]:
             valid_labs.add(key)
+    lab_list = sorted(valid_labs)
 
-    lab_list = list(valid_labs)
-    lab_list.sort()
-
-    header = ["Date"] + [allele_status_data[status].label for status in allele_status_report]
+    header = ["Date"]
+    header.extend([allele_status_data[status].label for status in allele_status_report])
     header.extend(lab_list)
 
     yield header
@@ -317,8 +332,8 @@ def download_report(request):
     return response
 
 
-def get_accumulation_graph_data(mode: AccumulationReportMode = AccumulationReportMode.Classification) -> List[Dict]:
-    data = list(_iter_report_list(mode=mode))
+def get_accumulation_graph_data(mode: AccumulationReportMode = AccumulationReportMode.Classification, labs: Optional[List[Lab]] = None) -> Dict[str, Any]:
+    data = list(_iter_report_list(mode=mode, labs=labs))
     header = data[0]
     rows = data[1:]
     df = pd.DataFrame(rows, columns=header)
