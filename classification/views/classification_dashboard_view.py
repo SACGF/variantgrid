@@ -80,7 +80,7 @@ class ClassificationDashboard:
 
     @lazy
     def outstanding_plain_text_qs(self) -> QuerySet['ConditionText']:
-        return ConditionText.objects.filter(lab__in=self.labs).order_by('-classifications_count_outstanding')
+        return ConditionText.objects.filter(lab__in=self.labs, classifications_count_outstanding__gt=0).order_by('-classifications_count_outstanding')
 
     def accumulation_graph_data(self):
         return get_accumulation_graph_data(AccumulationReportMode.Classification, labs=self.labs).get('lab')

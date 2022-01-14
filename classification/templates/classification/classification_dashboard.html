@@ -93,31 +93,25 @@
             </p>
         {% end_page_help_embedded %}
 
-        <div class="row">
-            <div class="col-6">
-                {% labelled hint="tiny" label="Matched & Shared Classifications" %}
-                    {{ dlab.shared_classifications.count | number:'S' }}
-                {% endlabelled %}
+        {% labelled hint="tiny" label="Matched & Shared Classifications" %}
+            {{ dlab.shared_classifications.count | number:'S' }}
+        {% endlabelled %}
 
-                {% labelled hint="tiny"  label="Across Unique Alleles" %}
-                    {{ dlab.unique_classified_alleles_count | number:'S' }}
-                {% endlabelled %}
-            </div>
-            <div class="col-6">
-                {% if 'clinvar_key_summary'|is_view_enabled %}
-                    {% labelled hint="tiny"  label="Classifications Uploaded to Clinvar" %}
-                        {{ dlab.uploads_to_clinvar_qs.count | number:'S' }}
-                        <a class="hover-link" href="{% url 'clinvar_key_summary' %}"><small class="form-text">Review your lab's ClinVar status here.</small></a>
-                    {% endlabelled %}
-                {% endif %}
-                {% if 'condition_matchings_lab'|is_view_enabled %}
-                    {% labelled hint="tiny"  label="Classifications w Unresolved Condition Texts" %}
-                        {{ dlab.outstanding_plain_text_qs.count | number:'W' }}
-                        <a class="hover-link" href="{% url 'condition_matchings_lab' dlab.lab_id %}"><small class="form-text">Review your lab's unresolved condition text here.</small></a>
-                    {% endlabelled %}
-                {% endif %}
-            </div>
-        </div>
+        {% labelled hint="tiny"  label="Across Unique Alleles" %}
+            {{ dlab.unique_classified_alleles_count | number:'S' }}
+        {% endlabelled %}
+        {% if 'clinvar_key_summary'|is_view_enabled %}
+            {% labelled hint="tiny"  label="Classifications Uploaded to Clinvar" %}
+                {{ dlab.uploads_to_clinvar_qs.count | number:'S' }}
+                <a class="hover-link" href="{% url 'clinvar_key_summary' %}"><small class="form-text">Review your lab's ClinVar status here.</small></a>
+            {% endlabelled %}
+        {% endif %}
+        {% if 'condition_matchings_lab'|is_view_enabled %}
+            {% labelled hint="tiny"  label="Unresolved Condition Texts" %}
+                {{ dlab.outstanding_plain_text_qs.count | number:'W' }}
+                <a class="hover-link" href="{% url 'condition_matchings_lab' dlab.lab_id %}"><small class="form-text">Review your lab's unresolved condition text here.</small></a>
+            {% endlabelled %}
+        {% endif %}
     {% endif %}
 
     {% if 'discordance_report'|is_view_enabled %}
