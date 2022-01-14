@@ -8,97 +8,194 @@
 {% load ui_utils %}
 {% load ui_menu_bars %}
 {% load ui_tabs_builder %}
-{% block title %}Classification Issues{% endblock %}
+{% load lab_tags %}
+{% load classification_tags %}
+{% block title %}Classification Dashboard{% endblock %}
 {% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
-{% block head %}
-    <script>
-        function classificationDiscordant(data) {
-            data.flags = JSON.stringify(['classification_discordant']);
-            data.my_labs = "true";
-        }
-        function classificationMatchingVariant(data) {
-            data.flags = JSON.stringify(['classification_matching_variant', 'classification_matching_variant_warning', 'classification_transcript_version_change']);
-            data.my_labs = "true";
-        }
-        function classificationComments(data) {
-            data.flags = JSON.stringify(['classification_suggestion', 'classification_internal_review', 'classification_significance_change']);
-            data.my_labs = "true";
-        }
-        function classificationUnshared(data) {
-            data.flags = JSON.stringify(['classification_unshared']);
-            data.my_labs = "true";
-        }
-        function classificationWithdrawn(data) {
-            data.flags = JSON.stringify(['classification_withdrawn']);
-            data.my_labs = "true";
-        }
-        function classificationExcludeClinVar(data) {
-            data.flags = JSON.stringify(['classification_not_public']);
-            data.my_labs = "true";
-        }
-        $(document).ready(() => {
-            $('a[data-toggle="tab"]').on('shown.bs.tab', function (event) {
-                Flags.instance.init({userId: '{{user.id}}', filter: '.active', forceRender: true});
-            });
-            $('.dataTable').on('draw.dt', () => {
-                Flags.instance.init({userId: '{{user.id}}', filter: '.active', forceRender: true});
-            });
-        });
-    </script>
-{% endblock %}
-
 {% block content %}
-    <div class="container-table" id="dashboard-links">
-        {% page_help_embedded page_id='classification/issues_help' title='Classification Issues' %}
+<script type="text/javascript" src="{% static 'js/lib/plotly-latest.min.js' %}"></script>
+<script type="text/javascript" src="{% static 'js/plotly_helper.js' %}"></script>
+<script>
+    // for showing issues
+    function classificationDiscordant(data) {
+        data.flags = JSON.stringify(['classification_discordant']);
+        data.labs = {{ dlab.lab_ids_str | jsonify }};
+    }
+    function classificationMatchingVariant(data) {
+        data.flags = JSON.stringify(['classification_matching_variant', 'classification_matching_variant_warning', 'classification_transcript_version_change']);
+        data.labs = {{ dlab.lab_ids_str | jsonify }};
+    }
+    function classificationComments(data) {
+        data.flags = JSON.stringify(['classification_suggestion', 'classification_internal_review', 'classification_significance_change']);
+        data.labs = {{ dlab.lab_ids_str | jsonify }};
+    }
+    function classificationUnshared(data) {
+        data.flags = JSON.stringify(['classification_unshared']);
+        data.labs = {{ dlab.lab_ids_str | jsonify }};
+    }
+    function classificationWithdrawn(data) {
+        data.flags = JSON.stringify(['classification_withdrawn']);
+        data.labs = {{ dlab.lab_ids_str | jsonify }};
+    }
+    function classificationExcludeClinVar(data) {
+        data.flags = JSON.stringify(['classification_not_public']);
+        data.labs = {{ dlab.lab_ids_str | jsonify }};
+    }
+    $(document).ready(() => {
+        $('a[data-toggle="tab"]').on('shown.bs.tab', function (event) {
+            Flags.instance.init({userId: '{{user.id}}', filter: '.active', forceRender: true});
+        });
+        $('.dataTable').on('draw.dt', () => {
+            Flags.instance.init({userId: '{{user.id}}', filter: '.active', forceRender: true});
+        });
+    });
+
+    function plotCumulativeClassifications(selector, cum_data, title, width, height) {
+        let layout = defaultLayout(title, width, height);
+        layout["xaxis"] = {"nticks": 10}; // keep under 20 dates so they don't get too crowded
+        layout["yaxis"] = {
+            "range": [0, {{ dlab.shared_classifications.count }} + 10]
+        };
+        Plotly.newPlot(selector, cum_data, layout);
+    }
+</script>
+<div class="container">
+    {% lab_picker view_name="classification_dashboard" selected_lab=dlab.lab_id all_option=True %}
+
+    {% labelled row_css="my-4" label="Email Preview" admin_only=True %}
+        <div class="link-toolbar">
+            <a class="download-link type-csv" href="{% url 'summary_email_html' %}">HTML</a>
+            <a class="download-link type-json" href="{% url 'summary_email_text' %}">TEXT</a>
+        </div>
+    {% endlabelled %}
+
+    {% if use_shared %}
+            {% if dlab.shared_classifications.count %}
+                {% page_help_embedded title="Shared Classifications Over Time" %}
+                This graphs shows how many shared classifications your lab submitted over time.
+            {% end_page_help_embedded %}
+
+            <div id="accumulation-graph"></div>
+            <script>
+                let graph_width = 1000;
+                let graph_height = 400;
+                let accumulation_data = {{ dlab.accumulation_graph_data | jsonify }};
+                plotCumulativeClassifications("accumulation-graph", accumulation_data, "", graph_width, graph_height)
+            </script>
+        {% endif %}
+
+        {% comment %}section only makes sense for where Shared is king{% endcomment %}
+        {% page_help_embedded title="Classification Counts" %}
             <p>
-                This page will list all classifications belonging to your lab/s that have flags raised against them.<br/>
-                Each classification flag indicates that there is an action that needs to be performed against the classification.<br/>
-                Clicking on each flag will give you instructions on what needs to be done to resolve it.
-            </p>
-            <p>
-                Flags range from issues with variant matching, to discordances or suggestions.<br/>
+            See the grand total of classifications provided to {{ SITE_NAME }} by your lab.
             </p>
         {% end_page_help_embedded %}
-        {% labelled row_css="my-4" label="Email Preview" admin_only=True %}
-            <div class="link-toolbar">
-                <a class="download-link type-csv" href="{% url 'summary_email_html' %}">HTML</a>
-                <a class="download-link type-json" href="{% url 'summary_email_text' %}">TEXT</a>
+
+        <div class="row">
+            <div class="col-6">
+                {% labelled hint="tiny" label="Matched & Shared Classifications" %}
+                    {{ dlab.shared_classifications.count | number:'S' }}
+                {% endlabelled %}
+
+                {% labelled hint="tiny"  label="Across Unique Alleles" %}
+                    {{ dlab.unique_classified_alleles_count | number:'S' }}
+                {% endlabelled %}
             </div>
-        {% endlabelled %}
-
-        {% labelled label="Showing Issues for Your Labs" %}{% for lab in labs %}{% if not forloop.first %}, {% endif %}{{ lab }}{% endfor %}{% endlabelled %}
-        <a class="download-link type-csv" href="{% url 'classification_dashboard_download' %}">Download all issues requiring action</a>
-
-        <p class="text-info">For instructions on how to fix the outstanding actions, click on the icons in the flag column for each classification.</p>
-
-        <div class="mt-4">
-            {% ui_register_tab_embedded tab_set="classification_issues" label="Discordance" badge=counts.classifications.discordant %}
-                <table id="classifications-discordant" data-datatable-url="{% url 'classification_datatables' %}" class="sticky-header classification-table" data-datatable-data="classificationDiscordant"></table>
-            {% end_ui_register_tab_embedded %}
-
-            {% ui_register_tab_embedded tab_set="classification_issues" label="Suggestion/Internal Review/Clin Change" badge=counts.classifications.comments %}
-                <table id="classifications-comment" data-datatable-url="{% url 'classification_datatables' %}" class="sticky-header classification-table" data-datatable-data="classificationComments"></table>
-            {% end_ui_register_tab_embedded %}
-
-            {% ui_register_tab_embedded tab_set="classification_issues" label="Variant Matching Issues" badge=counts.classifications.variant_matching %}
-                <table id="classifications-matching" data-datatable-url="{% url 'classification_datatables' %}" class="sticky-header classification-table" data-datatable-data="classificationMatchingVariant"></table>
-            {% end_ui_register_tab_embedded %}
-
-            {% ui_register_tab_embedded tab_set="classification_issues" label="Unshared" badge=counts.classifications.unshared %}
-                <table id="classifications-unshared" data-datatable-url="{% url 'classification_datatables' %}" class="sticky-header classification-table" data-datatable-data="classificationUnshared"></table>
-            {% end_ui_register_tab_embedded %}
-
-            {% ui_register_tab_embedded tab_set="classification_issues" label="Withdrawn" badge=counts.classifications.withdrawn %}
-                <table id="classifications-withdrawn" data-datatable-url="{% url 'classification_datatables' %}" class="sticky-header classification-table" data-datatable-data="classificationWithdrawn"></table>
-            {% end_ui_register_tab_embedded %}
-
-            {% if clinvar_export_enabled %}
-                {% ui_register_tab_embedded tab_set="classification_issues" label="Exclude from ClinVar" badge=counts.classifications.clinvar_exclude %}
-                    <table id="classifications-exclude-clinvar" data-datatable-url="{% url 'classification_datatables' %}" class="sticky-header classification-table" data-datatable-data="classificationExcludeClinVar"></table>
-                {% end_ui_register_tab_embedded %}
-            {% endif %}
-
-            {% ui_render_tabs tab_set="classification_issues" %}
+            <div class="col-6">
+                {% if 'clinvar_key_summary'|is_view_enabled %}
+                    {% labelled hint="tiny"  label="Classifications Uploaded to Clinvar" %}
+                        {{ dlab.uploads_to_clinvar_qs.count | number:'S' }}
+                        <a class="hover-link" href="{% url 'clinvar_key_summary' %}"><small class="form-text">Review your lab's ClinVar status here.</small></a>
+                    {% endlabelled %}
+                {% endif %}
+                {% if 'condition_matchings_lab'|is_view_enabled %}
+                    {% labelled hint="tiny"  label="Classifications w Unresolved Condition Texts" %}
+                        {{ dlab.outstanding_plain_text_qs.count | number:'W' }}
+                        <a class="hover-link" href="{% url 'condition_matchings_lab' dlab.lab_id %}"><small class="form-text">Review your lab's unresolved condition text here.</small></a>
+                    {% endlabelled %}
+                {% endif %}
+            </div>
         </div>
+    {% endif %}
+
+    {% if 'discordance_report'|is_view_enabled %}
+        {% page_help_embedded title="Outstanding Discordances" %}
+            Below is a list of all outstanding discordances where your lab is involved.
+        {% end_page_help_embedded %}
+        {% if not dlab.discordances_qs %}
+            <div class="no-value">There are no outstanding discordances for this lab {{ 'S' | severity_icon }}</div>
+        {% else %}
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th class="text-left">Discordance Detected</th>
+                        <th class="text-left">c.HGVS</th>
+                        <th class="text-left">Labs</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for dr in dlab.discordances_qs %}
+                    <tr>
+                        <td class="text-center"><a href="{% url 'discordance_report' dr.id %}">{{ dr.id }}</a></td>
+                        <td>{% timestamp dr.created %}</td>
+                        <td>{% for c_hgvs in dr.all_c_hgvs %}
+                                <div>{% c_hgvs c_hgvs %}</div>
+                            {% endfor %}
+                        </td>
+                        <td>{% for lab in dr.all_labs %}
+                            <div>{{ lab.name }}</div>
+                            {% endfor %}
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        {% endif %}
+    {% endif %}
+
+    {% page_help_embedded title="Flagged Classifications" %}
+        <p>
+            This page will list all classifications belonging to your lab/s that have flags raised against them.
+            Each classification flag indicates that there is an action that needs to be performed against the classification.
+            Clicking on each flag will give you instructions on what needs to be done to resolve it.
+        </p><p>
+            Flags range from issues with variant matching, to discordances or suggestions.
+        </p>
+    {% end_page_help_embedded %}
+
+    <a class="download-link type-csv" href="{% url 'classification_dashboard_download' dlab.lab_id %}">Download all issues requiring action</a>
+    <p class="text-info">For instructions on how to fix the outstanding actions, click on the icons in the flag column for each classification.</p>
+
+    <div class="mt-4">
+        {% ui_register_tab_embedded tab_set="classification_issues" label="Discordance" badge=dlab.counts.discordant %}
+            <table id="classifications-discordant" data-datatable-url="{% url 'classification_datatables' %}" class="sticky-header classification-table" data-datatable-data="classificationDiscordant"></table>
+        {% end_ui_register_tab_embedded %}
+
+        {% ui_register_tab_embedded tab_set="classification_issues" label="Suggestion/Internal Review/Clin Change" badge=dlab.counts.comments %}
+            <table id="classifications-comment" data-datatable-url="{% url 'classification_datatables' %}" class="sticky-header classification-table" data-datatable-data="classificationComments"></table>
+        {% end_ui_register_tab_embedded %}
+
+        {% ui_register_tab_embedded tab_set="classification_issues" label="Variant Matching Issues" badge=dlab.counts.variant_matching %}
+            <table id="classifications-matching" data-datatable-url="{% url 'classification_datatables' %}" class="sticky-header classification-table" data-datatable-data="classificationMatchingVariant"></table>
+        {% end_ui_register_tab_embedded %}
+
+        {% ui_register_tab_embedded tab_set="classification_issues" label="Unshared" badge=dlab.counts.unshared %}
+            <table id="classifications-unshared" data-datatable-url="{% url 'classification_datatables' %}" class="sticky-header classification-table" data-datatable-data="classificationUnshared"></table>
+        {% end_ui_register_tab_embedded %}
+
+        {% ui_register_tab_embedded tab_set="classification_issues" label="Withdrawn" badge=dlab.counts.withdrawn %}
+            <table id="classifications-withdrawn" data-datatable-url="{% url 'classification_datatables' %}" class="sticky-header classification-table" data-datatable-data="classificationWithdrawn"></table>
+        {% end_ui_register_tab_embedded %}
+
+        {% if clinvar_export_enabled %}
+            {% ui_register_tab_embedded tab_set="classification_issues" label="Exclude from ClinVar" badge=dlab.counts.clinvar_exclude %}
+                <table id="classifications-exclude-clinvar" data-datatable-url="{% url 'classification_datatables' %}" class="sticky-header classification-table" data-datatable-data="classificationExcludeClinVar"></table>
+            {% end_ui_register_tab_embedded %}
+        {% endif %}
+
+        {% ui_render_tabs tab_set="classification_issues" %}
     </div>
-{% endblock %}
+
+</div>
+{% endblock content %}

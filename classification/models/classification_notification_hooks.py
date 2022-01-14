@@ -19,7 +19,7 @@ def notify_discordance_change(discordance_report: DiscordanceReport, **kwargs):
 def send_discordance_notification(discordance_report: DiscordanceReport):
     all_labs = discordance_report.all_actively_involved_labs()
     all_lab_names = ", ".join(lab.name for lab in all_labs)
-    groups = ClassificationGroups(discordance_report.all_classification_modifications())
+    groups = ClassificationGroups(discordance_report.all_classification_modifications)
     report_url = get_url_from_view_path(
         reverse('discordance_report', kwargs={'report_id': discordance_report.id}),
     )

@@ -18,7 +18,9 @@ from classification.models.clinical_context_models import ClinicalContext
 from classification.models.flag_types import classification_flag_types
 from flags.models.enums import FlagStatus
 from flags.models.models import FlagComment
-from snpdb.models import Lab
+from genes.hgvs import CHGVS
+from snpdb.genome_build_manager import GenomeBuildManager
+from snpdb.models import Lab, GenomeBuild
 
 discordance_change_signal = django.dispatch.Signal()  # args: "discordance_report"
 
@@ -209,11 +211,26 @@ class DiscordanceReport(TimeStampedModel):
                 classifications.add(dr.classification_original.classification.id)
         return classifications
 
+    @lazy
     def all_classification_modifications(self) -> List[ClassificationModification]:
         vcms: List[ClassificationModification] = list()
         for dr in DiscordanceReportClassification.objects.filter(report=self):
             vcms.append(dr.classfication_effective)
         return vcms
+
+    def all_c_hgvs(self, genome_build: Optional[GenomeBuild] = None) -> List[CHGVS]:
+        if not genome_build:
+            genome_build = GenomeBuildManager.get_current_genome_build()
+        c_hgvs = set()
+        for cm in self.all_classification_modifications:
+            c_hgvs.add(cm.c_hgvs_best(genome_build))
+        return sorted(c_hgvs)
+
+    def all_labs(self):
+        labs = set()
+        for cm in self.all_classification_modifications:
+            labs.add(cm.classification.lab)
+        return sorted(labs)
 
 
 class DiscordanceAction:

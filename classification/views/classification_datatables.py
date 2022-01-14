@@ -195,9 +195,12 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
             exclude_withdrawn=exclude_withdrawn)
 
         # filtering to your labs only is done on the
-        if my_labs := self.get_query_param('my_labs'):
-            if my_labs == "true":
+        if labs := self.get_query_param('labs'):
+            if labs == "mine":
                 initial_qs = initial_qs.filter(classification__lab__in=Lab.valid_labs_qs(user=self.user, admin_check=True))
+            else:
+                lab_ids = [int(lab_id.strip()) for lab_id in labs.split(',')]
+                initial_qs = initial_qs.filter(classification__lab_id__in=lab_ids)
 
         # Make an annotated column c_hgvs which is the first non null value of
         # user's normalised preference (e.g. 37), the alternative normalised (e.g. 38) the imported c.hgvs

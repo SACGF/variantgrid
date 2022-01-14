@@ -5,7 +5,7 @@ from classification.views import clinvar_export_view
 from classification.views import views, classification_dashboard_view, \
     classification_export_view, views_autocomplete, classification_import_upload_view, \
     classification_accumulation_graph
-from classification.views.classification_dashboard_view import problem_download
+from classification.views.classification_dashboard_view import issues_download
 from classification.views.classification_datatables import ClassificationColumns
 from classification.views.classification_email_view import summary_email_preview_html, \
     summary_email_preview_text
@@ -80,10 +80,15 @@ urlpatterns = [
 
     perm_path('summary_email', summary_email_preview_html, name='summary_email_html'),
     perm_path('summary_email_text', summary_email_preview_text, name='summary_email_text'),
-    perm_path('dashboard', classification_dashboard_view.dashboard, name='classification_dashboard'),
-    # giving the dashboard a mode has been deprecated, but a lot of refernces still exist
-    perm_path('dashboard/all', classification_dashboard_view.dashboard, name="classification_dashboard_all"),
-    perm_path('dashboard_download', problem_download, name='classification_dashboard_download'),
+
+
+    perm_path('dashboard', classification_dashboard_view.classification_dashboard, name='classification_dashboard'),
+    perm_path('dashboard/<int:lab_id>', classification_dashboard_view.classification_dashboard, name='classification_dashboard'),
+    perm_path('dashboard_download', issues_download, name='classification_dashboard_download'),
+    perm_path('dashboard_download/<int:lab_id>', issues_download, name='classification_dashboard_download'),
+    # legacy URL
+    perm_path('dashboard/all', classification_dashboard_view.classification_dashboard, name="classification_dashboard_all"),
+
 
     perm_path('accumulation_data', classification_accumulation_graph.download_report, name="classification_accumulation_data"),
 

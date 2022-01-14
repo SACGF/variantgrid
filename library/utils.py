@@ -21,7 +21,7 @@ from functools import reduce
 from itertools import islice
 from json.encoder import JSONEncoder
 from operator import attrgetter
-from typing import TypeVar, Optional, Iterator, Tuple, Any, List, Iterable, Set, Dict, Union, Callable, Type
+from typing import TypeVar, Optional, Iterator, Tuple, Any, List, Iterable, Set, Dict, Union, Callable, Type, Generic
 from urllib.parse import urlparse
 
 from bs4 import BeautifulSoup
@@ -559,7 +559,10 @@ def clean_string(input_string: str) -> str:
     return re.sub(f'[^{re.escape(string.printable)}]', '', input_string.strip())
 
 
-class IterableTransformer:
+T = TypeVar("T")
+
+
+class IterableTransformer(Generic[T], Iterable[T]):
     """
     Given an iterable and a transformer, makes a new iterable that will lazily transform the elements
     """
@@ -576,11 +579,11 @@ class IterableTransformer:
         self.iterable = iterable
         self.transform = transform
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[T]:
         return self._IteratorTransformer(iter(self.iterable), self.transform)
 
 
-class IteratableStitcher:
+class IteratableStitcher(Generic[T], Iterable[T]):
     """
     Given a list of SORTED iterables, will give you the smallest element from any of them
     """
@@ -607,7 +610,7 @@ class IteratableStitcher:
             def preview(self):
                 return self.cache
 
-        def __init__(self, iteratables: List[Iterable], comparison):
+        def __init__(self, iteratables: List[Iterable[T]], comparison):
             self.iterators = [self._CachedIterator(iterable) for iterable in iteratables]
             self.comparison = comparison
 
@@ -627,11 +630,11 @@ class IteratableStitcher:
             min_ci.fetch_next()
             return min_value
 
-    def __init__(self, iterables: List[Iterable], comparison=operator.__lt__):
+    def __init__(self, iterables: List[Iterable[T]], comparison=operator.__lt__):
         self.iterables = iterables
         self.comparison = comparison
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[T]:
         return self._IteratorStitcher(iteratables=self.iterables, comparison=self.comparison)
 
 

@@ -3,18 +3,16 @@
 
 {% menu_item 'activity' admin_only=True %}
 {% menu_item 'hgvs_issues' title="HGVS Issues" admin_only=True %}
-
+{% menu_item 'classification_import_tool' title="Import Test" admin_only=True %}
+{% menu_item 'condition_match_test' title="Condition Test" admin_only=True %}
 {% menu_item 'classifications' other_urls='/classification/classification' %}
 {% menu_item 'clinvar_key_summary' title="ClinVar Exports" %}
 {% menu_item 'condition_matchings' title="Condition Matching" %}
-{% menu_item 'condition_match_test' title="Condition Match Test" admin_only=True %}
-{% menu_item 'classification_dashboard' title="Issues" badge_count=classification_issue_count %}
+{% menu_item 'classification_dashboard_lab' title="Dashboard" %}
+{% menu_item 'classification_dashboard' title="Dashboard" %}{% comment  badge_count=classification_issue_count  %}{% endcomment %}
 {% menu_item 'overlaps' title="Overlaps" %}
 {% menu_item 'labs' %}
 {% menu_item 'classification_graphs' title="Graphs / Stats" %}
-{% comment %}
-{% menu_item 'evidence_keys' title="Evidence Keys" external=True %}
-{% endcomment %}
 {% menu_item 'classification_export' title="Export" %}
-{% menu_item 'classification_import_tool' title="Import" admin_only=True %}
+
 {% menu_item 'classification_import_upload' title="Upload" %}

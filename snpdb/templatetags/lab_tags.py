@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Union
 
 from django.conf import settings
 from django.template.library import Library
@@ -24,9 +24,12 @@ def lab_card(context, lab: Lab, lab_link=True, org_link=True):
 
 
 @register.inclusion_tag("snpdb/tags/lab_picker.html", takes_context=True)
-def lab_picker(context, view_name: str, selected_lab: Optional[Lab] = None):
+def lab_picker(context, view_name: str, selected_lab: Optional[Union[Lab, int]] = None, all_option=False):
     labs = list(Lab.valid_labs_qs(context.request.user, admin_check=True))
+    if isinstance(selected_lab, Lab):
+        selected_lab = selected_lab.pk
     return {
+        "all_option": all_option,
         "labs": labs,
         "lab_count": len(labs),
         "view_name": view_name,

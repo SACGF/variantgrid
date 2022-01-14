@@ -10,6 +10,8 @@ from django.forms.utils import ErrorList
 from django.template.base import FilterExpression, kwarg_re
 from django.utils.safestring import SafeString
 
+from variantgrid.perm_path import get_visible_url_names
+
 register = template.Library()
 
 
@@ -434,6 +436,17 @@ def boolean(test: bool) -> str:
 
 
 @register.filter()
+def number(number: int, severity: Optional[str] = None) -> str:
+    if number:
+        result = SafeString(f'<span class="text-monospace" style="inline-block;margin-right:4px">{number:,}</span> ')
+        if severity:
+            result += severity_icon(severity)
+        return result
+    else:
+        return SafeString('<span class="no-value">0</span>')
+
+
+@register.filter()
 def value(value: Any) -> str:
     if isinstance(value, bool):
         return boolean(value)
@@ -457,6 +470,11 @@ def secret(value: Any, length: int = -4) -> str:
             return SafeString("<span class='secret'>****" + escape(str_value[length:]) + "</span>")
         else:
             return str_value
+
+
+@register.filter()
+def is_view_enabled(view_name: str) -> bool:
+    return get_visible_url_names().get(view_name)
 
 
 class TagUtils:
