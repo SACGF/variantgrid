@@ -107,8 +107,8 @@
             {% endlabelled %}
         {% endif %}
         {% if 'condition_matchings_lab'|is_view_enabled %}
-            {% labelled hint="tiny"  label="Unresolved Condition Texts" %}
-                {{ dlab.outstanding_plain_text_qs.count | number:'W' }}
+            {% labelled hint="tiny"  label="Classifications w/out Standard Condition" %}
+                {{ dlab.conditions_wout_standard_text | number:'W' }}
                 <a class="hover-link" href="{% url 'condition_matchings_lab' dlab.lab_id %}"><small class="form-text">Review your lab's unresolved condition text here.</small></a>
             {% endlabelled %}
         {% endif %}
