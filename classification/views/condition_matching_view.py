@@ -10,6 +10,7 @@ from rest_framework.views import APIView
 
 from classification.models import ConditionTextMatch, ConditionText, update_condition_text_match_counts, MultiCondition, \
     ConditionMatchingSuggestion, condition_matching_suggestions, Classification
+from classification.views.classification_dashboard_view import ClassificationDashboard
 from library.utils import empty_to_none
 from ontology.models import OntologyTerm
 from ontology.ontology_matching import normalize_condition_text
@@ -65,25 +66,14 @@ class ConditionTextColumns(DatatableConfig):
 
 
 def condition_matchings_view(request, lab_id: Optional[int] = None):
-    selected_lab: Optional[Lab] = None
-    if lab_id:
-        selected_lab = Lab.valid_labs_qs(request.user, admin_check=True).get(pk=lab_id)
-    else:
-        all_labs = Lab.valid_labs_qs(request.user, admin_check=True)
-        if len(all_labs) == 1:
-            return redirect(reverse('condition_matchings_lab', kwargs={'lab_id': all_labs[0].pk}))
-
-    # no longer restrict to shared only
-    relevant_records = Classification.objects.filter(withdrawn=False)
-    if selected_lab:
-        relevant_records = relevant_records.filter(lab=selected_lab)
-    missing_condition_count = relevant_records.filter(condition_resolution__isnull=True).count()
-    matched_condition_count = relevant_records.filter(condition_resolution__isnull=False).count()
+    cd = ClassificationDashboard(request.user, lab_id)
+    if not lab_id and len(cd.labs) == 1:
+        return redirect(reverse('condition_matchings_lab', kwargs={'lab_id': all_labs[0].pk}))
 
     return render(request, 'classification/condition_matchings.html', context={
-        'selected_lab': selected_lab.pk if selected_lab else 0,
-        'matched_condition_count': matched_condition_count,
-        'missing_condition_count': missing_condition_count
+        'selected_lab': cd.lab_id,
+        'matched_condition_count': cd.classifications_with_standard_text,
+        'missing_condition_count': cd.classifications_wout_standard_text
     })
 
 
