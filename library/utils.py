@@ -415,6 +415,34 @@ def execute_cmd(cmd: list, **kwargs) -> Tuple[int, Optional[str], Optional[str]]
     return pipes.returncode, std_out.decode() if std_out else None, std_err.decode() if std_err else None
 
 
+Key = TypeVar("Key")
+Value = TypeVar("Value")
+Data = TypeVar("Data")
+
+@dataclass
+class Group(Generic[Key, Value]):
+    key: Key
+    values: Set[Value]
+
+    @property
+    def values_list(self):
+        return sorted(self.values)
+
+    def __lt__(self, other):
+        return self.key < other.key
+
+
+def group_data(data: Iterable[Data], key_func: Callable[[Data], Tuple[Key, Value]]) -> List[Group[Key, Value]]:
+    group_dict = defaultdict(set)
+    for element in data:
+        key, value = key_func(element)
+        group_dict[key].add(value)
+    flat: List[Group[Key, Value]] = list()
+    for key, values in group_dict.items():
+        flat.append(Group(key, values))
+    return flat
+
+
 def group_by_key(qs: Iterable, key: attrgetter) -> Iterator[Tuple[Any, List]]:
     """
     Provide a sorted iterable value (like a queryset) and an attrgetter for getting values from it.

@@ -1,6 +1,26 @@
+{% load ui_utils %}
 {% if lab_count > 1 %}
-    <div class="btn-group mb-4" style="flex-wrap: wrap" role="group" aria-label="Lab">
-        {% if all_option %}<a type="button" href="{% url view_name 0 %}" class="btn {% if not selected_lab %}btn-secondary text-black-50 font-weight-bold{% endif %}">All</a>{% endif %}
-        {% for lab in labs %}<a type="button" href="{% url view_name lab.pk %}" class="btn {% if selected_lab == lab.pk %}btn-secondary text-black-50 font-weight-bold{% else %}btn-outline-secondary{% endif %}">{{ lab.name }}</a>{% endfor %}
-    </div>
+    {% labelled label="For Lab" %}
+        <div class="form">
+            <select id="lab-picker" class="chosen-select">
+                {% if all_option %}<option value="0">All Labs You Are Assigned To</option>{% endif %}
+                {% for org_group in org_groups %}
+                    <optgroup label="{{ org_group.key.name }}">
+                        {% for lab in org_group.values_list %}
+                            <option value="{{ lab.pk }}" {% if lab.pk == selected_lab %}selected{% endif %}>
+                                {% if lab.external %}EXTERNAL {% endif %}
+                                {{ lab.name }}
+                            </option>{% endfor %}
+                    </optgroup>
+                {% endfor %}
+            </select>
+        </div>
+        <script>
+            $('#lab-picker').chosen({width:'400px'}).change((change) => {
+                let val = $(change.target).val();
+                let url = Urls.{{ view_name | safe }}(val);
+                window.open(url, '_self');
+            });
+        </script>
+    {% endlabelled %}
 {% endif %}

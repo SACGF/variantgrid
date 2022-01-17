@@ -169,6 +169,9 @@ class Organization(models.Model):
         verbose_name = 'Organisation'
         verbose_name_plural = 'Organisations'
 
+    def __lt__(self, other):
+        return self.name < other.name
+
     def get_absolute_url(self):
         return reverse('view_organization', kwargs={"pk": self.pk})
 
@@ -370,7 +373,7 @@ class Lab(models.Model):
 
     def __lt__(self, other):
         if self.organization != other.organization:
-            return self.organization.name < other.organization.name
+            return self.organization < other.organization
         return self.name < other.name
 
     class Meta:

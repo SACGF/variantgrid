@@ -3,6 +3,7 @@ from typing import Optional, Union
 from django.conf import settings
 from django.template.library import Library
 
+from library.utils import group_data
 from snpdb.models import Lab
 
 register = Library()
@@ -28,8 +29,12 @@ def lab_picker(context, view_name: str, selected_lab: Optional[Union[Lab, int]] 
     labs = list(Lab.valid_labs_qs(context.request.user, admin_check=True))
     if isinstance(selected_lab, Lab):
         selected_lab = selected_lab.pk
+
+    org_groups = sorted(group_data(labs, lambda lab: (lab.organization, lab)))
+
     return {
         "all_option": all_option,
+        "org_groups": org_groups,
         "labs": labs,
         "lab_count": len(labs),
         "view_name": view_name,
