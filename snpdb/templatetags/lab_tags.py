@@ -26,17 +26,18 @@ def lab_card(context, lab: Lab, lab_link=True, org_link=True):
 
 @register.inclusion_tag("snpdb/tags/lab_picker.html", takes_context=True)
 def lab_picker(context, view_name: str, selected_lab: Optional[Union[Lab, int]] = None, all_option=False):
-    labs = list(Lab.valid_labs_qs(context.request.user, admin_check=True))
+    labs_qs = Lab.valid_labs_qs(context.request.user, admin_check=True)
     if isinstance(selected_lab, Lab):
         selected_lab = selected_lab.pk
 
-    org_groups = sorted(group_data(labs, lambda lab: (lab.organization, lab)))
+    internal = labs_qs.filter(external=False)
+    external = labs_qs.filter(external=True)
 
     return {
         "all_option": all_option,
-        "org_groups": org_groups,
-        "labs": labs,
-        "lab_count": len(labs),
+        "internal": sorted(group_data(internal, lambda lab: (lab.organization, lab))),
+        "external": sorted(group_data(external, lambda lab: (lab.organization, lab))),
+        "lab_count": labs_qs.count(),
         "view_name": view_name,
         "selected_lab": selected_lab
     }

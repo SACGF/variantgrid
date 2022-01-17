@@ -4,11 +4,18 @@
         <div class="form">
             <select id="lab-picker" class="chosen-select">
                 {% if all_option %}<option value="0">All Labs You Are Assigned To</option>{% endif %}
-                {% for org_group in org_groups %}
+                {% for org_group in internal %}
                     <optgroup label="{{ org_group.key.name }}">
                         {% for lab in org_group.values_list %}
                             <option value="{{ lab.pk }}" {% if lab.pk == selected_lab %}selected{% endif %}>
-                                {% if lab.external %}EXTERNAL {% endif %}
+                                {{ lab.name }}
+                            </option>{% endfor %}
+                    </optgroup>
+                {% endfor %}
+                {% for org_group in external %}
+                    <optgroup label="EXTERNAL {{ org_group.key.name }}">
+                        {% for lab in org_group.values_list %}
+                            <option value="{{ lab.pk }}" {% if lab.pk == selected_lab %}selected{% endif %}>
                                 {{ lab.name }}
                             </option>{% endfor %}
                     </optgroup>
