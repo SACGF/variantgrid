@@ -111,7 +111,11 @@
     <div class="container">
         {% if all_keys.count > 1 %}
             <div class="btn-group mb-4" role="group" aria-label="ClinVar Key Picker">
-                {% for key in all_keys %}<a type="button" href="{% url 'clinvar_key_summary' key.pk %}" class="btn {% if key.pk == clinvar_key.pk %}btn-secondary text-black-50 font-weight-bold{% else %}btn-outline-secondary{% endif %}">{{ key.pk }}</a>{% endfor %}
+                {% for key in all_keys %}
+                    <button onclick="window.open('{% url 'clinvar_key_summary' key.pk %}', '_self')"
+                    class="btn {% if key.pk == clinvar_key.pk %}btn-secondary font-weight-bold{% else %}btn-outline-secondary{% endif %}">{{ key.pk }}
+                    </button>
+                {% endfor %}
             </div>
         {% endif %}
 
