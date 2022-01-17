@@ -22,6 +22,7 @@ from classification.views.classification_accumulation_graph import \
     AccumulationReportMode, get_accumulation_graph_data
 from classification.views.classification_export_flags import ExportFormatterFlags
 from flags.models import FlagCollection
+from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import Lab, UserSettings, ClinVarKey
 from snpdb.models.models_genome import GenomeBuild
 
@@ -170,5 +171,6 @@ def classification_dashboard(request: HttpRequest, lab_id: Optional[int] = None)
     return render(request, "classification/classification_dashboard.html", {
         "dlab": dlab,
         "use_shared": settings.VARIANT_CLASSIFICATION_STATS_USE_SHARED,
-        "clinvar_export_enabled": clinvar_export_sync.is_enabled
+        "clinvar_export_enabled": clinvar_export_sync.is_enabled,
+        "genome_build": GenomeBuildManager.get_current_genome_build()
     })
