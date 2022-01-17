@@ -14,6 +14,7 @@ from pytz import timezone
 from classification.enums import SpecialEKeys
 from classification.models import ClinVarExport, ClinVarExportBatch, ClinVarExportBatchStatus, \
     Classification, EvidenceKeyMap, ClinVarExportStatus
+from classification.views.classification_dashboard_view import ClassificationDashboard
 from genes.hgvs import CHGVS
 from library.cache import timed_cache
 from library.django_utils import add_save_message, get_url_from_view_path
@@ -297,8 +298,7 @@ def clinvar_export_summary(request: HttpRequest, pk: Optional[str] = None) -> Ht
     clinvar_key.check_user_can_access(request.user)
 
     labs = Lab.objects.filter(clinvar_key=clinvar_key).order_by('name')
-    # no longer restrict to shared
-    missing_condition = Classification.objects.filter(withdrawn=False, lab__in=labs, condition_resolution__isnull=True)
+    dashbaord = ClassificationDashboard(user=request.user, labs=labs)
 
     export_columns = ClinVarExportColumns(request)
     export_batch_columns = ClinVarExportBatchColumns(request)
@@ -307,7 +307,7 @@ def clinvar_export_summary(request: HttpRequest, pk: Optional[str] = None) -> Ht
         'all_keys': ClinVarKey.clinvar_keys_for_user(request.user),
         'clinvar_key': clinvar_key,
         'labs': labs,
-        'missing_condition_count': missing_condition.count(),
+        'missing_condition_count': dashbaord.classifications_wout_standard_text,
         'count_records': export_columns.get_initial_query_params(clinvar_key=pk).count(),
         'count_batch': export_batch_columns.get_initial_query_params(clinvar_key=pk).count()
     })

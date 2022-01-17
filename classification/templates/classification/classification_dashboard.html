@@ -17,10 +17,6 @@
 <script type="text/javascript" src="{% static 'js/plotly_helper.js' %}"></script>
 <script>
     // for showing issues
-    function classificationDiscordant(data) {
-        data.flags = JSON.stringify(['classification_discordant']);
-        data.labs = {{ dlab.lab_ids_str | jsonify }};
-    }
     function classificationMatchingVariant(data) {
         data.flags = JSON.stringify(['classification_matching_variant', 'classification_matching_variant_warning', 'classification_transcript_version_change']);
         data.labs = {{ dlab.lab_ids_str | jsonify }};
@@ -124,23 +120,26 @@
             <table class="table">
                 <thead>
                     <tr>
-                        <th>ID</th>
+                        <th style="width:100px">ID</th>
                         <th class="text-left">Discordance Detected</th>
                         <th class="text-left">c.HGVS</th>
-                        <th class="text-left">Labs</th>
+                        <th class="text-left" style="width:40%">Labs</th>
                     </tr>
                 </thead>
                 <tbody>
                 {% for dr in dlab.discordances_qs %}
                     <tr>
-                        <td class="text-center"><a href="{% url 'discordance_report' dr.id %}">{{ dr.id }}</a></td>
+                        <td class="text-center"><a href="{% url 'discordance_report' dr.id %}" class="hover-link">{{ dr.id }}</a></td>
                         <td>{% timestamp dr.created %}</td>
                         <td>{% for c_hgvs in dr.all_c_hgvs %}
                                 <div>{% c_hgvs c_hgvs %}</div>
                             {% endfor %}
                         </td>
-                        <td>{% for lab in dr.all_labs %}
-                            <div>{{ lab.name }}</div>
+                        <td style="width:40%">{% for lab_summ in dr.labs_to_classification %}
+                            <div>
+                                {% for cs in lab_summ.values %}{% clinical_significance cs %}{% endfor %}
+                                {{ lab_summ.lab.name }}
+                            </div>
                             {% endfor %}
                         </td>
                     </tr>
@@ -164,9 +163,6 @@
     <p class="text-info">For instructions on how to fix the outstanding actions, click on the icons in the flag column for each classification.</p>
 
     <div class="mt-4">
-        {% ui_register_tab_embedded tab_set="classification_issues" label="Discordance" badge=dlab.counts.discordant %}
-            <table id="classifications-discordant" data-datatable-url="{% url 'classification_datatables' %}" class="sticky-header classification-table" data-datatable-data="classificationDiscordant"></table>
-        {% end_ui_register_tab_embedded %}
 
         {% ui_register_tab_embedded tab_set="classification_issues" label="Suggestion/Internal Review/Clin Change" badge=dlab.counts.comments %}
             <table id="classifications-comment" data-datatable-url="{% url 'classification_datatables' %}" class="sticky-header classification-table" data-datatable-data="classificationComments"></table>

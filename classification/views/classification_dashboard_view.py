@@ -28,13 +28,19 @@ from snpdb.models.models_genome import GenomeBuild
 
 class ClassificationDashboard:
 
-    def __init__(self, user: User, lab_id: Optional[int] = 0):
+    def __init__(self, user: User, lab_id: Optional[int] = 0, labs: Optional[Lab] = None):
         self.user = user
-        all_labs = Lab.valid_labs_qs(user, admin_check=True).exclude(external=True)
+        all_labs = Lab.valid_labs_qs(user, admin_check=True)
         if lab_id:
             self.labs = [all_labs.filter(pk=lab_id).get()]
+        elif labs:
+            # assume safety check not required if given specific set of labs,
+            # user has access to see some data from other labs anyway
+            self.labs = labs
         else:
-            self.labs = sorted(all_labs)
+            self.labs = all_labs.exclude(external=True)
+
+        self.labs = sorted(self.labs)
 
     def lab_id(self) -> int:
         if len(self.labs) > 1:
@@ -164,5 +170,5 @@ def classification_dashboard(request: HttpRequest, lab_id: Optional[int] = None)
     return render(request, "classification/classification_dashboard.html", {
         "dlab": dlab,
         "use_shared": settings.VARIANT_CLASSIFICATION_STATS_USE_SHARED,
-        "clinvar_enabled": clinvar_export_sync.is_enabled
+        "clinvar_export_enabled": clinvar_export_sync.is_enabled
     })

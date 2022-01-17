@@ -184,6 +184,11 @@ class EvidenceKey(TimeStampedModel):
             return index_map.get(val, 0)
         return val
 
+    def sort_values(self, values: Iterable) -> List:
+        sorter = self.classification_sorter_value
+        sorted_list = sorted(values, key=lambda x: (sorter(x), x))
+        return sorted_list
+
     def classification_sorter(self, evidence: Dict[str, Any]) -> Union[int, Any]:
         """
         Provide .classification_sorter as a Callable[dict aka ClassificationData] -> sortable

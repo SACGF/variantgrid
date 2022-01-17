@@ -1,6 +1,8 @@
 import typing
+from collections import defaultdict
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import Set, Optional, List
+from typing import Set, Optional, List, Dict
 
 import django.dispatch
 from django.conf import settings
@@ -215,7 +217,7 @@ class DiscordanceReport(TimeStampedModel):
     def all_classification_modifications(self) -> List[ClassificationModification]:
         vcms: List[ClassificationModification] = list()
         for dr in DiscordanceReportClassification.objects.filter(report=self):
-            vcms.append(dr.classfication_effective)
+            vcms.append(dr.classification_effective)
         return vcms
 
     def all_c_hgvs(self, genome_build: Optional[GenomeBuild] = None) -> List[CHGVS]:
@@ -226,11 +228,23 @@ class DiscordanceReport(TimeStampedModel):
             c_hgvs.add(cm.c_hgvs_best(genome_build))
         return sorted(c_hgvs)
 
-    def all_labs(self):
-        labs = set()
-        for cm in self.all_classification_modifications:
-            labs.add(cm.classification.lab)
-        return sorted(labs)
+    @dataclass
+    class DiscordanceLabSummary:
+        lab: Lab
+        values: Set[str]
+
+        def __lt__(self, other):
+            return self.lab < other.lab
+
+    def labs_to_classification(self) -> List[DiscordanceLabSummary]:
+        lab_to_class: Dict[Lab, Set[str]] = defaultdict(set)
+        for drc in DiscordanceReportClassification.objects.filter(report=self):
+            lab_to_class[drc.classification_effective.classification.lab].add(drc.classification_effective.get(SpecialEKeys.CLINICAL_SIGNIFICANCE))
+
+        from classification.models import EvidenceKeyMap
+        clin_sig = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE)
+
+        return sorted([DiscordanceReport.DiscordanceLabSummary(k, clin_sig.sort_values(v)) for k, v in lab_to_class.items()])
 
 
 class DiscordanceAction:
@@ -312,7 +326,7 @@ class DiscordanceReportClassification(TimeStampedModel):
     withdrawn_final = models.BooleanField(default=False)
 
     @lazy
-    def classfication_effective(self) -> ClassificationModification:
+    def classification_effective(self) -> ClassificationModification:
         """
         The final state of the classification (or the current if the report is still open)
         """
@@ -344,7 +358,7 @@ class DiscordanceReportClassification(TimeStampedModel):
     def close(self):
         self.clinical_context_final = self.clinical_context_effective
         self.withdrawn_final = self.withdrawn_effective
-        self.classification_final = self.classfication_effective
+        self.classification_final = self.classification_effective
         self.save()
 
     @lazy
@@ -390,7 +404,7 @@ class DiscordanceReportClassification(TimeStampedModel):
         # e.g. there's no
         had_significant_change = ClinicalSignificance.is_significant_change(
             old_classification=self.classification_original.get(SpecialEKeys.CLINICAL_SIGNIFICANCE),
-            new_classification=self.classfication_effective.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
+            new_classification=self.classification_effective.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
         )
 
         if self.report.clinical_context != self.clinical_context_effective:

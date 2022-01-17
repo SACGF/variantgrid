@@ -48,7 +48,7 @@ def discordance_report_view(request: HttpRequest, report_id: int) -> HttpRespons
         if report == latest_report:
             provide_reopen = True
 
-    effectives = [drc.classfication_effective for drc in report.discordancereportclassification_set.all()]
+    effectives = [drc.classification_effective for drc in report.discordancereportclassification_set.all()]
 
     context = {
         'report': report,
@@ -73,7 +73,7 @@ def export_discordance_report(request: HttpRequest, report_id: int) -> HttpRespo
     include: [ClassificationModification] = []
     for dc in dcs:
         if dc.clinical_context_effective == report.clinical_context and not dc.withdrawn_effective:
-            include.append(dc.classfication_effective)
+            include.append(dc.classification_effective)
 
     vcs_qs = ClassificationModification.objects.filter(pk__in=[vcm.id for vcm in include])
 
