@@ -91,6 +91,11 @@
             params.mode = 'old';
         }
 
+        let allele = $("input[name='allele']").val().trim();
+        if (allele.length) {
+            params.allele = allele;
+        }
+
         let paramParts = [];
         for (let [key, value] of Object.entries(params)) {
             paramParts.push(`${key}=${encodeURIComponent(value)}`);
@@ -220,6 +225,11 @@
                 <input id="mode" name="mode-old" value="old" type="checkbox" class="form-check-input" />
             </label>
         </div>
+    {% endlabelled %}
+    {% labelled label="Single Allele" admin_only=True %}
+        <input id="allele" name="allele" value="" type="text" class="form-control" />
+        <p class="text-muted">Filters to single Allele ID, if the export otherwise wouldn't include this allele
+        the export will be blank.</p>
     {% endlabelled %}
 
     {% labelled label="Organistion Exclusion" %}

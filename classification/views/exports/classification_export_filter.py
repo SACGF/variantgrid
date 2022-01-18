@@ -128,6 +128,7 @@ class ClassificationFilter:
     min_share_level: ShareLevel = ShareLevel.ALL_USERS
     transcript_strategy: TranscriptStrategy = TranscriptStrategy.ALL
     rows_per_file: Optional[int] = None
+    allele: Optional[int] = None
 
     @lazy
     def date_str(self) -> str:
@@ -178,6 +179,11 @@ class ClassificationFilter:
             from classification.views.classification_export_view import parse_since
             since = parse_since(since_str)
 
+        # just for debugging purposes allows us to download a single allele
+        allele: Optional[int] = None
+        if allele_str := request.query_params.get('allele'):
+            allele = int(allele_str)
+
         # TODO include rows_per_file into filter? right now it's hardcoded when doing MVL
 
         return ClassificationFilter(
@@ -187,7 +193,8 @@ class ClassificationFilter:
             genome_build=genome_build,
             min_share_level=share_level,
             transcript_strategy=transcript_strategy,
-            since=since
+            since=since,
+            allele=allele
             # rows_per_file=100
         )
 
@@ -214,16 +221,16 @@ class ClassificationFilter:
         ).values_list('collection_id', 'data')
 
         allele_to_bad_transcripts: Dict[int, Set[str]] = defaultdict(set)
-        collection_id_to_transcript = defaultdict(str)
+        collection_id_to_transcript = defaultdict(set)
         for collection_id, data in qs:
             if data:
-                collection_id_to_transcript[collection_id] = data.get('transcript')
+                collection_id_to_transcript[collection_id].add(data.get('transcript'))
 
         allele_qs = Allele.objects.filter(flag_collection__in=collection_id_to_transcript.keys())\
             .values_list('pk', 'flag_collection_id')
         for pk, collection_id in allele_qs:
-            if transcript := collection_id_to_transcript.get(collection_id):
-                allele_to_bad_transcripts[pk].add(transcript)
+            if transcripts := collection_id_to_transcript.get(collection_id):
+                allele_to_bad_transcripts[pk].update(transcripts)
 
         return allele_to_bad_transcripts
 
@@ -282,7 +289,6 @@ class ClassificationFilter:
     @lazy
     def since_flagged_allele_ids(self) -> Set[int]:
         """
-        TODO rename to indicate this is a flag check only
         :return: A set of allele IDs that have relevant flags that have changed since the since date
         """
         return flag_ids_to(Allele, FlagComment.objects.filter(
@@ -343,6 +349,9 @@ class ClassificationFilter:
 
         cms = cms.order_by('-classification__allele_id', '-classification__id')
         cms = cms.select_related('classification', 'classification__lab', 'classification__lab__organization')
+
+        if allele_id := self.allele:
+            cms = cms.filter(classification__allele_id=allele_id)
 
         # Always safe to exclude these (unless we want them in a CSV) even with since changes
         # couldn't show these ones if we wanted to

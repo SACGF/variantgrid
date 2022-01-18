@@ -268,6 +268,9 @@ class ClassificationApiExportView(APIView):
         formatter: BaseExportFormatter
         qs = qs.select_related('classification', 'classification__lab', 'classification__clinical_context')
 
+        if allele := request.query_params.get('allele'):
+            qs = qs.filter(classification__allele_id=int(allele))
+
         formatter_kwargs = {
             "genome_build": genome_build,
             "qs": qs,
