@@ -197,7 +197,7 @@ class MVLEntry(ExportRow):
     def warnings(self) -> List[str]:
         warnings: List[str] = list()
 
-        if self.data.different_versions:
+        if self.data.different_chgvs:
             warnings.append('Warning <b>c.hgvs representations are different across transcript versions</b>')
         if self.classifications_values.special:
             warnings.append('Warning <b>Contains non-standard clinical significance</b>')

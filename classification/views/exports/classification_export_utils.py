@@ -15,7 +15,7 @@ class CHGVSData:
 
     :var allele: The allele data record
     :var chgvs: The c.hgvs with the highest found transcript version
-    :var different_versions: Bool indicating if multiple transcript versions were bundled together here
+    :var different_chgvs: Bool indicating if multiple c.hgvs versions were bundled together here
     :var cms: The classifications
     """
     allele: AlleleData
@@ -25,7 +25,7 @@ class CHGVSData:
         return self.allele.source
 
     chgvs: CHGVS
-    different_versions: bool = False
+    different_chgvs: bool = False
     cms: List[ClassificationModification] = field(default_factory=list)
 
     @staticmethod
@@ -54,13 +54,13 @@ class CHGVSData:
             if versions:
                 c_hgvs.transcript = c_hgvs.transcript + f'.{versions[0]}'
 
-            sub_datas.append(CHGVSData(allele=allele_data, chgvs=c_hgvs, different_versions=len(cms) > 1, cms=cms))
+            sub_datas.append(CHGVSData(allele=allele_data, chgvs=c_hgvs, different_chgvs=False, cms=cms))
 
         # If we actually want to merge c.hgvs data together
         if len(sub_datas) > 1:
             first = sorted(sub_datas, key=lambda cd: (cd.chgvs.transcript_parts.version, cd.chgvs.sort_str), reverse=True)[0]
             first.cms = allele_data.cms
-            first.different_versions = True
+            first.different_chgvs = True
             return [first]
 
         return sub_datas
