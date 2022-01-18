@@ -73,6 +73,7 @@ class ExportFormatterReport(ExportFormatter):
             report_blob['label'] = "c.HGVS"
             context[key] = report_blob
 
+        context['condition_resolved'] = record.classification.condition_resolution
         context['citations'] = [vars(citation) for citation in get_citations(record.citations)]
         context['evidence_weights'] = Classification.summarize_evidence_weights(evidence)
         context['acmg_criteria'] = record.criteria_strength_summary(e_keys)
