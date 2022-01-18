@@ -55,4 +55,12 @@ class CHGVSData:
                 c_hgvs.transcript = c_hgvs.transcript + f'.{versions[0]}'
 
             sub_datas.append(CHGVSData(allele=allele_data, chgvs=c_hgvs, different_versions=len(cms) > 1, cms=cms))
+
+        # If we actually want to merge c.hgvs data together
+        if len(sub_datas) > 1:
+            first = sorted(sub_datas, key=lambda cd: (cd.chgvs.transcript_parts.version, cd.chgvs.sort_str), reverse=True)[0]
+            first.cms = allele_data.cms
+            first.different_versions = True
+            return [first]
+
         return sub_datas
