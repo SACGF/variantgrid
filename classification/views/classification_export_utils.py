@@ -178,6 +178,19 @@ class TranscriptGroup:
             self.highest_transcript_chgvs = vcmc.chgvs
 
     @property
+    def different_c_hgvs(self):
+        first_c = self.vcmcs[0].chgvs
+        for vc in self.vcmcs[1:]:
+            if first_c != vc.chgvs:
+                return True
+        return False
+
+    @property
+    def cms(self) -> List[ClassificationModification]:
+        return [vcmcs.vcm for vcmcs in self.vcmcs]
+
+
+    @property
     def chgvs(self):
         return self.highest_transcript_chgvs
 
