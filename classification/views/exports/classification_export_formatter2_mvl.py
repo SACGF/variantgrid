@@ -15,6 +15,7 @@ from classification.views.exports.classification_export_filter import AlleleData
 from classification.views.exports.classification_export_utils import CHGVSData
 from library.django_utils import get_url_from_view_path
 from library.utils import delimited_row, export_column, ExportRow
+from snpdb.models import Allele
 
 
 class FormatDetailsMVL:
@@ -36,6 +37,7 @@ class FormatDetailsMVL:
             'LP': 'LIKELY_PATHOGENIC',
             'P': 'PATHOGENIC'
         }
+        self.compatability_mode = False
         self.conflict_strategy = ConflictStrategy.MOST_PATHOGENIC
         self.is_shell = False
 
@@ -80,6 +82,9 @@ class FormatDetailsMVL:
 
         if request.query_params.get('mvl_detail', 'standard') == 'shell':
             format_details.is_shell = True
+
+        if request.query_params.get('mode') == 'compatibility':
+            format_details.compatability_mode = True
 
         return format_details
 
@@ -180,14 +185,16 @@ class MVLEntry(ExportRow):
     @lazy
     def variant_anchor_tag(self):
         # if we want to produce the same URLs as before for comparison, at the cost of a lot of speed
-        # v = Allele.objects.get(pk=self._cm.classification.allele_id).variant_for_build(self.mvl_data.data.source.source.genome_build)
-        # url = v.get_absolute_url()
-        # url = get_url_from_view_path(url) + f'?refer=mvl&seen={self.data.source.source.date_str}'
-        # return f'<a href="{url}" target="_blank">Click here for up-to-date classifications on this variant.</a>'
-        # restore this after a comparison
-        url = reverse('view_allele', kwargs={'pk': self._cm.classification.allele_id})
-        url = get_url_from_view_path(url) + f'?refer=mvl&seen={self.data.source.date_str}'
-        return f'<a href="{url}" target="_blank">Click here for up-to-date classifications on this variant.</a>'
+        if self.formatter.compatability_mode:
+            v = Allele.objects.get(pk=self._cm.classification.allele_id).variant_for_build(self.mvl_data.data.source.genome_build)
+            url = v.get_absolute_url()
+            url = get_url_from_view_path(url) + f'?refer=mvl&seen={self.data.source.date_str}'
+            return f'<a href="{url}" target="_blank">Click here for up-to-date classifications on this variant.</a>'
+        else:
+            # restore this after a comparison
+            url = reverse('view_allele', kwargs={'pk': self._cm.classification.allele_id})
+            url = get_url_from_view_path(url) + f'?refer=mvl&seen={self.data.source.date_str}'
+            return f'<a href="{url}" target="_blank">Click here for up-to-date classifications on this variant.</a>'
 
     @lazy
     def groups(self) -> ClassificationGroups:
@@ -234,12 +241,6 @@ class MVLEntry(ExportRow):
             citations_html += "No citations provided"
         return citations_html
 
-    @export_column('report abstract')
-    def report_abstract(self):
-        if self.formatter.is_shell:
-            return 'This is a test'
-
-        return self.variant_anchor_tag
 
     @export_column('variant information')
     def variant_information(self):
@@ -256,6 +257,14 @@ class MVLEntry(ExportRow):
         combined_data = f'{warning_text}{groups_html}<p>Data as of {date_str} {self.variant_anchor_tag}</p>{citations_html}'
 
         return combined_data
+
+
+    @export_column('report abstract')
+    def report_abstract(self):
+        if self.formatter.is_shell:
+            return 'This is a test'
+
+        return self.variant_anchor_tag
 
 
 @register_classification_exporter("mvl")
