@@ -179,9 +179,9 @@ class TranscriptGroup:
 
     @property
     def different_c_hgvs(self):
-        first_c = self.vcmcs[0].chgvs
+        first_c = self.vcmcs[0].chgvs.without_transcript_version
         for vc in self.vcmcs[1:]:
-            if first_c != vc.chgvs:
+            if first_c != vc.chgvs.without_transcript_version:
                 return True
         return False
 

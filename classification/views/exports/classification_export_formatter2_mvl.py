@@ -132,8 +132,8 @@ class MVLClinicalSignificance:
                 score = FormatDetailsMVL.DEFAULT_SCORE
                 special_classifications.add(label)
             if best_score is None or \
-                    (best_score < score and strategy == ConflictStrategy.MOST_BENIGN) or \
-                    (best_score > score and strategy == ConflictStrategy.MOST_PATHOGENIC):
+                    (score < best_score and strategy == ConflictStrategy.MOST_BENIGN) or \
+                    (score > best_score and strategy == ConflictStrategy.MOST_PATHOGENIC):
                 best_score = score
                 alissa_clasification = mvl_data.format.alissa_label_for(raw_classification)
 
