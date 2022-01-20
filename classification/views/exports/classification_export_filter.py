@@ -343,7 +343,7 @@ class ClassificationFilter:
             cms = cms.filter(classification__lab__in=labs)
         elif self.exclude_sources:
             if exclude_orgs := [org for org in self.exclude_sources if isinstance(org, Organization)]:
-                cms = cms.exclude(classification__lab__org__in=exclude_orgs)
+                cms = cms.exclude(classification__lab__organization__in=exclude_orgs)
             if exclude_labs := [lab for lab in self.exclude_sources if isinstance(lab, Lab)]:
                 cms = cms.exclude(classification__lab__in=exclude_labs)
 
