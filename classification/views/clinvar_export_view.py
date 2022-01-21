@@ -230,6 +230,12 @@ class ClinVarExportSummary(ExportRow):
     def genome_build(self):
         return str(self.genome_build_row) if self.genome_build_row else None
 
+    @export_column("ClinGenAllele")
+    def clingen_allele(self):
+        if classification := self.classification:
+            if allele := classification.classification.allele:
+                return str(allele.clingen_allele)
+
     @export_column("c.HGVS")
     def c_hgvs(self):
         if genome_build := self.genome_build_row:
