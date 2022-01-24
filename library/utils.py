@@ -874,7 +874,7 @@ class ExportRow:
             klass.export_methods = export_methods
 
             if not klass.export_methods:
-                raise ValueError(f"ExportRow class {klass} has no @export_columns")
+                raise ValueError(f"ExportRow class {klass} has no @export_columns, make sure you annotate @export_column(), not @export_column")
         return klass.export_methods
 
     @classmethod

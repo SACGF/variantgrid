@@ -10,7 +10,8 @@ from classification.views.classification_export_utils import UsedKeyTracker, Key
 from classification.views.exports.classification_export_decorator import register_classification_exporter
 from classification.views.exports.classification_export_formatter2 import ClassificationExportFormatter2
 from classification.views.exports.classification_export_filter import AlleleData, ClassificationFilter
-from library.utils import delimited_row
+from library.utils import delimited_row, export_column, ExportRow
+from snpdb.models import GenomeBuild
 
 
 @dataclass
@@ -21,6 +22,94 @@ class FormatDetailsCSV:
     def from_request(request: HttpRequest) -> 'FormatDetailsCSV':
         pretty = request.query_params.get('value_format') == 'labels'
         return FormatDetailsCSV(pretty=pretty)
+
+
+class RowID(ExportRow):
+
+    def __init__(self, cm: ClassificationModification, genome_build: GenomeBuild, message: Optional[str] = None):
+        self.cm = cm
+        self.vc = cm.classification
+        self.message = message
+        self.genome_build = genome_build
+
+    @export_column()
+    def id(self):
+        return self.vc.id
+
+    @export_column()
+    def lab(self):
+        return self.vc.lab.name
+
+    @export_column()
+    def lab_record_id(self):
+        return self.vc.lab_record_id
+
+    @export_column()
+    def share_level_enum(self):
+        return self.cm.share_level_enum.label
+
+    @export_column()
+    def version(self):
+        return self.cm.created.timestamp()
+
+    @export_column()
+    def liftover_error(self):
+        return self.message
+
+    @export_column()
+    def internal_allele_id(self):
+        return self.vc.allele_id
+
+    @export_column()
+    def resolved_clingen_allele_id(self):
+        if allele := self.vc.allele:
+            return str(allele.clingen_allele)
+
+    @export_column()
+    def target_genome_build(self):
+        return self.genome_build.name
+
+    @export_column()
+    def target_variant_coordinate(self):
+        try:
+            if allele := self.vc.allele:
+                if variant := allele.variant_for_build(genome_build=self.genome_build, best_attempt=True):
+                    return str(variant)
+        except ValueError:
+            pass
+
+    @export_column
+    def target_c_hgvs(self):
+        return self.vc.get_c_hgvs(genome_build=self.genome_build, use_full=False)
+
+
+class ClassificationMeta(ExportRow):
+
+    def __init__(self, cm: ClassificationModification, discordant: bool, e_keys: EvidenceKeyMap):
+        self.cm = cm
+        self.vc = cm.classification
+        self.discordant = discordant
+        self.e_keys = e_keys
+
+    @export_column()
+    def resolved_condition(self):
+        return (self.vc.condition_resolution_dict or {}).get('display_text')
+
+    @export_column()
+    def acmg_criteria(self):
+        return self.cm.criteria_strength_summary(self.e_keys)
+
+    @export_column()
+    def evidence_weights(self):
+        return Classification.summarize_evidence_weights(self.cm.evidence, self.e_keys)
+
+    @export_column()
+    def citations(self):
+        return ', '.join([c.ref_id() for c in self.cm.citations])
+
+    @export_column()
+    def is_discordant(self):
+        return 'TRUE' if self.discordant else 'FALSE'
 
 
 @register_classification_exporter("csv")
@@ -53,23 +142,9 @@ class ClassificationExportFormatter2CSV(ClassificationExportFormatter2):
         return "csv"
 
     def header(self) -> List[str]:
+
         self.errors_io = StringIO()
-        header = [
-                 'id',
-                 'lab',
-                 'lab_record_id',
-                 'share_level',
-                 'version',
-                 'liftover_error',
-                 'internal_allele_id',
-                 'target_genome_build',
-                 'target_c_hgvs',
-                 'resolved_condition',
-                 'acmg_criteria',
-                 'evidence_weights',
-                 'citations',
-                 'in_discordance'
-             ] + self.used_keys.header()
+        header = RowID.csv_header() + ClassificationMeta.csv_header() + self.used_keys.header()
         return [delimited_row(header, delimiter=',')]
 
     def row(self, allele_data: AlleleData) -> List[str]:
@@ -92,28 +167,9 @@ class ClassificationExportFormatter2CSV(ClassificationExportFormatter2):
             return []
 
     def to_row(self, vcm: ClassificationModification, message=None) -> str:
-        vc = vcm.classification
+        row_data = \
+            RowID(cm=vcm, genome_build=self.classification_filter.genome_build, message=message).to_csv() + \
+            ClassificationMeta(cm=vcm, discordant=self.classification_filter.is_discordant(vcm), e_keys=self.e_keys).to_csv() + \
+            self.used_keys.row(classification_modification=vcm)
 
-        acmg_criteria = vcm.criteria_strength_summary(self.e_keys)
-        evidence_weights = Classification.summarize_evidence_weights(vcm.evidence, self.e_keys)
-        citations = ', '.join([c.ref_id() for c in vcm.citations])
-
-        full_chgvs = vc.get_c_hgvs(genome_build=self.classification_filter.genome_build, use_full=False)
-
-        row = [
-            vc.id,
-            vc.lab.name,  # row
-            vc.lab_record_id,
-            vcm.share_level_enum.label,
-            vcm.created.timestamp(),
-            message,
-            vc.allele_id,
-            self.classification_filter.genome_build.name,
-            full_chgvs,
-            (vc.condition_resolution_dict or {}).get('display_text'),
-            acmg_criteria,
-            evidence_weights,
-            citations,
-            'TRUE' if self.classification_filter.is_discordant(vcm) else 'FALSE',
-        ] + self.used_keys.row(classification_modification=vcm)
-        return delimited_row(row, delimiter=',')
+        return delimited_row(row_data, delimiter=',')
