@@ -68,7 +68,7 @@ class ConditionTextColumns(DatatableConfig):
 def condition_matchings_view(request, lab_id: Optional[int] = None):
     cd = ClassificationDashboard(request.user, lab_id)
     if not lab_id and len(cd.labs) == 1:
-        return redirect(reverse('condition_matchings_lab', kwargs={'lab_id': all_labs[0].pk}))
+        return redirect(reverse('condition_matchings_lab', kwargs={'lab_id': cd.labs[0].pk}))
 
     return render(request, 'classification/condition_matchings.html', context={
         'selected_lab': cd.lab_id,
