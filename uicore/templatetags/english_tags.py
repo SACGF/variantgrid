@@ -6,6 +6,18 @@ from django.db.models import QuerySet
 register = template.Library()
 
 
+def count_items(items: Union[List, QuerySet, int]) -> int:
+    item_count: int
+    if isinstance(items, list):
+        item_count = len(items)
+    elif isinstance(items, QuerySet):
+        item_count = items.count()
+    else:
+        item_count = items
+
+    return item_count
+
+
 @register.simple_tag()
 def count(items: Union[List, QuerySet, int], singular: str, plural: Optional[str] = None):
     """
@@ -16,13 +28,7 @@ def count(items: Union[List, QuerySet, int], singular: str, plural: Optional[str
     :param plural: Refer to it if there's any other number, will be prefixed by the count e.g. "cars" to say "Look at my 2 cars"
     If plural is not provided will default to singular with a s on the end.
     """
-    item_count: int
-    if isinstance(items, list):
-        item_count = len(items)
-    elif isinstance(items, QuerySet):
-        item_count = items.count()
-    else:
-        item_count = items
+    item_count = count_items(items)
 
     if item_count == 1:
         return f'{singular}'
@@ -30,3 +36,10 @@ def count(items: Union[List, QuerySet, int], singular: str, plural: Optional[str
         if plural is None:
             plural = f'{singular}s'
         return f'{item_count} {plural}'
+
+
+@register.simple_tag()
+def plural(items: Union[List, QuerySet, int], singular: str = "", plural: str = "s"):
+    if count_items(items) == 1:
+        return singular
+    return plural

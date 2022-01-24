@@ -66,15 +66,22 @@
         {% lab_picker view_name="condition_matchings_lab" selected_lab=selected_lab all_option=True %}
 
         {% labelled hint="tiny" label="Classifications w Standard Condition" %}
-            {{ matched_condition_count | number:'success' }}
+            {{ dlab.classifications_with_standard_text | number:'success' }}
         {% endlabelled %}
         {% labelled hint="tiny" label="Classifications w/out Standard Condition" %}
-            {% if missing_condition_count %}
+            {% if dlab.classifications_wout_standard_text %}
                 <span class="hover-detail" title="Classifications require a standard condition to be exported to ClinVar">
-                    {{ missing_condition_count | number:'warning' }}
+                    {{ dlab.classifications_wout_standard_text | number:'warning' }}
                 </span>
             {% else %}0 {{ 'success' | severity_icon }}{% endif %}
         {% endlabelled %}
+        {% if dlab.classifications_wout_standard_gene %}
+            {% labelled hint="tiny" label="Classifications w/out Known Gene Symbol" %}
+                <span class="hover-detail" title="Classifications require a known gene symbol to be matched to a standard condition">
+                    {{ dlab.classifications_wout_standard_gene | number:'warning'}}
+                </span>
+            {% endlabelled %}
+        {% endif %}
 
         <div class="form-row align-items-center">
             <div class="input-group col-8">

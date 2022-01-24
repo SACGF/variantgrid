@@ -3,7 +3,7 @@
     {% labelled label="For Lab" %}
         <div class="form">
             <select id="lab-picker" class="chosen-select">
-                {% if all_option %}<option value="0">All {% if external %}Internal{% endif %} Labs You Are Assigned To</option>{% endif %}
+                {% if all_option %}<option value="0">All {% if external %}Internal{% endif %} Assigned Labs</option>{% endif %}
                 {% for org_group in internal %}
                     <optgroup label="{{ org_group.key.name }}">
                         {% for lab in org_group.values_list %}

@@ -70,7 +70,7 @@
     {% if use_shared %}
         {% if dlab.shared_classifications.count %}
                 {% page_help_embedded title="Shared Classifications Over Time" %}
-                This graphs shows how many shared classifications your lab submitted over time.
+                This graphs shows how many shared classifications your lab has submitted over time.
             {% end_page_help_embedded %}
 
             <div id="accumulation-graph"></div>
@@ -85,7 +85,7 @@
         {% comment %}section only makes sense for where Shared is king{% endcomment %}
         {% page_help_embedded title="Classification Counts" %}
             <p>
-            See the grand total of classifications provided to {{ SITE_NAME }} by your lab.
+            See the grand total of classifications provided by your lab.
             </p>
         {% end_page_help_embedded %}
 
@@ -93,13 +93,19 @@
             {{ dlab.shared_classifications.count | number:'S' }}
         {% endlabelled %}
 
-        {% labelled hint="tiny"  label="Across Unique Alleles" %}
+        {% labelled hint="tiny"  label="Unique Alleles" %}
             {{ dlab.unique_classified_alleles_count | number:'S' }}
         {% endlabelled %}
         {% if 'clinvar_key_summary'|is_view_enabled %}
             {% labelled hint="tiny"  label="Classifications Uploaded to Clinvar" %}
-                {{ dlab.uploads_to_clinvar_qs.count | number:'S' }}
-                <a class="hover-link" href="{% url 'clinvar_key_summary' %}"><small class="form-text">Review your lab's ClinVar status here.</small></a>
+                {% if dlab.clinvar_keys %}
+                    {{ dlab.uploads_to_clinvar_qs.count | number:'S' }}
+                    {% for clinvar_key in dlab.clinvar_keys %}
+                        <a class="hover-link" href="{% url 'clinvar_key_summary' clinvar_key.id %}"><small class="form-text">Review ClinVar Submissions of {{ clinvar_key.id }} here.</small></a>
+                    {% endfor %}
+                {% else %}
+                    <span class="text-muted">Your {% plural dlab.labs singular="lab is" plural="labss are" %} not configured for ClinVar yet.</span>
+                {% endif %}
             {% endlabelled %}
         {% endif %}
         {% if 'condition_matchings_lab'|is_view_enabled %}
@@ -123,7 +129,7 @@
                         <th style="width:100px">ID</th>
                         <th class="text-left">Discordance Detected</th>
                         <th class="text-left">c.HGVS ({{ genome_build.name }})</th>
-                        <th class="text-left" style="width:40%">Labs</th>
+                        <th class="text-left" style="width:40%">Clinical Significances / Labs</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -176,15 +182,15 @@
             <table id="classifications-unshared" data-datatable-url="{% url 'classification_datatables' %}" class="sticky-header classification-table" data-datatable-data="classificationUnshared"></table>
         {% end_ui_register_tab_embedded %}
 
-        {% ui_register_tab_embedded tab_set="classification_issues" label="Withdrawn" badge=dlab.counts.withdrawn %}
-            <table id="classifications-withdrawn" data-datatable-url="{% url 'classification_datatables' %}" class="sticky-header classification-table" data-datatable-data="classificationWithdrawn"></table>
-        {% end_ui_register_tab_embedded %}
-
         {% if clinvar_export_enabled %}
             {% ui_register_tab_embedded tab_set="classification_issues" label="Exclude from ClinVar" badge=dlab.counts.clinvar_exclude %}
                 <table id="classifications-exclude-clinvar" data-datatable-url="{% url 'classification_datatables' %}" class="sticky-header classification-table" data-datatable-data="classificationExcludeClinVar"></table>
             {% end_ui_register_tab_embedded %}
         {% endif %}
+
+        {% ui_register_tab_embedded tab_set="classification_issues" label="Withdrawn" badge=dlab.counts.withdrawn %}
+            <table id="classifications-withdrawn" data-datatable-url="{% url 'classification_datatables' %}" class="sticky-header classification-table" data-datatable-data="classificationWithdrawn"></table>
+        {% end_ui_register_tab_embedded %}
 
         {% ui_render_tabs tab_set="classification_issues" %}
     </div>

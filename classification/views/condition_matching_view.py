@@ -48,6 +48,8 @@ class ConditionTextColumns(DatatableConfig):
         filter_labs = Lab.valid_labs_qs(self.user, admin_check=True)
         if lab_id := self.lab_id:
             filter_labs = filter_labs.filter(pk=lab_id)
+        else:
+            filter_labs = filter_labs.filter(external=False)
 
         cts_qs = cts_qs.filter(lab_id__in=filter_labs)
         return cts_qs
@@ -72,8 +74,7 @@ def condition_matchings_view(request, lab_id: Optional[int] = None):
 
     return render(request, 'classification/condition_matchings.html', context={
         'selected_lab': cd.lab_id,
-        'matched_condition_count': cd.classifications_with_standard_text,
-        'missing_condition_count': cd.classifications_wout_standard_text
+        'dlab': cd,
     })
 
 

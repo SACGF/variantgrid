@@ -2,8 +2,9 @@ from typing import Optional, List
 
 from django.conf import settings
 from django.contrib.auth.models import User
-from django.db.models import QuerySet
+from django.db.models import QuerySet, TextField, Sum
 from django.db.models.expressions import Subquery
+from django.db.models.functions import Cast
 from django.http import HttpResponse
 from django.http.request import HttpRequest
 from django.shortcuts import render, redirect
@@ -22,6 +23,7 @@ from classification.views.classification_accumulation_graph import \
     AccumulationReportMode, get_accumulation_graph_data
 from classification.views.classification_export_flags import ExportFormatterFlags
 from flags.models import FlagCollection
+from genes.models import GeneSymbol
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import Lab, UserSettings, ClinVarKey
 from snpdb.models.models_genome import GenomeBuild
@@ -86,16 +88,17 @@ class ClassificationDashboard:
             .order_by('-created')
 
     @lazy
-    def outstanding_plain_text_qs(self) -> QuerySet['ConditionText']:
-        return ConditionText.objects.filter(lab__in=self.labs, classifications_count_outstanding__gt=0).order_by('-classifications_count_outstanding')
-
-    @property
     def classifications_wout_standard_text(self) -> int:
-        return Classification.objects.filter(withdrawn=False, condition_resolution__isnull=True, lab__in=self.labs).count()
+        return ConditionText.objects.filter(lab__in=self.labs).aggregate(total_outstanding=Sum('classifications_count_outstanding'))['total_outstanding']
 
     @property
     def classifications_with_standard_text(self) -> int:
         return Classification.objects.filter(withdrawn=False, condition_resolution__isnull=False, lab__in=self.labs).count()
+
+    @lazy
+    def classifications_wout_standard_gene(self) -> int:
+        return Classification.objects.filter(withdrawn=False, condition_resolution__isnull=True, lab__in=self.labs).count() - self.classifications_wout_standard_text
+
 
     def accumulation_graph_data(self):
         return get_accumulation_graph_data(AccumulationReportMode.Classification, labs=self.labs).get('lab')
