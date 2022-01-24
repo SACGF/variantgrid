@@ -165,7 +165,7 @@ def classification_dashboard(request: HttpRequest, lab_id: Optional[int] = None)
 
     all_labs = list(Lab.valid_labs_qs(request.user, admin_check=True))
     if len(all_labs) == 1 and not lab_id:
-        return redirect(reverse('classification_dashboard_lab', kwargs={'lab_id': all_labs[0].pk}))
+        return redirect(reverse('classification_dashboard', kwargs={'lab_id': all_labs[0].pk}))
 
     dlab = ClassificationDashboard(user=request.user, lab_id=lab_id)
     return render(request, "classification/classification_dashboard.html", {
