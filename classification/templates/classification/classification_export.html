@@ -87,13 +87,13 @@
             params.benchmark = 'true';
         }
         let mode = $("input[name='mode']:checked").val();
-        if (mode.length) {
+        if (mode && mode.length) {
             params.mode = mode;
         }
 
-        let allele = $("input[name='allele']").val().trim();
-        if (allele.length) {
-            params.allele = allele;
+        let allele = $("input[name='allele']").val();
+        if (allele && allele.trim().length) {
+            params.allele = allele.trim();
         }
 
         let paramParts = [];
