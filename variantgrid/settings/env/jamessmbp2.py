@@ -297,7 +297,10 @@ URLS_NAME_REGISTER.update({  # Disable selected snpdb urls
     "jfu_upload": False,
     "jfu_delete": False,
     "download_uploaded_file": False,
-    "clinvar_key_summary": True
+    "clinvar_key_summary": True,
+
+    "condition_matchings": True,
+    "condition_match_test": True
 })
 
 # mimic shariant
