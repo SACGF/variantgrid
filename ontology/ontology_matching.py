@@ -9,7 +9,8 @@ from lazy import lazy
 from annotation.regexes import db_ref_regexes
 from library.log_utils import report_message
 from library.utils import empty_to_none
-from ontology.models import OntologyTerm, OntologyService, OntologySnake, OntologyImportSource
+from ontology.models import OntologyTerm, OntologyService, OntologySnake, OntologyImportSource, \
+    GeneDiseaseClassification
 
 
 class OntologySnakeJson(TypedDict):
@@ -247,7 +248,7 @@ class OntologyMatching:
                 report_message(message=f"Could not resolve {gene_symbol} to HGNC OntologyTerm - can't do gene specific resolutions", level='warning')
                 return
 
-            snakes = OntologySnake.terms_for_gene_symbol(gene_symbol=gene_symbol, desired_ontology=OntologyService.MONDO)  # always convert to MONDO for now
+            snakes = OntologySnake.terms_for_gene_symbol(gene_symbol=gene_symbol, desired_ontology=OntologyService.MONDO, min_classification=GeneDiseaseClassification.STRONG)  # always convert to MONDO for now
             had_panel_app = False
             for snake in snakes:
                 if snake.show_steps()[0].relation.from_import.import_source == OntologyImportSource.PANEL_APP_AU:
