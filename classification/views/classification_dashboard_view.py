@@ -89,7 +89,7 @@ class ClassificationDashboard:
 
     @lazy
     def classifications_wout_standard_text(self) -> int:
-        return ConditionText.objects.filter(lab__in=self.labs).aggregate(total_outstanding=Sum('classifications_count_outstanding'))['total_outstanding']
+        return ConditionText.objects.filter(lab__in=self.labs).aggregate(total_outstanding=Sum('classifications_count_outstanding'))['total_outstanding'] or 0
 
     @property
     def classifications_with_standard_text(self) -> int:
