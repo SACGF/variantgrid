@@ -1452,7 +1452,8 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                     if gene_symbol and not gene_symbol_cell.provided:
                         # if no gene symbol value provided, populate it from c.hgvs
                         gene_symbol_cell.value = gene_symbol
-                    elif not gene_symbol and gene_symbol_cell.provided:
+
+                    elif not gene_symbol and gene_symbol_cell.value:
                         # if gene symbol provided (but not in c.hgvs) inject it into it
                         c_parts = c_parts.with_gene_symbol(gene_symbol_cell.value)
                         c_parts_cell.value = c_parts.full_c_hgvs
