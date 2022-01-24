@@ -46,7 +46,6 @@
                 {% endlabelled %}
             {% endif %}
             {% labelled hint="tiny" label="First Record" %}{% timestamp lab.first_classification_ever_shared_date time_ago=True %}{% endlabelled %}
-            {% labelled hint="tiny" label="Last Updated" %}{% timestamp lab.classifications_by_modified.first.modified time_ago=True %}{% endlabelled %}
             {% labelled hint="tiny" label="Last New Record" %}{% timestamp lab.classifications_by_created.last.created time_ago=True %}{% endlabelled %}
             {% labelled hint="tiny" label="Avg/Week" %}{{ lab.classifications_per_week | floatformat:1 }}{% endlabelled %}
         {% else %}
