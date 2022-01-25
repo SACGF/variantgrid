@@ -2,7 +2,7 @@ import json
 from typing import Set
 
 from django.contrib import admin, messages
-from django.contrib.admin import RelatedFieldListFilter
+from django.contrib.admin import RelatedFieldListFilter, BooleanFieldListFilter
 from django.db.models import QuerySet
 from django.utils import timezone
 
@@ -113,8 +113,17 @@ class ClassificationImportRunAdmin(ModelAdminBasics):
 
 @admin.register(Classification)
 class ClassificationAdmin(ModelAdminBasics):
-    list_display = ['id', 'lab', 'lab_record_id', 'share_level', 'clinical_significance', 'variant', 'allele', 'imported_genome_build', 'imported_c_hgvs', 'chgvs_grch37', 'chgvs_grch38', 'withdrawn', 'user', 'created_detailed', 'modified_detailed']
-    list_filter = (('lab__organization', RelatedFieldListFilter), ('lab', RelatedFieldListFilter), ClassificationShareLevelFilter, VariantMatchedFilter, ClinicalContextFilter, ClassificationImportedGenomeBuildFilter, ('user', RelatedFieldListFilter),)
+    list_display = ['id', 'lab', 'lab_record_id', 'share_level', 'clinical_significance', 'allele_fallback', 'imported_genome_build', 'imported_c_hgvs', 'chgvs_grch37', 'chgvs_grch38', 'withdrawn', 'user', 'created_detailed', 'modified_detailed']
+    list_filter = (
+        ('lab__organization', RelatedFieldListFilter),
+        ('lab', RelatedFieldListFilter),
+        ('withdrawn', BooleanFieldListFilter),
+        ClassificationShareLevelFilter,
+        VariantMatchedFilter,
+        ClinicalContextFilter,
+        ClassificationImportedGenomeBuildFilter,
+        ('user', RelatedFieldListFilter),
+    )
     search_fields = ('id', 'lab_record_id')
     list_per_page = 100
     inlines = (ClassificationModificationAdmin,)
@@ -126,6 +135,14 @@ class ClassificationAdmin(ModelAdminBasics):
     @admin_list_column(short_description="Modified", order_field="modified")
     def modified_detailed(self, obj: Classification):
         return obj.modified.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+
+    @admin_list_column(short_description="Allele", order_field="allele")
+    def allele_fallback(self, obj: Classification):
+        if allele := obj.allele:
+            return str(allele)
+        if variant := obj.variant:
+            return str(variant)
+        return "-"
 
     def has_add_permission(self, request):
         return False
