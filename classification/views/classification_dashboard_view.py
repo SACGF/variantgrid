@@ -103,7 +103,7 @@ class ClassificationDashboard:
         # return cms.filter(gene_symbol__in=Subquery(gene_symbols.values('symbol'))).count()
 
         linked_classifications = ConditionTextMatch.objects.filter(condition_text__lab__in=self.labs, classification__isnull=False)
-        return list(Classification.objects.filter(withdrawn=False, lab__in=self.labs).exclude(pk__in=Subquery(linked_classifications.values('classification_id'))).values_list("pk", flat=True))
+        return Classification.objects.filter(withdrawn=False, lab__in=self.labs).exclude(pk__in=Subquery(linked_classifications.values('classification_id'))).order_by('created')
 
         #return Classification.objects.filter(withdrawn=False, condition_resolution__isnull=True, lab__in=self.labs).count() - self.classifications_wout_standard_text
 
