@@ -101,9 +101,6 @@ class ClassificationDashboard:
         linked_classifications = ConditionTextMatch.objects.filter(condition_text__lab__in=self.labs, classification__isnull=False)
         return Classification.objects.filter(withdrawn=False, lab__in=self.labs).exclude(pk__in=Subquery(linked_classifications.values('classification_id'))).order_by('lab', 'created')
 
-        #return Classification.objects.filter(withdrawn=False, condition_resolution__isnull=True, lab__in=self.labs).count() - self.classifications_wout_standard_text
-
-
     def accumulation_graph_data(self):
         return get_accumulation_graph_data(AccumulationReportMode.Classification, labs=self.labs).get('lab')
 

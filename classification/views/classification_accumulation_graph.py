@@ -30,6 +30,10 @@ class ClassificationSummary:
     def __lt__(self, other):
         return self.at < other.at
 
+    @property
+    def is_valid(self):
+        return self.classification_id != 0
+
     def merge(self, older: Optional['ClassificationSummary']) -> 'ClassificationSummary':
         if not older:
             return self
@@ -273,6 +277,9 @@ class ClassificationAccumulationGraph:
         summary: ClassificationSummary
         for summary in stitcher:
 
+            if not summary.is_valid:
+                continue
+
             if not start_date:
                 start_date = summary.at.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
                 next_date = start_date + time_delta
@@ -287,6 +294,13 @@ class ClassificationAccumulationGraph:
         if start_date:
             sub_totals.append(running_accum.snapshot(at=start_date))
             sub_totals.append(running_accum.snapshot(at=start_date + time_delta))
+
+        ## if numbers go off, uncomment the following code to test
+        # expected_end_classification_ids = set(Classification.objects.filter(allele__isnull=False, lab__in=self.labs, withdrawn=False, share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS).values_list('pk', flat=True))
+        # for allele_summary in running_accum.allele_summaries.values():
+        #     for cs in allele_summary.not_withdrawn:
+        #         if cs.classification_id not in expected_end_classification_ids:
+        #             raise ValueError(f"{cs.classification_id} was counted but not expected")
 
         return sub_totals
 
