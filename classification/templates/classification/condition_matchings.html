@@ -77,13 +77,27 @@
         {% endlabelled %}
         {% if dlab.classifications_wout_standard_gene %}
             {% labelled hint="tiny" label="Classifications w/out Known Gene Symbol" %}
-                <span class="hover-detail" title="Classifications require a known gene symbol to be matched to a standard condition">
-                    {% for c in dlab.classifications_wout_standard_gene %}
-                        <a class="hover-link" href="{% url 'view_classification' c.id %}">
-                            {{ c.friendly_label }}</a>
-                        Gene Symbol = "{{ c.evidence.gene_symbol.value }}"<br/>
-                    {% endfor %}
-                </span>
+                <div class="hover-detail" title="Classifications require a known gene symbol to be matched to a standard condition">
+                    <a href="#bad_gene_symbols" class="toggle-link" data-toggle="collapse">Show {{ dlab.classifications_wout_standard_gene.count }} records with unknown gene symbols</a>
+                    <div id="bad_gene_symbols" class="collapse" >
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Classification</th>
+                                    <th>Gene Symbol</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            {% for c in dlab.classifications_wout_standard_gene %}
+                                <tr>
+                                    <td><a class="hover-link" href="{% url 'view_classification' c.id %}">{{ c.friendly_label }}</a></td>
+                                    <td>{{ c.evidence.gene_symbol.value | value:'No Gene Symbol' }}</td>
+                                </tr>
+                            </tbody>
+                        {% endfor %}
+                        </table>
+                    </div>
+                </div>
             {% endlabelled %}
         {% endif %}
 
