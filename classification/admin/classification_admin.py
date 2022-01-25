@@ -113,7 +113,7 @@ class ClassificationImportRunAdmin(ModelAdminBasics):
 
 @admin.register(Classification)
 class ClassificationAdmin(ModelAdminBasics):
-    list_display = ['id', 'lab', 'lab_record_id', 'share_level', 'clinical_significance', 'clinical_context', 'variant', 'imported_genome_build', 'imported_c_hgvs', 'chgvs_grch37', 'chgvs_grch38', 'withdrawn', 'user', 'created_detailed', 'modified_detailed']
+    list_display = ['id', 'lab', 'lab_record_id', 'share_level', 'clinical_significance', 'variant', 'allele', 'imported_genome_build', 'imported_c_hgvs', 'chgvs_grch37', 'chgvs_grch38', 'withdrawn', 'user', 'created_detailed', 'modified_detailed']
     list_filter = (('lab__organization', RelatedFieldListFilter), ('lab', RelatedFieldListFilter), ClassificationShareLevelFilter, VariantMatchedFilter, ClinicalContextFilter, ClassificationImportedGenomeBuildFilter, ('user', RelatedFieldListFilter),)
     search_fields = ('id', 'lab_record_id')
     list_per_page = 100
