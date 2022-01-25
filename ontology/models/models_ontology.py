@@ -587,7 +587,7 @@ class OntologySnake:
     # TODO only allow EXACT between two anythings that aren't Gene Symbols
     @staticmethod
     def snake_from(term: OntologyTerm, to_ontology: OntologyService,
-                   min_classification: GeneDiseaseClassification = GeneDiseaseClassification.STRONG,
+                   min_classification: Optional[GeneDiseaseClassification] = GeneDiseaseClassification.STRONG,
                    max_depth: int = 1) -> 'OntologySnakes':
         """
         Returns the smallest snake/paths from source term to the desired OntologyService
@@ -601,10 +601,9 @@ class OntologySnake:
         new_snakes: List[OntologySnake] = list([OntologySnake(source_term=term)])
         valid_snakes: List[OntologySnake] = []
 
-        gencc_classifications = GeneDiseaseClassification.get_above_min(min_classification)
         relation_q_list = [
             ~Q(relation__in={OntologyRelation.IS_A, OntologyRelation.EXACT_SYNONYM, OntologyRelation.RELATED_SYNONYM}),
-            ~Q(relation=OntologyRelation.RELATED) | Q(extra__strongest_classification__in=gencc_classifications),
+            OntologySnake.gencc_quality_filter(min_classification),
         ]
         q_relation = functools.reduce(operator.and_, relation_q_list)
 
@@ -649,14 +648,18 @@ class OntologySnake:
         return OntologySnakes(valid_snakes)
 
     @staticmethod
+    def gencc_quality_filter(quality: GeneDiseaseClassification = GeneDiseaseClassification.STRONG) -> Q:
+        gencc_classifications = GeneDiseaseClassification.get_above_min(GeneDiseaseClassification.STRONG)
+        return ~Q(from_import__import_source='gencc') | Q(extra__strongest_classification__in=gencc_classifications)
+
+    @staticmethod
     def mondo_terms_for_gene_symbol(gene_symbol: Union[str, GeneSymbol]) -> Set[OntologyTerm]:
         gene_ontology = OntologyTerm.get_gene_symbol(gene_symbol)
         from ontology.panel_app_ontology import update_gene_relations
         update_gene_relations(gene_symbol)
         terms = set()
 
-        gencc_classifications = GeneDiseaseClassification.get_above_min(GeneDiseaseClassification.STRONG)
-        q_relation = ~Q(relation=OntologyRelation.RELATED) | Q(extra__strongest_classification__in=gencc_classifications)
+        q_relation = OntologySnake.gencc_quality_filter()
 
         mondos = OntologyTermRelation.objects.filter(q_relation, dest_term=gene_ontology,
                                                      source_term__ontology_service=OntologyService.MONDO)
@@ -673,7 +676,8 @@ class OntologySnake:
 
     @staticmethod
     def terms_for_gene_symbol(gene_symbol: Union[str, GeneSymbol], desired_ontology: OntologyService,
-                              max_depth=1, min_classification: GeneDiseaseClassification = None) -> 'OntologySnakes':
+                              max_depth=1, min_classification: Optional[GeneDiseaseClassification] = None) -> 'OntologySnakes':
+        # FIXME, can the min_classification default to STRONG and other code can filter it out?
         """ max_depth: How many steps in snake path to go through """
         # TODO, do this with hooks
         from ontology.panel_app_ontology import update_gene_relations
@@ -702,7 +706,7 @@ class OntologySnake:
         return GeneSymbol.objects.filter(symbol__in=gene_symbol_names)
 
     @staticmethod
-    def has_gene_relationship(term: Union[OntologyTerm, str], gene_symbol: Union[GeneSymbol, str]) -> bool:
+    def has_gene_relationship(term: Union[OntologyTerm, str], gene_symbol: Union[GeneSymbol, str], quality: Optional[GeneDiseaseClassification] = GeneDiseaseClassification.STRONG) -> bool:
         # TODO, do this with hooks
         from ontology.panel_app_ontology import update_gene_relations
         update_gene_relations(gene_symbol)
@@ -713,16 +717,17 @@ class OntologySnake:
         try:
             gene_term = OntologyTerm.get_gene_symbol(gene_symbol)
             # try direct link first
-            if OntologyTermRelation.objects.filter(source_term=term, dest_term=gene_term).exists():
+            quality_q = OntologySnake.gencc_quality_filter(quality)
+            if OntologyTermRelation.objects.filter(source_term=term, dest_term=gene_term).filter(quality_q).exists():
                 return True
             # optimisations for OMIM/MONDO
             if term.ontology_service in {OntologyService.MONDO, OntologyService.OMIM}:
                 via_ids: QuerySet = None
                 exclude_mondo_omim = ~Q(relation__in={OntologyRelation.EXACT_SYNONYM, OntologyRelation.RELATED_SYNONYM})
                 if term.ontology_service == OntologyService.MONDO:
-                    via_ids = OntologyTermRelation.objects.filter(source_term=term, dest_term__ontology_service=OntologyService.OMIM).filter(exclude_mondo_omim).values_list("dest_term_id", flat=True)
+                    via_ids = OntologyTermRelation.objects.filter(source_term=term, dest_term__ontology_service=OntologyService.OMIM).filter(quality_q).filter(exclude_mondo_omim).values_list("dest_term_id", flat=True)
                 else:
-                    via_ids = OntologyTermRelation.objects.filter(dest_term=term, source_term__ontology_service=OntologyService.MONDO).filter(exclude_mondo_omim).values_list("source_term_id", flat=True)
+                    via_ids = OntologyTermRelation.objects.filter(dest_term=term, source_term__ontology_service=OntologyService.MONDO).filter(quality_q).filter(exclude_mondo_omim).values_list("source_term_id", flat=True)
                 return OntologyTermRelation.objects.filter(source_term_id__in=via_ids, dest_term=gene_term).exists()
 
             hgnc_terms = OntologySnake.snake_from(term=term, to_ontology=OntologyService.HGNC).leafs()

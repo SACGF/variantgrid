@@ -894,13 +894,13 @@ def condition_matching_suggestions(ct: ConditionText, ignore_existing=False) -> 
 
             gene_symbol = ctm.gene_symbol
             if root_level_mondo:
-                gene_level_terms = OntologySnake.mondo_terms_for_gene_symbol(gene_symbol=gene_symbol)
-                matches_gene_level = set()
+                gene_level_terms: Set[OntologyTerm] = OntologySnake.mondo_terms_for_gene_symbol(gene_symbol=gene_symbol)
+                matches_gene_level: Set[OntologyTerm] = set()
                 for gene_level in gene_level_terms:
                     if is_descendant({gene_level}, root_level_mondo):
                         matches_gene_level.add(gene_level)
 
-                not_root_gene_terms = list()
+                not_root_gene_terms: List[OntologyTerm] = list()
                 for term in matches_gene_level:
                     if term not in root_level_terms:
                         not_root_gene_terms.append(term)
