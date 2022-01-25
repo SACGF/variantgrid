@@ -78,7 +78,7 @@
         {% if dlab.classifications_wout_standard_gene %}
             {% labelled hint="tiny" label="Classifications w/out Known Gene Symbol" %}
                 <span class="hover-detail" title="Classifications require a known gene symbol to be matched to a standard condition">
-                    {{ dlab.classifications_wout_standard_gene | number:'warning'}}
+                    {% for c_id in dlab.classifications_wout_standard_gene %}{% if not forloop.first %}, {% endif %}<a class="hover-link" href="{% url 'view_classification' c_id %}">{{ c_id }}</a>{% endfor %}
                 </span>
             {% endlabelled %}
         {% endif %}
