@@ -69,7 +69,7 @@ class ClassificationDashboard:
 
     @property
     def clinvar_keys(self) -> List[ClinVarKey]:
-        return [lab.clinvar_key for lab in self.labs if lab.clinvar_key]
+        return sorted(set(lab.clinvar_key for lab in self.labs if lab.clinvar_key))
 
     @lazy
     def uploads_to_clinvar_qs(self) -> QuerySet[ClinVarExport]:
@@ -98,12 +98,8 @@ class ClassificationDashboard:
 
     @lazy
     def classifications_wout_standard_gene(self) -> List[int]:
-        # cms = ClassificationModification.objects.annotate(gene_symbol=Cast('published_evidence__gene_symbol__value', CITextField()))
-        # gene_symbols = GeneSymbol.objects.all()
-        # return cms.filter(gene_symbol__in=Subquery(gene_symbols.values('symbol'))).count()
-
         linked_classifications = ConditionTextMatch.objects.filter(condition_text__lab__in=self.labs, classification__isnull=False)
-        return Classification.objects.filter(withdrawn=False, lab__in=self.labs).exclude(pk__in=Subquery(linked_classifications.values('classification_id'))).order_by('created')
+        return Classification.objects.filter(withdrawn=False, lab__in=self.labs).exclude(pk__in=Subquery(linked_classifications.values('classification_id'))).order_by('lab', 'created')
 
         #return Classification.objects.filter(withdrawn=False, condition_resolution__isnull=True, lab__in=self.labs).count() - self.classifications_wout_standard_text
 

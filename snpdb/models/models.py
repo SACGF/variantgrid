@@ -244,6 +244,9 @@ class ClinVarKey(TimeStampedModel):
     def __str__(self):
         return f"ClinVarKey ({self.id})"
 
+    def __lt__(self, other):
+        return self.id < other.id
+
     def clean(self):
         #  validate assertion method lookup
         if not isinstance(self.assertion_method_lookup, dict):
