@@ -466,6 +466,12 @@ class DiscordanceReportAdmin(ModelAdminBasics):
         for ds in queryset:
             send_discordance_notification(ds)
 
+    @admin_action("Re-calculate")
+    def re_calculate(self, request, queryset):
+        ds: DiscordanceReport
+        for ds in queryset:
+            ds.update()
+
 
 @admin.register(UploadedFileLab)
 class UploadedFileLabAdmin(ModelAdminBasics):
