@@ -492,6 +492,10 @@ class OntologySnakeStep:
     relation: OntologyTermRelation
     dest_term: OntologyTerm
 
+    @property
+    def source_term(self) -> OntologyTerm:
+        return self.relation.other_end(self.dest_term)
+
 
 OntologyList = Optional[Union[QuerySet, List[OntologyTerm]]]
 
