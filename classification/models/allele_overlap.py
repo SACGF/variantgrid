@@ -51,8 +51,11 @@ class AlleleOverlap:
 
     @lazy
     def discordance_reports(self) -> List[DiscordanceReport]:
-        ccs = ClinicalContext.objects.filter(allele=self.allele)
-        return DiscordanceReport.objects.filter(clinical_context__in=ccs).order_by('clinical_context__name')
+        if self.discordant_level == DiscordanceLevel.DISCORDANT:
+            if ccs := ClinicalContext.objects.filter(allele=self.allele):
+                return DiscordanceReport.objects.filter(clinical_context__in=ccs).order_by('clinical_context__name')
+
+        return list()
 
 
     LEVEL_SORT_DICT = {
