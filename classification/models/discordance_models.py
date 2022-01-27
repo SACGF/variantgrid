@@ -49,6 +49,16 @@ class DiscordanceReport(TimeStampedModel):
         return reverse('discordance_report', kwargs={"report_id": self.pk})
 
     @property
+    def status(self) -> str:
+        if self.resolution:
+            return self.get_resolution_display()
+        return "Ongoing"
+
+    @property
+    def is_important(self):
+        return self.is_active and self.resolution != DiscordanceReportResolution.CONCORDANT
+
+    @property
     def is_active(self) -> bool:
         return self.resolution is None
 
@@ -114,6 +124,7 @@ class DiscordanceReport(TimeStampedModel):
                 vcm = ClassificationModification.objects.get(is_last_published=True, classification=vcm_id)
                 if vcm.classification.lab not in existing_labs:
                     newly_added_labs.add(vcm.classification.lab)
+
                 DiscordanceReportClassification(
                     report=self,
                     classification_original=vcm

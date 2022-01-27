@@ -420,3 +420,8 @@ def db_ref(data: VCDbRefDict, css: Optional[str] = ''):
 @register.inclusion_tag("classification/tags/condition.html")
 def condition(condition_obj: ConditionResolved, limit: Optional[int] = 100):
     return {"condition": condition_obj, "limit": limit}
+
+
+@register.inclusion_tag("classification/tags/discordance_report.html")
+def discordance_report(discordance_report: DiscordanceReport):
+    return {"discordance_report": discordance_report}

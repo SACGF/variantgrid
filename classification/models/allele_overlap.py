@@ -8,7 +8,7 @@ from django.contrib.auth.models import User
 from lazy import lazy
 
 from classification.enums import SpecialEKeys
-from classification.models import ClassificationModification
+from classification.models import ClassificationModification, DiscordanceReport
 from classification.models.classification import Classification
 from classification.models.clinical_context_models import ClinicalContext, DiscordanceLevel, DiscordanceStatus
 from genes.hgvs import CHGVS
@@ -48,6 +48,12 @@ class AlleleOverlap:
     @lazy
     def discordant_level(self) -> DiscordanceLevel:
         return self.discordance_status.level
+
+    @lazy
+    def discordance_reports(self) -> List[DiscordanceReport]:
+        ccs = ClinicalContext.objects.filter(allele=self.allele)
+        return DiscordanceReport.objects.filter(clinical_context__in=ccs).order_by('clinical_context__name')
+
 
     LEVEL_SORT_DICT = {
         DiscordanceLevel.DISCORDANT: 4,

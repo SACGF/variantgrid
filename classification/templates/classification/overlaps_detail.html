@@ -75,6 +75,9 @@
                         <div class="link-toolbar">
                             <a href="{{ overlap.allele.get_absolute_url }}" class="hover-link float-left">Go to Allele</a>
                             <a href="{% url 'classification_diff' %}?allele={{ overlap.allele.id }}" class="hover-link">Show Diffs</a>
+                            {% for dr in overlap.discordance_reports %}
+                                {% if dr.is_important %}{% discordance_report dr %}{% endif %}
+                            {% endfor %}
                         </div>
                     </div>
                 </div>
