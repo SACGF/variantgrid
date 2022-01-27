@@ -21,6 +21,7 @@
         window.open(`{% url 'discordance_export' report.id %}`, '_self');
         return false;
     }
+    {% comment %}
     function reorgGroupings() {
         {% if use_allele_links %}
         window.location = `{% url 'view_allele' allele.id %}?edit_clinical_groupings=True`;
@@ -28,6 +29,7 @@
         window.location = `{% url 'view_variant' preferred_variant.id %}?edit_clinical_groupings=True`;
         {% endif %}
     }
+    {% endcomment %}
     function confirmUnable() {
         let reason = $(`input[name='continued_discordance_reason']:checked`).val();
         if (!reason) {
@@ -57,16 +59,24 @@
                 <h5>Discordance</h5>
             </div>
              <div class="card-body">
-                 {% labelled label="Resolution" %}{{ report.resolution_text }}{% endlabelled %}
+                 {% labelled label="Resolution" %}
+                     {% if report.resolution %}{{ report.resolution_text }}
+                     {% else %}<span class="no-value">Ongoing : In Discordance</span>{% endif %}
+                 {% endlabelled %}
                  {% labelled label="Allele" %}<a class="hover-link" href="{% url 'view_allele' allele.id %}">{{ allele.clingen_allele }}</a>{% endlabelled %}
+                 {% comment %}
                  {% for va in allele.variant_alleles %}
                      {% labelled label=va.genome_build %}
                         <a class="hover-link variant-coordinate" href="{% url 'view_variant' va.variant_id %}">{{ va.variant }}</a>
                      {% endlabelled %}
                 {% endfor %}
+                {% endcomment %}
+                {% labelled label="c.HGVS "|add:genome_build.name %}
+                    {% for c_hgvs in c_hgvses %}<div>{% c_hgvs c_hgvs %}</div>{% endfor %}
+                {% endlabelled %}
                 {% labelled label="Variant Interpreted in Context of" %}{{ clinical_context }}{% endlabelled %}
                 {% labelled label="Opened At" value_css="timestamp" %}{% timestamp report.report_started_date %}{% endlabelled %}
-                {% labelled label="Closed At" %}
+                {% labelled label="Closed At" value_css="timestamp" %}
                     {% if report.report_completed_date %}{% timestamp report.report_completed_date %}
                     {% else %}<span class="no-value">-</span>
                     {% endif %}
@@ -86,7 +96,7 @@
                 {% endif %}
                 {% if report.resolution == 'D' %}
                     {% labelled label="Continued Discordance Notes" %}
-                        <span class="textarea-readonly">{{ report.continued_discordance_text }}</span>
+                        {% if report.continued_discordance_text %}<span class="textarea-readonly">{{ report.continued_discordance_text }}</span>{% else %}<span class="no-value">-</span>{% endif %}
                     {% endlabelled %}
                 {% endif %}
              </div>
@@ -94,8 +104,10 @@
     </div>
 
     <div class="container mt-4">
-        <h4>Classifications</h4>
-        {% classification_groups classifications %}
+        {% classification_groups classifications title="Considered Classifications" %}
+        {% for nlc in no_longer_considered %}
+            {% classification_groups nlc.classifications title=nlc.reason %}
+        {% endfor %}
     </div>
 
     {% if provide_reopen %}
@@ -169,7 +181,7 @@
                         {% endif %}
                     </td>
                     <td class="timestamp">{% timestamp old_report.report_completed_date %}</td>
-                    <td>{{ old_report.resolution_text }}</td>
+                    <td>{% if old_report.resolution %}{{ old_report.resolution_text }}{% else %}<span class="no-value">Ongoing : In Discordance</span>{% endif %}</td>
                 </tr>
             {% endfor %}
             </tbody>

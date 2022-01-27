@@ -58,16 +58,18 @@ def classification_groups(
         classification_modifications: Iterable[ClassificationModification],
         show_diffs: bool = True,
         link_discordance_reports: bool = False,
-        genome_build: Optional[GenomeBuild] = None):
+        genome_build: Optional[GenomeBuild] = None,
+        title: Optional[str] = None):
 
     groups = ClassificationGroups(classification_modifications, genome_build=genome_build)
 
     context = {
+        "title": title,
         "classification_groups": groups,
         "user": context.request.user,
         "genome_build": groups.genome_build,
         "table_id": str(uuid.uuid4()).replace("-", "_"),
-        "show_allele_origin": settings.VARIANT_CLASSIFICATION_GRID_SHOW_ORIGIN
+        "show_allele_origin": settings.VARIANT_CLASSIFICATION_GRID_SHOW_ORIGIN,
     }
     ordered_classifications = list(groups.modifications)
     # classifications are sorted by group, display them so they're sorted by date
@@ -87,6 +89,8 @@ def classification_groups(
         clinical_grouping_list = list(all_clinical_groupings)
         clinical_grouping_list.sort(key=lambda cg:(not cg.is_default if cg else False, cg.name if cg else 'No Allele'))
         context["clinical_contexts"] = clinical_grouping_list
+
+    context["paging"] = len(groups) > 10
 
     return context
 
