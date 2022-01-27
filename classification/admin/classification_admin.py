@@ -399,6 +399,11 @@ class DiscordanceReportAdminLabFilter(admin.SimpleListFilter):
 
 class DiscordanceReportClassificationAdmin(admin.TabularInline):
     model = DiscordanceReportClassification
+    readonly_fields = ["classification_original", "clinical_context_effective", "clinical_context_final", "withdrawn_final"]
+    fields = ["classification_original", "clinical_context_effective", "clinical_context_final", "withdrawn_final"]
+
+    def clinical_context_effective(self, drc: DiscordanceReportClassification):
+        return drc.clinical_context_effective
 
     def has_add_permission(self, request, obj=None):
         return False
