@@ -132,10 +132,30 @@ def reattempt_variant_matching(user: User, queryset: QuerySet[Classification]) -
 
     invalid_record_count = 0
     valid_record_count = 0
+    valid_this_loop = 0
     imports_by_genome: Dict[int, ClassificationImport] = dict()
+    max_size = 100
+
+    def process_outstanding():
+        # processes the contents of imports_by_genome
+        # and then clears out the appropriate variables
+        nonlocal valid_this_loop
+        nonlocal valid_record_count
+        nonlocal imports_by_genome
+
+        if imports_by_genome:
+            for vc_import in imports_by_genome.values():
+                process_classification_import(vc_import, ImportSource.API)
+            ClassificationImportRun.record_classification_import("admin-variant-rematch", valid_this_loop)
+
+            # reset variables and continue
+            valid_record_count += valid_this_loop
+            valid_this_loop = 0
+            imports_by_genome.clear()
 
     ClassificationImportRun.record_classification_import("admin-variant-rematch")
     try:
+
         for vc in qs:
             try:
                 vc.revalidate(user=user)
@@ -147,14 +167,16 @@ def reattempt_variant_matching(user: User, queryset: QuerySet[Classification]) -
                 vc.set_variant(variant=None, message='Admin has re-triggered variant matching')
                 vc.classification_import = vc_import
                 vc.save()
-                valid_record_count += 1
+                valid_this_loop += 1
 
             except BaseException:
                 invalid_record_count += 1
 
-        for vc_import in imports_by_genome.values():
-            process_classification_import(vc_import, ImportSource.API)
-        ClassificationImportRun.record_classification_import("admin-variant-rematch", valid_record_count)
+            if valid_this_loop >= max_size:
+                process_outstanding()
+                sleep(2)  # minor pause to stop the variant matcher from being bombarded
+
+        process_outstanding()
 
     finally:
         # got to give time for variant matching to complete, a bit hacky
