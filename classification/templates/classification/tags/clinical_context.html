@@ -1,24 +1,19 @@
+{% load classification_tags %}
 <div>
 {%  if link %}
     <a class="hover-link font-weight-bold" href="{% url 'clinical_context' cc.id %}">{{ cc }}</a>&#160;
 {% else %}
-    <span class="font-weight-bold">{{ cc }}</span>&#160;
+    <label>{{ cc }}</label>&#160;
 {% endif %}
 </div>
 <div>
-{% if cc.latest_report %}
-    {% if cc.latest_report.resolution != 'C' %}
-        <span class="text-danger">In Discordance</span><br/><a class='hover-link' href="{% url 'discordance_report' cc.latest_report.pk %}">Click for Discordance Report</a>
-    {% else %}
-        <a class='hover-link' href="{% url 'discordance_report' cc.latest_report.pk %}">{{ cc.latest_report.resolution_text }}</a>
-    {% endif %}
-{% elif cc.status == 'D' %}
-    <b>&nbsp;- DISCORDANT</b>
+{% if cc.latest_report and cc.latest_report.is_important %}
+    {% discordance_report cc.latest_report %}
 {% elif cc.relevant_classification_count == 0 %}
     No relevant classifications
-    {% elif cc.relevant_classification_count == 1 %}
+{% elif cc.relevant_classification_count == 1 %}
     Single relevant classification
-    {% else %}
+{% else %}
     Concordant
 {% endif %}
 </div>

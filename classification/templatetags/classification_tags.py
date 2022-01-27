@@ -151,8 +151,10 @@ def clinical_significance_select(name, value):
 
 
 @register.inclusion_tag("classification/tags/clinical_context.html", takes_context=True)
-def clinical_context(context, cc: ClinicalContext):
-    return {"cc": cc, "link": context.request.user.is_superuser}
+def clinical_context(context, cc: ClinicalContext, show_link: Optional[bool] = None):
+    if show_link is None:
+        show_link = context.request.user.is_superuser
+    return {"cc": cc, "link": show_link}
 
 
 @register.inclusion_tag("classification/tags/classification_quick.html", takes_context=True)
