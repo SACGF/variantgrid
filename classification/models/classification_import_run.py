@@ -19,6 +19,9 @@ class ClassificationImportRunStatus(models.TextChoices):
     UNFINISHED = "U", 'Unfinished'
 
 
+MAX_IMPORT_AGE = timedelta(minutes=5)
+
+
 class ClassificationImportRun(TimeStampedModel):
     # Could put lab and user in this to make it more specific
     # but an import can even be across labs
@@ -34,27 +37,29 @@ class ClassificationImportRun(TimeStampedModel):
         :param is_complete: Is the import complete
         This method may trigger classification_imports_complete_signal
         """
-        cir = ClassificationImportRun._get_or_create_for_identifier(identifier)
-        cir.row_count += add_row_count
+        use_me: Optional[ClassificationImportRun] = None
+
+        # see if there's already an ongoing import, if it's not too old
+        if latest := ClassificationImportRun.objects.filter(identifier=identifier).order_by('-modified').first():
+            # do these as checks on the most recent import, rather than new ones
+            if latest.status == ClassificationImportRunStatus.ONGOING and (now() - latest.modified) <= MAX_IMPORT_AGE:
+                use_me = latest
+
+        if not use_me:
+            use_me = ClassificationImportRun(identifier=identifier)
+
+        use_me.row_count += add_row_count
         if is_complete:
-            cir.status = ClassificationImportRunStatus.COMPLETED
-        cir.save()
+            use_me.status = ClassificationImportRunStatus.COMPLETED
+        use_me.save()
 
-    @staticmethod
-    def _get_or_create_for_identifier(identifier: str):
+        # after we've either updated or created a new import, cleanup any old ones
+        # do this after so we don't close and import and start a new one - but trigger the fact that there were 0 imports in that split moment inbetween
         ClassificationImportRun.cleanup()
-
-        if existing := ClassificationImportRun.objects.filter(identifier=identifier, status=ClassificationImportRunStatus.ONGOING).first():
-            return existing
-        else:
-            nb = NotificationBuilder("Import started")
-            nb.add_markdown(f":golfer: Import Started {identifier}")
-            nb.send()
-            return ClassificationImportRun(identifier=identifier)
 
     @staticmethod
     def cleanup():
-        too_old = now() - timedelta(minutes=5)
+        too_old = now() - MAX_IMPORT_AGE
         for unfinished in ClassificationImportRun.objects.filter(status=ClassificationImportRunStatus.ONGOING, modified__lte=too_old):
             unfinished.status = ClassificationImportRunStatus.UNFINISHED
             unfinished.save()
