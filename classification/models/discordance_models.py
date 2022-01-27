@@ -56,7 +56,7 @@ class DiscordanceReport(TimeStampedModel):
 
     @property
     def is_important(self):
-        return self.is_active and self.resolution != DiscordanceReportResolution.CONCORDANT
+        return self.resolution is None or self.resolution == DiscordanceReportResolution.CONTINUED_DISCORDANCE
 
     @property
     def is_active(self) -> bool:
