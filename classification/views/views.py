@@ -383,7 +383,7 @@ def classification_import_tool(request: HttpRequest) -> Response:
     else:
         # choose the first test lab for import to process on
         for lab in all_labs:
-            if 'test' in lab.name.lower():
+            if lab.name.lower().startswith('test'):
                 selected_lab = lab
                 break
 

@@ -259,6 +259,21 @@ class ClassificationAdmin(ModelAdminBasics):
         count = self.set_withdraw(request, queryset, False)
         self.message_user(request, f"{count} records now newly set to un-withdrawn")
 
+    @admin_action("Condition Text Sync")
+    def condition_text_sync(self, request, queryset: QuerySet[Classification]):
+        from classification.models import ConditionTextMatch
+
+        conditions_newly_set = 0
+        for c in queryset:
+            has_condition_already = bool(c.condition_resolution)
+            ConditionTextMatch.sync_condition_text_classification(c.last_published_version)
+            c.refresh_from_db(fields=["condition_resolution"])
+            has_condition_now = bool(c.condition_resolution)
+            if has_condition_now and not has_condition_already:
+                conditions_newly_set += 1
+
+        self.message_user(request, f"{conditions_newly_set} records have conditions now when they didn't previously")
+
     """
     @admin_action("Fix allele Freq History")
     def fix_allele_freq_history(self, request, queryset):

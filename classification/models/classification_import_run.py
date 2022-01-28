@@ -47,6 +47,9 @@ class ClassificationImportRun(TimeStampedModel):
 
         if not use_me:
             use_me = ClassificationImportRun(identifier=identifier)
+            nb = NotificationBuilder("Import started")
+            nb.add_markdown(f":golfer: Import Started {identifier}")
+            nb.send()
 
         use_me.row_count += add_row_count
         if is_complete:

@@ -227,7 +227,7 @@ class ClinicalContext(FlagsMixin, TimeStampedModel):
 
         cause = self.pending_cause or cause
 
-        if ongoing_import and self.status != new_status:
+        if ongoing_import and self.status != new_status and old_status is not None:
             if new_status != self.pending_status:
                 # only update the cause if we're going to end up with a new status
                 self.pending_cause = cause
