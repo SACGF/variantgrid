@@ -91,6 +91,15 @@
         } else {
             previewDom.removeClass('invalid');
         }
+
+        envelope = {
+            "records": [envelope]
+        }
+        if ($('#import_recording').prop('checked')) {
+            envelope["import_id"] = "classification_import_tool";
+            envelope["status"] = "complete";
+        }
+
         return [JSON.stringify(envelope), valid]
     }
 
@@ -208,7 +217,13 @@ div.json {
         {% labelled label="Toggles" %}
             <div class="form-check">
                 <label class="form-check-label">
-                    <input type="checkbox" id="test" checked="checked" class="form-check-input" />
+                    <input type="checkbox" id="import_recording" class="form-check-input" />
+                    Use the new import API which triggers notifications
+                </label>
+            </div>
+            <div class="form-check">
+                <label class="form-check-label">
+                    <input type="checkbox" id="test" class="form-check-input" />
                     Test Mode
                 </label>
             </div>
@@ -243,14 +258,14 @@ div.json {
         {% labelled label="Genome Build" %}
             <select id="genome_build" class="form-control">
                 <option value="GRCh37">GRCh37</option>
-                <option value="GRCh38">GRCh38</option>
+                <option value="GRCh38" selected>GRCh38</option>
             </select>
         {% endlabelled %}
         {% labelled label="Clinical Significance" %}
-            <input id="clinical_significance" type="text" placeholder="B, LB, VUS, LP, P, etc" class="form-control data-field"/>
+            <input id="clinical_significance" type="text" placeholder="B, LB, VUS, LP, P, etc" class="form-control data-field" value="VUS" />
         {% endlabelled %}
         {% labelled label="Zygosity" %}
-            <input id="zygosity" type="text" placeholder="heterozygous, homozygous, hemizygous, mosaic, etc" class="form-control data-field"/>
+            <input id="zygosity" type="text" placeholder="heterozygous, homozygous, hemizygous, mosaic, etc" class="form-control data-field" value="heterozygous" />
         {% endlabelled %}
         {% labelled label="Condition" %}
             <input id="condition" type="text" class="form-control data-field"/>
