@@ -5,7 +5,7 @@ from operator import attrgetter
 from typing import Dict, List, Collection, Optional, Tuple
 
 from django.contrib.auth.models import User
-from django.db.models import Count
+from django.db.models import Count, Subquery, QuerySet
 from lazy import lazy
 
 from classification.enums import SpecialEKeys
@@ -157,51 +157,28 @@ class AlleleOverlap:
 
         # find all overlaps, then see if user is allowed to see them and if user wants to see them (lab restriction)
 
-        allele_qs = Allele.objects
-        allele_qs = allele_qs.annotate(Count('classifications'))
-        allele_qs.filter(classification__count__gte=2)
+        allele_qs = Allele.objects.annotate(classification__count=Count('classification')).filter(classification__count__gte=2)
 
-        # find the variant for ALL variant classifications, and keep a dict of variant id to classification id
-        # want to do minimum amount of work until we've confirmed there's an overlap (as overlaps will only ever be a tiny percentage)
-        classification_variant_ids_qs = Classification.objects.exclude(withdrawn=True).values_list('id', 'allele_id', 'lab_id')
+        cm_qs: QuerySet[ClassificationModification]
+        cm_qs = ClassificationModification.latest_for_user(user=user, published=True).filter(classification__allele_id__in=Subquery(allele_qs.values("pk")))\
+            .select_related('classification', 'classification__allele', 'classification__clinical_context', 'classification__lab')
 
-        # only consider allele ids associated to 2 or more variant classifications
-        allele_vcids_multiple = {allele_id: vc_ids for allele_id, vc_ids in allele_to_vcids.items() if len(vc_ids) >= 2}
+        allele_to_cms = defaultdict(list)
+        for cm in cm_qs:
+            allele_to_cms[cm.classification.allele].append(cm)
 
-        # find the actual alleles for the ids
-        allele_qs = Allele.objects.filter(id__in=allele_vcids_multiple.keys())
-        all_relevant_vcids = list()
-        for vcids in allele_vcids_multiple.values():
-            all_relevant_vcids.extend(vcids)
-
-        # find the last published classification modifications for the relevant variants
-        vcid_vc: Dict[int, ClassificationModification] = dict()
-        vc: ClassificationModification
-        for vc in ClassificationModification.latest_for_user(user=user, published=True) \
-                .filter(classification_id__in=all_relevant_vcids) \
-                .select_related('classification', 'classification__clinical_context',
-                                'classification__lab'):
-            vcid_vc[vc.classification_id] = vc
-
-        # lastly return a list of tuples of (Allele, ClassificationModification)
-        allele_and_vcs: [AlleleOverlap] = list()
-        for allele in allele_qs:
-            vcids = allele_to_vcids[allele.id]
-            vcs = [vc for vc in [vcid_vc.get(vcid) for vcid in vcids] if vc is not None]
-            if vcs:
-                valid_for_user = user.is_superuser
+        # now make sure each allele has 2+ classifications and at least 1 of them involves the lab_ids
+        allele_and_vcs: List[AlleleOverlap] = list()
+        for allele, cms in allele_to_cms.items():
+            if len(cms) >= 2 and any((cm.classification.lab_id in lab_ids for cm in cms)):
                 clinical_contexts = set()
-                for vc in vcs:
-                    if not valid_for_user and vc.classification.lab_id in lab_ids:
-                        valid_for_user = True
-                    cc = vc.classification.clinical_context
-                    if cc:  # the clinical context might still be resolving if right after an import
+                for cm in cms:
+                    if cc := cm.classification.clinical_context:
                         clinical_contexts.add(cc)
-                clinical_context_list = list(clinical_contexts)
-                clinical_context_list.sort(key=attrgetter('name'))
-                if valid_for_user and len(vcs) >= 2:
-                    allele_and_vcs.append(
-                        AlleleOverlap(genome_build=genome_build, allele=allele, vcms=vcs, ccs=clinical_context_list))
+
+                clinical_contexts = sorted(clinical_contexts, key=attrgetter('name'))
+                ao = AlleleOverlap(genome_build=genome_build, allele=allele, vcms=cms, ccs=clinical_contexts)
+                allele_and_vcs.append(ao)
 
         allele_and_vcs.sort(reverse=True)
         return allele_and_vcs
