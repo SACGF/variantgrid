@@ -5,6 +5,7 @@ from operator import attrgetter
 from typing import Dict, List, Collection, Optional, Tuple
 
 from django.contrib.auth.models import User
+from django.db.models import Count
 from lazy import lazy
 
 from classification.enums import SpecialEKeys
@@ -142,25 +143,27 @@ class AlleleOverlap:
         return groups
 
     @staticmethod
-    def overlaps_for_user(user: User) -> List['AlleleOverlap']:
+    def overlaps_for_user(user: User, lab_id: Optional[int] = None) -> List['AlleleOverlap']:
         if user is None:
             user = admin_bot()
         genome_build = UserSettings.get_for_user(user).default_genome_build
-        labs = set(Lab.valid_labs_qs(user))
+        labs = set(Lab.valid_labs_qs(user, admin_check=True))
         lab_ids = set(lab.id for lab in labs)
+        if lab_id:
+            if lab_id in lab_ids:
+                lab_ids = set([lab_id])
+            else:
+                raise ValueError(f"You do not have access to lab id {lab_id}")
+
+        # find all overlaps, then see if user is allowed to see them and if user wants to see them (lab restriction)
+
+        allele_qs = Allele.objects
+        allele_qs = allele_qs.annotate(Count('classifications'))
+        allele_qs.filter(classification__count__gte=2)
 
         # find the variant for ALL variant classifications, and keep a dict of variant id to classification id
-        classification_variant_ids_qs = Classification.objects.exclude(withdrawn=True).values_list('id', 'variant')
-        variant_to_vcids: Dict[int, List[int]] = defaultdict(list)
-        for classification_id, variant_id in classification_variant_ids_qs:
-            variant_to_vcids[variant_id].append(classification_id)
-
-        # find all alleles for those variants, then merge the variant id to classification ids to be an allele id to classification ids
-        variant_allele_qs = VariantAllele.objects.filter(variant_id__in=variant_to_vcids.keys()).values_list('variant',
-                                                                                                             'allele')
-        allele_to_vcids: Dict[int, List[int]] = defaultdict(list)
-        for variant_id, allele_id in variant_allele_qs:
-            allele_to_vcids[allele_id].extend(variant_to_vcids[variant_id])
+        # want to do minimum amount of work until we've confirmed there's an overlap (as overlaps will only ever be a tiny percentage)
+        classification_variant_ids_qs = Classification.objects.exclude(withdrawn=True).values_list('id', 'allele_id', 'lab_id')
 
         # only consider allele ids associated to 2 or more variant classifications
         allele_vcids_multiple = {allele_id: vc_ids for allele_id, vc_ids in allele_to_vcids.items() if len(vc_ids) >= 2}

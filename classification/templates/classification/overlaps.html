@@ -1,19 +1,15 @@
 {% extends "uicore/page/base.html" %}
 {% load ui_menu_bars %}
 {% load ui_help %}
+{% load lab_tags %}
 {% block title %}Overlaps{% endblock %}
 {% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
 {% block content %}
 <div class="container">
     {% page_help page_id='classification/overlaps_help' title='Classification Overlaps' %}
+    {% lab_picker view_name='overlaps' selected_lab=selected_lab all_option=True %}
 
-    <p>
-        <span class="text-info">Showing alleles with two or more classifications involving :</span>
-        {% if user.is_superuser %}Any Lab{% else %}
-        {% for lab in labs %}<span class="comma-sep">{{ lab }}</span>{% endfor %}
-        {% endif %}
-    </p>
-    <div data-toggle="ajax" href="{% url 'overlaps_detail' %}">
+    <div data-toggle="ajax" href="{% url 'overlaps_detail' selected_lab %}">
         <div class="loading-message">Loading Overlaps, this may take a while.</div>
     </div>
 
