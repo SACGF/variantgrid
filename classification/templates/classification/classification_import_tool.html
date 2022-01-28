@@ -124,15 +124,19 @@
             success: (record) => {
                 $('#response_preview').html(formatJson(record));
                 let link = null;
-                if (record.meta && record.meta.id) {
-                    let id = record.meta.id;
-                    link = `/classification/classification/${id}`;
 
-                    $('#record-link-pair').show();
-                    $('#record-link').attr('href',link);
-                    $('#record-link').text(`Open classification ${id}`);
-                } else {
-                    $('#record-link-pair').hide();
+                if (record.results) {
+                    record = record.results[0];
+                    if (record.meta && record.meta.id) {
+                        let id = record.meta.id;
+                        link = `/classification/classification/${id}`;
+
+                        $('#record-link-pair').show();
+                        $('#record-link').attr('href', link);
+                        $('#record-link').text(`Open classification ${id}`);
+                    } else {
+                        $('#record-link-pair').hide();
+                    }
                 }
             },
             complete: () => {
