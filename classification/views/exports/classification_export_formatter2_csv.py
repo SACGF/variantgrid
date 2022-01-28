@@ -70,6 +70,11 @@ class RowID(ExportRow):
         return self.genome_build.name
 
     @export_column()
+    def target_c_hgvs(self):
+        if c_hgvs := self.vc.get_c_hgvs(self.genome_build):
+            return c_hgvs
+
+    @export_column()
     def target_variant_coordinate(self):
         try:
             if allele := self.vc.allele:
@@ -77,10 +82,6 @@ class RowID(ExportRow):
                     return str(variant)
         except ValueError:
             pass
-
-    @export_column
-    def target_c_hgvs(self):
-        return self.vc.get_c_hgvs(genome_build=self.genome_build, use_full=False)
 
 
 class ClassificationMeta(ExportRow):
