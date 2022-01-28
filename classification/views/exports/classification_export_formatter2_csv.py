@@ -45,7 +45,7 @@ class RowID(ExportRow):
         return self.vc.lab_record_id
 
     @export_column()
-    def share_level_enum(self):
+    def share_level(self):
         return self.cm.share_level_enum.label
 
     @export_column()
