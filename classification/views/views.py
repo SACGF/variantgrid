@@ -42,6 +42,9 @@ from classification.models.flag_types import classification_flag_types
 from classification.views.classification_datatables import ClassificationColumns
 from classification.views.classification_export_csv import ExportFormatterCSV
 from classification.views.classification_export_redcap import ExportFormatterRedcap
+from classification.views.exports import ClassificationExportFormatter2CSV
+from classification.views.exports.classification_export_filter import ClassificationFilter
+from classification.views.exports.classification_export_formatter2_csv import FormatDetailsCSV
 from flags.models import Flag, FlagComment
 from flags.models.models import FlagType
 from genes.forms import GeneSymbolForm
@@ -51,6 +54,7 @@ from library.file_utils import rm_if_exists
 from library.guardian_utils import is_superuser
 from library.log_utils import log_traceback
 from library.utils import delimited_row
+from snpdb import genome_build_manager
 from snpdb.forms import SampleChoiceForm, UserSelectForm, LabSelectForm
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import Variant, UserSettings, Sample, Lab, Allele
@@ -408,7 +412,15 @@ def export_classifications_grid(request):
     """
     genome_build = UserSettings.get_for_user(request.user).default_genome_build
     qs = classification_qs(request)
-    return ExportFormatterCSV(user=request.user, genome_build=genome_build, qs=qs).export()
+    return ClassificationExportFormatter2CSV(
+        ClassificationFilter(
+            user=request.user,
+            genome_build=GenomeBuildManager.get_current_genome_build(),
+            starting_query=qs,
+            file_prefix="classifications_table"
+        ),
+        FormatDetailsCSV()
+    ).serve()
 
 
 def export_classifications_grid_redcap(request):
