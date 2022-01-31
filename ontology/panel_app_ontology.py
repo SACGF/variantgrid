@@ -75,7 +75,7 @@ def _update_gene_relations(gene_symbol: str):
                             if not found_term:
                                 # just look for abandoned 6 digit numbers numbers
                                 for omim_id in ABANDONED_OMIM_RE.finditer(phenotype_row):
-                                    add_term_if_valid(f"OMIM:{omim_id.group[1]}")
+                                    add_term_if_valid(f"OMIM:{omim_id.group(1)}")
 
             ontology_builder.complete(verbose=False)
 
