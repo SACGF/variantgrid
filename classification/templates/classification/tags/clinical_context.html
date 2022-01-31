@@ -1,6 +1,6 @@
 {% load classification_tags %}
 <div>
-{%  if link %}
+{% if link %}
     <a class="hover-link font-weight-bold" href="{% url 'clinical_context' cc.id %}">{{ cc }}</a>&#160;
 {% else %}
     <label>{{ cc }}</label>&#160;

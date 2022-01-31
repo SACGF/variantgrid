@@ -1,3 +1,7 @@
+from collections import defaultdict
+from dataclasses import dataclass
+from typing import List, Dict, Optional
+
 from django.conf import settings
 from django.http import HttpRequest
 from django.http.response import HttpResponseRedirect, HttpResponse
@@ -5,11 +9,19 @@ from django.shortcuts import render
 
 from classification.enums.discordance_enums import ContinuedDiscordanceReason, \
     DiscordanceReportResolution
-from classification.models import ClassificationModification, DiscordanceReportClassification
+from classification.models import ClassificationModification, DiscordanceReportClassification, ClinicalContext
 from classification.models.discordance_models import DiscordanceReport, \
     DiscordanceActionsLog
 from classification.views.classification_export_csv import ExportFormatterCSV
+from snpdb import genome_build_manager
+from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models.models_user_settings import UserSettings
+
+
+@dataclass
+class DiscordanceNoLongerConsiders:
+    reason: str
+    classifications: List[ClassificationModification]
 
 
 def discordance_report_view(request: HttpRequest, report_id: int) -> HttpResponse:
@@ -48,9 +60,37 @@ def discordance_report_view(request: HttpRequest, report_id: int) -> HttpRespons
         if report == latest_report:
             provide_reopen = True
 
-    effectives = [drc.classification_effective for drc in report.discordancereportclassification_set.all()]
+    effectives: List[ClassificationModification] = list()
+    withdrawns: List[ClassificationModification] = list()
+    changed_context: Dict[Optional[ClinicalContext], List[ClassificationModification]] = defaultdict(list)
+
+    for drc in report.discordancereportclassification_set.all().order_by('-created'):
+        if drc.withdrawn_effective:
+            withdrawns.append(drc.classification_effective)
+        elif drc.clinical_context_effective != clinical_context:
+            changed_context[drc.clinical_context_effective].append(drc.classification_effective)
+        else:
+            effectives.append(drc.classification_effective)
+
+    no_longer_considered: List[DiscordanceNoLongerConsiders] = list()
+    if withdrawns:
+        no_longer_considered.append(DiscordanceNoLongerConsiders("Withdrawn", withdrawns))
+    if unmatched := changed_context.pop(None, None):
+        no_longer_considered.append(DiscordanceNoLongerConsiders("Un-matched", unmatched))
+    for key in sorted(changed_context.keys()):
+        no_longer_considered.append(DiscordanceNoLongerConsiders(f"Changed context to {key.name}", changed_context[key]))
+
+    preferred_genome_build = GenomeBuildManager.get_current_genome_build()
+
+    c_hgvses = set()
+    cm: ClassificationModification
+    for cm in report.all_classification_modifications:
+        c_hgvses.add(cm.c_hgvs_best(preferred_genome_build))
+    c_hgvses = sorted(c_hgvses)
 
     context = {
+        'c_hgvses': c_hgvses,
+        'genome_build': preferred_genome_build,
         'report': report,
         'clinical_context': clinical_context,
         'allele': allele,
@@ -58,6 +98,7 @@ def discordance_report_view(request: HttpRequest, report_id: int) -> HttpRespons
         'use_allele_links': use_allele_links,
         'rows': report.discordancereportclassification_set.all(),
         'classifications': effectives,
+        'no_longer_considered': no_longer_considered,
         'all_reports': all_reports,
         'ongoing': report.resolution is None,
         'continued_discordance_reasons': continued_discordance_reasons,
