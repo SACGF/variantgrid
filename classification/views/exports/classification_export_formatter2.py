@@ -59,7 +59,9 @@ class ClassificationExportFormatter2(ABC):
         :param extension_override: If creating a wrapper file, e.g. "zip"
         :return: The appropriate filename
         """
-        filename_parts: List[str] = ['classifications', self.classification_filter.date_str]
+        filename_parts: List[str] = [self.classification_filter.file_prefix]
+        if self.classification_filter.file_include_date:
+            filename_parts.append(self.classification_filter.date_str)
 
         if self.is_genome_build_relevant:
             filename_parts.append(str(self.classification_filter.genome_build))

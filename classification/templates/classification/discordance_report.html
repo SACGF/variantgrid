@@ -17,10 +17,6 @@
         window.open(`{% url 'classification_diff' %}?clinical_context={{clinical_context.id}}`, '_blank');
         return false;
     }
-    function download() {
-        window.open(`{% url 'discordance_export' report.id %}`, '_self');
-        return false;
-    }
     {% comment %}
     function reorgGroupings() {
         {% if use_allele_links %}
@@ -104,7 +100,8 @@
     </div>
 
     <div class="container mt-4">
-        {% classification_groups classifications title="Considered Classifications" %}
+        {% url 'discordance_export' report.id as download_link %}
+        {% classification_groups classifications title="Classifications Considered" download_link=download_link %}
         {% for nlc in no_longer_considered %}
             {% classification_groups nlc.classifications title=nlc.reason %}
         {% endfor %}
@@ -115,7 +112,6 @@
         <div class="container">
             <h4>Actions</h4>
             <div class="btn-toolbar">
-                <button class="btn btn-outline-primary" onclick="download()">Download as CSV</button>
                 <form method="post">
                     {% csrf_token %}
                     <input type="hidden" name="action" value="reopen" />
@@ -129,10 +125,6 @@
         <div class="container">
             <h4>Actions</h4>
             <div class="btn-toolbar">
-                <button type="button" class="btn btn-outline-primary" onclick="download()">Download as CSV</button>
-                {% comment %}
-                <button type="button" class="btn btn-outline-secondary" onclick="reorgGroupings()">Reorganise Clinical Groupings</button>
-                {% endcomment %}
                 <button type="button" class="btn btn-outline-danger" onclick="toggleUnable()">Unable to Resolve Discordance</button>
             </div>
             <div id="discordance-reasons" style="display:none">

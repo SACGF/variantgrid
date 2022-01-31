@@ -472,11 +472,12 @@ class Lab(models.Model):
 
     @staticmethod
     def valid_labs_qs(user: User, admin_check=False) -> QuerySet:
+        # as organization is used for sorting, it's generally always a good idea to select related it
         if admin_check and user.is_superuser:
-            return Lab.objects.all()
+            return Lab.objects.select_related('organization')
 
         group_names = list(user.groups.values_list('name', flat=True))
-        return Lab.objects.filter(group_name__in=group_names).order_by('name')
+        return Lab.objects.select_related('organization').filter(group_name__in=group_names).order_by('name')
 
     def classifications_activity(self, time_period):
         trunc_func = TimePeriod.truncate_func(time_period)

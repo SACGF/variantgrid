@@ -57,6 +57,7 @@ def classification_groups(
         context,
         classification_modifications: Iterable[ClassificationModification],
         show_diffs: bool = True,
+        download_link: Optional[str] = None,
         link_discordance_reports: bool = False,
         genome_build: Optional[GenomeBuild] = None,
         title: Optional[str] = None):
@@ -74,6 +75,9 @@ def classification_groups(
     ordered_classifications = list(groups.modifications)
     # classifications are sorted by group, display them so they're sorted by date
     ordered_classifications.sort(key=lambda cm: cm.curated_date_check, reverse=True)
+
+    if groups and download_link:
+        context["download_link"] = download_link
 
     if show_diffs:
         if 1 < len(groups) <= 20 and len(groups) != len(ordered_classifications):

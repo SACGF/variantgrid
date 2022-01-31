@@ -99,7 +99,7 @@ class ClassificationDashboard:
     @lazy
     def classifications_wout_standard_gene(self) -> List[int]:
         linked_classifications = ConditionTextMatch.objects.filter(condition_text__lab__in=self.labs, classification__isnull=False)
-        return Classification.objects.filter(withdrawn=False, lab__in=self.labs).exclude(pk__in=Subquery(linked_classifications.values('classification_id'))).order_by('lab', 'created')
+        return Classification.objects.filter(withdrawn=False, lab__in=self.labs).exclude(pk__in=Subquery(linked_classifications.values('classification_id'))).order_by('lab', 'created').select_related('lab')
 
     def accumulation_graph_data(self):
         return get_accumulation_graph_data(AccumulationReportMode.Classification, labs=self.labs).get('lab')

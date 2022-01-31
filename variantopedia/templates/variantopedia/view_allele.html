@@ -116,7 +116,8 @@
     {% if classifications_new_grouping and not edit_clinical_groupings %}
         <div class="container mt-4">
             <h3>Classifications</h3>
-            {% classification_groups classifications link_discordance_reports=discordance_enabled %}
+            {% url 'allele_classifications_download' allele.id as download_link %}
+            {% classification_groups classifications link_discordance_reports=discordance_enabled download_link=download_link %}
         </div>
     {% else %}
         <div class="container-table mt-4">

@@ -1,10 +1,13 @@
 import re
 from datetime import datetime
+from typing import Optional
 
 from django.conf import settings
+from django.contrib.auth.models import User
 from django.db import transaction
 from django.http.request import HttpRequest
 from django.shortcuts import render, redirect, get_object_or_404
+from django.urls import reverse
 from requests.models import Response
 
 from classification.models import ClassificationRef, ClinicalContextRecalcTrigger
@@ -17,20 +20,25 @@ from snpdb.models import Allele, Lab
 from snpdb.models.models_variant import Variant
 
 
-def view_overlaps(request: HttpRequest) -> Response:
+def view_overlaps(request: HttpRequest, lab_id: Optional[int] = None) -> Response:
     user = request.user
-    labs = set(Lab.valid_labs_qs(user))
+    user: User = request.user
+
+    all_labs = list(Lab.valid_labs_qs(request.user, admin_check=True))
+    if len(all_labs) == 1 and not lab_id:
+        return redirect(reverse('view_overlaps', kwargs={'lab_id': all_labs[0].pk}))
 
     context = {
-        "labs": labs
+        "selected_lab": lab_id or 0,
+        "labs": all_labs
     }
 
     return render(request, "classification/overlaps.html", context)
 
 
-def view_overlaps_detail(request: HttpRequest) -> Response:
+def view_overlaps_detail(request: HttpRequest, lab_id: Optional[int] = None) -> Response:
     user = request.user
-    allele_and_vcs = AlleleOverlap.overlaps_for_user(user)
+    allele_and_vcs = AlleleOverlap.overlaps_for_user(user, lab_id = lab_id)
     overlap_counts = OverlapCounts(allele_and_vcs)
 
     context = {
