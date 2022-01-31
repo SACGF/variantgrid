@@ -101,10 +101,10 @@
                 {% if dlab.clinvar_keys %}
                     {{ dlab.uploads_to_clinvar_qs.count | number:'S' }}
                     {% for clinvar_key in dlab.clinvar_keys %}
-                        <a class="hover-link" href="{% url 'clinvar_key_summary' clinvar_key.id %}"><small class="form-text">Review ClinVar Submissions of {{ clinvar_key.id }} here.</small></a>
+                        <a class="hover-link" href="{% url 'clinvar_key_summary' clinvar_key.id %}"><small class="form-text">Review {{ clinvar_key.id }} ClinVar Submissions here.</small></a>
                     {% endfor %}
                 {% else %}
-                    <span class="text-muted">Your {% plural dlab.labs singular="lab is" plural="labss are" %} not configured for ClinVar yet.</span>
+                    <span class="text-muted">Your {% plural dlab.labs singular="lab is" plural="labss are" %} not configured for ClinVar.</span>
                 {% endif %}
             {% endlabelled %}
         {% endif %}
