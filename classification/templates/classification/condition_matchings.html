@@ -78,7 +78,7 @@
         {% if dlab.classifications_wout_standard_gene %}
             {% labelled hint="tiny" label="Classifications w/out Known Gene Symbol" %}
                 <div class="hover-detail" title="Classifications require a known gene symbol to be matched to a standard condition">
-                    <a href="#bad_gene_symbols" class="toggle-link" data-toggle="collapse">Show {{ dlab.classifications_wout_standard_gene.count }} records with unknown gene symbols</a>
+                    <a href="#bad_gene_symbols" class="toggle-link" data-toggle="collapse">Show {{ dlab.classifications_wout_standard_gene.count }} classifications with unknown gene symbols</a>
                     <div id="bad_gene_symbols" class="collapse" >
                         <table class="table">
                             <thead>
