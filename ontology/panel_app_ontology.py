@@ -1,5 +1,6 @@
 from datetime import timedelta
 from typing import Union
+import re
 
 from django.conf import settings
 
@@ -14,7 +15,8 @@ from ontology.ontology_builder import OntologyBuilder, OntologyBuilderDataUpToDa
 # increment if you change the logic of parsing ontology terms from PanelApp
 # which will then effectively nullify the cache so the new logic is run
 PANEL_APP_API_PROCESSOR_VERSION = 4
-
+# with look ahead and behind to make sure we're not in a 7 digit number
+ABANDONED_OMIM_RE = re.compile('(?<![0-9])([0-9]{6})(?![0-9])')
 
 def update_gene_relations(gene_symbol: Union[GeneSymbol, str]):
     if isinstance(gene_symbol, GeneSymbol):
@@ -65,9 +67,15 @@ def _update_gene_relations(gene_symbol: str):
                                     report_message("Found ontology term from PanelApp not in DB", level="error", extra_data={"target": full_id, "gene_symbol": str(gene_symbol)})
 
                             from annotation.regexes import db_ref_regexes, DbRegexes
-                            for result in db_ref_regexes.search(phenotype_row, default_regex=DbRegexes.OMIM):
+                            found_term = False
+                            for result in db_ref_regexes.search(phenotype_row):
                                 if result.cregx in (DbRegexes.OMIM, DbRegexes.MONDO):
                                     add_term_if_valid(result.id_fixed)
+                                    found_term = True
+                            if not found_term:
+                                # just look for abandoned 6 digit numbers numbers
+                                for omim_id in ABANDONED_OMIM_RE.finditer(phenotype_row):
+                                    add_term_if_valid(f"OMIM:{omim_id.group[1]}")
 
             ontology_builder.complete(verbose=False)
 
