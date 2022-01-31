@@ -22,6 +22,9 @@ from annotation.models import AnnotationRun, AnnotationVersion, ClassificationMo
     VariantAnnotationVersion, VariantAnnotation
 from annotation.transcripts_annotation_selections import VariantTranscriptSelections
 from classification.models.classification_import_run import ClassificationImportRun
+from classification.views.exports import ClassificationExportFormatter2CSV
+from classification.views.exports.classification_export_filter import ClassificationFilter
+from classification.views.exports.classification_export_formatter2_csv import FormatDetailsCSV
 from eventlog.models import create_event
 from genes.hgvs import HGVSMatcher
 from genes.models import CanonicalTranscriptCollection, GeneSymbol
@@ -431,6 +434,22 @@ def view_allele(request, pk):
                "classifications": latest_classifications,
                "annotated_builds": GenomeBuild.builds_with_annotation()}
     return render(request, "variantopedia/view_allele.html", context)
+
+
+def export_classifications_allele(request, pk:int):
+    """
+    CSV export of what is currently filtered into the classification grid
+    """
+    genome_build = UserSettings.get_for_user(request.user).default_genome_build
+    return ClassificationExportFormatter2CSV(
+        ClassificationFilter(
+            user=request.user,
+            genome_build=GenomeBuildManager.get_current_genome_build(),
+            allele=pk,
+            file_prefix="classifications_table"
+        ),
+        FormatDetailsCSV()
+    ).serve()
 
 
 @require_POST
