@@ -118,24 +118,29 @@ class ClassificationFilter:
         min_share_level: Minimum share level of classifications to include
         transcript_strategy: Which classification transcripts should be considered
         row_limit: Max number of rows per file (data from the 1 allele will still be grouped together if formatted produces multiple lines)
+        starting_query: If this is provided then instead of using all of the above filters, just this
         TODO rename row_limit to indicate that it's the max per file, not
     """
+
     user: User
     genome_build: GenomeBuild
     exclude_sources: Optional[Set[Union[Lab, Organization]]] = None
     include_sources: Optional[Set[Lab]] = None
     since: Optional[datetime] = None
-    min_share_level: ShareLevel = ShareLevel.ALL_USERS
+    min_share_level: ShareLevel = ShareLevel.LAB
     transcript_strategy: TranscriptStrategy = TranscriptStrategy.ALL
     rows_per_file: Optional[int] = None
     allele: Optional[int] = None
+    file_prefix: str = "classifications"
+    file_include_date: bool = True
+    starting_query: Optional[QuerySet[Classification]] = None
 
     @lazy
     def date_str(self) -> str:
         return now().astimezone(tz=timezone(settings.TIME_ZONE)).strftime("%Y-%m-%d")
 
     @staticmethod
-    def string_to_group_name(model: Type[Union[Lab, Organization]], group_names: str) -> Union[Set[Lab], Set[Organization]]:
+    def _string_to_group_name(model: Type[Union[Lab, Organization]], group_names: str) -> Union[Set[Lab], Set[Organization]]:
         """
         Converts comma separated group names to the org or lab objects.
         Invalid org/lab group names will be ignored
@@ -160,9 +165,9 @@ class ClassificationFilter:
         user = request.user
 
         exclude_sources = \
-            ClassificationFilter.string_to_group_name(Organization, request.query_params.get('exclude_orgs')) | \
-            ClassificationFilter.string_to_group_name(Lab, request.query_params.get('exclude_labs'))
-        include_sources = ClassificationFilter.string_to_group_name(Lab, request.query_params.get('include_labs'))
+            ClassificationFilter._string_to_group_name(Organization, request.query_params.get('exclude_orgs')) | \
+            ClassificationFilter._string_to_group_name(Lab, request.query_params.get('exclude_labs'))
+        include_sources = ClassificationFilter._string_to_group_name(Lab, request.query_params.get('include_labs'))
         build_name = request.query_params.get('build', 'GRCh38')
 
         share_level_str = request.query_params.get('share_level', 'logged_in_users')
@@ -210,7 +215,7 @@ class ClassificationFilter:
             return 'classification__chgvs_grch38'
 
     @lazy
-    def bad_allele_transcripts(self) -> Dict[int, Set[str]]:
+    def _bad_allele_transcripts(self) -> Dict[int, Set[str]]:
         """
         :return: A dictionary of Allele ID to a set of Transcripts for that allele which has bad flags
         """
@@ -235,7 +240,7 @@ class ClassificationFilter:
         return allele_to_bad_transcripts
 
     @lazy
-    def transcript_version_classification_ids(self) -> Set[int]:
+    def _transcript_version_classification_ids(self) -> Set[int]:
         """
         Returns a set of classification IDs that have flags that make us want to exclude due to errors
         :return: A set of classification IDs
@@ -248,7 +253,7 @@ class ClassificationFilter:
             ))
 
     @lazy
-    def variant_matching_classification_ids(self) -> Set[int]:
+    def _variant_matching_classification_ids(self) -> Set[int]:
         return flag_ids_to(
             Classification,
             Flag.objects.filter(
@@ -257,9 +262,10 @@ class ClassificationFilter:
             ))
 
     @lazy
-    def discordant_classification_ids(self) -> Set[int]:
+    def _discordant_classification_ids(self) -> Set[int]:
         """
         Returns a set of classification IDs where the classification id discordant
+        Ids are not necessarily part of this import
         :return: A set of classification IDs
         """
         return flag_ids_to(Classification, Flag.objects.filter(
@@ -268,10 +274,10 @@ class ClassificationFilter:
         ))
 
     def is_discordant(self, cm: ClassificationModification) -> bool:
-        return cm.classification_id in self.discordant_classification_ids
+        return cm.classification_id in self._discordant_classification_ids
 
     @lazy
-    def since_flagged_classification_ids(self) -> Set[int]:
+    def _since_flagged_classification_ids(self) -> Set[int]:
         """
         TODO rename to indicate this is a flag check only
         Returns classification ids that have had flags change since the since date
@@ -287,7 +293,7 @@ class ClassificationFilter:
         ))
 
     @lazy
-    def since_flagged_allele_ids(self) -> Set[int]:
+    def _since_flagged_allele_ids(self) -> Set[int]:
         """
         :return: A set of allele IDs that have relevant flags that have changed since the since date
         """
@@ -298,24 +304,24 @@ class ClassificationFilter:
             created__gte=self.since
         ))
 
-    def passes_since(self, allele_data: AlleleData) -> bool:
+    def _passes_since(self, allele_data: AlleleData) -> bool:
         """
         Is there anything about this AlleleData that indicates it should be included since the since date
         """
         if not self.since:
             return True
-        if allele_data.allele_id and allele_data.allele_id in self.since_flagged_allele_ids:
+        if allele_data.allele_id and allele_data.allele_id in self._since_flagged_allele_ids:
             return True
         for cmi in allele_data.all_cms:
             cm = cmi.classification
             if cm.modified >= self.since or cm.classification.modified > self.since:
                 return True
-            if cm.classification_id in self.since_flagged_classification_ids:
+            if cm.classification_id in self._since_flagged_classification_ids:
                 return True
         return False
 
     @property
-    def share_levels(self) -> Set[ShareLevel]:
+    def _share_levels(self) -> Set[ShareLevel]:
         """
         :return: A set of all ShareLevels that should be considered
         """
@@ -330,10 +336,12 @@ class ClassificationFilter:
         Returns a new QuerySet of all classifications BEFORE
         filtering for errors and since date
         """
-        cms = ClassificationModification.objects.filter(
-            is_last_published=True,
-            share_level__in=self.share_levels
-        )
+        if starting_query := self.starting_query:
+            cms = starting_query
+        else:
+            cms = ClassificationModification.objects.filter(is_last_published=True)
+
+        cms = cms.filter(share_level__in=self._share_levels)
 
         if not self.since:
             # can only exclude withdrawn from complete consideration
@@ -377,12 +385,12 @@ class ClassificationFilter:
     def _record_issues(self, allele_id: int, cm: ClassificationModification) -> ClassificationIssue:
         ci = ClassificationIssue(classification=cm)
         ci.withdrawn = cm.classification.withdrawn
-        ci.transcript_version = cm.classification_id in self.transcript_version_classification_ids
-        ci.matching_warning = cm.classification_id in self.variant_matching_classification_ids
+        ci.transcript_version = cm.classification_id in self._transcript_version_classification_ids
+        ci.matching_warning = cm.classification_id in self._variant_matching_classification_ids
         if not allele_id:
             ci.not_matched = True
         else:
-            if allele_bad_transcripts := self.bad_allele_transcripts.get(allele_id):
+            if allele_bad_transcripts := self._bad_allele_transcripts.get(allele_id):
                 ci.c_37_not_38 = cm.transcript in allele_bad_transcripts
 
         if not ci.classification.classification.get_c_hgvs(self.genome_build):
@@ -415,5 +423,5 @@ class ClassificationFilter:
         Is only AlleleData with classifications that have passed since checks and errors
         """
         for allele_data in self._allele_data():
-            if self.passes_since(allele_data):
+            if self._passes_since(allele_data):
                 yield allele_data

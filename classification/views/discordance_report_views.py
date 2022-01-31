@@ -13,6 +13,9 @@ from classification.models import ClassificationModification, DiscordanceReportC
 from classification.models.discordance_models import DiscordanceReport, \
     DiscordanceActionsLog
 from classification.views.classification_export_csv import ExportFormatterCSV
+from classification.views.exports import ClassificationExportFormatter2CSV
+from classification.views.exports.classification_export_filter import ClassificationFilter
+from classification.views.exports.classification_export_formatter2_csv import FormatDetailsCSV
 from snpdb import genome_build_manager
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models.models_user_settings import UserSettings
@@ -111,16 +114,22 @@ def discordance_report_view(request: HttpRequest, report_id: int) -> HttpRespons
 def export_discordance_report(request: HttpRequest, report_id: int) -> HttpResponse:
     report = DiscordanceReport.objects.get(pk=report_id)
     dcs = DiscordanceReportClassification.objects.filter(report=report)
-    include: [ClassificationModification] = []
+    include: [ClassificationModification] = list()
     for dc in dcs:
         if dc.clinical_context_effective == report.clinical_context and not dc.withdrawn_effective:
             include.append(dc.classification_effective)
 
     vcs_qs = ClassificationModification.objects.filter(pk__in=[vcm.id for vcm in include])
 
-    genome_build = UserSettings.get_for_user(request.user).default_genome_build
-    filename_override = f'discordance_report_{report_id}.csv'
-    return ExportFormatterCSV(user=request.user,
-                              genome_build=genome_build,
-                              qs=vcs_qs, pretty=True,
-                              filename_override=filename_override).export()
+    return ClassificationExportFormatter2CSV(
+        ClassificationFilter(
+            user=request.user,
+            genome_build=GenomeBuildManager.get_current_genome_build(),
+            file_prefix=f"discordance_report_{report_id}",
+            file_include_date=False,
+            starting_query=vcs_qs
+        ),
+        format_details=FormatDetailsCSV(
+            pretty=True
+        )
+    ).serve()
