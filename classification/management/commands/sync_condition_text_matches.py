@@ -38,8 +38,10 @@ class Command(BaseCommand):
                 found_records = False
                 for gene_symbol, count in classifications_for_gene_symbol.items():
                     if count == 0:
-                        _, delete_count = ct.conditiontextmatch_set.filter(gene_symbol=gene_symbol).delete()
+                        delete_qs = ct.conditiontextmatch_set.filter(gene_symbol=gene_symbol)
+                        delete_count = delete_qs.count()
                         total_deleted += delete_count
+                        delete_qs.delete()
                         found_records = True
 
                 if found_records:
