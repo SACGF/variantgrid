@@ -27,6 +27,9 @@ ACCOUNTS_EMAIL = 'accounts@shariant.org.au'
 DEBUG = True
 ROLLBAR['enabled'] = False
 
+MIDDLEWARE += ('debug_toolbar.middleware.DebugToolbarMiddleware',)
+INSTALLED_APPS.append('debug_toolbar')
+
 """
 AUTHENTICATION_BACKENDS = (
     'auth.backend.VariantGridOIDCAuthenticationBackend',
@@ -300,7 +303,8 @@ URLS_NAME_REGISTER.update({  # Disable selected snpdb urls
     "clinvar_key_summary": True,
 
     "condition_matchings": True,
-    "condition_match_test": True
+    "condition_match_test": True,
+    "classification_import_upload": True
 })
 
 # mimic shariant
