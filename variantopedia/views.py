@@ -440,13 +440,12 @@ def export_classifications_allele(request, pk:int):
     """
     CSV export of what is currently filtered into the classification grid
     """
-    genome_build = UserSettings.get_for_user(request.user).default_genome_build
     return ClassificationExportFormatter2CSV(
         ClassificationFilter(
             user=request.user,
             genome_build=GenomeBuildManager.get_current_genome_build(),
             allele=pk,
-            file_prefix="classifications_table"
+            file_prefix=f"classifications_allele_{pk}"
         ),
         FormatDetailsCSV()
     ).serve()

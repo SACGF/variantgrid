@@ -1,2 +1,3 @@
 {% load classification_tags %}
-{% classification_groups classifications show_diffs=False genome_build=genome_build %}
+{% url 'view_gene_symbol_classifications_download' gene_symbol genome_build.name as download_link %}
+{% classification_groups classifications show_diffs=False genome_build=genome_build download_link=download_link %}

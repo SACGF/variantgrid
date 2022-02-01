@@ -29,6 +29,9 @@ from classification.enums import ShareLevel
 from classification.models import ClassificationModification, Classification
 from classification.models.classification_utils import classification_gene_symbol_filter
 from classification.views.classification_datatables import ClassificationColumns
+from classification.views.exports import ClassificationExportFormatter2CSV
+from classification.views.exports.classification_export_filter import ClassificationFilter
+from classification.views.exports.classification_export_formatter2_csv import FormatDetailsCSV
 from genes.custom_text_gene_list import create_custom_text_gene_list
 from genes.forms import GeneListForm, NamedCustomGeneListForm, UserGeneListForm, CustomGeneListForm, \
     GeneSymbolForm, GeneAnnotationReleaseGenomeBuildForm
@@ -45,6 +48,7 @@ from library.django_utils import get_field_counts, add_save_message
 from library.utils import defaultdict_to_dict, LazyAttribute
 from ontology.models import OntologySnake, OntologyService, OntologyTerm
 from seqauto.models import EnrichmentKit
+from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import CohortGenotypeCollection, Cohort, VariantZygosityCountCollection, Sample
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_user_settings import UserSettings
@@ -278,9 +282,9 @@ class GeneSymbolViewInfo:
         return GeneInfo.get_for_gene_symbol(self.gene_symbol)
 
     @lazy
-    def classifications(self) -> List[ClassificationModification]:
+    def classifications(self) -> QuerySet[ClassificationModification]:
         # Note this is loaded in Ajax
-        classifications = list()
+        classifications = ClassificationModification.objects.none()
         if filters := classification_gene_symbol_filter(self.gene_symbol):
             classifications = ClassificationModification.objects.filter(filters).filter(
                 is_last_published=True).exclude(classification__withdrawn=True)
@@ -295,6 +299,24 @@ class GeneSymbolViewInfo:
 
     def show_hotspot_graph(self) -> bool:
         return settings.VIEW_GENE_SHOW_HOTSPOT_GRAPH and self.has_variants.has_observed_variants
+
+
+def export_classifications_gene_symbol(request, gene_symbol: str, genome_build_name: str):
+    genome_build = GenomeBuild.get_from_fuzzy_string(genome_build_name)
+    gene_symbol_info = GeneSymbolViewInfo(
+        gene_symbol=gene_symbol,
+        desired_genome_build=genome_build,
+        user=request.user
+    )
+    return ClassificationExportFormatter2CSV(
+        ClassificationFilter(
+            user=request.user,
+            genome_build=genome_build,
+            file_prefix=f"classifications_{gene_symbol}",
+            starting_query=gene_symbol_info.classifications
+        ),
+        FormatDetailsCSV()
+    ).serve()
 
 
 def view_gene_symbol(request, gene_symbol: str, genome_build_name: Optional[str] = None):
@@ -346,6 +368,7 @@ def view_classifications(request, gene_symbol: str, genome_build_name: str):
 
     return render(request, "genes/view_gene_symbol_classifications.html", {
         "classifications": view_info.classifications,
+        "gene_symbol": gene_symbol,
         "genome_build": genome_build
     })
 

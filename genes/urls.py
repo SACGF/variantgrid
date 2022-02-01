@@ -12,6 +12,7 @@ urlpatterns = [
     perm_path('view_gene/<gene_id>', views.view_gene, name='view_gene'),
     perm_path('view_gene_symbol/<gene_symbol>', views.view_gene_symbol, name='view_gene_symbol'),
     perm_path('view_gene_symbol/<gene_symbol>/<genome_build_name>/classification', views.view_classifications, name='view_gene_symbol_classifications'),
+    perm_path('view_gene_symbol/<gene_symbol>/<genome_build_name>/classifications_download', views.export_classifications_gene_symbol, name='view_gene_symbol_classifications_download'),
     perm_path('view_gene_symbol/<gene_symbol>/<genome_build_name>', views.view_gene_symbol, name='view_gene_symbol_genome_build'),
     perm_path('view_transcript/<transcript_id>', views.view_transcript, name='view_transcript'),
     perm_path('view_transcript_version/<transcript_id>/<int:version>', views.view_transcript_version, name='view_transcript_version'),
