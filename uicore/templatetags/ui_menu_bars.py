@@ -72,9 +72,7 @@ def menu_bar_settings(context):
 
 @register.inclusion_tag("uicore/menus/menu_bar_classifications.html", takes_context=True)
 def menu_bar_classifications(context):
-    return {
-        'classification_issue_count': UserClassificationStats(context.request.user).issue_count
-    }
+    return {}
 
 
 @register.inclusion_tag("uicore/menus/menu_bar_variants.html", takes_context=True)

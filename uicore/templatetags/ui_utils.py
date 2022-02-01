@@ -502,8 +502,11 @@ class TagUtils:
         if val is not None and val != '':
             try:
                 return int(val)
-            except ValueError:
-                pass
+            except TypeError:
+                try:
+                    return len(val)
+                except TypeError:
+                    pass
         return None
 
     @staticmethod
