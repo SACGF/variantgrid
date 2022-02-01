@@ -57,7 +57,7 @@
              <div class="card-body">
                  {% labelled label="Resolution" %}
                      {% if report.resolution %}{{ report.resolution_text }}
-                     {% else %}<span class="no-value">Ongoing : In Discordance</span>{% endif %}
+                     {% else %}<span class="no-value">Active Discordance</span>{% endif %}
                  {% endlabelled %}
                  {% labelled label="Allele" %}<a class="hover-link" href="{% url 'view_allele' allele.id %}">{{ allele.clingen_allele }}</a>{% endlabelled %}
                  {% comment %}
@@ -173,7 +173,7 @@
                         {% endif %}
                     </td>
                     <td class="timestamp">{% timestamp old_report.report_completed_date %}</td>
-                    <td>{% if old_report.resolution %}{{ old_report.resolution_text }}{% else %}<span class="no-value">Ongoing : In Discordance</span>{% endif %}</td>
+                    <td>{% if old_report.resolution %}{{ old_report.resolution_text }}{% else %}<span class="no-value">Active Discordance</span>{% endif %}</td>
                 </tr>
             {% endfor %}
             </tbody>

@@ -8,12 +8,10 @@
 </div>
 <div>
 {% if cc.latest_report and cc.latest_report.is_important %}
-    {% discordance_report cc.latest_report %}
+    <span class="flag flag-classification_discordant res-open" style="margin-right:4px;position:relative;top:4px;"></span> {% discordance_report cc.latest_report %}
 {% elif cc.relevant_classification_count == 0 %}
     No relevant classifications
 {% elif cc.relevant_classification_count == 1 %}
     Single relevant classification
-{% else %}
-    Concordant
 {% endif %}
 </div>

@@ -35,7 +35,7 @@
 {% if overlap_sets %}
     {% ui_register_tabs tab_set="overlaps" %}
     {% for overlap_set in overlap_sets %}
-        {% ui_register_tab_embedded label=overlap_set.label tab_set="overlaps" %}
+        {% ui_register_tab_embedded label=overlap_set.label tab_set="overlaps" badge=overlap_set.overlaps badge_status="info" %}
             {% for overlap in overlap_set.overlaps %}
                 <div class="card mt-4">
                     <div class="card-header overlap-{{ overlap.discordance_status.level.value }}">
@@ -47,7 +47,7 @@
                     <div class="card-body">
                         <div class="row">
                         {% for hgvs in overlap.preferred_hgvses %}
-                            <div class="col-6">{% c_hgvs hgvs show_genome_build=True %}</div>
+                            <div class="col-12">{% c_hgvs hgvs show_genome_build=True %}</div>
                         {% endfor %}
                         </div>
                         {% for grouping in overlap.by_clinical_groupings %}

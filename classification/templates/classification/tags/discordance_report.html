@@ -1,1 +1,2 @@
-<a href="{% url 'discordance_report' discordance_report.pk %}" class="hover-link">Discordance Status {% if dr.clinical_context.name != "default" %}{{ dr.clinical_context.name }}{% endif %}: <strong>{{ discordance_report.status }}</strong></a>
+{% comment %}{% if dr.clinical_context.name != "default" %}{{ dr.clinical_context.name }}{% endif %} -- this is usually redundant {% endcomment %}
+<a href="{% url 'discordance_report' discordance_report.pk %}" class="hover-link">{% if discordance_report.status %}{% endif %}<strong>{{ discordance_report.status }}</strong></a>

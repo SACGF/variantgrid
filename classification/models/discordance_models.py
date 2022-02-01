@@ -52,7 +52,7 @@ class DiscordanceReport(TimeStampedModel):
     def status(self) -> str:
         if self.resolution:
             return self.get_resolution_display()
-        return "Ongoing"
+        return "Active Discordance"
 
     @property
     def is_important(self):
