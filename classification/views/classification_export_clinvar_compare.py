@@ -20,7 +20,8 @@ class ClinVarCompareRow(ExportRow):
         "Pathogenic": "P",
         "Pathogenic/Likely_pathogenic": ["P", "LP"],
         "Benign/Likely_benign": ["B", "LB"],
-        "risk_factor": "R"
+        "risk_factor": "R",
+        "Conflicting_interpretations_of_pathogenicity": "Conflicting"
     }
     CLINSIG_BUCKETS = {
         "B": 1,
@@ -83,7 +84,7 @@ class ClinVarCompareRow(ExportRow):
         return cs_set
 
     @export_column()
-    def server_clinical_significance(self) -> str:
+    def servers_clinical_significance(self) -> str:
         (cs_list := list(self.server_clinical_significance_set)).sort()
         return ";".join(cs_list)
 
@@ -92,7 +93,6 @@ class ClinVarCompareRow(ExportRow):
         (cs_list := list(self.clinvar_clinical_significance_set)).sort()
         return ";".join(cs_list)
 
-    @export_column()
     def clinvar_clinical_significance_raw(self) -> str:
         if clinvar := self.clinvar:
             return clinvar.clinical_significance
@@ -124,7 +124,7 @@ class ClinVarCompareRow(ExportRow):
 
         if not clinvar_clins:
             return "6 novel"
-        if "Conflicting_interpretations_of_pathogenicity" in server_clins:
+        if "Conflicting" in clinvar_clins:
             return "3 unknown"
         if server_clins == clinvar_clins:
             return "5 agreement"
