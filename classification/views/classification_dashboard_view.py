@@ -101,8 +101,15 @@ class ClassificationDashboard:
         linked_classifications = ConditionTextMatch.objects.filter(condition_text__lab__in=self.labs, classification__isnull=False)
         return Classification.objects.filter(withdrawn=False, lab__in=self.labs).exclude(pk__in=Subquery(linked_classifications.values('classification_id'))).order_by('lab', 'created').select_related('lab')
 
+    @lazy
     def accumulation_graph_data(self):
         return get_accumulation_graph_data(AccumulationReportMode.Classification, labs=self.labs).get('lab')
+
+    def max_accumulation_graph(self) -> int:
+        max_y = 0
+        for lab_values in self.accumulation_graph_data:
+            max_y = max(max_y, max(lab_values.get('y')))
+        return max_y
 
     @lazy
     def counts(self):

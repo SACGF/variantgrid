@@ -50,7 +50,7 @@
         let layout = defaultLayout(title, width, height);
         layout["xaxis"] = {"nticks": 10}; // keep under 20 dates so they don't get too crowded
         layout["yaxis"] = {
-            "range": [0, {{ dlab.shared_classifications.count }} + 10]
+            "range": [0, {{ dlab.max_accumulation_graph }} + 1]
         };
         Plotly.newPlot(selector, cum_data, layout);
     }
