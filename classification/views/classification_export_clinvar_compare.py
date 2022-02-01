@@ -123,11 +123,13 @@ class ClinVarCompareRow(ExportRow):
                 server_clins.add('VUS')
 
         if not clinvar_clins:
-            return "novel"
+            return "6 novel"
+        if "Conflicting_interpretations_of_pathogenicity" in server_clins:
+            return "3 unknown"
         if server_clins == clinvar_clins:
-            return "same"
+            return "5 agreement"
         if server_clins.intersection(clinvar_clins):
-            return "overlap"
+            return "4 overlap"
 
         def to_buckets(cs_set: Iterable[str]) -> Set[int]:
             bucket_set = set()
@@ -139,9 +141,9 @@ class ClinVarCompareRow(ExportRow):
         server_buckets = to_buckets(server_clins)
         clinsig_buckets = to_buckets(clinvar_clins)
         if server_clins.intersection(clinsig_buckets):
-            return "confidence"
+            return "2 confidence"
 
-        return "discordant"
+        return "1 discordant"
 
     @lazy
     def clinvar(self) -> Optional[ClinVar]:
