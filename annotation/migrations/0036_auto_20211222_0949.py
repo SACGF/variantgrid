@@ -7,6 +7,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('annotation', '0035_clinvarcitationscollection_cached_web_resource'),
+        ('genes', '0028_one_off_fix_lowercase_gene_symbols'),
     ]
 
     operations = [
