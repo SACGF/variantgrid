@@ -2,41 +2,17 @@ import zipfile
 from abc import ABC, abstractmethod
 from datetime import datetime
 from io import StringIO
-from typing import Optional, List, Iterator
+from typing import Optional, List, Iterator, Tuple, Any
 
 from django.conf import settings
 from django.http.response import HttpResponseBase
 from django.http import HttpResponse, StreamingHttpResponse
+from more_itertools import peekable
+from stream_zip import NO_COMPRESSION_64, stream_zip, NO_COMPRESSION_32, ZIP_64, ZIP_32
 from threadlocals.threadlocals import get_current_request
 from library.guardian_utils import bot_group
 from library.log_utils import NotificationBuilder
 from classification.views.exports.classification_export_filter import AlleleData, ClassificationFilter
-
-
-class FileWriter:
-    """
-    In memory file writer, used if export create a zip file with the data potentially split across
-    multiple entries
-    :var file: StringIO data to write to
-    :var row_count: How many lines have been written to this file
-    """
-
-    def __init__(self):
-        self.file = StringIO()
-        self.row_count = 0
-
-    def __bool__(self):
-        return self.row_count > 0
-
-    def write(self, rows: List[str], count: bool = True):
-        self.file.writelines(rows)
-        if count:
-            self.row_count += len(rows)
-
-    def finish(self):
-        content = self.file.getvalue()
-        self.file.close()
-        return content
 
 
 class ClassificationExportFormatter2(ABC):
@@ -69,7 +45,7 @@ class ClassificationExportFormatter2(ABC):
             filename_parts.append(str(self.classification_filter.genome_build))
 
         if part is not None:
-            filename_parts.append(f"part_{part+1:02}")
+            filename_parts.append(f"part_{part:02}")
 
         filename = "_".join(filename_parts)
 
@@ -80,18 +56,8 @@ class ClassificationExportFormatter2(ABC):
         Start generating the data and return it in a HTTP Response
         """
         if self.classification_filter.rows_per_file:
-            response = HttpResponse(content_type='application/zip')
+            response = StreamingHttpResponse(stream_zip(self._yield_streaming_files()), content_type='application/zip')
             response['Content-Disposition'] = f'attachment; filename="{self.filename(extension_override="zip")}"'
-
-            with zipfile.ZipFile(response, 'w') as zf:
-                # zf.writestr("readme.txt", f"This file was downloaded from {settings.SITE_NAME}\nThis is buffer" + ("0") * 16384)
-                # response.flush()
-
-                for index, entry in enumerate(self._yield_files()):
-                    self.file_count += 1
-                    # can we be more efficient than converting StringIO to a string to be converted back into bytes?
-                    zf.writestr(self.filename(part=index), str(entry.file.getvalue()))
-
             return response
         else:
             self.file_count = 1
@@ -107,28 +73,50 @@ class ClassificationExportFormatter2(ABC):
         """
         pass
 
-    def _yield_files(self) -> Iterator[FileWriter]:
-        """
-        :return: An iterator of chunked file data (each value could be made into a ZipEntry)
-        """
-        fw: Optional[FileWriter] = None
+    def _yield_streaming_entry(self, source: peekable) -> Iterator[bytes]:
+        # source should be a peekable of List[str]
 
-        for allele_data in self.classification_filter.allele_data_filtered():
-            to_rows = self.row(allele_data)
-            self.row_count += len(to_rows)
-            if not fw or (self.classification_filter.rows_per_file and fw.row_count + len(to_rows) > self.classification_filter.rows_per_file):
-                if fw:
-                    fw.write(self.footer(), count=False)
-                    yield fw
-                fw = FileWriter()
-                fw.write(self.header(), count=False)
+        def byte_me(rows: List[str]) -> bytes:
+            return "\n".join(rows).encode()
 
-            fw.write(to_rows, count=True)
+        if header := self.header():
+            yield byte_me(header)
 
-        if fw:
-            fw.write(self.footer(), count=False)
-            yield fw
-        self.send_stats()
+        this_entry_row_count = 0
+        while True:
+            # peek the next entry to see if it's big enough that we should split the file
+            # if it's not too big (or if we've reached the end where False will be returned)
+            # then add the footer and this iteration is done
+            if next_rows := source.peek(False):
+                if this_entry_row_count + len(next_rows) > self.classification_filter.rows_per_file:
+                    break
+                # now that we're sure we want the rows, call next (which will give us the same data)
+                # but progress the iterator
+                next_rows = next(source)
+                next_rows_count = len(next_rows)
+                this_entry_row_count += next_rows_count
+                self.row_count += next_rows_count
+                yield byte_me(next_rows)
+            else:
+                break
+
+        if footer := self.footer():
+            yield byte_me(footer)
+
+    def _yield_streaming_files(self) -> Iterator[Tuple[str, datetime, int, Any, bytes]]:
+        def row_iterator():
+            for allele_data in self.classification_filter.allele_data_filtered():
+                if rows := self.row(allele_data):
+                    yield rows
+
+        modified_at = datetime.now()
+        perms = 0o600
+
+        data_peek = peekable(row_iterator())
+        while data_peek.peek(False):
+            self.file_count += 1
+            yield self.filename(part=self.file_count), modified_at, perms, NO_COMPRESSION_64, self._yield_streaming_entry(data_peek)
+
 
     def _yield_file(self) -> Iterator[str]:
         """

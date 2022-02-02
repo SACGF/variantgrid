@@ -1,3 +1,5 @@
+stream-zip==0.0.47
+more-itertools
 beautifulsoup4==4.9.3
 bgzip==0.3.5
 Bio==1.3.2
