@@ -1,3 +1,5 @@
+stream-zip
+more-itertools
 beautifulsoup4
 bgzip
 Bio
