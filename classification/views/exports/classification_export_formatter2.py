@@ -7,6 +7,7 @@ from typing import Optional, List, Iterator, Tuple, Any
 from django.conf import settings
 from django.http.response import HttpResponseBase
 from django.http import HttpResponse, StreamingHttpResponse
+from django.shortcuts import render
 from more_itertools import peekable
 from stream_zip import NO_COMPRESSION_64, stream_zip, NO_COMPRESSION_32, ZIP_64, ZIP_32
 from threadlocals.threadlocals import get_current_request
@@ -55,7 +56,14 @@ class ClassificationExportFormatter2(ABC):
         """
         Start generating the data and return it in a HTTP Response
         """
+        if self.classification_filter.benchmarking:
+            for count, row in enumerate(self._yield_file()):
+                if count > 1000:
+                    break
+            return render(get_current_request(), "snpdb/benchmark.html", {"content": "TODO"})
+
         if self.classification_filter.rows_per_file:
+            # default is 64kb chunks, but try serving up in kb
             response = StreamingHttpResponse(stream_zip(self._yield_streaming_files()), content_type='application/zip')
             response['Content-Disposition'] = f'attachment; filename="{self.filename(extension_override="zip")}"'
             return response

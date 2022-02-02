@@ -134,6 +134,7 @@ class ClassificationFilter:
     file_prefix: str = "classifications"
     file_include_date: bool = True
     starting_query: Optional[QuerySet[Classification]] = None
+    benchmarking: bool = False
 
     @lazy
     def date_str(self) -> str:
@@ -189,6 +190,7 @@ class ClassificationFilter:
         if allele_str := request.query_params.get('allele'):
             allele = int(allele_str)
 
+        benchmarking = request.query_params.get('benchmark') == 'true'
         # TODO include rows_per_file into filter? right now it's hardcoded when doing MVL
 
         return ClassificationFilter(
@@ -199,7 +201,8 @@ class ClassificationFilter:
             min_share_level=share_level,
             transcript_strategy=transcript_strategy,
             since=since,
-            allele=allele
+            allele=allele,
+            benchmarking = benchmarking
             # rows_per_file=100
         )
 
