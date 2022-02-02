@@ -84,14 +84,13 @@ class ClassificationExportFormatter2(ABC):
             response['Content-Disposition'] = f'attachment; filename="{self.filename(extension_override="zip")}"'
 
             with zipfile.ZipFile(response, 'w') as zf:
-                zf.writestr("readme.txt", f"This file was downloaded from {settings.SITE_NAME}")
-                response.flush()
+                # zf.writestr("readme.txt", f"This file was downloaded from {settings.SITE_NAME}\nThis is buffer" + ("0") * 16384)
+                # response.flush()
 
                 for index, entry in enumerate(self._yield_files()):
                     self.file_count += 1
                     # can we be more efficient than converting StringIO to a string to be converted back into bytes?
                     zf.writestr(self.filename(part=index), str(entry.file.getvalue()))
-                    response.flush()
 
             return response
         else:
