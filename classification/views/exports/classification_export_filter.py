@@ -359,7 +359,7 @@ class ClassificationFilter:
                 cms = cms.exclude(classification__lab__in=exclude_labs)
 
         cms = cms.order_by('-classification__allele_id', '-classification__id')
-        cms = cms.select_related('classification', 'classification__lab', 'classification__lab__organization')
+        cms = cms.select_related('classification', 'classification__lab', 'classification__lab__organization', 'classification__clinical_context')
 
         if allele_id := self.allele:
             cms = cms.filter(classification__allele_id=allele_id)

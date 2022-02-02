@@ -112,18 +112,24 @@ class ClassificationExportFormatter2(ABC):
             yield byte_me(footer)
 
     def _yield_streaming_files(self) -> Iterator[Tuple[str, datetime, int, Any, bytes]]:
-        def row_iterator():
-            for allele_data in self.classification_filter.allele_data_filtered():
-                if rows := self.row(allele_data):
-                    yield rows
+        try:
+            def row_iterator():
+                for allele_data in self.classification_filter.allele_data_filtered():
+                    if rows := self.row(allele_data):
+                        yield rows
 
-        modified_at = datetime.now()
-        perms = 0o600
+            modified_at = datetime.now()
+            perms = 0o600
 
-        data_peek = peekable(row_iterator())
-        while data_peek.peek(False):
-            self.file_count += 1
-            yield self.filename(part=self.file_count), modified_at, perms, NO_COMPRESSION_64, self._yield_streaming_entry(data_peek)
+            data_peek = peekable(row_iterator())
+            while data_peek.peek(False):
+                self.file_count += 1
+                yield self.filename(part=self.file_count), modified_at, perms, ZIP_64, self._yield_streaming_entry(data_peek)
+        except:
+            yield "An error occurred generating the file"
+            raise
+
+        self.send_stats()
 
 
     def _yield_file(self) -> Iterator[str]:
