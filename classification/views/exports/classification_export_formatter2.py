@@ -3,6 +3,8 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 from io import StringIO
 from typing import Optional, List, Iterator
+
+from django.conf import settings
 from django.http.response import HttpResponseBase
 from django.http import HttpResponse, StreamingHttpResponse
 from threadlocals.threadlocals import get_current_request
@@ -79,12 +81,18 @@ class ClassificationExportFormatter2(ABC):
         """
         if self.classification_filter.rows_per_file:
             response = HttpResponse(content_type='application/zip')
+            response['Content-Disposition'] = f'attachment; filename="{self.filename(extension_override="zip")}"'
+
             with zipfile.ZipFile(response, 'w') as zf:
+                zf.writestr("readme.txt", f"This file was downloaded from {settings.SITE_NAME}")
+                response.flush()
+
                 for index, entry in enumerate(self._yield_files()):
                     self.file_count += 1
                     # can we be more efficient than converting StringIO to a string to be converted back into bytes?
                     zf.writestr(self.filename(part=index), str(entry.file.getvalue()))
-            response['Content-Disposition'] = f'attachment; filename="{self.filename(extension_override="zip")}"'
+                    response.flush()
+
             return response
         else:
             self.file_count = 1
