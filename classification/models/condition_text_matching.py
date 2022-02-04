@@ -682,7 +682,7 @@ def embedded_ids_check(text: str) -> ConditionMatchingSuggestion:
                 text_tokens.discard(matched_term.id.lower())
                 text_tokens.discard(matched_term.id.lower().split(":")[1])
                 text_tokens.discard("#" + matched_term.id.lower().split(":")[1])
-                text_tokens.remove("mim")
+                text_tokens.discard("mim")
 
                 term_tokens: Set[str] = set()
                 # term_tokens.add(str(matched_term.id).lower())
@@ -696,10 +696,7 @@ def embedded_ids_check(text: str) -> ConditionMatchingSuggestion:
                             tokens = tokens.union(SearchText.tokenize_condition_text(normalize_condition_text(alias),
                                                                                      deplural=True, deroman=True))
 
-                    try:
-                        tokens.remove(term.id.lower())
-                    except KeyError:
-                        pass
+                    tokens.discard(term.id.lower())
                     return tokens
 
                 term_tokens = term_tokens.union(get_term_tokens(matched_term))
