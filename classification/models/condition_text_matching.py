@@ -29,7 +29,7 @@ from library.log_utils import report_exc_info, report_message
 from library.utils import ArrayLength, DebugTimer
 from ontology.models import OntologyTerm, OntologyService, OntologySnake, OntologyTermRelation, OntologyRelation
 from ontology.ontology_matching import normalize_condition_text, \
-    OPRPHAN_OMIM_TERMS, SearchText, pretty_set, PREFIX_SKIP_TERMS, IGNORE_TERMS
+    OPRPHAN_OMIM_TERMS, SearchText, pretty_set, PREFIX_SKIP_TERMS, IGNORE_TERMS, NON_PR_TERMS
 from snpdb.models import Lab
 
 
@@ -704,6 +704,14 @@ def embedded_ids_check(text: str) -> ConditionMatchingSuggestion:
                     if mondo_term := OntologyTermRelation.as_mondo(matched_term):
                         term_tokens = term_tokens.union(get_term_tokens(mondo_term))
 
+                has_non_pr_terms = False
+                for term in term_tokens:
+                    for non_pr in NON_PR_TERMS:
+                        if non_pr in term:
+                            has_non_pr_terms = True
+                            break
+
+
                 extra_words = text_tokens.difference(term_tokens) - PREFIX_SKIP_TERMS - IGNORE_TERMS
                 same_words = text_tokens.intersection(term_tokens) - {"disease", }  # disease isn't an overly impressive same word
                 same_word_letters = reduce(lambda a, b: a+b, [len(word) for word in same_words], 0)
@@ -715,7 +723,8 @@ def embedded_ids_check(text: str) -> ConditionMatchingSuggestion:
                 # print(f"Extra words = {extra_words}")
                 # print(f"Same Words = {same_words} same letters = {same_word_letters}")
 
-                if (len(extra_words) >= 3 and same_word_letters < 9) or (len(extra_words) >= 1 and same_word_letters == 0):  # 3 extra words and for words that are in common aren't longer than 9 letters combined
+                if not has_non_pr_terms and \
+                        ((len(extra_words) >= 3 and same_word_letters < 9) or (len(extra_words) >= 1 and same_word_letters == 0)):  # 3 extra words and for words that are in common aren't longer than 9 letters combined
                     cms.add_message(ConditionMatchingMessage(severity="warning", text=f"Found {matched_term.id} in text, but also apparently unrelated words : {pretty_set(extra_words)}"))
 
     cms.validate()
