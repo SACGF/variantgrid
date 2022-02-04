@@ -29,7 +29,7 @@ from library.log_utils import report_exc_info, report_message
 from library.utils import ArrayLength, DebugTimer
 from ontology.models import OntologyTerm, OntologyService, OntologySnake, OntologyTermRelation, OntologyRelation
 from ontology.ontology_matching import normalize_condition_text, \
-    OPRPHAN_OMIM_TERMS, SearchText, pretty_set, PREFIX_SKIP_TERMS
+    OPRPHAN_OMIM_TERMS, SearchText, pretty_set, PREFIX_SKIP_TERMS, IGNORE_TERMS
 from snpdb.models import Lab
 
 
@@ -679,16 +679,46 @@ def embedded_ids_check(text: str) -> ConditionMatchingSuggestion:
             if not matched_term.is_stub:
                 text_tokens = SearchText.tokenize_condition_text(normalize_condition_text(text),
                                                                  deplural=True, deroman=True)
-                term_tokens = SearchText.tokenize_condition_text(normalize_condition_text(matched_term.name),
-                                                                 deplural=True, deroman=True)
-                if aliases := matched_term.aliases:
-                    for alias in aliases:
-                        term_tokens = term_tokens.union(SearchText.tokenize_condition_text(normalize_condition_text(alias),
-                                                                                           deplural=True, deroman=True))
-                term_tokens.add(str(matched_term.id).lower())
-                term_tokens.add(str(matched_term.id.split(":")[1]))
-                extra_words = text_tokens.difference(term_tokens) - PREFIX_SKIP_TERMS
-                if len(extra_words) >= 3:
+                text_tokens.discard(matched_term.id.lower())
+                text_tokens.discard(matched_term.id.lower().split(":")[1])
+                text_tokens.discard("#" + matched_term.id.lower().split(":")[1])
+                text_tokens.remove("mim")
+
+                term_tokens: Set[str] = set()
+                # term_tokens.add(str(matched_term.id).lower())
+                # term_tokens.add(str(matched_term.id.split(":")[1]))
+
+                def get_term_tokens(term: OntologyTerm):
+                    tokens = SearchText.tokenize_condition_text(normalize_condition_text(matched_term.name),
+                                                                     deplural=True, deroman=True)
+                    if aliases := matched_term.aliases:
+                        for alias in aliases:
+                            tokens = tokens.union(SearchText.tokenize_condition_text(normalize_condition_text(alias),
+                                                                                     deplural=True, deroman=True))
+
+                    try:
+                        tokens.remove(term.id.lower())
+                    except KeyError:
+                        pass
+                    return tokens
+
+                term_tokens = term_tokens.union(get_term_tokens(matched_term))
+                if matched_term.ontology_service == OntologyService.OMIM:
+                    if mondo_term := OntologyTermRelation.as_mondo(matched_term):
+                        term_tokens = term_tokens.union(get_term_tokens(mondo_term))
+
+                extra_words = text_tokens.difference(term_tokens) - PREFIX_SKIP_TERMS - IGNORE_TERMS
+                same_words = text_tokens.intersection(term_tokens) - {"disease", }  # disease isn't an overly impressive same word
+                same_word_letters = reduce(lambda a, b: a+b, [len(word) for word in same_words], 0)
+                extra_words = [word for word in extra_words if
+                               not GeneSymbol.objects.filter(symbol=word).exists()]  # take out gene symbols
+
+                # print(f"Text Tokens = {text_tokens}")
+                # print(f"Term Tokens = {term_tokens}")
+                # print(f"Extra words = {extra_words}")
+                # print(f"Same Words = {same_words} same letters = {same_word_letters}")
+
+                if (len(extra_words) >= 3 and same_word_letters < 9) or (len(extra_words) >= 1 and same_word_letters == 0):  # 3 extra words and for words that are in common aren't longer than 9 letters combined
                     cms.add_message(ConditionMatchingMessage(severity="warning", text=f"Found {matched_term.id} in text, but also apparently unrelated words : {pretty_set(extra_words)}"))
 
     cms.validate()
