@@ -393,13 +393,11 @@
     </div>
     <div class="container">
         {% if show_annotation %}
-                <h3>Variants</h3>
+                <h3>Variants ({{ genome_build }})</h3>
 
             {% if has_samples_in_other_builds %}
-                {% page_help_embedded page_id='genes/view_gene_symbol_variants_help' title='Gene Symbol Variants' %}
-                    The variants below are from VCFs in the current genome build. You may want to view this page in another
-                    build to see other samples. Switch via buttons at the top of the page.
-                {% end_page_help_embedded %}
+                Note: The variants below are from {{ genome_build }} VCFs only. To see data from other builds, switch
+                via buttons at the top of the page.
             {% endif %}
 
             {% if has_variants %}
