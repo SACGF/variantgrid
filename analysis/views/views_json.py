@@ -398,6 +398,19 @@ def analysis_template_save(request, pk):
     """ Creates a new AnalysisTemplateVersion for an AnalysisTemplate """
     analysis_template = AnalysisTemplate.get_for_user(request.user, pk, write=True)
 
+    # Make sure it has variables
+    analysis_variables = AnalysisVariable.objects.filter(node__analysis=analysis_template.analysis)
+    error = None
+    if not analysis_variables.exists():
+        error = "You have not configured any analysis variables."
+    else:
+        required_fields = ["pedigree", "trio", "cohort", "sample"]
+        if not analysis_variables.filter(field__in=required_fields).exists():
+            error = f"You need at at least one analysis variable of: {', '.join(required_fields)}"
+
+    if error:
+        return JsonResponse({"error": error})
+
     analysis_name_template = request.POST.get("analysis_name_template")
 
     # Mark all previous as inactive

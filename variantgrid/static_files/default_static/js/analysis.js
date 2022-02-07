@@ -386,6 +386,7 @@ function addAnalysisVariableButton(nodeId, field, readOnly) {
                         $(".node-overlay", node).removeClass("variable-node");
                     }
                     lockNodeField(nodeId, field, false);
+                    checkTemplateSave();
                 }
 
                 analysisVariable(nodeId, field, 'del', removeVariableButton);
@@ -393,8 +394,20 @@ function addAnalysisVariableButton(nodeId, field, readOnly) {
         }
         existingNodeContainer.append(fieldAnalysisVariable);
     }
+    checkTemplateSave();
 }
 
+function checkTemplateSave() {
+    let analysisVariables = $(".analysis-variable-node", "#analysis-variables");
+    let templateSave = $("button#analysis-template-save-version", "#analysis-template-version");
+    if (analysisVariables.length) {
+        templateSave.prop("disabled", false);
+        templateSave.prop("title", "");
+    } else {
+        templateSave.prop("disabled", true);
+        templateSave.prop("title", "Cannot save - no Analysis variables!");
+    }
+}
 
 function setupAnalysisTemplateTopBar(analysisTemplateId) {
     let templateInfo = $("#analysis-template-info");
@@ -412,17 +425,28 @@ function setupAnalysisTemplateTopBar(analysisTemplateId) {
             url: Urls.analysis_template_save(analysisTemplateId),
             success: function(data) {
                 savingMessage.remove();
+                let message = "Save completed";
+                let severity = "info";
+                let messageTime = 1000;
 
-                $("#latest-template-version").html(data.version);
-                let sm = $("<li />", {class: 'info'}).html("Save completed.")
+                if (data.version) {
+                    $("#latest-template-version").html(data.version);
+                }
+                if (data.error) {
+                    message = data.error;
+                    severity = "error";
+                    messageTime = 5000;
+                }
+                let sm = $("<li />", {class: severity}).html(message)
                 let saveMessage = $("<ul />", {class: 'messages'}).append(sm);
                 templateInfo.append(saveMessage);
-                saveMessage.fadeOut(1000, function () {
+                saveMessage.fadeOut(messageTime, function () {
                     atVersion.fadeIn();
                 });
             },
         });
     });
+    checkTemplateSave();
 }
 
 function addInitialAnalysisVariables(analysisVariablesArray, readOnly) {

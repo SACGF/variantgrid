@@ -485,7 +485,7 @@ class AnalysisTemplateRun(TimeStampedModel):
     def populate_analysis_name(self):
         """ Populate analysis_name_template with params based on AnalysisVariable fields, and the magic values:
                 * template - TemplateVersion string representation
-                * input - 1st we find of "sample", "cohort", "trio" """
+                * input - 1st we find of "pedigree", "trio", "cohort", "sample" """
 
         params = {"template": str(self.template_version)}
         for arg in self.analysistemplaterunargument_set.all():
