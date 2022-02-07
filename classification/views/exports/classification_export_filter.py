@@ -191,6 +191,18 @@ class ClassificationFilter:
             allele = int(allele_str)
 
         benchmarking = request.query_params.get('benchmark') == 'true'
+
+        rows_per_file = None
+        if rows_per_file_str := request.query_params.get('rows_per_file'):
+            try:
+                rows_per_file = int(rows_per_file_str)
+                if rows_per_file <= 0:
+                    raise ValueError("Can't handle negative rows per file")
+                if 0 < rows_per_file < 100:
+                    rows_per_file = 100
+            except:
+                pass
+
         # TODO include rows_per_file into filter? right now it's hardcoded when doing MVL
 
         return ClassificationFilter(
@@ -202,8 +214,8 @@ class ClassificationFilter:
             transcript_strategy=transcript_strategy,
             since=since,
             allele=allele,
-            benchmarking = benchmarking
-            # rows_per_file=100
+            benchmarking=benchmarking,
+            rows_per_file=rows_per_file
         )
 
     @lazy

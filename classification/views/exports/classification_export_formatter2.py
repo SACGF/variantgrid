@@ -57,22 +57,26 @@ class ClassificationExportFormatter2(ABC):
         Start generating the data and return it in a HTTP Response
         """
         if self.classification_filter.benchmarking:
-            for count, row in enumerate(self._yield_file()):
+            for count, row in enumerate(self._yield_single_file()):
                 if count > 1000:
                     break
             return render(get_current_request(), "snpdb/benchmark.html", {"content": "TODO"})
 
-        if self.classification_filter.rows_per_file:
-            # default is 64kb chunks, but try serving up in kb
-            response = StreamingHttpResponse(stream_zip(self._yield_streaming_files()), content_type='application/zip')
-            response['Content-Disposition'] = f'attachment; filename="{self.filename(extension_override="zip")}"'
-            return response
-        else:
-            self.file_count = 1
-            # can stream in single file
-            response = StreamingHttpResponse(self._yield_file(), self.content_type())
-            response['Content-Disposition'] = f'attachment; filename="{self.filename()}"'
-            return response
+        try:
+            if self.classification_filter.rows_per_file:
+                # Had subtle issues with stream_zip, maybe try again after a version increase
+                # response = StreamingHttpResponse(stream_zip(self._yield_streaming_zip_entries()), content_type='application/zip')
+                # response['Content-Disposition'] = f'attachment; filename="{self.filename(extension_override="zip")}"'
+                # return response
+                return self._non_streaming_zip()
+            else:
+                self.file_count = 1
+                # can stream in single file
+                response = StreamingHttpResponse(self._yield_single_file(), self.content_type())
+                response['Content-Disposition'] = f'attachment; filename="{self.filename()}"'
+                return response
+        finally:
+            self.send_stats()
 
     @abstractmethod
     def content_type(self) -> str:
@@ -81,58 +85,89 @@ class ClassificationExportFormatter2(ABC):
         """
         pass
 
-    def _yield_streaming_entry(self, source: peekable) -> Iterator[bytes]:
-        # source should be a peekable of List[str]
+    def _peekable_data(self) -> peekable:  # peekable[List[str]]
+        def row_iterator():
+            for allele_data in self.classification_filter.allele_data_filtered():
+                if rows := self.row(allele_data):
+                    yield rows
+        return peekable(row_iterator())
 
-        def byte_me(rows: List[str]) -> bytes:
-            return "\n".join(rows).encode()
+    def _yield_streaming_entry_str(self, source: peekable) -> Iterator[List[str]]:
+        # source should be a peekable of List[str]
+        # yield's a file's worth of data (in several chunks)
 
         if header := self.header():
-            yield byte_me(header)
+            yield header
 
         this_entry_row_count = 0
         while True:
             # peek the next entry to see if it's big enough that we should split the file
             # if it's not too big (or if we've reached the end where False will be returned)
             # then add the footer and this iteration is done
-            if next_rows := source.peek(False):
-                if this_entry_row_count + len(next_rows) > self.classification_filter.rows_per_file:
+            if next_rows := source.peek(default=False):
+                next_rows_count = len(next_rows)
+                # code somewhat assumes header count = 1
+                if not this_entry_row_count == 0 and this_entry_row_count + next_rows_count >= self.classification_filter.rows_per_file:
                     break
                 # now that we're sure we want the rows, call next (which will give us the same data)
-                # but progress the iterator
-                next_rows = next(source)
-                next_rows_count = len(next_rows)
+                # and progress the iterator
+                next(source)
+
                 this_entry_row_count += next_rows_count
                 self.row_count += next_rows_count
-                yield byte_me(next_rows)
+                yield next_rows
             else:
                 break
 
         if footer := self.footer():
-            yield byte_me(footer)
+            yield footer
 
-    def _yield_streaming_files(self) -> Iterator[Tuple[str, datetime, int, Any, bytes]]:
+    def _yield_streaming_entry_bytes(self, source: peekable) -> Iterator[bytes]:
+        for entry in self._yield_streaming_entry_str(source):
+            yield "\n".join(entry).encode()
+
+    def _yield_streaming_zip_entries(self) -> Iterator[Tuple[str, datetime, int, Any, bytes]]:
         try:
-            def row_iterator():
-                for allele_data in self.classification_filter.allele_data_filtered():
-                    if rows := self.row(allele_data):
-                        yield rows
-
             modified_at = datetime.now()
             perms = 0o600
 
-            data_peek = peekable(row_iterator())
-            while data_peek.peek(False):
+            data_peek = self._peekable_data()
+            while data_peek.peek(default=False):
                 self.file_count += 1
-                yield self.filename(part=self.file_count), modified_at, perms, ZIP_64, self._yield_streaming_entry(data_peek)
+                yield self.filename(part=self.file_count), modified_at, perms, ZIP_64, self._yield_streaming_entry_bytes(data_peek)
         except:
             yield "An error occurred generating the file"
             raise
 
-        self.send_stats()
+    def _streaming_zip(self) -> StreamingHttpResponse:
+        # Had some issues with stream_zip telling macOS couldn't extract file, but then being able to manually extract the downloaded file fine
+        # not sure if the error is on macOs, stream_zip or my implementation, so using non streaming version for now
+        response = StreamingHttpResponse(stream_zip(self._yield_streaming_zip_entries()), content_type='application/zip')
+        response['Content-Disposition'] = f'attachment; filename="{self.filename(extension_override="zip")}"'
+        return response
 
+    def _non_streaming_zip(self) -> HttpResponse:
+        response = HttpResponse(content_type='application/zip')
+        with zipfile.ZipFile(response, 'w') as zf:
+            data_peek = self._peekable_data()
 
-    def _yield_file(self) -> Iterator[str]:
+            data_peek = self._peekable_data()
+            while data_peek.peek(default=False):
+                self.file_count += 1
+
+                def next_file() -> str:
+                    str_buffer = StringIO()
+                    for str_data in self._yield_streaming_entry_str(source=data_peek):
+                        str_buffer.writelines(str_data)
+                    str_buffer.flush()
+                    return str_buffer.getvalue()
+
+                zf.writestr(self.filename(part=self.file_count), next_file())
+
+        response['Content-Disposition'] = f'attachment; filename="{self.filename(extension_override="zip")}"'
+        return response
+
+    def _yield_single_file(self) -> Iterator[str]:
         """
         :return: An iterator for a single streaming file, call either this or yield_file
         """
@@ -150,8 +185,6 @@ class ClassificationExportFormatter2(ABC):
         except:
             yield "An error occurred generating the file"
             raise
-
-        self.send_stats()
 
     @abstractmethod
     def extension(self) -> str:

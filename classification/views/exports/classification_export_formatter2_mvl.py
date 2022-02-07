@@ -241,7 +241,6 @@ class MVLEntry(ExportRow):
             citations_html += "No citations provided"
         return citations_html
 
-
     @export_column('variant information')
     def variant_information(self):
         if self.formatter.is_shell:
@@ -257,7 +256,6 @@ class MVLEntry(ExportRow):
         combined_data = f'{warning_text}{groups_html}<p>Data as of {date_str} {self.variant_anchor_tag}</p>{citations_html}'
 
         return combined_data
-
 
     @export_column('report abstract')
     def report_abstract(self):
@@ -280,8 +278,6 @@ class ClassificationExportFormatter2MVL(ClassificationExportFormatter2):
     @staticmethod
     def from_request(request: HttpRequest) -> 'ClassificationExportFormatter2MVL':
         classification_filter = ClassificationFilter.from_request(request)
-        classification_filter.rows_per_file = 9999
-
         return ClassificationExportFormatter2MVL(
             classification_filter=classification_filter,
             format_details=FormatDetailsMVL.from_request(request)

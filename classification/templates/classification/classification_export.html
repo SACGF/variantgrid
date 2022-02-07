@@ -52,6 +52,11 @@
             if (detailLevelChecked.length) {
                 params.mvl_detail = detailLevelChecked.val();
             }
+            let rowsPerFile = $("#rows_per_file").val();
+            if (rowsPerFile.length) {
+                params.rows_per_file = rowsPerFile;
+            }
+
         } else if (format === 'vcf') {
             let encoding = $("input[name='encoding']:checked").val();
             params.encoding = encoding;
@@ -328,6 +333,11 @@
         {% labelled label="MVL Grouping" %}
             MVLs will have one row per transcript-variant combination.<br/>
             If there are multiple classifications for a transcript-variant pair then the details of those will be in the report abstract section for that row.
+        {% endlabelled %}
+        {% labelled label="Rows Per File" %}
+            <input class="form-control" id="rows_per_file" type="number" value="10000" />
+            <span class="text-muted">Various versions of Alissa limit how many rows can be in an individual MVL file<br/>
+            Minimum value is 100, but can set to 0 to have it all in a single file.</span>
         {% endlabelled %}
         {% labelled label="MVL Conflict Strategy" %}
             <div class="form-check">
