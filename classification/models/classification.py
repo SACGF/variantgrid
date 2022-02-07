@@ -2088,7 +2088,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
     @staticmethod
     def get_variant_q_from_classification_qs(vc_qs, genome_build: GenomeBuild) -> Q:
         va_qs = VariantAllele.objects.filter(genome_build=genome_build,
-                                             allele__in=vc_qs.values_list("variant__variantallele__allele"))
+                                             allele__in=vc_qs.values_list("allele"))
         variant_ids = va_qs.values_list("variant_id", flat=True)
         return Q(id__in=list(variant_ids))  # List is much faster than inner query...
 

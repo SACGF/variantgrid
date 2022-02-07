@@ -343,7 +343,7 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
             variant_qs = Variant.objects.filter(varianttranscriptannotation__transcript_version=transcript_version,
                                                 varianttranscriptannotation__protein_position__icontains=protein_position)
             # Join through allele so it works across genome builds
-            filters.append(Q(classification__variant__variantallele__allele__variantallele__variant__in=variant_qs))
+            filters.append(Q(classification__allele__variantallele__variant__in=variant_qs))
 
         if analysis_id := self.get_query_json("analysis_id"):
             filters.append(Q(classification__analysisclassification__analysis_id=analysis_id))

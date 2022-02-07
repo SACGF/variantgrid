@@ -22,16 +22,13 @@ REQUIRED_FIELDS = [
 CLASSIFICATION_COUNT_SQL = """
 select 1
 from classification_classification
-where classification_classification.variant_id in (
-    select snpdb_variantallele.variant_id
+where classification_classification.allele_id in (
+    select snpdb_variantallele.allele_id
     from snpdb_variantallele
-    where allele_id in (
-        select allele_id
-        from snpdb_variantallele
-        where variant_id = snpdb_variant.id
-    )
+    where variant_id = snpdb_variant.id
 )
 """
+
 
 COUNTS = {
     BuiltInFilters.TOTAL: "count(*)",

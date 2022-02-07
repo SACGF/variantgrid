@@ -834,7 +834,7 @@ class ClassificationsHotspotGraphView(HotspotGraphView):
         qs = self._get_variant_queryset(transcript_version)
         vc_qs = self._get_classifications()
         # Need to join through Allele so we get classifications through all genome builds
-        vc_column = "variantallele__allele__variantallele__variant__classification"
+        vc_column = "variantallele__allele__classification"  # variantallele__allele__classification
         qs = qs.filter(**{vc_column + "__in": vc_qs})
         count_column = "classifications_count"
         qs = qs.values("variantallele__allele").annotate(**{count_column: Count(vc_column)})
