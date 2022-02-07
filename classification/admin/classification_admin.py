@@ -127,6 +127,7 @@ class ClassificationAdmin(ModelAdminBasics):
     search_fields = ('id', 'lab_record_id')
     list_per_page = 100
     inlines = (ClassificationModificationAdmin,)
+    list_select_related = ('lab', 'user', 'allele')
 
     @admin_list_column(short_description="Created", order_field="created")
     def created_detailed(self, obj: Classification):

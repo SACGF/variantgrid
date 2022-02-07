@@ -47,6 +47,7 @@ class ClinVarExportAdmin(ModelAdminBasics):
     list_filter = (('clinvar_allele__clinvar_key', admin.RelatedFieldListFilter), ('status', AllValuesChoicesFieldListFilter), ClinVarClassificationAgeFilter)
     search_fields = ('pk', "scv")
     inlines = (ClinVarExportSubmissionAdmin, )
+    list_select_related = ('classification_based_on', )
 
     def has_add_permission(self, request, obj=None):
         return False
