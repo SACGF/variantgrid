@@ -59,7 +59,8 @@ class ClinVarExportAdmin(ModelAdminBasics):
     @admin_list_column(short_description="Classification Created", order_field="classification_based_on__classification__created")
     def classification_created(self, obj: ClinVarExport):
         if cm := obj.classification_based_on:
-            return cm.classification.created.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+            return f"{(timezone.now() - cm.classification.created).days} days old : {cm.classification.created.strftime('%Y-%m-%d')}"
+            # return cm.classification.created.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
 
     @admin_list_column(short_description="Condition",
                        order_field="condition__sort_text")
