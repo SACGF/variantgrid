@@ -24,7 +24,7 @@ def generate_key(max_length, seed_length):
 def get_or_create_django_secret_key(key_dir):
     key_filename = os.path.join(key_dir, "django_secret_key.txt")
     if not os.path.exists(key_filename):
-        secret_key = generate_key(40, 128)
+        secret_key = generate_key(50, 128)
         with open(key_filename, "wb") as f:
             f.write(secret_key)
     else:
