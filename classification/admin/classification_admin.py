@@ -14,7 +14,7 @@ from classification.models import EvidenceKey, EvidenceKeyMap, DiscordanceReport
     send_discordance_notification, ClinicalContext, ClassificationReportTemplate, ClassificationModification, \
     UploadedFileLab, ClinicalContextRecalcTrigger
 from classification.models.classification import Classification
-from classification.models.classification_import_run import ClassificationImportRun
+from classification.models.classification_import_run import ClassificationImportRun, ClassificationImportRunStatus
 from library.guardian_utils import admin_bot
 from snpdb.admin_utils import ModelAdminBasics, admin_action, admin_list_column, AllValuesChoicesFieldListFilter
 from snpdb.models import GenomeBuild, Lab
@@ -109,6 +109,18 @@ class ClassificationImportRunAdmin(ModelAdminBasics):
     @admin_list_column(short_description="Modified", order_field="modified")
     def modified_detailed(self, obj: ClassificationImportRun):
         return obj.modified.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+
+    @admin_action(short_description="Mark Unfinished")
+    def mark_unfinished(self, request, queryset:QuerySet[ClassificationImportRun]):
+        for cir in queryset:
+            if cir.status == ClassificationImportRunStatus.ONGOING:
+                cir.status = ClassificationImportRunStatus.UNFINISHED
+                cir.save()
+                self.message_user(request, message='Changed import from ongoing to unfinished',
+                                  level=messages.INFO)
+            else:
+                self.message_user(request, message='Can only mark unfinished ongoing records',
+                                  level=messages.WARNING)
 
 
 @admin.register(Classification)
