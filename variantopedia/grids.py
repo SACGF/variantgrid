@@ -1,33 +1,48 @@
-from django.db.models import TextField, Value
+from typing import Dict, Any
+
+from django.db.models import TextField, Value, QuerySet
+from django.http import HttpRequest
 from django.shortcuts import get_object_or_404
-from django.urls.base import reverse
 
 from analysis.models import VariantTag, Analysis
 from annotation.annotation_version_querysets import get_variant_queryset_for_latest_annotation_version
 from annotation.models import AnnotationVersion
-from library.django_utils.jqgrid_view import JQGridViewOp
+from genes.hgvs import HGVSMatcher
 from library.jqgrid_user_row_config import JqGridUserRowConfig
 from snpdb.grid_columns.custom_columns import get_custom_column_fields_override_and_sample_position
 from snpdb.grids import AbstractVariantGrid
-from snpdb.models import Variant, VariantZygosityCountCollection, GenomeBuild, Tag
+from snpdb.models import Variant, VariantZygosityCountCollection, GenomeBuild, Tag, VariantWiki
 from snpdb.models.models_user_settings import UserSettings, UserGridConfig
+from uicore.json.json_types import JsonDataType
 from variantopedia.interesting_nearby import get_nearby_qs
 
+from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
 
-class VariantWikiGrid(JqGridUserRowConfig):
-    model = Variant
-    caption = 'Variant Wiki'
-    fields = ["id", 'variantwiki__markdown', 'variantwiki__last_edited_by__username']
-    colmodel_overrides = {'id': {'width': 20, 'formatter': 'viewVariantDetails'},
-                          'variantwiki__markdown': {'label': 'Markdown', 'formatter': 'viewContent'},
-                          'variantwiki__last_edited_by__username': {'label': 'Last edited by'}}
 
-    def __init__(self, user, **kwargs):
-        super().__init__(user)
-        queryset = self.model.objects.filter(variantwiki__isnull=False)
-        self.queryset = queryset.values(*self.get_field_names())
-        grid_export_url = reverse("variantopedia_wiki_grid", kwargs={"op": JQGridViewOp.DOWNLOAD})
-        self.extra_config['grid_export_url'] = grid_export_url
+class VariantWikiColumns(DatatableConfig[VariantWiki]):
+    def __init__(self, request: HttpRequest):
+        super().__init__(request)
+
+        # self.expand_client_renderer = DatatableConfig._row_expand_ajax('eventlog_detail', expected_height=120)
+        self.rich_columns = [
+            RichColumn('variant', renderer=self.render_variant, client_renderer="renderVariantId"),
+            RichColumn('markdown'),
+            RichColumn('last_edited_by__username', name='user', orderable=True),
+            RichColumn('created', client_renderer='TableFormat.timestamp', orderable=True),
+            RichColumn('modified', client_renderer='TableFormat.timestamp', orderable=True,
+                       default_sort=SortOrder.DESC),
+        ]
+
+    @staticmethod
+    def render_variant(row: Dict[str, Any]) -> JsonDataType:
+        variant_id = row["variant"]
+        variant = get_object_or_404(Variant, pk=variant_id)
+        genome_build = next(iter(variant.genome_builds))
+        g_hgvs = HGVSMatcher(genome_build).variant_to_g_hgvs(variant)
+        return {"id": variant_id, "g_hgvs": g_hgvs}
+
+    def get_initial_queryset(self) -> QuerySet[VariantWiki]:
+        return VariantWiki.objects.all()
 
 
 class AllVariantsGrid(AbstractVariantGrid):

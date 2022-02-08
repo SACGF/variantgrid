@@ -1,14 +1,16 @@
 from library.django_utils.jqgrid_view import JQGridView
+from snpdb.views.datatable_view import DatabaseTableView
 from variantgrid.perm_path import perm_path
 from variantopedia import views
-from variantopedia.grids import VariantWikiGrid, AllVariantsGrid, NearbyVariantsGrid, TaggedVariantGrid, VariantTagsGrid
-
+from variantopedia.grids import AllVariantsGrid, NearbyVariantsGrid, TaggedVariantGrid, \
+    VariantTagsGrid, VariantWikiColumns
 
 urlpatterns = [
     perm_path('variants', views.variants, name='variants'),
     perm_path('dashboard', views.dashboard, name='dashboard'),
     perm_path('server_status', views.server_status, name='server_status'),
-    perm_path('server_status_activity_detail/<int:days_ago>', views.server_status_activity, name='server_status_activity_detail'),
+    perm_path('server_status_activity_detail/<int:days_ago>', views.server_status_activity,
+              name='server_status_activity_detail'),
     perm_path('server_status_settings_detail', views.server_status_settings, name='server_status_settings_detail'),
     perm_path('database_statistics_detail', views.database_statistics, name='database_statistics_detail'),
     # Tagging
@@ -26,7 +28,8 @@ urlpatterns = [
     perm_path('view_allele_from_variant/<int:variant_id>', views.view_allele_from_variant,
               name='view_allele_from_variant'),
     perm_path('view_allele/<int:pk>', views.view_allele, name='view_allele'),
-    perm_path('view_allele/<int:pk>/classifications_download', views.export_classifications_allele, name='allele_classifications_download'),
+    perm_path('view_allele/<int:pk>/classifications_download', views.export_classifications_allele,
+              name='allele_classifications_download'),
     perm_path('allele/<allele_id>/create_variant/<genome_build_name>',
               views.create_variant_for_allele, name='create_variant_for_allele'),
     perm_path('view/<int:variant_id>/<int:annotation_version_id>', views.variant_details_annotation_version,
@@ -40,8 +43,8 @@ urlpatterns = [
               name='variant_sample_information'),
 
     # Grids
-    perm_path('wiki/grid/<slug:op>/', JQGridView.as_view(grid=VariantWikiGrid, csv_download=True),
-              name='variantopedia_wiki_grid'),
+    perm_path('wiki/datatable', DatabaseTableView.as_view(column_class=VariantWikiColumns),
+              name='variant_wiki_datatable'),
     perm_path('nearby/grid/<variant_id>/<region_type>/<slug:op>/',
               JQGridView.as_view(grid=NearbyVariantsGrid, csv_download=True),
               name='nearby_variants_grid'),

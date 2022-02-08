@@ -2,23 +2,6 @@
 {% load static %}
 {% block title %}Wiki{% endblock %}
 
-{% block jshead %}
-{{ block.super }}
-    function viewVariantDetails(variantId) {
-        var variant_details_url = Urls.view_variant(variantId);
-        var win = window.open(variant_details_url, '_blank');
-        win.focus();
-    }
-
-
-    function formatViewVariantDetails(variantId) {
-        var url = "javascript:viewVariantDetails(" + variantId + ");";
-        return "<a href='" + url + "'><div class='grid-link-icon view-details-link'></div></a>";
-    }
-
-
-{% endblock %}
-
 {% block jsdocumentready %}
 {{ block.super }}
 
@@ -32,14 +15,21 @@
 {% endblock %}
 
 {% block submenu_page_content %}
+    <script>
+        function renderVariantId(data, type, row) {
+            let link = $('<a>', {
+                href: Urls.view_variant(data.id),
+                class: 'hover-link',
+                html: [
+                    $('<span>', {text: data.g_hgvs}),
+                ]
+            });
+            return link.prop('outerHTML');
+        }
+    </script>
 
-	<div>
-		<h3>Wiki</h3>
-		<table id="grid"></table>
-		<div id="pager"></div>	
-	</div>
+    <h3>Variant Wiki</h3>
 
-	{% load jqgrid_tags %}
-	{% jqgrid 'variantopedia_wiki_grid' 'wiki-grid' %}
+    <table id="variant-wiki-datatable" class="wiki-table sticky-header" data-datatable-responsive="true" data-datatable-url="{% url 'variant_wiki_datatable' %}"></table>
 
 {% endblock %}
