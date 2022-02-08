@@ -146,12 +146,18 @@ class GlobalSettings(SettingsOverride):
 class OrganizationUserSettingsOverride(SettingsOverride):
     organization = models.OneToOneField(Organization, on_delete=CASCADE)
 
+    def get_absolute_url(self):
+        return self.organization.get_absolute_url() + '?activeTab=org_tabs%3AtOrg-Settings'
+
     def __str__(self):
         return str(self.organization)
 
 
 class LabUserSettingsOverride(SettingsOverride):
     lab = models.OneToOneField(Lab, on_delete=CASCADE)
+
+    def get_absolute_url(self):
+        return self.lab.get_absolute_url() + '?activeTab=lab_tabs%3AtLab-Settings'
 
     def __str__(self):
         return str(self.lab)

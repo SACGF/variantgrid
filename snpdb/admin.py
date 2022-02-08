@@ -90,17 +90,32 @@ class UserSettingsOverrideAdmin(ModelAdminBasics):
     search_fields = ('user__username', 'user__first_name', 'user__last_name')
     actions = ["export_as_csv"]
 
+    def is_readonly_field(self, f):
+        if f.name == 'default_genome_build':
+            return False
+        return super().is_readonly_field(f)
+
 
 @admin.register(LabUserSettingsOverride)
 class LabUserSettingsOverrideAdmin(ModelAdminBasics):
     list_display = ('lab', 'default_genome_build', 'email_weekly_updates', 'email_discordance_updates')
     actions = ["export_as_csv"]
 
+    def is_readonly_field(self, f):
+        if f.name == 'default_genome_build':
+            return False
+        return super().is_readonly_field(f)
+
 
 @admin.register(OrganizationUserSettingsOverride)
 class OrganizationUserSettingsOverrideAdmin(ModelAdminBasics):
     list_display = ('organization', 'default_genome_build', 'email_weekly_updates', 'email_discordance_updates')
     actions = ["export_as_csv"]
+
+    def is_readonly_field(self, f):
+        if f.name == 'default_genome_build':
+            return False
+        return super().is_readonly_field(f)
 
 
 @admin.register(UserPageAck)
