@@ -91,6 +91,7 @@ OPRPHAN_OMIM_TERMS = re.compile("[0-9]{6,}")
 SUFFIX_SKIP_TERMS = {"", "the", "an", "and", "&", "or", "for", "the", "type", "group", "with"}
 PREFIX_SKIP_TERMS = SUFFIX_SKIP_TERMS.union({"a", })  # only exclude "A" from prefix, in case it says "type" A
 IGNORE_TERMS = {"ar", "ad", "linked", "related", "xld", "xlr", "disability", "disorder"}  # ignore when the user provides
+# should disease be in this as well?
 NON_PR_TERMS = {"retard", }
 
 SUB_TYPE = re.compile("^(.*?)(?: )((?:group|type)?(?: )?(?:[A-Z]|[0-9]+|[0-9]+[A-Z]|i|ii|iii|iv|v|vi|vii|viii|ix))$", re.IGNORECASE)
@@ -138,7 +139,10 @@ class SearchText:  # TODO shold be renamed ConditionSearchText
     def tokenize_condition_text(text: str, deplural=False, deroman=False) -> Set[str]:
         if text is None:
             return set()
-        text = text.replace(";", " ").replace("-", " ").lower()
+        ignore_me = [";", "-", "{", "}", "(", ")"]
+        for ignore_char in ignore_me:
+            text = text.replace(ignore_char, " ")
+        text = text.lower()
         tokens = [token.strip() for token in text.split(" ")]
         if deplural:
             new_tokens = list()

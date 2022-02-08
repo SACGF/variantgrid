@@ -1,4 +1,5 @@
 import operator
+import json
 from dataclasses import dataclass
 from functools import reduce
 from operator import attrgetter
@@ -513,7 +514,7 @@ class ConditionMatchingSuggestion:
             "info_only": self.info_only,
             "terms": [{"id": term.id, "name": term.name, "definition": '???' if term.is_stub else term.definition} for term in self.terms],
             "joiner": self.condition_multi_operation,
-            "messages": [message.as_json() for message in self.messages],
+            "messages": [message.as_json() for message in self.messages if message.severity != 'debug'],
             "user": user_json
         }
 
@@ -533,7 +534,7 @@ class ConditionMatchingSuggestion:
                 return False
 
             for message in self.messages:
-                if message.severity not in {"success", "info"}:
+                if message.severity not in {"success", "info", "debug"}:
                     return False
 
             if gene_symbol:
@@ -725,21 +726,20 @@ def embedded_ids_check(text: str) -> ConditionMatchingSuggestion:
                     for non_pr in NON_PR_TERMS:
                         if non_pr in term:
                             has_non_pr_terms = True
+                            cms.add_message(ConditionMatchingMessage(severity="debug", text="Text matching ignored as official term uses out of date terminology"))
                             break
 
                 extra_words = text_tokens.difference(term_tokens) - PREFIX_SKIP_TERMS - IGNORE_TERMS
-                same_words = text_tokens.intersection(term_tokens) - {"disease", }  # disease isn't an overly impressive same word
+                same_words = text_tokens.intersection(term_tokens)
                 same_word_letters = reduce(lambda a, b: a+b, [len(word) for word in same_words], 0)
                 extra_words = [word for word in extra_words if
                                not GeneSymbol.objects.filter(symbol=word).exists()]  # take out gene symbols
 
-                # print(f"Text Tokens = {text_tokens}")
-                # print(f"Term Tokens = {term_tokens}")
-                # print(f"Extra words = {extra_words}")
-                # print(f"Same Words = {same_words} same letters = {same_word_letters}")
+                cms.add_message(ConditionMatchingMessage(severity="debug", text=f"Same words = {json.dumps(sorted(same_words))}, length = {same_word_letters}"))
+                cms.add_message(ConditionMatchingMessage(severity="debug", text=f"Different words = {json.dumps(sorted(extra_words))}, count = {len(extra_words)}"))
 
                 if not has_non_pr_terms and \
-                        ((len(extra_words) >= 3 and same_word_letters < 9) or (len(extra_words) >= 1 and same_word_letters == 0)):  # 3 extra words and for words that are in common aren't longer than 9 letters combined
+                        ((len(extra_words) >= 3 and same_word_letters < 12) or (len(extra_words) >= 1 and same_word_letters == 0)):  # 3 extra words and for words that are in common aren't longer than 9 letters combined
                     cms.add_message(ConditionMatchingMessage(severity="warning", text=f"Found {matched_term.id} in text, but also apparently unrelated words : {pretty_set(extra_words)}"))
 
     cms.validate()
