@@ -27,7 +27,7 @@ class ImportedVariantTag(models.Model):
     variant_tags_import = models.ForeignKey(VariantTagsImport, on_delete=CASCADE)
     variant_string = models.TextField()
     genome_build_string = models.TextField()
-    gene_symbol_string = models.TextField()
+    gene_symbol_string = models.TextField(null=True)
     tag_string = models.TextField()
     variant_id = models.IntegerField()
     analysis_id = models.IntegerField(null=True)

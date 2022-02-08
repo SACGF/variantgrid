@@ -14,7 +14,7 @@ from snpdb.clingen_allele import populate_clingen_alleles_for_variants
 from snpdb.liftover import create_liftover_pipelines
 from snpdb.models import GenomeBuild, Variant, ImportSource, Tag, VariantAlleleCollectionSource, VariantAllele, \
     VariantAlleleCollectionRecord
-from upload.models import UploadedVariantTags, UploadStep, ModifiedImportedVariant
+from upload.models import UploadedVariantTags, UploadStep, ModifiedImportedVariant, SimpleVCFImportInfo
 from upload.tasks.vcf.import_vcf_step_task import ImportVCFStepTask
 from variantgrid.celery import app
 
@@ -23,7 +23,6 @@ class VariantTagsCreateVCFTask(ImportVCFStepTask):
     """ Write a VCF with variants in VariantTags so they can go through normal insert pipeline """
 
     def process_items(self, upload_step):
-        logging.info("VariantTagsCreateVCFTask - ready to go here!!!")
         upload_pipeline = upload_step.upload_pipeline
         uploaded_file = upload_pipeline.uploaded_file
 
@@ -52,6 +51,8 @@ class VariantTagsCreateVCFTask(ImportVCFStepTask):
 
         variant_tuples = []
         imported_tags = []
+        num_skipped_records = 0
+        num_skipped_with_star = 0
         for _, row in df.iterrows():
             variant_string = row["variant_string"]
             if variant_string.endswith(NEW_CLASSIFICATION):
@@ -59,7 +60,11 @@ class VariantTagsCreateVCFTask(ImportVCFStepTask):
 
             variant_tuple = Variant.get_tuple_from_string(variant_string, genome_build=genome_build)
             if variant_tuple is None:
-                raise ValueError(f"Could not convert '{variant_string}'")
+                num_skipped_records += 1
+                if "*" in variant_string:
+                    num_skipped_with_star += 1
+                logging.warning("Could not convert '%s'", variant_string)
+                continue
             variant_tuples.append(variant_tuple)
             node_id = None
             if "node__id" in row:
@@ -84,6 +89,12 @@ class VariantTagsCreateVCFTask(ImportVCFStepTask):
         items_processed = len(imported_tags)
         if imported_tags:
             ImportedVariantTag.objects.bulk_create(imported_tags, batch_size=2000)
+
+        if num_skipped_records:
+            message_string = f"Skipped {num_skipped_records} records."
+            if num_skipped_with_star:
+                message_string += f" ({num_skipped_with_star} containing '*') "
+            SimpleVCFImportInfo.objects.create(upload_step=upload_step, message_string=message_string)
 
         write_vcf_from_tuples(upload_step.output_filename, variant_tuples)
         return items_processed
