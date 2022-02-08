@@ -60,7 +60,7 @@ class OntologyService(models.TextChoices):
     })
 
     URLS: Dict[str, str] = Constant({
-        MONDO[0]: "https://vm-monitor.monarchinitiative.org/disease/MONDO:${1}",
+        MONDO[0]: "https://monarchinitiative.org/disease/MONDO:${1}",
         OMIM[0]: "http://www.omim.org/entry/${1}",
         HPO[0]: "https://hpo.jax.org/app/browse/term/HP:${1}",
         HGNC[0]: "https://www.genenames.org/data/gene-symbol-report/#!/hgnc_id/HGNC:${1}",
