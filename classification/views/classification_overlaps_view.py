@@ -26,7 +26,7 @@ def view_overlaps(request: HttpRequest, lab_id: Optional[int] = None) -> Respons
 
     all_labs = list(Lab.valid_labs_qs(request.user, admin_check=True))
     if len(all_labs) == 1 and not lab_id:
-        return redirect(reverse('view_overlaps', kwargs={'lab_id': all_labs[0].pk}))
+        return redirect(reverse('overlaps', kwargs={'lab_id': all_labs[0].pk}))
 
     context = {
         "selected_lab": lab_id or 0,
