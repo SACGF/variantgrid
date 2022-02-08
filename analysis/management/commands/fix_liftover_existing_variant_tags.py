@@ -2,6 +2,7 @@
 from django.core.management.base import BaseCommand
 
 from library.guardian_utils import admin_bot
+from library.utils import iter_fixed_chunks
 from snpdb.clingen_allele import populate_clingen_alleles_for_variants
 from snpdb.liftover import create_liftover_pipelines
 from snpdb.models import VariantAlleleCollectionSource, GenomeBuild, ImportSource, VariantAllele, \
@@ -11,8 +12,12 @@ from snpdb.models import VariantAlleleCollectionSource, GenomeBuild, ImportSourc
 class Command(BaseCommand):
     def handle(self, *args, **options):
         for genome_build in GenomeBuild.builds_with_annotation():
+            print(f"Handling {genome_build}")
             variant_qs = Variant.objects.filter(Variant.get_contigs_q(genome_build), varianttag__isnull=False)
-            populate_clingen_alleles_for_variants(genome_build, variant_qs)  # Will add VariantAlleles
+            # Do in small chunks so we can save as we go - this already uses smaller batches internally
+            for variant_chunk in iter_fixed_chunks(variant_qs, 10_000):
+                print("Handling 10k chunk")
+                populate_clingen_alleles_for_variants(genome_build, variant_chunk)  # Will add VariantAlleles
 
             va_collection = VariantAlleleCollectionSource.objects.create(genome_build=genome_build)
             records = []

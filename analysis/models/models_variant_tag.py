@@ -2,7 +2,7 @@ from typing import List
 
 from django.contrib.auth.models import User
 from django.db import models
-from django.db.models import CASCADE, SET_NULL, PROTECT
+from django.db.models import CASCADE, SET_NULL, PROTECT, Q
 from django_extensions.db.models import TimeStampedModel
 
 from analysis.models.enums import TagLocation
@@ -10,7 +10,7 @@ from analysis.models.models_analysis import Analysis
 from analysis.models.nodes.analysis_node import AnalysisNode
 from annotation.annotation_version_querysets import get_variant_queryset_for_latest_annotation_version
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsAutoInitialSaveMixin
-from snpdb.models import Variant, GenomeBuild, Tag, VariantAllele
+from snpdb.models import Variant, GenomeBuild, Tag, VariantAllele, Allele
 
 
 class VariantTagsImport(TimeStampedModel):
@@ -41,6 +41,7 @@ class VariantTag(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
     """ A tag in an analysis. Has create create/delete signal handlers:
         @see analysis.signals.signal_handlers._update_analysis_on_variant_tag_change """
     variant = models.ForeignKey(Variant, on_delete=PROTECT)
+    allele = models.ForeignKey(Allele, null=True, on_delete=PROTECT)  # moved to own field as an optimisation
     genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)
     tag = models.ForeignKey(Tag, on_delete=CASCADE)
     analysis = models.ForeignKey(Analysis, null=True, on_delete=SET_NULL)
@@ -84,22 +85,25 @@ class VariantTag(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
 
         va_kwargs = {
             "genome_build": genome_build,
-            "allele__in": tags_qs.values_list("variant__variantallele__allele")
+            "allele__in": tags_qs.values_list("allele")
         }
         if variant_qs is not None:
             va_kwargs["variant__in"] = variant_qs
 
         va_qs = VariantAllele.objects.filter(**va_kwargs)
         # Do distinct as we used to get 2x results with MT (which share contigs across builds)
-        tags_qs = VariantTag.objects.filter(variant__variantallele__allele__in=va_qs.values_list("allele", flat=True))
+        tags_qs = VariantTag.objects.filter(allele__in=va_qs.values_list("allele", flat=True))
         return tags_qs.distinct()
 
     @staticmethod
-    def variants_for_build(genome_build, tags_qs, tag_ids: List[str]):
-        tags_qs = VariantTag.get_for_build(genome_build, tags_qs=tags_qs)
+    def variants_for_build_q(genome_build, tags_qs, tag_ids: List[str]) -> Q:
+        if tags_qs is None:
+            tags_qs = VariantTag.objects.all()
         if tag_ids:
             tags_qs = tags_qs.filter(tag__in=tag_ids)
 
-        qs = get_variant_queryset_for_latest_annotation_version(genome_build)
-        return qs.filter(variantallele__genome_build=genome_build,
-                         variantallele__allele__in=tags_qs.values_list("variant__variantallele__allele", flat=True))
+        va_qs = VariantAllele.objects.filter(genome_build=genome_build,
+                                             allele__in=tags_qs.values_list("allele"))
+
+        return Q(pk__in=va_qs.values_list("variant"))
+

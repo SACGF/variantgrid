@@ -137,9 +137,9 @@ class VariantTagsGrid(JqGridUserRowConfig):
             queryset = queryset.filter(user=user)
 
         # Need to go through Allele to get variant in this build
-        queryset = queryset.filter(variant__variantallele__allele__variantallele__genome_build=genome_build)
+        queryset = queryset.filter(allele__variantallele__genome_build=genome_build)
         queryset = Variant.annotate_variant_string(queryset,
-                                                   path_to_variant="variant__variantallele__allele__variantallele__variant__")
+                                                   path_to_variant="allele__variantallele__variant__")
         queryset = queryset.annotate(view_genome_build=Value(genome_build_name, output_field=TextField()))
         field_names = self.get_field_names() + ["variant_string", "view_genome_build"]
         self.queryset = queryset.values(*field_names)
@@ -182,14 +182,15 @@ class TaggedVariantGrid(AbstractVariantGrid):
             if tag_id := extra_filters.get("tag"):
                 tag_ids.append(tag_id)
 
-        qs = VariantTag.variants_for_build(genome_build, tags_qs, tag_ids)
+        qs = get_variant_queryset_for_latest_annotation_version(genome_build)
+        qs = qs.filter(VariantTag.variants_for_build_q(genome_build, tags_qs, tag_ids))
         user_settings = UserSettings.get_for_user(user)
         fields, override, _ = get_custom_column_fields_override_and_sample_position(user_settings.columns)
         fields.remove("tags")
         self.fields = fields
         self.update_overrides(override)
 
-        self.queryset = qs.distinct().values(*self.get_queryset_field_names())
+        self.queryset = qs.values(*self.get_queryset_field_names())
         self.extra_config.update({'sortname': "locus__position",
                                   'sortorder': "asc",
                                   'shrinkToFit': False})

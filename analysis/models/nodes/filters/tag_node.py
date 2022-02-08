@@ -1,3 +1,6 @@
+import operator
+import time
+from functools import reduce
 from typing import List
 
 from django.db import models
@@ -36,17 +39,16 @@ class TagNode(AnalysisNode):
         variants_with_tags = VariantTag.objects.filter(analysis=self.analysis)
         if self.tag_ids:
             variants_with_tags = variants_with_tags.filter(tag__in=self.tag_ids)
-        variants_set = set(variants_with_tags.values_list("variant_id", flat=True))
+        q_list = [Q(pk__in=variants_with_tags.values_list("variant_id"))]
 
         if self.mode == TagNodeMode.ALL_TAGS:
             tags_qs = VariantTag.filter_for_user(self.analysis.user)
             # We already have tags from this analysis, no need to retrieve again
             tags_qs = tags_qs.exclude(analysis=self.analysis)
             # Builds from different analyses (maybe diff builds) - so do query using Allele
-            variants_qs = VariantTag.variants_for_build(self.analysis.genome_build, tags_qs, self.tag_ids)
-            variants_set.update(variants_qs.values_list("pk", flat=True))
+            q_list.append(VariantTag.variants_for_build_q(self.analysis.genome_build, tags_qs, self.tag_ids))
 
-        q = Q(pk__in=variants_set)
+        q = reduce(operator.or_, q_list)
         if self.exclude:
             q = ~q
         return q

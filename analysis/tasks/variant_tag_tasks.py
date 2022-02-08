@@ -30,5 +30,11 @@ def variant_tag_deleted_in_analysis_task(analysis_id, _tag_id):
 def _liftover_variant_tag(variant_tag: VariantTag):
     populate_clingen_alleles_for_variants(variant_tag.genome_build, [variant_tag.variant])
     variant_allele = VariantAllele.objects.get(variant=variant_tag.variant, genome_build=variant_tag.genome_build)
+
+    # Assign allele to VariantTag
+    if variant_tag.allele is None:
+        variant_allele.allele = variant_allele.allele
+        variant_allele.save()
+
     allele_source = VariantAlleleSource.objects.create(variant_allele=variant_allele)
     create_liftover_pipelines(admin_bot(), allele_source, ImportSource.WEB, variant_tag.genome_build)
