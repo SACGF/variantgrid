@@ -2463,7 +2463,7 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
         clear_permissions(self, [self.get_read_perm()])
         assign_perm(self.get_read_perm(), self.classification.lab.group, self)
         if self.published:
-            if group := self.share_level.group(lab=self.classification.lab):
+            if group := self.share_level_enum.group(lab=self.classification.lab):
                 assign_perm(self.get_read_perm(), group, self)
 
     @lazy
