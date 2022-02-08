@@ -62,21 +62,18 @@ class ClassificationExportFormatter2(ABC):
                     break
             return render(get_current_request(), "snpdb/benchmark.html", {"content": "TODO"})
 
-        try:
-            if self.classification_filter.rows_per_file:
-                # Had subtle issues with stream_zip, maybe try again after a version increase
-                # response = StreamingHttpResponse(stream_zip(self._yield_streaming_zip_entries()), content_type='application/zip')
-                # response['Content-Disposition'] = f'attachment; filename="{self.filename(extension_override="zip")}"'
-                # return response
-                return self._non_streaming_zip()
-            else:
-                self.file_count = 1
-                # can stream in single file
-                response = StreamingHttpResponse(self._yield_single_file(), self.content_type())
-                response['Content-Disposition'] = f'attachment; filename="{self.filename()}"'
-                return response
-        finally:
-            self.send_stats()
+        if self.classification_filter.rows_per_file:
+            # Had subtle issues with stream_zip, maybe try again after a version increase
+            # response = StreamingHttpResponse(stream_zip(self._yield_streaming_zip_entries()), content_type='application/zip')
+            # response['Content-Disposition'] = f'attachment; filename="{self.filename(extension_override="zip")}"'
+            # return response
+            return self._non_streaming_zip()
+        else:
+            self.file_count = 1
+            # can stream in single file
+            response = StreamingHttpResponse(self._yield_single_file(), self.content_type())
+            response['Content-Disposition'] = f'attachment; filename="{self.filename()}"'
+            return response
 
     @abstractmethod
     def content_type(self) -> str:
@@ -165,6 +162,7 @@ class ClassificationExportFormatter2(ABC):
                 zf.writestr(self.filename(part=self.file_count), next_file())
 
         response['Content-Disposition'] = f'attachment; filename="{self.filename(extension_override="zip")}"'
+        self.send_stats()
         return response
 
     def _yield_single_file(self) -> Iterator[str]:
@@ -185,6 +183,8 @@ class ClassificationExportFormatter2(ABC):
         except:
             yield "An error occurred generating the file"
             raise
+        finally:
+            self.send_stats()
 
     @abstractmethod
     def extension(self) -> str:
