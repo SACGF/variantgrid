@@ -287,6 +287,11 @@ class ClassificationAdmin(ModelAdminBasics):
 
         self.message_user(request, f"{conditions_newly_set} records have conditions now when they didn't previously")
 
+    @admin_action("Fix Permissions")
+    def fix_permissions(self, request, queryset: QuerySet[Classification]):
+        for c in queryset:
+            c.fix_permissions(fix_modifications=True)
+
     """
     @admin_action("Fix allele Freq History")
     def fix_allele_freq_history(self, request, queryset):

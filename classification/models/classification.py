@@ -1739,10 +1739,13 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 flat[use_key] = value
         return flat
 
-    def fix_permissions(self):
+    def fix_permissions(self, fix_modifications=False):
         clear_permissions(self, [self.get_write_perm()])
         # labs can edit classifications
         assign_perm(self.get_write_perm(), self.lab.group, self)
+        if fix_modifications:
+            for cm in self.classificationmodification_set.all():
+                cm.fix_permissions()
 
     @property
     def unique_patient_id(self):
@@ -2455,6 +2458,13 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
 
         vc.refresh_from_db()
         return True
+
+    def fix_permissions(self):
+        clear_permissions(self, [self.get_read_perm()])
+        assign_perm(self.get_read_perm(), self.classification.lab.group, self)
+        if self.published:
+            if group := self.share_level.group(lab=self.classification.lab):
+                assign_perm(self.get_read_perm(), group, self)
 
     @lazy
     def previous(self) -> Optional['ClassificationModification']:
