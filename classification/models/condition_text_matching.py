@@ -677,16 +677,32 @@ def embedded_ids_check(text: str) -> ConditionMatchingSuggestion:
         if len(cms.terms) == 1:
             matched_term = cms.terms[0]
             if not matched_term.is_stub:
+                # work out all the words in the text, subtract any ontology IDs from the text
                 text_tokens = SearchText.tokenize_condition_text(normalize_condition_text(text),
                                                                  deplural=True, deroman=True)
-                text_tokens.discard(matched_term.id.lower())
-                text_tokens.discard(matched_term.id.lower().split(":")[1])
-                text_tokens.discard("#" + matched_term.id.lower().split(":")[1])
-                text_tokens.discard("mim")
+                # remove all numbers that are the same as the OMIM or MONDO number
+                ontology_terms = set()
+                number_part = matched_term.id.split(":")[1]
+                ontology_terms.add(number_part)
+                while number_part.startswith("0"):
+                    number_part = number_part[1:]
+                    ontology_terms.add(number_part)
 
+                ontology_prefixes = {ontology.lower() for ontology in OntologyService.CONDITION_ONTOLOGIES}
+                ontology_prefixes.add("mim")
+                # remove any terms with a : or # that look like they might be an ontology ID
+                ontology_terms |= ontology_prefixes
+                for term in text_tokens:
+                    if ":" in term or "#" in term:
+                        for ontology_prefix in ontology_prefixes:
+                            if ontology_prefix in term:
+                                ontology_terms.add(term)
+                                break
+                text_tokens -= ontology_terms
+                text_tokens.discard(matched_term.id.lower())
+
+                # now find all the terms that should be expected in the term
                 term_tokens: Set[str] = set()
-                # term_tokens.add(str(matched_term.id).lower())
-                # term_tokens.add(str(matched_term.id.split(":")[1]))
 
                 def get_term_tokens(term: OntologyTerm):
                     tokens = SearchText.tokenize_condition_text(normalize_condition_text(matched_term.name),
@@ -710,7 +726,6 @@ def embedded_ids_check(text: str) -> ConditionMatchingSuggestion:
                         if non_pr in term:
                             has_non_pr_terms = True
                             break
-
 
                 extra_words = text_tokens.difference(term_tokens) - PREFIX_SKIP_TERMS - IGNORE_TERMS
                 same_words = text_tokens.intersection(term_tokens) - {"disease", }  # disease isn't an overly impressive same word
