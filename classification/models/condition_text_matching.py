@@ -738,8 +738,7 @@ def embedded_ids_check(text: str) -> ConditionMatchingSuggestion:
                 cms.add_message(ConditionMatchingMessage(severity="debug", text=f"Same words = {json.dumps(sorted(same_words))}, length = {same_word_letters}"))
                 cms.add_message(ConditionMatchingMessage(severity="debug", text=f"Different words = {json.dumps(sorted(extra_words))}, count = {len(extra_words)}"))
 
-                if not has_non_pr_terms and \
-                        ((len(extra_words) >= 3 and same_word_letters < 12) or (len(extra_words) >= 1 and same_word_letters == 0)):  # 3 extra words and for words that are in common aren't longer than 9 letters combined
+                if not has_non_pr_terms and len(extra_words) >= 3:  # 3 extra words and for words that are in common aren't longer than 9 letters combined
                     cms.add_message(ConditionMatchingMessage(severity="warning", text=f"Found {matched_term.id} in text, but also apparently unrelated words : {pretty_set(extra_words)}"))
 
     cms.validate()
