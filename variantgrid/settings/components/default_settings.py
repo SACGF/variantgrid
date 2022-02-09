@@ -547,6 +547,9 @@ MIDDLEWARE = (
     # 'debug_panel.middleware.DebugPanelMiddleware',
 )
 HTML_MINIFY = True
+EXCLUDE_FROM_MINIFYING = (
+    '^media/',  # Died in Django 4: FileResponse instance has no 'content' attribute. Use 'streaming_content' instead.
+)
 
 ROOT_URLCONF = 'variantgrid.urls'
 

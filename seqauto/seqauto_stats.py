@@ -22,12 +22,12 @@ def get_sample_enrichment_kits_df():
         for i, val in sr.items():
             sr_name = SequencingRun.get_original_illumina_sequencing_run(val)
             run_date = sr_name.split("_")[0]
-            year_series[i] = run_date[:2]
-            year_month_series[i] = run_date[:4]
+            year_series[i] = int(run_date[:2])
+            year_month_series[i] = int(run_date[:4])
 
         start_month, start_year = get_month_and_year(year_month_series.min())
 
-        month_offset = pd.Series(index=df.index)
+        month_offset = pd.Series(index=df.index, dtype='i')
         for i, year_month in year_month_series.items():
             month, year = get_month_and_year(year_month)
             month_offset[i] = get_months_since(start_month, start_year, month, year)

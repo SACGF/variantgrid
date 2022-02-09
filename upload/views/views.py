@@ -211,7 +211,7 @@ def view_uploaded_file(request, uploaded_file_id):
 def view_upload_stats(request):
     DAYS = 30
 
-    end_date = date.today() - timedelta(days=DAYS)
+    end_date = timezone.now() - timedelta(days=DAYS)
     ups_qs = UploadStep.objects.filter(end_date__gte=end_date, name__isnull=False)
     us = list(map(json.dumps, upload_stats.get_upload_stats(ups_qs, max_step_names=10)))
     num_upload_pipelines, total_times, time_per_kilo_variant = us
