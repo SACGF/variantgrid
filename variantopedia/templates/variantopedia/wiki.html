@@ -2,18 +2,6 @@
 {% load static %}
 {% block title %}Wiki{% endblock %}
 
-{% block jsdocumentready %}
-{{ block.super }}
-
-	jQuery.extend($.fn.fmatter , {
-   		viewContent : function(content) {
-			var markdown = markdownize(content);
-	    	return markdown;
-		},
-        'viewVariantDetails' : formatViewVariantDetails,
-	});
-{% endblock %}
-
 {% block submenu_page_content %}
     <script>
         function renderVariantId(data, type, row) {
