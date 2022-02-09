@@ -19,7 +19,7 @@ class ClassificationImportRunStatus(models.TextChoices):
     UNFINISHED = "U", 'Unfinished'
 
 
-MAX_IMPORT_AGE = timedelta(minutes=5)
+MAX_IMPORT_AGE = timedelta(minutes=10)
 
 
 class ClassificationImportRun(TimeStampedModel):
