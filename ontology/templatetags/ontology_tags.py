@@ -2,7 +2,7 @@ from typing import Optional
 
 from django.template import Library
 
-from ontology.models import OntologyTerm, OntologyRelation, OntologyTermRelation, GeneDiseaseClassification
+from ontology.models import OntologyTerm, OntologyTermRelation, GeneDiseaseClassification
 from ontology.ontology_matching import OntologyMatch
 
 register = Library()
@@ -27,7 +27,6 @@ def ontology_relationship(relationship: OntologyTermRelation, term: OntologyTerm
             if strongest not in allowed_set:
                 low_quality = True
                 quality = strongest
-
 
     return {
         "relationship": relationship,

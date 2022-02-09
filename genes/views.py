@@ -48,7 +48,6 @@ from library.django_utils import get_field_counts, add_save_message
 from library.utils import defaultdict_to_dict, LazyAttribute
 from ontology.models import OntologySnake, OntologyService, OntologyTerm
 from seqauto.models import EnrichmentKit
-from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import CohortGenotypeCollection, Cohort, VariantZygosityCountCollection, Sample
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_user_settings import UserSettings

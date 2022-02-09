@@ -1,6 +1,6 @@
 from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import List, Dict, Tuple, Iterable
+from typing import List, Dict, Iterable
 
 from classification.enums import SpecialEKeys
 from classification.models import ClassificationModification

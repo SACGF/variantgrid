@@ -218,7 +218,6 @@ class ClassificationApiExportView(APIView):
         genome_build = GenomeBuild.get_name_or_alias(build_name)
         pretty = request.query_params.get('value_format') == 'labels'
 
-
         conflict_strategy = request.query_params.get('conflict_strategy', ConflictStrategy.MOST_PATHOGENIC)
         encoding = request.query_params.get('encoding', VCFEncoding.BASIC)
         cs_override_labels = {}

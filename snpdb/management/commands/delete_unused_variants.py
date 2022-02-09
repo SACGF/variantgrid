@@ -1,4 +1,3 @@
-import random
 import numpy as np
 from django.core.management.base import BaseCommand
 
@@ -26,7 +25,7 @@ class Command(BaseCommand):
         steps = options["steps"]
         min_variant = options["min_variant"]
 
-        check_ref = True 
+        check_ref = True
         arl_qs = AnnotationRangeLock.objects.filter(version__genome_build__name='GRCh37')
         if min_variant:
             arl_qs = arl_qs.filter(min_variant__gt=min_variant)

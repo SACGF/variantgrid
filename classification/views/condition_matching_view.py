@@ -9,12 +9,12 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from classification.models import ConditionTextMatch, ConditionText, update_condition_text_match_counts, MultiCondition, \
-    ConditionMatchingSuggestion, condition_matching_suggestions, Classification
+    ConditionMatchingSuggestion, condition_matching_suggestions
 from classification.views.classification_dashboard_view import ClassificationDashboard
 from library.utils import empty_to_none
 from ontology.models import OntologyTerm
 from ontology.ontology_matching import normalize_condition_text
-from snpdb.models import Lab, UserSettings
+from snpdb.models import Lab
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
 
 

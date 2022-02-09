@@ -13,10 +13,9 @@ from snpdb.grid_columns.custom_columns import get_custom_column_fields_override_
 from snpdb.grids import AbstractVariantGrid
 from snpdb.models import Variant, VariantZygosityCountCollection, GenomeBuild, Tag, VariantWiki
 from snpdb.models.models_user_settings import UserSettings, UserGridConfig
+from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
 from uicore.json.json_types import JsonDataType
 from variantopedia.interesting_nearby import get_nearby_qs
-
-from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
 
 
 class VariantWikiColumns(DatatableConfig[VariantWiki]):

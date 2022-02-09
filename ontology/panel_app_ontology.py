@@ -1,6 +1,6 @@
+import re
 from datetime import timedelta
 from typing import Union
-import re
 
 from django.conf import settings
 

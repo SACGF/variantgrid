@@ -1,9 +1,10 @@
 import json
 from datetime import timedelta
-from django.utils import timezone
+
 from django.contrib import messages, admin
 from django.db.models import QuerySet
 from django.http import HttpResponse
+from django.utils import timezone
 
 from classification.models import ClinVarExport, ClinVarExportBatch, ClinVarAllele, ClinVarExportBatchStatus, \
     ClinVarExportRequest, ClinVarExportSubmission

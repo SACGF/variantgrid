@@ -1,8 +1,6 @@
 from django.conf import settings
 from django.template.library import Library
 
-from classification.models.classification_utils import UserClassificationStats
-
 register = Library()
 
 """

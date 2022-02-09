@@ -4,16 +4,16 @@ from datetime import datetime
 from io import StringIO
 from typing import Optional, List, Iterator, Tuple, Any
 
-from django.conf import settings
-from django.http.response import HttpResponseBase
 from django.http import HttpResponse, StreamingHttpResponse
+from django.http.response import HttpResponseBase
 from django.shortcuts import render
 from more_itertools import peekable
-from stream_zip import NO_COMPRESSION_64, stream_zip, NO_COMPRESSION_32, ZIP_64, ZIP_32
+from stream_zip import stream_zip, ZIP_64
 from threadlocals.threadlocals import get_current_request
+
+from classification.views.exports.classification_export_filter import AlleleData, ClassificationFilter
 from library.guardian_utils import bot_group
 from library.log_utils import NotificationBuilder
-from classification.views.exports.classification_export_filter import AlleleData, ClassificationFilter
 
 
 class ClassificationExportFormatter2(ABC):

@@ -8,8 +8,8 @@ from lazy import lazy
 from classification.models import Classification, ClassificationModification, EvidenceKeyMap
 from classification.views.classification_export_utils import UsedKeyTracker, KeyValueFormatter
 from classification.views.exports.classification_export_decorator import register_classification_exporter
-from classification.views.exports.classification_export_formatter2 import ClassificationExportFormatter2
 from classification.views.exports.classification_export_filter import AlleleData, ClassificationFilter
+from classification.views.exports.classification_export_formatter2 import ClassificationExportFormatter2
 from library.utils import delimited_row, export_column, ExportRow
 from snpdb.models import GenomeBuild
 

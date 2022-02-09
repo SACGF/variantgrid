@@ -13,7 +13,7 @@ from pytz import timezone
 
 from classification.enums import SpecialEKeys
 from classification.models import ClinVarExport, ClinVarExportBatch, ClinVarExportBatchStatus, \
-    Classification, EvidenceKeyMap, ClinVarExportStatus
+    EvidenceKeyMap, ClinVarExportStatus
 from classification.views.classification_dashboard_view import ClassificationDashboard
 from genes.hgvs import CHGVS
 from library.cache import timed_cache

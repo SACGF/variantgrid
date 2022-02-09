@@ -12,11 +12,9 @@ from classification.enums.discordance_enums import ContinuedDiscordanceReason, \
 from classification.models import ClassificationModification, DiscordanceReportClassification, ClinicalContext
 from classification.models.discordance_models import DiscordanceReport, \
     DiscordanceActionsLog
-from classification.views.classification_export_csv import ExportFormatterCSV
 from classification.views.exports import ClassificationExportFormatter2CSV
 from classification.views.exports.classification_export_filter import ClassificationFilter
 from classification.views.exports.classification_export_formatter2_csv import FormatDetailsCSV
-from snpdb import genome_build_manager
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models.models_user_settings import UserSettings
 

@@ -1,5 +1,5 @@
-import operator
 import json
+import operator
 from dataclasses import dataclass
 from functools import reduce
 from operator import attrgetter

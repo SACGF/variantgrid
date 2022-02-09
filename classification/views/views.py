@@ -40,7 +40,6 @@ from classification.models.clinical_context_models import ClinicalContext
 from classification.models.evidence_key import EvidenceKeyMap
 from classification.models.flag_types import classification_flag_types
 from classification.views.classification_datatables import ClassificationColumns
-from classification.views.classification_export_csv import ExportFormatterCSV
 from classification.views.classification_export_redcap import ExportFormatterRedcap
 from classification.views.exports import ClassificationExportFormatter2CSV
 from classification.views.exports.classification_export_filter import ClassificationFilter
@@ -54,7 +53,6 @@ from library.file_utils import rm_if_exists
 from library.guardian_utils import is_superuser
 from library.log_utils import log_traceback
 from library.utils import delimited_row
-from snpdb import genome_build_manager
 from snpdb.forms import SampleChoiceForm, UserSelectForm, LabSelectForm
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import Variant, UserSettings, Sample, Lab, Allele

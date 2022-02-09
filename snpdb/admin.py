@@ -268,7 +268,6 @@ class OrganizationAdmin(ModelAdminBasics):
         }, **kwargs)
 
 
-
 admin.site.register(models.CachedGeneratedFile, ModelAdminBasics)
 admin.site.register(models.Cohort, ModelAdminBasics)
 admin.site.register(models.CohortGenotypeCollection, ModelAdminBasics)

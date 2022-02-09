@@ -8,7 +8,7 @@ from django.utils import timezone
 from lazy import lazy
 from model_utils.models import now
 
-from ontology.models import OntologyTermRelation, OntologyTerm, OntologyImport, OntologyService
+from ontology.models import OntologyTermRelation, OntologyTerm, OntologyImport
 
 
 class OntologyBuilderDataUpToDateException(Exception):
@@ -186,7 +186,6 @@ class OntologyBuilder:
         cached.modify(self._ontology_import)
         cached.obj.extra = extra
 
-
     def add_term(self,
                  term_id: str,
                  name: str,
@@ -226,7 +225,6 @@ class OntologyBuilder:
 
         if aliases is not None or primary_source:
             term.aliases = aliases or list()
-
 
     def complete(self, purge_old_relationships=True, purge_old_terms=False, verbose=True):
         """

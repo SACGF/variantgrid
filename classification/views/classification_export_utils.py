@@ -189,7 +189,6 @@ class TranscriptGroup:
     def cms(self) -> List[ClassificationModification]:
         return [vcmcs.vcm for vcmcs in self.vcmcs]
 
-
     @property
     def chgvs(self):
         return self.highest_transcript_chgvs

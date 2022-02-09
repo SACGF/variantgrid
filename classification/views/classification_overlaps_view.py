@@ -38,7 +38,7 @@ def view_overlaps(request: HttpRequest, lab_id: Optional[int] = None) -> Respons
 
 def view_overlaps_detail(request: HttpRequest, lab_id: Optional[int] = None) -> Response:
     user = request.user
-    allele_and_vcs = AlleleOverlap.overlaps_for_user(user, lab_id = lab_id)
+    allele_and_vcs = AlleleOverlap.overlaps_for_user(user, lab_id=lab_id)
     overlap_counts = OverlapCounts(allele_and_vcs)
 
     context = {

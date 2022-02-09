@@ -2,10 +2,8 @@ from typing import Optional, List
 
 from django.conf import settings
 from django.contrib.auth.models import User
-from django.contrib.postgres.fields import CITextField
-from django.db.models import QuerySet, TextField, Sum
+from django.db.models import QuerySet, Sum
 from django.db.models.expressions import Subquery
-from django.db.models.functions import Cast
 from django.http import HttpResponse
 from django.http.request import HttpRequest
 from django.shortcuts import render, redirect
@@ -24,9 +22,8 @@ from classification.views.classification_accumulation_graph import \
     AccumulationReportMode, get_accumulation_graph_data
 from classification.views.classification_export_flags import ExportFormatterFlags
 from flags.models import FlagCollection
-from genes.models import GeneSymbol
 from snpdb.genome_build_manager import GenomeBuildManager
-from snpdb.models import Lab, UserSettings, ClinVarKey
+from snpdb.models import Lab, ClinVarKey
 from snpdb.models.models_genome import GenomeBuild
 
 

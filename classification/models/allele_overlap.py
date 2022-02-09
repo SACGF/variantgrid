@@ -10,11 +10,10 @@ from lazy import lazy
 
 from classification.enums import SpecialEKeys
 from classification.models import ClassificationModification, DiscordanceReport
-from classification.models.classification import Classification
 from classification.models.clinical_context_models import ClinicalContext, DiscordanceLevel, DiscordanceStatus
 from genes.hgvs import CHGVS
 from library.guardian_utils import admin_bot
-from snpdb.models import VariantAllele, Allele, GenomeBuild, UserSettings, Lab
+from snpdb.models import Allele, GenomeBuild, UserSettings, Lab
 
 
 class AlleleOverlapClinicalGrouping:
