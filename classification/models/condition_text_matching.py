@@ -681,6 +681,7 @@ def embedded_ids_check(text: str) -> ConditionMatchingSuggestion:
                 # work out all the words in the text, subtract any ontology IDs from the text
                 text_tokens = SearchText.tokenize_condition_text(normalize_condition_text(text),
                                                                  deplural=True, deroman=True)
+                origin_text_tokens = set(text_tokens)
                 # remove all numbers that are the same as the OMIM or MONDO number
                 ontology_terms = set()
                 number_part = matched_term.id.split(":")[1]
@@ -717,9 +718,9 @@ def embedded_ids_check(text: str) -> ConditionMatchingSuggestion:
                     return tokens
 
                 term_tokens = term_tokens.union(get_term_tokens(matched_term))
-                if matched_term.ontology_service == OntologyService.OMIM:
-                    if mondo_term := OntologyTermRelation.as_mondo(matched_term):
-                        term_tokens = term_tokens.union(get_term_tokens(mondo_term))
+                #if matched_term.ontology_service == OntologyService.OMIM:
+                #    if mondo_term := OntologyTermRelation.as_mondo(matched_term):
+                #        term_tokens = term_tokens.union(get_term_tokens(mondo_term))
 
                 has_non_pr_terms = False
                 for term in term_tokens:
@@ -729,14 +730,18 @@ def embedded_ids_check(text: str) -> ConditionMatchingSuggestion:
                             cms.add_message(ConditionMatchingMessage(severity="debug", text="Text matching ignored as official term uses out of date terminology"))
                             break
 
-                extra_words = text_tokens.difference(term_tokens) - PREFIX_SKIP_TERMS - IGNORE_TERMS
-                same_words = text_tokens.intersection(term_tokens)
-                same_word_letters = reduce(lambda a, b: a+b, [len(word) for word in same_words], 0)
-                extra_words = [word for word in extra_words if
-                               not GeneSymbol.objects.filter(symbol=word).exists()]  # take out gene symbols
-
-                cms.add_message(ConditionMatchingMessage(severity="debug", text=f"Same words = {json.dumps(sorted(same_words))}, length = {same_word_letters}"))
-                cms.add_message(ConditionMatchingMessage(severity="debug", text=f"Different words = {json.dumps(sorted(extra_words))}, count = {len(extra_words)}"))
+                cms.add_message(ConditionMatchingMessage(severity="debug", text=f"TEXT words (RAW) = {json.dumps(sorted(text_tokens))}"))
+                cms.add_message(ConditionMatchingMessage(severity="debug", text=f"TERM words (RAW) = {json.dumps(sorted(term_tokens))}"))
+                extra_words = text_tokens.difference(term_tokens)
+                raw_extra_words = set(extra_words)
+                cms.add_message(ConditionMatchingMessage(severity="debug", text=f"Diff words (RAW) = {json.dumps(sorted(extra_words))}"))
+                extra_words = extra_words - PREFIX_SKIP_TERMS - IGNORE_TERMS
+                extra_words = set([word for word in extra_words if
+                               not GeneSymbol.objects.filter(symbol=word).exists()])
+                # cms.add_message(ConditionMatchingMessage(severity="debug", text=f"Same words = {json.dumps(sorted(same_words))}, length = {same_word_letters}"))
+                ignored_words = raw_extra_words - extra_words
+                cms.add_message(ConditionMatchingMessage(severity="debug", text=f"Ignored common words/gene symbols = {json.dumps(sorted(ignored_words))}"))
+                cms.add_message(ConditionMatchingMessage(severity="debug", text=f"Diff words (Processed) = {json.dumps(sorted(extra_words))}, count = {len(extra_words)}"))
 
                 if not has_non_pr_terms and len(extra_words) >= 3:  # 3 extra words and for words that are in common aren't longer than 9 letters combined
                     cms.add_message(ConditionMatchingMessage(severity="warning", text=f"Found {matched_term.id} in text, but also apparently unrelated words : {pretty_set(extra_words)}"))
