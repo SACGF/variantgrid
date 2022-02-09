@@ -10,7 +10,7 @@
             <a href="{% url 'discordance_report' ccg.latest_report.id %}">{% if not ccg.is_default %}<span class="font-weight-bold">{{ ccg.name }}</span> {% endif %}
                 Status :
                 {% if discordance_status.lab_count == 1 %}Single Lab, {% endif %}
-                {{ ccg.latest_report.resolution_text }} (Click for Discordance Report)</a>
+                {{ ccg.latest_report.status }} (Click for Discordance Report)</a>
         {% else %}
                 {% if not ccg.is_default %}<span class="font-weight-bold">{{ ccg.name }}</span> {% endif %}Status :
                 {% if discordance_status.lab_count == 1 %}Single Lab, {% endif %}
