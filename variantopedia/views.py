@@ -403,9 +403,8 @@ def search(request):
     return render(request, "variantopedia/search.html", context)
 
 
-def wiki(request):
-    context = {}
-    return render(request, "variantopedia/wiki.html", context)
+def variant_wiki(request):
+    return render(request, "variantopedia/variant_wiki.html")
 
 
 def view_allele_from_variant(request, variant_id):

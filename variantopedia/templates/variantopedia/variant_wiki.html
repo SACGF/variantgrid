@@ -1,6 +1,6 @@
 {% extends menu_variants_base %}
 {% load static %}
-{% block title %}Wiki{% endblock %}
+{% block title %}Variant Wiki{% endblock %}
 
 {% block submenu_page_content %}
     <script>
@@ -18,6 +18,6 @@
 
     <h3>Variant Wiki</h3>
 
-    <table id="variant-wiki-datatable" class="wiki-table sticky-header" data-datatable-responsive="true" data-datatable-url="{% url 'variant_wiki_datatable' %}"></table>
+    <table id="variant-wiki-datatable" class="variant-wiki-table sticky-header" data-datatable-responsive="true" data-datatable-url="{% url 'variant_wiki_datatable' %}"></table>
 
 {% endblock %}

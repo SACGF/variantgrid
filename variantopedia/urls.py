@@ -24,7 +24,7 @@ urlpatterns = [
               name='view_variant_genome_build'),
     perm_path('view_variant_annotation_history/<int:variant_id>', views.view_variant_annotation_history,
               name='view_variant_annotation_history'),
-    perm_path('wiki', views.wiki, name='variantopedia_wiki'),
+    perm_path('variant_wiki', views.variant_wiki, name='variant_wiki'),
     perm_path('view_allele_from_variant/<int:variant_id>', views.view_allele_from_variant,
               name='view_allele_from_variant'),
     perm_path('view_allele/<int:pk>', views.view_allele, name='view_allele'),

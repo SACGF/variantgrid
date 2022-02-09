@@ -2,8 +2,9 @@ from rest_framework.urlpatterns import format_suffix_patterns
 
 from genes import views, views_autocomplete, views_rest
 from genes.grids import GeneListsGrid, CanonicalTranscriptGrid, GeneListGenesGrid, GenesGrid, QCGeneCoverageGrid, \
-    UncoveredGenesGrid, CanonicalTranscriptCollectionsGrid, GeneSymbolVariantsGrid
+    UncoveredGenesGrid, CanonicalTranscriptCollectionsGrid, GeneSymbolVariantsGrid, GeneSymbolWikiColumns
 from library.django_utils.jqgrid_view import JQGridView
+from snpdb.views.datatable_view import DatabaseTableView
 from variantgrid.perm_path import perm_path
 
 urlpatterns = [
@@ -30,6 +31,8 @@ urlpatterns = [
     perm_path('gene_grid', views.gene_grid, name='gene_grid'),
     perm_path('canonical_transcripts', views.canonical_transcripts, name='canonical_transcripts'),
     perm_path('sample_gene_lists_tab/<int:sample_id>', views.sample_gene_lists_tab, name='sample_gene_lists_tab'),
+    perm_path('wiki', views.gene_wiki, name='gene_wiki'),
+
     perm_path('hotspot_graph/gene/<genome_build_name>/<gene_symbol>',
               views.HotspotGraphView.as_view(), name='gene_symbol_hotspot_graph'),
     perm_path('hotspot_graph/gene/<genome_build_name>/<gene_id>',
@@ -46,6 +49,8 @@ urlpatterns = [
               views.CohortHotspotGraphView.as_view(), name='cohort_hotspot_graph'),
     perm_path('hotspot_graph/public', views.PublicRUNX1HotspotGraphView.as_view(), name='public_hotspot_graph'),
 
+    perm_path('wiki/datatable', DatabaseTableView.as_view(column_class=GeneSymbolWikiColumns),
+              name='gene_wiki_datatable'),
     perm_path('gene/grid/<gene_symbol>/<genome_build_name>/<slug:op>/', JQGridView.as_view(grid=GeneSymbolVariantsGrid), name='gene_symbol_variants_grid'),
     perm_path('gene_lists/category/grid/<int:gene_list_category_id>/<slug:op>/', JQGridView.as_view(grid=GeneListsGrid, delete_row=True), name='gene_lists_grid'),
     perm_path('gene_lists/uncategorised/grid/<slug:op>/', JQGridView.as_view(grid=GeneListsGrid, delete_row=True), name='uncategorised_gene_lists_grid'),

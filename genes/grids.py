@@ -1,10 +1,12 @@
 import operator
 from functools import reduce
+from typing import Dict, Any
 
 from django.conf import settings
 from django.contrib.postgres.aggregates.general import StringAgg
 from django.core.exceptions import PermissionDenied
-from django.db.models import Count, TextField
+from django.db.models import Count, TextField, QuerySet
+from django.http import HttpRequest
 from django.shortcuts import get_object_or_404
 from django.urls.base import reverse
 
@@ -12,7 +14,7 @@ from analysis.models import VariantTag
 from annotation.models.models import AnnotationVersion, GeneAnnotationVersion, InvalidAnnotationVersionError
 from genes.models import CanonicalTranscript, GeneListCategory, GeneList, GeneSymbol, \
     GeneCoverageCanonicalTranscript, CanonicalTranscriptCollection, GeneCoverageCollection, TranscriptVersion, \
-    GeneListGeneSymbol, GeneAnnotationRelease, ReleaseGeneVersion
+    GeneListGeneSymbol, GeneAnnotationRelease, ReleaseGeneVersion, GeneSymbolWiki
 from library.django_utils.jqgrid_view import JQGridViewOp
 from library.jqgrid_user_row_config import JqGridUserRowConfig
 from snpdb.grid_columns.custom_columns import get_custom_column_fields_override_and_sample_position
@@ -20,6 +22,8 @@ from snpdb.grids import AbstractVariantGrid
 from snpdb.models import UserSettings, Q, VariantGridColumn, Tag
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.variant_queries import get_variant_queryset_for_gene_symbol, variant_qs_filter_has_internal_data
+from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
+from uicore.json.json_types import JsonDataType
 
 
 class GeneListsGrid(JqGridUserRowConfig):
@@ -316,3 +320,26 @@ class UncoveredGenesGrid(QCGeneCoverageGrid):
     def get_coverage_q(self, gene_coverage_collection, gene_symbols) -> Q:
         q = super().get_coverage_q(gene_coverage_collection, gene_symbols)
         return q & Q(min__lt=self.min_depth)
+
+
+class GeneSymbolWikiColumns(DatatableConfig[GeneSymbolWiki]):
+    def __init__(self, request: HttpRequest):
+        super().__init__(request)
+        self.download_csv_button_enabled = True
+
+        self.rich_columns = [
+            RichColumn('gene_symbol', renderer=self.render_gene_symbol, client_renderer="renderGeneSymbol"),
+            RichColumn('markdown'),
+            RichColumn('last_edited_by__username', name='user', orderable=True),
+            RichColumn('created', client_renderer='TableFormat.timestamp', orderable=True),
+            RichColumn('modified', client_renderer='TableFormat.timestamp', orderable=True,
+                       default_sort=SortOrder.DESC),
+        ]
+
+    @staticmethod
+    def render_gene_symbol(row: Dict[str, Any]) -> JsonDataType:
+        gene_symbol = row["gene_symbol"]
+        return {"id": gene_symbol}
+
+    def get_initial_queryset(self) -> QuerySet[GeneSymbolWiki]:
+        return GeneSymbolWiki.objects.all()

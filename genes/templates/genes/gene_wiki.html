@@ -1,0 +1,23 @@
+{% extends menu_variants_base %}
+{% load static %}
+{% block title %}Gene Wikis{% endblock %}
+
+{% block submenu_page_content %}
+    <script>
+        function renderGeneSymbol(data, type, row) {
+            let link = $('<a>', {
+                href: Urls.view_gene_symbol(data.id),
+                class: 'hover-link',
+                html: [
+                    $('<span>', {text: data.id}),
+                ]
+            });
+            return link.prop('outerHTML');
+        }
+    </script>
+
+    <h3>Gene Wikis</h3>
+
+    <table id="gene-wiki-datatable" class="wiki-table sticky-header" data-datatable-responsive="true" data-datatable-url="{% url 'gene_wiki_datatable' %}"></table>
+
+{% endblock %}

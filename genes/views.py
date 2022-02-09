@@ -729,6 +729,10 @@ def sample_gene_lists_tab(request, sample_id):
     return render(request, 'genes/sample_gene_lists_tab.html', context)
 
 
+def gene_wiki(request):
+    return render(request, "genes/gene_wiki.html")
+
+
 class HotspotGraphView(TemplateView):
     template_name = "genes/hotspot_graph.html"
     has_graph_filter_toolbar = True
