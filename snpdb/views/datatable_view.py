@@ -430,7 +430,7 @@ class DatabaseTableView(Generic[DC], JSONResponseView):
                 "className": rc.css_classes,
                 "visible": rc.visible,
             })
-        data["columns"] = columns;
+        data["columns"] = columns
 
         return data
 

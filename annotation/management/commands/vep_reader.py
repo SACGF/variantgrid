@@ -27,7 +27,7 @@ class Command(BaseCommand):
                 td = dict(zip(vep_columns, transcript_csq.split("|")))
                 # print(td)
                 if mane_select := td.get("MANE_SELECT"):
-                    print(f'mane_select={mane_select}, {td["HGVSc"]}');
+                    print(f'mane_select={mane_select}, {td["HGVSc"]}')
 
                 #if td["PICK"]:
                 #    print(f'{td["SYMBOL"]} {td["HGVSc"]}, impact: {td["IMPACT"]}, revel: {td["REVEL_score"]}')
