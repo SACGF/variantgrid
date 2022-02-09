@@ -177,6 +177,7 @@ class DatatableConfig(Generic[DC]):
     and how the server will send data to it via ajax (via BaseDatatableView)
     """
     search_box_enabled = False
+    download_csv_button_enabled = False
     rich_columns: List[RichColumn]  # columns for display
     expand_client_renderer: Optional[str] = None  # if provided, will expand rows and render content with this JavaScript method
 
@@ -414,6 +415,7 @@ class DatabaseTableView(Generic[DC], JSONResponseView):
         data: JsonObjType = {
             "responsive": any(col.detail for col in config.enabled_columns),
             "searchBoxEnabled": config.search_box_enabled,
+            "downloadCsvButtonEnabled": config.download_csv_button_enabled,
             "expandClientRenderer": config.expand_client_renderer,
         }
         if config.default_sort_order_column:

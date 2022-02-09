@@ -22,6 +22,7 @@ from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
 class VariantWikiColumns(DatatableConfig[VariantWiki]):
     def __init__(self, request: HttpRequest):
         super().__init__(request)
+        self.download_csv_button_enabled = True
 
         # self.expand_client_renderer = DatatableConfig._row_expand_ajax('eventlog_detail', expected_height=120)
         self.rich_columns = [

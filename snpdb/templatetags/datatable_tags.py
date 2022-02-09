@@ -16,6 +16,7 @@ def datatable(table_config: DatatableConfig, table_id: str, class_name: str = ''
     return {
         "rich_columns": table_config.enabled_columns,
         "search_box_enabled": table_config.search_box_enabled,
+        "download_csv_button_enabled": table_config.download_csv_button_enabled,
         "table_id": table_id,
         "class_name": class_name,
         "expand_client_renderer": table_config.expand_client_renderer
@@ -46,6 +47,7 @@ def datatable_definition(
     return {
         "rich_columns": table_config.enabled_columns,
         "search_box_enabled": table_config.search_box_enabled,
+        "download_csv_button_enabled": table_config.download_csv_button_enabled,
         "expand_client_renderer": table_config.expand_client_renderer,
         "table_id": table_id,
         "url": url, "data": data,

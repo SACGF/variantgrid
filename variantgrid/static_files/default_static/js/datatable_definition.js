@@ -1,3 +1,46 @@
+let oldExportAction = function (self, e, dt, button, config) {
+    if (button[0].className.indexOf('buttons-csv') >= 0) {
+        if ($.fn.dataTable.ext.buttons.csvHtml5.available(dt, config)) {
+            $.fn.dataTable.ext.buttons.csvHtml5.action.call(self, e, dt, button, config);
+        }
+    }
+};
+
+let newExportAction = function (e, dt, button, config) {
+    /* Pull all data from Ajax - but don't do the draw
+       Code taken from https://stackoverflow.com/a/44635032/295724 */
+    let self = this;
+    let oldStart = dt.settings()[0]._iDisplayStart;
+
+    dt.one('preXhr', function (e, s, data) {
+        // Just this once, load all data from the server...
+        data.start = 0;
+        data.length = 2147483647;
+
+        dt.one('preDraw', function (e, settings) {
+            // Call the original action function
+            oldExportAction(self, e, dt, button, config);
+
+            dt.one('preXhr', function (e, s, data) {
+                // DataTables thinks the first item displayed is index 0, but we're not drawing that.
+                // Set the property to what it was before exporting.
+                settings._iDisplayStart = oldStart;
+                data.start = oldStart;
+            });
+
+            // Reload the grid with the original page. Otherwise, API functions like table.cell(this) don't work properly.
+            setTimeout(dt.ajax.reload, 0);
+
+            // Prevent rendering of the full data to the DOM
+            return false;
+        });
+    });
+
+    // Requery the server with the new one-time export settings
+    dt.ajax.reload();
+};
+
+
 let DataTableDefinition = (function() {
     "use strict";
 
@@ -66,7 +109,7 @@ let DataTableDefinition = (function() {
                 lengthValue = parseInt(localStorage.getItem(lengthKey)) || 10;
             }
 
-            let domString = `<"top"><"toolbar"<"custom">${ defn.searchBoxEnabled ? 'f' : ''}>rt<"bottom"<"showing"il>p><"clear">`;
+            let domString = `<"top"><"toolbar"<"custom">${ defn.searchBoxEnabled ? 'f' : ''}>rt${ defn.downloadCsvButtonEnabled ? 'B' : ''}<"bottom"<"showing"il>p><"clear">`;
 
             let dtParams = {
                 processing: true,
@@ -85,8 +128,19 @@ let DataTableDefinition = (function() {
                     data: this.data ? eval(this.data) : null
                 },
                 bFilter: defn.searchBoxEnabled,
-                bAutoWidth: false
+                bAutoWidth: false,
             };
+            if (defn.downloadCsvButtonEnabled) {
+                dtParams.buttons = [
+                    {
+                        extend: 'csvHtml5',
+                        action: newExportAction,
+                        className: 'btn btn-outline-primary',
+                        text: "Download as CSV",
+                    }
+                ]
+            }
+
             if (this.filterCount === 'hide') {
                 dtParams.langauge = {infoFiltered: ""};
             }
