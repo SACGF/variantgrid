@@ -1862,6 +1862,10 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         if self.variant:
             content["allele"] = self.get_allele_info()
 
+        if self.sample:
+            content["sample_id"] = self.sample.pk
+            content["sample_name"] = self.sample.name
+
         if include_data is not None and not isinstance(include_data, bool):
             if isinstance(include_data, str):
                 include_data = [include_data]

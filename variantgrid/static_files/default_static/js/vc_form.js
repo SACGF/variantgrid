@@ -821,6 +821,15 @@ const VCForm = (function() {
 
             appendLabelHeadingForKey(SpecialEKeys.CLINICAL_SIGNIFICANCE, true, 'Clin Sig');
 
+            if (this.record.sample_id) {
+                let href = Urls.view_sample(this.record.sample_id);
+                sampleElement = $('<a>', {class:'hover-link', text: this.record.sample_name, href:href});
+                sampleElement = $('<span>', {html: [
+                    sampleElement,
+                ]})
+                appendLabelHeading('Sample', sampleElement);
+            }
+
             $('<div>', {id:'vc-quick-submit'}).appendTo(jSyncStatus);
         },
 
