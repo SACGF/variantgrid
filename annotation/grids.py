@@ -105,7 +105,7 @@ class VariantAnnotationVersionGrid(JqGridUserRowConfig):
                                   'shrinkToFit': False})
 
 
-class VaraintAnnotationVersionColumns(DatatableConfig[VariantAnnotationVersion]):
+class VariantAnnotationVersionColumns(DatatableConfig[VariantAnnotationVersion]):
 
     def __init__(self, request):
         super().__init__(request)
