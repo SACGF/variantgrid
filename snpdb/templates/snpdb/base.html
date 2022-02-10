@@ -44,6 +44,14 @@ This template is deprecated and only used for analysis until we can transfer it 
     <!-- Font Awesome -->
     <script src="https://kit.fontawesome.com/56193c3ca3.js" crossorigin="anonymous"></script>
 
+    <!-- Datatables -->
+    <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/v/dt/dt-1.11.4/datatables.min.css"/>
+    <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/buttons/2.2.2/css/buttons.bootstrap4.min.css"/>
+    <script type="text/javascript" src="https://cdn.datatables.net/1.11.4/js/jquery.dataTables.min.js"></script>
+    <script type="text/javascript" src="https://cdn.datatables.net/buttons/2.2.2/js/dataTables.buttons.min.js"></script>
+    <script type="text/javascript" src="https://cdn.datatables.net/buttons/2.2.2/js/buttons.html5.min.js"></script>
+
+
 	{% compress js %}
         <script>
         window.SITE_NAME = "{{ site_name }}";
@@ -56,18 +64,12 @@ This template is deprecated and only used for analysis until we can transfer it 
         <script src="{% static 'js/vc_keys.js' %}"></script>
         <script src="{% static 'js/vc_links.js' %}"></script>
         <script src="{% static 'js/vc_form.js' %}"></script>
-        <script src="{% static 'js/vc_diff.js' %}"></script>
         <script src="{% static 'js/datatable_definition.js' %}"></script>
         <script src="{% static 'js/flags.js' %}"></script>
+        <script src="{% static 'js/vc_diff.js' %}"></script>
         <script src="{% static 'js/age_widget.js' %}"></script>
         <script src="{% static 'js/scientific_number_widget.js' %}"></script>
 	{% endcompress %}
-
-    <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/v/dt/dt-1.11.4/datatables.min.css"/>
-    <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/buttons/2.2.2/css/buttons.bootstrap4.min.css"/>
-    <script type="text/javascript" src="https://cdn.datatables.net/1.11.4/js/jquery.dataTables.min.js"></script>
-    <script type="text/javascript" src="https://cdn.datatables.net/buttons/2.2.2/js/dataTables.buttons.min.js"></script>
-    <script type="text/javascript" src="https://cdn.datatables.net/buttons/2.2.2/js/buttons.html5.min.js"></script>
 
     <script>
         var $buoop = {
