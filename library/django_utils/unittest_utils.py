@@ -83,8 +83,18 @@ class URLTestCase(TestCase):
 
         for name, kwargs, obj in names_obj:
             kwargs = kwargs.copy()  # In case client shared them
+            kwargs["op"] = "config"
+            config_url = reverse(name, kwargs=kwargs)
+            response = client.get(config_url)
+            try:
+                config_data = response.json()
+            except ValueError:  # Not JSON
+                config_data = {}
             kwargs["op"] = "handler"  # To show grid
             url = reverse(name, kwargs=kwargs)
+            # Add sidx so we don't get pager order warning
+            if sortname := config_data.get("sortname"):
+                url += f"?sidx={sortname}"
             response = client.get(url)
             if response.status_code == 403 and in_results is False:
                 return
