@@ -11,12 +11,13 @@
 
 	function loadSequencingRunQCGraph() {
 	    const SEQUENCING_RUN_ID = "{{ sequencing_run.pk }}";
-		const graph_selector = $('#generated-graph-qc', "#run-stats");
-		const compare_against = $('#id_compare_against', "#run-stats").val();
-		const graph_type = $('#id_graph_type', "#run-stats").val();
+        const rsSelector = $("#run-stats");
+		const graph_selector = $('#generated-graph-qc', rsSelector);
+		const compare_against = $('#id_compare_against', rsSelector).val();
+		const graph_type = $('#id_graph_type', rsSelector).val();
 
 		clearGraph(graph_selector);
-		const columnSelect = $("select#id_column").parent();
+		const columnSelect = $("select#id_column", rsSelector).parent();
 		if (graph_type == 'B') {
 			columnSelect.hide();
 			const POLL_URL = Urls.sequencing_run_qc_graph(SEQUENCING_RUN_ID, compare_against);

@@ -519,10 +519,13 @@ def sequencing_run_qc_json_graph(request, sequencing_run_id, qc_compare_type):
     sr_columns = get_sequencing_run_columns(ss_path, ['name', 'gold_standard'])
     (sequencing_run_column, gold_column) = tuple(sr_columns)
 
-    context = {"current_label": sequencing_run_id,
-               "qc_data": sequencing_run_data,
-               "label_column": sequencing_run_column,
-               "gold_column": gold_column}
+    context = {
+        "container_name": "run-stats",
+        "current_label": sequencing_run_id,
+        "qc_data": sequencing_run_data,
+        "label_column": sequencing_run_column,
+        "gold_column": gold_column
+    }
     return render(request, 'seqauto/json_graphs/qc_json_graph.html', context)
 
 
@@ -557,10 +560,13 @@ def qc_exec_summary_json_graph(request, qc_exec_summary_id, qc_compare_type):
     labels = [get_label(sr, ss) for sr, ss in zip(sequencing_run_names, sample_names)]
     qc_exec_summary_data["label"] = labels
 
-    context = {"current_label": current_label,
-               "qc_data": qc_exec_summary_data,
-               "label_column": "label",
-               "gold_column": gold_column}
+    context = {
+        "container_name": "exec-summary",
+        "current_label": current_label,
+        "qc_data": qc_exec_summary_data,
+        "label_column": "label",
+        "gold_column": gold_column
+    }
     return render(request, 'seqauto/json_graphs/qc_json_graph.html', context)
 
 

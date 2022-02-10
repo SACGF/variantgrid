@@ -2,16 +2,18 @@
 {% load js_tags %}
 <script type="text/javascript" src="{% static 'js/lib/plotly-latest.min.js' %}"></script>
 <script>
-	var qc_data = {{ qc_data | jsonify }};
-	var current_label = "{{ current_label }}";
-    var label_column = "{{ label_column }}";
-    var gold_column = "{{ gold_column }}";
+(function () {
+    const containerSelector = $("#{{ container_name }}");
+	const qc_data = {{ qc_data | jsonify }};
+	const current_label = "{{ current_label }}";
+    const label_column = "{{ label_column }}";
+    const gold_column = "{{ gold_column }}";
 
 	function createBar(name, color) {
 		return {x : [], y: [], type: 'bar', name: name, marker: { color: color} };
 	}
 
-	function plotColumn() {
+	let plotColumn = function() {
         const column = $('option:selected', this).attr('value');
         const labels = qc_data[label_column];
         const is_gold = qc_data[gold_column];
@@ -59,14 +61,15 @@
             plot_bgcolor: 'rgba(0,0,0,0)'
         };
 
-        Plotly.newPlot('plotly-graph-container', data, layout);
+        let dom = $('.plotly-graph-container', containerSelector)[0];
+        Plotly.newPlot(dom, data, layout);
 	}
 	
 	$(document).ready(function() {
-		$("select#id_column").change(plotColumn);
-		$("select#id_column").each(plotColumn); // initial plot
+        let runStatsColumn = $("select#id_column", containerSelector);
+		runStatsColumn.change(plotColumn);
+		runStatsColumn.each(plotColumn); // initial plot
 	});
-
+})();
 </script>
-
-<div id='plotly-graph-container'></div>
+<div class='plotly-graph-container'></div>
