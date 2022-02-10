@@ -8,7 +8,7 @@ from upload.import_task_factories.abstract_vcf_import_task_factory import Abstra
 from upload.import_task_factories.import_task_factory import ImportTaskFactory
 from upload.models import UploadedFileTypes, UploadedBed, UploadedExpressionFile, \
     UploadedGeneList, UploadedPatientRecords, UploadedPedFile, UploadedVCF, \
-    UploadedGeneCoverage, UploadStep, UploadStepTaskType
+    UploadedGeneCoverage, UploadStep, UploadStepTaskType, UploadedWikiCollection
 from upload.tasks.import_bedfile_task import ImportBedFileTask
 from upload.tasks.import_expression_task import ImportExpressionTask
 from upload.tasks.import_gene_coverage_task import ImportGeneCoverageTask
@@ -16,6 +16,7 @@ from upload.tasks.import_gene_list_task import ImportGeneListTask
 from upload.tasks.import_patient_records_task import ImportPatientRecords
 from upload.tasks.import_ped_task import ImportPedTask
 from upload.tasks.import_variant_tags_task import VariantTagsCreateVCFTask, VariantTagsInsertTask
+from upload.tasks.import_wiki_task import ImportGeneWikiCollection, VariantWikiCreateVCFTask, VariantWikiInsertTask
 from upload.tasks.vcf.genotype_vcf_tasks import VCFCheckAnnotationTask, ProcessGenotypeVCFDataTask, \
     ImportGenotypeVCFSuccessTask, UpdateVariantZygosityCountsTask, SampleLocusCountsTask, \
     ImportCreateVCFModelForGenotypeVCFTask, SomalierVCFTask
@@ -269,3 +270,69 @@ class VariantTagsImportTaskFactory(VCFInsertVariantsOnlyImportFactory):
     def get_post_data_insertion_classes(self):
         post_data_insertion_classes = super().get_post_data_insertion_classes()
         return post_data_insertion_classes + [VariantTagsInsertTask]
+
+
+class GeneWikiCollectionImportTaskFactory(ImportTaskFactory):
+    def get_uploaded_file_type(self):
+        return UploadedFileTypes.WIKI_GENE
+
+    def get_possible_extensions(self):
+        return ['csv']
+
+    def get_data_classes(self):
+        return [UploadedWikiCollection]
+
+    def get_processing_ability(self, user, filename, file_extension):
+        df = pd.read_csv(filename, nrows=1)  # Just need header
+        REQUIRED_COLUMNS = ["Gene Symbol", "Markdown", "User", "Created", "Modified"]
+        for c in REQUIRED_COLUMNS:
+            if c not in df.columns:
+                return 0
+        return 1000
+
+    def create_import_task(self, upload_pipeline):
+        return ImportGeneWikiCollection.si(upload_pipeline.pk)
+
+
+class VariantWikiImportTaskFactory(VCFInsertVariantsOnlyImportFactory):
+    """ Variant Wiki CSV may have variants we don't know about, so need to create a VCF and run them through
+        VCFInsertVariantsOnly pipeline, then afterwards we can create wiki against known variants """
+
+    def get_uploaded_file_type(self):
+        return UploadedFileTypes.WIKI_VARIANT
+
+    def get_possible_extensions(self):
+        return ['csv']
+
+    def get_data_classes(self):
+        return [UploadedVCF]
+
+    def get_processing_ability(self, user, filename, file_extension):
+        df = pd.read_csv(filename, nrows=1)  # Just need header
+        REQUIRED_COLUMNS = ["Variant", "Genome Build", "Markdown", "User", "Created", "Modified"]
+        for c in REQUIRED_COLUMNS:
+            if c not in df.columns:
+                return 0
+        return 1000
+
+    def _get_vcf_filename(self, upload_pipeline) -> str:
+        return get_import_processing_filename(upload_pipeline.pk, "variant_tag_variants.vcf")
+
+    def get_pre_vcf_task(self, upload_pipeline):
+        """ Need to write a VCF for variants used in tags """
+
+        variant_wiki_filename = upload_pipeline.uploaded_file.get_filename()
+        vcf_filename = self._get_vcf_filename(upload_pipeline)
+        upload_step = UploadStep.objects.create(upload_pipeline=upload_pipeline,
+                                                name="Create VariantWiki Variant VCF",
+                                                sort_order=self.get_sort_order(),
+                                                task_type=UploadStepTaskType.CELERY,
+                                                script=full_class_name(VariantWikiCreateVCFTask),
+                                                input_filename=variant_wiki_filename,
+                                                output_filename=vcf_filename)
+        return VariantWikiCreateVCFTask.si(upload_step.pk, 0)
+
+    def get_post_data_insertion_classes(self):
+        post_data_insertion_classes = super().get_post_data_insertion_classes()
+        return post_data_insertion_classes + [VariantWikiInsertTask]
+

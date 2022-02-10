@@ -1388,7 +1388,7 @@ class GeneSymbolWiki(Wiki):
             gene_citation_ids_to_keep.append(gene_citation.pk)
 
         # Delete any non-used ones
-        num_deleted = self.gene_symbol.genesymbolcitation_set.exclude(pk__in=gene_citation_ids_to_keep).delete()
+        num_deleted = self.gene_symbol.genesymbolcitation_set.exclude(pk__in=gene_citation_ids_to_keep).delete()[0]
         logging.info("Kept %s, deleted %d", gene_citation_ids_to_keep, num_deleted)
 
 

@@ -3,10 +3,10 @@ from collections import defaultdict
 
 import pandas as pd
 from dateutil import parser
-from django.contrib.auth.models import User
 from django.utils.timezone import make_aware
 
 from analysis.models import VariantTagsImport, ImportedVariantTag, VariantTag, TagLocation
+from library.django_utils import UserMatcher
 from library.guardian_utils import assign_permission_to_user_and_groups
 from library.pandas_utils import df_nan_to_none
 from library.vcf_utils import write_vcf_from_tuples
@@ -82,7 +82,7 @@ class VariantTagsCreateVCFTask(ImportVCFStepTask):
                                      analysis_id=row["analysis__id"],
                                      node_id=node_id,
                                      analysis_name=row["analysis__name"],
-                                     user_name=row["user__username"],
+                                     username=row["user__username"],
                                      created=created)
             imported_tags.append(ivt)
 
@@ -113,7 +113,7 @@ class VariantTagsInsertTask(ImportVCFStepTask):
         genome_build = variant_tags_import.genome_build
 
         tag_cache = {}
-        user_cache = {}
+        user_matcher = UserMatcher(default_user=variant_tags_import.user)
         variant_tags = []
         created_date = []
         for ivt in variant_tags_import.importedvarianttag_set.all():
@@ -134,15 +134,6 @@ class VariantTagsInsertTask(ImportVCFStepTask):
             analysis = None
             node = None
 
-            # Try and match user up to one on our system. If not there, use user from import
-            user = user_cache.get(ivt.user_name)
-            if user is None:
-                try:
-                    user = User.objects.get(username=ivt.user_name)
-                except User.DoesNotExist:
-                    user = variant_tags_import.user
-                user_cache[ivt.user_name] = user
-
             # TODO: We should also look at not creating dupes somehow??
             vt = VariantTag(variant=variant,
                             genome_build=genome_build,
@@ -151,7 +142,7 @@ class VariantTagsInsertTask(ImportVCFStepTask):
                             location=TagLocation.EXTERNAL,
                             imported_variant_tag=ivt,
                             node=node,
-                            user=user)
+                            user=user_matcher.get_user(ivt.username))
 
             created_date.append(ivt.created)
             variant_tags.append(vt)

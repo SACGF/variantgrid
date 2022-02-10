@@ -1,9 +1,14 @@
 {% extends menu_variants_base %}
 {% load static %}
+{% load genome_build_tags %}
 {% block title %}Variant Wiki{% endblock %}
 
 {% block submenu_page_content %}
     <script>
+        function datatableFilter(data) {
+            data.genome_build = "{{ genome_build.name  }}";
+        }
+
         function renderVariantId(data, type, row) {
             let link = $('<a>', {
                 href: Urls.view_variant(data.id),
@@ -16,8 +21,10 @@
         }
     </script>
 
+    {% genome_build_url_arg genome_build 'genome_build_variant_wiki' %}
+
     <h3>Variant Wiki</h3>
 
-    <table id="variant-wiki-datatable" class="variant-wiki-table sticky-header" data-datatable-responsive="true" data-datatable-url="{% url 'variant_wiki_datatable' %}"></table>
+    <table id="variant-wiki-datatable" class="variant-wiki-table sticky-header" data-datatable-responsive="true" data-datatable-url="{% url 'variant_wiki_datatable' %}" data-datatable-data="datatableFilter"></table>
 
 {% endblock %}

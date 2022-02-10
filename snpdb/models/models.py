@@ -156,6 +156,22 @@ class Wiki(TimeStampedModel):
         return self.markdown
 
 
+class ImportedWikiCollection(models.Model):
+    """ VCF imports only support 1 file at a time, so we can't import a multi build file easily """
+    match_column_name = models.TextField()  # eg gene/variant
+    genome_build = models.ForeignKey('GenomeBuild', null=True, on_delete=CASCADE)
+
+
+class ImportedWiki(models.Model):
+    collection = models.ForeignKey(ImportedWikiCollection, on_delete=CASCADE)
+    match_column_value = models.TextField()  # From collection.match_column_name
+    markdown = models.TextField()
+    matched_wiki = models.ForeignKey(Wiki, null=True, on_delete=SET_NULL)
+    username = models.TextField()
+    created = models.DateTimeField()  # Time on original server
+    modified = models.DateTimeField()  # Time on original server
+
+
 class Organization(models.Model):
     # If you add fields @see OrganizationAdmin
     name = models.TextField()

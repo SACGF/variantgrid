@@ -403,8 +403,12 @@ def search(request):
     return render(request, "variantopedia/search.html", context)
 
 
-def variant_wiki(request):
-    return render(request, "variantopedia/variant_wiki.html")
+def variant_wiki(request, genome_build_name=None):
+    genome_build = UserSettings.get_genome_build_or_default(request.user, genome_build_name)
+    context = {
+        "genome_build": genome_build,
+    }
+    return render(request, "variantopedia/variant_wiki.html", context)
 
 
 def view_allele_from_variant(request, variant_id):

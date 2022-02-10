@@ -240,6 +240,8 @@ class UploadPipeline(models.Model):
             genome_build = uploaded_file.uploadedclinvarversion.clinvar_version.genome_build
         elif file_type == UploadedFileTypes.VARIANT_TAGS:
             genome_build = uploaded_file.uploadedvarianttags.variant_tags_import.genome_build
+        elif file_type == UploadedFileTypes.WIKI_VARIANT:
+            genome_build = uploaded_file.uploadedwikicollection.wiki_collection.genome_build
 
         if genome_build is None:
             msg = f"Don't know how to get GenomeBuild for UploadedFile type '{uploaded_file.get_file_type_display()}'"

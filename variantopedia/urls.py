@@ -25,6 +25,8 @@ urlpatterns = [
     perm_path('view_variant_annotation_history/<int:variant_id>', views.view_variant_annotation_history,
               name='view_variant_annotation_history'),
     perm_path('variant_wiki', views.variant_wiki, name='variant_wiki'),
+    perm_path('variant_wiki/<genome_build_name>', views.variant_wiki, name='genome_build_variant_wiki'),
+
     perm_path('view_allele_from_variant/<int:variant_id>', views.view_allele_from_variant,
               name='view_allele_from_variant'),
     perm_path('view_allele/<int:pk>', views.view_allele, name='view_allele'),
@@ -43,7 +45,7 @@ urlpatterns = [
               name='variant_sample_information'),
 
     # Grids
-    perm_path('wiki/datatable', DatabaseTableView.as_view(column_class=VariantWikiColumns),
+    perm_path('wiki/datatable/', DatabaseTableView.as_view(column_class=VariantWikiColumns),
               name='variant_wiki_datatable'),
     perm_path('nearby/grid/<variant_id>/<region_type>/<slug:op>/',
               JQGridView.as_view(grid=NearbyVariantsGrid, csv_download=True),

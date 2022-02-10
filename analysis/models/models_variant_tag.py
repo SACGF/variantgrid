@@ -32,7 +32,7 @@ class ImportedVariantTag(models.Model):
     analysis_id = models.IntegerField(null=True)
     node_id = models.IntegerField(null=True)
     analysis_name = models.TextField(null=True)
-    user_name = models.TextField()
+    username = models.TextField()
     created = models.DateTimeField()  # Time on original server
 
 

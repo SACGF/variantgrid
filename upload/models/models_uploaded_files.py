@@ -14,7 +14,7 @@ from genes.models import GeneList, GeneCoverageCollection
 from library.file_utils import name_from_filename
 from patients.models import PatientRecords
 from pedigree.models import PedFile
-from snpdb.models import GenomicIntervalsCollection, AnnotationLevel, ImportStatus, Sample
+from snpdb.models import GenomicIntervalsCollection, AnnotationLevel, ImportStatus, Sample, ImportedWikiCollection
 from snpdb.models.models_variant import Liftover
 from upload.bed_file_processing import process_bed_file
 from upload.models import UploadedFile
@@ -112,6 +112,14 @@ class UploadedLiftover(models.Model):
 
     def get_data(self):
         return self.liftover
+
+
+class UploadedWikiCollection(models.Model):
+    uploaded_file = models.OneToOneField(UploadedFile, on_delete=CASCADE)
+    wiki_collection = models.OneToOneField(ImportedWikiCollection, null=True, on_delete=CASCADE)
+
+    def get_data(self):
+        return self.wiki_collection
 
 
 @receiver(post_delete, sender=UploadedGeneCoverage)

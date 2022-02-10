@@ -3,7 +3,7 @@ import operator
 from collections import defaultdict
 from functools import reduce
 from functools import wraps, partial
-from typing import List, Tuple, Dict
+from typing import List, Tuple, Dict, Optional
 
 import nameparser
 from dateutil import parser
@@ -333,3 +333,21 @@ def chunked_queryset(queryset, chunk_size):
         yield queryset.filter(pk__gt=start_pk).filter(pk__lte=end_pk)
 
         start_pk = end_pk
+
+
+class UserMatcher:
+    def __init__(self, default_user=None):
+        self.user_cache = {}
+        self.default_user = default_user
+
+    def get_user(self, username):
+        from django.contrib.auth.models import User
+
+        user = self.user_cache.get(username)
+        if user is None:
+            try:
+                user = User.objects.get(username=username)
+            except User.DoesNotExist:
+                user = self.default_user
+            self.user_cache[username] = user
+        return user

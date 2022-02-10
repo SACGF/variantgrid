@@ -26,6 +26,7 @@ class VariantWikiColumns(DatatableConfig[VariantWiki]):
         # self.expand_client_renderer = DatatableConfig._row_expand_ajax('eventlog_detail', expected_height=120)
         self.rich_columns = [
             RichColumn('variant', renderer=self.render_variant, client_renderer="renderVariantId"),
+            RichColumn(name="genome_build", renderer=self.render_genome_build, visible=False),
             RichColumn('markdown'),
             RichColumn('last_edited_by__username', name='user', orderable=True),
             RichColumn('created', client_renderer='TableFormat.timestamp', orderable=True),
@@ -41,8 +42,17 @@ class VariantWikiColumns(DatatableConfig[VariantWiki]):
         g_hgvs = HGVSMatcher(genome_build).variant_to_g_hgvs(variant)
         return {"id": variant_id, "g_hgvs": g_hgvs}
 
+    def render_genome_build(self, row: Dict[str, Any]) -> JsonDataType:
+        return self.get_query_param('genome_build')
+
     def get_initial_queryset(self) -> QuerySet[VariantWiki]:
         return VariantWiki.objects.all()
+
+    def filter_queryset(self, qs: QuerySet[VariantWiki]) -> QuerySet[VariantWiki]:
+        if genome_build_name := self.get_query_param('genome_build'):
+            genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
+            qs = qs.filter(variant__locus__contig__genomebuildcontig__genome_build=genome_build)
+        return qs
 
 
 class AllVariantsGrid(AbstractVariantGrid):

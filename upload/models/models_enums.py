@@ -14,6 +14,9 @@ class UploadedFileTypes(models.TextChoices):
     VARIANT_TAGS = "A", "Variant Tags"
     VCF = 'V', 'VCF'
     VCF_INSERT_VARIANTS_ONLY = 'Y', 'VCF - Insert variants only (no samples etc)'
+    # Need to separate these as Variant needs to be imported using VCF (for normalization etc)
+    WIKI_GENE = "w", "Gene Wiki records"
+    WIKI_VARIANT = "W", "Variant Wiki records"
 
 
 class UploadStepTaskType(models.TextChoices):
