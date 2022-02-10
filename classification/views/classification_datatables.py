@@ -142,6 +142,21 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
                 orderable=True
             ),
             RichColumn(
+                key='classification__sample_id',
+                name='sample_id',
+                visible=False,  # Only used to build links
+                enabled=settings.VARIANT_CLASSIFICATION_GRID_SHOW_SAMPLE,
+                orderable=True
+            ),
+            RichColumn(
+                key='classification__sample__name',
+                name='sample_name',
+                label='Sample',
+                client_renderer=f'VCTable.sample',
+                enabled=settings.VARIANT_CLASSIFICATION_GRID_SHOW_SAMPLE,
+                orderable=True
+            ),
+            RichColumn(
                 key='published_evidence__allele_origin__value',
                 name='allele_origin',
                 label='Allele Origin',

@@ -2202,3 +2202,18 @@ VCTable.identifier = (data, type, row) => {
     }
     return dom.prop('outerHTML');
 };
+
+VCTable.sample = (sample_name, type, row) => {
+    let dom = $('<span/>');
+    if (sample_name && row.sample_id) {
+        let link = $('<a>', {
+            href: Urls.view_sample(row.sample_id),
+            class: 'hover-link',
+            html: [
+                $('<span>', {text: sample_name}),
+            ]
+        });
+        dom = link;
+    }
+    return dom.prop('outerHTML');
+};
