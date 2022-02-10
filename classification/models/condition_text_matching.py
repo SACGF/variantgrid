@@ -15,6 +15,7 @@ from django.db.models.signals import post_save
 from django.dispatch import receiver
 from guardian.shortcuts import assign_perm
 from lazy import lazy
+from lxml.ElementInclude import include
 from model_utils.models import TimeStampedModel
 
 from annotation.regexes import db_ref_regexes
@@ -705,30 +706,32 @@ def embedded_ids_check(text: str) -> ConditionMatchingSuggestion:
 
                 # now find all the terms that should be expected in the term
                 term_tokens: Set[str] = set()
+                term_tokens = SearchText.tokenize_condition_text(normalize_condition_text(matched_term.name),
+                                                                 deplural=True, deroman=True)
+                term_tokens.discard(matched_term.id.lower())
 
-                def get_term_tokens(term: OntologyTerm):
-                    tokens = SearchText.tokenize_condition_text(normalize_condition_text(matched_term.name),
-                                                                     deplural=True, deroman=True)
-                    if aliases := matched_term.aliases:
-                        for alias in aliases:
-                            tokens = tokens.union(SearchText.tokenize_condition_text(normalize_condition_text(alias),
-                                                                                     deplural=True, deroman=True))
+                def check_has_non_pr_term(tokens: Set[str]):
+                    for term in term_tokens:
+                        for non_pr in NON_PR_TERMS:
+                            if non_pr in term:
+                                return True
+                    return False
 
-                    tokens.discard(term.id.lower())
-                    return tokens
+                has_non_pr_terms = check_has_non_pr_term(term_tokens)
+                if has_non_pr_terms:
+                    cms.add_message(ConditionMatchingMessage(severity="debug",
+                                                             text="Text matching ignored as official term uses out of date terminology"))
 
-                term_tokens = term_tokens.union(get_term_tokens(matched_term))
-                #if matched_term.ontology_service == OntologyService.OMIM:
-                #    if mondo_term := OntologyTermRelation.as_mondo(matched_term):
-                #        term_tokens = term_tokens.union(get_term_tokens(mondo_term))
-
-                has_non_pr_terms = False
-                for term in term_tokens:
-                    for non_pr in NON_PR_TERMS:
-                        if non_pr in term:
-                            has_non_pr_terms = True
-                            cms.add_message(ConditionMatchingMessage(severity="debug", text="Text matching ignored as official term uses out of date terminology"))
-                            break
+                if aliases := matched_term.aliases:
+                    for alias in aliases:
+                        term_tokens = term_tokens.union(SearchText.tokenize_condition_text(normalize_condition_text(alias),
+                                                                                 deplural=True, deroman=True))
+                if extra := matched_term.extra:
+                    if included_titles := extra.get('included_titles'):
+                        for included_title in included_titles.split(';;'):
+                            term_tokens = term_tokens.union(
+                                SearchText.tokenize_condition_text(normalize_condition_text(included_title),
+                                                                   deplural=True, deroman=True))
 
                 cms.add_message(ConditionMatchingMessage(severity="debug", text=f"TEXT words (RAW) = {json.dumps(sorted(text_tokens))}"))
                 cms.add_message(ConditionMatchingMessage(severity="debug", text=f"TERM words (RAW) = {json.dumps(sorted(term_tokens))}"))
