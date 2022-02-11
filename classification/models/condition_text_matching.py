@@ -717,11 +717,6 @@ def embedded_ids_check(text: str) -> ConditionMatchingSuggestion:
                                 return True
                     return False
 
-                has_non_pr_terms = check_has_non_pr_term(term_tokens)
-                if has_non_pr_terms:
-                    cms.add_message(ConditionMatchingMessage(severity="debug",
-                                                             text="Text matching ignored as official term uses out of date terminology"))
-
                 if aliases := matched_term.aliases:
                     for alias in aliases:
                         term_tokens = term_tokens.union(SearchText.tokenize_condition_text(normalize_condition_text(alias),
@@ -739,14 +734,28 @@ def embedded_ids_check(text: str) -> ConditionMatchingSuggestion:
                 raw_extra_words = set(extra_words)
                 cms.add_message(ConditionMatchingMessage(severity="debug", text=f"Diff words (RAW) = {json.dumps(sorted(extra_words))}"))
                 extra_words = extra_words - PREFIX_SKIP_TERMS - IGNORE_TERMS
-                extra_words = set([word for word in extra_words if
-                               not GeneSymbol.objects.filter(symbol=word).exists()])
+                gene_symbols_in_text = set([word for word in extra_words if GeneSymbol.objects.filter(symbol=word).exists()])
                 # cms.add_message(ConditionMatchingMessage(severity="debug", text=f"Same words = {json.dumps(sorted(same_words))}, length = {same_word_letters}"))
                 ignored_words = raw_extra_words - extra_words
                 cms.add_message(ConditionMatchingMessage(severity="debug", text=f"Ignored common words/gene symbols = {json.dumps(sorted(ignored_words))}"))
                 cms.add_message(ConditionMatchingMessage(severity="debug", text=f"Diff words (Processed) = {json.dumps(sorted(extra_words))}, count = {len(extra_words)}"))
 
-                if not has_non_pr_terms and len(extra_words) >= 3:  # 3 extra words and for words that are in common aren't longer than 9 letters combined
+                failed_related_check = False
+                for gene_symbol in gene_symbols_in_text:
+                    gene_symbol = gene_symbol.lower()
+                    if f'{gene_symbol}-related' in text.lower():
+                        cms.add_message(ConditionMatchingMessage(severity="warning", text=f"Found {matched_term.id} in text, but also '{gene_symbol}-related', was this a placeholder term?"))
+                        failed_related_check = True
+                        break
+
+                if failed_related_check:
+                    pass
+
+                elif check_has_non_pr_term(term_tokens):
+                    cms.add_message(ConditionMatchingMessage(severity="debug",
+                                                             text="Text matching ignored as official term uses out of date terminology"))
+
+                elif len(extra_words) >= 3:  # 3 extra words and for words that are in common aren't longer than 9 letters combined
                     cms.add_message(ConditionMatchingMessage(severity="warning", text=f"Found {matched_term.id} in text, but also apparently unrelated words : {pretty_set(extra_words)}"))
 
     cms.validate()
