@@ -8,6 +8,7 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied, ObjectDoesNotExist
 from django.db import models
+from django.db.models import Lookup, Field
 from django.db.models.deletion import SET_NULL, CASCADE
 from django.db.models.functions import Substr
 from django.db.models.query_utils import Q
@@ -28,6 +29,18 @@ from snpdb.models.models_enums import ImportStatus, VariantsType, ProcessingStat
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_genomic_interval import GenomicIntervalsCollection
 from snpdb.models.models_variant import Variant, VariantCollection, AlleleSource
+
+
+@Field.register_lookup
+class NotEqual(Lookup):
+    """ From https://docs.djangoproject.com/en/4.0/howto/custom-lookups/#a-lookup-example """
+    lookup_name = 'ne'
+
+    def as_sql(self, compiler, connection):
+        lhs, lhs_params = self.process_lhs(compiler, connection)
+        rhs, rhs_params = self.process_rhs(compiler, connection)
+        params = lhs_params + rhs_params
+        return '%s <> %s' % (lhs, rhs), params
 
 
 class Project(models.Model):

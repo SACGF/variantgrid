@@ -83,7 +83,7 @@ class PathogenicityImpact(AbstractPathogenicity):
         if min_level == cls.MODERATE_OTHER:
             # SNV=HIGH, non SNV HIGH or MODERATE
             q_non_snv = cls._get_q_for_damage_levels([cls.MODERATE], allow_null)
-            q |= q_non_snv & ~Q(variantannotation__variant_class=VariantClass.SNV)
+            q |= q_non_snv & Q(variantannotation__variant_class__ne=VariantClass.SNV)
         return q
 
 

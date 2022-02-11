@@ -67,7 +67,7 @@ class DamageNode(AnalysisNode):
         if self.splice_min is not None:
             # [consequence contains 'splice' OR not null splice region] AND [variant class not SNV]
             q_splice_indels = Q(variantannotation__consequence__contains='splice') | Q(variantannotation__splice_region__isnull=False)
-            q_splice_indels &= ~Q(variantannotation__variant_class='SN')
+            q_splice_indels &= Q(variantannotation__variant_class__ne="SN")
             splicing_q_list = [
                 q_splice_indels,
                 Q(variantannotation__dbscsnv_ada_score__gte=self.splice_min),
