@@ -40,10 +40,6 @@ class DamageNode(AnalysisNode):
     published = models.BooleanField(default=False)
     published_required = models.BooleanField(default=False)
 
-    # TODO: Remove these 2
-    always_keep_splice_variants_regardless_of_impact = models.BooleanField(default=True)
-    allow_null = models.BooleanField(default=False)
-
     def modifies_parents(self):
         return any([self.impact_min, self.splice_min, self.cadd_score_min, self.revel_score_min,
                     self.cosmic_count_min, self.damage_predictions_min, self.protein_domain, self.published])

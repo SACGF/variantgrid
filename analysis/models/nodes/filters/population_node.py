@@ -10,7 +10,6 @@ from lazy import lazy
 
 from analysis.models.enums import GroupOperation
 from analysis.models.nodes.analysis_node import AnalysisNode
-from annotation import population_frequency
 from annotation.models.models import VariantAnnotation
 from classification.enums import ClinicalSignificance
 from classification.models.classification import Classification
@@ -74,10 +73,13 @@ class PopulationNode(AnalysisNode):
                 }
                 group_operation = OPERATIONS[self.group_operation]
                 max_allele_frequency = self.percent / 100
-                q_pop = population_frequency.get_population_af_q(max_allele_frequency,
-                                                                 population_databases=population_databases,
-                                                                 group_operation=group_operation)
-                and_q.append(q_pop)
+                filters = []
+                for field in self.POPULATION_DATABASE_FIELDS:
+                    q_isnull = Q(**{f"variantannotation__{field}__isnull": True})
+                    q_max_value = Q(**{f"variantannotation__{field}__lte": max_allele_frequency})
+                    filters.append(q_isnull | q_max_value)
+
+                and_q.append(reduce(group_operation, filters))
 
         if self.gnomad_hom_alt_max is not None:
             q_hom_alt_lt = Q(variantannotation__gnomad_hom_alt__lte=self.gnomad_hom_alt_max)
