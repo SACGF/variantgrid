@@ -167,6 +167,9 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
 
     def _get_cached_label_count(self, label):
         """ Input counts can be static, so use cached AnnotationStats if we can """
+        if self._has_filters_that_affect_label_counts():
+            return None  # Have to do counts
+
         CLASSES = {
             BuiltInFilters.TOTAL: (SampleStats, SampleStatsPassingFilter),
             BuiltInFilters.CLINVAR: (SampleClinVarAnnotationStats, SampleClinVarAnnotationStatsPassingFilter),
@@ -175,18 +178,17 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
         }
         annotation_version = self.analysis.annotation_version
         count = None
-        if not self._has_filters_that_affect_label_counts():
-            try:
-                filter_code = self.get_filter_code()
-                klazz = CLASSES[label][filter_code]  # Maybe exception and out of range
-                obj = klazz.load_version(self.sample, annotation_version)
-                zygosities = [self.zygosity_ref, self.zygosity_het, self.zygosity_hom, self.zygosity_unk]
-                if self.sample and not self.sample.has_genotype:
-                    zygosities = [True] * len(zygosities)  # Show everything
+        try:
+            filter_code = self.get_filter_code()
+            klazz = CLASSES[label][filter_code]  # Maybe exception and out of range
+            obj = klazz.load_version(self.sample, annotation_version)
+            zygosities = [self.zygosity_ref, self.zygosity_het, self.zygosity_hom, self.zygosity_unk]
+            if self.sample and not self.sample.has_genotype:
+                zygosities = [True] * len(zygosities)  # Show everything
 
-                count = obj.count_for_zygosity(*zygosities, label=label)
-            except (IndexError, KeyError, ObjectDoesNotExist):
-                pass  # OK, will just calculate it
+            count = obj.count_for_zygosity(*zygosities, label=label)
+        except (IndexError, KeyError, ObjectDoesNotExist):
+            pass  # OK, will just calculate it
 
         return count
 
