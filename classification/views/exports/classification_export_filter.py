@@ -1,11 +1,10 @@
+from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from functools import reduce
 from operator import __or__
 from typing import List, Type, Union, Set, Optional, Dict, Iterator
-
-from cyvcf2.cyvcf2 import defaultdict
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.db.models import QuerySet, Q
