@@ -13,11 +13,11 @@ from library.database_utils import get_queryset_select_from_where_parts, dictfet
 from snpdb.models.models_enums import BuiltInFilters
 
 # Add the necessary fields to qs to create join:
-REQUIRED_FIELDS = [
-    "clinvar__highest_pathogenicity",
-    "variantannotation__gene__geneannotation__omim_terms",
-    "variantannotation__impact"
-]
+REQUIRED_FIELDS = {
+    BuiltInFilters.CLINVAR: "clinvar__highest_pathogenicity",
+    BuiltInFilters.OMIM: "variantannotation__gene__geneannotation__omim_terms",
+    BuiltInFilters.IMPACT_HIGH_OR_MODERATE: "variantannotation__impact",
+}
 
 CLASSIFICATION_COUNT_SQL = """
 select 1
@@ -98,15 +98,16 @@ def get_node_counts_mine_and_available(analysis):
     return my_node_counts_list, available_node_counts_list
 
 
-def get_node_counts_and_labels_dict(node):
-
-    # TODO: We should pass in the labels we want, only join to the appropriate tables and retrieve what we want
-    # so if we only want clinvar or classified we only have to scan short tables
+def get_node_counts_and_labels_dict(node, counts_to_get):
 
     # Need to do inner query as distinct needs to be applied
     # before aggregate functions
     qs = node.get_queryset(inner_query_distinct=True)
-    qs = qs.values(*REQUIRED_FIELDS)
+    required_fields = []
+    for c in counts_to_get:
+        if field := REQUIRED_FIELDS.get(c):
+            required_fields.append(field)
+    qs = qs.values(*required_fields)
 
     def get_count_alias(count_type):
         return f"{count_type}_count".lower()
@@ -117,15 +118,16 @@ def get_node_counts_and_labels_dict(node):
         partition_names = node.analysis.annotation_version.get_partition_names()
 
         select_columns = []
-        for count_type, column_string in COUNTS.items():
+        for count_type in counts_to_get:
+            column_string = COUNTS[count_type]
             column_string %= partition_names
             column_string += " as " + get_count_alias(count_type)
             select_columns.append(column_string)
 
         select_str = 'SELECT ' + ',\n'.join(select_columns)
         sql = '\n'.join([select_str, from_str, where_str])
-        # logging.info("NODE COUNT sql was:")
-        # logging.info(sql)
+        logging.info("NODE COUNT sql was:")
+        logging.info(sql)
 
         try:
             cursor = connection.cursor()
@@ -144,7 +146,7 @@ def get_node_counts_and_labels_dict(node):
         data = defaultdict(int)
 
     node_counts = {}
-    for count_type in COUNTS:
+    for count_type in counts_to_get:
         count_alias = get_count_alias(count_type)
         node_counts[count_type] = data[count_alias] or 0
 

@@ -776,7 +776,7 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
         logging.debug("%s cached counts: %s", self, label_counts)
         if counts_to_get:
             logging.debug("%s needs DB request for %s", self, counts_to_get)
-            retrieved_label_counts = get_node_counts_and_labels_dict(self)
+            retrieved_label_counts = get_node_counts_and_labels_dict(self, counts_to_get)
             label_counts.update(retrieved_label_counts)
 
         node_version = NodeVersion.get(self)
