@@ -26,7 +26,7 @@ from termsandconditions.decorators import terms_required
 
 from analysis.analysis_templates import get_sample_analysis
 from analysis.forms import AnalysisOutputNodeChoiceForm
-from analysis.models import AnalysisTemplate, SampleStats, SampleStatsPassingFilter
+from analysis.models import AnalysisTemplate
 from annotation.forms import GeneCountTypeChoiceForm
 from annotation.manual_variant_entry import create_manual_variants, can_create_variants
 from annotation.models import AnnotationVersion, SampleVariantAnnotationStats, SampleGeneAnnotationStats, \
@@ -70,7 +70,8 @@ from snpdb.models import CachedGeneratedFile, VariantGridColumn, UserSettings, \
     get_igv_data, SampleLocusCount, UserContact, Tag, Wiki, Organization, GenomeBuild, \
     Trio, AbstractNodeCountSettings, CohortGenotypeCollection, UserSettingsOverride, NodeCountSettingsCollection, Lab, \
     LabUserSettingsOverride, OrganizationUserSettingsOverride, LabHead, SomalierRelatePairs, \
-    VariantZygosityCountCollection, VariantZygosityCountForVCF, ClinVarKey, AvatarDetails, State
+    VariantZygosityCountCollection, VariantZygosityCountForVCF, ClinVarKey, AvatarDetails, State, SampleStats, \
+    SampleStatsPassingFilter
 from snpdb.models.models_enums import ProcessingStatus, ImportStatus, BuiltInFilters
 from snpdb.tasks.soft_delete_tasks import soft_delete_vcfs
 from snpdb.utils import LabNotificationBuilder
