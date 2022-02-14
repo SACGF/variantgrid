@@ -40,10 +40,8 @@ class ClassificationImportRun(TimeStampedModel):
         use_me: Optional[ClassificationImportRun] = None
 
         # see if there's already an ongoing import, if it's not too old
-        if latest := ClassificationImportRun.objects.filter(identifier=identifier).order_by('-modified').first():
-            # do these as checks on the most recent import, rather than new ones
-            if latest.status == ClassificationImportRunStatus.ONGOING and (now() - latest.modified) <= MAX_IMPORT_AGE:
-                use_me = latest
+        too_old = now() - MAX_IMPORT_AGE
+        use_me = ClassificationImportRun.objects.filter(status=ClassificationImportRunStatus.ONGOING, identifier=identifier, modified__gte=too_old).order_by('-modified').first()
 
         if not use_me:
             use_me = ClassificationImportRun(identifier=identifier)
@@ -63,7 +61,7 @@ class ClassificationImportRun(TimeStampedModel):
     @staticmethod
     def cleanup():
         too_old = now() - MAX_IMPORT_AGE
-        for unfinished in ClassificationImportRun.objects.filter(status=ClassificationImportRunStatus.ONGOING, modified__lte=too_old):
+        for unfinished in ClassificationImportRun.objects.filter(status=ClassificationImportRunStatus.ONGOING, modified__lt=too_old):
             unfinished.status = ClassificationImportRunStatus.UNFINISHED
             unfinished.save()
 
