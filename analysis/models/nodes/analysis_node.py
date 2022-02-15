@@ -786,8 +786,11 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
             label_counts.update(retrieved_label_counts)
 
         node_version = NodeVersion.get(self)
+        node_counts = []
         for label, count in label_counts.items():
-            NodeCount.objects.create(node_version=node_version, label=label, count=count)
+            node_counts.append(NodeCount(node_version=node_version, label=label, count=count))
+        if node_counts:
+            NodeCount.objects.bulk_create(node_counts)
 
         total_count = label_counts[BuiltInFilters.TOTAL]
 

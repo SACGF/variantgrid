@@ -96,7 +96,7 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
     def get_absolute_url(self):
         return reverse('analysis', kwargs={"analysis_id": self.pk})
 
-    @property
+    @lazy
     def gene_annotation_release(self):
         return self.annotation_version.variant_annotation_version.gene_annotation_release
 

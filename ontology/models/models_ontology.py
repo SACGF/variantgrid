@@ -692,7 +692,7 @@ class OntologySnake:
 
     @staticmethod
     @cache_memoize(DAY_SECS)
-    def cached_gene_symbols_for_terms_tuple(terms_tuple: Tuple[OntologyTerm]) -> QuerySet:
+    def cached_gene_symbols_for_terms_tuple(terms_tuple: Tuple[int]) -> QuerySet:
         """ Slightly restricted signature so we can cache it """
         return OntologySnake.gene_symbols_for_terms(terms_tuple)
 

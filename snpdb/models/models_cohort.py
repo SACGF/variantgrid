@@ -20,7 +20,7 @@ from django_extensions.db.models import TimeStampedModel
 from guardian.shortcuts import get_objects_for_user
 from lazy import lazy
 
-from library.constants import DAY_SECS
+from library.constants import HOUR_SECS
 from library.django_utils import SortByPKMixin
 from library.django_utils.django_partition import RelatedModelsPartitionModel
 from library.django_utils.django_postgres import PostgresRealField
@@ -124,8 +124,8 @@ class Cohort(GuardianPermissionsAutoInitialSaveMixin, SortByPKMixin, TimeStamped
     def get_cohort_samples(self):
         return self.cohortsample_set.all().select_related("sample").order_by("sort_order")
 
-    @cache_memoize(timeout=DAY_SECS,
-                   key_generator_callable=lambda self: f"cohort.get_samples({(self.pk, self.version)}")
+    @cache_memoize(timeout=HOUR_SECS,
+                   args_rewrite=lambda s: (s.pk, s.version))
     def get_samples(self) -> List[Sample]:
         """ In sample.pk order (consistent regardless of cohort samples order) """
         return list(self.get_samples_qs())
