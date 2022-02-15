@@ -135,7 +135,6 @@ let DataTableDefinition = (function() {
                     {
                         extend: 'csvHtml5',
                         action: newExportAction,
-                        className: 'btn btn-outline-primary',
                         text: "Download as CSV",
                     }
                 ]
