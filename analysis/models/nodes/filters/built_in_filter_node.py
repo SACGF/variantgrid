@@ -66,15 +66,15 @@ class BuiltInFilterNode(AnalysisNode):
         """ Use parent ClinVar count """
         count = super()._get_cached_label_count(label)
         if count is None:
-            if label in [BuiltInFilters.TOTAL, self.built_in_filter]:
-                # Can't use if any extra filters applied
-                if label == BuiltInFilters.CLINVAR:
-                    if self.clinvar_stars_min:
-                        return None
-                elif label == BuiltInFilters.COSMIC:
-                    if self.cosmic_count_min:
-                        return None
+            # Can't use if any extra filters applied
+            if self.built_in_filter == BuiltInFilters.CLINVAR:
+                if self.clinvar_stars_min:
+                    return None
+            elif self.built_in_filter == BuiltInFilters.COSMIC:
+                if self.cosmic_count_min:
+                    return None
 
+            if label in [BuiltInFilters.TOTAL, self.built_in_filter]:
                 try:
                     parent = self.get_single_parent()
                     parent_node_count = NodeCount.load_for_node(parent, self.built_in_filter)
