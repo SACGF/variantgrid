@@ -1,4 +1,6 @@
+import logging
 import random
+import time
 from collections import defaultdict
 
 from celery.canvas import Signature
@@ -6,6 +8,7 @@ from django.db.models.query_utils import Q
 from toposort import toposort
 
 from analysis.models.nodes.analysis_node import AnalysisNode, AnalysisEdge
+from analysis.tasks.node_update_tasks import delete_analysis_old_node_versions
 
 
 def get_nodes_by_id(nodes_qs):
@@ -56,16 +59,24 @@ def get_toposorted_nodes_from_parent_value_data(nodes, parent_value_data):
 
 def update_analysis(analysis_id):
     """ Launches async job to update analysis """
+
+    delete_analysis_old_node_versions.si(analysis_id).apply_async()
+
     task = Signature("analysis.tasks.analysis_update_tasks.create_and_launch_analysis_tasks", args=(analysis_id,))
     task.apply_async()
 
 
 def reload_analysis_nodes(analysis_id):
+    start = time.time()
+    num_nodes = 0
     for node in AnalysisNode.objects.filter(analysis_id=analysis_id).select_subclasses():
         node.update_children = False  # Will get them all in loop
         node.appearance_dirty = True
         node.queryset_dirty = True
         node.save()
+        num_nodes += 1
+    end = time.time()
+    logging.info("%d took %.2f secs", num_nodes, end-start)
     return update_analysis(analysis_id)
 
 

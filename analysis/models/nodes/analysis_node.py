@@ -35,7 +35,6 @@ from library.utils import format_percent
 from snpdb.models import BuiltInFilters, Sample, Variant, VCFFilter, Wiki, Cohort, VariantCollection, \
     ProcessingStatus, GenomeBuild, AlleleSource, Contig
 from snpdb.variant_collection import write_sql_to_variant_collection
-from variantgrid.celery import app
 
 
 def _default_position():
@@ -685,10 +684,6 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
         return NodeStatus.is_ready(self.status)
 
     def bump_version(self):
-        if self.version > 0:
-            DELETE_CACHE_TASK = "analysis.tasks.node_update_tasks.delete_old_node_versions"
-            app.send_task(DELETE_CACHE_TASK, args=(self.pk, self.version))
-
         self.version += 1
         self.status = NodeStatus.DIRTY
         self.count = None
@@ -1033,8 +1028,7 @@ class NodeCache(models.Model):
 
 @receiver(post_delete, sender=NodeCache)
 def post_delete_node_cache(sender, instance, **kwargs):  # pylint: disable=unused-argument
-    """ This can sometimes be called multiple times - if node updated again before previous updates
-        delete_old_node_versions is finished """
+    """ This can sometimes be called multiple times - if node updated again before previous delete is done """
     try:
         if instance.variant_collection:
             instance.variant_collection.delete_related_objects()

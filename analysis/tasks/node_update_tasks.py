@@ -4,6 +4,7 @@ from time import sleep
 import celery
 from celery.contrib.abortable import AbortableTask
 from celery.result import AsyncResult
+from django.db.models import OuterRef, Subquery, F
 from django.db.utils import OperationalError, IntegrityError
 
 from analysis.exceptions import NodeConfigurationException, NodeParentErrorsException, CeleryTasksObsoleteException, \
@@ -143,10 +144,13 @@ def node_cache_task(node_id, version):
 
 
 @celery.shared_task
-def delete_old_node_versions(node_id, version):
-    """ This is called before bumping the version, so delete that version and earlier """
-    logging.debug(f"Deleting stale cache for node_id={node_id}, version_id={version}")
-    NodeVersion.objects.filter(node_id=node_id, version__lte=version).delete()
+def delete_analysis_old_node_versions(analysis_id):
+    """ This is called after creating new versions, so delete anything not latest """
+    logging.debug(f"Deleting stale cache for analysis_id={analysis_id}")
+    node_versions_qs = NodeVersion.objects.filter(node__analysis_id=analysis_id)
+    latest = node_versions_qs.filter(node_id=OuterRef('node_id')).order_by('-version')
+    sub_query = Subquery(latest.values('pk')[:1])
+    node_versions_qs.annotate(latest_version=sub_query).exclude(pk=F('latest_version')).delete()
 
 
 @celery.shared_task

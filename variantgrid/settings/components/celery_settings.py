@@ -59,7 +59,7 @@ CELERY_ROUTES = {
     "analysis.tasks.node_update_tasks.update_node_task": ANALYSIS_WORKERS,
     "analysis.tasks.node_update_tasks.node_cache_task": ANALYSIS_WORKERS,
     "analysis.tasks.node_update_tasks.wait_for_cache_task": ANALYSIS_WORKERS,
-    "analysis.tasks.node_update_tasks.delete_old_node_versions": ANALYSIS_WORKERS,
+    "analysis.tasks.node_update_tasks.delete_analysis_old_node_versions": ANALYSIS_WORKERS,
     "analysis.tasks.node_update_tasks.wait_for_node": ANALYSIS_WORKERS,
     # Annotation
     "annotation.tasks.annotate_variants.delete_annotation_run": ANNOTATION_WORKERS,

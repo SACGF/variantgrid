@@ -37,15 +37,14 @@ def _get_analysis_update_tasks(analysis_id) -> List:
     tasks = []
 
     analysis = Analysis.objects.get(pk=analysis_id)
-    node_ids = analysis.analysisnode_set.all().values_list("pk", flat=True)
+    nodes_by_id = get_nodes_by_id(analysis.analysisnode_set.all().select_subclasses())
     edges = AnalysisEdge.objects.filter(parent__analysis=analysis).values_list("parent", "child")
 
     all_nodes_graph = nx.DiGraph()
-    all_nodes_graph.add_nodes_from(node_ids)
+    all_nodes_graph.add_nodes_from(nodes_by_id)
     all_nodes_graph.add_edges_from(edges)
 
     logging.info("-" * 60)
-
     for connected_components in nx.weakly_connected_components(all_nodes_graph):
         sub_graph = all_nodes_graph.subgraph(connected_components)
         sub_graph_node_ids = list(sub_graph)
@@ -54,14 +53,15 @@ def _get_analysis_update_tasks(analysis_id) -> List:
 
         # We need a way to lock/claim the nodes - so someone else calling get_analysis_update_task()
         # doesn't also launch update tasks for them.
-        sub_graph_nodes_qs = analysis.analysisnode_set.filter(pk__in=sub_graph_node_ids)
         analysis_update_uuid = uuid.uuid4()
         node_task_records = []
         logging.info("Dirty nodes:")
-        for node_id, version in sub_graph_nodes_qs.filter(status=NodeStatus.DIRTY).values_list("pk", "version"):
-            node_task = NodeTask(node_id=node_id, version=version, analysis_update_uuid=analysis_update_uuid)
-            logging.info(node_task)
-            node_task_records.append(node_task)
+        for node_id in sub_graph_node_ids:
+            node = nodes_by_id[node_id]
+            if node.status == NodeStatus.DIRTY:
+                node_task = NodeTask(node_id=node_id, version=node.version, analysis_update_uuid=analysis_update_uuid)
+                logging.info(node_task)
+                node_task_records.append(node_task)
 
         if node_task_records:
             NodeTask.objects.bulk_create(node_task_records, ignore_conflicts=True)
@@ -78,7 +78,6 @@ def _get_analysis_update_tasks(analysis_id) -> List:
                 for child_node_id in child_list:
                     parent_value_data[child_node_id].add(parent)
 
-            nodes_by_id = get_nodes_by_id(sub_graph_nodes_qs.select_subclasses())
             dependencies = _get_node_dependencies(nodes_by_id, parent_value_data)
             topo_sorted = get_toposorted_nodes_from_parent_value_data(nodes_by_id, parent_value_data)
 
