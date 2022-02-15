@@ -82,6 +82,8 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
         self.parents_changed = False
         self.queryset_dirty = False
         self.update_children = True
+        self._cached_parents = None
+        self._cached_analysis_errors = None
 
     def get_subclass(self):
         """ Returns the node loaded as a subclass """
@@ -213,8 +215,15 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
         return task_args_objs_set
 
     def get_parent_subclasses_and_errors(self):
-        qs = AnalysisNode.objects.filter(children=self.id, children__isnull=False)
-        parents = list(qs.select_subclasses())
+        if self._cached_parents is None:
+            logging.info("parents cache miss for %d", self.pk)
+            qs = AnalysisNode.objects.filter(children=self.id, children__isnull=False)
+            self._cached_parents = list(qs.select_subclasses())
+        else:
+            logging.info("parents cache HIT for %d", self.pk)
+
+        parents = self._cached_parents
+
         num_parents = len(parents)
         errors = []
         if self.min_inputs != AnalysisNode.PARENT_CAP_NOT_SET and num_parents < self.min_inputs:
@@ -563,10 +572,15 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
             return self.get_parent_subclasses_and_errors()
         return [], []
 
+    def _get_analysis_errors(self) -> List[str]:
+        if self._cached_analysis_errors is None:
+            self._cached_analysis_errors = self.analysis.get_errors()
+        return self._cached_analysis_errors
+
     def get_errors(self, include_parent_errors=True, flat=False):
         """ returns a tuple of (NodeError, str) unless flat=True where it's only string """
         errors = []
-        for analysis_error in self.analysis.get_errors():
+        for analysis_error in self._get_analysis_errors():
             errors.append((NodeErrorSource.ANALYSIS, analysis_error))
 
         _, parent_errors = self.get_parents_and_errors()

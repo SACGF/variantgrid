@@ -4,10 +4,13 @@ import time
 from collections import defaultdict
 
 from celery.canvas import Signature
+from django.db.models import F
 from django.db.models.query_utils import Q
+from django.utils import timezone
 from toposort import toposort
 
-from analysis.models.nodes.analysis_node import AnalysisNode, AnalysisEdge
+from analysis.models import Analysis, NodeStatus, NodeColors
+from analysis.models.nodes.analysis_node import AnalysisEdge, NodeVersion
 from analysis.tasks.node_update_tasks import delete_analysis_old_node_versions
 
 
@@ -68,15 +71,48 @@ def update_analysis(analysis_id):
 
 def reload_analysis_nodes(analysis_id):
     start = time.time()
-    num_nodes = 0
-    for node in AnalysisNode.objects.filter(analysis_id=analysis_id).select_subclasses():
-        node.update_children = False  # Will get them all in loop
-        node.appearance_dirty = True
-        node.queryset_dirty = True
-        node.save()
-        num_nodes += 1
+
+    analysis = Analysis.objects.get(pk=analysis_id)
+    nodes_qs = analysis.analysisnode_set.all()
+    nodes_by_id = get_nodes_by_id(nodes_qs.select_subclasses())
+    parents = defaultdict(list)
+    for parent, child in AnalysisEdge.objects.filter(parent__analysis=analysis).values_list("parent", "child"):
+        parents[child].append(nodes_by_id[parent])
+
+    analysis_errors = analysis.get_errors()
+    num_nodes = len(nodes_by_id)
+    valid_nodes = []
+    invalid_nodes = []
+    for node_id, node in nodes_by_id.items():
+        node._cached_analysis_errors = analysis_errors
+        node._cached_parents = parents.get(node_id, [])
+        if node.get_errors():
+            invalid_nodes.append(node_id)
+        else:
+            valid_nodes.append(node_id)
+
+    update_kwargs = {
+        "status": NodeStatus.DIRTY,
+        "count": None,
+        "errors": None,
+        "cloned_from": None,
+        "version": F("version") + 1,
+        "appearance_version": F("appearance_version") + 1,
+    }
+    if valid_nodes:
+        nodes_qs.filter(pk__in=valid_nodes).update(valid=True, shadow_color=NodeColors.VALID, **update_kwargs)
+    if invalid_nodes:
+        nodes_qs.filter(pk__in=invalid_nodes).update(valid=False, shadow_color=NodeColors.ERROR, **update_kwargs)
+
+    node_versions = []
+    for node_id, version in nodes_qs.values_list("pk", "version"):
+        node_versions.append(NodeVersion(node_id=node_id, version=version))
+    if node_versions:
+        NodeVersion.objects.bulk_create(node_versions, ignore_conflicts=True)
+
+    Analysis.objects.filter(pk=analysis_id).update(modified=timezone.now())
     end = time.time()
-    logging.info("%d took %.2f secs", num_nodes, end-start)
+    logging.info("%d saves took %.2f secs", num_nodes, end-start)
     return update_analysis(analysis_id)
 
 
