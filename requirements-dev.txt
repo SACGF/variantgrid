@@ -6,7 +6,6 @@ Bio
 celery
 ConfigArgParse
 cyvcf2>=0.30.14
-datetimeutc
 Django
 django-amazon-ses
 django_auth_ldap
