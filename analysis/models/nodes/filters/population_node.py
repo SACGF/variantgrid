@@ -78,7 +78,7 @@ class PopulationNode(AnalysisNode):
                     GroupOperation.ALL: operator.or_,
                     GroupOperation.ANY: operator.and_,
                 }
-                group_operation = OPERATIONS[self.group_operation]
+                group_operation = OPERATIONS[GroupOperation(self.group_operation)]
                 max_allele_frequency = self.percent / 100
                 filters = []
                 for field in self.POPULATION_DATABASE_FIELDS:
