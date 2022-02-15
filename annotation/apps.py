@@ -1,6 +1,17 @@
 from django.apps.config import AppConfig
+from django.core.cache import cache
 from django.db import ProgrammingError
 from django.db.models.signals import post_save
+
+
+def _has_classification_gene_count_type(GeneCountType):
+    cache_key = "has_classification_gene_count_type"
+    exists = cache.get(cache_key)
+    if exists is None:
+        exists = GeneCountType.objects.filter(enabled=True, uses_classifications=True).exists()
+        cache.set(cache_key, exists)
+    return exists
+
 
 
 class AnnotationConfig(AppConfig):
@@ -24,7 +35,7 @@ class AnnotationConfig(AppConfig):
 
         try:
             GeneCountType = self.get_model('GeneCountType')
-            if GeneCountType.objects.filter(enabled=True, uses_classifications=True).exists():
+            if _has_classification_gene_count_type(GeneCountType):
                 from annotation.signals import gene_counts_classification_withdraw_handler, \
                     gene_counts_classification_publish_handler
                 from classification.models import Classification, \

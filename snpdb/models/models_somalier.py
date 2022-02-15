@@ -180,7 +180,7 @@ class SomalierCohortRelate(SomalierRelate):
     cohort_version = models.IntegerField()
 
     def get_samples(self) -> Iterable[Sample]:
-        return self.cohort.get_samples().filter(no_dna_control=False)
+        return self.cohort.get_samples_qs().filter(no_dna_control=False)
 
 
 class SomalierTrioRelate(SomalierRelate):

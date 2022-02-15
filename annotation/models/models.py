@@ -868,12 +868,20 @@ class InvalidAnnotationVersionError(Exception):
     pass
 
 
+class AnnotationVersionManager(models.Manager):
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        return qs.select_related('genome_build', 'variant_annotation_version', 'gene_annotation_version',
+                                 'clinvar_version', 'human_protein_atlas_version')
+
+
 # Use this as a way to keep all the versions together.
 # We re-use this, if nobody has referenced it - as you may eg update
 # variant/gene/clinvar annotations every 6 months etc and no point having so many sub-versions
 class AnnotationVersion(models.Model):
     SUB_ANNOTATIONS = ['variant_annotation_version', 'gene_annotation_version', 'clinvar_version', 'human_protein_atlas_version']
-
+    objects = AnnotationVersionManager()  # Always select_related
     annotation_date = models.DateTimeField(auto_now=True)
     genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)
     variant_annotation_version = models.ForeignKey(VariantAnnotationVersion, null=True, on_delete=PROTECT)

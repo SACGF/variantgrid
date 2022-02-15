@@ -216,11 +216,8 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
 
     def get_parent_subclasses_and_errors(self):
         if self._cached_parents is None:
-            logging.info("parents cache miss for %d", self.pk)
             qs = AnalysisNode.objects.filter(children=self.id, children__isnull=False)
             self._cached_parents = list(qs.select_subclasses())
-        else:
-            logging.info("parents cache HIT for %d", self.pk)
 
         parents = self._cached_parents
 
