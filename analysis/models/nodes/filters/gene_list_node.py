@@ -61,7 +61,8 @@ class GeneListNode(AncestorSampleMixin, GeneCoverageMixin, AnalysisNode):
         # Combine multiple gene lists into 1 query is much faster than OR'ing them together
         genes_ids_qs = GeneList.get_gene_ids_for_gene_lists(self.analysis.gene_annotation_release,
                                                             self.get_gene_lists())
-        q_gl = VariantTranscriptAnnotation.get_overlapping_genes_q(genes_ids_qs)
+        variant_annotation_version = self.analysis.annotation_version.variant_annotation_version
+        q_gl = VariantTranscriptAnnotation.get_overlapping_genes_q(variant_annotation_version, genes_ids_qs)
         if self.exclude:
             q_gl = ~q_gl
         return q_gl

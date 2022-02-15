@@ -93,7 +93,8 @@ class PhenotypeNode(AnalysisNode):
     def _get_node_q(self) -> Optional[Q]:
         qs_filters = []
         gene_qs = self.get_gene_qs()
-        qs_filters.append(VariantTranscriptAnnotation.get_overlapping_genes_q(gene_qs))
+        variant_annotation_version = self.analysis.annotation_version.variant_annotation_version
+        qs_filters.append(VariantTranscriptAnnotation.get_overlapping_genes_q(variant_annotation_version, gene_qs))
 
         text_phenotypes = (self.text_phenotype or '').split()
         if text_phenotypes:

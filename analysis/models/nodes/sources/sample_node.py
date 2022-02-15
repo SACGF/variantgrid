@@ -105,7 +105,7 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
 
         if self.restrict_to_qc_gene_list:
             if self.sample_gene_list:
-                q = self.sample_gene_list.gene_list.get_q(self.analysis.gene_annotation_release)
+                q = self.sample_gene_list.gene_list.get_q(self.analysis.annotation_version.variant_annotation_version)
             else:
                 q = self.q_none()  # Safety - don't show anything if missing
             q_and.append(q)

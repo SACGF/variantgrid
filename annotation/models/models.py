@@ -759,13 +759,13 @@ class VariantTranscriptAnnotation(AbstractVariantAnnotation):
         unique_together = ("version", "variant", "transcript_version")
 
     @staticmethod
-    def get_overlapping_genes_q(gene_ids_qs) -> Q:
+    def get_overlapping_genes_q(variant_annotation_version: VariantAnnotationVersion, gene_ids_qs) -> Q:
         """ Returns Q object where any transcript for a variant matches gene in genes
             Variants can overlap with multiple genes, and the VariantAnnotation (ie "pick" or representative annotation)
             may not be the one in the gene list. Thus we have to check everything that was in transcript annotation too
         """
 
-        vto = VariantGeneOverlap.objects.filter(gene__in=gene_ids_qs)
+        vto = VariantGeneOverlap.objects.filter(version=variant_annotation_version, gene__in=gene_ids_qs)
         # Use pk__in so we don't return multiple records per variant
         return Q(pk__in=vto.values_list("variant_id", flat=True))
 

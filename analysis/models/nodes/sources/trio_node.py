@@ -1,3 +1,4 @@
+import time
 from abc import ABC, abstractmethod
 from typing import Optional, List, Set, Tuple
 
@@ -140,7 +141,8 @@ class CompHet(AbstractTrioInheritance):
 
         # This ends up doing 3 queries (where we call set() - to work out what Q we need to return)
         common_genes = set(get_parent_genes(mum_but_not_dad)) & set(get_parent_genes(dad_but_not_mum))
-        q_in_genes = Q(varianttranscriptannotation__gene__in=common_genes)
+        variant_annotation_version = self.node.analysis.annotation_version.variant_annotation_version
+        q_in_genes = VariantTranscriptAnnotation.get_overlapping_genes_q(variant_annotation_version, common_genes)
         parent_genes_qs = parent.get_queryset(q_in_genes, extra_annotation_kwargs=annotation_kwargs)
         parent_genes_qs = parent_genes_qs.values_list("varianttranscriptannotation__gene")
         two_hits = parent_genes_qs.annotate(gene_count=Count("pk")).filter(gene_count__gte=2)
@@ -149,7 +151,8 @@ class CompHet(AbstractTrioInheritance):
 
     def get_q(self) -> Q:
         parent, comp_het_q, two_hit_genes = self._get_parent_comp_het_q_and_two_hit_genes()
-        comp_het_genes = VariantTranscriptAnnotation.get_overlapping_genes_q(two_hit_genes)
+        variant_annotation_version = self.node.analysis.annotation_version.variant_annotation_version
+        comp_het_genes = VariantTranscriptAnnotation.get_overlapping_genes_q(variant_annotation_version, two_hit_genes)
         return parent.get_q() & comp_het_q & comp_het_genes
 
     def get_method(self) -> str:

@@ -138,7 +138,8 @@ class MOINode(AncestorSampleMixin, AnalysisNode):
     def _get_genes_q_from_hgnc(self, hgnc_names: Set[str]):
         gene_symbols_qs = GeneSymbol.objects.filter(symbol__in=hgnc_names)
         gene_qs = self.analysis.gene_annotation_release.genes_for_symbols(gene_symbols_qs)
-        return VariantTranscriptAnnotation.get_overlapping_genes_q(gene_qs)
+        variant_annotation_version = self.analysis.annotation_version.variant_annotation_version
+        return VariantTranscriptAnnotation.get_overlapping_genes_q(variant_annotation_version, gene_qs)
 
     def _get_moi_genes(self):
         moi_genes = defaultdict(set)
@@ -160,7 +161,8 @@ class MOINode(AncestorSampleMixin, AnalysisNode):
             q = reduce(operator.or_, or_filters)
         else:
             gene_qs = self._get_gene_qs()
-            q = VariantTranscriptAnnotation.get_overlapping_genes_q(gene_qs)
+            variant_annotation_version = self.analysis.annotation_version.variant_annotation_version
+            q = VariantTranscriptAnnotation.get_overlapping_genes_q(variant_annotation_version, gene_qs)
         return q
 
     def _get_node_contigs(self) -> Optional[Set[Contig]]:
