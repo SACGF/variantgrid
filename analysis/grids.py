@@ -24,7 +24,8 @@ from patients.models_enums import Zygosity
 from snpdb.grid_columns.custom_columns import get_custom_column_fields_override_and_sample_position, \
     get_variantgrid_extra_alias_and_select_columns
 from snpdb.grid_columns.grid_sample_columns import get_columns_and_sql_parts_for_cohorts, get_available_format_columns
-from snpdb.models import VariantGridColumn, UserGridConfig, VCFFilter, Sample, ClinGenAllele, CohortGenotype
+from snpdb.models import VariantGridColumn, UserGridConfig, VCFFilter, Sample, ClinGenAllele, CohortGenotype, \
+    VariantZygosityCountCollection
 from snpdb.models.models_genome import GenomeBuild
 
 
@@ -121,6 +122,9 @@ class VariantGrid(JqGridSQL):
 
     def _get_queryset(self):
         qs = self.node.get_queryset()
+        # Annotate so we can use global_variant_zygosity in grid columns
+        qs, _ = VariantZygosityCountCollection.annotate_global_germline_counts(qs)
+
         if self.sort_by_contig_and_position:
             # These 2 are custom_columns.ID_FORMATTER_REQUIRED_FIELDS so won't add extra cols
             qs = qs.order_by("locus__contig__name", "locus__position")

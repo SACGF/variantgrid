@@ -1,6 +1,6 @@
 import operator
 from functools import reduce
-from typing import Optional
+from typing import Optional, Dict
 
 from django.conf import settings
 from django.db import models
@@ -48,6 +48,13 @@ class PopulationNode(AnalysisNode):
     def modifies_parents(self):
         return any([self.filtering_by_population, self.use_internal_counts,
                     self.gnomad_hom_alt_max, not self.show_gnomad_filtered])
+
+    def _get_annotation_kwargs_for_node(self) -> Dict:
+        annotation_kwargs = super()._get_annotation_kwargs_for_node()
+        if self.use_internal_counts:
+            vzcc = VariantZygosityCountCollection.objects.get(name=settings.VARIANT_ZYGOSITY_GLOBAL_COLLECTION)
+            annotation_kwargs.update(vzcc.get_annotation_kwargs())
+        return annotation_kwargs
 
     def _get_node_q(self) -> Optional[Q]:
         and_q = []
