@@ -81,7 +81,7 @@ class PopulationNode(AnalysisNode):
                 group_operation = OPERATIONS[GroupOperation(self.group_operation)]
                 max_allele_frequency = self.percent / 100
                 filters = []
-                for field in self.POPULATION_DATABASE_FIELDS:
+                for field in population_databases:
                     q_isnull = Q(**{f"variantannotation__{field}__isnull": True})
                     q_max_value = Q(**{f"variantannotation__{field}__lte": max_allele_frequency})
                     filters.append(q_isnull | q_max_value)
