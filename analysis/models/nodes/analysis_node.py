@@ -152,7 +152,6 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
 
     @cache_memoize(DAY_SECS, args_rewrite=lambda s: (s.pk, s.version))
     def get_sample_ids(self) -> List[Sample]:
-        logging.info("Node.get_sample_ids()")
         return [s.pk for s in self.get_samples()]
 
     def get_samples_from_node_only_not_ancestors(self):

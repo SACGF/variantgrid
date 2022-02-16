@@ -120,7 +120,7 @@ class Cohort(GuardianPermissionsAutoInitialSaveMixin, SortByPKMixin, TimeStamped
         return ss
 
     def get_cohort_samples(self):
-        return self.cohortsample_set.all().select_related("sample").order_by("sort_order")
+        return self.cohortsample_set.all().select_related("sample", "sample__vcf").order_by("sort_order")
 
     def get_samples(self) -> Iterable[Sample]:
         """ In sample.pk order (consistent regardless of cohort samples order)
