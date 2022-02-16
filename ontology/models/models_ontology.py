@@ -348,6 +348,13 @@ class OntologyTerm(TimeStampedModel):
         return {"HPO": hpo_qs, "OMIM": omim_qs, "MONDO": mondo_qs}
 
 
+class OntologyTermRelationManager(models.Manager):
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        return qs.select_related("source_term", "dest_term", "from_import")
+
+
 class OntologyTermRelation(TimeStampedModel):
     """
     Relationship between two terms, is generally considered to be bi-directional (or at the very least
@@ -356,6 +363,7 @@ class OntologyTermRelation(TimeStampedModel):
     I haven't elected to use django_dag node_factory here as it only allows one kind of relationship
     and we have quite a lot.
     """
+    objects = OntologyTermRelationManager()
     source_term = models.ForeignKey(OntologyTerm, on_delete=CASCADE, related_name="subject")
     dest_term = models.ForeignKey(OntologyTerm, on_delete=CASCADE)
     relation = models.TextField()
@@ -436,7 +444,7 @@ class OntologyTermRelation(TimeStampedModel):
                 return -1 if rel1source else 1
             return -1 if other1.index < other2.index else 1
 
-        items = list(OntologyTermRelation.objects.filter(Q(source_term=term) | Q(dest_term=term)).select_related("source_term", "dest_term", "from_import"))
+        items = list(OntologyTermRelation.objects.filter(Q(source_term=term) | Q(dest_term=term)))
         items.sort(key=functools.cmp_to_key(sort_relationships))
         return items
 
@@ -572,8 +580,7 @@ class OntologySnake:
             new_snakes: List[OntologySnake] = []
             for relationship in OntologyTermRelation.objects\
                     .filter(source_term__in=snakes_by_leaf.keys(), relation=OntologyRelation.IS_A)\
-                    .exclude(dest_term__in=seen)\
-                    .select_related("source_term", "dest_term"):
+                    .exclude(dest_term__in=seen):
                 snake = snakes_by_leaf[relationship.source_term]
                 new_snake = snake.snake_step(relationship)
                 leaf_term = new_snake.leaf_term
@@ -625,8 +632,8 @@ class OntologySnake:
                     by_leafs[snake.leaf_term] = snake
             all_leafs = by_leafs.keys()
 
-            outgoing = OntologyTermRelation.objects.filter(source_term__in=all_leafs).exclude(dest_term__in=seen).filter(q_relation).select_related("source_term", "dest_term")
-            incoming = OntologyTermRelation.objects.filter(dest_term__in=all_leafs).exclude(source_term__in=seen).filter(q_relation).select_related("source_term", "dest_term")
+            outgoing = OntologyTermRelation.objects.filter(source_term__in=all_leafs).exclude(dest_term__in=seen).filter(q_relation)
+            incoming = OntologyTermRelation.objects.filter(dest_term__in=all_leafs).exclude(source_term__in=seen).filter(q_relation)
             if to_ontology == OntologyService.HGNC:
                 outgoing = outgoing.exclude(dest_term__ontology_service=OntologyService.HPO)
                 incoming = incoming.exclude(source_term__ontology_service=OntologyService.HPO)
