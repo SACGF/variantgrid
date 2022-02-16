@@ -1,7 +1,6 @@
 from typing import List
 
 from django.db.models import QuerySet
-from lazy import lazy
 
 
 class HasPhenotypeDescriptionMixin:
@@ -22,7 +21,7 @@ class HasPhenotypeDescriptionMixin:
     def phenotype_input_text(self, value):
         setattr(self, self._get_phenotype_input_text_field(), value)
 
-    @lazy
+    @property
     def phenotype_description_relation(self):
         try:
             klass, kwargs = self._get_phenotype_description_relation_class_and_kwargs()
