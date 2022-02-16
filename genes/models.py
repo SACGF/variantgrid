@@ -1063,7 +1063,7 @@ class TranscriptVersion(SortByPKMixin, models.Model):
             TranscriptVersion.objects.filter(**filter_kwargs).update(**update_kwargs)
 
     def __str__(self):
-        return f"{self.accession} ({self.gene_version.gene_symbol}/{self.genome_build.name})"
+        return f"{self.accession} ({self.gene_version.gene_symbol}/{self.genome_build_id})"
 
 
 class TranscriptVersionSequenceInfoFastaFileImport(TimeStampedModel):
@@ -1322,7 +1322,7 @@ class GeneAnnotationRelease(models.Model):
         return self.genes_for_symbols([gene_symbol])
 
     def __str__(self):
-        return f"{self.genome_build.name}/{self.get_annotation_consortium_display()} - v{self.version}"
+        return f"{self.genome_build_id}/{self.get_annotation_consortium_display()} - v{self.version}"
 
 
 class ReleaseGeneVersion(models.Model):

@@ -356,7 +356,7 @@ class VariantAnnotationVersion(SubVersionPartition):
 
     def __str__(self):
         super_str = super().__str__()
-        return f"{super_str} VEP: {self.vep}/{self.get_annotation_consortium_display()}/{self.genome_build.name}"
+        return f"{super_str} VEP: {self.vep}/{self.get_annotation_consortium_display()}/{self.genome_build_id}"
 
 
 @receiver(pre_delete, sender=VariantAnnotationVersion)

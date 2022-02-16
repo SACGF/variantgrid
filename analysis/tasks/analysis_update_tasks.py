@@ -63,8 +63,10 @@ def _get_analysis_update_tasks(analysis_id) -> List:
                 logging.info(node_task)
                 node_task_records.append(node_task)
 
-        if node_task_records:
-            NodeTask.objects.bulk_create(node_task_records, ignore_conflicts=True)
+        if not node_task_records:
+            continue
+
+        NodeTask.objects.bulk_create(node_task_records, ignore_conflicts=True)
 
         # Return the ones we got the lock for
         node_tasks = NodeTask.objects.filter(analysis_update_uuid=analysis_update_uuid)

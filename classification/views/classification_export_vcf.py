@@ -58,7 +58,7 @@ class ExportFormatterVCF(ExportFormatter):
         out += f'##INFO=<ID=count,Number=1,Type=Integer,Description="Number of records for this variant">\n'
         out += f'##INFO=<ID=url,Number=1,Type=String,Description="Shariant URL record">\n'
         out += f'##INFO=<ID=lab,Number=.,Type=String,Description="Source lab for the variant classifications">\n'
-        out += f'##INFO=<ID=chgvs,Number=.,Type=String,Description="The c.hgvs for the variants in {self.genome_build.name}">\n'
+        out += f'##INFO=<ID=chgvs,Number=.,Type=String,Description="The c.hgvs for the variants in {self.genome_build_id}">\n'
         out += f'##INFO=<ID=multiple_clinical_significances,Number=0,Type=Flag,Description="Present if there are multiple clinical significances for the variant">\n'
         out += f'##INFO=<ID=discordant,Number=.,Type=Number,Description="If 1, indicates that the corresponding classification is in discordance">\n'
         out += f'##INFO=<ID=condition,Number=.,Type=String,Description="Condition Under Curation">\n'
