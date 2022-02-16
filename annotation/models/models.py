@@ -915,17 +915,18 @@ class AnnotationVersion(models.Model):
     def validate(self):
         missing_sub_annotations = []
         for field in self.SUB_ANNOTATIONS:
-            sub_annotation = getattr(self, field)
+            field_fk = f"{field}_id"  # Avoid fetching related data
+            sub_annotation = getattr(self, field_fk)
             if sub_annotation is None:
                 missing_sub_annotations.append(field)
         if missing_sub_annotations:
             missing = ", ".join([str(s) for s in missing_sub_annotations])
             raise InvalidAnnotationVersionError(f"AnnotationVersion: {self} missing sub annotations: {missing}")
 
-        if vav_gar := self.variant_annotation_version.gene_annotation_release:
-            gene_gar = self.gene_annotation_version.gene_annotation_release
-            if vav_gar != gene_gar:
-                different_msg = f"GeneAnnotationRelease is different fro Variant {vav_gar.pk} vs Gene: {gene_gar.pk}"
+        if vav_gar_id := self.variant_annotation_version.gene_annotation_release_id:
+            gene_gar_id = self.gene_annotation_version.gene_annotation_release_id
+            if vav_gar_id != gene_gar_id:
+                different_msg = f"GeneAnnotationRelease is different fro Variant {vav_gar_id} vs Gene: {gene_gar_id}"
                 raise InvalidAnnotationVersionError(different_msg)
 
     @staticmethod

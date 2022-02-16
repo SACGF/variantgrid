@@ -111,7 +111,8 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
     def get_errors(self) -> List[str]:
         errors = []
         for field in ['custom_columns_collection', 'annotation_version']:
-            value = getattr(self, field)
+            field_fk = f"{field}_id"  # Avoid fetching related object
+            value = getattr(self, field_fk)
             if value is None:
                 msg = f"Analysis setting '{field}' is not set. "
                 msg += "<a href='javascript:analysisSettings()'>Open Analysis Settings</a>"

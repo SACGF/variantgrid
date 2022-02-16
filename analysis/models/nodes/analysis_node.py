@@ -6,6 +6,7 @@ from random import random
 from time import time
 from typing import Tuple, Sequence, List, Dict, Optional, Set
 
+from cache_memoize import cache_memoize
 from celery.canvas import Signature
 from django.conf import settings
 from django.core.cache import cache
@@ -28,6 +29,7 @@ from analysis.models.models_analysis import Analysis
 from analysis.models.nodes.node_counts import get_extra_filters_q, get_node_counts_and_labels_dict
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
 from classification.models import Classification, post_delete
+from library.constants import DAY_SECS
 from library.database_utils import queryset_to_sql
 from library.django_utils import thread_safe_unique_together_get_or_create
 from library.log_utils import report_event
@@ -41,9 +43,20 @@ def _default_position():
     return 10 + random() * 50
 
 
+class NodeInheritanceManager(InheritanceManager):
+    def get_queryset(self):
+        queryset = super()._queryset_class(self.model)
+        return queryset.select_related("analysis",
+                                       "analysis__user",
+                                       "analysis__genome_build",
+                                       "analysis__annotation_version",
+                                       "analysis__annotation_version__variant_annotation_version",
+                                       "analysis__annotation_version__variant_annotation_version__gene_annotation_release")
+
+
 class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
     model = Variant
-    objects = InheritanceManager()
+    objects = NodeInheritanceManager()
     analysis = models.ForeignKey(Analysis, on_delete=CASCADE)
     name = models.TextField(blank=True)
     x = models.IntegerField(default=_default_position)
@@ -137,7 +150,9 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
             cohorts = sorted(cohorts)
         return cohorts, visibility
 
+    @cache_memoize(DAY_SECS, args_rewrite=lambda s: (s.pk, s.version))
     def get_sample_ids(self) -> List[Sample]:
+        logging.info("Node.get_sample_ids()")
         return [s.pk for s in self.get_samples()]
 
     def get_samples_from_node_only_not_ancestors(self):

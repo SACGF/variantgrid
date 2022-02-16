@@ -6,7 +6,8 @@ from snpdb.models.models_enums import ColumnAnnotationLevel
 
 
 def get_custom_column_fields_override_and_sample_position(custom_columns_collection: CustomColumnsCollection):
-    columns_queryset = CustomColumn.objects.filter(custom_columns_collection=custom_columns_collection).order_by("sort_order")
+    columns_queryset = CustomColumn.objects.filter(custom_columns_collection=custom_columns_collection)
+    columns_queryset = columns_queryset.select_related("column").order_by("sort_order")
     fields = []
     sample_columns_position = None
     override = {}
