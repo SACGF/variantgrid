@@ -392,7 +392,13 @@ function showTagAutocomplete(variantId) {
                 addVariantTag(variantId, nodeId, tag, successFunc);
             }
         });
-        tagSelect.select2('open');
+
+        // Can't call open() until element is fully initialised
+        $(document).on("dal-element-initialized", function (e) {
+            if (e.detail.element == tagSelect[0]) {
+                tagSelect.select2("open").trigger("focus");
+            }
+        });
     });
 
 }
