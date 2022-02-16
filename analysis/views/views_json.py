@@ -1,6 +1,7 @@
 import json
 import logging
 import random
+from collections import defaultdict
 
 from django.conf import settings
 from django.db.models import Max
@@ -332,19 +333,15 @@ def analysis_reload(request, analysis_id):
     return JsonResponse({})
 
 
-def get_node_counts(node_id, version, total_count):
-    counts = {}
-    if total_count is not None:  # Sub-counts will only be here if total count is
-        counts[BuiltInFilters.TOTAL] = total_count
-        node_version = NodeVersion.objects.get_or_create(node_id=node_id, version=version)[0]
-        for nc in NodeCount.objects.filter(node_version=node_version):
-            counts[nc.label] = nc.count
-    return counts
-
-
 def nodes_status(request, analysis_id):
     analysis = get_analysis_or_404(request.user, analysis_id)
     nodes = json.loads(request.GET['nodes'])
+    node_counts_qs = NodeCount.objects.filter(node_version__node__in=nodes).select_related("node_version")
+    node_counts = defaultdict(dict)
+    for node_id, version, label, count in node_counts_qs.values_list("node_version__node_id", "node_version__version",
+                                                                     "label", "count"):
+        node_counts[f"{node_id}_{version}"][label] = count
+
     qs = analysis.analysisnode_set.filter(id__in=nodes)
     node_status_list = []
     for data in qs.values("id", "version", "status", "count", "shadow_color"):
@@ -353,7 +350,10 @@ def nodes_status(request, analysis_id):
 
         data["valid"] = not NodeStatus.is_error(data["status"])
         data["ready"] = NodeStatus.is_ready(data["status"])
-        data["counts"] = get_node_counts(node_id, version, data["count"])
+
+        counts = node_counts.get(f"{node_id}_{version}", {})
+        counts[BuiltInFilters.TOTAL] = data["count"]
+        data["counts"] = counts
         node_status_list.append(data)
     return JsonResponse({"node_status": node_status_list})
 
