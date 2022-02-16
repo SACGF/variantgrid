@@ -5,7 +5,7 @@
 {% block content %}
     <div class="container">
         <h3>{% trans "Compose Message"%}</h3>
-        <form action="" method="post">
+        <form method="post">
             {% crispy form form_helper.horizontal %}
             <input class="btn btn-primary" type="submit" value="{% trans "Send" %}"X>
         </form>

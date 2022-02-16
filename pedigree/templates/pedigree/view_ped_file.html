@@ -97,7 +97,7 @@
 			
           <div id="new">
             <h3>Create Pedigree from family</h3>
-            <form class="pedigree-form" method="post" action="">
+            <form class="pedigree-form" method="post">
                 {% csrf_token %}
                 <p>Create a pedigree by mapping samples from a PED file to samples from a cohort.
                 <p>The cohort must contain all samples - you may need to make a <a class="hover-link" href="{% url 'cohorts' %}">cohort</a> first.

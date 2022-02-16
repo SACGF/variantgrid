@@ -10,7 +10,7 @@
 
 <h1>{{ title }}</h1>
 
-<form action="" method="post">
+<form method="post">
     {% csrf_token %}
     {{ form.as_p }}
     <button id='save-button'>save</button>
