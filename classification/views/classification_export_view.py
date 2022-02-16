@@ -81,8 +81,8 @@ def parse_since(since_str: str) -> datetime:
 
 def export_view(request: HttpRequest) -> Response:
 
-    orgs = Organization.objects.all().filter(active=True, group_name__isnull=False).order_by('group_name')
-    labs = Lab.objects.all().filter(organization__active=True, group_name__isnull=False).order_by('group_name')
+    orgs = Organization.objects.filter(active=True, group_name__isnull=False).order_by('group_name')
+    labs = Lab.objects.filter(organization__active=True, group_name__isnull=False).order_by('group_name')
 
     genome_builds = GenomeBuild.objects.all()
 

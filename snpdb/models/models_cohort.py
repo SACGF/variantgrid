@@ -67,7 +67,7 @@ class Cohort(GuardianPermissionsAutoInitialSaveMixin, SortByPKMixin, TimeStamped
                 self.parent_cohort = None  # No longer a sub cohort
 
         self.version += 1
-        self.sample_count = self.cohortsample_set.all().count()
+        self.sample_count = self.cohortsample_set.count()
         self.save()
 
         if self.vcf is None:

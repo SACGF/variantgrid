@@ -38,7 +38,7 @@ class Command(BaseCommand):
         gold_runs = self._get_gold_runs(gold_runs_filename)
         runs_for_enrichment_kit_qs = SequencingRun.objects.filter(enrichment_kit=enrichment_kit)
         old_gold_for_enrichment_kit = get_enrichment_kit_gold_sequencing_runs(runs_for_enrichment_kit_qs)
-        gold_runs_qs = SequencingRun.objects.all().filter(name__in=gold_runs)  # Get all in case was set to wrong kit
+        gold_runs_qs = SequencingRun.objects.filter(name__in=gold_runs)  # Get all in case was set to wrong kit
         logging.info("Setting enrichment_kit '%s' runs '%s' to this kit and gold", enrichment_kit, ','.join(gold_runs))
         # Also update enrichment_kit - as some runs weren't set properly in SampleSheet
         gold_runs_qs.update(gold_standard=True, enrichment_kit=enrichment_kit)

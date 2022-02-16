@@ -68,8 +68,8 @@ class TestAnnotationVCF(TestCase):
         genome_build = GenomeBuild.get_name_or_alias('GRCh37')
         vav = self.variant_annotation_versions_by_build[genome_build.name]
 
-        print("Variants: ", Variant.objects.all().count())
-        print("VariantAnnotation: ", VariantAnnotation.objects.all().count())
+        print("Variants: ", Variant.objects.count())
+        print("VariantAnnotation: ", VariantAnnotation.objects.count())
         print(f"VariantAnnotationVersion: {vav}")
 
         annotation_range_lock, _ = get_annotation_range_lock_and_unannotated_count(vav)
@@ -99,8 +99,8 @@ class TestAnnotationVCF(TestCase):
         genome_build = GenomeBuild.get_name_or_alias('GRCh38')
         vav = self.variant_annotation_versions_by_build[genome_build.name]
 
-        print("Variants: ", Variant.objects.all().count())
-        print("VariantAnnotation: ", VariantAnnotation.objects.all().count())
+        print("Variants: ", Variant.objects.count())
+        print("VariantAnnotation: ", VariantAnnotation.objects.count())
         print(f"VariantAnnotationVersion: {vav}")
 
         annotation_range_lock, _ = get_annotation_range_lock_and_unannotated_count(vav)

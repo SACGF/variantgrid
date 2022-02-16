@@ -193,7 +193,7 @@ def annotation_detail(request):
         ontology_imports.append({"context": context, "last_import": last_import})
 
     diagnostic = GeneListCategory.objects.get(name='Diagnostic')
-    diagnostic_gene_list_count = diagnostic.genelist_set.all().count()
+    diagnostic_gene_list_count = diagnostic.genelist_set.count()
     if diagnostic_gene_list_count:
         diagnostic_gene_list = f"{diagnostic_gene_list_count} diagnostic gene lists"
 

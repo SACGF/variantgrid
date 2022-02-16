@@ -275,8 +275,8 @@ def long_running_sql():
 
 def database_statistics(request):
     max_variant_id = highest_pk(Variant)
-    num_vcfs = VCF.objects.all().count()
-    num_samples = Sample.objects.all().count()
+    num_vcfs = VCF.objects.count()
+    num_samples = Sample.objects.count()
 
     vcf_variant_stats_df = get_vcf_variant_upload_stats()
     variant_stats = {}
@@ -538,7 +538,7 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
         except:  # May not have been annotated?
             log_traceback()
 
-    modified_normalised_variants = variant.modifiedimportedvariant_set.all().filter(old_variant__isnull=False)
+    modified_normalised_variants = variant.modifiedimportedvariant_set.filter(old_variant__isnull=False)
     modified_normalised_variants = modified_normalised_variants.values_list("old_variant", flat=True).distinct()
 
     variant_allele_data = None

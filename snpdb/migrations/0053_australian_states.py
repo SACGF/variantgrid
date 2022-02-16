@@ -32,7 +32,7 @@ def _one_off_assign_labs_to_states(apps, schema_editor):
     State = apps.get_model("snpdb", "State")
     Country = apps.get_model("snpdb", "Country")
 
-    lab_count = Lab.objects.all().count()
+    lab_count = Lab.objects.count()
 
     if lab_count:
         country_names = set(Lab.objects.all().order_by("old_country").values_list("old_country", flat=True).distinct())

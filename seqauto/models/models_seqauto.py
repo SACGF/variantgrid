@@ -909,7 +909,7 @@ class SampleSheetCombinedVCFFile(SeqAutoRecord):
         return paths
 
     def __str__(self):
-        num_samples = self.sample_sheet.sequencingsample_set.all().count()
+        num_samples = self.sample_sheet.sequencingsample_set.count()
         return f"{self.variant_caller} ComboVCF ({self.pk}) for {self.sequencing_run} ({num_samples} samples)"
 
 
