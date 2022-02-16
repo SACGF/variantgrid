@@ -7,7 +7,7 @@ from annotation.annotation_version_querysets import get_variant_queryset_for_lat
 from annotation.models import patients_qs_for_ontology_term
 from classification.models import Classification
 from ontology.models import OntologyTerm
-from snpdb.models import Variant
+from snpdb.models import Variant, VariantZygosityCountCollection
 from variantopedia.interesting_nearby import interesting_summary
 
 register = Library()
@@ -51,6 +51,7 @@ def _get_ontology_summary(user: User, ontology_term) -> str:
 
 def _variant_interesting_summary(user: User, variant: Variant, genome_build, clinical_significance=False) -> str:
     qs = get_variant_queryset_for_latest_annotation_version(genome_build)
+    qs, _ = VariantZygosityCountCollection.annotate_global_germline_counts(qs)
     qs = qs.filter(pk=variant.pk)
 
     return interesting_summary(qs, user, genome_build, total=False,
