@@ -1,8 +1,7 @@
 import logging
-from typing import List, Dict
+from typing import List, Dict, Iterable
 
 import celery
-from cache_memoize import cache_memoize
 from django.contrib.auth.models import User
 from django.contrib.postgres.fields.array import ArrayField
 from django.core.exceptions import PermissionDenied
@@ -20,7 +19,6 @@ from django_extensions.db.models import TimeStampedModel
 from guardian.shortcuts import get_objects_for_user
 from lazy import lazy
 
-from library.constants import HOUR_SECS
 from library.django_utils import SortByPKMixin
 from library.django_utils.django_partition import RelatedModelsPartitionModel
 from library.django_utils.django_postgres import PostgresRealField
@@ -124,11 +122,11 @@ class Cohort(GuardianPermissionsAutoInitialSaveMixin, SortByPKMixin, TimeStamped
     def get_cohort_samples(self):
         return self.cohortsample_set.all().select_related("sample").order_by("sort_order")
 
-    @cache_memoize(timeout=HOUR_SECS,
-                   args_rewrite=lambda s: (s.pk, s.version))
-    def get_samples(self) -> List[Sample]:
-        """ In sample.pk order (consistent regardless of cohort samples order) """
-        return list(self.get_samples_qs())
+    def get_samples(self) -> Iterable[Sample]:
+        """ In sample.pk order (consistent regardless of cohort samples order)
+            This is different than get_samples_qs so that we have the option of caching it
+        """
+        return self.get_samples_qs()
 
     def get_samples_qs(self) -> QuerySet[Sample]:
         return Sample.objects.filter(cohortsample__cohort=self).order_by("pk")

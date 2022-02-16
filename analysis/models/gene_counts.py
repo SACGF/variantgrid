@@ -13,8 +13,7 @@ class NodeGenesCountCollection(models.Model):
 
     @staticmethod
     def get_or_create_gene_counts_qs_for_node(node, queryset):
-        node_version = NodeVersion.get(node)
-        ncscc, created = NodeGenesCountCollection.objects.get_or_create(node_version=node_version)
+        ncscc, created = NodeGenesCountCollection.objects.get_or_create(node_version=node.node_version)
         if created:
             queryset = queryset.filter(**{VariantAnnotation.GENE_COLUMN + "__isnull": False})
             count_qs = queryset.values_list(VariantAnnotation.GENE_COLUMN).distinct().annotate(Count('id'))

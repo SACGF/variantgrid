@@ -343,8 +343,7 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
         return ~AnalysisNode.q_all()
 
     def _get_cache_key(self) -> str:
-        nv = NodeVersion.get(self)
-        return str(nv.pk)
+        return str(self.node_version.pk)
 
     def get_q(self, disable_cache=False):
         """ A Django Q object representing the Variant filters for this node.
@@ -785,10 +784,9 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
             retrieved_label_counts = get_node_counts_and_labels_dict(self, counts_to_get)
             label_counts.update(retrieved_label_counts)
 
-        node_version = NodeVersion.get(self)
         node_counts = []
         for label, count in label_counts.items():
-            node_counts.append(NodeCount(node_version=node_version, label=label, count=count))
+            node_counts.append(NodeCount(node_version=self.node_version, label=label, count=count))
         if node_counts:
             NodeCount.objects.bulk_create(node_counts)
 
@@ -905,7 +903,7 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
         try:
             # Have sometimes had race condition where we try to clone a node that has been updated
             # In that case we'll just miss out on the cache
-            original_node_version = NodeVersion.get(self)
+            original_node_version = self.node_version
         except NodeVersion.DoesNotExist:
             original_node_version = None
 
@@ -1066,7 +1064,7 @@ class NodeCount(models.Model):
 
     @staticmethod
     def load_for_node(node: AnalysisNode, label: str) -> 'NodeCount':
-        return NodeCount.load_for_node_version(NodeVersion.get(node), label=label)
+        return NodeCount.load_for_node_version(node.node_version, label=label)
 
     def __str__(self):
         return f"NodeCount({self.node_version}, {self.label}) = {self.count}"
@@ -1079,8 +1077,7 @@ class NodeColumnSummaryCacheCollection(models.Model):
 
     @staticmethod
     def get_counts_for_node(node, variant_column, extra_filters):
-        node_version = NodeVersion.get(node)
-        ncscc, created = NodeColumnSummaryCacheCollection.objects.get_or_create(node_version=node_version,
+        ncscc, created = NodeColumnSummaryCacheCollection.objects.get_or_create(node_version=node.node_version,
                                                                                 variant_column=variant_column,
                                                                                 extra_filters=extra_filters)
         if created:

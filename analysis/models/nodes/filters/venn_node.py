@@ -1,7 +1,7 @@
 import logging
 import sys
 import traceback
-from typing import Optional
+from typing import Optional, Tuple
 
 import celery
 from django.db import models
@@ -9,6 +9,7 @@ from django.db.models.deletion import SET_NULL, CASCADE
 from django.db.models.query_utils import Q
 from django.db.models.signals import post_delete
 from django.dispatch import receiver
+from lazy import lazy
 
 from analysis.models.enums import SetOperations
 from analysis.models.nodes.analysis_node import AnalysisNode, NodeStatus, NodeVersion
@@ -93,7 +94,8 @@ class VennNode(AnalysisNode):
     def get_rendering_args(self):
         return {"venn_flag": self.get_venn_flag()}
 
-    def get_ordered_parents(self):
+    @lazy
+    def ordered_parents(self) -> Tuple[AnalysisNode, AnalysisNode]:
         """ Return left_parent, right_parent """
         parents = self.get_parent_subclasses()
         a, b = parents
@@ -117,10 +119,10 @@ class VennNode(AnalysisNode):
         task_args_objs_set = set()
         if self.is_valid():
             try:
-                a, b = self.get_ordered_parents()
+                a, b = self.ordered_parents
                 for intersection_type in self.get_vennodecache_intersection_types():
-                    vennode_cache, created = VennNodeCache.objects.get_or_create(parent_a_node_version=NodeVersion.get(a),
-                                                                                 parent_b_node_version=NodeVersion.get(b),
+                    vennode_cache, created = VennNodeCache.objects.get_or_create(parent_a_node_version=a.node_version,
+                                                                                 parent_b_node_version=b.node_version,
                                                                                  intersection_type=intersection_type)
 
                     if not created:
@@ -174,11 +176,11 @@ class VennNode(AnalysisNode):
         if self.set_operation == SetOperations.NONE:
             return self.q_none()
 
-        a, b = self.get_ordered_parents()
+        a, b = self.ordered_parents
         variant_collections = []
         for intersection_type in self.get_vennodecache_intersection_types():
-            vennode_cache = VennNodeCache.objects.get(parent_a_node_version=NodeVersion.get(a),
-                                                      parent_b_node_version=NodeVersion.get(b),
+            vennode_cache = VennNodeCache.objects.get(parent_a_node_version=a.node_version,
+                                                      parent_b_node_version=b.node_version,
                                                       intersection_type=intersection_type)
 
             if vennode_cache.variant_collection.status != ProcessingStatus.SUCCESS:
