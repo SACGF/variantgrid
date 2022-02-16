@@ -17,6 +17,7 @@ REQUIRED_FIELDS = {
     BuiltInFilters.CLINVAR: "clinvar__highest_pathogenicity",
     BuiltInFilters.OMIM: "variantannotation__gene__geneannotation__omim_terms",
     BuiltInFilters.IMPACT_HIGH_OR_MODERATE: "variantannotation__impact",
+    BuiltInFilters.COSMIC: "variantannotation__cosmic_id"
 }
 
 CLASSIFICATION_COUNT_SQL = """
