@@ -180,6 +180,7 @@ ANNOTATION = {
         "reference_fasta": os.path.join(_ANNOTATION_FASTA_BASE_DIR, "GCF_000001405.25_GRCh37.p13_genomic.fna.gz"),
         "reference_fasta_has_chr": False,
         "cytoband": os.path.join(VG_REFERENCE_DIR, "hg19", "cytoband.hg19.txt.gz"),
+        "vcf_import_gnomad_af": "annotation_data/GRCh37/gnomad_GRCh37_af_greater_than_5.contigs.vcf.bgz",
 
         # VEP paths are relative to ANNOTATION_VEP_BASE_DIR - worked out at runtime
         # so you can change just that variable and have everything else work
@@ -211,6 +212,7 @@ ANNOTATION = {
         "reference_fasta": os.path.join(_ANNOTATION_FASTA_BASE_DIR, "GCF_000001405.39_GRCh38.p13_genomic.fna.gz"),
         "reference_fasta_has_chr": False,
         "cytoband": os.path.join(VG_REFERENCE_DIR, "hg38", "cytoband.hg38.txt.gz"),
+        "vcf_import_gnomad_af": "annotation_data/GRCh37/gnomad_GRCh37_af_greater_than_5.contigs.vcf.bgz",
 
         # VEP paths are relative to ANNOTATION_VEP_BASE_DIR - worked out at runtime
         # so you can change just that variable and have everything else work
@@ -305,6 +307,7 @@ VCF_IMPORT_VT_COMMAND = "vt"  # Needs to be installed and in path
 VCF_IMPORT_SKIP_RECORD_REGEX = {
     "Fusion": "VARTYPE=fusion",
 }
+
 
 COMPANY = None  # Used for gene list categories
 

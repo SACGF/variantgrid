@@ -5,6 +5,7 @@ from collections import OrderedDict
 from subprocess import Popen, PIPE, CalledProcessError
 
 import pandas as pd
+import cyvcf2
 from django.conf import settings
 from django.utils import timezone
 
@@ -13,7 +14,7 @@ from library.file_utils import name_from_filename
 from upload.models import ModifiedImportedVariants, ToolVersion, UploadStep, \
     UploadStepTaskType, VCFSkippedContigs, VCFSkippedContig, UploadStepMultiFileOutput, VCFPipelineStage, \
     SimpleVCFImportInfo
-from upload.tasks.vcf.unknown_variants_task import SeparateUnknownVariantsTask
+from upload.tasks.vcf.unknown_variants_task import SeparateUnknownVariantsTask, AnnotateImportedVCFTask
 
 
 def get_vt_tool_version(vt_command):
@@ -36,6 +37,28 @@ def create_sub_step(upload_step, sub_step_name, sub_step_commands):
                                      tool_version=tool_version,
                                      start_date=start_date,
                                      task_type=UploadStepTaskType.TOOL)
+
+
+def _write_split_headers(vcf_filename, split_headers_filename):
+    """ Remove any INFO lines (they can break bcftools annotate) and write in VT normalize ones """
+    VT_HEADERS = [
+        '##INFO=<ID=OLD_MULTIALLELIC,Number=1,Type=String,Description="Original chr:pos:ref:alt encoding">',
+        '##INFO=<ID=OLD_VARIANT,Number=.,Type=String,Description="Original chr:pos:ref:alt encoding">',
+    ]
+    with open(split_headers_filename, "w") as f:
+        written_vt_headers = False
+        for line in cyvcf2.Reader(vcf_filename).raw_header.split("\n"):
+            info_line = line.startswith("##INFO")
+            if info_line or line.startswith("#CHROM"):
+                if not written_vt_headers:
+                    for vt_line in VT_HEADERS:
+                        f.write(vt_line + "\n")
+                    written_vt_headers = True
+
+                if info_line:
+                    continue
+            if line:
+                f.write(line + "\n")
 
 
 def preprocess_vcf(upload_step):
@@ -85,10 +108,14 @@ def preprocess_vcf(upload_step):
 
     # Split up the VCF
     split_vcf_dir = upload_pipeline.get_pipeline_processing_subdir("split_vcf")
+    # We'll cat split_headers_filename on top of every split VCF
+    split_headers_filename = os.path.join(split_vcf_dir, name_from_filename(vcf_filename, remove_gz=True))
+    _write_split_headers(vcf_filename, split_headers_filename)
+
     pipe_commands[REMOVE_HEADER_SUB_STEP] = [settings.VCF_IMPORT_VT_COMMAND, "view", "-"]
     pipe_commands[SPLIT_VCF_SUB_STEP] = ["split", "-", vcf_name, "--additional-suffix=.vcf.gz", "--numeric-suffixes",
                                          "--lines", str(settings.VCF_IMPORT_FILE_SPLIT_ROWS),
-                                         f"--filter='sh -c \"{{ vt view -H {vcf_filename}; cat; }} | gzip > {split_vcf_dir}/$FILE\"'"]
+                                         f"--filter='sh -c \"{{ cat {split_headers_filename}; cat; }} | bgzip -c > {split_vcf_dir}/$FILE\"'"]
 
     for sub_step_name in [DECOMPOSE_SUB_STEP, NORMALIZE_SUB_STEP, UNIQ_SUB_STEP]:
         sub_step_commands = pipe_commands[sub_step_name]
@@ -170,8 +197,7 @@ def preprocess_vcf(upload_step):
 
     # Create this here so downstream tasks can add modified imported variant messages
     import_info, _ = ModifiedImportedVariants.objects.get_or_create(upload_step=upload_step)
-
-    # split_vcf_dir
+    vcf_import_annotate_dir = upload_pipeline.get_pipeline_processing_subdir("vcf_import_annotate")
     sort_order = upload_pipeline.get_max_step_sort_order()
     for split_vcf_filename in glob.glob(f"{split_vcf_dir}/*.vcf.gz"):
         sort_order += 1
@@ -182,7 +208,22 @@ def preprocess_vcf(upload_step):
                                                          pipeline_stage=VCFPipelineStage.INSERT_UNKNOWN_VARIANTS,
                                                          input_filename=split_vcf_filename)
         separate_upload_step.launch_task(SeparateUnknownVariantsTask)
+        output_filename = split_vcf_filename
 
-        # We don't know how big the last split file is, so leave it as null so no check
+        # If we annotate, that file will be processed in UploadStepMultiFileOutput
+        if genome_build.settings.get("vcf_import_gnomad_af"):
+            sort_order += 1
+            name = name_from_filename(split_vcf_filename, remove_gz=True)
+            output_filename = os.path.join(vcf_import_annotate_dir, f"{name}.annotated.vcf.gz")
+            gnomad_step = UploadStep.objects.create(upload_pipeline=upload_pipeline,
+                                                    name="Annotate gnomAD AF",
+                                                    sort_order=sort_order,
+                                                    task_type=UploadStepTaskType.CELERY,
+                                                    pipeline_stage=VCFPipelineStage.INSERT_UNKNOWN_VARIANTS,
+                                                    input_filename=split_vcf_filename,
+                                                    output_filename=output_filename)
+            gnomad_step.launch_task(AnnotateImportedVCFTask)
+
+        # We don't know how big the last split file is, so leave items_to_process as null so no check
         UploadStepMultiFileOutput.objects.create(upload_step=upload_step,
-                                                 output_filename=split_vcf_filename)
+                                                 output_filename=output_filename)

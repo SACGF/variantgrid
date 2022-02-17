@@ -1,7 +1,9 @@
 import gzip
 import logging
 import os
+import subprocess
 from concurrent.futures.thread import ThreadPoolExecutor
+from subprocess import Popen
 
 from django.conf import settings
 from django.core.cache import cache
@@ -114,6 +116,24 @@ class SeparateUnknownVariantsTask(ImportVCFStepTask):
         return bulk_inserter.rows_processed
 
 
+class AnnotateImportedVCFTask(ImportVCFStepTask):
+    """ Indexes then annotates the VCF """
+    def process_items(self, upload_step):
+        cmd_index = ['bcftools', 'index', upload_step.input_filename]
+        subprocess.run(cmd_index, capture_output=True, check=True)
+
+        vcf_import_gnomad_af = upload_step.genome_build.settings["vcf_import_gnomad_af"]
+        annotation_filename = os.path.join(settings.ANNOTATION_VEP_BASE_DIR, vcf_import_gnomad_af)
+        cmd_annotate = [
+            "bcftools", "annotate", "-force",
+            "--annotations", annotation_filename, "--columns", "AF",
+            "--output-type", "z", "--output", upload_step.output_filename,
+            upload_step.input_filename
+        ]
+        subprocess.run(cmd_annotate, capture_output=True, check=True)
+        return 1
+
+
 class InsertUnknownVariantsTask(ImportVCFStepTask):
     """ Loci/Variants may have been inserted since the unknown variants were written, so we need to check
         in this process (which runs under a lock and in variant_id_single_workers so will avoid race conditions """
@@ -162,4 +182,5 @@ class InsertUnknownVariantsTask(ImportVCFStepTask):
 
 
 SeparateUnknownVariantsTask = app.register_task(SeparateUnknownVariantsTask())
+AnnotateImportedVCFTask = app.register_task(AnnotateImportedVCFTask())
 InsertUnknownVariantsTask = app.register_task(InsertUnknownVariantsTask())

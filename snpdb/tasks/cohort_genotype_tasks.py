@@ -71,7 +71,7 @@ def create_cohort_genotype_collection(cohort):
         msg = f"create_cohort_genotype_collection called for empty cohort {cohort.pk}: {cohort}"
         raise ValueError(msg)
 
-    name = f"cached count for {cohort.name} ({cohort.pk}:{cohort.version})"
+    name = f"{cohort.name} ({cohort.pk}:{cohort.version})"
     collection = CohortGenotypeCollection.objects.create(name=name,
                                                          cohort=cohort,
                                                          cohort_version=cohort.version,

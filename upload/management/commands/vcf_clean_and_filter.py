@@ -48,7 +48,8 @@ class Command(BaseCommand):
 
         for line in f:
             if line and line[0] != '#':
-                chrom, rest_of_line = line.split("\t", 1)
+                columns = line.split("\t")
+                chrom = columns[0]
                 contig_id = chrom_to_contig_id.get(chrom)
                 fasta_chrom = None
                 if contig_id:
@@ -66,7 +67,8 @@ class Command(BaseCommand):
 
                 # Check ref / alt bases are ok
                 if settings.VARIANT_STANDARD_BASES_ONLY:
-                    _, _, ref, alt, _ = rest_of_line.split("\t", 4)
+                    ref = columns[3]
+                    alt = columns[4]
                     if ref_standard_bases_pattern.sub("", ref):
                         if ref.startswith("<") and ref.endswith(">"):
                             skip_reason = f"REF = {ref}"
@@ -83,7 +85,10 @@ class Command(BaseCommand):
                         skipped_records[skip_reason] += 1
                         continue
 
-                sys.stdout.write("\t".join([fasta_chrom, rest_of_line]))
+                columns[0] = fasta_chrom
+                # Zero out INFO (makes file size smaller and causes bcftools issues)
+                columns[7] = "."
+                sys.stdout.write("\t".join(columns))
             else:
                 sys.stdout.write(line)
 
