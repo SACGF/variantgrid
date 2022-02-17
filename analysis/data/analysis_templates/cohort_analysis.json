@@ -203,30 +203,6 @@
         "nodewiki": null,
         "populationnodegnomadpopulation_set": []
       }
-    },
-    {
-      "model": "analysis.TagNode",
-      "pk": 2530,
-      "fields": {
-        "id": 2530,
-        "analysis": 185,
-        "name": "Tagged Variants",
-        "x": 34,
-        "y": 45,
-        "auto_node_name": true,
-        "output_node": false,
-        "hide_node_and_descendants_upon_template_configuration_error": false,
-        "visible": false,
-        "errors": null,
-        "shadow_color": null,
-        "load_seconds": 0.03998684883117676,
-        "parents_should_cache": false,
-        "analysis_update_uuid": null,
-        "status": "R",
-        "analysisvariable_set": [],
-        "nodeallelefrequencyfilter": null,
-        "nodewiki": null
-      }
     }
   ],
   "edges": [

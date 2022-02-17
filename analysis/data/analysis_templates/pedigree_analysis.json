@@ -326,32 +326,6 @@
       }
     },
     {
-      "model": "analysis.TagNode",
-      "pk": 3049,
-      "fields": {
-        "id": 3049,
-        "analysis": 210,
-        "name": "Tagged Variants",
-        "x": 11,
-        "y": 27,
-        "auto_node_name": true,
-        "output_node": false,
-        "hide_node_and_descendants_upon_template_configuration_error": false,
-        "visible": false,
-        "errors": null,
-        "shadow_color": null,
-        "load_seconds": 0.05537700653076172,
-        "parents_should_cache": false,
-        "analysis_update_uuid": null,
-        "status": "R",
-        "analysis_wide": true,
-        "tag": null,
-        "analysisvariable_set": [],
-        "nodeallelefrequencyfilter": null,
-        "nodewiki": null
-      }
-    },
-    {
       "model": "analysis.DamageNode",
       "pk": 3055,
       "fields": {

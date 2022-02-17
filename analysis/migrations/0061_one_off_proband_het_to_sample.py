@@ -75,7 +75,13 @@ def _one_off_proband_het_to_sample(apps, schema_editor):
             av.class_name = 'snpdb.Sample'
             av.save()
 
-        print(old_node.delete())
+        old_node.delete()
+
+
+def _one_off_delete_invisible_tag_node(apps, schema_editor):
+    # We accidentally left these in
+    TagNode = apps.get_model("analysis", "TagNode")
+    TagNode.objects.filter(parent_input=True, visible=False).delete()
 
 
 class Migration(migrations.Migration):
@@ -86,4 +92,5 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.RunPython(_one_off_proband_het_to_sample),
+        migrations.RunPython(_one_off_delete_invisible_tag_node),
     ]

@@ -363,30 +363,6 @@
         "nodewiki": null,
         "genelistnodegenelist_set": []
       }
-    },
-    {
-      "model": "analysis.TagNode",
-      "pk": 2467,
-      "fields": {
-        "id": 2467,
-        "analysis": 174,
-        "name": "Tagged Variants",
-        "x": 37,
-        "y": 33,
-        "auto_node_name": true,
-        "output_node": false,
-        "hide_node_and_descendants_upon_template_configuration_error": false,
-        "visible": false,
-        "errors": null,
-        "shadow_color": null,
-        "load_seconds": 0.05483603477478027,
-        "parents_should_cache": false,
-        "analysis_update_uuid": null,
-        "status": "R",
-        "analysisvariable_set": [],
-        "nodeallelefrequencyfilter": null,
-        "nodewiki": null
-      }
     }
   ],
   "edges": [

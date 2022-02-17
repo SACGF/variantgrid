@@ -15,32 +15,6 @@
   },
   "nodes": [
     {
-      "model": "analysis.TagNode",
-      "pk": 3001,
-      "fields": {
-        "id": 3001,
-        "analysis": 206,
-        "name": "Tagged Variants",
-        "x": 17,
-        "y": 31,
-        "auto_node_name": true,
-        "output_node": false,
-        "hide_node_and_descendants_upon_template_configuration_error": false,
-        "visible": false,
-        "errors": null,
-        "shadow_color": null,
-        "load_seconds": 0.0468440055847168,
-        "parents_should_cache": false,
-        "analysis_update_uuid": null,
-        "status": "R",
-        "analysis_wide": true,
-        "tag": null,
-        "analysisvariable_set": [],
-        "nodeallelefrequencyfilter": null,
-        "nodewiki": null
-      }
-    },
-    {
       "model": "analysis.BuiltInFilterNode",
       "pk": 3010,
       "fields": {
