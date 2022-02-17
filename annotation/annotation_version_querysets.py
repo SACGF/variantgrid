@@ -46,7 +46,9 @@ def get_queryset_for_annotation_version(klass, annotation_version):
 def get_unannotated_variants_qs(annotation_version, min_variant_id=None, max_variant_id=None):
     # Explicitly join to version partition so other version annotations don't count
     qs = get_variant_queryset_for_annotation_version(annotation_version)
-    q_filters = VariantAnnotation.VARIANT_ANNOTATION_Q + [Q(variantannotation__isnull=True)]  # Not annotated
+    q_filters = VariantAnnotation.VARIANT_ANNOTATION_Q + \
+        [Variant.get_contigs_q(annotation_version.genome_build),
+         Q(variantannotation__isnull=True)]  # Not annotated
 
     if min_variant_id:
         q_filters.append(Q(pk__gte=min_variant_id))
