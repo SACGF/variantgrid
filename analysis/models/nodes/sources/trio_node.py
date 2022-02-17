@@ -1,4 +1,3 @@
-import time
 from abc import ABC, abstractmethod
 from typing import Optional, List, Set, Tuple
 
@@ -94,12 +93,6 @@ class Dominant(SimpleTrioInheritance):
 class Denovo(SimpleTrioInheritance):
     def _get_mum_dad_proband_zygosities(self) -> Tuple[Set, Set, Set]:
         return self.NO_VARIANT, self.NO_VARIANT, self.HAS_VARIANT
-
-
-class ProbandHet(SimpleTrioInheritance):
-    """ Equivalent of SampleNode, but in TrioNode so analysis templates only need to have Trio as argument """
-    def _get_mum_dad_proband_zygosities(self) -> Tuple[Set, Set, Set]:
-        return set(), set(), {Zygosity.HET}
 
 
 class XLinkedRecessive(SimpleTrioInheritance):
@@ -225,7 +218,6 @@ class TrioNode(AbstractCohortBasedNode):
             TrioInheritance.RECESSIVE: Recessive,
             TrioInheritance.DOMINANT: Dominant,
             TrioInheritance.DENOVO: Denovo,
-            TrioInheritance.PROBAND_HET: ProbandHet,
             TrioInheritance.XLINKED_RECESSIVE: XLinkedRecessive
         }
         klass = inhertiance_classes[TrioInheritance(self.inheritance)]

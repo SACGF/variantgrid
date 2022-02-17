@@ -41,7 +41,6 @@ class TrioInheritance(models.TextChoices):
     COMPOUND_HET = 'C', 'C. Het'
     DOMINANT = 'D', 'Dominant'
     DENOVO = 'N', "Denovo"
-    PROBAND_HET = 'P', 'Proband Het'  # can be fed into compound het (so analysis template only takes Trio variable)
     XLINKED_RECESSIVE = 'X', "X-Linked Recessive"
 
 
