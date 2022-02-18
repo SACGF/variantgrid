@@ -26,7 +26,7 @@ class SearchResponseClassification(SearchResponseRecordAbstract[Classification])
 
 
 @receiver(search_signal, sender=SearchInput)
-def search_ontology(sender: Any, search_input: SearchInput, **kwargs) -> Optional[SearchResponse]:
+def search_ontology(sender: Any, search_input: SearchInput, **kwargs) -> SearchResponse:
     response: SearchResponse[SearchResponseClassification] = SearchResponse(SearchResponseClassification)
 
     search_string = search_input.search_string

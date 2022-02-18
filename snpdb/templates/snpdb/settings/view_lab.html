@@ -22,28 +22,7 @@
                 </div>
             </div>
             {% if is_member %}
-                <h4>Classification Activity Log</h4>
-
-                {% with classifications_activity=lab.classifications_activity_by_day %}
-                    {% if classifications_activity.exists %}
-                        <table class="table">
-                            <thead>
-                                <tr>
-                                    <th>Classifications {{ visibility }}</th>
-                                    <th>Date</th>
-                                </tr>
-                            </thead>
-                        {% for time_period, num_classifications in classifications_activity %}
-                            <tr>
-                                <td class="date">{{ num_classifications }}</td>
-                                <td><span class="timestamp">{% timestamp time_period time_ago=True %}</span></td>
-                            </tr>
-                        {% endfor %}
-                        </table>
-                    {% else %}
-                        No activity.
-                    {% endif %}
-                {% endwith %}
+                <br/><a href="{% url 'activity_lab' lab.pk %}">Classification Activity Log</a>
             {% endif %}
         {% end_ui_register_tab_embedded %}
         {% if is_member %}

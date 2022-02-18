@@ -4,14 +4,14 @@ from functools import total_ordering
 from typing import Any, List, Optional, Union
 
 from django.contrib.auth.models import User
-from django.db.models import Q
+from django.db.models import Q, Subquery
 from django.utils.timezone import now
 
 from classification.enums import SubmissionSource
 from classification.models import ClassificationModification, Classification, classification_flag_types
 from flags.models import FlagComment, Flag, FlagResolution
 from library.utils import IterableTransformer, IteratableStitcher
-from snpdb.models import Allele
+from snpdb.models import Allele, Lab
 
 
 class ClassificationChange:
@@ -111,7 +111,12 @@ class ClassificationChanges:
             source=vcm.source)
 
     @staticmethod
-    def list_changes(classification: Optional[Classification] = None, latest_date: Optional[datetime] = None, limit=100) -> List['ClassificationChanges']:
+    def list_changes(
+            classification: Optional[Classification] = None,
+            latest_date: Optional[datetime] = None,
+            for_user: Optional[User] = None,
+            for_lab: Optional[Lab] = None,
+            limit=100) -> List['ClassificationChanges']:
         if not latest_date:
             latest_date = now()
 
@@ -123,6 +128,15 @@ class ClassificationChanges:
         if classification:
             vcm_q = vcm_q & Q(classification=classification)
             flags_q = flags_q & Q(flag__collection=classification.flag_collection_safe)
+        elif for_user:
+            vcm_q = vcm_q & Q(user=for_user)
+            flags_q = flags_q & Q(user=for_user)
+        elif for_lab:
+            vcm_q = vcm_q & Q(classification__lab=for_lab)
+
+            flag_collections_q = Classification.objects.filter(lab=for_lab).values_list('flag_collection', flat=True)
+            flags_q = flags_q & Q(flag__collection__context__id='classification')
+            flags_q = flags_q & Q(flag__collection__in=Subquery(flag_collections_q))
         else:
             # can't currently render clinical context flags
             flags_q = flags_q & Q(flag__collection__context__id__in=['classification', 'allele'])
@@ -131,6 +145,7 @@ class ClassificationChanges:
         vcm_qs = ClassificationModification.objects.filter(vcm_q) \
                      .select_related('classification', 'classification__lab',
                                      'classification__user', 'user').order_by('-created')[:limit+1]
+
 
         # Flag Changes
         flags_qs = FlagComment.objects.filter(

@@ -51,7 +51,7 @@
 {% endblock head %}
 {% block content %}
     <div class="container">
-    {% page_help_embedded title='Classification Activity' %}
+    {% page_help_embedded title=page_title %}
         <p>
         This page shows changes that have been performed on a classification (or classifications) evidence and flags.<br/>
         The oldest changes are shown at the top and the newest at the bottom.<br/>
@@ -76,6 +76,6 @@
     {% end_page_help_embedded %}
     {% labelled label="Data as of" %}{% timestamp now time_ago=True %}{% endlabelled %}
     {% classification_changes changes %}
-    {% if last_date %}<br/><a class="btn btn-outline-primary" href="{% url 'activity_dated' last_date %}">Load Older</a>{% endif %}
+    {% if load_older_url %}<br/><a class="btn btn-outline-primary" href="{{ load_older_url }}">Load Older</a>{% endif %}
     </div>
 {% endblock %}

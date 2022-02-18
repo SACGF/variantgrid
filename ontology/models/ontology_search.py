@@ -13,7 +13,7 @@ class SearchResponseOntology(SearchResponseRecordAbstract[OntologyTerm]):
 
 
 @receiver(search_signal, sender=SearchInput)
-def search_ontology(sender: Any, search_input: SearchInput, **kwargs) -> Optional[SearchResponse]:
+def search_ontology(sender: Any, search_input: SearchInput, **kwargs) -> SearchResponse:
     response: SearchResponse[OntologyTerm] = SearchResponse(SearchResponseOntology)
 
     if search_input.matches_pattern(r"\w+:\s*.*"):

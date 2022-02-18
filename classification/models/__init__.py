@@ -13,3 +13,4 @@ from classification.models.clinvar_export_models import *
 from classification.models.classification_report_models import *
 from classification.models.upload_file_lab import *
 from classification.models.clinvar_export_exclude_utils import *  # so we load the receivers
+from classification.models.classification_search import *  # so we load the receivers

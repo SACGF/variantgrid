@@ -1,17 +1,24 @@
 {% extends menu_settings_base %}
 
+{% load ui_utils %}
 {% block title %}{{ user }} user page.{% endblock %}
 
 {% block submenu_page_content %}
-	<div>
-		<table>
-		<tr><th>Username: </th> <td> {{ user }}
-        <tr><th>Email: </th> <td> {{ user.email }}		
-        <tr><th>Phone #: </th> <td> {{ user_contact.phone_number }}
-        </table>
-        
-        <a href="{% url 'messages_compose_to' recipient=user.pk %}">Write internal message</a>
-        
-	</div>
+    <div class="container">
+        <div class="card">
+            <div class="card-header">View User</div>
+            <div class="card-body">
+                {% labelled label="Username" %}{{ user }}{% endlabelled %}
+                {% labelled label="Email" %}{{ email }}{% endlabelled %}
+                {% labelled label="Phone: #" %}{{ user_contact.phone_number }}{% endlabelled %}
+            </div>
+            <div class="card-footer link-toolbar">
+                {% if inbox_enabled %}
+                    <a href="{% url 'messages_compose_to' recipient=user.pk %}">Write internal message</a>
+                {% endif %}
+                <a href="{% url 'activity_user' user_id=user.pk %}">View Classification Edits</a>
+            </div>
+        </div>
+    </div>
 
 {% endblock %}

@@ -23,6 +23,14 @@
             display: block;
         }
     </style>
+    <script>
+        $(document).ready(() => {
+            $('#big_search').select();
+            $('#big_search').focus(() => {
+               $('#big_search').select();
+            });
+        });
+    </script>
 {% endblock %}
 {% block content %}
 
@@ -31,7 +39,7 @@
 
         <form id="search-form inline-form" method="get">
             <div class="input-group">
-                {% crispy_field form.search %}
+                <input id="big_search" class="form-control" name="search" placeholder="Search" value="{{ form.search.value }}" autofocus="autofocus">
                 <div class="input-group-append">
                     <button id='search-page-button' class="input-group-append btn btn-primary">Go</button>
                 </div>

@@ -10,8 +10,9 @@ from crispy_forms.layout import Layout, Field, Submit
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import user_passes_test
+from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
-from django.http import StreamingHttpResponse
+from django.http import StreamingHttpResponse, HttpResponseForbidden
 from django.http.request import HttpRequest
 from django.http.response import HttpResponse
 from django.shortcuts import render, get_object_or_404, redirect
@@ -61,17 +62,47 @@ from uicore.utils.form_helpers import form_helper_horizontal
 from variantopedia.forms import SearchAndClassifyForm
 
 
-@user_passes_test(is_superuser)
-def activity(request, latest_timestamp: Optional[str] = None):
-    if latest_timestamp:
+def activity(request, user_id: Optional[int] = None, lab_id: Optional[int] = None):
+
+    if latest_timestamp := request.GET.get('latest_timestamp'):
         latest_timestamp = datetime.fromtimestamp(float(latest_timestamp))
-    changes = ClassificationChanges.list_changes(latest_date=latest_timestamp)
-    last_date = changes[len(changes)-1].date.timestamp() if changes else None
+
+    user: Optional[User] = None
+    lab: Optional[Lab] = None
+    base_url: str = None
+    page_title = 'Classification Activity'
+    if user_id:
+        if request.user.is_superuser or request.user.pk == user_id:
+            user = User.objects.get(pk=user_id)
+            base_url = reverse('activity_user', kwargs={"user_id": user_id})
+            page_title = f'{page_title} ({user.username})'
+        else:
+            raise PermissionDenied()
+    elif lab_id:
+        if check_lab := Lab.valid_labs_qs(request.user, admin_check=True).filter(pk=lab_id).first():
+            lab = check_lab
+            base_url = reverse('activity_lab', kwargs={"lab_id": lab_id})
+            page_title = f'{page_title} ({lab.name})'
+        else:
+            raise PermissionDenied()
+    else:
+        if request.user.is_superuser:
+            base_url = reverse('activity')
+        else:
+            raise PermissionDenied()
+
+    changes = ClassificationChanges.list_changes(latest_date=latest_timestamp, for_user=user, for_lab=lab)
+
+    load_older_url = None
+    if last_date := changes[len(changes)-1].date.timestamp() if changes else None:
+        load_older_url = f'{base_url}?latest_timestamp={last_date}'
+
     context = {
         'changes': changes,
-        'last_date': last_date,
+        'load_older_url': load_older_url,
         'can_create_classifications': settings.VARIANT_CLASSIFICATION_WEB_FORM_CREATE_BY_NON_ADMIN,
-        'now': latest_timestamp if latest_timestamp else now()
+        'now': latest_timestamp if latest_timestamp else now(),
+        'page_title': page_title
     }
     return render(request, 'classification/activity.html', context)
 
@@ -255,7 +286,8 @@ def classification_history(request, record_id):
     context = {
         'changes': changes,
         'can_create_classifications': Classification.can_create_via_web_form(request.user),
-        'now': now()
+        'now': now(),
+        'page_title': f'Classification Activity ({ref.lab_record_id})'
     }
     return render(request, 'classification/activity.html', context)
 
