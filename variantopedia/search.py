@@ -27,7 +27,6 @@ from genes.models_enums import AnnotationConsortium
 from library.genomics import format_chrom
 from library.log_utils import report_message
 from library.utils import clean_string
-from ontology.models import OntologyTerm, OntologyService
 from patients.models import ExternalPK, Patient
 from pedigree.models import Pedigree
 from seqauto.illumina.illumina_sequencers import SEQUENCING_RUN_REGEX
@@ -36,6 +35,7 @@ from snpdb.clingen_allele import get_clingen_allele
 from snpdb.models import VARIANT_PATTERN, LOCUS_PATTERN, LOCUS_NO_REF_PATTERN, DBSNP_PATTERN, Allele, Contig, \
     ClinGenAllele, GenomeBuild, Sample, Variant, Sequence, VariantCoordinate, UserSettings, Organization, Lab, VCF, \
     DbSNP, Cohort
+from snpdb.search2 import SearchInput, SearchResponseRecordAbstract, SearchResponse
 from upload.models import ModifiedImportedVariant
 from variantgrid.perm_path import get_visible_url_names
 from variantopedia.models import SearchTypes
@@ -44,7 +44,6 @@ DB_PREFIX_PATTERN = re.compile(fr"^(v|{settings.VARIANT_VCF_DB_PREFIX})(\d+)$")
 VARIANT_VCF_PATTERN = re.compile(r"((?:chr)?\S*)\s+(\d+)\s+\.?\s*([GATC]+)\s+([GATC]+)")
 VARIANT_GNOMAD_PATTERN = re.compile(r"(?:chr)?(\S*)-(\d+)-([GATC]+)-([GATC]+)")
 HGVS_MINIMUM_TO_SHOW_ERROR_PATTERN = re.compile(r":[cgpn]\..*\d+")
-ONTOLOGY_PATTERN = re.compile(r"\w+:\s*.*")
 MAX_RESULTS_PER_TYPE = 50
 
 
@@ -140,7 +139,7 @@ class SearchResult:
 
     def __init__(self, record: Any,
                  genome_builds: Optional[Set[GenomeBuild]] = None,
-                 annotation_consortia: Optional[List[str]] = None,
+                 annotation_consortia: Optional[List[str]] = None,  # why isn't this a set?
                  message: Optional[Union[str, List[str]]] = None,
                  is_debug_data: bool = False,
                  initial_score: int = 0):
@@ -161,6 +160,24 @@ class SearchResult:
 
         self.is_preferred_build: Optional[bool] = None
         self.is_preferred_annotation: Optional[bool] = None
+
+    @staticmethod
+    def from_search_result_abs(search_type: str, result: SearchResponseRecordAbstract[Any]):
+        genome_builds: Set[GenomeBuild] = set()
+        annotation_consortias: List[str] = list()
+        if genome_build := result.genome_build:
+            genome_builds.add(genome_build)
+        if annotation_consortia := result.annotation_consortia:
+            annotation_consortias.append(annotation_consortia)
+
+        sr = SearchResult(
+            record=result.record,
+            genome_builds=genome_builds,
+            annotation_consortia=annotation_consortias,
+            message=result.messages
+        )
+        sr.search_type = search_type
+        return sr
 
     def apply_search_score(self, preferred_genome_build: GenomeBuild):
         self.is_preferred_build = not self.genome_builds or preferred_genome_build in self.genome_builds
@@ -231,6 +248,16 @@ class SearchResults:
         self.results: List[SearchResult] = list()
         self.search_types: Set[str] = set()
         self.search_errors: Dict[SearchError, Set[GenomeBuild]] = defaultdict(set)
+
+    @staticmethod
+    def from_search_response(input: SearchInput, response: SearchResponse) -> 'SearchResults':
+        sr = SearchResults(search_string=input.search_string,
+                           genome_build_preferred=input.genome_build_preferred)
+        sr.search_types.add(response.search_type)
+        sr.search_string = input.search_string
+        sr.genome_build_preferred = input.genome_build_preferred
+        sr.results = [SearchResult.from_search_result_abs(search_type=response.search_type, result=result) for result in response.results]
+        return sr
 
     def append_search_type(self, search_type: str):
         self.search_types.add(search_type)
@@ -316,15 +343,15 @@ class Searcher:
             (SearchTypes.COSMIC, COSMIC_PATTERN, search_cosmic),
             (SearchTypes.EXPERIMENT, HAS_ALPHA_PATTERN, search_experiment),
             (SearchTypes.EXTERNAL_PK, HAS_ALPHA_PATTERN, search_external_pk),
-            (SearchTypes.CLASSIFICATION, None, search_classification),
             (SearchTypes.PATIENT, HAS_ALPHA_PATTERN, search_patient),
             (SearchTypes.SEQUENCING_RUN, SEQUENCING_RUN_REGEX, search_sequencing_run),
             (SearchTypes.TRANSCRIPT, r"^(ENST|NM_|NR_|XR_)\d+\.?\d*$", search_transcript),
             (SearchTypes.VARIANT, DB_PREFIX_PATTERN, search_variant_id),
             (SearchTypes.LAB, r"[a-zA-Z]{3,}", search_lab),
             (SearchTypes.ORG, r"[a-zA-Z]{3,}", search_org),
-            (SearchTypes.ONTOLOGY, ONTOLOGY_PATTERN, search_ontology),
-            (SearchTypes.ONTOLOGY, HAS_ALPHA_PATTERN, search_ontology_name)
+            # now done via new search
+            # (SearchTypes.ONTOLOGY, ONTOLOGY_PATTERN, search_ontology),
+            # (SearchTypes.ONTOLOGY, HAS_ALPHA_PATTERN, search_ontology_name)
         ]
 
         exclude_search_types = set()
@@ -361,6 +388,14 @@ class Searcher:
         for genome_build in self.genome_build_all:
             # do genome build specific searches
             search_results.extend(self.search_within(genome_build=genome_build))
+
+        # TODO: Migrate everything to the new search
+        search_input = SearchInput(user=self.user, search_string=self.search_string, genome_build_preferred=self.genome_build_preferred)
+        search_responses = search_input.search()
+
+        for search_response in search_responses:
+            search_results.extend(SearchResults.from_search_response(input=search_input, response=search_response))
+        # END NEW CODE
 
         search_results.complete()
         return search_results
@@ -494,30 +529,6 @@ def search_gene_symbol(search_string: str, **kwargs) -> Iterable[Union[GeneSymbo
     gene_symbol_strs = {gene_symbol.symbol for gene_symbol in gene_symbols}
     aliases = [alias for alias in GeneSymbolAlias.objects.filter(alias__iexact=search_string).all() if alias.alias not in gene_symbol_strs]
     return gene_symbols + aliases
-
-
-def search_ontology(search_string: str, **kwargs) -> Optional[SearchResult]:
-    try:
-        return [SearchResult(OntologyTerm.get_or_stub(search_string))]
-    except ValueError:
-        return []
-
-
-def search_ontology_name(search_string: str, **kwargs) -> Iterable[OntologyTerm]:
-    # We don't want to stop "jump to gene symbol" from working, so skip ontology if a gene symbol
-    # It's not enough to exclude HGNC as MONDO has gene names as well
-    if GeneSymbol.objects.filter(symbol=search_string).exists():
-        return []
-
-    qs = OntologyTerm.objects.exclude(ontology_service=OntologyService.HGNC).\
-        filter(name__icontains=search_string).\
-        order_by('ontology_service', 'name', 'index')
-
-    # unless we're specifically searching for obsolete, filter them out
-    if 'obsolete' not in search_string:
-        qs = qs.exclude(name__icontains='obsolete')
-
-    return qs
 
 
 def search_gene(search_string: str, **kwargs) -> Iterable[Gene]:
@@ -786,30 +797,6 @@ def search_external_pk(search_string: str, user: User, **kwargs):
             except ObjectDoesNotExist:
                 pass
     return results
-
-
-def search_classification(search_string: str, user: User, **kwargs) -> Iterable[Classification]:
-    """ Search for LabId which can be either:
-        "vc1080" or "Molecular Genetics, Frome Road / vc1080" (as it appears in classification) """
-
-    filters = [Q(classification__lab_record_id=search_string)]  # exact match
-    slash_index = search_string.find("/")
-    if slash_index > 0:
-        lab_name = search_string[:slash_index].strip()
-        lab_record_id = search_string[slash_index + 1:].strip()
-        if lab_name and lab_record_id:
-            q_lab_name = Q(classification__lab__name=lab_name)
-            q_lab_record = Q(classification__lab_record_id=lab_record_id)
-            filters.append(q_lab_name & q_lab_record)
-    q_vcm = reduce(operator.or_, filters)
-    vcm_qs = ClassificationModification.filter_for_user(user).filter(is_last_published=True)
-    vcm_ids = vcm_qs.filter(q_vcm).values('classification')
-
-    # check for source ID but only for labs that the user belongs to
-    vcm_source_ids = vcm_qs.filter(classification__lab__in=Lab.valid_labs_qs(user, admin_check=True)).filter(published_evidence__source_id__value=search_string).values('classification')
-
-    # convert from modifications back to Classification so absolute_url returns the editable link
-    return Classification.objects.filter(Q(pk__in=vcm_ids) | Q(pk__in=vcm_source_ids))
 
 
 def search_clingen_allele(search_string: str, user: User, genome_build: GenomeBuild, variant_qs: QuerySet, **kwargs) -> VARIANT_SEARCH_RESULTS:
