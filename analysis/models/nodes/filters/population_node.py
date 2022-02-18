@@ -49,11 +49,17 @@ class PopulationNode(AnalysisNode):
         return any([self.filtering_by_population, self.use_internal_counts,
                     self.gnomad_hom_alt_max, not self.show_gnomad_filtered])
 
-    def _get_annotation_kwargs_for_node(self) -> Dict:
-        annotation_kwargs = super()._get_annotation_kwargs_for_node()
+    def _get_kwargs_for_parent_annotation_kwargs(self):
+        kwargs = {}
+        if (self.gnomad_af or self.gnomad_popmax_af) and self.percent <= 5:
+            kwargs["common_variants"] = False
+        return kwargs
+
+    def _get_annotation_kwargs_for_node(self, **kwargs) -> Dict:
+        annotation_kwargs = super()._get_annotation_kwargs_for_node(**kwargs)
         if self.use_internal_counts:
             vzcc = VariantZygosityCountCollection.objects.get(name=settings.VARIANT_ZYGOSITY_GLOBAL_COLLECTION)
-            annotation_kwargs.update(vzcc.get_annotation_kwargs())
+            annotation_kwargs.update(vzcc.get_annotation_kwargs(**kwargs))
         return annotation_kwargs
 
     def _get_node_q(self) -> Optional[Q]:

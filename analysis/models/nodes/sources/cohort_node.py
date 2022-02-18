@@ -82,8 +82,8 @@ class CohortNode(AbstractCohortBasedNode, AbstractZygosityCountNode):
                 pass
         return cohorts, visibility
 
-    def _get_annotation_kwargs_for_node(self) -> Dict:
-        annotation_kwargs = super()._get_annotation_kwargs_for_node()
+    def _get_annotation_kwargs_for_node(self, **kwargs) -> Dict:
+        annotation_kwargs = super()._get_annotation_kwargs_for_node(**kwargs)
 
         if self.cohort:
             # We need to join to our cohort genotype before annotate, or the counts etc will be for the whole table
@@ -113,10 +113,17 @@ class CohortNode(AbstractCohortBasedNode, AbstractZygosityCountNode):
         return annotation_kwargs
 
     def _get_node_q(self) -> Optional[Q]:
-        cohort, q = self.get_cohort_and_q()
+        cohort, q_cohort = self.get_cohort_and_q()
+        q_and = []
+        if q_cohort:
+            q_and.append(q_cohort)
         if cohort:
-            q &= self.get_cohort_settings_q(cohort)
-            q &= self.get_vcf_locus_filters_q()
+            q_and.append(self.get_cohort_settings_q(cohort))
+            q_and.append(self.get_vcf_locus_filters_q())
+        if q_and:
+            q = reduce(operator.and_, q_and)
+        else:
+            q = None
         return q
 
     def get_cohort_settings_q(self, cohort):

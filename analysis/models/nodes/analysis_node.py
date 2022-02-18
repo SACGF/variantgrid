@@ -310,27 +310,32 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
             raise ValueError("get_single_parent_contigs called when single parent not ready!!!")
         return contigs
 
-    def _get_annotation_kwargs_for_node(self) -> Dict:
+    def _get_kwargs_for_parent_annotation_kwargs(self, **kwargs) -> Dict:
+        """ Use this to pass messages up through to parents """
+        return {}
+
+    def _get_annotation_kwargs_for_node(self, **kwargs) -> Dict:
         """ Override this method per-node.
             Any key/values in here MUST be consistent - as annotation_kwargs from multiple
             nodes may be combined in the MergeNode
         """
         annotation_kwargs = {}
         if self.node_cache:
-            annotation_kwargs.update(self.node_cache.variant_collection.get_annotation_kwargs())
+            annotation_kwargs.update(self.node_cache.variant_collection.get_annotation_kwargs(**kwargs))
         return annotation_kwargs
 
-    def get_annotation_kwargs(self) -> Dict:
+    def get_annotation_kwargs(self, **kwargs) -> Dict:
         """ Passed to Variant QuerySet annotate()
             Can be used w/FilteredRelation to force a join to a partition, in which case you need to use
             the alias given in annotate. @see https://github.com/SACGF/variantgrid/wiki/Data-Partitioning """
         a_kwargs = {}
+        kwargs.update(self._get_kwargs_for_parent_annotation_kwargs())
         # Only apply parent annotation kwargs if you actually use their queryset
         if self.has_input() and self.uses_parent_queryset:
             for parent in self.get_non_empty_parents():
-                a_kwargs.update(parent.get_annotation_kwargs())
+                a_kwargs.update(parent.get_annotation_kwargs(**kwargs))
 
-        a_kwargs.update(self._get_annotation_kwargs_for_node())
+        a_kwargs.update(self._get_annotation_kwargs_for_node(**kwargs))
         return a_kwargs
 
     @property

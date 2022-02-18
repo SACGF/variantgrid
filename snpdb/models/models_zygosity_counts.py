@@ -50,7 +50,7 @@ class VariantZygosityCountCollection(RelatedModelsPartitionModel):
     def all_zygosity_counts_alias(self) -> str:
         return f"all_zygosity_counts_{self.pk}"
 
-    def get_annotation_kwargs(self):
+    def get_annotation_kwargs(self, **kwargs):
         q_collection = Q(variantzygositycount__collection=self)
         return {self.alias: FilteredRelation('variantzygositycount', condition=q_collection),
                 self.germline_counts_alias: F(self.het_alias) + F(self.hom_alias),

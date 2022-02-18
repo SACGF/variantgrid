@@ -547,7 +547,7 @@ class VariantCollection(RelatedModelsPartitionModel):
     def variant_collection_alias(self):
         return f"variantcollection_{self.pk}"
 
-    def get_annotation_kwargs(self):
+    def get_annotation_kwargs(self, **kwargs):
         vcr_condition = Q(variantcollectionrecord__variant_collection=self)
         return {self.variant_collection_alias: FilteredRelation('variantcollectionrecord', condition=vcr_condition)}
 

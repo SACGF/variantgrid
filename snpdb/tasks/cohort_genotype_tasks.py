@@ -72,10 +72,17 @@ def create_cohort_genotype_collection(cohort):
         raise ValueError(msg)
 
     name = f"{cohort.name} ({cohort.pk}:{cohort.version})"
-    collection = CohortGenotypeCollection.objects.create(name=name,
+    common_collection = CohortGenotypeCollection.objects.create(name=f"{name} common",
+                                                                cohort=cohort,
+                                                                cohort_version=0,  # so it isn't retrieved
+                                                                num_samples=cohort.cohortsample_set.count())
+
+    collection = CohortGenotypeCollection.objects.create(name=f"{name} rare",
                                                          cohort=cohort,
                                                          cohort_version=cohort.version,
+                                                         common_collection=common_collection,
                                                          num_samples=cohort.cohortsample_set.count())
+
     logging.info(f"Created {collection}")
     return collection
 

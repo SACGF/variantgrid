@@ -74,14 +74,5 @@ def _get_columns_and_sql_parts_for_pack_lists_and_joins(values_queryset, new_col
         new_columns.append(packed_column)
 
     select_part = ",\n".join([select_part] + new_select)
-
-    # The SQL spec states that explicit joins are performed before implicit joins.
-    # Django will already manage this for us, but we have to keep it up, so insert our new joins at the start
-    from_before_comma, *existing_joins = from_part.split(',')
-    if existing_joins:
-        print("*" * 50)
-        print("existing_joins:")
-        print(existing_joins)
-    from_before_comma = "\n".join([from_before_comma] + new_joins)
-    from_part = ','.join([from_before_comma] + existing_joins)
+    from_part = "\n".join([from_part] + new_joins)
     return new_columns, select_part, from_part, where_part

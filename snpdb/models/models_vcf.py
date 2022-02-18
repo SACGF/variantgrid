@@ -342,7 +342,7 @@ class Sample(SortByPKMixin, models.Model):
     def zygosity_alias(self):
         return f"sample_{self.pk}"
 
-    def get_annotation_kwargs(self) -> Dict:
+    def get_annotation_kwargs(self, **kwargs) -> Dict:
         """ For annotating Variant queries """
         cgc = self.cohort_genotype_collection
         i = cgc.get_sql_index_for_sample_id(self.pk)

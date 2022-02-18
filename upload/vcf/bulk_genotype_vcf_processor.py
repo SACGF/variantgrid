@@ -91,6 +91,7 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
         self.locus_variant_hashes = []
         self.locus_filters = []
         self.locus_cohort_genotypes = []
+        self.locus_gnomad_af = []
         self.locus_allele_depths = []
         self.locus_modified_imported_variant_hashes = []
         self.locus_modified_imported_variants = []
@@ -98,6 +99,7 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
         # Variant lists are kept in sync with super().variant_hashes
         self.variant_filters = []
         self.cohort_genotypes = []
+        self.variant_gnomad_af = []
 
         if num_samples:
             # Only need this if we have genotypes (otherwise will be NoGenotypeProcessor)
@@ -227,6 +229,7 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
 
         self.variant_hashes.extend(self.locus_variant_hashes)
         self.variant_filters.extend(self.locus_filters)
+        self.variant_gnomad_af.extend(self.locus_gnomad_af)
         self.modified_imported_variant_hashes.extend(self.locus_modified_imported_variant_hashes)
         self.modified_imported_variants.extend(self.locus_modified_imported_variants)
 
@@ -243,6 +246,7 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
 
         self.locus_variant_hashes = []
         self.locus_filters = []
+        self.locus_gnomad_af = []
         self.locus_cohort_genotypes = []
         self.locus_allele_depths = []
         self.locus_modified_imported_variant_hashes = []
@@ -296,6 +300,7 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
         self.locus_variant_hashes.append(alt_hash)
         self.locus_filters.append(self.convert_filters(variant.FILTER))
         self.locus_cohort_genotypes.append(cohort_gt)
+        self.locus_gnomad_af.append(variant.INFO.get("AF"))
         self.locus_allele_depths.append(empty_as_zero_alt_allele_depth)
 
         if self.preprocess_vcf_import_info:
@@ -339,22 +344,41 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
             self.process_cohort_genotypes(variant_ids)
 
     def process_cohort_genotypes(self, variant_ids):
-        cohort_genotypes = []
+        cohort_genotypes_common = []
+        cohort_genotypes_rare = []
         # If you add any columns here, need to adjust COHORT_GT_NUM_ADDED_FIELDS
-        for variant_id, filters, cohort_gt in zip(variant_ids, self.variant_filters, self.cohort_genotypes):
-            cohort_genotypes.append([self.cohort_genotype_collection.pk, variant_id, filters] + cohort_gt)
+        for variant_id, filters, cohort_gt, gnomad_af in zip(variant_ids, self.variant_filters,
+                                                             self.cohort_genotypes, self.variant_gnomad_af):
+            if gnomad_af:  # Common
+                cgc_id = self.cohort_genotype_collection.common_collection_id
+                cohort_genotypes = cohort_genotypes_common
+            else:  # Rare
+                cgc_id = self.cohort_genotype_collection.pk
+                cohort_genotypes = cohort_genotypes_rare
+            cohort_genotypes.append([cgc_id, variant_id, filters] + cohort_gt)
 
-        cg_basename = f"cohort_genotype_step_{self.upload_step.pk}_batch_{self.cohort_genotype_file_id}.csv"
-        cohort_genotypes_filename = get_import_processing_filename(self.upload_pipeline.pk, cg_basename)
-        write_sql_copy_csv(cohort_genotypes, cohort_genotypes_filename,
-                           quoting=csv.QUOTE_NONE, escapechar='\\', quotechar='')
-        table_name = self.cohort_genotype_collection.get_partition_table()
-        num_cohort_genotypes = len(cohort_genotypes)
-        self.create_cohort_genotype_job(table_name, num_cohort_genotypes, cohort_genotypes_filename)
+        cg_destinations = {
+            "common": (cohort_genotypes_common, {"base_table_name": "common"}),
+            "rare": (cohort_genotypes_rare, {}),
+        }
+        total_variants = len(variant_ids)
+        for cg_dest, (cohort_genotypes, partition_kwargs) in cg_destinations.items():
+            num_genotypes = len(cohort_genotypes)
+            logging.info(f"{cg_dest}: {num_genotypes} ({100 * num_genotypes / total_variants}%)")
+            if not cohort_genotypes:
+                continue
+            cg_basename = f"cohort_genotype_step_{self.upload_step.pk}_batch_{self.cohort_genotype_file_id}.csv"
+            cohort_genotypes_filename = get_import_processing_filename(self.upload_pipeline.pk, cg_basename)
+            write_sql_copy_csv(cohort_genotypes, cohort_genotypes_filename,
+                               quoting=csv.QUOTE_NONE, escapechar='\\', quotechar='')
+            table_name = self.cohort_genotype_collection.get_partition_table(**partition_kwargs)
+            num_cohort_genotypes = len(cohort_genotypes)
+            self.create_cohort_genotype_job(table_name, num_cohort_genotypes, cohort_genotypes_filename)
+            self.cohort_genotype_file_id += 1
 
-        self.cohort_genotype_file_id += 1
         self.variant_hashes = []
         self.cohort_genotypes = []
+        self.variant_gnomad_af = []
         self.check_pipeline_for_failures()  # Need to do this every so often
 
     def create_cohort_genotype_job(self, table_name, items_to_process, input_filename):

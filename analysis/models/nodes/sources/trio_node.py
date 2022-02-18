@@ -1,4 +1,6 @@
+import operator
 from abc import ABC, abstractmethod
+from functools import reduce
 from typing import Optional, List, Set, Tuple
 
 from cache_memoize import cache_memoize
@@ -224,11 +226,18 @@ class TrioNode(AbstractCohortBasedNode):
         return klass(self)
 
     def _get_node_q(self) -> Optional[Q]:
-        cohort, q = self.get_cohort_and_q()
+        cohort, q_cohort = self.get_cohort_and_q()
+        q_and = []
+        if q_cohort:
+            q_and.append(q_cohort)
         if cohort:
             inheritance = self._inheritance_factory()
-            q &= inheritance.get_q()
-            q &= self.get_vcf_locus_filters_q()
+            q_and.append(inheritance.get_q())
+            q_and.append(self.get_vcf_locus_filters_q())
+        if q_and:
+            q = reduce(operator.and_, q_and)
+        else:
+            q = None
         return q
 
     def _get_node_contigs(self) -> Optional[Set[Contig]]:

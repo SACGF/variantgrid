@@ -300,16 +300,23 @@ class CohortGenotypeTaskVersion(TimeStampedModel):
 
 
 class CohortGenotypeCollection(RelatedModelsPartitionModel):
-    """ A collection of Multiple-genotype records for a set of variants, used to perform fast multi-sample zygosity queries.
-
-        Storing genotypes as ObservedVariant records per sample requires lots of joins when doing multi-sample zygosity queries
+    """ A collection of Multiple-genotype records for a set of variants, for fast multi-sample zygosity queries.
+        Storing genotypes individually per sample requires lots of joins when doing trios/cohorts
 
         We pack together genotype info into a single row (CohortGenotype) similar to Gemini:
         @see https://gemini.readthedocs.io/en/latest/content/database_schema.html#genotype-information
 
         These records are created via:
             * VCF import (in which case cohort.vcf will be set)
-            * cohort_genotype_task
+            * cohort_genotype_task (joining samples from diff VCFs together into a cohort)
+
+        RARE / COMMON
+
+        For rare disease work, a lot of the time we're only concerned about rare variants, so split rare/common
+        variants from a VCF into separate CGCs (ie partitions)
+
+        When we join to the CGC tables, we can then join to 1 or both partitions, reducing the number of variants
+        we have to consider, without having to join to the large annotation tables to look up a gnomAD scores
     """
 
     RECORDS_BASE_TABLE_NAMES = ["snpdb_cohortgenotype"]
@@ -325,14 +332,32 @@ class CohortGenotypeCollection(RelatedModelsPartitionModel):
     celery_task = models.CharField(max_length=36, null=True)
     task_version = models.ForeignKey(CohortGenotypeTaskVersion, null=True, on_delete=CASCADE)
     marked_for_deletion = models.BooleanField(null=False, default=False)
+    # Collection that handles common variants
+    common_collection = models.ForeignKey('self', null=True, on_delete=CASCADE)
 
     @property
     def cohortgenotype_alias(self):
         return f"cohortgenotype_{self.pk}"
 
-    def get_annotation_kwargs(self) -> Dict:
+    def get_partition_table(self, base_table_name=None):
+        if base_table_name == "common":
+            partition_table = self.common_collection.get_partition_table()
+        else:
+            partition_table = super().get_partition_table()
+        return partition_table
+
+    def sql_partition_transformer(self, sql):
+        # No need to do anything as we're joining to Variant
+        return sql
+
+    def get_annotation_kwargs(self, **kwargs) -> Dict:
         """ For Variant.objects.annotate """
-        cgc_condition = Q(cohortgenotype__collection=self)
+        common_variants = kwargs.get("common_variants", True)
+
+        collections = [self.pk]
+        if common_variants:
+            collections.append(self.common_collection_id)
+        cgc_condition = Q(cohortgenotype__collection__in=collections)
         return {self.cohortgenotype_alias: FilteredRelation('cohortgenotype', condition=cgc_condition)}
 
     def get_sample_zygosity_regex(self, sample_zygosities: dict, sample_require_zygosity: dict):

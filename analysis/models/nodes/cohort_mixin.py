@@ -41,10 +41,10 @@ class CohortMixin:
             cdc = None
         return cdc
 
-    def _get_annotation_kwargs_for_node(self) -> Dict:
-        annotation_kwargs = super()._get_annotation_kwargs_for_node()
+    def _get_annotation_kwargs_for_node(self, **kwargs) -> Dict:
+        annotation_kwargs = super()._get_annotation_kwargs_for_node(**kwargs)
         if cgc := self.cohort_genotype_collection:
-            annotation_kwargs.update(cgc.get_annotation_kwargs())
+            annotation_kwargs.update(cgc.get_annotation_kwargs(**kwargs))
         return annotation_kwargs
 
     def _get_cohorts_and_sample_visibility(self):
@@ -94,14 +94,16 @@ class CohortMixin:
         cohort = self._get_cohort()
         if cohort:
             cgc = self.cohort_genotype_collection
-            q_and = [Q(**{f"{cgc.cohortgenotype_alias}__collection": cgc})]
+            q_and = []
             if cohort.is_sub_cohort():
                 missing = [Zygosity.UNKNOWN_ZYGOSITY, Zygosity.MISSING]
                 sample_zygosities_dict = {s: missing for s in cohort.get_samples()}
                 q_sub = cgc.get_zygosity_q(sample_zygosities_dict, exclude=True)
                 q_and.append(q_sub)
             q_and.extend(self._get_q_and_list())
-            q = reduce(operator.and_, q_and)
+            q = None
+            if q_and:
+                q = reduce(operator.and_, q_and)
         else:
             q = self.q_none()
         return cohort, q
@@ -217,10 +219,10 @@ class CohortMixin:
 class SampleMixin(CohortMixin):
     """ Adds sample to query via annotation kwargs, must have a "sample" field """
 
-    def _get_annotation_kwargs_for_node(self) -> Dict:
-        annotation_kwargs = super()._get_annotation_kwargs_for_node()
+    def _get_annotation_kwargs_for_node(self, **kwargs) -> Dict:
+        annotation_kwargs = super()._get_annotation_kwargs_for_node(**kwargs)
         if self.sample:
-            annotation_kwargs.update(self.sample.get_annotation_kwargs())
+            annotation_kwargs.update(self.sample.get_annotation_kwargs(**kwargs))
         return annotation_kwargs
 
     def _get_cohort(self):

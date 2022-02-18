@@ -1,3 +1,5 @@
+import operator
+from functools import reduce
 from typing import Optional, List
 
 from django.db import models
@@ -23,12 +25,20 @@ class PedigreeNode(AbstractCohortBasedNode):
         return cohort
 
     def _get_node_q(self) -> Optional[Q]:
-        cohort, q = self.get_cohort_and_q()
+        cohort, q_cohort = self.get_cohort_and_q()
+
+        q_and = []
+        if q_cohort:
+            q_and.append(q_cohort)
         if cohort:
             if self.inheritance_model == PedigreeInheritance.AUTOSOMAL_RECESSIVE:
-                q &= self.get_recessive_q(cohort.cohort_genotype_collection)
+                q_and.append(self.get_recessive_q(cohort.cohort_genotype_collection))
             elif self.inheritance_model == PedigreeInheritance.AUTOSOMAL_DOMINANT:
-                q &= self.get_dominant_q(cohort.cohort_genotype_collection)
+                q_and.append(self.get_dominant_q(cohort.cohort_genotype_collection))
+        if q_and:
+            q = reduce(operator.and_, q_and)
+        else:
+            q = None
         return q
 
     def get_affected_unaffected_sample_zygosities_dict(self, unaffected_zygosities, affected_zygosities):

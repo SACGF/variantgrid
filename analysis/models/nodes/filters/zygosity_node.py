@@ -46,7 +46,7 @@ class ZygosityNode(AncestorSampleMixin, AnalysisNode):
         if self.zygosity == ZygosityNodeZygosity.MULTIPLE_HIT:
             parent = self.get_single_parent()
             # Need to pass in kwargs in case we have parent (eg VennNode) that doesn't have needed annotation kwargs
-            annotation_kwargs = self.get_annotation_kwargs()
+            annotation_kwargs = self.get_annotation_kwargs(**kwargs)
             parent_qs = parent.get_queryset(extra_filters_q=sample_q, extra_annotation_kwargs=annotation_kwargs)
             gene_counts_qs = NodeGenesCountCollection.get_or_create_gene_counts_qs_for_node(self, parent_qs)
             genes_with_compound_het_qs = gene_counts_qs.filter(count__gte=2).values('gene_id')
