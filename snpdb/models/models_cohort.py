@@ -1,14 +1,15 @@
 import logging
-from typing import List, Dict, Iterable
+from typing import List, Dict, Iterable, Optional
 
 import celery
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.contrib.postgres.fields.array import ArrayField
 from django.core.exceptions import PermissionDenied
 from django.db import models
 from django.db.models import QuerySet
 from django.db.models.aggregates import Max
-from django.db.models.deletion import CASCADE, DO_NOTHING
+from django.db.models.deletion import CASCADE, DO_NOTHING, PROTECT
 from django.db.models.expressions import F, Value
 from django.db.models.query_utils import Q, FilteredRelation
 from django.db.models.signals import pre_delete
@@ -299,6 +300,38 @@ class CohortGenotypeTaskVersion(TimeStampedModel):
         return self.name
 
 
+class CohortGenotypeCommonFilterVersion(TimeStampedModel):
+    """ 'Common' variants are predominantly based on population frequency, but if a 'common' variant is ever
+        classified, we need to move it from everyone's common to non-common collection
+
+        For utilities on this method, see "common_variants.py" """
+    gnomad_version = models.TextField()
+    gnomad_af_min = models.FloatField()
+    # This value is from classification.enums.classification_enums.ClinicalSignificance
+    # but don't want to bring dependency in from classification
+    clinical_significance_max = models.CharField(max_length=1, null=True)
+    genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)
+
+    @staticmethod
+    def get(genome_build) -> Optional['CohortGenotypeCommonFilterVersion']:
+        common_filter = None
+        if cf_data := settings.VCF_IMPORT_COMMON_FILTERS.get(genome_build.name):
+            kwargs = {
+                "gnomad_version": cf_data["gnomad_version"],
+                "gnomad_af_min": cf_data["gnomad_af_min"],
+                "clinical_significance_max": cf_data["clinical_significance_max"],
+                "genome_build": genome_build,
+            }
+            common_filter, _ = CohortGenotypeCommonFilterVersion.objects.get_or_create(**kwargs)
+        return common_filter
+
+    def __str__(self):
+        description = f"gnomAD: {self.gnomad_version} AF>{self.gnomad_af_min}"
+        if self.clinical_significance_max:
+            description += f" and clinical_significance <= {self.clinical_significance_max}"
+        return description
+
+
 class CohortGenotypeCollection(RelatedModelsPartitionModel):
     """ A collection of Multiple-genotype records for a set of variants, for fast multi-sample zygosity queries.
         Storing genotypes individually per sample requires lots of joins when doing trios/cohorts
@@ -310,10 +343,10 @@ class CohortGenotypeCollection(RelatedModelsPartitionModel):
             * VCF import (in which case cohort.vcf will be set)
             * cohort_genotype_task (joining samples from diff VCFs together into a cohort)
 
-        RARE / COMMON
+        COMMON FILTER
 
-        For rare disease work, a lot of the time we're only concerned about rare variants, so split rare/common
-        variants from a VCF into separate CGCs (ie partitions)
+        For rare disease work, a lot of the time we're only concerned about rare variants, so split out the common
+        variants from a VCF into a separate CGCs (ie partitions)
 
         When we join to the CGC tables, we can then join to 1 or both partitions, reducing the number of variants
         we have to consider, without having to join to the large annotation tables to look up a gnomAD scores
@@ -332,8 +365,12 @@ class CohortGenotypeCollection(RelatedModelsPartitionModel):
     celery_task = models.CharField(max_length=36, null=True)
     task_version = models.ForeignKey(CohortGenotypeTaskVersion, null=True, on_delete=CASCADE)
     marked_for_deletion = models.BooleanField(null=False, default=False)
-    # Collection that handles common variants
-    common_collection = models.ForeignKey('self', null=True, on_delete=CASCADE)
+    # common_collection will be set on the 'interesting/rare' CGC
+    common_collection = models.OneToOneField('self', null=True, on_delete=CASCADE)
+    # common filter will be set on the 'common' CGC
+    common_filter = models.ForeignKey(CohortGenotypeCommonFilterVersion, null=True, on_delete=PROTECT)
+    # We update this timestamp when we look for pathogenic
+    common_checked = models.DateTimeField(null=True)
 
     @property
     def cohortgenotype_alias(self):

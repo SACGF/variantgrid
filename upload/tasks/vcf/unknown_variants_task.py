@@ -122,11 +122,12 @@ class AnnotateImportedVCFTask(ImportVCFStepTask):
         cmd_index = ['bcftools', 'index', upload_step.input_filename]
         subprocess.run(cmd_index, capture_output=True, check=True)
 
-        vcf_import_gnomad_af = upload_step.genome_build.settings["vcf_import_gnomad_af"]
-        annotation_filename = os.path.join(settings.ANNOTATION_VEP_BASE_DIR, vcf_import_gnomad_af)
+        gnomad_af_filename = settings.VCF_IMPORT_COMMON_FILTERS.get(upload_step.genome_build.name)
+        if not gnomad_af_filename.startswith("/"):
+            gnomad_af_filename = os.path.join(settings.ANNOTATION_VEP_BASE_DIR, gnomad_af_filename)
         cmd_annotate = [
             "bcftools", "annotate", "-force",
-            "--annotations", annotation_filename, "--columns", "AF",
+            "--annotations", gnomad_af_filename, "--columns", "AF",
             "--output-type", "z", "--output", upload_step.output_filename,
             upload_step.input_filename
         ]

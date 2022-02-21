@@ -1,7 +1,7 @@
 import csv
 import logging
 import os
-from typing import Optional
+from typing import Optional, Set
 
 import cyvcf2
 import numpy as np
@@ -14,6 +14,7 @@ from library.postgres_utils import postgres_arrays
 from library.utils import double_quote
 from library.vcf_utils import VCFConstant
 from patients.models_enums import Zygosity
+from snpdb.common_variants import get_classified_high_frequency_variants_qs
 from snpdb.models import CohortGenotype
 from snpdb.models.models_enums import ProcessingStatus
 from upload.models import UploadPipeline, PipelineFailedJobTerminateEarlyException, \
@@ -101,6 +102,9 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
         self.cohort_genotypes = []
         self.variant_gnomad_af = []
 
+        # These are variant IDs that won't be kept in "common" CGC regardless of frequency
+        self.uncommon_variant_ids = self._get_uncommon_variant_ids()
+
         if num_samples:
             # Only need this if we have genotypes (otherwise will be NoGenotypeProcessor)
             self.get_ref_alt_allele_depth = self.get_ref_alt_allele_depth_function(self.vcf)
@@ -111,6 +115,13 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
         if self.cohort_gt_vaf_index < 0:
             raise ValueError(f"Could not find 'samples_allele_frequency' in {COHORT_GENOTYPE_HEADER}")
         self.cohort_gt_vaf_index -= self.COHORT_GT_NUM_ADDED_FIELDS
+
+    def _get_uncommon_variant_ids(self) -> Set[int]:
+        uncommon_variant_ids = set()
+        if common_collection := self.cohort_genotype_collection.common_collection:
+            uncommon_qs = get_classified_high_frequency_variants_qs(common_collection.common_filter)
+            uncommon_variant_ids.update(uncommon_qs.values_list("pk", flat=True))
+        return uncommon_variant_ids
 
     def finish(self):
         """ This is called at the very end so we can collect any remaining items to process """
@@ -349,7 +360,8 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
         # If you add any columns here, need to adjust COHORT_GT_NUM_ADDED_FIELDS
         for variant_id, filters, cohort_gt, gnomad_af in zip(variant_ids, self.variant_filters,
                                                              self.cohort_genotypes, self.variant_gnomad_af):
-            if gnomad_af:  # Common
+            common = gnomad_af and variant_id not in self.uncommon_variant_ids
+            if common:
                 cgc_id = self.cohort_genotype_collection.common_collection_id
                 cohort_genotypes = cohort_genotypes_common
             else:  # Rare

@@ -211,7 +211,7 @@ def preprocess_vcf(upload_step):
         output_filename = split_vcf_filename
 
         # If we annotate, that file will be processed in UploadStepMultiFileOutput
-        if genome_build.settings.get("vcf_import_gnomad_af"):
+        if settings.VCF_IMPORT_COMMON_FILTERS.get(genome_build.name):
             sort_order += 1
             name = name_from_filename(split_vcf_filename, remove_gz=True)
             output_filename = os.path.join(vcf_import_annotate_dir, f"{name}.annotated.vcf.gz")
