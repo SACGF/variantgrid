@@ -56,7 +56,7 @@ def backend_vcf_import_success_handler(*args, **kwargs):
     create_backend_vcf_bed_intersections(backend_vcf)
 
 
-def trio_save_handler(sender, instance, **kwargs):
+def trio_post_save_handler(sender, instance, **kwargs):
     created = kwargs.get("created")
     if created:
         celery_task = create_genome_karyomapping_for_trio.si(instance.pk)  # @UndefinedVariable
