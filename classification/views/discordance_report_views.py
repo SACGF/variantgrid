@@ -7,9 +7,11 @@ from django.http import HttpRequest
 from django.http.response import HttpResponseRedirect, HttpResponse
 from django.shortcuts import render
 
+from classification.enums import ClinicalContextStatus
 from classification.enums.discordance_enums import ContinuedDiscordanceReason, \
     DiscordanceReportResolution
-from classification.models import ClassificationModification, DiscordanceReportClassification, ClinicalContext
+from classification.models import ClassificationModification, DiscordanceReportClassification, ClinicalContext, \
+    clinical_context_signal
 from classification.models.discordance_models import DiscordanceReport, \
     DiscordanceActionsLog
 from classification.views.exports import ClassificationExportFormatter2CSV
@@ -29,19 +31,22 @@ def discordance_report_view(request: HttpRequest, report_id: int) -> HttpRespons
     report = DiscordanceReport.objects.get(pk=report_id)  # : :type report: DiscordanceReport
 
     if request.method == 'POST':
-        action = request.POST.get('action')
-        if action == 'reopen':
-            newly_opened = report.create_new_report(only_if_necessary=False, cause='Discordance manually re-opened')
-            return HttpResponseRedirect(newly_opened.get_absolute_url())
+        try:
+            action = request.POST.get('action')
+            if action == 'reopen':
+                newly_opened = report.create_new_report(only_if_necessary=False, cause='Discordance manually re-opened')
+                return HttpResponseRedirect(newly_opened.get_absolute_url())
 
-        elif action == 'close':
-            report.unresolve_close(
-                user=request.user,
-                continued_discordance_reason=request.POST.get('continued_discordance_reason'),
-                continued_discordance_text=request.POST.get('continued_discordance_text')
-            )
+            elif action == 'close':
+                report.unresolve_close(
+                    user=request.user,
+                    continued_discordance_reason=request.POST.get('continued_discordance_reason'),
+                    continued_discordance_text=request.POST.get('continued_discordance_text')
+                )
 
-        return HttpResponseRedirect(report.get_absolute_url())
+            return HttpResponseRedirect(report.get_absolute_url())
+        finally:
+            DiscordanceReport.apply_flags_to_context(report.clinical_context)
 
     all_reports = DiscordanceReport.objects.filter(clinical_context=report.clinical_context).order_by('report_started_date')
 

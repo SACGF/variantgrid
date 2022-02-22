@@ -265,25 +265,8 @@ class ClinicalContext(FlagsMixin, TimeStampedModel):
             nb.send()
 
         clinical_context_signal.send(sender=ClinicalContext, clinical_context=self, status=new_status, is_significance_change=is_significance_change, cause=cause)
-        # might be worth checking to see if the clinical context has changed against post signal
+        # clinical_context_signal is now in charge of applying all relevant flags to clinical context and classifications
 
-        if settings.DISCORDANCE_ENABLED:
-            if new_status == ClinicalContextStatus.DISCORDANT:
-                self.flag_collection_safe.get_or_create_open_flag_of_type(
-                    flag_type=classification_flag_types.clinical_context_discordance,
-                    reopen=True
-                )
-
-            else:
-                self.flag_collection_safe.close_open_flags_of_type(
-                    flag_type=classification_flag_types.clinical_context_discordance
-                )
-
-        else:
-            self.flag_collection_safe.close_open_flags_of_type(
-                flag_type=classification_flag_types.clinical_context_discordance,
-                comment='Discordance functionality has been disabled'
-            )
 
     @property
     def is_default(self) -> bool:

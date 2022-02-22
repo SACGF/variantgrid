@@ -148,21 +148,13 @@ def clinical_context_update(sender, clinical_context: ClinicalContext, status: s
     if settings.DISCORDANCE_ENABLED:
 
         discordant_classifications = set()
-        latest = DiscordanceReport.update_latest(clinical_context, cause=cause)
-        if latest:
-            discordant_classifications = latest.actively_discordant_classification_ids()
+        latest = DiscordanceReport.update_latest(clinical_context, cause=cause, update_flags=True)
 
-        for vc in Classification.objects.filter(clinical_context=clinical_context):
-            discordant = vc.id in discordant_classifications
-            if discordant:
-                vc.flag_collection_safe.get_or_create_open_flag_of_type(
-                    flag_type=classification_flag_types.discordant
-                )
-            else:
-                vc.flag_collection_safe.close_open_flags_of_type(
-                    flag_type=classification_flag_types.discordant
-                )
     else:
+        clinical_context.flag_collection_safe.close_open_flags_of_type(
+            flag_type=classification_flag_types.clinical_context_discordance,
+            comment='Discordance functionality has been disabled'
+        )
         for vc in Classification.objects.filter(clinical_context=clinical_context):
             vc.flag_collection_safe.close_open_flags_of_type(
                 flag_type=classification_flag_types.discordant,

@@ -194,29 +194,70 @@ class DiscordanceReport(TimeStampedModel):
         return DiscordanceReport.objects.filter(clinical_context=clinical_context).order_by('-created').first()
 
     @staticmethod
-    def update_latest(clinical_context: ClinicalContext, cause: str):
-        latest_report = DiscordanceReport.latest_report(clinical_context=clinical_context)
-        if latest_report:
-            if latest_report.is_active:
-                latest_report.update(cause_text=cause)
-                return latest_report
-            if latest_report.resolution == DiscordanceReportResolution.CONCORDANT:
-                # most recent report ended with discordance, can start fresh
-                pass
-            elif latest_report.resolution == DiscordanceReportResolution.CONTINUED_DISCORDANCE:
-                # create a new report if data has changed significantly
-                return latest_report.create_new_report(only_if_necessary=True, cause=f'Change after previous report marked as continued discordance - {cause}')
+    def update_latest(clinical_context: ClinicalContext, cause: str, update_flags: bool):
+        try:
+            latest_report = DiscordanceReport.latest_report(clinical_context=clinical_context)
+            if latest_report:
+                if latest_report.is_active:
+                    latest_report.update(cause_text=cause)
+                    return latest_report
+                if latest_report.resolution == DiscordanceReportResolution.CONCORDANT:
+                    # most recent report ended with discordance, can start fresh
+                    pass
+                elif latest_report.resolution == DiscordanceReportResolution.CONTINUED_DISCORDANCE:
+                    # create a new report if data has changed significantly
+                    return latest_report.create_new_report(only_if_necessary=True, cause=f'Change after previous report marked as continued discordance - {cause}')
 
-        if clinical_context.is_discordant():
-            report = DiscordanceReport(clinical_context=clinical_context, cause_text=cause)
-            report.update(cause_text=cause)
-            return report
+            if clinical_context.is_discordant():
+                report = DiscordanceReport(clinical_context=clinical_context, cause_text=cause)
+                report.update(cause_text=cause)
+                return report
 
-        # no report has been made
-        return None
+            # no report has been made
+            return None
+        finally:
+            if update_flags:
+                DiscordanceReport.apply_flags_to_context(clinical_context)
+
+    @staticmethod
+    def apply_flags_to_context(clinical_context: ClinicalContext):
+        # this is now the one function that applies and closes discordance flags to classifications and clinical contexts
+        discordant_classifications: Set[int] = set()
+        is_in_discordance = False
+        if latest_report := DiscordanceReport.latest_report(clinical_context):
+            if latest_report.is_important:
+                discordant_classifications = latest_report.actively_discordant_classification_ids()
+                is_in_discordance = True
+
+        # apply flags to clinical context
+        if is_in_discordance:
+            clinical_context.flag_collection_safe.get_or_create_open_flag_of_type(
+                flag_type=classification_flag_types.clinical_context_discordance
+            )
+        else:
+            clinical_context.flag_collection_safe.close_open_flags_of_type(
+                flag_type=classification_flag_types.clinical_context_discordance
+            )
+
+        # apply flags to classifications
+        for vc in Classification.objects.filter(clinical_context=clinical_context):
+            discordant = vc.id in discordant_classifications
+            if discordant:
+                vc.flag_collection_safe.get_or_create_open_flag_of_type(
+                    flag_type=classification_flag_types.discordant
+                )
+            else:
+                vc.flag_collection_safe.close_open_flags_of_type(
+                    flag_type=classification_flag_types.discordant
+                )
+
+    def apply_flags(self):
+        if self != DiscordanceReport.latest_report(self.clinical_context):
+            raise ValueError("Can only apply_flags on the latest discordance report for any clinical context")
+        DiscordanceReport.apply_flags_to_context(self.clinical_context)
 
     def actively_discordant_classification_ids(self) -> Set[Classification]:
-        if not self.is_active:
+        if not self.is_important:
             return set()
         classifications = set()
         for dr in DiscordanceReportClassification.objects.filter(report=self):
