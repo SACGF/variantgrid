@@ -2393,7 +2393,16 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
                                    'classification__user')
             qs = qs.filter(is_last_published=True)
         else:
-            qs = qs.filter(is_last_edited=True)
+            if classification:  # if we're only looking at one classification, grab the latest the user can see
+                # not guaranteed to be is_last_edited
+                if latest_single := qs.order_by('-created').first():
+                    qs = ClassificationModification.objects.filter(pk=latest_single.pk)
+                else:
+                    return ClassificationModification.objects.none()
+
+            else:
+                # FIXME this will not get classifications with outstanding edits that the user can see
+                qs = qs.filter(is_last_edited=True)
 
         return qs
 
