@@ -32,7 +32,7 @@ class ClassificationImportProcessVariantsTask(ImportVCFStepTask):
         liftover_classification_import(vc_import, ImportSource.API)
         # bulk_update_cached_c_hgvs call below won't get liftovers as they're in a separate task.
         # It will be called again in Liftover.complete()
-        Classification.bulk_update_cached_c_hgvs(vc_import)
+        Classification.relink_variants(vc_import)
 
         return 0  # Unknown how many we have to do so was set to 0
 

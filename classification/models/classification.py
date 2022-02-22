@@ -117,7 +117,7 @@ class ClassificationImportAlleleSource(AlleleSource):
                                                 variantallele__allele__in=allele_qs)
         populate_clingen_alleles_for_variants(genome_build, build_variants)
 
-        Classification.bulk_update_cached_c_hgvs(self.classification_import)
+        Classification.relink_variants(self.classification_import)
         allele: Allele
         for allele in allele_qs:
             allele.validate()
@@ -142,7 +142,7 @@ class AllClassificationsAlleleSource(TimeStampedModel, AlleleSource):
         return Variant.objects.filter(contigs_q, classification__isnull=False)
 
     def liftover_complete(self, genome_build: GenomeBuild):
-        Classification.bulk_update_cached_c_hgvs()
+        Classification.relink_variants()
         allele: Allele
         for allele in self.get_allele_qs():
             allele.validate()
@@ -538,12 +538,13 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         return RawSQL('cast(evidence->>%s as jsonb)->>%s', (key_id, 'value'))
 
     @staticmethod
-    def bulk_update_cached_c_hgvs(vc_import: Optional[ClassificationImport] = None):
+    def relink_variants(vc_import: Optional[ClassificationImport] = None):
         """
-        Updates all records that have a variant but not cached c.hgvs values or no clinical context.
-        The variants may not have been processed enough at the time of "set_variant"
-        :param vc_import: Optional import, if provided only classifications associated to this import will have their values setp
-        :return: A tuple of records now correctly set and those still outstanding
+            Call after import/liftover as variants may not have been processed enough at the time of "set_variant"
+            Updates all records that have a variant but not cached c.hgvs values or no clinical context.
+
+            :param vc_import: if provided only classifications associated to this import will have their values set
+            :return: A tuple of records now correctly set and those still outstanding
         """
 
         tests = Q()
@@ -552,18 +553,18 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         if GenomeBuild.grch38().is_annotated:
             tests |= Q(chgvs_grch38__isnull=True)
 
-        requires_caching = Classification.objects.filter(
+        requires_relinking = Classification.objects.filter(
             (tests | Q(clinical_context__isnull=True)) & Q(variant__isnull=False)
         )
         if vc_import:
-            requires_caching = requires_caching.filter(classification_import=vc_import)
+            requires_relinking = requires_relinking.filter(classification_import=vc_import)
 
         vc: Classification
-        for vc in requires_caching:
+        for vc in requires_relinking:
             vc.set_variant(vc.variant)
             vc.save()
 
-        logging.info("Bulk Update of Cached c.hgvs complete")
+        logging.info("Bulk Update of variant relinking complete")
 
     @property
     def variant_coordinate(self):
