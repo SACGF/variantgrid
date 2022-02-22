@@ -301,8 +301,10 @@ class CohortGenotypeTaskVersion(TimeStampedModel):
 
 
 class CohortGenotypeCommonFilterVersion(TimeStampedModel):
-    """ 'Common' variants are predominantly based on population frequency, but if a 'common' variant is ever
-        classified, we need to move it from everyone's common to non-common collection
+    """
+        We split a VCF up into 2 partitions based on how common the variants are (also classification)
+
+        @see https://github.com/SACGF/variantgrid/wiki/Cohort-Genotype-Common-Filters
 
         For utilities on this method, see "common_variants.py" """
     gnomad_version = models.TextField()
@@ -343,13 +345,8 @@ class CohortGenotypeCollection(RelatedModelsPartitionModel):
             * VCF import (in which case cohort.vcf will be set)
             * cohort_genotype_task (joining samples from diff VCFs together into a cohort)
 
-        COMMON FILTER
-
-        For rare disease work, a lot of the time we're only concerned about rare variants, so split out the common
-        variants from a VCF into a separate CGCs (ie partitions)
-
-        When we join to the CGC tables, we can then join to 1 or both partitions, reducing the number of variants
-        we have to consider, without having to join to the large annotation tables to look up a gnomAD scores
+        A VCF can be split into 2 CGCs (2 partitions) based on common / uncommon
+        see CohortGenotypeCommonFilterVersion above
     """
 
     RECORDS_BASE_TABLE_NAMES = ["snpdb_cohortgenotype"]
