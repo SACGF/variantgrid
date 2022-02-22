@@ -314,24 +314,20 @@ class CohortGenotypeCommonFilterVersion(TimeStampedModel):
     clinical_significance_max = models.CharField(max_length=1, null=True)
     genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)
 
-    @staticmethod
-    def get(genome_build) -> Optional['CohortGenotypeCommonFilterVersion']:
-        common_filter = None
-        if cf_data := settings.VCF_IMPORT_COMMON_FILTERS.get(genome_build.name):
-            kwargs = {
-                "gnomad_version": cf_data["gnomad_version"],
-                "gnomad_af_min": cf_data["gnomad_af_min"],
-                "clinical_significance_max": cf_data["clinical_significance_max"],
-                "genome_build": genome_build,
-            }
-            common_filter, _ = CohortGenotypeCommonFilterVersion.objects.get_or_create(**kwargs)
-        return common_filter
-
     def __str__(self):
         description = f"gnomAD: {self.gnomad_version} AF>{self.gnomad_af_min}"
         if self.clinical_significance_max:
             description += f" and clinical_significance <= {self.clinical_significance_max}"
         return description
+
+
+class CommonVariantClassified(TimeStampedModel):
+    """ We store this so we know we've handled a variant being classified """
+    variant = models.ForeignKey(Variant, on_delete=CASCADE)
+    common_filter = models.ForeignKey(CohortGenotypeCommonFilterVersion, on_delete=CASCADE)
+
+    class Meta:
+        unique_together = ('variant', 'common_filter')
 
 
 class CohortGenotypeCollection(RelatedModelsPartitionModel):
@@ -363,7 +359,7 @@ class CohortGenotypeCollection(RelatedModelsPartitionModel):
     task_version = models.ForeignKey(CohortGenotypeTaskVersion, null=True, on_delete=CASCADE)
     marked_for_deletion = models.BooleanField(null=False, default=False)
     # common_collection will be set on the 'interesting/rare' CGC
-    common_collection = models.OneToOneField('self', null=True, on_delete=CASCADE)
+    common_collection = models.OneToOneField('self', null=True, related_name="uncommon",  on_delete=CASCADE)
     # common filter will be set on the 'common' CGC
     common_filter = models.ForeignKey(CohortGenotypeCommonFilterVersion, null=True, on_delete=PROTECT)
     # We update this timestamp when we look for pathogenic

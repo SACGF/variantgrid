@@ -4,16 +4,17 @@ from collections import defaultdict
 
 import celery
 from celery.result import AsyncResult
-from django.conf import settings
 from django.db.models.query_utils import Q
 from django.utils import timezone
 
 from library.database_utils import run_sql
+from library.django_utils import get_model_fields
 from library.log_utils import log_traceback
 from library.utils import single_quote
 from patients.models_enums import Zygosity
+from snpdb.common_variants import get_common_filter
 from snpdb.grid_columns.grid_sample_columns import get_left_outer_join_on_variant
-from snpdb.models import Cohort, ImportStatus, CohortGenotypeCommonFilterVersion
+from snpdb.models import Cohort, ImportStatus, CohortGenotypeCommonFilterVersion, Variant, CommonVariantClassified
 from snpdb.models import CohortGenotypeCollection, CohortGenotype, CohortGenotypeTaskVersion
 
 
@@ -76,7 +77,7 @@ def create_cohort_genotype_collection(cohort):
     name = f"{cohort.name} ({cohort.pk}:{cohort.version})"
     num_samples = cohort.cohortsample_set.count()
     common_collection = None
-    if common_filter := CohortGenotypeCommonFilterVersion.get(cohort.genome_build):
+    if common_filter := get_common_filter(cohort.genome_build):
         common_collection = CohortGenotypeCollection.objects.create(name=f"{name} common",
                                                                     cohort=cohort,
                                                                     cohort_version=0,  # so it isn't retrieved
@@ -206,3 +207,44 @@ def cohort_genotype_task(cohort_genotype_collection_id):
         Cohort.objects.filter(pk=cohort.pk).update(import_status=import_status)
         log_traceback()
         raise  # So it errors
+
+
+@celery.shared_task(ignore_result=False)
+def common_variant_classified_task(variant_id, common_filter_id):
+    variant = Variant.objects.get(pk=variant_id)
+    common_filter = CohortGenotypeCommonFilterVersion.objects.get(pk=common_filter_id)
+
+    cohort_genotype_records = []
+    cohort_genotype_delete_ids = []
+    for cgc in common_filter.cohortgenotypecollection_set.all():
+        uncommon = cgc.uncommon
+        for cg in cgc.cohortgenotype_set.filter(variant=variant):
+            # Because they are in different partitions we can't just update them
+            # get_insert_cohort_genotype_sql
+            insert_sql = _get_insert_sql(cg, uncommon.get_partition_table())
+            run_sql(insert_sql)
+
+            cohort_genotype_delete_ids.append(cg.pk)
+            cg.pk = None
+            cg.collection = uncommon
+            cohort_genotype_records.append(cg)
+
+
+
+    # When it's completed - we can create the record
+    # CommonVariantClassified.objects.create(variant=variant, common_filter=common_filter)
+
+
+def _get_insert_sql(cohort_genotype: CohortGenotype, table_name: str) -> str:
+    fields = get_model_fields(CohortGenotype, ignore_fields=['id'])
+    columns = ", ".join(fields)
+    values = [getattr(cohort_genotype, f) for f in fields]
+
+    sql = f"""
+INSERT INTO {table_name}
+({','.join(columns)})
+VALUES
+({})
+    """
+
+    return sql

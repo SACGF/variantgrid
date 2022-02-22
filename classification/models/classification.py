@@ -60,6 +60,8 @@ classification_post_publish_signal = django.dispatch.Signal()  # args: "classifi
 classification_withdraw_signal = django.dispatch.Signal()  # args: "classification", "user"
 classification_variant_set_signal = django.dispatch.Signal()  # args: "classification", "variant"
 classification_revalidate_signal = django.dispatch.Signal()  # args "classification"
+# This signal is called if a classification is assigned to a variant (or liftover), or the classification changes
+variants_classification_changed_signal = django.dispatch.Signal()  # args: "classification", "variant"
 
 _key_to_regex = {
     'db_rs_id': DbRegexes.SNP,
@@ -118,6 +120,9 @@ class ClassificationImportAlleleSource(AlleleSource):
         populate_clingen_alleles_for_variants(genome_build, build_variants)
 
         Classification.relink_variants(self.classification_import)
+        variants_classification_changed_signal.send(sender=Classification,
+                                                    variants=build_variants, genome_build=genome_build)
+
         allele: Allele
         for allele in allele_qs:
             allele.validate()
@@ -777,6 +782,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         Calling set_variant will automatically call .save()
         If there is no variant and failed = True, any classification_import will be unset
         """
+        old_allele = self.allele
         self.variant = variant
         self.update_allele()
 
@@ -811,6 +817,8 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                                                          comment='Variant Matched')
                 classification_variant_set_signal.send(sender=Classification, classification=self, variant=variant)
 
+                if self.allele and self.allele != old_allele:
+                    self.allele_classification_changed()
             else:
                 # matching ongoing
                 flag_collection.ensure_resolution(classification_flag_types.matching_variant_flag,
@@ -828,6 +836,13 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             flag_collection.ensure_resolution(classification_flag_types.matching_variant_flag,
                                               resolution='matching_failed',
                                               comment='Could not set variant for unexpected reason')
+
+    def allele_classification_changed(self):
+        """ Notifies all variants linked to allele that the classification has changed """
+        for variant_allele in self.allele.variant_alleles():
+            variants_classification_changed_signal.send(sender=Classification,
+                                                        variants=[variant_allele.variant],
+                                                        genome_build=variant_allele.genome_build)
 
     @property
     def share_level_enum(self) -> ShareLevel:
@@ -2469,6 +2484,9 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
             newly_published=self,
             user=user,
             debug_timer=debug_timer)
+
+        if previously_published and previously_published.clinical_significance != vc.clinical_significance:
+            vc.allele_classification_changed()
 
         vc.refresh_from_db()
         return True

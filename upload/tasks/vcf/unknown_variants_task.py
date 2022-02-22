@@ -3,7 +3,6 @@ import logging
 import os
 import subprocess
 from concurrent.futures.thread import ThreadPoolExecutor
-from subprocess import Popen
 
 from django.conf import settings
 from django.core.cache import cache
@@ -122,7 +121,8 @@ class AnnotateImportedVCFTask(ImportVCFStepTask):
         cmd_index = ['bcftools', 'index', upload_step.input_filename]
         subprocess.run(cmd_index, capture_output=True, check=True)
 
-        gnomad_af_filename = settings.VCF_IMPORT_COMMON_FILTERS.get(upload_step.genome_build.name)
+        common_settings = settings.VCF_IMPORT_COMMON_FILTERS.get(upload_step.genome_build.name)
+        gnomad_af_filename = common_settings["gnomad_af_filename"]
         if not gnomad_af_filename.startswith("/"):
             gnomad_af_filename = os.path.join(settings.ANNOTATION_VEP_BASE_DIR, gnomad_af_filename)
         cmd_annotate = [
