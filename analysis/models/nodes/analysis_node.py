@@ -473,24 +473,23 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
         """ Return the contigs we filter for in this node. None means we don't know how to describe that """
         return None
 
-    def _get_unfiltered_queryset(self, **extra_annotation_kwargs):
-        """ Unfiltered means before the get_q() is applied
-            extra_annotation_kwargs is applied AFTER node's annotation kwargs
-        """
-        qs = self._get_model_queryset()
-        a_kwargs = self.get_annotation_kwargs()
-        a_kwargs.update(extra_annotation_kwargs)
-        if a_kwargs:
-            # Clear ordering, @see
-            # https://docs.djangoproject.com/en/3.0/topics/db/aggregation/#interaction-with-default-ordering-or-order-by
-            qs = qs.annotate(**a_kwargs).order_by()
-        return qs
-
     def get_queryset(self, extra_filters_q=None, extra_annotation_kwargs=None,
                      inner_query_distinct=False, disable_cache=False):
         if extra_annotation_kwargs is None:
             extra_annotation_kwargs = {}
-        qs = self._get_unfiltered_queryset(**extra_annotation_kwargs)
+
+        qs = self._get_model_queryset()
+        a_kwargs = self.get_annotation_kwargs()
+        a_kwargs.update(extra_annotation_kwargs)
+        if a_kwargs:
+            # If we apply the kwargs at the same time, it can join to the same table twice.
+            # We want to go through and apply each annotation then the filters that use it, so that it forces
+            # an inner query. Then do next annotation etc
+
+            # Clear ordering, @see
+            # https://docs.djangoproject.com/en/3.0/topics/db/aggregation/#interaction-with-default-ordering-or-order-by
+            qs = qs.annotate(**a_kwargs).order_by()
+
         q_list = [self.get_q(disable_cache=disable_cache)]
         if self.analysis.node_queryset_filter_contigs:
             q_list.append(Q(locus__contig__in=self.get_contigs()))
