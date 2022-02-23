@@ -58,6 +58,7 @@ def classification_groups(
         classification_modifications: Iterable[ClassificationModification],
         show_diffs: bool = True,
         download_link: Optional[str] = None,
+        history_link: Optional[str] = None,
         link_discordance_reports: bool = False,
         genome_build: Optional[GenomeBuild] = None,
         title: Optional[str] = None):
@@ -78,6 +79,8 @@ def classification_groups(
 
     if groups and download_link:
         context["download_link"] = download_link
+    if groups and history_link:
+        context["history_link"] = history_link
 
     if show_diffs:
         if 1 < len(groups) <= 20 and len(groups) != len(ordered_classifications):

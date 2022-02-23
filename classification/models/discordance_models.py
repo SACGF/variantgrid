@@ -140,7 +140,7 @@ class DiscordanceReport(TimeStampedModel):
             if newly_added_labs:  # change is significant
                 discordance_change_signal.send(DiscordanceReport, discordance_report=self)
 
-    def all_actively_involved_labs(self):
+    def all_actively_involved_labs(self) -> List[Lab]:
         all_lab_ids = set()
         for lab_id in DiscordanceReportClassification.objects.filter(report=self).values_list('classification_original__classification__lab', flat=True):
             all_lab_ids.add(lab_id)

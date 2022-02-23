@@ -35,7 +35,7 @@ from classification.classification_stats import get_grouped_classification_count
 from classification.enums import SubmissionSource, SpecialEKeys
 from classification.models import ClassificationAttachment, Classification, \
     ClassificationRef, ClassificationJsonParams, ClassificationConsensus, ClassificationReportTemplate, ReportNames, \
-    ConditionResolvedDict
+    ConditionResolvedDict, DiscordanceReport
 from classification.models.classification import ClassificationModification
 from classification.models.clinical_context_models import ClinicalContext
 from classification.models.evidence_key import EvidenceKeyMap
@@ -62,13 +62,14 @@ from uicore.utils.form_helpers import form_helper_horizontal
 from variantopedia.forms import SearchAndClassifyForm
 
 
-def activity(request, user_id: Optional[int] = None, lab_id: Optional[int] = None):
+def activity(request, user_id: Optional[int] = None, lab_id: Optional[int] = None, discordance_report_id: Optional[int] = None):
 
     if latest_timestamp := request.GET.get('latest_timestamp'):
         latest_timestamp = datetime.fromtimestamp(float(latest_timestamp))
 
     user: Optional[User] = None
     lab: Optional[Lab] = None
+    classifications: Optional[Classification] = None
     base_url: str = None
     page_title = 'Classification Activity'
     if user_id:
@@ -85,13 +86,26 @@ def activity(request, user_id: Optional[int] = None, lab_id: Optional[int] = Non
             page_title = f'{page_title} ({lab.name})'
         else:
             raise PermissionDenied()
+    elif discordance_report_id:
+        if report := DiscordanceReport.objects.get(pk=discordance_report_id):
+            user = request.user
+            if not user.is_superuser:
+                user_labs = set(Lab.valid_labs_qs(user, admin_check=True))
+                report_labs = set(report.all_actively_involved_labs())
+                if not user_labs.intersection(report_labs):
+                    raise PermissionDenied()
+            page_title = f'{page_title} for Discordance Report ({report.id} : {report.clinical_context} : {report.clinical_context.allele:CA})'
+        else:
+            raise PermissionDenied()
+        classifications = [cm.classification for cm in report.all_classification_modifications]
+
     else:
         if request.user.is_superuser:
             base_url = reverse('activity')
         else:
             raise PermissionDenied()
 
-    changes = ClassificationChanges.list_changes(latest_date=latest_timestamp, for_user=user, for_lab=lab)
+    changes = ClassificationChanges.list_changes(classifications=classifications, latest_date=latest_timestamp, for_user=user, for_lab=lab)
 
     load_older_url = None
     if last_date := changes[len(changes)-1].date.timestamp() if changes else None:
@@ -282,7 +296,7 @@ def classification_history(request, record_id):
     #  so need to restrict to people who've always had access to the record
     ref.check_security(must_be_writable=True)
 
-    changes = ClassificationChanges.list_changes(classification=ref.record, limit=100)
+    changes = ClassificationChanges.list_changes(classifications=[ref.record], limit=100)
     context = {
         'changes': changes,
         'can_create_classifications': Classification.can_create_via_web_form(request.user),

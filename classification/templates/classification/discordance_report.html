@@ -91,7 +91,7 @@
                     {% labelled label="Reason for Continued Discordance" %}{{ report.get_continued_discordance_reason_display }}{% endlabelled %}
                 {% endif %}
                 {% if report.resolution == 'D' %}
-                    {% labelled label="Continued Discordance Notes" %}
+                    {% labelled label="Continued Discordance N   otes" %}
                         {% if report.continued_discordance_text %}<span class="textarea-readonly">{{ report.continued_discordance_text }}</span>{% else %}<span class="no-value">-</span>{% endif %}
                     {% endlabelled %}
                 {% endif %}
@@ -101,7 +101,8 @@
 
     <div class="container mt-4">
         {% url 'discordance_export' report.id as download_link %}
-        {% classification_groups classifications title="Classifications Considered" download_link=download_link %}
+        {% url 'activity_discordance' discordance_report_id=report.id as history_link %}
+        {% classification_groups classifications title="Classifications Considered" download_link=download_link history_link=history_link %}
         {% for nlc in no_longer_considered %}
             {% classification_groups nlc.classifications title=nlc.reason %}
         {% endfor %}

@@ -112,7 +112,7 @@ class ClassificationChanges:
 
     @staticmethod
     def list_changes(
-            classification: Optional[Classification] = None,
+            classifications: Optional[List[Classification]] = None,
             latest_date: Optional[datetime] = None,
             for_user: Optional[User] = None,
             for_lab: Optional[Lab] = None,
@@ -125,9 +125,11 @@ class ClassificationChanges:
         vcm_q = date_q
         flags_q = date_q
 
-        if classification:
-            vcm_q = vcm_q & Q(classification=classification)
-            flags_q = flags_q & Q(flag__collection=classification.flag_collection_safe)
+        if classifications:
+            cids = [c.pk for c in classifications]
+            flag_collections = [fid for fid in [c.flag_collection_id for c in classifications] if fid]
+            vcm_q = vcm_q & Q(classification__in=cids)
+            flags_q = flags_q & Q(flag__collection__in=flag_collections)
         elif for_user:
             vcm_q = vcm_q & Q(user=for_user)
             flags_q = flags_q & Q(user=for_user)

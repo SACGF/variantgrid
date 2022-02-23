@@ -19,7 +19,7 @@
         </div>
     {% endwith %}
 {% endfor %}
-{% if diff_latest or diff_all or download_link %}
+{% if diff_latest or diff_all or download_link or history_link %}
     <div data-toolbar="#{{ table_id }}" class="link-toolbar">
         {% if title %}<label>{{ title }}</label>{% endif %}
         {% if diff_latest %}
@@ -30,6 +30,9 @@
         {% endif %}
         {% if download_link %}
             <a class="download-link" href="{{ download_link }}">Download as CSV</a>
+        {% endif %}
+        {% if history_link %}
+            <a class="hover-link" href="{{ history_link }}">Show History</a>
         {% endif %}
         {% comment %}<a class="btn btn-outline-secondary" href="#">TODO Download CSV</a>{% endcomment %}
     </div>
