@@ -53,7 +53,7 @@ def get_classified_high_frequency_variants_qs(cgcfv: CohortGenotypeCommonFilterV
     classification_kwargs = {
         "clinical_significance__in": clinical_significances,
     }
-    if alleles:
+    if alleles is not None:
         classification_kwargs["allele__in"] = alleles
     vc_qs = Classification.objects.filter(**classification_kwargs)
     q_classification = Classification.get_variant_q_from_classification_qs(vc_qs, cgcfv.genome_build)
@@ -66,7 +66,7 @@ def variants_classification_changed(sender, **kwargs):  # pylint: disable=unused
     variants = kwargs['variants']
     genome_build = kwargs['genome_build']
 
-    logging.error("variants_classification_changed_signal!! %s, %s", genome_build, variants)
+    logging.info("variants_classification_changed_signal!! %s, %s", genome_build, variants)
 
     # Look to see if any of these are in common filter (and not already handled)
     for cgcfv in CohortGenotypeCommonFilterVersion.objects.filter(genome_build=genome_build):
@@ -75,5 +75,6 @@ def variants_classification_changed(sender, **kwargs):  # pylint: disable=unused
         va_qs = va_qs.exclude(variant__commonvariantclassified__common_filter=cgcfv)
         alleles = va_qs.values_list("allele")
         for variant in get_classified_high_frequency_variants_qs(cgcfv, alleles=alleles):
-            task = Signature("common_variant_classified_task", args=(variant.pk, cgcfv.pk), immutable=True)
+            task_name = "snpdb.tasks.cohort_genotype_tasks.common_variant_classified_task"
+            task = Signature(task_name, args=(variant.pk, cgcfv.pk), immutable=True)
             task.apply_async()

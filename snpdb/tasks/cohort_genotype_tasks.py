@@ -5,10 +5,9 @@ from collections import defaultdict
 import celery
 from celery.result import AsyncResult
 from django.db.models.query_utils import Q
-from django.utils import timezone
 
 from library.database_utils import run_sql
-from library.django_utils import get_model_fields
+from library.django_utils.django_postgres import pg_sql_array, model_to_insert_sql
 from library.log_utils import log_traceback
 from library.utils import single_quote
 from patients.models_enums import Zygosity
@@ -82,7 +81,6 @@ def create_cohort_genotype_collection(cohort):
                                                                     cohort=cohort,
                                                                     cohort_version=0,  # so it isn't retrieved
                                                                     common_filter=common_filter,
-                                                                    common_checked=timezone.now(),
                                                                     num_samples=num_samples)
         logging.info(f"Created common collection: {common_collection}")
 
@@ -98,10 +96,6 @@ def create_cohort_genotype_collection(cohort):
 
 def _get_sample_zygosity_count_sql(sample_value, zygosity):
     return f'CASE WHEN (({sample_value}) = \'{zygosity}\') THEN 1 ELSE 0 END'
-
-
-def pg_sql_array(values):
-    return 'array[%s]' % ','.join(values)
 
 
 def get_insert_cohort_genotype_sql(cgc: CohortGenotypeCollection):
@@ -211,40 +205,32 @@ def cohort_genotype_task(cohort_genotype_collection_id):
 
 @celery.shared_task(ignore_result=False)
 def common_variant_classified_task(variant_id, common_filter_id):
-    variant = Variant.objects.get(pk=variant_id)
-    common_filter = CohortGenotypeCommonFilterVersion.objects.get(pk=common_filter_id)
+    try:
+        variant = Variant.objects.get(pk=variant_id)
+        common_filter = CohortGenotypeCommonFilterVersion.objects.get(pk=common_filter_id)
 
-    cohort_genotype_records = []
-    cohort_genotype_delete_ids = []
-    for cgc in common_filter.cohortgenotypecollection_set.all():
-        uncommon = cgc.uncommon
-        for cg in cgc.cohortgenotype_set.filter(variant=variant):
-            # Because they are in different partitions we can't just update them
-            # get_insert_cohort_genotype_sql
-            insert_sql = _get_insert_sql(cg, uncommon.get_partition_table())
-            run_sql(insert_sql)
+        # We should only be called if CommonVariantClassified doesn't exist
+        logging.info("common_variant_classified_task(%s, %s)", str(variant), str(common_filter))
 
-            cohort_genotype_delete_ids.append(cg.pk)
-            cg.pk = None
-            cg.collection = uncommon
-            cohort_genotype_records.append(cg)
+        cohort_genotype_delete_ids = []
+        for cgc in common_filter.cohortgenotypecollection_set.all():
+            uncommon = cgc.uncommon
+            for cg in cgc.cohortgenotype_set.filter(variant=variant):
+                # Because they are in different partitions we can't just update them, need to re-insert and then delete
+                # old ones
+                cohort_genotype_delete_ids.append(cg.pk)
+                cg.pk = None
+                cg.collection = uncommon
+                insert_sql = model_to_insert_sql([cg], ignore_fields=['id'],
+                                                 db_table=uncommon.get_partition_table())[0]
+                run_sql(insert_sql)
 
+        # No errors, insert must have gone through ok
+        logging.info("Deleting %d cohort genotype records", len(cohort_genotype_delete_ids))
+        CohortGenotype.objects.filter(pk__in=cohort_genotype_delete_ids).delete()
 
-
-    # When it's completed - we can create the record
-    # CommonVariantClassified.objects.create(variant=variant, common_filter=common_filter)
-
-
-def _get_insert_sql(cohort_genotype: CohortGenotype, table_name: str) -> str:
-    fields = get_model_fields(CohortGenotype, ignore_fields=['id'])
-    columns = ", ".join(fields)
-    values = [getattr(cohort_genotype, f) for f in fields]
-
-    sql = f"""
-INSERT INTO {table_name}
-({','.join(columns)})
-VALUES
-({})
-    """
-
-    return sql
+        # When it's completed - we can create the record
+        CommonVariantClassified.objects.create(variant=variant, common_filter=common_filter)
+    except:
+        log_traceback()
+        raise

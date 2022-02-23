@@ -362,8 +362,6 @@ class CohortGenotypeCollection(RelatedModelsPartitionModel):
     common_collection = models.OneToOneField('self', null=True, related_name="uncommon",  on_delete=CASCADE)
     # common filter will be set on the 'common' CGC
     common_filter = models.ForeignKey(CohortGenotypeCommonFilterVersion, null=True, on_delete=PROTECT)
-    # We update this timestamp when we look for pathogenic
-    common_checked = models.DateTimeField(null=True)
 
     @property
     def cohortgenotype_alias(self):

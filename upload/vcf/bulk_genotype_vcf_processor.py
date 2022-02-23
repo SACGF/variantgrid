@@ -43,7 +43,8 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
     # v17. Use refactored RedisVariantPKLookup
     # v18. Handle Mixed diploid/haploid calls eg male chrX GT=1 - see https://github.com/brentp/cyvcf2/issues/227
     # v19. Go back to using CyVCF code as of version >= 0.30.14
-    VCF_IMPORTER_VERSION = 19  # Change this if you make a major change to the code.
+    # v20. Split into common/uncommon genotype collections
+    VCF_IMPORTER_VERSION = 20  # Change this if you make a major change to the code.
     # Need to distinguish between no entry and 0, can't use None w/postgres command line inserts
     DEFAULT_AD_FIELD = 'AD'  # What CyVCF2 uses
     # GL = Genotype Likelihood - used by freeBayes v1.2.0: log10-scaled likelihoods of the data given the called
