@@ -14,8 +14,10 @@ from guardian.shortcuts import get_objects_for_user
 from lazy import lazy
 from pytz import timezone
 
-from classification.enums import ShareLevel
-from classification.models import ClassificationModification, Classification, classification_flag_types
+from classification.enums import ShareLevel, ClinicalContextStatus
+from classification.enums.discordance_enums import DiscordanceReportResolution
+from classification.models import ClassificationModification, Classification, classification_flag_types, \
+    DiscordanceReport, ClinicalContext
 from flags.models import FlagsMixin, Flag, FlagComment, FlagStatus
 from snpdb.models import GenomeBuild, Lab, Organization, allele_flag_types, Allele
 
@@ -105,6 +107,15 @@ class TranscriptStrategy(str, Enum):
     """
     ALL = "all"
     REFSEQ = "refseq"
+
+
+class DiscordanceReportStatus(str, Enum):
+    """
+    Different from DiscordanceReportResolution as that uses None to indicate an ongoing discordance
+    where when we need it that would indicate no discordance at all
+    """
+    ON_GOING = 'ongoing'
+    CONTINUED = 'continued'
 
 
 @dataclass
@@ -278,19 +289,23 @@ class ClassificationFilter:
             ))
 
     @lazy
-    def _discordant_classification_ids(self) -> Set[int]:
+    def _discordant_classification_ids(self) -> Dict[int, DiscordanceReportStatus]:
         """
         Returns a set of classification IDs where the classification id discordant
         Ids are not necessarily part of this import
         :return: A set of classification IDs
         """
-        return flag_ids_to(Classification, Flag.objects.filter(
-            flag_type=classification_flag_types.discordant,
-            resolution__status=FlagStatus.OPEN
-        ))
+        discordance_status: Dict[int, DiscordanceReportStatus] = dict()
+        for cc in ClinicalContext.objects.filter(status=ClinicalContextStatus.DISCORDANT):
+            dr = DiscordanceReport.latest_report(cc)
+            if dr.resolution in {DiscordanceReportResolution.CONTINUED_DISCORDANCE, DiscordanceReportResolution.ONGOING}:
+                for c in dr.actively_discordant_classification_ids():
+                    discordance_status[c] = DiscordanceReportStatus.ON_GOING if dr.resolution == DiscordanceReportResolution.ONGOING else DiscordanceReportStatus.CONTINUED
 
-    def is_discordant(self, cm: ClassificationModification) -> bool:
-        return cm.classification_id in self._discordant_classification_ids
+        return discordance_status
+
+    def is_discordant(self, cm: ClassificationModification) -> DiscordanceReportStatus:
+        return self._discordant_classification_ids.get(cm.classification_id)
 
     @lazy
     def _since_flagged_classification_ids(self) -> Set[int]:

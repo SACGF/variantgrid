@@ -12,7 +12,8 @@ from classification.models import ClassificationModification, EvidenceKeyMap, Cl
 from classification.views.classification_export_mvl import CitationCounter
 from classification.views.classification_export_utils import ConflictStrategy
 from classification.views.exports.classification_export_decorator import register_classification_exporter
-from classification.views.exports.classification_export_filter import AlleleData, ClassificationFilter
+from classification.views.exports.classification_export_filter import AlleleData, ClassificationFilter, \
+    DiscordanceReportStatus
 from classification.views.exports.classification_export_formatter2 import ClassificationExportFormatter2
 from classification.views.exports.classification_export_utils import CHGVSData
 from library.django_utils import get_url_from_view_path
@@ -212,15 +213,20 @@ class MVLEntry(ExportRow):
             warnings.append('Warning <b>Contains non-standard clinical significance</b>')
 
         discordant_count = 0
+        continued_discordance_count = 0
         for cms in self.data.cms:
-            if self.data.source.is_discordant(cms):
-                discordant_count += 1
+            if discordance_status := self.data.source.is_discordant(cms):
+                if discordance_status == DiscordanceReportStatus.CONTINUED:
+                    continued_discordance_count += 1
+                else:
+                    discordant_count += 1
 
         if discordant_count:
-            if discordant_count == 1:
-                warnings.append(f'Warning <b>1 record is in discordance</b>')
-            else:
-                warnings.append(f'Warning <b>{discordant_count} records are in discordance</b>')
+            warning = f'Warning <b>{discordant_count} ' + ('records are' if discordant_count > 1 else 'record is') + ' in active discordance</b>'
+            warnings.append(warning)
+        if continued_discordance_count:
+            warning = f'Warning <b>{continued_discordance_count} ' + ('records are' if discordant_count > 1 else 'record is') + ' in continued discordance</b>'
+            warnings.append(warning)
 
         if len(self.classifications_values.all) > 1:
             strength_list = ', '.join(self.classifications_values.all)

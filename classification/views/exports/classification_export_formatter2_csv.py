@@ -8,7 +8,8 @@ from lazy import lazy
 from classification.models import Classification, ClassificationModification, EvidenceKeyMap
 from classification.views.classification_export_utils import UsedKeyTracker, KeyValueFormatter
 from classification.views.exports.classification_export_decorator import register_classification_exporter
-from classification.views.exports.classification_export_filter import AlleleData, ClassificationFilter
+from classification.views.exports.classification_export_filter import AlleleData, ClassificationFilter, \
+    DiscordanceReportStatus
 from classification.views.exports.classification_export_formatter2 import ClassificationExportFormatter2
 from library.utils import delimited_row, export_column, ExportRow
 from snpdb.models import GenomeBuild
@@ -85,11 +86,14 @@ class RowID(ExportRow):
 
 
 class ClassificationMeta(ExportRow):
+    """
+    Deals with the static columns - to be followed by all the evidence key columns
+    """
 
-    def __init__(self, cm: ClassificationModification, discordant: bool, e_keys: EvidenceKeyMap):
+    def __init__(self, cm: ClassificationModification, discordance_status: DiscordanceReportStatus, e_keys: EvidenceKeyMap):
         self.cm = cm
         self.vc = cm.classification
-        self.discordant = discordant
+        self.discordance_status = discordance_status
         self.e_keys = e_keys
 
     @export_column()
@@ -106,11 +110,18 @@ class ClassificationMeta(ExportRow):
 
     @export_column()
     def citations(self):
-        return ', '.join([c.ref_id() for c in self.cm.citations])
+        return ', '.join([c.ref_id() for c in sorted(set(self.cm.citations), key=lambda c:c.sort_key)])
 
     @export_column()
-    def is_discordant(self):
-        return 'TRUE' if self.discordant else 'FALSE'
+    def discordance_status(self):
+        if not self.discordance_status:
+            return ''
+        elif self.discordance_status == DiscordanceReportStatus.ON_GOING:
+            return 'active discordance'
+        elif self.discordance_status == DiscordanceReportStatus.CONTINUED:
+            return 'continued discordance'
+        else:
+            return self.discordance_status
 
 
 @register_classification_exporter("csv")
@@ -170,7 +181,7 @@ class ClassificationExportFormatter2CSV(ClassificationExportFormatter2):
     def to_row(self, vcm: ClassificationModification, message=None) -> str:
         row_data = \
             RowID(cm=vcm, genome_build=self.classification_filter.genome_build, message=message).to_csv() + \
-            ClassificationMeta(cm=vcm, discordant=self.classification_filter.is_discordant(vcm), e_keys=self.e_keys).to_csv() + \
+            ClassificationMeta(cm=vcm, discordance_status=self.classification_filter.is_discordant(vcm), e_keys=self.e_keys).to_csv() + \
             self.used_keys.row(classification_modification=vcm)
 
         return delimited_row(row_data, delimiter=',')

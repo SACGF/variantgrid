@@ -162,6 +162,13 @@ class Citation(models.Model):
         citation_source = self.get_citation_source_display()
         return f"{citation_source}:{self.citation_id}"
 
+    @property
+    def sort_key(self):
+        return self.citation_source, self.citation_id.rjust(10, '0')
+
+    def __lt__(self, other):
+        self._sort_key < other._sort_key
+
     @staticmethod
     def citations_from_text(text):
         """ returns a list of (unsaved) Citation objects from text """
