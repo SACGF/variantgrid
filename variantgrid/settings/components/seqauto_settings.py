@@ -52,7 +52,9 @@ SEQAUTO_MISEQ_ALIGNED_PATTERN = "%(sample_name_underscores)s_S%(sample_number)s"
 SEQAUTO_HISEQ_ALIGNED_PATTERN = "%(sample_id)s"
 
 SEQAUTO_BAM_PATTERN = "%(sample_name)s.hg38.bam"
-SEQAUTO_VCF_PATTERN = "gatk_per_sample/%(sample_name)s.gatk.hg38.vcf.gz"
+SEQAUTO_VCF_PATTERNS_FOR_KIT = {
+    "default": "gatk_per_sample/%(sample_name)s.gatk.hg38.vcf.gz",
+}
 
 # If the sequencing run name ends with '_FFPE' we'll add "_ffpe" onto the end of the kit name
 SEQAUTO_COMBINED_VCF_PATTERNS_FOR_KIT = {

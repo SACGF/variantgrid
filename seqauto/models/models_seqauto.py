@@ -821,7 +821,12 @@ class VCFFile(SeqAutoRecord):
 
     @staticmethod
     def get_path_from_bam(bam):
-        pattern = os.path.join(settings.SEQAUTO_VCF_DIR_PATTERN, settings.SEQAUTO_VCF_PATTERN)
+        vcf_pattern = None
+        if enrichment_kit := bam.sequencing_sample.enrichment_kit:
+            vcf_pattern = settings.SEQAUTO_VCF_PATTERNS_FOR_KIT.get(enrichment_kit.name)
+        if vcf_pattern is None:
+            vcf_pattern = settings.SEQAUTO_VCF_PATTERNS_FOR_KIT["default"]
+        pattern = os.path.join(settings.SEQAUTO_VCF_DIR_PATTERN, vcf_pattern)
         vcf_path = pattern % bam.get_params()
         return os.path.abspath(vcf_path)
 
@@ -1010,12 +1015,12 @@ class QCExecSummary(SeqAutoRecord):
     gene_list = models.ForeignKey(GeneList, null=True, on_delete=CASCADE)  # GOI - null = all genes
 
     deduplicated_reads = models.IntegerField(null=True)
-    indels_dbsnp_percent = models.FloatField()
+    indels_dbsnp_percent = models.FloatField(null=True)
     mean_coverage_across_genes = models.FloatField()
     mean_coverage_across_kit = models.FloatField()
     median_insert = models.FloatField()
-    number_indels = models.IntegerField()
-    number_snps = models.IntegerField()
+    number_indels = models.IntegerField(null=True)
+    number_snps = models.IntegerField(null=True)
     percent_10x_goi = models.FloatField(null=True)
     percent_20x_goi = models.FloatField(null=True)
     percent_20x_kit = models.FloatField(null=True)
@@ -1034,8 +1039,8 @@ class QCExecSummary(SeqAutoRecord):
     reads = models.IntegerField(null=True)
     sample_id_lod = models.FloatField(null=True)
     sex_match = models.TextField(null=True)
-    snp_dbsnp_percent = models.FloatField()
-    ts_to_tv_ratio = models.FloatField()
+    snp_dbsnp_percent = models.FloatField(null=True)
+    ts_to_tv_ratio = models.FloatField(null=True)
     uniformity_of_coverage = models.FloatField()
 
     def get_coverage_columns(self) -> List[str]:
