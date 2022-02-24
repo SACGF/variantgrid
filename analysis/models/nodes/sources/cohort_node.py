@@ -112,22 +112,16 @@ class CohortNode(AbstractCohortBasedNode, AbstractZygosityCountNode):
             annotation_kwargs[self.any_zygosity_count_column] = hom_and_het + F(self.ref_count_column)
         return annotation_kwargs
 
-    def _get_node_q(self) -> Optional[Q]:
-        cohort, q_cohort = self.get_cohort_and_q()
-        q_and = []
-        if q_cohort:
-            q_and.append(q_cohort)
+    def _get_node_arg_q_dict(self) -> Dict[Optional[str], Q]:
+        cohort, arg_q_dict = self.get_cohort_and_arg_q_dict()
         if cohort:
-            q_and.append(self.get_cohort_settings_q(cohort))
-            q_and.append(self.get_vcf_locus_filters_q())
-        if q_and:
-            q = reduce(operator.and_, q_and)
-        else:
-            q = None
-        return q
+            self._merge_arg_q_dict(arg_q_dict, self.get_vcf_locus_filters_arg_q_dict())
+            self._merge_arg_q_dict(arg_q_dict, self.get_cohort_settings_q(cohort))
+        return arg_q_dict
 
-    def get_cohort_settings_q(self, cohort):
-        cohort_genotype_collection = cohort.cohort_genotype_collection
+    def get_cohort_settings_arg_q_dict(self, cohort) -> Dict[Optional[str], Q]:
+        arg_q_dict = {}
+        cgc = cohort.cohort_genotype_collection
         and_q = []
         if self.accordion_panel == self.COUNT:
             # Use minimum filters even for sub-cohorts as the min will always be above sub-cohort min
@@ -136,13 +130,11 @@ class CohortNode(AbstractCohortBasedNode, AbstractZygosityCountNode):
         elif self.accordion_panel == self.SIMPLE_ZYGOSITY:
             and_q.extend(self.get_cohort_simple_zygosity_q_list())
         elif self.accordion_panel == self.PER_SAMPLE_ZYGOSITY:
-            and_q.extend(self.get_cohort_per_sample_zygosity_q_list(cohort_genotype_collection))
+            and_q.extend(self.get_cohort_per_sample_zygosity_q_list(cgc))
 
         if and_q:
-            q = reduce(operator.and_, and_q)
-        else:
-            q = self.q_all()
-        return q
+            arg_q_dict[cgc.cohortgenotype_alias] = reduce(operator.and_, and_q)
+        return arg_q_dict
 
     @lazy
     def simple_zygosity_columns(self) -> Dict:

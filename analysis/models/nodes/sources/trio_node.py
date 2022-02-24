@@ -1,7 +1,5 @@
-import operator
 from abc import ABC, abstractmethod
-from functools import reduce
-from typing import Optional, List, Set, Tuple
+from typing import Optional, List, Set, Tuple, Dict
 
 from cache_memoize import cache_memoize
 from django.db import models
@@ -53,6 +51,10 @@ class AbstractTrioInheritance(ABC):
         dad = self._zygosity_options(dad_z, not self.node.require_zygosity)
         filters = {"Proband": proband, "Mother": mum, "Father": dad}
         return ", ".join([f"{k}: {v}" for k, v in filters.items() if v])
+
+    def get_arg_q_dict(self) -> Dict[Optional[str], Q]:
+        alias = self.node.trio.cohort.cohort_genotype_collection.cohortgenotype_alias
+        return {alias: self.get_q()}
 
     @abstractmethod
     def get_q(self) -> Q:
@@ -225,20 +227,13 @@ class TrioNode(AbstractCohortBasedNode):
         klass = inhertiance_classes[TrioInheritance(self.inheritance)]
         return klass(self)
 
-    def _get_node_q(self) -> Optional[Q]:
-        cohort, q_cohort = self.get_cohort_and_q()
-        q_and = []
-        if q_cohort:
-            q_and.append(q_cohort)
+    def _get_node_arg_q_dict(self) -> Dict[Optional[str], Q]:
+        cohort, arg_q_dict = self.get_cohort_and_arg_q_dict()
         if cohort:
             inheritance = self._inheritance_factory()
-            q_and.append(inheritance.get_q())
-            q_and.append(self.get_vcf_locus_filters_q())
-        if q_and:
-            q = reduce(operator.and_, q_and)
-        else:
-            q = None
-        return q
+            self._merge_arg_q_dict(arg_q_dict, inheritance.get_arg_q_dict())
+            self._merge_arg_q_dict(arg_q_dict, self.get_vcf_locus_filters_arg_q_dict())
+        return arg_q_dict
 
     def _get_node_contigs(self) -> Optional[Set[Contig]]:
         node_contigs = None

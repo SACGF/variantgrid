@@ -127,8 +127,8 @@ def get_node_counts_and_labels_dict(node, counts_to_get):
 
         select_str = 'SELECT ' + ',\n'.join(select_columns)
         sql = '\n'.join([select_str, from_str, where_str])
-        # logging.info("NODE COUNT sql was:")
-        # logging.info(sql)
+        logging.info("NODE COUNT sql was:")
+        logging.info(sql)
 
         try:
             cursor = connection.cursor()

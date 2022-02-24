@@ -167,7 +167,7 @@ class VennNode(AnalysisNode):
             SetOperations.SYMMETRIC_DIFFERENCE: [VennNodeCache.A_ONLY, VennNodeCache.B_ONLY],
             SetOperations.B_ONLY: [VennNodeCache.INTERSECTION, VennNodeCache.B_ONLY],
         }
-        return INTERSECTIONS[self.set_operation]
+        return INTERSECTIONS[SetOperations(self.set_operation)]
 
     def _get_node_q(self) -> Optional[Q]:
         raise ValueError("VennNode always uses cache - this should never be called!")
