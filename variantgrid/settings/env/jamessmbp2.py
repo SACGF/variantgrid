@@ -27,8 +27,12 @@ ACCOUNTS_EMAIL = 'accounts@shariant.org.au'
 DEBUG = True
 ROLLBAR['enabled'] = False
 
-MIDDLEWARE += ('debug_toolbar.middleware.DebugToolbarMiddleware',)
-INSTALLED_APPS.append('debug_toolbar')
+# MIDDLEWARE += ('debug_toolbar.middleware.DebugToolbarMiddleware',)
+# INSTALLED_APPS.append('debug_toolbar')
+
+MIDDLEWARE += ('eventlog.middleware.PageViewsMiddleware', )
+LOG_ACTIVITY_APPS = {"classification", "variantopedia", "snpdb"}
+
 
 """
 AUTHENTICATION_BACKENDS = (
