@@ -2,6 +2,7 @@
 #995 - rewrite 28/10/2019 - read from CSV instead of human file
 """
 
+import numpy as np
 import pandas as pd
 
 
@@ -37,7 +38,7 @@ def load_exec_summary(klass, exec_summary_filename):
     type_converters = {f.name: f.get_internal_type() for f in klass._meta.fields}
 
     df = pd.read_csv(exec_summary_filename, sep='\t', index_col='Name')
-    values = df["Value"]
+    values = df["Value"].replace("NotAvail", np.NaN)
     sample_name = values["Sample"]
 
     exec_data = {}
