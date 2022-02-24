@@ -146,6 +146,14 @@ class DiscordanceReport(TimeStampedModel):
             all_lab_ids.add(lab_id)
         return list(Lab.objects.filter(id__in=all_lab_ids).all())
 
+    def user_is_involved(self, user: User) -> bool:
+        if user.is_superuser:
+            return True
+
+        user_labs = set(Lab.valid_labs_qs(user, admin_check=True))
+        report_labs = set(self.all_actively_involved_labs())
+        return bool(user_labs.intersection(report_labs))
+
     @transaction.atomic
     def create_new_report(self, only_if_necessary: bool = True, cause: str = ''):
         if not self.resolution == DiscordanceReportResolution.CONTINUED_DISCORDANCE:

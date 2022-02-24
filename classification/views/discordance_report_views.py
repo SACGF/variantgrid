@@ -98,6 +98,7 @@ def discordance_report_view(request: HttpRequest, report_id: int) -> HttpRespons
         'c_hgvses': c_hgvses,
         'genome_build': preferred_genome_build,
         'report': report,
+        'user_involved': report.user_is_involved(request.user),
         'clinical_context': clinical_context,
         'allele': allele,
         'preferred_variant': preferred_variant,

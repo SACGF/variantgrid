@@ -87,13 +87,11 @@ def activity(request, user_id: Optional[int] = None, lab_id: Optional[int] = Non
         else:
             raise PermissionDenied()
     elif discordance_report_id:
+        # for now discordance report activity has to be admin only, as those classifications could have history before they were
+        # shared
         if report := DiscordanceReport.objects.get(pk=discordance_report_id):
-            user = request.user
-            if not user.is_superuser:
-                user_labs = set(Lab.valid_labs_qs(user, admin_check=True))
-                report_labs = set(report.all_actively_involved_labs())
-                if not user_labs.intersection(report_labs):
-                    raise PermissionDenied()
+            if not request.user.is_superuser:
+                raise PermissionDenied()
             page_title = f'{page_title} for Discordance Report ({report.id} : {report.clinical_context} : {report.clinical_context.allele:CA})'
         else:
             raise PermissionDenied()

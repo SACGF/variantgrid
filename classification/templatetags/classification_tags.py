@@ -65,7 +65,7 @@ def classification_groups(
 
     groups = ClassificationGroups(classification_modifications, genome_build=genome_build)
 
-    context = {
+    tag_context = {
         "title": title,
         "classification_groups": groups,
         "user": context.request.user,
@@ -78,16 +78,16 @@ def classification_groups(
     ordered_classifications.sort(key=lambda cm: cm.curated_date_check, reverse=True)
 
     if groups and download_link:
-        context["download_link"] = download_link
-    if groups and history_link:
-        context["history_link"] = history_link
+        tag_context["download_link"] = download_link
+    if groups and history_link and context.request.user.is_superuser:
+        tag_context["history_link"] = history_link
 
     if show_diffs:
         if 1 < len(groups) <= 20 and len(groups) != len(ordered_classifications):
             diff_latest = ",".join([str(group.most_recent.classification.id) for group in groups])
-            context["diff_latest"] = diff_latest
+            tag_context["diff_latest"] = diff_latest
         if 1 < len(ordered_classifications) <= 20:
-            context["diff_all"] = ",".join([str(cm.classification.id) for cm in ordered_classifications])
+            tag_context["diff_all"] = ",".join([str(cm.classification.id) for cm in ordered_classifications])
 
     if link_discordance_reports:
         all_clinical_groupings = set()
@@ -95,11 +95,11 @@ def classification_groups(
             all_clinical_groupings.add(cm.classification.clinical_context)
         clinical_grouping_list = list(all_clinical_groupings)
         clinical_grouping_list.sort(key=lambda cg:(not cg.is_default if cg else False, cg.name if cg else 'No Allele'))
-        context["clinical_contexts"] = clinical_grouping_list
+        tag_context["clinical_contexts"] = clinical_grouping_list
 
     context["paging"] = len(groups) > 10
 
-    return context
+    return tag_context
 
 
 def render_ekey(val, key: Optional[str] = None, value_if_none: Optional[str] = None):
