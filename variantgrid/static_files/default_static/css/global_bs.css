@@ -1,4 +1,3 @@
-@charset "UTF-8";
 h3:not(.popover-header), h4:not(.popover-header) {
   margin-bottom: 16px;
 }
@@ -19,8 +18,12 @@ h3:not(:first-child):not(.popover-header), h4:not(:first-child):not(.popover-hea
   border-color: #ced4da !important;
 }
 
-.form-control .select2-selection__arrow {
+.form-control .select2-selection__arrow, .form-group .select2-selection__arrow {
   display: none;
+}
+
+.form-group .select2-selection__rendered {
+  margin-top: -5px;
 }
 
 label, form label {
@@ -116,7 +119,7 @@ table.dataTable td.dataTables_empty:before {
   font-variant: normal;
   text-rendering: auto;
   font-family: "FontAwesome";
-  content: "";
+  content: "\f1b2";
   opacity: 0.4;
   margin-right: 8px;
 }
@@ -305,7 +308,7 @@ a {
   font-variant: normal;
   text-rendering: auto;
   font-family: "FontAwesome";
-  content: "";
+  content: "\f35d";
   opacity: 0.4;
   margin-left: 4px;
 }
@@ -316,7 +319,7 @@ a {
   font-variant: normal;
   text-rendering: auto;
   font-family: "FontAwesome";
-  content: "";
+  content: "\f2d0";
   opacity: 0.4;
   margin-left: 4px;
 }
@@ -327,7 +330,7 @@ a {
   font-variant: normal;
   text-rendering: auto;
   font-family: "FontAwesome";
-  content: "";
+  content: "\f2b6";
   opacity: 0.4;
   margin-left: 4px;
 }
@@ -338,7 +341,7 @@ a {
   font-variant: normal;
   text-rendering: auto;
   font-family: "FontAwesome";
-  content: "";
+  content: "\f56d";
   opacity: 0.6;
   margin-left: 4px;
 }
@@ -349,14 +352,14 @@ a {
   font-variant: normal;
   text-rendering: auto;
   font-family: "FontAwesome";
-  content: "";
+  content: "\f105";
   opacity: 0.6;
   margin-right: 4px;
   width: 12px;
 }
 
 .toggle-link[aria-expanded=true]:before, tr.parent .toggle-link:before, .toggle-link[aria-expanded=true]:before, tr.shown .toggle-link:before {
-  content: "";
+  content: "\f107";
 }
 
 .modal-header nav .breadcrumb {
@@ -403,46 +406,46 @@ a.list-group-item-action.list-group-item-light {
 }
 .accordion.indicator-plus .card-header:after {
   font-family: "FontAwesome";
-  content: "";
+  content: "\f078";
   position: absolute;
   right: 1rem;
   top: 0.5rem;
 }
 .accordion.indicator-plus .card-header.collapsed:after {
-  content: "";
+  content: "\f077";
 }
 .accordion.indicator-plus-before.round-indicator .card-header:before {
   font-family: "FontAwesome";
   font-size: 12pt;
-  content: "";
+  content: "\f077";
   position: absolute;
   right: 1rem;
   top: 0.5rem;
   color: #88b;
 }
 .accordion.indicator-plus-before.round-indicator .card-header.collapsed:before {
-  content: "";
+  content: "\f078";
   color: #88b;
 }
 .accordion.indicator-plus-before .card-header:before {
   font-family: "FontAwesome";
-  content: "";
+  content: "\f068";
   position: absolute;
   right: 1rem;
   top: 0.5rem;
 }
 .accordion.indicator-plus-before .card-header.collapsed:before {
-  content: "";
+  content: "\f067";
 }
 .accordion.indicator-chevron .card-header:after {
   font-family: "FontAwesome";
-  content: "";
+  content: "\f078";
   position: absolute;
   right: 1rem;
   top: 0.5rem;
 }
 .accordion.indicator-chevron .card-header.collapsed:after {
-  content: "";
+  content: "\f077";
 }
 .accordion.background-none [class^=card] {
   background: transparent;
@@ -595,7 +598,7 @@ div.background-image {
   z-index: 100;
   position: absolute;
   left: -16px;
-  content: "";
+  content: "\f056";
   font-family: "FontAwesome";
 }
 
@@ -663,25 +666,25 @@ table.as_table td {
 .dt-status .val-R:before {
   font-family: "FontAwesome";
   margin-right: 4px;
-  content: "";
+  content: "\f058";
   color: green;
 }
 .dt-status .val-P:before {
   font-family: "FontAwesome";
   color: #bbb;
   margin-right: 4px;
-  content: "";
+  content: "\f111";
 }
 .dt-status .val-A:before {
   font-family: "FontAwesome";
   margin-right: 4px;
-  content: "";
+  content: "\f544";
   color: #6a6;
 }
 .dt-status .val-U:before {
   font-family: "FontAwesome";
   margin-right: 4px;
-  content: "";
+  content: "\f057";
 }
 
 .list-group-small {
@@ -739,7 +742,7 @@ ul.compact li:before {
   font-size: 0.4rem;
   font-weight: 900;
   font-family: "Font Awesome 5 Free";
-  content: "";
+  content: "\f111";
   line-height: 0;
 }
 

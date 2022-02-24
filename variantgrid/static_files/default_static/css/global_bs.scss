@@ -27,9 +27,13 @@ h3:not(:first-child):not(.popover-header), h4:not(:first-child):not(.popover-hea
     border-color: #ced4da !important;
 }
 // adjust the expand/collapse arrow location accordingly
-.form-control .select2-selection__arrow {
+.form-control .select2-selection__arrow, .form-group .select2-selection__arrow {
     // top: 5px !important;
     display: none;  // is redundant to another indicator
+}
+
+.form-group .select2-selection__rendered {
+   margin-top: -5px;
 }
 
 /// GENERAL FORMS
