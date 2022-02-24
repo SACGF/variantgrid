@@ -75,7 +75,7 @@ class MergeNode(AnalysisNode):
             return q_by_string.values()
         return unique_parent_q_set
 
-    def get_parent_q(self):
+    def get_parent_arg_q_dict(self):
         if self._unique_parent_q_set:
             q = reduce(operator.or_, self._unique_parent_q_set)
         else:

@@ -87,24 +87,24 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
                 if min_value:
                     alias, ov_path = self.sample.get_cohort_genotype_alias_and_field(ov_field)
                     q = Q(**{f"{ov_path}__gte": min_value})
-                    self._merge_arg_q_dict(arg_q_dict, {alias: q})
+                    self.merge_arg_q_dicts(arg_q_dict, {alias: q})
 
             if self.max_pl is not None:
                 alias, pl_path = self.sample.get_cohort_genotype_alias_and_field("phred_likelihood")
                 q = Q(**{f"{pl_path}__lte": self.max_pl})
-                self._merge_arg_q_dict(arg_q_dict, {alias: q})
+                self.merge_arg_q_dicts(arg_q_dict, {alias: q})
 
-            if sample_args_q_dict := NodeAlleleFrequencyFilter.get_sample_args_q_dict(self, self.sample):
-                self._merge_arg_q_dict(arg_q_dict, sample_args_q_dict)
+            if sample_arg_q_dict := NodeAlleleFrequencyFilter.get_sample_arg_q_dict(self, self.sample):
+                self.merge_arg_q_dicts(arg_q_dict, sample_arg_q_dict)
 
         if self.restrict_to_qc_gene_list:
             if self.sample_gene_list:
                 q = self.sample_gene_list.gene_list.get_q(self.analysis.annotation_version.variant_annotation_version)
             else:
                 q = self.q_none()  # Safety - don't show anything if missing
-            self._merge_arg_q_dict(arg_q_dict, {None: q})
+            self.merge_arg_q_dicts(arg_q_dict, {None: q})
 
-        self._merge_arg_q_dict(arg_q_dict, self.get_vcf_locus_filters_arg_q_dict())
+        self.merge_arg_q_dicts(arg_q_dict, self.get_vcf_locus_filters_arg_q_dict())
         return arg_q_dict
 
     def _get_method_summary(self):
@@ -154,7 +154,7 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
 
     def _has_filters_that_affect_label_counts(self):
         # This returns None if no filters to apply
-        if NodeAlleleFrequencyFilter.get_sample_args_q_dict(self, self.sample):
+        if NodeAlleleFrequencyFilter.get_sample_arg_q_dict(self, self.sample):
             return True
 
         return any([getattr(self, f) for f in self.FIELDS_THAT_CHANGE_QUERYSET])

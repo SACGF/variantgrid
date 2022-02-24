@@ -32,7 +32,7 @@ class PedigreeNode(AbstractCohortBasedNode):
                 q = self.get_recessive_q(cohort.cohort_genotype_collection)
             elif self.inheritance_model == PedigreeInheritance.AUTOSOMAL_DOMINANT:
                 q = self.get_dominant_q(cohort.cohort_genotype_collection)
-            self._merge_arg_q_dict(arg_q_dict, {self.cohort_genotype_collection.cohortgenotype_alias: q})
+            self.merge_arg_q_dicts(arg_q_dict, {self.cohort_genotype_collection.cohortgenotype_alias: q})
         return arg_q_dict
 
     def get_affected_unaffected_sample_zygosities_dict(self, unaffected_zygosities, affected_zygosities):

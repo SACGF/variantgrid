@@ -286,18 +286,18 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
             raise ValueError(msg)
         return parents[0]
 
-    def get_single_parent_args_q_dict(self) -> Dict[Optional[str], Q]:
-        args_q_dict = {}
+    def get_single_parent_arg_q_dict(self) -> Dict[Optional[str], Q]:
+        arg_q_dict = {}
         parent = self.get_single_parent()
         if parent.is_ready():
             if parent.count == 0:
-                args_q_dict[None] = self.q_none()
+                arg_q_dict[None] = self.q_none()
             else:
-                args_q_dict = parent.get_args_q_dict()
+                arg_q_dict = parent.get_arg_q_dict()
         else:
             # This should never happen...
             raise ValueError("get_single_parent_q called when single parent not ready!!!")
-        return args_q_dict
+        return arg_q_dict
 
     def get_single_parent_contigs(self):
         parent = self.get_single_parent()
@@ -387,7 +387,7 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
                 arg_q_dict = self.get_parent_arg_q_dict()
                 if self.modifies_parents():
                     if node_arg_q_dict := self._get_node_arg_q_dict():
-                        self._merge_arg_q_dict(arg_q_dict, node_arg_q_dict)
+                        self.merge_arg_q_dicts(arg_q_dict, node_arg_q_dict)
             else:
                 if node_arg_q_dict := self._get_node_arg_q_dict():
                     arg_q_dict = node_arg_q_dict
@@ -418,10 +418,10 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
             cache.set(cache_key, contigs)
         return contigs
 
-    def get_parent_q(self):
+    def get_parent_arg_q_dict(self):
         if self.min_inputs == 1:
-            return self.get_single_parent_q()
-        raise NotImplementedError("Need to implement a non-default 'get_parent_q' if you have more than 1 parent")
+            return self.get_single_parent_arg_q_dict()
+        raise NotImplementedError("Implement a non-default 'get_parent_arg_q_dict' if you have more than 1 parent")
 
     def get_parent_contigs(self) -> Set[Contig]:
         contigs = set()
@@ -461,7 +461,7 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
         raise NotImplementedError()
 
     @staticmethod
-    def _merge_arg_q_dict(arg_q_dict, other_arg_q_dict, op=operator.and_):
+    def merge_arg_q_dicts(arg_q_dict, other_arg_q_dict, op=operator.and_):
         for k, q in other_arg_q_dict.items():
             if existing_q := arg_q_dict.get(k):
                 q = op(q, existing_q)
@@ -484,7 +484,7 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
         a_kwargs = self.get_annotation_kwargs()
         a_kwargs.update(extra_annotation_kwargs)
         arg_q_dict = self.get_arg_q_dict(disable_cache=disable_cache)
-        print(arg_q_dict)
+        # print(arg_q_dict)
         if a_kwargs:
             # If we apply the kwargs at the same time, it can join to the same table twice.
             # We want to go through and apply each annotation then the filters that use it, so that it forces
@@ -1156,7 +1156,7 @@ class NodeAlleleFrequencyFilter(models.Model):
     node = models.OneToOneField(AnalysisNode, on_delete=CASCADE)
     group_operation = models.CharField(max_length=1, choices=GroupOperation.choices, default=GroupOperation.ANY)
 
-    def get_q(self, allele_frequency_path: str, allele_frequency_percent: bool):
+    def get_q(self, allele_frequency_path: str, allele_frequency_percent: bool) -> Optional[Q]:
         af_q = None
         try:
             filters = []
@@ -1187,17 +1187,17 @@ class NodeAlleleFrequencyFilter(models.Model):
         return af_q
 
     @staticmethod
-    def get_sample_args_q_dict(node: AnalysisNode, sample: Sample) -> Dict[Optional[str], Q]:
-        args_q_dict = {}
+    def get_sample_arg_q_dict(node: AnalysisNode, sample: Sample) -> Dict[Optional[str], Q]:
+        arg_q_dict = {}
         if sample:
             try:
                 alias, allele_frequency_path = sample.get_cohort_genotype_alias_and_field("allele_frequency")
                 allele_frequency_percent = sample.vcf.allele_frequency_percent
-                af_q = node.nodeallelefrequencyfilter.get_q(allele_frequency_path, allele_frequency_percent)
-                args_q_dict[alias] = af_q
+                if af_q := node.nodeallelefrequencyfilter.get_q(allele_frequency_path, allele_frequency_percent):
+                    arg_q_dict[alias] = af_q
             except NodeAlleleFrequencyFilter.DoesNotExist:
                 pass
-        return args_q_dict
+        return arg_q_dict
 
     def get_description(self):
         # TODO: do this properly with group operators etc
