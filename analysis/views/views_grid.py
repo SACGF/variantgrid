@@ -141,6 +141,27 @@ def replace_transcripts_iterator(grid, ctc: CanonicalTranscriptCollection, items
         yield item
 
 
+def get_node_export_basename(node: AnalysisNode) -> str:
+    """ For CSV/VCF etc """
+    name_parts = []
+    if samples := node.get_samples():
+        if len(samples) == 1:
+            name_parts.append(samples[0].name)
+
+    name_parts.append(f"analysis_{node.analysis.pk}")
+
+    node_label = node.get_node_class_label()
+    if not node_label.endswith("Node"):
+        node_label += "Node"
+    name_parts.append(node_label)
+    name_parts.append(str(node.pk))
+
+    if node.name:
+        name_underscores = re.sub(r"\s", "_", node.name)
+        name_parts.append(name_underscores)
+    return "_".join(name_parts)
+
+
 def node_grid_export(request):
     node = _node_from_request(request)
     export_type = request.GET["export_type"]
@@ -154,13 +175,8 @@ def node_grid_export(request):
 
     grid = _variant_grid_from_request(request, node, **grid_kwargs)
 
-    # TODO: Change filename to use set operation between samples
-    basename = f"node_{grid.node.pk}"
-    if grid.name:
-        name = re.sub(r"\s", "_", grid.name)
-        basename = f"{basename}_{name}"
-
-    sample_ids = grid.node.get_sample_ids()
+    basename = get_node_export_basename(node)
+    sample_ids = node.get_sample_ids()
     _, _, items = grid.get_items(request)
 
     if use_canonical_transcripts:
@@ -171,14 +187,14 @@ def node_grid_export(request):
         else:
             logging.warning("Grid request had 'use_canonical_transcripts' but analysis did not.")
 
-    items = format_items_iterator(grid.node.analysis, sample_ids, items)
+    items = format_items_iterator(node.analysis, sample_ids, items)
 
     colmodels = grid.get_colmodels()
 
     if export_type == 'csv':
         return grid_export_csv(basename, colmodels, items)
     elif export_type == 'vcf':
-        genome_build = grid.node.analysis.genome_build
+        genome_build = node.analysis.genome_build
         values_qs = Sample.objects.filter(id__in=sample_ids).values_list("id", "name")
         sample_names_by_id = dict(values_qs)
         return _grid_export_vcf(basename, genome_build, colmodels, items, sample_ids, sample_names_by_id)

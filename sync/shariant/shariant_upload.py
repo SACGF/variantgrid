@@ -120,7 +120,7 @@ def sync_shariant_upload(sync_destination: SyncDestination, full_sync: bool = Fa
         somatic = filters.get("somatic", True)
         if not somatic:
             q_allele_origin_null = Q(classification__evidence__allele_origin__isnull=True)
-            q_not_somatic = ~Q(classification__evidence__allele_origin__value='Somatic')
+            q_not_somatic = ~Q(classification__evidence__allele_origin__value='somatic')
             qs = qs.filter(q_allele_origin_null | q_not_somatic)
 
     if not full_sync:

@@ -821,7 +821,12 @@ class VCFFile(SeqAutoRecord):
 
     @staticmethod
     def get_path_from_bam(bam):
-        pattern = os.path.join(settings.SEQAUTO_VCF_DIR_PATTERN, settings.SEQAUTO_VCF_PATTERN)
+        vcf_pattern = None
+        if enrichment_kit := bam.sequencing_sample.enrichment_kit:
+            vcf_pattern = settings.SEQAUTO_VCF_PATTERNS_FOR_KIT.get(enrichment_kit.name)
+        if vcf_pattern is None:
+            vcf_pattern = settings.SEQAUTO_VCF_PATTERNS_FOR_KIT["default"]
+        pattern = os.path.join(settings.SEQAUTO_VCF_DIR_PATTERN, vcf_pattern)
         vcf_path = pattern % bam.get_params()
         return os.path.abspath(vcf_path)
 
