@@ -335,12 +335,12 @@ class Searcher:
             (SearchTypes.VARIANT, VARIANT_PATTERN, search_variant),
             (SearchTypes.CLINGEN_ALLELE_ID, r"^CA", search_clingen_allele),
             (SearchTypes.VARIANT, VARIANT_VCF_PATTERN, search_variant_vcf),
-            (SearchTypes.VARIANT, VARIANT_GNOMAD_PATTERN, search_variant_gnomad)
+            (SearchTypes.VARIANT, VARIANT_GNOMAD_PATTERN, search_variant_gnomad),
+            (SearchTypes.COSMIC, COSMIC_PATTERN, search_cosmic),
         ]
         self.genome_agnostic_searches = [
             (SearchTypes.GENE, NO_WHITESPACE, search_gene_symbol),  # special case
             (SearchTypes.GENE, r"(ENSG|Gene.*:)\d+", search_gene),  # special case
-            (SearchTypes.COSMIC, COSMIC_PATTERN, search_cosmic),
             (SearchTypes.EXPERIMENT, HAS_ALPHA_PATTERN, search_experiment),
             (SearchTypes.EXTERNAL_PK, HAS_ALPHA_PATTERN, search_external_pk),
             (SearchTypes.PATIENT, HAS_ALPHA_PATTERN, search_patient),
