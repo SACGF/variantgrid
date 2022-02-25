@@ -44,9 +44,14 @@ class ViewEventCounts:
     def count_field(self, field_name: str, resolver: Optional[Callable]) -> List[Counted]:
         id_to_count = defaultdict(int)
         field_name = f"args__{field_name}"
-        for pk, user in ViewEvent.objects.filter(**{f"{field_name}__isnull": False}).filter(created__gte=self.as_of).annotate(
-                total=Count(field_name)).order_by(field_name).values_list(field_name, 'user'):
-            id_to_count[pk] += 1  # just want to count once per unique user
+        for values in ViewEvent.objects \
+                .values(field_name, 'user')\
+                .filter(created__gte=self.as_of)\
+                .filter(**{f"{field_name}__isnull": False})\
+                .annotate(total=Count('pk'))\
+                .order_by():
+            id_to_count[values.get(field_name)] += 1  # just want to count once per unique user
+            # TODO limit the number of results we look at? (though wont work if we want unique users)
 
         return sorted((Counted(pk, count, resolver) for pk, count in id_to_count.items()), reverse=True)
 
@@ -67,22 +72,27 @@ class ViewEventCounts:
     @lazy
     def page_views(self) -> List[Counted[str]]:
         id_to_count = defaultdict(int)
-        for pk in ViewEvent.objects.filter(
-                created__gte=self.as_of).annotate(
-                total=Count('user')).order_by('user').values_list('view_name', flat=True):
-            id_to_count[pk] += 1  # just want to count once per unique user
+        for values in ViewEvent.objects\
+                .values('view_name')\
+                .filter(created__gte=self.as_of)\
+                .annotate(total=Count('pk'))\
+                .order_by():
+            id_to_count[values.get('view_name')] += 1  # just want to count once per unique user
 
         return sorted((Counted(pk, count, None) for pk, count in id_to_count.items()), reverse=True)
 
     @lazy
     def active_users(self) -> List[Counted[str]]:
         id_to_count = defaultdict(int)
-        for pk, total in ViewEvent.objects.filter(
-                created__gte=self.as_of).annotate(
-            total=Count('user')).order_by('user').values_list('user', 'total'):
-            id_to_count[pk] += total  # just want to count once per unique user
+        for values in ViewEvent.objects \
+                .values('user')\
+                .filter(created__gte=self.as_of)\
+                .annotate(total=Count('pk'))\
+                .order_by():
+            id_to_count[values.get('user')] += values.get('total')  # just want to count once per unique user
 
         return sorted((Counted(pk, count, ViewEventCounts.resolver_for_model(User)) for pk, count in id_to_count.items()), reverse=True)
+
 
 def view_classifiaction_metrics(request: HttpRequest) -> HttpResponseBase:
     if not request.user.is_superuser:
