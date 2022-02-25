@@ -1,8 +1,7 @@
 import logging
-from typing import List, Dict, Iterable, Optional
+from typing import List, Dict, Iterable
 
 import celery
-from django.conf import settings
 from django.contrib.auth.models import User
 from django.contrib.postgres.fields.array import ArrayField
 from django.core.exceptions import PermissionDenied

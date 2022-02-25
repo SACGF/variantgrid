@@ -3,7 +3,7 @@ import operator
 from collections import defaultdict
 from functools import reduce
 from functools import wraps, partial
-from typing import List, Tuple, Dict, Optional
+from typing import List, Tuple, Dict
 
 import nameparser
 from dateutil import parser

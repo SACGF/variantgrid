@@ -1,14 +1,15 @@
-from abc import ABC, abstractmethod
+import re
+from abc import ABC
 from dataclasses import dataclass
 from re import Match, IGNORECASE
 from typing import Optional, TypeVar, Generic, Union, List, Iterable, Type
 
+import django
 from django.contrib.auth.models import User
 from django.utils.safestring import SafeString
+
 from genes.models_enums import AnnotationConsortium
 from snpdb.models import GenomeBuild
-import django
-import re
 
 search_signal = django.dispatch.Signal()
 HAS_ALPHA_PATTERN = r"[a-zA-Z]"

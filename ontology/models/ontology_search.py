@@ -1,5 +1,7 @@
-from typing import Any, Optional
+from typing import Any
+
 from django.dispatch import receiver
+
 from genes.models import GeneSymbol
 from ontology.models import OntologyTerm, OntologyService
 from snpdb.search2 import SearchResponseRecordAbstract, search_signal, SearchInput, SearchResponse

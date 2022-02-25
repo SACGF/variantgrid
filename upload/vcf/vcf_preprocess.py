@@ -4,8 +4,8 @@ import os
 from collections import OrderedDict
 from subprocess import Popen, PIPE, CalledProcessError
 
-import pandas as pd
 import cyvcf2
+import pandas as pd
 from django.conf import settings
 from django.utils import timezone
 
