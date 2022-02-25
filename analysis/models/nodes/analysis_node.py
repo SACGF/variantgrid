@@ -464,7 +464,7 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
     def merge_arg_q_dicts(arg_q_dict, other_arg_q_dict, op=operator.and_):
         for k, q in other_arg_q_dict.items():
             if existing_q := arg_q_dict.get(k):
-                q = op(q, existing_q)
+                q = op(existing_q, q)
             arg_q_dict[k] = q
 
     def _get_node_arg_q_dict(self) -> Dict[Optional[str], Q]:

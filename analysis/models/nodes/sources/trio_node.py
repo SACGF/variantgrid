@@ -152,8 +152,10 @@ class CompHet(AbstractTrioInheritance):
         variant_annotation_version = self.node.analysis.annotation_version.variant_annotation_version
         comp_het_genes = VariantTranscriptAnnotation.get_overlapping_genes_q(variant_annotation_version, two_hit_genes)
         arg_q_dict = parent.get_arg_q_dict()
+        cgc = self.node.trio.cohort.cohort_genotype_collection
         comp_het_args_q_dict = {
-            None: comp_het_q & comp_het_genes,
+            cgc.cohortgenotype_alias: comp_het_q,
+            None: comp_het_genes,
         }
         AnalysisNode.merge_arg_q_dicts(arg_q_dict, comp_het_args_q_dict)
         return arg_q_dict
