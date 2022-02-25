@@ -1,7 +1,9 @@
 import operator
+import time
 from functools import reduce
-from typing import Optional, Dict
+from typing import Optional, Dict, List
 
+from cache_memoize import cache_memoize
 from django.conf import settings
 from django.db import models
 from django.db.models.deletion import CASCADE
@@ -10,9 +12,11 @@ from lazy import lazy
 
 from analysis.models.enums import GroupOperation
 from analysis.models.nodes.analysis_node import AnalysisNode
+from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
 from annotation.models.models import VariantAnnotation
 from classification.enums import ClinicalSignificance
 from classification.models.classification import Classification
+from library.constants import MINUTE_SECS
 from patients.models_enums import SimpleZygosity, GnomADPopulation
 from snpdb.models import Sample, VariantZygosityCountCollection
 
@@ -136,18 +140,26 @@ class PopulationNode(AnalysisNode):
                 and_q.append(less_than | is_null)
 
         if and_q:
-            or_q = [reduce(operator.and_, and_q)]
+            q = reduce(operator.and_, and_q)
             if self.keep_internally_classified_pathogenic:
-                path_and_likely_path = [ClinicalSignificance.LIKELY_PATHOGENIC, ClinicalSignificance.PATHOGENIC]
-                q_classified = Classification.get_variant_q(self.analysis.user, self.analysis.genome_build,
-                                                            clinical_significance_list=path_and_likely_path)
-                or_q.append(q_classified)
-
-            q_node = reduce(operator.or_, or_q)
-            q = reduce(operator.and_, [q_node])
+                classified_variant_ids = self._get_classified_variant_ids(self.analysis, q)
+                q |= Q(pk__in=classified_variant_ids)
         else:
             q = None
         return q
+
+    @staticmethod
+    @cache_memoize(timeout=MINUTE_SECS)
+    def _get_classified_variant_ids(analysis, q_pop: Q) -> List:
+        """ Uses q_pop to only keeps the ones that matter """
+        qs = get_variant_queryset_for_annotation_version(analysis.annotation_version)
+        path_and_likely_path = [ClinicalSignificance.LIKELY_PATHOGENIC, ClinicalSignificance.PATHOGENIC]
+        q_classified = Classification.get_variant_q(analysis.user, analysis.genome_build,
+                                                    clinical_significance_list=path_and_likely_path)
+        qs = qs.filter(q_classified).exclude(q_pop)
+        classified_variant_ids = list(qs.values_list("pk", flat=True))
+        return classified_variant_ids
+
 
     def _get_method_summary(self):
         if self.modifies_parents():
