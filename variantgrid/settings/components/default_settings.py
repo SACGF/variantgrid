@@ -71,6 +71,7 @@ AVATAR_PROVIDERS = (
     'avatar.providers.PrimaryAvatarProvider',
     'library.django_utils.avatar.SpaceThemedAvatarProvider',
 )
+AVATAR_THUMB_FORMAT = "PNG"
 
 MANAGERS = ADMINS
 
