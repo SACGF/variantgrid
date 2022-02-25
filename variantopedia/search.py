@@ -1,9 +1,7 @@
 import logging
-import operator
 import re
 from collections import defaultdict
 from dataclasses import dataclass
-from functools import reduce
 from itertools import zip_longest
 from typing import Set, Iterable, Union, Optional, Match, List, Any, Dict
 
@@ -19,7 +17,7 @@ from pyhgvs import HGVSName, InvalidHGVSName
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
 from annotation.manual_variant_entry import check_can_create_variants, CreateManualVariantForbidden
 from annotation.models.models import AnnotationVersion
-from classification.models.classification import ClassificationModification, Classification, \
+from classification.models.classification import Classification, \
     CreateNoClassificationForbidden
 from genes.hgvs import HGVSMatcher
 from genes.models import TranscriptVersion, Transcript, MissingTranscript, Gene, GeneSymbol, GeneSymbolAlias
