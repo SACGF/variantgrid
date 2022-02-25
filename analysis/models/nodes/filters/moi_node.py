@@ -2,7 +2,7 @@ import operator
 from collections import defaultdict
 from datetime import date
 from functools import reduce
-from typing import Optional, Set, List
+from typing import Optional, Set, List, Dict
 
 from django.db import models
 from django.db.models.deletion import SET_NULL, CASCADE
@@ -131,7 +131,7 @@ class MOINode(AncestorSampleMixin, AnalysisNode):
     def _get_zygosity_q(self, moi: str) -> Optional[Q]:
         q = None
         if zygosities := self._get_zygosities(moi):
-            field = self.sample.get_cohort_genotype_field("zygosity")
+            _alias, field = self.sample.get_cohort_genotype_alias_and_field("zygosity")
             q = Q(**{f"{field}__in": zygosities})
         return q
 
@@ -148,7 +148,8 @@ class MOINode(AncestorSampleMixin, AnalysisNode):
                 moi_genes[source["mode_of_inheritance"]].add(otr.dest_term.name)
         return moi_genes
 
-    def _get_node_q(self) -> Optional[Q]:
+    def _get_node_arg_q_dict(self) -> Dict[Optional[str], Q]:
+        arg_q_dict = {}
         if self.sample:
             moi_genes = self._get_moi_genes()
             or_filters = []
@@ -158,12 +159,12 @@ class MOINode(AncestorSampleMixin, AnalysisNode):
                     or_filters.append(q_zygosity & q_genes)
                 else:
                     or_filters.append(q_genes)  # Any zygosity
-            q = reduce(operator.or_, or_filters)
+            arg_q_dict[self.sample.zygosity_alias] = reduce(operator.or_, or_filters)
         else:
             gene_qs = self._get_gene_qs()
             variant_annotation_version = self.analysis.annotation_version.variant_annotation_version
-            q = VariantTranscriptAnnotation.get_overlapping_genes_q(variant_annotation_version, gene_qs)
-        return q
+            arg_q_dict[None] = VariantTranscriptAnnotation.get_overlapping_genes_q(variant_annotation_version, gene_qs)
+        return arg_q_dict
 
     def _get_node_contigs(self) -> Optional[Set[Contig]]:
         contig_qs = Contig.objects.filter(transcriptversion__genome_build=self.analysis.genome_build,
