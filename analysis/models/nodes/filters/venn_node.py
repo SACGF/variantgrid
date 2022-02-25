@@ -1,7 +1,7 @@
 import logging
 import sys
 import traceback
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Dict
 
 import celery
 from django.db import models
@@ -172,9 +172,10 @@ class VennNode(AnalysisNode):
     def _get_node_q(self) -> Optional[Q]:
         raise ValueError("VennNode always uses cache - this should never be called!")
 
-    def _get_node_cache_q(self) -> Optional[Q]:
+    def _get_node_cache_arg_q_dict(self) -> Dict[Optional[str], Q]:
+        arg_q_dict = {}
         if self.set_operation == SetOperations.NONE:
-            return self.q_none()
+            return {None: self.q_none()}
 
         a, b = self.ordered_parents
         variant_collections = []
@@ -187,7 +188,8 @@ class VennNode(AnalysisNode):
                 raise ValueError(f"{vennode_cache} had status: {vennode_cache.variant_collection.get_status_display()}")
             variant_collections.append(vennode_cache.variant_collection)
 
-        return Q(variantcollectionrecord__variant_collection__in=variant_collections)
+        q = Q(variantcollectionrecord__variant_collection__in=variant_collections)
+        return {None: q}
 
     def _get_method_summary(self):
         return self.get_set_operation_display()
