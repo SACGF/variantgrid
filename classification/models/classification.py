@@ -2089,7 +2089,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         return vcfe.variant_coordinate
 
     def get_absolute_url(self):
-        return reverse('view_classification', kwargs={'record_id': self.pk})
+        return reverse('view_classification', kwargs={'classification_id': self.pk})
 
     @staticmethod
     def get_q_for_gene(gene: Gene) -> Q:

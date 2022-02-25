@@ -415,12 +415,12 @@ def view_allele_from_variant(request, variant_id):
     variant = get_object_or_404(Variant, pk=variant_id)
     allele = variant.allele
     if allele and settings.PREFER_ALLELE_LINKS:
-        return redirect(reverse('view_allele', kwargs={"pk": allele.id}))
+        return redirect(reverse('view_allele', kwargs={"allele_id": allele.id}))
     return redirect(reverse('view_variant', kwargs={"variant_id": variant_id}))
 
 
-def view_allele(request, pk):
-    allele: Allele = get_object_or_404(Allele, pk=pk)
+def view_allele(request, allele_id:int):
+    allele: Allele = get_object_or_404(Allele, pk=allele_id)
     link_allele_to_existing_variants(allele, AlleleConversionTool.CLINGEN_ALLELE_REGISTRY)
 
     latest_classifications = ClassificationModification.latest_for_user(
@@ -439,11 +439,11 @@ def view_allele(request, pk):
     return render(request, "variantopedia/view_allele.html", context)
 
 
-def export_classifications_allele(request, pk:int):
+def export_classifications_allele(request, allele_id:int):
     """
     CSV export of what is currently filtered into the classification grid
     """
-    allele = Allele.objects.get(pk=pk)
+    allele = Allele.objects.get(pk=allele_id)
     return ClassificationExportFormatter2CSV(
         ClassificationFilter(
             user=request.user,

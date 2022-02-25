@@ -3,7 +3,7 @@ from django.urls import resolve
 
 from eventlog.models import ViewEvent
 
-INGORE_SEGMENTS = {"api", "datatable"}
+INGORE_SEGMENTS = {"api", "datatable", "citations_json"}
 
 class PageViewsMiddleware:
 
@@ -33,12 +33,22 @@ class PageViewsMiddleware:
 
                         all_params = {**view_kwargs, **request.GET.dict(), **request.POST.dict()}
 
+                        # hack to split up classification ID when it's in the form of "classification_id.modification_timestamp"
+                        if classification_id := all_params.get("classification_id"):
+                            if isinstance(classification_id, str) or isinstance(classification_id, float):
+                                check_for_parts = str(classification_id)
+                                parts = check_for_parts.split(".")
+                                all_params["classification_id"] = int(parts[0])
+                                if len(parts) > 1:
+                                    all_params["modification_timestamp"] = float(parts[1])
+
                         ViewEvent(
                             user=request.user,
                             view_name=f"{app}:{url_obj.view_name}",
                             args=all_params,
                             path=request.get_full_path(),
-                            method=request.method
+                            method=request.method,
+                            referer=request.headers.get('Referer')
                         ).save()
 
         pass

@@ -65,6 +65,10 @@ REST_FRAMEWORK = {
     'EXCEPTION_HANDLER': 'rollbar.contrib.django_rest_framework.post_exception_handler'
 }
 
+# user logging
+MIDDLEWARE += ('eventlog.middleware.PageViewsMiddleware', )
+LOG_ACTIVITY_APPS = {"classification", "variantopedia", "snpdb"}
+
 #OIDC_DRF_AUTH_BACKEND = 'auth.backend.VariantGridOIDCAuthenticationBackend'
 
 # OIDC SETTINGS
@@ -202,9 +206,10 @@ URLS_NAME_REGISTER.update({  # Disable selected snpdb urls
     "condition_matchings": True,
     "condition_match_test": True,
     # "condition_aliases": True
+    "classification_view_metrics": True,
 
     # ClinVarExport
-    "clinvar_key_summary": True
+    "clinvar_key_summary": True,
 })
 
 PREFER_ALLELE_LINKS = True

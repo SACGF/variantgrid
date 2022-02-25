@@ -189,7 +189,7 @@ class Organization(models.Model):
         return self.name < other.name
 
     def get_absolute_url(self):
-        return reverse('view_organization', kwargs={"pk": self.pk})
+        return reverse('view_organization', kwargs={"organization_id": self.pk})
 
     def __str__(self):
         return self.name
@@ -531,7 +531,7 @@ class Lab(models.Model):
             # but also make sure this doesn't break RunX1
 
     def get_absolute_url(self):
-        return reverse('view_lab', kwargs={"pk": self.pk})
+        return reverse('view_lab', kwargs={"lab_id": self.pk})
 
     def __str__(self):
         name = self.name

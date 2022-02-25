@@ -14,6 +14,7 @@ from classification.views.classification_import_upload_view import UploadedFileL
 from classification.views.classification_overlaps_view import view_overlaps, post_clinical_context, \
     view_clinical_context, view_overlaps_detail
 from classification.views.classification_view import ClassificationView, LabGeneClassificationCountsView
+from classification.views.classification_view_metrics import view_classifiaction_metrics
 from classification.views.condition_match_test_view import condition_match_test_view, condition_match_test_download_view
 from classification.views.condition_matching_view import condition_matching_view, condition_matchings_view, \
     ConditionTextColumns, ConditionTextMatchingAPI
@@ -36,6 +37,8 @@ urlpatterns = [
     perm_path('create_for_variant/<int:variant_id>/<genome_build_name>', views.CreateClassificationForVariantView.as_view(),
               name='create_classification_for_variant'),
 
+    perm_path('classification/views', view_classifiaction_metrics, name="classification_view_metrics"),
+
     # this is uploading the entire import file, distinct from attaching a file to a classification
     perm_path('classification/import_upload', classification_import_upload_view.FileUploadView.as_view(), name="classification_import_upload"),
     perm_path('classification/import_upload/<int:lab_id>', classification_import_upload_view.FileUploadView.as_view(), name="classification_import_upload_lab"),
@@ -52,15 +55,15 @@ urlpatterns = [
     perm_path('classification_grid/export_redcap/', views.export_classifications_grid_redcap, name='export_classifications_grid_redcap'),
 
     perm_path('clivnar_export_summary', clinvar_export_view.clinvar_export_summary, name='clinvar_key_summary'),  # version that lets you pick which clinvarkey if you access to multiple
-    perm_path('clinvar_export_summary/<str:pk>', clinvar_export_view.clinvar_export_summary, name='clinvar_key_summary'),
-    perm_path('clinvar_export_summary/<str:clinvar_key>/download', clinvar_export_view.clinvar_export_download, name='clinvar_key_summary_export_download'),
+    perm_path('clinvar_export_summary/<str:clinvar_key_id>', clinvar_export_view.clinvar_export_summary, name='clinvar_key_summary'),
+    perm_path('clinvar_export_summary/<str:clinvar_key_id>/download', clinvar_export_view.clinvar_export_download, name='clinvar_key_summary_export_download'),
     perm_path('clinvar_export/datatable', DatabaseTableView.as_view(column_class=clinvar_export_view.ClinVarExportColumns), name='clinvar_exports_datatables'),
-    perm_path('clinvar_export/<int:pk>', clinvar_export_view.clinvar_export_review, name='clinvar_export'),
-    perm_path('clinvar_export/<int:pk>/detail', clinvar_export_view.clinvar_export_detail, name='clinvar_export_detail'),
-    perm_path('clinvar_export/<int:pk>/history', clinvar_export_view.clinvar_export_history, name='clinvar_export_history'),
+    perm_path('clinvar_export/<int:clinvar_export_id>', clinvar_export_view.clinvar_export_review, name='clinvar_export'),
+    perm_path('clinvar_export/<int:clinvar_export_id>/detail', clinvar_export_view.clinvar_export_detail, name='clinvar_export_detail'),
+    perm_path('clinvar_export/<int:clinvar_export_id>/history', clinvar_export_view.clinvar_export_history, name='clinvar_export_history'),
     perm_path('clinvar_export_batch/datatable', DatabaseTableView.as_view(column_class=clinvar_export_view.ClinVarExportBatchColumns), name='clinvar_export_batch_datatables'),
-    perm_path('clinvar_export_batch/<int:pk>/detail', clinvar_export_view.clinvar_export_batch_detail, name='clinvar_export_batch_detail'),
-    perm_path('clinvar_export_batch/<int:pk>/download', clinvar_export_view.clinvar_export_batch_download, name='clinvar_export_batch_download'),
+    perm_path('clinvar_export_batch/<int:clinvar_export_batch_id>/detail', clinvar_export_view.clinvar_export_batch_detail, name='clinvar_export_batch_detail'),
+    perm_path('clinvar_export_batch/<int:clinvar_export_batch_id>/download', clinvar_export_view.clinvar_export_batch_download, name='clinvar_export_batch_download'),
 
     perm_path('condition_matchings', condition_matchings_view, name='condition_matchings'),
     perm_path('condition_matchings/<int:lab_id>', condition_matchings_view, name='condition_matchings_lab'),
@@ -72,10 +75,10 @@ urlpatterns = [
 
     perm_path('diff/', views.view_classification_diff, name='classification_diff'),
     perm_path('redcap_data_dictionary.csv', classification_export_view.redcap_data_dictionary, name='redcap_data_dictionary'),
-    perm_path('classification/<record_id>/classification.csv', classification_export_view.record_csv, name='classification_csv'),
-    perm_path('classification/<record_id>/report.html', classification_export_view.template_report, name='view_template_report'),
-    perm_path('classification/<record_id>/history', views.classification_history, name='classification_history'),
-    perm_path('classification/<record_id>', views.view_classification, name='view_classification'),
+    perm_path('classification/<classification_id>/classification.csv', classification_export_view.record_csv, name='classification_csv'),
+    perm_path('classification/<classification_id>/report.html', classification_export_view.template_report, name='view_template_report'),
+    perm_path('classification/<classification_id>/history', views.classification_history, name='classification_history'),
+    perm_path('classification/<classification_id>', views.view_classification, name='view_classification'),  # classificaiton ID might have a version in it (e.g. a dot)
 
     perm_path('evidence_keys/<max_share_level>', views.evidence_keys, name='evidence_keys_max_share_level'),
     perm_path('evidence_keys', views.evidence_keys, name='evidence_keys'),

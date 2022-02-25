@@ -313,8 +313,8 @@ def _single_classification_mod_qs(request: HttpRequest, record_id) -> QuerySet:
 
 
 @not_minified_response
-def template_report(request: HttpRequest, record_id) -> HttpResponseBase:
-    qs = _single_classification_mod_qs(request, record_id)
+def template_report(request: HttpRequest, classification_id) -> HttpResponseBase:
+    qs = _single_classification_mod_qs(request, classification_id)
     genome_build = UserSettings.get_for_user(request.user).default_genome_build
 
     return ExportFormatterReport(user=request.user, genome_build=genome_build, qs=qs).export(as_attachment=False)
@@ -327,8 +327,8 @@ def redcap_data_dictionary(request: HttpRequest) -> HttpResponseBase:
     return response
 
 
-def record_csv(request: HttpRequest, record_id) -> HttpResponseBase:
-    vcm: ClassificationModification = ClassificationRef.init_from_obj(request.user, record_id).modification
+def record_csv(request: HttpRequest, classification_id) -> HttpResponseBase:
+    vcm: ClassificationModification = ClassificationRef.init_from_obj(request.user, classification_id).modification
     qs = ClassificationModification.objects.filter(pk=vcm.id)
 
     genome_build = UserSettings.get_for_user(request.user).default_genome_build

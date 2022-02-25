@@ -1,0 +1,69 @@
+{% extends "uicore/page/base.html" %}
+{% load static %}
+{% load compress %}
+{% load ui_help %}
+{% load user_tags %}
+{% load ui_utils %}
+{% load ui_menu_bars %}
+{% load classification_tags %}
+{% block title %}Classification View Metrics{% endblock %}
+{% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
+{% block content %}
+<div class="container">
+
+    {% page_help_embedded title="Classification View Metrics (Last 30 days)" %}
+        <p>Most Viewed Xs count unique users accessing the data across the last 30 days</p>
+        <p>Most Active Users count how many pages the user viewed across the last 30 days</p>
+    {% end_page_help_embedded %}
+
+    <div class="card">
+        <div class="card-header">Most Viewed Classifications</div>
+        <ul class="list-group">
+        {% for ccount in counts.classification_views|slice:"10" %}
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+                {% classification_quick ccount.resolve %}
+                <span class="badge badge-primary badge-pill">{{ ccount.count }}</span>
+            </li>
+        {% endfor %}
+        </ul>
+    </div>
+
+    <div class="card mt-4">
+        <div class="card-header">Most Viewed Alleles</div>
+        <ul class="list-group">
+        {% for ccount in counts.allele_views|slice:"10" %}
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+                {% with allele=ccount.resolve %}
+                    <a class="hover-link" href="{{ allele.get_absolute_url }}">{{ ccount.resolve }}</a>
+                    <span class="badge badge-primary badge-pill">{{ ccount.count }}</span>
+                {% endwith %}
+            </li>
+        {% endfor %}
+        </ul>
+    </div>
+
+    <div class="card mt-4">
+        <div class="card-header">Most Viewed Pages</div>
+        <ul class="list-group">
+        {% for ccount in counts.page_views|slice:"10" %}
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+                {{ ccount.pk }}
+                <span class="badge badge-primary badge-pill">{{ ccount.count }}</span>
+            </li>
+        {% endfor %}
+        </ul>
+    </div>
+
+    <div class="card mt-4">
+        <div class="card-header">Most Active Users</div>
+        <ul class="list-group">
+        {% for ccount in counts.active_users|slice:"10" %}
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+                {% user ccount.resolve %}
+                <span class="badge badge-primary badge-pill">{{ ccount.count }}</span>
+            </li>
+        {% endfor %}
+        </ul>
+    </div>
+</div>
+{% endblock content %}

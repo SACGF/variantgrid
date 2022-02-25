@@ -61,8 +61,8 @@ class ClinVarExportBatchColumns(DatatableConfig):
         return initial_qs
 
 
-def clinvar_export_batch_detail(request, pk: int):
-    clinvar_export_batch: ClinVarExportBatch = ClinVarExportBatch.objects.get(pk=pk)
+def clinvar_export_batch_detail(request, clinvar_export_batch_id: int):
+    clinvar_export_batch: ClinVarExportBatch = ClinVarExportBatch.objects.get(pk=clinvar_export_batch_id)
     clinvar_export_batch.clinvar_key.check_user_can_access(request.user)
     submissions = clinvar_export_batch.clinvarexportsubmission_set.order_by('created')
 
@@ -173,8 +173,8 @@ class ClinVarExportColumns(DatatableConfig[ClinVarExport]):
         return initial_qs
 
 
-def clinvar_export_review(request: HttpRequest, pk) -> HttpResponseBase:
-    clinvar_export: ClinVarExport = ClinVarExport.objects.get(pk=pk)  # fixme get or 404
+def clinvar_export_review(request: HttpRequest, clinvar_export_id: int) -> HttpResponseBase:
+    clinvar_export: ClinVarExport = ClinVarExport.objects.get(pk=clinvar_export_id)  # fixme get or 404
     clinvar_export.clinvar_allele.clinvar_key.check_user_can_access(request.user)
 
     if request.method == "POST":
@@ -189,8 +189,8 @@ def clinvar_export_review(request: HttpRequest, pk) -> HttpResponseBase:
     })
 
 
-def clinvar_export_history(request: HttpRequest, pk) -> HttpResponseBase:
-    clinvar_export: ClinVarExport = ClinVarExport.objects.get(pk=pk)
+def clinvar_export_history(request: HttpRequest, clinvar_export_id: int) -> HttpResponseBase:
+    clinvar_export: ClinVarExport = ClinVarExport.objects.get(pk=clinvar_export_id)
     clinvar_export.clinvar_allele.clinvar_key.check_user_can_access(request.user)
 
     history = clinvar_export.clinvarexportsubmission_set.order_by('-created')
@@ -264,8 +264,8 @@ class ClinVarExportSummary(ExportRow):
         return self.clinvar_export.scv
 
 
-def clinvar_export_download(request: HttpRequest, clinvar_key: str) -> HttpResponseBase:
-    clinvar_key: ClinVarKey = get_object_or_404(ClinVarKey, pk=clinvar_key)
+def clinvar_export_download(request: HttpRequest, clinvar_key_id: str) -> HttpResponseBase:
+    clinvar_key: ClinVarKey = get_object_or_404(ClinVarKey, pk=clinvar_key_id)
     clinvar_key.check_user_can_access(request.user)
 
     def rows() -> Iterable[str]:
@@ -279,8 +279,8 @@ def clinvar_export_download(request: HttpRequest, clinvar_key: str) -> HttpRespo
     return response
 
 
-def clinvar_export_batch_download(request: HttpRequest, pk) -> HttpResponseBase:
-    clinvar_export_batch: ClinVarExportBatch = ClinVarExportBatch.objects.get(pk=pk)
+def clinvar_export_batch_download(request: HttpRequest, clinvar_export_batch_id: int) -> HttpResponseBase:
+    clinvar_export_batch: ClinVarExportBatch = ClinVarExportBatch.objects.get(pk=clinvar_export_batch_id)
     clinvar_export_batch.clinvar_key.check_user_can_access(request.user)
 
     # code duplicated from admin, but don't feel this should go into models
@@ -291,16 +291,16 @@ def clinvar_export_batch_download(request: HttpRequest, pk) -> HttpResponseBase:
     return response
 
 
-def clinvar_export_summary(request: HttpRequest, pk: Optional[str] = None) -> HttpResponseBase:
+def clinvar_export_summary(request: HttpRequest, clinvar_key_id: Optional[str] = None) -> HttpResponseBase:
     clinvar_key: ClinVarKey
-    if not pk:
+    if not clinvar_key_id:
         if clinvar_key := ClinVarKey.clinvar_keys_for_user(request.user).first():
             return redirect(reverse('clinvar_key_summary', kwargs={'pk': clinvar_key.pk}))
         else:
             # page has special support if no clinvar key is available to the user
             return render(request, 'classification/clinvar_key_summary_none.html')
 
-    clinvar_key = get_object_or_404(ClinVarKey, pk=pk)
+    clinvar_key = get_object_or_404(ClinVarKey, pk=clinvar_key_id)
     clinvar_key.check_user_can_access(request.user)
 
     labs = Lab.objects.filter(clinvar_key=clinvar_key).order_by('name')
@@ -319,8 +319,8 @@ def clinvar_export_summary(request: HttpRequest, pk: Optional[str] = None) -> Ht
     })
 
 
-def clinvar_export_detail(request: HttpRequest, pk: Optional[str] = None) -> HttpResponseBase:
-    clinvar_export = get_object_or_404(ClinVarExport, pk=pk)
+def clinvar_export_detail(request: HttpRequest, clinvar_export_id: int) -> HttpResponseBase:
+    clinvar_export = get_object_or_404(ClinVarExport, pk=clinvar_export_id)
     clinvar_export.clinvar_allele.clinvar_key.check_user_can_access(request.user)
 
     interpretation_summary: Optional[str] = None

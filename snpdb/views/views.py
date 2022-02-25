@@ -721,8 +721,8 @@ def _add_read_only_settings_message(request, lab_list: Iterable[Lab]):
     messages.add_message(request, messages.INFO, read_only_message)
 
 
-def view_lab(request, pk):
-    lab = get_object_or_404(Lab, pk=pk)
+def view_lab(request, lab_id: int):
+    lab = get_object_or_404(Lab, pk=lab_id)
 
     lab_form = LabForm(request.POST or None, instance=lab)
     lab_settings_override = LabUserSettingsOverride.objects.get_or_create(lab=lab)[0]
@@ -810,8 +810,8 @@ def view_clinvar_key(request, pk: str):
     })
 
 
-def view_organization(request, pk):
-    organization = get_object_or_404(Organization, pk=pk)
+def view_organization(request, organization_id:int):
+    organization = get_object_or_404(Organization, pk=organization_id)
     organization_form = OrganizationForm(request.POST or None, instance=organization)
     org_settings_override = OrganizationUserSettingsOverride.objects.get_or_create(organization=organization)[0]
     override_fields = set(get_model_fields(OrganizationUserSettingsOverride)) - {"id", "settingsoverride_ptr", "organization"}

@@ -20,7 +20,7 @@ class ViewEvent(TimeStampedModel):
     args = models.JSONField(null=False, blank=True, default=empty_dict)
     path = models.TextField()
     method = models.TextField()
-
+    referer = models.TextField(null=True, blank=True)
 
 
 class Event(models.Model):

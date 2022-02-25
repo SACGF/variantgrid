@@ -2,7 +2,7 @@ import json
 import mimetypes
 import re
 from datetime import datetime
-from typing import Optional, List, Set, Dict
+from typing import Optional, List, Set, Dict, Any
 
 import rest_framework
 from crispy_forms.bootstrap import FieldWithButtons
@@ -287,8 +287,8 @@ def create_classification_object(request) -> Classification:
     return classification
 
 
-def classification_history(request, record_id):
-    ref = ClassificationRef.init_from_str(request.user, str(record_id))
+def classification_history(request, classification_id: Any):
+    ref = ClassificationRef.init_from_str(request.user, str(classification_id))
     ref.check_exists()
     #  changes page will show things before they were submitted and not hide values
     #  so need to restrict to people who've always had access to the record
@@ -304,8 +304,8 @@ def classification_history(request, record_id):
     return render(request, 'classification/activity.html', context)
 
 
-def view_classification(request, record_id):
-    ref = ClassificationRef.init_from_str(request.user, str(record_id))
+def view_classification(request: HttpRequest, classification_id: str):
+    ref = ClassificationRef.init_from_str(request.user, str(classification_id))
     ref.check_exists()
     ref.check_security()
 

@@ -46,7 +46,7 @@ class Allele(FlagsMixin, models.Model):
 
     def get_absolute_url(self):
         # will show allele if there is one, otherwise go to variant page
-        return reverse('view_allele', kwargs={"pk": self.id})
+        return reverse('view_allele', kwargs={"allele_id": self.id})
 
     def flag_type_context(self) -> FlagTypeContext:
         return FlagTypeContext.objects.get(pk="allele")

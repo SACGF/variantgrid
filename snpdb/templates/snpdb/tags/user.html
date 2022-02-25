@@ -1,23 +1,21 @@
 {% load js_tags %}
 {% load static %}
 {% load user_tags %}
-<li class="list-group-item p-1">
-    <div class="d-flex">
-        {% avatar2 avatar %}
-        <div style="line-height:1.3" class="flex-grow align-self-center">
-            {% if show_email and user.email %}
-                <a class="hover-link" href="mailto:{{user.email}}" title="{{ user.email }}">{{ avatar.preferred_label }}</a>
-            {% else %}
-                {{ avatar.preferred_label }}
-            {% endif %}
+<div class="d-flex">
+    {% avatar2 avatar %}
+    <div style="line-height:1.3" class="flex-grow align-self-center">
+        {% if show_email and user.email %}
+            <a class="hover-link" href="mailto:{{user.email}}" title="{{ user.email }}">{{ avatar.preferred_label }}</a>
+        {% else %}
+            {{ avatar.preferred_label }}
+        {% endif %}
 
-            {% if show_last_login %}
-                <br/>
-                <span class="timestamp">{% timestamp user.last_login time_ago=True %}</span>
-                {% if email_weekly %}<i class="far fa-envelope ml-1" title="Receives weekly updates" data-toggle="tooltip"></i>{% endif %}
-                {% if email_discordance %}<i class="far fa-bell ml-1" title="Receives discordance updates" data-toggle="tooltip"></i>{% endif %}
-            {% endif %}
-            {% if role == 'head' %}<i class="far fa-star ml-1" title="User is lab head" data-toggle="tooltip"></i>{% endif %}
-        </div>
+        {% if show_last_login %}
+            <br/>
+            <span class="timestamp">{% timestamp user.last_login time_ago=True %}</span>
+            {% if email_weekly %}<i class="far fa-envelope ml-1" title="Receives weekly updates" data-toggle="tooltip"></i>{% endif %}
+            {% if email_discordance %}<i class="far fa-bell ml-1" title="Receives discordance updates" data-toggle="tooltip"></i>{% endif %}
+        {% endif %}
+        {% if role == 'head' %}<i class="far fa-star ml-1" title="User is lab head" data-toggle="tooltip"></i>{% endif %}
     </div>
-</li>
+</div>
