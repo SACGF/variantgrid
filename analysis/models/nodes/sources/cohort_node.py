@@ -116,7 +116,7 @@ class CohortNode(AbstractCohortBasedNode, AbstractZygosityCountNode):
         cohort, arg_q_dict = self.get_cohort_and_arg_q_dict()
         if cohort:
             self.merge_arg_q_dicts(arg_q_dict, self.get_vcf_locus_filters_arg_q_dict())
-            self.merge_arg_q_dicts(arg_q_dict, self.get_cohort_settings_q(cohort))
+            self.merge_arg_q_dicts(arg_q_dict, self.get_cohort_settings_arg_q_dict(cohort))
         return arg_q_dict
 
     def get_cohort_settings_arg_q_dict(self, cohort) -> Dict[Optional[str], Q]:
