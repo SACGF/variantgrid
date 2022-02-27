@@ -37,7 +37,7 @@ urlpatterns = [
     perm_path('create_for_variant/<int:variant_id>/<genome_build_name>', views.CreateClassificationForVariantView.as_view(),
               name='create_classification_for_variant'),
 
-    perm_path('classification/views', view_classifiaction_metrics, name="classification_view_metrics"),
+    perm_path('classification/view_metrics', view_classifiaction_metrics, name="classification_view_metrics"),
 
     # this is uploading the entire import file, distinct from attaching a file to a classification
     perm_path('classification/import_upload', classification_import_upload_view.FileUploadView.as_view(), name="classification_import_upload"),

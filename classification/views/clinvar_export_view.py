@@ -304,7 +304,7 @@ def clinvar_export_summary(request: HttpRequest, clinvar_key_id: Optional[str] =
     clinvar_key.check_user_can_access(request.user)
 
     labs = Lab.objects.filter(clinvar_key=clinvar_key).order_by('name')
-    dashbaord = ClassificationDashboard(user=request.user, labs=labs)
+    dashboard = ClassificationDashboard(user=request.user, labs=labs)
 
     export_columns = ClinVarExportColumns(request)
     export_batch_columns = ClinVarExportBatchColumns(request)
@@ -313,7 +313,7 @@ def clinvar_export_summary(request: HttpRequest, clinvar_key_id: Optional[str] =
         'all_keys': ClinVarKey.clinvar_keys_for_user(request.user),
         'clinvar_key': clinvar_key,
         'labs': labs,
-        'missing_condition_count': dashbaord.classifications_wout_standard_text,
+        'missing_condition_count': dashboard.classifications_wout_standard_text,
         'count_records': export_columns.get_initial_query_params(clinvar_key=clinvar_key_id).count(),
         'count_batch': export_batch_columns.get_initial_query_params(clinvar_key=clinvar_key_id).count()
     })

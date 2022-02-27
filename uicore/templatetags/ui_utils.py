@@ -475,6 +475,20 @@ def secret(value: Any, length: int = -4) -> str:
 
 
 @register.filter()
+def segmented_text(text: str, divider: str = ':') -> str:
+    if not text:
+        return ""
+    parts = text.split(divider)
+    output = list()
+    for segment in parts[:-1]:
+        output.append(f"<span class='text-monospace text-small text-muted'>{escape(segment)}</span>")
+        output.append(f"<span class='text-monospace text-muted'>{escape(divider)}</span>")
+    output.append(parts[-1])
+    output_str = "".join(output)
+    return SafeString(f"<span>{output_str}</span>")
+
+
+@register.filter()
 def is_view_enabled(view_name: str) -> bool:
     return get_visible_url_names().get(view_name)
 

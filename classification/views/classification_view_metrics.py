@@ -13,7 +13,9 @@ from django.utils.timezone import now
 from lazy import lazy
 from classification.models import Classification
 from eventlog.models import ViewEvent
+from library.django_utils import require_superuser
 from snpdb.models import Allele
+from snpdb.views.views import staff_only
 
 T = TypeVar("T")
 
@@ -94,12 +96,19 @@ class ViewEventCounts:
         return sorted((Counted(pk, count, ViewEventCounts.resolver_for_model(User)) for pk, count in id_to_count.items()), reverse=True)
 
 
+@require_superuser
 def view_classifiaction_metrics(request: HttpRequest) -> HttpResponseBase:
     if not request.user.is_superuser:
         raise PermissionDenied()
 
+    days_old = 30
+    if days_old_str := request.GET.get('days'):
+        days_old = int(days_old_str)
+
     context = {
-        "counts": ViewEventCounts(time_ago=timedelta(30))
+        "counts": ViewEventCounts(time_ago=timedelta(days_old)),
+        "days": days_old,
+        "days_options": [1, 7, 30, 60, 90],
+        "page_title": f"Classification View Metrics (Last {days_old} days)"
     }
     return render(request, "classification/classification_view_metrics.html", context)
-

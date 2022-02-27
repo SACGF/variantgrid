@@ -11,7 +11,15 @@
 {% block content %}
 <div class="container">
 
-    {% page_help_embedded title="Classification View Metrics (Last 30 days)" %}
+    <div class="btn-group mb-4" role="group" aria-label="ClinVar Key Picker">
+        {% for days_option in days_options %}
+            <button onclick="window.open('{% url 'classification_view_metrics' %}?days={{ days_option }}', '_self')"
+            class="btn {% if days == days_option %}btn-secondary font-weight-bold{% else %}btn-outline-secondary{% endif %}">{{ days_option }} days
+            </button>
+        {% endfor %}
+    </div>
+
+    {% page_help_embedded title=page_title %}
         <p>Most Viewed Xs count unique users accessing the data across the last 30 days</p>
         <p>Most Active Users count how many pages the user viewed across the last 30 days</p>
     {% end_page_help_embedded %}
@@ -47,7 +55,7 @@
         <ul class="list-group">
         {% for ccount in counts.page_views|slice:"10" %}
             <li class="list-group-item d-flex justify-content-between align-items-center">
-                {{ ccount.pk }}
+                {{ ccount.pk | segmented_text }}
                 <span class="badge badge-primary badge-pill">{{ ccount.count }}</span>
             </li>
         {% endfor %}
