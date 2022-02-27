@@ -6,12 +6,13 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.test import TestCase
 
+from annotation.fake_annotation import get_fake_annotation_version
 from snpdb.models import ImportSource, Sequence, md5sum_str
 from upload.models import UploadedFile, UploadPipeline, UploadedVCF, UploadStep, UploadedFileTypes
 from upload.vcf.bulk_genotype_vcf_processor import BulkGenotypeVCFProcessor
 from upload.vcf.bulk_no_genotype_vcf_processor import BulkNoGenotypeVCFProcessor
 from upload.vcf.sql_copy_files import COHORT_GENOTYPE_HEADER
-from upload.vcf.vcf_import import create_vcf_from_vcf
+from upload.vcf.vcf_import import create_vcf_from_vcf, create_cohort_genotype_collection_from_vcf
 
 
 class TestVCFProcessors(TestCase):
@@ -36,7 +37,9 @@ class TestVCFProcessors(TestCase):
         upload_step = UploadStep.objects.create(upload_pipeline=upload_pipeline,
                                                 input_filename=vcf_filename,
                                                 sort_order=0)
-        create_vcf_from_vcf(upload_step, vcf_reader)
+        vcf = create_vcf_from_vcf(upload_step, vcf_reader)
+        get_fake_annotation_version(vcf.genome_build)
+        create_cohort_genotype_collection_from_vcf(vcf, vcf_reader)
         uploaded_vcf = UploadedVCF.objects.get(upload_pipeline=upload_pipeline)
         return upload_step, uploaded_vcf
 
@@ -44,7 +47,8 @@ class TestVCFProcessors(TestCase):
         """ I keep forgetting to adjust the columns to match the CSV """
         fast_vcf_reader = cyvcf2.VCF(vcf_filename)
         upload_step, uploaded_vcf = self._create_fake_upload_step_and_vcf(vcf_filename, fast_vcf_reader)
-        processor = processor_klass(upload_step, None, uploaded_vcf, None)
+        cohort_genotype_collection = uploaded_vcf.vcf.cohort.cohort_genotype_collection
+        processor = processor_klass(upload_step, cohort_genotype_collection, uploaded_vcf, None)
 
         for v in fast_vcf_reader:
             processor.process_entry(v)
