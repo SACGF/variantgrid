@@ -295,7 +295,7 @@ def clinvar_export_summary(request: HttpRequest, clinvar_key_id: Optional[str] =
     clinvar_key: ClinVarKey
     if not clinvar_key_id:
         if clinvar_key := ClinVarKey.clinvar_keys_for_user(request.user).first():
-            return redirect(reverse('clinvar_key_summary', kwargs={'pk': clinvar_key.pk}))
+            return redirect(reverse('clinvar_key_summary', kwargs={'clinvar_key_id': clinvar_key.pk}))
         else:
             # page has special support if no clinvar key is available to the user
             return render(request, 'classification/clinvar_key_summary_none.html')
@@ -314,8 +314,8 @@ def clinvar_export_summary(request: HttpRequest, clinvar_key_id: Optional[str] =
         'clinvar_key': clinvar_key,
         'labs': labs,
         'missing_condition_count': dashbaord.classifications_wout_standard_text,
-        'count_records': export_columns.get_initial_query_params(clinvar_key=pk).count(),
-        'count_batch': export_batch_columns.get_initial_query_params(clinvar_key=pk).count()
+        'count_records': export_columns.get_initial_query_params(clinvar_key=clinvar_key_id).count(),
+        'count_batch': export_batch_columns.get_initial_query_params(clinvar_key=clinvar_key_id).count()
     })
 
 
