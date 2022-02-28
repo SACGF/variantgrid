@@ -225,6 +225,9 @@ class VCFFilter(models.Model):
     filter_id = models.TextField()
     description = models.TextField(null=True)
 
+    class Meta:
+        unique_together = (('vcf', 'filter_code'), ('vcf', 'filter_id'))
+
     @staticmethod
     def get_formatter(vcf: VCF):
         lookup = {vf.filter_code: vf.filter_id for vf in vcf.vcffilter_set.all()}
