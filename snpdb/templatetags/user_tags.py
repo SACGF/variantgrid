@@ -20,7 +20,7 @@ def has_group_or_admin(user, group_name):
 
 
 @register.inclusion_tag("snpdb/tags/user.html", takes_context=True)
-def user(context, u: User, show_avatar=False, show_email=False, show_last_login=False, role='user', display='normal'):
+def user(context, u: User, show_avatar=False, show_email=False, show_last_login=False, role='user', size='normal'):
     user_cache: Dict[int, UserSettings] = context.get("_user_cache")
     if not user_cache:
         user_cache = dict()
@@ -39,7 +39,7 @@ def user(context, u: User, show_avatar=False, show_email=False, show_last_login=
         "show_last_login": show_last_login,
         "email_weekly": us.email_weekly_updates,
         "email_discordance": us.email_discordance_updates,
-        "display": display,
+        "size": size,
     }
 
 
