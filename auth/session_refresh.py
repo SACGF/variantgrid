@@ -4,7 +4,7 @@ from mozilla_django_oidc.middleware import SessionRefresh
 class VariantGridSessionRefresh(SessionRefresh):
 
     @staticmethod
-    def is_ajax(self, request):
+    def is_ajax(request):
         # request.is_ajax has been deprecated, is somewhat jQuery dependant
         # we need to start making sure all our ajax targets are in some kind of pattern
         return request.META.get('HTTP_X_REQUESTED_WITH') == 'XMLHttpRequest'
