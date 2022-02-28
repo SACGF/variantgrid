@@ -31,7 +31,7 @@ from snpdb.models.models_enums import AlleleConversionTool, AlleleOrigin, Proces
 from snpdb.models.models_genome import Contig, GenomeBuild, GenomeBuildContig
 
 LOCUS_PATTERN = re.compile(r"^([^:]+):(\d+)[,\s]*([GATC]+)$", re.IGNORECASE)
-LOCUS_NO_REF_PATTERN = r"^([^:]+):(\d+)$"
+LOCUS_NO_REF_PATTERN = re.compile(r"^([^:]+):(\d+)$")
 VARIANT_PATTERN = re.compile(r"^([^:]+):(\d+)[,\s]*([GATC]+)>(=|[GATC]+)$", re.IGNORECASE)
 
 allele_validate_signal = django.dispatch.Signal()  # args: "allele"

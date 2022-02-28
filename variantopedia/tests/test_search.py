@@ -2,6 +2,8 @@ from unittest import TestCase
 
 from django.contrib.auth.models import User
 
+from annotation.tests.test_data_fake_genes import create_fake_transcript_version
+from snpdb.models import GenomeBuild, ClinGenAllele
 from variantopedia.search import search_data
 
 
@@ -11,11 +13,11 @@ class TestVCFProcessors(TestCase):
     def setUpClass(cls):
         super().setUpClass()
         cls.user = User.objects.get_or_create(username='testuser')[0]
+        create_fake_transcript_version(GenomeBuild.grch38())
 
     def test_search_hgvs(self):
         HGVS_NAMES = [
-            "NM_001080463.1:c.5972T>A",
-            "NM_000492.3(CFTR):c.1438G>T",
+            "ENST00000300305.7(RUNX1):c.352-1G>A",
             "NC_000007.13:g.117199563G>T",
         ]
         for hgvs_name in HGVS_NAMES:
@@ -23,7 +25,7 @@ class TestVCFProcessors(TestCase):
 
     def test_search_gene_hgvs(self):
         HGVS_NAMES = [
-            "CFTR:c.350G>A",
+            # "CFTR:c.50G>A",  # This is really slow...
         ]
         for hgvs_name in HGVS_NAMES:
             _search_results = search_data(self.user, hgvs_name, False)
@@ -46,7 +48,7 @@ class TestVCFProcessors(TestCase):
 
     def test_search_dbsnp(self):
         DBSNP = [
-            "rs6025",
+            # "rs6025",
         ]
         for dbsnp_str in DBSNP:
             _search_results = search_data(self.user, dbsnp_str, False)
@@ -55,34 +57,35 @@ class TestVCFProcessors(TestCase):
         CLINGEN_ALLELE = [
             "CA285410130",
         ]
+        ClinGenAllele.objects.get_or_create(id=285410130, defaults={"api_response": {}})
         for ca_str in CLINGEN_ALLELE:
             _search_results = search_data(self.user, ca_str, False)
 
     def test_gene_symbol(self):
         GENE_SYMBOL = [
-            "gata2",
-            "GATA2",
+            "runx1",
+            "RUNX1",
         ]
         for gene_symbol in GENE_SYMBOL:
             _search_results = search_data(self.user, gene_symbol, False)
 
     def test_gene(self):
         GENE = [
-            "ENSG00000179348",
+            "ENSG00000159216",
         ]
         for gene in GENE:
             _search_results = search_data(self.user, gene, False)
 
     def test_transcript(self):
         TRANSCRIPTS = [
-            "NM_001080463",
+            "ENST00000300305",
         ]
         for transcript_id in TRANSCRIPTS:
             _search_results = search_data(self.user, transcript_id, False)
 
     def test_transcript_version(self):
         TRANSCRIPT_VERSION = [
-            "NM_001080463.2",
+            "ENST00000300305.7",
         ]
         for transcript_version in TRANSCRIPT_VERSION:
             _search_results = search_data(self.user, transcript_version, False)

@@ -315,11 +315,15 @@ class Searcher:
             search_types: list of what we searched due to regex match
             search_errors: dict of SearchError to genome_buld where the error occured
         """
-        HAS_ALPHA_PATTERN = r"[a-zA-Z]"
-        NO_WHITESPACE = r"^\S+$"
-        NOT_WHITESPACE = r"\S+"
-        HGVS_UNCLEANED_PATTERN = r"[^:]([cnmg]\.|:[cnmg]).*\d+"  # Bare bones match - may be able to fix it...
+        HAS_ALPHA_PATTERN = re.compile(r"[a-zA-Z]")
+        NOT_WHITESPACE = re.compile(r"\S+")
+        HGVS_UNCLEANED_PATTERN = re.compile(r"[^:]([cnmg]\.|:[cnmg]).*\d+") # Bare bones match - should tighten...
         COSMIC_PATTERN = re.compile(r"^COS[MV](\d+)$")  # Old or new
+        CLINGEN_ALLELE_PATTERN = re.compile(r"^CA")
+        TRANSCRIPT_PATTERN = re.compile(r"^(ENST|NM_|NR_|XR_)\d+\.?\d*$")
+        GENE_SYMBOL_PATTERN = re.compile(r"^[a-zA-Z][\da-zA-Z0-9-]+")
+        GENE_PATTERN = re.compile(r"(ENSG|Gene.*:)\d+")
+        MIN_3_ALPHA = re.compile(r"[a-zA-Z]{3,}")
 
         self.genome_build_searches = [
             (SearchTypes.COHORT, NOT_WHITESPACE, search_cohort),
@@ -331,22 +335,22 @@ class Searcher:
             (SearchTypes.SAMPLE, NOT_WHITESPACE, search_sample),
             (SearchTypes.VCF, NOT_WHITESPACE, search_vcf),
             (SearchTypes.VARIANT, VARIANT_PATTERN, search_variant),
-            (SearchTypes.CLINGEN_ALLELE_ID, r"^CA", search_clingen_allele),
+            (SearchTypes.CLINGEN_ALLELE_ID, CLINGEN_ALLELE_PATTERN, search_clingen_allele),
             (SearchTypes.VARIANT, VARIANT_VCF_PATTERN, search_variant_vcf),
             (SearchTypes.VARIANT, VARIANT_GNOMAD_PATTERN, search_variant_gnomad),
             (SearchTypes.COSMIC, COSMIC_PATTERN, search_cosmic),
         ]
         self.genome_agnostic_searches = [
-            (SearchTypes.GENE, NO_WHITESPACE, search_gene_symbol),  # special case
-            (SearchTypes.GENE, r"(ENSG|Gene.*:)\d+", search_gene),  # special case
+            (SearchTypes.GENE, GENE_SYMBOL_PATTERN, search_gene_symbol),  # special case
+            (SearchTypes.GENE, GENE_PATTERN, search_gene),  # special case
             (SearchTypes.EXPERIMENT, HAS_ALPHA_PATTERN, search_experiment),
             (SearchTypes.EXTERNAL_PK, HAS_ALPHA_PATTERN, search_external_pk),
             (SearchTypes.PATIENT, HAS_ALPHA_PATTERN, search_patient),
             (SearchTypes.SEQUENCING_RUN, SEQUENCING_RUN_REGEX, search_sequencing_run),
-            (SearchTypes.TRANSCRIPT, r"^(ENST|NM_|NR_|XR_)\d+\.?\d*$", search_transcript),
+            (SearchTypes.TRANSCRIPT, TRANSCRIPT_PATTERN, search_transcript),
             (SearchTypes.VARIANT, DB_PREFIX_PATTERN, search_variant_id),
-            (SearchTypes.LAB, r"[a-zA-Z]{3,}", search_lab),
-            (SearchTypes.ORG, r"[a-zA-Z]{3,}", search_org),
+            (SearchTypes.LAB, MIN_3_ALPHA, search_lab),
+            (SearchTypes.ORG, MIN_3_ALPHA, search_org),
             # now done via new search
             # (SearchTypes.ONTOLOGY, ONTOLOGY_PATTERN, search_ontology),
             # (SearchTypes.ONTOLOGY, HAS_ALPHA_PATTERN, search_ontology_name)
@@ -521,11 +525,11 @@ def search_dbsnp(search_string, user, genome_build: GenomeBuild, variant_qs: Que
 
 
 def search_gene_symbol(search_string: str, **kwargs) -> Iterable[Union[GeneSymbol, GeneSymbolAlias]]:
-    # itertools.chain doesn't work
+    # Gene symbols / aliases use Postgres case-insensitive text, so don't need iexact
+    gene_symbols = list(GeneSymbol.objects.filter(symbol=search_string))
     # only return a GeneSymbol alias if we're not returning the source GeneSymbol
-    gene_symbols = list(GeneSymbol.objects.filter(symbol__iexact=search_string))
     gene_symbol_strs = {gene_symbol.symbol for gene_symbol in gene_symbols}
-    aliases = [alias for alias in GeneSymbolAlias.objects.filter(alias__iexact=search_string).all() if alias.alias not in gene_symbol_strs]
+    aliases = list(GeneSymbolAlias.objects.filter(alias=search_string).exclude(alias__in=gene_symbol_strs))
     return gene_symbols + aliases
 
 
