@@ -110,7 +110,7 @@ function sendUpdateNodeMessage(nodeId, op, params, on_success_function) {
 	$.ajax({
 	    type: "POST",
 	    data: data,
-	    url: Urls.node_update(nodeId),
+	    url: Urls.node_update(ANALYSIS_ID, nodeId),
 	    success: function(data) {
 	       on_success_function(data.dirty_nodes);
         },
@@ -901,7 +901,7 @@ function retrieveAndUpdateNodeAppearances(nodeList) {
     for (let i=0 ; i<nodeList.length ; ++i) {
         let nodeId = nodeList[i];
         $.ajax({
-            url: Urls.node_data(nodeId),
+            url: Urls.node_data(ANALYSIS_ID, nodeId),
             success: updateNodeAppearance,
         });
     }

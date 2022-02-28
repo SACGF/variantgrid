@@ -3,7 +3,7 @@
         function loadBaseURL(func, pk) {
             var container = $("#vcf-locus-filter-container");
             if (pk) {
-                const URL = func({{ node.pk }}, pk);
+                const URL = func({{ node.analysis_id }}, {{ node.pk }}, pk);
                 container.load(URL);
             } else {
                 container.html("No input selected");

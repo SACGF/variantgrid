@@ -70,7 +70,7 @@
 
             jQuery.extend($.fn.fmatter , {
                 analysisNodeLink : function(cellvalue, options, rowObject) {
-                    let analysisId = rowObject.analysis_id;
+                    let analysisId = rowObject.analysis__id;
                     let nodeId = rowObject.id;
                     // Hack as Urls can use dictionary as kwargs (set in JqGrid colmodel override)
                     rowObject.hack_kwargs = {analysis_id: analysisId, active_node_id: nodeId};

@@ -266,9 +266,11 @@ NODE_DISPATCHER = get_node_views_by_class()
 
 @cache_page(WEEK_SECS)
 @vary_on_cookie
-def node_view(request, analysis_version, node_id, node_version, extra_filters):
+def node_view(request, analysis_id, analysis_version, node_id, node_version, extra_filters):
     """ So we don't fill up urls with lots of different views, just come here and dispatch
-        to subclasses of NodeView in analysis.views.nodes based on the model field """
+        to subclasses of NodeView in analysis.views.nodes based on the model field
+
+        We use analysis version to be able to expire cache if the custom columns etc change """
     node = get_node_subclass_or_404(request.user, node_id, version=node_version)
     view = NODE_DISPATCHER[node.__class__]
     return view(request, pk=node_id, version_id=node_version, extra_filters=extra_filters)
@@ -290,7 +292,8 @@ def get_node_sql(grid):
 @not_minified_response
 @cache_page(WEEK_SECS)
 @vary_on_cookie
-def node_debug(request, analysis_version, node_id, node_version, extra_filters):
+def node_debug(request, analysis_id, analysis_version, node_id, node_version, extra_filters):
+    """ We use analysis version to be able to expire cache if the custom columns etc change """
     node = get_node_subclass_or_404(request.user, node_id, version=node_version)
     model_name = node._meta.label
     node_serializers = AnalysisNodeSerializer.get_node_serializers()
@@ -310,7 +313,7 @@ def node_debug(request, analysis_version, node_id, node_version, extra_filters):
     return render(request, "analysis/node_editors/grid_editor_debug_tab.html", context)
 
 
-def node_doc(request, node_id):
+def node_doc(request, analysis_id, node_id):
     node = get_node_subclass_or_404(request.user, node_id)
     has_write_permission = node.analysis.can_write(request.user)
     form = forms.AnalysisNodeForm(request.POST or None, instance=node)
@@ -331,23 +334,26 @@ def node_doc(request, node_id):
 
 @cache_page(WEEK_SECS)
 @vary_on_cookie
-def node_data_grid(request, analysis_version, node_id, node_version, extra_filters):
+def node_data_grid(request, analysis_id, analysis_version, node_id, node_version, extra_filters):
     try:
         node = get_node_subclass_or_404(request.user, node_id, version=node_version)
     except NodeOutOfDateException:
         return HttpResponseRedirect(reverse("node_load", kwargs={"node_id": node_id}))
 
-    context = {"analysis_version": analysis_version,
-               "node_id": node_id,
-               "node_version": node_version,
-               "extra_filters": extra_filters,
-               "bams_dict": node.get_bams_dict()}
+    context = {
+        "analysis_id": analysis_id,
+        "analysis_version": analysis_version,
+        "node_id": node_id,
+        "node_version": node_version,
+        "extra_filters": extra_filters,
+        "bams_dict": node.get_bams_dict()
+    }
     return render(request, 'analysis/node_data/node_data_grid.html', context)
 
 
 @cache_page(WEEK_SECS)
 @vary_on_cookie
-def node_column_summary(request, analysis_version, node_id, node_version, extra_filters, grid_column_name, significant_figures):
+def node_column_summary(request, analysis_id, analysis_version, node_id, node_version, extra_filters, grid_column_name, significant_figures):
     node = get_node_subclass_or_404(request.user, node_id, version=node_version)
 
     grid = VariantGrid(request.user, node, extra_filters)
@@ -356,14 +362,18 @@ def node_column_summary(request, analysis_version, node_id, node_version, extra_
     sorttype = cm.get('sorttype')
     quantitative = sorttype in ['float', 'int']
 
-    context = {"node_id": node.id,
-               "node_version": node.version,
-               "extra_filters": extra_filters}
+    context = {
+        "analysis_id": analysis_id,
+        "node_id": node.id,
+        "node_version": node.version,
+        "extra_filters": extra_filters
+    }
 
     if quantitative:
         label = cm['label']
 
-        poll_url = reverse(column_summary_boxplot, kwargs={"node_id": node_id, "label": label, "variant_column": variant_column})
+        poll_url = reverse(column_summary_boxplot, kwargs={"analysis_id": analysis_id, "node_id": node_id,
+                                                           "label": label, "variant_column": variant_column})
         context["poll_url"] = poll_url
         template = 'analysis/node_data/node_data_graph.html'
         return render(request, template, context)
@@ -391,7 +401,7 @@ def get_snp_matrix_counts(user: User, node_id, version_id):
 
 @cache_page(WEEK_SECS)
 @vary_on_cookie
-def node_snp_matrix(request, node_id, node_version, conversion, significant_figures):
+def node_snp_matrix(request, analysis_id, node_id, node_version, conversion, significant_figures):
     counts_df = get_snp_matrix_counts(request.user, node_id, node_version)
     total = counts_df.sum().sum()
     ti = tv = ti_tv_ratio = None
@@ -430,13 +440,14 @@ def node_snp_matrix(request, node_id, node_version, conversion, significant_figu
 
 @cache_page(WEEK_SECS)
 @vary_on_cookie
-def node_data_graph(request, analysis_version, node_id, node_version, graph_type_id, cmap):
+def node_data_graph(request, analysis_id, analysis_version, node_id, node_version, graph_type_id, cmap):
     context = {"node_id": node_id,
                "node_version": node_version,
                "extra_filters": None}
 
     node = get_node_subclass_or_404(request.user, node_id, version=node_version)
-    poll_url = reverse(node_graph, kwargs={"node_id": node.id, "graph_type_id": graph_type_id, "cmap": cmap})
+    poll_url = reverse(node_graph, kwargs={"analysis_id": analysis_id, "node_id": node.id,
+                                           "graph_type_id": graph_type_id, "cmap": cmap})
     context["poll_url"] = poll_url
     template = 'analysis/node_data/node_data_graph.html'
     return render(request, template, context)
@@ -444,7 +455,7 @@ def node_data_graph(request, analysis_version, node_id, node_version, graph_type
 
 @cache_page(HOUR_SECS)
 @vary_on_cookie
-def node_async_wait(request, analysis_version, node_id, node_version, extra_filters):
+def node_async_wait(request, analysis_id, analysis_version, node_id, node_version, extra_filters):
     node = get_node_subclass_or_404(request.user, node_id)
 
     context = {"analysis_version": analysis_version,
@@ -459,13 +470,14 @@ def node_async_wait(request, analysis_version, node_id, node_version, extra_filt
 
 @cache_page(WEEK_SECS)
 @vary_on_cookie
-def node_errors(request, analysis_version, node_id, node_version, extra_filters):
+def node_errors(request, analysis_id, analysis_version, node_id, node_version, extra_filters):
     try:
         node = get_node_subclass_or_404(request.user, node_id, version=node_version)
     except NodeOutOfDateException:
         return HttpResponseRedirect(reverse("node_load", kwargs={"node_id": node_id}))
 
-    context = {"analysis_version": analysis_version,
+    context = {"analysis_id": analysis_id,
+               "analysis_version": analysis_version,
                "node_id": node_id,
                "node_version": node_version,
                "node": node,
@@ -477,7 +489,7 @@ def node_errors(request, analysis_version, node_id, node_version, extra_filters)
     return render(request, template, context)
 
 
-def node_load(request, node_id):
+def node_load(request, analysis_id, node_id):
     """ loads main grid area, and triggers loading of node editor
         we can't cache this as the node version may have changed since last visit """
 
@@ -485,10 +497,13 @@ def node_load(request, node_id):
         errors = []
         node = get_node_subclass_or_non_fatal_exception(request.user, node_id)
         extra_filters = request.GET.get("extra_filters", "default")
-        kwargs = {"analysis_version": node.analysis.version,
-                  "node_id": node.id,
-                  "node_version": node.version,
-                  "extra_filters": extra_filters}
+        kwargs = {
+            "analysis_id": node.analysis_id,
+            "analysis_version": node.analysis.version,
+            "node_id": node.id,
+            "node_version": node.version,
+            "extra_filters": extra_filters
+        }
         if NodeStatus.is_error(node.status):
             view_name = "node_errors"
         elif NodeStatus.is_ready(node.status):
@@ -508,7 +523,7 @@ def node_load(request, node_id):
 
 
 @require_POST
-def node_cancel_load(request, node_id):
+def node_cancel_load(request, analysis_id, node_id):
     node = get_node_subclass_or_404(request.user, node_id)
     if node_task := NodeTask.objects.filter(node=node, version=node.version).first():
         if node_task.celery_task:
@@ -529,24 +544,24 @@ def node_cancel_load(request, node_id):
     return HttpResponse()
 
 
-def node_graph(request, node_id, graph_type_id, cmap):
+def node_graph(request, analysis_id, node_id, graph_type_id, cmap):
     get_node_subclass_or_404(request.user, node_id)  # Permission check
     node_graph_type = NodeGraphType.objects.get(pk=graph_type_id)
     cached_graph = graphcache.async_graph(node_graph_type.graph_class, cmap, node_id)
     return HttpResponseRedirect(reverse("cached_generated_file_check", kwargs={"cgf_id": cached_graph.id}))
 
 
-def column_summary_boxplot(request, node_id, label, variant_column):
+def column_summary_boxplot(request, analysis_id, node_id, label, variant_column):
     get_node_subclass_or_404(request.user, node_id)  # Permission check
     graph_class_name = full_class_name(ColumnBoxplotGraph)
     cached_graph = graphcache.async_graph(graph_class_name, node_id, label, variant_column)
     return HttpResponseRedirect(reverse("cached_generated_file_check", kwargs={"cgf_id": cached_graph.id}))
 
 
-def cohort_zygosity_filters(request, cohort_node_id, cohort_id):
+def cohort_zygosity_filters(request, analysis_id, node_id, cohort_id):
     """ Called from Cohort Node editor - cohort is what's currently selected,
         not what is saved in node """
-    cohort_node = get_node_subclass_or_404(request.user, cohort_node_id)
+    cohort_node = get_node_subclass_or_404(request.user, node_id)
     cohort = Cohort.get_for_user(request.user, cohort_id)
 
     cnzfc = CohortNodeZygosityFiltersCollection.get_for_node_and_cohort(cohort_node, cohort)
@@ -572,7 +587,7 @@ def cohort_zygosity_filters(request, cohort_node_id, cohort_id):
     return render(request, template, context)
 
 
-def vcf_locus_filters(request, node_id, vcf_id):
+def vcf_locus_filters(request, analysis_id, node_id, vcf_id):
     node = get_node_subclass_or_404(request.user, node_id)
     if vcf_id:
         vcf = VCF.get_for_user(request.user, vcf_id)
@@ -604,29 +619,29 @@ def vcf_locus_filters(request, node_id, vcf_id):
     return render(request, 'analysis/node_editors/vcf_locus_filters.html', context)
 
 
-def sample_vcf_locus_filters(request, node_id, sample_id):
+def sample_vcf_locus_filters(request, analysis_id, node_id, sample_id):
     sample = Sample.get_for_user(request.user, sample_id)
-    return vcf_locus_filters(request, node_id, sample.vcf.pk)
+    return vcf_locus_filters(request, analysis_id, node_id, sample.vcf.pk)
 
 
-def cohort_vcf_locus_filters(request, node_id, cohort_id):
+def cohort_vcf_locus_filters(request, analysis_id, node_id, cohort_id):
     cohort = Cohort.get_for_user(request.user, cohort_id)
     if cohort.vcf:
         vcf_id = cohort.vcf.pk
     else:
         vcf_id = None
 
-    return vcf_locus_filters(request, node_id, vcf_id)
+    return vcf_locus_filters(request, analysis_id, node_id, vcf_id)
 
 
-def pedigree_vcf_locus_filters(request, node_id, pedigree_id):
+def pedigree_vcf_locus_filters(request, analysis_id, node_id, pedigree_id):
     pedigree = Pedigree.get_for_user(request.user, pedigree_id)
     if pedigree.cohort.vcf:
         vcf_id = pedigree.cohort.vcf.pk
     else:
         vcf_id = None
 
-    return vcf_locus_filters(request, node_id, vcf_id)
+    return vcf_locus_filters(request, analysis_id, node_id, vcf_id)
 
 
 def view_analysis_settings(request, analysis_id):
@@ -762,7 +777,7 @@ def analysis_input_samples(request, analysis_id):
     return render(request, 'analysis/analysis_input_samples.html', context)
 
 
-def node_method_description(request, node_id, node_version):
+def node_method_description(request, analysis_id, node_id, node_version):
     node = get_node_subclass_or_404(request.user, node_id, version=node_version)
     nodes = AnalysisNode.depth_first(node)
 
@@ -834,7 +849,7 @@ class CreateClassificationForVariantTagView(CreateClassificationForVariantView):
 
     def _get_form_post_url(self) -> str:
         if self.variant_tag.analysis:
-            return reverse("create_classification_for_analysis", kwargs={"analysis_id": self.variant_tag.analysis.pk})
+            return reverse("create_classification_for_analysis", kwargs={"analysis_id": self.variant_tag.analysis_id})
         else:
             # Just for variant
             return super()._get_form_post_url()

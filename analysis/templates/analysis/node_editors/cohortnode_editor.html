@@ -65,7 +65,7 @@
 	    cohortSaveButton.button('disable');
 		var container = $("#per-sample-zygosity-container");
 		if (cohortId) {
-			let url = Urls.cohort_zygosity_filters({{ node.pk }}, cohortId);
+			let url = Urls.cohort_zygosity_filters({{ node.analysis_id }}, {{ node.pk }}, cohortId);
 			$.ajax(url, {
                 suppressErrors: true,
                 success: function(html) {

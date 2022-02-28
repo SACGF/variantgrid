@@ -36,7 +36,7 @@ class NodeGridHandler(NodeJSONGetView):
         ret = None
         grid_node_id, grid_node_version = node.get_grid_node_id_and_version()
         if grid_node_id != node.pk:
-            url = reverse("node_grid_handler")
+            url = reverse("node_grid_handler", kwargs={"analysis_id": node.analysis_id})
             params = request.GET.dict()
             params.update({"node_id": grid_node_id, "version_id": grid_node_version})
             url += "?" + urlencode(params)
@@ -160,7 +160,7 @@ def get_node_export_basename(node: AnalysisNode) -> str:
     return "_".join(name_parts)
 
 
-def node_grid_export(request):
+def node_grid_export(request, analysis_id):
     export_type = request.GET["export_type"]
     use_canonical_transcripts = request.GET.get("use_canonical_transcripts")
 

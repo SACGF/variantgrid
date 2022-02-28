@@ -14,21 +14,23 @@
         }
 
         function showNodeGrid(nodeStatus) {
-            var nodeId = nodeStatus.id;
-            var version = nodeStatus.version;
+            let analysisId = {{ analysis.id }};
+            let analysisVersion = {{ analysis.version }};
+            let nodeId = nodeStatus.id;
+            let version = nodeStatus.version;
 
-            var grid_url = Urls.node_grid_config({{ analysis.version }}, nodeId, version, "default");
-            var unique_code = "sample-variants-grid";  // ok to be constant on this page
+            let grid_url = Urls.node_grid_config(analysisId, analysisVersion, nodeId, version, "default");
+            let unique_code = "sample-variants-grid";  // ok to be constant on this page
             function noOp() {};
-            setupGrid(grid_url, nodeId, version, unique_code, noOp, gridLoadError, on_error_function);
+            setupGrid(grid_url, analysisId, nodeId, version, unique_code, noOp, gridLoadError, on_error_function);
         }
 
         $(document).ready(function() {
-            var messagePoller = new AnalysisMessagePoller(Urls.nodes_status({{ analysis.pk }}));
-            var gridContainer = $("#node-data-grid");
+            let messagePoller = new AnalysisMessagePoller(Urls.nodes_status({{ analysis.pk }}));
+            let gridContainer = $("#node-data-grid");
 
             $("#id_node").change(function() {
-                var nodeId = $(this).val();
+                let nodeId = $(this).val();
                 gridContainer.empty();
                 if (nodeId) {
                     $("<table/>").attr({

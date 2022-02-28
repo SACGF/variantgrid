@@ -22,7 +22,7 @@ function classificationFilter(data, type) {
 }
 
 function classifyAndCloseButton(tagId) {
-    let classifyUrl = Urls.create_classification_for_variant_tag(tagId);
+    let classifyUrl = Urls.create_classification_for_variant_tag({{ node.analysis_id }}, tagId);
     window.open(classifyUrl, "_blank");
     $(`#tag-button-${tagId}`).remove();
 }

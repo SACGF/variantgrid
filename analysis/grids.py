@@ -45,7 +45,6 @@ def server_side_format_exon_and_intron(row, field):
 class VariantGrid(JqGridSQL):
     model = AnalysisNode.model
     caption = 'VariantGrid'
-    url = SimpleLazyObject(lambda: reverse("node_grid_handler"))
     GENOTYPE_COLUMNS_MISSING_VALUE = "."
     colmodel_overrides = {
         # Note:     client side formatters should only be used for adding links etc, never conversion of data, such as
@@ -77,6 +76,7 @@ class VariantGrid(JqGridSQL):
         self.fields, override = self._get_fields_and_overrides(node, af_show_in_percent)
         super().__init__(user)  # Need to call init after setting fields
 
+        self.url = SimpleLazyObject(lambda: reverse("node_grid_handler", kwargs={"analysis_id": node.analysis_id}))
         self.sort_by_contig_and_position = sort_by_contig_and_position
         self.extra_config.update(node.get_extra_grid_config())
         default_sort_by_column = node.analysis.default_sort_by_column
@@ -435,7 +435,7 @@ class NodeColumnSummaryGrid(DataFrameJqGrid):
         "Percent": {"formatter": "number"},
     }
 
-    def __init__(self, user, node_id, node_version, extra_filters, variant_column, significant_figures):
+    def __init__(self, user, analysis_id, node_id, node_version, extra_filters, variant_column, significant_figures):
         super().__init__()
 
         self.node = get_node_subclass_or_404(user, node_id, version=node_version)
@@ -480,10 +480,10 @@ class NodeColumnSummaryGrid(DataFrameJqGrid):
 class AnalysisNodeIssuesGrid(JqGridUserRowConfig):
     model = AnalysisNode
     caption = 'Analysis Node Issues'
-    fields = ["id", "analysis_id", "analysis__name", "status", "modified", "errors"]
+    fields = ["id", "analysis__id", "analysis__name", "status", "modified", "errors"]
     colmodel_overrides = {
         "id": {"hidden": True},
-        'analysis_id': {"hidden": True},
+        'analysis__id': {"hidden": True},
         'analysis__name': {"width": 400,
                            'formatter': 'analysisNodeLink',
                            'formatter_kwargs': {"icon_css_class": "analysis-icon",
@@ -505,7 +505,8 @@ class AnalysisNodeIssuesGrid(JqGridUserRowConfig):
 class KaromappingAnalysesGrid(JqGridUserRowConfig):
     model = KaryomappingAnalysis
     caption = 'Karomapping Analyses'
-    fields = ['id', 'name', 'modified', "trio__cohort__genome_build", 'user__username', 'trio__name', 'trio__proband__sample__name']
+    fields = ['id', 'name', 'modified', "trio__cohort__genome_build__name", 'user__username',
+              'trio__name', 'trio__proband__sample__name']
 
     colmodel_overrides = {
         'id': {"hidden": True},
@@ -537,7 +538,7 @@ class NodeOntologyGenesGrid(AbstractOntologyGenesGrid):
         "omim": {"width": 400},
     }
 
-    def __init__(self, user, node_id, version):
+    def __init__(self, user, analysis_id, node_id, version):
         self.node = get_node_subclass_or_404(user, node_id, version=version)
         super().__init__()
 
@@ -546,7 +547,7 @@ class NodeOntologyGenesGrid(AbstractOntologyGenesGrid):
 
 
 class NodeGeneDiseaseClassificationGenesGrid(DataFrameJqGrid):
-    def __init__(self, user, node_id, version):
+    def __init__(self, user, analysis_id, node_id, version):
         super().__init__()
         self.node = get_node_subclass_or_404(user, node_id, version=version)
 

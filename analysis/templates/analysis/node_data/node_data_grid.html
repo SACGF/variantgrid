@@ -12,7 +12,7 @@ function selectVariant() {
     $.ajax({
 	    type: "POST",
 	    data: data,
-	    url: '{% url 'set_variant_selected' node_id %}',
+	    url: '{% url 'set_variant_selected' analysis_id node_id %}',
 	    success: function() {
             const aWin = getAnalysisWindow();
             const variants = aWin.selectedVariants[nodeId] || {};
@@ -58,13 +58,13 @@ function getBams() {
 }
 
 $(document).ready(function() {
-    const node_view_url = "{% url 'node_view' analysis_version node_id node_version extra_filters %}";
+    const node_view_url = "{% url 'node_view' analysis_id analysis_version node_id node_version extra_filters %}";
     load_node_editor(node_view_url);
 
     // Need to capture unique code and pass to functions as pages may be redefined by further DOM manipulation before load()s etc come back
-    const grid_url = "{% url 'node_grid_config' analysis_version node_id node_version extra_filters %}";
+    const grid_url = "{% url 'node_grid_config' analysis_id analysis_version node_id node_version extra_filters %}";
     const unique_code = "{{ node_id }}_{{ node_version }}";
-    setupGrid(grid_url, {{ node_id }}, {{ node_version }}, unique_code, gridComplete, gridLoadError, on_error_function);
+    setupGrid(grid_url, {{ analysis_id }}, {{ node_id }}, {{ node_version }}, unique_code, gridComplete, gridLoadError, on_error_function);
 
 });
 </script>

@@ -1,31 +1,16 @@
 {% extends "analysis/node_data/base_node_data.html" %}
 
-{% block javascript %}
-
-function cancelNodeLoad(nodeId) {
-	$.ajax({
-	    type: "POST",
-	    url: Urls.node_cancel_load(nodeId),
-	    success: function(data) {
-	    	console.log("Stopped loading");
-		}
-	});
-}
-
-{% endblock javascript %}
-
-
 {% block docreadyjs %}
+    let analysisId = {{ node.analysis_id }};
+	let nodeId = {{ node.id }};
+	let aWin = getAnalysisWindow();
+	aWin.loadNodeWhenReady(nodeId);
 
-	var node_id = {{ node.id }};
-	var aWin = getAnalysisWindow();
-	aWin.loadNodeWhenReady(node_id);
-
-	var nlc = $("#node-load-cancel");
+	let nlc = $("#node-load-cancel");
 	nlc.show();
 	
 	$("button", nlc).click(function() {
-		cancelNodeLoad(node_id);
+		cancelNodeLoad(analysisId, nodeId);
 	});
 
 {% endblock docreadyjs %}
