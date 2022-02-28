@@ -1,7 +1,7 @@
 import collections
 import logging
 import re
-from typing import Optional, Pattern, Tuple, Iterable, Set, Union
+from typing import Optional, Pattern, Tuple, Iterable, Set, Union, Dict
 
 import django.dispatch
 from django.conf import settings
@@ -551,11 +551,12 @@ class VariantCollection(RelatedModelsPartitionModel):
         vcr_condition = Q(variantcollectionrecord__variant_collection=self)
         return {self.variant_collection_alias: FilteredRelation('variantcollectionrecord', condition=vcr_condition)}
 
-    def get_q(self):
+    def get_arg_q_dict(self) -> Dict[Optional[str], Q]:
         if self.status != ProcessingStatus.SUCCESS:
             raise ValueError(f"{self}: status {self.get_status_display()} != SUCCESS")
 
-        return Q(**{f"{self.variant_collection_alias}__isnull": False})
+        q = Q(**{f"{self.variant_collection_alias}__isnull": False})
+        return {self.variant_collection_alias: q}
 
     def __str__(self):
         return f"VariantCollection: {self.pk} ({self.name})"

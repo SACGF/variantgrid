@@ -286,17 +286,18 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
             raise ValueError(msg)
         return parents[0]
 
-    def get_single_parent_q(self):
+    def get_single_parent_arg_q_dict(self) -> Dict[Optional[str], Q]:
+        arg_q_dict = {}
         parent = self.get_single_parent()
         if parent.is_ready():
             if parent.count == 0:
-                q = self.q_none()
+                arg_q_dict[None] = self.q_none()
             else:
-                q = parent.get_q()
+                arg_q_dict = parent.get_arg_q_dict()
         else:
             # This should never happen...
             raise ValueError("get_single_parent_q called when single parent not ready!!!")
-        return q
+        return arg_q_dict
 
     def get_single_parent_contigs(self):
         parent = self.get_single_parent()
@@ -364,46 +365,36 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
     def _get_cache_key(self) -> str:
         return str(self.node_version.pk)
 
-    def get_q(self, disable_cache=False):
+    def get_arg_q_dict(self, disable_cache=False) -> Dict[Optional[str], Q]:
         """ A Django Q object representing the Variant filters for this node.
-            This is the method to override in subclasses - not get_queryset() as:
+            This is the method to override in subclasses - not get_queryset()
 
-            Chains of filters to a reverse foreign key relationship causes
-            Multiple joins, so use Q objects which are combined at the end
-
-            qs = qs.filter(table_1__val=1)
-            qs = qs.filter(table_2__val=2)
-
-            This is not necessarily equal to:
-
-            qs.filter(table_1__val=1, table_2__val=2)
-
-            @see https://docs.djangoproject.com/en/2/topics/db/queries/#spanning-multi-valued-relationships
+            @see https://github.com/SACGF/variantgrid/wiki/Analysis-Nodes#node-q-objects
         """
         # We need this for node counts, and doing a grid query (each page) - and it can take a few secs to generate
         # for some nodes (Comp HET / pheno) so cache it
         cache_key = self._get_cache_key() + f"q_cache={disable_cache}"
-        q: Optional[Q] = None
+        arg_q_dict: Dict[Optional[str], Q] = {}
         if settings.ANALYSIS_NODE_CACHE_Q:  # Disable for unit tests
-            q = cache.get(cache_key)
+            arg_q_dict = cache.get(cache_key)
 
-        if q is None:
+        if not arg_q_dict:
             if disable_cache is False:
-                if cache_q := self._get_node_cache_q():
-                    return cache_q
+                if cache_arg_q_dict := self._get_node_cache_arg_q_dict():
+                    return cache_arg_q_dict
 
             if self.has_input():
-                q = self.get_parent_q()
+                arg_q_dict = self.get_parent_arg_q_dict()
                 if self.modifies_parents():
-                    if node_q := self._get_node_q():
-                        q &= node_q
+                    if node_arg_q_dict := self._get_node_arg_q_dict():
+                        self.merge_arg_q_dicts(arg_q_dict, node_arg_q_dict)
             else:
-                if node_q := self._get_node_q():
-                    q = node_q
+                if node_arg_q_dict := self._get_node_arg_q_dict():
+                    arg_q_dict = node_arg_q_dict
                 else:
-                    q = self.q_all()
-            cache.set(cache_key, q)
-        return q
+                    arg_q_dict[None] = self.q_all()
+            cache.set(cache_key, arg_q_dict)
+        return arg_q_dict
 
     def get_contigs(self) -> Set[Contig]:
         """ A set of contigs that contain variants for the node """
@@ -427,10 +418,10 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
             cache.set(cache_key, contigs)
         return contigs
 
-    def get_parent_q(self):
+    def get_parent_arg_q_dict(self):
         if self.min_inputs == 1:
-            return self.get_single_parent_q()
-        raise NotImplementedError("Need to implement a non-default 'get_parent_q' if you have more than 1 parent")
+            return self.get_single_parent_arg_q_dict()
+        raise NotImplementedError("Implement a non-default 'get_parent_arg_q_dict' if you have more than 1 parent")
 
     def get_parent_contigs(self) -> Set[Contig]:
         contigs = set()
@@ -460,14 +451,25 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
         return NodeCache.objects.filter(node_version=self.node_version,
                                         variant_collection__status=ProcessingStatus.SUCCESS).first()
 
-    def _get_node_cache_q(self) -> Optional[Q]:
-        q = None
+    def _get_node_cache_arg_q_dict(self) -> Dict[Optional[str], Q]:
+        arg_q_dict = {}
         if self.node_cache:
-            q = self.node_cache.variant_collection.get_q()
-        return q
+            arg_q_dict = self.node_cache.variant_collection.get_arg_q_dict()
+        return arg_q_dict
 
     def _get_node_q(self) -> Optional[Q]:
         raise NotImplementedError()
+
+    @staticmethod
+    def merge_arg_q_dicts(arg_q_dict, other_arg_q_dict, op=operator.and_):
+        for k, q in other_arg_q_dict.items():
+            if existing_q := arg_q_dict.get(k):
+                q = op(existing_q, q)
+            arg_q_dict[k] = q
+
+    def _get_node_arg_q_dict(self) -> Dict[Optional[str], Q]:
+        """ By default - we assume node implements _get_node_q and none of the filters apply to annotations """
+        return {None: self._get_node_q()}
 
     def _get_node_contigs(self) -> Optional[Set[Contig]]:
         """ Return the contigs we filter for in this node. None means we don't know how to describe that """
@@ -481,33 +483,43 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
         qs = self._get_model_queryset()
         a_kwargs = self.get_annotation_kwargs()
         a_kwargs.update(extra_annotation_kwargs)
+        arg_q_dict = self.get_arg_q_dict(disable_cache=disable_cache)
+        # print(arg_q_dict)
         if a_kwargs:
             # If we apply the kwargs at the same time, it can join to the same table twice.
             # We want to go through and apply each annotation then the filters that use it, so that it forces
             # an inner query. Then do next annotation etc
 
-            # Clear ordering, @see
-            # https://docs.djangoproject.com/en/3.0/topics/db/aggregation/#interaction-with-default-ordering-or-order-by
-            qs = qs.annotate(**a_kwargs).order_by()
+            for k, v in a_kwargs.items():
+                qs = qs.annotate(**{k: v})
+                if q := arg_q_dict.get(k):
+                    qs = qs.filter(q)
 
-        q_list = [self.get_q(disable_cache=disable_cache)]
+        q_list = []
+        # Anything stored under None means filters that don't rely on annotation - do afterwards
+        if q := arg_q_dict.get(None):
+            q_list.append(q)
+
         if self.analysis.node_queryset_filter_contigs:
             q_list.append(Q(locus__contig__in=self.get_contigs()))
 
         if extra_filters_q:
             q_list.append(extra_filters_q)
-        q = reduce(operator.and_, q_list)
-        filtered_qs = qs.filter(q)
+        if q_list:
+            q = reduce(operator.and_, q_list)
+            filtered_qs = qs.filter(q)
 
-        if self.queryset_requires_distinct:
-            if inner_query_distinct:
-                qs = qs.filter(pk__in=filtered_qs.values_list("pk", flat=True))
+            if self.queryset_requires_distinct:
+                if inner_query_distinct:
+                    qs = qs.filter(pk__in=filtered_qs.values_list("pk", flat=True))
+                else:
+                    qs = filtered_qs.distinct()
             else:
-                qs = filtered_qs.distinct()
-        else:
-            qs = filtered_qs
+                qs = filtered_qs
 
-        return qs
+        # Clear ordering, @see
+        # https://docs.djangoproject.com/en/3.0/topics/db/aggregation/#interaction-with-default-ordering-or-order-by
+        return qs.order_by()
 
     def get_extra_grid_config(self):
         return {}
@@ -1144,7 +1156,7 @@ class NodeAlleleFrequencyFilter(models.Model):
     node = models.OneToOneField(AnalysisNode, on_delete=CASCADE)
     group_operation = models.CharField(max_length=1, choices=GroupOperation.choices, default=GroupOperation.ANY)
 
-    def get_q(self, allele_frequency_path: str, allele_frequency_percent: bool):
+    def get_q(self, allele_frequency_path: str, allele_frequency_percent: bool) -> Optional[Q]:
         af_q = None
         try:
             filters = []
@@ -1175,16 +1187,17 @@ class NodeAlleleFrequencyFilter(models.Model):
         return af_q
 
     @staticmethod
-    def get_sample_q(node: AnalysisNode, sample: Sample) -> Optional[Q]:
-        af_q = None
+    def get_sample_arg_q_dict(node: AnalysisNode, sample: Sample) -> Dict[Optional[str], Q]:
+        arg_q_dict = {}
         if sample:
             try:
-                allele_frequency_path = sample.get_cohort_genotype_field("allele_frequency")
+                alias, allele_frequency_path = sample.get_cohort_genotype_alias_and_field("allele_frequency")
                 allele_frequency_percent = sample.vcf.allele_frequency_percent
-                af_q = node.nodeallelefrequencyfilter.get_q(allele_frequency_path, allele_frequency_percent)
+                if af_q := node.nodeallelefrequencyfilter.get_q(allele_frequency_path, allele_frequency_percent):
+                    arg_q_dict[alias] = af_q
             except NodeAlleleFrequencyFilter.DoesNotExist:
                 pass
-        return af_q
+        return arg_q_dict
 
     def get_description(self):
         # TODO: do this properly with group operators etc

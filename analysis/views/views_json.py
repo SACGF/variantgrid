@@ -13,7 +13,7 @@ from analysis.models import AnalysisVariable, AnalysisTemplate, AnalysisTemplate
     AnalysisTemplateVersion, VariantTag
 from analysis.models.enums import TagLocation
 from analysis.models.nodes import node_utils
-from analysis.models.nodes.analysis_node import NodeStatus, AnalysisEdge, NodeVersion, AnalysisNodeAlleleSource, \
+from analysis.models.nodes.analysis_node import NodeStatus, AnalysisEdge, AnalysisNodeAlleleSource, \
     AnalysisNode
 from analysis.models.nodes.filter_child import create_filter_child_node
 from analysis.models.nodes.filters.built_in_filter_node import BuiltInFilterNode

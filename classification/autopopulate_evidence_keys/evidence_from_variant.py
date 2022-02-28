@@ -135,6 +135,12 @@ def vep_multi_to_list(value):
     return value.split(VEP_SEPARATOR)
 
 
+def molecular_consequence_formatter(value):
+    if value:
+        value = value.lower()
+    return vep_multi_to_list(value)
+
+
 def domain_to_pfam(value):
     domains_components = VariantAnnotation.get_domains_components(value)
     return ", ".join(domains_components["Pfam_domain"])
@@ -155,7 +161,7 @@ def ekey_from_vg_column_formatters():
         "clinvar_preferred_disease_name": clinvar_pipe_formatter,
         "clinvar_review_status": lambda crs: clinvar_review_status_to_vcf_dict.get(crs),
         "fathmm_pred_most_damaging": get_choices_formatter(FATHMMPrediction.CHOICES),
-        "molecular_consequence": vep_multi_to_list,
+        "molecular_consequence": molecular_consequence_formatter,
         'mutation_assessor': get_choices_formatter(MutationAssessorPrediction.CHOICES),
         'mutation_taster': get_choices_formatter(MutationTasterPrediction.CHOICES),
         'polyphen2': get_choices_formatter(Polyphen2Prediction.CHOICES),

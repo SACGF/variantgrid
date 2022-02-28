@@ -59,12 +59,12 @@ class TestCloneAnalysisNodes(TestCase):
 
     def _test_clone_node(self, node):
         clone = node.save_clone()
-        node_q = str(node._get_node_q())
-        clone_q = str(clone._get_node_q())
+        node_arg_q_dict = str(node._get_node_arg_q_dict())
+        clone_arg_q_dict = str(clone._get_node_arg_q_dict())
         class_name = node.get_class_name()
         msg = f"Clone of {class_name} has same get_q()"
-        print(f"Type '{class_name}' Node: {node_q} <=> {clone_q}")
-        self.assertEqual(node_q, clone_q, msg)
+        print(f"Type '{class_name}' Node: {node_arg_q_dict} <=> {clone_arg_q_dict}")
+        self.assertEqual(node_arg_q_dict, clone_arg_q_dict, msg)
 
     @staticmethod
     def _set_af_for_node(node):

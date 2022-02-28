@@ -2,7 +2,7 @@ import logging
 import operator
 from collections import namedtuple
 from functools import reduce
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -349,18 +349,20 @@ class Sample(SortByPKMixin, models.Model):
         sample_zygosity = Substr(f"{cgc.cohortgenotype_alias}__samples_zygosity", i, length=1)
         return {self.zygosity_alias: sample_zygosity}
 
-    def get_cohort_genotype_field(self, field_name):
+    def get_cohort_genotype_alias_and_field(self, field_name) -> Tuple[str, str]:
         if not field_name.startswith("samples_"):
             field_name = f"samples_{field_name}"
 
         # samples_zygosity is a string not array, and should be added to w/get_annotation_kwargs
         if field_name == "samples_zygosity":
+            alias = self.zygosity_alias
             field = self.zygosity_alias
         else:
             cgc = self.cohort_genotype_collection
             i = cgc.get_array_index_for_sample_id(self.pk)
-            field = f"{cgc.cohortgenotype_alias}__{field_name}__{i}"
-        return field
+            alias = cgc.cohortgenotype_alias
+            field = f"{alias}__{field_name}__{i}"
+        return alias, field
 
     def get_variant_qs(self, qs=None):
         """ Returns a Variant queryset inner joined to CohortGenotype with annotation aliases

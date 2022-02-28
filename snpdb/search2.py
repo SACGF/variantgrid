@@ -1,14 +1,16 @@
-from abc import ABC, abstractmethod
+import re
+from abc import ABC
 from dataclasses import dataclass
 from re import Match, IGNORECASE
 from typing import Optional, TypeVar, Generic, Union, List, Iterable, Type
 
+import django
 from django.contrib.auth.models import User
 from django.utils.safestring import SafeString
+
 from genes.models_enums import AnnotationConsortium
+from library.log_utils import report_exc_info, report_message
 from snpdb.models import GenomeBuild
-import django
-import re
 
 search_signal = django.dispatch.Signal()
 HAS_ALPHA_PATTERN = r"[a-zA-Z]"
@@ -27,7 +29,18 @@ class SearchInput:
         return bool(self.matches_pattern(HAS_ALPHA_PATTERN))
 
     def search(self) -> List['SearchResponse']:
-        return [response for _, response in search_signal.send(sender=SearchInput, search_input=self) if response.valid_search]
+        valid_responses:List[SearchResponse] = list()
+        response_tuples = search_signal.send_robust(sender=SearchInput, search_input=self)
+        for caller, response in response_tuples:
+            if response:
+                if isinstance(response, SearchResponse):
+                    if response.valid_search:
+                        valid_responses.append(response)
+                else:
+                    # TODO see if there's a more useful way we can pass exceptions?
+                    report_message("Error during search", 'error', extra_data={"target": str(response), "caller": str(caller)})
+
+        return valid_responses
 
 
 T = TypeVar("T")
