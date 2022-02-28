@@ -7,7 +7,6 @@ from django.contrib.auth.signals import user_logged_in
 from django.db import models
 from django.db.models.deletion import SET_NULL
 from django.utils import timezone
-from model_utils.fields import AutoCreatedField
 from model_utils.models import TimeStampedModel
 
 from library.enums.log_level import LogLevel

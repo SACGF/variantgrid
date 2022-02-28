@@ -14,7 +14,8 @@ from classification.views.classification_import_upload_view import UploadedFileL
 from classification.views.classification_overlaps_view import view_overlaps, post_clinical_context, \
     view_clinical_context, view_overlaps_detail
 from classification.views.classification_view import ClassificationView, LabGeneClassificationCountsView
-from classification.views.classification_view_metrics import view_classifiaction_metrics
+from classification.views.classification_view_metrics import view_classification_metrics, \
+    view_page_metrics_detail
 from classification.views.condition_match_test_view import condition_match_test_view, condition_match_test_download_view
 from classification.views.condition_matching_view import condition_matching_view, condition_matchings_view, \
     ConditionTextColumns, ConditionTextMatchingAPI
@@ -37,7 +38,8 @@ urlpatterns = [
     perm_path('create_for_variant/<int:variant_id>/<genome_build_name>', views.CreateClassificationForVariantView.as_view(),
               name='create_classification_for_variant'),
 
-    perm_path('classification/view_metrics', view_classifiaction_metrics, name="classification_view_metrics"),
+    perm_path('classification/view_metrics', view_classification_metrics, name="classification_view_metrics"),
+    perm_path('classification/view_metrics/detail', view_page_metrics_detail, name="classification_view_metrics_detail"),
 
     # this is uploading the entire import file, distinct from attaching a file to a classification
     perm_path('classification/import_upload', classification_import_upload_view.FileUploadView.as_view(), name="classification_import_upload"),

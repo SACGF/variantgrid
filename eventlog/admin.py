@@ -16,5 +16,5 @@ class ViewEventAdmin(ModelAdminBasics):
 
     """
 
-    list_display = ('pk', 'view_name', 'user', 'args', 'path')
+    list_display = ('pk', 'view_name', 'user', 'args', 'path', 'created')
     search_fields = ('view_name', )

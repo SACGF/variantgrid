@@ -4,6 +4,7 @@ from django.urls import resolve
 from eventlog.models import ViewEvent
 
 INGORE_SEGMENTS = {"api", "datatable", "citations_json"}
+IGNORE_TEXT = {"detail", "metrics"}
 
 class PageViewsMiddleware:
 
@@ -25,6 +26,10 @@ class PageViewsMiddleware:
     def process_view(self, request, view_func, view_args, view_kwargs):
         parts = request.path_info.split('/')
         if len(parts) > 1:
+            for ignore_text in IGNORE_TEXT:
+                if ignore_text in request.path_info:
+                    return
+
             if not any(segment in INGORE_SEGMENTS for segment in parts):
                 app = request.path_info.split('/')[1]  # FYI not guarenteed to be the app, but closest thing I can find that links it
                 if app in settings.LOG_ACTIVITY_APPS:

@@ -887,6 +887,10 @@ ul.compact li:before {
   color: #888;
   display: inline-block;
 }
+.json.compact .js-block {
+  display: inline-block;
+  margin-left: 4px;
+}
 
 .install-instructions {
   min-height: 16px;

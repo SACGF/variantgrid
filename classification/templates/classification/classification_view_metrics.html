@@ -2,6 +2,7 @@
 {% load static %}
 {% load compress %}
 {% load ui_help %}
+{% load js_tags %}
 {% load user_tags %}
 {% load ui_utils %}
 {% load ui_menu_bars %}
@@ -11,15 +12,25 @@
 {% block content %}
 <div class="container">
 
-    <div class="btn-group mb-4" role="group" aria-label="ClinVar Key Picker">
-        {% for days_option in days_options %}
-            <button onclick="window.open('{% url 'classification_view_metrics' %}?days={{ days_option }}', '_self')"
-            class="btn {% if days == days_option %}btn-secondary font-weight-bold{% else %}btn-outline-secondary{% endif %}">{{ days_option }} days
-            </button>
-        {% endfor %}
-    </div>
+    <div class="d-flex justify-content-between align-items-center">
+        <div class="btn-group mb-4" role="group" aria-label="Days Old">
+            {% for days_option in days_options %}
+                <button onclick="window.open('{% url 'classification_view_metrics' %}?days={{ days_option }}&exclude_admin={{ exclude_admin | jsonify }}', '_self')"
+                class="btn {% if days == days_option %}btn-secondary font-weight-bold{% else %}btn-outline-secondary{% endif %}">{{ days_option }} days
+                </button>
+            {% endfor %}
+        </div>
 
-    {% page_help_embedded title=page_title %}
+        <div class="btn-group mb-4" role="group" aria-label="Days Old">
+            <button onclick="window.open('{% url 'classification_view_metrics' %}?days={{ days }}&exclude_admin=true', '_self')"
+            class="btn {% if exclude_admin %}btn-secondary font-weight-bold{% else %}btn-outline-secondary{% endif %}">Exclude Admins
+            </button>
+            <button onclick="window.open('{% url 'classification_view_metrics' %}?days={{ days }}&exclude_admin=false', '_self')"
+            class="btn {% if not exclude_admin %}btn-secondary font-weight-bold{% else %}btn-outline-secondary{% endif %}">Include Admins
+            </button>
+        </div>
+    </div>
+    {% page_help_embedded title="Views "|append:page_suffix %}
         <p>Most Viewed Xs count unique users accessing the data across the last 30 days</p>
         <p>Most Active Users count how many pages the user viewed across the last 30 days</p>
     {% end_page_help_embedded %}
@@ -30,7 +41,13 @@
         {% for ccount in counts.classification_views|slice:"10" %}
             <li class="list-group-item d-flex justify-content-between align-items-center">
                 {% classification_quick ccount.resolve %}
-                <span class="badge badge-primary badge-pill">{{ ccount.count }}</span>
+                <span>
+                    <a class="mr-1"
+                        data-toggle="ajax-modal"
+                        data-title="All views of Classification ({{ ccount.pk }}) {{ page_suffix }}"
+                        data-href="{% url 'classification_view_metrics_detail' %}?age={{ days }}&classification_id={{ ccount.pk }}">Show Views</a>
+                    <span class="badge badge-primary badge-pill">{{ ccount.count }}</span>
+                </span>
             </li>
         {% endfor %}
         </ul>
@@ -43,7 +60,13 @@
             <li class="list-group-item d-flex justify-content-between align-items-center">
                 {% with allele=ccount.resolve %}
                     <a class="hover-link" href="{{ allele.get_absolute_url }}">{{ ccount.resolve }}</a>
-                    <span class="badge badge-primary badge-pill">{{ ccount.count }}</span>
+                    <span>
+                        <a class="mr-1"
+                            data-toggle="ajax-modal"
+                            data-title="All views of Allele ({{ ccount.pk }}) {{ page_suffix }}"
+                            data-href="{% url 'classification_view_metrics_detail' %}?age={{ days }}&allele_id={{ ccount.pk }}">Show Views</a>
+                        <span class="badge badge-primary badge-pill">{{ ccount.count }}</span>
+                    </span>
                 {% endwith %}
             </li>
         {% endfor %}
@@ -53,10 +76,18 @@
     <div class="card mt-4">
         <div class="card-header">Most Viewed Pages <span class="float-right">unique viewers</span></div>
         <ul class="list-group">
-        {% for ccount in counts.page_views|slice:"10" %}
+        {% for ccount in counts.page_views|slice:20 %}
             <li class="list-group-item d-flex justify-content-between align-items-center">
-                {{ ccount.pk | segmented_text }}
-                <span class="badge badge-primary badge-pill">{{ ccount.count }}</span>
+                <span>
+                    {{ ccount.pk | segmented_text }}
+                </span>
+                <span>
+                    <a class="mr-1"
+                        data-toggle="ajax-modal"
+                        data-title="All views of ({{ ccount.pk }}) {{ page_suffix }}"
+                        data-href="{% url 'classification_view_metrics_detail' %}?age={{ days }}&view_name={{ ccount.pk }}">Show Views</a>
+                    <span class="badge badge-primary badge-pill">{{ ccount.count }}</span>
+                </span>
             </li>
         {% endfor %}
         </ul>
@@ -68,7 +99,13 @@
         {% for ccount in counts.active_users|slice:"10" %}
             <li class="list-group-item d-flex justify-content-between align-items-center">
                 {% user ccount.resolve %}
-                <span class="badge badge-primary badge-pill">{{ ccount.count }}</span>
+                <span>
+                     <a class="mr-1"
+                        data-toggle="ajax-modal"
+                        data-title="All views from User ({{ ccount.resolve.username }}) {{ page_suffix }}"
+                        data-href="{% url 'classification_view_metrics_detail' %}?age={{ days }}&user_id={{ ccount.pk }}">Show Views</a>
+                    <span class="badge badge-primary badge-pill">{{ ccount.count }}</span>
+                </span>
             </li>
         {% endfor %}
         </ul>
