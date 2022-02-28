@@ -45,7 +45,7 @@
                     <a class="mr-1"
                         data-toggle="ajax-modal"
                         data-title="All views of Classification ({{ ccount.pk }}) {{ page_suffix }}"
-                        data-href="{% url 'classification_view_metrics_detail' %}?age={{ days }}&classification_id={{ ccount.pk }}">Show Views</a>
+                        data-href="{% url 'classification_view_metrics_detail' %}?age={{ days }}&exclude_admin={{ exclude_admin|jsonify }}&classification_id={{ ccount.pk }}">Show Views</a>
                     <span class="badge badge-primary badge-pill">{{ ccount.count }}</span>
                 </span>
             </li>
@@ -64,7 +64,7 @@
                         <a class="mr-1"
                             data-toggle="ajax-modal"
                             data-title="All views of Allele ({{ ccount.pk }}) {{ page_suffix }}"
-                            data-href="{% url 'classification_view_metrics_detail' %}?age={{ days }}&allele_id={{ ccount.pk }}">Show Views</a>
+                            data-href="{% url 'classification_view_metrics_detail' %}?age={{ days }}&exclude_admin={{ exclude_admin|jsonify }}&allele_id={{ ccount.pk }}">Show Views</a>
                         <span class="badge badge-primary badge-pill">{{ ccount.count }}</span>
                     </span>
                 {% endwith %}
@@ -85,7 +85,7 @@
                     <a class="mr-1"
                         data-toggle="ajax-modal"
                         data-title="All views of ({{ ccount.pk }}) {{ page_suffix }}"
-                        data-href="{% url 'classification_view_metrics_detail' %}?age={{ days }}&view_name={{ ccount.pk }}">Show Views</a>
+                        data-href="{% url 'classification_view_metrics_detail' %}?age={{ days }}&exclude_admin={{ exclude_admin|jsonify }}&view_name={{ ccount.pk }}">Show Views</a>
                     <span class="badge badge-primary badge-pill">{{ ccount.count }}</span>
                 </span>
             </li>
@@ -103,7 +103,7 @@
                      <a class="mr-1"
                         data-toggle="ajax-modal"
                         data-title="All views from User ({{ ccount.resolve.username }}) {{ page_suffix }}"
-                        data-href="{% url 'classification_view_metrics_detail' %}?age={{ days }}&user_id={{ ccount.pk }}">Show Views</a>
+                        data-href="{% url 'classification_view_metrics_detail' %}?age={{ days }}&exclude_admin={{ exclude_admin|jsonify }}&user_id={{ ccount.pk }}">Show Views</a>
                     <span class="badge badge-primary badge-pill">{{ ccount.count }}</span>
                 </span>
             </li>
