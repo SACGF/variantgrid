@@ -458,7 +458,7 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
         return arg_q_dict
 
     def _get_node_q(self) -> Optional[Q]:
-        raise NotImplementedError()
+        return None
 
     @staticmethod
     def merge_arg_q_dicts(arg_q_dict, other_arg_q_dict, op=operator.and_):

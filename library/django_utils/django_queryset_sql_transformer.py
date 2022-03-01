@@ -1,3 +1,5 @@
+from typing import Optional
+
 from django.db import connections
 from django.db.models.query import QuerySet
 from django.db.models.sql import UpdateQuery
@@ -25,7 +27,7 @@ def get_queryset_with_transformer_hook(klass):
         pass
 
     class QueryTransformerCompilerMixin:
-        compiler_klass = None
+        compiler_klass: Optional[type] = None
 
         def get_compiler(self, using=None, connection=None, elide_empty=True):
             if using is None and connection is None:

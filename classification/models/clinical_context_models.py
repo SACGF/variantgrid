@@ -19,7 +19,6 @@ from classification.models.classification import Classification, \
     ClassificationModification
 from classification.models.classification_import_run import ClassificationImportRun, \
     classification_imports_complete_signal
-from classification.models.flag_types import classification_flag_types
 from flags.models.models import FlagsMixin, FlagCollection, FlagTypeContext, \
     flag_collection_extra_info_signal, FlagInfos
 from library.django_utils import get_url_from_view_path
@@ -266,7 +265,6 @@ class ClinicalContext(FlagsMixin, TimeStampedModel):
 
         clinical_context_signal.send(sender=ClinicalContext, clinical_context=self, status=new_status, is_significance_change=is_significance_change, cause=cause)
         # clinical_context_signal is now in charge of applying all relevant flags to clinical context and classifications
-
 
     @property
     def is_default(self) -> bool:

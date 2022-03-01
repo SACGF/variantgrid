@@ -9,7 +9,7 @@ from django.contrib.auth.models import User
 from django.utils.safestring import SafeString
 
 from genes.models_enums import AnnotationConsortium
-from library.log_utils import report_exc_info, report_message
+from library.log_utils import report_message
 from snpdb.models import GenomeBuild
 
 search_signal = django.dispatch.Signal()
@@ -29,7 +29,7 @@ class SearchInput:
         return bool(self.matches_pattern(HAS_ALPHA_PATTERN))
 
     def search(self) -> List['SearchResponse']:
-        valid_responses:List[SearchResponse] = list()
+        valid_responses: List[SearchResponse] = list()
         response_tuples = search_signal.send_robust(sender=SearchInput, search_input=self)
         for caller, response in response_tuples:
             if response:

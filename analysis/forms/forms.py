@@ -17,6 +17,7 @@ from library.forms import NumberInput, ROFormMixin
 from library.guardian_utils import assign_permission_to_user_and_groups
 from snpdb.forms import GenomeBuildAutocompleteForwardMixin, UserSettingsGenomeBuildMixin
 from snpdb.models import CustomColumnsCollection, Sample, VariantGridColumn, Trio, UserSettings
+from uicore.utils.form_helpers import form_helper_horizontal
 
 
 class AnalysisChoiceForm(forms.Form):
@@ -85,6 +86,10 @@ class CreateAnalysisForm(UserSettingsGenomeBuildMixin, forms.ModelForm):
         fields = ('name', 'genome_build')
         model = Analysis
         widgets = {'name': TextInput()}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.helper = form_helper_horizontal()
 
     def save(self, commit=True):
         instance = super().save(commit=False)

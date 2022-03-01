@@ -9,10 +9,9 @@ from crispy_forms.bootstrap import FieldWithButtons
 from crispy_forms.layout import Layout, Field, Submit
 from django.conf import settings
 from django.contrib import messages
-from django.contrib.auth.decorators import user_passes_test
 from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
-from django.http import StreamingHttpResponse, HttpResponseForbidden
+from django.http import StreamingHttpResponse
 from django.http.request import HttpRequest
 from django.http.response import HttpResponse
 from django.shortcuts import render, get_object_or_404, redirect
@@ -51,7 +50,6 @@ from genes.forms import GeneSymbolForm
 from genes.hgvs import get_kind_and_transcript_accession_from_invalid_hgvs
 from library.django_utils import require_superuser, get_url_from_view_path
 from library.file_utils import rm_if_exists
-from library.guardian_utils import is_superuser
 from library.log_utils import log_traceback
 from library.utils import delimited_row
 from snpdb.forms import SampleChoiceForm, UserSelectForm, LabSelectForm

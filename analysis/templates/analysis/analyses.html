@@ -3,6 +3,8 @@
 {% load ui_menu_bars %}
 {% load ui_utils %}
 {% load crispy_forms_field %}
+{% load crispy_forms_tags %}
+
 {% load menu_tags %}
 {% block submenu %}{% menu_bar_analysis %}{% endblock %}
 {% block title %}VariantGrid: Analyses{% endblock title %}
@@ -81,14 +83,11 @@
             <div class="card">
                 <div class="card-header">Create</div>
                 <div class="card-body">
-                    {% labelled label="New Analysis Name" %}
-                        {% crispy_field create_analysis_form.name %}
-                    {% endlabelled %}
+                    {{ create_analysis_form.name | as_crispy_field }}
                     {% if not create_analysis_form.genome_build_hidden %}
-                        {% labelled label="Genome Build" %}
-                            <span title="Analysis GenomeBuild defaults and options come from your user settings">{% crispy_field create_analysis_form.genome_build %}</span>
-                            {{ create_analysis_form.genome_build.errors }}
-                        {% endlabelled %}
+                        <span title="Analysis GenomeBuild defaults and options come from your user settings">
+                            {{ create_analysis_form.genome_build | as_crispy_field }}
+                        </span>
                     {% endif %}
                     <button class="btn btn-primary" id='create-analysis'><i class="fas fa-plus-circle"></i> Create New Analysis</button>
                 </div>

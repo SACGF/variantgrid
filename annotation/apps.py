@@ -13,7 +13,6 @@ def _has_classification_gene_count_type(GeneCountType):
     return exists
 
 
-
 class AnnotationConfig(AppConfig):
     name = 'annotation'
 

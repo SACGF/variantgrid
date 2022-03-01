@@ -448,7 +448,7 @@ def export_classifications_allele(request, allele_id:int):
         ClassificationFilter(
             user=request.user,
             genome_build=GenomeBuildManager.get_current_genome_build(),
-            allele=pk,
+            allele=allele_id,
             file_prefix=f"classifications_allele_{allele:CA}"
         ),
         FormatDetailsCSV()

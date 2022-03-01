@@ -1,6 +1,8 @@
 {% extends "seqauto/menu_sequencing_data_base.html" %}
 {% load static %}
 {% load seqauto_record_tags %}
+{% load crispy_forms_tags %}
+
 {% block title %}{{ bam_file }}{% endblock %}
 {% block head %}
 <link rel="stylesheet" href="{% static 'css/seqauto.css' %}" />
@@ -17,7 +19,8 @@
 
 	{% if bam_file.data_state == 'C' %}
 		<form>
-			{{ form.as_p }}
+            {% csrf_token %}
+            {% crispy form form_helper.horizontal %}
 		</form>
 	
 		{% if flagstats %}

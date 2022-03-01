@@ -1,3 +1,4 @@
+from crispy_forms.helper import FormHelper
 from django.conf import settings
 from django.forms.forms import Form
 from django.forms.formsets import formset_factory
@@ -55,6 +56,11 @@ def view_pedigree(request, pedigree_id):
     class CohortSamplesForm(Form):
         ped_file_record = ModelChoiceField(disabled=True, queryset=PedFileRecord.objects.all())
         cohort_sample = ModelChoiceField(required=False, queryset=cohort_samples_qs)
+
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.helper = FormHelper()
+            self.helper.form_show_labels = False
 
     CohortSamplesForPedFileRecordsFormSet = formset_factory(CohortSamplesForm, formset=BaseCohortSamplesForPedFileRecordsFormSet, extra=0)
     # TODO: Make this non read only and save name etc.

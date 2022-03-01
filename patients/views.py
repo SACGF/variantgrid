@@ -20,11 +20,13 @@ from patients.forms import PatientSearchForm, PatientContactForm
 from patients.models import PatientColumns, PatientRecords, Patient, PatientModification, PatientRecordOriginType, \
     PatientAttachment
 from snpdb.models import Sample
+from uicore.utils.form_helpers import form_helper_horizontal
 
 
 def view_patient(request, patient_id):
     patient = Patient.get_for_user(request.user, patient_id)
     form = forms.PatientForm(request.POST or None, instance=patient, user=request.user)
+    form.helper = form_helper_horizontal()
 
     has_write_permission = patient.can_write(request.user)
     if not has_write_permission:

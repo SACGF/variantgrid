@@ -89,6 +89,3 @@ class TestVCFProcessors(TestCase):
         ]
         for transcript_version in TRANSCRIPT_VERSION:
             _search_results = search_data(self.user, transcript_version, False)
-
-
-

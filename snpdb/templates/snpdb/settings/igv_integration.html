@@ -28,27 +28,18 @@
 	<form id='igv-integration-form' method="post">
         {% csrf_token %}
 		<table class="table">
-            <thead>
-                <tr>
-                    <th></th>
-                    <th>From</th>
-                    <th>To</th>
-                    <th class="text-center">Delete</th>
-                </tr>
-                {% for f in formset.management_form %}
-                    {{ f }}
-                {% endfor %}
-                {{ formset.management_form }}
-            </thead>
+            {% for f in formset.management_form %}
+                {{ f }}
+            {% endfor %}
+            {{ formset.management_form }}
 	     	{% for f in formset.forms %}
 				<tr class="user_data_prefix_row">
 				{% for hidden in f.hidden_fields %}
 					{{ hidden }}
 				{% endfor %}
-					<th class="align-middle text-right">{{ f.prefix.label_tag }}</th>
-                    <td><div class="prefix-container">{% crispy_field f.prefix %}</div></td>
-                    <td><div class="replacement-container">{% crispy_field f.replacement %}</div></td>
-                    <td class="align-middle text-center">{% crispy_field f.DELETE %} {{ f.errors }}</td>
+                    <td><div class="prefix-container">{{ f.prefix | as_crispy_field }}</div></td>
+                    <td><div class="replacement-container">{{ f.replacement | as_crispy_field }}</div></td>
+                    <td class="align-middle text-center">{{ f.DELETE | as_crispy_field }}</td>
 				</tr>
 			{% endfor %}
 		</table>

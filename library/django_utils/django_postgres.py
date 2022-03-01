@@ -35,7 +35,7 @@ def model_to_insert_sql(model_list: List[Model], db_table: str = None, ignore_fi
     old_table = model._meta.db_table
     if db_table:
         model._meta.db_table = db_table
-    fields = [f for f in model._meta.local_fields if (f.name not in ignore_fields)]
+    fields = [f for f in model._meta.local_fields if f.name not in ignore_fields]
     q = sql.InsertQuery(model)
     q.insert_values(fields, model_list)
 

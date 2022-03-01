@@ -40,6 +40,7 @@ class FlagTypeResolution(TabularInline):
     def has_change_permission(self, request, obj=None):
         return False
 
+
 @admin.register(FlagType)
 class FlagTypeAdmin(ModelAdminBasics):
     list_display = ('id', 'context', 'label', 'description', 'help_text', 'raise_permission')

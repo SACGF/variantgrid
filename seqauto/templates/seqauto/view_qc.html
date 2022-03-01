@@ -3,6 +3,7 @@
 {% load jqgrid_tags %}
 {% load help_tags %}
 {% load seqauto_record_tags %}
+{% load crispy_forms_tags %}
 
 {% block title %}{{ qc }}{% endblock %}
 {% block head %}
@@ -36,7 +37,7 @@
 	  	</ul>
 		<div id="qc-details">
 			<form>
-				{{ form.as_p }}
+                {% crispy form form_helper.horizontal %}
 			</form>
 		</div>
 	<div>

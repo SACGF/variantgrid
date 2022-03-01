@@ -1,6 +1,7 @@
 {% extends menu_patients_base %}
 {% load related_data_tags %}
 {% load related_analyses_tags %}
+{% load crispy_forms_tags %}
 
 {% block title %}Pedigree: {{ pedigree.name }}{% endblock title %}
 
@@ -83,9 +84,7 @@
 		{% csrf_token %}
 		<div id="pedigree">
 		<h3>Pedigree: {{ pedigree.name }}</h3>
-				<table>
-				{{ pedigree_form.as_table }}
-				</table>
+            {% crispy pedigree_form form_helper.horizontal %}
 		</div>
 		
 		<p>
@@ -96,8 +95,8 @@
         <table>
             {% for form in formset %}
             <tr>
-                <td>{{ form.ped_file_record }}
-                <td>{{ form.cohort_sample }}
+                <td>{{ form.ped_file_record | as_crispy_field }}
+                <td>{{ form.cohort_sample | as_crispy_field }}
             {% endfor %}
         </table>
         <button id='save-pedigree' class="btn btn-primary">save</button

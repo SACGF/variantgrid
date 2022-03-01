@@ -15,7 +15,6 @@ from django.db.models.signals import post_save
 from django.dispatch import receiver
 from guardian.shortcuts import assign_perm
 from lazy import lazy
-from lxml.ElementInclude import include
 from model_utils.models import TimeStampedModel
 
 from annotation.regexes import db_ref_regexes
@@ -721,8 +720,9 @@ def embedded_ids_check(text: str) -> ConditionMatchingSuggestion:
 
                 if aliases := matched_term.aliases:
                     for alias in aliases:
-                        term_tokens = term_tokens.union(SearchText.tokenize_condition_text(normalize_condition_text(alias),
-                                                                                 deplural=True, deroman=True))
+                        term_tokens = term_tokens.union(
+                            SearchText.tokenize_condition_text(normalize_condition_text(alias),
+                                                               deplural=True, deroman=True))
                 if extra := matched_term.extra:
                     if included_titles := extra.get('included_titles'):
                         for included_title in included_titles.split(';;'):

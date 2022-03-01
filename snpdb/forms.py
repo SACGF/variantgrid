@@ -271,10 +271,12 @@ class SettingsInitialGroupPermissionForm(forms.Form):
 
 
 class SampleForm(forms.ModelForm, ROFormMixin):
+    genome_build = forms.CharField()
+
     class Meta:
         model = models.Sample
         exclude = ['vcf', 'has_genotype']
-        read_only = ('vcf_sample_name', 'import_status')
+        read_only = ('genome_build', 'vcf_sample_name', 'import_status')
         widgets = {'vcf_sample_name': TextInput(),
                    'name': TextInput(),
                    'bam_file_path': TextInput(),
@@ -283,6 +285,12 @@ class SampleForm(forms.ModelForm, ROFormMixin):
                    'specimen': ModelSelect2(url='specimen_autocomplete',
                                             forward=['patient'],
                                             attrs={'data-placeholder': 'Specimen...'})}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        fields = ["genome_build"] + [f for f in self.fields if f != 'genome_build']
+        self.order_fields(fields)
+        self.fields['genome_build'].initial = self.instance.vcf.genome_build
 
     def clean(self):
         cleaned_data = super().clean()
