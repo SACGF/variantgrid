@@ -1,6 +1,7 @@
 {% extends menu_patients_base %}
 {% load static %}
 {% load related_data_for_pathtests_tags %}
+{% load crispy_forms_tags %}
 
 {% block title %}Case {{ case }}{% endblock title %}
 
@@ -24,9 +25,9 @@ setPatientLink();
 
     <form method="post" id='case-form'>
         {% csrf_token %}
-        {{ form.as_p }}
+        {% crispy form form_helper.horizontal %}
         {% if has_write_permission %}
-            <input type="submit" value='save' />
+            <button class="btn btn-secondary" type='button'>Save</button>
         {% endif %}
         {% include "messages/messages.html" %}
         {{ form.media }}

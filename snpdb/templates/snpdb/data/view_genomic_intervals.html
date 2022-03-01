@@ -1,6 +1,7 @@
 {% extends menu_data_base %}
 {% load static %}
 {% load help_tags %}
+{% load crispy_forms_tags %}
 
 {% block title %}{{ gic.name }}{% endblock %}
 {% block head %}
@@ -50,7 +51,7 @@
                 <form method="post" id='genomic-intervals-collection-form'>
                     {% csrf_token %}
 
-                    {{  form.as_p }}
+                    {% crispy form form_helper.horizontal %}
                     {% if has_write_permission %}
                         <button id='save-genomic-intervals-collection' class="btn btn-primary">save</button>
                     {% else %}

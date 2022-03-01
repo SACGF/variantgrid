@@ -2,6 +2,8 @@
 {% load jqgrid_tags %}
 {% load help_tags %}
 {% load model_helpers %}
+{% load crispy_forms_tags %}
+
 <link rel="stylesheet" href="{% static 'css/graphs.css' %}" />
 <style>
 #qc-exec-summary-graph {
@@ -57,7 +59,7 @@ table th.num, table td.num {
 
 <div id="exec-summary">
     {% if qc.data_state == 'C' and exec_summary.data_state == 'C' %}
-		{{ graph_form.as_p }}
+        {% crispy graph_form form_helper.horizontal %}
 		<div id='qc-exec-summary-graph' class='generated-graph'></div>
 
         <table class="table">

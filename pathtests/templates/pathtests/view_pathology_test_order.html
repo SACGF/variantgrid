@@ -1,6 +1,7 @@
 {% extends menu_pathtests_base %}
 {% load static %}
 {% load related_data_for_pathtests_tags %}
+{% load crispy_forms_tags %}
 
 {% block title %}Pathology Test Order {{ pathology_test_order }}{% endblock title %}
 
@@ -26,9 +27,9 @@ setCaseLink();
 
     <form method="post" id='pathology-test-order-form'>
         {% csrf_token %}
-        {{ form.as_p }}
+        {% crispy form form_helper.horizontal %}
         {% if can_write %}
-            <input type="submit" value='save' />
+            <button class="btn btn-secondary" type='button'>Save</button>
         {% endif %}
         {% include "messages/messages.html" %}
         {{ form.media }}

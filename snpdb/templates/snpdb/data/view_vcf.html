@@ -5,6 +5,7 @@
 {% load vcf_import_info_tags %}
 {% load js_tags %}
 {% load settings_tags %}
+{% load crispy_forms_tags %}
 
 {% block title %}{{ vcf.name }}{% endblock %}
 {% block head %}
@@ -323,32 +324,17 @@ $(document).ready(function() {
     <div id="details">
     <form method="post" id='vcf-form'>
         {% csrf_token %}
-        <table>
-                {{ vcf_form.as_table }}
-
-                {% if vcf.vcffromsequencingrun.sequencing_run %}
-                <tr>
-                <th>SequencingRun:
-                <td>
-                {% if url_name_visible.view_sequencing_run %}              
-                    <a href="{% url 'view_sequencing_run' vcf.vcffromsequencingrun.sequencing_run.pk %}">{{ vcf.vcffromsequencingrun.sequencing_run }}</a> - Auto uploaded from {{ vcf.uploadedvcf.backendvcf.vcf }}
-                {% else %}
-                    {{ vcf.vcffromsequencingrun.sequencing_run }} - Auto uploaded from {{ vcf.uploadedvcf.backendvcf.vcf }}
-                {% endif %}
-                </tr>
-                {% endif %}
+        {% crispy vcf_form form_helper.horizontal %}
 
         {% if vcf.uploadedvcf.uploaded_file and can_download_vcf %}
             {% if vcf.uploadedvcf.uploaded_file.exists %}
-                <tr>
-                <th>Download</th>
-                <td><div class="left margin-r-5"><a href="{% url 'download_uploaded_file' vcf.uploadedvcf.uploaded_file.pk %}"><div class="icon24 left margin-r-5 vcf-icon"></div> Uploaded VCF</a> ({{ vcf.uploadedvcf.uploaded_file.size|filesizeformat }})</div>
+                <div class="form-group-row row">
+                <label class="col-form-label col-12 col-md-3 text-md-right">Download</label>
+                <div class="col-12 col-md-9 text-left"><a href="{% url 'download_uploaded_file' vcf.uploadedvcf.uploaded_file.pk %}"><div class="icon24 left margin-r-5 vcf-icon"></div> Uploaded VCF</a> ({{ vcf.uploadedvcf.uploaded_file.size|filesizeformat }})</div>
                     <!-- <div class="left margin-r-5"><a href=""><div class="icon24 left margin-r-5 vcf-icon"></div> Annotated VCF</a></div> -->
-                </td>
-                </tr>
+                </div>
             {% endif %}
         {% endif %}
-        </table>
 
         <h3>Samples</h3>
 

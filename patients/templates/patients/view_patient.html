@@ -65,26 +65,26 @@
         {% ui_register_tab_embedded label="Patient" tab_set="patients" %}
             <form id="patient-form" method="post">
                 {% csrf_token %}
-                    {% labelled label=form.first_name.label %}{% crispy_field form.first_name %}{% endlabelled %}
-                    {% labelled label=form.last_name.label %}{% crispy_field form.last_name %}{% endlabelled %}
-                    {% labelled label=form.family_code.label %}{% crispy_field form.family_code %}{% endlabelled %}
-                    {% labelled label=form.sex.label %}{% crispy_field form.sex %}{% endlabelled %}
+                    {{ form.first_name | as_crispy_field }}
+                    {{ form.last_name | as_crispy_field }}
+                    {{ form.family_code | as_crispy_field }}
+                    {{ form.sex | as_crispy_field }}
                     {% if has_write_permission or show_read_only_patient_dob %}
-                        {% labelled label=form.date_of_birth.label %}{% crispy_field form.date_of_birth %}{% endlabelled %}
-                        {% labelled label=form.date_of_death.label %}{% crispy_field form.date_of_death %}{% endlabelled %}
+                        {{ form.date_of_birth | as_crispy_field }}
+                        {{ form.date_of_death | as_crispy_field }}
                     {% else %}
-                        {% labelled label="Age" %}{{ patient.age }}{% endlabelled %}
+                        {{ form.age | as_crispy_field }}
                     {% endif %}
                 <div>
                     {% page_help 'patients/patient_population_help' 'Patient Population' header_tag="h4" %}
-                    {{ form.population }}
+                    {{ form.population | as_crispy_field }}
                 </div>
-                {% labelled label=form.consanguineous.label %}{% crispy_field form.consanguineous %}{% endlabelled %}
+                {{  form.consanguineous | as_crispy_field }}
 
                 <div>
                     <h4>Phenotype</h4>
                     <div id='patient-phenotype-form-section'>
-                        {% labelled label=form.affected.label %}{% crispy_field form.affected %}{% endlabelled %}
+                        {{ form.affected | as_crispy_field }}
                     </div>
                     <div id="phenotype-container">
                     {% phenotype_entry form.phenotype patient.phenotype_description edit=has_write_permission %}

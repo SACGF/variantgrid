@@ -7,6 +7,7 @@
 {% load vcf_import_info_tags %}
 {% load text_tags %}
 {% load tz %}
+{% load crispy_forms_tags %}
 
 {% block title %}{{ sample.name }}{% endblock %}
 {% block head %}
@@ -161,11 +162,8 @@ $(document).ready(function() {
 
             <form method="post" id='sample-form'>
                 {% csrf_token %}
-                <p>
-                    <label for="id_genome_build">Genome build:</label>
-                    <span id='id_genome_build'> {{ sample.vcf.genome_build }}</span>
-                </p>
-                {{ form.as_p }}
+                {% crispy form form_helper.horizontal %}
+
                 {% if has_write_permission %}
                     <button id='save-sample' class="btn btn-primary">save</button>
                 {% endif %}

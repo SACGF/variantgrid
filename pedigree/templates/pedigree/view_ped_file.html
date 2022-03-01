@@ -1,5 +1,6 @@
 {% extends menu_data_base %}
 {% load static %}
+{% load crispy_forms_tags %}
 
 {% block title %}{{ ped_file.name }}{% endblock title %}
 {% block head %}
@@ -54,18 +55,21 @@
 {% block submenu_page_content %}
 	<div id="ped_file">
 		<h3>PED file: {{ ped_file.name }}</h3>
-			<table>
-			{{ ped_file_form.as_table }}
+
+            <form>
+                {% crispy ped_file_form form_helper.horizontal %}
+            </form>
+
             {% if ped_file.uploadedpedfile.uploaded_file.uploadpipeline %}
                 {% if url_name_visible.view_upload_pipeline %}              
-                    <tr>
-                    <th>Processing</th>
-                    <td><a href="{% url 'view_upload_pipeline' ped_file.uploadedpedfile.uploaded_file.uploadpipeline.pk %}">View upload processing</a></td>
-                    </tr>
+                <div class="form-group-row row">
+                    <label class="col-form-label col-12 col-md-3 text-md-right">Processing</label>
+                    <div class="col-12 col-md-9 text-left">
+                        <a href="{% url 'view_upload_pipeline' ped_file.uploadedpedfile.uploaded_file.uploadpipeline.pk %}">View upload processing</a>
+                    </div>
+                </div>
                 {% endif %}
             {% endif %}
-
-			</table>
 	</div>
 
     <div id='pedigree-chart' class='generated-graph graph-loading'></div>
@@ -102,11 +106,10 @@
                 <p>Create a pedigree by mapping samples from a PED file to samples from a cohort.
                 <p>The cohort must contain all samples - you may need to make a <a class="hover-link" href="{% url 'cohorts' %}">cohort</a> first.
                 <div>
-                <span>{{ cohort_form }}</span>
-                {{ cohort_form.media }}
-                <input type="hidden" name="family_id" value="{{ family.pk }}" />
-
-                <span><button id='new-pedigree' type='button'>Create</button></span>
+                    {{ cohort_form }}
+                    {{ cohort_form.media }}
+                    <input type="hidden" name="family_id" value="{{ family.pk }}" />
+                    <button id='new-pedigree' class="btn btn-secondary" type='button'>Create</button>
                 </div>
             </form>
           </div>
