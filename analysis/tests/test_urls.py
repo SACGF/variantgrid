@@ -105,7 +105,8 @@ class Test(URLTestCase):
 
         grid_column_name = "variantannotation__transcript_version__gene_version__gene_symbol__symbol"
         analysis_params = {"analysis_id": cls.analysis.pk}
-        node_version_params = {"node_id": cls.node.pk, "node_version": cls.node.version}
+        analysis_node_params = {**analysis_params, "node_id": cls.node.pk}
+        node_version_params = {**analysis_node_params, "node_version": cls.node.version}
         analysis_version_and_node_version_params = {**node_version_params,
                                                     "analysis_version": cls.analysis.version,
                                                     "extra_filters": "default"}
@@ -121,11 +122,12 @@ class Test(URLTestCase):
             ('node_debug', analysis_version_and_node_version_params, 200),
 
             # Reproduce issue serializing GeneListNode
-            ('node_debug', {"node_id": cls.gene_list_node.pk, "node_version": cls.gene_list_node.version,
-                            "analysis_version": cls.analysis.version, "extra_filters": "default"}, 200),
+            ('node_debug', {"analysis_id": cls.analysis.pk, "analysis_version": cls.analysis.version,
+                            "node_id": cls.gene_list_node.pk, "node_version": cls.gene_list_node.version,
+                            "extra_filters": "default"}, 200),
 
-            ('node_doc', {"node_id": cls.node.pk}, 200),
-            ('node_load', {"node_id": cls.node.pk}, 302),
+            ('node_doc', analysis_node_params, 200),
+            ('node_load', analysis_node_params, 302),
 
             ('node_column_summary', {**node_version_params,
                                      "analysis_version": cls.analysis.version,
@@ -136,7 +138,7 @@ class Test(URLTestCase):
                                  "conversion": SNPMatrix.TOTAL_PERCENT,
                                  "significant_figures": 2}, 200),
 
-            ('node_data', {"node_id": cls.node.pk}, 200),
+            ('node_data', analysis_node_params, 200),
             ('analysis_node_versions', analysis_params, 200),
             ('analysis_editor_and_grid', analysis_params, 200),
             ('analysis_settings', analysis_params, 200),
@@ -191,11 +193,13 @@ class Test(URLTestCase):
     def _testVariantGridExport(self, export_type: str):
         client = Client()
         client.force_login(self.user_owner)
-        url = reverse("node_grid_export")
-        params = {"node_id": self.node.pk,
-                  "version_id": self.node.version,
-                  "extra_filters": "",
-                  "export_type": export_type}
+        url = reverse("node_grid_export", kwargs={"analysis_id": self.analysis.pk})
+        params = {
+            "node_id": self.node.pk,
+            "version_id": self.node.version,
+            "extra_filters": "",
+            "export_type": export_type,
+        }
         url = url + "?" + "&".join([f"{k}={v}" for k, v in params.items()])
         response = client.get(url)
         response.getvalue()  # Read streaming content

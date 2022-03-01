@@ -2,7 +2,7 @@ function getGrid(nodeId, unique_code) {
 	return $("#grid-" + nodeId, "#" + unique_code);
 }
 
-function export_grid(nodeId, unique_code, export_type, use_canonical_transcripts) {
+function export_grid(analysisId, nodeId, unique_code, export_type, use_canonical_transcripts) {
 	let grid = getGrid(nodeId, unique_code);
 	let gridParam = grid.jqGrid('getGridParam', 'postData');
 	gridParam['rows'] = 0; // no pagination
@@ -10,7 +10,7 @@ function export_grid(nodeId, unique_code, export_type, use_canonical_transcripts
 	gridParam['use_canonical_transcripts'] = use_canonical_transcripts;
 
 	let querystring = EncodeQueryData(gridParam);
-	let url = Urls.node_grid_export() + "?" + querystring;
+	let url = Urls.node_grid_export(analysisId) + "?" + querystring;
 	window.location = url;
 }
 
@@ -616,7 +616,7 @@ function gridCompleteExtra() {
 
 
 
-function setupGrid(config_url, nodeId, versionId, unique_code, gridComplete, gridLoadError, on_error_function) {
+function setupGrid(config_url, analysisId, nodeId, versionId, unique_code, gridComplete, gridLoadError, on_error_function) {
 	$(function () {
     	$.getJSON(config_url, function(data) {
             const errors = data["errors"];
@@ -671,7 +671,7 @@ function setupGrid(config_url, nodeId, versionId, unique_code, gridComplete, gri
 		            caption : "CSV",
 		            buttonicon : "ui-icon-arrowthickstop-1-s",
 		            onClickButton : function() {
-		            	export_grid(nodeId, unique_code, 'csv');
+		            	export_grid(analysisId, nodeId, unique_code, 'csv');
 		            },
 		            title : "Download as CSV",
 		            cursor : "pointer"
@@ -685,7 +685,7 @@ function setupGrid(config_url, nodeId, versionId, unique_code, gridComplete, gri
                         caption : "Canonical transcript CSV",
                         buttonicon : "ui-icon-arrowthickstop-1-s",
                         onClickButton : function() {
-                            export_grid(nodeId, unique_code, 'csv', true);
+                            export_grid(analysisId, nodeId, unique_code, 'csv', true);
                         },
                         title : "Download CSV using transcripts from " + ctc,
                         cursor : "pointer"
@@ -697,7 +697,7 @@ function setupGrid(config_url, nodeId, versionId, unique_code, gridComplete, gri
 		            caption : "VCF",
 		            buttonicon : "ui-icon-arrowthickstop-1-s",
 		            onClickButton : function() {
-		            	export_grid(nodeId, unique_code, 'vcf');
+		            	export_grid(analysisId, nodeId, unique_code, 'vcf');
 		            },
 		            title : "Download as VCF",
 		            cursor : "pointer"

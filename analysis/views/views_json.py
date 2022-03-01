@@ -88,7 +88,7 @@ class NodeUpdate(NodeJSONPostView):
 NODE_TYPES_HASH = None
 
 
-def node_data(request, node_id):
+def node_data(request, analysis_id, node_id):
     node = get_node_subclass_or_404(request.user, node_id)
     return JsonResponse(get_rendering_dict(node))
 
@@ -181,7 +181,8 @@ def nodes_delete(request, analysis_id):
 
 
 @require_POST
-def set_variant_tag(request, location):
+def set_variant_tag(request, analysis_id, location):
+    """ Can be called from analysis or variant details page (location = A or V) """
     location = TagLocation(location)
     variant_id = request.POST['variant_id']
     tag_id = request.POST['tag_id']
@@ -234,7 +235,7 @@ def set_variant_tag(request, location):
 
 
 @require_POST
-def set_variant_selected(request, node_id):
+def set_variant_selected(request, analysis_id, node_id):
     node = get_node_subclass_or_404(request.user, node_id, write=True)
     variant_id = request.POST['variant_id']
     checked = json.loads(request.POST['checked'])
@@ -255,7 +256,7 @@ def set_variant_selected(request, node_id):
     return JsonResponse({})
 
 
-def create_filter_child(request, node_id):
+def create_filter_child(request, analysis_id, node_id):
     node = get_node_subclass_or_404(request.user, node_id)
     column_name = request.POST['column_name']
     column_filter = request.POST['column_filter']
@@ -268,7 +269,7 @@ def create_filter_child(request, node_id):
 
 
 @require_POST
-def create_extra_filter_child(request, node_id, extra_filters):
+def create_extra_filter_child(request, analysis_id, node_id, extra_filters):
     node = get_node_subclass_or_404(request.user, node_id, write=True)
     x = node.x + 50 + random.randrange(-10, 10)
     y = node.y + 100 + random.randrange(-10, 10)
@@ -286,7 +287,7 @@ def create_extra_filter_child(request, node_id, extra_filters):
     return JsonResponse(data)
 
 
-def create_selected_child(request, node_id):
+def create_selected_child(request, analysis_id, node_id):
     node = get_node_subclass_or_404(request.user, node_id)
     x = node.x + 50 + random.randrange(-10, 10)
     y = node.y + 100 + random.randrange(-10, 10)
@@ -369,7 +370,7 @@ def analysis_set_panel_size(request, analysis_id):
 
 @require_POST
 @require_superuser
-def node_populate_clingen_alleles(request, node_id):
+def node_populate_clingen_alleles(request, analysis_id, node_id):
     node = get_node_subclass_or_404(request.user, node_id)
     an_as, _ = AnalysisNodeAlleleSource.objects.get_or_create(node=node)
     populate_clingen_alleles_from_allele_source.si(an_as.pk, settings.CLINGEN_ALLELE_REGISTRY_MAX_MANUAL_REQUESTS).apply_async()
@@ -377,7 +378,7 @@ def node_populate_clingen_alleles(request, node_id):
 
 
 @require_POST
-def analysis_template_variable(request, node_id):
+def analysis_template_variable(request, analysis_id, node_id):
     node = get_node_subclass_or_404(request.user, node_id, write=True)
 
     field = request.POST["field"]

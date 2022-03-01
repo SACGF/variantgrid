@@ -147,7 +147,7 @@
 
 {% block gene_list_grid %}
 
-{% jqgrid 'node_gene_disease_classification_genes_grid' 'node-ontology-genes' search=False download_grid_json_as_csv=True node_id=node.pk version=node.version %}
+{% jqgrid 'node_gene_disease_classification_genes_grid' 'node-ontology-genes' search=False download_grid_json_as_csv=True analysis_id=node.analysis_id node_id=node.pk version=node.version %}
 
 {% endblock gene_list_grid %}
 

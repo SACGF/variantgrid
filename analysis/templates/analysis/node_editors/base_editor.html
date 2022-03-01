@@ -91,7 +91,7 @@
 		const loadFuncLookup = {
 			'tab-link-doc': function () {
 				const loadDiv = $(nodeData, dataContainer);
-				const descriptionUrl = "{% url 'node_method_description' node.id node.version %}";
+				const descriptionUrl = "{% url 'node_method_description' node.analysis_id node.id node.version %}";
 				loadDiv.load(descriptionUrl).fadeIn();
 			}
 		};
@@ -102,7 +102,7 @@
 
 	function load_column_summary() {
 		const column = $("select#id_column", "form#column-summary-form").val();
-		const base_url = "{% url 'node_column_summary' node.analysis.version node.pk node.version extra_filters 'COLUMN' 3 %}";
+		const base_url = "{% url 'node_column_summary' node.analysis_id node.analysis.version node.pk node.version extra_filters 'COLUMN' 3 %}";
 		const url = base_url.replace('COLUMN', column);
 		const nodeDataSummary = $("#node-data-summary");
 
@@ -111,7 +111,7 @@
 
 
 	function createFilterChild(columnName, columnFilter) {
-		const CREATE_FILTER_CHILD_URL = "{% url 'create_filter_child' node.id %}";
+		const CREATE_FILTER_CHILD_URL = "{% url 'create_filter_child' node.analysis_id node.id %}";
 		const data = 'column_name=' + columnName + '&column_filter=' + encodeURIComponent(columnFilter);
 		$.ajax({
 			type: "POST",
@@ -123,7 +123,7 @@
 
 
 	function createExtraFilterChild(columnName, columnFilter) {
-		const CREATE_EXTRA_FILTER_CHILD_URL = "{% url 'create_extra_filter_child' node.id extra_filters %}";
+		const CREATE_EXTRA_FILTER_CHILD_URL = "{% url 'create_extra_filter_child' node.analysis_id node.id extra_filters %}";
 		$.ajax({
 			type: "POST",
 			url: CREATE_EXTRA_FILTER_CHILD_URL,
@@ -136,7 +136,7 @@
 		const snpmatrix_form = $("form#snp-matrix-form");
 		const conversion = $("#id_conversion", snpmatrix_form).val();
 		const significant_figures = $("#id_significant_figures", snpmatrix_form).val();
-		const base_url = "{% url 'node_snp_matrix' node.pk node.version 'CONVERSION' 0 %}";
+		const base_url = "{% url 'node_snp_matrix' node.analysis_id node.pk node.version 'CONVERSION' 0 %}";
 		let url = base_url.replace('CONVERSION', conversion);
 		url = url.substr(0, url.length-1) + significant_figures; // Replace last 0
 		const nodeDataSummary = $("#node-data-summary");
@@ -149,7 +149,7 @@
 		const graph_type = $("#id_graph_type", graph_node_form).val();
 		const cmap = $("#id_cmap", graph_node_form).val();
 
-		const base_url = "{% url 'node_data_graph' node.analysis.version node.pk node.version 'GRAPH_TYPE' 'CMAP' %}";
+		const base_url = "{% url 'node_data_graph' node.analysis_id node.analysis.version node.pk node.version 'GRAPH_TYPE' 'CMAP' %}";
 		const url = base_url.replace('GRAPH_TYPE', graph_type).replace('CMAP', cmap);
 		const nodeDataGraph = $("#node-data-graphs");
 		nodeDataGraph.html("Loading...");
@@ -207,7 +207,7 @@
 
 				{% if node.visible %}
 					<li><a id='tab-link-summary' href="#node-summary">Summary</a></li>
-					<li><a id='tab-link-doc' href="{% url 'node_doc' node.pk %}">Doc</a></li>
+					<li><a id='tab-link-doc' href="{% url 'node_doc' node.analysis_id node.pk %}">Doc</a></li>
 					{% if graph_form %}
 					<li><a id='tab-link-graphs' href="#node-graphs">Graphs</a></li>
 					{% endif %}
@@ -215,7 +215,7 @@
 					{% block node_editor_not_visible_tab_links %}{% endblock node_editor_not_visible_tab_links %}
 				{% endif %}
 				{% if node_debug_tab %}
-					<li><a id='tab-link-debug' href="{% url 'node_debug' node.analysis.version node.pk node.version extra_filters %}">Debug</a></li>
+					<li><a id='tab-link-debug' href="{% url 'node_debug' node.analysis_id node.analysis.version node.pk node.version extra_filters %}">Debug</a></li>
 				{% endif %}
 				{% block node_editor_tab_links_end %}{% endblock node_editor_tab_links_end %}
 			</ul>

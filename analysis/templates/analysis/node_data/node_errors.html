@@ -7,7 +7,7 @@
         const errors = {{ errors|jsonify }};
         on_error_function(errors);
         {% if node_id %}
-        const node_view_url = "{% url 'node_view' analysis_version node_id node_version extra_filters %}";
+        const node_view_url = "{% url 'node_view' analysis_id analysis_version node_id node_version extra_filters %}";
         load_node_editor(node_view_url);
         {% endif %}
     });

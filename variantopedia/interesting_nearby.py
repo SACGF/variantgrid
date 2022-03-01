@@ -133,8 +133,12 @@ def interesting_counts(qs, user, genome_build, clinical_significance=False):
     }
 
     clinical_significance_list = [c[0] for c in ClinicalSignificance.SHORT_CHOICES]
-    q_classification = Classification.get_variant_q(user, genome_build,
-                                                    clinical_significance_list=clinical_significance_list)
+    classification_qs = Classification.get_classifications_qs(user,
+                                                              clinical_significance_list=clinical_significance_list)
+    classifications_ids = list(classification_qs.values_list("pk", flat=True))
+    q_classification = Q(classification__in=classifications_ids)
+    q_classification &= Classification.get_variant_q_from_classification_qs(classification_qs, genome_build)
+
     classifications = {
         "clinvar": ("clinvar", Q(clinvar__isnull=False), "highest_pathogenicity"),
         "classification": ("classification", q_classification, "clinical_significance")

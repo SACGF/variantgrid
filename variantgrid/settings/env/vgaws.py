@@ -43,6 +43,7 @@ SEND_EMAILS = True
 
 # Needed in production (when debug=False)
 ALLOWED_HOSTS = ['variantgrid.com', 'www.variantgrid.com', WEB_HOSTNAME, WEB_IP]
+CSRF_TRUSTED_ORIGINS = [WEB_HOSTNAME]
 
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTOCOL', 'https')
 

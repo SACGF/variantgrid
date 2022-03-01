@@ -2,7 +2,7 @@
 
 {% block inlinejs %}
 	function createSelectedChild() {
-		var CREATE_SELECTED_CHILD_URL = "{% url 'create_selected_child' node.id %}";
+		var CREATE_SELECTED_CHILD_URL = "{% url 'create_selected_child' node.analysis_id node.id %}";
 		$.ajax({
 		    type: "POST",
 		    url: CREATE_SELECTED_CHILD_URL,

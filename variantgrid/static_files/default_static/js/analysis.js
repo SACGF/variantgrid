@@ -313,7 +313,7 @@ function setVariantTag(variantId, nodeId, tagId, successFunc, op) {
 }
 
 function analysisVariable(nodeId, field, op, successCallback) {
-    let url = Urls.analysis_template_variable(nodeId);
+    let url = Urls.analysis_template_variable(ANALYSIS_ID, nodeId);
     let data = 'field=' + field + '&op=' + op;
     $.ajax({
         type: "POST",
@@ -471,7 +471,7 @@ function loadGridAndEditorForNode(nodeId, extra_filters, fromSelectNode) {
     let gridAndEditorContainer = $("#grid-and-editor-container");
     let dataContainer = $("#node-data-container", gridAndEditorContainer);
     if (nodeId) {
-        let load_node_url = Urls.node_load(nodeId);
+        let load_node_url = Urls.node_load(ANALYSIS_ID, nodeId);
         if (extra_filters) {
             load_node_url += "?extra_filters=" + extra_filters;
         }
@@ -501,6 +501,17 @@ function layout_analysis_editor_and_grid() {
         //console.log("resizePanel = null");
         resizePanel = null;
     }
+}
+
+
+function cancelNodeLoad(analysisId, nodeId) {
+	$.ajax({
+	    type: "POST",
+	    url: Urls.node_cancel_load(analysisId, nodeId),
+	    success: function(data) {
+	    	console.log("Stopped loading");
+		}
+	});
 }
 
 function getLoadedNodeId() {

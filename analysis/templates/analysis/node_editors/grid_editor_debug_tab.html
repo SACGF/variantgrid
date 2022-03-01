@@ -44,7 +44,7 @@
             if (!btn.hasClass("disabled")) {
                 $.ajax({
                     type: "POST",
-                    url: "{% url 'node_populate_clingen_alleles' node.pk %}",
+                    url: "{% url 'node_populate_clingen_alleles' node.analysis_id node.pk %}",
                     success: function(data) {
                         btn.addClass("disabled");
                     },

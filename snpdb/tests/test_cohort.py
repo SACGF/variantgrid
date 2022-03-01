@@ -1,6 +1,7 @@
 from django.contrib.auth.models import User
 from django.test import TestCase
 
+from annotation.fake_annotation import get_fake_annotation_version
 from snpdb.models import GenomeBuild, Cohort, CohortSample
 from snpdb.tasks.cohort_genotype_tasks import create_cohort_genotype_and_launch_task
 from snpdb.tests.test_data import create_fake_trio
@@ -14,6 +15,7 @@ class CohortGenotypeTestCase(TestCase):
         cls.grch37 = GenomeBuild.get_name_or_alias("GRCh37")
         cls.trio1 = create_fake_trio(cls.user_owner, cls.grch37)
         cls.trio2 = create_fake_trio(cls.user_owner, cls.grch37)
+        get_fake_annotation_version(cls.grch37)
 
     def test_sub_cohort(self):
         """ Create a cohort which should be a sub-cohort of trio1 """

@@ -74,22 +74,23 @@ def create_vcf_filters(vcf, header_types):
     filter_code_id = VCFFilter.ASCII_MIN
     filters = header_types.get("FILTER", [])
     for filter_id, filter_dict in filters.items():
+        if filter_code_id > VCFFilter.ASCII_MAX:
+            num_filters = VCFFilter.ASCII_MAX - VCFFilter.ASCII_MIN
+            logging.warning("Warning: Run out of characters to store filters! Only storing 1st %d.", num_filters)
+            break
+
         if filter_id == "PASS":  # Special - don't store this as vcf.Reader will not return it
             continue
         filter_description = filter_dict["Description"]
 
         filter_code = chr(filter_code_id)
-        VCFFilter.objects.create(vcf=vcf,
-                                 filter_code=filter_code,
-                                 filter_id=filter_id,
-                                 description=filter_description)
+        VCFFilter.objects.get_or_create(vcf=vcf,
+                                        filter_code=filter_code,
+                                        filter_id=filter_id,
+                                        defaults={"description": filter_description})
         filter_code_id += 1
         if chr(filter_code_id) in "',\"":
             filter_code_id += 1  # Skip these as it causes quoting issues
-        if filter_code_id > VCFFilter.ASCII_MAX:
-            num_filters = VCFFilter.ASCII_MAX - VCFFilter.ASCII_MIN
-            logging.warning("Warning: Run out of characters to store filters! Only storing 1st %d.", num_filters)
-            continue
 
 
 def create_cohort_genotype_collection_from_vcf(vcf: VCF, vcf_reader):

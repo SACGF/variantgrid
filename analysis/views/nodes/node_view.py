@@ -21,6 +21,7 @@ class NodeView(UpdateView):
                         "node_id": self.object.pk,
                         "version_id": self.object.version,
                         "user_tag_colors": user_tag_colors,
+                        "analysis_id": self.object.analysis_id,
                         "annotation_version": self.object.analysis.annotation_version,
                         "extra_filters": extra_filters,
                         "extra_filters_label": dict(BuiltInFilters.CHOICES).get(extra_filters),
