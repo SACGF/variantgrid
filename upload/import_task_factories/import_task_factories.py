@@ -335,4 +335,3 @@ class VariantWikiImportTaskFactory(VCFInsertVariantsOnlyImportFactory):
     def get_post_data_insertion_classes(self):
         post_data_insertion_classes = super().get_post_data_insertion_classes()
         return post_data_insertion_classes + [VariantWikiInsertTask]
-

@@ -317,7 +317,7 @@ class Searcher:
         """
         HAS_ALPHA_PATTERN = re.compile(r"[a-zA-Z]")
         NOT_WHITESPACE = re.compile(r"\S+")
-        HGVS_UNCLEANED_PATTERN = re.compile(r"[^:]([cnmg]\.|:[cnmg]).*\d+") # Bare bones match - should tighten...
+        HGVS_UNCLEANED_PATTERN = re.compile(r"[^:]([cnmg]\.|:[cnmg]).*\d+")  # Bare bones match - should tighten...
         COSMIC_PATTERN = re.compile(r"^COS[MV](\d+)$")  # Old or new
         CLINGEN_ALLELE_PATTERN = re.compile(r"^CA")
         TRANSCRIPT_PATTERN = re.compile(r"^(ENST|NM_|NR_|XR_)\d+\.?\d*$")

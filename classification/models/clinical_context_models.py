@@ -266,7 +266,6 @@ class ClinicalContext(FlagsMixin, TimeStampedModel):
         clinical_context_signal.send(sender=ClinicalContext, clinical_context=self, status=new_status, is_significance_change=is_significance_change, cause=cause)
         # clinical_context_signal is now in charge of applying all relevant flags to clinical context and classifications
 
-
     @property
     def is_default(self) -> bool:
         return self.name == ClinicalContext.default_name

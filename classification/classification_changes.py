@@ -148,7 +148,6 @@ class ClassificationChanges:
                      .select_related('classification', 'classification__lab',
                                      'classification__user', 'user').order_by('-created')[:limit+1]
 
-
         # Flag Changes
         flags_qs = FlagComment.objects.filter(
             flags_q

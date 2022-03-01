@@ -159,7 +159,6 @@ class PopulationNode(AnalysisNode):
         classified_variant_ids = list(qs.values_list("pk", flat=True))
         return classified_variant_ids
 
-
     def _get_method_summary(self):
         if self.modifies_parents():
             filters = []
