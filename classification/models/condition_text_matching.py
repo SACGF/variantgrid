@@ -15,7 +15,6 @@ from django.db.models.signals import post_save
 from django.dispatch import receiver
 from guardian.shortcuts import assign_perm
 from lazy import lazy
-from lxml.ElementInclude import include
 from model_utils.models import TimeStampedModel
 
 from annotation.regexes import db_ref_regexes

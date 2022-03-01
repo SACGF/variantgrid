@@ -19,7 +19,6 @@ from classification.models.classification import Classification, \
     ClassificationModification
 from classification.models.classification_import_run import ClassificationImportRun, \
     classification_imports_complete_signal
-from classification.models.flag_types import classification_flag_types
 from flags.models.models import FlagsMixin, FlagCollection, FlagTypeContext, \
     flag_collection_extra_info_signal, FlagInfos
 from library.django_utils import get_url_from_view_path

@@ -1,6 +1,7 @@
 import operator
 from functools import reduce
-from typing import Any, Optional, Union
+from typing import Any, Union
+
 from django.db.models import Q
 from django.dispatch import receiver
 from django.utils.safestring import SafeString

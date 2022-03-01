@@ -9,7 +9,7 @@ from django.contrib.auth.models import User
 from django.utils.safestring import SafeString
 
 from genes.models_enums import AnnotationConsortium
-from library.log_utils import report_exc_info, report_message
+from library.log_utils import report_message
 from snpdb.models import GenomeBuild
 
 search_signal = django.dispatch.Signal()

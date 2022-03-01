@@ -7,11 +7,9 @@ from django.http import HttpRequest
 from django.http.response import HttpResponseRedirect, HttpResponse
 from django.shortcuts import render
 
-from classification.enums import ClinicalContextStatus
 from classification.enums.discordance_enums import ContinuedDiscordanceReason, \
     DiscordanceReportResolution
-from classification.models import ClassificationModification, DiscordanceReportClassification, ClinicalContext, \
-    clinical_context_signal
+from classification.models import ClassificationModification, DiscordanceReportClassification, ClinicalContext
 from classification.models.discordance_models import DiscordanceReport, \
     DiscordanceActionsLog
 from classification.views.exports import ClassificationExportFormatter2CSV
