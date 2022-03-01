@@ -1,7 +1,7 @@
 import collections
 import logging
 import re
-from typing import Optional, Pattern, Tuple, Iterable, Set, Union, Dict
+from typing import Optional, Pattern, Tuple, Iterable, Set, Union, Dict, Any
 
 import django.dispatch
 from django.conf import settings
@@ -50,6 +50,10 @@ class Allele(FlagsMixin, models.Model):
 
     def flag_type_context(self) -> FlagTypeContext:
         return FlagTypeContext.objects.get(pk="allele")
+
+    @property
+    def metrics_logging_key(self):
+        return "allele_id", self.pk
 
     @lazy
     def clingen_error(self):
@@ -446,6 +450,12 @@ class Variant(models.Model):
         if va:
             return va.allele
         return None
+
+    @property
+    def metrics_logging_key(self) -> Tuple[str, Any]:
+        if allele := self.allele:
+            return "allele_id", allele.pk
+        return "variant_id", self.pk
 
     @property
     def equivalent_variants(self) -> Iterable['Variant']:

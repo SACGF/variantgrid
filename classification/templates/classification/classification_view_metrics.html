@@ -136,5 +136,26 @@
         {% endfor %}
         </ul>
     </div>
+
+    <div class="card mt-4">
+        <div class="card-header">Recently Viewed Pages</div>
+        <table class="table">
+            <thead>
+                <tr><th>View Date</th><th>User</th><th>View Name</th><th>Parameters</th></tr>
+            </thead>
+            <tbody>
+                {% for view_event in counts.recent_views|slice:10 %}
+                    <tr>
+                        <td>{% timestamp view_event.created %}</td>
+                        <td>{% user view_event.user size="tiny" %}</td>
+                        <td>{{ view_event.view_name }}</td>
+                        <td>{% code_json view_event.args css_class="compact" %}</td>
+                    </tr>
+                    {% empty %}<tr><td colspan="4" class="text-center"><span class="no-value">No Data</span></td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
 </div>
 {% endblock content %}

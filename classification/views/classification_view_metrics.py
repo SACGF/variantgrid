@@ -127,6 +127,9 @@ class ViewEventCounts:
 
         return sorted((Counted(pk, count, ViewEventCounts.resolver_for_model(User)) for pk, count in id_to_count.items()), reverse=True)
 
+    def recent_views(self) -> QuerySet[ViewEvent]:
+        return ViewEvent.objects.filter(self.base_filter).order_by('-created')
+
     def all_views_for(self, request: HttpRequest) -> QuerySet[ViewEvent]:
         views = ViewEvent.objects \
             .filter(self.base_filter) \

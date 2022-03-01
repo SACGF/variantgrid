@@ -887,6 +887,9 @@ ul.compact li:before {
   color: #888;
   display: inline-block;
 }
+.json.compact {
+  background-color: transparent;
+}
 .json.compact .js-block {
   display: inline;
   margin-left: 4px;

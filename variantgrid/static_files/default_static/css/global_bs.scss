@@ -926,6 +926,7 @@ ul.compact {
     color: #888; display:inline-block;
   }
   &.compact {
+    background-color: transparent;
     .js-block {display: inline; margin-left: 4px}
     .js-comma {display: inline}
     br {display: none}
