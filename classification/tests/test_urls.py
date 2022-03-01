@@ -85,7 +85,6 @@ class Test(URLTestCase):
             ("summary_email_text", {}, 200),
             ("overlaps", {}, 200),
             ("evidence_keys_api", {}, 200),
-            ("classification_export_api", {}, 200),
         ]
         self._test_urls(URL_NAMES_AND_KWARGS, self.user_non_owner)
 
