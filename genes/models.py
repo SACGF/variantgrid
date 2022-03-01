@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from datetime import timedelta
 from functools import total_ordering
 from io import StringIO
-from typing import Tuple, Optional, Dict, List, Set, Union, Iterable
+from typing import Tuple, Optional, Dict, List, Set, Union, Iterable, Any
 from urllib.error import URLError, HTTPError
 
 import requests
@@ -166,6 +166,10 @@ class GeneSymbol(models.Model):
         if isinstance(symbol, str):
             return GeneSymbol.objects.filter(symbol=symbol).first()
         return symbol
+
+    @property
+    def metrics_logging_key(self) -> Tuple[str, Any]:
+        return "gene_symbol", self.symbol
 
     @property
     def name(self):

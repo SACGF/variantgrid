@@ -31,12 +31,25 @@ class PageViewsMiddleware:
                     return
 
             if not any(segment in INGORE_SEGMENTS for segment in parts):
-                app = request.path_info.split('/')[1]  # FYI not guarenteed to be the app, but closest thing I can find that links it
+                app = request.path_info.split('/')[1]  # FYI not guaranteed to be the app, but closest thing I can find that links it
                 if app in settings.LOG_ACTIVITY_APPS:
                     if url_obj := resolve(request.path_info):
                         # but url_obj.app_name returns an empty string
 
-                        all_params = {**view_kwargs, **request.GET.dict(), **request.POST.dict()}
+                        all_params = {**view_kwargs}
+                        for key, value in {**request.GET.dict(), **request.POST.dict()}.items():
+                            key: str
+                            value: str
+                            if value.lower() == "true":
+                                value = True
+                            elif value.lower() == "false":
+                                value = False
+                            else:
+                                try:
+                                    value = int(value)
+                                except ValueError:
+                                    pass
+                            all_params[key] = value
 
                         # hack to split up classification ID when it's in the form of "classification_id.modification_timestamp"
                         if classification_id := all_params.get("classification_id"):

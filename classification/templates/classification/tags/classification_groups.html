@@ -23,10 +23,10 @@
     <div data-toolbar="#{{ table_id }}" class="link-toolbar">
         {% if title %}<label>{{ title }}</label>{% endif %}
         {% if diff_latest %}
-            <a class="hover-link" href="{% url 'classification_diff' %}?cids={{ diff_latest }}">Show Diff Latest</a>
+            <a class="hover-link" href="{% url 'classification_diff' %}?cids={{ diff_latest }}{{ logging_key | safe }}">Show Diff Latest</a>
         {% endif %}
         {% if diff_all %}
-            <a class="hover-link" href="{% url 'classification_diff' %}?cids={{ diff_all }}">Show Diff All</a>
+            <a class="hover-link" href="{% url 'classification_diff' %}?cids={{ diff_all }}{{ logging_key | safe }}">Show Diff All</a>
         {% endif %}
         {% if download_link %}
             <a class="download-link" href="{{ download_link }}">Download as CSV</a>

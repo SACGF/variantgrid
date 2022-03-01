@@ -6,7 +6,7 @@ from collections import Counter, namedtuple
 from dataclasses import dataclass, field
 from datetime import datetime, timezone, timedelta
 from enum import Enum
-from typing import Any, Dict, List, Union, Optional, Iterable, Callable, Mapping, TypedDict
+from typing import Any, Dict, List, Union, Optional, Iterable, Callable, Mapping, TypedDict, Tuple
 
 import django.dispatch
 import pytz
@@ -455,6 +455,10 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
 
     clinical_significance = models.CharField(max_length=1, choices=ClinicalSignificance.CHOICES, null=True, blank=True)
     condition_resolution = models.JSONField(null=True, blank=True)  # of type ConditionProcessedDict
+
+    @property
+    def metrics_logging_key(self) -> Tuple[str, Any]:
+        return "classification_id", self.pk
 
     @property
     def clinical_grouping_name(self) -> str:
@@ -2004,7 +2008,8 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
 
         allele_info = {}
         try:
-            allele = self.variant.allele
+            allele: Allele = self.variant.allele
+            allele_info["id"] = allele.pk
             if allele.clingen_allele:
                 allele_info[SpecialEKeys.CLINGEN_ALLELE_ID] = str(allele.clingen_allele)
 

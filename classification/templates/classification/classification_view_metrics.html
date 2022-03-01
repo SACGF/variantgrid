@@ -35,12 +35,35 @@
         <p>Most Active Users count how many pages the user viewed across the last 30 days</p>
     {% end_page_help_embedded %}
 
-    <div class="card">
+    <div class="card mt-4">
+        <div class="card-header">Most Viewed Alleles <span class="float-right">unique viewers</span></div>
+        <ul class="list-group">
+        {% for ccount in counts.allele_views|slice:"10" %}
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+                {% with allele=ccount.resolve %}
+                    <a class="hover-link" href="{{ allele.get_absolute_url }}">{{ ccount.resolve }}</a>
+                    <span>
+                        <a class="mr-1"
+                            data-toggle="ajax-modal"
+                            data-title="All views of Allele ({{ ccount.pk }}) {{ page_suffix }}"
+                            data-href="{% url 'classification_view_metrics_detail' %}?age={{ days }}&exclude_admin={{ exclude_admin|jsonify }}&allele_id={{ ccount.pk }}">Show Views</a>
+                        <span class="badge badge-primary badge-pill">{{ ccount.count }}</span>
+                    </span>
+                {% endwith %}
+            </li>
+        {% endfor %}
+        </ul>
+    </div>
+
+    <div class="card mt-4">
         <div class="card-header">Most Viewed Classifications <span class="float-right">unique viewers</span></div>
         <ul class="list-group">
         {% for ccount in counts.classification_views|slice:"10" %}
             <li class="list-group-item d-flex justify-content-between align-items-center">
-                {% classification_quick ccount.resolve %}
+                <span>
+                    {% classification_quick ccount.resolve %}
+                    {{ ccount.resolve.allele }}
+                </span>
                 <span>
                     <a class="mr-1"
                         data-toggle="ajax-modal"
@@ -54,17 +77,20 @@
     </div>
 
     <div class="card mt-4">
-        <div class="card-header">Most Viewed Alleles <span class="float-right">unique viewers</span></div>
+        <div class="card-header">Most Viewed Discordance Reports <span class="float-right">unique viewers</span></div>
         <ul class="list-group">
-        {% for ccount in counts.allele_views|slice:"10" %}
+        {% for ccount in counts.discordance_report_views|slice:"10" %}
             <li class="list-group-item d-flex justify-content-between align-items-center">
-                {% with allele=ccount.resolve %}
-                    <a class="hover-link" href="{{ allele.get_absolute_url }}">{{ ccount.resolve }}</a>
+                {% with discordance_report=ccount.resolve %}
+                    <span>
+                        <a class="hover-link" href="{{ discordance_report.get_absolute_url }}">{{ ccount.resolve }}</a>
+                        {{ discordance_report.clinical_context.allele }}
+                    </span>
                     <span>
                         <a class="mr-1"
                             data-toggle="ajax-modal"
-                            data-title="All views of Allele ({{ ccount.pk }}) {{ page_suffix }}"
-                            data-href="{% url 'classification_view_metrics_detail' %}?age={{ days }}&exclude_admin={{ exclude_admin|jsonify }}&allele_id={{ ccount.pk }}">Show Views</a>
+                            data-title="All views of Discordance REport ({{ ccount.pk }}) {{ page_suffix }}"
+                            data-href="{% url 'classification_view_metrics_detail' %}?age={{ days }}&exclude_admin={{ exclude_admin|jsonify }}&discordance_report_id={{ ccount.pk }}">Show Views</a>
                         <span class="badge badge-primary badge-pill">{{ ccount.count }}</span>
                     </span>
                 {% endwith %}

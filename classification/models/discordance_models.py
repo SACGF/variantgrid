@@ -2,7 +2,7 @@ import typing
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Set, Optional, List, Dict
+from typing import Set, Optional, List, Dict, Tuple, Any
 
 import django.dispatch
 from django.conf import settings
@@ -46,7 +46,14 @@ class DiscordanceReport(TimeStampedModel):
     resolved_text = models.TextField(null=False, blank=True, default='')
 
     def get_absolute_url(self):
-        return reverse('discordance_report', kwargs={"report_id": self.pk})
+        return reverse('discordance_report', kwargs={"discordance_report_id": self.pk})
+
+    def __str__(self):
+        return f"Discordance Report ({self.pk})"
+
+    @property
+    def metrics_logging_key(self) -> Tuple[str, Any]:
+        return "discordance_report_id", self.pk
 
     @property
     def status(self) -> str:

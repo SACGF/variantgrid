@@ -13,7 +13,7 @@ from django.http.response import HttpResponseBase
 from django.shortcuts import render
 from django.utils.timezone import now
 from lazy import lazy
-from classification.models import Classification
+from classification.models import Classification, DiscordanceReport
 from eventlog.models import ViewEvent
 from library.django_utils import require_superuser
 from snpdb.models import Allele
@@ -96,6 +96,10 @@ class ViewEventCounts:
         return self.count_field("classification_id", ViewEventCounts.resolver_for_model(Classification))
 
     @lazy
+    def discordance_report_views(self) -> List[Counted[Classification]]:
+        return self.count_field("discordance_report_id", ViewEventCounts.resolver_for_model(DiscordanceReport))
+
+    @lazy
     def allele_views(self) -> List[Counted[Allele]]:
         return self.count_field("allele_id", ViewEventCounts.resolver_for_model(Allele))
 
@@ -135,6 +139,8 @@ class ViewEventCounts:
             views = views.filter(args__classification_id=int(classification_id))
         elif allele_id := request.GET.get('allele_id'):
             views = views.filter(args__allele_id=int(allele_id))
+        elif discordance_report_id := request.GET.get('discordance_report_id'):
+            views = views.filter(args__discordance_report_id=int(discordance_report_id))
         elif user_id := request.GET.get('user_id'):
             views = views.filter(user=user_id)
         return views

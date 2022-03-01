@@ -548,7 +548,7 @@ function applyVariantValues() {
     {% if classifications_new_grouping %}
         <div class="container mt-4">
             <h4>Classifications</h4>
-            {% classification_groups classifications link_discordance_reports=discordance_enabled %}
+            {% classification_groups classifications link_discordance_reports=discordance_enabled context_object=variant %}
         </div>
     {% else %}
         {% if classifications %}

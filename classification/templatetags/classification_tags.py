@@ -4,6 +4,7 @@ from typing import Union, Optional, Iterable
 
 from django.conf import settings
 from django.contrib.auth.models import User
+from django.db.models import Model
 from django.db.models.query import QuerySet
 from django.template import Library
 from django.utils.safestring import mark_safe
@@ -61,7 +62,19 @@ def classification_groups(
         history_link: Optional[str] = None,
         link_discordance_reports: bool = False,
         genome_build: Optional[GenomeBuild] = None,
-        title: Optional[str] = None):
+        title: Optional[str] = None,
+        context_object: Optional[Model] = None):
+    """
+    :param context: Auto included
+    :param classification_modifications: The classification modifications to render
+    :param show_diffs: Should a link to show diffs be shown
+    :param download_link: URL to download this data
+    :param history_link: URL to see the history of this data
+    :param link_discordance_reports: Should link to discordance reports (if so will subdivide by clinical context)
+    :param genome_build: Preferred genome build
+    :param title: Heading to give the table
+    :param context_object: If all these records are from an allele, provide "allele" if from a discordance report provide "discordance_report" etc
+    """
 
     groups = ClassificationGroups(classification_modifications, genome_build=genome_build)
 
@@ -89,6 +102,14 @@ def classification_groups(
         if 1 < len(ordered_classifications) <= 20:
             tag_context["diff_all"] = ",".join([str(cm.classification.id) for cm in ordered_classifications])
 
+    tag_context["logging_key"] = ""
+    if context_object:
+        try:
+            logging_key = context_object.metrics_logging_key
+            tag_context["logging_key"] = f"&{logging_key[0]}={logging_key[1]}"
+        except:
+            raise ValueError(f"Context Object {context_object} does not have metrics_logging_key property")
+
     if link_discordance_reports:
         all_clinical_groupings = set()
         for cm in ordered_classifications:
@@ -97,7 +118,7 @@ def classification_groups(
         clinical_grouping_list.sort(key=lambda cg:(not cg.is_default if cg else False, cg.name if cg else 'No Allele'))
         tag_context["clinical_contexts"] = clinical_grouping_list
 
-    context["paging"] = len(groups) > 10
+    tag_context["paging"] = len(groups) > 10
 
     return tag_context
 

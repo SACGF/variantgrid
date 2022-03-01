@@ -888,8 +888,14 @@ ul.compact li:before {
   display: inline-block;
 }
 .json.compact .js-block {
-  display: inline-block;
+  display: inline;
   margin-left: 4px;
+}
+.json.compact .js-comma {
+  display: inline;
+}
+.json.compact br {
+  display: none;
 }
 
 .install-instructions {
