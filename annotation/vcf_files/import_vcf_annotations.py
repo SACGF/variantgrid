@@ -2,7 +2,6 @@
 import logging
 import os
 
-import cyvcf2
 from django.conf import settings
 from django.utils import timezone
 
@@ -10,11 +9,13 @@ from annotation.annotation_version_querysets import get_unannotated_variants_qs
 from annotation.models import AnnotationRun, re, VEPSkippedReason
 from annotation.vcf_files.bulk_vep_vcf_annotation_inserter import BulkVEPVCFAnnotationInserter
 from annotation.vep_annotation import vep_check_version_match
-from library.vcf_utils import cyvcf2_header_types
 
 
 def import_vcf_annotations(annotation_run: AnnotationRun, insert_variants=True,
                            delete_temp_files=settings.VARIANT_ANNOTATION_DELETE_TEMP_FILES_ON_SUCCESS):
+    import cyvcf2
+    from library.vcf_utils import cyvcf2_header_types
+
     annotation_run.upload_start = timezone.now()
     annotation_run.upload_attempts += 1
     annotation_run.save()
