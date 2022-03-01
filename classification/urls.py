@@ -99,8 +99,8 @@ urlpatterns = [
 
     perm_path('accumulation_data', classification_accumulation_graph.download_report, name="classification_accumulation_data"),
 
-    perm_path('classification/discordance_report/<int:report_id>', discordance_report_view, name='discordance_report'),
-    perm_path('classification/discordance_report/<int:report_id>/export', export_discordance_report, name='discordance_export'),
+    perm_path('classification/discordance_report/<int:discordance_report_id>', discordance_report_view, name='discordance_report'),
+    perm_path('classification/discordance_report/<int:discordance_report_id>/export', export_discordance_report, name='discordance_export'),
 
     perm_path('export', classification_export_view.export_view, name='classification_export'),
     perm_path('export_redirect', classification_export_view.export_view_redirector, name='classification_export_redirect'),

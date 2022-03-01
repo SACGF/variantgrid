@@ -9,10 +9,10 @@ urlpatterns = [
     perm_path('variants', views.variants, name='variants'),
     perm_path('dashboard', views.dashboard, name='dashboard'),
     perm_path('server_status', views.server_status, name='server_status'),
-    perm_path('server_status_activity_detail/<int:days_ago>', views.server_status_activity,
+    perm_path('server_status_activity/detail/<int:days_ago>', views.server_status_activity,
               name='server_status_activity_detail'),
-    perm_path('server_status_settings_detail', views.server_status_settings, name='server_status_settings_detail'),
-    perm_path('database_statistics_detail', views.database_statistics, name='database_statistics_detail'),
+    perm_path('server_status_settings/detail', views.server_status_settings, name='server_status_settings_detail'),
+    perm_path('database_statistics/detail', views.database_statistics, name='database_statistics_detail'),
     # Tagging
     perm_path('variant_tags/', views.variant_tags, name='variant_tags'),
     perm_path('variant_tags/<genome_build_name>', views.variant_tags, name='genome_build_variant_tags'),

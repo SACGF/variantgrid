@@ -103,7 +103,7 @@ class ViewEventCounts:
     def page_views(self) -> List[Counted[str]]:
         id_to_count = defaultdict(int)
         for values in ViewEvent.objects\
-                .values('view_name')\
+                .values('view_name', 'user')\
                 .filter(self.base_filter)\
                 .annotate(total=Count('pk'))\
                 .order_by():

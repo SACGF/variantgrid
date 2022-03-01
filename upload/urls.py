@@ -17,7 +17,7 @@ urlpatterns = [
               name='upload_pipeline_skipped_annotation_grid'),
     perm_path('upload_pipeline/modified_variants/grid/<int:upload_pipeline_id>/<slug:op>/', JQGridView.as_view(grid=UploadPipelineModifiedVariantsGrid), name='upload_pipeline_modified_variants_grid'),
 
-    perm_path('view_upload_stats_detail', views.view_upload_stats, name='view_upload_stats_detail'),
+    perm_path('view_upload_stats/detail', views.view_upload_stats, name='view_upload_stats_detail'),
     perm_path('vcf_import_info_tags/accept/<int:vcf_import_info_id>', views.accept_vcf_import_info_tag, name='accept_vcf_import_info_tag'),
     perm_path('jfu_upload/', views.jfu_upload, name='jfu_upload'),
     perm_path('jfu_delete/<int:pk>', views.jfu_upload_delete, name='jfu_delete'),

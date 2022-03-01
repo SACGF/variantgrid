@@ -27,8 +27,8 @@ class DiscordanceNoLongerConsiders:
     classifications: List[ClassificationModification]
 
 
-def discordance_report_view(request: HttpRequest, report_id: int) -> HttpResponse:
-    report = DiscordanceReport.objects.get(pk=report_id)  # : :type report: DiscordanceReport
+def discordance_report_view(request: HttpRequest, discordance_report_id: int) -> HttpResponse:
+    report = DiscordanceReport.objects.get(pk=discordance_report_id)  # : :type report: DiscordanceReport
 
     if request.method == 'POST':
         try:
@@ -115,8 +115,8 @@ def discordance_report_view(request: HttpRequest, report_id: int) -> HttpRespons
     return render(request, "classification/discordance_report.html", context)
 
 
-def export_discordance_report(request: HttpRequest, report_id: int) -> HttpResponse:
-    report = DiscordanceReport.objects.get(pk=report_id)
+def export_discordance_report(request: HttpRequest, discordance_report_id: int) -> HttpResponse:
+    report = DiscordanceReport.objects.get(pk=discordance_report_id)
     dcs = DiscordanceReportClassification.objects.filter(report=report)
     include: [ClassificationModification] = list()
     for dc in dcs:
@@ -129,7 +129,7 @@ def export_discordance_report(request: HttpRequest, report_id: int) -> HttpRespo
         ClassificationFilter(
             user=request.user,
             genome_build=GenomeBuildManager.get_current_genome_build(),
-            file_prefix=f"discordance_report_{report_id}",
+            file_prefix=f"discordance_report_{discordance_report_id}",
             file_include_date=False,
             starting_query=vcs_qs
         ),
