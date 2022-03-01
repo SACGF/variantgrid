@@ -358,7 +358,7 @@ class CohortGenotypeCollection(RelatedModelsPartitionModel):
     task_version = models.ForeignKey(CohortGenotypeTaskVersion, null=True, on_delete=CASCADE)
     marked_for_deletion = models.BooleanField(null=False, default=False)
     # common_collection will be set on the 'interesting/rare' CGC
-    common_collection = models.OneToOneField('self', null=True, related_name="uncommon",  on_delete=CASCADE)
+    common_collection = models.OneToOneField('self', null=True, related_name="uncommon", on_delete=CASCADE)
     # common filter will be set on the 'common' CGC
     common_filter = models.ForeignKey(CohortGenotypeCommonFilterVersion, null=True, on_delete=PROTECT)
 

@@ -720,8 +720,9 @@ def embedded_ids_check(text: str) -> ConditionMatchingSuggestion:
 
                 if aliases := matched_term.aliases:
                     for alias in aliases:
-                        term_tokens = term_tokens.union(SearchText.tokenize_condition_text(normalize_condition_text(alias),
-                                                                                 deplural=True, deroman=True))
+                        term_tokens = term_tokens.union(
+                            SearchText.tokenize_condition_text(normalize_condition_text(alias),
+                                                               deplural=True, deroman=True))
                 if extra := matched_term.extra:
                     if included_titles := extra.get('included_titles'):
                         for included_title in included_titles.split(';;'):

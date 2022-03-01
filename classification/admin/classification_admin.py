@@ -111,7 +111,7 @@ class ClassificationImportRunAdmin(ModelAdminBasics):
         return obj.modified.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
 
     @admin_action(short_description="Mark Unfinished")
-    def mark_unfinished(self, request, queryset:QuerySet[ClassificationImportRun]):
+    def mark_unfinished(self, request, queryset: QuerySet[ClassificationImportRun]):
         for cir in queryset:
             if cir.status == ClassificationImportRunStatus.ONGOING:
                 cir.status = ClassificationImportRunStatus.UNFINISHED

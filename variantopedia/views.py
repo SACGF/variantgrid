@@ -439,7 +439,7 @@ def view_allele(request, pk):
     return render(request, "variantopedia/view_allele.html", context)
 
 
-def export_classifications_allele(request, pk:int):
+def export_classifications_allele(request, pk: int):
     """
     CSV export of what is currently filtered into the classification grid
     """

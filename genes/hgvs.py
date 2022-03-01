@@ -475,7 +475,8 @@ class HGVSMatcher:
         # Transcript Flanking: it is not allowed to describe variants in nucleotides beyond the boundaries of the
         # reference sequence using the reference sequence
         transcript_position = HGVSMatcher._transcript_position(transcript_version, hgvs_name.kind, cdna_coord)
-        if not (1 <= transcript_position <= transcript_version.length):
+        within_transcript = 1 <= transcript_position <= transcript_version.length
+        if not within_transcript:
             raise pyhgvs.InvalidHGVSName(f"'{hgvs_name.format()}' transcript position {transcript_position} is outside "
                                          f"of {transcript_version} range [1,{transcript_version.length}]")
 

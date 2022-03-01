@@ -29,7 +29,7 @@ class SearchInput:
         return bool(self.matches_pattern(HAS_ALPHA_PATTERN))
 
     def search(self) -> List['SearchResponse']:
-        valid_responses:List[SearchResponse] = list()
+        valid_responses: List[SearchResponse] = list()
         response_tuples = search_signal.send_robust(sender=SearchInput, search_input=self)
         for caller, response in response_tuples:
             if response:

@@ -23,7 +23,7 @@ class Test(URLTestCase):
         organization = Organization.objects.get_or_create(name="Fake Org", group_name="fake_org")[0]
         australia = Country.objects.get_or_create(name="Australia")[0]
         cls.lab = Lab.objects.get_or_create(name="Fake Lab", city="Adelaide", country=australia,
-                                        organization=organization, group_name="fake_org/fake_lab")[0]
+                                            organization=organization, group_name="fake_org/fake_lab")[0]
         cls.lab.group.user_set.add(cls.user_owner)
 
         grch37 = GenomeBuild.get_name_or_alias("GRCh37")
