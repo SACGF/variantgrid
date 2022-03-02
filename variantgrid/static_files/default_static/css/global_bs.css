@@ -888,6 +888,7 @@ ul.compact li:before {
   display: inline-block;
 }
 .json.compact {
+  word-break: break-word;
   background-color: transparent;
 }
 .json.compact .js-block {
