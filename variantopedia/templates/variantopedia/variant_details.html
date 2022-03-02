@@ -455,7 +455,13 @@ $(document).ready(function() {
 });
 
 function applyVariantValues() {
+    // Render variant annotation values this way so it's colored correctly etc as it
     // goes through the same formatting as transcript JavaScript values if done through here
+    applyValue("phastcons_100_way_vertebrate", {{ variant_annotation.phastcons_100_way_vertebrate | jsonify}});
+    applyValue("phastcons_30_way_mammalian", {{ variant_annotation.phastcons_30_way_mammalian | jsonify}});
+    applyValue("phylop_100_way_vertebrate", {{ variant_annotation.phylop_100_way_vertebrate | jsonify}});
+    applyValue("phylop_30_way_mammalian", {{ variant_annotation.phylop_30_way_mammalian | jsonify}});
+
     applyValue("dbscsnv_ada_score", {{ variant_annotation.dbscsnv_ada_score | jsonify}});
     applyValue("dbscsnv_rf_score", {{ variant_annotation.dbscsnv_rf_score | jsonify}});
     {% if variant_annotation.has_spliceai %}
@@ -804,7 +810,7 @@ function applyVariantValues() {
                             {% labelled id='cosmic_id' label='COSMIC Genomic Mutation ID' hint="tiny" %}{{ variant_annotation.cosmic_id }}{% endlabelled %}
                             {% labelled id='cosmic_legacy_id' label='COSMIC Legacy ID' hint="tiny" %}{{ variant_annotation.cosmic_legacy_id }}{% endlabelled %}
                             {% labelled id='cosmic_count' label='COSMIC Sample Count' hint="tiny" %}{% endlabelled %}
-                            {% labelled id='dbsnp_rs_id' label='dbSNP' hint="tiny" %}{% endlabelled %}
+                            {% labelled id='dbsnp_rs_id' label='dbSNP' hint="tiny" %}{{ variant_annotation.dbsnp_rs_id }}{% endlabelled %}
                             {% labelled id='ensembl_protein' label='Ensembl Protein' hint="tiny" %}{% endlabelled %}
                             {% labelled id='search_terms' label='Search Terms' hint="tiny" %}
                                 {% with search_term=variant_annotation.get_search_terms %}

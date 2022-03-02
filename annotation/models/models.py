@@ -738,7 +738,10 @@ class VariantAnnotation(AbstractVariantAnnotation):
         return self.variant.varianttranscriptannotation_set.filter(version=self.version)
 
     def get_search_terms(self):
-        return get_variant_search_terms(self.transcript_annotation)
+        extra_terms = []
+        if self.dbsnp_rs_id:
+            extra_terms.append(self.dbsnp_rs_id)
+        return get_variant_search_terms(self.transcript_annotation, extra_terms=extra_terms)
 
     def get_pubmed_search_terms(self):
         return get_variant_pubmed_search_terms(self.transcript_annotation)
