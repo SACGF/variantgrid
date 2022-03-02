@@ -195,7 +195,7 @@ class MVLEntry(ExportRow):
             return f'<a href="{url}" target="_blank">Click here for up-to-date classifications on this variant.</a>'
         else:
             # restore this after a comparison
-            url = reverse('view_allele', kwargs={'pk': self._cm.classification.allele_id})
+            url = reverse('view_allele', kwargs={'allele_id': self._cm.classification.allele_id})
             url = get_url_from_view_path(url) + f'?refer=mvl&seen={self.data.source.date_str}'
             return f'<a href="{url}" target="_blank">Click here for up-to-date classifications on this variant.</a>'
 

@@ -37,7 +37,7 @@ class ClinVarCompareRow(ExportRow):
 
     @export_column()
     def allele_url(self) -> str:
-        return get_url_from_view_path(reverse('view_allele', kwargs={"pk": self.allele_group.allele_id}))
+        return get_url_from_view_path(reverse('view_allele', kwargs={"allele_id": self.allele_group.allele_id}))
 
     @export_column()
     def clinvar_url(self) -> str:
