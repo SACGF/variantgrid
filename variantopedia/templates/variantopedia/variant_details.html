@@ -672,7 +672,6 @@ function applyVariantValues() {
                         <div class="card-header">Pathogenicity</div>
                         <div class="card-body">
                             {% labelled id='cadd_phred' label='CADD Phred' hint="tiny" %}{% endlabelled %}
-                            {% comment %}{% labelled id='cadd_raw' label='CADD Raw' hint="tiny" %}{% endlabelled %}{% endcomment %}
                             {% labelled id='grantham' label='Grantham' hint="tiny" %}{% endlabelled %}
                             {% labelled id='revel_score' label='REVEL score' hint="tiny" %}{% endlabelled %}
                             {% comment %}{% labelled id='loftool' label='LOFtool' hint="tiny" %}{% endlabelled %}{% endcomment %}
@@ -807,10 +806,6 @@ function applyVariantValues() {
                             {% labelled id='cosmic_count' label='COSMIC Sample Count' hint="tiny" %}{% endlabelled %}
                             {% labelled id='dbsnp_rs_id' label='dbSNP' hint="tiny" %}{% endlabelled %}
                             {% labelled id='ensembl_protein' label='Ensembl Protein' hint="tiny" %}{% endlabelled %}
-                            {% comment %}{% labelled id='swissprot' label='Swiss-prot' hint="tiny" %}
-                            {% labelled id='trembl' label='Trembl' hint="tiny" %}{% endlabelled %}
-                            {% labelled id='uniparc' label='UniParc' hint="tiny" %}{% endlabelled %}{% endcomment %}
-
                             {% labelled id='search_terms' label='Search Terms' hint="tiny" %}
                                 {% with search_term=variant_annotation.get_search_terms %}
                                     {% if search_term %}
