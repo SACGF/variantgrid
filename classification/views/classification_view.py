@@ -1,5 +1,5 @@
 import collections
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Set
 
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
@@ -205,6 +205,10 @@ class BulkInserter:
 
                         debug_timer.tick("Publish Complete")
                 else:
+                    ignore_if_only_patch: Optional[Set[str]] = None
+                    if source == SubmissionSource.API:
+                        ignore_if_only_patch = {"curation_date", "source_id"}
+
                     # patching existing records
                     record = record_ref.record
                     record.check_can_write(user)
@@ -216,7 +220,8 @@ class BulkInserter:
                                                       user=user,
                                                       source=source,
                                                       save=save,
-                                                      make_patch_fields_immutable=immutable)
+                                                      make_patch_fields_immutable=immutable,
+                                                      ignore_if_only_patching=ignore_if_only_patch)
                     patch_messages = patch_result['messages']
                     patched_keys = patch_result['modified']
 

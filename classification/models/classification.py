@@ -6,7 +6,7 @@ from collections import Counter, namedtuple
 from dataclasses import dataclass, field
 from datetime import datetime, timezone, timedelta
 from enum import Enum
-from typing import Any, Dict, List, Union, Optional, Iterable, Callable, Mapping, TypedDict, Tuple
+from typing import Any, Dict, List, Union, Optional, Iterable, Callable, Mapping, TypedDict, Tuple, Set
 
 import django.dispatch
 import pytz
@@ -1408,7 +1408,8 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                     save=False,
                     make_patch_fields_immutable=False,
                     initial_data=False,
-                    revalidate_all=False) -> Dict[str, Any]:
+                    revalidate_all=False,
+                    ignore_if_only_patching: Optional[Set[str]] = None) -> Dict[str, Any]:
         """
             Creates a new ClassificationModification if the patch values are different to the current values
             Patching a value with the same value has no effect
@@ -1596,6 +1597,9 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                         patched.wipe(WipeMode.POP)
 
         apply_patch = bool(diffs_only_patch)
+        if apply_patch and ignore_if_only_patching and ignore_if_only_patching.issuperset(diffs_only_patch.keys()):
+            apply_patch = False
+
         if not apply_patch:
             # if this is the first submission, create a version regardless of if there's data or not
             apply_patch = self.id is None
@@ -1642,7 +1646,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             pending_modification.clinical_significance = clinical_significance_choice
 
             warnings.append(
-                {'code': 'patched', 'message': 'Patched changed values for ' + ', '.join(diffs_only_patch.keys())})
+                {'code': 'patched', 'message': 'Patched changed values for ' + ', '.join(sorted(diffs_only_patch.keys()))})
 
             if save:
                 self.save()
@@ -1655,8 +1659,12 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
 
         # end apply patch diff
         else:
-            warnings.append({'code': 'no_patch', 'message': 'No changes detected to patch'})
-            # don't save if we haven't changed any values
+            if diffs_only_patch:
+                message = 'Only ' + ', '.join(sorted(diffs_only_patch.keys())) + ' changed, ignoring'
+                warnings.append({'code': 'no_patch', 'message': message})
+            else:
+                warnings.append({'code': 'no_patch', 'message': 'No changes detected to patch'})
+                # don't save if we haven't changed any values
 
         if self.requires_auto_population:
             self.requires_auto_population = False
