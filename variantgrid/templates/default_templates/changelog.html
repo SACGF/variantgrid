@@ -10,12 +10,16 @@
         <h3>Changelog</h3>
 
         <div class="card mt-4">
-            <div class="card-header">XXX, 2022</div>
+            <div class="card-header">Mar 3, 2022</div>
             <div class="card-body">
                 <ul>
+                {% if url_name_visible.analysis %}
                     <li>Analysis - Performance improvements</li>
                     <li>Analysis - Trio Proband HET removed + replaced with SampleNode (which is faster)</li>
+                {% endif %}
+                {% if url_name_visible.variant_tags %}
                     <li>Variant Tags grid - performance improvements</li>
+                {% endif %}
                     <li>Bug fixes</li>
                 </ul>
             </div>
@@ -38,6 +42,7 @@
             <div class="card-header">Jan 8, 2022</div>
             <div class="card-body">
                 <ul>
+                {% if url_name_visible.analysis %}
                     <li>Analysis - pop node, can exclude filtered by gnomAD</li>
                     <li>Analysis - PhenotypeNode can now use MONDO</li>
                     <li>Analysis - Gene annotation column changes:
@@ -54,6 +59,7 @@
                             </li>
                         </ul>
                     </li>
+                {% endif %}
                     <li>Patients - phenotype text also matched for MONDO terms</li>
                     <li>Search - dbSNP lookup is faster, can search for cohort/pedigree</li>
                     <li>Data - add user to pedigree/cohort to make it easier to find</li>
@@ -69,8 +75,10 @@
             <div class="card-header">November 30, 2021</div>
             <div class="card-body">
                 <ul>
+                {% if url_name_visible.analysis %}
                     <li>Analysis - export CSV now matches grid (previously only grid but not CSV had allele frequency as percent and was sorted)</li>
                     <li>Analysis - Phenotype node now shows a warning if ontology term doesn't map to genes</li>
+                {% endif %}
                     <li>HGVS - Correctly handle RefSeq gapped alignments, update gene annotation</li>
                     <li>HGVS - support LRG + non-coding transcripts</li>
                     <li>ClinVar - update to latest version</li>
@@ -107,7 +115,9 @@
                 <div class="card-body">
                     <ul>
                         <li>Ontology (OMIM/HPO) updates</li>
+                {% if url_name_visible.analysis %}
                         <li>Analysis - GeneListNode - filter to PanelApp panels</li>
+                {% endif %}
                         <li>gnomAD 3 (GRCh38 only) - 4 new fields: AC/AN, popmax AC/AN (autopop classifications)</li>
                         <li>Variant tags liftover between builds</li>
                         <li>DamageNode renamed to EffectNode - now has splicing, domain, literature filters</li>
@@ -132,8 +142,10 @@
                 <div class="card-header">November 24, 2020</div>
                 <div class="card-body">
                     <ul>
+                {% if url_name_visible.analysis %}
                         <li>Show tags from other analyses</li>
                         <li>Analyses can be locked (via analysis settings) and set to read-only</li>
+                {% endif %}
                         <li>Nearby Variants + Classifications</li>
                         <li>MONDO terms are now recognised in the classification form</li>
                         <li>merge & venn joins should be much faster</li>
