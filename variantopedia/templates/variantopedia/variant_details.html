@@ -667,15 +667,28 @@ function applyVariantValues() {
                     <div class="card">
                         <div class="card-header">Pathogenicity</div>
                         <div class="card-body">
-                            {% labelled id='cadd_phred' label='CADD Phred' hint="tiny" %}{% endlabelled %}
-                            {% labelled id='grantham' label='Grantham' hint="tiny" %}{% endlabelled %}
-                            {% labelled id='revel_score' label='REVEL score' hint="tiny" %}{% endlabelled %}
-                            {% comment %}{% labelled id='loftool' label='LOFtool' hint="tiny" %}{% endlabelled %}{% endcomment %}
-                            {% labelled id='fathmm_pred_most_damaging' label='FATHMM' hint="tiny" %}{% endlabelled %}
-                            {% labelled id='mutation_assessor_pred_most_damaging' label='Mutation Assessor' hint="tiny" %}{% endlabelled %}
-                            {% labelled id='mutation_taster_pred_most_damaging' label='Mutation Taster' hint="tiny" %}{% endlabelled %}
-                            {% labelled id='polyphen2_hvar_pred_most_damaging' label='Polyphen2 HVAR' hint="tiny" %}{% endlabelled %}
-                            {% labelled id='sift' label='SIFT' hint="tiny" %}{% endlabelled %}
+                            {% with pathogenicity_tools_version=annotation_version.variant_annotation_version.pathogenicity_tools_version %}
+                                {% if pathogenicity_tools_version == 1 %}
+                                    {% labelled id='cadd_phred' label='CADD Phred' hint="tiny" %}{% endlabelled %}
+                                    {% labelled id='grantham' label='Grantham' hint="tiny" %}{% endlabelled %}
+                                    {% labelled id='revel_score' label='REVEL score' hint="tiny" %}{% endlabelled %}
+                                    {% labelled id='fathmm_pred_most_damaging' label='FATHMM' hint="tiny" %}{% endlabelled %}
+                                    {% labelled id='mutation_assessor_pred_most_damaging' label='Mutation Assessor' hint="tiny" %}{% endlabelled %}
+                                    {% labelled id='polyphen2_hvar_pred_most_damaging' label='Polyphen2 HVAR' hint="tiny" %}{% endlabelled %}
+                                    {% labelled id='sift' label='SIFT' hint="tiny" %}{% endlabelled %}
+                                {% endif %}
+
+                                {% labelled label="other predictions" hint="tiny" %}
+                                    <a class='toggle-link' data-toggle="collapse" href='#other-predictions'>Show other predictions</a>
+                                {% endlabelled %}
+
+                                <div id="other-predictions" class="collapse">
+                                    {% if pathogenicity_tools_version == 1 %}
+                                        {% labelled id='mutation_taster_pred_most_damaging' label='Mutation Taster' hint="tiny" %}{% endlabelled %}
+                                        {% labelled id='loftool' label='LOFtool' hint="tiny" %}{% endlabelled %}
+                                    {% endif %}
+                                </div>
+                            {% endwith %}
                         </div>
                     </div>
                 </div>

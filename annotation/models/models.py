@@ -4,7 +4,7 @@ import os
 import re
 from collections import defaultdict
 from datetime import datetime, timedelta
-from typing import List, Optional
+from typing import List, Optional, Dict
 
 from Bio import Entrez
 from Bio.Data.IUPACData import protein_letters_1to3
@@ -22,7 +22,7 @@ from lazy import lazy
 
 from annotation.external_search_terms import get_variant_search_terms, get_variant_pubmed_search_terms
 from annotation.models.damage_enums import Polyphen2Prediction, FATHMMPrediction, MutationTasterPrediction, \
-    SIFTPrediction, PathogenicityImpact, MutationAssessorPrediction
+    SIFTPrediction, PathogenicityImpact, MutationAssessorPrediction, AbstractPathogenicity
 from annotation.models.models_enums import HumanProteinAtlasAbundance, AnnotationStatus, CitationSource, \
     VariantClass, ColumnAnnotationCategory, VEPPlugin, VEPCustom, ClinVarReviewStatus, VEPSkippedReason, \
     ManualVariantEntryType
@@ -361,6 +361,27 @@ class VariantAnnotationVersion(SubVersionPartition):
         """ Often you don't care what annotation version you use, only that variant annotation version is this one """
         return self.annotationversion_set.last()
 
+    @property
+    def pathogenicity_tools_version(self) -> int:
+        """ We've changed how this is handled over time """
+        if self.dbnsfp.startswith("4.0"):
+            return 1
+        elif self.dbnsfp.startswith("4.3"):
+            return 2
+        else:
+            raise ValueError(f"Don't know how to handle dbNSFP version '{self.dbnsfp}'")
+
+    def get_functional_prediction_pathogenic_levels(self) -> Dict:
+        if self.pathogenicity_tools_version == 1:
+            return {
+                'sift': SIFTPrediction.get_damage_or_greater_levels(),
+                'fathmm_pred_most_damaging': FATHMMPrediction.get_damage_or_greater_levels(),
+                'mutation_assessor_pred_most_damaging': MutationAssessorPrediction.get_damage_or_greater_levels(),
+                'mutation_taster_pred_most_damaging': MutationTasterPrediction.get_damage_or_greater_levels(),
+                'polyphen2_hvar_pred_most_damaging': Polyphen2Prediction.get_damage_or_greater_levels(),
+            }
+        raise ValueError(f"Don't know fields for {self.pathogenicity_tools_version=}")
+
     def __str__(self):
         super_str = super().__str__()
         return f"{super_str} VEP: {self.vep}/{self.get_annotation_consortium_display()}/{self.genome_build_id}"
@@ -664,14 +685,6 @@ class VariantAnnotation(AbstractVariantAnnotation):
         "mastermind_count_2_cdna_prot": "cDNA/Prot",
         "mastermind_count_3_aa_change": "AA change",
         "mastermind_mmid3": "MMID3",
-    }
-
-    COUNT_PATHOGENICITY_FIELDS = {
-        "fathmm_pred_most_damaging": FATHMMPrediction,
-        "mutation_assessor_pred_most_damaging": MutationAssessorPrediction,
-        "mutation_taster_pred_most_damaging": MutationTasterPrediction,
-        "polyphen2_hvar_pred_most_damaging": Polyphen2Prediction,
-        "sift": SIFTPrediction,
     }
 
     SPLICEAI_DS_DP = {
