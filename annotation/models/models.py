@@ -545,14 +545,6 @@ class AbstractVariantAnnotation(models.Model):
             return self.transcript.identifier
         return None
 
-    @lazy
-    def flagged_pathogenicity(self):
-        fp = {}
-        for f, klass in self.PATHOGENICITY_FIELDS.items():
-            level = getattr(self, f)
-            fp[f] = klass.is_level_flagged(level)
-        return fp
-
     @staticmethod
     def get_domains_components(domains):
         domain_dict = defaultdict(list)

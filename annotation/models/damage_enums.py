@@ -45,14 +45,6 @@ class AbstractPathogenicity:
         damage_levels = cls.get_damage_or_greater_levels(min_level)
         return cls._get_q_for_damage_levels(damage_levels, allow_null)
 
-    @classmethod
-    def is_level_flagged(cls, level):
-        """ level >= MINIMUM_FLAG_DAMAGE_LEVEL """
-        if level is None:
-            return False
-        level_score = {l: i for i, l in enumerate(dict(cls.CHOICES))}
-        return level_score[level] >= level_score[cls.MINIMUM_FLAG_DAMAGE_LEVEL]
-
 
 class PathogenicityImpact(AbstractPathogenicity):
     MODIFIER = '1'

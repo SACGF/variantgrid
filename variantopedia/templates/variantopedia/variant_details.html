@@ -184,16 +184,6 @@ function transcriptFunc(transcriptId, data) {
         applyValue(name, value);
     });
 
-    let FLAGGED_CLASS = "pathogenicity-flagged";
-    $.each(data.flagged_pathogenicity, (name, flagged) => {
-        let s = $("#" + name, transcriptInfoTable);
-        if (flagged) {
-            s.addClass(FLAGGED_CLASS);
-        } else {
-            s.removeClass(FLAGGED_CLASS);
-        }
-    });
-
     handlePubMedLinks(data.pubmed);
 
     formatField($("#cosmic_id"), cosmicLink);
