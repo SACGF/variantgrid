@@ -382,6 +382,26 @@ class VariantAnnotationVersion(SubVersionPartition):
             }
         raise ValueError(f"Don't know fields for {self.pathogenicity_tools_version=}")
 
+    @lazy
+    def _vep_config(self) -> Dict:
+        return self.genome_build.settings["vep_config"]
+
+    @lazy
+    def has_phastcons_30_way_mammalian(self) -> bool:
+        return self._vep_config.get("phastcons30way")
+
+    @lazy
+    def has_phylop_30_way_mammalian(self) -> bool:
+        return self._vep_config.get("phylop30way")
+
+    @lazy
+    def has_phastcons_46_way_mammalian(self) -> bool:
+        return self._vep_config.get("phastcons46way")
+
+    @lazy
+    def has_phylop_46_way_mammalian(self) -> bool:
+        return self._vep_config.get("phylop46way")
+
     def __str__(self):
         super_str = super().__str__()
         return f"{super_str} VEP: {self.vep}/{self.get_annotation_consortium_display()}/{self.genome_build_id}"

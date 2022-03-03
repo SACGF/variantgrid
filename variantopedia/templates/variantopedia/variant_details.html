@@ -49,8 +49,11 @@ var CODE_THRESHOLDS = {
     "gerp_pp_rs": [0, 3],
     "maxentscan_percent_diff_ref": [-150, -70, 70, 150],
     "phastcons_100_way_vertebrate": [0.85],
+    "phastcons_46_way_mammalian": [0.85],
     "phastcons_30_way_mammalian": [0.85],
     "phylop_100_way_vertebrate": [1.4],
+    // TODO: can't find what the ranges are...
+    // "phylop_46_way_mammalian": [1],
     "phylop_30_way_mammalian": [1],
     "spliceai_pred_ds_ag": [0.2, 0.6],
     "spliceai_pred_ds_al": [0.2, 0.6],
@@ -448,8 +451,10 @@ function applyVariantValues() {
     // Render variant annotation values this way so it's colored correctly etc as it
     // goes through the same formatting as transcript JavaScript values if done through here
     applyValue("phastcons_100_way_vertebrate", {{ variant_annotation.phastcons_100_way_vertebrate | jsonify}});
+    applyValue("phastcons_46_way_mammalian", {{ variant_annotation.phastcons_46_way_mammalian | jsonify}});
     applyValue("phastcons_30_way_mammalian", {{ variant_annotation.phastcons_30_way_mammalian | jsonify}});
     applyValue("phylop_100_way_vertebrate", {{ variant_annotation.phylop_100_way_vertebrate | jsonify}});
+    applyValue("phylop_46_way_mammalian", {{ variant_annotation.phylop_46_way_mammalian | jsonify}});
     applyValue("phylop_30_way_mammalian", {{ variant_annotation.phylop_30_way_mammalian | jsonify}});
 
     applyValue("dbscsnv_ada_score", {{ variant_annotation.dbscsnv_ada_score | jsonify}});
@@ -667,28 +672,24 @@ function applyVariantValues() {
                     <div class="card">
                         <div class="card-header">Pathogenicity</div>
                         <div class="card-body">
-                            {% with pathogenicity_tools_version=annotation_version.variant_annotation_version.pathogenicity_tools_version %}
-                                {% if pathogenicity_tools_version == 1 %}
-                                    {% labelled id='cadd_phred' label='CADD Phred' hint="tiny" %}{% endlabelled %}
-                                    {% labelled id='grantham' label='Grantham' hint="tiny" %}{% endlabelled %}
-                                    {% labelled id='revel_score' label='REVEL score' hint="tiny" %}{% endlabelled %}
-                                    {% labelled id='fathmm_pred_most_damaging' label='FATHMM' hint="tiny" %}{% endlabelled %}
-                                    {% labelled id='mutation_assessor_pred_most_damaging' label='Mutation Assessor' hint="tiny" %}{% endlabelled %}
-                                    {% labelled id='polyphen2_hvar_pred_most_damaging' label='Polyphen2 HVAR' hint="tiny" %}{% endlabelled %}
-                                    {% labelled id='sift' label='SIFT' hint="tiny" %}{% endlabelled %}
-                                {% endif %}
+                            {% if annotation_version.variant_annotation_version.pathogenicity_tools_version == 1 %}
+                                {% labelled id='cadd_phred' label='CADD Phred' hint="tiny" %}{% endlabelled %}
+                                {% labelled id='grantham' label='Grantham' hint="tiny" %}{% endlabelled %}
+                                {% labelled id='revel_score' label='REVEL score' hint="tiny" %}{% endlabelled %}
+                                {% labelled id='fathmm_pred_most_damaging' label='FATHMM' hint="tiny" %}{% endlabelled %}
+                                {% labelled id='mutation_assessor_pred_most_damaging' label='Mutation Assessor' hint="tiny" %}{% endlabelled %}
+                                {% labelled id='polyphen2_hvar_pred_most_damaging' label='Polyphen2 HVAR' hint="tiny" %}{% endlabelled %}
+                                {% labelled id='sift' label='SIFT' hint="tiny" %}{% endlabelled %}
 
                                 {% labelled label="other predictions" hint="tiny" %}
                                     <a class='toggle-link' data-toggle="collapse" href='#other-predictions'>Show other predictions</a>
                                 {% endlabelled %}
 
                                 <div id="other-predictions" class="collapse">
-                                    {% if pathogenicity_tools_version == 1 %}
-                                        {% labelled id='mutation_taster_pred_most_damaging' label='Mutation Taster' hint="tiny" %}{% endlabelled %}
-                                        {% labelled id='loftool' label='LOFtool' hint="tiny" %}{% endlabelled %}
-                                    {% endif %}
+                                    {% labelled id='mutation_taster_pred_most_damaging' label='Mutation Taster' hint="tiny" %}{% endlabelled %}
+                                    {% labelled id='loftool' label='LOFtool' hint="tiny" %}{% endlabelled %}
                                 </div>
-                            {% endwith %}
+                            {% endif %}
                         </div>
                     </div>
                 </div>
@@ -699,9 +700,19 @@ function applyVariantValues() {
                         <div class="card-body">
                             {% labelled id="gerp_pp_rs" label="Gerp++ (-12 - 6.8)" hint="tiny" %}{% endlabelled %}
                             {% labelled id="phastcons_100_way_vertebrate" label="PhastCons 100 way vertebrate (0-1)" hint="tiny" %}{% endlabelled %}
-                            {% labelled id="phastcons_30_way_mammalian" label="PhastCons 30 way mammalian (0-1)" label_css="text-small" hint="tiny" %}{% endlabelled %}
+                            {% if annotation_version.variant_annotation_version.has_phastcons_30_way_mammalian %}
+                                {% labelled id="phastcons_30_way_mammalian" label="PhastCons 30 way mammalian (0-1)" label_css="text-small" hint="tiny" %}{% endlabelled %}
+                            {% endif %}
+                            {% if annotation_version.variant_annotation_version.has_phastcons_46_way_mammalian %}
+                                {% labelled id="phastcons_46_way_mammalian" label="PhastCons 46 way mammalian (0-1)" label_css="text-small" hint="tiny" %}{% endlabelled %}
+                            {% endif %}
                             {% labelled id="phylop_100_way_vertebrate" label="PhyloP 100 way vertebrate (-20 - 10)" label_css="text-small" hint="tiny" %}{% endlabelled %}
-                            {% labelled id="phylop_30_way_mammalian" label="PhyloP 30 way mammalian (-20 - 1.3)" label_css="text-small" hint="tiny" %}{% endlabelled %}
+                            {% if annotation_version.variant_annotation_version.has_phylop_30_way_mammalian %}
+                                {% labelled id="phylop_30_way_mammalian" label="PhyloP 30 way mammalian (-20 - 1.3)" label_css="text-small" hint="tiny" %}{% endlabelled %}
+                            {% endif %}
+                            {% if annotation_version.variant_annotation_version.has_phylop_46_way_mammalian %}
+                                {% labelled id="phylop_46_way_mammalian" label="PhyloP 46 way mammalian" label_css="text-small" hint="tiny" %}{% endlabelled %}
+                            {% endif %}
                         </div>
                     </div>
                 </div>
