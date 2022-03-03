@@ -287,6 +287,12 @@ ShareLevel.ALL_LEVELS = [ShareLevel.CURRENT_USER, ShareLevel.LAB, ShareLevel.INS
 ShareLevel.DISCORDANT_LEVEL_KEYS = {ShareLevel.ALL_USERS.value, ShareLevel.PUBLIC.value}
 
 
+class ForceUpdate(str, Enum):
+    # NONE = None - when we've got default behaviour
+    SOURCE = 'source'  # supports changing source_id and curation_date
+    # ALL (in future might support this for updating of genome_build or other immutable fields)
+
+
 class SubmissionSource(str, Enum):
     FORM = 'form'
     CONSENSUS = 'consensus'  # now is copy from latest

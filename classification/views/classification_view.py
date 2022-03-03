@@ -15,7 +15,7 @@ from rest_framework.status import HTTP_200_OK, HTTP_400_BAD_REQUEST, \
 from rest_framework.views import APIView
 
 from classification.classification_stats import get_lab_gene_counts
-from classification.enums import SubmissionSource, ShareLevel, ClinicalSignificance
+from classification.enums import SubmissionSource, ShareLevel, ClinicalSignificance, ForceUpdate
 from classification.models import ClassificationRef, ClassificationImport, \
     ClassificationJsonParams, PatchMeta, Classification
 from classification.models.classification import ClassificationProcessError, \
@@ -120,6 +120,13 @@ class BulkInserter:
 
             debug_timer.tick("Security Check")
 
+            force: Optional[ForceUpdate] = None
+            if force_str := data.pop('force', None):
+                try:
+                    force = ForceUpdate(force_str)
+                except ValueError:
+                    pass
+
             for op in ['create', 'upsert', 'overwrite', 'data', 'patch']:
                 op_data = data.pop(op, None)
                 if op == 'data':
@@ -206,7 +213,7 @@ class BulkInserter:
                         debug_timer.tick("Publish Complete")
                 else:
                     ignore_if_only_patch: Optional[Set[str]] = None
-                    if source == SubmissionSource.API:
+                    if source == SubmissionSource.API and not force:
                         ignore_if_only_patch = {"curation_date", "source_id"}
 
                     # patching existing records

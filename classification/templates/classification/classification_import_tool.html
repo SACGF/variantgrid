@@ -19,6 +19,7 @@
         let lab = $('#lab').val();
         let record_id = $('#record_id').val();
         let delete_mode = $('#delete').prop('checked');
+        let force_mode = $('#force').prop('checked');
         let publish = $('#publish').val();
         let data = $('#data').val().trim();
         if (data.length === 0) {
@@ -64,6 +65,10 @@
         if (delete_mode) {
             envelope["delete"] = true;
         } else {
+            if (force_mode) {
+                envelope["force"] = "source";
+            }
+
             try {
                 let special_values = {
                     "c_hgvs": c_hgvs,
@@ -235,6 +240,12 @@ div.json {
                 <label class="form-check-label">
                     <input type="checkbox" id="delete" class="form-check-input" />
                     Delete
+                </label>
+            </div>
+            <div class="form-check">
+                <label class="form-check-label">
+                    <input type="checkbox" id="force" class="form-check-input" />
+                    Force (if changes are only curation date and/or source id)
                 </label>
             </div>
         {% endlabelled %}
