@@ -120,10 +120,13 @@ class VariantSampleInformation:
             ontology_path = f"patient__{PATIENT_ONTOLOGY_TERM_PATH}__name"
             q_hpo = Q(**{f"patient__{PATIENT_ONTOLOGY_TERM_PATH}__ontology_service": OntologyService.HPO})
             q_omim = Q(**{f"patient__{PATIENT_ONTOLOGY_TERM_PATH}__ontology_service": OntologyService.OMIM})
+            q_mondo = Q(**{f"patient__{PATIENT_ONTOLOGY_TERM_PATH}__ontology_service": OntologyService.MONDO})
             annotation_kwargs = {"patient_hpo": StringAgg(ontology_path, '|', filter=q_hpo,
                                                           distinct=True, output_field=TextField()),
                                  "patient_omim": StringAgg(ontology_path, '|', filter=q_omim,
-                                                           distinct=True, output_field=TextField())}
+                                                           distinct=True, output_field=TextField()),
+                                 "patient_mondo": StringAgg(ontology_path, '|', filter=q_mondo,
+                                                            distinct=True, output_field=TextField())}
             samples_qs = samples_qs.annotate(**annotation_kwargs)
 
             COPY_SAMPLE_FIELDS = ["id", "name", "patient", SAMPLE_ENRICHMENT_KIT_PATH]

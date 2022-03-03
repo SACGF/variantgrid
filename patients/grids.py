@@ -29,7 +29,7 @@ class PatientListGrid(JqGridUserRowConfig):
 
             # We need to filter to a sub patients list NOT just to certain terms, so that StringAgg will
             # return all the terms for that person
-            if term_type in ('HP', 'OMIM', 'HGNC'):
+            if term_type in ('HP', 'OMIM', 'MONDO', 'HGNC'):
                 ontology_service = OntologyService(term_type)
                 ontology_term = OntologyTerm.objects.get(name=value, ontology_service=ontology_service)
                 patient_id_q = Q(**{PATIENT_ONTOLOGY_TERM_PATH: ontology_term})
@@ -43,6 +43,7 @@ class PatientListGrid(JqGridUserRowConfig):
         ontology_path = f"{PATIENT_ONTOLOGY_TERM_PATH}__name"
         q_hpo = Q(**{f"{PATIENT_ONTOLOGY_TERM_PATH}__ontology_service": OntologyService.HPO})
         q_omim = Q(**{f"{PATIENT_ONTOLOGY_TERM_PATH}__ontology_service": OntologyService.OMIM})
+        q_mondo = Q(**{f"{PATIENT_ONTOLOGY_TERM_PATH}__ontology_service": OntologyService.MONDO})
         q_hgnc = Q(**{f"{PATIENT_ONTOLOGY_TERM_PATH}__ontology_service": OntologyService.HGNC})
         # Add sample_count to queryset
         annotation_kwargs = {"reference_id": StringAgg("specimen__reference_id", ',',
@@ -51,6 +52,8 @@ class PatientListGrid(JqGridUserRowConfig):
                                               filter=q_hpo, distinct=True, output_field=TextField()),
                              "omim": StringAgg(ontology_path, '|',
                                                filter=q_omim, distinct=True, output_field=TextField()),
+                             "mondo": StringAgg(ontology_path, '|',
+                                                filter=q_mondo, distinct=True, output_field=TextField()),
                              "hgnc": StringAgg(ontology_path, '|',
                                                filter=q_hgnc, distinct=True, output_field=TextField()),
                              "sample_count": Count("sample", distinct=True),
@@ -68,6 +71,7 @@ class PatientListGrid(JqGridUserRowConfig):
             {'index': 'reference_id', 'name': 'reference_id', 'label': 'Specimen ReferenceIDs'},
             {'index': 'hpo', 'name': 'hpo', 'label': 'HPO', 'classes': 'no-word-wrap', 'formatter': 'hpoFormatter'},
             {'index': 'omim', 'name': 'omim', 'label': 'OMIM', 'classes': 'no-word-wrap', 'formatter': 'omimFormatter'},
+            {'index': 'mondo', 'name': 'mondo', 'label': 'MONDO', 'classes': 'no-word-wrap', 'formatter': 'mondoFormatter'},
             {'index': 'hgnc', 'name': 'hgnc', 'label': 'Genes', 'classes': 'no-word-wrap', 'formatter': 'hgncFormatter'},
             {'index': 'sample_count', 'name': 'sample_count', 'label': '# samples', 'sorttype': 'int', 'width': '30px'},
             {'index': 'samples', 'name': 'samples', 'label': 'Samples'},
@@ -79,7 +83,8 @@ class PatientListGrid(JqGridUserRowConfig):
 class PatientRecordsGrid(JqGridUserRowConfig):
     model = PatientRecords
     caption = 'PatientRecords'
-    fields = ["id", "uploadedpatientrecords__uploaded_file__user__username", "uploadedpatientrecords__uploaded_file__name"]
+    fields = ["id", "uploadedpatientrecords__uploaded_file__user__username",
+              "uploadedpatientrecords__uploaded_file__name"]
     colmodel_overrides = {'id': {'width': 40, 'formatter': 'viewPatientRecordsLink'},
                           'uploadedpatientrecords__uploaded_file__user__username': {'label': 'Uploaded by'},
                           'uploadedpatientrecords__uploaded_file__name': {'label': 'Uploaded File Name'}}

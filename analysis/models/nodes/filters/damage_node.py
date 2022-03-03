@@ -117,7 +117,7 @@ class DamageNode(AnalysisNode):
             q_damage = Q(variantannotation__predictions_num_pathogenic__gte=self.damage_predictions_min)
             if self.damage_predictions_required:
                 if self.damage_predictions_allow_null:
-                    max_benign = len(VariantAnnotation.PATHOGENICITY_FIELDS) - self.damage_predictions_min
+                    max_benign = self.num_prediction_fields - self.damage_predictions_min
                     q_damage = Q(variantannotation__predictions_num_benign__lte=max_benign)
                 and_filters.append(q_damage)
             else:
@@ -156,6 +156,11 @@ class DamageNode(AnalysisNode):
             q = None
         return q
 
+    @property
+    def num_prediction_fields(self) -> int:
+        vav = self.analysis.annotation_version.variant_annotation_version
+        return len(vav.get_functional_prediction_pathogenic_levels())
+
     def _get_method_summary(self):
         if self.modifies_parents():
             method_summary = self.get_node_name()
@@ -168,7 +173,7 @@ class DamageNode(AnalysisNode):
         name = ''
         if self.modifies_parents():
             if self.damage_predictions_min:
-                name = f"{self.damage_predictions_min} of {len(VariantAnnotation.PATHOGENICITY_FIELDS)}"
+                name = f"{self.damage_predictions_min} of {self.num_prediction_fields}"
         return name
 
     @staticmethod

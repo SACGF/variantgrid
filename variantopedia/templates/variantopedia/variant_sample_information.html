@@ -190,6 +190,9 @@
                 omimFormatter : function(omim_terms) {
                     return getTermLinks('omim', omim_terms);
                 },
+                mondoFormatter : function(mondo_terms) {
+                    return getTermLinks('mondo', mondo_terms);
+                },
                 sampleFormatFieldFormatter : sampleFormatFieldFormatter,
             });
 
@@ -202,6 +205,7 @@
                           {name:'sample__samplefromsequencingsample__sequencing_sample__enrichment_kit__name', index:'sample__samplefromsequencingsample__sequencing_sample__enrichment_kit__name', label: 'EnrichmentKit'},
                           {name:'patient_hpo', index:'patient_hpo', label: 'Patient HPO', classes: 'no-word-wrap', formatter: 'hpoFormatter'},
                           {name:'patient_omim', index:'patient_omim', label: 'Patient OMIM', classes: 'no-word-wrap', formatter: 'omimFormatter'},
+                          {name:'patient_mondo', index:'patient_mondo', label: 'Patient MONDO', classes: 'no-word-wrap', formatter: 'mondoFormatter'},
                           {name:'sample__vcf__name', index:'sample__vcf__name', label: 'VCF'},
                           {name:'allele_frequency', index:'allele_frequency', label: 'Allele Frequency', sorttype: 'float', formatter: 'sampleFormatFieldFormatter'},
                           {name:'allele_depth', index:'allele_depth', label: 'Allele Depth', sorttype: 'int', formatter: 'sampleFormatFieldFormatter'},

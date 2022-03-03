@@ -222,6 +222,9 @@ $(document).ready(function() {
         omimFormatter: function (omim_terms) {
             return getTermLinks('OMIM', omim_terms);
         },
+        mondoFormatter: function (mondo_terms) {
+            return getTermLinks('MONDO', mondo_terms);
+        },
         hgncFormatter: function (genes) {
             return getTermLinks('HGNC', genes);
         },
@@ -269,6 +272,10 @@ $(document).ready(function() {
         $('#id_omim').change(function () {
             const regex = "OMIM:\\d+ ([^\\(]*)";
             searchForText('OMIM', regex, this);
+        });
+        $('#id_mondo').change(function () {
+            const regex = "MONDO:\\d+ ([^\\(]*)";
+            searchForText('MONDO', regex, this);
         });
         $('#id_hgnc').change(function () {
             const regex = "HGNC:\\d+ ([^\\(]*)";
@@ -392,6 +399,8 @@ $(document).ready(function() {
                     <tr><td class='hpo'> {{ hpo_form.hpo }}
                     <tr><td><div class='ontology-label omim w-100'>OMIM</div>
                     <tr><td class='omim'> {{ omim_form.omim }}
+                    <tr><td><div class='ontology-label mondo w-100'>MONDO</div>
+                    <tr><td class='mondo'> {{ mondo_form.mondo }}
                     <tr><td><div class='ontology-label hgnc w-100'>Genes/HGNC</div>
                     <tr><td class='hgnc'> {{ hgnc_form.hgnc }}
                     <!-- Only need 1 media for entire page -->

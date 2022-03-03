@@ -18,6 +18,13 @@ class HPOForm(forms.Form):
                                                      attrs={'data-placeholder': 'HPO...'}))
 
 
+class MONDOForm(forms.Form):
+    mondo = forms.ModelChoiceField(queryset=OntologyTerm.objects.all(),
+                                   required=False,
+                                   widget=ModelSelect2(url='mondo_autocomplete',
+                                                       attrs={'data-placeholder': 'MONDO...'}))
+
+
 class HGNCForm(forms.Form):
     hgnc = forms.ModelChoiceField(queryset=OntologyTerm.objects.all(),
                                   required=False,

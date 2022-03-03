@@ -272,13 +272,18 @@ class DamageNodeForm(BaseNodeForm):
     class Meta:
         model = DamageNode
         exclude = ANALYSIS_NODE_FIELDS
-        widgets = {"accordion_panel": HiddenInput(),
-                   "splice_min": HiddenInput(attrs={"min": 0, "max": 1, "step": 0.1}),
-                   "cadd_score_min": HiddenInput(attrs={"min": 0, "max": 70}),
-                   "revel_score_min": HiddenInput(attrs={"min": 0, "max": 1, "step": 0.05}),
-                   "cosmic_count_min": HiddenInput(attrs={"min": 0, "max": 50, "step": 1}),
-                   "damage_predictions_min": HiddenInput(attrs={"min": 0,
-                                                                "max": len(VariantAnnotation.PATHOGENICITY_FIELDS)})}
+        widgets = {
+            "accordion_panel": HiddenInput(),
+            "splice_min": HiddenInput(attrs={"min": 0, "max": 1, "step": 0.1}),
+            "cadd_score_min": HiddenInput(attrs={"min": 0, "max": 70}),
+            "revel_score_min": HiddenInput(attrs={"min": 0, "max": 1, "step": 0.05}),
+            "cosmic_count_min": HiddenInput(attrs={"min": 0, "max": 50, "step": 1}),
+            "damage_predictions_min": HiddenInput(attrs={"min": 0}),
+       }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["damage_predictions_min"].widget.attrs["max"] = self.instance.num_prediction_fields
 
 
 class ExpressionNodeForm(forms.Form):

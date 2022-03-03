@@ -193,13 +193,8 @@ class BulkVEPVCFAnnotationInserter:
             except:
                 logging.warning("Skipping custom %s due to missing settings", cvf.vep_info_field)
 
-        self.prediction_pathogenic_values = {
-            'sift': SIFTPrediction.get_damage_or_greater_levels(),
-            'fathmm_pred_most_damaging': FATHMMPrediction.get_damage_or_greater_levels(),
-            'mutation_assessor_pred_most_damaging': MutationAssessorPrediction.get_damage_or_greater_levels(),
-            'mutation_taster_pred_most_damaging': MutationTasterPrediction.get_damage_or_greater_levels(),
-            'polyphen2_hvar_pred_most_damaging': Polyphen2Prediction.get_damage_or_greater_levels(),
-        }
+        vav = self.annotation_run.variant_annotation_version
+        self.prediction_pathogenic_values = vav.get_functional_prediction_pathogenic_levels()
 
     def _setup_vep_fields_and_db_columns(self, validate_columns):
         self._add_vep_field_handlers()

@@ -14,7 +14,7 @@ from library.file_utils import rm_if_exists
 from library.guardian_utils import assign_permission_to_user_and_groups
 from library.log_utils import log_traceback
 from library.utils import invert_dict
-from ontology.forms import OMIMForm, HPOForm, HGNCForm
+from ontology.forms import OMIMForm, HPOForm, HGNCForm, MONDOForm
 from patients import forms
 from patients.forms import PatientSearchForm, PatientContactForm
 from patients.models import PatientColumns, PatientRecords, Patient, PatientModification, PatientRecordOriginType, \
@@ -268,6 +268,7 @@ def patients(request):
                "patient_search_form": PatientSearchForm(),
                'omim_form': OMIMForm(),
                'hpo_form': HPOForm(),
+               'mondo_form': MONDOForm(),
                'hgnc_form': HGNCForm(),
                "initially_hide_create_patient_form": initially_hide_create_patient_form,
                "form": form}
