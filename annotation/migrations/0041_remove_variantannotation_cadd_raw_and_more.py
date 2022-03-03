@@ -131,6 +131,14 @@ class Migration(migrations.Migration):
             model_name='varianttranscriptannotation',
             name='uniparc',
         ),
+        migrations.RemoveField(
+            model_name='varianttranscriptannotation',
+            name='predictions_num_benign',
+        ),
+        migrations.RemoveField(
+            model_name='varianttranscriptannotation',
+            name='predictions_num_pathogenic',
+        ),
         migrations.AlterField(
             model_name='columnvepfield',
             name='variant_grid_column',

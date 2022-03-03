@@ -514,9 +514,6 @@ class AbstractVariantAnnotation(models.Model):
     maxentscan_percent_diff_ref = models.FloatField(null=True, blank=True)
     mutation_assessor_pred_most_damaging = models.CharField(max_length=1, choices=MutationAssessorPrediction.CHOICES, null=True, blank=True)
     mutation_taster_pred_most_damaging = models.CharField(max_length=1, choices=MutationTasterPrediction.CHOICES, null=True, blank=True)
-    # Summary of most_damaging fields for faster DamageNode queries
-    predictions_num_pathogenic = models.IntegerField(default=0)
-    predictions_num_benign = models.IntegerField(default=0)
     polyphen2_hvar_pred_most_damaging = models.CharField(max_length=1, choices=Polyphen2Prediction.CHOICES, null=True, blank=True)
     # protein_position = text as it can be eg indel: "22-23" or splicing: "?-10" or "10-?"
     protein_position = models.TextField(null=True, blank=True)
@@ -647,6 +644,9 @@ class VariantAnnotation(AbstractVariantAnnotation):
     spliceai_gene_symbol = models.TextField(null=True, blank=True)
     repeat_masker = models.TextField(null=True, blank=True)
     overlapping_symbols = models.TextField(null=True, blank=True)
+    # Summary of most_damaging fields for faster DamageNode queries
+    predictions_num_pathogenic = models.IntegerField(default=0)
+    predictions_num_benign = models.IntegerField(default=0)
 
     somatic = models.BooleanField(null=True, blank=True)
     # Out of 2M records on my machine, 0.12% had multiple records, but linking just 1 is much simpler as it allows us
