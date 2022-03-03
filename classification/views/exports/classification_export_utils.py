@@ -1,13 +1,68 @@
 from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import List, Dict, Iterable
+from typing import List, Dict, Iterable, Set, Tuple, Any
 
+from annotation.citations import CitationDetails, get_citations
+from annotation.models import CitationSource, Citation
 from classification.enums import SpecialEKeys
 from classification.models import ClassificationModification
 from classification.views.classification_export_utils import TranscriptGroup, VariantWithChgvs
 from classification.views.exports.classification_export_filter import AlleleData, ClassificationFilter
 from genes.hgvs import CHGVS
 from library.log_utils import report_message
+
+
+@dataclass(frozen=True, eq=True)
+class CitationStub:
+    source: str
+    idx: str
+
+    def __lt__(self, other):
+        if self.source < other.source:
+            return True
+        if self.source == other.source:
+            return self.idx.rjust(10, '0') < other.idx.rjust(10, '0')
+        return False
+
+
+class CitationCounter:
+
+    def __init__(self):
+        self.all_citations: Dict[CitationStub, Set[str]] = defaultdict(set)
+
+    def reference_citations(self, cm: ClassificationModification):
+        for db_ref in cm.db_refs:
+            db = db_ref.get('db')
+            if source := CitationSource.CODES.get(db):
+                idx = db_ref.get('idx')
+                stub = CitationStub(source=source, idx=idx)
+                self.all_citations[stub].add(cm.classification.lab.name)
+
+    def ordered_references(self) -> Iterable[Tuple[CitationDetails, List[Any]]]:
+        citations: List[Citation] = list()
+
+        by_source: Dict[str, List[str]] = defaultdict(list)
+        for stub in list(self.all_citations.keys()):
+            by_source[stub.source].append(stub.idx)
+
+        # bulk select and select cachedcitation since we're going to be asking for that soon
+        for source, keys in by_source.items():
+            found = set()
+            for cit in Citation.objects.select_related('cachedcitation').filter(citation_source=source, citation_id__in=keys):
+                found.add(cit.citation_id)
+                citations.append(cit)
+
+            for check in keys:
+                if check not in found:
+                    citations.append(Citation.objects.create(citation_source=source, citation_id=check))
+
+        details = get_citations(citations)
+
+        for citation_detail in details:
+            stub = CitationStub(CitationSource.CODES.get(citation_detail.source), citation_detail.citation_id)
+            references = list(self.all_citations[stub])
+            references.sort()
+            yield citation_detail, references
 
 
 @dataclass

@@ -67,6 +67,10 @@ class AlleleData:
     all_cms: List[ClassificationIssue] = field(default_factory=list)
 
     @property
+    def genome_build(self) -> GenomeBuild:
+        return self.source.genome_build
+
+    @property
     def cms(self) -> List[ClassificationModification]:
         # The classifications that should be exported (passed validation, not withdrawn)
         return [ci.classification for ci in self.all_cms if not ci.has_issue]

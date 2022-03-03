@@ -133,8 +133,8 @@ class ClassificationExportFormatter2CSV(ClassificationExportFormatter2):
         self.e_keys = EvidenceKeyMap.cached()
         super().__init__(classification_filter=classification_filter)
 
-    @staticmethod
-    def from_request(request: HttpRequest) -> 'ClassificationExportFormatter2CSV':
+    @classmethod
+    def from_request(cls, request: HttpRequest) -> 'ClassificationExportFormatter2CSV':
         return ClassificationExportFormatter2CSV(
             classification_filter=ClassificationFilter.from_request(request),
             format_details=FormatDetailsCSV.from_request(request)
@@ -154,7 +154,6 @@ class ClassificationExportFormatter2CSV(ClassificationExportFormatter2):
         return "csv"
 
     def header(self) -> List[str]:
-
         self.errors_io = StringIO()
         header = RowID.csv_header() + ClassificationMeta.csv_header() + self.used_keys.header()
         return [delimited_row(header, delimiter=',')]

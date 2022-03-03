@@ -45,6 +45,9 @@ class ClassificationExportFormatter2(ABC):
         if self.is_genome_build_relevant:
             filename_parts.append(str(self.classification_filter.genome_build))
 
+        # set by the decorator
+        filename_parts.append(self.format_type)
+
         if part is not None:
             filename_parts.append(f"part_{part:02}")
 

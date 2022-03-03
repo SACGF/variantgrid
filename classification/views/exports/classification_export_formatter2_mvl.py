@@ -9,13 +9,12 @@ from lazy import lazy
 from annotation.views import simple_citation_html
 from classification.enums import SpecialEKeys
 from classification.models import ClassificationModification, EvidenceKeyMap, ClassificationGroups
-from classification.views.classification_export_mvl import CitationCounter
 from classification.views.classification_export_utils import ConflictStrategy
 from classification.views.exports.classification_export_decorator import register_classification_exporter
 from classification.views.exports.classification_export_filter import AlleleData, ClassificationFilter, \
     DiscordanceReportStatus
 from classification.views.exports.classification_export_formatter2 import ClassificationExportFormatter2
-from classification.views.exports.classification_export_utils import CHGVSData
+from classification.views.exports.classification_export_utils import CHGVSData, CitationCounter
 from library.django_utils import get_url_from_view_path
 from library.utils import delimited_row, export_column, ExportRow
 from snpdb.models import Allele
@@ -283,8 +282,8 @@ class ClassificationExportFormatter2MVL(ClassificationExportFormatter2):
         self.format_details = format_details
         super().__init__(classification_filter=classification_filter)
 
-    @staticmethod
-    def from_request(request: HttpRequest) -> 'ClassificationExportFormatter2MVL':
+    @classmethod
+    def from_request(cls, request: HttpRequest) -> 'ClassificationExportFormatter2MVL':
         classification_filter = ClassificationFilter.from_request(request)
         return ClassificationExportFormatter2MVL(
             classification_filter=classification_filter,

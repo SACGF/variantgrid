@@ -18,7 +18,7 @@
         baseUriApi = '{% url 'classification_export_api' %}';
         baseUriRedirect = '{% url 'classification_export_redirect' %}';
     }
-    
+
     function generateUrl() {
         let params = {};
         let inputError = null;
@@ -30,12 +30,12 @@
         }
         let share_level = $("input[name='share_level']:checked").val();
         params.share_level = share_level;
-        
+
         let genomeBuild = $("input[name='genome_build']:checked").val();
         params.build = genomeBuild;
-        
+
         params.type = format;
-        
+
         if (format === 'mvl') {
             let conflictStrategy = $("input[name='conflict_strategy']:checked").val();
             params.conflict_strategy=conflictStrategy;
@@ -64,7 +64,7 @@
             let value_format = $("input[name='value_format']:checked").val();
             params.value_format = value_format;
         }
-        
+
         let labSelectionMode = $("input[name='lab_selection_mode']:checked").val();
         let selectedLabs = $("input[name='lab_selection']:checked");
         if (selectedLabs.length) {
@@ -75,7 +75,7 @@
         } else if (labSelectionMode === 'include') {
             inputError = 'You must include at least 1 lab';
         }
-        
+
         let selectedOrgs = $("input[name='org_selection']:checked");
         if (selectedOrgs.length) {
             let orgArray = selectedOrgs.toArray().map(el => $(el).val());
@@ -90,10 +90,6 @@
         let benchmark = $("input[name='benchmark']:checked");
         if (benchmark.length) {
             params.benchmark = 'true';
-        }
-        let mode = $("input[name='mode']:checked").val();
-        if (mode && mode.length) {
-            params.mode = mode;
         }
 
         let allele = $("input[name='allele']").val();
@@ -131,10 +127,10 @@
             }
         }
     }
-    
+
     $(document).ready(() => {
         $('#export-fields input').change(() => {
-           this.generateUrl(); 
+           this.generateUrl();
         });
         $('#export-fields input').keyup(() => {
            this.generateUrl();
@@ -223,27 +219,6 @@
                 <input id="benchmark" name="benchmark" value="true" type="checkbox" class="form-check-input" />
             </label>
         </div>
-    {% endlabelled %}
-    {% labelled label="Code Mode" admin_only=True %}
-        <div class="form-check">
-            <label class="form-check-label">
-                <input checked="true" id="mode_new" type="radio" name="mode" value="new" class="form-check-input" />
-                New Code
-            </label>
-        </div>
-        <div class="form-check">
-            <label class="form-check-label">
-                <input id="mode_compatibility" type="radio" name="mode" value="compatibility" class="form-check-input" />
-                Compatibility Mode (make links the old way, slower but good for testing)
-            </label>
-        </div>
-        <div class="form-check">
-            <label class="form-check-label">
-                <input id="mode_old" type="radio" name="mode" value="old" class="form-check-input" />
-                Old Mode
-            </label>
-        </div>
-        <div class="text-muted">Only applies to MVL and CSV for now</div>
     {% endlabelled %}
     {% labelled label="Single Allele" admin_only=True %}
         <input id="allele" name="allele" value="" type="text" class="form-control" />

@@ -20,20 +20,21 @@ from rest_framework.views import APIView
 from classification.enums.classification_enums import ShareLevel
 from classification.models.classification import ClassificationModification
 from classification.models.classification_ref import ClassificationRef
-from classification.views.classification_export_clinvar_compare import ExportFormatterClinVarCompare
-from classification.views.classification_export_csv import ExportFormatterCSV
 from classification.views.classification_export_json import ExportFormatterJSON
 from classification.views.classification_export_keys import ExportFormatterKeys
-from classification.views.classification_export_mvl import ExportFormatterMVL
-from classification.views.classification_export_mvl_shell import ExportFormatterMVLShell
 from classification.views.classification_export_redcap import ExportFormatterRedcap, \
     export_redcap_definition
 from classification.views.classification_export_report import ExportFormatterReport
 from classification.views.classification_export_utils import ConflictStrategy, \
     VCFEncoding, BaseExportFormatter
 from classification.views.classification_export_vcf import ExportFormatterVCF
+from classification.views.exports import ClassificationExportFormatter2CSV
+from classification.views.exports.classification_export_decorator import UnsupportedExportType
+from classification.views.exports.classification_export_filter import ClassificationFilter
+from classification.views.exports.classification_export_formatter2_csv import FormatDetailsCSV
 from classification.views.exports.classification_export_view import serve_export
 from library.django_utils import get_url_from_view_path
+from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models.models import Lab, Organization
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_user_settings import UserSettings
@@ -201,10 +202,13 @@ class ClassificationApiExportView(APIView):
 
     def get(self, request: Request, **kwargs) -> HttpResponseBase:
 
-        file_format = request.query_params.get('type', 'csv')
+        file_format = request.query_params.get('type')
 
-        if file_format in {'csv', 'mvl'} and request.query_params.get('mode') != 'old':
+        try:
             return serve_export(request)
+        except UnsupportedExportType:
+            # assume that the default import will handle it if type wasn't handled elsewhere
+            pass
 
         # deprecating all this... eventually
 
@@ -277,27 +281,16 @@ class ClassificationApiExportView(APIView):
             "since": since
         }
 
-        if file_format == 'mvl':
-            if request.query_params.get('mvl_detail', 'standard') == 'shell':
-                formatter = ExportFormatterMVLShell(conflict_strategy=conflict_strategy,
-                                               cs_override_labels=cs_override_labels, **formatter_kwargs)
-            else:
-                formatter = ExportFormatterMVL(conflict_strategy=conflict_strategy, cs_override_labels=cs_override_labels, **formatter_kwargs)
-        elif file_format == 'json':
+        if file_format == 'json':
             formatter = ExportFormatterJSON(**formatter_kwargs)
         elif file_format == 'redcap':
             formatter = ExportFormatterRedcap(**formatter_kwargs)
         elif file_format == 'vcf':
             formatter = ExportFormatterVCF(encoding=encoding, **formatter_kwargs)
-        elif file_format == 'csv':
-            formatter = ExportFormatterCSV(pretty=pretty, **formatter_kwargs)
         elif file_format == 'keys':
             formatter = ExportFormatterKeys(qs=qs)
-        elif file_format == 'clinvar_compare':
-            formatter = ExportFormatterClinVarCompare(**formatter_kwargs)
-
         else:
-            raise ValueError(f'Unexpected file format {file_format}')
+            raise ValueError(f'Unsupported export format {file_format}')
 
         if request.query_params.get('benchmark') == 'true':
             benchmarks = formatter.benchmark()
@@ -331,9 +324,19 @@ def record_csv(request: HttpRequest, classification_id) -> HttpResponseBase:
     vcm: ClassificationModification = ClassificationRef.init_from_obj(request.user, classification_id).modification
     qs = ClassificationModification.objects.filter(pk=vcm.id)
 
-    genome_build = UserSettings.get_for_user(request.user).default_genome_build
-    start_part = vcm.classification.friendly_label.replace('/', '-')
-    date_part = str(vcm.created.astimezone(tz=timezone.get_default_timezone()).strftime("%Y-%m-%d"))
-    filename = f'{start_part} - {date_part}.csv'
-    ef = ExportFormatterCSV(user=request.user, filename_override=filename, genome_build=genome_build, qs=qs)
-    return ef.export()
+    filename_parts = [
+        vcm.classification.lab.group_name.replace('/', '-'),
+        vcm.classification.lab_record_id.replace('/', '-'),
+        str(vcm.created.astimezone(tz=timezone.get_default_timezone()).strftime("%Y-%m-%d"))
+    ]
+    file_prefix = "_".join(filename_parts)
+
+    return ClassificationExportFormatter2CSV(
+        ClassificationFilter(
+            user=request.user,
+            genome_build=GenomeBuildManager.get_current_genome_build(),
+            starting_query=qs,
+            file_prefix=file_prefix
+        ),
+        FormatDetailsCSV()
+    ).serve()

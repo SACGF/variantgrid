@@ -1,13 +1,18 @@
-from typing import Set, Optional, Iterable
+from typing import Set, Optional, Iterable, List
 
+from django.http import HttpRequest
 from django.urls import reverse
 from lazy import lazy
 
 from annotation.models import ClinVar, ClinVarVersion
 from classification.enums import SpecialEKeys
 from classification.views.classification_export_utils import ExportFormatter, AlleleGroup
+from classification.views.exports.classification_export_decorator import register_classification_exporter
+from classification.views.exports.classification_export_filter import ClassificationFilter, AlleleData
+from classification.views.exports.classification_export_formatter2 import ClassificationExportFormatter2
 from library.django_utils import get_url_from_view_path
 from library.utils import ExportRow, export_column
+from snpdb.models import VariantAllele
 
 
 class ClinVarCompareRow(ExportRow):
@@ -31,7 +36,7 @@ class ClinVarCompareRow(ExportRow):
         "P": 3
     }
 
-    def __init__(self, allele_group: AlleleGroup, clinvar_version: ClinVarVersion):
+    def __init__(self, allele_group: AlleleData, clinvar_version: ClinVarVersion):
         self.allele_group = allele_group
         self.clinvar_version = clinvar_version
 
@@ -47,14 +52,14 @@ class ClinVarCompareRow(ExportRow):
 
     @export_column()
     def c_hgvs(self) -> str:
-        for cm in self.allele_group.data:
+        for cm in self.allele_group.cms:
             if c_hgvs := cm.c_hgvs_best(self.allele_group.genome_build):
                 if full_c_hgvs := c_hgvs.full_c_hgvs:
                     return full_c_hgvs
 
     @export_column()
     def gene_symbol(self) -> str:
-        for cm in self.allele_group.data:
+        for cm in self.allele_group.cms:
             if c_hgvs := cm.c_hgvs_best(self.allele_group.genome_build):
                 if gene_symbol := c_hgvs.gene_symbol:
                     return gene_symbol
@@ -62,7 +67,7 @@ class ClinVarCompareRow(ExportRow):
     @lazy
     def server_clinical_significance_set(self) -> Set[str]:
         cs_set: Set[str] = set()
-        for cm in self.allele_group.data:
+        for cm in self.allele_group.cms:
             if classified := cm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE):
                 cs_set.add(classified)
         return cs_set
@@ -148,20 +153,31 @@ class ClinVarCompareRow(ExportRow):
     @lazy
     def clinvar(self) -> Optional[ClinVar]:
         # do we want to try all clinvar versions?
-        return ClinVar.objects.filter(variant__in=self.allele_group.variant_ids, version=self.clinvar_version).first()
+        variant_ids = list(VariantAllele.objects.filter(allele_id=self.allele_group.allele_id).values_list('variant_id', flat=True))
+        return ClinVar.objects.filter(variant__in=variant_ids, version=self.clinvar_version).first()
 
 
-class ExportFormatterClinVarCompare(ExportFormatter):
+@register_classification_exporter("clinvar_compare")
+class ClassificationExportFormatter2ClinVarCompare(ClassificationExportFormatter2):
+
+    @classmethod
+    def from_request(cls, request: HttpRequest) -> 'ClassificationExportFormatter2CSV':
+        return ClassificationExportFormatter2ClinVarCompare(
+            classification_filter=ClassificationFilter.from_request(request)
+        )
 
     @lazy
     def clinvar_version(self) -> ClinVarVersion:
-        return ClinVarVersion.objects.filter(genome_build=self.genome_build).order_by('-created').first()
+        return ClinVarVersion.objects.filter(genome_build=self.classification_filter.genome_build).order_by('-created').first()
 
-    def header(self) -> Optional[str]:
-        return ExportFormatter.write_single_row(ClinVarCompareRow.csv_header())
+    def content_type(self) -> str:
+        return "text/csv"
 
-    def row(self, group) -> Optional[str]:
-        return ExportFormatter.write_single_row(ClinVarCompareRow(group, self.clinvar_version).to_csv())
+    def extension(self) -> str:
+        return "csv"
 
-    def filename(self) -> str:
-        return self.generate_filename(suffix="clinvar_compare")
+    def header(self) -> List[str]:
+        return [ExportFormatter.write_single_row(ClinVarCompareRow.csv_header())]
+
+    def row(self, allele_data: AlleleData) -> List[str]:
+        return [ExportFormatter.write_single_row(ClinVarCompareRow(allele_data, self.clinvar_version).to_csv())]
