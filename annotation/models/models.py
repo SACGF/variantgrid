@@ -525,14 +525,6 @@ class AbstractVariantAnnotation(models.Model):
     class Meta:
         abstract = True
 
-    PATHOGENICITY_FIELDS = {
-        "fathmm_pred_most_damaging": FATHMMPrediction,
-        "mutation_assessor_pred_most_damaging": MutationAssessorPrediction,
-        "mutation_taster_pred_most_damaging": MutationTasterPrediction,
-        "polyphen2_hvar_pred_most_damaging": Polyphen2Prediction,
-        "sift": SIFTPrediction,
-    }
-
     @property
     def transcript_accession(self):
         """ Get transcript_id (with version if possible) """
@@ -672,6 +664,14 @@ class VariantAnnotation(AbstractVariantAnnotation):
         "mastermind_count_2_cdna_prot": "cDNA/Prot",
         "mastermind_count_3_aa_change": "AA change",
         "mastermind_mmid3": "MMID3",
+    }
+
+    PATHOGENICITY_FIELDS = {
+        "fathmm_pred_most_damaging": FATHMMPrediction,
+        "mutation_assessor_pred_most_damaging": MutationAssessorPrediction,
+        "mutation_taster_pred_most_damaging": MutationTasterPrediction,
+        "polyphen2_hvar_pred_most_damaging": Polyphen2Prediction,
+        "sift": SIFTPrediction,
     }
 
     SPLICEAI_DS_DP = {
