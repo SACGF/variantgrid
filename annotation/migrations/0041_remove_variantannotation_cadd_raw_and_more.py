@@ -4,6 +4,13 @@ from django.db import migrations, models
 import django.db.models.deletion
 
 
+def _one_off_delete_obsolete_column_vep_fields(apps):
+    ColumnVEPField = apps.get_model("annotation", "ColumnVEPField")
+    # These were inserted in legacy code but have since been deleted
+    DELETE_COLUMNS = ['feature', 'feature_type', 'gene_text']
+    ColumnVEPField.objects.filter(column__in=DELETE_COLUMNS).delete()
+
+
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -11,6 +18,7 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
+        migrations.RunPython(_one_off_delete_obsolete_column_vep_fields),
         migrations.RemoveField(
             model_name='variantannotation',
             name='cadd_raw',
