@@ -117,7 +117,7 @@ class DamageNode(AnalysisNode):
             q_damage = Q(variantannotation__predictions_num_pathogenic__gte=self.damage_predictions_min)
             if self.damage_predictions_required:
                 if self.damage_predictions_allow_null:
-                    max_benign = len(VariantAnnotation.PATHOGENICITY_FIELDS) - self.damage_predictions_min
+                    max_benign = len(VariantAnnotation.COUNT_PATHOGENICITY_FIELDS) - self.damage_predictions_min
                     q_damage = Q(variantannotation__predictions_num_benign__lte=max_benign)
                 and_filters.append(q_damage)
             else:
@@ -168,7 +168,7 @@ class DamageNode(AnalysisNode):
         name = ''
         if self.modifies_parents():
             if self.damage_predictions_min:
-                name = f"{self.damage_predictions_min} of {len(VariantAnnotation.PATHOGENICITY_FIELDS)}"
+                name = f"{self.damage_predictions_min} of {len(VariantAnnotation.COUNT_PATHOGENICITY_FIELDS)}"
         return name
 
     @staticmethod

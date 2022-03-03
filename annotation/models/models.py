@@ -666,7 +666,7 @@ class VariantAnnotation(AbstractVariantAnnotation):
         "mastermind_mmid3": "MMID3",
     }
 
-    PATHOGENICITY_FIELDS = {
+    COUNT_PATHOGENICITY_FIELDS = {
         "fathmm_pred_most_damaging": FATHMMPrediction,
         "mutation_assessor_pred_most_damaging": MutationAssessorPrediction,
         "mutation_taster_pred_most_damaging": MutationTasterPrediction,

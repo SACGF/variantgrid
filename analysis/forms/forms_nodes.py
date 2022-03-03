@@ -278,7 +278,7 @@ class DamageNodeForm(BaseNodeForm):
                    "revel_score_min": HiddenInput(attrs={"min": 0, "max": 1, "step": 0.05}),
                    "cosmic_count_min": HiddenInput(attrs={"min": 0, "max": 50, "step": 1}),
                    "damage_predictions_min": HiddenInput(attrs={"min": 0,
-                                                                "max": len(VariantAnnotation.PATHOGENICITY_FIELDS)})}
+                                                                "max": len(VariantAnnotation.COUNT_PATHOGENICITY_FIELDS)})}
 
 
 class ExpressionNodeForm(forms.Form):
