@@ -100,7 +100,6 @@ class VariantTranscriptSelections:
 
             data[self.GENE_SYMBOL] = obj.symbol
             data["gene_id"] = obj.gene_id
-            data["flagged_pathogenicity"] = obj.flagged_pathogenicity
 
             for col in settings.VARIANT_ANNOTATION_TRANSCRIPT_PREFERENCES:
                 if transcript_id := data.get(col):

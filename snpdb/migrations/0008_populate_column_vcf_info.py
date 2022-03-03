@@ -41,8 +41,6 @@ def populate_column_vcf_info(apps, schema_editor):
         {'info_id': 'GENE_BAND', 'column_id': 'band', 'number': None, 'type': 'S', 'description': 'Cytogenetic band'},
         {'info_id': 'CADD_phred', 'column_id': 'cadd_phred', 'number': 1, 'type': 'F',
          'description': 'Combined Annotation Dependent Depletion raw scores'},
-        {'info_id': 'CADD_raw', 'column_id': 'cadd_raw', 'number': 1, 'type': 'F',
-         'description': 'Phred-scaled score of Combined Annotation Dependent Depletion'},
         {'info_id': 'GENE_ccds_ids', 'column_id': 'ccds_ids', 'number': None, 'type': 'S',
          'description': 'Consensus Coding Sequence Project Ids'},
         {'info_id': 'CLNSIG', 'column_id': 'clinical_significance', 'number': None, 'type': 'S',

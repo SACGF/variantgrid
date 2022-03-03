@@ -1,11 +1,11 @@
 """ A list of (Google) search terms for a variant """
 from collections import defaultdict
-from typing import Tuple, List
+from typing import Tuple, List, Optional
 
 from pyhgvs import HGVSName, InvalidHGVSName
 
 
-def _get_gene_and_terms(vta, c_hgvs=True, dbsnp=True) -> Tuple[str, List]:
+def _get_gene_and_terms(vta, c_hgvs=True, extra_terms: Optional[List[str]] = None) -> Tuple[str, List]:
     from annotation.models import VariantTranscriptAnnotation
 
     if vta.gene:
@@ -14,6 +14,8 @@ def _get_gene_and_terms(vta, c_hgvs=True, dbsnp=True) -> Tuple[str, List]:
         gene_symbol = None
 
     terms = []
+    if extra_terms:
+        terms.extend(extra_terms)
     hgvs_name = None
     try:
         hgvs_name = HGVSName(vta.hgvs_c)
@@ -34,9 +36,6 @@ def _get_gene_and_terms(vta, c_hgvs=True, dbsnp=True) -> Tuple[str, List]:
         terms.append(protein_aa3)
         protein_aa1 = VariantTranscriptAnnotation.amino_acid_3_to_1(protein_aa3)
         terms.append(protein_aa1)
-
-    if dbsnp and vta.dbsnp_rs_id:
-        terms.append(vta.dbsnp_rs_id)
 
     if hgvs_name and hgvs_name.mutation_type in ('ins', 'del', 'dup'):
         # "del ex 20" and "del exon 20"
@@ -75,7 +74,7 @@ def _get_search_terms(variant_transcripts_list: List, formatter: str = None, **k
     return " OR ".join(["(%s)" % s for s in searches])
 
 
-def get_variant_search_terms(variant_transcripts_list: List):
+def get_variant_search_terms(variant_transcripts_list: List, extra_terms: Optional[List[str]] = None):
     """
     Examples:
 
@@ -91,7 +90,7 @@ def get_variant_search_terms(variant_transcripts_list: List):
 
     """
 
-    return _get_search_terms(variant_transcripts_list, formatter='"%s"')
+    return _get_search_terms(variant_transcripts_list, formatter='"%s"', extra_terms=extra_terms)
 
 
 def get_variant_pubmed_search_terms(variant_transcripts_list: List):
@@ -100,4 +99,4 @@ def get_variant_pubmed_search_terms(variant_transcripts_list: List):
             (CFTR) AND ((Arg117His) OR (R117H))
 
         PubMed doesn't like rsIds or c.HGVS """
-    return _get_search_terms(variant_transcripts_list, formatter='(%s)', c_hgvs=False, dbsnp=False)
+    return _get_search_terms(variant_transcripts_list, formatter='(%s)', c_hgvs=False)

@@ -140,6 +140,8 @@ class TestAnnotationVCF(TestCase):
 
         # RPE65:G197E | 1&1&1
         va = VariantAnnotation.objects.get(variant_id=131167)
+        self.assertEqual(va.mutation_assessor_pred_most_damaging, 'M')
+        self.assertEqual(va.polyphen2_hvar_pred_most_damaging, 'D')
         self.assertEqual(va.mastermind_count_1_cdna, 1)
         self.assertEqual(va.mastermind_count_2_cdna_prot, 1)
         self.assertEqual(va.mastermind_count_3_aa_change, 1)

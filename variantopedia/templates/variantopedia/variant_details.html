@@ -60,6 +60,7 @@ var CODE_THRESHOLDS = {
     "dbscsnv_rf_score": [0.2, 0.6],
     "cosmic_count": [2, 10]
 };
+// These are looked up in lower case
 var CODE_WORDS = {
     "tolerated": "low",
     "neutral": "low",
@@ -70,7 +71,12 @@ var CODE_WORDS = {
     "possibly damaging": "med",
     "damaging": "high",
     "high": "high",
-    "probably damaging": "high"
+    "probably damaging": "high",
+    // Mutation Taster
+    "polymorphism (automatic)": "low", // known benign
+    "polymorphism": "med", // probably benign
+    "disease causing": "high", // probably pathogenic
+    "disease causing (automatic)": "high", // known pathogenic
 };
 
 
@@ -176,16 +182,6 @@ function transcriptFunc(transcriptId, data) {
     let transcriptInfoTable = $('#transcript-info');
     $.each(data, (name, value) => {
         applyValue(name, value);
-    });
-
-    let FLAGGED_CLASS = "pathogenicity-flagged";
-    $.each(data.flagged_pathogenicity, (name, flagged) => {
-        let s = $("#" + name, transcriptInfoTable);
-        if (flagged) {
-            s.addClass(FLAGGED_CLASS);
-        } else {
-            s.removeClass(FLAGGED_CLASS);
-        }
     });
 
     handlePubMedLinks(data.pubmed);
@@ -449,7 +445,13 @@ $(document).ready(function() {
 });
 
 function applyVariantValues() {
+    // Render variant annotation values this way so it's colored correctly etc as it
     // goes through the same formatting as transcript JavaScript values if done through here
+    applyValue("phastcons_100_way_vertebrate", {{ variant_annotation.phastcons_100_way_vertebrate | jsonify}});
+    applyValue("phastcons_30_way_mammalian", {{ variant_annotation.phastcons_30_way_mammalian | jsonify}});
+    applyValue("phylop_100_way_vertebrate", {{ variant_annotation.phylop_100_way_vertebrate | jsonify}});
+    applyValue("phylop_30_way_mammalian", {{ variant_annotation.phylop_30_way_mammalian | jsonify}});
+
     applyValue("dbscsnv_ada_score", {{ variant_annotation.dbscsnv_ada_score | jsonify}});
     applyValue("dbscsnv_rf_score", {{ variant_annotation.dbscsnv_rf_score | jsonify}});
     {% if variant_annotation.has_spliceai %}
@@ -666,12 +668,12 @@ function applyVariantValues() {
                         <div class="card-header">Pathogenicity</div>
                         <div class="card-body">
                             {% labelled id='cadd_phred' label='CADD Phred' hint="tiny" %}{% endlabelled %}
-                            {% comment %}{% labelled id='cadd_raw' label='CADD Raw' hint="tiny" %}{% endlabelled %}{% endcomment %}
                             {% labelled id='grantham' label='Grantham' hint="tiny" %}{% endlabelled %}
                             {% labelled id='revel_score' label='REVEL score' hint="tiny" %}{% endlabelled %}
                             {% comment %}{% labelled id='loftool' label='LOFtool' hint="tiny" %}{% endlabelled %}{% endcomment %}
                             {% labelled id='fathmm_pred_most_damaging' label='FATHMM' hint="tiny" %}{% endlabelled %}
                             {% labelled id='mutation_assessor_pred_most_damaging' label='Mutation Assessor' hint="tiny" %}{% endlabelled %}
+                            {% labelled id='mutation_taster_pred_most_damaging' label='Mutation Taster' hint="tiny" %}{% endlabelled %}
                             {% labelled id='polyphen2_hvar_pred_most_damaging' label='Polyphen2 HVAR' hint="tiny" %}{% endlabelled %}
                             {% labelled id='sift' label='SIFT' hint="tiny" %}{% endlabelled %}
                         </div>
@@ -798,12 +800,8 @@ function applyVariantValues() {
                             {% labelled id='cosmic_id' label='COSMIC Genomic Mutation ID' hint="tiny" %}{{ variant_annotation.cosmic_id }}{% endlabelled %}
                             {% labelled id='cosmic_legacy_id' label='COSMIC Legacy ID' hint="tiny" %}{{ variant_annotation.cosmic_legacy_id }}{% endlabelled %}
                             {% labelled id='cosmic_count' label='COSMIC Sample Count' hint="tiny" %}{% endlabelled %}
-                            {% labelled id='dbsnp_rs_id' label='dbSNP' hint="tiny" %}{% endlabelled %}
+                            {% labelled id='dbsnp_rs_id' label='dbSNP' hint="tiny" %}{{ variant_annotation.dbsnp_rs_id }}{% endlabelled %}
                             {% labelled id='ensembl_protein' label='Ensembl Protein' hint="tiny" %}{% endlabelled %}
-                            {% comment %}{% labelled id='swissprot' label='Swiss-prot' hint="tiny" %}
-                            {% labelled id='trembl' label='Trembl' hint="tiny" %}{% endlabelled %}
-                            {% labelled id='uniparc' label='UniParc' hint="tiny" %}{% endlabelled %}{% endcomment %}
-
                             {% labelled id='search_terms' label='Search Terms' hint="tiny" %}
                                 {% with search_term=variant_annotation.get_search_terms %}
                                     {% if search_term %}

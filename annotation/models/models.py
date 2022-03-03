@@ -289,7 +289,7 @@ class HumanProteinAtlasAnnotation(models.Model):
 class ColumnVEPField(models.Model):
     """ For VariantAnnotation/Transcript columns derived from VEP fields """
     column = models.TextField(unique=True)
-    variant_grid_column = models.ForeignKey(VariantGridColumn, null=True, on_delete=SET_NULL)
+    variant_grid_column = models.ForeignKey(VariantGridColumn, on_delete=CASCADE)
     genome_build = models.ForeignKey(GenomeBuild, null=True, on_delete=CASCADE)  # null = all builds
     category = models.CharField(max_length=1, choices=ColumnAnnotationCategory.choices)
     source_field = models.TextField(null=True)  # @see use vep_info_field
@@ -491,22 +491,17 @@ class AbstractVariantAnnotation(models.Model):
     # The best way to see how these map to VEP fields is via the annotation details page
     amino_acids = models.TextField(null=True, blank=True)
     cadd_phred = models.FloatField(null=True, blank=True)
-    cadd_raw = models.FloatField(null=True, blank=True)
     canonical = models.BooleanField(null=True, blank=True)
     codons = models.TextField(null=True, blank=True)
     consequence = models.TextField(null=True, blank=True)
-    dbsnp_rs_id = models.TextField(null=True, blank=True)
     distance = models.IntegerField(null=True, blank=True)
     domains = models.TextField(null=True, blank=True)
     ensembl_protein = models.TextField(null=True, blank=True)
     exon = models.TextField(null=True, blank=True)
-    fathmm_pred = models.TextField(null=True, blank=True)
     fathmm_pred_most_damaging = models.CharField(max_length=1, choices=FATHMMPrediction.CHOICES, null=True, blank=True)
     flags = models.TextField(null=True, blank=True)
-    gene_text = models.TextField(null=True, blank=True)
     gerp_pp_rs = models.FloatField(null=True, blank=True)
     grantham = models.IntegerField(null=True, blank=True)
-    hgnc_id = models.IntegerField(null=True, blank=True)
     hgvs_c = models.TextField(null=True, blank=True)
     hgvs_p = models.TextField(null=True, blank=True)
     impact = models.CharField(max_length=1, choices=PathogenicityImpact.CHOICES, null=True, blank=True)
@@ -517,44 +512,18 @@ class AbstractVariantAnnotation(models.Model):
     maxentscan_diff = models.FloatField(null=True, blank=True)
     maxentscan_ref = models.FloatField(null=True, blank=True)
     maxentscan_percent_diff_ref = models.FloatField(null=True, blank=True)
-    mutation_assessor_pred = models.TextField(null=True, blank=True)
     mutation_assessor_pred_most_damaging = models.CharField(max_length=1, choices=MutationAssessorPrediction.CHOICES, null=True, blank=True)
-    mutation_taster_pred = models.TextField(null=True, blank=True)
     mutation_taster_pred_most_damaging = models.CharField(max_length=1, choices=MutationTasterPrediction.CHOICES, null=True, blank=True)
-    # Summary of most_damaging fields for faster DamageNode queries
-    predictions_num_pathogenic = models.IntegerField(default=0)
-    predictions_num_benign = models.IntegerField(default=0)
-    # Not all builds have all phylop/phastcons
-    phylop_30_way_mammalian = models.FloatField(null=True, blank=True)
-    phylop_46_way_mammalian = models.FloatField(null=True, blank=True)
-    phylop_100_way_vertebrate = models.FloatField(null=True, blank=True)
-    phastcons_30_way_mammalian = models.FloatField(null=True, blank=True)
-    phastcons_46_way_mammalian = models.FloatField(null=True, blank=True)
-    phastcons_100_way_vertebrate = models.FloatField(null=True, blank=True)
-    polyphen2_hvar_pred = models.TextField(null=True, blank=True)
     polyphen2_hvar_pred_most_damaging = models.CharField(max_length=1, choices=Polyphen2Prediction.CHOICES, null=True, blank=True)
-    pubmed = models.TextField(null=True, blank=True)
     # protein_position = text as it can be eg indel: "22-23" or splicing: "?-10" or "10-?"
     protein_position = models.TextField(null=True, blank=True)
     revel_score = models.FloatField(null=True, blank=True)
     sift = models.CharField(max_length=1, choices=SIFTPrediction.CHOICES, null=True, blank=True)
     splice_region = models.TextField(null=True, blank=True)
-    swissprot = models.TextField(null=True, blank=True)
     symbol = models.TextField(null=True, blank=True)
-    symbol_source = models.TextField(null=True, blank=True)
-    trembl = models.TextField(null=True, blank=True)
-    uniparc = models.TextField(null=True, blank=True)
 
     class Meta:
         abstract = True
-
-    PATHOGENICITY_FIELDS = {
-        "fathmm_pred_most_damaging": FATHMMPrediction,
-        "mutation_assessor_pred_most_damaging": MutationAssessorPrediction,
-        "mutation_taster_pred_most_damaging": MutationTasterPrediction,
-        "polyphen2_hvar_pred_most_damaging": Polyphen2Prediction,
-        "sift": SIFTPrediction,
-    }
 
     @property
     def transcript_accession(self):
@@ -564,14 +533,6 @@ class AbstractVariantAnnotation(models.Model):
         if self.transcript:
             return self.transcript.identifier
         return None
-
-    @lazy
-    def flagged_pathogenicity(self):
-        fp = {}
-        for f, klass in self.PATHOGENICITY_FIELDS.items():
-            level = getattr(self, f)
-            fp[f] = klass.is_level_flagged(level)
-        return fp
 
     @staticmethod
     def get_domains_components(domains):
@@ -642,14 +603,25 @@ class VariantAnnotation(AbstractVariantAnnotation):
     # "optimum cutoff value identified in the ROC analysis (0.6)"
     dbscsnv_ada_score = models.FloatField(null=True, blank=True)
     dbscsnv_rf_score = models.FloatField(null=True, blank=True)
+    dbsnp_rs_id = models.TextField(null=True, blank=True)
     cosmic_id = models.TextField(null=True, blank=True)  # COSV - Genomic Mutation ID
     cosmic_legacy_id = models.TextField(null=True, blank=True)  # COSM
     cosmic_count = models.IntegerField(null=True, blank=True)
+    pubmed = models.TextField(null=True, blank=True)
     # Mastermind Cited Variants Reference. @see https://www.genomenon.com/cvr/
     mastermind_count_1_cdna = models.IntegerField(null=True, blank=True)
     mastermind_count_2_cdna_prot = models.IntegerField(null=True, blank=True)
     mastermind_count_3_aa_change = models.IntegerField(null=True, blank=True)
     mastermind_mmid3 = models.TextField(null=True, blank=True)  # gene:key for mastermind_count_3_aa_change
+
+    # Not all builds have all phylop/phastcons
+    phylop_30_way_mammalian = models.FloatField(null=True, blank=True)
+    phylop_46_way_mammalian = models.FloatField(null=True, blank=True)
+    phylop_100_way_vertebrate = models.FloatField(null=True, blank=True)
+    phastcons_30_way_mammalian = models.FloatField(null=True, blank=True)
+    phastcons_46_way_mammalian = models.FloatField(null=True, blank=True)
+    phastcons_100_way_vertebrate = models.FloatField(null=True, blank=True)
+
     # SpliceAI - @see https://pubmed.ncbi.nlm.nih.gov/30661751/
     # This has so many columns, perhaps a highest score and summary col of "AG: -5, AL: 35, DG: -5, DL: 17"
     # 0.2 = high recal, 0.5 = recommended, 0.8 = high precision
@@ -664,6 +636,9 @@ class VariantAnnotation(AbstractVariantAnnotation):
     spliceai_gene_symbol = models.TextField(null=True, blank=True)
     repeat_masker = models.TextField(null=True, blank=True)
     overlapping_symbols = models.TextField(null=True, blank=True)
+    # Summary of most_damaging fields for faster DamageNode queries
+    predictions_num_pathogenic = models.IntegerField(default=0)
+    predictions_num_benign = models.IntegerField(default=0)
 
     somatic = models.BooleanField(null=True, blank=True)
     # Out of 2M records on my machine, 0.12% had multiple records, but linking just 1 is much simpler as it allows us
@@ -689,6 +664,14 @@ class VariantAnnotation(AbstractVariantAnnotation):
         "mastermind_count_2_cdna_prot": "cDNA/Prot",
         "mastermind_count_3_aa_change": "AA change",
         "mastermind_mmid3": "MMID3",
+    }
+
+    PATHOGENICITY_FIELDS = {
+        "fathmm_pred_most_damaging": FATHMMPrediction,
+        "mutation_assessor_pred_most_damaging": MutationAssessorPrediction,
+        "mutation_taster_pred_most_damaging": MutationTasterPrediction,
+        "polyphen2_hvar_pred_most_damaging": Polyphen2Prediction,
+        "sift": SIFTPrediction,
     }
 
     SPLICEAI_DS_DP = {
@@ -747,7 +730,10 @@ class VariantAnnotation(AbstractVariantAnnotation):
         return self.variant.varianttranscriptannotation_set.filter(version=self.version)
 
     def get_search_terms(self):
-        return get_variant_search_terms(self.transcript_annotation)
+        extra_terms = []
+        if self.dbsnp_rs_id:
+            extra_terms.append(self.dbsnp_rs_id)
+        return get_variant_search_terms(self.transcript_annotation, extra_terms=extra_terms)
 
     def get_pubmed_search_terms(self):
         return get_variant_pubmed_search_terms(self.transcript_annotation)
