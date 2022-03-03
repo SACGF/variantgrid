@@ -228,6 +228,10 @@ function downloadPhenotypeGridAsCSV_{{ flattened_uuid }}() {
             const regex = "OMIM:\\d+ ([^\\(]*)";
             searchForText('omim', regex, this);
         });
+        $('#id_mondo', phenotypeEditorTag).change(function() {
+            const regex = "MONDO:\\d+ ([^\\(]*)";
+            searchForText('mondo', regex, this);
+        });
         $('#id_gene_symbol', phenotypeEditorTag).change(function() {
             const regex = "(.*)";
             searchForText('gene', regex, this);
@@ -250,11 +254,13 @@ function downloadPhenotypeGridAsCSV_{{ flattened_uuid }}() {
         <tr>
             {% if hpo_form %}<td style="width:30%"><div class='ontology-label hpo'>Human Phenotype Ontology</div></td>{% endif %}
             {% if omim_form %}<td style="width:30%"><div class='ontology-label omim'>OMIM</div></td>{% endif %}
+            {% if mondo_form %}<td style="width:30%"><div class='ontology-label mondo'>MONDO</div></td>{% endif %}
             {% if gene_symbol_form %}<td style="width:30%"><div class='ontology-label gene'>Genes</div></td>{% endif %}
         </tr>
         <tr>
             {% if hpo_form %}<td style="width:30%"><div class="hpo">{{ hpo_form.hpo }} {{ hpo_form.media }}</div></td>{% endif %}
             {% if omim_form %}<td style="width:30%"><div class='omim'>{{ omim_form.omim }}</div></td>{% endif %}
+            {% if mondo_form %}<td style="width:30%"><div class='mondo'>{{ mondo_form.mondo }}</div></td>{% endif %}
             {% if gene_symbol_form %}<td style="width:30%"><div class='gene'>{{ gene_symbol_form.gene_symbol }}</div></td>{% endif %}
         </tr>
     </table>

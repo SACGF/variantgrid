@@ -38,7 +38,6 @@ def get_terms_from_words(text_phenotype, words_and_spans_subset, phenotype_match
 
     results = []
     for ontology_term_id in phenotype_matcher.get_matches(words_and_spans_subset):
-        print(f"{ontology_term_id=}")
         tpm = TextPhenotypeMatch.objects.create(text_phenotype=text_phenotype,
                                                 ontology_term_id=ontology_term_id,
                                                 offset_start=offset_start,
