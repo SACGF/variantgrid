@@ -4,7 +4,7 @@ from django.db import migrations, models
 import django.db.models.deletion
 
 
-def _one_off_delete_obsolete_column_vep_fields(apps):
+def _one_off_delete_obsolete_column_vep_fields(apps, schema_editor):
     ColumnVEPField = apps.get_model("annotation", "ColumnVEPField")
     # These were inserted in legacy code but have since been deleted
     DELETE_COLUMNS = ['feature', 'feature_type', 'gene_text']
