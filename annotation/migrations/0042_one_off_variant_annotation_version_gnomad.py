@@ -15,8 +15,8 @@ def _one_off_variant_annotation_version_gnomad(apps, schema_editor):
 
 def _test_variant_annotation_run(apps):
     """ Only show this for old installations (ie that have done analyses before) - not new ones """
-    VariantAnnotationRun = apps.get_model("annotation", "VariantAnnotationRun")
-    return VariantAnnotationRun.objects.exist()
+    AnnotationRun = apps.get_model("annotation", "AnnotationRun")
+    return AnnotationRun.objects.exist()
 
 
 class Migration(migrations.Migration):
