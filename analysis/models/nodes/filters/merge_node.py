@@ -38,7 +38,12 @@ class MergeNode(AnalysisNode):
 
     @lazy
     def _num_unique_parents_in_queryset(self):
-        return len(set(p.get_q() for p in self.get_non_empty_parents(require_parents_ready=False)))
+        parent_q_dicts = set()
+        for p in self.get_non_empty_parents(require_parents_ready=False):
+            key = tuple(p.get_arg_q_dict().items())
+            print(f"{key=}")
+            parent_q_dicts.add(key)
+        return len(parent_q_dicts)
 
     def get_single_parent(self):
         """ Override so we can use get_grid_node_id_and_version
@@ -75,12 +80,12 @@ class MergeNode(AnalysisNode):
             return q_by_string.values()
         return unique_parent_q_set
 
-    def get_parent_arg_q_dict(self):
+    def _get_arg_q_dict_from_parents_and_node(self):
         if self._unique_parent_q_set:
             q = reduce(operator.or_, self._unique_parent_q_set)
         else:
             q = self.q_none()
-        return q
+        return {None: q}
 
     def _get_node_q(self) -> Optional[Q]:
         return None  # No extra filtering needed after get_parent_q()

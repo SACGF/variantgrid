@@ -256,7 +256,7 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
             AnalysisNode.throw_errors_exception(errors)
         return parents
 
-    def get_non_empty_parents(self, require_parents_ready=True):
+    def get_non_empty_parents(self, require_parents_ready=True) -> List['AnalysisNode']:
         """ Returns non-empty (count > 0) parents.
             If require_parents_ready=True, die if parents not ready
             Otherwise, return them as we don't know if they're empty or not """
@@ -365,6 +365,13 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
     def _get_cache_key(self) -> str:
         return str(self.node_version.pk)
 
+    def _get_arg_q_dict_from_parents_and_node(self):
+        arg_q_dict = self.get_parent_arg_q_dict()
+        if self.modifies_parents():
+            if node_arg_q_dict := self._get_node_arg_q_dict():
+                self.merge_arg_q_dicts(arg_q_dict, node_arg_q_dict)
+        return arg_q_dict
+
     def get_arg_q_dict(self, disable_cache=False) -> Dict[Optional[str], Q]:
         """ A Django Q object representing the Variant filters for this node.
             This is the method to override in subclasses - not get_queryset()
@@ -384,10 +391,7 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
                     return cache_arg_q_dict
 
             if self.has_input():
-                arg_q_dict = self.get_parent_arg_q_dict()
-                if self.modifies_parents():
-                    if node_arg_q_dict := self._get_node_arg_q_dict():
-                        self.merge_arg_q_dicts(arg_q_dict, node_arg_q_dict)
+                arg_q_dict = self._get_arg_q_dict_from_parents_and_node()
             else:
                 if node_arg_q_dict := self._get_node_arg_q_dict():
                     arg_q_dict = node_arg_q_dict
@@ -469,7 +473,10 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
 
     def _get_node_arg_q_dict(self) -> Dict[Optional[str], Q]:
         """ By default - we assume node implements _get_node_q and none of the filters apply to annotations """
-        return {None: self._get_node_q()}
+        node_arg_q_dict = {}
+        if node_q := self._get_node_q():
+            node_arg_q_dict[None] = node_q
+        return node_arg_q_dict
 
     def _get_node_contigs(self) -> Optional[Set[Contig]]:
         """ Return the contigs we filter for in this node. None means we don't know how to describe that """
