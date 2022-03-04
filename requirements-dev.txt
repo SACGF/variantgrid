@@ -25,6 +25,7 @@ django_htmlmin
 django-leaflet
 django_model_utils
 django_recaptcha
+django-registration-redux
 django-rest-framework
 django_termsandconditions
 easy_thumbnails
