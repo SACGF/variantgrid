@@ -313,14 +313,13 @@ VCF_IMPORT_COMMON_FILTERS = {
     # If the filenames don't start with "/" they're relative to ANNOTATION_VEP_BASE_DIR
     "GRCh37": {
         "gnomad_af_filename": "annotation_data/GRCh37/gnomad_GRCh37_af_greater_than_5.contigs.vcf.bgz",
-        "gnomad_version": "r2.1",
+        "gnomad_version": "2.1.1",
         "gnomad_af_min": 0.05,
         "clinical_significance_max": "3",
-
     },
     "GRCh38": {
         "gnomad_af_filename": "annotation_data/GRCh38/gnomad_GRCh38_af_greater_than_5.contigs.vcf.bgz",
-        "gnomad_version": "r2.1",
+        "gnomad_version": "3.1",
         "gnomad_af_min": 0.05,
         "clinical_significance_max": "3",
     }

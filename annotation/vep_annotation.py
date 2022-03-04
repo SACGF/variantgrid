@@ -252,6 +252,21 @@ def get_vep_variant_annotation_version_kwargs(genome_build: GenomeBuild):
     except KeyError:
         kwargs["dbnsfp"] = 'n/a'
 
+    # we use our own gnomAD custom annotation, not the default VEP one
+    if cvf := ColumnVEPField.objects.filter(variant_grid_column='gnomad_af', genome_build=genome_build).first():
+        try:
+            # annotation_data/GRCh37/gnomad2.1.1_GRCh37_combined_af.vcf.bgz
+            # gnomad3.1_GRCh38_merged.vcf.bgz
+            gnomad_filename = genome_build.settings["vep_config"][cvf.get_vep_custom_display().lower()]
+            gnomad_basename = os.path.basename(gnomad_filename)
+            if m := re.match(r"^gnomad(.*?)_(GRCh37|GRCh38|hg19|hg38)", gnomad_basename, flags=re.IGNORECASE):
+                kwargs["gnomad"] = m.group(1)
+            else:
+                msg = f"Couldn't determine gnomAD version from file: {gnomad_basename}"
+                raise ValueError(msg)
+        except KeyError:
+            pass  # Will just use VEP values
+
     return kwargs
 
 
