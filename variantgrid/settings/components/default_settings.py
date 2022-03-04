@@ -713,11 +713,11 @@ LOGGING = {
             'level': 'DEBUG',
             'class': 'logging.NullHandler',
         },
-        'file': {
-            'level': 'DEBUG',
-            'class': 'logging.FileHandler',
-            'filename': '/tmp/django_debug.log',
-        },
+        # 'file': {
+        #     'level': 'DEBUG',
+        #     'class': 'logging.FileHandler',
+        #     'filename': '/tmp/django_debug.log',
+        # },
         'console': {
             'level': 'DEBUG',
             'class': 'logging.StreamHandler',
