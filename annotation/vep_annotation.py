@@ -223,7 +223,8 @@ def vep_dict_to_variant_annotation_version_kwargs(vep_config, vep_version_dict: 
             value = converter(value)
         kwargs[python_field] = value
 
-    kwargs["genome_build"] = vep_config.genome_build
+    genome_build = vep_config.genome_build
+    kwargs["genome_build"] = genome_build
     kwargs["annotation_consortium"] = vep_config.annotation_consortium
     distance = getattr(settings, "ANNOTATION_VEP_DISTANCE", None)
     if distance is None:
