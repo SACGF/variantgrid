@@ -111,7 +111,7 @@ class FileUploadView(View):
                 user: User = requests.user
                 uploaded_file = UploadedFileLab.objects.create(
                     url=file_url,
-                    filename=file_path_within_bucket + '/' + file_obj.name,  #file_path_within_bucket,
+                    filename=file_path_within_bucket,
                     user=requests.user,
                     lab=lab,
                     status=status
