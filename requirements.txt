@@ -68,6 +68,6 @@ toposort==1.7
 Unidecode==1.3.2
 # below are only required for environments directly integrating with s3
 # separate to django-amazon-ses
-boto3==1.14.51
+boto3==1.21.13
 django-storages==1.9.1
 django_threadlocals==0.10

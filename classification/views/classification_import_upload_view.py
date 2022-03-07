@@ -1,6 +1,6 @@
 import os
 import re
-
+import django
 from django.contrib import messages
 from django.contrib.auth.models import User
 from django.db.models import QuerySet
@@ -51,6 +51,10 @@ class FileUploadView(View):
 
     def post(self, requests, **kwargs):
         # lazily have s3boto3 requirements
+
+        django.utils.encoding.force_text = django.utils.encoding.force_str
+        django.utils.encoding.smart_text = django.utils.encoding.smart_str
+
         from storages.backends.s3boto3 import S3Boto3Storage
         lab_id: int
         try:
@@ -62,7 +66,7 @@ class FileUploadView(View):
             if not lab.is_member(user=requests.user, admin_check=True):
                 raise PermissionError("User does not have access to lab")
 
-            protocol, path = lab.upload_location.split(":", maxsplit=1)
+            protocol, path = lab.upload_location.split("://", maxsplit=1)
 
             if protocol == "s3":
                 parts = path.split("/", maxsplit=1)
@@ -107,7 +111,7 @@ class FileUploadView(View):
                 user: User = requests.user
                 uploaded_file = UploadedFileLab.objects.create(
                     url=file_url,
-                    filename=file_obj.name,
+                    filename=file_path_within_bucket + '/' + file_obj.name,  #file_path_within_bucket,
                     user=requests.user,
                     lab=lab,
                     status=status
