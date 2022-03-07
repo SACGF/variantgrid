@@ -88,6 +88,10 @@ class BulkVEPVCFAnnotationInserter:
         "SOURCE",  # only populated when using --merged (which we don't use)
         "SpliceAI_pred_SYMBOL",
         "STRAND",
+        "SWISSPROT",
+        "SYMBOL_SOURCE",
+        "TREMBL",
+        "UNIPARC",
     ]
     VEP_NOT_COPIED_REFSEQ_ONLY = [
         "REFSEQ_MATCH",

@@ -185,7 +185,7 @@ def get_vep_version(genome_build: GenomeBuild, annotation_consortium):
     return get_vep_version_from_vcf(output_filename)
 
 
-def vep_dict_to_variant_annotation_version_kwargs(vep_version_dict: Dict) -> Dict:
+def vep_dict_to_variant_annotation_version_kwargs(vep_config, vep_version_dict: Dict) -> Dict:
     def vep_int_version(vep_string_version):
         m = re.match(r"v(\d+)", vep_string_version)
         return int(m.group(1))
@@ -222,20 +222,9 @@ def vep_dict_to_variant_annotation_version_kwargs(vep_version_dict: Dict) -> Dic
         if converter:
             value = converter(value)
         kwargs[python_field] = value
-    return kwargs
 
-
-def get_vep_variant_annotation_version_kwargs(genome_build: GenomeBuild):
-    vep_config = VEPConfig(genome_build)
-    if settings.ANNOTATION_VEP_FAKE_VERSION:
-        return get_fake_vep_version(genome_build, vep_config.annotation_consortium)
-
-    vep_version_dict = get_vep_version(genome_build, vep_config.annotation_consortium)
-    kwargs = vep_dict_to_variant_annotation_version_kwargs(vep_version_dict)
-
-    vc = VEPConfig(genome_build)
-    kwargs["genome_build"] = genome_build
-    kwargs["annotation_consortium"] = vc.annotation_consortium
+    kwargs["genome_build"] = vep_config.genome_build
+    kwargs["annotation_consortium"] = vep_config.annotation_consortium
     distance = getattr(settings, "ANNOTATION_VEP_DISTANCE", None)
     if distance is None:
         distance = 5000
@@ -243,7 +232,7 @@ def get_vep_variant_annotation_version_kwargs(genome_build: GenomeBuild):
 
     # Plugins are optional
     try:
-        dbnsfp_path = vc["dbnsfp"]  # KeyError if not set in settings
+        dbnsfp_path = vep_config["dbnsfp"]  # KeyError if not set in settings
         if m := re.match(r".*/dbNSFP_?(.*?)\.(GRCh37|GRCh38|hg19|hg38)", dbnsfp_path, flags=re.IGNORECASE):
             kwargs["dbnsfp"] = m.group(1)
         else:
@@ -267,6 +256,16 @@ def get_vep_variant_annotation_version_kwargs(genome_build: GenomeBuild):
         except KeyError:
             pass  # Will just use VEP values
 
+    return kwargs
+
+
+def get_vep_variant_annotation_version_kwargs(genome_build: GenomeBuild):
+    vep_config = VEPConfig(genome_build)
+    if settings.ANNOTATION_VEP_FAKE_VERSION:
+        return get_fake_vep_version(genome_build, vep_config.annotation_consortium)
+
+    vep_version_dict = get_vep_version(genome_build, vep_config.annotation_consortium)
+    kwargs = vep_dict_to_variant_annotation_version_kwargs(vep_config, vep_version_dict)
     return kwargs
 
 
@@ -304,8 +303,9 @@ def vep_parse_version_line(line):
 
 def vep_check_version_match(variant_annotation_version, filename: str):
     """ Load VEP VCF, check VEP= line and make sure that values match expected VariantAnnotationVersion """
+    vep_config = VEPConfig(variant_annotation_version.genome_build)
     vep_dict = get_vep_version_from_vcf(filename)
-    kwargs = vep_dict_to_variant_annotation_version_kwargs(vep_dict)
+    kwargs = vep_dict_to_variant_annotation_version_kwargs(vep_config, vep_dict)
     for k, v in kwargs.items():
         version_value = getattr(variant_annotation_version, k)
         if version_value != v:

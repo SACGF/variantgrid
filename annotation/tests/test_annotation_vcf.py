@@ -12,7 +12,7 @@ from annotation.models.damage_enums import PathogenicityImpact
 from annotation.models.models import AnnotationRun, VariantAnnotationVersion
 from annotation.vcf_files.import_vcf_annotations import import_vcf_annotations
 from annotation.vep_annotation import vep_parse_version_line, get_vep_version_from_vcf, \
-    vep_dict_to_variant_annotation_version_kwargs, VEPVersionMismatchError
+    vep_dict_to_variant_annotation_version_kwargs, VEPVersionMismatchError, VEPConfig
 from snpdb.models import Variant
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_loci_and_variants_for_vcf
@@ -41,9 +41,9 @@ class TestAnnotationVCF(TestCase):
 
         for genome_build_name, vcf in VCFS.items():
             genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
-
+            vep_config = VEPConfig(genome_build)
             vep_dict = get_vep_version_from_vcf(vcf)
-            kwargs = vep_dict_to_variant_annotation_version_kwargs(vep_dict)
+            kwargs = vep_dict_to_variant_annotation_version_kwargs(vep_config, vep_dict)
             kwargs["genome_build"] = genome_build
             vav, created = VariantAnnotationVersion.objects.get_or_create(**kwargs)
             if not created:
