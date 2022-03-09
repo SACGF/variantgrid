@@ -29,6 +29,7 @@ django-registration-redux
 django-rest-framework
 django_termsandconditions
 easy_thumbnails
+fontawesomefree==5.15.4
 git+https://github.com/davmlaw/django-json-widget#egg=django_json_widget
 git+https://github.com/davmlaw/django-avatar#egg=django-avatar
 git+https://github.com/davmlaw/django-jfu#egg=django-jfu

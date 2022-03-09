@@ -29,6 +29,7 @@ django-registration-redux==2.9
 django-rest-framework==0.1.0
 django_termsandconditions==2.0.9
 easy_thumbnails==2.8.1
+fontawesomefree==5.15.4
 git+https://github.com/davmlaw/django-json-widget#egg=django_json_widget
 git+https://github.com/davmlaw/django-avatar#egg=django-avatar
 git+https://github.com/davmlaw/django-jfu#egg=django-jfu

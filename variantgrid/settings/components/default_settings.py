@@ -641,6 +641,7 @@ INSTALLED_APPS = [
     'django_extensions',
     'djgeojson',
     'easy_thumbnails',
+    'fontawesomefree',
     'guardian',
     'jfu',
     'leaflet',
