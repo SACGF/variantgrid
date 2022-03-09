@@ -3,7 +3,6 @@ import uuid
 from django.db.models.aggregates import Count
 from django.template import Library
 
-from genes.models import GeneSymbol
 from ontology.models import OntologyTerm, OntologyService
 
 GENES_COLOR = "#99CD83"
@@ -55,5 +54,5 @@ def patient_omim_graph(graph_width=512, graph_height=384, max_records=20, click_
 
 @register.inclusion_tag(MATCHES_GRAPH_TEMPLATE)
 def patient_genes_graph(graph_width=512, graph_height=384, max_records=20, click_handler=None, patient_ids=None):
-    qs = GeneSymbol.objects.all()
-    return match_graph("Genes", qs, "symbol", GENES_COLOR, graph_width=graph_width, graph_height=graph_height, max_records=max_records, click_handler=click_handler, patient_ids=patient_ids)
+    qs = OntologyTerm.objects.filter(ontology_service=OntologyService.HGNC)
+    return match_graph("Genes", qs, "name", GENES_COLOR, graph_width=graph_width, graph_height=graph_height, max_records=max_records, click_handler=click_handler, patient_ids=patient_ids)
