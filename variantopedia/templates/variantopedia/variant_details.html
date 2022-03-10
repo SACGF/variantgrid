@@ -197,6 +197,7 @@ function transcriptFunc(transcriptId, data) {
 
 
 function geneFunc(geneId, geneSymbol, data) {
+    {% if show_gene_coverage %}
     if (geneSymbol) {
         const currentCoverageGeneId = $("#gene-coverage-data").attr("gene_symbol");
         console.log("currentCoverageGeneId:");
@@ -205,6 +206,7 @@ function geneFunc(geneId, geneSymbol, data) {
             $("#gene_coverage").load(Urls.gene_coverage(geneSymbol));
         }
     }
+    {% endif %}
 
     const gic = $("#gene-info-container");
     if (data) {
@@ -880,7 +882,7 @@ function applyVariantValues() {
         
         {% endif %}
     
-        {% if seqauto_enabled %}
+        {% if seqauto_enabled and show_gene_coverage %}
         <div id="gene_coverage">
             <!-- todo convert to bootstrap spinner -->
             <img src="{% static 'images/spinner.gif' %}" /> Checking for gene coverage...
