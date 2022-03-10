@@ -698,20 +698,29 @@ class VariantAnnotation(AbstractVariantAnnotation):
     def has_extended_gnomad_fields(self):
         """ I grabbed a few new fields but haven't patched back to GRCh37 yet
             TODO: remove this and if statements in variant_details.html once issue #231 is completed """
-        extended_fields = ["gnomad_ac", "gnomad_an", "gnomad_popmax_ac", "gnomad_popmax_an", "gnomad_popmax_hom_alt"]
-        return any(getattr(self, f) for f in extended_fields)
+        extended_fields = ["gnomad2_liftover_af", "gnomad_ac", "gnomad_an", "gnomad_popmax_ac",
+                           "gnomad_popmax_an", "gnomad_popmax_hom_alt"]
+        return any(getattr(self, f) is not None for f in extended_fields)
 
     @property
     def gnomad_url(self):
+        GNOMAD2 = "gnomad_r2_1"
+        GNOMAD3 = "gnomad_r3"
+
+        gnomad_dataset = None
+        if self.version.genome_build.name == "GRCh38":
+            if self.gnomad_af is not None:
+                gnomad_dataset = GNOMAD3
+            elif self.gnomad2_liftover_af is not None:
+                gnomad_dataset = GNOMAD2
+        elif self.gnomad_af and self.version.genome_build.name == "GRCh37":
+            gnomad_dataset = GNOMAD2
+
         url = None
-        if self.gnomad_af is not None:
+        if gnomad_dataset:
             v = self.variant
             gnomad_variant = f"{v.locus.chrom}-{v.locus.position}-{v.locus.ref}-{v.alt}"
-            url = f"http://gnomad.broadinstitute.org/variant/{gnomad_variant}"
-            if self.version.genome_build == GenomeBuild.grch37():
-                url += "?dataset=gnomad_r2_1"
-            elif self.version.genome_build == GenomeBuild.grch38():
-                url += "?dataset=gnomad_r3"
+            url = f"http://gnomad.broadinstitute.org/variant/{gnomad_variant}?dataset={gnomad_dataset}"
         return url
 
     @property
