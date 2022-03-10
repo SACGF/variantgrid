@@ -708,12 +708,12 @@ class VariantAnnotation(AbstractVariantAnnotation):
         GNOMAD3 = "gnomad_r3"
 
         gnomad_dataset = None
-        if self.version.gnomad.startswith("3"):
+        if self.version.genome_build.name == "GRCh38":
             if self.gnomad_af is not None:
                 gnomad_dataset = GNOMAD3
             elif self.gnomad2_liftover_af is not None:
                 gnomad_dataset = GNOMAD2
-        elif self.gnomad_af and self.version.gnomad.startswith("2.1"):
+        elif self.gnomad_af and self.version.genome_build.name == "GRCh37":
             gnomad_dataset = GNOMAD2
 
         url = None

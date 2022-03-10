@@ -33,3 +33,8 @@ class AutocompleteView(autocomplete.Select2QuerySetView):
             qs = qs.filter(q)
 
         return self.sort_queryset(qs)
+
+
+class ModelSelect2(autocomplete.ModelSelect2):
+    """ This is just here so SA Path code can pull in this model (different in master) """
+    pass
