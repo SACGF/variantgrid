@@ -91,12 +91,14 @@ No link for the thumbnail
 
 
 {% block JS_BOOTSTRAP %}
-    <script src="//netdna.bootstrapcdn.com/bootstrap/3.0.3/js/bootstrap.min.js"></script>
+    {% comment %}
+    bootstrap already loaded
+    {% endcomment %}
 {% endblock %}
 {% block CSS_BOOTSTRAP %}
     {% comment %}
     only support for bootstrap 3
-    <link rel="stylesheet" href="http://netdna.bootstrapcdn.com/bootstrap/3.0.3/css/bootstrap.min.css" />
+    Just use our existing bootstrap
     {% endcomment %}
     <style>
         .fade:not(.show) {

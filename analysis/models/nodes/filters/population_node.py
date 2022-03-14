@@ -107,9 +107,20 @@ class PopulationNode(AnalysisNode):
             q_gnomad_filtered_null = Q(variantannotation__gnomad_filtered__isnull=True)
             and_q.append(q_gnomad_filtered | q_gnomad_filtered_null)
 
+        if and_q:
+            q = reduce(operator.and_, and_q)
+            if self.keep_internally_classified_pathogenic:
+                classified_variant_ids = self._get_classified_variant_ids(self.analysis, q)
+                q |= Q(pk__in=classified_variant_ids)
+        else:
+            q = None
+        return q
+
+    def _get_node_arg_q_dict(self) -> Dict[Optional[str], Q]:
+        """ By default - we assume node implements _get_node_q and none of the filters apply to annotations """
+        node_arg_q_dict = {}
         # Internal filters
         if self.use_internal_counts:
-            # Global counts is added to every get_annotation_kwargs()
             vzcc = VariantZygosityCountCollection.objects.get(name=settings.VARIANT_ZYGOSITY_GLOBAL_COLLECTION)
 
             if self.internal_percent != self.EVERYTHING:
@@ -118,7 +129,7 @@ class PopulationNode(AnalysisNode):
                 max_samples_from_percent = max(max_samples_from_percent, 1)
                 less_than = Q(**{vzcc.germline_counts_alias + "__lte": max_samples_from_percent})
                 is_null = Q(**{vzcc.germline_counts_alias + "__isnull": True})
-                and_q.append(less_than | is_null)
+                node_arg_q_dict[vzcc.germline_counts_alias] = less_than | is_null
 
             if self.max_samples is not None:
                 if self.zygosity == SimpleZygosity.ANY_GERMLINE:
@@ -136,16 +147,12 @@ class PopulationNode(AnalysisNode):
                 less_than = Q(**{column + "__lte": self.max_samples})
                 is_null = Q(**{column + "__isnull": True})
 
-                and_q.append(less_than | is_null)
+                node_arg_q_dict[column] = less_than | is_null
 
-        if and_q:
-            q = reduce(operator.and_, and_q)
-            if self.keep_internally_classified_pathogenic:
-                classified_variant_ids = self._get_classified_variant_ids(self.analysis, q)
-                q |= Q(pk__in=classified_variant_ids)
-        else:
-            q = None
-        return q
+        if node_q := self._get_node_q():
+            node_arg_q_dict[None] = node_q
+        return node_arg_q_dict
+
 
     @staticmethod
     @cache_memoize(timeout=MINUTE_SECS)

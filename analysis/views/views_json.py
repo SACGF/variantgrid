@@ -181,7 +181,7 @@ def nodes_delete(request, analysis_id):
 
 
 @require_POST
-def set_variant_tag(request, analysis_id, location):
+def set_variant_tag(request, location):
     """ Can be called from analysis or variant details page (location = A or V) """
     location = TagLocation(location)
     variant_id = request.POST['variant_id']

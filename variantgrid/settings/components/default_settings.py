@@ -96,7 +96,7 @@ DATABASES = {
 CACHE_HOURS = 48
 TIMEOUT = 60 * 60 * CACHE_HOURS
 REDIS_PORT = 6379
-CACHE_VERSION = 32  # increment to flush caches (eg if invalid due to upgrade)
+CACHE_VERSION = 33  # increment to flush caches (eg if invalid due to upgrade)
 CACHES = {
     'default': {
         "BACKEND": "django.core.cache.backends.redis.RedisCache",
@@ -313,14 +313,13 @@ VCF_IMPORT_COMMON_FILTERS = {
     # If the filenames don't start with "/" they're relative to ANNOTATION_VEP_BASE_DIR
     "GRCh37": {
         "gnomad_af_filename": "annotation_data/GRCh37/gnomad_GRCh37_af_greater_than_5.contigs.vcf.bgz",
-        "gnomad_version": "r2.1",
+        "gnomad_version": "2.1.1",
         "gnomad_af_min": 0.05,
         "clinical_significance_max": "3",
-
     },
     "GRCh38": {
         "gnomad_af_filename": "annotation_data/GRCh38/gnomad_GRCh38_af_greater_than_5.contigs.vcf.bgz",
-        "gnomad_version": "r2.1",
+        "gnomad_version": "3.1",
         "gnomad_af_min": 0.05,
         "clinical_significance_max": "3",
     }
@@ -387,6 +386,7 @@ GENE_GRID_ENRICHMENT_KIT_COLUMN_LABELS = ["Mean", "Min Mean", "Depth 20x (5th pe
 GENE_GRID_ENRICHMENT_KIT_COLUMN_LABEL_TOOL_TIPS = [None, None, None]
 
 GENES_DEFAULT_CANONICAL_TRANSCRIPT_COLLECTION_ID = None
+VIEW_GENE_SYMBOL_SHOW_GENE_COVERAGE = False
 
 DEFAULT_COLUMNS_NAME = 'Default columns'
 
@@ -642,6 +642,7 @@ INSTALLED_APPS = [
     'django_extensions',
     'djgeojson',
     'easy_thumbnails',
+    'fontawesomefree',
     'guardian',
     'jfu',
     'leaflet',
@@ -714,11 +715,11 @@ LOGGING = {
             'level': 'DEBUG',
             'class': 'logging.NullHandler',
         },
-        'file': {
-            'level': 'DEBUG',
-            'class': 'logging.FileHandler',
-            'filename': '/tmp/django_debug.log',
-        },
+        # 'file': {
+        #     'level': 'DEBUG',
+        #     'class': 'logging.FileHandler',
+        #     'filename': '/tmp/django_debug.log',
+        # },
         'console': {
             'level': 'DEBUG',
             'class': 'logging.StreamHandler',
@@ -847,6 +848,7 @@ URLS_NAME_REGISTER.update({"classification_dashboard": False,
                            "classification_import_upload": False})
 
 VARIANT_DETAILS_SHOW_ANNOTATION = True  # also doubles as GENE_SHOW_ANNOTATION
+VARIANT_DETAILS_SHOW_GENE_COVERAGE = False
 VARIANT_DETAILS_SHOW_SAMPLES = True
 VARIANT_DETAILS_NEARBY_RANGE = 50
 VARIANT_VCF_DB_PREFIX = "vg"

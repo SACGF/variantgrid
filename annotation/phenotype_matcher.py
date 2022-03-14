@@ -91,8 +91,8 @@ class PhenotypeMatcher:
         hgnc_qs = OntologyTerm.objects.filter(ontology_service=OntologyService.HGNC)
         for pk, name, aliases in hgnc_qs.values_list("pk", "name", "aliases"):
             for alias in aliases:
-                hgnc_aliases[alias] = pk
-            hgnc_names[name] = pk
+                hgnc_aliases[alias.lower()] = pk
+            hgnc_names[name.lower()] = pk
         self.hgnc_records = hgnc_aliases  # Aliases first so they get overwritten
         self.hgnc_records.update(hgnc_names)  # Overwrite with assigned names
 

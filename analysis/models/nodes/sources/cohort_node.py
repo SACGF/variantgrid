@@ -121,19 +121,15 @@ class CohortNode(AbstractCohortBasedNode, AbstractZygosityCountNode):
 
     def get_cohort_settings_arg_q_dict(self, cohort) -> Dict[Optional[str], Q]:
         arg_q_dict = {}
-        cgc = cohort.cohort_genotype_collection
-        and_q = []
         if self.accordion_panel == self.COUNT:
             # Use minimum filters even for sub-cohorts as the min will always be above sub-cohort min
             # And they are a fast integer test, so may be a quicker path
-            and_q.extend(self.get_zygosity_count_q_list())
+            arg_q_dict = self.get_zygosity_count_arg_q_dict()
         elif self.accordion_panel == self.SIMPLE_ZYGOSITY:
-            and_q.extend(self.get_cohort_simple_zygosity_q_list())
+            arg_q_dict = self._get_simple_arg_q_dict()
         elif self.accordion_panel == self.PER_SAMPLE_ZYGOSITY:
-            and_q.extend(self.get_cohort_per_sample_zygosity_q_list(cgc))
-
-        if and_q:
-            arg_q_dict[cgc.cohortgenotype_alias] = reduce(operator.and_, and_q)
+            cgc = cohort.cohort_genotype_collection
+            arg_q_dict = self._get_per_sample_zygosity_arg_q_dict(cgc)
         return arg_q_dict
 
     @lazy
@@ -155,13 +151,13 @@ class CohortNode(AbstractCohortBasedNode, AbstractZygosityCountNode):
             min_count = 1
         return min_count
 
-    def get_cohort_simple_zygosity_q_list(self):
-        q_and = []
+    def _get_simple_arg_q_dict(self) -> Dict[Optional[str], Q]:
+        arg_q_dict = {}
         if self.zygosity:
             if min_count := self._get_simple_zygosity_min_count():
                 column = self.simple_zygosity_columns[self.zygosity]
-                q_and = [Q(**{column + "__gte": min_count})]
-        return q_and
+                arg_q_dict[column] = Q(**{column + "__gte": min_count})
+        return arg_q_dict
 
     def _get_cohort_simple_zygosity_description(self) -> str:
         description = ""
@@ -171,7 +167,7 @@ class CohortNode(AbstractCohortBasedNode, AbstractZygosityCountNode):
                 description = f"{zyg.label} >= {min_count}"
         return description
 
-    def get_cohort_per_sample_zygosity_q_list(self, cohort_genotype_collection):
+    def _get_per_sample_zygosity_arg_q_dict(self, cgc: CohortGenotypeCollection) -> Dict[Optional[str], Q]:
         sample_zygosities_dict = {}
 
         # Start with zygosity_sample_matches of all dots (as need to handle all
@@ -189,7 +185,7 @@ class CohortNode(AbstractCohortBasedNode, AbstractZygosityCountNode):
 
             sample_zygosities_dict[cnzf.cohort_sample.sample] = zygosities
 
-        return [cohort_genotype_collection.get_zygosity_q(sample_zygosities_dict)]
+        return {cgc.cohortgenotype_alias: cgc.get_zygosity_q(sample_zygosities_dict)}
 
     def _get_cohort_per_sample_zygosity_description(self) -> str:
         return "Per Sample Zygosity"

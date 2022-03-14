@@ -208,6 +208,7 @@ class TaggedVariantGrid(AbstractVariantGrid):
                 tag_ids.append(tag_id)
 
         qs = get_variant_queryset_for_latest_annotation_version(genome_build)
+        qs, _ = VariantZygosityCountCollection.annotate_global_germline_counts(qs)
         qs = qs.filter(VariantTag.variants_for_build_q(genome_build, tags_qs, tag_ids))
         user_settings = UserSettings.get_for_user(user)
         fields, override, _ = get_custom_column_fields_override_and_sample_position(user_settings.columns)

@@ -31,7 +31,12 @@ def get_fake_vep_version(genome_build: GenomeBuild, annotation_consortium):
         elif isinstance(f, TextField):
             # Need proper gnomAD for get_classified_high_frequency_variants_qs
             if f.name == 'gnomad':
-                value = "r2.1"
+                if genome_build.name == 'GRCh37':
+                    value = "2.1.1"
+                else:
+                    value = "3.1"
+            elif f.name == 'dbnsfp':
+                value = '4.0a'
             else:
                 value = "fake"
         else:

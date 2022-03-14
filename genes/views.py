@@ -260,6 +260,8 @@ class GeneSymbolViewInfo:
 
     @lazy
     def has_gene_coverage(self) -> bool:
+        if not settings.VIEW_GENE_SYMBOL_SHOW_GENE_COVERAGE:
+            return False
         has_gene_coverage = GeneCoverage.get_for_symbol(self.genome_build, self.gene_symbol).exists()
         if has_gene_coverage:
             return True

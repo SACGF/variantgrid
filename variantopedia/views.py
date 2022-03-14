@@ -568,6 +568,7 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
         "num_clinvar_citations": num_clinvar_citations,
         "clinvar_citations": clinvar_citations,
         "show_annotation": settings.VARIANT_DETAILS_SHOW_ANNOTATION,
+        "show_gene_coverage": settings.VARIANT_DETAILS_SHOW_GENE_COVERAGE,
         "show_samples": settings.VARIANT_DETAILS_SHOW_SAMPLES,
         "tag_form": TagForm(),
         "variant": variant,

@@ -185,7 +185,7 @@ def get_vep_version(genome_build: GenomeBuild, annotation_consortium):
     return get_vep_version_from_vcf(output_filename)
 
 
-def vep_dict_to_variant_annotation_version_kwargs(vep_version_dict: Dict) -> Dict:
+def vep_dict_to_variant_annotation_version_kwargs(vep_config, vep_version_dict: Dict) -> Dict:
     def vep_int_version(vep_string_version):
         m = re.match(r"v(\d+)", vep_string_version)
         return int(m.group(1))
@@ -222,6 +222,41 @@ def vep_dict_to_variant_annotation_version_kwargs(vep_version_dict: Dict) -> Dic
         if converter:
             value = converter(value)
         kwargs[python_field] = value
+
+    genome_build = vep_config.genome_build
+    kwargs["genome_build"] = genome_build
+    kwargs["annotation_consortium"] = vep_config.annotation_consortium
+    distance = getattr(settings, "ANNOTATION_VEP_DISTANCE", None)
+    if distance is None:
+        distance = 5000
+    kwargs["distance"] = distance
+
+    # Plugins are optional
+    try:
+        dbnsfp_path = vep_config["dbnsfp"]  # KeyError if not set in settings
+        if m := re.match(r".*/dbNSFP_?(.*?)\.(GRCh37|GRCh38|hg19|hg38)", dbnsfp_path, flags=re.IGNORECASE):
+            kwargs["dbnsfp"] = m.group(1)
+        else:
+            msg = f"Couldn't determine dbNSFP version from file: {dbnsfp_path}"
+            raise ValueError(msg)
+    except KeyError:
+        kwargs["dbnsfp"] = 'n/a'
+
+    # we use our own gnomAD custom annotation, not the default VEP one
+    if cvf := ColumnVEPField.objects.filter(variant_grid_column='gnomad_af', genome_build=genome_build).first():
+        try:
+            # annotation_data/GRCh37/gnomad2.1.1_GRCh37_combined_af.vcf.bgz
+            # gnomad3.1_GRCh38_merged.vcf.bgz
+            gnomad_filename = genome_build.settings["vep_config"][cvf.get_vep_custom_display().lower()]
+            gnomad_basename = os.path.basename(gnomad_filename)
+            if m := re.match(r"^gnomad(.*?)_(GRCh37|GRCh38|hg19|hg38)", gnomad_basename, flags=re.IGNORECASE):
+                kwargs["gnomad"] = m.group(1)
+            else:
+                msg = f"Couldn't determine gnomAD version from file: {gnomad_basename}"
+                raise ValueError(msg)
+        except KeyError:
+            pass  # Will just use VEP values
+
     return kwargs
 
 
@@ -231,27 +266,7 @@ def get_vep_variant_annotation_version_kwargs(genome_build: GenomeBuild):
         return get_fake_vep_version(genome_build, vep_config.annotation_consortium)
 
     vep_version_dict = get_vep_version(genome_build, vep_config.annotation_consortium)
-    kwargs = vep_dict_to_variant_annotation_version_kwargs(vep_version_dict)
-
-    vc = VEPConfig(genome_build)
-    kwargs["genome_build"] = genome_build
-    kwargs["annotation_consortium"] = vc.annotation_consortium
-    distance = getattr(settings, "ANNOTATION_VEP_DISTANCE", None)
-    if distance is None:
-        distance = 5000
-    kwargs["distance"] = distance
-
-    # Plugins are optional
-    try:
-        dbnsfp_path = vc["dbnsfp"]  # KeyError if not set in settings
-        if m := re.match(r".*/dbNSFP_?(.*?)\.(GRCh37|GRCh38|hg19|hg38)", dbnsfp_path, flags=re.IGNORECASE):
-            kwargs["dbnsfp"] = m.group(1)
-        else:
-            msg = f"Couldn't determine dbNSFP version from file: {dbnsfp_path}"
-            raise ValueError(msg)
-    except KeyError:
-        kwargs["dbnsfp"] = 'n/a'
-
+    kwargs = vep_dict_to_variant_annotation_version_kwargs(vep_config, vep_version_dict)
     return kwargs
 
 
@@ -289,8 +304,9 @@ def vep_parse_version_line(line):
 
 def vep_check_version_match(variant_annotation_version, filename: str):
     """ Load VEP VCF, check VEP= line and make sure that values match expected VariantAnnotationVersion """
+    vep_config = VEPConfig(variant_annotation_version.genome_build)
     vep_dict = get_vep_version_from_vcf(filename)
-    kwargs = vep_dict_to_variant_annotation_version_kwargs(vep_dict)
+    kwargs = vep_dict_to_variant_annotation_version_kwargs(vep_config, vep_dict)
     for k, v in kwargs.items():
         version_value = getattr(variant_annotation_version, k)
         if version_value != v:

@@ -18,6 +18,7 @@ class Test(URLTestCase):
         cls.user_non_owner = User.objects.get_or_create(username='different_user')[0]
         cls.grch37 = GenomeBuild.get_name_or_alias("GRCh37")
         cls.cohort = Cohort.objects.get_or_create(name="fake cohort",
+                                                  user=cls.user_owner,
                                                   version=1,
                                                   import_status=ImportStatus.SUCCESS,
                                                   genome_build=cls.grch37)[0]
