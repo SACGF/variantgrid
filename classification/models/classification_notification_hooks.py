@@ -21,7 +21,7 @@ def send_discordance_notification(discordance_report: DiscordanceReport):
     all_lab_names = ", ".join(lab.name for lab in all_labs)
     groups = ClassificationGroups(discordance_report.all_classification_modifications)
     report_url = get_url_from_view_path(
-        reverse('discordance_report', kwargs={'report_id': discordance_report.id}),
+        reverse('discordance_report', kwargs={'discordance_report_id': discordance_report.id}),
     )
     clin_sig_key = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE)
     for lab in all_labs:
