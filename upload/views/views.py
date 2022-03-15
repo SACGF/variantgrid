@@ -229,7 +229,7 @@ def view_upload_pipeline(request, upload_pipeline_id):
     uploaded_file.check_can_view(request.user)
 
     filename = uploaded_file.get_filename()
-    file_exists = os.path.exists(filename)
+    file_exists = filename and os.path.exists(filename)
     allow_retry_import = (uploaded_file.user == request.user or request.user.is_superuser) and file_exists
 
     if not file_exists:
