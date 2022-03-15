@@ -160,7 +160,7 @@ class ClassificationAdmin(ModelAdminBasics):
     def has_add_permission(self, request):
         return False
 
-    @admin_action("Populate base variant data")
+    @admin_action("Data: Populate w Annotations")
     def populate_base_variant_data(self, request, queryset: QuerySet[Classification]):
         for vc in queryset:
             refseq_transcript_id = vc.get(SpecialEKeys.REFSEQ_TRANSCRIPT_ID)
@@ -202,19 +202,44 @@ class ClassificationAdmin(ModelAdminBasics):
                 else:
                     self.message_user(request, "(%i) No changes with = %s" % (vc.id, json.dumps(patch)))
 
-    @admin_action("Revalidate")
+    @admin_action("Fixes: Condition Text Sync")
+    def condition_text_sync(self, request, queryset: QuerySet[Classification]):
+        from classification.models import ConditionTextMatch
+
+        conditions_newly_set = 0
+        for c in queryset:
+            has_condition_already = bool(c.condition_resolution)
+            ConditionTextMatch.sync_condition_text_classification(c.last_published_version)
+            c.refresh_from_db(fields=["condition_resolution"])
+            has_condition_now = bool(c.condition_resolution)
+            if has_condition_now and not has_condition_already:
+                conditions_newly_set += 1
+
+        self.message_user(request, f"{conditions_newly_set} records have conditions now when they didn't previously")
+
+    @admin_action("Fixes: Fix Permissions")
+    def fix_permissions(self, request, queryset: QuerySet[Classification]):
+        for c in queryset:
+            c.fix_permissions(fix_modifications=True)
+
+    @admin_action("Fixes: Revalidate")
     def revalidate(self, request, queryset):
         for vc in queryset:
             vc.revalidate(request.user)
         self.message_user(request, str(queryset.count()) + " records revalidated")
 
-    @admin_action("Publish - Logged in Users")
-    def publish_logged_in_users(self, request, queryset):
-        self.publish_share_level(request, queryset, ShareLevel.ALL_USERS)
+    @admin_action("Matching: Re-Match")
+    def reattempt_variant_matching(self, request, queryset: QuerySet[Classification]):
+        valid_record_count, invalid_record_count = reattempt_variant_matching(request.user, queryset)
+        if invalid_record_count:
+            self.message_user(request, f'Records with missing or invalid builds/coordinates : {invalid_record_count}')
+        self.message_user(request, f'Records revalidating : {valid_record_count}')
 
-    @admin_action("Publish - Organisation")
-    def publish_org(self, request, queryset):
-        self.publish_share_level(request, queryset, ShareLevel.INSTITUTION)
+    @admin_action("Matching: Re-Calculate c.hgvs")
+    def recalculate_cached_chgvs(self, request, queryset: QuerySet[Classification]):
+        for vc in queryset:
+            vc.update_cached_c_hgvs()
+            vc.save()
 
     def publish_share_level(self, request, queryset: QuerySet[Classification], share_level: ShareLevel):
         already_published = 0
@@ -238,20 +263,15 @@ class ClassificationAdmin(ModelAdminBasics):
             self.message_user(request, message=f"({in_error}) records can't be published due to validation errors", level=messages.ERROR)
         self.message_user(request, message=f"({published}) records have been freshly published", level=messages.INFO)
 
-    @admin_action("Variant re-matching")
-    def reattempt_variant_matching(self, request, queryset: QuerySet[Classification]):
-        valid_record_count, invalid_record_count = reattempt_variant_matching(request.user, queryset)
-        if invalid_record_count:
-            self.message_user(request, f'Records with missing or invalid builds/coordinates : {invalid_record_count}')
-        self.message_user(request, f'Records revalidating : {valid_record_count}')
+    @admin_action("Publish: Organisation")
+    def publish_org(self, request, queryset):
+        self.publish_share_level(request, queryset, ShareLevel.INSTITUTION)
 
-    @admin_action("Re-calculate cached chgvs")
-    def recalculate_cached_chgvs(self, request, queryset: QuerySet[Classification]):
-        for vc in queryset:
-            vc.update_cached_c_hgvs()
-            vc.save()
+    @admin_action("Publish: Logged in Users")
+    def publish_logged_in_users(self, request, queryset):
+        self.publish_share_level(request, queryset, ShareLevel.ALL_USERS)
 
-    @admin_action("Make mutable")
+    @admin_action("State: Make Mutable")
     def make_mutable(self, request, queryset: QuerySet[Classification]):
         for vc in queryset:
             vc.patch_value(patch={}, user=request.user, source=SubmissionSource.VARIANT_GRID, remove_api_immutable=True, save=True)
@@ -267,35 +287,15 @@ class ClassificationAdmin(ModelAdminBasics):
                 pass
         return count
 
-    @admin_action("Withdraw")
+    @admin_action("State: Withdraw")
     def withdraw_true(self, request, queryset: QuerySet[Classification]):
         count = self.set_withdraw(request, queryset, True)
         self.message_user(request, f"{count} records now newly set to withdrawn")
 
-    @admin_action("Un-Withdraw")
+    @admin_action("State: Un-Withdraw")
     def withdraw_false(self, request, queryset):
         count = self.set_withdraw(request, queryset, False)
         self.message_user(request, f"{count} records now newly set to un-withdrawn")
-
-    @admin_action("Condition Text Sync")
-    def condition_text_sync(self, request, queryset: QuerySet[Classification]):
-        from classification.models import ConditionTextMatch
-
-        conditions_newly_set = 0
-        for c in queryset:
-            has_condition_already = bool(c.condition_resolution)
-            ConditionTextMatch.sync_condition_text_classification(c.last_published_version)
-            c.refresh_from_db(fields=["condition_resolution"])
-            has_condition_now = bool(c.condition_resolution)
-            if has_condition_now and not has_condition_already:
-                conditions_newly_set += 1
-
-        self.message_user(request, f"{conditions_newly_set} records have conditions now when they didn't previously")
-
-    @admin_action("Fix Permissions")
-    def fix_permissions(self, request, queryset: QuerySet[Classification]):
-        for c in queryset:
-            c.fix_permissions(fix_modifications=True)
 
     """
     @admin_action("Fix allele Freq History")
