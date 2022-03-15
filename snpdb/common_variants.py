@@ -45,8 +45,13 @@ def get_classified_high_frequency_variants_qs(cgcfv: CohortGenotypeCommonFilterV
                                               alleles: Optional[QuerySet[Allele]] = None) -> QuerySet[Variant]:
     """ These are 'common' variants that have classifications against them, thus can't be store in common """
     from annotation.models import VariantAnnotationVersion
-    vav = VariantAnnotationVersion.objects.filter(gnomad=cgcfv.gnomad_version,
-                                                  genome_build=cgcfv.genome_build).order_by("pk").last()
+    kwargs = {
+        "gnomad": cgcfv.gnomad_version,
+        "genome_build": cgcfv.genome_build
+    }
+    vav = VariantAnnotationVersion.objects.filter(**kwargs).order_by("pk").last()
+    if vav is None:
+        raise VariantAnnotationVersion.DoesNotExist(f"Can't find VariantAnnotationVersion({kwargs})")
     av = vav.get_any_annotation_version()
     qs = get_variant_queryset_for_annotation_version(av)
     clinical_significances = get_excluded_clinical_significances(cgcfv)

@@ -1,6 +1,7 @@
 import operator
 from abc import abstractmethod
 from functools import reduce
+from typing import Type
 
 from library.utils import full_class_name, is_not_none
 from upload.import_task_factories.import_task_factory import ImportTaskFactory
@@ -57,8 +58,11 @@ class AbstractVCFImportTaskFactory(ImportTaskFactory):
                                                           **kwargs)
         return create_data_from_vcf_header_task_clazz.si(unknown_variants_step.pk, 0)
 
+    def _get_preprocess_class(self) -> Type:
+        return PreprocessVCFTask
+
     def get_preprocess_vcf_step_and_task(self, upload_pipeline, input_filename):
-        preprocess_clazz = PreprocessVCFTask
+        preprocess_clazz = self._get_preprocess_class()
         class_name = full_class_name(preprocess_clazz)
         preprocess_step = UploadStep.objects.create(upload_pipeline=upload_pipeline,
                                                     name=UploadStep.PREPROCESS_VCF_NAME,

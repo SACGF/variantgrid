@@ -1,3 +1,5 @@
+from typing import Type
+
 import pandas as pd
 from django.conf import settings
 
@@ -21,7 +23,8 @@ from upload.tasks.vcf.genotype_vcf_tasks import VCFCheckAnnotationTask, ProcessG
     ImportGenotypeVCFSuccessTask, UpdateVariantZygosityCountsTask, SampleLocusCountsTask, \
     ImportCreateVCFModelForGenotypeVCFTask, SomalierVCFTask
 from upload.tasks.vcf.import_vcf_tasks import ProcessVCFSetMaxVariantTask, \
-    ImportCreateUploadedVCFTask, ProcessVCFLinkAllelesSetMaxVariantTask, LiftoverCompleteTask, LiftoverCreateVCFTask
+    ImportCreateUploadedVCFTask, ProcessVCFLinkAllelesSetMaxVariantTask, LiftoverCompleteTask, LiftoverCreateVCFTask, \
+    PreprocessAndAnnotateVCFTask
 
 
 class BedImportTaskFactory(ImportTaskFactory):
@@ -139,6 +142,9 @@ class GenotypeVCFImportFactory(AbstractVCFImportTaskFactory):
 
     def get_create_data_from_vcf_header_task_class(self):
         return ImportCreateVCFModelForGenotypeVCFTask
+
+    def _get_preprocess_class(self) -> Type:
+        return PreprocessAndAnnotateVCFTask
 
     def get_known_variants_parallel_vcf_processing_task_class(self):
         return ProcessGenotypeVCFDataTask

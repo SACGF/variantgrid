@@ -61,7 +61,7 @@ def _write_split_headers(vcf_filename, split_headers_filename):
                 f.write(line + "\n")
 
 
-def preprocess_vcf(upload_step):
+def preprocess_vcf(upload_step, annotate_gnomad_af=False):
     MAX_STDERR_OUTPUT = 5000  # How much stderr output per process to store in DB
 
     VCF_CLEAN_AND_FILTER_SUB_STEP = "vcf_clean_and_filter"
@@ -211,7 +211,7 @@ def preprocess_vcf(upload_step):
         output_filename = split_vcf_filename
 
         # If we annotate, that file will be processed in UploadStepMultiFileOutput
-        if settings.VCF_IMPORT_COMMON_FILTERS.get(genome_build.name):
+        if annotate_gnomad_af:
             sort_order += 1
             name = name_from_filename(split_vcf_filename, remove_gz=True)
             output_filename = os.path.join(vcf_import_annotate_dir, f"{name}.annotated.vcf.gz")
