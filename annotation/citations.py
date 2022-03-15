@@ -53,7 +53,7 @@ def _citation_error(cached_citation: Union[Citation, CachedCitation]) -> Citatio
     citation_source = citation.get_citation_source_display()
 
     return CitationDetails(id=citation.id,
-                           title=CITATION_COULD_NOT_LOAD_TEXT,
+                           title=f"{citation.citation_id} - {CITATION_COULD_NOT_LOAD_TEXT}",
                            journal=None,
                            journal_short=None,
                            year=None,
