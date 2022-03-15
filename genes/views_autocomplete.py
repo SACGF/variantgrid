@@ -100,7 +100,7 @@ class GeneSymbolAutocompleteView(AutocompleteView):
 
 @method_decorator(cache_page(WEEK_SECS), name='dispatch')
 class GeneAnnotationReleaseAutocompleteView(AutocompleteView):
-    fields = ['version', 'genome_build']
+    fields = ['version', 'genome_build__name']
 
     def get_user_queryset(self, _user):
         """ Doesn't actually use user for GeneAnnotationRelease """
