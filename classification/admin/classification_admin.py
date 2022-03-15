@@ -251,6 +251,11 @@ class ClassificationAdmin(ModelAdminBasics):
             vc.update_cached_c_hgvs()
             vc.save()
 
+    @admin_action("Make mutable")
+    def make_mutable(self, request, queryset: QuerySet[Classification]):
+        for vc in queryset:
+            vc.patch_value(patch={}, user=request.user, source=SubmissionSource.VARIANT_GRID, remove_api_immutable=True, save=True)
+
     def set_withdraw(self, request, queryset: QuerySet[Classification], withdraw: bool) -> int:
         count = 0
         for vc in queryset:

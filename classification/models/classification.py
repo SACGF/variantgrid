@@ -1407,6 +1407,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                     leave_existing_values=False,
                     save=False,
                     make_patch_fields_immutable=False,
+                    remove_api_immutable=False,
                     initial_data=False,
                     revalidate_all=False,
                     ignore_if_only_patching: Optional[Set[str]] = None) -> Dict[str, Any]:
@@ -1415,11 +1416,12 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             Patching a value with the same value has no effect
             :param patch: The set of values we're patching
             :param clear_all_fields: If completely overwriting the classification
-            :param user: The user patching these values (for security checks)
+            :param user: The user patching these values (for security checks) - should always be provided
             :param source: See SubmissionSource, determines what's immutable
             :param leave_existing_values: Only update empty fields
             :param save: saves to the database (leave as False if test mode or going to do other changes)
             :param make_patch_fields_immutable: Make all fields updated in this patch immutable.
+            :param remove_api_immutable: If True, immutability level (under variantgrid) is removed from all fields. Requires source: SubissionSource.VariantGrid
             :param initial_data: if True, divides c.hgvs to
             :param revalidate_all: if True, runs validation over all fields we have, otherwise only the values being patched
             :returns: A dict with "messages" (validation errors, warnings etc) and "modified" (fields that actually changed value)
@@ -1497,6 +1499,12 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             for e_key in key_dict.mandatory():
                 if e_key not in patch:
                     patch[e_key].wipe(WipeMode.SET_EMPTY)
+
+        if remove_api_immutable:
+            for key in use_evidence.keys():
+                cell = use_evidence[key]
+                if cell.immutability == SubmissionSource.API:
+                    patch[key].immutability = None
 
         for cell in patch.cells():
             if cell.raw is not None:
