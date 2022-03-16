@@ -12,6 +12,10 @@
         function datatableFilter(data) {
             data.lab_id = {{ selected_lab.pk }};
         }
+        function fileDownloaderRenderer(data, type, row) {
+            let pk = row['id'];
+            return $('<a>', {'href': Urls.classification_import_download(pk), 'text': data, 'class': 'download-link'}).prop('outerHTML');
+        }
     </script>
 {% endblock %}
 {% block content %}

@@ -3,8 +3,9 @@ import re
 import django
 from django.contrib import messages
 from django.contrib.auth.models import User
+from django.core.exceptions import PermissionDenied
 from django.db.models import QuerySet
-from django.http import HttpResponseRedirect
+from django.http import HttpResponseRedirect, HttpRequest, StreamingHttpResponse
 from django.shortcuts import render
 from django.urls import reverse
 from django.views import View
@@ -24,7 +25,7 @@ class UploadedFileLabColumns(DatatableConfig[UploadedFileLab]):
 
         self.rich_columns = [
             RichColumn(key="id", label="ID", orderable=True, default_sort=SortOrder.DESC),
-            RichColumn(key="filename", orderable=True),
+            RichColumn(key="filename", orderable=True, client_renderer='fileDownloaderRenderer'),
             RichColumn(key="created", label='Created', orderable=True, client_renderer='TableFormat.timestamp'),
             RichColumn(key="status", label="Status", orderable=True, renderer=lambda x: UploadedFileLabStatus(x["status"]).label),
             RichColumn(key="comment", client_renderer='TableFormat.text')
@@ -36,6 +37,31 @@ class UploadedFileLabColumns(DatatableConfig[UploadedFileLab]):
         else:
             raise ValueError("Must pass in lab_id")
 
+# e.g. https://shariant-temp.s3.amazonaws.com/test/hello.txt?AWSAccessKeyId=ASFDWEROMDEOLNZA&Signature=mxBuRkSDFDHgwZyfZYfxQPXE%3D&Expires=1647392831
+UPLOADED_FILE_RE = re.compile(r"https:\/\/(?P<bucket>.*?)\.s3\.amazonaws\.com/(?P<file>.*?)(?:\?AWSAccessKeyId.*|$)")
+
+
+def download_uploaded_file(request: HttpRequest, upload_file_lab_id: int):
+    user = request.user
+    record = UploadedFileLab.objects.filter(pk=upload_file_lab_id).filter(lab__in=Lab.valid_labs_qs(user, admin_check=True)).first()
+    if not record:
+        raise PermissionDenied("You do not have access to this file")
+    if match := UPLOADED_FILE_RE.match(record.url):
+        bucket = match.group('bucket')
+        file = match.group('file')
+
+        def streaming_file(filename: str):
+            from storages.backends.s3boto3 import S3Boto3Storage
+            media_storage = S3Boto3Storage(bucket_name=bucket)
+            with media_storage.open(filename) as s3file:
+                while data := s3file.read(4096):
+                    yield data
+
+        response = StreamingHttpResponse(streaming_file(file), content_type='streaming_content')
+        response['Content-Disposition'] = f'attachment; filename="{file}"'
+        return response
+    else:
+        raise ValueError(f"Don't know how to download {record.url}")
 
 class FileUploadView(View):
 
@@ -52,7 +78,7 @@ class FileUploadView(View):
     def post(self, requests, **kwargs):
         # lazily have s3boto3 requirements
 
-        django.utils.encoding.force_text = django.utils.encoding.force_str
+        django.utils.encoding.force_text1 = django.utils.encoding.force_str
         django.utils.encoding.smart_text = django.utils.encoding.smart_str
 
         from storages.backends.s3boto3 import S3Boto3Storage

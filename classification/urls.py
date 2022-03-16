@@ -10,7 +10,7 @@ from classification.views.classification_datatables import ClassificationColumns
 from classification.views.classification_email_view import summary_email_preview_html, \
     summary_email_preview_text
 from classification.views.classification_export_view import ClassificationApiExportView
-from classification.views.classification_import_upload_view import UploadedFileLabColumns
+from classification.views.classification_import_upload_view import UploadedFileLabColumns, download_uploaded_file
 from classification.views.classification_overlaps_view import view_overlaps, post_clinical_context, \
     view_clinical_context, view_overlaps_detail
 from classification.views.classification_view import ClassificationView, LabGeneClassificationCountsView
@@ -45,6 +45,7 @@ urlpatterns = [
     perm_path('classification/import_upload', classification_import_upload_view.FileUploadView.as_view(), name="classification_import_upload"),
     perm_path('classification/import_upload/<int:lab_id>', classification_import_upload_view.FileUploadView.as_view(), name="classification_import_upload_lab"),
     perm_path('classification/import_upload/datatable', DatabaseTableView.as_view(column_class=UploadedFileLabColumns), name='classification_import_upload_datatable'),
+    perm_path('classification/import_upload/download/<int:upload_file_lab_id>', download_uploaded_file, name='classification_import_download'),
 
     perm_path('classification/create', views.create_classification, name='create_classification'),
     perm_path('classification/create_from_hgvs/<genome_build_name>/<hgvs_string>', views.create_classification_from_hgvs, name='create_classification_from_hgvs'),
