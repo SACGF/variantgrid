@@ -2,6 +2,18 @@
 /*globals $:false, jQuery:false, console:false, moment:false, Rollbar:false */
 /*globals toMarkdown:false */
 
+// Required until we can up our minimum browser suppert to this https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String/replaceAll
+if (!String.prototype.replaceAll) {
+	String.prototype.replaceAll = function(str, newStr){
+		// If a regex pattern
+		if (Object.prototype.toString.call(str).toLowerCase() === '[object regexp]') {
+			return this.replace(str, newStr);
+		}
+		// If a string
+		return this.replace(new RegExp(str, 'g'), newStr);
+	};
+}
+
 function tweakAjax() {
     // automatically send X-CSRFToken on ajax calls
     $.ajaxSetup({
