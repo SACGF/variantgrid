@@ -148,7 +148,8 @@ table.dataTable td.dataTables_empty {
         font-style: normal;
         font-variant: normal;
         text-rendering: auto;
-        font-family: 'FontAwesome';
+        font-family: 'Font Awesome 5 Free', 'FontAwesome';
+        font-weight: 900;
         content: "\f1b2";
         opacity: 0.4;
         margin-right: 8px;
@@ -204,7 +205,8 @@ span.select2-container {
 //.filter-row::before {
 //    /*
 //    content: 'f0b0';
-//    font-family: 'FontAwesome';
+//    font-family: 'Font Awesome 5 Free', 'FontAwesome';
+//    font-weight: 900
 //    font-size: 14pt;
 //    display: inline-block;
 //    font-style: normal;
@@ -212,7 +214,8 @@ span.select2-container {
 //    text-rendering: auto;
 //    -webkit-font-smoothing: antialiased;
 //     */
-//    font-family: 'FontAwesome';
+//    font-family: 'Font Awesome 5 Free', 'FontAwesome';
+//    font-weight: 900;
 //    content: "\f0b0";
 //    position: absolute;
 //    bottom: 20px;
@@ -366,7 +369,8 @@ a {
     font-style: normal;
     font-variant: normal;
     text-rendering: auto;
-    font-family: 'FontAwesome';
+    font-family: 'Font Awesome 5 Free', 'FontAwesome';
+    font-weight: 900;
     content: "\f35d";
     opacity: 0.4;
     margin-left: 4px;
@@ -376,7 +380,8 @@ a {
     font-style: normal;
     font-variant: normal;
     text-rendering: auto;
-    font-family: 'FontAwesome';
+    font-family: 'Font Awesome 5 Free', 'FontAwesome';
+    font-weight: 900;
     content: "\f2d0";
     opacity: 0.4;
     margin-left: 4px;
@@ -386,7 +391,8 @@ a {
     font-style: normal;
     font-variant: normal;
     text-rendering: auto;
-    font-family: 'FontAwesome';
+    font-family: 'Font Awesome 5 Free', 'FontAwesome';
+    font-weight: 900;
     content: "\f2b6";
     opacity: 0.4;
     margin-left: 4px;
@@ -396,7 +402,8 @@ a {
     font-style: normal;
     font-variant: normal;
     text-rendering: auto;
-    font-family: 'FontAwesome';
+    font-family: 'Font Awesome 5 Free', 'FontAwesome';
+    font-weight: 900;
     content: "\f56d";
     opacity: 0.6;
     margin-left: 4px;
@@ -411,7 +418,8 @@ a {
     font-style: normal;
     font-variant: normal;
     text-rendering: auto;
-    font-family: 'FontAwesome';
+    font-family: 'Font Awesome 5 Free', 'FontAwesome';
+    font-weight: 900;
     content: "\f105";
     opacity: 0.6;
     margin-right: 4px;
@@ -467,7 +475,8 @@ a.list-group-item-action.list-group-item-light {
 	&.indicator-plus {
 		.card-header {
 			&:after {
-				font-family: 'FontAwesome';
+                font-family: 'Font Awesome 5 Free', 'FontAwesome';
+                font-weight: 900;
 				content: "\f078";
 				// float: left;
 				position: absolute;
@@ -485,7 +494,8 @@ a.list-group-item-action.list-group-item-light {
 		&.round-indicator {
 			.card-header {
 				&:before {
-					font-family: 'FontAwesome';
+                    font-family: 'Font Awesome 5 Free', 'FontAwesome';
+                    font-weight: 900;
 					font-size: 12pt;
 					content: "\f077";
 					// float: left;
@@ -505,7 +515,8 @@ a.list-group-item-action.list-group-item-light {
 		}
 		.card-header {
 			&:before {
-				font-family: 'FontAwesome';
+                font-family: 'Font Awesome 5 Free', 'FontAwesome';
+                font-weight: 900;
 				content: "\f068";
 				// float: left;
 				position: absolute;
@@ -523,7 +534,8 @@ a.list-group-item-action.list-group-item-light {
 	&.indicator-chevron {
 		.card-header {
 			&:after {
-				font-family: 'FontAwesome';
+                font-family: 'Font Awesome 5 Free', 'FontAwesome';
+                font-weight: 900;
 				content: "\f078";
 				// float: right;
 				position: absolute;
@@ -665,7 +677,8 @@ div.background-image {
             position: absolute;
             left: -16px;
             content: '\f056';
-            font-family: 'FontAwesome';
+            font-family: 'Font Awesome 5 Free', 'FontAwesome';
+            font-weight: 900;
         }
     }
 }
@@ -739,25 +752,29 @@ table.as_table {
 // Condition Aliases
 .dt-status {
     .val-R:before {
-        font-family: 'FontAwesome';
+        font-family: 'Font Awesome 5 Free', 'FontAwesome';
+        font-weight: 900;
         margin-right: 4px;
         content: "\f058";
         color: green;
     }
     .val-P:before {
-        font-family: 'FontAwesome';
+        font-family: 'Font Awesome 5 Free', 'FontAwesome';
+        font-weight: 900;
         color: #bbb;
         margin-right: 4px;
         content: "\f111";
     }
     .val-A:before {
-      font-family: 'FontAwesome';
+        font-family: 'Font Awesome 5 Free', 'FontAwesome';
+        font-weight: 900;
         margin-right: 4px;
         content: "\f544";
         color: #6a6;
     }
     .val-U:before {
-      font-family: 'FontAwesome';
+        font-family: 'Font Awesome 5 Free', 'FontAwesome';
+        font-weight: 900;
         margin-right: 4px;
         content: "\f057";
     }
