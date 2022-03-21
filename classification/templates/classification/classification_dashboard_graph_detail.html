@@ -1,0 +1,13 @@
+{% load ui_help %}
+{% load js_tags %}
+{% if dlab.shared_classifications.count %}
+    <div id="accumulation-graph"></div>
+    <script>
+        let graph_width = 1000;
+        let graph_height = 400;
+        let accumulation_data = {{ dlab.accumulation_graph_data | jsonify }};
+        plotCumulativeClassifications("accumulation-graph", accumulation_data, "", graph_width, graph_height)
+    </script>
+{% else %}
+    <p class="no-value">There is no shared classification data to show.</p>
+{% endif %}

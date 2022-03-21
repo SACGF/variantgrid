@@ -1,9 +1,0 @@
-{% load static %}
-{% load classification_tags %}
-Dear Shariant User,<br/><br/>
-
-A variant classification belonging to your lab "{{ lab.name }}"
-{% if entered %} has been detected as discordant with another variant classification.
-{% else %} is no longer marked as discordant.
-{% endif %}<br/>
-Please <a href="{{ review_link }}">click here</a> to review.
