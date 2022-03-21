@@ -124,11 +124,11 @@
             {% if not discordance_qs %}
                 <div class="no-value">There are no outstanding discordances for this lab {{ 'S' | severity_icon }}</div>
             {% else %}
-                <ul>
+                <ul class="list-group mb-4">
                     {% for lab_count in dlab.labs_to_discordance_counts %}
-                    <li>
-                        {% if lab_count.is_your_lab %}Internal Only discordances account for <strong>{{ lab_count.count }}</strong> of these discordances
-                            {% else %}{% lab lab_count.lab %} are involved in <strong>{{ lab_count.count }}</strong> of these discordances{% endif %}
+                    <li class="list-group-item">
+                        {% if lab_count.is_your_lab %}<span style="font-weight:500">Internal Only</span> discordances account for <strong>{{ lab_count.count }}</strong> of these discordances
+                        {% else %}<span style="font-weight:500">{% lab lab_count.lab %}</span> are involved in <strong>{{ lab_count.count }}</strong> of these discordances{% endif %}
                     </li>
                     {% endfor %}
                 </ul>
@@ -152,7 +152,7 @@
                             </td>
                             <td style="width:40%">{% for lab_summ in dr.labs_to_classification %}
                                 <div>
-                                    <span class="d-inline-block mr-2" style="min-width:180px">{% lab lab_summ.lab %}</span>
+                                    <span class="d-inline-block mr-2" style="min-width:150px">{% lab lab_summ.lab %}</span>
                                     {% for cs in lab_summ.values %}{% clinical_significance cs %}{% endfor %}
                                 </div>
                                 {% endfor %}
