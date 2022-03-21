@@ -49,7 +49,7 @@ Hello Shariant User,
                             <td>{% c_hgvs discordance_report_summary.c_hgvs show_genome_build=False %}</td> {% comment %}do inline style for c.hgvs{% endcomment %}
                             <td>
                                 {% for d_lab_summary in discordance_report_summary.lab_summaries %}
-                                    <div>{% if lab_summary.lab == d_lab_summary.lab %}<em>{{ lab_summary.lab }}</em>{% else %}{{ lab_summary.lab }}{% endif %} -
+                                    <div>{% if lab_summary.lab == d_lab_summary.lab %}<em>{{ lab_summary.lab }}</em>{% else %}{{ d_lab_summary.lab }}{% endif %} -
                                     {% for clin_sig in d_lab_summary.values %}{% if not forloop.first %}, {% endif %}{% clinical_significance_inline clin_sig %}{% endfor %}
                                     </div>
                                 {% endfor %}
