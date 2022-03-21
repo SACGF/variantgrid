@@ -129,7 +129,7 @@
                         <th style="width:100px">ID</th>
                         <th class="text-left">Discordance Detected</th>
                         <th class="text-left">c.HGVS ({{ genome_build.name }})</th>
-                        <th class="text-left" style="width:40%">Clinical Significances / Labs</th>
+                        <th class="text-left" style="width:40%">Lab / Clinical Significances</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -143,8 +143,8 @@
                         </td>
                         <td style="width:40%">{% for lab_summ in dr.labs_to_classification %}
                             <div>
+                                <span class="d-inline-block mr-2" style="min-width:180px">{{ lab_summ.lab.name }}</span>
                                 {% for cs in lab_summ.values %}{% clinical_significance cs %}{% endfor %}
-                                {{ lab_summ.lab.name }}
                             </div>
                             {% endfor %}
                         </td>

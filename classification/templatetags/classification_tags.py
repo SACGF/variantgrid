@@ -1,13 +1,13 @@
 import uuid
 from html import escape
-from typing import Union, Optional, Iterable
+from typing import Union, Optional, Iterable, Any
 
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.db.models import Model
 from django.db.models.query import QuerySet
 from django.template import Library
-from django.utils.safestring import mark_safe
+from django.utils.safestring import mark_safe, SafeString
 
 from annotation.manual_variant_entry import check_can_create_variants, CreateManualVariantForbidden
 from classification.enums import SpecialEKeys
@@ -171,6 +171,22 @@ def clinical_significance(value):
         "label": key.option_dictionary.get(value, value) or "Unclassified"
     }
 
+@register.inclusion_tag("classification/tags/clinical_significance_inline.html")
+def clinical_significance_inline(value):
+    key = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE)
+    colors = {
+        "B": "#44d",
+        "LB": "#88d",
+        "VUS": "#888",
+        "LP": "#d88",
+        "P": "#d44"
+    }
+    return {
+        "key": value.lower(),
+        "color": colors.get(value) or "#aaa",
+        "label": key.option_dictionary.get(value, value) or "Unclassified"
+    }
+
 
 @register.inclusion_tag("classification/tags/clinical_significance_select.html")
 def clinical_significance_select(name, value):
@@ -297,8 +313,7 @@ def classification_table(
     }
 
 
-@register.inclusion_tag("classification/tags/c_hgvs.html")
-def c_hgvs(c_hgvs: Union[CHGVS, str], show_genome_build: Optional[bool] = None):
+def _to_c_hgvs(c_hgvs: Any) -> CHGVS:
     if isinstance(c_hgvs, ClassificationModification):
         if c_hgvs := c_hgvs.classification.get_c_hgvs(GenomeBuildManager.get_current_genome_build()):
             c_hgvs = CHGVS(c_hgvs)
@@ -308,6 +323,13 @@ def c_hgvs(c_hgvs: Union[CHGVS, str], show_genome_build: Optional[bool] = None):
 
     if c_hgvs is None:  # might have got a none c.hgvs from the ClassificationModification
         c_hgvs = CHGVS("")
+
+    return c_hgvs
+
+
+@register.inclusion_tag("classification/tags/c_hgvs.html")
+def c_hgvs(c_hgvs: Union[CHGVS, ClassificationModification, str], show_genome_build: Optional[bool] = None):
+    c_hgvs = _to_c_hgvs(c_hgvs)
 
     if show_genome_build is None:
         show_genome_build = c_hgvs.is_desired_build is False or c_hgvs.is_normalised is False

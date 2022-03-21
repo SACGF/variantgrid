@@ -3,16 +3,10 @@
 {% load english_tags %}
 {% load menu_tags %}
 Hello Shariant User,
-<p style="color:#444">
-Quick Links :
-{% if data.has_issues %}
-    <a href="{% absolute_url 'classification_dashboard' %}">View Issues</a>
-    | <a href="{% absolute_url 'classification_dashboard_download' %}">Download Issues</a>
-{% else %}
-    <a href="{% absolute_url 'classifications' %}">Classifications</a>
-{% endif %}
-</p>
 <p>Below is a summary of your {% count data.lab_summaries 'lab' 'labs' %}:</p>
+<p style="color:#444">
+<a href="{% absolute_url 'classification_dashboard' %}">Click here to login to Shariant</a>
+</p>
 {% for lab_summary in data.lab_summaries %}
     <h4>{{ lab_summary.lab.organization.name }} / {{ lab_summary.lab.name }}</h4>
     <ul>
@@ -21,7 +15,7 @@ Quick Links :
             {% if lab_summary.imported_30_days_count > 0 %}<li>In the last 30 days, {% count lab_summary.imported_30_days_count '1 new classification has' 'new classifications have' %} been uploaded</li>{% endif %}
         {% else %}<li>Has not yet uploaded its first classifications</li>
         {% endif %}
-
+        {% comment %}
         <li>
             {% if lab_summary.flagged_variants_count %}
             {% count lab_summary.flagged_variants_count '1 classification requires' 'classifications require' %} attention (see the quick links for details)
@@ -29,16 +23,44 @@ Quick Links :
             No classifications require attention
             {% endif %}
         </li>
-        {% if lab_summary.discordance_reports|length %}
-            <li>This lab is involved in {% count lab_summary.discordance_reports 'a discordance' 'discordances' %}:</li>
-            <ul>
-            {% for discordance_report in lab_summary.discordance_reports %}
-                <li><a href="{% absolute_url 'discordance_report' discordance_report.id %}">Discordance ({{ discordance_report.id }})</a></li>
-            {% endfor %}
-            </ul>
+       {% endcomment %}
+        {% if lab_summary.discordance_report_summaries|length %}
+        <li>This lab is involved in the following {% count lab_summary.discordance_report_summaries 'discordance' 'discordances' %}:</li>
         {% endif %}
     </ul>
+
+    {% if lab_summary.discordance_report_summaries|length %}
+        <div style="padding-left: 24px">
+
+            <table cellspacing="10">
+                <thead>
+                    <tr>
+                        <th style="font-weight:600; text-align:left">Shariant ID</th>
+                        <th style="font-weight:600; text-align:left">Discordance Detected</th>
+                        <th style="font-weight:600; text-align:left">c.HGVS ({{ lab_summary.genome_build }})</th>
+                        <th style="font-weight:600; text-align:left">Lab / Clinical Significances</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                    {% for discordance_report_summary in lab_summary.discordance_report_summaries %}
+                        <td><a href="{% absolute_url 'discordance_report' discordance_report_summary.id %}">DR {{ discordance_report_summary.id }}</a></td>
+                        <td><span style="font-family:monospace">{{ discordance_report_summary.date_detected_str }}</span></td>
+                        <td>{% c_hgvs discordance_report_summary.c_hgvs show_genome_build=False %}</td> {% comment %}do inline style for c.hgvs{% endcomment %}
+                        <td>
+                            {% for d_lab_summary in discordance_report_summary.lab_summaries %}
+                                <div>{% if lab_summary.lab == d_lab_summary.lab %}<em>{{ lab_summary.lab }}</em>{% else %}{{ lab_summary.lab }}{% endif %} -
+                                {% for clin_sig in d_lab_summary.values %}{% if not forloop.first %}, {% endif %}{% clinical_significance_inline clin_sig %}{% endfor %}
+                                </div>
+                            {% endfor %}
+                        </td>
+                    {% endfor %}
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    {% endif %}
 {% endfor %}
 
 Thanks,<br/>
-The Shariant team.
+The Shariant Team.

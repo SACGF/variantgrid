@@ -18,7 +18,8 @@ from classification.models import Classification, classification_flag_types, \
 from email_manager.models import EmailLog
 from flags.models import FlagCollection
 from library.log_utils import report_exc_info, report_message
-from snpdb.models import Lab, UserSettings
+from snpdb.genome_build_manager import GenomeBuildManager
+from snpdb.models import Lab, UserSettings, GenomeBuild
 
 EmailOutput = collections.namedtuple('EmailOutput', 'subject html text')
 
@@ -50,6 +51,15 @@ class EmailLabSummaryData:
             classification_original__classification__in=discordant_vcs,
             report__resolution=DiscordanceReportResolution.ONGOING).values_list('report', flat=True)
         return DiscordanceReport.objects.filter(pk__in=report_ids).order_by('id')
+
+    @lazy
+    def genome_build(self) -> GenomeBuild:
+        # TODO if user setting isn't set, grab it from lab instead
+        return UserSettings.get_genome_build_or_default(self.user)
+
+    @lazy
+    def discordance_report_summaries(self) -> List[DiscordanceReport.DiscordanceReportSummary]:
+        return [dr.report_for(lab=self.lab, genome_build=self.genome_build) for dr in self.discordance_reports]
 
     @lazy
     def flagged_variants(self):

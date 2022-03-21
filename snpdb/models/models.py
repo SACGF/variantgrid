@@ -536,7 +536,7 @@ class Lab(models.Model):
     def __str__(self):
         name = self.name
         if self.organization:
-            name += f" ({self.organization})"
+            name = f"({self.organization}) {name}"
         return name
 
 

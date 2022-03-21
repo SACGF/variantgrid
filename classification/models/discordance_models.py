@@ -21,6 +21,7 @@ from classification.models.flag_types import classification_flag_types
 from flags.models.enums import FlagStatus
 from flags.models.models import FlagComment
 from genes.hgvs import CHGVS
+from library.utils import segment
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import Lab, GenomeBuild
 
@@ -304,6 +305,7 @@ class DiscordanceReport(TimeStampedModel):
             return self.lab < other.lab
 
     def labs_to_classification(self) -> List[DiscordanceLabSummary]:
+        # TODO rename this more like DiscordanceLabSummary
         lab_to_class: Dict[Lab, Set[str]] = defaultdict(set)
         for drc in DiscordanceReportClassification.objects.filter(report=self):
             lab_to_class[drc.classification_effective.classification.lab].add(drc.classification_effective.get(SpecialEKeys.CLINICAL_SIGNIFICANCE))
@@ -312,6 +314,47 @@ class DiscordanceReport(TimeStampedModel):
         clin_sig = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE)
 
         return sorted([DiscordanceReport.DiscordanceLabSummary(k, clin_sig.sort_values(v)) for k, v in lab_to_class.items()])
+
+    # just for reporting
+    class DiscordanceReportSummary:
+
+        def __init__(self, discordance_report: 'DiscordanceReport', for_lab: Lab, genome_build: GenomeBuild):
+            self.discordance_report = discordance_report
+            self.lab = for_lab
+            self.genome_build = genome_build
+
+        @property
+        def _cm_candidate(self) -> ClassificationModification:
+            for cm_candidate in self.discordance_report.all_classification_modifications:
+                if cm_candidate.classification.lab == self.lab:
+                    return cm_candidate
+            raise ValueError(f"No classification for lab {self.lab}")
+
+        @property
+        def id(self):
+            return self.discordance_report.id
+
+        @property
+        def date_detected(self) -> datetime:
+            return self.discordance_report.report_started_date
+
+        @property
+        def date_detected_str(self) -> str:
+            return f"{self.date_detected:%Y-%m-%d}"
+
+        @property
+        def c_hgvs(self) -> CHGVS:
+            return self._cm_candidate.c_hgvs_best(genome_build=self.genome_build)
+
+        @property
+        def lab_summaries(self) -> List['DiscordanceReport.DiscordanceLabSummary']:
+            all_summaries = self.discordance_report.labs_to_classification()
+            my_summaries, other_summaries = segment(all_summaries, lambda x: x.lab == self.lab)
+            # sort user's lab to the front for comparison
+            return my_summaries + other_summaries
+
+    def report_for(self, lab: Lab, genome_build: GenomeBuild) -> DiscordanceReportSummary:
+        return DiscordanceReport.DiscordanceReportSummary(discordance_report=self, for_lab=lab, genome_build=genome_build)
 
 
 class DiscordanceAction:
