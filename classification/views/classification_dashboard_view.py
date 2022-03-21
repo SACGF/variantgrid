@@ -176,7 +176,6 @@ def issues_download(request: HttpRequest, lab_id: int = 0):
 @terms_required
 def classification_dashboard(request: HttpRequest, lab_id: Optional[int] = None) -> HttpResponse:
     user: User = request.user
-
     all_labs = list(Lab.valid_labs_qs(request.user, admin_check=True))
     if len(all_labs) == 1 and not lab_id:
         return redirect(reverse('classification_dashboard', kwargs={'lab_id': all_labs[0].pk}))
@@ -187,5 +186,12 @@ def classification_dashboard(request: HttpRequest, lab_id: Optional[int] = None)
         "dlab": dlab,
         "use_shared": settings.VARIANT_CLASSIFICATION_STATS_USE_SHARED,
         "clinvar_export_enabled": clinvar_export_sync.is_enabled,
-        "genome_build": GenomeBuildManager.get_current_genome_build()
+        "genome_build": GenomeBuildManager.get_current_genome_build(),
+    })
+
+
+def classification_dashboard_graph_detail(request: HttpRequest, lab_id: Optional[int] = None) -> HttpResponse:
+    dlab = ClassificationDashboard(user=request.user, lab_id=lab_id)
+    return render(request, "classification/classification_dashboard_graph_detail.html", {
+        "dlab": dlab
     })

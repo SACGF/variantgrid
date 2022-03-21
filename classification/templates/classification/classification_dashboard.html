@@ -68,19 +68,13 @@
     {% endif %}
 
     {% if use_shared %}
-        {% if dlab.shared_classifications.count %}
-                {% page_help_embedded title="Shared Classifications Over Time" %}
-                This graphs shows how many shared classifications your lab has submitted over time.
-            {% end_page_help_embedded %}
+        {% page_help_embedded title="Shared Classifications Over Time" %}
+            This graphs shows how many shared classifications your lab has submitted over time.
+        {% end_page_help_embedded %}
 
-            <div id="accumulation-graph"></div>
-            <script>
-                let graph_width = 1000;
-                let graph_height = 400;
-                let accumulation_data = {{ dlab.accumulation_graph_data | jsonify }};
-                plotCumulativeClassifications("accumulation-graph", accumulation_data, "", graph_width, graph_height)
-            </script>
-        {% endif %}
+        <div data-toggle="ajax" href="{% url 'classification_dashboard_graph_detail' dlab.lab_id %}">
+            <div class="loading-message" style="height:381px">Loading Graph.</div>
+        </div>
 
         {% comment %}section only makes sense for where Shared is king{% endcomment %}
         {% page_help_embedded title="Classification Counts" %}
