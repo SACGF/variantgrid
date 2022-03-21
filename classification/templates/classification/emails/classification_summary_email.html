@@ -42,20 +42,20 @@ Hello Shariant User,
                     </tr>
                 </thead>
                 <tbody>
-                    <tr>
                     {% for discordance_report_summary in lab_summary.discordance_report_summaries %}
-                        <td><a href="{% absolute_url 'discordance_report' discordance_report_summary.id %}">DR {{ discordance_report_summary.id }}</a></td>
-                        <td><span style="font-family:monospace">{{ discordance_report_summary.date_detected_str }}</span></td>
-                        <td>{% c_hgvs discordance_report_summary.c_hgvs show_genome_build=False %}</td> {% comment %}do inline style for c.hgvs{% endcomment %}
-                        <td>
-                            {% for d_lab_summary in discordance_report_summary.lab_summaries %}
-                                <div>{% if lab_summary.lab == d_lab_summary.lab %}<em>{{ lab_summary.lab }}</em>{% else %}{{ lab_summary.lab }}{% endif %} -
-                                {% for clin_sig in d_lab_summary.values %}{% if not forloop.first %}, {% endif %}{% clinical_significance_inline clin_sig %}{% endfor %}
-                                </div>
-                            {% endfor %}
-                        </td>
+                        <tr>
+                            <td><a href="{% absolute_url 'discordance_report' discordance_report_summary.id %}">DR {{ discordance_report_summary.id }}</a></td>
+                            <td><span style="font-family:monospace">{{ discordance_report_summary.date_detected_str }}</span></td>
+                            <td>{% c_hgvs discordance_report_summary.c_hgvs show_genome_build=False %}</td> {% comment %}do inline style for c.hgvs{% endcomment %}
+                            <td>
+                                {% for d_lab_summary in discordance_report_summary.lab_summaries %}
+                                    <div>{% if lab_summary.lab == d_lab_summary.lab %}<em>{{ lab_summary.lab }}</em>{% else %}{{ lab_summary.lab }}{% endif %} -
+                                    {% for clin_sig in d_lab_summary.values %}{% if not forloop.first %}, {% endif %}{% clinical_significance_inline clin_sig %}{% endfor %}
+                                    </div>
+                                {% endfor %}
+                            </td>
+                         </tr>
                     {% endfor %}
-                    </tr>
                 </tbody>
             </table>
         </div>
