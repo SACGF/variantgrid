@@ -74,7 +74,7 @@ class ClassificationDashboard:
             return ClinVarExport.objects.filter(clinvar_allele__clinvar_key__in=clinvar_keys).exclude(scv__exact='').order_by('-modified')
         return ClinVarExport.objects.none()
 
-    @lazy
+    @property
     def discordances_qs(self) -> QuerySet[DiscordanceReport]:
         # WARNING, this will count discordances that involve the lab in a classification, but one that has
         # has changed clinical context
@@ -84,6 +84,12 @@ class ClassificationDashboard:
             .order_by('report_id').values_list('report_id', flat=True)
         return DiscordanceReport.objects.filter(pk__in=discordant_c, resolution=DiscordanceReportResolution.ONGOING)\
             .order_by('-created')
+
+    def labs_to_discordance_counts(self) -> Optional[List[DiscordanceReport.LabDiscordantCount]]:
+        # this isn't very useful for an org that has multiple labs
+        if len(self.labs) != 1:
+            return None
+        return DiscordanceReport.count_labs(self.discordances_qs, your_lab=self.labs[0])
 
     @lazy
     def classifications_wout_standard_text(self) -> int:
@@ -176,6 +182,7 @@ def classification_dashboard(request: HttpRequest, lab_id: Optional[int] = None)
         return redirect(reverse('classification_dashboard', kwargs={'lab_id': all_labs[0].pk}))
 
     dlab = ClassificationDashboard(user=request.user, lab_id=lab_id)
+
     return render(request, "classification/classification_dashboard.html", {
         "dlab": dlab,
         "use_shared": settings.VARIANT_CLASSIFICATION_STATS_USE_SHARED,
