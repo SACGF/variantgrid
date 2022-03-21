@@ -144,7 +144,7 @@
                     <tbody>
                     {% for dr in discordance_qs %}
                         <tr>
-                            <td class="text-center"><a href="{% url 'discordance_report' dr.id %}" class="hover-link">{{ dr.id }}</a></td>
+                            <td class="text-center"><a href="{% url 'discordance_report' dr.id %}" class="hover-link">DR_{{ dr.id }}</a></td>
                             <td>{% timestamp dr.created %}</td>
                             <td>{% for c_hgvs in dr.all_c_hgvs %}
                                     <div>{% c_hgvs c_hgvs %}</div>
