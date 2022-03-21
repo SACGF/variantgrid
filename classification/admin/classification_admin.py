@@ -228,7 +228,7 @@ class ClassificationAdmin(ModelAdminBasics):
             vc.revalidate(request.user)
         self.message_user(request, str(queryset.count()) + " records revalidated")
 
-    @admin_action("Matching: Re-Match")
+    @admin_action("Matching: Re-Match Variant")
     def reattempt_variant_matching(self, request, queryset: QuerySet[Classification]):
         valid_record_count, invalid_record_count = reattempt_variant_matching(request.user, queryset)
         if invalid_record_count:
