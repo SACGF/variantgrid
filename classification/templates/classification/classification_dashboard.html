@@ -45,15 +45,6 @@
             Flags.instance.init({userId: '{{user.id}}', filter: '.active', forceRender: true});
         });
     });
-
-    function plotCumulativeClassifications(selector, cum_data, title, width, height) {
-        let layout = defaultLayout(title, width, height);
-        layout["xaxis"] = {"nticks": 10}; // keep under 20 dates so they don't get too crowded
-        layout["yaxis"] = {
-            "range": [0, {{ dlab.max_accumulation_graph }} + 1]
-        };
-        Plotly.newPlot(selector, cum_data, layout);
-    }
 </script>
 <div class="container">
     {% lab_picker view_name="classification_dashboard" selected_lab=dlab.lab_id all_option=True %}

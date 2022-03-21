@@ -3,6 +3,15 @@
 {% if dlab.shared_classifications.count %}
     <div id="accumulation-graph"></div>
     <script>
+        function plotCumulativeClassifications(selector, cum_data, title, width, height) {
+            let layout = defaultLayout(title, width, height);
+            layout["xaxis"] = {"nticks": 10}; // keep under 20 dates so they don't get too crowded
+            layout["yaxis"] = {
+                "range": [0, {{ dlab.max_accumulation_graph }} + 1]
+            };
+            Plotly.newPlot(selector, cum_data, layout);
+        }
+
         let graph_width = 1000;
         let graph_height = 400;
         let accumulation_data = {{ dlab.accumulation_graph_data | jsonify }};
