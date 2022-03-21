@@ -1,5 +1,6 @@
 import collections
 import datetime
+from dataclasses import dataclass
 from typing import List
 
 import celery
@@ -40,6 +41,11 @@ class EmailLabSummaryData:
             return None
 
     @lazy
+    def genome_build(self) -> GenomeBuild:
+        # TODO if user setting isn't set, grab it from lab instead
+        return UserSettings.get_genome_build_or_default(self.user)
+
+    @lazy
     def discordance_reports(self) -> List[DiscordanceReport]:
         discordant_vcs = FlagCollection.filter_for_open_flags(
             Classification.objects.filter(lab=self.lab),
@@ -53,13 +59,12 @@ class EmailLabSummaryData:
         return DiscordanceReport.objects.filter(pk__in=report_ids).order_by('id')
 
     @lazy
-    def genome_build(self) -> GenomeBuild:
-        # TODO if user setting isn't set, grab it from lab instead
-        return UserSettings.get_genome_build_or_default(self.user)
-
-    @lazy
     def discordance_report_summaries(self) -> List[DiscordanceReport.DiscordanceReportSummary]:
         return [dr.report_for(lab=self.lab, genome_build=self.genome_build) for dr in self.discordance_reports]
+
+    @lazy
+    def labs_to_discordance_counts(self) -> List[DiscordanceReport.LabDiscordantCount]:
+        return DiscordanceReport.count_labs(self.discordance_reports, your_lab=self.lab)
 
     @lazy
     def flagged_variants(self):

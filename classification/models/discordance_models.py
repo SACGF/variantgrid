@@ -2,7 +2,7 @@ import typing
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Set, Optional, List, Dict, Tuple, Any
+from typing import Set, Optional, List, Dict, Tuple, Any, Iterable
 
 import django.dispatch
 from django.conf import settings
@@ -314,6 +314,38 @@ class DiscordanceReport(TimeStampedModel):
         clin_sig = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE)
 
         return sorted([DiscordanceReport.DiscordanceLabSummary(k, clin_sig.sort_values(v)) for k, v in lab_to_class.items()])
+
+    @dataclass(frozen=True)
+    class LabDiscordantCount:
+        lab: Lab
+        your_lab: Lab
+        count: int
+
+        @property
+        def is_your_lab(self):
+            return self.lab == self.your_lab
+
+        def __lt__(self, other):
+            # if we want internal to go first no matter the count
+            if self.is_your_lab != other.is_your_lab:
+                return self.is_your_lab
+            if self.count != other.count:
+                return self.count > other.count
+
+            return self.lab < other.lab
+
+    @staticmethod
+    def count_labs(reports: Iterable['DiscordanceReport'], your_lab: Lab) -> List['DiscordantReport.LabDiscordantCount']:
+        lab_counts = defaultdict(int)
+        for dr in reports:
+            all_involved_labs = dr.all_actively_involved_labs()
+            if len(all_involved_labs) == 1 and your_lab in all_involved_labs:
+                lab_counts[your_lab] += 1
+            else:
+                for lab in all_involved_labs:
+                    if lab != your_lab:  # only record internal only discordances when it comes to your_lab
+                        lab_counts[lab] += 1
+        return sorted([DiscordanceReport.LabDiscordantCount(lab=key, your_lab=your_lab, count=value) for key, value in lab_counts.items()])
 
     # just for reporting
     class DiscordanceReportSummary:

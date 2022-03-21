@@ -22,7 +22,7 @@ from classification.models.evidence_key import EvidenceKey, EvidenceKeyMap
 from classification.models.evidence_mixin import VCDbRefDict
 from genes.hgvs import CHGVS
 from snpdb.genome_build_manager import GenomeBuildManager
-from snpdb.models import VariantAllele
+from snpdb.models import VariantAllele, Lab
 from snpdb.models.models_genome import GenomeBuild, Contig, GenomeFasta
 from snpdb.models.models_user_settings import UserSettings
 from snpdb.models.models_variant import Allele, Variant, VariantAlleleSource
@@ -177,7 +177,7 @@ def clinical_significance_inline(value):
     colors = {
         "B": "#44d",
         "LB": "#88d",
-        "VUS": "#888",
+        "VUS": "#666",
         "LP": "#d88",
         "P": "#d44"
     }
@@ -185,6 +185,13 @@ def clinical_significance_inline(value):
         "key": value.lower(),
         "color": colors.get(value) or "#aaa",
         "label": key.option_dictionary.get(value, value) or "Unclassified"
+    }
+
+@register.inclusion_tag("classification/tags/lab.html")
+def lab(lab: Lab, your_lab: Optional[Lab] = None):
+    return {
+        "lab": lab,
+        "is_your_lab": your_lab == lab
     }
 
 
