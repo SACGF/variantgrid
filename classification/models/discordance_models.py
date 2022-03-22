@@ -284,15 +284,8 @@ class DiscordanceReport(TimeStampedModel):
     @lazy
     def all_classification_modifications(self) -> List[ClassificationModification]:
         vcms: List[ClassificationModification] = list()
-        active: List[int] = list()
         for dr in DiscordanceReportClassification.objects.filter(report=self):
-            if dr.classification_final:
-                vcms.append(dr.classification_final)
-            else:
-                active.append(dr.classification_original.classification_id)
-        if active:
-            vcms += list(ClassificationModification.objects.filter(classification_id__in=active, is_last_published=True)\
-                .select_related('classification', 'classification__lab', 'classification__lab__organization'))
+            vcms.append(dr.classification_effective)
         return vcms
 
     def all_c_hgvs(self, genome_build: Optional[GenomeBuild] = None) -> List[CHGVS]:
@@ -471,8 +464,9 @@ class DiscordanceReportClassificationRelationManager(models.Manager):
 
     def get_queryset(self):
         qs = super().get_queryset()
-        return qs.select_related(
-                        'classification_final', 'classification_final__classification',
+        return qs.select_related('classification_original',
+                        'classification_final',
+                        'classification_final__classification',
                         'classification_final__classification__lab',
                         'classification_final__classification__lab__organization')
 
@@ -493,9 +487,9 @@ class DiscordanceReportClassification(TimeStampedModel):
         if self.classification_final:
             return self.classification_final
         return ClassificationModification.objects.filter(
-            classification=self.classification_original_id,
+            classification=self.classification_original.classification,
             is_last_published=True
-        ).select_related('classification', 'classification__lab', 'classification__lab__organization').get()
+        ).select_related('classification', 'classification__lab').get()
 
     @lazy
     def clinical_context_effective(self) -> ClinicalContext:
