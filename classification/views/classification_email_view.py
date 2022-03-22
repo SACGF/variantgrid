@@ -56,7 +56,7 @@ class EmailLabSummaryData:
         report_ids = DiscordanceReportClassification.objects.filter(
             classification_original__classification__in=discordant_vcs,
             report__resolution=DiscordanceReportResolution.ONGOING).values_list('report', flat=True)
-        return DiscordanceReport.objects.filter(pk__in=report_ids).order_by('id')
+        return DiscordanceReport.objects.filter(pk__in=report_ids).order_by('-id')
 
     @lazy
     def discordance_report_summaries(self) -> List[DiscordanceReport.DiscordanceReportSummary]:

@@ -10,6 +10,7 @@ from django.contrib.auth.models import User
 from django.db import models, transaction
 from django.db.models.deletion import PROTECT, CASCADE
 from django.urls.base import reverse
+from django.utils.timezone import now
 from django_extensions.db.models import TimeStampedModel
 from lazy import lazy
 
@@ -372,7 +373,10 @@ class DiscordanceReport(TimeStampedModel):
 
         @property
         def date_detected_str(self) -> str:
-            return f"{self.date_detected:%Y-%m-%d}"
+            date_str = f"{self.date_detected:%Y-%m-%d}"
+            if (now() - self.date_detected) <= timedelta(days=1):
+                date_str = f"{date_str} (NEW)"
+            return date_str
 
         @property
         def c_hgvs(self) -> CHGVS:
