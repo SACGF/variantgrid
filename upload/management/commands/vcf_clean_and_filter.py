@@ -88,7 +88,7 @@ class Command(BaseCommand):
                 columns[0] = fasta_chrom
                 # Zero out INFO (makes file size smaller and causes bcftools issues)
                 columns[7] = "."
-                sys.stdout.write("\t".join(columns))
+                sys.stdout.write("\t".join(columns) + "\n")
             else:
                 sys.stdout.write(line)
 
