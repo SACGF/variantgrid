@@ -1346,20 +1346,7 @@ def wiki_save(request, class_name, unique_keyword, unique_value):
 
 def labs(request):
     # Use short names is available
-    short_names_qs = Organization.objects.filter(short_name__isnull=False)
-    name_to_short_name = dict(short_names_qs.values_list("name", "short_name"))
-
-    org_field = "classification__lab__organization__name"
-    state_field = "classification__lab__state"
     show_unclassified = not settings.VARIANT_CLASSIFICATION_STATS_USE_SHARED
-
-    vc_org_data_json = get_grouped_classification_counts(
-        user=request.user,
-        field=org_field,
-        max_groups=15,
-        field_labels=name_to_short_name,
-        show_unclassified=show_unclassified,
-        allele_level=True)
 
     """
     vc_state_data_json = get_grouped_classification_counts(
@@ -1382,10 +1369,30 @@ def labs(request):
         "organization_labs": organization_labs,
         "labs": lab_list,
         "shared_classifications": settings.VARIANT_CLASSIFICATION_STATS_USE_SHARED,
-        "vc_org_data": vc_org_data_json,
         # "vc_state_data": vc_state_data_json,
         "show_unclassified": show_unclassified,
     }
+
+    return render(request, "snpdb/labs.html", context)
+
+
+def labs_graph_detail(request):
+    short_names_qs = Organization.objects.filter(short_name__isnull=False)
+    name_to_short_name = dict(short_names_qs.values_list("name", "short_name"))
+    state_field = "classification__lab__state"
+    show_unclassified = not settings.VARIANT_CLASSIFICATION_STATS_USE_SHARED
+    org_field = "classification__lab__organization__name"
+
+    vc_org_data_json = get_grouped_classification_counts(
+        user=request.user,
+        field=org_field,
+        max_groups=15,
+        field_labels=name_to_short_name,
+        show_unclassified=show_unclassified,
+        allele_level=True)
+
+    context = dict()
+    context["vc_org_data"] = vc_org_data_json
 
     graph_data = get_accumulation_graph_data(mode=AccumulationReportMode.Allele)
     context["accumulation_by_status"] = graph_data["status"]
@@ -1406,8 +1413,7 @@ def labs(request):
             allele_level=True)
 
         context["vc_normalized_state_data_json"] = vc_normalized_state_data_json
-
-    return render(request, "snpdb/labs.html", context)
+    return render(request, "snpdb/labs_graph_detail.html", context)
 
 
 @login_not_required

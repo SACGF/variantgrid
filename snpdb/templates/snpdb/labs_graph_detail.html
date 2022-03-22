@@ -1,0 +1,69 @@
+{% load ui_utils %}
+{% load ui_tabs_builder %}
+{% load js_tags %}
+
+{% ui_register_tabs tab_set="graph_tabs" %}
+{% if vc_org_data %}
+    {% ui_register_tab_embedded tab_set="graph_tabs" label="Clinical Significance by Org" %}<div id='org-classifications-graph'></div>{% end_ui_register_tab_embedded %}
+{% endif %}
+{% if accumulation_by_status %}
+    {% ui_register_tab_embedded tab_set="graph_tabs" label="Cumulative Alleles by Status" %}<div id='accumulation-status-graph'></div>{% end_ui_register_tab_embedded %}
+{% endif %}
+{% if accumulation_by_lab %}
+    {% ui_register_tab_embedded tab_set="graph_tabs" label="Cumulative Alleles by Lab" admin_only=True %}<div id='accumulation-lab-graph'></div>{% end_ui_register_tab_embedded %}
+{% endif %}
+{% if vc_normalized_state_data_json %}
+    {% ui_register_tab_embedded tab_set="graph_tabs" label="Alleles/100K Pop by State" admin_only=True %}<div id='normalized-state-classifications-graph'></div>{% end_ui_register_tab_embedded %}
+{% endif %}
+{% ui_render_tabs tab_set="graph_tabs" mode="tabs" %}
+<script>
+    // updated the colors to match the classification table
+    // but make pathogenic reder and VUS darker to stand out more
+    var PATHOGENIC_COLORS = [   '#666666', // other
+                                '#7777ff', // Benign
+                                '#aaaaff', // Likely benign
+                                '#cccccc', // VUS
+                                '#ffaaaa', // Likely pathogenic
+                                '#ff7777', // pathogenic
+                                ];
+
+    {%  if show_unclassified %}
+        PATHOGENIC_COLORS.push('#1f77b4'); // Unclassified
+    {%  endif %}
+
+    function plotClassifications(selector, vc_data, title, width, height) {
+        for (let i=0 ; i<vc_data.length ; ++i) {
+            vc_data[i]["marker"] = {
+                color: PATHOGENIC_COLORS[i],
+            };
+        }
+        let layout = defaultLayout(title, width, height);
+        layout["barmode"] = 'stack';
+        Plotly.newPlot(selector, vc_data, layout);
+    }
+
+    function plotCumulativeClassifications(selector, cum_data, title, width, height) {
+        let layout = defaultLayout(title, width, height);
+        layout["xaxis"] = {"nticks": 10}; // keep under 20 dates so they don't get too crowded
+        Plotly.newPlot(selector, cum_data, layout);
+    }
+
+    let graph_width = 1000;
+    let graph_height = 400;
+    {% if vc_org_data %}
+        let vc_org_data = {{ vc_org_data | jsonify }};
+        plotClassifications('org-classifications-graph', vc_org_data, 'Allele Clinical Significance by Organisation', graph_width, graph_height);
+    {% endif %}
+    {% if accumulation_by_status %}
+        let accumulation_by_status = {{ accumulation_by_status | jsonify }};
+        plotCumulativeClassifications("accumulation-status-graph", accumulation_by_status, "Cumulative Alleles by Status (stacked)", graph_width, graph_height)
+    {% endif %}
+    {% if accumulation_by_lab %}
+        let accumulation_by_org = {{ accumulation_by_lab | jsonify }};
+        plotCumulativeClassifications("accumulation-lab-graph", accumulation_by_org, "Cumulative Alleles by Lab", graph_width, graph_height)
+    {% endif %}
+    {% if vc_normalized_state_data_json %}
+        let vc_normalized_state_data_json = {{ vc_normalized_state_data_json | jsonify }};
+        plotClassifications('normalized-state-classifications-graph', vc_normalized_state_data_json, 'Alleles/100k Pop by State', graph_width, graph_height);
+    {% endif %}
+</script>

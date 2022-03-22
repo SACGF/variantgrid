@@ -83,6 +83,7 @@ urlpatterns = [
     perm_path('celery/wait_for_task/<celery_task>/<int:sleep_ms>/<path:redirect_url>', views.wait_for_task, name='wait_for_task'),
     perm_path('wiki_save/<class_name>/<unique_keyword>/<unique_value>', views.wiki_save, name='wiki_save'),
     perm_path('labs', views.labs, name='labs'),
+    perm_path('labs_graph_detail', views.labs_graph_detail, name='labs_graph_detail'),
     perm_path('maps', views.maps, name='maps'),
     perm_path('index', views.index, name='index'),
     perm_path('user_global_sample_gene_matrix', views.user_global_sample_gene_matrix, name='user_global_sample_gene_matrix'),
