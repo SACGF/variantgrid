@@ -9,6 +9,7 @@
 {% load ui_menu_bars %}
 {% load user_tags %}
 {% load ui_tabs_builder %}
+{% load classification_tags %}
 {% block title %}Settings{% endblock %}
 {% block submenu %}{% menu_bar_settings %}{% endblock submenu %}
 {% block head %}
@@ -119,9 +120,9 @@
                 <ul class="list-group">
                 {% for _, lab in labs_by_group_name.items %}
                     {% if url_name_visible.view_lab %}
-                        <a class='list-group-item list-group-item-action' href="{% url 'view_lab' lab.pk %}">{{ lab }}</a>
+                        <a class='list-group-item list-group-item-action' href="{% url 'view_lab' lab.pk %}">{% lab lab %}</a>
                     {% else %}
-                        <li class="list-group-item">{{ lab }}</li>
+                        <li class="list-group-item">{% lab lab %}</li>
                     {% endif %}
                 {% endfor %}
                 </ul>
