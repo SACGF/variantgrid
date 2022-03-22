@@ -678,6 +678,12 @@ INSTALLED_APPS = [
 # https://django-crispy-forms.readthedocs.io/en/latest/install.html
 # CRISPY_ALLOWED_TEMPLATE_PACKS = ('bootstrap4_neat', 'bootstrap4') # need to do this if you make an alternative template pack
 CRISPY_TEMPLATE_PACK = 'bootstrap4'
+CRISPY_CLASS_CONVERTERS = {
+    "blanknullbooleanselect": "form-control",
+    "select": "form-control",
+    "numberinput": "form-control",
+    "textinput": "form-control"
+}
 
 # https://github.com/iatkin/leaflet-svgicon
 LEAFLET_CONFIG = {

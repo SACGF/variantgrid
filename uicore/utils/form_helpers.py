@@ -40,6 +40,15 @@ class FormHelperHelper:
         helper.form_show_labels = False
         return helper
 
+    @property
+    def fields_only(self) -> FormHelper:
+        helper = FormHelper()
+        helper.form_tag = False
+        helper.form_show_labels = False
+        helper.label_class = "d-none"
+        helper.field_class = "col-12"
+        return helper
+
 
 FORM_HELPER_HELPER = FormHelperHelper()
 FormHelperHelper.instance = FORM_HELPER_HELPER

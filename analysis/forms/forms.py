@@ -2,9 +2,12 @@ import itertools
 import operator
 from collections import defaultdict
 
+from crispy_forms.bootstrap import FieldWithButtons, StrictButton
+from crispy_forms.layout import Layout, Field, Submit, Button
 from dal import forward
 from django import forms
 from django.forms.widgets import TextInput
+from django.utils.safestring import SafeString
 
 from analysis.models import Analysis, NodeGraphType, FilterNodeItem, AnalysisTemplate
 from analysis.models.enums import SNPMatrix, AnalysisTemplateType, TrioSample
@@ -111,6 +114,14 @@ class CreateAnalysisTemplateForm(forms.ModelForm):
         self.user = kwargs.pop("user")
         self.analysis = kwargs.pop("analysis", None)
         super().__init__(*args, **kwargs)
+
+        self.fields['name'].label = "Unique Name"
+        helper = form_helper_horizontal()
+        helper.layout = Layout(
+            FieldWithButtons(Field('name', placeholder=""),
+                             StrictButton(name="action", type="submit", css_class="btn-primary", content="<i class='fas fa-plus-circle'></i> Create New Template"))
+        )
+        self.helper = helper
 
     def save(self, commit=True):
         instance = super().save(commit=False)

@@ -3,6 +3,7 @@
 {% load ui_help %}
 {% load ui_utils %}
 {% load crispy_forms_field %}
+{% load crispy_forms_tags %}
 {% load jqgrid_tags %}
 {% block title %}VariantGrid: Analysis templates{% endblock title %}
 
@@ -32,12 +33,7 @@
         <div class="card">
             <div class="card-header">Create Template</div>
             <div class="card-body">
-                {% labelled label="Unique Name" %}
-                    {% crispy_field create_analysis_template_form.name %}{{ create_analysis_template_form.name.errors }}
-                {% endlabelled %}
-                <div class="buttons">
-                    <button id='create-analysis-template' class="btn btn-primary"><i class="fas fa-plus-circle"></i> Create New Template</button>
-                </div>
+                {% crispy create_analysis_template_form %}
             </div>
         </div>
       </form>

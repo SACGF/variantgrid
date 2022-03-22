@@ -1,5 +1,6 @@
 {% load ui_help %}
 {% load crispy_forms_field %}
+{% load crispy_forms_tags %}
 {% load js_tags %}
 
 {% if override_source %}
@@ -38,14 +39,10 @@
         {% endif %}
         </div>
         <div class="col-6 col-md-5">
-        {% if field|is_select %}
             {% crispy_field field %}
-        {% else %}
-            {{ field }}
-        {% endif %}
-        {% if field.help_text %}
-        <p class="help">{{ field.help_text|safe }}</p>
-        {% endif %}
+            {% if field.help_text %}
+                <p class="help">{{ field.help_text|safe }}</p>
+            {% endif %}
         </div>
     </div>
 {% endfor %}
