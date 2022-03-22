@@ -284,8 +284,15 @@ class DiscordanceReport(TimeStampedModel):
     @lazy
     def all_classification_modifications(self) -> List[ClassificationModification]:
         vcms: List[ClassificationModification] = list()
+        active: List[int] = list()
         for dr in DiscordanceReportClassification.objects.filter(report=self):
-            vcms.append(dr.classification_effective)
+            if dr.classification_final:
+                vcms.append(dr.classification_final)
+            else:
+                active.append(dr.classification_original.classification_id)
+        if active:
+            vcms += list(ClassificationModification.objects.filter(classification_id__in=active, is_last_published=True)\
+                .select_related('classification', 'classification__lab', 'classification__lab__organization'))
         return vcms
 
     def all_c_hgvs(self, genome_build: Optional[GenomeBuild] = None) -> List[CHGVS]:
@@ -460,7 +467,18 @@ class DiscordanceActionsLog:
         return f'internal review = {self.internal_reviewed}, actions = {self.actions}'
 
 
+class DiscordanceReportClassificationRelationManager(models.Manager):
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        return qs.select_related(
+                        'classification_final', 'classification_final__classification',
+                        'classification_final__classification__lab',
+                        'classification_final__classification__lab__organization')
+
+
 class DiscordanceReportClassification(TimeStampedModel):
+    objects = DiscordanceReportClassificationRelationManager()
     report = models.ForeignKey(DiscordanceReport, on_delete=CASCADE)
     classification_original = models.ForeignKey(ClassificationModification, related_name='+', on_delete=CASCADE)
     classification_final = models.ForeignKey(ClassificationModification, related_name='+', on_delete=CASCADE, null=True, blank=True)
@@ -474,10 +492,10 @@ class DiscordanceReportClassification(TimeStampedModel):
         """
         if self.classification_final:
             return self.classification_final
-        return ClassificationModification.objects.get(
-            classification=self.classification_original.classification,
+        return ClassificationModification.objects.filter(
+            classification=self.classification_original_id,
             is_last_published=True
-        )
+        ).select_related('classification', 'classification__lab', 'classification__lab__organization').get()
 
     @lazy
     def clinical_context_effective(self) -> ClinicalContext:

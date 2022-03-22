@@ -26,7 +26,7 @@ def lab_card(context, lab: Lab, lab_link=True, org_link=True):
 
 @register.inclusion_tag("snpdb/tags/lab_picker.html", takes_context=True)
 def lab_picker(context, view_name: str, selected_lab: Optional[Union[Lab, int]] = None, all_option=False):
-    labs_qs = Lab.valid_labs_qs(context.request.user, admin_check=True)
+    labs_qs = Lab.valid_labs_qs(context.request.user, admin_check=True).select_related('organization')
     if isinstance(selected_lab, Lab):
         selected_lab = selected_lab.pk
 

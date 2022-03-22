@@ -31,7 +31,7 @@ class ClassificationDashboard:
 
     def __init__(self, user: User, lab_id: Optional[int] = 0, labs: Optional[Lab] = None):
         self.user = user
-        all_labs = Lab.valid_labs_qs(user, admin_check=True)
+        all_labs = Lab.valid_labs_qs(user, admin_check=True).select_related('clinvar_key')
         if lab_id:
             self.labs = [all_labs.filter(pk=lab_id).get()]
         elif labs:
