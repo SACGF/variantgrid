@@ -7,16 +7,16 @@
     <div class="card-header">
         <div class="font-weight-bold">
         {% if url_name_visible.view_organization and org_link %}
-            <a class="hover-link" href="{% url 'view_organization' org.pk %}">{{ org }}</a>
+            <a class="hover-link" href="{% url 'view_organization' org.pk %}">[{{ org }}]</a>
         {% else %}
-            {{ org }}
+            [{{ org }}]
         {% endif %}
         </div>
         <div>
         {% if lab_link and url_name_visible.view_lab %}
-            <a class="hover-link" href="{% url 'view_lab' lab.pk %}">{{ lab }}</a>
+            <a class="hover-link" href="{% url 'view_lab' lab.pk %}">{{ lab.name }}</a>
         {% else %}
-            {{ lab }}
+            {{ lab.name }}
         {% endif %}
         </div>
     </div>
