@@ -128,8 +128,9 @@ def _add_post_data_insertion_upload_steps(upload_pipeline: UploadPipeline):
 
 
 def reattempt_variant_matching(user: User, queryset: QuerySet[Classification]) -> Tuple[int, int]:
-    qs: QuerySet[Classification] = queryset.order_by('evidence__genome_build')
+    """ @:returns (valid_record_count, invalid_record_count) """
 
+    qs: QuerySet[Classification] = queryset.order_by('evidence__genome_build')
     invalid_record_count = 0
     valid_record_count = 0
     valid_this_loop = 0
