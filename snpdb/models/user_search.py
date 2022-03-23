@@ -19,7 +19,7 @@ class SearchResponseUser(SearchResponseRecordAbstract[User]):
 
 
 @receiver(search_signal, sender=SearchInput)
-def search_ontology(sender: Any, search_input: SearchInput, **kwargs) -> SearchResponse:
+def search_users(sender: Any, search_input: SearchInput, **kwargs) -> SearchResponse:
     response: SearchResponse[User] = SearchResponse(SearchResponseUser)
     if search_input.user.is_superuser and search_input.matches_has_alpha():
         response.extend(User.objects.filter(

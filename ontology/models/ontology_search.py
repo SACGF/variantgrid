@@ -22,8 +22,7 @@ def search_ontology(sender: Any, search_input: SearchInput, **kwargs) -> SearchR
         if search_input.matches_pattern(r"\w+:\s*.*"):
             term = OntologyTerm.get_or_stub(search_input.search_string)
             response.mark_valid_search()
-            if not term.is_stub:
-                response.add(term)
+            response.add(term)
     except ValueError:
         # might not be a valid ontology, there's a lot of text that passes the search_input
         pass
