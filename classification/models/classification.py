@@ -485,6 +485,21 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             return ConditionResolved.from_dict(cr_dict)
         return None
 
+    def refresh_condition_resolution_details(self) -> bool:
+        """
+        If the condition sort text / display text has gotten out of date (as the term has updated itself) this will
+        update the record
+        :return: True if a change was detected and saved, False if no change was detected
+        """
+        if cond_obj := self.condition_resolution_obj:
+            cond_json = cond_obj.to_json()
+            if self.condition_resolution != cond_json:
+                self.condition_resolution = cond_json
+                lazy.invalidate(self, 'condition_resolution_obj')
+                self.save()
+                return True
+        return False
+
     class Meta:
         unique_together = ('lab', 'lab_record_id')
 
@@ -1545,9 +1560,10 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             self.process_entry(cell, source=source)
 
         # creating the record, if no owner was provided set the value to match current
-        owner_cell = patch[SpecialEKeys.OWNER]
-        if not self.id and not owner_cell.provided and user:
-            owner_cell.value = user.username
+        if not self.id:
+            owner_cell = patch[SpecialEKeys.OWNER]
+            if not owner_cell.provided and user:
+                owner_cell.value = user.username
 
         patch_meta = PatchMeta(patch=patch.data, existing=use_evidence.data, revalidate_all=revalidate_all)
 
