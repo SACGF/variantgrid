@@ -63,6 +63,16 @@
         } else if (format === 'csv') {
             let value_format = $("input[name='value_format']:checked").val();
             params.value_format = value_format;
+
+            let include_explains = $("input[name='include_explains']:checked");
+            if (include_explains.length) {
+                params.include_explains = 'true';
+            }
+
+            let exclude_transient = $("input[name='exclude_transient']:checked");
+            if (exclude_transient.length) {
+                params.exclude_transient = 'true';
+            }
         }
 
         let labSelectionMode = $("input[name='lab_selection_mode']:checked").val();
@@ -300,6 +310,22 @@
                 <label class="form-check-label">
                     <input id="value_format_labels" type="radio" name="value_format" value="labels" class="form-check-input" />
                     Use labels for headings and values (e.g. "Strand bias" instead of "strand_bias")
+                </label>
+            </div>
+        {% endlabelled %}
+        {% labelled label="Include Explains" admin_only=True %}
+             <div class="form-check">
+                <label class="form-check-label">
+                    <input id="include_explains" name="include_explains" value="true" type="checkbox" class="form-check-input" />
+                    Include columns for "explain" attributes on evidence. System generated definitions of how labs populated the data.
+                </label>
+            </div>
+        {% endlabelled %}
+        {% labelled label="Cross-Environment Comparison" admin_only=True %}
+             <div class="form-check">
+                <label class="form-check-label">
+                    <input id="exclude_transient" name="exclude_transient" value="true" type="checkbox" class="form-check-input" />
+                    Excludes meta-columns that would always be different between installs, e.g. id, internal_allele_id.
                 </label>
             </div>
         {% endlabelled %}

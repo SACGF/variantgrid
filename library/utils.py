@@ -842,7 +842,7 @@ def segment(iterable: Iterable[P], filter: Callable[[P], bool]) -> Tuple[List[P]
     return passes, fails
 
 
-def export_column(label: Optional[str] = None, sub_data: Optional[Type] = None):
+def export_column(label: Optional[str] = None, sub_data: Optional[Type] = None, categories: Dict[str, Any] = None):
     """
     Extend ExportRow and annotate methods with export_column.
     The order of defined methods determines the order that the results will appear in an export file
@@ -858,6 +858,7 @@ def export_column(label: Optional[str] = None, sub_data: Optional[Type] = None):
         wrapper.label = label or method.__name__
         wrapper.__name__ = method.__name__
         wrapper.is_export = True
+        wrapper.categories = categories
         wrapper.sub_data = sub_data
         return wrapper
     return decorator
@@ -866,16 +867,28 @@ def export_column(label: Optional[str] = None, sub_data: Optional[Type] = None):
 class ExportRow:
 
     @staticmethod
-    def get_export_methods(klass):
+    def get_export_methods(klass, categories: Optional[Dict[str, Any]] = None):
         if not hasattr(klass, 'export_methods'):
             export_methods = [func for _, func in inspect.getmembers(klass, lambda x: getattr(x, 'is_export', False))]
             export_methods.sort(key=lambda x: x.line_number)
-
             klass.export_methods = export_methods
 
             if not klass.export_methods:
                 raise ValueError(f"ExportRow class {klass} has no @export_columns, make sure you annotate @export_column(), not @export_column")
-        return klass.export_methods
+
+        export_methods = klass.export_methods
+        if categories:
+            def passes_filter(export_method) -> bool:
+                nonlocal categories
+                export_categories = export_method.categories or dict()
+                for key, value in categories.items():
+                    if not export_categories.get(key) == value:
+                        return False
+                return True
+
+            export_methods = [em for em in export_methods if passes_filter(em)]
+
+        return export_methods
 
     @classmethod
     def _data_generator(cls, data: Iterable[Any]) -> Iterator[Any]:
@@ -883,16 +896,17 @@ class ExportRow:
             if row_data is None:
                 continue
             if not isinstance(row_data, cls):
+                # it's expected that the class can be initiated with each "row" in data
                 row_data = cls(row_data)
             yield row_data
 
     @classmethod
-    def csv_generator(cls, data: Iterable[Any], delimiter=',', include_header=True) -> Iterator[str]:
+    def csv_generator(cls, data: Iterable[Any], delimiter=',', include_header=True, categories: Optional[Dict[str, Any]] = None) -> Iterator[str]:
         try:
             if include_header:
-                yield delimited_row(cls.csv_header(), delimiter=delimiter)
+                yield delimited_row(cls.csv_header(), delimiter=delimiter, categories=categories)
             for row_data in cls._data_generator(data):
-                yield delimited_row(row_data.to_csv(), delimiter=delimiter)
+                yield delimited_row(row_data.to_csv(), delimiter=delimiter, categories=categories)
         except:
             from library.log_utils import report_exc_info
             report_exc_info(extra_data={"activity": "Exporting"})
@@ -915,25 +929,25 @@ class ExportRow:
             raise
 
     @classmethod
-    def csv_header(cls) -> List[str]:
+    def csv_header(cls, categories: Optional[Dict[str, Any]] = None) -> List[str]:
         row = list()
-        for method in ExportRow.get_export_methods(cls):
+        for method in ExportRow.get_export_methods(cls, categories=categories):
             label = method.label or method.__name__
             if sub_data := method.sub_data:
-                sub_header = sub_data.csv_header()
+                sub_header = sub_data.csv_header(categories=categories)
                 for sub in sub_header:
                     row.append(label + "." + sub)
             else:
                 row.append(label)
         return row
 
-    def to_csv(self) -> List[str]:
+    def to_csv(self, categories: Optional[Dict[str, Any]] = None) -> List[str]:
         row = list()
-        for method in ExportRow.get_export_methods(self.__class__):
+        for method in ExportRow.get_export_methods(self.__class__, categories=categories):
             result = method(self)
             if sub_data := method.sub_data:
                 if result is None:
-                    for entry in sub_data.csv_header():
+                    for entry in sub_data.csv_header(categories=categories):
                         row.append("")
                 else:
                     row += result.to_csv()
@@ -941,15 +955,15 @@ class ExportRow:
                 row.append(result)
         return row
 
-    def to_json(self) -> JsonObjType:
+    def to_json(self, categories: Optional[Dict[str, Any]] = None) -> JsonObjType:
         row = dict()
-        for method in ExportRow.get_export_methods(self.__class__):
+        for method in ExportRow.get_export_methods(self.__class__, categories=categories):
             result = method(self)
             value: Any
             if result is None:
                 value = None
             elif method.sub_data:
-                value = result.to_json()
+                value = result.to_json(categories=categories)
             else:
                 value = result
 
@@ -960,27 +974,27 @@ class ExportRow:
         return row
 
     @classmethod
-    def streaming(cls, request: HttpRequest, data: Iterable[Any], filename: str):
+    def streaming(cls, request: HttpRequest, data: Iterable[Any], filename: str, categories: Optional[Dict[str, Any]] = None):
         if request.GET.get('format') == 'json':
-            return cls.streaming_json(data, filename)
+            return cls.streaming_json(data, filename, categories=categories)
         else:
-            return cls.streaming_csv(data, filename)
+            return cls.streaming_csv(data, filename, categories=categories)
 
     @classmethod
-    def streaming_csv(cls, data: Iterable[Any], filename: str):
+    def streaming_csv(cls, data: Iterable[Any], filename: str, categories: Optional[Dict[str, Any]] = None):
         date_time = datetime.now(tz=timezone(settings.TIME_ZONE)).strftime("%Y-%m-%d")
 
-        response = StreamingHttpResponse(cls.csv_generator(data), content_type='text/csv')
+        response = StreamingHttpResponse(cls.csv_generator(data, categories=categories), content_type='text/csv')
         response['Content-Disposition'] = f'attachment; filename="{filename}_{settings.SITE_NAME}_{date_time}.csv"'
         return response
 
     @classmethod
-    def streaming_json(cls, data: Iterable[Any], filename: str, records_key: str = None):
+    def streaming_json(cls, data: Iterable[Any], filename: str, records_key: str = None, categories: Optional[Dict[str, Any]] = None):
         date_time = datetime.now(tz=timezone(settings.TIME_ZONE)).strftime("%Y-%m-%d")
 
         if not records_key:
             records_key = filename.replace(" ", "_")
 
-        response = StreamingHttpResponse(cls.json_generator(data, records_key), content_type='application/json')
+        response = StreamingHttpResponse(cls.json_generator(data, records_key, categories=categories), content_type='application/json')
         response['Content-Disposition'] = f'attachment; filename="{filename}_{settings.SITE_NAME}_{date_time}.json"'
         return response

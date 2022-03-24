@@ -65,17 +65,24 @@ class UsedKey:
         self.ekey = None
         self.has_value = False
         self.has_note = False
+        self.has_explain = False
 
 
 class UsedKeyTracker:
 
-    def __init__(self, user: User, ekeys: EvidenceKeyMap, key_value_formatter: KeyValueFormatter, pretty: bool = False):
+    def __init__(self,
+                 user: User,
+                 ekeys: EvidenceKeyMap,
+                 key_value_formatter: KeyValueFormatter,
+                 pretty: bool = False,
+                 include_explains: bool = False):
         self.user = user
         self.ekeys = ekeys
         self.key_value_formatter = key_value_formatter
-        self.calc_dict = {}
+        self.calc_dict: Dict[str, UsedKey] = dict()
         self.pretty = pretty
         self.ordered_keys = None
+        self.include_explains = include_explains
 
     def check_record(self, vcm: ClassificationModification):
         self.check_evidence(vcm.evidence)
@@ -87,8 +94,9 @@ class UsedKeyTracker:
             if isinstance(valueObj, collections.Mapping):
                 has_value = valueObj.get('value') is not None
                 has_note = valueObj.get('note') is not None
+                has_explain = valueObj.get('explain') is not None
 
-            if has_value or has_note:
+            if has_value or has_note or (self.include_explains and has_explain):
                 used_key = self.calc_dict.get(key)
                 if not used_key:
                     used_key = UsedKey()
@@ -96,6 +104,7 @@ class UsedKeyTracker:
 
                 used_key.has_value = used_key.has_value or has_value
                 used_key.has_note = used_key.has_note or has_note
+                used_key.has_explain = used_key.has_explain or has_explain
 
     def process(self):
         self.ordered_keys = []
@@ -107,16 +116,18 @@ class UsedKeyTracker:
 
     def header(self) -> List[str]:
         self.process()
-        cols = []
+        cols: List[str] = list()
         for used_key in self.ordered_keys:
             if used_key.has_value:
                 cols.append(self.key_value_formatter.header_for(used_key.ekey, pretty=self.pretty))
             if used_key.has_note:
                 cols.append(self.key_value_formatter.header_for(used_key.ekey, is_note=True, pretty=self.pretty))
+            if self.include_explains and used_key.has_explain:
+                cols.append(self.key_value_formatter.header_for(used_key.ekey, pretty=self.pretty) + '.explain')
         return cols
 
-    def row(self, classification_modification: ClassificationModification) -> List:
-        cols = []
+    def row(self, classification_modification: ClassificationModification) -> List[Optional[str]]:
+        cols: List[Optional[str]] = list()
         evidence = classification_modification.get_visible_evidence(self.user)
         for used_key in self.ordered_keys:
             value_obj = evidence.get(used_key.ekey.key)
@@ -131,6 +142,12 @@ class UsedKeyTracker:
                     cols.append(None)
                 else:
                     cols.append(value_obj.get('note'))
+            if self.include_explains and used_key.has_explain:
+                if not value_obj:
+                    cols.append(None)
+                else:
+                    cols.append(value_obj.get('explain'))
+
         return cols
 
 

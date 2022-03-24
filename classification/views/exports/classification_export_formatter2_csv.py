@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from io import StringIO
-from typing import List, Optional
+from typing import List, Optional, Dict
 
 from django.http import HttpRequest
 from lazy import lazy
@@ -15,14 +15,23 @@ from library.utils import delimited_row, export_column, ExportRow
 from snpdb.models import GenomeBuild
 
 
-@dataclass
+@dataclass(frozen=True)
 class FormatDetailsCSV:
+    # format evidence keys to nice human labels or leave as raw codes easier handled by code
     pretty: bool = False
+
+    # include the explain keys (text that lets labs explain their process), notes (human entered text) are always included
+    include_explains: bool = False
+
+    # exclude fields that change between environments, makes it easier to compare changes if the same data is in both environments
+    exclude_transient: bool = False
 
     @staticmethod
     def from_request(request: HttpRequest) -> 'FormatDetailsCSV':
         pretty = request.query_params.get('value_format') == 'labels'
-        return FormatDetailsCSV(pretty=pretty)
+        include_explains = request.query_params.get('include_explains') == 'true'
+        exclude_transient = request.query_params.get('exclude_transient') == 'true'
+        return FormatDetailsCSV(pretty=pretty, include_explains=include_explains, exclude_transient=exclude_transient)
 
 
 class RowID(ExportRow):
@@ -33,7 +42,7 @@ class RowID(ExportRow):
         self.message = message
         self.genome_build = genome_build
 
-    @export_column()
+    @export_column(categories={"transient": True})
     def id(self):
         return self.vc.id
 
@@ -45,11 +54,15 @@ class RowID(ExportRow):
     def lab_record_id(self):
         return self.vc.lab_record_id
 
-    @export_column()
+    @export_column(categories={"transient": True})
+    def internal_first_seen_date(self):
+        return self.vc.created.strftime("%Y-%m-%d")
+
+    @export_column(categories={"transient": True})
     def share_level(self):
         return self.cm.share_level_enum.label
 
-    @export_column()
+    @export_column(categories={"transient": True})
     def version(self):
         return self.cm.created.timestamp()
 
@@ -57,7 +70,7 @@ class RowID(ExportRow):
     def liftover_error(self):
         return self.message
 
-    @export_column()
+    @export_column(categories={"transient": True})
     def internal_allele_id(self):
         return self.vc.allele_id
 
@@ -96,7 +109,7 @@ class ClassificationMeta(ExportRow):
         self.discordance_status = discordance_status
         self.e_keys = e_keys
 
-    @export_column()
+    @export_column(categories={"transient": True})
     def resolved_condition(self):
         return (self.vc.condition_resolution_dict or {}).get('display_text')
 
@@ -112,7 +125,7 @@ class ClassificationMeta(ExportRow):
     def citations(self):
         return ', '.join([c.ref_id() for c in sorted(set(self.cm.citations), key=lambda c:c.sort_key)])
 
-    @export_column()
+    @export_column(categories={"transient": True})
     def discordance_status(self):
         if not self.discordance_status:
             return ''
@@ -142,7 +155,12 @@ class ClassificationExportFormatter2CSV(ClassificationExportFormatter2):
 
     @lazy
     def used_keys(self) -> UsedKeyTracker:
-        used_keys = UsedKeyTracker(self.classification_filter.user, self.e_keys, KeyValueFormatter(), pretty=self.format_details.pretty)
+        used_keys = UsedKeyTracker(
+            self.classification_filter.user,
+            self.e_keys, KeyValueFormatter(),
+            pretty=self.format_details.pretty,
+            include_explains=self.format_details.include_explains
+        )
         for evidence in self.classification_filter.cms_qs().values_list('published_evidence', flat=True):
             used_keys.check_evidence(evidence)
         return used_keys
@@ -155,7 +173,7 @@ class ClassificationExportFormatter2CSV(ClassificationExportFormatter2):
 
     def header(self) -> List[str]:
         self.errors_io = StringIO()
-        header = RowID.csv_header() + ClassificationMeta.csv_header() + self.used_keys.header()
+        header = RowID.csv_header(self._categories) + ClassificationMeta.csv_header(self._categories) + self.used_keys.header()
         return [delimited_row(header, delimiter=',')]
 
     def row(self, allele_data: AlleleData) -> List[str]:
@@ -177,10 +195,17 @@ class ClassificationExportFormatter2CSV(ClassificationExportFormatter2):
         else:
             return []
 
+    @lazy
+    def _categories(self) -> Optional[Dict]:
+        if self.format_details.exclude_transient:
+            return {"transient": None}
+        else:
+            return None
+
     def to_row(self, vcm: ClassificationModification, message=None) -> str:
         row_data = \
-            RowID(cm=vcm, genome_build=self.classification_filter.genome_build, message=message).to_csv() + \
-            ClassificationMeta(cm=vcm, discordance_status=self.classification_filter.is_discordant(vcm), e_keys=self.e_keys).to_csv() + \
+            RowID(cm=vcm, genome_build=self.classification_filter.genome_build, message=message).to_csv(categories=self._categories) + \
+            ClassificationMeta(cm=vcm, discordance_status=self.classification_filter.is_discordant(vcm), e_keys=self.e_keys).to_csv(categories=self._categories) + \
             self.used_keys.row(classification_modification=vcm)
 
         return delimited_row(row_data, delimiter=',')
