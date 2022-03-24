@@ -11,6 +11,7 @@ from classification.views.exports.classification_export_decorator import registe
 from classification.views.exports.classification_export_filter import AlleleData, ClassificationFilter, \
     DiscordanceReportStatus
 from classification.views.exports.classification_export_formatter2 import ClassificationExportFormatter2
+from classification.views.exports.classification_export_utils import CitationCounter
 from library.utils import delimited_row, export_column, ExportRow
 from snpdb.models import GenomeBuild
 
@@ -123,7 +124,9 @@ class ClassificationMeta(ExportRow):
 
     @export_column()
     def citations(self):
-        return ', '.join([c.ref_id() for c in sorted(set(self.cm.citations), key=lambda c:c.sort_key)])
+        cc = CitationCounter()
+        cc.reference_citations(self.cm)
+        return ', '.join([c.ref_id() for c in sorted(set(cc.citations()), key=lambda c:c.sort_key)])
 
     @export_column(categories={"transient": True})
     def discordance_status(self):
@@ -161,8 +164,11 @@ class ClassificationExportFormatter2CSV(ClassificationExportFormatter2):
             pretty=self.format_details.pretty,
             include_explains=self.format_details.include_explains
         )
-        for evidence in self.classification_filter.cms_qs().values_list('published_evidence', flat=True):
-            used_keys.check_evidence(evidence)
+        #for evidence in self.classification_filter.cms_qs().values_list('published_evidence', flat=True):
+        #    used_keys.check_evidence(evidence)
+        # todo cache cms_qs?
+        used_keys.check_evidence_qs(self.classification_filter.cms_qs())
+
         return used_keys
 
     def content_type(self) -> str:

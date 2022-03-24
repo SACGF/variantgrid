@@ -1,12 +1,13 @@
 import collections
 from collections import defaultdict
+from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
 from typing import List, Union, Iterable, Optional, Dict, Tuple, Set, Any
 
 from django.conf import settings
 from django.contrib.auth.models import User
-from django.db.models import Q
+from django.db.models import Q, Count
 from django.db.models.query import QuerySet
 from django.http.response import StreamingHttpResponse
 from django.utils.timezone import now
@@ -68,6 +69,36 @@ class UsedKey:
         self.has_explain = False
 
 
+@dataclass
+class KeyProperty:
+    key: str
+    property: str
+
+    @property
+    def field(self):
+        return f"published_evidence__{self.key}__{self.property}"
+
+    @property
+    def count_key(self):
+        return f"{self.field}__count"
+
+    def count_aggregate(self) -> Count:
+        return Count(f"{self.field}")
+
+    def apply_to(self, used_key_dict: Dict[str, UsedKey]):
+        used_key = used_key_dict.get(self.key)
+        if not used_key:
+            used_key = UsedKey()
+            used_key_dict[self.key] = used_key
+
+        if self.property == 'value':
+            used_key.has_value = True
+        elif self.property == 'note':
+            used_key.has_note = True
+        elif self.property == 'explain':
+            used_key.has_explain = True
+
+
 class UsedKeyTracker:
 
     def __init__(self,
@@ -83,6 +114,25 @@ class UsedKeyTracker:
         self.pretty = pretty
         self.ordered_keys = None
         self.include_explains = include_explains
+
+    def all_key_properties(self) -> List[KeyProperty]:
+        all_props: List[KeyProperty] = list()
+        properties = ['value', 'note']
+        if self.include_explains:
+            properties.append('explain')
+        for e_key in self.ekeys.all_keys:
+            for prop in properties:
+                all_props.append(KeyProperty(key=e_key.key, property=prop))
+        return all_props
+
+    def check_evidence_qs(self, qs: QuerySet[ClassificationModification]):
+        all_key_properties = self.all_key_properties()
+        aggregate_list = [kp.count_aggregate() for kp in all_key_properties]
+        result_dict = qs.aggregate(*aggregate_list)
+        print(result_dict)
+        for kp in all_key_properties:
+            if result_dict.get(kp.count_key):
+                kp.apply_to(self.calc_dict)
 
     def check_record(self, vcm: ClassificationModification):
         self.check_evidence(vcm.evidence)

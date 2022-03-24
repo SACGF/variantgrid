@@ -163,6 +163,7 @@ class EvidenceMixin:
         Returns the entire list of citations through the evidence
         :return: A list of Citations
         """
+        # NOTE using CitationCounter is much more efficient
         citations = []
         for db_ref in self.db_refs:
             source = CitationSource.CODES.get(db_ref.get('db'))

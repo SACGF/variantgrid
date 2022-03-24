@@ -38,7 +38,7 @@ class CitationCounter:
                 stub = CitationStub(source=source, idx=idx)
                 self.all_citations[stub].add(cm.classification.lab.name)
 
-    def ordered_references(self) -> Iterable[Tuple[CitationDetails, List[Any]]]:
+    def citations(self) -> List[Citation]:
         citations: List[Citation] = list()
 
         by_source: Dict[str, List[str]] = defaultdict(list)
@@ -48,14 +48,18 @@ class CitationCounter:
         # bulk select and select cachedcitation since we're going to be asking for that soon
         for source, keys in by_source.items():
             found = set()
-            for cit in Citation.objects.select_related('cachedcitation').filter(citation_source=source, citation_id__in=keys):
+            for cit in Citation.objects.select_related('cachedcitation').filter(citation_source=source,
+                                                                                citation_id__in=keys):
                 found.add(cit.citation_id)
                 citations.append(cit)
 
             for check in keys:
                 if check not in found:
                     citations.append(Citation.objects.create(citation_source=source, citation_id=check))
+        return citations
 
+    def ordered_references(self) -> Iterable[Tuple[CitationDetails, List[Any]]]:
+        citations = self.citations()
         details = get_citations(citations)
 
         for citation_detail in details:
