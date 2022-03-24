@@ -3,6 +3,7 @@ more-itertools
 beautifulsoup4
 bgzip
 Bio
+cdot
 celery
 ConfigArgParse
 cyvcf2>=0.30.14

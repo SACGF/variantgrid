@@ -443,12 +443,7 @@ class HGVSMatcher:
 
     @staticmethod
     def _create_pyhgvs_transcript(transcript_version: TranscriptVersion):
-        # Legacy data stored gene_name in JSON, but that could lead to diverging values vs TranscriptVersion relations
-        # so use DB as source of truth and replace into PyHGVS at last minute
-        if transcript_version.gene_symbol:
-            transcript_version.data["gene_name"] = str(transcript_version.gene_symbol)
-        transcript_version.data["id"] = transcript_version.accession
-        return make_transcript(transcript_version.data)
+        return make_transcript(transcript_version.pyhgvs_data)
 
     def _get_pyhgvs_transcript(self, transcript_name):
         return self._get_transcript_version_and_pyhgvs_transcript(transcript_name)[1]
