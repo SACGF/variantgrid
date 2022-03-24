@@ -142,6 +142,9 @@ class LabForm(forms.ModelForm, ROFormMixin):
             "city": TextInput(),
             "state": TextInput(),
             "country": TextInput(),
+            "contact_name": TextInput(),
+            "contact_email": TextInput(),
+            "contact_phone": TextInput(),
             "url": TextInput(),
             "css_class": TextInput(),
             "group_name": TextInput(),
@@ -150,16 +153,23 @@ class LabForm(forms.ModelForm, ROFormMixin):
             "slack_webhook": URLInput()
         }
         labels = {
+            "email": "Group Email",
             "url": "URL",
             "clinvar_key": "ClinVar Key",
             "group_name": "Group Name",
             "organization": "Organisation",  # really need to do translations, even if just en-US vs en-UK
             "upload_location": "Upload Location",
             "upload_auto_pattern": "Upload Auto Pattern",
-            "slack_webhook": "Slack Webhook"
+            "slack_webhook": "Slack Webhook",
+            "contact_name": "Contact Name",
+            "contact_email": "Contact Email",
+            "contact_phone": "Contact Phone"
         }
         help_texts = {
             "email": "Lab wide email for discordance and general communications.",
+            "contact_name": "Name of contact person available for other labs to contact (if applicable)",
+            "contact_email": "Email address to be provided to other labs when needing to communicate",
+            "contact_phone": "Phone number to be provided to other labs when needing to communicate",
             "upload_location": "If provided, classification uploads can be done via the classifications/upload page.",
             "upload_auto_pattern": "If provided, then uploading files that match this pattern will be automatically processed, otherwise there will be a delay for manual review.",
             "slack_webhook": "If provided, discordance and general communications can be posted to your Slack instance. Should look like https://hooks.slack.com/services/ABC/DEF/GHI",

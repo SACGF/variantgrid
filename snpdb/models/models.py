@@ -372,6 +372,10 @@ class Lab(models.Model):
     lat = models.FloatField(null=True, blank=True)
     long = models.FloatField(null=True, blank=True)
 
+    contact_name = models.TextField(blank=True)
+    contact_phone = models.TextField(blank=True)
+    contact_email = models.TextField(blank=True)
+
     clinvar_key = models.ForeignKey(ClinVarKey, null=True, blank=True, on_delete=SET_NULL)
 
     group_name = models.TextField(blank=True, null=True, unique=True)
