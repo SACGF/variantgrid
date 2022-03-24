@@ -141,7 +141,8 @@ class ModelAdminBasics(admin.ModelAdmin):
 
         if actions:
             actions.sort(key=lambda x: x.line_number)
-            cls.actions = ['export_as_csv'] + actions
+
+        cls.actions = ['export_as_csv'] + actions
         return super().__new__(cls)
 
     def is_readonly_field(self, f) -> bool:
