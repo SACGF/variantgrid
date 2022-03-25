@@ -20,7 +20,8 @@ from classification.enums.discordance_enums import DiscordanceReportResolution
 from classification.models import ClassificationModification, Classification, classification_flag_types, \
     DiscordanceReport, ClinicalContext
 from flags.models import FlagsMixin, Flag, FlagComment, FlagStatus
-from snpdb.models import GenomeBuild, Lab, Organization, allele_flag_types, Allele, Variant
+from library.utils import batch_iterator
+from snpdb.models import GenomeBuild, Lab, Organization, allele_flag_types, Allele, Variant, VariantAllele
 
 
 @dataclass
@@ -66,17 +67,36 @@ class AlleleData:
     allele_id: int
     all_cms: List[ClassificationIssue] = field(default_factory=list)
 
-    @lazy
+    cached_allele: Optional[Allele] = None
+    cached_variant: Optional[Variant] = None
+
+    @staticmethod
+    def pre_process(batch: List['AlleleData']):
+        if batch:
+            genome_build = batch[0].genome_build
+            allele_ids = [ad.allele_id for ad in batch]
+            alleles = Allele.objects.filter(pk__in=allele_ids).select_related('clingen_allele')
+            allele_dict = {allele.pk: allele for allele in alleles}
+            variant_alleles = VariantAllele.objects.filter(allele_id__in=allele_ids, genome_build=genome_build).select_related('variant', 'variant__locus', 'variant__locus__contig', 'variant__locus__ref', 'variant__alt')
+            variant_dict = {variant_allele.allele_id: variant_allele.variant for variant_allele in variant_alleles}
+
+            for ad in batch:
+                ad.cached_allele = allele_dict.get(ad.allele_id)
+                ad.cached_variant = variant_dict.get(ad.allele_id)
+
+    @property
     def allele(self) -> Allele:
-        return Allele.objects.filter(pk=self.allele_id).select_related('clingen_allele').first()
+        # return Allele.objects.filter(pk=self.allele_id).select_related('clingen_allele').first()
+        return self.cached_allele
 
     @lazy
     def variant(self) -> Optional[Variant]:
-        if allele := self.allele:
-            try:
-                return self.allele.variant_for_build(genome_build=self.genome_build, best_attempt=True)
-            except ValueError:
-                pass
+        return self.cached_variant
+        # if allele := self.allele:
+        #    try:
+        #        return self.allele.variant_for_build(genome_build=self.genome_build, best_attempt=True)
+        #    except ValueError:
+        #        pass
 
     @property
     def genome_build(self) -> GenomeBuild:
@@ -463,6 +483,12 @@ class ClassificationFilter:
 
         if allele_data:
             yield allele_data
+
+    def allele_data_filtered_pre_processed(self) -> Iterator[AlleleData]:
+        for batch in batch_iterator(self.allele_data_filtered(), batch_size=100):
+            AlleleData.pre_process(batch)
+            for data in batch:
+                yield data
 
     def allele_data_filtered(self) -> Iterator[AlleleData]:
         """

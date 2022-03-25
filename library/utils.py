@@ -342,13 +342,16 @@ def html_link(url: str, title: str) -> SafeString:
     return mark_safe(f"<a href='{url}'>{html.escape(title)}</a>")
 
 
-def batch_iterator(iterable, batch_size: int = 10):
-    batch = []
+T = TypeVar("T")
+
+
+def batch_iterator(iterable: Iterable[T], batch_size: int = 10) -> List[T]:
+    batch: List[T] = list()
     for record in iterable:
         batch.append(record)
         if len(batch) >= batch_size:
             yield batch
-            batch = []
+            batch = list()
     if batch:
         yield batch
 
@@ -904,9 +907,9 @@ class ExportRow:
     def csv_generator(cls, data: Iterable[Any], delimiter=',', include_header=True, categories: Optional[Dict[str, Any]] = None) -> Iterator[str]:
         try:
             if include_header:
-                yield delimited_row(cls.csv_header(), delimiter=delimiter, categories=categories)
+                yield delimited_row(cls.csv_header(categories=categories), delimiter=delimiter)
             for row_data in cls._data_generator(data):
-                yield delimited_row(row_data.to_csv(), delimiter=delimiter, categories=categories)
+                yield delimited_row(row_data.to_csv(categories=categories), delimiter=delimiter)
         except:
             from library.log_utils import report_exc_info
             report_exc_info(extra_data={"activity": "Exporting"})

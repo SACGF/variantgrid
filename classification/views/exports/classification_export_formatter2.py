@@ -87,7 +87,7 @@ class ClassificationExportFormatter2(ABC):
 
     def _peekable_data(self) -> peekable:  # peekable[List[str]]
         def row_iterator():
-            for allele_data in self.classification_filter.allele_data_filtered():
+            for allele_data in self.classification_filter.allele_data_filtered_pre_processed():
                 if rows := self.row(allele_data):
                     yield rows
         return peekable(row_iterator())
@@ -175,7 +175,7 @@ class ClassificationExportFormatter2(ABC):
         try:
             for header in self.header():
                 yield header
-            for allele_data in self.classification_filter.allele_data_filtered():
+            for allele_data in self.classification_filter.allele_data_filtered_pre_processed():
 
                 row_data = self.row(allele_data)
                 for row in row_data:
