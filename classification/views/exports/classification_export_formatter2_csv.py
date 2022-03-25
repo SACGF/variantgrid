@@ -37,11 +37,15 @@ class FormatDetailsCSV:
 
 class RowID(ExportRow):
 
-    def __init__(self, cm: ClassificationModification, genome_build: GenomeBuild, message: Optional[str] = None):
+    def __init__(self, cm: ClassificationModification, allele_data: AlleleData, message: Optional[str] = None):
         self.cm = cm
         self.vc = cm.classification
         self.message = message
-        self.genome_build = genome_build
+        self.allele_data = allele_data
+
+    @property
+    def genome_build(self) -> GenomeBuild:
+        return self.allele_data.genome_build
 
     @export_column(categories={"transient": True})
     def id(self):
@@ -73,11 +77,11 @@ class RowID(ExportRow):
 
     @export_column(categories={"transient": True})
     def internal_allele_id(self):
-        return self.vc.allele_id
+        return self.allele_data.allele_id
 
     @export_column()
     def resolved_clingen_allele_id(self):
-        if allele := self.vc.allele:
+        if allele := self.allele_data.allele:
             return str(allele.clingen_allele)
 
     @export_column()
@@ -91,12 +95,8 @@ class RowID(ExportRow):
 
     @export_column()
     def target_variant_coordinate(self):
-        try:
-            if allele := self.vc.allele:
-                if variant := allele.variant_for_build(genome_build=self.genome_build, best_attempt=True):
-                    return str(variant)
-        except ValueError:
-            pass
+        if variant := self.allele_data.variant:
+            return str(variant)
 
 
 class ClassificationMeta(ExportRow):
@@ -187,10 +187,10 @@ class ClassificationExportFormatter2CSV(ClassificationExportFormatter2):
         # record error to report them in the footer
         if issues := allele_data.issues:
             for issue in issues:
-                self.errors_io.writelines(self.to_row(issue.classification, message=issue.message))
+                self.errors_io.writelines(self.to_row(issue.classification,  allele_data=allele_data, message=issue.message))
         rows = []
         for vcm in allele_data.cms:
-            rows.append(self.to_row(vcm))
+            rows.append(self.to_row(vcm, allele_data=allele_data))
 
         return rows
 
@@ -209,9 +209,9 @@ class ClassificationExportFormatter2CSV(ClassificationExportFormatter2):
         else:
             return None
 
-    def to_row(self, vcm: ClassificationModification, message=None) -> str:
+    def to_row(self, vcm: ClassificationModification, allele_data: AlleleData, message=None) -> str:
         row_data = \
-            RowID(cm=vcm, genome_build=self.classification_filter.genome_build, message=message).to_csv(categories=self._categories) + \
+            RowID(cm=vcm, allele_data=allele_data, message=message).to_csv(categories=self._categories) + \
             ClassificationMeta(cm=vcm, discordance_status=self.classification_filter.is_discordant(vcm), e_keys=self.e_keys).to_csv(categories=self._categories) + \
             self.used_keys.row(classification_modification=vcm)
 

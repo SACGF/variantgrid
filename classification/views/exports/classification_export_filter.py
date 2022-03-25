@@ -20,7 +20,7 @@ from classification.enums.discordance_enums import DiscordanceReportResolution
 from classification.models import ClassificationModification, Classification, classification_flag_types, \
     DiscordanceReport, ClinicalContext
 from flags.models import FlagsMixin, Flag, FlagComment, FlagStatus
-from snpdb.models import GenomeBuild, Lab, Organization, allele_flag_types, Allele
+from snpdb.models import GenomeBuild, Lab, Organization, allele_flag_types, Allele, Variant
 
 
 @dataclass
@@ -65,6 +65,18 @@ class AlleleData:
     source: 'ClassificationFilter'
     allele_id: int
     all_cms: List[ClassificationIssue] = field(default_factory=list)
+
+    @lazy
+    def allele(self) -> Allele:
+        return Allele.objects.filter(pk=self.allele_id).select_related('clingen_allele').first()
+
+    @lazy
+    def variant(self) -> Optional[Variant]:
+        if allele := self.allele:
+            try:
+                return self.allele.variant_for_build(genome_build=self.genome_build, best_attempt=True)
+            except ValueError:
+                pass
 
     @property
     def genome_build(self) -> GenomeBuild:
