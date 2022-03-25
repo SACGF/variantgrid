@@ -129,7 +129,6 @@ class UsedKeyTracker:
         all_key_properties = self.all_key_properties()
         aggregate_list = [kp.count_aggregate() for kp in all_key_properties]
         result_dict = qs.aggregate(*aggregate_list)
-        print(result_dict)
         for kp in all_key_properties:
             if result_dict.get(kp.count_key):
                 kp.apply_to(self.calc_dict)

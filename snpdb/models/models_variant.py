@@ -63,7 +63,7 @@ class Allele(FlagsMixin, models.Model):
         return error
 
     def variant_alleles(self):
-        return self.variantallele_set.order_by("genome_build__name")
+        return self.variantallele_set.select_related('variant__locus', 'variant__locus__contig').order_by("genome_build__name")
 
     @lazy
     def grch37(self) -> Optional['Variant']:

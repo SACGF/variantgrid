@@ -17,6 +17,16 @@ class CitationStub:
     source: str
     idx: str
 
+    def __str__(self):
+        prefix: str
+        if self.source == CitationSource.PUBMED.value:
+            prefix = CitationSource.PUBMED.label  # would be better off as PMID
+        elif self.source == CitationSource.PUBMED_CENTRAL.value:
+            prefix = CitationSource.PUBMED_CENTRAL.label
+        elif self.source == CitationSource.NCBI_BOOKSHELF.value:
+            prefix = CitationSource.NCBI_BOOKSHELF.label
+        return f"{prefix}:{self.idx}"
+
     def __lt__(self, other):
         if self.source < other.source:
             return True
@@ -37,6 +47,9 @@ class CitationCounter:
                 idx = db_ref.get('idx')
                 stub = CitationStub(source=source, idx=idx)
                 self.all_citations[stub].add(cm.classification.lab.name)
+
+    def citation_ids(self) -> List[str]:
+        return [str(stub) for stub in sorted(set(self.all_citations.keys()))]
 
     def citations(self) -> List[Citation]:
         citations: List[Citation] = list()

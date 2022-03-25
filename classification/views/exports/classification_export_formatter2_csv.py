@@ -126,7 +126,8 @@ class ClassificationMeta(ExportRow):
     def citations(self):
         cc = CitationCounter()
         cc.reference_citations(self.cm)
-        return ', '.join([c.ref_id() for c in sorted(set(cc.citations()), key=lambda c:c.sort_key)])
+        return ', '.join(cc.citation_ids())
+        # return ', '.join([c.ref_id() for c in sorted(set(cc.citations()), key=lambda c:c.sort_key)])
 
     @export_column(categories={"transient": True})
     def discordance_status(self):
