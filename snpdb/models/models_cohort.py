@@ -362,6 +362,14 @@ class CohortGenotypeCollection(RelatedModelsPartitionModel):
     # common filter will be set on the 'common' CGC
     common_filter = models.ForeignKey(CohortGenotypeCommonFilterVersion, null=True, on_delete=PROTECT)
 
+    def percent_common(self) -> float:
+        common = self.common_collection.cohortgenotype_set.count()
+        rare = self.cohortgenotype_set.count()
+        total = rare + common
+        if total:
+            return 100 * common / (rare + common)
+        return 0
+
     @property
     def cohortgenotype_alias(self):
         return f"cohortgenotype_{self.pk}"

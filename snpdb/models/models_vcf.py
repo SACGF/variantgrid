@@ -178,6 +178,9 @@ class VCF(models.Model):
     def delete_internal_data(self):
         """ Remove internal data but keep VCF and samples for reloading in place """
 
+        # Remove VCF filters - some old ones had diff symbol/filter combos that cause errors trying to re-use
+        self.vcffilter_set.all().delete()
+
         for sample in self.sample_set.all():
             sample.delete_internal_data()
 
