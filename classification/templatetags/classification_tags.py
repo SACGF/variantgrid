@@ -21,6 +21,7 @@ from classification.models.discordance_models import DiscordanceReport
 from classification.models.evidence_key import EvidenceKey, EvidenceKeyMap
 from classification.models.evidence_mixin import VCDbRefDict
 from genes.hgvs import CHGVS
+from genes.models import GeneSymbol
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import VariantAllele, Lab
 from snpdb.models.models_genome import GenomeBuild, Contig, GenomeFasta
@@ -104,6 +105,10 @@ def classification_groups(
 
     tag_context["logging_key"] = ""
     if context_object:
+        # in some contexts we get a string instead of Gene Symbol
+        if isinstance(context_object, str):
+            if gene_symbol := GeneSymbol.objects.filter(symbol=context_object).first():
+                context_object = gene_symbol
         try:
             logging_key = context_object.metrics_logging_key
             tag_context["logging_key"] = f"&{logging_key[0]}={logging_key[1]}"
