@@ -120,6 +120,8 @@ class BulkInserter:
 
             debug_timer.tick("Security Check")
 
+            # note we don't actually use ForceUpdate for anything at the moment
+            # at one time (never in prod) was used to stop changes to only source ID, curation date
             force: Optional[ForceUpdate] = None
             if force_str := data.pop('force', None):
                 try:
@@ -213,8 +215,9 @@ class BulkInserter:
                         debug_timer.tick("Publish Complete")
                 else:
                     ignore_if_only_patch: Optional[Set[str]] = None
-                    if source == SubmissionSource.API and not force:
-                        ignore_if_only_patch = {"curation_date", "source_id"}
+                    ## if some updates are not-meaningful and by themselves shouldn't cause a new version of the record to be made
+                    # if source == SubmissionSource.API and not force:
+                    #     ignore_if_only_patch = {"curation_date", "source_id"}
 
                     # patching existing records
                     record = record_ref.record
