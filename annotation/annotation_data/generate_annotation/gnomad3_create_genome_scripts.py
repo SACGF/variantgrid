@@ -51,8 +51,7 @@ def main(args):
         chrom_scripts.append(chrom_script)
         with open(chrom_script, "w") as cs:
             cs.write(bash_header)
-
-            url = f"https://storage.googleapis.com/gcp-public-data--gnomad/release/3.1/vcf/genomes/gnomad.genomes.v3.1.sites.chr{chrom}.vcf.bgz"
+            url = f"https://storage.googleapis.com/gcp-public-data--gnomad/release/3.1.2/vcf/genomes/gnomad.genomes.v3.1.3.sites.chr{chrom}.vcf.bgz"
             output_vcf = f"{prefix}.filtered_info.vcf.gz"
             if args.chrom_mapping_file:
                 annotate_args = f"--rename-chrs={args.chrom_mapping_file}"
@@ -101,7 +100,9 @@ def write_vcf_header():
 def get_columns():
     columns = COUNTS + OTHER_INFOS
     for g in GNOMAD_SUB_POPS:
-        columns.append(f"AF-{g.lower()}")  # gnomAD 3 changed from underscore to dash
+        # gnomAD 3 changed from underscore to dash
+        # 3.1.2 changed back to underscore
+        columns.append(f"AF_{g.lower()}")
     return columns
 
 
