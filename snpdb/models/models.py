@@ -8,7 +8,8 @@ etc and things that don't fit anywhere else.
 import json
 import logging
 import re
-from datetime import datetime
+from dataclasses import dataclass
+from datetime import datetime, timedelta
 from functools import total_ordering
 from re import RegexFlag
 from typing import List, TypedDict, Optional
@@ -361,6 +362,19 @@ class State(models.Model):
     def __str__(self):
         return self.name
 
+
+@dataclass
+class ContactDetails:
+    website: Optional[str] = ""
+    name: Optional[str] = ""
+    phone: Optional[str] = ""
+    email: Optional[str] = ""
+
+    def __bool__(self):
+        # contact name by its self isn't useful
+        return bool(self.website) or bool(self.phone) or bool(self.email)
+
+
 class Lab(models.Model):
     name = models.TextField()
     external = models.BooleanField(default=False, blank=True)  # From somewhere else, eg Shariant
@@ -403,14 +417,23 @@ class Lab(models.Model):
         ordering = ['name']
 
     @property
-    def group(self):
+    def contact_details(self) -> ContactDetails:
+        return ContactDetails(
+            name=self.contact_name,
+            phone=self.contact_phone,
+            email=self.contact_email,
+            website=self.url
+        )
+
+    @property
+    def group(self) -> Optional[Group]:
         if self.group_name:
             group, _ = Group.objects.get_or_create(name=self.group_name)
             return group
         return None
 
     @property
-    def group_institution(self):
+    def group_institution(self) -> Optional[Group]:
         if self.group_name:
             parts = self.group_name.split('/')
             if len(parts) >= 2:
@@ -419,11 +442,11 @@ class Lab(models.Model):
                 return group
 
     @lazy
-    def active_users(self):
+    def active_users(self) -> QuerySet[User]:
         return self.group.user_set.filter(is_active=True)
 
     @lazy
-    def lab_users(self):
+    def lab_users(self) -> List[User]:
         users = list(self.group.user_set.filter(is_active=True))
         heads = set(self.labhead_set.values_list('user_id', flat=True))
         lab_users: List[LabUser] = list()
@@ -436,11 +459,11 @@ class Lab(models.Model):
         return lab_users
 
     @lazy
-    def shared_classifications(self):
+    def shared_classifications(self) -> QuerySet['Classification']:
         return self.classification_set.filter(share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS).exclude(withdrawn=True)
 
     @lazy
-    def classifications(self):
+    def classifications(self) -> QuerySet['Classification']:
         """ Shared or all classifications based on settings.VARIANT_CLASSIFICATION_STATS_USE_SHARED """
         if settings.VARIANT_CLASSIFICATION_STATS_USE_SHARED:
             qs = self.shared_classifications
@@ -449,7 +472,7 @@ class Lab(models.Model):
         return qs
 
     @lazy
-    def total_classifications(self):
+    def total_classifications(self) -> int:
         """ Total 'classifications' as per above method """
         return self.classifications.count()
 
@@ -463,11 +486,11 @@ class Lab(models.Model):
         return all_classifications - self.total_shared_classifications
 
     @lazy
-    def classifications_by_created(self) -> QuerySet:
+    def classifications_by_created(self) -> QuerySet['Classification']:
         return self.classifications.order_by("created")
 
     @lazy
-    def classifications_by_modified(self) -> QuerySet:
+    def classifications_by_modified(self) -> QuerySet['Classification']:
         return self.classifications.order_by("-modified")
 
     @property
@@ -475,7 +498,7 @@ class Lab(models.Model):
         return self.classification_set.filter(share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS).values_list('created', flat=True).order_by('created').first()
 
     @lazy
-    def classifications_per_day(self):
+    def classifications_per_day(self) -> float:
         try:
             latest = now()
             days = (latest - self.first_classification_ever_shared_date).days
@@ -487,11 +510,11 @@ class Lab(models.Model):
         return cpd
 
     @lazy
-    def classifications_per_week(self):
+    def classifications_per_week(self) -> float:
         return self.classifications_per_day * 7
 
     @staticmethod
-    def valid_labs_qs(user: User, admin_check=False) -> QuerySet:
+    def valid_labs_qs(user: User, admin_check=False) -> QuerySet['Lab']:
         # as organization is used for sorting, it's generally always a good idea to select related it
         if admin_check and user.is_superuser:
             return Lab.objects.select_related('organization')
@@ -499,7 +522,9 @@ class Lab(models.Model):
         group_names = list(user.groups.values_list('name', flat=True))
         return Lab.objects.select_related('organization').filter(group_name__in=group_names).order_by('name')
 
-    def classifications_activity(self, time_period):
+    """
+    # these methods have been superseeded by having full classification activity by lab
+    def classifications_activity(self, time_period: timedelta):
         trunc_func = TimePeriod.truncate_func(time_period)
         qs = self.classifications.annotate(time_period=trunc_func("created")).values("time_period") \
             .annotate(num_classifications=Count("id")).order_by("-time_period")
@@ -507,11 +532,12 @@ class Lab(models.Model):
 
     def classifications_activity_by_day(self):
         return self.classifications_activity(TimePeriod.DAY)
+    """
 
-    def is_member(self, user: User, admin_check=False):
+    def is_member(self, user: User, admin_check=False) -> bool:
         return self.valid_labs_qs(user=user, admin_check=admin_check).filter(pk=self.pk).exists()
 
-    def can_write(self, user: User):
+    def can_write(self, user: User) -> bool:
         return user.is_superuser or self.labhead_set.filter(user=user).exists()
 
     def check_can_write(self, user):

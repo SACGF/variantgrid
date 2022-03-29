@@ -155,10 +155,12 @@ class DiscordanceReport(TimeStampedModel):
             all_lab_ids.add(lab_id)
         return list(Lab.objects.filter(id__in=all_lab_ids).all())
 
+    def all_actively_involved_labs_ids(self) -> str:
+        return ";".join(str(lab.pk) for lab in self.all_actively_involved_labs())
+
     def user_is_involved(self, user: User) -> bool:
         if user.is_superuser:
             return True
-
         user_labs = set(Lab.valid_labs_qs(user, admin_check=True))
         report_labs = set(self.all_actively_involved_labs())
         return bool(user_labs.intersection(report_labs))

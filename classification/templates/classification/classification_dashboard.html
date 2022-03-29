@@ -44,6 +44,34 @@
         $('.dataTable').on('draw.dt', () => {
             Flags.instance.init({userId: '{{user.id}}', filter: '.active', forceRender: true});
         });
+
+        $('input[name=discordances-filter]').click(() => {
+            let selected = $("input[name=discordances-filter]:checked").val();
+            let isInternal = selected == "{{ dlab.lab_id }}";
+            $('.contact-details').hide();
+            $(`.contact-details[data-lab=${selected}]`).show();
+            $('.discordance-row').each((index, row) => {
+                row = $(row);
+                let show = false;
+                if (selected == "0") {
+                    show = true;
+                } else {
+                    let labs = row.attr('data-labs').split(";");
+                    if (isInternal) {
+                        show = labs.length == 1 && labs[0] == selected;
+                    } else {
+                        show = labs.includes(selected);
+                    }
+                }
+                if (show) {
+
+                    row.show();
+                } else {
+
+                    row.hide();
+                }
+            });
+        });
     });
 </script>
 <div class="container">
@@ -109,14 +137,73 @@
             {% if not discordance_qs %}
                 <div class="no-value">There are no outstanding discordances for this lab {{ 'S' | severity_icon }}</div>
             {% else %}
-                <ul class="list-group mb-4">
+                {% if dlab.labs_to_discordance_counts %}
+                    <ul class="list-group mb-4">
+                        <li class="list-group-item">
+                            <label class="form-check" for="discordances-filter-all">
+                                <input class="form-check-input" type="radio" name="discordances-filter" id="discordances-filter-all" value="0" checked />
+                                <span class="form-check-label">
+                                Show all discordances
+                                </span>
+                            </label>
+                        </li>
+                        {% for lab_count in dlab.labs_to_discordance_counts %}
+                        <li class="list-group-item">
+                            {% if lab_count.is_your_lab %}
+                                <label class="form-check" for="discordances-filter-{{ lab_count.lab.pk }}">
+                                    <input class="form-check-input" type="radio" name="discordances-filter" id="discordances-filter-{{ lab_count.lab.pk }}" value="{{ lab_count.lab.pk }}" />
+                                    <span class="form-check-label">
+                                        <span style="font-weight:500">Internal Only</span> discordances account for <strong>{{ lab_count.count }}</strong> of these discordances
+                                    </span>
+                                </label>
+                            {% else %}
+                                <label class="form-check" for="discordances-filter-{{ lab_count.lab.pk }}">
+                                    <input class="form-check-input" type="radio" name="discordances-filter" id="discordances-filter-{{ lab_count.lab.pk }}" value="{{ lab_count.lab.pk }}" />
+                                    <span class="form-check-label">
+                                        <span style="font-weight:500">{% lab lab_count.lab %}</span> are involved in <strong>{{ lab_count.count }}</strong> of these discordances
+                                    </span>
+                                    {% with contact=lab_count.lab.contact_details %}
+                                        {% if contact %}
+                                            <div class="float-right">
+                                                {% if contact.website %}<i class="fas fa-globe"></i>{% endif %}
+                                                {% if contact.email %}<i class="fas fa-envelope"></i>{% endif %}
+                                                {% if contact.phone %}<i class="fas fa-phone"></i>{% endif %}
+                                            </div>
+                                        {% endif %}
+                                    {% endwith %}
+                                </label>
+                            {% endif %}
+                        </li>
+                        {% endfor %}
+                    </ul>
+
                     {% for lab_count in dlab.labs_to_discordance_counts %}
-                    <li class="list-group-item">
-                        {% if lab_count.is_your_lab %}<span style="font-weight:500">Internal Only</span> discordances account for <strong>{{ lab_count.count }}</strong> of these discordances
-                        {% else %}<span style="font-weight:500">{% lab lab_count.lab %}</span> are involved in <strong>{{ lab_count.count }}</strong> of these discordances{% endif %}
-                    </li>
+                        {% with lab=lab_count.lab %}
+                            {% if lab.id != dlab.lab_id %}
+                                {% with contact=lab.contact_details %}
+                                    {% if contact %}
+                                        <div class="contact-details mb-4" style="display:none" data-lab="{{ lab.id }}">
+
+                                                {% if contact.website %}
+                                                    {% labelled label="Website" hint="tiny" %}<a href="{{ contact.website }}">{{ contact.website }}</a>{% endlabelled %}
+                                                {% endif %}
+                                                {% if contact.name %}
+                                                    {% labelled label="Contact Person" hint="tiny" %}{{ contact.name }}{% endlabelled %}
+                                                {% endif %}
+                                                {% if contact.phone %}
+                                                    {% labelled label="Contact Phone" hint="tiny" %}{{ contact.phone }}{% endlabelled %}
+                                                {% endif %}
+                                                {% if contact.email %}
+                                                    {% labelled label="Contact Email" hint="tiny" %}<a href="mailto:{{ contact.email }}">{{ contact.email }}</a>{% endlabelled %}
+                                                {% endif %}
+                                        </div>
+                                    {% endif %}
+                                {% endwith %}
+                            {% endif %}
+                        {% endwith %}
                     {% endfor %}
-                </ul>
+                {% endif %}
+
                 <table class="table">
                     <thead>
                         <tr>
@@ -128,7 +215,7 @@
                     </thead>
                     <tbody>
                     {% for dr in discordance_qs %}
-                        <tr>
+                        <tr class="discordance-row" data-labs="{{ dr.all_actively_involved_labs_ids }}">
                             <td class="text-center"><a href="{% url 'discordance_report' dr.id %}" class="hover-link">DR_{{ dr.id }}</a></td>
                             <td>{% timestamp dr.created %}</td>
                             <td>{% for c_hgvs in dr.all_c_hgvs %}
