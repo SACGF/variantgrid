@@ -184,18 +184,18 @@
                                     {% if contact %}
                                         <div class="contact-details mb-4" style="display:none" data-lab="{{ lab.id }}">
 
-                                                {% if contact.website %}
-                                                    {% labelled label="Website" hint="tiny" %}<a href="{{ contact.website }}">{{ contact.website }}</a>{% endlabelled %}
-                                                {% endif %}
-                                                {% if contact.name %}
-                                                    {% labelled label="Contact Person" hint="tiny" %}{{ contact.name }}{% endlabelled %}
-                                                {% endif %}
-                                                {% if contact.phone %}
-                                                    {% labelled label="Contact Phone" hint="tiny" %}{{ contact.phone }}{% endlabelled %}
-                                                {% endif %}
-                                                {% if contact.email %}
-                                                    {% labelled label="Contact Email" hint="tiny" %}<a href="mailto:{{ contact.email }}">{{ contact.email }}</a>{% endlabelled %}
-                                                {% endif %}
+                                            {% if contact.website %}
+                                                {% labelled label="Website" hint="tiny" %}<a href="{{ contact.website }}">{{ contact.website }}</a>{% endlabelled %}
+                                            {% endif %}
+                                            {% if contact.name %}
+                                                {% labelled label="Contact Person" hint="tiny" %}{{ contact.name }}{% endlabelled %}
+                                            {% endif %}
+                                            {% if contact.phone %}
+                                                {% labelled label="Contact Phone" hint="tiny" %}{{ contact.phone }}{% endlabelled %}
+                                            {% endif %}
+                                            {% if contact.email %}
+                                                {% labelled label="Contact Email" hint="tiny" %}<a href="mailto:{{ contact.email }}">{{ contact.email }}</a>{% endlabelled %}
+                                            {% endif %}
                                         </div>
                                     {% endif %}
                                 {% endwith %}
