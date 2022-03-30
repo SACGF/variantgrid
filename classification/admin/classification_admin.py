@@ -536,4 +536,5 @@ class UploadedFileLabAdmin(ModelAdminBasics):
     @admin_action("Process (Async)")
     def process_async(self, request, queryset: QuerySet[UploadedFileLab]):
         for ufl in queryset:
-            cirp = ClassificationImportMapInsertTask.si(ufl.pk)
+            task = ClassificationImportMapInsertTask.si(ufl.pk)
+            task.apply_async()
