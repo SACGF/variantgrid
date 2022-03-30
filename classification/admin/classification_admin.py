@@ -526,12 +526,14 @@ class UploadedFileLabAdmin(ModelAdminBasics):
             return True
         return super().is_readonly_field(f)
 
+    """
     @admin_action("Process (Wait)")
     def process(self, request, queryset: QuerySet[UploadedFileLab]):
         for ufl in queryset:
             ClassificationImportMapInsertTask().run(upload_file_id=ufl.pk)
+    """
 
     @admin_action("Process (Async)")
     def process_async(self, request, queryset: QuerySet[UploadedFileLab]):
         for ufl in queryset:
-            cirp = ClassificationImportMapInsertTask().si(ufl.pk)
+            cirp = ClassificationImportMapInsertTask.si(ufl.pk)

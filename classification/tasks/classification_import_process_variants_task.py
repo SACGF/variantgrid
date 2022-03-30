@@ -95,4 +95,3 @@ def liftover_classification_import(classification_import: ClassificationImport,
 
 
 ClassificationImportProcessVariantsTask = app.register_task(ClassificationImportProcessVariantsTask())
-ClassificationImportMapInsertTask = app.register_task(ClassificationImportMapInsertTask())

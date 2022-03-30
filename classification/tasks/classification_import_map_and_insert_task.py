@@ -1,18 +1,15 @@
 import subprocess
 from pathlib import Path
-from typing import Iterator, List, Dict
-
-import celery
+from typing import List, Dict
 import ijson
 from celery import Task
 from django.conf import settings
-from lazy import lazy
-
 from classification.enums import SubmissionSource
 from classification.models import UploadedFileLab, UploadedFileLabStatus
 from classification.models.classification_import_run import ClassificationImportRun
 from library.utils import batch_iterator
 import pathlib
+from variantgrid.celery import app
 
 
 class ClassificationImportMapInsertTask(Task):
@@ -146,3 +143,6 @@ class ClassificationImportMapInsertTask(Task):
         except:
             ClassificationImportMapInsertTask.update_status(upload_file, UploadedFileLabStatus.Error)
             raise
+
+
+ClassificationImportMapInsertTask = app.register_task(ClassificationImportMapInsertTask())
