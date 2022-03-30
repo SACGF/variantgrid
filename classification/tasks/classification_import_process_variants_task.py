@@ -2,6 +2,7 @@ from django.conf import settings
 
 from classification.models.classification import ClassificationImport, \
     ClassificationImportAlleleSource, Classification
+from classification.tasks.classification_import_map_and_insert_task import ClassificationImportMapInsertTask
 from library.log_utils import report_exc_info
 from snpdb.clingen_allele import populate_clingen_alleles_for_variants
 from snpdb.liftover import create_liftover_pipelines
@@ -94,3 +95,4 @@ def liftover_classification_import(classification_import: ClassificationImport,
 
 
 ClassificationImportProcessVariantsTask = app.register_task(ClassificationImportProcessVariantsTask())
+ClassificationImportMapInsertTask = app.register_task(ClassificationImportMapInsertTask())

@@ -12,9 +12,10 @@ from classification.classification_import import reattempt_variant_matching
 from classification.enums.classification_enums import EvidenceCategory, SpecialEKeys, SubmissionSource, ShareLevel
 from classification.models import EvidenceKey, EvidenceKeyMap, DiscordanceReport, DiscordanceReportClassification, \
     send_discordance_notification, ClinicalContext, ClassificationReportTemplate, ClassificationModification, \
-    UploadedFileLab, ClinicalContextRecalcTrigger, ClassificationImportRunPerformer
+    UploadedFileLab, ClinicalContextRecalcTrigger
 from classification.models.classification import Classification
 from classification.models.classification_import_run import ClassificationImportRun, ClassificationImportRunStatus
+from classification.tasks.classification_import_map_and_insert_task import ClassificationImportMapInsertTask
 from library.guardian_utils import admin_bot
 from snpdb.admin_utils import ModelAdminBasics, admin_action, admin_list_column, AllValuesChoicesFieldListFilter
 from snpdb.models import GenomeBuild, Lab
@@ -528,10 +529,9 @@ class UploadedFileLabAdmin(ModelAdminBasics):
     @admin_action("Process (Wait)")
     def process(self, request, queryset: QuerySet[UploadedFileLab]):
         for ufl in queryset:
-            ClassificationImportRunPerformer(upload_file=ufl).process()
+            ClassificationImportMapInsertTask().run(upload_file_id=ufl.pk)
 
     @admin_action("Process (Async)")
     def process_async(self, request, queryset: QuerySet[UploadedFileLab]):
         for ufl in queryset:
-            cirp = ClassificationImportRunPerformer(upload_file=ufl)
-            cirp.process_async.si()
+            cirp = ClassificationImportMapInsertTask().si(ufl.pk)

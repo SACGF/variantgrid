@@ -87,6 +87,7 @@ CELERY_ROUTES = {
     'upload.tasks.import_patient_records_task.ImportPatientRecords': WEB_WORKERS,
     'upload.tasks.import_ped_task.ImportPedTask': WEB_WORKERS,
     'generate_graph': WEB_WORKERS,
+    'classification.tasks.classification_import_map_and_insert_task.ClassificationImportMapInsertTask': WEB_WORKERS,
 
     # VariantID workers
     'upload.tasks.vcf.unknown_variants_task.InsertUnknownVariantsTask': VARIANT_ID_SINGLE_WORKER,
