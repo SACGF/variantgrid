@@ -402,6 +402,9 @@ VARIANT_ALLELE_FREQUENCY_CLIENT_SIDE_PERCENT = True  # For analysis Grid/CSV exp
 VARIANT_STANDARD_BASES_ONLY = True  # True to reject anything other than A, C, G, T
 VARIANT_SHOW_CANONICAL_HGVS = True
 
+VARIANT_CLASSIFICATION_OMNI_IMPORTER_APP_DIR = None  # location of OmniImporter (if present) to map imported classifications
+VARIANT_CLASSIFICATION_OMNI_IMPORTER_DATA_DIR = None  # location of directory for saving and mapping files to send to OmniImporter (can by any directory with write access)
+
 VARIANT_CLASSIFICATION_SUPPORTED_TRANSCRIPTS = {"NR", "NM", "NC", "ENST", "LRG_", "XR"}
 VARIANT_CLASSIFICATION_MATCH_VARIANTS = True  # exists only so we can turn it off during testing
 VARIANT_CLASSIFICATION_REQUIRE_OVERWRITE_NOTE = True

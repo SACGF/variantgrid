@@ -12,7 +12,7 @@ from classification.classification_import import reattempt_variant_matching
 from classification.enums.classification_enums import EvidenceCategory, SpecialEKeys, SubmissionSource, ShareLevel
 from classification.models import EvidenceKey, EvidenceKeyMap, DiscordanceReport, DiscordanceReportClassification, \
     send_discordance_notification, ClinicalContext, ClassificationReportTemplate, ClassificationModification, \
-    UploadedFileLab, ClinicalContextRecalcTrigger
+    UploadedFileLab, ClinicalContextRecalcTrigger, ClassificationImportRunPerformer
 from classification.models.classification import Classification
 from classification.models.classification_import_run import ClassificationImportRun, ClassificationImportRunStatus
 from library.guardian_utils import admin_bot
@@ -524,3 +524,14 @@ class UploadedFileLabAdmin(ModelAdminBasics):
         if f.name in ("url", "filename"):
             return True
         return super().is_readonly_field(f)
+
+    @admin_action("Process (Wait)")
+    def process(self, request, queryset: QuerySet[UploadedFileLab]):
+        for ufl in queryset:
+            ClassificationImportRunPerformer(upload_file=ufl).process()
+
+    @admin_action("Process (Async)")
+    def process_async(self, request, queryset: QuerySet[UploadedFileLab]):
+        for ufl in queryset:
+            cirp = ClassificationImportRunPerformer(upload_file=ufl)
+            cirp.process_async.si()

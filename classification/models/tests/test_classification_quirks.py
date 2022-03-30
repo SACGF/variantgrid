@@ -3,6 +3,7 @@ from django.test import TestCase
 from classification.enums import SubmissionSource, CriteriaEvaluation, ValidationCode, SpecialEKeys
 from classification.models import VCDataDict, EvidenceKeyMap
 from classification.models.classification import Classification
+from classification.models.classification_inserter import BulkClassificationInserter
 from classification.models.tests.test_utils import ClassificationTestUtils
 from classification.views.classification_view import ClassificationView
 
@@ -62,17 +63,17 @@ class ClassificationTestQuirks(TestCase):
         self.assertEqual(data['sequencing_platform'].value, 'Illumina_HiSeq')  # option value, that unfornately has come case
 
     def test_verify_source(self):
-        form = ClassificationView.verify_source({'source': SubmissionSource.FORM})
+        form = BulkClassificationInserter.verify_source({'source': SubmissionSource.FORM})
         self.assertEqual(form, SubmissionSource.FORM)
 
-        api = ClassificationView.verify_source({'source': SubmissionSource.API})
+        api = BulkClassificationInserter.verify_source({'source': SubmissionSource.API})
         self.assertEqual(api, SubmissionSource.API)
 
-        default_api = ClassificationView.verify_source({})
+        default_api = BulkClassificationInserter.verify_source({})
         self.assertEqual(default_api, SubmissionSource.API)
 
         try:
-            ClassificationView.verify_source({'source': 'invalid'})
+            BulkClassificationInserter.verify_source({'source': 'invalid'})
             raise self.failureException('Source of invalid did not throw exception')
         except ValueError:
             pass

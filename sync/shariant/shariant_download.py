@@ -7,7 +7,7 @@ import requests
 from dateutil import tz
 
 from classification.models.evidence_key import EvidenceKeyMap
-from classification.views.classification_view import BulkInserter
+from classification.views.classification_view import BulkClassificationInserter
 from library.guardian_utils import admin_bot
 from library.oauth import OAuthConnector
 from library.utils import make_json_safe_in_place, batch_iterator
@@ -129,7 +129,7 @@ def sync_shariant_download(sync_destination: SyncDestination, full_sync: bool = 
 
         first_batch = True
         for batch in batch_iterator(records(), batch_size=50):
-            inserter = BulkInserter(user=admin_bot(), force_publish=True)
+            inserter = BulkClassificationInserter(user=admin_bot(), force_publish=True)
             try:
                 # give the process 10 seconds to breath between batches of 50 classifications
                 # in case we're downloading giant chunks of data

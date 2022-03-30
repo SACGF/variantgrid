@@ -37,31 +37,19 @@ class UploadedFileLabColumns(DatatableConfig[UploadedFileLab]):
         else:
             raise ValueError("Must pass in lab_id")
 
-# e.g. https://shariant-temp.s3.amazonaws.com/test/hello.txt?AWSAccessKeyId=ASFDWEROMDEOLNZA&Signature=mxBuRkSDFDHgwZyfZYfxQPXE%3D&Expires=1647392831
-UPLOADED_FILE_RE = re.compile(r"https:\/\/(?P<bucket>.*?)\.s3\.amazonaws\.com/(?P<file>.*?)(?:\?AWSAccessKeyId.*|$)")
-
 
 def download_uploaded_file(request: HttpRequest, upload_file_lab_id: int):
     user = request.user
     record = UploadedFileLab.objects.filter(pk=upload_file_lab_id).filter(lab__in=Lab.valid_labs_qs(user, admin_check=True)).first()
     if not record:
         raise PermissionDenied("You do not have access to this file")
-    if match := UPLOADED_FILE_RE.match(record.url):
-        bucket = match.group('bucket')
-        file = match.group('file')
 
-        def streaming_file(filename: str):
-            from storages.backends.s3boto3 import S3Boto3Storage
-            media_storage = S3Boto3Storage(bucket_name=bucket)
-            with media_storage.open(filename) as s3file:
-                while data := s3file.read(4096):
-                    yield data
+    file_info = record.file_data()
 
-        response = StreamingHttpResponse(streaming_file(file), content_type='streaming_content')
-        response['Content-Disposition'] = f'attachment; filename="{file}"'
-        return response
-    else:
-        raise ValueError(f"Don't know how to download {record.url}")
+    response = StreamingHttpResponse(file_info.stream(), content_type='streaming_content')
+    response['Content-Disposition'] = f'attachment; filename="{file_info.filename()}"'
+    return response
+
 
 class FileUploadView(View):
 

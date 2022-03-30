@@ -345,7 +345,7 @@ def html_link(url: str, title: str) -> SafeString:
 T = TypeVar("T")
 
 
-def batch_iterator(iterable: Iterable[T], batch_size: int = 10) -> List[T]:
+def batch_iterator(iterable: Iterable[T], batch_size: int = 10) -> Iterator[List[T]]:
     batch: List[T] = list()
     for record in iterable:
         batch.append(record)
