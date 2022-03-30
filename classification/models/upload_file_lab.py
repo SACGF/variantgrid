@@ -1,5 +1,6 @@
 import subprocess
 from abc import ABC, abstractmethod
+from pathlib import Path
 from typing import Iterator, List, Dict
 
 import celery
@@ -103,6 +104,7 @@ class ClassificationImportRunPerformer:
 
         if data_dir := settings.VARIANT_CLASSIFICATION_OMNI_IMPORTER_DATA_DIR:
             self.data_dir = pathlib.Path(data_dir)
+            self.data_dir.mkdir(parents=True, exist_ok=True)
             if not self.data_dir.exists():
                 raise ValueError(f"{self.data_dir} does not exist")
         else:
@@ -121,6 +123,20 @@ class ClassificationImportRunPerformer:
     def process_async(self):
         self.process()
 
+    @staticmethod
+    def cleanup_dir(path: Path, delete_dir: bool = False):
+        if existing_files := list(path.iterdir()):
+            if len(existing_files) > 4:
+                raise ValueError(f"Working subdirectory {path} has {len(existing_files)} files/folders in it, too dangerous to delete")
+            if sub_dirs := [ef for ef in existing_files if ef.is_dir()]:
+                raise ValueError(
+                    f"Working subdirectory {path} has subdirectories {sub_dirs}, too dangerous to delete")
+
+            for sub_file in existing_files:
+                sub_file.unlink()
+        if delete_dir:
+            path.rmdir()
+
     def process(self):
         from classification.models.classification_inserter import BulkClassificationInserter
         try:
@@ -133,6 +149,8 @@ class ClassificationImportRunPerformer:
             sub_folder = f"upload_{self.upload_file.pk}"
             working_sub_folder = self.data_dir / sub_folder
             working_sub_folder.mkdir(exist_ok=True)
+            # if working folder already exists, delete files inside it
+            ClassificationImportRunPerformer.cleanup_dir(working_sub_folder)
 
             file_handle = working_sub_folder / filename
             mapped_file = working_sub_folder / f"mapped_classifications.json"
@@ -157,16 +175,16 @@ class ClassificationImportRunPerformer:
                 stdout=subprocess.PIPE,
                 cwd=self.omni_importer_dir
             )
+
             stdout, _ = process.communicate()
             stdout_str = stdout.decode()
-            # TODO, actually do something with this output
+            if error_code := process.returncode:
+                raise ValueError(f"cwd {self.omni_importer_dir : {' '.join(args)}} returned {error_code}")
 
             if mapped_file.exists():
                 with open(mapped_file, 'r') as file_handle:
                     self.update_status(UploadedFileLabStatus.Importing)
 
-                    # TODO maybe : do we more efficiently read through the data as we need it
-                    # or do we read it all so we know how many files we expect to upload?
                     def row_generator() -> Dict:
                         nonlocal file_handle
                         for record in ijson.items(file_handle, 'records.item'):
@@ -188,9 +206,12 @@ class ClassificationImportRunPerformer:
                         add_row_count=0,
                         is_complete=True
                     )
-                    self.update_status(UploadedFileLabStatus.Processed)
-                    # TODO delete the files off the server
 
+                    # tidy up if everything is working
+                    # if things failed (so we never reached this code), we'll still have this directory to investigate
+                    ClassificationImportRunPerformer.cleanup_dir(working_sub_folder, delete_dir=True)
+
+                    self.update_status(UploadedFileLabStatus.Processed)
             else:
                 self.update_status(UploadedFileLabStatus.Error)
         except:
