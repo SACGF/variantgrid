@@ -12,7 +12,7 @@ from classification.classification_import import reattempt_variant_matching
 from classification.enums.classification_enums import EvidenceCategory, SpecialEKeys, SubmissionSource, ShareLevel
 from classification.models import EvidenceKey, EvidenceKeyMap, DiscordanceReport, DiscordanceReportClassification, \
     send_discordance_notification, ClinicalContext, ClassificationReportTemplate, ClassificationModification, \
-    UploadedFileLab, ClinicalContextRecalcTrigger
+    UploadedClassificationsUnmapped, ClinicalContextRecalcTrigger
 from classification.models.classification import Classification
 from classification.models.classification_import_run import ClassificationImportRun, ClassificationImportRunStatus
 from classification.tasks.classification_import_map_and_insert_task import ClassificationImportMapInsertTask
@@ -517,9 +517,9 @@ class DiscordanceReportAdmin(ModelAdminBasics):
             ds.update()
 
 
-@admin.register(UploadedFileLab)
-class UploadedFileLabAdmin(ModelAdminBasics):
-    list_display = ("pk", "lab", "created", "filename", "status", "comment")
+@admin.register(UploadedClassificationsUnmapped)
+class UploadedClassificationsUnmappedAdmin(ModelAdminBasics):
+    list_display = ("pk", "lab", "created", "filename", "validation_summary", "status", "comment")
     list_filter = (('lab', RelatedFieldListFilter), ('status', AllValuesChoicesFieldListFilter))
 
     def is_readonly_field(self, f) -> bool:
@@ -527,15 +527,13 @@ class UploadedFileLabAdmin(ModelAdminBasics):
             return True
         return super().is_readonly_field(f)
 
-    """
-    @admin_action("Process (Wait)")
-    def process(self, request, queryset: QuerySet[UploadedFileLab]):
+    @admin_action("Process (Wait & Validate Only)")
+    def process(self, request, queryset: QuerySet[UploadedClassificationsUnmapped]):
         for ufl in queryset:
-            ClassificationImportMapInsertTask().run(upload_file_id=ufl.pk)
-    """
+            ClassificationImportMapInsertTask.run(upload_classifications_unmapped_id=ufl.pk, import_records=False)
 
     @admin_action("Process (Async)")
-    def process_async(self, request, queryset: QuerySet[UploadedFileLab]):
+    def process_async(self, request, queryset: QuerySet[UploadedClassificationsUnmapped]):
         for ufl in queryset:
             task = ClassificationImportMapInsertTask.si(ufl.pk)
             task.apply_async()

@@ -400,7 +400,6 @@ class Lab(models.Model):
     organization = models.ForeignKey(Organization, null=False, blank=False, on_delete=CASCADE)
     # location where the lab can upload files to, (in some environments may refer to s3 directory)
     upload_location = models.TextField(null=True, blank=True)
-    upload_auto_pattern = models.TextField(default="", blank=True)
     """
     If provided, and filename matches, file upload will be automatically set to auto_processed
     """
@@ -546,12 +545,6 @@ class Lab(models.Model):
             raise PermissionDenied(msg)
 
     def save(self, **kwargs):
-        if upload_auto_pattern := self.upload_auto_pattern:
-            try:
-                re.compile(upload_auto_pattern)
-            except ValueError as ve:
-                raise ValueError(f"Upload auto pattern {upload_auto_pattern} is not a valid regular expression")
-
         super().save(**kwargs)
         if self.group_name:
             # pre-create the groups

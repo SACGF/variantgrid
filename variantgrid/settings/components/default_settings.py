@@ -404,6 +404,8 @@ VARIANT_SHOW_CANONICAL_HGVS = True
 
 VARIANT_CLASSIFICATION_OMNI_IMPORTER_APP_DIR = None  # location of OmniImporter (if present) to map imported classifications
 VARIANT_CLASSIFICATION_OMNI_IMPORTER_DATA_DIR = os.path.join(PRIVATE_DATA_ROOT, "lab_classification_files")  # location of directory for saving and mapping files to send to OmniImporter (can by any directory with write access)
+VARIANT_CLASSIFICATION_OMNI_IMPORTER_PUBLISH_LEVEL = "lab"  # change this to logged_in_users for prod environments
+VARIANT_CLASSIFICATION_OMNI_IMPORTER_INCLUDE_SOURCE = False  # change this to True for dev environments (too dangerous to set to True by default)
 
 VARIANT_CLASSIFICATION_SUPPORTED_TRANSCRIPTS = {"NR", "NM", "NC", "ENST", "LRG_", "XR"}
 VARIANT_CLASSIFICATION_MATCH_VARIANTS = True  # exists only so we can turn it off during testing
@@ -854,7 +856,7 @@ TERMS_BASE_TEMPLATE = 'base_tc.html'
 URLS_NAME_REGISTER.update({"classification_dashboard": False,
                            "keycloak_admin": False,
                            "version_diffs": False,
-                           "classification_import_upload": False})
+                           "classification_upload_unmapped": False})
 
 VARIANT_DETAILS_SHOW_ANNOTATION = True  # also doubles as GENE_SHOW_ANNOTATION
 VARIANT_DETAILS_SHOW_GENE_COVERAGE = False

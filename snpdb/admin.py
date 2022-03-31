@@ -184,13 +184,13 @@ def make_code_friendly(text: str) -> str:
 class LabAdmin(ModelAdminBasics):
     list_per_page = 200
     list_display = ('name', 'group_name', 'organization', 'state', 'country',
-                    'external', 'clinvar_key', 'upload_location', 'upload_auto_pattern', 'classification_config')
+                    'external', 'clinvar_key', 'upload_location', 'classification_config')
 
     fieldsets = (
         ('Basic', {'fields': ('name', 'group_name', 'organization')}),
         ('Position', {'fields': ('city', 'state', 'country', 'lat', 'long')}),
         ('Style', {'fields': ('url', 'css_class')}),
-        ('Submissions', {'fields': ('classification_config', 'upload_location', 'upload_auto_pattern', 'external', 'clinvar_key')})
+        ('Submissions', {'fields': ('classification_config', 'upload_location', 'external', 'clinvar_key')})
     )
 
     def is_readonly_field(self, f) -> bool:
@@ -208,8 +208,7 @@ class LabAdmin(ModelAdminBasics):
             'long': admin.widgets.AdminTextInputWidget(),
             'url': admin.widgets.AdminURLFieldWidget(),
             'css_class': admin.widgets.AdminTextInputWidget(),
-            'upload_location': admin.widgets.AdminTextInputWidget(),
-            'upload_auto_pattern': admin.widgets.AdminTextInputWidget()
+            'upload_location': admin.widgets.AdminTextInputWidget()
         }, **kwargs)
 
     def fix_group_name(self, request, queryset):

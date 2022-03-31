@@ -2,11 +2,13 @@ import subprocess
 from pathlib import Path
 from typing import List, Dict
 import ijson
+import json
 from celery import Task
 from django.conf import settings
 from classification.enums import SubmissionSource
-from classification.models import UploadedFileLab, UploadedFileLabStatus
+from classification.models import UploadedClassificationsUnmapped, UploadedFileLabStatus
 from classification.models.classification_import_run import ClassificationImportRun
+from library.log_utils import report_message, NotificationBuilder
 from library.utils import batch_iterator
 import pathlib
 from variantgrid.celery import app
@@ -42,26 +44,37 @@ class ClassificationImportMapInsertTask(Task):
             raise ValueError("Require settings.VARIANT_CLASSIFICATION_OMNI_IMPORTER_APP_DIR to be set to do automated imports")
 
     @staticmethod
-    def update_status(upload_file: UploadedFileLab, status: UploadedFileLabStatus):
+    def update_status(upload_file: UploadedClassificationsUnmapped, status: UploadedFileLabStatus):
         upload_file.status = status
         upload_file.save()
 
     @staticmethod
-    def cleanup_dir(path: Path, delete_dir: bool = False):
-        if existing_files := list(path.iterdir()):
-            if len(existing_files) > 4:
-                raise ValueError(f"Working subdirectory {path} has {len(existing_files)} files/folders in it, too dangerous to delete")
-            if sub_dirs := [ef for ef in existing_files if ef.is_dir()]:
-                raise ValueError(
-                    f"Working subdirectory {path} has subdirectories {sub_dirs}, too dangerous to delete")
-
-            for sub_file in existing_files:
-                sub_file.unlink()
-        if delete_dir:
+    def _rm_dir(path: Path):
+        if path.is_dir():
+            for sub_file in path.iterdir():
+                ClassificationImportMapInsertTask._rm_dir(sub_file)
             path.rmdir()
+        else:
+            path.unlink()
 
-    def run(self, upload_file_id: int):
-        upload_file = UploadedFileLab.objects.get(pk=upload_file_id)
+    @staticmethod
+    def cleanup_dir(path: Path, delete_dir: bool = False):
+        for sub_path in path.iterdir():
+            if sub_path.is_dir() and sub_path.name not in {"source", "output"}:
+                raise ValueError(f"Working directory has unexpected sub-directory {sub_path.absolute()}")
+
+        if delete_dir:
+            ClassificationImportMapInsertTask._rm_dir(path)
+        else:
+            for sub_path in path.iterdir():
+                ClassificationImportMapInsertTask._rm_dir(sub_path)
+
+    def run(self, upload_classifications_unmapped_id: int, import_records: bool = True):
+        """
+        :param upload_classifications_unmapped_id: ID of the unmapped file
+        :param import_records: If False, we run and record the validation, but don't import any of the classifications
+        """
+        upload_file = UploadedClassificationsUnmapped.objects.get(pk=upload_classifications_unmapped_id)
 
         from classification.models.classification_inserter import BulkClassificationInserter
         try:
@@ -77,22 +90,30 @@ class ClassificationImportMapInsertTask(Task):
             # if working folder already exists, delete files inside it
             ClassificationImportMapInsertTask.cleanup_dir(working_sub_folder)
 
-            file_handle = working_sub_folder / filename
-            mapped_file = working_sub_folder / f"mapped_classifications.json"
+            source_dir = working_sub_folder / "source"
+            source_dir.mkdir()
+            file_handle = source_dir / filename
 
             upload_file.file_data.download_to(file_handle)
             # next step is to trigger the omni importer to map the file
             # read the mapped file back
             # and import it
             # --file data/path_west/sharmvl_grch38molecular_variants20220326_060243.json --publish logged_in_users --org path_west --lab unit_1 --env prod
+
+            publish = settings.VARIANT_CLASSIFICATION_OMNI_IMPORTER_PUBLISH_LEVEL
+            include_source = settings.VARIANT_CLASSIFICATION_OMNI_IMPORTER_INCLUDE_SOURCE
+
             args: List[str] = [
                 settings.PYTHON_COMMAND, "main.py",
-                "--file", file_handle,
-                "--publish", "logged_in_users",
+                "--dir", working_sub_folder.absolute(),
+                "--publish", publish,
                 "--org", upload_file.lab.organization.group_name,
                 "--lab", upload_file.lab.group_name.split("/")[1],
-                "--env", f"file:{mapped_file}"
+                "--env", f"file"
             ]
+            if include_source:
+                args.append("--include_source")
+
             # could make it returned the mapped file to stdout
             # but it's handy having the mapped file present
             process = subprocess.Popen(
@@ -106,40 +127,80 @@ class ClassificationImportMapInsertTask(Task):
             if error_code := process.returncode:
                 raise ValueError(f"cwd {self.omni_importer_dir : {' '.join(args)}} returned {error_code}")
 
-            if mapped_file.exists():
-                import_id = upload_file.file_data.filename + "_" + upload_file.lab.group_name
-                with open(mapped_file, 'r') as file_handle:
-                    ClassificationImportMapInsertTask.update_status(upload_file, UploadedFileLabStatus.Importing)
+            output_dir = working_sub_folder / "output"
+            classifications_file = output_dir / "classifications.json"
+            validation_summary_file = output_dir / "validation_summary.json"
+            validation_list_file = output_dir / "validation_list.json"
+            fatal_error = None
 
-                    def row_generator() -> Dict:
-                        nonlocal file_handle
-                        for record in ijson.items(file_handle, 'records.item'):
-                            yield record
+            with open(validation_summary_file, 'r') as validation_handle:
+                validation_json = json.load(validation_handle)
+                fatal_error = validation_json.get('fatal_error')
+                upload_file.validation_summary = validation_json
 
-                    for batch in batch_iterator(row_generator(), batch_size=50):
-                        # record the import
+                nb = NotificationBuilder(message="Import Mapped")
+                nb.add_header(":currency_exchange: Import Mapped")
+                nb.add_field("File ID", f"{upload_file.pk} {upload_file.filename}")
+                nb.add_field("Lab", str(upload_file.lab))
+                nb.add_divider()
+                for key, value in validation_json.items():
+                    if key == "fatal_error":
+                        key = ":bangbang: fatal_error"
+                    if key == "message_counts":
+                        if not value:
+                            value = "- no messages -"
+                        else:
+                            value = json.dumps(value, indent=4)
+                    nb.add_field(str(key), value)
+                nb.send()
+
+            with open(validation_list_file, 'r') as validation_handle:
+                validation_list = json.load(validation_handle)
+                upload_file.validation_list = validation_list
+
+            upload_file.save()
+            if fatal_error:
+                report_message(f"Could not map file for UploadedClassificationsUnmapped ({upload_file.pk})", extra_data={"target": fatal_error})
+                ClassificationImportMapInsertTask.update_status(upload_file, UploadedFileLabStatus.Error)
+                return
+
+            if import_records:
+                if classifications_file.exists():
+                    import_id = upload_file.file_data.filename + "_" + upload_file.lab.group_name
+                    with open(classifications_file, 'r') as file_handle:
+                        ClassificationImportMapInsertTask.update_status(upload_file, UploadedFileLabStatus.Importing)
+
+                        def row_generator() -> Dict:
+                            nonlocal file_handle
+                            for record in ijson.items(file_handle, 'records.item'):
+                                yield record
+
+                        for batch in batch_iterator(row_generator(), batch_size=50):
+                            # record the import
+                            ClassificationImportRun.record_classification_import(
+                                identifier=import_id,
+                                add_row_count=len(batch))
+
+                            bci = BulkClassificationInserter(user=user)
+                            for row in batch:
+                                bci.insert(data=row, submission_source=SubmissionSource.API)
+                            bci.finish()
+
                         ClassificationImportRun.record_classification_import(
                             identifier=import_id,
-                            add_row_count=len(batch))
+                            add_row_count=0,
+                            is_complete=True
+                        )
 
-                        bci = BulkClassificationInserter(user=user)
-                        for row in batch:
-                            bci.insert(data=row, submission_source=SubmissionSource.API)
-                        bci.finish()
+                        # tidy up if everything is working
+                        # if things failed (so we never reached this code), we'll still have this directory to investigate
+                        ClassificationImportMapInsertTask.cleanup_dir(working_sub_folder, delete_dir=True)
 
-                    ClassificationImportRun.record_classification_import(
-                        identifier=import_id,
-                        add_row_count=0,
-                        is_complete=True
-                    )
-
-                    # tidy up if everything is working
-                    # if things failed (so we never reached this code), we'll still have this directory to investigate
-                    ClassificationImportMapInsertTask.cleanup_dir(working_sub_folder, delete_dir=True)
-
-                    ClassificationImportMapInsertTask.update_status(upload_file, UploadedFileLabStatus.Processed)
+                        ClassificationImportMapInsertTask.update_status(upload_file, UploadedFileLabStatus.Processed)
+                else:
+                    ClassificationImportMapInsertTask.update_status(upload_file, UploadedFileLabStatus.Error)
             else:
-                ClassificationImportMapInsertTask.update_status(upload_file, UploadedFileLabStatus.Error)
+                ClassificationImportMapInsertTask.update_status(upload_file, UploadedFileLabStatus.Pending)
         except:
             ClassificationImportMapInsertTask.update_status(upload_file, UploadedFileLabStatus.Error)
             raise

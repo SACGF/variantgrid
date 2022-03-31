@@ -128,6 +128,8 @@ SITE_NAME = "Shariant"
 
 # "LRG_" has been disabled, see https://github.com/SACGF/shariant-admin/issues/126
 VARIANT_CLASSIFICATION_OMNI_IMPORTER_APP_DIR = "/opt/shariant_omni_importer"
+VARIANT_CLASSIFICATION_OMNI_IMPORTER_PUBLISH_LEVEL = "logged_in_users"
+VARIANT_CLASSIFICATION_OMNI_IMPORTER_INCLUDE_SOURCE = False
 
 VARIANT_CLASSIFICATION_SUPPORTED_TRANSCRIPTS = {"NM", "NR", "ENST", "XR"}
 VARIANT_CLASSIFICATION_REQUIRE_OVERWRITE_NOTE = False
@@ -202,7 +204,7 @@ URLS_NAME_REGISTER.update({  # Disable selected snpdb urls
     "jfu_delete": False,
     "download_uploaded_file": False,
 
-    "classification_import_upload": True,
+    "classification_upload_unmapped": True,
     "condition_matchings": True,
     "condition_match_test": True,
     # "condition_aliases": True

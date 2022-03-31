@@ -10,7 +10,6 @@ import re
 
 class UploadedFileLabStatus(models.TextChoices):
     Pending = 'P', 'Pending'
-    AutoProcessed = 'AP', 'Automatically-Processed'
     Processed = 'MP', 'Processed'
     Error = 'E', 'Error'
 
@@ -57,15 +56,17 @@ class FileDataS3(FileData):
                 yield data
 
 
-class UploadedFileLab(TimeStampedModel):
+class UploadedClassificationsUnmapped(TimeStampedModel):
     class Meta:
-        verbose_name = "Lab Classification File"
+        verbose_name = "Classification upload file"
 
     url = models.TextField()
     filename = models.TextField()
     lab = models.ForeignKey(Lab, on_delete=models.CASCADE)
     user = models.ForeignKey(User, on_delete=models.PROTECT)
     comment = models.TextField(default="", blank=True)
+    validation_summary = models.JSONField(null=True, blank=True)
+    validation_list = models.JSONField(null=True, blank=True)
     status = models.CharField(max_length=2, choices=UploadedFileLabStatus.choices, default=UploadedFileLabStatus.Pending)
 
     @lazy

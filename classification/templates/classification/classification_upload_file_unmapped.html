@@ -23,21 +23,15 @@
         {% page_help_embedded title="Classifications Upload" %}
             <p>This page allows you to upload classification data to be shared within {{ site_name }}.</p>
             {% if selected_lab.upload_location %}
-                {% if selected_lab.upload_auto_pattern %}
-                    <p>After uploading a file in the right format it will begin automatically importing classifications.
-                        Depending on the size of your file it may take between a minute to an hour to process the entire file.
-                    </p>
-                {% else %}
-                    <p>{{ site_name }} administrators will be notified once your file is uploaded.<br/>
-                    They will then be able to process the file, you can check the status of your uploads in the table below.<br/>
-                    Please allow a business day for your file to be processed.</p>
-                {% endif %}
+                <p>{{ site_name }} administrators will be notified once your file is uploaded.<br/>
+                They will then be able to process the file, you can check the status of your uploads in the table below.<br/>
+                Please allow a business day for your file to be processed.</p>
             {% else %}
                 This lab has not been configured for uploads yet. Please contact a {{ site_name }} administrator if you'd like to upload a file.
             {% endif %}
         {% end_page_help_embedded %}
 
-        {% lab_picker view_name="classification_import_upload_lab" selected_lab=selected_lab %}
+        {% lab_picker view_name="classification_upload_unmapped_lab" selected_lab=selected_lab %}
         {% if selected_lab.upload_location %}
              <form method="post" enctype="multipart/form-data">
                 {% csrf_token %}
@@ -64,10 +58,9 @@
                 </div>
             </form>
             <h4>File Upload History</h4>
-            <table data-datatable-url="{% url 'classification_import_upload_datatable' %}" data-datatable-data='datatableFilter' class="import-table sticky-header" responsive="true"></table>
-
-            {% else %}
-                <p>{{ 'warning' | severity_icon }} Your lab "{{ selected_lab.name }}" has not been configured for file uploads. Please contact a {{ site_name }} administrator if you believe this is required.</p>
-            {% endif %}
+            <table data-datatable-url="{% url 'classification_upload_unmapped_datatable' %}" data-datatable-data='datatableFilter' class="import-table sticky-header" responsive="true"></table>
+        {% else %}
+            <p>{{ 'warning' | severity_icon }} Your lab "{{ selected_lab.name }}" has not been configured for file uploads. Please contact a {{ site_name }} administrator if you believe this is required.</p>
+        {% endif %}
     </div>
 {% endblock %}
