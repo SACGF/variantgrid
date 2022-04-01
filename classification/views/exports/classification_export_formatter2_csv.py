@@ -39,7 +39,7 @@ class FormatDetailsCSV:
         if self.exclude_transient:
             return {
                 "owner",
-                "source_id"
+                "source_id",
                 "source_data",
             }
         else:
