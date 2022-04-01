@@ -9,7 +9,7 @@ from classification.enums import SubmissionSource
 from classification.models import UploadedClassificationsUnmapped, UploadedFileLabStatus
 from classification.models.classification_import_run import ClassificationImportRun
 from library.log_utils import report_message, NotificationBuilder
-from library.utils import batch_iterator
+from library.utils import batch_iterator, pretty_label
 import pathlib
 from variantgrid.celery import app
 
@@ -140,18 +140,23 @@ class ClassificationImportMapInsertTask(Task):
 
                 nb = NotificationBuilder(message="Import Mapped")
                 nb.add_header(":currency_exchange: Import Mapped")
-                nb.add_field("File ID", f"{upload_file.pk} {upload_file.filename}")
+                nb.add_field("File ID", f"*{upload_file.pk}* {upload_file.filename}")
                 nb.add_field("Lab", str(upload_file.lab))
                 nb.add_divider()
                 for key, value in validation_json.items():
+                    formatted_key = pretty_label(str(key))
                     if key == "fatal_error":
-                        key = ":bangbang: fatal_error"
+                        formatted_key = ":bangbang: Fatal Error"
                     if key == "message_counts":
+                        key = "messages"
                         if not value:
                             value = "- no messages -"
                         else:
-                            value = json.dumps(value, indent=4)
-                    nb.add_field(str(key), value)
+                            value_lst = list()
+                            for message_type, message_count in value:
+                                value_lst.append(f"{message_type}: {message_count}")
+                            value = "\n".join(value_lst)
+                    nb.add_field(formatted_key, value)
                 nb.send()
 
             with open(validation_list_file, 'r') as validation_handle:
