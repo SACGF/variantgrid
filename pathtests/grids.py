@@ -6,8 +6,8 @@ class PathologyTestOrdersGrid(JqGridUserRowConfig):
     model = PathologyTestOrder
     caption = "Pathology Test Orders"
     fields = ["id", "external_pk__code", "case__external_pk__code", "pathology_test_version__pathology_test__name",
-              "user", "created", "modified", "started_library", "finished_library", "started_sequencing",
-              "finished_sequencing", "order_completed", "experiment", "sequencing_run"]
+              "user__username", "created", "modified", "started_library", "finished_library", "started_sequencing",
+              "finished_sequencing", "order_completed", "experiment__name", "sequencing_run__name"]
     colmodel_overrides = {'id': {"width": 30, 'formatter': 'viewPathologyOrderLink'}}
 
     def __init__(self, user, **kwargs):
@@ -37,12 +37,12 @@ class PathologyTestsGrid(JqGridUserRowConfig):
     model = PathologyTest
     caption = "Pathology Tests"
     fields = ["name", "curator__username",
-              'activepathologytestversion__pathology_test_version',
+              'activepathologytestversion__pathology_test_version__id',
               'activepathologytestversion__pathology_test_version__version',
               'modified']
     colmodel_overrides = {'name': {"width": 150, 'formatter': 'viewPathologyTestLink'},
                           'curator__username': {"label": 'Curator'},
-                          'activepathologytestversion__pathology_test_version': {"hidden": True},
+                          'activepathologytestversion__pathology_test_version__id': {"hidden": True},
                           'activepathologytestversion__pathology_test_version__version': {"label": "Active Version",
                                                                                           "formatter": "viewPathologyTestVersionLink"}}
 

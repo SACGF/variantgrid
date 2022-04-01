@@ -21,7 +21,7 @@ jQuery.extend($.fn.fmatter , {
         },
         viewPathologyTestVersionLink : function(cellvalue, options, rowObject) {
             if (cellvalue) {
-                const ptvId = rowObject.activepathologytestversion__pathology_test_version;
+                const ptvId = rowObject.activepathologytestversion__pathology_test_version__id;
                 const VIEW_PATHOLOGY_TEST_VERSION_URL = Urls.view_pathology_test_version(ptvId);
                 cellvalue = "<a href='" + VIEW_PATHOLOGY_TEST_VERSION_URL + "'>Version " + cellvalue + "</a>";
             } else {
