@@ -106,7 +106,8 @@ class UsedKeyTracker:
                  ekeys: EvidenceKeyMap,
                  key_value_formatter: KeyValueFormatter,
                  pretty: bool = False,
-                 include_explains: bool = False):
+                 include_explains: bool = False,
+                 ignore_evidence_keys: Optional[Set[str]] = None):
         self.user = user
         self.ekeys = ekeys
         self.key_value_formatter = key_value_formatter
@@ -114,13 +115,21 @@ class UsedKeyTracker:
         self.pretty = pretty
         self.ordered_keys = None
         self.include_explains = include_explains
+        self.ignore_evidence_keys = ignore_evidence_keys
+
+    @property
+    def keys_ignore_exclude(self) -> Iterable[EvidenceKey]:
+        if self.ignore_evidence_keys:
+            return [e_key for e_key in self.ekeys.all_keys if e_key.key not in self.ignore_evidence_keys]
+        else:
+            return self.ekeys.all_keys
 
     def all_key_properties(self) -> List[KeyProperty]:
         all_props: List[KeyProperty] = list()
         properties = ['value', 'note']
         if self.include_explains:
             properties.append('explain')
-        for e_key in self.ekeys.all_keys:
+        for e_key in self.keys_ignore_exclude:
             for prop in properties:
                 all_props.append(KeyProperty(key=e_key.key, property=prop))
         return all_props

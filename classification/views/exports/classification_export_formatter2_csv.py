@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from io import StringIO
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Set
 
 from django.http import HttpRequest
 from lazy import lazy
@@ -34,6 +34,16 @@ class FormatDetailsCSV:
         exclude_transient = request.query_params.get('exclude_transient') == 'true'
         return FormatDetailsCSV(pretty=pretty, include_explains=include_explains, exclude_transient=exclude_transient)
 
+    @property
+    def ignore_evidence_keys(self) -> Set[str]:
+        if self.exclude_transient:
+            return {
+                "owner",
+                "source_id"
+                "source_data",
+            }
+        else:
+            return set()
 
 class RowID(ExportRow):
 
@@ -163,7 +173,8 @@ class ClassificationExportFormatter2CSV(ClassificationExportFormatter2):
             self.classification_filter.user,
             self.e_keys, KeyValueFormatter(),
             pretty=self.format_details.pretty,
-            include_explains=self.format_details.include_explains
+            include_explains=self.format_details.include_explains,
+            ignore_evidence_keys=self.format_details.ignore_evidence_keys
         )
         #for evidence in self.classification_filter.cms_qs().values_list('published_evidence', flat=True):
         #    used_keys.check_evidence(evidence)
