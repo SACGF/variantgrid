@@ -20,6 +20,8 @@ AWS_SES_ACCESS_KEY_ID, AWS_SES_SECRET_ACCESS_KEY, AWS_SES_REGION = \
 KEYCLOAK_SYNC_DETAILS = get_keycloak_sync_secrets()
 """
 
+AWS_S3_REGION_NAME = "ap-southeast-2"
+
 aws_s3_dict = get_s3_secrets()
 AWS_S3_ACCESS_KEY_ID, AWS_S3_SECRET_ACCESS_KEY = \
     [aws_s3_dict[k] for k in ("AWS_S3_ACCESS_KEY_ID", "AWS_S3_SECRET_ACCESS_KEY")]
@@ -41,6 +43,9 @@ ROLLBAR['enabled'] = False
 MIDDLEWARE += ('eventlog.middleware.PageViewsMiddleware', )
 LOG_ACTIVITY_APPS = {"classification", "variantopedia", "snpdb"}
 
+VARIANT_CLASSIFICATION_OMNI_IMPORTER_APP_DIR = "/Users/jamesandrews/Projects/VariantGrid/shariant-omni-importer"
+VARIANT_CLASSIFICATION_OMNI_IMPORTER_PUBLISH_LEVEL = "logged_in_users"
+VARIANT_CLASSIFICATION_OMNI_IMPORTER_INCLUDE_SOURCE = True
 
 """
 AUTHENTICATION_BACKENDS = (
@@ -260,7 +265,8 @@ VARIANT_SHOW_CANONICAL_HGVS = False
 
 # Lock down Shariant menu - hide a lot of VariantGrid urls
 # Completely hide URLS from these apps
-URLS_APP_REGISTER.update({"analysis": False,
+
+URLS_APP_REGISTER.update({"analysis": True,
                           "expression": False,
                           "pathtests": False,
                           "pedigree": False,
@@ -288,7 +294,7 @@ URLS_NAME_REGISTER.update({  # Disable selected snpdb urls
     "version_diffs": False,
 
     # Settings
-    "change_password": False,
+    "change_password": True,
     "custom_columns": False,
     "tag_settings": False,
     "igv_integration": False,
@@ -316,7 +322,7 @@ URLS_NAME_REGISTER.update({  # Disable selected snpdb urls
 
     "condition_matchings": True,
     "condition_match_test": True,
-    "classification_import_upload": True,
+    "classification_upload_unmapped": True,
     "classification_view_metrics": True
 })
 
