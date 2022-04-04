@@ -65,7 +65,7 @@ class PhenotypeMatcher:
                     'large', 'lateral', 'left', 'likes', 'liver',
                     'match', 'macro', 'mild', 'milena', 'moderate', 'motor',
                     'name',
-                    'onset',
+                    'onset', 'other',
                     'parts', 'pending', 'periodic', 'person', 'pit', 'plan', 'position', 'profound', 'prolonged',
                     'proximal', 'progressive',
                     'range', 'raise', 'recurrent', 'right',
