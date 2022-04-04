@@ -1497,7 +1497,7 @@ class GeneList(models.Model):
 
     def clone(self):
         """ Needed to clone analysis node GeneListNode """
-        genelistgenesymbol_set = self.genelistgenesymbol_set.all()
+        genelistgenesymbol_set = set(self.genelistgenesymbol_set.all())
         copy = self
         copy.pk = None
         copy.save()

@@ -91,10 +91,10 @@ class PathologyTestVersion(TimeStampedModel):
         """ Clones w/new version """
 
         copy = self
+        gene_list = copy.gene_list.clone()
         copy.pk = None
         copy.version += 1
         copy.confirmed_date = None
-        gene_list = copy.gene_list.clone()
         gene_list.locked = False
         gene_list.save()
         copy.gene_list = gene_list
