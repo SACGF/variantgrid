@@ -810,7 +810,7 @@ def view_clinvar_key(request, pk: str):
     })
 
 
-def view_organization(request, organization_id:int):
+def view_organization(request, organization_id: int):
     organization = get_object_or_404(Organization, pk=organization_id)
     organization_form = OrganizationForm(request.POST or None, instance=organization)
     org_settings_override = OrganizationUserSettingsOverride.objects.get_or_create(organization=organization)[0]

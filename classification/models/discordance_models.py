@@ -471,10 +471,10 @@ class DiscordanceReportClassificationRelationManager(models.Manager):
     def get_queryset(self):
         qs = super().get_queryset()
         return qs.select_related('classification_original',
-                        'classification_final',
-                        'classification_final__classification',
-                        'classification_final__classification__lab',
-                        'classification_final__classification__lab__organization')
+                                 'classification_final',
+                                 'classification_final__classification',
+                                 'classification_final__classification__lab',
+                                 'classification_final__classification__lab__organization')
 
 
 class DiscordanceReportClassification(TimeStampedModel):

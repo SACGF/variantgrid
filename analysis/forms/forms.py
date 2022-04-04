@@ -3,11 +3,10 @@ import operator
 from collections import defaultdict
 
 from crispy_forms.bootstrap import FieldWithButtons, StrictButton
-from crispy_forms.layout import Layout, Field, Submit, Button
+from crispy_forms.layout import Layout, Field
 from dal import forward
 from django import forms
 from django.forms.widgets import TextInput
-from django.utils.safestring import SafeString
 
 from analysis.models import Analysis, NodeGraphType, FilterNodeItem, AnalysisTemplate
 from analysis.models.enums import SNPMatrix, AnalysisTemplateType, TrioSample

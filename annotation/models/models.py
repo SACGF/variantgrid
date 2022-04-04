@@ -22,7 +22,7 @@ from lazy import lazy
 
 from annotation.external_search_terms import get_variant_search_terms, get_variant_pubmed_search_terms
 from annotation.models.damage_enums import Polyphen2Prediction, FATHMMPrediction, MutationTasterPrediction, \
-    SIFTPrediction, PathogenicityImpact, MutationAssessorPrediction, AbstractPathogenicity
+    SIFTPrediction, PathogenicityImpact, MutationAssessorPrediction
 from annotation.models.models_enums import HumanProteinAtlasAbundance, AnnotationStatus, CitationSource, \
     VariantClass, ColumnAnnotationCategory, VEPPlugin, VEPCustom, ClinVarReviewStatus, VEPSkippedReason, \
     ManualVariantEntryType

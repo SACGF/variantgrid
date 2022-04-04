@@ -419,7 +419,7 @@ def view_allele_from_variant(request, variant_id):
     return redirect(reverse('view_variant', kwargs={"variant_id": variant_id}))
 
 
-def view_allele(request, allele_id:int):
+def view_allele(request, allele_id: int):
     allele: Allele = get_object_or_404(Allele, pk=allele_id)
     link_allele_to_existing_variants(allele, AlleleConversionTool.CLINGEN_ALLELE_REGISTRY)
 
@@ -439,7 +439,7 @@ def view_allele(request, allele_id:int):
     return render(request, "variantopedia/view_allele.html", context)
 
 
-def export_classifications_allele(request, allele_id:int):
+def export_classifications_allele(request, allele_id: int):
     """
     CSV export of what is currently filtered into the classification grid
     """

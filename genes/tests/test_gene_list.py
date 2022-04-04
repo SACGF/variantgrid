@@ -18,4 +18,3 @@ class TestAnnotationVCF(TestCase):
         copy = gl.clone()
         copy_symbols = set(copy.genelistgenesymbol_set.values_list("gene_symbol", flat=True))
         self.assertEqual(GENE_SYMBOLS, copy_symbols)
-

@@ -403,7 +403,7 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
     def get_contigs(self) -> Set[Contig]:
         """ A set of contigs that contain variants for the node """
 
-        cache_key = self._get_cache_key() + f"_contigs"
+        cache_key = self._get_cache_key() + "_contigs"
         contigs: Set[Contig] = cache.get(cache_key)
 
         if contigs is None:

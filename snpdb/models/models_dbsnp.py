@@ -39,7 +39,7 @@ class DbSNP(TimeStampedModel):
             raise ValueError(f"This record was withdrawn on {withdrawn_snapshot_data['withdrawn_time']}")
 
         if "primary_snapshot_data" not in dbsnp.api_response:
-            raise ValueError(f"Invalid record")
+            raise ValueError("Invalid record")
 
         return dbsnp
 

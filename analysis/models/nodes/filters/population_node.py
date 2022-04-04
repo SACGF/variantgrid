@@ -153,7 +153,6 @@ class PopulationNode(AnalysisNode):
             node_arg_q_dict[None] = node_q
         return node_arg_q_dict
 
-
     @staticmethod
     @cache_memoize(timeout=MINUTE_SECS)
     def _get_classified_variant_ids(analysis, q_pop: Q) -> List:

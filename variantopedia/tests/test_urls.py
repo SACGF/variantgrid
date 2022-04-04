@@ -50,7 +50,6 @@ class Test(URLTestCase):
         vzcc = VariantZygosityCountCollection.objects.get_or_create(name=settings.VARIANT_ZYGOSITY_GLOBAL_COLLECTION)[0]
         VariantZygosityCount.objects.get_or_create(variant=cls.variant, collection=vzcc, het_count=1)
 
-
     @classmethod
     def tearDownClass(cls):
         super().tearDownClass()

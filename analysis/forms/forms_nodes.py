@@ -30,7 +30,6 @@ from analysis.models.nodes.sources.cohort_node import CohortNode, CohortNodeZygo
 from analysis.models.nodes.sources.pedigree_node import PedigreeNode
 from analysis.models.nodes.sources.sample_node import SampleNode
 from analysis.models.nodes.sources.trio_node import TrioNode
-from annotation.models import VariantAnnotation
 from genes.custom_text_gene_list import create_custom_text_gene_list
 from genes.hgvs import get_hgvs_variant_tuple, get_hgvs_variant
 from genes.models import GeneListCategory, CustomTextGeneList, GeneList, PanelAppPanel
@@ -279,7 +278,7 @@ class DamageNodeForm(BaseNodeForm):
             "revel_score_min": HiddenInput(attrs={"min": 0, "max": 1, "step": 0.05}),
             "cosmic_count_min": HiddenInput(attrs={"min": 0, "max": 50, "step": 1}),
             "damage_predictions_min": HiddenInput(attrs={"min": 0}),
-       }
+        }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
