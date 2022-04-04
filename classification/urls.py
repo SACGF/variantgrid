@@ -12,8 +12,9 @@ from classification.views.classification_email_view import summary_email_preview
 from classification.views.classification_export_view import ClassificationApiExportView
 from classification.views.classification_overlaps_view import view_overlaps, post_clinical_context, \
     view_clinical_context, view_overlaps_detail
-from classification.views.classification_upload_file_view import UploadedClassificationsUnmappedView, \
-    UploadedClassificationsUnmappedColumns, download_classification_unmapped_fiile
+from classification.views.views_uploaded_classifications_unmapped import UploadedClassificationsUnmappedView, \
+    UploadedClassificationsUnmappedColumns, download_classification_unmapped_file, \
+    view_uploaded_classification_unmapped, view_uploaded_classification_unmapped_detail
 from classification.views.classification_view import ClassificationView, LabGeneClassificationCountsView
 from classification.views.classification_view_metrics import view_classification_metrics, \
     view_page_metrics_detail
@@ -44,9 +45,12 @@ urlpatterns = [
 
     # this is uploading the entire import file, distinct from attaching a file to a classification
     perm_path('classification/import_upload', UploadedClassificationsUnmappedView.as_view(), name="classification_upload_unmapped"),
+    # TODO move file lab into another subfolder as it gets a bit confused with upload page
     perm_path('classification/import_upload/<int:lab_id>', UploadedClassificationsUnmappedView.as_view(), name="classification_upload_unmapped_lab"),
+    perm_path('classification/import_upload/file/<int:uploaded_classification_unmapped_id>', view_uploaded_classification_unmapped, name="classification_upload_unmapped_status"),
+    perm_path('classification/import_upload/file/<int:uploaded_classification_unmapped_id>/detail', view_uploaded_classification_unmapped_detail, name="classification_upload_unmapped_status_detail"),
     perm_path('classification/import_upload/datatable', DatabaseTableView.as_view(column_class=UploadedClassificationsUnmappedColumns), name='classification_upload_unmapped_datatable'),
-    perm_path('classification/import_upload/download/<int:upload_file_lab_id>', download_classification_unmapped_fiile, name='classification_upload_unmapped_download'),
+    perm_path('classification/import_upload/download/<int:uploaded_classification_unmapped_id>', download_classification_unmapped_file, name='classification_upload_unmapped_download'),
 
     perm_path('classification/create', views.create_classification, name='create_classification'),
     perm_path('classification/create_from_hgvs/<genome_build_name>/<hgvs_string>', views.create_classification_from_hgvs, name='create_classification_from_hgvs'),

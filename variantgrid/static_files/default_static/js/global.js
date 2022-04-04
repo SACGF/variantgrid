@@ -316,8 +316,15 @@ function loadAjaxBlock(dom, url) {
         type: "GET",
         url: url,
         async: true,
-        success: (results) => {
+        success: (results, textStatus, jqXHR) => {
+            // TODO provide the ability for a cache token, so we only reload data if something's changed
             dom.html(results);
+            let autoRefreshTime = jqXHR.getResponseHeader('Auto-refresh');
+            if (autoRefreshTime) {
+                window.setTimeout(() => {
+                    loadAjaxBlock(dom, url);
+                }, parseInt(autoRefreshTime));
+            }
         },
         error: (call, status, text) => {
             dom.replaceWith($('<div>', {class: 'ajax-error', html:[severityIcon('C'), "Error Loading Data"]}));

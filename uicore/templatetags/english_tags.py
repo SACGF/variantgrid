@@ -3,6 +3,8 @@ from typing import Optional, List, Union
 from django import template
 from django.db.models import QuerySet
 
+from library.utils import pretty_label
+
 register = template.Library()
 
 
@@ -43,3 +45,8 @@ def plural(items: Union[List, QuerySet, int], singular: str = "", plural: str = 
     if count_items(items) == 1:
         return singular
     return plural
+
+
+@register.filter()
+def code_to_english(text: str):
+    return pretty_label(text)

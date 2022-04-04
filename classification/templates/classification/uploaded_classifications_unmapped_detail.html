@@ -1,0 +1,12 @@
+{% load ui_utils %}
+{% load english_tags %}
+{% labelled label="Status" %}{{ record.get_status_display }}{% endlabelled %}
+{% if record.validation_summary %}
+    {% for prop in record.validation_summary_properties %}
+        {% labelled label=prop.0|code_to_english %}{{ prop.1 }}{% endlabelled %}
+    {% endfor %}
+    <h4>Validation Summary</h4>
+    {% for message_count in record.message_counts %}
+        {% labelled label=message_count.0 %}{{ message_count.1 }}{% endlabelled %}
+    {% endfor %}
+{% endif %}

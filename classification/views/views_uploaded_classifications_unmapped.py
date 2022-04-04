@@ -8,6 +8,7 @@ from django.db.models import QuerySet
 from django.http import HttpResponseRedirect, HttpRequest, StreamingHttpResponse
 from django.shortcuts import render
 from django.urls import reverse
+from django.utils.timezone import now
 from django.views import View
 
 from classification.models.uploaded_classifications_unmapped import UploadedClassificationsUnmapped, UploadedFileLabStatus
@@ -24,7 +25,7 @@ class UploadedClassificationsUnmappedColumns(DatatableConfig[UploadedClassificat
         super().__init__(request)
 
         self.rich_columns = [
-            RichColumn(key="id", label="ID", orderable=True, default_sort=SortOrder.DESC),
+            RichColumn(key="id", label="ID", orderable=True, default_sort=SortOrder.DESC, client_renderer="idRenderer"),
             RichColumn(key="filename", orderable=True, client_renderer='fileDownloaderRenderer'),
             RichColumn(key="created", label='Created', orderable=True, client_renderer='TableFormat.timestamp'),
             RichColumn(key="status", label="Status", orderable=True, renderer=lambda x: UploadedFileLabStatus(x["status"]).label),
@@ -38,17 +39,45 @@ class UploadedClassificationsUnmappedColumns(DatatableConfig[UploadedClassificat
             raise ValueError("Must pass in lab_id")
 
 
-def download_classification_unmapped_fiile(request: HttpRequest, upload_file_lab_id: int):
+def download_classification_unmapped_file(request: HttpRequest, uploaded_classification_unmapped_id: int):
     user = request.user
-    record = UploadedClassificationsUnmapped.objects.filter(pk=upload_file_lab_id).filter(lab__in=Lab.valid_labs_qs(user, admin_check=True)).first()
+    record = UploadedClassificationsUnmapped.objects.filter(pk=uploaded_classification_unmapped_id).filter(lab__in=Lab.valid_labs_qs(user, admin_check=True)).first()
     if not record:
         raise PermissionDenied("You do not have access to this file")
 
-    file_info = record.file_data()
-
+    file_info = record.file_data
     response = StreamingHttpResponse(file_info.stream(), content_type='streaming_content')
-    response['Content-Disposition'] = f'attachment; filename="{file_info.filename()}"'
+    response['Content-Disposition'] = f'attachment; filename="{file_info.filename}"'
     return response
+
+
+def view_uploaded_classification_unmapped(request: HttpRequest, uploaded_classification_unmapped_id: int):
+    user = request.user
+    record = UploadedClassificationsUnmapped.objects.filter(pk=uploaded_classification_unmapped_id).filter(
+        lab__in=Lab.valid_labs_qs(user, admin_check=True)).first()
+    if not record:
+        raise PermissionDenied("You do not have access to this file")
+
+    return render(request, 'classification/uploaded_classifications_unmapped.html', {
+        "record": record
+    })
+
+
+def view_uploaded_classification_unmapped_detail(request: HttpRequest, uploaded_classification_unmapped_id: int):
+    user = request.user
+    record = UploadedClassificationsUnmapped.objects.filter(pk=uploaded_classification_unmapped_id).filter(
+        lab__in=Lab.valid_labs_qs(user, admin_check=True)).first()
+    if not record:
+        raise PermissionDenied("You do not have access to this file")
+
+    http_response = render(request, 'classification/uploaded_classifications_unmapped_detail.html', {
+        "record": record,
+        "now": now()
+    })
+    if record.status not in {UploadedFileLabStatus.Error, UploadedFileLabStatus.Processed}:
+        # data is still being processed, we should continue to reload this page
+        http_response['Auto-refresh'] = str(5000)  # auto-refresh in 5 seconds
+    return http_response
 
 
 class UploadedClassificationsUnmappedView(View):

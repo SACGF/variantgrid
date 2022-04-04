@@ -412,6 +412,35 @@ a {
     // uncomment once we've differentiated the link data type enough
     // content: "\f6dd";
 }
+.link-back:before {
+    display: inline-block;
+    font-style: normal;
+    font-variant: normal;
+    text-rendering: auto;
+    font-family: 'Font Awesome 5 Free', 'FontAwesome';
+    font-weight: 900;
+    content: "\f137";
+    opacity: 0.6;
+    margin-right: 4px;
+    width: 12px;
+}
+.id-link {
+  min-width: 40px;
+  text-align: center;
+  display: inline-block;
+  &:before {
+    display: inline-block;
+    font-style: normal;
+    font-variant: normal;
+    text-rendering: auto;
+    font-family: 'Font Awesome 5 Free', 'FontAwesome';
+    font-weight: 900;
+    content: "\f15b";
+    opacity: 0.6;
+    margin-right: 4px;
+    width: 12px;
+  }
+}
 
 .toggle-link:before {
     display: inline-block;

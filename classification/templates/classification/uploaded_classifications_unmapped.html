@@ -1,0 +1,20 @@
+{% extends "uicore/page/base.html" %}
+{% load static %}
+{% load ui_menu_bars %}
+{% load ui_utils %}
+{% load ui_help %}
+{% load js_tags %}
+{% load lab_tags %}
+{% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
+{% block title %}File Upload Statys{% endblock %}
+{% block content %}
+    <div class="container">
+        <p><a class="link-back" href="{% url 'classification_upload_unmapped_lab' record.lab.pk %}">Back to file uploads</a></p>
+        <h4>File Status ({{ record.file_data.filename }})</h4>
+        {% labelled label="File ID" %}{{ record.pk }}{% endlabelled %}
+        {% labelled label="Upload Date" %}{% timestamp record.created %}{% endlabelled %}
+        <div data-toggle="ajax" href="{% url 'classification_upload_unmapped_status_detail' record.pk %}">
+            Loading Status
+        </div>
+    </div>
+{% endblock %}
