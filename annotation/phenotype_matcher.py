@@ -50,28 +50,30 @@ class SkipAllPhenotypeMatchException(Exception):
 
 class PhenotypeMatcher:
     # Words which have no use matching on their own
-    COMMON_WORDS = {'acute', 'adult', 'all', 'and', 'associated',
-                    'bad', 'bilateral', 'birth', 'blood', 'borderline',
-                    'can', 'carries', 'central', 'change', 'charge', 'child', 'chronic', 'close', 'comma', 'commas',
-                    'coned', 'cord', 'cousin', 'cousins',
-                    'diffused', 'deficiency', 'disorder', 'distal',
-                    'exclude',
-                    'face', 'familial', 'floating', 'focal', 'forms', 'frequent', 'frequency', 'from',
-                    'generalized', "generalised",
-                    'hard', 'hearing',
-                    'image', 'inheritance', 'insulin',
-                    'joints',
-                    'kit',
-                    'large', 'lateral', 'left', 'likes', 'liver',
-                    'match', 'macro', 'mild', 'milena', 'moderate', 'motor',
-                    'name',
-                    'onset', 'other',
-                    'parts', 'pending', 'periodic', 'person', 'pit', 'plan', 'position', 'profound', 'prolonged',
-                    'proximal', 'progressive',
-                    'range', 'raise', 'recurrent', 'right',
-                    'severe', 'she', 'short', 'skeletal', 'sleep', 'syndrome',
-                    'the', 'transient',
-                    'wants', 'was', 'with'}
+    COMMON_WORDS = {
+        'acute', 'across', 'adult', 'all', 'and', 'associated', 'auditory',
+        'bad', 'bilateral', 'birth', 'blood', 'borderline', 'brain', 'brainstem',
+        'can', 'carries', 'central', 'change', 'charge', 'child', 'chronic', 'close', 'comma', 'commas',
+        'coned', 'cord', 'cousin', 'cousins',
+        'diffused', 'deficiency', 'disorder', 'distal',
+        'ear', 'exclude',
+        'face', 'familial', 'floating', 'focal', 'forms', 'frequent', 'frequency', 'from', "ft 4",
+        'generalized', "generalised",
+        'hard', 'hearing',
+        'image', 'inheritance', 'insulin',
+        'joints',
+        'kit',
+        'large', 'lateral', 'left', 'likes', 'liver',
+        'match', 'macro', 'mild', 'milena', 'moderate', 'motor', 'movements',
+        'name',
+        'onset', 'other',
+        'parts', 'pending', 'periodic', 'person', 'pit', 'plan', 'position', 'profound', 'prolonged',
+        'proximal', 'progressive',
+        'range', 'raise', 'recurrent', 'right',
+        'severe', 'she', 'short', 'skeletal', 'sleep', 'syndrome',
+        'the', 'transient',
+        'wants', 'was', 'white', 'with',
+    }
 
     def __init__(self):
         ONTOLOGY_PK = {
