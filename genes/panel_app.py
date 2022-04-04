@@ -11,7 +11,7 @@ from genes.models import PanelAppPanelRelevantDisorders, PanelAppPanel, PanelApp
 from genes.serializers import GeneListGeneSymbolSerializer
 from library.guardian_utils import admin_bot, add_public_group_read_permission
 
-PANEL_APP_PREFIX = "panel-app-"
+PANEL_APP_PREFIX = "panel-app"
 PANEL_APP_LIST_PANELS_PATH = "/api/v1/panels/"
 PANEL_APP_GET_PANEL_API_BASE_PATH = "/api/v1/panels/"
 PANEL_APP_SEARCH_BY_GENES_BASE_PATH = "/api/v1/genes/"
@@ -68,14 +68,16 @@ def get_panel_app_panel_as_gene_list_json(panel_app_panel_id):
             gene_evidence[glgs.gene_symbol_id] = evidence
             # TODO: Handle unmatched symbols??
 
-    data = {"pk": f"{PANEL_APP_PREFIX}-{panel_app_panel_id}",
-            "category": {"name": "PanelApp", "icon_css_class": panel_app_panel.server.icon_css_class},
-            "name": name,
-            "import_status": "S",
-            "genelistgenesymbol_set": genelistgenesymbol_set,
-            "can_write": False,
-            "absolute_url": url,
-            "gene_evidence": gene_evidence}
+    data = {
+        "pk": f"{PANEL_APP_PREFIX}-{panel_app_panel_id}",
+        "category": {"name": "PanelApp", "icon_css_class": panel_app_panel.server.icon_css_class},
+        "name": name,
+        "import_status": "S",
+        "genelistgenesymbol_set": genelistgenesymbol_set,
+        "can_write": False,
+        "absolute_url": url,
+        "gene_evidence": gene_evidence,
+    }
     return data
 
 

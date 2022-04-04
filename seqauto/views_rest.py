@@ -2,8 +2,10 @@ import json
 import operator
 from collections import defaultdict
 from functools import reduce
+from math import log10
 
 import numpy as np
+from django.conf import settings
 from django.db.models.query_utils import Q
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
@@ -108,8 +110,23 @@ class BatchGoldCoverageSummaryView(APIView):
         gene_symbols_json = request.data["gene_symbols_json"]
         gene_symbols = json.loads(gene_symbols_json)
 
-        enrichment_kit = get_object_or_404(EnrichmentKit, pk=enrichment_kit_id)
-        gcs_qs = GoldCoverageSummary.filter_for_kit_and_gene_symbols(enrichment_kit, gene_symbols)
-        serializer = GoldCoverageSummarySerializer(gcs_qs, many=True)
-        data = serializer.data
+        if settings.GENE_GRID_FAKE_GOLD_COVERAGE:
+            data = []
+            for gene_symbol in gene_symbols:
+                seed = abs(hash(gene_symbol) % 100) + abs(hash(enrichment_kit_id) % 100)
+                fake_value = log10(1 + seed) / 2
+                if fake_value > .9:
+                    fake_depth = 100
+                else:
+                    fake_depth = 100 - fake_value
+                data.append({
+                    "original_gene_symbol": gene_symbol,
+                    "gene_symbol": {"symbol": gene_symbol},
+                    "depth_20x_5th_percentile": fake_depth,
+                })
+        else:
+            enrichment_kit = get_object_or_404(EnrichmentKit, pk=enrichment_kit_id)
+            gcs_qs = GoldCoverageSummary.filter_for_kit_and_gene_symbols(enrichment_kit, gene_symbols)
+            serializer = GoldCoverageSummarySerializer(gcs_qs, many=True)
+            data = serializer.data
         return Response(data)
