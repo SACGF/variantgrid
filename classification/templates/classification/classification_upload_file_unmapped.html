@@ -41,13 +41,12 @@
                 <div class="card">
                     <div class="card-header">File Upload</div>
                     <div class="card-body">
-                        {% if selected_lab.upload_auto_pattern %}
-                            {% labelled label="Expected Filename Pattern" %}
-                                {% code_regex selected_lab.upload_auto_pattern %}
-                            {% endlabelled %}
+                        {% if selected_lab.upload_automatic %}
+                            <p class="text-info">Once the file is uploaded it will be automatically processed.</p>
                         {% else %}
                             <p class="text-info">Once the file is uploaded it will be added to a queue and processed over the next few days.</p>
                         {% endif %}
+                        {% if selected_lab.upload_instructions %}<p class="text-info">{{ upload_instructions }}</p>{% endif %}
                         {% if user.is_superuser %}
                             {% labelled label="Destination" value_css="admin-only" %}{{ selected_lab.upload_location }}{% endlabelled %}
                         {% endif %}

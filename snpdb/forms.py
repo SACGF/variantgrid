@@ -136,7 +136,7 @@ class LabForm(forms.ModelForm, ROFormMixin):
         model = Lab
         # fields = '__all__'
         exclude = ("classification_config", "css_class")
-        read_only = ("name", "external", "group_name", "organization", "upload_location", "clinvar_key")
+        read_only = ("name", "external", "group_name", "organization", "upload_location", "upload_automatic", "upload_instructions", "clinvar_key")
         widgets = {
             "name": TextInput(),
             "city": TextInput(),

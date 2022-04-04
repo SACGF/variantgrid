@@ -12,6 +12,7 @@ from django.utils.timezone import now
 from django.views import View
 
 from classification.models.uploaded_classifications_unmapped import UploadedClassificationsUnmapped, UploadedFileLabStatus
+from classification.tasks.classification_import_map_and_insert_task import ClassificationImportMapInsertTask
 from library.django_utils import get_url_from_view_path
 from library.log_utils import NotificationBuilder
 from library.utils import filename_safe
@@ -162,11 +163,19 @@ class UploadedClassificationsUnmappedView(View):
                     add_markdown(f"*URL:* <{admin_url}>")
 
                 # Soon going to replace this with automated import
-                notifier.add_markdown("This file will need to be handled manually!")
-                messages.add_message(requests, messages.INFO,
-                                     f"File {file_obj.name} uploaded for {lab.name}. This file will be uploaded after manual review.")
+                if not lab.upload_automatic:
+                    notifier.add_markdown("This file will need to be handled manually!")
+                    messages.add_message(requests, messages.INFO,
+                                         f"File {file_obj.name} uploaded for {lab.name}. This file will be uploaded after manual review.")
+                else:
+                    notifier.add_markdown("Attempting to automatically upload file")
 
                 notifier.send()
+
+                if lab.upload_automatic:
+                    task = ClassificationImportMapInsertTask.si(uploaded_file.pk)
+                    task.apply_async()
+                    return HttpResponseRedirect(reverse("classification_upload_unmapped_status", kwargs={"uploaded_classification_unmapped_id": uploaded_file.pk}))
 
             else:
                 raise ValueError("Only s3 storage is currently supported for lab uploads")

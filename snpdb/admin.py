@@ -190,7 +190,7 @@ class LabAdmin(ModelAdminBasics):
         ('Basic', {'fields': ('name', 'group_name', 'organization')}),
         ('Position', {'fields': ('city', 'state', 'country', 'lat', 'long')}),
         ('Style', {'fields': ('url', 'css_class')}),
-        ('Submissions', {'fields': ('classification_config', 'upload_location', 'external', 'clinvar_key')})
+        ('Submissions', {'fields': ('classification_config', 'upload_location', 'upload_automatic', 'upload_instructions', 'external', 'clinvar_key')})
     )
 
     def is_readonly_field(self, f) -> bool:
@@ -208,7 +208,7 @@ class LabAdmin(ModelAdminBasics):
             'long': admin.widgets.AdminTextInputWidget(),
             'url': admin.widgets.AdminURLFieldWidget(),
             'css_class': admin.widgets.AdminTextInputWidget(),
-            'upload_location': admin.widgets.AdminTextInputWidget()
+            'upload_location': admin.widgets.AdminTextInputWidget(),
         }, **kwargs)
 
     def fix_group_name(self, request, queryset):
