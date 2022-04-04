@@ -1,9 +1,16 @@
+import contextlib
 from abc import ABC, abstractmethod
-from typing import Iterator
+from os import PathLike
+from pathlib import Path
+from typing import Iterator, Union, Optional, Dict, List, Tuple
+from zipfile import ZipFile
+
 from django.contrib.auth.models import User
 from django.db import models
 from lazy import lazy
 from model_utils.models import TimeStampedModel
+from six import BytesIO
+
 from snpdb.models import Lab
 import re
 
@@ -24,17 +31,46 @@ UPLOADED_FILE_RE = re.compile(r"https:\/\/(?P<bucket>.*?)\.s3\.amazonaws\.com/(?
 class FileData(ABC):
 
     @abstractmethod
-    def stream(self) -> Iterator[bytes]:
+    def _data_handle(self):
+        """
+        Return handle to an open file or storage, anything that you can call .read() on
+        """
         pass
 
+    @property
     @abstractmethod
     def filename(self) -> str:
         pass
 
-    def download_to(self, filename):
-        with open(filename, 'wb') as output:
-            for chunk in self.stream():
-                output.write(chunk)
+    @contextlib.contextmanager
+    def open(self):
+        handle = self._data_handle()
+        try:
+            yield handle
+        finally:
+            handle.close()
+
+    def stream(self) -> Iterator[bytes]:
+        handle = self._data_handle()
+        while buffer := handle.read(4096):
+            yield buffer
+        handle.close()
+
+    def download_to(self, filename: Union[str, PathLike]):
+        with open(filename, 'wb') as output_file:
+            with self.open() as input_file:
+                output_file.write(input_file.read())
+
+    def download_to_dir(self, download_dir: Path, extract_zip: bool = False):
+        # this is pretty inefficient
+        if extract_zip and self.filename.endswith(".zip"):
+            with self.open() as input_file:
+                zippy = ZipFile(BytesIO(input_file.read()))
+                zippy.extractall(path=download_dir)
+        else:
+            with open(download_dir / self.filename, 'wb') as output_file:
+                with self.open() as input_file:
+                    output_file.write(input_file.read())
 
 
 class FileDataS3(FileData):
@@ -48,12 +84,10 @@ class FileDataS3(FileData):
         segments = self.file.split("/")
         return segments[-1]
 
-    def stream(self) -> Iterator[bytes]:
+    def _data_handle(self):
         from storages.backends.s3boto3 import S3Boto3Storage
         media_storage = S3Boto3Storage(bucket_name=self.bucket)
-        with media_storage.open(self.file) as s3file:
-            while data := s3file.read(4096):
-                yield data
+        return media_storage.open(self.file)
 
 
 class UploadedClassificationsUnmapped(TimeStampedModel):
@@ -76,3 +110,15 @@ class UploadedClassificationsUnmapped(TimeStampedModel):
             file = match.group('file')
             return FileDataS3(bucket=bucket, file=file)
         raise ValueError(f"Don't know how to download {self.url}")
+
+    @property
+    def message_counts(self) -> Optional[List[Tuple[str, int]]]:
+        if summary := self.validation_summary:
+            entries = [(key, value) for key, value in summary.get("message_counts").items()]
+            return sorted(entries, key=lambda x: x[0])
+
+    @property
+    def validation_summary_properties(self) -> Optional[List[Tuple[str, Union[int, str]]]]:
+        if summary := self.validation_summary:
+            entries = [(key, value) for key, value in summary.items() if isinstance(value, (str, int))]
+            return sorted(entries, key=lambda x: x[0])

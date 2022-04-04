@@ -82,8 +82,6 @@ class ClassificationImportMapInsertTask(Task):
             ClassificationImportMapInsertTask.update_status(upload_file, UploadedFileLabStatus.Mapping)
 
             file_data = upload_file.file_data
-            filename = file_data.filename
-
             sub_folder = f"upload_{upload_file.pk}"
             working_sub_folder = self.data_dir / sub_folder
             working_sub_folder.mkdir(exist_ok=True)
@@ -92,9 +90,8 @@ class ClassificationImportMapInsertTask(Task):
 
             source_dir = working_sub_folder / "source"
             source_dir.mkdir()
-            file_handle = source_dir / filename
 
-            upload_file.file_data.download_to(file_handle)
+            upload_file.file_data.download_to_dir(source_dir, extract_zip=True)
             # next step is to trigger the omni importer to map the file
             # read the mapped file back
             # and import it
@@ -123,7 +120,7 @@ class ClassificationImportMapInsertTask(Task):
             )
 
             stdout, _ = process.communicate()
-            stdout_str = stdout.decode()
+            _ = stdout.decode()
             if error_code := process.returncode:
                 raise ValueError(f"cwd {self.omni_importer_dir : {' '.join(args)}} returned {error_code}")
 
@@ -205,6 +202,7 @@ class ClassificationImportMapInsertTask(Task):
                 else:
                     ClassificationImportMapInsertTask.update_status(upload_file, UploadedFileLabStatus.Error)
             else:
+                ClassificationImportMapInsertTask.cleanup_dir(working_sub_folder, delete_dir=True)
                 ClassificationImportMapInsertTask.update_status(upload_file, UploadedFileLabStatus.Pending)
         except:
             ClassificationImportMapInsertTask.update_status(upload_file, UploadedFileLabStatus.Error)
