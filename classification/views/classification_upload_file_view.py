@@ -10,7 +10,7 @@ from django.shortcuts import render
 from django.urls import reverse
 from django.views import View
 
-from classification.models.upload_file_lab import UploadedClassificationsUnmapped, UploadedFileLabStatus
+from classification.models.uploaded_classifications_unmapped import UploadedClassificationsUnmapped, UploadedFileLabStatus
 from library.django_utils import get_url_from_view_path
 from library.log_utils import NotificationBuilder
 from library.utils import filename_safe

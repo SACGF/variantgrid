@@ -398,6 +398,7 @@ class Lab(models.Model):
     organization = models.ForeignKey(Organization, null=False, blank=False, on_delete=CASCADE)
     # location where the lab can upload files to, (in some environments may refer to s3 directory)
     upload_location = models.TextField(null=True, blank=True)
+
     """
     If provided, and filename matches, file upload will be automatically set to auto_processed
     """
