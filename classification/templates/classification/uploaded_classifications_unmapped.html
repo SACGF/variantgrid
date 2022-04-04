@@ -6,11 +6,23 @@
 {% load js_tags %}
 {% load lab_tags %}
 {% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
-{% block title %}File Upload Statys{% endblock %}
+{% block title %}File Upload Status{% endblock %}
 {% block content %}
     <div class="container">
         <p><a class="link-back" href="{% url 'classification_upload_unmapped_lab' record.lab.pk %}">Back to file uploads</a></p>
-        <h4>File Status ({{ record.file_data.filename }})</h4>
+
+        {% page_help_embedded title="File Status" %}
+            <p>This page provides status of the file your lab uploaded.</p>
+            <p>The details can be quite technical, but of importance is -<br/>
+                <span class="text-info">Records Excluded</span> The number of classification records in the file that we did not attempt to upload due to filtering rules (e.g. possible somatic).<br/>
+                <span class="text-info">Records Mapped</span> The number of classification records that we did attempt to upload from the file.<br/>
+                <span class="text-info">Validation Messages</span> The number of each warning we came across processing the file.
+            </p>
+            <p>If the status is <span class="text-info">Pending</span> or <span class="text-info">Mapping</span>, we are still converting the file to our format.</p>
+            <p>If the status is <span class="text-info">Processed</span>, please allow a few minutes before the updated records will be inserted into our database.</p>
+        {% end_page_help_embedded %}
+
+        {% labelled label="File Name" %}{{ record.file_data.filename }}{% endlabelled %}
         {% labelled label="File ID" %}{{ record.pk }}{% endlabelled %}
         {% labelled label="Upload Date" %}{% timestamp record.created %}{% endlabelled %}
         <div data-toggle="ajax" href="{% url 'classification_upload_unmapped_status_detail' record.pk %}">

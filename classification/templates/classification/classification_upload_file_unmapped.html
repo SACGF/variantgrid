@@ -44,7 +44,7 @@
                         {% if selected_lab.upload_automatic %}
                             <p class="text-info">Once the file is uploaded it will be automatically processed.</p>
                         {% else %}
-                            <p class="text-info">Once the file is uploaded it will be added to a queue and processed over the next few days.</p>
+                            <p class="text-info">Once the file is uploaded it will be manually reviewed and processed over the next few days.</p>
                         {% endif %}
                         {% if selected_lab.upload_instructions %}<p class="text-info">{{ upload_instructions }}</p>{% endif %}
                         {% if user.is_superuser %}
