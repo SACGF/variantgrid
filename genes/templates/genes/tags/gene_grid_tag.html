@@ -1880,11 +1880,11 @@ function createPathologyTestGeneModificationForm(container, headerText, submitFu
         f.remove();
     }
     let input = $("<input />").attr("placeholder", "reason / justification...");
-    let submitButton = $("<button />").button().html("save").click(function() {
+    let submitButton = $("<button />").addClass("btn btn-secondary").html("save").click(function() {
         resetStuff();
         submitFunc(input.val());
     }); 
-    let cancelButton = $("<button />").button().html("cancel").click(resetStuff); 
+    let cancelButton = $("<button />").addClass("btn btn-secondary").html("cancel").click(resetStuff);
 
     f.append($("<h3 />").text(headerText));
     f.append(input);
