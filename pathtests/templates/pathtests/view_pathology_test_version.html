@@ -198,9 +198,9 @@ $("button#confirm-test").click(function() {
 
     {% if is_curator %} 
         {% if pathology_test_version.confirmed_date %}
-        <input type='submit' value="Create new test version" />
+            <button class='btn btn-primary' type='submit'>Create new test version</button>
         {% else %}
-        <input type='submit' value="Modify test version" />
+        <button class='btn btn-primary' type='submit'>Modify test version</button>
         {% endif %}
     {% endif %}
     </form>
