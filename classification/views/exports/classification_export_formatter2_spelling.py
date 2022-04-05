@@ -1,6 +1,5 @@
 from collections import defaultdict
 from typing import Set, Optional, Iterable, List, Dict
-
 import nltk
 from django.http import HttpRequest
 from lazy import lazy
@@ -15,9 +14,8 @@ from library.utils import ExportRow, export_column
 
 
 class ClassificationSpellingRow(ExportRow):
-    from spellchecker import SpellChecker
 
-    def __init__(self, cm: ClassificationModification, spell: SpellChecker):
+    def __init__(self, cm: ClassificationModification, spell: 'SpellChecker'):
         self.cm = cm
         self.spell = spell
 
