@@ -74,7 +74,7 @@ class ClassificationDashboard:
             return ClinVarExport.objects.filter(clinvar_allele__clinvar_key__in=clinvar_keys).exclude(scv__exact='').order_by('-modified')
         return ClinVarExport.objects.none()
 
-    @property
+    @lazy
     def discordances_qs(self) -> QuerySet[DiscordanceReport]:
         # WARNING, this will count discordances that involve the lab in a classification, but one that has
         # has changed clinical context
