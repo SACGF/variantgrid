@@ -1,4 +1,5 @@
 from collections import defaultdict
+from itertools import chain
 from typing import Set, Optional, Iterable, List, Dict
 import nltk
 from django.http import HttpRequest
@@ -11,7 +12,9 @@ from classification.views.exports.classification_export_filter import Classifica
 from classification.views.exports.classification_export_formatter2 import ClassificationExportFormatter2
 from library.django_utils import get_url_from_view_path
 from library.utils import ExportRow, export_column
+import re
 
+RE_HAS_BAD_CHAR = re.compile(r"[0-9._]")
 
 class ClassificationSpellingRow(ExportRow):
 
@@ -31,10 +34,23 @@ class ClassificationSpellingRow(ExportRow):
     def interpretation_summary(self) -> str:
         return self.cm.get(SpecialEKeys.INTERPRETATION_SUMMARY)
 
+    @staticmethod
+    def fix_word_token(word) -> List[str]:
+        for bad_char in RE_HAS_BAD_CHAR.finditer(word):
+            return list()
+        if "/" in word:
+            words = word.split("/")
+        else:
+            words = [word]
+        return [word for word in words if len(word) >= 4]
+
     @lazy
     def suspect_words_set(self) -> Set[str]:
         if interpretation_summary := self.cm.get(SpecialEKeys.INTERPRETATION_SUMMARY):
             words = nltk.word_tokenize(interpretation_summary)
+            words_2d = [ClassificationSpellingRow.fix_word_token(word) for word in words]
+            words = list(chain.from_iterable(words_2d))
+
             return self.spell.unknown(words)
         return set()
 
