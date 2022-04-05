@@ -1,7 +1,8 @@
 import collections
 import datetime
+import unicodedata
 from dataclasses import dataclass
-from typing import List
+from typing import List, Optional
 
 import celery
 from django.conf import settings
@@ -32,11 +33,12 @@ class EmailLabSummaryData:
         self.user = user
 
     @lazy
-    def last_imported_new_ago(self):
+    def last_imported_new_ago(self) -> Optional[str]:
         latest = Classification.objects.order_by('-created').filter(lab=self.lab).values_list('created',
                                                                                               flat=True).first()
         if latest:
-            return timesince(latest)
+            timesince_str = timesince(latest)
+            return unicodedata.normalize("NFKD", timesince_str)
         else:
             return None
 
