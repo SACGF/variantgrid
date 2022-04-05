@@ -13,7 +13,7 @@ from threadlocals.threadlocals import get_current_request
 
 from classification.views.exports.classification_export_filter import AlleleData, ClassificationFilter
 from library.guardian_utils import bot_group
-from library.log_utils import NotificationBuilder
+from library.log_utils import NotificationBuilder, report_exc_info
 
 
 class ClassificationExportFormatter2(ABC):
@@ -136,6 +136,7 @@ class ClassificationExportFormatter2(ABC):
                 self.file_count += 1
                 yield self.filename(part=self.file_count), modified_at, perms, ZIP_64, self._yield_streaming_entry_bytes(data_peek)
         except:
+            report_exc_info()
             yield "An error occurred generating the file"
             raise
 
@@ -184,6 +185,7 @@ class ClassificationExportFormatter2(ABC):
             for footer in self.footer():
                 yield footer
         except:
+            report_exc_info()
             yield "An error occurred generating the file"
             raise
         finally:
