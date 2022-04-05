@@ -13,13 +13,13 @@ from pytz import timezone
 
 from classification.enums import SpecialEKeys
 from classification.models import ClinVarExport, ClinVarExportBatch, ClinVarExportBatchStatus, \
-    EvidenceKeyMap, ClinVarExportStatus
+    EvidenceKeyMap, ClinVarExportStatus, ClinVarExportSubmission
 from classification.views.classification_dashboard_view import ClassificationDashboard
 from genes.hgvs import CHGVS
 from library.cache import timed_cache
 from library.django_utils import add_save_message, get_url_from_view_path
 from library.utils import html_to_text, export_column, ExportRow
-from snpdb.models import ClinVarKey, Lab, Allele
+from snpdb.models import ClinVarKey, Lab, Allele, GenomeBuild
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
 from uicore.json.json_types import JsonDataType
 
@@ -211,7 +211,7 @@ class ClinVarExportSummary(ExportRow):
         return self.clinvar_export.classification_based_on
 
     @lazy
-    def genome_build_row(self):
+    def genome_build_row(self) -> GenomeBuild:
         if classification := self.classification:
             try:
                 return classification.get_genome_build()
@@ -245,6 +245,11 @@ class ClinVarExportSummary(ExportRow):
     def condition_umbrella(self):
         return self.clinvar_export.condition_resolved.as_plain_text
 
+    @export_column("Condition")
+    def condition(self):
+        if classification := self.classification:
+            return classification.condition_text
+
     @export_column("Interpretation Summary")
     def interpretation_summary(self):
         if classification := self.classification:
@@ -262,6 +267,20 @@ class ClinVarExportSummary(ExportRow):
     @export_column("SCV")
     def scv(self):
         return self.clinvar_export.scv
+
+    @lazy
+    def latest_submission(self) -> ClinVarExportSubmission:
+        return self.clinvar_export.clinvarexportsubmission_set.order_by('-pk').first()
+
+    @export_column("Latest Batch ID")
+    def batch_id(self):
+        if submission := self.latest_submission:
+            return submission.submission_batch_id
+
+    @export_column("Latest Batch Status")
+    def batch_status(self):
+        if submission := self.latest_submission:
+            submission.submission_batch.get_status_display()
 
 
 def clinvar_export_download(request: HttpRequest, clinvar_key_id: str) -> HttpResponseBase:

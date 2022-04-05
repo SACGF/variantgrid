@@ -93,12 +93,14 @@ def export_view(request: HttpRequest) -> Response:
     format_csv = {'id': 'csv', 'name': 'CSV'}
     format_clinvar_compare = {'id': 'clinvar_compare', 'name': 'ClinVar Compare'}
     format_json = {'id': 'json', 'name': 'JSON'}
+    format_spelling = {'id': 'spelling', 'name': 'Spelling Report', 'admin_only': True}
     format_redcap = {'id': 'redcap', 'name': 'REDCap'}
     format_vcf = {'id': 'vcf', 'name': 'VCF'}
     formats = [
         format_keys,
         format_csv,
         format_clinvar_compare,
+        format_spelling,
         format_json,
         format_mvl
     ]
