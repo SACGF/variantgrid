@@ -11,7 +11,7 @@ from django.urls import reverse
 from django.utils.timezone import now
 from django.views import View
 
-from classification.models.uploaded_classifications_unmapped import UploadedClassificationsUnmapped, UploadedFileLabStatus
+from classification.models.uploaded_classifications_unmapped import UploadedClassificationsUnmapped, UploadedClassificationsUnmappedStatus
 from classification.tasks.classification_import_map_and_insert_task import ClassificationImportMapInsertTask
 from library.django_utils import get_url_from_view_path
 from library.log_utils import NotificationBuilder
@@ -29,7 +29,7 @@ class UploadedClassificationsUnmappedColumns(DatatableConfig[UploadedClassificat
             RichColumn(key="id", label="ID", orderable=True, default_sort=SortOrder.DESC, client_renderer="idRenderer"),
             RichColumn(key="filename", orderable=True, client_renderer='fileDownloaderRenderer'),
             RichColumn(key="created", label='Created', orderable=True, client_renderer='TableFormat.timestamp'),
-            RichColumn(key="status", label="Status", orderable=True, renderer=lambda x: UploadedFileLabStatus(x["status"]).label),
+            RichColumn(key="status", label="Status", orderable=True, renderer=lambda x: UploadedClassificationsUnmappedStatus(x["status"]).label),
             RichColumn(key="comment", client_renderer='TableFormat.text')
         ]
 
@@ -75,7 +75,10 @@ def view_uploaded_classification_unmapped_detail(request: HttpRequest, uploaded_
         "record": record,
         "now": now()
     })
-    if record.status not in {UploadedFileLabStatus.Error, UploadedFileLabStatus.Processed}:
+    if record.status not in {
+        UploadedClassificationsUnmappedStatus.Error,
+        UploadedClassificationsUnmappedStatus.Validated,
+        UploadedClassificationsUnmappedStatus.Processed}:
         # data is still being processed, we should continue to reload this page
         http_response['Auto-refresh'] = str(5000)  # auto-refresh in 5 seconds
     return http_response
@@ -143,7 +146,7 @@ class UploadedClassificationsUnmappedView(View):
                 media_storage.save(file_path_within_bucket, file_obj)
                 file_url = media_storage.url(file_path_within_bucket)
 
-                status = UploadedFileLabStatus.Pending
+                status = UploadedClassificationsUnmappedStatus.Pending if lab.upload_automatic else UploadedClassificationsUnmappedStatus.Manual
                 user: User = requests.user
                 uploaded_file = UploadedClassificationsUnmapped.objects.create(
                     url=file_url,
@@ -153,26 +156,26 @@ class UploadedClassificationsUnmappedView(View):
                     status=status
                 )
 
-                admin_url = get_url_from_view_path(f"/admin/classification/uploadedfilelab/{uploaded_file.pk}/change")
-                notifier = NotificationBuilder(
-                    message="File Uploaded"
-                ).add_header(":file_folder: File Uploaded").\
-                    add_field("For Lab", lab.name).\
-                    add_field("By User", user.username).\
-                    add_field("Path", "s3://" + bucket + "/" + file_path_within_bucket).\
-                    add_markdown(f"*URL:* <{admin_url}>")
-
-                # Soon going to replace this with automated import
                 if not lab.upload_automatic:
+                    # if no automatic process of automated file,
+                    admin_url = get_url_from_view_path(f"/admin/classification/uploadedfilelab/{uploaded_file.pk}/change")
+                    notifier = NotificationBuilder(
+                        message="File Uploaded"
+                    ).add_header(":file_folder: File Uploaded").\
+                        add_field("For Lab", lab.name).\
+                        add_field("By User", user.username).\
+                        add_field("Path", "s3://" + bucket + "/" + file_path_within_bucket).\
+                        add_markdown(f"*URL:* <{admin_url}>")
+
+                    # Soon going to replace this with automated import
+
                     notifier.add_markdown("This file will need to be handled manually!")
                     messages.add_message(requests, messages.INFO,
                                          f"File {file_obj.name} uploaded for {lab.name}. This file will be uploaded after manual review.")
+
+                    notifier.send()
+
                 else:
-                    notifier.add_markdown("Attempting to automatically upload file")
-
-                notifier.send()
-
-                if lab.upload_automatic:
                     task = ClassificationImportMapInsertTask.si(uploaded_file.pk)
                     task.apply_async()
                     return HttpResponseRedirect(reverse("classification_upload_unmapped_status", kwargs={"uploaded_classification_unmapped_id": uploaded_file.pk}))

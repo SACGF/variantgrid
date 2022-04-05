@@ -3,11 +3,13 @@ from typing import Optional
 
 from django import dispatch
 from django.db import models
+from django.db.models import CASCADE
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.utils.timezone import now
 from model_utils.models import TimeStampedModel
 
+from classification.models.uploaded_classifications_unmapped import UploadedClassificationsUnmapped
 from library.log_utils import NotificationBuilder
 
 classification_imports_complete_signal = dispatch.Signal()
@@ -28,9 +30,10 @@ class ClassificationImportRun(TimeStampedModel):
     identifier = models.TextField()
     row_count = models.IntegerField(default=0)
     status = models.TextField(choices=ClassificationImportRunStatus.choices, default=ClassificationImportRunStatus.ONGOING)
+    from_file = models.ForeignKey(UploadedClassificationsUnmapped, on_delete=CASCADE, null=True, blank=True)
 
     @staticmethod
-    def record_classification_import(identifier: str, add_row_count: int = 0, is_complete: bool = False):
+    def record_classification_import(identifier: str, add_row_count: int = 0, is_complete: bool = False) -> 'ClassificationImportRun':
         """
         :param identifier: An identifier for the import - when importing more up to date versions of the same file, try to re-use the same identifier
         :param add_row_count: How many rows just got added
@@ -57,6 +60,7 @@ class ClassificationImportRun(TimeStampedModel):
         # after we've either updated or created a new import, cleanup any old ones
         # do this after so we don't close and import and start a new one - but trigger the fact that there were 0 imports in that split moment inbetween
         ClassificationImportRun.cleanup()
+        return use_me
 
     @staticmethod
     def cleanup():

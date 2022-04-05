@@ -15,13 +15,16 @@ from snpdb.models import Lab
 import re
 
 
-class UploadedFileLabStatus(models.TextChoices):
+class UploadedClassificationsUnmappedStatus(models.TextChoices):
+    Manual = "MA", "Manual"
     Pending = 'P', 'Pending'
-    Processed = 'MP', 'Processed'
-    Error = 'E', 'Error'
 
     Mapping = "M", "Mapping"
     Importing = "I", "Importing"
+
+    Validated = 'V', 'Validated'
+    Error = 'E', 'Error'
+    Processed = 'MP', 'Processed'
 
 
 # e.g. https://shariant-temp.s3.amazonaws.com/test/hello.txt?AWSAccessKeyId=ASFDWEROMDEOLNZA&Signature=mxBuRkSDFDHgwZyfZYfxQPXE%3D&Expires=1647392831
@@ -101,7 +104,10 @@ class UploadedClassificationsUnmapped(TimeStampedModel):
     comment = models.TextField(default="", blank=True)
     validation_summary = models.JSONField(null=True, blank=True)
     validation_list = models.JSONField(null=True, blank=True)
-    status = models.CharField(max_length=2, choices=UploadedFileLabStatus.choices, default=UploadedFileLabStatus.Pending)
+    status = models.CharField(max_length=2, choices=UploadedClassificationsUnmappedStatus.choices, default=UploadedClassificationsUnmappedStatus.Pending)
+
+    def __str__(self):
+        return f"{self.lab} {self.filename}"
 
     @lazy
     def file_data(self) -> FileData:
