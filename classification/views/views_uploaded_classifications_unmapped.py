@@ -14,7 +14,7 @@ from django.views import View
 from classification.models.uploaded_classifications_unmapped import UploadedClassificationsUnmapped, UploadedClassificationsUnmappedStatus
 from classification.tasks.classification_import_map_and_insert_task import ClassificationImportMapInsertTask
 from library.django_utils import get_url_from_view_path
-from library.log_utils import NotificationBuilder
+from library.log_utils import NotificationBuilder, report_exc_info
 from library.utils import filename_safe
 from snpdb.models import Lab, UserSettings
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
@@ -183,6 +183,7 @@ class UploadedClassificationsUnmappedView(View):
             else:
                 raise ValueError("Only s3 storage is currently supported for lab uploads")
         except ValueError as ve:
+            report_exc_info()
             messages.add_message(requests, messages.ERROR, str(ve))
 
         if lab_id := lab_id:
