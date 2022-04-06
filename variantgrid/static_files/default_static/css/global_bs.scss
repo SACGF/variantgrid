@@ -1004,3 +1004,11 @@ ul.compact {
 .overlap-single_submission, .overlap-no_entries {
     background-color: #ccc;
 }
+
+.fa-spinner {
+  animation:spin 3s steps(8) infinite;
+}
+@keyframes spin {
+    from { transform:rotate(0deg); }
+    to { transform:rotate(360deg); }
+}

@@ -1,6 +1,6 @@
 {% load ui_utils %}
 {% load english_tags %}
-{% labelled label="Status" %}{{ record.get_status_display }}{% endlabelled %}
+{% labelled label="Status" %}{{ record.get_status_display }}{% if in_progress %} <i class="fa fa-spinner"></i>{% endif %}{% endlabelled %}
 {% if record.validation_summary %}
     <hr/>
     {% for prop in record.validation_summary_properties %}
