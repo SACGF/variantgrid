@@ -175,7 +175,12 @@ class Migrator:
     STANDARD_MIGRATIONS: List[SubMigration] = [
         CommandSubMigration.git(["pull"]).using(key="g", task_id="git*pull"),
         CommandSubMigration.manage_py(["migrate"]).using(key="m", task_id="manage*migrate"),
-        CommandSubMigration.manage_py(["collectstatic", "--noinput"]).using(key="c", task_id="manage*collectstatic"),
+        CommandSubMigration.manage_py(["collectstatic_js_reverse"]).using(key="r",
+                                                                          task_id="manage*collectstatic_js_reverse"),
+        # collectstatic without warning for conflicting files has been an issue for 6 years https://code.djangoproject.com/ticket/26583
+        # maybe it'll get fixed soon? For now (since we've never had a problem) just turn off all verbosity
+        CommandSubMigration.manage_py(["collectstatic", "-v", "0", "--noinput"]).using(key="c",
+                                                                                       task_id="manage*collectstatic"),
         CommandSubMigration.script(["deployed.sh"]).using(key="d")
     ]
 
