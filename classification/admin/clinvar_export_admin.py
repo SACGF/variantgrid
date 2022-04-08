@@ -3,7 +3,7 @@ from datetime import timedelta
 
 from django.contrib import messages, admin
 from django.db.models import QuerySet
-from django.http import HttpResponse
+from django.http import HttpResponse, HttpRequest
 from django.utils import timezone
 
 from classification.models import ClinVarExport, ClinVarExportBatch, ClinVarAllele, ClinVarExportBatchStatus, \
@@ -14,6 +14,7 @@ from snpdb.admin_utils import AllValuesChoicesFieldListFilter, ModelAdminBasics,
 
 class ClinVarExportSubmissionAdmin(admin.TabularInline):
     model = ClinVarExportSubmission
+    fields = ('clinvar_export', 'classification_based_on', 'submission_full', 'submission_version', 'localId', 'localKey', 'status', 'scv', 'response_json')
 
     def has_add_permission(self, request, obj=None):
         return False
@@ -44,7 +45,7 @@ class ClinVarClassificationAgeFilter(admin.SimpleListFilter):
 
 @admin.register(ClinVarExport)
 class ClinVarExportAdmin(ModelAdminBasics):
-    list_display = ("pk", "clinvar_allele", "status", "classification_based_on", "classification_created", "condition_smart", "scv", "created", "modified")
+    list_display = ("pk", "clinvar_allele", "status", "classification_based_on", "classification_created", "condition_smart", "scv", "latest_batch", "created", "modified")
     list_filter = (('clinvar_allele__clinvar_key', admin.RelatedFieldListFilter), ('status', AllValuesChoicesFieldListFilter), ClinVarClassificationAgeFilter)
     search_fields = ('pk', "scv")
     inlines = (ClinVarExportSubmissionAdmin, )
@@ -71,6 +72,11 @@ class ClinVarExportAdmin(ModelAdminBasics):
         if display_text := condition.get('display_text'):
             return display_text
         return condition
+
+    @admin_list_column("Latest Batch")
+    def latest_batch(self, obj: ClinVarExport):
+        if submission := obj.clinvarexportsubmission_set.order_by('-pk').first():
+            return submission.submission_batch_id
 
     @admin_action("Add to ClinVar Submission Batch")
     def add_to_batch(self, request, queryset):
@@ -118,7 +124,7 @@ class ClinVarExportBatchAdmin(ModelAdminBasics):
     list_display = ("pk", "clinvar_key", "created", "modified", "record_count", "status")
     list_filter = (('status', AllValuesChoicesFieldListFilter), ('clinvar_key', admin.RelatedFieldListFilter))
     search_fields = ('pk', )
-    inlines = (ClinVarExportRequestAdmin,)
+    inlines = (ClinVarExportRequestAdmin, ClinVarExportSubmissionAdmin)
 
     def has_add_permission(self, request, obj=None):
         return False
@@ -129,8 +135,19 @@ class ClinVarExportBatchAdmin(ModelAdminBasics):
             'file_url': admin.widgets.AdminURLFieldWidget()
         }, **kwargs)
 
+    @admin_list_column(short_description="Record Count")
     def record_count(self, obj: ClinVarExportBatch):
         return obj.clinvarexportsubmission_set.count()
+
+    @admin_action("Reject")
+    def reject(self, request: HttpRequest, queryset: QuerySet[ClinVarExportBatch]):
+        for ceb in queryset:
+            ceb.reject()
+
+    @admin_action("Regenerate")
+    def regenerate(self, request: HttpRequest, queryset: QuerySet[ClinVarExportBatch]):
+        for ceb in queryset:
+            ceb.regenerate()
 
     @admin_action("Download JSON")
     def download_json(self, request, queryset: QuerySet[ClinVarExportBatch]):

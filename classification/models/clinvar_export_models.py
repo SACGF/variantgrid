@@ -11,6 +11,7 @@ from lazy import lazy
 from model_utils.models import TimeStampedModel
 
 from classification.models import ClassificationModification, ConditionResolved, classification_flag_types
+from library.utils import first
 from snpdb.models import ClinVarKey, Allele
 from uicore.json.json_types import JsonObjType
 from uicore.json.json_utils import JsonDiffs
@@ -221,9 +222,32 @@ class ClinVarExportBatch(TimeStampedModel):
     def reject(self):
         self.status = ClinVarExportBatchStatus.REJECTED
         self.save()
-        exports = self.clinvarexportsubmission_set.values_list('clinvar_export', flat=True).distinct()
+        # Note that we don't change the status on the individual ClinVarExportSubmissions... should we?
+        submissions = self.clinvarexportsubmission_set
+        # TODO add the below setting of rejected rather then leaving the submission in WAITING
+        # submissions.update('status', ClinVarExportSubmissionStatus.REJECTED)
+        exports = submissions.values_list('clinvar_export', flat=True)
         for export in ClinVarExport.objects.filter(pk__in=exports):
             export.update()
+
+    def regenerate(self) -> Optional['ClinVarExportBatch']:
+        """
+        Generates a new batch that should include all the records that this one did (assuming this batch is the latest
+        batch for the clinvar key)
+        """
+        if ClinVarExportBatch.objects.filter(clinvar_key=self.clinvar_key).order_by('-pk').first() != self:
+            raise ValueError(f"Can only regenerate the latest ClinVarExportBatch for a given ClinVarKey {self} is not the latest")
+
+        can_delete_batch = self.status == ClinVarExportBatchStatus.AWAITING_UPLOAD
+        if self.status not in (ClinVarExportBatchStatus.SUBMITTED, ClinVarExportBatchStatus.REJECTED):
+            self.reject()
+        exports = ClinVarExport.objects.filter(pk__in=self.clinvarexportsubmission_set.values_list('clinvar_export', flat=True))
+        # as we're regenerating just one ClinVarExportBatch we expect we're only going to get 1 or 0 new batches (based on changes)
+        response = first(ClinVarExportBatch.create_batches(qs=exports, force_update=True))
+        if can_delete_batch:
+            # no point keeping a batch that we're never going to send, confusing change history
+            self.delete()
+        return response
 
     @staticmethod
     @transaction.atomic()
@@ -285,6 +309,7 @@ class ClinVarExportSubmissionStatus(TextChoices):
     WAITING = "W", "Waiting"
     SUCCESS = "S", "Success"
     ERROR = "E", "Error"
+    #  REJECTED = "R", "Rejected"  # TODO : add this manually rejected option (only not adding now as need to hot fix)
 
 
 class ClinVarExportSubmission(TimeStampedModel):
@@ -305,7 +330,8 @@ class ClinVarExportSubmission(TimeStampedModel):
     submission_body = models.JSONField()  # used to see if there are any changes since last submission (other than going from novel to update)
     submission_version = models.IntegerField()
 
-    localId = models.TextField()  # should be static
+    # fix me - should be snake case
+    localId = models.TextField()  # should generally not change for a c.hgvs/condition umbrella combo
     localKey = models.TextField()  # can change as the selected classification changes
 
     # individual record failure, batch can be in error too
