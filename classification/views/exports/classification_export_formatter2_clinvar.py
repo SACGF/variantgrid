@@ -1,3 +1,4 @@
+from enum import Enum
 from typing import Set, Optional, Iterable, List
 
 from django.http import HttpRequest
@@ -13,6 +14,36 @@ from classification.views.exports.classification_export_formatter2 import Classi
 from library.django_utils import get_url_from_view_path
 from library.utils import ExportRow, export_column
 from snpdb.models import VariantAllele
+
+
+class ClinVarCompareValue(int, Enum):
+    # the order is as such as discordant and confidence both show a distinct difference to the only value provided by ClinVar - so you're the one causing waves
+    # unknown means that while you disagree with someone, you most likely agree with someone else
+    # overlap, agreement means that you agree completely with someone and we know it
+    UNCLASSIFIED = 0
+    DISCORDANT = 1
+    CONFIDENCE = 2
+    UNKNOWN = 3
+    OVERLAP = 4
+    AGREEMENT = 5
+    NOVEL = 6
+    NOT_CALCULATED = 7
+
+    @property
+    def label(self) -> str:
+        return {
+            ClinVarCompareValue.UNCLASSIFIED: "unclassified",
+            ClinVarCompareValue.DISCORDANT: "discordant",
+            ClinVarCompareValue.CONFIDENCE: "confidence",
+            ClinVarCompareValue.UNKNOWN: "unknown",
+            ClinVarCompareValue.OVERLAP: "overlap",
+            ClinVarCompareValue.AGREEMENT: "agreement",
+            ClinVarCompareValue.NOVEL: "novel",
+            ClinVarCompareValue.NOT_CALCULATED: "error"
+        }[self.value]
+
+    def __str__(self):
+        return f"{self.value} {self.label}"
 
 
 class ClinVarCompareRow(ExportRow):
@@ -33,7 +64,8 @@ class ClinVarCompareRow(ExportRow):
         "LB": 1,
         "VUS": 2,
         "LP": 3,
-        "P": 3
+        "P": 3,
+        "R": 4
     }
 
     def __init__(self, allele_group: AlleleData, clinvar_version: ClinVarVersion):
@@ -117,39 +149,43 @@ class ClinVarCompareRow(ExportRow):
             return clinvar.stars
 
     @export_column()
-    def diff(self):
-        server_clins: Set[str] = self.server_clinical_significance_set
+    def diff_value(self) -> ClinVarCompareValue:
+        our_clins: Set[str] = self.server_clinical_significance_set
         clinvar_clins: Set[str] = self.clinvar_clinical_significance_set
-        if "not_provided" in clinvar_clins:
-            clinvar_clins.remove("not_provided")
-
-        for vus_x in ('VUS_A', 'VUS_B', 'VUS_C'):
-            if vus_x in server_clins:
-                server_clins.remove(vus_x)
-                server_clins.add('VUS')
+        clinvar_clins.discard("not_provided")
 
         if not clinvar_clins:
-            return "6 novel"
+            return ClinVarCompareValue.NOVEL
+        if not our_clins:
+            return ClinVarCompareValue.UNCLASSIFIED
+
         if "Conflicting" in clinvar_clins:
-            return "3 unknown"
-        if server_clins == clinvar_clins:
-            return "5 agreement"
-        if server_clins.intersection(clinvar_clins):
-            return "4 overlap"
+            return ClinVarCompareValue.UNKNOWN
 
-        def to_buckets(cs_set: Iterable[str]) -> Set[int]:
-            bucket_set = set()
-            for cs in cs_set:
-                if bucket := ClinVarCompareRow.CLINSIG_BUCKETS.get(cs):
-                    bucket_set.add(bucket)
-            return bucket_set
+        # simplify VUS_A/B/C to just VUS
+        our_clins = {"VUS" if sc.startswith("VUS") else sc for sc in our_clins}
 
-        server_buckets = to_buckets(server_clins)
-        clinsig_buckets = to_buckets(clinvar_clins)
-        if server_clins.intersection(clinsig_buckets):
-            return "2 confidence"
+        lowest_value = ClinVarCompareValue.NOT_CALCULATED
+        clingen_buckets = {ClinVarCompareRow.CLINSIG_BUCKETS.get(cs, -1) for cs in clinvar_clins}
 
-        return "1 discordant"
+        def compare_single(server_clin: str) -> ClinVarCompareValue:
+            nonlocal clinvar_clins
+            nonlocal clingen_buckets
+            server_bucket = ClinVarCompareRow.CLINSIG_BUCKETS.get(server_clin, 0)
+            if server_clin in clinvar_clins:
+                return ClinVarCompareValue.AGREEMENT
+            elif server_bucket in clingen_buckets:
+                return ClinVarCompareValue.CONFIDENCE
+            else:
+                return ClinVarCompareValue.DISCORDANT
+
+        compare_values = [compare_single(sc) for sc in our_clins]
+        lowest_value = min(compare_values)
+
+        if lowest_value == ClinVarCompareValue.AGREEMENT and len(clinvar_clins) > 1:
+            return ClinVarCompareValue.OVERLAP
+        else:
+            return lowest_value
 
     @lazy
     def clinvar(self) -> Optional[ClinVar]:
