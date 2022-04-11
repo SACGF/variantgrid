@@ -57,6 +57,7 @@ class ClinVarCompareRow(ExportRow):
         "Pathogenic/Likely_pathogenic": ["P", "LP"],
         "Benign/Likely_benign": ["B", "LB"],
         "risk_factor": "R",
+        "drug_response": "D",
         "Conflicting_interpretations_of_pathogenicity": "Conflicting"
     }
     CLINSIG_BUCKETS = {
@@ -65,7 +66,8 @@ class ClinVarCompareRow(ExportRow):
         "VUS": 2,
         "LP": 3,
         "P": 3,
-        "R": 4
+        "R": 4,
+        "D": 5
     }
 
     def __init__(self, allele_group: AlleleData, clinvar_version: ClinVarVersion):
@@ -113,6 +115,8 @@ class ClinVarCompareRow(ExportRow):
             if cs := clinvar.clinical_significance:
                 for part in cs.split(","):
                     part = part.strip()
+                    if part.startswith("_"):
+                        part = part[1:]
                     m_parts = ClinVarCompareRow.CLINSIG_TO_VGSIG.get(part, part)
                     if isinstance(m_parts, str):
                         cs_set.add(m_parts)
