@@ -23,7 +23,7 @@ class SearchResponseClassification(SearchResponseRecordAbstract[Classification])
         classification: Classification = self.record
         clin_sig = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE).\
             pretty_value(last_published.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)) or 'Unclassified'
-        return f"{clin_sig} {classification.lab.name} / {classification.lab_record_id}"
+        return f"({clin_sig}) {classification.lab.name} / {classification.lab_record_id}"
 
 
 @receiver(search_signal, sender=SearchInput)
