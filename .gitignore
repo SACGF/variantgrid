@@ -15,3 +15,4 @@ lint.txt
 /.idea/csv-plugin.xml
 /bin/
 /pyvenv.cfg
+/variantgrid/static_files/default_static/django_js_reverse/reverse.js
