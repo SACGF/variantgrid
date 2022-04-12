@@ -16,7 +16,7 @@ import re
 
 
 class UploadedClassificationsUnmappedStatus(models.TextChoices):
-    Manual = "MA", "Manual"
+    Manual = "MA", "Manual Review Pending"
     Pending = 'P', 'Pending'
 
     Mapping = "M", "Mapping"
