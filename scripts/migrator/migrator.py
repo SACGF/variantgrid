@@ -235,7 +235,7 @@ class Migrator:
         self.refresh_migrations()
         keys = list()
         print_purple("-- Welcome to variantgrid upgrader --")
-        print("a: automate standard steps (runs git, migrate, collectstatic, deployed)")
+        print("a: automate standard steps (runs git, migrate, collectstatic_js_reverse, collectstatic, deployed)")
         for migration in self.migrations:
             if migration.key == "1":
                 print("****** SPECIAL STEPS ******")
