@@ -939,7 +939,7 @@ ul.compact li:before {
 }
 .json.compact .js-block {
   display: inline;
-  margin-left: 4px;
+  margin-left: 0px;
 }
 .json.compact .js-comma {
   display: inline;

@@ -974,7 +974,7 @@ ul.compact {
   &.compact {
     word-break: break-word;
     background-color: transparent;
-    .js-block {display: inline; margin-left: 4px}
+    .js-block {display: inline; margin-left: 0px}
     .js-comma {display: inline;}
     br {display: none}
   }

@@ -21,6 +21,10 @@ class ViewEvent(TimeStampedModel):
     method = models.TextField()
     referer = models.TextField(null=True, blank=True)
 
+    @property
+    def is_get(self):
+        return not self.method or self.method.upper() == "GET"
+
 
 class Event(models.Model):
     user = models.ForeignKey(User, null=True, on_delete=SET_NULL)

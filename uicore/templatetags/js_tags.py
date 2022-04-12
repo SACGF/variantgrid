@@ -1,3 +1,4 @@
+import collections.abc
 import json
 import re
 import urllib
@@ -105,9 +106,13 @@ def dash_if_empty(val):
 
 
 @register.inclusion_tag("uicore/tags/code_block_json.html")
-def code_json(data: JsonDataType, css_class: Optional[str] = ""):
+def code_json(data: JsonDataType, css_class: Optional[str] = "", dash_if_empty: bool = False):
     if isinstance(data, ValidatedJson):
         data = data.serialize()
+
+    # note that we still want to print data if it's "false" or "0" but not if it's None or an empty dict or list
+    if dash_if_empty and data is None or (isinstance(data, collections.abc.Sized) and len(data) == 0):
+        return {"blank": True}
 
     if not css_class:
         # if we're formatting ValidatedJson and the first element has messages, that provides formatting
