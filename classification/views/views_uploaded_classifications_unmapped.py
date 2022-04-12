@@ -71,6 +71,7 @@ def view_uploaded_classification_unmapped_detail(request: HttpRequest, uploaded_
     if not record:
         raise PermissionDenied("You do not have access to this file")
     in_progress = record.status not in {
+        UploadedClassificationsUnmappedStatus.Manual,
         UploadedClassificationsUnmappedStatus.Error,
         UploadedClassificationsUnmappedStatus.Validated,
         UploadedClassificationsUnmappedStatus.Processed}
