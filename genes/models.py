@@ -1864,8 +1864,8 @@ class CanonicalTranscriptCollection(TimeStampedModel):
 class CanonicalTranscript(models.Model):
     collection = models.ForeignKey(CanonicalTranscriptCollection, on_delete=CASCADE)
     gene_symbol = models.ForeignKey(GeneSymbol, null=True, on_delete=CASCADE)
-    transcript = models.ForeignKey(Transcript, null=True, blank=True, on_delete=CASCADE)
-    transcript_version = models.ForeignKey(TranscriptVersion, null=True, blank=True, on_delete=CASCADE)
+    transcript = models.ForeignKey(Transcript, null=True, blank=True, on_delete=SET_NULL)
+    transcript_version = models.ForeignKey(TranscriptVersion, null=True, blank=True, on_delete=SET_NULL)
     original_gene_symbol = models.TextField()
     original_transcript = models.TextField()
 
@@ -1999,8 +1999,8 @@ def gene_coverage_collection_pre_delete_handler(sender, instance, **kwargs):  # 
 class AbstractGeneCoverage(models.Model):
     gene_coverage_collection = models.ForeignKey(GeneCoverageCollection, on_delete=CASCADE)  # rename to "coverage"?
     gene_symbol = models.ForeignKey(GeneSymbol, null=True, on_delete=CASCADE)
-    transcript = models.ForeignKey(Transcript, null=True, blank=True, on_delete=CASCADE)
-    transcript_version = models.ForeignKey(TranscriptVersion, null=True, blank=True, on_delete=CASCADE)
+    transcript = models.ForeignKey(Transcript, null=True, blank=True, on_delete=SET_NULL)
+    transcript_version = models.ForeignKey(TranscriptVersion, null=True, blank=True, on_delete=SET_NULL)
     original_gene_symbol = models.TextField()  # raw input string
     original_transcript = models.TextField()  # raw input string
     size = models.IntegerField(null=True)
@@ -2165,7 +2165,7 @@ class PfamSequenceIdentifier(models.Model):
     """ From HUMAN_9606_idmapping - Used to map Transcripts to PFam sequences """
     pfam_sequence = models.ForeignKey(PfamSequence, on_delete=CASCADE)
     transcript = models.ForeignKey(Transcript, on_delete=CASCADE)
-    transcript_version = models.ForeignKey(TranscriptVersion, null=True, on_delete=CASCADE)
+    transcript_version = models.ForeignKey(TranscriptVersion, null=True, on_delete=SET_NULL)
 
     @classmethod
     def get_transcript_for_gene(cls, gene: Gene, variant_annotation_version):

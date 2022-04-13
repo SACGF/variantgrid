@@ -1217,7 +1217,7 @@ class GoldCoverageSummary(models.Model):
     gold_reference = models.ForeignKey(GoldReference, on_delete=CASCADE)
     gene_symbol = models.ForeignKey(GeneSymbol, null=True, on_delete=CASCADE)
     transcript = models.ForeignKey(Transcript, null=True, on_delete=CASCADE)
-    transcript_version = models.ForeignKey(TranscriptVersion, null=True, on_delete=CASCADE)
+    transcript_version = models.ForeignKey(TranscriptVersion, null=True, on_delete=SET_NULL)
     original_gene_symbol = models.TextField()
     original_transcript = models.TextField()
     mean = models.FloatField()

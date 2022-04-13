@@ -524,9 +524,9 @@ class AbstractVariantAnnotation(models.Model):
     # gene/transcript are set by VEP and don't have a version.
     # can be set when up/downstream of gene (in which case HGVS_C and thus transcript_version will be null)
     gene = models.ForeignKey(Gene, null=True, on_delete=CASCADE)
-    transcript = models.ForeignKey(Transcript, null=True, on_delete=CASCADE)
+    transcript = models.ForeignKey(Transcript, null=True, on_delete=SET_NULL)
     # Linked from HGVS transcript (to get version) @see BulkVEPVCFAnnotationInserter.get_transcript_version_id
-    transcript_version = models.ForeignKey(TranscriptVersion, null=True, on_delete=CASCADE)
+    transcript_version = models.ForeignKey(TranscriptVersion, null=True, on_delete=SET_NULL)
 
     # VEP Fields
     # The best way to see how these map to VEP fields is via the annotation details page
