@@ -39,8 +39,8 @@ def create_sub_step(upload_step, sub_step_name, sub_step_commands):
                                      task_type=UploadStepTaskType.TOOL)
 
 
-def _write_split_headers(vcf_filename, split_headers_filename):
-    """ Remove any INFO lines (they can break bcftools annotate) and write in VT normalize ones """
+def _write_split_headers(vcf_filename: str, remove_info: bool, split_headers_filename: str):
+    """ Add VT normalize INFO to header, strip if remove_info = True """
     VT_HEADERS = [
         '##INFO=<ID=OLD_MULTIALLELIC,Number=1,Type=String,Description="Original chr:pos:ref:alt encoding">',
         '##INFO=<ID=OLD_VARIANT,Number=.,Type=String,Description="Original chr:pos:ref:alt encoding">',
@@ -55,13 +55,13 @@ def _write_split_headers(vcf_filename, split_headers_filename):
                         f.write(vt_line + "\n")
                     written_vt_headers = True
 
-                if info_line:
+                if info_line and remove_info:
                     continue
             if line:
                 f.write(line + "\n")
 
 
-def preprocess_vcf(upload_step, annotate_gnomad_af=False):
+def preprocess_vcf(upload_step, remove_info=False, annotate_gnomad_af=False):
     MAX_STDERR_OUTPUT = 5000  # How much stderr output per process to store in DB
 
     VCF_CLEAN_AND_FILTER_SUB_STEP = "vcf_clean_and_filter"
@@ -98,6 +98,8 @@ def preprocess_vcf(upload_step, annotate_gnomad_af=False):
                                           skipped_contigs_stats_file,
                                           "--skipped-records-stats-file",
                                           skipped_records_stats_file]
+    if remove_info:
+        read_variants_cmd.append("--remove-info")
     pipe_commands[VCF_CLEAN_AND_FILTER_SUB_STEP] = read_variants_cmd
     sub_steps[VCF_CLEAN_AND_FILTER_SUB_STEP] = create_sub_step(upload_step, VCF_CLEAN_AND_FILTER_SUB_STEP, read_variants_cmd)
 
@@ -110,7 +112,7 @@ def preprocess_vcf(upload_step, annotate_gnomad_af=False):
     split_vcf_dir = upload_pipeline.get_pipeline_processing_subdir("split_vcf")
     # We'll cat split_headers_filename on top of every split VCF
     split_headers_filename = os.path.join(split_vcf_dir, name_from_filename(vcf_filename, remove_gz=True))
-    _write_split_headers(vcf_filename, split_headers_filename)
+    _write_split_headers(vcf_filename, remove_info, split_headers_filename)
 
     pipe_commands[REMOVE_HEADER_SUB_STEP] = [settings.VCF_IMPORT_VT_COMMAND, "view", "-"]
     pipe_commands[SPLIT_VCF_SUB_STEP] = ["split", "-", vcf_name, "--additional-suffix=.vcf.gz", "--numeric-suffixes",
