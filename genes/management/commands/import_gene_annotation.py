@@ -3,7 +3,6 @@ import logging
 from typing import Dict, Tuple
 
 from django.core.management.base import BaseCommand
-from django.db.models import Count
 from django.db.models.functions import Upper
 
 from genes.cached_web_resource.refseq import retrieve_refseq_gene_summaries
@@ -33,6 +32,7 @@ class Command(BaseCommand):
                             help="Make a release (to match VEP) store all gene/transcript versions")
         parser.add_argument('--json-file', required=True,
                             help='cdot JSON.gz')
+        parser.add_argument('--clear-obsolete', actions='store_true', help='Clear old transcripts')
 
     def handle(self, *args, **options):
         build_name = options["genome_build"]
@@ -57,6 +57,13 @@ class Command(BaseCommand):
             self._create_release(genome_build, annotation_consortium, release_version, cdot_data)
         else:
             self._import_merged_data(genome_build, annotation_consortium, cdot_data)
+
+        if options["clear_obsolete"]:
+            print("Clearing old Transcript Versions")
+            tv_qs = TranscriptVersion.objects.filter(transcript__annotation_consortium=annotation_consortium,
+                                                     genome_build=genome_build)
+            ret = tv_qs.filter(data__genome_builds__isnull=True).delete()
+            print(f"Deleted: {ret}")
 
     def _get_import_source_by_url(self, genome_build, annotation_consortium, url):
         import_source = self.import_source_by_url.get(url)
