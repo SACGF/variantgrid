@@ -11,7 +11,7 @@
         <p>
         See instructions at <a href="https://github.com/sacgf/variantgrid/wiki/Annotation%20Setup">Annotation Setup (VariantGrid Wiki)</a>
 
-        <p>Command line examples should be executed in the variantgrid dir <code>(${VG_INSTALL_DIR})</code> running as the <code>(${VARIANTGRID_USER})</code>.
+        <p>Command line examples should be executed in the variantgrid dir <code>(${VG_INSTALL_DIR})</code> running as the <code>(${VARIANTGRID_USER})</code>
 
         <p>The variables should be set as per <a href="https://github.com/sacgf/variantgrid/wiki/Annotation%20Setup">wiki link (same as above)</a>:
 
@@ -48,7 +48,7 @@
             {% endlabelled %}
             {% labelled label="Contigs" %}
                 <div class="{{ build_name }}">
-                    <b>Contigs:</b>&#31;{{ details.contigs.num_contigs }} <a href="#{{ build_name }}-contigs" data-toggle="collapse" class="toggle-link">Toggle</a>
+                    <b>Contigs:</b> {{ details.contigs.num_contigs }} <a href="#{{ build_name }}-contigs" data-toggle="collapse" class="toggle-link">Toggle</a>
                     <div id="{{ build_name }}-contigs" class='contig-details collapse'>{{ details.contigs.contigs }}</div>
                 </div>
             {% endlabelled %}
@@ -56,8 +56,8 @@
                 {% if details.genes_and_transcripts %}
                     <div>
                         <b>Annotation:</b> {{ details.annotation_consortium }}
-                        <b>Genes:</b> {{ details.genes_and_transcripts.genes }}
-                        <b>Transcripts:</b> {{ details.genes_and_transcripts.transcripts }}
+                        <b>Genes:</b> {{ details.genes_and_transcripts.genes | intcomma }}
+                        <b>Transcripts:</b> {{ details.genes_and_transcripts.transcripts | intcomma }}
                         <a href="#{{ build_name }}-import-sources" data-toggle="collapse" class="toggle-link">Toggle import sources</a>
                     </div>
                     <div id="{{ build_name }}-import-sources" class='gene-transcript-instructions collapse'>
@@ -73,8 +73,8 @@
                 {% for cons_name, other_consortia_data in details.other_consortia.items %}
                     <div>
                         <b>Annotation:</b> {{ cons_name }}
-                        <b>Genes:</b> {{ other_consortia_data.genes }}
-                        <b>Transcripts:</b> {{ other_consortia_data.transcripts }}
+                        <b>Genes:</b> {{ other_consortia_data.genes | intcomma }}
+                        <b>Transcripts:</b> {{ other_consortia_data.transcripts | intcomma }}
                         <a href="#{{ build_name }}-other-import-sources" data-toggle="collapse" class="toggle-link">Toggle import sources</a>
                     </div>
                     <div id="{{ build_name }}-other-import-sources" class='gene-transcript-instructions collapse'>
@@ -335,7 +335,7 @@ ${VARIANTGRID_DIR}/scripts/install/get_somalier_release.sh
                 {% else %}
                     {% if user.is_superuser %}
                         {% if cwr.import_status != 'S' %}
-                        <b>Status:</b>&#31;{{ cwr.get_import_status_display }}
+                        <b>Status:</b> {{ cwr.get_import_status_display }}
                         <div class='install-instructions'>Click the button below to retrieve annotations</div>
                         {% endif %}
                         <button class='load-cached-web-resource btn btn-primary mr-2' cached-web-resource='{{ cwr.name }}' >Update from web</button>
