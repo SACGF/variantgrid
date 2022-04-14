@@ -144,9 +144,9 @@
                                 <input class="form-check-input" type="radio" name="discordances-filter" id="discordances-filter-all" value="0" checked />
                                 <span class="form-check-label">
                                 {% if dlab.discordances_qs.count == 1 %}
-                                    Show the discordance
+                                    Show the 1 discordance
                                 {% else %}
-                                    Show all {{ dlab.discordances_qs.count }} discordances
+                                    Show all {{ dlab.discordances_qs.count }} discordances <span class="text-info">(Use the below filters to show discordances with specific labs)</span>
                                 {% endif %}
                                 </span>
                             </label>
