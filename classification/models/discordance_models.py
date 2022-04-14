@@ -150,10 +150,9 @@ class DiscordanceReport(TimeStampedModel):
                 discordance_change_signal.send(DiscordanceReport, discordance_report=self)
 
     def all_actively_involved_labs(self) -> List[Lab]:
-        all_lab_ids = set()
-        for lab_id in DiscordanceReportClassification.objects.filter(report=self).values_list('classification_original__classification__lab', flat=True):
-            all_lab_ids.add(lab_id)
-        return list(Lab.objects.filter(id__in=all_lab_ids).all())
+        # labs_to_classification isn't the most efficient, but chances are if you want all_actively_involved_labs
+        # you also want the lab summaries
+        return [ds.lab for ds in self.labs_to_classification]
 
     def all_actively_involved_labs_ids(self) -> str:
         return ";".join(str(lab.pk) for lab in self.all_actively_involved_labs())
@@ -307,11 +306,14 @@ class DiscordanceReport(TimeStampedModel):
         def __lt__(self, other):
             return self.lab < other.lab
 
+    @lazy
     def labs_to_classification(self) -> List[DiscordanceLabSummary]:
         # TODO rename this more like DiscordanceLabSummary
         lab_to_class: Dict[Lab, Set[str]] = defaultdict(set)
         for drc in DiscordanceReportClassification.objects.filter(report=self):
-            lab_to_class[drc.classification_effective.classification.lab].add(drc.classification_effective.get(SpecialEKeys.CLINICAL_SIGNIFICANCE))
+            effective_c: Classification = drc.classification_effective.classification
+            if not effective_c.withdrawn:
+                lab_to_class[effective_c.lab].add(drc.classification_effective.get(SpecialEKeys.CLINICAL_SIGNIFICANCE))
 
         from classification.models import EvidenceKeyMap
         clin_sig = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE)
@@ -386,7 +388,7 @@ class DiscordanceReport(TimeStampedModel):
 
         @property
         def lab_summaries(self) -> List['DiscordanceReport.DiscordanceLabSummary']:
-            all_summaries = self.discordance_report.labs_to_classification()
+            all_summaries = self.discordance_report.labs_to_classification
             my_summaries, other_summaries = segment(all_summaries, lambda x: x.lab == self.lab)
             # sort user's lab to the front for comparison
             return my_summaries + other_summaries
