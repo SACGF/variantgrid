@@ -805,7 +805,7 @@ class HGVSMatcher:
 
                     # Sanity Check - make sure contig is the same
                     contig_mappings = self.genome_build.chrom_contig_mappings
-                    transcript_chrom = transcript_version.data["chrom"]
+                    transcript_chrom = transcript_version.pyhgvs_data["chrom"]
                     transcript_contig = contig_mappings.get(transcript_chrom)
                     if variant.locus.contig != transcript_contig:
                         contig_msg = f"Variant contig={variant.locus.contig} (chrom={chrom}) while Transcript " \
