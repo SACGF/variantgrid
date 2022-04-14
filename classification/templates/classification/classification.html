@@ -7,7 +7,7 @@
 {% load ui_help %}
 {% load ui_menu_bars %}
 
-{% block title %}Variant Classification Groups{% endblock %}
+{% block title %}{{ site_name }}: Classification{% endblock %}
 {% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
 {% block head %}
 <script>
@@ -18,6 +18,7 @@
     
     EKeys.load().then(keys => {
         $(document).ready(function() {
+            let record = {{ record | jsonify }};
             vcform.init(
                 {
                     genomeBuild: "{{ genome_build.pk }}",
@@ -37,9 +38,10 @@
                     attachmentsEnabled: {{ attachments_enabled | jsonify }}
                 },
                 keys,
-                {{ record | jsonify }}
+                record,
             );
             Flags.instance.init({userId: '{{user.id}}'});
+            document.title = getPageTitle(record);
         });
     });
     window.fileupload_ready = function () {
@@ -59,6 +61,31 @@
             $('#fileupload .btn').remove();
         {% endif %}
     });
+
+    function getPageTitle(record) {
+        // Not much space in tabs so move gene symbol to front
+        let siteName = "{{ site_name }}";
+        let summaryList = [];
+        let geneSymbol = record.data.gene_symbol;
+        if (geneSymbol) {
+            summaryList.push(geneSymbol.value);
+        } else {
+            summaryList.push(record["lab_record_id"]);
+        }
+        summaryList.push("Classification");
+        let cHGVS = record.data.c_hgvs;
+        if (cHGVS) {
+            summaryList.push("- " + cHGVS.value);
+        } else {
+            let gHGVS = record.data.g_hgvs;
+            if (gHGVS) {
+                summaryList.push("- " + gHGVS.value);
+            }
+        }
+        let summary = summaryList.join(" ");
+        return siteName + ": " +  summary;
+    }
+
 </script>
 {% endblock %}
 {% block content %}
