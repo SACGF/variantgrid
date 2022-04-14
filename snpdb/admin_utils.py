@@ -125,6 +125,8 @@ class ModelAdminBasics(admin.ModelAdmin):
     def export_as_csv(self, request, queryset) -> HttpResponse:
         meta = self.model._meta
         field_names = [field.name for field in meta.fields]
+        if related_fields := [field.name for field in meta.fields if isinstance(field, ForeignKey)]:
+            queryset = queryset.select_related(*related_fields)
 
         def data_generator() -> Iterator[str]:
             nonlocal field_names
