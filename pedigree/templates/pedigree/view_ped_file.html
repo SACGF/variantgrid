@@ -27,7 +27,7 @@
 {% endblock css %}
 
 {% block jsdocumentready %}
-    {%  if draw_pedigree_chart %}
+    {% if draw_pedigree_chart %}
         var graph_selector = $('#pedigree-chart');
         {% if ped_file.import_status == 'S' %}
             var poll_url = "{% url 'pedigree_chart' ped_file.pk %}";
@@ -72,7 +72,9 @@
             {% endif %}
 	</div>
 
+    {% if draw_pedigree_chart %}
     <div id='pedigree-chart' class='generated-graph graph-loading'></div>
+    {% endif %}
 
 	{% for family in ped_file.pedfilefamily_set.all %}
 		<div class="ped-family-container" id="family-{{family.name}}">
