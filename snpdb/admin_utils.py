@@ -1,17 +1,20 @@
 import csv
 import inspect
-from typing import Optional, List
+from typing import Optional, List, Iterator
 
 from django.contrib import admin, messages
 from django.db import models
 from django.db.models import AutoField, ForeignKey, DateTimeField
-from django.http import HttpResponse
+from django.http import HttpResponse, StreamingHttpResponse
 from django.utils.encoding import smart_str
 from django_json_widget.widgets import JSONEditorWidget
 from guardian.admin import GuardedModelAdminMixin
 
 
 # https://stackoverflow.com/questions/41228687/how-to-decorate-admin-actions-in-django-action-name-used-as-dict-key
+from library.utils import delimited_row
+
+
 def admin_action(short_description: str):
     """
     Decorator, if used in ModelAdminBasics, marks function as something that can be done on selected rows.
@@ -123,14 +126,18 @@ class ModelAdminBasics(admin.ModelAdmin):
         meta = self.model._meta
         field_names = [field.name for field in meta.fields]
 
-        response = HttpResponse(content_type='text/csv')
-        response['Content-Disposition'] = 'attachment; filename={}.csv'.format(meta)
-        writer = csv.writer(response)
+        def data_generator() -> Iterator[str]:
+            nonlocal field_names
+            nonlocal queryset
 
-        writer.writerow(field_names)
-        for obj in queryset:
-            writer.writerow([getattr(obj, field) for field in field_names])
+            yield delimited_row(field_names)
+            for qs_obj in queryset:
+                yield delimited_row([getattr(qs_obj, field) for field in field_names])
+
+        response = StreamingHttpResponse(data_generator(), content_type='text/csv')
+        response['Content-Disposition'] = 'attachment; filename={}.csv'.format(meta)
         return response
+
     export_as_csv.short_description = "Export selected as CSV"
 
     def __new__(cls, *args, **kwargs):
