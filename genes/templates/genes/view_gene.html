@@ -48,7 +48,7 @@
                                 <tr>
                                     {% for d in version_data %}
                                         {% if forloop.first %}
-                                            <td>{{ gene.identifier }}.{{ d }}</td>
+                                            <td>{{ gene.identifier }}{% if d %}.{{ d }}{% endif %}</td>
                                         {% else %}
                                             <td>
                                                 {% if d %}

@@ -22,9 +22,8 @@ from django.contrib.postgres.fields import CITextField
 from django.core.cache import cache
 from django.core.exceptions import PermissionDenied, ObjectDoesNotExist, MultipleObjectsReturned
 from django.db import models, IntegrityError, transaction
-from django.db.models import Min, Max, QuerySet, TextField
+from django.db.models import QuerySet, TextField
 from django.db.models.deletion import CASCADE, SET_NULL, PROTECT
-from django.db.models.fields.json import KeyTextTransform
 from django.db.models.functions import Upper
 from django.db.models.query_utils import Q
 from django.db.models.signals import post_save, pre_delete
@@ -471,19 +470,19 @@ class GeneVersion(models.Model):
 
     @property
     def chrom(self):
-        return self._transcript_extents["chroms"]
+        return self._transcript_extents["chrom"]
 
     @property
     def start(self):
-        return int(self._transcript_extents["min_start"])
+        return int(self._transcript_extents["start"])
 
     @property
     def end(self):
-        return int(self._transcript_extents["max_end"])
+        return int(self._transcript_extents["end"])
 
     @property
     def strand(self):
-        return self._transcript_extents["strands"]
+        return self._transcript_extents["strand"]
 
     @lazy
     def coordinate(self) -> str:
@@ -496,25 +495,29 @@ class GeneVersion(models.Model):
     @lazy
     def _transcript_extents(self):
         """ Stores chroms/min_start/max_end/strands - which are aggregate of all linked TranscriptVersions """
-        DELIMITER = ","
-        qs = self.transcriptversion_set.filter(data__strand__isnull=False)
-        qs = qs.annotate(**{k: KeyTextTransform(k, "data") for k in ["chrom", "start", "end", "strand"]})
-        data = qs.aggregate(chroms=StringAgg("chrom", delimiter=DELIMITER, distinct=True, output_field=TextField()),
-                            min_start=Min("start"), max_end=Max("end"),
-                            strands=StringAgg("strand", delimiter=DELIMITER, distinct=True, output_field=TextField()))
+
+        FIELDS = ["chrom", "start", "end", "strand"]
+        data = defaultdict(set)
+        for tv in self.transcriptversion_set.all():
+            for f in FIELDS:
+                data[f].add(tv.pyhgvs_data[f])
+
+        print(f"{data}")
 
         # Sometimes chrom is a contig so we'll end up with chrom as "3,NC_000003.11" - check only 1 and convert to name
-        chrom_list = data["chroms"].split(DELIMITER)
-        if len(chrom_list) > 1:
-            contigs = {self.genome_build.chrom_contig_mappings[chrom] for chrom in chrom_list}
-            if len(contigs) > 1:
-                raise ValueError(f"{self}: 'chrom' ({data['chroms']}) mapped to >1 contigs: '{contigs}'")
-            data["chroms"] = contigs.pop().name
+        chrom_list = data["chrom"]
+        contigs = {self.genome_build.chrom_contig_mappings[chrom] for chrom in chrom_list}
+        if len(contigs) != 1:
+            raise ValueError(f"{self}: 'chrom' ({data['chrom']}) didn't matp to exactly 1 contig: '{contigs}'")
+        data["chrom"] = contigs.pop().name
 
-        for k in ["strands"]:
-            v = data[k]
-            if len(v.split(DELIMITER)) != 1:
-                raise ValueError(f"{self}: Not exactly 1 value for {k}, was: {v}")
+        data["start"] = min(data["start"])
+        data["end"] = min(data["end"])
+
+        strand = data["strand"]
+        if len(strand) != 1:
+            raise ValueError(f"{self}: Not exactly 1 value for 'strand', was: {strand}")
+        data["strand"] = data["strand"].pop()
         return data
 
     @staticmethod

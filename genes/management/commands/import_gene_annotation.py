@@ -32,7 +32,7 @@ class Command(BaseCommand):
                             help="Make a release (to match VEP) store all gene/transcript versions")
         parser.add_argument('--json-file', required=True,
                             help='cdot JSON.gz')
-        parser.add_argument('--clear-obsolete', actions='store_true', help='Clear old transcripts')
+        parser.add_argument('--clear-obsolete', action='store_true', help='Clear old transcripts')
 
     def handle(self, *args, **options):
         build_name = options["genome_build"]
