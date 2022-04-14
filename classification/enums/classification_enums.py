@@ -44,6 +44,7 @@ class SpecialEKeys:
     GENE_SYMBOL = 'gene_symbol'
     GENOME_BUILD = "genome_build"
     GENOTYPE_QUALITY = 'genotype_quality'
+    GNOMAD_AF = "gnomad_af"
     GNOMAD_OE_LOF = "gnomad_oe_lof"
     INTERNAL_SAMPLES_20X_COVERAGE = "internal_samples_100_percent_20x_gene_coverage"
     LITERATURE = "literature"
