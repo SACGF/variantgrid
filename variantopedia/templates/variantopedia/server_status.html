@@ -123,10 +123,11 @@
                         <div class="alert {% if worker_info.ok %}alert-primary{% else %}alert-danger{% endif %}">
                             {{ worker_info.status }}
                             {% if worker_info.ok %}
-                                {{ worker_info.active }} jobs
+                                Jobs: {{ worker_info.active }}
                                 {% if worker_info.scheduled %}
-                                    ({{ worker_info.scheduled }} scheduled)
+                                    Scheduled: {{ worker_info.scheduled }}
                                 {% endif %}
+                                Total workers: {{ worker_info.num_workers }}
                             {% endif %}
                         </div>
                     {% endlabelled %}
