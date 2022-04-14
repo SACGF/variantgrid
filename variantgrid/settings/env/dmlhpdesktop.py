@@ -63,6 +63,8 @@ LIFTOVER_NCBI_REMAP_PERLBREW_RUNNER_SCRIPT = os.path.join(BASE_DIR, "scripts", "
 SOMALIER["enabled"] = True
 SOMALIER["annotation_base_dir"] = os.path.join(ANNOTATION_REFERENCE_BASE_DIR, "somalier")
 
+PEDIGREE_MADELINE2_COMMAND = "madeline2"
+
 #CLINGEN_ALLELE_REGISTRY_DOMAIN = "http://reg.test.genome.network"
 
 #DEBUG = False
