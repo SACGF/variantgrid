@@ -1001,3 +1001,15 @@ class ExportRow:
         response = StreamingHttpResponse(cls.json_generator(data, records_key, categories=categories), content_type='application/json')
         response['Content-Disposition'] = f'attachment; filename="{filename}_{settings.SITE_NAME}_{date_time}.json"'
         return response
+
+
+class VarsDict:
+
+    def get(self, key, default=None):
+        return vars(self).get(key, default)
+
+    def __contains__(self, item):
+        return bool(self.get(item))
+
+    def __getitem__(self, item):
+        return vars(self)[item]

@@ -32,7 +32,7 @@ from annotation.regexes import db_ref_regexes, DbRegexes
 from classification.enums import ClinicalSignificance, SubmissionSource, ShareLevel, SpecialEKeys, \
     CRITERIA_NOT_MET, ValidationCode, CriteriaEvaluation
 from classification.models.classification_utils import \
-    ValidationMerger, ClassificationJsonParams, VariantCoordinateFromEvidence, PatchMeta
+    ValidationMerger, ClassificationJsonParams, VariantCoordinateFromEvidence, PatchMeta, ClassificationPatchResponse
 from classification.models.evidence_key import EvidenceKeyValueType, \
     EvidenceKey, EvidenceKeyMap, VCDataDict, WipeMode, VCDataCell
 from classification.models.evidence_mixin import EvidenceMixin, VCPatch
@@ -1425,7 +1425,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                     remove_api_immutable=False,
                     initial_data=False,
                     revalidate_all=False,
-                    ignore_if_only_patching: Optional[Set[str]] = None) -> Dict[str, Any]:
+                    ignore_if_only_patching: Optional[Set[str]] = None) -> ClassificationPatchResponse:
         """
             Creates a new ClassificationModification if the patch values are different to the current values
             Patching a value with the same value has no effect
@@ -1442,8 +1442,8 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             :returns: A dict with "messages" (validation errors, warnings etc) and "modified" (fields that actually changed value)
         """
         source = source or SubmissionSource.API
-        warnings = []
-        modified_keys = set()
+
+        patch_response = ClassificationPatchResponse()
 
         is_admin_patch = source.can_edit(SubmissionSource.VARIANT_GRID)
         key_dict: EvidenceKeyMap = self.evidence_keys
@@ -1594,17 +1594,14 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 patched.raw = cell.diff(None)
             elif cell.raw is None:
                 if not source.can_edit(existing_immutability):
-                    warnings.append(
-                        {'key': key, 'code': 'immutable', 'message': 'Cannot change immutable value for ' + key +
-                                                                     ' from ' + str(existing.value) + ' to blank'})
+                    patch_response.append_warning(key=key, code="immutable", message=f"Cannot change immutable value for {key} from {existing.value} to blank")
                     patched.wipe(WipeMode.POP)  # reject entire change if attempting to change immutable value
                 else:
                     patched.wipe(WipeMode.SET_NONE)
             else:
                 patched.raw = cell.diff(dest=existing, ignore_if_omitted={'immutable'})
                 if ('value' in patched or 'explain' in patched) and not source.can_edit(existing_immutability):
-                    message = f'Cannot change immutable value or explain for {key} from {existing.value} to {patched.value}'
-                    warnings.append({'key': key, 'code': 'immutable', 'message': message})
+                    patch_response.append_warning(key=key, code="immutable", message=f"Cannot change immutable value or explain for {key} from {existing.value} to {patched.value}")
                     patched.wipe(WipeMode.POP)  # reject entire change if attempting to change immutable value
                 else:
 
@@ -1632,7 +1629,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
 
         # only make a modification if there's data to actually patch
         if apply_patch:
-            modified_keys = set(diffs_only_patch.keys())
+            patch_response.modified_keys = set(diffs_only_patch.keys())
             last_edited = self.last_edited_version
 
             # in some cases we can append the last version
@@ -1669,8 +1666,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             self.clinical_significance = clinical_significance_choice
             pending_modification.clinical_significance = clinical_significance_choice
 
-            warnings.append(
-                {'code': 'patched', 'message': 'Patched changed values for ' + ', '.join(sorted(diffs_only_patch.keys()))})
+            patch_response.append_warning(code="patched", message='Patched changed values for ' + ', '.join(sorted(diffs_only_patch.keys())))
 
             if save:
                 self.save()
@@ -1685,9 +1681,9 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         else:
             if diffs_only_patch:
                 message = 'Only ' + ', '.join(sorted(diffs_only_patch.keys())) + ' changed, ignoring'
-                warnings.append({'code': 'no_patch', 'message': message})
+                patch_response.append_warning(code="no_patch", message=message)
             else:
-                warnings.append({'code': 'no_patch', 'message': 'No changes detected to patch'})
+                patch_response.append_warning(code="no_patch", message="No changes detected to patch")
                 # don't save if we haven't changed any values
 
         if self.requires_auto_population:
@@ -1697,10 +1693,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             genome_build = self.get_genome_build()
             classification_auto_populate_fields(self, genome_build, save=save)
 
-        return {
-            'messages': warnings,
-            'modified': modified_keys
-        }
+        return patch_response
 
     def publish_latest(self, user: User, share_level=None, debug_timer: DebugTimer = DebugTimer.NullTimer):
         if not share_level:
