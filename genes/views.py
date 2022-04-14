@@ -285,12 +285,14 @@ class GeneSymbolViewInfo:
     @lazy
     def classifications(self) -> QuerySet[ClassificationModification]:
         # Note this is loaded in Ajax
-        classifications = ClassificationModification.objects.none()
+        classifications_qs = ClassificationModification.objects.none()
         if filters := classification_gene_symbol_filter(self.gene_symbol):
             classifications = ClassificationModification.objects.filter(filters).filter(
                 is_last_published=True).exclude(classification__withdrawn=True)
-            classifications = ClassificationModification.filter_for_user(user=self.user, queryset=classifications)
-        return classifications
+            classifications_qs = ClassificationModification.filter_for_user(user=self.user, queryset=classifications)
+
+        classifications_qs = classifications_qs.select_related('classification', 'classification__lab', 'classification__allele', 'classification__allele__clingen_allele')
+        return classifications_qs
 
     def panel_app_servers(self) -> Union[QuerySet, Iterable[PanelAppServer]]:
         return PanelAppServer.objects.order_by("pk")
