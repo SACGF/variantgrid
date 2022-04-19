@@ -1,7 +1,6 @@
 import collections
 import datetime
 import unicodedata
-from dataclasses import dataclass
 from typing import List, Optional
 
 import celery
@@ -16,11 +15,10 @@ from lazy import lazy
 
 from classification.enums.discordance_enums import DiscordanceReportResolution
 from classification.models import Classification, classification_flag_types, \
-    DiscordanceReportClassification, DiscordanceReport
+    DiscordanceReportClassification, DiscordanceReport, DiscordanceReportSummaries, UserPerspective
 from email_manager.models import EmailLog
 from flags.models import FlagCollection
 from library.log_utils import report_exc_info, report_message
-from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import Lab, UserSettings, GenomeBuild
 
 EmailOutput = collections.namedtuple('EmailOutput', 'subject html text')
@@ -48,7 +46,7 @@ class EmailLabSummaryData:
         return UserSettings.get_genome_build_or_default(self.user)
 
     @lazy
-    def discordance_reports(self) -> List[DiscordanceReport]:
+    def discordance_report_summaries(self) -> DiscordanceReportSummaries:
         discordant_vcs = FlagCollection.filter_for_open_flags(
             Classification.objects.filter(lab=self.lab),
             flag_types=[classification_flag_types.discordant]
@@ -58,15 +56,9 @@ class EmailLabSummaryData:
         report_ids = DiscordanceReportClassification.objects.filter(
             classification_original__classification__in=discordant_vcs,
             report__resolution=DiscordanceReportResolution.ONGOING).values_list('report', flat=True)
-        return DiscordanceReport.objects.filter(pk__in=report_ids).order_by('-id')
+        dr_qs = DiscordanceReport.objects.filter(pk__in=report_ids).order_by('-id')
 
-    @lazy
-    def discordance_report_summaries(self) -> List[DiscordanceReport.DiscordanceReportSummary]:
-        return [dr.report_for(lab=self.lab, genome_build=self.genome_build) for dr in self.discordance_reports]
-
-    @lazy
-    def labs_to_discordance_counts(self) -> List[DiscordanceReport.LabDiscordantCount]:
-        return DiscordanceReport.count_labs(self.discordance_reports, your_lab=self.lab)
+        return DiscordanceReportSummaries.create(perspective=UserPerspective.for_lab(lab=self.lab, genome_build=self.genome_build), discordance_reports=dr_qs)
 
     @lazy
     def flagged_variants(self):
@@ -117,7 +109,7 @@ def send_summary_emails():
             us = UserSettings.get_for_user(user)
             if us.email_weekly_updates:
                 send_summary_email_to_user(user=user)
-        except:
+        except Exception:
             report_exc_info({"user": user.username})
 
 

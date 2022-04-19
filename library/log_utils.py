@@ -82,7 +82,7 @@ def report_exc_info(extra_data=None, request=None, report_externally=True):
         rollbar.report_exc_info(extra_data=extra_data, request=request)
     exc_info = sys.exc_info()
     if exc_info:
-        print(exc_info)
+        traceback.print_exc()
 
 
 class NotificationBuilder:
