@@ -10,6 +10,6 @@ Below is a summary of your {% count data.lab_summaries 'lab' 'labs' %}:
 {% for lab_summary in data.lab_summaries %}
 ** {{ lab_summary.lab.organization.name }} / {{ lab_summary.lab.name }} **
 {% if lab_summary.last_imported_new_ago %}Last uploaded a new classification {{ lab_summary.last_imported_new_ago }} ago.{% else %}Has not yet uploaded its first classifications.{% endif %}
-{{ lab_summary.discordance_reports|length }} active discordances.
+{{ lab_summary.discordance_report_summaries.summaries|length }} active discordances.
 {% endfor %}
 Thanks from the Shariant team.

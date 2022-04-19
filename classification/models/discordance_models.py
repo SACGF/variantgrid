@@ -22,7 +22,6 @@ from classification.models.flag_types import classification_flag_types
 from flags.models.enums import FlagStatus
 from flags.models.models import FlagComment
 from genes.hgvs import CHGVS
-from library.utils import segment
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import Lab, GenomeBuild
 
@@ -149,19 +148,22 @@ class DiscordanceReport(TimeStampedModel):
             if newly_added_labs:  # change is significant
                 discordance_change_signal.send(DiscordanceReport, discordance_report=self)
 
-    def all_actively_involved_labs(self) -> List[Lab]:
+    @property
+    def all_actively_involved_labs(self) -> Set[Lab]:
         # labs_to_classification isn't the most efficient, but chances are if you want all_actively_involved_labs
         # you also want the lab summaries
-        return [ds.lab for ds in self.labs_to_classification]
-
-    def all_actively_involved_labs_ids(self) -> str:
-        return ";".join(str(lab.pk) for lab in self.all_actively_involved_labs())
+        labs: Set[Lab] = set()
+        for drc in DiscordanceReportClassification.objects.filter(report=self):
+            effective_c: Classification = drc.classification_effective.classification
+            if not effective_c.withdrawn:
+                labs.add(effective_c.lab)
+        return labs
 
     def user_is_involved(self, user: User) -> bool:
         if user.is_superuser:
             return True
         user_labs = set(Lab.valid_labs_qs(user, admin_check=True))
-        report_labs = set(self.all_actively_involved_labs())
+        report_labs = self.all_actively_involved_labs
         return bool(user_labs.intersection(report_labs))
 
     @transaction.atomic
@@ -178,7 +180,7 @@ class DiscordanceReport(TimeStampedModel):
             for last_id in DiscordanceReportClassification.objects.filter(
                     report=self,
                     clinical_context_final=self.clinical_context
-                ).values_list('classification_final', flat=True):
+                    ).values_list('classification_final', flat=True):
 
                 DiscordanceReportClassification(
                     report=self,
@@ -274,7 +276,7 @@ class DiscordanceReport(TimeStampedModel):
             raise ValueError("Can only apply_flags on the latest discordance report for any clinical context")
         DiscordanceReport.apply_flags_to_context(self.clinical_context)
 
-    def actively_discordant_classification_ids(self) -> Set[Classification]:
+    def actively_discordant_classification_ids(self) -> Set[int]:
         if not self.is_important:
             return set()
         classifications = set()
@@ -298,19 +300,89 @@ class DiscordanceReport(TimeStampedModel):
             c_hgvs.add(cm.c_hgvs_best(genome_build))
         return sorted(c_hgvs)
 
+
+@dataclass(frozen=True)
+class UserPerspective:
+    your_labs: Set[Lab]
+    genome_build: GenomeBuild
+    is_admin_mode: bool
+
+    @staticmethod
+    def for_lab(lab: Lab, genome_build: GenomeBuild):
+        return UserPerspective(your_labs={lab, }, genome_build=genome_build, is_admin_mode=False)
+
+    @property
+    def labs_if_not_admin(self) -> Set[Lab]:
+        if self.is_admin_mode:
+            return set()
+        return self.your_labs
+
+class DiscordanceReportSummary:
+
+    def __init__(self, discordance_report: DiscordanceReport, perspective: UserPerspective):
+        self.discordance_report = discordance_report
+        self.perspective = perspective
+
+    @lazy
+    def all_actively_involved_labs(self):
+        return self.discordance_report.all_actively_involved_labs
+
+    def all_actively_involved_labs_ids(self) -> str:
+        return ";".join(str(lab.pk) for lab in self.all_actively_involved_labs)
+
+    @property
+    def is_valid(self) -> bool:
+        return self.perspective.is_admin_mode or bool(self.all_actively_involved_labs.intersection(self.perspective.your_labs))
+
+    @property
+    def other_labs(self) -> Set[Lab]:
+        return self.all_actively_involved_labs - self.perspective.labs_if_not_admin
+
+    @property
+    def is_internal(self):
+        return not self.perspective.is_admin_mode and not self.other_labs
+
+    @property
+    def _cm_candidate(self) -> ClassificationModification:
+        for cm_candidate in self.discordance_report.all_classification_modifications:
+            if cm_candidate.classification.lab in self.perspective.your_labs:
+                return cm_candidate
+        return self.discordance_report.all_classification_modifications[0]
+
+    @property
+    def id(self):
+        return self.discordance_report.id
+
+    @property
+    def date_detected(self) -> datetime:
+        return self.discordance_report.report_started_date
+
+    @property
+    def date_detected_str(self) -> str:
+        date_str = f"{self.date_detected:%Y-%m-%d}"
+        if (now() - self.date_detected) <= timedelta(days=1):
+            date_str = f"{date_str} (NEW)"
+        return date_str
+
+    @property
+    def c_hgvs(self) -> CHGVS:
+        return self._cm_candidate.c_hgvs_best(genome_build=self.perspective.genome_build)
+
     @dataclass
-    class DiscordanceLabSummary:
+    class LabClinicalSignificances:
         lab: Lab
-        values: Set[str]
+        clinical_significances: Iterable[str]  # values are clinical significance strings
+        is_internal: bool
 
         def __lt__(self, other):
+            if self.is_internal != other.is_internal:
+                return self.is_internal
             return self.lab < other.lab
 
     @lazy
-    def labs_to_classification(self) -> List[DiscordanceLabSummary]:
-        # TODO rename this more like DiscordanceLabSummary
+    def lab_significances(self) -> List[LabClinicalSignificances]:
         lab_to_class: Dict[Lab, Set[str]] = defaultdict(set)
-        for drc in DiscordanceReportClassification.objects.filter(report=self):
+        for drc in DiscordanceReportClassification.objects.filter(report=self.discordance_report):
             effective_c: Classification = drc.classification_effective.classification
             if not effective_c.withdrawn:
                 lab_to_class[effective_c.lab].add(drc.classification_effective.get(SpecialEKeys.CLINICAL_SIGNIFICANCE))
@@ -318,83 +390,58 @@ class DiscordanceReport(TimeStampedModel):
         from classification.models import EvidenceKeyMap
         clin_sig = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE)
 
-        return sorted([DiscordanceReport.DiscordanceLabSummary(k, clin_sig.sort_values(v)) for k, v in lab_to_class.items()])
+        return sorted([DiscordanceReportSummary.LabClinicalSignificances(lab=k, clinical_significances=clin_sig.sort_values(v), is_internal=k in self.perspective.labs_if_not_admin) for k, v in lab_to_class.items()])
 
-    @dataclass(frozen=True)
-    class LabDiscordantCount:
-        lab: Lab
-        your_lab: Lab
-        count: int
 
-        @property
-        def is_your_lab(self):
-            return self.lab == self.your_lab
+@dataclass(frozen=True)
+class DiscordanceReportSummaryCount:
+    lab: Optional[Lab]
+    count: int
 
-        def __lt__(self, other):
-            # if we want internal to go first no matter the count
-            if self.is_your_lab != other.is_your_lab:
-                return self.is_your_lab
-            if self.count != other.count:
-                return self.count > other.count
+    @property
+    def is_internal(self):
+        return self.lab is None
 
-            return self.lab < other.lab
+    def __lt__(self, other):
+        # if we want internal to go first no matter the count
+        if self.is_internal != other.is_internal:
+            return self.is_internal
+        if self.count != other.count:
+            return self.count > other.count
+
+        return self.lab < other.lab
+
+
+@dataclass(frozen=True)
+class DiscordanceReportSummaries:
+    perspective: UserPerspective
+    summaries: List[DiscordanceReportSummary]
+    counts: List[DiscordanceReportSummaryCount]
+
+    def __bool__(self):
+        return bool(self.summaries)
 
     @staticmethod
-    def count_labs(reports: Iterable['DiscordanceReport'], your_lab: Lab) -> List['DiscordantReport.LabDiscordantCount']:
-        lab_counts = defaultdict(int)
-        for dr in reports:
-            all_involved_labs = dr.all_actively_involved_labs()
-            if len(all_involved_labs) == 1 and your_lab in all_involved_labs:
-                lab_counts[your_lab] += 1
-            else:
-                for lab in all_involved_labs:
-                    if lab != your_lab:  # only record internal only discordances when it comes to your_lab
-                        lab_counts[lab] += 1
-        return sorted([DiscordanceReport.LabDiscordantCount(lab=key, your_lab=your_lab, count=value) for key, value in lab_counts.items()])
+    def create(perspective: UserPerspective, discordance_reports: Iterable[DiscordanceReport]) -> 'DiscordanceReportSummaries':
+        internal_count = 0
+        by_lab: Dict[Lab, int] = defaultdict(int)
+        summaries: List[DiscordanceReportSummary] = list()
 
-    # just for reporting
-    class DiscordanceReportSummary:
+        for dr in discordance_reports:
+            summary = DiscordanceReportSummary(discordance_report=dr, perspective=perspective)
+            if summary.is_valid:
+                summaries.append(summary)
+                if summary.is_internal:
+                    internal_count += 1
+                else:
+                    for lab in summary.other_labs:
+                        by_lab[lab] += 1
 
-        def __init__(self, discordance_report: 'DiscordanceReport', for_lab: Lab, genome_build: GenomeBuild):
-            self.discordance_report = discordance_report
-            self.lab = for_lab
-            self.genome_build = genome_build
-
-        @property
-        def _cm_candidate(self) -> ClassificationModification:
-            for cm_candidate in self.discordance_report.all_classification_modifications:
-                if cm_candidate.classification.lab == self.lab:
-                    return cm_candidate
-            raise ValueError(f"No classification for lab {self.lab}")
-
-        @property
-        def id(self):
-            return self.discordance_report.id
-
-        @property
-        def date_detected(self) -> datetime:
-            return self.discordance_report.report_started_date
-
-        @property
-        def date_detected_str(self) -> str:
-            date_str = f"{self.date_detected:%Y-%m-%d}"
-            if (now() - self.date_detected) <= timedelta(days=1):
-                date_str = f"{date_str} (NEW)"
-            return date_str
-
-        @property
-        def c_hgvs(self) -> CHGVS:
-            return self._cm_candidate.c_hgvs_best(genome_build=self.genome_build)
-
-        @property
-        def lab_summaries(self) -> List['DiscordanceReport.DiscordanceLabSummary']:
-            all_summaries = self.discordance_report.labs_to_classification
-            my_summaries, other_summaries = segment(all_summaries, lambda x: x.lab == self.lab)
-            # sort user's lab to the front for comparison
-            return my_summaries + other_summaries
-
-    def report_for(self, lab: Lab, genome_build: GenomeBuild) -> DiscordanceReportSummary:
-        return DiscordanceReport.DiscordanceReportSummary(discordance_report=self, for_lab=lab, genome_build=genome_build)
+        counts = sorted([DiscordanceReportSummaryCount(lab=key, count=value) for key, value in by_lab.items()])
+        if internal_count:
+            counts.insert(0, DiscordanceReportSummaryCount(lab=None, count=internal_count))
+        counts = counts
+        return DiscordanceReportSummaries(perspective=perspective, summaries=summaries, counts=counts)
 
 
 class DiscordanceAction:

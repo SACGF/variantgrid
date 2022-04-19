@@ -14,7 +14,7 @@ from termsandconditions.decorators import terms_required
 from classification.enums import ShareLevel
 from classification.enums.discordance_enums import DiscordanceReportResolution
 from classification.models import classification_flag_types, ClinVarExport, DiscordanceReportClassification, \
-    DiscordanceReport, ConditionText, ConditionTextMatch
+    DiscordanceReport, ConditionText, ConditionTextMatch, DiscordanceReportSummaries, UserPerspective
 from classification.models.classification import Classification, \
     ClassificationModification
 from classification.models.clinvar_export_sync import clinvar_export_sync
@@ -43,6 +43,7 @@ class ClassificationDashboard:
 
         self.labs = sorted(self.labs)
 
+    @property
     def lab_id(self) -> int:
         if len(self.labs) > 1:
             return 0
@@ -75,21 +76,24 @@ class ClassificationDashboard:
         return ClinVarExport.objects.none()
 
     @lazy
-    def discordances_qs(self) -> QuerySet[DiscordanceReport]:
+    def discordance_summaries(self) -> DiscordanceReportSummaries:
         # WARNING, this will count discordances that involve the lab in a classification, but one that has
         # has changed clinical context
         discordant_c = DiscordanceReportClassification.objects\
             .filter(classification_original__classification__lab__in=self.labs)\
             .filter(classification_original__classification__withdrawn=False)\
             .order_by('report_id').values_list('report_id', flat=True)
-        return DiscordanceReport.objects.filter(pk__in=discordant_c, resolution=DiscordanceReportResolution.ONGOING)\
+        dr_qs = DiscordanceReport.objects.filter(pk__in=discordant_c, resolution=DiscordanceReportResolution.ONGOING)\
             .order_by('-created')
 
-    def labs_to_discordance_counts(self) -> Optional[List[DiscordanceReport.LabDiscordantCount]]:
-        # this isn't very useful for an org that has multiple labs
-        if len(self.labs) != 1:
-            return None
-        return DiscordanceReport.count_labs(self.discordances_qs, your_lab=self.labs[0])
+        genome_build = GenomeBuildManager.get_current_genome_build()
+        perspective: UserPerspective
+        if len(self.labs) == 1:
+            perspective = UserPerspective.for_lab(self.labs[0], genome_build=genome_build)
+        else:
+            perspective = UserPerspective(your_labs=set(self.labs), genome_build=genome_build, is_admin_mode=self.user.is_superuser)
+
+        return DiscordanceReportSummaries.create(perspective=perspective, discordance_reports=dr_qs)
 
     @lazy
     def classifications_wout_standard_text(self) -> int:
