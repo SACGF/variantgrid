@@ -70,7 +70,7 @@ class RowID(ExportRow):
         return self.vc.lab_record_id
 
     @export_column(categories={"transient": True})
-    def internal_first_seen_date(self):
+    def server_created_date(self):
         return self.vc.created.strftime("%Y-%m-%d")
 
     @export_column(categories={"transient": True})
