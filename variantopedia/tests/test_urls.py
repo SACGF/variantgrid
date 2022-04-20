@@ -67,7 +67,7 @@ class Test(URLTestCase):
             ("view_variant", {"variant_id": self.variant.pk}, 200),
             ("view_variant_annotation_history", {"variant_id": self.variant.pk}, 200),
             ("view_allele_from_variant", variant_kwargs, 302),
-            ("view_allele", {"pk": self.allele.pk}, 200),
+            ("view_allele", {"allele_id": self.allele.pk}, 200),
             ("variant_details_annotation_version", {"variant_id": self.variant.pk,
                                                     "annotation_version_id": self.annotation_version.pk}, 200),
             ('gene_coverage', {"gene_symbol_id": self.gene_symbol.symbol}, 200),
