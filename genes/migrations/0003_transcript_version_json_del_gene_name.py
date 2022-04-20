@@ -2,8 +2,6 @@
 
 from django.db import migrations
 
-from manual.operations.manual_operations import ManualOperation
-
 
 class Migration(migrations.Migration):
 
