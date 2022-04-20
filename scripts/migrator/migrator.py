@@ -9,11 +9,8 @@ from typing import List, Optional, Dict
 
 from library.git import Git
 
-PYTHON_CMD = "python3.8"
-PYTHON_ALIAS = "python"
-
 COMMAND_ALIASES = {
-    "python": "python3.8"
+    "python": "python3"
 }
 
 
