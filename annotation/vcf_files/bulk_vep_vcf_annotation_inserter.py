@@ -63,11 +63,11 @@ class BulkVEPVCFAnnotationInserter:
         "gene_id",
         "transcript_id",
         "transcript_version_id",
-        "predictions_num_pathogenic",
-        "predictions_num_benign",
         "maxentscan_percent_diff_ref",
     ]
     DB_MANUALLY_POPULATED_VARIANT_ONLY_COLUMNS = [
+        "predictions_num_pathogenic",
+        "predictions_num_benign",
         "overlapping_symbols",
         "uniprot_id",  # set via swissprot
     ]
@@ -333,9 +333,11 @@ class BulkVEPVCFAnnotationInserter:
                     return uv
         return None
 
-    def add_calculated_columns(self, transcript_data):
-        self._add_calculated_num_predictions(transcript_data)
+    def add_calculated_transcript_columns(self, transcript_data):
         self._add_calculated_maxentscan(transcript_data)
+
+    def add_calculated_variant_annotation_columns(self, transcript_data):
+        self._add_calculated_num_predictions(transcript_data)
 
     def _add_calculated_num_predictions(self, transcript_data):
         num_pathogenic = 0
@@ -404,13 +406,14 @@ class BulkVEPVCFAnnotationInserter:
                     overlapping_symbols.add(symbol)
                 if gene_id:
                     overlapping_gene_ids.add(gene_id)
-                self.add_calculated_columns(transcript_data)
+                self.add_calculated_transcript_columns(transcript_data)
                 self.variant_transcript_annotation_list.append(transcript_data)
 
                 representative_transcript = vep_transcript_data.get(VEPColumns.PICK, False)
                 if representative_transcript:
                     variant_data = self.vep_to_db_dict(vep_transcript_data, self.variant_only_columns)
                     variant_data.update(transcript_data)
+                    self.add_calculated_variant_annotation_columns(variant_data)
                     # If we're using custom COSMIC vcf, merge with those from VEP existing variation
                     if custom_vcf_cosmic_ids := vep_transcript_data.get("COSMIC"):
                         self._merge_cosmic_ids(variant_data, custom_vcf_cosmic_ids)
