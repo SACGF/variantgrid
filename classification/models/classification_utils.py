@@ -59,10 +59,10 @@ class ClassificationPatchResponse(VarsDict):
         self.warnings += other.warnings
         self.modified_keys |= other.modified_keys
         self.internal_error = self.internal_error or other.internal_error
-        self.withdrawn |= other.withdrawn
-        self.deleted |= other.deleted
-        self.published |= other.published
-        self.saved |= other.saved
+        self.withdrawn = self.withdrawn or other.withdrawn
+        self.deleted = self.deleted or other.deleted
+        self.published = self.published or other.published
+        self.saved = self.saved or other.saved
         # classification json is a hard field to merge, just take the 2nd?
         self.classification_json = other.classification_json or self.classification_json
         # status is a hard field to merge

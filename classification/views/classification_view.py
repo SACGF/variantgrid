@@ -17,6 +17,7 @@ from classification.models.classification_import_run import ClassificationImport
 from classification.models.classification_inserter import BulkClassificationInserter
 from library.utils import empty_to_none
 from snpdb.models import Lab
+from uicore.json.to_json import force_json
 
 
 class ClassificationView(APIView):
@@ -105,15 +106,13 @@ class ClassificationView(APIView):
 
             else:
                 # single record
-                json_data = importer.insert(data, record_id).to_json()
-                if 'fatal_error' in json_data:
-                    return Response(status=HTTP_400_BAD_REQUEST, data=json_data)
-                elif 'internal_error' in json_data:
-                    return Response(status=HTTP_500_INTERNAL_SERVER_ERROR, data=json_data)
+                json_data = importer.insert(data, record_id)
+                if json_data.internal_error:
+                    return Response(status=HTTP_500_INTERNAL_SERVER_ERROR, data=force_json(json_data))
 
         importer.finish()
 
-        return Response(status=HTTP_200_OK, data=json_data)
+        return Response(status=HTTP_200_OK, data=force_json(json_data))
 
 
 class LabGeneClassificationCountsView(APIView):
