@@ -224,7 +224,7 @@ class ClinVarExportSummary(ExportRow):
 
     @export_column("Allele URL")
     def allele_id(self) -> str:
-        if allele_id := self.classification.allele_id:
+        if allele_id := self.classification.classification.allele_id:
             return get_url_from_view_path(reverse('view_allele', kwargs={"allele_id": allele_id}))
 
     @export_column("URL")
