@@ -1,16 +1,14 @@
 import collections
-from typing import Dict, Any, Optional, Set
+from typing import Dict, Any, Optional, Set, Mapping
 
 from django.conf import settings
+from django.contrib.auth.models import User
 from django.db import transaction
-from registration.forms import User
-from classification.enums import ShareLevel, ForceUpdate, SubmissionSource
+from classification.enums import ShareLevel, ForceUpdate, SubmissionSource, SpecialEKeys
 from classification.models import ClassificationImport, Classification, ClassificationProcessError, ClassificationRef, \
-    EvidenceMixin, PatchMeta, classification_flag_types, ClassificationJsonParams, ClassificationModification, \
-    ClassificationPatchResponse
-from classification.models.classification_patcher import patch_merge_age_units, patch_fuzzy_age
+    EvidenceMixin, classification_flag_types, ClassificationJsonParams, ClassificationModification, \
+    ClassificationPatchResponse, ClassificationImportRun
 from classification.models.classification_utils import ClassificationPatchStatus
-from classification.models.evidence_mixin import VCStore
 from classification.tasks.classification_import_task import process_classification_import_task
 from eventlog.models import create_event
 from library.log_utils import report_message, report_exc_info
@@ -67,8 +65,13 @@ class BulkClassificationInserter:
         return source
 
     @transaction.atomic
-    def insert(self, data: dict, record_id: Optional[str] = None, request=None,
-               submission_source: Optional[SubmissionSource] = None) -> ClassificationPatchResponse:
+    def insert(
+            self,
+            data: dict,
+            record_id: Optional[str] = None,
+            submission_source: Optional[SubmissionSource] = None,
+            import_run: Optional[ClassificationImportRun] = None) -> ClassificationPatchResponse:
+
         debug_timer = self.debug_timer
         patch_response = ClassificationPatchResponse()
 
@@ -104,8 +107,8 @@ class BulkClassificationInserter:
 
             record_ref.check_security(must_be_writable=True)
 
-            operation = None
-            operation_data = None
+            operation: Optional[str] = None
+            operation_data: Optional[Dict] = None
 
             # if you say test=true, we just want validation messages back
             save = not data.pop('test', False)
@@ -119,6 +122,8 @@ class BulkClassificationInserter:
             requested_undelete = delete_value is False
 
             debug_timer.tick("Security Check")
+
+            # -- ENSURE REQUEST IS WELL FORMATTED --
 
             # note we don't actually use ForceUpdate for anything at the moment
             # at one time (never in prod) was used to stop changes to only source ID, curation date
@@ -148,18 +153,14 @@ class BulkClassificationInserter:
                 operation_data = None
                 share_level = None
 
+            new_source_id: Optional[str] = None
             if operation_data:
-                operation_data = EvidenceMixin.to_patch(operation_data)
+                if source_id := operation_data.pop(SpecialEKeys.SOURCE_ID, None):
+                    if isinstance(source_id, collections.Mapping):
+                        source_id = source_id.get('value')
+                    new_source_id = source_id
 
-            # converts data before we even look at it
-            # good place to manipulate multi-keys, e.g.
-            # if we get age and age_units separately and want to merge
-            def pre_process(base_data: VCStore):
-                nonlocal operation_data
-                patch_meta = PatchMeta(patch=operation_data, existing=base_data)
-                patch_merge_age_units(patch_meta)
-                if settings.VARIANT_CLASSIFICATION_AUTOFUZZ_AGE:
-                    patch_fuzzy_age(patch_meta)
+                operation_data = EvidenceMixin.to_patch(operation_data)
 
             record = None
             if operation:
@@ -181,8 +182,6 @@ class BulkClassificationInserter:
                     debug_timer.tick("Preparing to Insert")
 
                     patch_response.status = ClassificationPatchStatus.NEW
-
-                    pre_process({})
                     record = record_ref.create(
                         source=source,
                         data=operation_data,
@@ -227,7 +226,6 @@ class BulkClassificationInserter:
                     record.check_can_write(user)
 
                     # THE ACTUAL PATCHING OF DATA VALUES
-                    pre_process(record.evidence)
                     patch_response += record.patch_value(operation_data,
                                                          clear_all_fields=operation == 'overwrite',
                                                          user=user,
@@ -249,6 +247,11 @@ class BulkClassificationInserter:
                 else:
                     raise ClassificationProcessError('Record not found')
 
+            if import_run:
+                record.last_import_run = import_run
+            if new_source_id:
+                record.last_source_id = new_source_id
+
             data_request = data.pop('return_data', False)
             flatten = data_request == 'flat'
             include_data = data_request or flatten
@@ -260,6 +263,7 @@ class BulkClassificationInserter:
 
             if save:
                 if requested_delete:
+                    # deleting or withdrawing
                     record.check_can_write(user)
 
                     params = ClassificationJsonParams(
@@ -290,7 +294,9 @@ class BulkClassificationInserter:
                         # raise ValueError('Record was already published at ' + record.share_level_enum.key + ', can no longer publish at ' + share_level.key)
                         patch_response.append_warning(code="shared_higher",
                                                       message=f"The record is already shared as '{record.share_level_enum.key}', re-sharing at that level instead of '{share_level}'")
-                        record.publish_latest(share_level=record.share_level_enum, user=user)
+                        patch_response.published = record.publish_latest(share_level=record.share_level_enum, user=user)
+                        if patch_response.published:
+                            patch_response.saved = True
 
                     elif not self.force_publish and record.has_errors():
                         patch_response.append_warning(code="share_failure", message="Cannot share record with errors")
@@ -301,10 +307,11 @@ class BulkClassificationInserter:
                                                       message=f"Latest revision is now shared with {share_level}")
 
                 if requested_undelete:
-                    patch_response.status = ClassificationPatchStatus.UN_WITHDRAWN
-                    record.set_withdrawn(user=user, withdraw=False)
+                    if record.withdrawn:
+                        patch_response.status = ClassificationPatchStatus.UN_WITHDRAWN
+                        record.set_withdrawn(user=user, withdraw=False)
 
-                if record.withdrawn:
+                elif record.withdrawn:
                     # Withdrawn records are no longer automatically un-withdrawn
                     # record.set_withdrawn(user=user, withdraw=False)
                     patch_response.status = ClassificationPatchStatus.ALREADY_WITHDRAWN
@@ -317,18 +324,18 @@ class BulkClassificationInserter:
             # Check to see if the current record matches the previous one exactly
             # then if the most recent record isn't marked as published, delete it.
             # - note we only compare against the very immediate previous record
-            recent_modifications = list(
-                ClassificationModification.objects.filter(classification=record.id).order_by('-created')[:2])
+            recent_modifications = list(ClassificationModification.objects.filter(classification=record.id).order_by('-created')[:2])
             resolution = 'closed'
             if recent_modifications:
                 latest_mod = recent_modifications[0]
                 if not latest_mod.is_last_edited:
                     raise ValueError('Assertion error - expected most recent record to be last edited')
 
+                # detect if a value was changed and then changed back (if so, delete the pointless change)
                 if len(recent_modifications) >= 2:
                     previous_mod = recent_modifications[1]
 
-                    # if this latest record isn't published, and it matches the previous record exactly, ew can delete it
+                    # if this latest record isn't published, and it matches the previous record exactly, we can delete it
                     if not latest_mod.published and latest_mod.evidence == previous_mod.evidence:
                         latest_mod.delete()
                         previous_mod.is_last_edited = True
@@ -349,6 +356,12 @@ class BulkClassificationInserter:
                     flag_type=classification_flag_types.classification_outstanding_edits,
                     resolution=resolution
                 )
+                if not patch_response.saved and (import_run or new_source_id):
+                    # we would be here if no data was patched
+                    # update the classification with the new import_run, but don't update the modified date
+                    # since nothing has otherwise changed
+                    record.update_modified = False
+                    record.save()
 
             json_data = record.as_json(ClassificationJsonParams(
                 version=record_ref.version,
@@ -366,12 +379,12 @@ class BulkClassificationInserter:
 
         except ClassificationProcessError as ve:
             # expected error
-            report_exc_info(request=request)
+            report_exc_info()
             patch_response.internal_error = ve
             return patch_response
         except Exception as e:
             # unexpected error
-            report_exc_info(request=request)
+            report_exc_info()
             patch_response.internal_error = e
             return patch_response
 

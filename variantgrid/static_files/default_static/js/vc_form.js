@@ -1509,7 +1509,6 @@ const VCForm = (function() {
                 case 'A': type = 'age'; break;
                 case 'T': type = 'textarea'; break;
                 case 'U': type = 'user'; break;
-                case 'P': type = 'percent'; break;
                 case 'N': type = 'unit'; break;
                 // case N Unit (0 to 100)
                 default: type = 'input';
@@ -1712,15 +1711,7 @@ const VCForm = (function() {
 
                     widgetDiv.append(input);
 
-                    if (type === 'percent') {
-                        // percent should be deprecated but just in case
-                        input.scientific({
-                            'placeholder_short': '%',
-                            'placeholder': 'Enter a percentage.',
-                            'tooltip': 'This value i',
-                            multiplier: 1
-                        });
-                    } else if (type === 'unit') {
+                    if (type === 'unit') {
                         //$('<div>', {text: '(0-1)', class: 'unit', title: 'This value should be between 0 and 1'}).appendTo(entry);
                         input.scientific({
                             placeholder_short: '(0-1)',

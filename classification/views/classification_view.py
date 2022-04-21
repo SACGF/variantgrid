@@ -75,7 +75,7 @@ class ClassificationView(APIView):
 
                 records = data.get('records')
                 complete_identifier = None
-                classification_import_run: Optional[ClassificationImportRun]
+                classification_import_run: Optional[ClassificationImportRun] = None
 
                 if import_id := data.get('import_id'):
                     # prefix import_id with username, so users can't overwrite each other
@@ -88,10 +88,11 @@ class ClassificationView(APIView):
 
                 per_json_data = list()
                 for record_data in records:
-                    result = importer.insert(record_data)
+                    result = importer.insert(record_data, import_run=classification_import_run)
                     if classification_import_run:
                         classification_import_run.increment_status(result.status)
                     per_json_data.append(result)
+
                 if classification_import_run:
                     classification_import_run.save()
                 json_data = {"results": per_json_data}
@@ -104,7 +105,7 @@ class ClassificationView(APIView):
 
             else:
                 # single record
-                json_data = importer.insert(data, record_id)
+                json_data = importer.insert(data, record_id).to_json()
                 if 'fatal_error' in json_data:
                     return Response(status=HTTP_400_BAD_REQUEST, data=json_data)
                 elif 'internal_error' in json_data:

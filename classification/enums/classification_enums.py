@@ -166,7 +166,6 @@ class EvidenceKeyValueType:
     DATE = 'D'
     CRITERIA = 'C'
     USER = 'U'
-    PERCENT = 'P'
     UNIT = 'N'
     INTEGER = 'I'
     FLOAT = 'L'
@@ -180,7 +179,6 @@ class EvidenceKeyValueType:
         (DATE, 'date'),
         (CRITERIA, 'criteria'),
         (USER, 'user'),
-        (PERCENT, 'percent'),
         (UNIT, 'unit (0 to 1)'),
         (INTEGER, 'integer'),
         (FLOAT, 'float')
