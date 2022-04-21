@@ -74,25 +74,25 @@ class ClinVarCompareRow(ExportRow):
         self.allele_group = allele_group
         self.clinvar_version = clinvar_version
 
-    @export_column()
+    @export_column("Allele URL")
     def allele_url(self) -> str:
         if allele_id := self.allele_group.allele_id:
             return get_url_from_view_path(reverse('view_allele', kwargs={"allele_id": allele_id}))
 
-    @export_column()
+    @export_column("ClinVar URL")
     def clinvar_url(self) -> str:
         clinvar: ClinVar
         if clinvar := self.clinvar:
             return f"https://www.ncbi.nlm.nih.gov/clinvar/variation/{clinvar.clinvar_variation_id}/"
 
-    @export_column()
+    @export_column("c.HGVS")
     def c_hgvs(self) -> str:
         for cm in self.allele_group.cms:
             if c_hgvs := cm.c_hgvs_best(self.allele_group.genome_build):
                 if full_c_hgvs := c_hgvs.full_c_hgvs:
                     return full_c_hgvs
 
-    @export_column()
+    @export_column("Gene Symbol")
     def gene_symbol(self) -> str:
         for cm in self.allele_group.cms:
             if c_hgvs := cm.c_hgvs_best(self.allele_group.genome_build):
@@ -125,12 +125,12 @@ class ClinVarCompareRow(ExportRow):
                             cs_set.add(m_part)
         return cs_set
 
-    @export_column()
+    @export_column("Clinical Significances")
     def servers_clinical_significance(self) -> str:
         (cs_list := list(self.server_clinical_significance_set)).sort()
         return ";".join(cs_list)
 
-    @export_column()
+    @export_column("ClinVar Clinical Significances")
     def clinvar_clinical_significance(self) -> str:
         (cs_list := list(self.clinvar_clinical_significance_set)).sort()
         return ";".join(cs_list)
@@ -140,19 +140,19 @@ class ClinVarCompareRow(ExportRow):
             return clinvar.clinical_significance
         return ""
 
-    @export_column()
+    @export_column("ClinVar Origin")
     def clinvar_origin(self) -> str:
         clinvar: ClinVar
         if clinvar := self.clinvar:
             return clinvar.get_origin_display()
 
-    @export_column()
+    @export_column("ClinVar Stars")
     def clinvar_stars(self) -> str:
         clinvar: ClinVar
         if clinvar := self.clinvar:
             return clinvar.stars
 
-    @export_column()
+    @export_column("Comparison")
     def diff_value(self) -> ClinVarCompareValue:
         our_clins: Set[str] = self.server_clinical_significance_set
         clinvar_clins: Set[str] = self.clinvar_clinical_significance_set
