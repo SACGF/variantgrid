@@ -67,7 +67,7 @@ class ClinVarExport(TimeStampedModel):
     submission_body_validated = models.JSONField(null=False, blank=False, default=dict)
 
     def get_absolute_url(self):
-        return reverse('clinvar_export', kwargs={'pk': self.pk})
+        return reverse('clinvar_export', kwargs={'clinvar_export_id': self.pk})
 
     def friendly_submission_status_str(self):
         if self.status == ClinVarExportStatus.NEW_SUBMISSION:
