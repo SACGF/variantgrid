@@ -3,7 +3,7 @@ from django.urls import resolve
 
 from eventlog.models import ViewEvent
 
-INGORE_SEGMENTS = {"api", "datatable", "citations_json"}
+IGNORE_SEGMENTS = {"api", "datatable", "citations_json"}
 IGNORE_TEXT = {"detail", "metrics"}
 IGNORE_PARAMETERS = {"csrfmiddlewaretoken"}
 
@@ -31,7 +31,7 @@ class PageViewsMiddleware:
                 if ignore_text in request.path_info:
                     return
 
-            if not any(segment in INGORE_SEGMENTS for segment in parts):
+            if not any(segment in IGNORE_SEGMENTS for segment in parts):
                 app = request.path_info.split('/')[1]  # FYI not guaranteed to be the app, but closest thing I can find that links it
                 if app in settings.LOG_ACTIVITY_APPS:
                     if url_obj := resolve(request.path_info):
