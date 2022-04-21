@@ -27,9 +27,9 @@ Hello Shariant User,
         {% if lab_summary.discordance_report_summaries|length %}
         <li>This lab is involved in a total of {% count lab_summary.discordance_report_summaries '1 discordance' 'discordances' %}</li>
         <ul>
-            {% for lab_count in lab_summary.labs_to_discordance_counts %}
+            {% for lab_count in lab_summary.discordance_report_summaries.counts %}
             <li>
-                {% if lab_count.is_your_lab %}<span style="font-weight:600">Internal Only</span> discordances account for <strong>{{ lab_count.count }}</strong> of these discordances
+                {% if lab_count.is_internal %}<span style="font-weight:600">Internal Only</span> discordances account for <strong>{{ lab_count.count }}</strong> of these discordances
                 {% else %}<span style="font-weight:600">{% lab lab_count.lab %}</span> are involved in <strong>{{ lab_count.count }}</strong> of these discordances{% endif %}
             </li>
             {% endfor %}
@@ -37,7 +37,7 @@ Hello Shariant User,
         {% endif %}
     </ul>
 
-    {% if lab_summary.discordance_report_summaries|length %}
+    {% if lab_summary.discordance_report_summaries %}
         <div style="padding-left: 24px">
             <table cellpadding="10" style="border-collapse: collapse;">
                 <thead>
@@ -49,15 +49,15 @@ Hello Shariant User,
                     </tr>
                 </thead>
                 <tbody>
-                    {% for discordance_report_summary in lab_summary.discordance_report_summaries %}
+                    {% for discordance_report_summary in lab_summary.discordance_report_summaries.summaries %}
                         <tr style="border-top: 1px solid #bbb;">
                             <td><a href="{% absolute_url 'discordance_report' discordance_report_summary.id %}">DR {{ discordance_report_summary.id }}</a></td>
                             <td style="font-family:monospace">{{ discordance_report_summary.date_detected_str }}</td>
                             <td>{% c_hgvs discordance_report_summary.c_hgvs show_genome_build=False %}</td> {% comment %}do inline style for c.hgvs{% endcomment %}
                             <td>
-                                {% for d_lab_summary in discordance_report_summary.lab_summaries %}
-                                    <div>{% lab d_lab_summary.lab your_lab=lab_summary.lab %} -
-                                    {% for clin_sig in d_lab_summary.values %}{% if not forloop.first %}, {% endif %}{% clinical_significance_inline clin_sig %}{% endfor %}
+                                {% for lab_cs in discordance_report_summary.lab_significances %}
+                                    <div>{% lab lab_cs.lab your_lab=lab_cs.is_internal %} -
+                                    {% for clin_sig in lab_cs.clinical_significances %}{% if not forloop.first %}, {% endif %}{% clinical_significance_inline clin_sig %}{% endfor %}
                                     </div>
                                 {% endfor %}
                             </td>

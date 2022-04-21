@@ -196,7 +196,7 @@ def clinical_significance_inline(value):
 def lab(lab: Lab, your_lab: Optional[Lab] = None):
     return {
         "lab": lab,
-        "is_your_lab": your_lab == lab
+        "is_your_lab": your_lab is True or your_lab == lab
     }
 
 

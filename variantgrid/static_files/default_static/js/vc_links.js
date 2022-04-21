@@ -161,13 +161,13 @@ let VCLinks = (function() {
             }
             let gene_symbol = this.data[SpecialEKeys.GENE_SYMBOL];
             if (gene_symbol) {
-                let link = `https://search.clinicalgenome.org/kb/home?term=${gene_symbol}`;
+                let link = `https://search.clinicalgenome.org/kb/genes?search=${gene_symbol}`;
                 return new VCLink({text: 'ClinGen KB', href: link});
             }
 
             return new VCLink({
                 text: 'ClinGen KB',
-                href: 'https://search.clinicalgenome.org/kb/home?term=',
+                href: 'https://search.clinicalgenome.org/kb/genes',
                 missing: this.eKeys.key(SpecialEKeys.HGNC_ID).label
             });
         },

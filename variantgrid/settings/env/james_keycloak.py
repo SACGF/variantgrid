@@ -39,7 +39,7 @@ AUTHENTICATION_BACKENDS = (
 
 MIDDLEWARE += (
     'auth.session_refresh.VariantGridSessionRefresh',
-    # 'debug_toolbar.middleware.DebugToolbarMiddleware',
+    'debug_toolbar.middleware.DebugToolbarMiddleware',
     'auth.oidc_error_handler.HandleOIDC400Middleware',
 )
 
@@ -78,6 +78,10 @@ LOGIN_REDIRECT_URL_FAILURE = '/accounts/logout'
 
 ALLOWED_HOSTS = ["*"]
 COMPRESS_ENABLED = False
+INTERNAL_IPS = [
+        '127.0.0.1',
+        '10.211.55.2'
+    ]
 """
 
 VARIANT_CLASSIFICATION_AUTOFUZZ_AGE = True
@@ -174,7 +178,7 @@ if _SHARIANT_MODE:
     TEMPLATES[0]["DIRS"].insert(0, SHARIANT_TEMPLATES_DIR)
     SITE_NAME = "Shariant"
 
-#INSTALLED_APPS.append('debug_toolbar')
+INSTALLED_APPS.append('debug_toolbar')
 
 #SAPATH_APP = 'sapath.apps.SapathConfig'
 #INSTALLED_APPS += [SAPATH_APP]
