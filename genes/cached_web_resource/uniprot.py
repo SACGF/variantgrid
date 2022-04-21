@@ -29,8 +29,12 @@ def store_uniprot_from_web(cached_web_resource: CachedWebResource):
 
     with gzip.GzipFile(fileobj=buffer) as f:
         text_f = TextIOWrapper(f)
-        logging.info("Extracting data")
-        uniprot_data = extract_uniprot_sprot(text_f)
+        store_uniprot(cached_web_resource, text_f)
+
+
+def store_uniprot(cached_web_resource: CachedWebResource, file_object):
+    logging.info("Extracting data")
+    uniprot_data = extract_uniprot_sprot(file_object)
 
     logging.info("Merging records")
     uniprot_records = []
