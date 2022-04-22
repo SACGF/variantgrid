@@ -11,14 +11,14 @@ from variantgrid.settings.components.seqauto_settings import *  # pylint: disabl
 SITE_ID = 3  # vg.com
 
 WEB_HOSTNAME = 'test.variantgrid.com'
-WEB_IP = '144.6.229.160'
+WEB_IP = '203.101.229.193'
 
 DEBUG = False
 
 ANNOTATION_ENTREZ_EMAIL = 'davmlaw@gmail.com'
 SLACK['emoji'] = ':mouse:'
 
-_BIG_DISK_BASE_DIR = "/mnt"
+_BIG_DISK_BASE_DIR = "/data"
 ANNOTATION_REFERENCE_BASE_DIR = os.path.join(_BIG_DISK_BASE_DIR, "annotation")
 ANNOTATION_VEP_BASE_DIR = os.path.join(ANNOTATION_REFERENCE_BASE_DIR, "VEP")
 ANNOTATION_VEP_CODE_DIR = os.path.join(ANNOTATION_VEP_BASE_DIR, "ensembl-vep")
