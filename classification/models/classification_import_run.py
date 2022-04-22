@@ -43,6 +43,15 @@ class ClassificationImportRun(TimeStampedModel):
     row_count_unknown = models.IntegerField(default=0)
     logging_version = models.IntegerField(default=0)
 
+    def __str__(self):
+        parts = []
+        if file := self.from_file:
+            parts.append(file.filename)
+        else:
+            parts.append(self.identifier)
+        parts.append(f"({self.row_count})")
+        return "".join(parts)
+
     def increment_status(self, status: ClassificationPatchStatus):
         self.row_count += 1
         if status == ClassificationPatchStatus.NEW:
