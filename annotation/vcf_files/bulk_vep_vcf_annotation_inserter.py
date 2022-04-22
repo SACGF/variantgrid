@@ -14,7 +14,7 @@ from annotation.models.models import ColumnVEPField, VariantAnnotation, \
     VariantTranscriptAnnotation, VariantAnnotationVersion
 from annotation.models.models_enums import VariantClass
 from annotation.vep_annotation import VEPConfig
-from genes.models import TranscriptVersion, GeneVersion, UniProt
+from genes.models import TranscriptVersion, GeneVersion
 from genes.models_enums import AnnotationConsortium
 from library.django_utils import get_model_fields
 from library.django_utils.django_file_utils import get_import_processing_filename, get_import_processing_dir
@@ -69,7 +69,6 @@ class BulkVEPVCFAnnotationInserter:
         "predictions_num_pathogenic",
         "predictions_num_benign",
         "overlapping_symbols",
-        "uniprot_id",  # set via swissprot
     ]
     DB_IGNORED_COLUMNS = ["id", "transcript"]
     VEP_NOT_COPIED_FIELDS = [
@@ -88,10 +87,7 @@ class BulkVEPVCFAnnotationInserter:
         "SOURCE",  # only populated when using --merged (which we don't use)
         "SpliceAI_pred_SYMBOL",
         "STRAND",
-        "SWISSPROT",
         "SYMBOL_SOURCE",
-        "TREMBL",
-        "UNIPARC",
     ]
     VEP_NOT_COPIED_REFSEQ_ONLY = [
         "REFSEQ_MATCH",
@@ -325,14 +321,6 @@ class BulkVEPVCFAnnotationInserter:
                     logging.warning(f"Could not find transcript: '{t_id}'")
         return transcript_id, transcript_version_id
 
-    def get_uniprot_id(self, data):
-        """ Out of 2M records, only 0.12% contain multiple (ie P0CG04&B9A064) - just take 1st """
-        if uniprot_value := data.get("swissprot"):
-            for uv in uniprot_value.split("&"):
-                if uv in self.uniprot_identifiers:
-                    return uv
-        return None
-
     def add_calculated_transcript_columns(self, transcript_data):
         self._add_calculated_maxentscan(transcript_data)
 
@@ -422,7 +410,6 @@ class BulkVEPVCFAnnotationInserter:
             if variant_data:
                 if overlapping_symbols:
                     variant_data["overlapping_symbols"] = ",".join(sorted(overlapping_symbols))
-                variant_data["uniprot_id"] = self.get_uniprot_id(variant_data)
                 self.variant_annotation_list.append(variant_data)
 
                 for gene_id in overlapping_gene_ids:
@@ -504,10 +491,6 @@ class BulkVEPVCFAnnotationInserter:
     def transcript_versions_by_id(self):
         vav = self.annotation_run.variant_annotation_version
         return TranscriptVersion.transcript_versions_by_id(vav.genome_build, vav.annotation_consortium)
-
-    @lazy
-    def uniprot_identifiers(self):
-        return set(UniProt.objects.all().values_list("pk", flat=True))
 
 
 def empty_to_none(it):

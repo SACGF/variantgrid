@@ -682,10 +682,6 @@ class VariantAnnotation(AbstractVariantAnnotation):
     predictions_num_benign = models.IntegerField(default=0)
 
     somatic = models.BooleanField(null=True, blank=True)
-    # Out of 2M records on my machine, 0.12% had multiple records, but linking just 1 is much simpler as it allows us
-    # to link through to UniProt via gene annotation for the columns on the analysis variant grid
-    # Just need to be aware that there may be multiple, and only 1st in list of VEP SWISSPROT is linked
-    uniprot = models.ForeignKey(UniProt, null=True, on_delete=SET_NULL)
     variant_class = models.CharField(max_length=2, choices=VariantClass.choices, null=True, blank=True)
     vep_skipped_reason = models.CharField(max_length=1, choices=VEPSkippedReason.choices, null=True, blank=True)
 

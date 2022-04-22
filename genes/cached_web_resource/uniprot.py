@@ -6,9 +6,9 @@ from io import BytesIO, TextIOWrapper
 from typing import Dict
 
 from Bio import SwissProt
-from django.db.models import F
+from django.db.models import Q
 
-from annotation.models import CachedWebResource, VariantAnnotationVersion, VariantAnnotation
+from annotation.models import CachedWebResource
 from genes.models import UniProt
 
 FUNCTION_KEY = "FUNCTION: "
@@ -45,7 +45,7 @@ def store_uniprot_from_web(cached_web_resource: CachedWebResource):
     logging.info("Creating DB records")
     UniProt.objects.bulk_create(uniprot_records, batch_size=2000)
 
-    link_variant_annotation_to_uniprot()
+    link_hgnc_and_uniprot()
 
     cached_web_resource.description = f"{len(uniprot_records)} UniProt records"
     cached_web_resource.save()
@@ -81,26 +81,25 @@ def extract_uniprot_sprot(f) -> Dict:
     return uniprot
 
 
-def link_variant_annotation_to_uniprot():
-    """ VariantAnnotation links to UniProt based on VEP SWISSPROT calculation
-        This is on_delete=SET_NONE so is cleared whenever UniProt is deleted in a reload so need to re-link """
+def link_hgnc_and_uniprot():
+    """ HGNC links to UniProt objects based on hgnc_ids text field
+        the FK is set to NONE on delete (ie during reload of cached_web_resource)
 
-    for vav in VariantAnnotationVersion.objects.all():
-        logging.info("Linking %s to UniProt records", vav)
-        has_uniprot_qs = VariantAnnotation.objects.filter(version=vav, swissprot__isnull=False)
+        As HGNC is inserted - it does its own uniprot - so only need to handle case of uniprot being
+        inserted last """
 
-        # Can do these ones as a straight update
-        updated = has_uniprot_qs.exclude(swissprot__icontains='&').update(uniprot_id=F("swissprot"))
-        logging.info("Directly linked %d variant annotation records to UniProt", updated)
+    from genes.models import HGNC
 
-        # Ones with "&" need special handling - only a small amount..
-        uniprot_ids = set(UniProt.objects.all().values_list("pk", flat=True))
-        variant_annotation_records = []
-        for pk, swissprot in has_uniprot_qs.filter(swissprot__icontains='&').values_list("pk", "swissprot"):
-            for sp in swissprot.split("&"):
-                if sp in uniprot_ids:
-                    variant_annotation_records.append(VariantAnnotation(pk=pk, uniprot_id=sp))
+    # We only store uni prot IDs that have info we care about, so not all will link
+    uniprot_pks = set(UniProt.objects.all().values_list("pk", flat=True))
 
-        if variant_annotation_records:
-            logging.info("Updating %d variant annotation records w/'&' in them", len(variant_annotation_records))
-            VariantAnnotation.objects.bulk_update(variant_annotation_records, fields=["uniprot_id"], batch_size=2000)
+    hgnc_records = []
+    for hgnc in HGNC.objects.filter(uniprot__isnull=True, uniprot_ids__isnull=False).exclude(uniprot_ids=''):
+        for up_id in hgnc.uniprot_ids.split(","):
+            if up_id in uniprot_pks:
+                hgnc.uniprot_id = up_id
+                hgnc_records.append(hgnc)
+
+    if hgnc_records:
+        logging.info("Linking %d HGNC w/uniprot", len(hgnc_records))
+        HGNC.objects.bulk_update(hgnc_records, fields=["uniprot_id"], batch_size=2000)

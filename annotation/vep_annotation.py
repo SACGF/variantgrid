@@ -83,7 +83,6 @@ def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, an
 
         # flags for fields
         "--sift", "b",
-        "--uniprot",
         "--hgvs",
         "--symbol",
         "--numbers",  # EXON/INTRON numbers

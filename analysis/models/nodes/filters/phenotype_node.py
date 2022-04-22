@@ -100,7 +100,7 @@ class PhenotypeNode(AnalysisNode):
         if text_phenotypes:
             columns = ['variantannotation__gene__summary',
                        'variantannotation__gene__geneannotation__omim_terms',
-                       'variantannotation__uniprot__function',
+                       'variantannotation__transcript_version__gene_version__hgnc__uniprot__function',
                        'variantannotation__gene__geneannotation__hpo_terms']
 
             text_filters = []
