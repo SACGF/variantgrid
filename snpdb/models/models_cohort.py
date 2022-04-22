@@ -122,7 +122,7 @@ class Cohort(GuardianPermissionsAutoInitialSaveMixin, SortByPKMixin, TimeStamped
     def get_cohort_samples(self):
         return self.cohortsample_set.all().select_related("sample", "sample__vcf").order_by("sort_order")
 
-    def get_samples(self) -> Iterable[Sample]:
+    def get_samples(self) -> QuerySet[Sample]:
         """ In sample.pk order (consistent regardless of cohort samples order)
             This is different than get_samples_qs so that we have the option of caching it
         """
@@ -398,13 +398,13 @@ class CohortGenotypeCollection(RelatedModelsPartitionModel):
     def get_sample_zygosity_regex(self, sample_zygosities: dict, sample_require_zygosity: dict):
         """ sample_zygosities_dict = {sample_id : zygosities_set} """
 
-        zygosity_sample_matches = []
+        zygosity_sample_matches = ["."] * self.num_samples
 
-        for sample in self.cohort.get_samples():
-            sample_zyg = sample_zygosities.get(sample)
-            require_zygosity = sample_require_zygosity.get(sample, True)
+        for cs in self.cohort.get_cohort_samples():
+            sample_zyg = sample_zygosities.get(cs.sample)
+            require_zygosity = sample_require_zygosity.get(cs.sample, True)
             regex_match = Zygosity.get_regex_match(sample_zyg, require_zygosity=require_zygosity)
-            zygosity_sample_matches.append(regex_match)
+            zygosity_sample_matches[cs.cohort_genotype_packed_field_index] = regex_match
 
         regex_string = ''.join(zygosity_sample_matches)
         return regex_string
