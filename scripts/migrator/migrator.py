@@ -5,7 +5,7 @@ import traceback
 from enum import Enum, auto
 from functools import partial
 from subprocess import Popen
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Callable
 
 from library.git import Git
 
@@ -120,6 +120,7 @@ class GitSubMigration(SubMigration):
         return "git " + " ".join(self.effective_args)
 
     def run(self) -> MigrationResult:
+        print_cyan(str(self))
         completed_process = subprocess.run("git pull", shell=True)
         if completed_process.returncode != 0:
             return MigrationResult(status=MigrationStatus.FAILURE,
@@ -138,7 +139,7 @@ class CommandSubMigration(SubMigration):
         return substitute_aliases(self.args)
 
     def run(self) -> MigrationResult:
-        print(str(self))
+        print_cyan(str(self))
         print_purple("-----------")
         cmd = str(self)
         completed_process = subprocess.run(cmd, shell=True)
@@ -186,7 +187,7 @@ class Migrator:
 
     def __init__(self):
         self.migrations = Migrator.STANDARD_MIGRATIONS
-        self.queued_migrations: List[SubMigration] = list()
+        self.has_custom_migrations = False
         self.git_version = Migrator.get_git_ver()
 
     def refresh_migrations(self):
@@ -195,11 +196,13 @@ class Migrator:
             migrations.extend(Migrator.STANDARD_MIGRATIONS)
 
             command = substitute_aliases(["python", "manage.py", "manual_outstanding"])
+            self.has_custom_migrations = False
             with Popen(command, stdout=subprocess.PIPE) as proc:
                 # stdout_text = proc.stdout.read()
                 task_json = json.load(proc.stdout)["tasks"]
                 command = 1
                 for task in task_json:
+                    self.has_custom_migrations = True
                     migrations.append(Migrator.subcommand_for_json(task).using(key=f"{command}"))
                     command += 1
 
@@ -231,8 +234,9 @@ class Migrator:
             return CommandSubMigration(args).using(task_id=task_id, notes=notes)
         return ManualSubMigration(line).using(task_id=task_id, notes=notes)
 
-    def prompt(self):
-        self.refresh_migrations()
+    def prompt(self, refresh: bool = True):
+        if refresh:
+            self.refresh_migrations()
         keys = list()
         print_purple("-- Welcome to variantgrid upgrader --")
         print("a: automate standard steps (runs git, migrate, collectstatic_js_reverse, collectstatic, deployed)")
@@ -254,8 +258,7 @@ class Migrator:
             selection = selection.strip()
 
             if selection == "a":
-                self.queued_migrations = list(Migrator.STANDARD_MIGRATIONS)
-                self.run_and_reprompt()
+                self.run_and_re_prompt(list(Migrator.STANDARD_MIGRATIONS))
                 return
 
             if selection == "q":
@@ -265,14 +268,32 @@ class Migrator:
             if selected_options:
                 selected_migration = selected_options[0]
 
-        self.run_and_reprompt(selected_migration)
+        self.run_and_re_prompt([selected_migration])
 
-    def run_and_reprompt(self, migration: Optional[SubMigration] = None):
-        if migration is None and self.queued_migrations:
-            migration = self.queued_migrations.pop(0)
+    def run_and_quit_if_success(self):
+        def on_complete(success: bool):
+            self.refresh_migrations()
+            if success:
+                if not self.has_custom_migrations:
+                    print_light_purple("Quick migration was successful")
+                    sys.exit(0)
+            if self.has_custom_migrations:
+                print_red("Outstanding custom migrations, remember you can mark them all as skipped using VGs version page")
+
+            self.prompt(refresh=False)
+
+        self.run_and_callback(migrations=list(Migrator.STANDARD_MIGRATIONS), callback=lambda success: on_complete(success))
+
+    def run_and_re_prompt(self, migrations: List[SubMigration]):
+        self.run_and_callback(migrations, lambda _: self.prompt())
+
+    def run_and_callback(self, migrations: List[SubMigration], callback: Callable[[bool], None]):
+        migration: Optional[SubMigration] = None
+        if migrations:
+            migration = migrations.pop(0)
 
         if migration is None:
-            self.prompt()
+            callback(True)
         else:
             result = migration.run()
             if result.status != MigrationStatus.SKIP:
@@ -280,14 +301,21 @@ class Migrator:
                     self.record_attempt(task_id=migration.task_id, success=result.status == MigrationStatus.SUCCESS)
             if result.status == MigrationStatus.SUCCESS:
                 print_green("*** task succeeded ***")
-                self.run_and_reprompt()
+                self.run_and_callback(migrations, callback)
             else:
                 # don't continue to auto-run migration step on failure
                 print_red("*** task failed ***")
-                self.queued_migrations = list()
-                self.prompt()
+                callback(False)
 
 
 if __name__ == '__main__':
+    quick_mode = False
+    if len(sys.argv) > 1:
+        quick_mode = sys.argv[1] == '--quick'
+
     migrator = Migrator()
-    migrator.prompt()
+    if quick_mode:
+        print_purple("-- Attempting automatic update --")
+        migrator.run_and_quit_if_success()
+    else:
+        migrator.prompt()
