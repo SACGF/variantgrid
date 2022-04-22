@@ -185,7 +185,7 @@ class ClassificationImportMapInsertTask(Task):
 
                         bci = BulkClassificationInserter(user=user)
                         for row in batch:
-                            response = bci.insert(data=row, submission_source=SubmissionSource.API)
+                            response = bci.insert(data=row, submission_source=SubmissionSource.API, import_run=import_run)
                             import_run.increment_status(response.status)
                         import_run.save()
                         bci.finish()

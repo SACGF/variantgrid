@@ -1,8 +1,9 @@
 import contextlib
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from os import PathLike
 from pathlib import Path
-from typing import Iterator, Union, Optional, Dict, List, Tuple
+from typing import Iterator, Union, Optional, Dict, List, Tuple, Any, Iterable
 from zipfile import ZipFile
 
 from django.contrib.auth.models import User
@@ -93,6 +94,39 @@ class FileDataS3(FileData):
         return media_storage.open(self.file)
 
 
+class UploadedClassificationsUnmappedValidationRow:
+
+    def __init__(self, row: Dict[str, Any]):
+        self._row = row
+
+    @property
+    def filename(self):
+        return self._row.get('file')
+
+    @property
+    def line_number(self) -> Optional[int]:
+        try:
+            return int(self._row.get('row'))
+        except:
+            return None
+
+    @property
+    def filename_line_number(self) -> str:
+        return f"{self.filename or '?'}:{self.line_number or '?'}"
+
+    @property
+    def category(self):
+        return self._row.get('category')
+
+    @property
+    def message(self):
+        return self._row.get('message')
+
+    @property
+    def severity(self):
+        return self._row.get('severity')
+
+
 class UploadedClassificationsUnmapped(TimeStampedModel):
     class Meta:
         verbose_name = "Classification upload file"
@@ -108,6 +142,25 @@ class UploadedClassificationsUnmapped(TimeStampedModel):
 
     def __str__(self):
         return f"{self.lab} {self.filename}"
+
+    def validation_list_objs(self) -> Iterable[UploadedClassificationsUnmappedValidationRow]:
+        if messages := self.validation_list.get('messages'):
+            return (UploadedClassificationsUnmappedValidationRow(entry) for entry in self.validation_list.get('messages'))
+        return []
+
+    @property
+    def validation_includes_json(self) -> bool:
+        if self.filename.endswith(".json"):
+            return True
+        elif self.filename.endswith(".zip"):
+            try:
+                if messages := self.validation_list.get('messages'):
+                    for message in messages:
+                        if message.get('file').endswith('.json'):
+                            return True
+            except Exception:
+                pass
+        return False
 
     @lazy
     def file_data(self) -> FileData:

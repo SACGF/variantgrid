@@ -1,14 +1,66 @@
 {% load ui_utils %}
+{% load js_tags %}
 {% load english_tags %}
 {% labelled label="Status" %}{{ record.get_status_display }}{% if in_progress %} <i class="fa fa-spinner"></i>{% endif %}{% endlabelled %}
 {% if record.validation_summary %}
     <hr/>
+    <h5 class="my-4">Mapping Summary</h5>
     {% for prop in record.validation_summary_properties %}
         {% labelled label=prop.0|code_to_english %}{{ prop.1 }}{% endlabelled %}
     {% endfor %}
     <hr/>
-    <h5 class="mb-4">Validation Messages</h5>
+    <h5 class="my-4">Mapping Validation Messages</h5>
     {% for message_count in record.message_counts %}
         {% labelled label=message_count.0 %}{{ message_count.1 }}{% endlabelled %}
     {% endfor %}
+    {% if record.validation_list %}
+        {% if in_progress %}<p class="text-info">Full validation details are available when the import has completed.</p>
+        {% else %}
+            <a class="toggle-link" data-toggle="collapse" href="#validation-details">Toggle Full Validation Details</a>
+            <div id="validation-details" class="collapse">
+                {% if record.validation_includes_json %}
+                <p class="text-info mt-2">Note that the source number refers to the index of the JSON entry, e.g. upload_file.json:4
+                    refers to the 4th relevant JSON object within the data that gets mapped.</p>
+                {% endif %}
+                <table class="table">
+                    <tr>
+                        <th>Source</th>
+                        <th>Category</th>
+                        <th>Message</th>
+                    </tr>
+                    <tbody>
+                        {% for validation_row in record.validation_list_objs %}
+                            <tr>
+                                <td>{{ validation_row.filename_line_number }}</td>
+                                <td>{{ validation_row.severity | severity_icon}} {{ validation_row.category }}</td>
+                                <td>{{ validation_row.message }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% endif %}
+    {% endif %}
+    {% if import_runs %}
+        <hr/>
+        <h5 class="my-4">Import into {{ site_name }} Details</h5>
+        {% comment %}Typically there should only be 1 import_run, so optimise the display for that{% endcomment %}
+        {% for import_run in import_runs %}
+
+            {% labelled label="Import Date" %}{% timestamp import_run.created %}{% endlabelled %}
+            {% comment %}For all the fields that are rare occurances, don't bother to show them unless they've actually occurred in this import{% endcomment %}
+            {% if import_run.row_count_already_withdrawn %}{% labelled label="Classifications that have been previously withdrawn" %}
+            {{ import_run.row_count_already_withdrawn }} {{ 'W' | severity_icon }}
+            {% endlabelled %}{% endif %}
+            {% if import_run.row_count_un_withdrawn %}{% labelled label="Classifications un-withdrawn" %}{{ import_run.row_count_un_withdrawn }}{% endlabelled %}{% endif %}
+            {% if import_run.row_count_withdrawn %}{% labelled label="Classifications withdrawn" %}{{ import_run.row_count_withdrawn }}{% endlabelled %}{% endif %}
+            {% if import_run.row_count_withdrawn %}{% labelled label="Classifications deleted" %}{{ import_run.row_count_delete }}{% endlabelled %}{% endif %}
+            {% if import_run.row_count_unknown %}{% labelled label="Unknown change" %}
+                {{ import_run.row_count_unknown }} We were unable to track what changes occurred in this instance
+            {% endlabelled %}{% endif %}
+            {% labelled label="Classifications Created" %}{{ import_run.row_count_new }}{% endlabelled %}
+            {% labelled label="Classifications Updated" %}{{ import_run.row_count_update }}{% endlabelled %}
+            {% labelled label="Classifications No-change" %}{{ import_run.row_count_no_change }}{% endlabelled %}
+        {% endfor %}
+    {% endif %}
 {% endif %}

@@ -13,15 +13,13 @@
 
         {% page_help_embedded title="File Status" %}
             <p>This page provides status of the file your lab uploaded.</p>
-            <p>The details can be quite technical, but of importance is -<br/>
-                <span class="text-info">Records Excluded</span> The number of classification records in the file that we did not attempt to upload due to filtering rules (e.g. possible somatic).<br/>
-                <span class="text-info">Records Mapped</span> The number of classification records that we did attempt to upload from the file.<br/>
-                <span class="text-info">Validation Messages</span> The number of each warning we came across processing the file.
-            </p>
-            <p>If the status is <span class="text-info">Pending</span> or <span class="text-info">Mapping</span>, we are still converting the file to our format.</p>
-            <p>If the status is <span class="text-info">Processed</span>, please allow a few minutes before the updated records will be inserted into our database.</p>
+            <p>The import goes through several stages, each of which are displayed after being performed:</p>
+            <p><span class="text-info">File Details</span> information about the raw file your lab provided.</p>
+            <p><span class="text-info">Mapping Summary</span> details about the conversion from your system to {{ site_name }}'s format.</p>
+            <p><span class="text-info">Mapping Validation Messages</span> totals of any conversion issues during the mapping step.</p>
+            <p><span class="text-info">Import into {{ site_name }} Details</span> details of the import of the mapped data, how many records were new/updates/etc.</p>
         {% end_page_help_embedded %}
-
+        <h5 class="my-4">File Details</h5>
         {% labelled label="File Name" %}{{ record.file_data.filename }}{% endlabelled %}
         {% labelled label="File ID" %}{{ record.pk }}{% endlabelled %}
         {% labelled label="Upload Date" %}{% timestamp record.created %}{% endlabelled %}

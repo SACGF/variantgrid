@@ -1,5 +1,7 @@
 import os
 import re
+from typing import List, Iterable
+
 import django
 from django.contrib import messages
 from django.contrib.auth.models import User
@@ -11,6 +13,7 @@ from django.urls import reverse
 from django.utils.timezone import now
 from django.views import View
 
+from classification.models import ClassificationImportRun
 from classification.models.uploaded_classifications_unmapped import UploadedClassificationsUnmapped, UploadedClassificationsUnmappedStatus
 from classification.tasks.classification_import_map_and_insert_task import ClassificationImportMapInsertTask
 from library.django_utils import get_url_from_view_path
@@ -60,7 +63,7 @@ def view_uploaded_classification_unmapped(request: HttpRequest, uploaded_classif
         raise PermissionDenied("You do not have access to this file")
 
     return render(request, 'classification/uploaded_classifications_unmapped.html', {
-        "record": record
+        "record": record,
     })
 
 
@@ -76,8 +79,11 @@ def view_uploaded_classification_unmapped_detail(request: HttpRequest, uploaded_
         UploadedClassificationsUnmappedStatus.Validated,
         UploadedClassificationsUnmappedStatus.Processed}
 
+    import_runs: Iterable[ClassificationImportRun] = ClassificationImportRun.objects.filter(from_file=record).order_by('pk')
+
     http_response = render(request, 'classification/uploaded_classifications_unmapped_detail.html', {
         "record": record,
+        "import_runs": import_runs,
         "now": now(),
         "in_progress": in_progress
     })
