@@ -3,12 +3,12 @@ more-itertools
 beautifulsoup4
 bgzip
 Bio
+cdot
 celery
 ConfigArgParse
 cyvcf2>=0.30.14
 Django
 django-amazon-ses
-django_auth_ldap
 django_autocomplete_light
 django_cache_memoize
 django-compressor

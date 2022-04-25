@@ -28,8 +28,7 @@ class ImportCreateVCFModelForGenotypeVCFTask(ImportVCFStepTask):
     """ Create VCF model from header """
 
     def process_items(self, upload_step):
-        from upload.vcf.vcf_import import create_vcf_from_vcf, create_import_success_message, import_vcf_file, \
-            create_cohort_genotype_collection_from_vcf, get_preprocess_vcf_import_info, genotype_vcf_processor_factory, \
+        from upload.vcf.vcf_import import create_vcf_from_vcf, create_cohort_genotype_collection_from_vcf, \
             configure_vcf_from_header
 
         vcf_filename = upload_step.input_filename
@@ -104,9 +103,8 @@ class ProcessGenotypeVCFDataTask(ImportVCFStepTask):
         (ie via ImportGenotypeVCFTask) - this can run in parallel """
 
     def process_items(self, upload_step):
-        from upload.vcf.vcf_import import create_vcf_from_vcf, create_import_success_message, import_vcf_file, \
-            create_cohort_genotype_collection_from_vcf, get_preprocess_vcf_import_info, genotype_vcf_processor_factory, \
-            configure_vcf_from_header
+        from upload.vcf.vcf_import import import_vcf_file, \
+            get_preprocess_vcf_import_info, genotype_vcf_processor_factory
 
         upload_pipeline = upload_step.upload_pipeline
         uploaded_vcf = upload_pipeline.uploadedvcf
@@ -172,9 +170,7 @@ class SomalierVCFTask(ImportVCFStepTask):
 class ImportGenotypeVCFSuccessTask(ImportVCFStepTask):
 
     def process_items(self, upload_step):
-        from upload.vcf.vcf_import import create_vcf_from_vcf, create_import_success_message, import_vcf_file, \
-            create_cohort_genotype_collection_from_vcf, get_preprocess_vcf_import_info, genotype_vcf_processor_factory, \
-            configure_vcf_from_header
+        from upload.vcf.vcf_import import create_import_success_message
 
         uploaded_vcf = upload_step.get_uploaded_vcf()
         vcf = uploaded_vcf.vcf

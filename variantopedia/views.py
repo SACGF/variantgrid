@@ -140,26 +140,29 @@ def server_status(request):
             worker_names.extend(settings.CELERY_SEQAUTO_WORKER_NAMES)
 
         i = app.control.inspect()
-        pong = strip_celery_from_keys(i.ping())
+        stats = strip_celery_from_keys(i.stats())
         active = strip_celery_from_keys(i.active())
         scheduled = strip_celery_from_keys(i.scheduled())
 
         for worker in worker_names:
-            data = pong.get(worker)
+            data = stats.get(worker)
+            num_workers = 0
+            status = 'ERROR - no workers found'
             ok = False
             if data:
-                if data.get('ok') == 'pong':
-                    status = 'ok'
+                processes = data.get("pool", {}).get("processes")
+                if processes:
+                    num_workers = len(processes)
+                    status = "OK"
                     ok = True
-                else:
-                    status = data
-            else:
-                status = 'ERROR - no workers found'
 
-            celery_workers[worker] = {"status": status,
-                                      "ok": ok,
-                                      "active": len(active.get(worker, [])),
-                                      "scheduled": len(scheduled.get(worker, []))}
+            celery_workers[worker] = {
+                "status": status,
+                "ok": ok,
+                "active": len(active.get(worker, [])),
+                "scheduled": len(scheduled.get(worker, [])),
+                "num_workers": num_workers,
+            }
 
     can_access_reference = True
     try:

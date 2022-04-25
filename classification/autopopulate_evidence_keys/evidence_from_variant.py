@@ -444,6 +444,9 @@ def get_evidence_fields_from_variant_query(
     qs = qs.filter(pk=variant.pk)
     columns = {f"variantannotation__{f}" for f in va_fields_for_summaries}
     columns.update([e['col'] for e in evidence_variant_columns.values()])
+    # Also retrieve gnomad2_liftover_af so we can use it if normal gnomAD isn't available
+    gnomad2_liftover_af = "variantannotation__gnomad2_liftover_af"
+    columns.add(gnomad2_liftover_af)
     values = qs.values(*columns).get()
 
     for evidence_key, variant_data in evidence_variant_columns.items():
@@ -455,6 +458,15 @@ def get_evidence_fields_from_variant_query(
     # VariantGridColumn 'pubmed' is transcript level so not set above
     data[SpecialEKeys.LITERATURE] = _get_mastermind_summary(values)
     data[SpecialEKeys.SPLICEAI] = _get_spliceai_summary(values)
+
+    # If gnomad_af is not populated, fall back on gnomAD2 liftover AF
+    if SpecialEKeys.GNOMAD_AF not in data:
+        if g2_af := values.get(gnomad2_liftover_af):
+            value = {
+                "value": g2_af,
+                "note": "gnomAD AF not found, using gnomad2 liftover AF",
+            }
+            set_evidence(data, SpecialEKeys.GNOMAD_AF, value, False, ekey_formatters)
     return data
 
 

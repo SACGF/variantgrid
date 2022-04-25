@@ -2,8 +2,6 @@
 
 from django.db import migrations
 
-from manual.operations.manual_operations import ManualOperation
-
 
 class Migration(migrations.Migration):
 
@@ -15,5 +13,4 @@ class Migration(migrations.Migration):
     operations = [
         # Remove "gene_name" from TranscriptVersion.data JSON (fill in from relation)
         migrations.RunSQL("update genes_transcriptversion set data = data - 'gene_name';"),
-        ManualOperation.operation_other(args=["If RefSeq, re-import everything as per https://github.com/SACGF/variantgrid/wiki/HGVS-and-historical-transcript-versions"]),
     ]

@@ -21,11 +21,11 @@ def create_fake_trio(user: User, genome_build: GenomeBuild) -> Trio:
                                    import_status=ImportStatus.SUCCESS)
 
     proband_cs = CohortSample.objects.create(cohort=cohort, sample=sample,
-                                             cohort_genotype_packed_field_index=1, sort_order=1)
+                                             cohort_genotype_packed_field_index=0, sort_order=0)
     mother_cs = CohortSample.objects.create(cohort=cohort, sample=mother_sample,
-                                            cohort_genotype_packed_field_index=2, sort_order=2)
+                                            cohort_genotype_packed_field_index=1, sort_order=1)
     father_cs = CohortSample.objects.create(cohort=cohort, sample=father_sample,
-                                            cohort_genotype_packed_field_index=3, sort_order=3)
+                                            cohort_genotype_packed_field_index=2, sort_order=2)
 
     assign_permission_to_user_and_groups(user, cohort)
 

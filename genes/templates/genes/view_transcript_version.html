@@ -92,7 +92,7 @@
                     <td> N/A</td>
                 {% endif %}
                 <td>
-                    {% modal id="transcript-"|append:transcript_version.pk|append:"-json" label="API Response" %}
+                    {% modal id="transcript-"|append:transcript_version.pk|append:"-json" label="JSON" %}
                         {% code_json transcript_version.data css_class="modal-body" %}
                     {% endmodal %}
                 </td>

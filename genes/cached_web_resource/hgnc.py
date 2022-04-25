@@ -9,7 +9,7 @@ import requests
 
 from annotation.models import CachedWebResource
 from genes.gene_matching import GeneMatcher
-from genes.models import HGNCImport, GeneAnnotationRelease, GeneSymbol, HGNC, GeneSymbolAlias
+from genes.models import HGNCImport, GeneAnnotationRelease, GeneSymbol, HGNC, GeneSymbolAlias, UniProt
 from genes.models_enums import HGNCStatus, GeneSymbolAliasSource
 from library.django_utils import get_model_fields, get_field_counts
 from library.utils import invert_dict
@@ -48,6 +48,7 @@ def save_hgnc_records(existing_hgnc_ids: Set, records: List):
     gene_symbols = []
     gene_symbol_aliases = []
 
+    uniprot_pks = set(UniProt.objects.all().values_list("pk", flat=True))
     hgnc_import = HGNCImport.objects.create()
 
     def _join_list(lst):
@@ -67,6 +68,12 @@ def save_hgnc_records(existing_hgnc_ids: Set, records: List):
         def _get_list(key):
             return _join_list(record.get(key, []))
 
+        uniprot_id = None
+        for up_id in record.get("uniprot_ids", []):
+            if up_id in uniprot_pks:
+                uniprot_id = up_id
+                break
+
         hgnc = HGNC(pk=hgnc_id,
                     alias_symbols=_join_list(alias_symbols),
                     approved_name=record['name'],
@@ -84,7 +91,8 @@ def save_hgnc_records(existing_hgnc_ids: Set, records: List):
                     rgd_ids=_get_list('rgd_id'),
                     status=status,
                     ucsc_ids=record.get('ucsc_id'),
-                    uniprot_ids=_get_list('uniprot_ids'))
+                    uniprot_ids=_get_list('uniprot_ids'),
+                    uniprot_id=uniprot_id)
 
         if hgnc_id in existing_hgnc_ids:
             hgnc_gene_names_update.append(hgnc)
@@ -117,45 +125,3 @@ def save_hgnc_records(existing_hgnc_ids: Set, records: List):
         logging.info("Updating %d hgnc_gene_names", len(hgnc_gene_names_update))
         fields = get_model_fields(HGNC, ignore_fields=["id"])
         HGNC.objects.bulk_update(hgnc_gene_names_update, fields, batch_size=2000)
-
-
-# http://rest.genenames.org/fetch/status/Approved
-# http://rest.genenames.org/fetch/status/%22Entry%20Withdrawn%22
-
-
-"""
-    {'hgnc_id': 'HGNC:4171',
-     'symbol': 'GATA2',
-     'name': 'GATA binding protein 2',
-     'status': 'Approved',
-     'locus_type': 'gene with protein product',
-     'prev_name': ['GATA-binding protein 2'],
-     'alias_symbol': ['NFE1B'],
-     'location': '3q21.3',
-     'date_approved_reserved': '1992-11-03T00:00:00Z',
-     'date_modified': '2020-12-06T00:00:00Z',
-     'date_name_changed': '2001-11-28T00:00:00Z',
-     'ena': ['AF169253'],
-     'entrez_id': '2624',
-     'mgd_id': ['MGI:95662'],
-     'cosmic': 'GATA2',
-     'orphanet': 274222,
-     'pubmed_id': [1714909],
-     'refseq_accession': ['NM_032638'],
-     'gene_group': ['GATA zinc finger domain containing'],
-     'vega_id': 'OTTHUMG00000159689',
-     'lsdb': ['LRG_295|http://ftp.ebi.ac.uk/pub/databases/lrgex/LRG_295.xml'],
-     'ensembl_gene_id': 'ENSG00000179348',
-     'ccds_id': ['CCDS3049', 'CCDS46903'],
-     'locus_group': 'protein-coding gene',
-     'omim_id': ['137295'],
-     'uniprot_ids': ['P23769'],
-     'ucsc_id': 'uc003eko.3',
-     'rgd_id': ['RGD:2664'],
-     'gene_group_id': [82],
-     'location_sortable': '03q21.3',
-     'agr': 'HGNC:4171',
-     'symbol_report_tag': ['Stable symbol'],
-     'uuid': '0c467aa5-50e2-4f56-acef-ce46ab6dba11',
-     '_version_': 1690196606957125633}
-"""

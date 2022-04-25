@@ -46,7 +46,7 @@ def create_classification_for_sample_and_variant_objects(
                                         refseq_transcript_accession=refseq_transcript_accession,
                                         ensembl_transcript_accession=ensembl_transcript_accession,
                                         annotation_version=annotation_version)
-    classification.set_variant(variant)  # have to re-do this because we didn't have the transcript the first time around
+    classification.set_variant(variant)  # have to re-do this because we didn't have the transcript the 1st time around
     liftover_classification_import(vc_import, ImportSource.WEB)
     return classification
 
@@ -71,8 +71,7 @@ def generate_auto_populate_data(
     data[SpecialEKeys.GENOME_BUILD] = genome_build.get_build_with_patch(annotation_version)
     data[SpecialEKeys.CURATION_SYSTEM] = get_curation_system()
 
-    # there used to be a check to see if variant existed, but pretty sure it can be guarenteed to exist
-    # at this point
+    # Used to be a check if variant existed, but pretty sure it can be guaranteed to exist at this point
     data.annotation_version = annotation_version
     data.update(get_evidence_fields_for_variant(genome_build, variant,
                                                 refseq_transcript_accession, ensembl_transcript_accession,

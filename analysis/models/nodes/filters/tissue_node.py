@@ -46,7 +46,7 @@ class TissueNode(AnalysisNode):
         else:
             filters = []
             for word in self.text_tissue.split():
-                f = Q(variantannotation__uniprot__tissue_specificity__icontains=word)
+                f = Q(variantannotation__transcript_version__gene_version__hgnc__uniprot__tissue_specificity__icontains=word)
                 filters.append(f)
 
             q = reduce(operator.and_, filters)

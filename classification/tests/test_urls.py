@@ -49,15 +49,15 @@ class Test(URLTestCase):
         classification.patch_value({"clinical_significance": "VUS"}, user=cls.user_owner, save=True)
         classification.publish_latest(cls.user_owner)
 
-        record_kwargs = {"record_id": classification.pk}
+        classification_kwargs = {"classification_id": classification.pk}
         #  = {"report_id": None}
         cls.PRIVATE_OBJECT_URL_NAMES_AND_KWARGS = [
             # ('classification_diff', {"GET_PARAMS": {"history": classification.pk}}, 200),
             # ('classification_diff', {"GET_PARAMS": {"record_ids": f"[{classification.pk}]"}}, 200),
             # ('classification_csv', record_kwargs, 200),
             # ('view_template_report', record_kwargs, 200),
-            ('classification_history', record_kwargs, 200),
-            ('view_classification', record_kwargs, 200),
+            ('classification_history', classification_kwargs, 200),
+            ('view_classification', classification_kwargs, 200),
             # ('discordance_report', report_kwargs, 200),
             # ('discordance_export', report_kwargs, 200),
         ]

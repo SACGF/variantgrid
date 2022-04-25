@@ -16,12 +16,14 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument('--vcf', help='VCF file, default: - (stdin)', default="-")
         parser.add_argument('--genome-build', help='GenomeBuild name', required=True)
+        parser.add_argument('--remove-info', action='store_true', help='clear INFO field')
         parser.add_argument('--skipped-contigs-stats-file', help='File name')
         parser.add_argument('--skipped-records-stats-file', help='File name')
 
     def handle(self, *args, **options):
         vcf_filename = options["vcf"]
         build_name = options["genome_build"]
+        remove_info = options["remove_info"]
         skipped_contigs_stats_file = options.get("skipped_contigs_stats_file")
         skipped_records_stats_file = options.get("skipped_records_stats_file")
 
@@ -86,9 +88,13 @@ class Command(BaseCommand):
                         continue
 
                 columns[0] = fasta_chrom
-                # Zero out INFO (makes file size smaller and causes bcftools issues)
-                columns[7] = "."
-                sys.stdout.write("\t".join(columns) + "\n")
+                if remove_info:
+                    # Zero out INFO (makes file size smaller and causes bcftools issues)
+                    columns[7] = "."
+                    # If (7) INFO was the last column, we just stripped the newline - might need to add it back
+                    if len(columns) == 8:
+                        columns[7] += "\n"
+                sys.stdout.write("\t".join(columns))
             else:
                 sys.stdout.write(line)
 

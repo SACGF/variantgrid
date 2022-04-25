@@ -179,6 +179,14 @@
                 <span>{{ uploaded_vcf.vcf_importer }}</span>
             </p>
             {% endif %}
+            {% with cgc=uploaded_vcf.vcf.cohort.cohort_genotype_collection %}
+                {% if cgc.common_collection %}
+                <p>
+                    <label>gnomAD common filter</label>
+                    <span>Rare: {{ cgc.percent_common|floatformat:2 }}% ({{ cgc.common_collection.common_filter }})</span>
+                </p>
+                {% endif %}
+            {% endwith %}
             <p>
                 <label>VCF</label>
                 {% if uploaded_vcf.vcf %}

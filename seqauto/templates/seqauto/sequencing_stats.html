@@ -30,35 +30,35 @@
 
     <script>
         function showGraph(elementId, title, data) {
-            var labels = [];
-            var values = [];
-            for(var i=0 ; i<data.length ; ++i) {
+            let labels = [];
+            let values = [];
+            for(let i=0 ; i<data.length ; ++i) {
                 labels.push(data[i][0]);
                 values.push(data[i][1]);
             }
 
-            var data = [{
+            let plotData = [{
               labels: labels,
               values: values,
               type: 'pie'
             }];
 
-            width = 500;
-            height = width;
+            let width = 500;
+            let height = width;
 
-            var layout = {
+            let layout = {
                 title: title,
                 width: width,
                 height: height,
             };
 
             $("#" + elementId).empty();
-            Plotly.newPlot(elementId, data, layout);
+            Plotly.newPlot(elementId, plotData, layout);
         }
 
         $(document).ready(function() {
-            var sequencingRunInfo = {{ sequencing_run_info | jsonify }};
-            var sequencingSampleInfo = {{ sequencing_sample_info | jsonify }};
+            let sequencingRunInfo = {{ sequencing_run_info | jsonify }};
+            let sequencingSampleInfo = {{ sequencing_sample_info | jsonify }};
 
             showGraph('sequencing-run-model', 'Sequencer Model', sequencingRunInfo['sequencer_model']);
             showGraph('sequencing-run-sequencer', 'Sequencer', sequencingRunInfo['sequencer']);

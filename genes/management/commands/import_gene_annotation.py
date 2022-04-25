@@ -31,7 +31,8 @@ class Command(BaseCommand):
         parser.add_argument('--release', required=False,
                             help="Make a release (to match VEP) store all gene/transcript versions")
         parser.add_argument('--json-file', required=True,
-                            help='PyHGVS JSON PyReference JSON.gz')
+                            help='cdot JSON.gz')
+        parser.add_argument('--clear-obsolete', action='store_true', help='Clear old transcripts')
 
     def handle(self, *args, **options):
         build_name = options["genome_build"]
@@ -46,12 +47,23 @@ class Command(BaseCommand):
 
         json_file = options["json_file"]
         with open_handle_gzip(json_file) as f:
-            pyhgvs_data = json.load(f)
+            cdot_data = json.load(f)
+            cdot_version = cdot_data.get("cdot_version")
+            if cdot_version is None:
+                raise ValueError("JSON does not contain 'cdot_version' key")
+            print(f"JSON uses cdot version {cdot_version}")
 
         if release_version := options["release"]:
-            self._create_release(genome_build, annotation_consortium, release_version, pyhgvs_data)
+            self._create_release(genome_build, annotation_consortium, release_version, cdot_data)
         else:
-            self._import_merged_data(genome_build, annotation_consortium, pyhgvs_data)
+            self._import_merged_data(genome_build, annotation_consortium, cdot_data)
+
+        if options["clear_obsolete"]:
+            print("Clearing old Transcript Versions")
+            tv_qs = TranscriptVersion.objects.filter(transcript__annotation_consortium=annotation_consortium,
+                                                     genome_build=genome_build)
+            ret = tv_qs.filter(data__genome_builds__isnull=True).delete()
+            print(f"Deleted: {ret}")
 
     def _get_import_source_by_url(self, genome_build, annotation_consortium, url):
         import_source = self.import_source_by_url.get(url)
@@ -62,12 +74,12 @@ class Command(BaseCommand):
             self.import_source_by_url[url] = import_source
         return import_source
 
-    def _create_release(self, genome_build: GenomeBuild, annotation_consortium, release_version, pyhgvs_data):
+    def _create_release(self, genome_build: GenomeBuild, annotation_consortium, release_version, cdot_data):
         """ A GeneAnnotationRelease doesn't change/store transcript data, but does keep track of eg what
             symbols are used and how things are linked together """
 
         # A release should be from a single GTF - so all URLs should be the same, so take any one
-        random_transcript = next(iter(pyhgvs_data["transcripts"].values()))
+        random_transcript = next(iter(cdot_data["transcripts"].values()))
         url = random_transcript["url"]
         import_source = self.import_source_by_url[url]  # For a release, this must be there as it was imported before
         release, created = GeneAnnotationRelease.objects.update_or_create(version=release_version,
@@ -85,7 +97,7 @@ class Command(BaseCommand):
 
         release_transcript_version_list = []
         gene_versions_used_by_transcripts = set()
-        for transcript_accession, tv_data in pyhgvs_data["transcript_version"].items():
+        for transcript_accession, tv_data in cdot_data["transcript_version"].items():
             transcript_version_id = transcript_version_ids_by_accession[transcript_accession]
             rtv = ReleaseTranscriptVersion(release=release, transcript_version_id=transcript_version_id)
             release_transcript_version_list.append(rtv)
@@ -94,7 +106,7 @@ class Command(BaseCommand):
                 gene_versions_used_by_transcripts.add(gene_version)
 
         release_gene_version_list = []
-        for gene_accession in pyhgvs_data["gene_version"]:
+        for gene_accession in cdot_data["gene_version"]:
 
             # Gene accession may not have
             # We only store gene versions that are used in the merged files (which is what's used to insert data)
@@ -133,7 +145,7 @@ class Command(BaseCommand):
                                                      for (pk, transcript_id, version) in tv_values}
         return gene_version_ids_by_accession, transcript_version_ids_by_accession
 
-    def _import_merged_data(self, genome_build: GenomeBuild, annotation_consortium, pyhgvs_data: Dict):
+    def _import_merged_data(self, genome_build: GenomeBuild, annotation_consortium, cdot_data: Dict):
         print("_import_merged_data")
 
         known_uc_gene_symbols = set(GeneSymbol.objects.annotate(uc_symbol=Upper("symbol")).values_list("uc_symbol", flat=True))
@@ -149,7 +161,15 @@ class Command(BaseCommand):
         new_gene_versions = []
         modified_gene_versions = []
 
-        for gene_accession, gv_data in pyhgvs_data["genes"].items():
+        def fix_accession(_gene_accession: str) -> str:
+            if _gene_accession.startswith("_"):  # Fake UTA
+                # If there's only 1 - we can use that
+                # otherwise rename slightly to w/ Gene.FAKE_GENE_ID_PREFIX
+                _gene_accession = Gene.FAKE_GENE_ID_PREFIX + _gene_accession[1:]
+            return _gene_accession
+
+        for gene_accession, gv_data in cdot_data["genes"].items():
+            gene_accession = fix_accession(gene_accession)
             gene_id, version = GeneVersion.get_gene_id_and_version(gene_accession)
             if version is None:
                 version = 0  # RefSeq genes have no version, store as 0
@@ -165,17 +185,17 @@ class Command(BaseCommand):
                     new_gene_symbols.add(symbol)
                     known_uc_gene_symbols.add(uc_symbol)
 
-            # Some HGNC IDs have been withdrawn and are not in the download files
-            hgnc_id = None
-            if hgnc := gv_data.get("hgnc"):
-                hgnc = int(hgnc)
-                if hgnc in hgnc_ids:
-                    hgnc_id = hgnc
+            hgnc_id = None  # Foreign Key - only set if we have it (ie not withdrawn)
+            if hgnc_identifier := gv_data.get("hgnc"):
+                hgnc_identifier = int(hgnc_identifier)
+                if hgnc_identifier in hgnc_ids:
+                    hgnc_id = hgnc_identifier
 
             import_source = self._get_import_source_by_url(genome_build, annotation_consortium, gv_data["url"])
             gene_version = GeneVersion(gene_id=gene_id,
                                        version=version,
                                        gene_symbol_id=symbol,
+                                       hgnc_identifier=hgnc_identifier,
                                        hgnc_id=hgnc_id,
                                        description=gv_data.get("description"),
                                        biotype=gv_data.get("biotype"),
@@ -206,30 +226,32 @@ class Command(BaseCommand):
         # Could potentially be duplicate gene versions (diff transcript versions from diff GFFs w/same GeneVersion)
         if modified_gene_versions:
             logging.info("Updating %d gene versions", len(modified_gene_versions))
+            gv_fields = ["gene_symbol_id", "hgnc_identifier", "hgnc_id", "description", "biotype", "import_source"]
             GeneVersion.objects.bulk_update(modified_gene_versions,
-                                            ["gene_symbol_id", "hgnc_id", "description", "biotype", "import_source"],
+                                            gv_fields,
                                             batch_size=self.BATCH_SIZE)
 
         new_transcript_ids = set()
         new_transcript_versions = []
         modified_transcript_versions = []
 
-        for transcript_accession, tv_data in pyhgvs_data["transcripts"].items():
+        for transcript_accession, tv_data in cdot_data["transcripts"].items():
             transcript_id, version = TranscriptVersion.get_transcript_id_and_version(transcript_accession)
             if transcript_id not in known_transcript_ids:
                 new_transcript_ids.add(transcript_id)
 
-            gene_version_id = gene_version_ids_by_accession[tv_data.pop("gene_version")]
-            import_source = self._get_import_source_by_url(genome_build, annotation_consortium, tv_data.pop("url"))
-            del tv_data["gene_name"]  # We'll put in symbol from related data gene_version.gene_symbol
-            contig = genome_build.chrom_contig_mappings[tv_data["chrom"]]
+            build_data = tv_data["genome_builds"][genome_build.name]  # Should always be there as single build file
+            gene_accession = fix_accession(tv_data.pop("gene_version"))
+            gene_version_id = gene_version_ids_by_accession[gene_accession]
+            import_source = self._get_import_source_by_url(genome_build, annotation_consortium, build_data["url"])
+            contig = genome_build.chrom_contig_mappings[build_data["contig"]]
             transcript_version = TranscriptVersion(transcript_id=transcript_id,
                                                    version=version,
                                                    gene_version_id=gene_version_id,
                                                    genome_build=genome_build,
                                                    contig=contig,
                                                    import_source=import_source,
-                                                   biotype=tv_data.pop("biotype"),
+                                                   biotype=tv_data.get("biotype"),
                                                    data=tv_data)
             if pk := transcript_version_ids_by_accession.get(transcript_accession):
                 transcript_version.pk = pk

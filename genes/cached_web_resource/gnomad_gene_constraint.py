@@ -15,7 +15,7 @@ import pandas as pd
 import requests
 
 from genes.models import GnomADGeneConstraint, \
-    Transcript, GeneVersion
+    Transcript, GeneVersion, GeneSymbol
 from genes.models_enums import AnnotationConsortium
 from library.pandas_utils import df_nan_to_none
 
@@ -46,6 +46,7 @@ def store_gnomad_gene_constraint_from_df(cached_web_resource, df):
         ensembl_gene_ids.add(gene_id)
         gene_symbols.add(gene_symbol)
 
+    new_gene_symbols = set()
     gene_constraints = []
     for _, row in df.iterrows():
         gene_id_str = row["gene_id"]
@@ -60,7 +61,11 @@ def store_gnomad_gene_constraint_from_df(cached_web_resource, df):
         else:
             gene_id = None
 
-        ggc = GnomADGeneConstraint(gene_symbol_id=row["gene"],
+        gene_symbol = row["gene"]
+        if gene_symbol not in gene_symbols:
+            new_gene_symbols.add(GeneSymbol(symbol=gene_symbol))
+
+        ggc = GnomADGeneConstraint(gene_symbol_id=gene_symbol,
                                    gene_id=gene_id,
                                    transcript_id=transcript_id,
                                    cached_web_resource=cached_web_resource,
@@ -68,6 +73,9 @@ def store_gnomad_gene_constraint_from_df(cached_web_resource, df):
                                    oe_lof_lower=row["oe_lof_lower"],
                                    oe_lof_upper=row["oe_lof_upper"])
         gene_constraints.append(ggc)
+
+    if new_gene_symbols:
+        GeneSymbol.objects.bulk_create(new_gene_symbols, batch_size=2000)
 
     GnomADGeneConstraint.objects.bulk_create(gene_constraints)
     cached_web_resource.description = f"{len(gene_constraints)} genes."

@@ -443,12 +443,7 @@ class HGVSMatcher:
 
     @staticmethod
     def _create_pyhgvs_transcript(transcript_version: TranscriptVersion):
-        # Legacy data stored gene_name in JSON, but that could lead to diverging values vs TranscriptVersion relations
-        # so use DB as source of truth and replace into PyHGVS at last minute
-        if transcript_version.gene_symbol:
-            transcript_version.data["gene_name"] = str(transcript_version.gene_symbol)
-        transcript_version.data["id"] = transcript_version.accession
-        return make_transcript(transcript_version.data)
+        return make_transcript(transcript_version.pyhgvs_data)
 
     def _get_pyhgvs_transcript(self, transcript_name):
         return self._get_transcript_version_and_pyhgvs_transcript(transcript_name)[1]
@@ -810,7 +805,7 @@ class HGVSMatcher:
 
                     # Sanity Check - make sure contig is the same
                     contig_mappings = self.genome_build.chrom_contig_mappings
-                    transcript_chrom = transcript_version.data["chrom"]
+                    transcript_chrom = transcript_version.pyhgvs_data["chrom"]
                     transcript_contig = contig_mappings.get(transcript_chrom)
                     if variant.locus.contig != transcript_contig:
                         contig_msg = f"Variant contig={variant.locus.contig} (chrom={chrom}) while Transcript " \

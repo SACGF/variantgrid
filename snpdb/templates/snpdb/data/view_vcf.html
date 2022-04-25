@@ -228,7 +228,7 @@ function hideVCFHeader() {
 function drawZygosityGraphs() {
     const sample_zygosities = {{ sample_zygosities | jsonify }};
     const sample_names = {{ sample_names | jsonify }};
-    showStackedBar('sample-zygosities-graph', 'Sample Zygosities', sample_zygosities, sample_names);
+    showStackedBar('sample-zygosities-graph', 'Sample Zygosities', 500, 500, sample_zygosities, sample_names);
 }
 
 $(document).ready(function() {

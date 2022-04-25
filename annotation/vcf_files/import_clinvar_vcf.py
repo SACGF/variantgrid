@@ -24,6 +24,8 @@ class BulkClinVarInserter:
         'SSR': 'clinvar_suspect_reason_code',
     }
 
+    CLINVAR_MANDATORY_FIELDS = ['clinvar_variation_id', 'clinvar_allele_id']
+
     CLINVAR_CSV_FIELDS = ['version_id',
                           'variant_id',
                           'clinvar_variation_id',
@@ -128,6 +130,10 @@ class BulkClinVarInserter:
                 if formatter:
                     value = formatter(value)
                 kwargs[field] = value
+
+        for field in BulkClinVarInserter.CLINVAR_MANDATORY_FIELDS:
+            if kwargs.get(field) is None:
+                raise ValueError(f"Mandatory field '{field}' missing: {v}")
 
         # clinical_significance is now a '|' separated string
         if clinical_significance := kwargs.get("clinical_significance"):

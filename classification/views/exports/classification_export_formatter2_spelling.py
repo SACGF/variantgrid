@@ -86,7 +86,7 @@ class ClassificationExportFormatter2Spelling(ClassificationExportFormatter2):
 
     def footer(self) -> List[str]:
         suspect_count_list = [(word, count) for word, count in self.suspect_count.items()]
-        suspect_count_list.sort(key = lambda x: x[1], reverse=True)
+        suspect_count_list.sort(key=lambda x: x[1], reverse=True)
         return [ExportFormatter.write_single_row([
             "", "", "Total Classifications Occurred In", "\n".join(f"{wc[0]}: {wc[1]}" for wc in suspect_count_list)
         ])]

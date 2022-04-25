@@ -6,6 +6,7 @@
 {% load static %}
 {% load js_tags %}
 {% load datatable_tags %}
+{% load tz %}
 {% block submenu %}{% menu_bar_data %}{% endblock %}
 
 {% block title %}{{ gene }}{% endblock title %}
@@ -48,7 +49,7 @@
                                 <tr>
                                     {% for d in version_data %}
                                         {% if forloop.first %}
-                                            <td>{{ gene.identifier }}.{{ d }}</td>
+                                            <td>{{ gene.identifier }}{% if d %}.{{ d }}{% endif %}</td>
                                         {% else %}
                                             <td>
                                                 {% if d %}
@@ -67,6 +68,10 @@
                                                         <a class="hover-link" href="{% url 'view_gene_symbol' d.gene_symbol %}">{{ d.gene_symbol }}</a>
                                                     {% endif %}
                                                     {{ d.coordinate }}
+                                                    <a class="toggle-link" data-toggle="collapse" href="#gene-import-{{ d.pk }}">Details...</a>
+                                                    <div id="gene-import-{{ d.pk }}" class="collapse">
+                                                        {{ d.import_source.url }} updated {{ d.import_source.modified|localtime }}
+                                                    </div>
                                                 {% endif %}
                                             </td>
                                         {% endif %}
