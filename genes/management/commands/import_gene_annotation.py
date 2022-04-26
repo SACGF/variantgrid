@@ -110,6 +110,7 @@ class Command(BaseCommand):
         # as a later transcript uses a different gene so this one was never stored. We'll have to make those now
         missing_gene_versions = set(gene_version_ids_by_accession) - gene_versions_used_by_transcripts
         if missing_gene_versions:
+            print(f"Missing {len(missing_gene_versions)} gene versions")
             max_gene_version = GeneVersion.objects.all().aggregate(pk__max=Max("pk"))["pk__max"]
             fake_cdot_data = {
                 "genes": {k: v for k, v in cdot_data["genes"].items() if k in missing_gene_versions},
@@ -117,7 +118,7 @@ class Command(BaseCommand):
             }
             self._import_merged_data(genome_build, annotation_consortium, fake_cdot_data)
             new_gene_versions = GeneVersion.objects.filter(genome_build=genome_build,
-                                                           annotation_consortium=annotation_consortium,
+                                                           gene__annotation_consortium=annotation_consortium,
                                                            pk__gt=max_gene_version)
             gene_version_ids_by_accession.update({gv.accession: gv.pk for gv in new_gene_versions})
 
