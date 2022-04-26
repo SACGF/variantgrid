@@ -97,7 +97,7 @@ class Command(BaseCommand):
 
         release_transcript_version_list = []
         gene_versions_used_by_transcripts = set()
-        for transcript_accession, tv_data in cdot_data["transcript_version"].items():
+        for transcript_accession, tv_data in cdot_data["transcripts"].items():
             transcript_version_id = transcript_version_ids_by_accession[transcript_accession]
             rtv = ReleaseTranscriptVersion(release=release, transcript_version_id=transcript_version_id)
             release_transcript_version_list.append(rtv)
@@ -106,7 +106,7 @@ class Command(BaseCommand):
                 gene_versions_used_by_transcripts.add(gene_version)
 
         release_gene_version_list = []
-        for gene_accession in cdot_data["gene_version"]:
+        for gene_accession in cdot_data["genes"]:
 
             # Gene accession may not have
             # We only store gene versions that are used in the merged files (which is what's used to insert data)
