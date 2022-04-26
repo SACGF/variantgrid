@@ -36,7 +36,7 @@ ANNOTATION[BUILD_GRCH38].update({
     "reference_fasta": os.path.join(_ANNOTATION_FASTA_BASE_DIR, "GCF_000001405.39_GRCh38.p13_genomic.fna.gz"),
 })
 
-ANNOTATION_VCF_DUMP_DIR = os.path.join(_BIG_DISK_BASE_DIR, 'annotation_scratch')
+ANNOTATION_VCF_DUMP_DIR = os.path.join(ANNOTATION_REFERENCE_BASE_DIR, 'scratch')
 
 GENES_DEFAULT_CANONICAL_TRANSCRIPT_COLLECTION_ID = 1  # MedEx
 DEFAULT_FROM_EMAIL = 'noreply@variantgrid.com'
