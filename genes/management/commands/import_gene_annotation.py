@@ -80,7 +80,7 @@ class Command(BaseCommand):
 
         # A release should be from a single GTF - so all URLs should be the same, so take any one
         random_transcript = next(iter(cdot_data["transcripts"].values()))
-        url = random_transcript[genome_build.name]["url"]
+        url = random_transcript["genome_builds"][genome_build.name]["url"]
         import_source = self.import_source_by_url[url]  # For a release, this must be there as it was imported before
         release, created = GeneAnnotationRelease.objects.update_or_create(version=release_version,
                                                                           genome_build=genome_build,
