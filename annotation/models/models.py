@@ -23,9 +23,9 @@ from lazy import lazy
 from annotation.external_search_terms import get_variant_search_terms, get_variant_pubmed_search_terms
 from annotation.models.damage_enums import Polyphen2Prediction, FATHMMPrediction, MutationTasterPrediction, \
     SIFTPrediction, PathogenicityImpact, MutationAssessorPrediction
-from annotation.models.models_enums import HumanProteinAtlasAbundance, AnnotationStatus, CitationSource, \
+from annotation.models.models_enums import AnnotationStatus, CitationSource, \
     VariantClass, ColumnAnnotationCategory, VEPPlugin, VEPCustom, ClinVarReviewStatus, VEPSkippedReason, \
-    ManualVariantEntryType
+    ManualVariantEntryType, HumanProteinAtlasAbundance
 from genes.models import GeneSymbol, Gene, TranscriptVersion, Transcript, GeneAnnotationRelease, UniProt
 from genes.models_enums import AnnotationConsortium
 from library.django_utils import object_is_referenced
@@ -265,6 +265,26 @@ class HumanProteinAtlasAnnotationVersion(SubVersionPartition):
     filename = models.TextField()
     md5_hash = models.CharField(max_length=32)
     hpa_version = models.FloatField()
+    unit = models.TextField()  # What unit "value" is in
+
+    def get_minimum_for_abundance_level(self, abundance: HumanProteinAtlasAbundance):
+        """ Attempt to remain backwards compatabile - see how this is calculated here:
+            https://github.com/SACGF/variantgrid/issues/9#issuecomment-563510678 """
+        abundance_mins = {
+            HumanProteinAtlasAbundance.NOT_DETECTED: 0,
+            HumanProteinAtlasAbundance.LOW: 1.1,
+            HumanProteinAtlasAbundance.MEDIUM: 15.5,
+            HumanProteinAtlasAbundance.HIGH: 83.6,
+        }
+
+        if self.hpa_version == 15:
+            abundance_mins = {
+                HumanProteinAtlasAbundance.NOT_DETECTED: 0,
+                HumanProteinAtlasAbundance.LOW: 0.5,
+                HumanProteinAtlasAbundance.MEDIUM: 10,
+                HumanProteinAtlasAbundance.HIGH: 50,
+            }
+        return abundance_mins[abundance]
 
 
 @receiver(pre_delete, sender=HumanProteinAtlasAnnotationVersion)
@@ -273,7 +293,7 @@ def human_protein_annotation_version_pre_delete_handler(sender, instance, **kwar
 
 
 class HumanProteinAtlasTissueSample(models.Model):
-    name = models.TextField()
+    name = models.TextField(unique=True)
 
     def __str__(self):
         return self.name
@@ -281,9 +301,10 @@ class HumanProteinAtlasTissueSample(models.Model):
 
 class HumanProteinAtlasAnnotation(models.Model):
     version = models.ForeignKey(HumanProteinAtlasAnnotationVersion, on_delete=CASCADE)
-    gene = models.ForeignKey(Gene, on_delete=CASCADE)  # Always Ensembl
+    gene_symbol = models.ForeignKey(GeneSymbol, null=True, on_delete=CASCADE)
+    gene = models.ForeignKey(Gene, null=True, on_delete=CASCADE)  # Always Ensembl
     tissue_sample = models.ForeignKey(HumanProteinAtlasTissueSample, on_delete=CASCADE)
-    abundance = models.CharField(max_length=1, choices=HumanProteinAtlasAbundance.choices)
+    value = models.FloatField()
 
 
 class ColumnVEPField(models.Model):

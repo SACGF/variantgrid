@@ -188,13 +188,15 @@ python3 manage.py import_gene_annotation --annotation-consortium=RefSeq --genome
     <div class="card-body">
         {% labelled label="Human Protein Atlas" %}
             {% if hpa_counts %}
-                {{ hpa_counts | intcomma }}
+                Version: {{ hpa_version.hpa_version }} ({{ hpa_version.unit}}) Records: {{ hpa_counts | intcomma }}
             {% else %}
                 <div class="no-value">Not installed</div>
             {% endif %}
             {% install-instructions "Human Protein Atlas" installed=hpa_counts %}
-                <div>Go to <a href='https://v15.proteinatlas.org/about/download'>Protein Atlas Download Page</a> (We only support version &lt;=15 currently)> and download <b>rna_tissue.csv.zip</b> note the version (ie <b>15</b>):</div>
-                <code>{{ python_command }} manage.py human_protein_atlas_import --hpa-version 15 ${VARIANTGRID_SETUP_DATA}/rna_tissue.csv.zip</code>
+                <div>Go to <a href='https://www.proteinatlas.org/about/download'>Protein Atlas Download Page</a> and download <b>rna_tissue_consensus.tsv.zip</b> note the version (ie <b>21</b>):</div>
+                <code>
+                    wget https://v21.proteinatlas.org/download/rna_tissue_consensus.tsv.zip
+                    {{ python_command }} manage.py human_protein_atlas_import --hpa-version 21 ${VARIANTGRID_SETUP_DATA}/rna_tissue_consensus.tsv.zip</code>
             {% endinstall-instructions %}
         {% endlabelled %}
 
