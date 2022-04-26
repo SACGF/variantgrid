@@ -2,6 +2,7 @@ import typing
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from enum import Enum
 from typing import Set, Optional, List, Dict, Tuple, Any, Iterable
 
 import django.dispatch
@@ -24,7 +25,7 @@ from flags.models.enums import FlagStatus
 from flags.models.models import FlagComment
 from genes.hgvs import CHGVS
 from snpdb.genome_build_manager import GenomeBuildManager
-from snpdb.models import Lab, GenomeBuild
+from snpdb.models import Lab, GenomeBuild, UserSettings
 
 discordance_change_signal = django.dispatch.Signal()  # args: "discordance_report"
 
@@ -46,6 +47,10 @@ class DiscordanceReport(TimeStampedModel):
 
     cause_text = models.TextField(null=False, blank=True, default='')
     resolved_text = models.TextField(null=False, blank=True, default='')
+
+    class LabInvolvement(int, Enum):
+        WITHDRAWN = 1
+        ACTIVE = 2
 
     def get_absolute_url(self):
         return reverse('discordance_report', kwargs={"discordance_report_id": self.pk})
@@ -151,21 +156,23 @@ class DiscordanceReport(TimeStampedModel):
 
     @property
     def all_actively_involved_labs(self) -> Set[Lab]:
-        # labs_to_classification isn't the most efficient, but chances are if you want all_actively_involved_labs
-        # you also want the lab summaries
-        labs: Set[Lab] = set()
+        return {lab for lab, status in self.involved_labs.items() if status == DiscordanceReport.LabInvolvement.ACTIVE}
+
+    @lazy
+    def involved_labs(self) -> Dict[Lab, LabInvolvement]:
+        lab_status: Dict[Lab, DiscordanceReport.LabInvolvement] = dict()
         for drc in DiscordanceReportClassification.objects.filter(report=self):
             effective_c: Classification = drc.classification_effective.classification
-            if not effective_c.withdrawn:
-                labs.add(effective_c.lab)
-        return labs
+            lab = effective_c.lab
+            status = DiscordanceReport.LabInvolvement.WITHDRAWN if effective_c.withdrawn else DiscordanceReport.LabInvolvement.ACTIVE
+            lab_status[lab] = max(lab_status.get(lab, 0), status)
+        return lab_status
 
     def user_is_involved(self, user: User) -> bool:
         if user.is_superuser:
             return True
         user_labs = set(Lab.valid_labs_qs(user, admin_check=True))
-        report_labs = self.all_actively_involved_labs
-        return bool(user_labs.intersection(report_labs))
+        return bool(user_labs.intersection(self.involved_labs.keys()))
 
     @transaction.atomic
     def create_new_report(self, only_if_necessary: bool = True, cause: str = ''):
@@ -309,7 +316,9 @@ class UserPerspective:
     is_admin_mode: bool
 
     @staticmethod
-    def for_lab(lab: Lab, genome_build: GenomeBuild):
+    def for_lab(lab: Lab, genome_build: Optional[GenomeBuild] = None):
+        if not genome_build:
+            genome_build = UserSettings.get_for(lab=lab).default_genome_build or GenomeBuild.grch38()
         return UserPerspective(your_labs={lab, }, genome_build=genome_build, is_admin_mode=False)
 
     @property

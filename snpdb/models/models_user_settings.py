@@ -284,10 +284,10 @@ class UserSettings:
         return settings_overrides
 
     @staticmethod
-    def get_for_user(user: User) -> 'UserSettings':
+    def get_for(user: Optional[User] = None, lab: Optional[Lab] = None, organization: Optional[Organization] = None):
         override_fields = [s.name for s in dataclasses.fields(UserSettings)]
         kwargs = {f: None for f in override_fields}  # Need to pass all params
-        settings_overrides = UserSettings.get_settings_overrides(user=user)
+        settings_overrides = UserSettings.get_settings_overrides(user=user, lab=lab, organization=organization)
         kwargs["_settings_overrides"] = settings_overrides
         for so in settings_overrides:
             for f in override_fields:
@@ -295,6 +295,10 @@ class UserSettings:
                 if val is not None:
                     kwargs[f] = val
         return UserSettings(**kwargs)
+
+    @staticmethod
+    def get_for_user(user: User) -> 'UserSettings':
+        return UserSettings.get_for(user=user)
 
     @lazy
     def initial_perm_read_and_write_groups(self) -> Tuple[Set[Group], Set[Group]]:
