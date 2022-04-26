@@ -13,6 +13,7 @@ from django.urls.base import reverse
 from django.utils.timezone import now
 from django_extensions.db.models import TimeStampedModel
 from lazy import lazy
+from more_itertools import first
 
 from classification.enums.classification_enums import SpecialEKeys, ClinicalSignificance
 from classification.enums.discordance_enums import DiscordanceReportResolution, ContinuedDiscordanceReason
@@ -317,6 +318,7 @@ class UserPerspective:
             return set()
         return self.your_labs
 
+
 class DiscordanceReportSummary:
 
     def __init__(self, discordance_report: DiscordanceReport, perspective: UserPerspective):
@@ -344,10 +346,17 @@ class DiscordanceReportSummary:
 
     @property
     def _cm_candidate(self) -> ClassificationModification:
+        return first(self._cm_candidates)
+
+    @property
+    def _cm_candidates(self) -> Iterable[ClassificationModification]:
+        yielded_any = False
         for cm_candidate in self.discordance_report.all_classification_modifications:
             if cm_candidate.classification.lab in self.perspective.your_labs:
-                return cm_candidate
-        return self.discordance_report.all_classification_modifications[0]
+                yielded_any = True
+                yield cm_candidate
+        if not yielded_any:
+            yield self.discordance_report.all_classification_modifications[0]
 
     @property
     def id(self):
@@ -367,6 +376,10 @@ class DiscordanceReportSummary:
     @property
     def c_hgvs(self) -> CHGVS:
         return self._cm_candidate.c_hgvs_best(genome_build=self.perspective.genome_build)
+
+    @property
+    def c_hgvses(self) -> List[CHGVS]:
+        return sorted({candidate.c_hgvs_best(genome_build=self.perspective.genome_build) for candidate in self._cm_candidates})
 
     @dataclass
     class LabClinicalSignificances:
