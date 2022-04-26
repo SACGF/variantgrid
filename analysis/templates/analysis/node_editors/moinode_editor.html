@@ -129,20 +129,6 @@
         }
     }
 
-    function addDownloadLink(grid, pagerId, url) {
-        var download_grid = function() {
-                window.location = url;
-        };
-
-        grid.jqGrid('navButtonAdd', pagerId, {
-                    caption : "Download",
-                    buttonicon : "ui-icon-arrowthickstop-1-s",
-                    onClickButton : download_grid,
-                    position : "first",
-                    title : "Export",
-                    cursor : "pointer"
-        });
-    }
 {% endblock inlinejs%}
 
 {% block gene_list_grid %}

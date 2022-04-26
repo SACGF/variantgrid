@@ -25,25 +25,6 @@
     ajaxForm(phenotypeNodeForm);
 {% endblock docreadyjs %}
 
-{% block inlinejs %}
-    {{ block.super }}
-
-    function addDownloadLink(grid, pagerId, url) {
-        var download_grid = function() {
-                window.location = url;
-        };
-
-        grid.jqGrid('navButtonAdd', pagerId, {
-                    caption : "Download",
-                    buttonicon : "ui-icon-arrowthickstop-1-s",
-                    onClickButton : download_grid,
-                    position : "first",
-                    title : "Export",
-                    cursor : "pointer"
-        });
-    }
-{% endblock inlinejs%}
-
 {% block gene_list_grid %}
 
 {% jqgrid 'node_ontology_genes_grid' 'node-ontology-genes' search=False download_grid_json_as_csv=True analysis_id=node.analysis_id node_id=node.pk version=node.version %}
