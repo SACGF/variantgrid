@@ -108,7 +108,7 @@ class Command(BaseCommand):
 
         # It's possible that we have gene versions in this release that we don't have normally in merged files
         # as a later transcript uses a different gene so this one was never stored. We'll have to make those now
-        missing_gene_versions = set(gene_version_ids_by_accession) - gene_versions_used_by_transcripts
+        missing_gene_versions = gene_versions_used_by_transcripts - set(gene_version_ids_by_accession)
         if missing_gene_versions:
             print(f"Missing {len(missing_gene_versions)} gene versions")
             max_gene_version = GeneVersion.objects.all().aggregate(pk__max=Max("pk"))["pk__max"]
