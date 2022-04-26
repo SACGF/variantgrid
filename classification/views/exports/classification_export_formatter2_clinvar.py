@@ -221,4 +221,7 @@ class ClassificationExportFormatter2ClinVarCompare(ClassificationExportFormatter
         return [ExportFormatter.write_single_row(ClinVarCompareRow.csv_header())]
 
     def row(self, allele_data: AlleleData) -> List[str]:
-        return [ExportFormatter.write_single_row(ClinVarCompareRow(allele_data, self.clinvar_version).to_csv())]
+        if allele_data.cms and allele_data.allele_id:
+            return [ExportFormatter.write_single_row(ClinVarCompareRow(allele_data, self.clinvar_version).to_csv())]
+        else:
+            return list()
