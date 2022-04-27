@@ -53,7 +53,11 @@ Hello Shariant User,
                         <tr style="border-top: 1px solid #bbb;">
                             <td><a href="{% absolute_url 'discordance_report' discordance_report_summary.id %}">DR {{ discordance_report_summary.id }}</a></td>
                             <td style="font-family:monospace">{{ discordance_report_summary.date_detected_str }}</td>
-                            <td>{% c_hgvs discordance_report_summary.c_hgvs show_genome_build=False %}</td> {% comment %}do inline style for c.hgvs{% endcomment %}
+                            <td>
+                                {% for c_hgvs_val in discordance_report_summary.c_hgvses %}
+                                <div>{% c_hgvs c_hgvs_val show_genome_build=False %}</div>
+                                {% endfor %}
+                            </td> {% comment %}do inline style for c.hgvs{% endcomment %}
                             <td>
                                 {% for lab_cs in discordance_report_summary.lab_significances %}
                                     <div>{% lab lab_cs.lab your_lab=lab_cs.is_internal %} -
