@@ -426,7 +426,8 @@ class DiscordanceReportSummaries:
 
     def labs_quick_str(self) -> str:
         if len(self.perspective.your_labs) == 1:
-            return str(list(self.perspective.your_labs) == 0)
+            lab = list(self.perspective.your_lab)[0]
+            return str(lab)
         else:
             return "your assigned labs"
 
