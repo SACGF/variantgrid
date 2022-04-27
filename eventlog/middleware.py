@@ -1,10 +1,12 @@
 from django.conf import settings
+from django.http.response import HttpResponseRedirectBase
 from django.urls import resolve
-
 from eventlog.models import ViewEvent
+import re
 
 INGORE_SEGMENTS = {"api", "datatable", "citations_json"}
 IGNORE_TEXT = {"detail", "metrics"}
+IGNORE_VIEW_NAME_SUFFIX = {"_detail", "_autocomplete"}
 IGNORE_PARAMETERS = {"csrfmiddlewaretoken"}
 
 class PageViewsMiddleware:
@@ -18,6 +20,11 @@ class PageViewsMiddleware:
         # the view (and later middleware) are called.
 
         response = self.get_response(request)
+        # don't record redirects, as the view that we're redirected to will be enough
+        if not isinstance(response, HttpResponseRedirectBase):
+            if hasattr(request, 'view_event'):
+                if view_event := request.view_event:
+                    view_event.save()
 
         # Code to be executed for each request/response after
         # the view is called.
@@ -27,14 +34,17 @@ class PageViewsMiddleware:
     def process_view(self, request, view_func, view_args, view_kwargs):
         parts = request.path_info.split('/')
         if len(parts) > 1:
-            for ignore_text in IGNORE_TEXT:
-                if ignore_text in request.path_info:
-                    return
+            if any(ignore_text in request.path_info for ignore_text in IGNORE_TEXT):
+                return
 
             if not any(segment in INGORE_SEGMENTS for segment in parts):
                 app = request.path_info.split('/')[1]  # FYI not guaranteed to be the app, but closest thing I can find that links it
                 if app in settings.LOG_ACTIVITY_APPS:
                     if url_obj := resolve(request.path_info):
+                        view_name = url_obj.view_name
+                        if any(view_name.endswith(ignore_suffix) for ignore_suffix in IGNORE_VIEW_NAME_SUFFIX):
+                            return
+
                         # but url_obj.app_name returns an empty string
 
                         all_params = {**view_kwargs}
@@ -65,13 +75,13 @@ class PageViewsMiddleware:
                                 if len(parts) > 1:
                                     all_params["modification_timestamp"] = float(parts[1])
 
-                        ViewEvent(
+                        request.view_event = ViewEvent(
                             user=request.user,
                             view_name=f"{app}:{url_obj.view_name}",
                             args=all_params,
                             path=request.get_full_path(),
                             method=request.method,
                             referer=request.headers.get('Referer')
-                        ).save()
+                        )
 
         pass
