@@ -1,7 +1,7 @@
 {% extends menu_data_base %}
 {% load static %}
 {% load js_tags %}
-
+{% load crispy_forms_tags %}
 {% block title %}Upload file{% endblock %}
 
 {% block head %}
@@ -283,6 +283,10 @@ img.thumbnail {
 		tabs.bind('tabsselect', function(event, ui) {
    			$(".ui-tabs-panel", this).empty();
 		});
+
+		$("#show-file-types-toggle").click(function() {
+			$("#file-types-description").hide()
+		});
 		setTimeout(update_uploads, UPDATE_TIME);
 	});
 </script>
@@ -307,9 +311,17 @@ img.thumbnail {
 	    {% csrf_token %}
 		<div class="horizontal-fields">
             <label>Show last</label>
-			{{ form.time_filter_value }}{{ form.time_filter_value.errors }}
-			{{ form.time_filter_method }}{{ form.time_filter_method.errors }}
-			<label>Show internal</label>{{ form.show_all }}{{ form.show_all.errors }}
+			{{ form.time_filter_value|as_crispy_field }}{{ form.time_filter_value.errors }}
+			{{ form.time_filter_method|as_crispy_field }}{{ form.time_filter_method.errors }}
+			{% with file_types_description=form.instance.file_types_description %}
+				<div>
+					<div id="file-types-description"><b>Showing:</b> {{ file_types_description }} file types</div>
+					<a id="show-file-types-toggle" class="hover-link" data-toggle="collapse" href="#show-file-types">Select file types...</a>
+				</div>
+				<div id="show-file-types" class="collapse {% if file_types_description != 'Custom' %}hide{% endif %}">
+					{{ form.file_types|as_crispy_field }}
+				</div>
+			{% endwith %}
 			<button class="btn btn-secondary">Show</button>
 		</div>
 	</form>

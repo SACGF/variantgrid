@@ -101,8 +101,7 @@ def _classification_upload_pipeline(
                                                 import_source=import_source,
                                                 name='Variants from API',
                                                 user=classification_import.user,
-                                                file_type=UploadedFileTypes.VCF_INSERT_VARIANTS_ONLY,
-                                                visible=False)
+                                                file_type=UploadedFileTypes.VCF_INSERT_VARIANTS_ONLY)
 
     UploadedClassificationImport.objects.create(uploaded_file=uploaded_file,
                                                 classification_import=classification_import)

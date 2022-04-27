@@ -1,11 +1,14 @@
 import json
 import logging
+import operator
 import os
 from datetime import date, timedelta
+from functools import reduce
 
 from django.conf import settings
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied
+from django.db.models import Q
 from django.http.response import HttpResponseRedirect, JsonResponse
 from django.shortcuts import render, get_object_or_404
 from django.urls.base import reverse
@@ -160,15 +163,18 @@ def jfu_upload_delete(request, pk):
 
 
 def get_file_dicts_list(upload_settings):
-    qs = UploadedFile.objects.order_by("-created")
+    file_types = upload_settings.uploadsettingsfiletype_set.values_list("file_type", flat=True)
+    filters = [Q(file_type__in=file_types)]
     if not upload_settings.user.is_superuser:
-        qs = qs.filter(user=upload_settings.user)
-    if not upload_settings.show_all:
-        qs = qs.filter(visible=True)
+        filters.append(Q(user=upload_settings.user))
+
     if upload_settings.time_filter_method == TimeFilterMethod.DAYS:
         start_date = date.today() - timedelta(days=upload_settings.time_filter_value)
-        qs = qs.filter(created__gte=start_date)
-    elif upload_settings.time_filter_method == TimeFilterMethod.RECORDS:
+        filters.append(Q(created__gte=start_date))
+
+    q = reduce(operator.and_, filters)
+    qs = UploadedFile.objects.filter(q).order_by("-created")
+    if upload_settings.time_filter_method == TimeFilterMethod.RECORDS:
         qs = qs[:upload_settings.time_filter_value]
 
     file_dicts = []

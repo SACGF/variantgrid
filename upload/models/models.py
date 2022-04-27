@@ -3,7 +3,7 @@ import os
 import re
 import shutil
 from collections import namedtuple
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Set
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -16,6 +16,7 @@ from django.db.models.signals import pre_delete
 from django.dispatch.dispatcher import receiver
 from django.utils import timezone
 from django_extensions.db.models import TimeStampedModel
+from lazy import lazy
 from model_utils.managers import InheritanceManager
 
 from eventlog.models import create_event
@@ -43,7 +44,6 @@ class UploadedFile(TimeStampedModel):
     import_source = models.CharField(max_length=1, choices=ImportSource.choices)
     name = models.TextField()
     user = models.ForeignKey(User, on_delete=CASCADE)
-    visible = models.BooleanField(default=True)  # Set False to hide on upload page
 
     @property
     def exists(self):
@@ -640,7 +640,40 @@ class UploadSettings(models.Model):
     user = models.OneToOneField(User, on_delete=CASCADE)
     time_filter_method = models.CharField(max_length=1, choices=TimeFilterMethod.choices, default=TimeFilterMethod.RECORDS)
     time_filter_value = models.IntegerField(default=5)
-    show_all = models.BooleanField(default=False)  # By default hide visible=False (liftover etc)
+
+    INTERNAL_TYPES = {UploadedFileTypes.LIFTOVER, UploadedFileTypes.VCF_INSERT_VARIANTS_ONLY}
+
+    @lazy
+    def file_types(self) -> Set:
+        return set(self.uploadsettingsfiletype_set.values_list("file_type", flat=True))
+
+    def file_types_description(self) -> str:
+        description = "Custom"
+        if self.file_types == set(UploadedFileTypes):
+            description = "All"
+        elif self.file_types == self.non_internal_types:
+            description = "Non internal"
+        return description
+
+    @property
+    def non_internal_types(self) -> Set:
+        return set(UploadedFileTypes) - self.INTERNAL_TYPES
+
+    def create_default_visible_file_types(self):
+        self.uploadsettingsfiletype_set.all().delete()
+        records = []
+        for uft in self.non_internal_types:
+            records.append(UploadSettingsFileType(upload_settings=self, file_type=uft))
+        if records:
+            UploadSettingsFileType.objects.bulk_create(records)
 
     def __str__(self):
         return f"User: {self.user}, {self.time_filter_value} {self.time_filter_method}"
+
+
+class UploadSettingsFileType(models.Model):
+    upload_settings = models.ForeignKey(UploadSettings, null=False, on_delete=CASCADE)
+    file_type = models.CharField(max_length=1, choices=UploadedFileTypes.choices, null=True)
+
+    class Meta:
+        unique_together = ('upload_settings', 'file_type')
