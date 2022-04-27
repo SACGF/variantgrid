@@ -303,7 +303,7 @@ python3 manage.py import_gene_annotation --annotation-consortium=RefSeq --genome
                 <div class="mt-4">
                     <b>Bulk</b><br/>
 If all the files are in place, the uploads can be triggered by a single command rather than waiting for each step to finish, e.g.
-<code>{{ python_command }} manage.py ontology_import --hgnc_sync --mondo_json (location of mondo.json) --hpo_owl (location of hp.owl) --biomart (location of mart_export) --phenotype_to_genes (location of phenotype_to_genes.txt) --gencc (location of gencc-submissions.csv)</code>
+<code>{{ python_command }} manage.py ontology_import --hgnc_sync --mondo (location of mondo.json) --hpo (location of hp.owl) --biomart (location of mart_export) --phenotype_to_genes (location of phenotype_to_genes.txt) --gencc (location of gencc-submissions.csv)</code>
                 </div>
 
             {% endinstall-instructions %}
