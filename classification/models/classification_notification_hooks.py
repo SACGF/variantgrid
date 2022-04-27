@@ -19,7 +19,7 @@ def notify_discordance_change(discordance_report: DiscordanceReport, **kwargs):
 
 
 def send_discordance_notification(discordance_report: DiscordanceReport):
-    all_labs = discordance_report.all_actively_involved_labs
+    all_labs = discordance_report.involved_labs.keys()
     # all_lab_names = ", ".join(lab.name for lab in all_labs)
     report_url = get_url_from_view_path(
         reverse('discordance_report', kwargs={'discordance_report_id': discordance_report.id}),
@@ -31,7 +31,7 @@ def send_discordance_notification(discordance_report: DiscordanceReport):
         user_perspective = UserPerspective.for_lab(lab=lab)
         report_summary = DiscordanceReportSummary(discordance_report=discordance_report, perspective=user_perspective)
         if resolution_text := discordance_report.resolution_text:
-            notification.add_markdown(f"The below overlap is now marked as **{resolution_text}**")
+            notification.add_markdown(f"The below overlap is now marked as *{resolution_text}*")
         # notification.add_markdown(f"The labs {all_lab_names} are involved in the following discordance:")
 
         notification.add_field(label="Discordance Detected On", value=report_summary.date_detected_str)
@@ -45,7 +45,7 @@ def send_discordance_notification(discordance_report: DiscordanceReport):
 
         withdrawn_labs = sorted({lab for lab, involvement in discordance_report.involved_labs.items() if involvement == DiscordanceReport.LabInvolvement.WITHDRAWN})
         for withdrawn_lab in withdrawn_labs:
-            notification.add_field(label=f"{sig_lab.lab} - classify this as", value="*NOW WITHDRAWN*")
+            notification.add_field(label=f"{sig_lab.lab} - classify this as", value="_WITHDRAWN_")
 
         notification.add_markdown(f"Full details of the overlap can be seen here : <{report_url}>")
         notification.send()
