@@ -190,6 +190,7 @@ class LabAdmin(ModelAdminBasics):
         ('Basic', {'fields': ('name', 'group_name', 'organization')}),
         ('Position', {'fields': ('city', 'state', 'country', 'lat', 'long')}),
         ('Style', {'fields': ('url', 'css_class')}),
+        ('Notifications', {'fields': ('email', 'slack_webhook')}),
         ('Submissions', {'fields': ('classification_config', 'upload_location', 'upload_automatic', 'upload_instructions', 'external', 'clinvar_key')})
     )
 
