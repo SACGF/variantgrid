@@ -421,6 +421,15 @@ class DiscordanceReportSummaries:
     def __bool__(self):
         return bool(self.summaries)
 
+    def labs(self) -> List[Lab]:
+        return sorted(self.perspective.your_labs)
+
+    def labs_quick_str(self) -> str:
+        if len(self.perspective.your_labs) == 1:
+            return str(list(self.perspective.your_labs) == 0)
+        else:
+            return "your assigned labs"
+
     @staticmethod
     def create(perspective: UserPerspective, discordance_reports: Iterable[DiscordanceReport]) -> 'DiscordanceReportSummaries':
         internal_count = 0
