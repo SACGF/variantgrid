@@ -3,6 +3,7 @@ import logging
 from typing import Dict, Tuple
 
 from django.core.management.base import BaseCommand
+from django.db.models import Max
 from django.db.models.functions import Upper
 
 from genes.cached_web_resource.refseq import retrieve_refseq_gene_summaries
@@ -80,7 +81,7 @@ class Command(BaseCommand):
 
         # A release should be from a single GTF - so all URLs should be the same, so take any one
         random_transcript = next(iter(cdot_data["transcripts"].values()))
-        url = random_transcript["url"]
+        url = random_transcript["genome_builds"][genome_build.name]["url"]
         import_source = self.import_source_by_url[url]  # For a release, this must be there as it was imported before
         release, created = GeneAnnotationRelease.objects.update_or_create(version=release_version,
                                                                           genome_build=genome_build,
@@ -97,7 +98,7 @@ class Command(BaseCommand):
 
         release_transcript_version_list = []
         gene_versions_used_by_transcripts = set()
-        for transcript_accession, tv_data in cdot_data["transcript_version"].items():
+        for transcript_accession, tv_data in cdot_data["transcripts"].items():
             transcript_version_id = transcript_version_ids_by_accession[transcript_accession]
             rtv = ReleaseTranscriptVersion(release=release, transcript_version_id=transcript_version_id)
             release_transcript_version_list.append(rtv)
@@ -105,9 +106,24 @@ class Command(BaseCommand):
             if gene_version := tv_data.get("gene_version"):
                 gene_versions_used_by_transcripts.add(gene_version)
 
-        release_gene_version_list = []
-        for gene_accession in cdot_data["gene_version"]:
+        # It's possible that we have gene versions in this release that we don't have normally in merged files
+        # as a later transcript uses a different gene so this one was never stored. We'll have to make those now
+        missing_gene_versions = gene_versions_used_by_transcripts - set(gene_version_ids_by_accession)
+        if missing_gene_versions:
+            print(f"Missing {len(missing_gene_versions)} gene versions")
+            max_gene_version = GeneVersion.objects.all().aggregate(pk__max=Max("pk"))["pk__max"]
+            fake_cdot_data = {
+                "genes": {k: v for k, v in cdot_data["genes"].items() if k in missing_gene_versions},
+                "transcripts": {},  # Don't insert any of these
+            }
+            self._import_merged_data(genome_build, annotation_consortium, fake_cdot_data)
+            new_gene_versions = GeneVersion.objects.filter(genome_build=genome_build,
+                                                           gene__annotation_consortium=annotation_consortium,
+                                                           pk__gt=max_gene_version)
+            gene_version_ids_by_accession.update({gv.accession: gv.pk for gv in new_gene_versions})
 
+        release_gene_version_list = []
+        for gene_accession in cdot_data["genes"]:
             # Gene accession may not have
             # We only store gene versions that are used in the merged files (which is what's used to insert data)
             if gene_accession in gene_versions_used_by_transcripts:

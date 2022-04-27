@@ -1,4 +1,6 @@
+import operator
 from collections import defaultdict
+from functools import reduce
 from typing import Dict, List, Tuple
 
 import pandas as pd
@@ -8,10 +10,12 @@ from django.db.models import Max, F, Q
 from django.urls.base import reverse
 from django.utils.functional import SimpleLazyObject
 
-from analysis.models import Analysis, AnalysisNode, NodeCount, NodeStatus, AnalysisTemplate
+from analysis.models import Analysis, AnalysisNode, NodeCount, NodeStatus, AnalysisTemplate, GroupOperation
 from analysis.models.models_karyomapping import KaryomappingAnalysis
 from analysis.models.nodes.analysis_node import get_extra_filters_q, NodeColumnSummaryCacheCollection
 from analysis.views.analysis_permissions import get_node_subclass_or_404
+from annotation.models import HumanProteinAtlasAnnotation
+from genes.models import UniProt, HGNC
 from library.database_utils import get_queryset_column_names, get_queryset_select_from_where_parts
 from library.jqgrid_sql import JqGridSQL, get_overrides
 from library.jqgrid_user_row_config import JqGridUserRowConfig
@@ -570,3 +574,32 @@ class NodeGeneDiseaseClassificationGenesGrid(DataFrameJqGrid):
 
         df = pd.DataFrame.from_dict(gene_data, orient='index')
         return df.sort_index()
+
+
+class NodeTissueExpressionGenesGrid(JqGridUserRowConfig):
+    model = HumanProteinAtlasAnnotation
+    caption = 'Tissue Node: Human Protein Atlas'
+    fields = ['gene_symbol', 'gene', 'value']
+
+    def __init__(self, user, analysis_id, node_id, version):
+        super().__init__(user)
+        node = get_node_subclass_or_404(user, node_id, version=version)
+        queryset = node.get_hpa_qs()
+        self.queryset = queryset.values(*self.get_field_names())
+
+
+class NodeTissueUniProtTissueSpecificityGenesGrid(JqGridUserRowConfig):
+    model = HGNC
+    caption = 'Tissue Node: UniProt Tissue Specificity'
+    fields = ['gene_symbol__symbol', 'uniprot__accession', 'uniprot__tissue_specificity']
+
+    def __init__(self, user, analysis_id, node_id, version):
+        super().__init__(user)
+        node = get_node_subclass_or_404(user, node_id, version=version)
+        filters = []
+        for word in node.text_tissue.split():
+            f = Q(uniprot__tissue_specificity__icontains=word)
+            filters.append(f)
+        q = GroupOperation.reduce(filters, node.group_operation)
+        queryset = self.model.objects.filter(q)
+        self.queryset = queryset.values(*self.get_field_names())

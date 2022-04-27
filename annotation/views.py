@@ -244,6 +244,7 @@ def annotation_detail(request):
         "ontology_imports": ontology_imports,
         "gene_symbol_alias_counts": gene_symbol_alias_counts,
         "diagnostic_gene_list": diagnostic_gene_list,
+        "hpa_version": hpa_version,
         "hpa_counts": hpa_counts,
         "transcript_version_sequence_info": transcript_version_sequence_info,
         "transcript_fasta_imports": transcript_fasta_imports,

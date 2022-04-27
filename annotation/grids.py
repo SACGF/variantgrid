@@ -3,13 +3,9 @@ from datetime import timedelta
 from typing import Dict, Any
 
 from django.db.models import QuerySet, ExpressionWrapper, F, fields
-from django.shortcuts import get_object_or_404
 
-from annotation.models import VariantAnnotationVersion, AnnotationRun, HumanProteinAtlasAbundance, AnnotationStatus
-from annotation.models.models import HumanProteinAtlasAnnotationVersion, HumanProteinAtlasTissueSample
-from genes.models import GeneVersion
+from annotation.models import VariantAnnotationVersion, AnnotationRun, AnnotationStatus
 from genes.models_enums import AnnotationConsortium
-from library.jqgrid_abstract_genes_grid import AbstractGenesGrid
 from library.jqgrid_user_row_config import JqGridUserRowConfig
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder, CellData
@@ -139,42 +135,3 @@ class VariantAnnotationVersionColumns(DatatableConfig[VariantAnnotationVersion])
         genome_build = GenomeBuild.get_name_or_alias(self.get_query_param("genome_build_name"))
         return VariantAnnotationVersion.objects.filter(genome_build=genome_build)
 
-
-class TissueGeneGrid(AbstractGenesGrid):
-    model = GeneVersion
-    caption = "Tissue Genes"
-
-    def __init__(self, user, human_protein_atlas_version_id, tissue_sample_id, min_abundance):
-        super().__init__(user)
-
-        self.human_protein_atlas_version = get_object_or_404(HumanProteinAtlasAnnotationVersion, pk=human_protein_atlas_version_id)
-        self.tissue_sample = get_object_or_404(HumanProteinAtlasTissueSample, pk=tissue_sample_id)
-        self.min_abundance = min_abundance
-        self.extra_config.update({'sortname': 'name',
-                                  'sortorder': 'asc'})
-
-    def get_column_names(self):
-        return ["gene_id"]
-
-    def get_sql_params_and_columns(self, request):
-        sql_template = """  select distinct genes_geneversion.gene_symbol_id as name, annotation_humanproteinatlasannotation.gene_id as gene_id
-                            from annotation_humanproteinatlasannotation
-                            join genes_gene on (genes_gene.identifier=annotation_humanproteinatlasannotation.gene_id)
-                            where annotation_humanproteinatlasannotation.tissue_sample_id = %s
-                            AND annotation_humanproteinatlasannotation.abundance in %s
-        """
-
-        from_table = "annotation_humanproteinatlasannotation"
-        to_table = self.human_protein_atlas_version.get_partition_table()
-        sql = sql_template.replace(from_table, to_table)
-
-        abundances = HumanProteinAtlasAbundance.get_abundance_or_greater_levels(self.min_abundance)
-        params = [self.tissue_sample.pk, tuple(abundances)]
-        return (sql, params, None, False)
-
-    def get_labels(self):
-        return ['Gene ID', "Ensembl Gene ID"]
-
-    @property
-    def csv_name(self):
-        return f"{self.tissue_sample.name}_{self.min_abundance}_tissue_genes"
