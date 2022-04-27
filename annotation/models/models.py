@@ -26,7 +26,7 @@ from annotation.models.damage_enums import Polyphen2Prediction, FATHMMPrediction
 from annotation.models.models_enums import AnnotationStatus, CitationSource, \
     VariantClass, ColumnAnnotationCategory, VEPPlugin, VEPCustom, ClinVarReviewStatus, VEPSkippedReason, \
     ManualVariantEntryType, HumanProteinAtlasAbundance
-from genes.models import GeneSymbol, Gene, TranscriptVersion, Transcript, GeneAnnotationRelease, UniProt
+from genes.models import GeneSymbol, Gene, TranscriptVersion, Transcript, GeneAnnotationRelease
 from genes.models_enums import AnnotationConsortium
 from library.django_utils import object_is_referenced
 from library.django_utils.django_partition import RelatedModelsPartitionModel
