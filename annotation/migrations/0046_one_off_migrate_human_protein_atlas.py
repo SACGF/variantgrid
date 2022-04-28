@@ -12,10 +12,6 @@ def _one_off_migrate_human_protein_atlas(apps, schema_editor):
     HumanProteinAtlasAnnotationVersion = apps.get_model("annotation", "HumanProteinAtlasAnnotationVersion")
     HumanProteinAtlasAnnotation = apps.get_model("annotation", "HumanProteinAtlasAnnotation")
 
-    hpa_version = HumanProteinAtlasAnnotationVersion.objects.filter(hpa_version=15).first()
-    if hpa_version is None:
-        return
-
     NOT_DETECTED = 'N'
     LOW = 'L'
     MEDIUM = 'M'
@@ -28,9 +24,13 @@ def _one_off_migrate_human_protein_atlas(apps, schema_editor):
         HIGH: 50,
     }
 
-    for abundance, value_min in ABUNDANCE_MINS.items():
-        HumanProteinAtlasAnnotation.objects.filter(version=hpa_version, abundance=abundance).update(value=value_min)
+    # Some deployments had >1 copies of HPA v.15 - we'll just change them all
+    for hpa_version in HumanProteinAtlasAnnotationVersion.objects.filter(hpa_version=15):
+        for abundance, value_min in ABUNDANCE_MINS.items():
+            HumanProteinAtlasAnnotation.objects.filter(version=hpa_version, abundance=abundance).update(value=value_min)
 
+    if hpa := HumanProteinAtlasAnnotation.objects.filter(value__isnull=True).first():
+        raise ValueError(f"HumanProteinAtlasAnnotation with value=NULL found: {hpa.version=}, {hpa.abundance=}")
 
 
 class Migration(migrations.Migration):

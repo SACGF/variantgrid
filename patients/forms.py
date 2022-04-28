@@ -35,9 +35,8 @@ class PatientForm(forms.ModelForm):
         kwargs.setdefault('label_suffix', '')
         if instance and instance.pk:
             self.old_patient_data = instance.__dict__.copy()
-            pop_set = instance.patientpopulation_set
-            old_populations = set(pop_set.all().values_list("population", flat=True))
-            initial["population"] = list(old_populations)
+            pop_set = instance.patientpopulation_set.all()
+            initial["population"] = list(set(pop_set.values_list("population", flat=True)))
         else:
             self.old_patient_data = {}
 

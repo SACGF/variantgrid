@@ -68,8 +68,7 @@ def create_manual_variants(user, genome_build: GenomeBuild, variants_text: str):
                                                 import_source=ImportSource.WEB,
                                                 name='Manual Variant Entry',
                                                 user=user,
-                                                file_type=UploadedFileTypes.VCF_INSERT_VARIANTS_ONLY,
-                                                visible=False)
+                                                file_type=UploadedFileTypes.VCF_INSERT_VARIANTS_ONLY)
 
     UploadedManualVariantEntryCollection.objects.create(uploaded_file=uploaded_file,
                                                         collection=mvec)

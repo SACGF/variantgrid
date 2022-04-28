@@ -59,8 +59,7 @@ def create_liftover_pipelines(user: User, allele_source: AlleleSource,
                                                             import_source=import_source,
                                                             name='Liftover',
                                                             user=user,
-                                                            file_type=UploadedFileTypes.LIFTOVER,
-                                                            visible=False)
+                                                            file_type=UploadedFileTypes.LIFTOVER)
 
                 UploadedLiftover.objects.create(uploaded_file=uploaded_file,
                                                 liftover=liftover)
