@@ -31,6 +31,8 @@ def _one_off_migrate_human_protein_atlas(apps, schema_editor):
     for abundance, value_min in ABUNDANCE_MINS.items():
         HumanProteinAtlasAnnotation.objects.filter(version=hpa_version, abundance=abundance).update(value=value_min)
 
+    if hpa := HumanProteinAtlasAnnotation.objects.filter(value__isnull=True).first():
+        raise ValueError(f"HumanProteinAtlasAnnotation with value=NULL found: {hpa.version=}, {hpa.abundance=}")
 
 
 class Migration(migrations.Migration):
