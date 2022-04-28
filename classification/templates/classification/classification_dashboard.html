@@ -158,7 +158,8 @@
                         <label class="form-check" for="discordances-filter-internal">
                             <input class="form-check-input" type="radio" name="discordances-filter" id="discordances-filter-internal" value="internal" />
                             <span class="form-check-label">
-                                <span style="font-weight:500">Internal Only</span> discordances account for <strong>{{ lab_count.count }}</strong> of these discordances
+
+                                Discordances only within {{ dlab.discordance_summaries.labs_quick_str }} account for <strong>{{ lab_count.count }}</strong> of these discordances
                             </span>
                         </label>
                     {% else %}

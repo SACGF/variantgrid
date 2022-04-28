@@ -224,7 +224,7 @@ class MVLEntry(ExportRow):
             warning = f'Warning <b>{discordant_count} ' + ('records are' if discordant_count > 1 else 'record is') + ' in active discordance</b>'
             warnings.append(warning)
         if continued_discordance_count:
-            warning = f'Warning <b>{continued_discordance_count} ' + ('records are' if discordant_count > 1 else 'record is') + ' in continued discordance</b>'
+            warning = f'Warning <b>{continued_discordance_count} ' + ('records are' if continued_discordance_count > 1 else 'record is') + ' in continued discordance</b>'
             warnings.append(warning)
 
         if len(self.classifications_values.all) > 1:

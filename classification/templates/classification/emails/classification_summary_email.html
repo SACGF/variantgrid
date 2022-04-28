@@ -29,7 +29,7 @@ Hello Shariant User,
         <ul>
             {% for lab_count in lab_summary.discordance_report_summaries.counts %}
             <li>
-                {% if lab_count.is_internal %}<span style="font-weight:600">Internal Only</span> discordances account for <strong>{{ lab_count.count }}</strong> of these discordances
+                {% if lab_count.is_internal %}Discordances only within {{ lab_summary.discordance_report_summaries.labs_quick_str }} account for <strong>{{ lab_count.count }}</strong> of these discordances
                 {% else %}<span style="font-weight:600">{% lab lab_count.lab %}</span> are involved in <strong>{{ lab_count.count }}</strong> of these discordances{% endif %}
             </li>
             {% endfor %}
