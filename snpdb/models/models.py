@@ -257,8 +257,12 @@ class ClinVarKey(TimeStampedModel):
     inject_acmg_description = models.BooleanField(blank=True, default=False)
     assertion_method_lookup = models.JSONField(null=False, default=dict)
 
+    @property
+    def label(self) -> str:
+        return self.name if self.name else self.id
+
     def __str__(self):
-        return f"ClinVarKey ({self.name if self.name else self.id})"
+        return f"ClinVarKey ({self.label})"
 
     def __lt__(self, other):
         return self.id < other.id

@@ -27,7 +27,7 @@
                 <div class="card-header">Summary of ClinVar Export {{ clinvar_export.pk }}</div>
                 <div class="card-body">
                     <div class="text-info mb-4">There will be one ClinVar Export for every valid ClinVar Key, Allele and Condition Umbrella combination.</div>
-                    {% labelled label="ClinVar Key" %}{{ clinvar_export.clinvar_allele.clinvar_key }}{% endlabelled %}
+                    {% labelled label="ClinVar Key" %}{{ clinvar_export.clinvar_allele.clinvar_key.label }}{% endlabelled %}
                     {% labelled label="Allele" %}{% with allele=clinvar_export.clinvar_allele.allele %}<a class="hover-link" href="{{ allele.get_absolute_url }}">{{ allele }}</a>{% endwith %}{% endlabelled %}
                     {% labelled label="Condition Umbrella" %}{% condition clinvar_export.condition_resolved %}
                         {% field_help %}Records for this variant and this (or a more specific) condition will be considered as part of this export.<br/>

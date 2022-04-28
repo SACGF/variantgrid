@@ -134,7 +134,7 @@ class ClinVarKeyExcludePatternAdmin(admin.TabularInline):
 
 @admin.register(ClinVarKey)
 class ClinVarKeyAdmin(ModelAdminBasics):
-    list_display = ('id', 'created', 'modified')
+    list_display = ('id', 'name', 'created', 'modified')
     inlines = (ClinVarKeyExcludePatternAdmin,)
 
     def run_ignores(self, request, queryset: QuerySet[ClinVarKey], apply: bool):
