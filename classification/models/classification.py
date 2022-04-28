@@ -31,8 +31,10 @@ from annotation.models.models import AnnotationVersion, VariantAnnotationVersion
 from annotation.regexes import db_ref_regexes, DbRegexes
 from classification.enums import ClinicalSignificance, SubmissionSource, ShareLevel, SpecialEKeys, \
     CRITERIA_NOT_MET, ValidationCode, CriteriaEvaluation
+from classification.models.classification_import_run import ClassificationImportRun
+from classification.models.classification_patcher import patch_fuzzy_age
 from classification.models.classification_utils import \
-    ValidationMerger, ClassificationJsonParams, VariantCoordinateFromEvidence, PatchMeta
+    ValidationMerger, ClassificationJsonParams, VariantCoordinateFromEvidence, PatchMeta, ClassificationPatchResponse
 from classification.models.evidence_key import EvidenceKeyValueType, \
     EvidenceKey, EvidenceKeyMap, VCDataDict, WipeMode, VCDataCell
 from classification.models.evidence_mixin import EvidenceMixin, VCPatch
@@ -455,6 +457,9 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
 
     clinical_significance = models.CharField(max_length=1, choices=ClinicalSignificance.CHOICES, null=True, blank=True)
     condition_resolution = models.JSONField(null=True, blank=True)  # of type ConditionProcessedDict
+
+    last_source_id = models.TextField(blank=True, null=True)
+    last_import_run = models.ForeignKey(ClassificationImportRun, null=True, blank=True, on_delete=SET_NULL)
 
     @property
     def metrics_logging_key(self) -> Tuple[str, Any]:
@@ -1140,7 +1145,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 value = value[0]
 
         if value is not None:
-
+            # special keys just
             if e_key.key == 'existing_variant_id':
                 try:
                     self.set_variant(Variant.objects.get(pk=int(value)))
@@ -1159,6 +1164,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                     cell.add_validation(code=ValidationCode.MATCHING_ERROR, severity='error',
                                         message="Couldn't resolve Sample " + str(value) + ")")
 
+            # convert users (username or email) to username if possible
             if e_key.value_type == EvidenceKeyValueType.USER:
                 value = str(value)
                 user = User.objects.filter(Q(username=value) | Q(email=value)).first()
@@ -1188,6 +1194,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                                                 message="Invalid value for yes/no field (" + str(value) + ")")
                 cell.value = value
 
+            # handle selects with multiple values (comma sep string, array etc)
             elif e_key.value_type in (EvidenceKeyValueType.MULTISELECT,
                                       EvidenceKeyValueType.SELECT,
                                       EvidenceKeyValueType.CRITERIA):
@@ -1217,29 +1224,18 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                             cell.value = value
                 cell.value = value
 
+            # base text tidy
             elif e_key.value_type in (EvidenceKeyValueType.FREE_ENTRY, EvidenceKeyValueType.TEXT_AREA):
                 value = str(value)
                 if e_key.value_type == EvidenceKeyValueType.FREE_ENTRY:
                     # strip out HTML from single row files to keep our data simple
                     # allow HTML in text areas
-                    if not value.startswith(
-                            "http"):  # this makes beautiful soap angry thinking we're asking it to go to the URL
+                    if not value.startswith("http"):  # this makes beautiful soap angry thinking we're asking it to go to the URL
                         value = cautious_attempt_html_to_text(value)
 
                 cell.value = value
 
-            elif e_key.value_type == EvidenceKeyValueType.PERCENT:
-                valid = False
-                try:
-                    value = float(value)
-                    cell.value = value
-                    valid = 0 <= value <= 100
-                except:
-                    pass
-                if not valid:
-                    cell.add_validation(code=ValidationCode.INVALID_PERCENT, severity='warning',
-                                        message='Value should be a number between 0 and 100')
-
+            # -- BASIC NUMBER NORMALISING, VALIDATING --
             elif e_key.value_type == EvidenceKeyValueType.UNIT:
                 valid = False
                 try:
@@ -1289,11 +1285,17 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 cell.add_validation(code=ValidationCode.UNKNOWN_KEY, severity='warning',
                                     message='This key ' + str(e_key.key) + ' has not been registered')
 
-        if e_key.key == SpecialEKeys.REFSEQ_TRANSCRIPT_ID and isinstance(value, str):
-            version_regex = re.compile('.*?[.][0-9]+')
-            if not version_regex.match(value):
-                cell.add_validation(code=ValidationCode.UNKNOWN_TRANSCRIPT, severity='warning',
-                                    message='Transcript should include version e.g. NM_001256799.1')
+        # SPECIAL HANDLING OF REFSEQ, basically looking for transcript version
+        if e_key.key == SpecialEKeys.REFSEQ_TRANSCRIPT_ID:
+            if isinstance(value, str):
+                version_regex = re.compile('.*?[.][0-9]+')
+                if not version_regex.match(value):
+                    cell.add_validation(code=ValidationCode.UNKNOWN_TRANSCRIPT, severity='warning',
+                                        message='Transcript should include version e.g. NM_001256799.1')
+
+        elif e_key == SpecialEKeys.AGE:
+            if settings.VARIANT_CLASSIFICATION_AUTOFUZZ_AGE:
+                cell.value = patch_fuzzy_age(value)
 
         # ensure we have one non None value before returning the structure
         if not cell.has_data:
@@ -1425,7 +1427,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                     remove_api_immutable=False,
                     initial_data=False,
                     revalidate_all=False,
-                    ignore_if_only_patching: Optional[Set[str]] = None) -> Dict[str, Any]:
+                    ignore_if_only_patching: Optional[Set[str]] = None) -> ClassificationPatchResponse:
         """
             Creates a new ClassificationModification if the patch values are different to the current values
             Patching a value with the same value has no effect
@@ -1442,8 +1444,8 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             :returns: A dict with "messages" (validation errors, warnings etc) and "modified" (fields that actually changed value)
         """
         source = source or SubmissionSource.API
-        warnings = []
-        modified_keys = set()
+
+        patch_response = ClassificationPatchResponse()
 
         is_admin_patch = source.can_edit(SubmissionSource.VARIANT_GRID)
         key_dict: EvidenceKeyMap = self.evidence_keys
@@ -1594,17 +1596,14 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 patched.raw = cell.diff(None)
             elif cell.raw is None:
                 if not source.can_edit(existing_immutability):
-                    warnings.append(
-                        {'key': key, 'code': 'immutable', 'message': 'Cannot change immutable value for ' + key +
-                                                                     ' from ' + str(existing.value) + ' to blank'})
+                    patch_response.append_warning(key=key, code="immutable", message=f"Cannot change immutable value for {key} from {existing.value} to blank")
                     patched.wipe(WipeMode.POP)  # reject entire change if attempting to change immutable value
                 else:
                     patched.wipe(WipeMode.SET_NONE)
             else:
                 patched.raw = cell.diff(dest=existing, ignore_if_omitted={'immutable'})
                 if ('value' in patched or 'explain' in patched) and not source.can_edit(existing_immutability):
-                    message = f'Cannot change immutable value or explain for {key} from {existing.value} to {patched.value}'
-                    warnings.append({'key': key, 'code': 'immutable', 'message': message})
+                    patch_response.append_warning(key=key, code="immutable", message=f"Cannot change immutable value or explain for {key} from {existing.value} to {patched.value}")
                     patched.wipe(WipeMode.POP)  # reject entire change if attempting to change immutable value
                 else:
 
@@ -1632,7 +1631,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
 
         # only make a modification if there's data to actually patch
         if apply_patch:
-            modified_keys = set(diffs_only_patch.keys())
+            patch_response.modified_keys = set(diffs_only_patch.keys())
             last_edited = self.last_edited_version
 
             # in some cases we can append the last version
@@ -1669,11 +1668,11 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             self.clinical_significance = clinical_significance_choice
             pending_modification.clinical_significance = clinical_significance_choice
 
-            warnings.append(
-                {'code': 'patched', 'message': 'Patched changed values for ' + ', '.join(sorted(diffs_only_patch.keys()))})
+            patch_response.append_warning(code="patched", message='Patched changed values for ' + ', '.join(sorted(diffs_only_patch.keys())))
 
             if save:
                 self.save()
+                patch_response.saved = True
                 # have to save the modification after saving the record in case this
                 # is the first record
                 if pending_modification:
@@ -1685,9 +1684,9 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         else:
             if diffs_only_patch:
                 message = 'Only ' + ', '.join(sorted(diffs_only_patch.keys())) + ' changed, ignoring'
-                warnings.append({'code': 'no_patch', 'message': message})
+                patch_response.append_warning(code="no_patch", message=message)
             else:
-                warnings.append({'code': 'no_patch', 'message': 'No changes detected to patch'})
+                patch_response.append_warning(code="no_patch", message="No changes detected to patch")
                 # don't save if we haven't changed any values
 
         if self.requires_auto_population:
@@ -1695,20 +1694,17 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             from classification.autopopulate_evidence_keys.autopopulate_evidence_keys import \
                 classification_auto_populate_fields
             genome_build = self.get_genome_build()
-            classification_auto_populate_fields(self, genome_build, save=save)
+            patch_response += classification_auto_populate_fields(self, genome_build, save=save)
 
-        return {
-            'messages': warnings,
-            'modified': modified_keys
-        }
+        return patch_response
 
-    def publish_latest(self, user: User, share_level=None, debug_timer: DebugTimer = DebugTimer.NullTimer):
+    def publish_latest(self, user: User, share_level=None, debug_timer: DebugTimer = DebugTimer.NullTimer) -> bool:
         if not share_level:
             share_level = self.share_level_enum
         latest_edited = self.last_edited_version
         if not latest_edited:
             raise ValueError(f'VC {self.id} does not have a last edited version')
-        latest_edited.publish(share_level=share_level, user=user, vc=self, debug_timer=debug_timer)
+        return latest_edited.publish(share_level=share_level, user=user, vc=self, debug_timer=debug_timer)
 
     @property
     def last_edited_version(self) -> 'ClassificationModification':
@@ -2482,6 +2478,7 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
         :param vc: The variant classification we're publishing - even though it's redundant but we get the same object
         instance and don't reload it from the database
         :param debug_timer: for timing the event
+        :return a boolean indicating if a new version was published (false if no change was required)
         """
         old_share_level = vc.share_level_enum
         share_level = ShareLevel.from_key(share_level)

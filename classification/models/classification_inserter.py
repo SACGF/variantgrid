@@ -1,14 +1,14 @@
 import collections
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Set, Mapping
 
 from django.conf import settings
+from django.contrib.auth.models import User
 from django.db import transaction
-from registration.forms import User
-from classification.enums import ShareLevel, ForceUpdate, SubmissionSource
+from classification.enums import ShareLevel, ForceUpdate, SubmissionSource, SpecialEKeys
 from classification.models import ClassificationImport, Classification, ClassificationProcessError, ClassificationRef, \
-    EvidenceMixin, PatchMeta, classification_flag_types, ClassificationJsonParams, ClassificationModification
-from classification.models.classification_patcher import patch_merge_age_units, patch_fuzzy_age
-from classification.models.evidence_mixin import VCStore
+    EvidenceMixin, classification_flag_types, ClassificationJsonParams, ClassificationModification, \
+    ClassificationPatchResponse, ClassificationImportRun
+from classification.models.classification_utils import ClassificationPatchStatus
 from classification.tasks.classification_import_task import process_classification_import_task
 from eventlog.models import create_event
 from library.log_utils import report_message, report_exc_info
@@ -37,13 +37,14 @@ class BulkClassificationInserter:
 
     def import_for(self, genome_build: GenomeBuild, transcript: str) -> Optional[ClassificationImport]:
         """
-        Returns the ClassificationImport record that a classification should attach to to have its variant processed
+        Returns the ClassificationImport record that a classification should attach to, to have its variant processed
         """
         if transcript:
             if not Classification.is_supported_transcript(transcript):
-                report_message(message="Unsupported transcript type imported - will not attempt variant match", extra_data={
-                    "target": transcript
-                })
+                report_message(message="Unsupported transcript type imported - will not attempt variant match",
+                               extra_data={
+                                   "target": transcript
+                               })
                 return None
 
         if existing := self._import_for_genome_build.get(genome_build):
@@ -59,12 +60,20 @@ class BulkClassificationInserter:
     def verify_source(data) -> SubmissionSource:
         source = SubmissionSource(data.pop('source', SubmissionSource.API))
         if not source.is_valid_user_source():
-            raise ValueError('Illegal value for source, should be "' + SubmissionSource.API.value + '" or "' + SubmissionSource.FORM.value + '"')
+            raise ValueError(
+                'Illegal value for source, should be "' + SubmissionSource.API.value + '" or "' + SubmissionSource.FORM.value + '"')
         return source
 
     @transaction.atomic
-    def insert(self, data: dict, record_id: Optional[str] = None, request=None, submission_source: Optional[SubmissionSource] = None):
+    def insert(
+            self,
+            data: dict,
+            record_id: Optional[str] = None,
+            submission_source: Optional[SubmissionSource] = None,
+            import_run: Optional[ClassificationImportRun] = None) -> ClassificationPatchResponse:
+
         debug_timer = self.debug_timer
+        patch_response = ClassificationPatchResponse()
 
         if self.single_insert:
             raise ClassificationProcessError('If record_id is provided in URL cannot insert more than one record')
@@ -88,7 +97,8 @@ class BulkClassificationInserter:
                 id_part = data.pop('id', None)
                 if not id_part:
                     keys_label = ', '.join(data.keys())
-                    raise ClassificationProcessError(f'Must provide "id" segment with submission - keys = ({keys_label})')
+                    raise ClassificationProcessError(
+                        f'Must provide "id" segment with submission - keys = ({keys_label})')
                 if isinstance(id_part, collections.Mapping):
                     id_part['user'] = user
                     record_ref = ClassificationRef.init_from_parts(**id_part)
@@ -97,8 +107,8 @@ class BulkClassificationInserter:
 
             record_ref.check_security(must_be_writable=True)
 
-            operation = None
-            operation_data = None
+            operation: Optional[str] = None
+            operation_data: Optional[Dict] = None
 
             # if you say test=true, we just want validation messages back
             save = not data.pop('test', False)
@@ -112,6 +122,8 @@ class BulkClassificationInserter:
             requested_undelete = delete_value is False
 
             debug_timer.tick("Security Check")
+
+            # -- ENSURE REQUEST IS WELL FORMATTED --
 
             # note we don't actually use ForceUpdate for anything at the moment
             # at one time (never in prod) was used to stop changes to only source ID, curation date
@@ -129,7 +141,8 @@ class BulkClassificationInserter:
 
                 if op_data is not None:
                     if operation:
-                        raise ClassificationProcessError('Can only provide 1 of create, overwrite, data, patch or upsert')
+                        raise ClassificationProcessError(
+                            'Can only provide 1 of create, overwrite, data, patch or upsert')
                     else:
                         operation = op
                         operation_data = op_data or {}
@@ -140,22 +153,16 @@ class BulkClassificationInserter:
                 operation_data = None
                 share_level = None
 
+            new_source_id: Optional[str] = None
             if operation_data:
+                if source_id := operation_data.pop(SpecialEKeys.SOURCE_ID, None):
+                    if isinstance(source_id, collections.Mapping):
+                        source_id = source_id.get('value')
+                    new_source_id = source_id
+
                 operation_data = EvidenceMixin.to_patch(operation_data)
 
-            # converts data before we even look at it
-            # good place to manipulate multi-keys, e.g.
-            # if we get age and age_units separately and want to merge
-            def pre_process(base_data: VCStore):
-                nonlocal operation_data
-                patch_meta = PatchMeta(patch=operation_data, existing=base_data)
-                patch_merge_age_units(patch_meta)
-                if settings.VARIANT_CLASSIFICATION_AUTOFUZZ_AGE:
-                    patch_fuzzy_age(patch_meta)
-
             record = None
-            patch_messages = None
-            patched_keys = None
             if operation:
                 # operation modifiers
                 immutable = source == SubmissionSource.API and not data.pop('editable', False)
@@ -174,7 +181,7 @@ class BulkClassificationInserter:
 
                     debug_timer.tick("Preparing to Insert")
 
-                    pre_process({})
+                    patch_response.status = ClassificationPatchStatus.NEW
                     record = record_ref.create(
                         source=source,
                         data=operation_data,
@@ -195,7 +202,9 @@ class BulkClassificationInserter:
                         # mark the fact that we're searching for a variant
                         if not record.variant:
                             if not classification_import:
-                                record.set_variant(message=f"Transcript {record.transcript} is not of a currently supported type", failed=True)
+                                record.set_variant(
+                                    message=f"Transcript {record.transcript} is not of a currently supported type",
+                                    failed=True)
                             else:
                                 record.set_variant()
 
@@ -208,7 +217,7 @@ class BulkClassificationInserter:
                         debug_timer.tick("Publish Complete")
                 else:
                     ignore_if_only_patch: Optional[Set[str]] = None
-                    ## if some updates are not-meaningful and by themselves shouldn't cause a new version of the record to be made
+                    # if some updates are not-meaningful and by themselves shouldn't cause a new version of the record to be made
                     # if source == SubmissionSource.API and not force:
                     #     ignore_if_only_patch = {"curation_date", "source_id"}
 
@@ -217,16 +226,15 @@ class BulkClassificationInserter:
                     record.check_can_write(user)
 
                     # THE ACTUAL PATCHING OF DATA VALUES
-                    pre_process(record.evidence)
-                    patch_result = record.patch_value(operation_data,
-                                                      clear_all_fields=operation == 'overwrite',
-                                                      user=user,
-                                                      source=source,
-                                                      save=save,
-                                                      make_patch_fields_immutable=immutable,
-                                                      ignore_if_only_patching=ignore_if_only_patch)
-                    patch_messages = patch_result['messages']
-                    patched_keys = patch_result['modified']
+                    patch_response += record.patch_value(operation_data,
+                                                         clear_all_fields=operation == 'overwrite',
+                                                         user=user,
+                                                         source=source,
+                                                         save=save,
+                                                         make_patch_fields_immutable=immutable,
+                                                         ignore_if_only_patching=ignore_if_only_patch)
+
+                    patch_response.status = ClassificationPatchStatus.UPDATE if patch_response.modified_keys else ClassificationPatchStatus.NO_CHANGE
 
                     debug_timer.tick("Update Existing Record")
             else:
@@ -234,24 +242,28 @@ class BulkClassificationInserter:
 
             if not record:
                 if requested_delete:
-                    return {"deleted": True}
+                    patch_response.deleted = True
+                    return patch_response
                 else:
                     raise ClassificationProcessError('Record not found')
+
+            if import_run:
+                record.last_import_run = import_run
+            if new_source_id:
+                record.last_source_id = new_source_id
 
             data_request = data.pop('return_data', False)
             flatten = data_request == 'flat'
             include_data = data_request or flatten
             if include_data == 'changes':
-                include_data = bool(patched_keys)
-
-            if patch_messages is None:
-                patch_messages = []
+                include_data = bool(patch_response.modified_keys)
 
             if data:
-                patch_messages.append({'code': 'unexpected_parameters', 'message': 'Unexpected parameters ' + str(data)})
+                patch_response.append_warning(code="unexpected_parameters", message=f"Unexpected parameters {data}")
 
             if save:
                 if requested_delete:
+                    # deleting or withdrawing
                     record.check_can_write(user)
 
                     params = ClassificationJsonParams(
@@ -262,42 +274,52 @@ class BulkClassificationInserter:
                         include_lab_config=data.pop('config', False),
                         api_version=self.api_version)
 
-                    response_data = record.as_json(params)
+                    patch_response.classification_json = record.as_json(params)
 
                     if record.share_level_enum >= ShareLevel.ALL_USERS:
+                        patch_response.status = ClassificationPatchStatus.WITHDRAWN if not record.withdrawn else ClassificationPatchStatus.NO_CHANGE
                         record.set_withdrawn(user=user, withdraw=True)
-                        response_data['withdrawn'] = True
+                        patch_response.withdrawn = True
                     else:
-                        response_data['deleted'] = True
+                        patch_response.status = ClassificationPatchStatus.DELETED
+                        patch_response.deleted = True
                         record.delete()
 
-                    return response_data
+                    return patch_response
 
                 elif share_level:
                     record.check_can_write(user)
 
                     if share_level < record.share_level_enum:
                         # raise ValueError('Record was already published at ' + record.share_level_enum.key + ', can no longer publish at ' + share_level.key)
-                        patch_messages.append({'code': 'shared_higher', 'message': f"The record is already shared as '{record.share_level_enum.key}', re-sharing at that level instead of '{share_level}'"})
-                        record.publish_latest(share_level=record.share_level_enum, user=user)
+                        patch_response.append_warning(code="shared_higher",
+                                                      message=f"The record is already shared as '{record.share_level_enum.key}', re-sharing at that level instead of '{share_level}'")
+                        patch_response.published = record.publish_latest(share_level=record.share_level_enum, user=user)
+                        if patch_response.published:
+                            patch_response.saved = True
 
                     elif not self.force_publish and record.has_errors():
-                        patch_messages.append({'code': 'share_failure', 'message': 'Cannot share record with errors'})
+                        patch_response.append_warning(code="share_failure", message="Cannot share record with errors")
 
                     else:
                         record.publish_latest(share_level=share_level, user=user)
-                        patch_messages.append({'code': 'shared', 'message': 'Latest revision is now shared with ' + str(share_level)})
+                        patch_response.append_warning(code="shared",
+                                                      message=f"Latest revision is now shared with {share_level}")
 
                 if requested_undelete:
-                    record.set_withdrawn(user=user, withdraw=False)
+                    if record.withdrawn:
+                        patch_response.status = ClassificationPatchStatus.UN_WITHDRAWN
+                        record.set_withdrawn(user=user, withdraw=False)
 
-                if record.withdrawn:
+                elif record.withdrawn:
                     # Withdrawn records are no longer automatically un-withdrawn
                     # record.set_withdrawn(user=user, withdraw=False)
-                    patch_messages.append({'code': 'withdrawn', 'message': 'The record you updated is withdrawn and will not appear to users'})
+                    patch_response.status = ClassificationPatchStatus.ALREADY_WITHDRAWN
+                    patch_response.append_warning(code="withdrawn",
+                                                  message="The record you updated is withdrawn and will not appear to users")
 
             else:
-                patch_messages.append({'code': 'test_mode', 'message': 'Test mode on, no changes have been saved'})
+                patch_response.append_warning(code="test_mode", message="Test mode on, no changes have been saved")
 
             # Check to see if the current record matches the previous one exactly
             # then if the most recent record isn't marked as published, delete it.
@@ -309,10 +331,11 @@ class BulkClassificationInserter:
                 if not latest_mod.is_last_edited:
                     raise ValueError('Assertion error - expected most recent record to be last edited')
 
+                # detect if a value was changed and then changed back (if so, delete the pointless change)
                 if len(recent_modifications) >= 2:
                     previous_mod = recent_modifications[1]
 
-                    # if this latest record isn't published, and it matches the previous record exactly, ew can delete it
+                    # if this latest record isn't published, and it matches the previous record exactly, we can delete it
                     if not latest_mod.published and latest_mod.evidence == previous_mod.evidence:
                         latest_mod.delete()
                         previous_mod.is_last_edited = True
@@ -333,6 +356,12 @@ class BulkClassificationInserter:
                     flag_type=classification_flag_types.classification_outstanding_edits,
                     resolution=resolution
                 )
+                if not patch_response.saved and (import_run or new_source_id):
+                    # we would be here if no data was patched
+                    # update the classification with the new import_run, but don't update the modified date
+                    # since nothing has otherwise changed
+                    record.update_modified = False
+                    record.save()
 
             json_data = record.as_json(ClassificationJsonParams(
                 version=record_ref.version,
@@ -345,18 +374,19 @@ class BulkClassificationInserter:
 
             debug_timer.tick("Generate Response")
 
-            if patch_messages:
-                json_data['patch_messages'] = patch_messages
-            return json_data
+            patch_response.classification_json = json_data
+            return patch_response
 
         except ClassificationProcessError as ve:
             # expected error
-            report_exc_info(request=request)
-            return {'fatal_error': str(ve)}
+            report_exc_info()
+            patch_response.internal_error = ve
+            return patch_response
         except Exception as e:
             # unexpected error
-            report_exc_info(request=request)
-            return {'internal_error': str(e)}
+            report_exc_info()
+            patch_response.internal_error = e
+            return patch_response
 
     def finish(self):
         debug_timer: DebugTimer = self.debug_timer

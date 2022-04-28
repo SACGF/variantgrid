@@ -103,6 +103,9 @@ class ClassificationImportRunAdmin(ModelAdminBasics):
     list_display = ['id', 'identifier', 'row_count', 'status', 'from_file', 'created_detailed', 'modified_detailed']
     list_filter = (('status', AllValuesChoicesFieldListFilter), )
 
+    def is_readonly_field(self, f) -> bool:
+        return True
+
     @admin_list_column(short_description="Created", order_field="created")
     def created_detailed(self, obj: ClassificationImportRun):
         return obj.created.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
@@ -126,7 +129,23 @@ class ClassificationImportRunAdmin(ModelAdminBasics):
 
 @admin.register(Classification)
 class ClassificationAdmin(ModelAdminBasics):
-    list_display = ['id', 'lab', 'lab_record_id', 'share_level', 'clinical_significance', 'allele_fallback', 'imported_genome_build', 'imported_c_hgvs', 'chgvs_grch37', 'chgvs_grch38', 'withdrawn', 'user', 'created_detailed', 'modified_detailed']
+    list_display = [
+        'id',
+        'lab',
+        'lab_record_id',
+        'last_import_run',
+        'last_source_id',
+        'share_level',
+        'clinical_significance',
+        'allele_fallback',
+        'imported_genome_build',
+        'imported_c_hgvs',
+        'chgvs_grch37',
+        'chgvs_grch38',
+        'withdrawn',
+        'user',
+        'created_detailed',
+        'modified_detailed']
     list_filter = (
         ('lab__organization', RelatedFieldListFilter),
         ('lab', RelatedFieldListFilter),

@@ -134,7 +134,7 @@ class ClinVarKeyExcludePatternAdmin(admin.TabularInline):
 
 @admin.register(ClinVarKey)
 class ClinVarKeyAdmin(ModelAdminBasics):
-    list_display = ('id', 'created', 'modified')
+    list_display = ('id', 'name', 'created', 'modified')
     inlines = (ClinVarKeyExcludePatternAdmin,)
 
     def run_ignores(self, request, queryset: QuerySet[ClinVarKey], apply: bool):
@@ -190,6 +190,7 @@ class LabAdmin(ModelAdminBasics):
         ('Basic', {'fields': ('name', 'group_name', 'organization')}),
         ('Position', {'fields': ('city', 'state', 'country', 'lat', 'long')}),
         ('Style', {'fields': ('url', 'css_class')}),
+        ('Notifications', {'fields': ('email', 'slack_webhook')}),
         ('Submissions', {'fields': ('classification_config', 'upload_location', 'upload_automatic', 'upload_instructions', 'external', 'clinvar_key')})
     )
 

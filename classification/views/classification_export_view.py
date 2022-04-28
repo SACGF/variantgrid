@@ -91,7 +91,7 @@ def export_view(request: HttpRequest) -> Response:
     format_keys = {'id': 'keys', 'name': 'Evidence Keys Report', 'admin_only': True}
     format_mvl = {'id': 'mvl', 'name': 'MVL'}
     format_csv = {'id': 'csv', 'name': 'CSV'}
-    format_clinvar_compare = {'id': 'clinvar_compare', 'name': 'ClinVar Compare'}
+    format_clinvar_compare = {'id': 'clinvar_compare', 'name': 'ClinVar Compare', 'admin_only': True}
     format_json = {'id': 'json', 'name': 'JSON'}
     format_spelling = {'id': 'spelling', 'name': 'Spelling Report', 'admin_only': True}
     format_redcap = {'id': 'redcap', 'name': 'REDCap'}

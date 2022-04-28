@@ -105,7 +105,7 @@ def classification_auto_populate_fields(
         annotation_version=annotation_version
     )
     classification.annotation_version = auto_data.annotation_version
-    classification.patch_value(auto_data.data,
+    return classification.patch_value(auto_data.data,
                                user=classification.user,
                                source=SubmissionSource.VARIANT_GRID,
                                leave_existing_values=leave_existing_values,

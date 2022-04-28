@@ -88,14 +88,22 @@ def report_exc_info(extra_data=None, request=None, report_externally=True):
 class NotificationBuilder:
 
     SLACK_EMOJI_RE = re.compile(r"[:][A-Z_]+[:]", re.IGNORECASE)
+    DE_P = re.compile(r"<p>(.*?)</p>", re.IGNORECASE | re.DOTALL)
 
     @staticmethod
     def slack_markdown_to_html(markdown_txt: str, surround_with_div: bool = False):
         if markdown_txt:
+            if not isinstance(markdown_txt, str):
+                raise TypeError(f"Expected string or bytes-like object, got {markdown_txt}")
             markdown_txt = re.sub(NotificationBuilder.SLACK_EMOJI_RE, "", markdown_txt)
             markdown_html = markdown(markdown_txt)
             if surround_with_div:
                 markdown_html = f"<div>{markdown_html}</div>"
+            else:
+                if de_ped := NotificationBuilder.DE_P.match(markdown_html):
+                    markdown_html = de_ped.group(1)
+
+            markdown_html = markdown_html.replace("\n", "<br/>")
             return markdown_html
         return ""
 
@@ -148,8 +156,9 @@ class NotificationBuilder:
 
         def as_html(self):
             def as_field(field: Tuple[str, Any]):
-                return f"<label>{NotificationBuilder.slack_markdown_to_html(field[0])}</label>: {field[1]}"
-            return "<div>" + "<br/>".join([as_field(field) for field in self.fields]) + "</div>"
+                return f"<p><span style='color:#888'>{NotificationBuilder.slack_markdown_to_html(field[0])}:</span><br/><span style='font-family:monospace'>{NotificationBuilder.slack_markdown_to_html(field[1])}</span></p>"
+
+            return "".join([as_field(field) for field in self.fields])
 
         def as_slack(self):
             blocks = list()

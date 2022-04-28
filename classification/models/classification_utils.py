@@ -1,5 +1,7 @@
 # used for validating multiple keys when one changes
 import operator
+from dataclasses import dataclass
+from enum import Enum
 from functools import reduce
 from typing import List, Set, Optional, Union, Any, Dict, Iterable
 
@@ -10,7 +12,83 @@ from classification.enums import SpecialEKeys
 from classification.models.evidence_mixin import VCPatch, VCStore
 from flags.models import FlagCollection
 from genes.models import GeneSymbol, Gene, Transcript
+from library.utils import VarsDict
 from snpdb.models import VariantCoordinate, Allele, Lab
+
+
+@dataclass
+class PatchMessage(VarsDict):
+    code: str
+    message: str
+    key: Optional[str]
+
+    def to_json(self):
+        json_blob = {"code": self.code, "message": self.message}
+        if self.key:
+            json_blob["key"] = self.key
+        return json_blob
+
+
+class ClassificationPatchStatus(str, Enum):
+    # doesn't capture super subtle actions like publishing when there were outstanding changes
+    # but will capture everything we want to know about for a multi-record import
+    UNKNOWN = "unknown"
+    NEW = "new"
+    UPDATE = "update"
+    NO_CHANGE = "no-change"
+    WITHDRAWN = "withdrawn"
+    DELETED = "deleted"
+    UN_WITHDRAWN = "un-withdrawn"
+    ALREADY_WITHDRAWN = "already-withdrawn"
+
+
+class ClassificationPatchResponse(VarsDict):
+
+    def __init__(self):
+        self.warnings: List[PatchMessage] = list()
+        self.modified_keys: Set[str] = set()
+        self.classification_json: Optional[Dict] = None
+        self.internal_error: Optional[Any] = None
+        self.withdrawn = None
+        self.deleted = None
+        self.published = False
+        self.saved = False
+        self.status = ClassificationPatchStatus.UNKNOWN
+
+    def __iadd__(self, other: 'ClassificationPatchResponse'):
+        self.warnings += other.warnings
+        self.modified_keys |= other.modified_keys
+        self.internal_error = self.internal_error or other.internal_error
+        self.withdrawn = self.withdrawn or other.withdrawn
+        self.deleted = self.deleted or other.deleted
+        self.published = self.published or other.published
+        self.saved = self.saved or other.saved
+        # classification json is a hard field to merge, just take the 2nd?
+        self.classification_json = other.classification_json or self.classification_json
+        # status is a hard field to merge
+        return self
+
+    def append_warning(self, code: str, message: str, key: Optional[str] = None):
+        self.warnings.append(PatchMessage(code=code, message=message, key=key))
+
+    def to_json(self):
+        # we have two modes, just from the patch, and from the API where we send a bunch of data
+        # a lot of this is legacy, bringing it all into ClassificationPatchResponse will hopefully let
+        # us consolidate
+        if self.internal_error:
+            return {"internal_error": str(self.internal_error)}
+
+        response_json = {}
+        if self.classification_json:
+            response_json = self.classification_json.copy()
+
+        if self.warnings:
+            response_json["patch_messages"] = self.warnings
+        if self.deleted:
+            response_json["deleted"] = True
+        if self.withdrawn:
+            response_json["withdrawn"] = True
+        return response_json
 
 
 class ValidationMerger:

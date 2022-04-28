@@ -1,3 +1,5 @@
+from typing import Optional
+
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
@@ -15,6 +17,7 @@ from classification.models.classification_import_run import ClassificationImport
 from classification.models.classification_inserter import BulkClassificationInserter
 from library.utils import empty_to_none
 from snpdb.models import Lab
+from uicore.json.to_json import force_json
 
 
 class ClassificationView(APIView):
@@ -73,6 +76,8 @@ class ClassificationView(APIView):
 
                 records = data.get('records')
                 complete_identifier = None
+                classification_import_run: Optional[ClassificationImportRun] = None
+
                 if import_id := data.get('import_id'):
                     # prefix import_id with username, so users can't overwrite each other
                     import_id = f"{user.username}#{import_id}"
@@ -80,16 +85,17 @@ class ClassificationView(APIView):
                     completed = status == 'complete'
                     if completed:
                         complete_identifier = import_id
-
-                    # record the import
-                    ClassificationImportRun.record_classification_import(
-                        identifier=import_id,
-                        add_row_count=len(records))
+                    classification_import_run = ClassificationImportRun.record_classification_import(identifier=import_id)
 
                 per_json_data = list()
                 for record_data in records:
-                    result = importer.insert(record_data)
+                    result = importer.insert(record_data, import_run=classification_import_run)
+                    if classification_import_run:
+                        classification_import_run.increment_status(result.status)
                     per_json_data.append(result)
+
+                if classification_import_run:
+                    classification_import_run.save()
                 json_data = {"results": per_json_data}
 
                 if complete_identifier:
@@ -99,15 +105,14 @@ class ClassificationView(APIView):
                         is_complete=True)
 
             else:
+                # single record
                 json_data = importer.insert(data, record_id)
-                if 'fatal_error' in json_data:
-                    return Response(status=HTTP_400_BAD_REQUEST, data=json_data)
-                elif 'internal_error' in json_data:
-                    return Response(status=HTTP_500_INTERNAL_SERVER_ERROR, data=json_data)
+                if json_data.internal_error:
+                    return Response(status=HTTP_500_INTERNAL_SERVER_ERROR, data=force_json(json_data))
 
         importer.finish()
 
-        return Response(status=HTTP_200_OK, data=json_data)
+        return Response(status=HTTP_200_OK, data=force_json(json_data))
 
 
 class LabGeneClassificationCountsView(APIView):

@@ -2,6 +2,7 @@ import typing
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from enum import Enum
 from typing import Set, Optional, List, Dict, Tuple, Any, Iterable
 
 import django.dispatch
@@ -13,6 +14,7 @@ from django.urls.base import reverse
 from django.utils.timezone import now
 from django_extensions.db.models import TimeStampedModel
 from lazy import lazy
+from more_itertools import first
 
 from classification.enums.classification_enums import SpecialEKeys, ClinicalSignificance
 from classification.enums.discordance_enums import DiscordanceReportResolution, ContinuedDiscordanceReason
@@ -23,7 +25,7 @@ from flags.models.enums import FlagStatus
 from flags.models.models import FlagComment
 from genes.hgvs import CHGVS
 from snpdb.genome_build_manager import GenomeBuildManager
-from snpdb.models import Lab, GenomeBuild
+from snpdb.models import Lab, GenomeBuild, UserSettings
 
 discordance_change_signal = django.dispatch.Signal()  # args: "discordance_report"
 
@@ -45,6 +47,10 @@ class DiscordanceReport(TimeStampedModel):
 
     cause_text = models.TextField(null=False, blank=True, default='')
     resolved_text = models.TextField(null=False, blank=True, default='')
+
+    class LabInvolvement(int, Enum):
+        WITHDRAWN = 1
+        ACTIVE = 2
 
     def get_absolute_url(self):
         return reverse('discordance_report', kwargs={"discordance_report_id": self.pk})
@@ -150,21 +156,23 @@ class DiscordanceReport(TimeStampedModel):
 
     @property
     def all_actively_involved_labs(self) -> Set[Lab]:
-        # labs_to_classification isn't the most efficient, but chances are if you want all_actively_involved_labs
-        # you also want the lab summaries
-        labs: Set[Lab] = set()
+        return {lab for lab, status in self.involved_labs.items() if status == DiscordanceReport.LabInvolvement.ACTIVE}
+
+    @lazy
+    def involved_labs(self) -> Dict[Lab, LabInvolvement]:
+        lab_status: Dict[Lab, DiscordanceReport.LabInvolvement] = dict()
         for drc in DiscordanceReportClassification.objects.filter(report=self):
             effective_c: Classification = drc.classification_effective.classification
-            if not effective_c.withdrawn:
-                labs.add(effective_c.lab)
-        return labs
+            lab = effective_c.lab
+            status = DiscordanceReport.LabInvolvement.WITHDRAWN if effective_c.withdrawn else DiscordanceReport.LabInvolvement.ACTIVE
+            lab_status[lab] = max(lab_status.get(lab, 0), status)
+        return lab_status
 
     def user_is_involved(self, user: User) -> bool:
         if user.is_superuser:
             return True
         user_labs = set(Lab.valid_labs_qs(user, admin_check=True))
-        report_labs = self.all_actively_involved_labs
-        return bool(user_labs.intersection(report_labs))
+        return bool(user_labs.intersection(self.involved_labs.keys()))
 
     @transaction.atomic
     def create_new_report(self, only_if_necessary: bool = True, cause: str = ''):
@@ -308,7 +316,9 @@ class UserPerspective:
     is_admin_mode: bool
 
     @staticmethod
-    def for_lab(lab: Lab, genome_build: GenomeBuild):
+    def for_lab(lab: Lab, genome_build: Optional[GenomeBuild] = None):
+        if not genome_build:
+            genome_build = UserSettings.get_for(lab=lab).default_genome_build or GenomeBuild.grch38()
         return UserPerspective(your_labs={lab, }, genome_build=genome_build, is_admin_mode=False)
 
     @property
@@ -316,6 +326,7 @@ class UserPerspective:
         if self.is_admin_mode:
             return set()
         return self.your_labs
+
 
 class DiscordanceReportSummary:
 
@@ -344,10 +355,17 @@ class DiscordanceReportSummary:
 
     @property
     def _cm_candidate(self) -> ClassificationModification:
+        return first(self._cm_candidates)
+
+    @property
+    def _cm_candidates(self) -> Iterable[ClassificationModification]:
+        yielded_any = False
         for cm_candidate in self.discordance_report.all_classification_modifications:
             if cm_candidate.classification.lab in self.perspective.your_labs:
-                return cm_candidate
-        return self.discordance_report.all_classification_modifications[0]
+                yielded_any = True
+                yield cm_candidate
+        if not yielded_any:
+            yield self.discordance_report.all_classification_modifications[0]
 
     @property
     def id(self):
@@ -367,6 +385,10 @@ class DiscordanceReportSummary:
     @property
     def c_hgvs(self) -> CHGVS:
         return self._cm_candidate.c_hgvs_best(genome_build=self.perspective.genome_build)
+
+    @property
+    def c_hgvses(self) -> List[CHGVS]:
+        return sorted({candidate.c_hgvs_best(genome_build=self.perspective.genome_build) for candidate in self._cm_candidates})
 
     @dataclass
     class LabClinicalSignificances:
@@ -420,6 +442,16 @@ class DiscordanceReportSummaries:
 
     def __bool__(self):
         return bool(self.summaries)
+
+    def labs(self) -> List[Lab]:
+        return sorted(self.perspective.your_labs)
+
+    def labs_quick_str(self) -> str:
+        if len(self.perspective.your_labs) == 1:
+            lab = list(self.perspective.your_labs)[0]
+            return str(lab)
+        else:
+            return "your assigned labs"
 
     @staticmethod
     def create(perspective: UserPerspective, discordance_reports: Iterable[DiscordanceReport]) -> 'DiscordanceReportSummaries':

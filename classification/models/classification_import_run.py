@@ -9,6 +9,7 @@ from django.dispatch import receiver
 from django.utils.timezone import now
 from model_utils.models import TimeStampedModel
 
+from classification.models.classification_utils import ClassificationPatchStatus
 from classification.models.uploaded_classifications_unmapped import UploadedClassificationsUnmapped
 from library.log_utils import NotificationBuilder
 
@@ -32,6 +33,45 @@ class ClassificationImportRun(TimeStampedModel):
     status = models.TextField(choices=ClassificationImportRunStatus.choices, default=ClassificationImportRunStatus.ONGOING)
     from_file = models.ForeignKey(UploadedClassificationsUnmapped, on_delete=CASCADE, null=True, blank=True)
 
+    row_count_new = models.IntegerField(default=0)
+    row_count_update = models.IntegerField(default=0)
+    row_count_no_change = models.IntegerField(default=0)
+    row_count_withdrawn = models.IntegerField(default=0)
+    row_count_delete = models.IntegerField(default=0)
+    row_count_un_withdrawn = models.IntegerField(default=0)
+    row_count_already_withdrawn = models.IntegerField(default=0)
+    row_count_unknown = models.IntegerField(default=0)
+    logging_version = models.IntegerField(default=0)
+
+    def __str__(self):
+        parts = []
+        if file := self.from_file:
+            parts.append(file.filename)
+        else:
+            parts.append(self.identifier)
+        parts.append(f"({self.row_count})")
+        return "".join(parts)
+
+    def increment_status(self, status: ClassificationPatchStatus):
+        self.row_count += 1
+        if status == ClassificationPatchStatus.NEW:
+            self.row_count_new += 1
+        elif status == ClassificationPatchStatus.ALREADY_WITHDRAWN:
+            self.row_count_already_withdrawn += 1
+        elif status == ClassificationPatchStatus.UPDATE:
+            self.row_count_update += 1
+        elif status == ClassificationPatchStatus.DELETED:
+            self.row_count_delete += 1
+        elif status == ClassificationPatchStatus.ALREADY_WITHDRAWN:
+            self.row_count_already_withdrawn += 1
+        elif status == ClassificationPatchStatus.NO_CHANGE:
+            self.row_count_no_change += 1
+        elif status == ClassificationPatchStatus.WITHDRAWN:
+            self.row_count_withdrawn += 1
+        else:
+            # shouldn't happen but it's here if we need it
+            self.row_count_unknown += 1
+
     @staticmethod
     def record_classification_import(identifier: str, add_row_count: int = 0, is_complete: bool = False) -> 'ClassificationImportRun':
         """
@@ -47,7 +87,7 @@ class ClassificationImportRun(TimeStampedModel):
         use_me = ClassificationImportRun.objects.filter(status=ClassificationImportRunStatus.ONGOING, identifier=identifier, modified__gte=too_old).order_by('-modified').first()
 
         if not use_me:
-            use_me = ClassificationImportRun(identifier=identifier)
+            use_me = ClassificationImportRun(identifier=identifier, logging_version=1)
             nb = NotificationBuilder("Import started")
             nb.add_markdown(f":golfer: Import Started {identifier}")
             nb.send()

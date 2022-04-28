@@ -180,18 +180,18 @@ class ClassificationImportMapInsertTask(Task):
                         # record the import
                         import_run = ClassificationImportRun.record_classification_import(
                             identifier=import_id,
-                            add_row_count=len(batch))
+                        )
                         import_run.from_file = upload_file
-                        import_run.save()
 
                         bci = BulkClassificationInserter(user=user)
                         for row in batch:
-                            bci.insert(data=row, submission_source=SubmissionSource.API)
+                            response = bci.insert(data=row, submission_source=SubmissionSource.API, import_run=import_run)
+                            import_run.increment_status(response.status)
+                        import_run.save()
                         bci.finish()
 
                     ClassificationImportRun.record_classification_import(
                         identifier=import_id,
-                        add_row_count=0,
                         is_complete=True
                     )
 

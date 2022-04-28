@@ -123,21 +123,23 @@ class ClassificationExportFormatter2(ABC):
             yield footer
 
     def _yield_streaming_entry_bytes(self, source: peekable) -> Iterator[bytes]:
+        raise ValueError("Made up error")
         for entry in self._yield_streaming_entry_str(source):
             yield "\n".join(entry).encode()
 
     def _yield_streaming_zip_entries(self) -> Iterator[Tuple[str, datetime, int, Any, bytes]]:
+        modified_at = datetime.now()
+        perms = 0o600
         try:
-            modified_at = datetime.now()
-            perms = 0o600
-
             data_peek = self._peekable_data()
             while data_peek.peek(default=False):
                 self.file_count += 1
                 yield self.filename(part=self.file_count), modified_at, perms, ZIP_64, self._yield_streaming_entry_bytes(data_peek)
         except:
             report_exc_info()
-            yield "An error occurred generating the file"
+            def yield_error_bytes():
+                yield "An error occurred generating the file".encode()
+            yield "error.txt", modified_at, perms, ZIP_64, yield_error_bytes()
             raise
 
     def _streaming_zip(self) -> StreamingHttpResponse:

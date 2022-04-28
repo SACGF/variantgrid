@@ -115,7 +115,7 @@
                 {% if dlab.clinvar_keys %}
                     {{ dlab.uploads_to_clinvar_qs.count | number:'S' }}
                     {% for clinvar_key in dlab.clinvar_keys %}
-                        <a class="hover-link" href="{% url 'clinvar_key_summary' clinvar_key.id %}"><small class="form-text">Review {{ clinvar_key.id }} ClinVar submissions here</small></a>
+                        <a class="hover-link" href="{% url 'clinvar_key_summary' clinvar_key.id %}"><small class="form-text">Review {{ clinvar_key.label }} ClinVar submissions here</small></a>
                     {% endfor %}
                 {% else %}
                     <span class="text-muted">Your {% plural dlab.labs singular="lab is" plural="labss are" %} not configured for ClinVar.</span>
@@ -158,7 +158,8 @@
                         <label class="form-check" for="discordances-filter-internal">
                             <input class="form-check-input" type="radio" name="discordances-filter" id="discordances-filter-internal" value="internal" />
                             <span class="form-check-label">
-                                <span style="font-weight:500">Internal Only</span> discordances account for <strong>{{ lab_count.count }}</strong> of these discordances
+
+                                Discordances only within {{ dlab.discordance_summaries.labs_quick_str }} account for <strong>{{ lab_count.count }}</strong> of these discordances
                             </span>
                         </label>
                     {% else %}
@@ -224,7 +225,9 @@
                     <tr class="discordance-row" data-labs="{% if summary.is_internal %}internal{% else %}{{ summary.all_actively_involved_labs_ids }}{% endif %}">
                         <td class="text-center"><a href="{% url 'discordance_report' summary.discordance_report.id %}" class="hover-link">DR_{{ summary.discordance_report.id }}</a></td>
                         <td>{% timestamp summary.discordance_report.created %}</td>
-                        <td>{% c_hgvs summary.c_hgvs %}
+                        <td>{% for c_hgvs_val in summary.c_hgvses %}
+                            <div>{% c_hgvs c_hgvs_val %}</div>
+                            {% endfor %}
 
                         </td>
                         <td style="width:40%">{% for lab_summ in summary.lab_significances %}

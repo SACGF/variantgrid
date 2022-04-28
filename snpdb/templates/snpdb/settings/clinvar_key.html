@@ -2,7 +2,7 @@
 {% load ui_utils %}
 {% load classification_tags %}
 <h4>ClinVar Key</h4>
-{% labelled label="ClinVar Key Name" %}{{ clinvar_key.id }}{% endlabelled %}
+{% labelled label="ClinVar Key Name" %}{{ clinvar_key.label }}{% endlabelled %}
 {% labelled label="Org ID" %}{% if clinvar_key.org_id %}<a href="https://www.ncbi.nlm.nih.gov/clinvar/submitters/{{ clinvar_key.org_id }}/">{{ clinvar_key.org_id }}</a>{% endif %}{% endlabelled %}
 {% labelled label="Configuration" %}<a href="#clinvar-key-config" class='toggle-link' data-toggle="collapse">Toggle Display</a>{% endlabelled %}
 <div id="clinvar-key-config" class="collapse">

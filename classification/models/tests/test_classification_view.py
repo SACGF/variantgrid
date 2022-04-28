@@ -245,7 +245,7 @@ class ClassificationTestCaseViews(TestCase):
         vc = Classification.objects.get(pk=vc_id)
         self.assertEqual(vc.evidence["p_hgvs"].get('immutable'), 'api')
 
-        resonse_2 = self.request_post({
+        response_2 = self.request_post({
             "id": f"{lab.group_name}/test_10",
             "test": False,
             "source": SubmissionSource.FORM.value,
