@@ -250,14 +250,15 @@ class ClinVarKey(TimeStampedModel):
 
     id = models.TextField(primary_key=True)
     api_key = models.TextField(null=True, blank=True)
-    org_id = models.TextField(null=False, blank=True, default='')  # maybe this should be the id?
+    org_id = models.TextField(null=False, blank=True, default='')  # maybe this should have been the id?
+    name = models.TextField(blank=True, default='')
 
     default_affected_status = models.TextField(choices=ClinVarAssertionMethods.choices, null=True, blank=True)
     inject_acmg_description = models.BooleanField(blank=True, default=False)
     assertion_method_lookup = models.JSONField(null=False, default=dict)
 
     def __str__(self):
-        return f"ClinVarKey ({self.id})"
+        return f"ClinVarKey ({self.name if self.name else self.id})"
 
     def __lt__(self, other):
         return self.id < other.id
