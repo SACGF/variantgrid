@@ -555,7 +555,7 @@ class FlagWatch(models.Model):
 class FlagComment(TimeStampedModel):
     flag = models.ForeignKey(Flag, on_delete=CASCADE)
     user = models.ForeignKey(User, on_delete=CASCADE)
-    text = models.TextField()
+    text = models.TextField(blank=True)
     resolution = models.ForeignKey(FlagResolution, on_delete=PROTECT, null=True)
 
     @staticmethod
