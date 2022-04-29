@@ -74,13 +74,8 @@ class Test(URLTestCase):
     def testGridUrls(self):
         build_kwargs = {"genome_build_name": self.grch37.name, "op": "config"}
         human_protein_atlas_version_id = self.annotation_version_grch37.human_protein_atlas_version.pk
-        tissue_kwargs = {"human_protein_atlas_version_id": human_protein_atlas_version_id,
-                         "tissue_sample_id": self.human_protein_atlas_tissue_sample.pk,
-                         "min_abundance": HumanProteinAtlasAbundance.MEDIUM,
-                         "op": "config"}
         GRID_LIST_URLS = [
             ("variant_annotation_version_grid", build_kwargs, 200),
-            ("tissue_gene_grid", tissue_kwargs, 200),
         ]
         self._test_urls(GRID_LIST_URLS, self.user)
 
