@@ -18,7 +18,7 @@ def annotation_scheduler():
     LOCK_EXPIRE = 60 * 5  # 5 minutes
     lock_id = "annotation-scheduler-lock"
 
-    # cache.add fails if if the key already exists
+    # cache.add fails if the key already exists
     acquire_lock = lambda: cache.add(lock_id, "true", LOCK_EXPIRE)
     release_lock = lambda: cache.delete(lock_id)
 
