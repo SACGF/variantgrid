@@ -30,8 +30,7 @@ class TestVCFProcessors(TestCase):
         uploaded_file = UploadedFile.objects.create(path=vcf_filename,
                                                     import_source=ImportSource.COMMAND_LINE,
                                                     user=user,
-                                                    file_type=UploadedFileTypes.VCF,
-                                                    visible=False)
+                                                    file_type=UploadedFileTypes.VCF)
 
         upload_pipeline = UploadPipeline.objects.create(uploaded_file=uploaded_file)
         upload_step = UploadStep.objects.create(upload_pipeline=upload_pipeline,
