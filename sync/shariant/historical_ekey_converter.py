@@ -1,5 +1,5 @@
 import copy
-from collections import Mapping
+from typing import Mapping
 
 from django.contrib.auth.models import User
 

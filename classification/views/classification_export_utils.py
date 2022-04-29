@@ -3,7 +3,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from typing import List, Union, Iterable, Optional, Dict, Tuple, Set, Any
+from typing import List, Union, Iterable, Optional, Dict, Tuple, Set, Any, Mapping
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -150,7 +150,7 @@ class UsedKeyTracker:
         has_note = False
         has_explain = False
         for key, valueObj in evidence.items():
-            if isinstance(valueObj, collections.Mapping):
+            if isinstance(valueObj, Mapping):
                 has_value = valueObj.get('value') is not None
                 has_note = valueObj.get('note') is not None
                 has_explain = valueObj.get('explain') is not None

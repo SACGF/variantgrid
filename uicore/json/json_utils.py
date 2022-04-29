@@ -1,7 +1,6 @@
-import collections
 import json
 from dataclasses import dataclass
-from typing import List
+from typing import List, Mapping
 
 from lazy import lazy
 
@@ -14,7 +13,7 @@ def strip_json(json_values: JsonDataType) -> JsonDataType:
     (contents of arrays wont be affected).
     Can optimise exports of json data when fields are often blank
     """
-    if isinstance(json_values, collections.Mapping):
+    if isinstance(json_values, Mapping):
         ret_value = {}
         for key, value in json_values.items():
             if value == '' or value is None or value is False or (isinstance(value, list) and not value):

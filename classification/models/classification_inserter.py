@@ -99,7 +99,7 @@ class BulkClassificationInserter:
                     keys_label = ', '.join(data.keys())
                     raise ClassificationProcessError(
                         f'Must provide "id" segment with submission - keys = ({keys_label})')
-                if isinstance(id_part, collections.Mapping):
+                if isinstance(id_part, Mapping):
                     id_part['user'] = user
                     record_ref = ClassificationRef.init_from_parts(**id_part)
                 else:
@@ -156,7 +156,7 @@ class BulkClassificationInserter:
             new_source_id: Optional[str] = None
             if operation_data:
                 if source_id := operation_data.pop(SpecialEKeys.SOURCE_ID, None):
-                    if isinstance(source_id, collections.Mapping):
+                    if isinstance(source_id, Mapping):
                         source_id = source_id.get('value')
                     new_source_id = source_id
 
