@@ -1,12 +1,12 @@
 from collections import defaultdict
 from itertools import chain
-from typing import Set, Optional, Iterable, List, Dict
+from typing import Set, List, Dict
 import nltk
 from django.http import HttpRequest
 from lazy import lazy
 from classification.enums import SpecialEKeys
 from classification.models import ClassificationModification
-from classification.views.classification_export_utils import ExportFormatter, AlleleGroup
+from classification.views.classification_export_utils import ExportFormatter
 from classification.views.exports.classification_export_decorator import register_classification_exporter
 from classification.views.exports.classification_export_filter import ClassificationFilter, AlleleData
 from classification.views.exports.classification_export_formatter2 import ClassificationExportFormatter2
@@ -14,7 +14,8 @@ from library.django_utils import get_url_from_view_path
 from library.utils import ExportRow, export_column
 import re
 
-RE_HAS_BAD_CHAR = re.compile(r"[0-9._]")
+RE_HAS_BAD_CHAR = re.compile(r"[\d._]")
+
 
 class ClassificationSpellingRow(ExportRow):
 
