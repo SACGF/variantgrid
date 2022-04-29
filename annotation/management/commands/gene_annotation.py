@@ -6,7 +6,7 @@ from django.utils import timezone
 
 from annotation.models import GeneAnnotationVersion, OntologyImport, OntologyTerm, GenomeBuild, AnnotationVersion, \
     InvalidAnnotationVersionError, GeneAnnotation
-from genes.gene_matching import GeneMatcher
+from genes.gene_matching import ReleaseGeneMatcher
 from genes.models import GeneAnnotationRelease, GnomADGeneConstraint
 from library.django_utils.django_file_utils import get_import_processing_filename
 from ontology.models import OntologyService, OntologySnake, GeneDiseaseClassification, OntologyTermRelation
@@ -151,7 +151,7 @@ class Command(BaseCommand):
                                                    gnomad_import_date=gnomad_gene_constraint.cached_web_resource.created)
 
         # 1st we need to make sure all symbols are matched in a GeneAnnotationRelease (HGNC already done)
-        gene_matcher = GeneMatcher(gene_annotation_release)
+        gene_matcher = ReleaseGeneMatcher(gene_annotation_release)
         gene_matcher.match_unmatched_symbols(gene_symbols)
 
         missing_genes = Counter()

@@ -7,7 +7,7 @@ from django.db.models import Max
 from django.db.models.functions import Upper
 
 from genes.cached_web_resource.refseq import retrieve_refseq_gene_summaries
-from genes.gene_matching import GeneMatcher
+from genes.gene_matching import ReleaseGeneMatcher
 from genes.models import GeneSymbol, GeneAnnotationImport, Gene, GeneVersion, TranscriptVersion, Transcript, HGNC, \
     GeneAnnotationRelease, ReleaseGeneVersion, ReleaseTranscriptVersion
 from genes.models_enums import AnnotationConsortium
@@ -139,7 +139,7 @@ class Command(BaseCommand):
             ReleaseTranscriptVersion.objects.bulk_create(release_transcript_version_list)
 
         print("Matching existing gene list symbols to this release...")
-        gm = GeneMatcher(release)
+        gm = ReleaseGeneMatcher(release)
         gm.match_unmatched_in_hgnc_and_gene_lists()
 
     @staticmethod

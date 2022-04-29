@@ -8,7 +8,7 @@ from typing import Set, List
 import requests
 
 from annotation.models import CachedWebResource
-from genes.gene_matching import GeneMatcher
+from genes.gene_matching import ReleaseGeneMatcher
 from genes.models import HGNCImport, GeneAnnotationRelease, GeneSymbol, HGNC, GeneSymbolAlias, UniProt
 from genes.models_enums import HGNCStatus, GeneSymbolAliasSource
 from library.django_utils import get_model_fields, get_field_counts
@@ -33,7 +33,7 @@ def store_hgnc_from_web(cached_web_resource: CachedWebResource):
 
     # Make sure gene symbols are matched to genes in each release
     for release in GeneAnnotationRelease.objects.all():
-        gm = GeneMatcher(release)
+        gm = ReleaseGeneMatcher(release)
         gm.match_unmatched_in_hgnc_and_gene_lists()
 
     status_counts = get_field_counts(HGNC.objects.all(), "status")

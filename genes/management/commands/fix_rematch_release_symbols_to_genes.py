@@ -1,6 +1,6 @@
 from django.core.management import BaseCommand
 
-from genes.gene_matching import GeneMatcher
+from genes.gene_matching import ReleaseGeneMatcher
 from genes.models import GeneAnnotationRelease, ReleaseGeneSymbolGene, ReleaseGeneSymbol
 
 
@@ -13,7 +13,7 @@ class Command(BaseCommand):
             num_genes_original = qs.count()
             num_no_match_original = no_match_qs.count()
             print(f"{gar} - symbols w/o gene: {num_no_match_original}")
-            gm = GeneMatcher(gar)
+            gm = ReleaseGeneMatcher(gar)
             release_gene_symbols = gar.releasegenesymbol_set.all()
             gm.match_symbols_to_genes(release_gene_symbols)
             num_genes = qs.count()

@@ -1,6 +1,6 @@
 from django.core.management import BaseCommand
 
-from genes.gene_matching import GeneMatcher, HGNCMatcher
+from genes.gene_matching import ReleaseGeneMatcher, HGNCMatcher
 from genes.models import GeneAnnotationRelease, GeneVersion
 from genes.models_enums import AnnotationConsortium
 
@@ -18,7 +18,7 @@ class Command(BaseCommand):
 
         # Make sure gene symbols are matched to genes in each release
         for release in GeneAnnotationRelease.objects.all():
-            gm = GeneMatcher(release)
+            gm = ReleaseGeneMatcher(release)
             gm.match_unmatched_in_hgnc_and_gene_lists()
 
         hgnc_matcher = HGNCMatcher()

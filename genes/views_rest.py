@@ -13,7 +13,7 @@ from rest_framework.response import Response
 from rest_framework.status import HTTP_200_OK
 from rest_framework.views import APIView
 
-from genes.gene_matching import GeneSymbolMatcher, GeneMatcher
+from genes.gene_matching import GeneSymbolMatcher, ReleaseGeneMatcher
 from genes.models import GeneInfo, GeneList, GeneAnnotationRelease, \
     ReleaseGeneSymbolGene, PanelAppServer, SampleGeneList, ActiveSampleGeneList, create_fake_gene_list
 from genes.panel_app import get_panel_app_panel_as_gene_list_json
@@ -195,7 +195,7 @@ class BatchGeneIdentifierForReleaseView(APIView):
         gene_symbols_json = request.data["gene_symbols_json"]
         gene_symbols = json.loads(gene_symbols_json)
 
-        gm = GeneMatcher(gene_annotation_release)
+        gm = ReleaseGeneMatcher(gene_annotation_release)
         gm.match_unmatched_symbols(gene_symbols)
 
         qs = ReleaseGeneSymbolGene.objects.filter(release_gene_symbol__release=gene_annotation_release,

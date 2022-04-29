@@ -24,7 +24,7 @@ class GeneSymbolMatcher:
 
     @lazy
     def _release_gene_matchers(self):
-        return [GeneMatcher(release) for release in GeneAnnotationRelease.objects.all()]
+        return [ReleaseGeneMatcher(release) for release in GeneAnnotationRelease.objects.all()]
 
     def _match_symbols_to_genes_in_releases(self):
         for gm in self._release_gene_matchers:
@@ -88,7 +88,7 @@ class HGNCMatcher:
         return self._hgnc_by_uc_gene_symbol.get(gene_symbol)
 
 
-class GeneMatcher:
+class ReleaseGeneMatcher:
     """ Genes and symbols change over time. This creates DB records connecting them for a particular
         GeneAnnotationRelease.
 
