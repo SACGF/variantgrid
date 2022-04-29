@@ -6,7 +6,6 @@ from io import BytesIO, TextIOWrapper
 from typing import Dict
 
 from Bio import SwissProt
-from django.db.models import Q
 
 from annotation.models import CachedWebResource
 from genes.models import UniProt

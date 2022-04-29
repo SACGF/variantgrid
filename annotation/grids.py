@@ -134,4 +134,3 @@ class VariantAnnotationVersionColumns(DatatableConfig[VariantAnnotationVersion])
     def get_initial_queryset(self) -> QuerySet[VariantAnnotationVersion]:
         genome_build = GenomeBuild.get_name_or_alias(self.get_query_param("genome_build_name"))
         return VariantAnnotationVersion.objects.filter(genome_build=genome_build)
-

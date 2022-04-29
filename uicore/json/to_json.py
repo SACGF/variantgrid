@@ -1,5 +1,4 @@
 import json
-
 # Inclusion of this code snippet will cause "to_json()" to be called on classes by the JSONEncoder, allowing them to become serializable
 from typing import Any
 

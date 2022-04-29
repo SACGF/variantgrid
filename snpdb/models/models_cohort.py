@@ -1,5 +1,5 @@
 import logging
-from typing import List, Dict, Iterable
+from typing import List, Dict
 
 import celery
 from django.contrib.auth.models import User

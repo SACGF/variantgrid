@@ -19,4 +19,3 @@ def upload_settings_post_save_handler(sender, instance, **kwargs):
     created = kwargs.get("created")
     if created:
         UploadSettings.create_default_visible_file_types()
-
