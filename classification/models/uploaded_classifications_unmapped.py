@@ -1,6 +1,5 @@
 import contextlib
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
 from os import PathLike
 from pathlib import Path
 from typing import Iterator, Union, Optional, Dict, List, Tuple, Any, Iterable

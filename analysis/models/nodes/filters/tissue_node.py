@@ -1,5 +1,3 @@
-import operator
-from functools import reduce
 from typing import Optional, List
 
 from django.db import models

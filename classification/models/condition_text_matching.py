@@ -736,7 +736,7 @@ def embedded_ids_check(text: str) -> ConditionMatchingSuggestion:
                 raw_extra_words = set(extra_words)
                 cms.add_message(ConditionMatchingMessage(severity="debug", text=f"Diff words (RAW) = {json.dumps(sorted(extra_words))}"))
                 extra_words = extra_words - PREFIX_SKIP_TERMS - IGNORE_TERMS
-                gene_symbols_in_text = set([word for word in extra_words if GeneSymbol.objects.filter(symbol=word).exists()])
+                gene_symbols_in_text = {word for word in extra_words if GeneSymbol.objects.filter(symbol=word).exists()}
                 # cms.add_message(ConditionMatchingMessage(severity="debug", text=f"Same words = {json.dumps(sorted(same_words))}, length = {same_word_letters}"))
                 ignored_words = raw_extra_words - extra_words
                 cms.add_message(ConditionMatchingMessage(severity="debug", text=f"Ignored common words/gene symbols = {json.dumps(sorted(ignored_words))}"))

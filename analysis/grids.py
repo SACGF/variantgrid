@@ -1,6 +1,4 @@
-import operator
 from collections import defaultdict
-from functools import reduce
 from typing import Dict, List, Tuple
 
 import pandas as pd
@@ -15,7 +13,7 @@ from analysis.models.models_karyomapping import KaryomappingAnalysis
 from analysis.models.nodes.analysis_node import get_extra_filters_q, NodeColumnSummaryCacheCollection
 from analysis.views.analysis_permissions import get_node_subclass_or_404
 from annotation.models import HumanProteinAtlasAnnotation
-from genes.models import UniProt, HGNC
+from genes.models import HGNC
 from library.database_utils import get_queryset_column_names, get_queryset_select_from_where_parts
 from library.jqgrid_sql import JqGridSQL, get_overrides
 from library.jqgrid_user_row_config import JqGridUserRowConfig

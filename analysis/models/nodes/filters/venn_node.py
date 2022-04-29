@@ -173,7 +173,6 @@ class VennNode(AnalysisNode):
         raise ValueError("VennNode always uses cache - this should never be called!")
 
     def _get_node_cache_arg_q_dict(self) -> Dict[Optional[str], Q]:
-        arg_q_dict = {}
         if self.set_operation == SetOperations.NONE:
             return {None: self.q_none()}
 

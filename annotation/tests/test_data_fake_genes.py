@@ -27,15 +27,15 @@ def create_fake_transcript_version(genome_build: GenomeBuild,
 
     # This is from GRCh38 (doesn't exist for 37) but we'll use it for both
     build_data = {
-         "url": "ftp://ftp.ensembl.org/pub/release-106/gff3/homo_sapiens/Homo_sapiens.GRCh38.106.gff3.gz",
-         "exons": [[34787800, 34792610, 7, 1413, 6222, None], [34799300, 34799462, 6, 1251, 1412, None],
-                   [34834409, 34834601, 5, 1059, 1250, None], [34859473, 34859578, 4, 954, 1058, None],
-                   [34880556, 34880713, 3, 797, 953, None], [34886842, 34887096, 2, 543, 796, None],
-                   [34892924, 34892963, 1, 504, 542, None], [35048841, 35049344, 0, 1, 503, None]],
-         "contig": "21",
-         "strand": "-",
-         "cds_end": 35048899,
-         "cds_start": 34792134,
+        "url": "ftp://ftp.ensembl.org/pub/release-106/gff3/homo_sapiens/Homo_sapiens.GRCh38.106.gff3.gz",
+        "exons": [[34787800, 34792610, 7, 1413, 6222, None], [34799300, 34799462, 6, 1251, 1412, None],
+                  [34834409, 34834601, 5, 1059, 1250, None], [34859473, 34859578, 4, 954, 1058, None],
+                  [34880556, 34880713, 3, 797, 953, None], [34886842, 34887096, 2, 543, 796, None],
+                  [34892924, 34892963, 1, 504, 542, None], [35048841, 35049344, 0, 1, 503, None]],
+        "contig": "21",
+        "strand": "-",
+        "cds_end": 35048899,
+        "cds_start": 34792134,
     }
 
     data["genome_builds"] = {genome_build.name: build_data}

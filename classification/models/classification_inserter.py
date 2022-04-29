@@ -1,4 +1,3 @@
-import collections
 from typing import Dict, Any, Optional, Set, Mapping
 
 from django.conf import settings

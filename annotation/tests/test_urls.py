@@ -5,8 +5,7 @@ from django.db import IntegrityError
 
 from annotation.fake_annotation import get_fake_annotation_version, create_fake_clinvar_data, \
     create_fake_variant_annotation
-from annotation.models import HumanProteinAtlasAbundance, HumanProteinAtlasTissueSample, \
-    ClinVar, Citation, CitationSource
+from annotation.models import HumanProteinAtlasTissueSample, ClinVar, Citation, CitationSource
 from library.django_utils.unittest_utils import URLTestCase
 from snpdb.models import Variant
 from snpdb.models.models_genome import GenomeBuild

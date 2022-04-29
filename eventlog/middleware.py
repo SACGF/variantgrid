@@ -2,12 +2,12 @@ from django.conf import settings
 from django.http.response import HttpResponseRedirectBase
 from django.urls import resolve
 from eventlog.models import ViewEvent
-import re
 
 IGNORE_SEGMENTS = {"api", "datatable", "citations_json"}
 IGNORE_TEXT = {"detail", "metrics"}
 IGNORE_VIEW_NAME_SUFFIX = {"_detail", "_autocomplete"}
 IGNORE_PARAMETERS = {"csrfmiddlewaretoken"}
+
 
 class PageViewsMiddleware:
 
@@ -83,5 +83,3 @@ class PageViewsMiddleware:
                             method=request.method,
                             referer=request.headers.get('Referer')
                         )
-
-        pass
