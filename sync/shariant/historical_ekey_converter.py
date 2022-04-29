@@ -42,8 +42,8 @@ class HistoricalEKeyConverter:
                                           EvidenceKeyValueType.INTEGER: int},
         EvidenceKeyValueType.INTEGER: {EvidenceKeyValueType.FREE_ENTRY: str,
                                        EvidenceKeyValueType.FLOAT: float},
-        EvidenceKeyValueType.PERCENT: {EvidenceKeyValueType.UNIT: lambda p: float(p) / 100},
-        EvidenceKeyValueType.UNIT: {EvidenceKeyValueType.PERCENT: lambda u: 100 * float(u)},
+        # EvidenceKeyValueType.PERCENT: {EvidenceKeyValueType.UNIT: lambda p: float(p) / 100},
+        # EvidenceKeyValueType.UNIT: {EvidenceKeyValueType.PERCENT: lambda u: 100 * float(u)},
     }
 
     def __init__(self):
