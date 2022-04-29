@@ -148,6 +148,7 @@ class UsedKeyTracker:
     def check_evidence(self, evidence: Dict[str, Any]):
         has_value = False
         has_note = False
+        has_explain = False
         for key, valueObj in evidence.items():
             if isinstance(valueObj, collections.Mapping):
                 has_value = valueObj.get('value') is not None
