@@ -57,7 +57,7 @@
 
         <script>
             function getRelatedVariantsExtraFilters() {
-                var variantTagGridParams = {
+                let variantTagGridParams = {
                     analysis_ids : {{ analysis_ids_list | jsonify }},
                 };
                 return JSON.stringify(variantTagGridParams);
