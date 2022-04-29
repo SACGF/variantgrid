@@ -189,7 +189,7 @@ class LabAdmin(ModelAdminBasics):
     fieldsets = (
         ('Basic', {'fields': ('name', 'group_name', 'organization')}),
         ('Position', {'fields': ('city', 'state', 'country', 'lat', 'long')}),
-        ('Style', {'fields': ('url', 'css_class')}),
+        ('Contact', {'fields': ('url', 'contact_name', 'contact_email', 'contact_phone')}),
         ('Notifications', {'fields': ('email', 'slack_webhook')}),
         ('Submissions', {'fields': ('classification_config', 'upload_location', 'upload_automatic', 'upload_instructions', 'external', 'clinvar_key')})
     )
@@ -209,7 +209,12 @@ class LabAdmin(ModelAdminBasics):
             'long': admin.widgets.AdminTextInputWidget(),
             'url': admin.widgets.AdminURLFieldWidget(),
             'css_class': admin.widgets.AdminTextInputWidget(),
+            'contact_name': admin.widgets.AdminTextInputWidget(),
+            'contact_email': admin.widgets.AdminEmailInputWidget(),
+            'contact_phone': admin.widgets.AdminTextInputWidget(),
             'upload_location': admin.widgets.AdminTextInputWidget(),
+            'email': admin.widgets.AdminEmailInputWidget(),
+            'slack_webhook': admin.widgets.AdminTextInputWidget()
         }, **kwargs)
 
     def fix_group_name(self, request, queryset):
