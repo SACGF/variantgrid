@@ -2,9 +2,15 @@
 {% load related_data_tags %}
 {% load related_analyses_tags %}
 {% load crispy_forms_tags %}
+{% load static %}
 
 {% block title %}Pedigree: {{ pedigree.name }}{% endblock title %}
-
+{% block head %}
+{{ block.super }}
+<link rel="stylesheet" type="text/css" media="screen" href="{% static 'js/lib/free-jqgrid/css/ui.jqgrid.min.css' %}" />
+<script src="{% static 'js/lib/free-jqgrid/jquery.jqgrid.min.js' %}"></script>
+<script type="text/javascript" src="{% static 'js/grid.js' %}"></script>
+{% endblock %}
 {% block css %}
 	table {
 		border-collapse: collapse;
