@@ -986,5 +986,16 @@ ul.compact li:before {
     transform: rotate(360deg);
   }
 }
+.diff-text {
+  display: inline-block;
+}
+.diff-text .diff-text-subtract {
+  border-radius: 2px;
+  background-color: #FFCCCC;
+}
+.diff-text .diff-text-add {
+  border-radius: 2px;
+  background-color: #AAFFAA;
+}
 
 /*# sourceMappingURL=global_bs.css.map */

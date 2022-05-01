@@ -1012,3 +1012,15 @@ ul.compact {
     from { transform:rotate(0deg); }
     to { transform:rotate(360deg); }
 }
+
+.diff-text {
+  display: inline-block;
+  .diff-text-subtract {
+    border-radius: 2px;
+    background-color: #FFCCCC
+  }
+  .diff-text-add {
+    border-radius: 2px;
+    background-color: #AAFFAA
+  }
+}

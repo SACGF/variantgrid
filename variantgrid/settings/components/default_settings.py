@@ -578,6 +578,7 @@ HTML_MINIFY = True
 EXCLUDE_FROM_MINIFYING = (
     '^media/',  # Died in Django 4: FileResponse instance has no 'content' attribute. Use 'streaming_content' instead.
 )
+EXCLUDE_TAGS_FROM_MINIFYING = ("pre", "script", "textarea", "nomin")
 
 ROOT_URLCONF = 'variantgrid.urls'
 

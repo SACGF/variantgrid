@@ -1,4 +1,5 @@
 import csv
+import difflib
 import hashlib
 import importlib
 import inspect
@@ -1013,3 +1014,39 @@ class VarsDict:
 
     def __getitem__(self, item):
         return vars(self)[item]
+
+
+@dataclass(frozen=True)
+class DiffTextSegment:
+    operation: str
+    text: str
+
+    @property
+    def operation_name(self):
+        if self.operation == ' ':
+            return 'same'
+        elif self.operation == '-':
+            return 'subtract'
+        elif self.operation == '+':
+            return 'add'
+        else:
+            return self.operation
+
+
+def diff_text(a: str, b: str) -> List[DiffTextSegment]:
+    segments: List[DiffTextSegment] = list()
+    last_operation = None
+    last_text = ''
+    for diff_char in difflib.Differ().compare(a, b):
+        operation = diff_char[0]
+        text_char = diff_char[2]
+        if operation != last_operation:
+            if text_char:
+                if last_text:
+                    segments.append(DiffTextSegment(operation=last_operation, text=last_text))
+                last_operation = operation
+                last_text = ''
+        last_text += text_char
+    if last_text:
+        segments.append(DiffTextSegment(operation=last_operation, text=last_text))
+    return segments

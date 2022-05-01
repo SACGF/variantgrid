@@ -10,6 +10,7 @@ from django.forms.utils import ErrorList
 from django.template.base import FilterExpression, kwarg_re
 from django.utils.safestring import SafeString
 
+from library.utils import diff_text
 from variantgrid.perm_path import get_visible_url_names
 
 register = template.Library()
@@ -531,3 +532,8 @@ class TagUtils:
         if val is not None:
             return bool(val)
         return None
+
+
+@register.inclusion_tag(name="diff_text", filename="uicore/tags/diff_text.html")
+def diff_text_html(a: str, b: str):
+    return {"diffs": diff_text(a, b)}
