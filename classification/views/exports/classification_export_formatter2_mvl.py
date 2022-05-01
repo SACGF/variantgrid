@@ -8,7 +8,8 @@ from lazy import lazy
 
 from annotation.views import simple_citation_html
 from classification.enums import SpecialEKeys
-from classification.models import ClassificationModification, EvidenceKeyMap, ClassificationGroups
+from classification.models import ClassificationModification, EvidenceKeyMap
+from classification.models.classification_groups import ClassificationGroups
 from classification.views.classification_export_utils import ConflictStrategy
 from classification.views.exports.classification_export_decorator import register_classification_exporter
 from classification.views.exports.classification_export_filter import AlleleData, ClassificationFilter, \
