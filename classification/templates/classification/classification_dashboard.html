@@ -123,12 +123,17 @@
                 {% endif %}
             {% endlabelled %}
         {% endif %}
+        {% labelled hint="tiny" label="Downloads" %}
+            <a href="{{ dlab.compare_to_clinvar_url }}" class="download-link">Classifications compared with ClinVar</a>
+        {% endlabelled %}
+
         {% if 'condition_matchings_lab'|is_view_enabled %}
-            {% labelled hint="tiny"  label="Classifications w/out Standard Condition" %}
+            {% labelled hint="tiny"  label="Classifications without Standard Condition" %}
                 {{ dlab.classifications_wout_standard_text | number:'W' }}
                 <a class="hover-link" href="{% url 'condition_matchings_lab' dlab.lab_id %}"><small class="form-text">Review your lab's unresolved condition text here</small></a>
             {% endlabelled %}
         {% endif %}
+
     {% endif %}
 
     {% if 'discordance_report'|is_view_enabled %}
@@ -246,9 +251,11 @@
 
     {% endif %}
 
+    <a href="#flagged-classifications" class="toggle-link" data-toggle="collapse">Advanced: show Flagged Classifications</a>
+    <div id="flagged-classifications" class="collapse">
     {% page_help_embedded title="Flagged Classifications" %}
         <p>
-            This page will list all classifications belonging to your lab/s that have flags raised against them.
+            This page will list all classifications belonging to your lab(s) that have flags raised against them.
             Each classification flag indicates that there is an action that needs to be performed against the classification.
             Clicking on each flag will give you instructions on what needs to be done to resolve it.
         </p><p>
@@ -284,6 +291,7 @@
         {% end_ui_register_tab_embedded %}
 
         {% ui_render_tabs tab_set="classification_issues" %}
+    </div>
     </div>
 
 </div>

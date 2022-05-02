@@ -1,5 +1,5 @@
 from typing import Optional, List
-
+from urllib.parse import urlencode
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.db.models import QuerySet, Sum
@@ -57,8 +57,19 @@ class ClassificationDashboard:
         else:
             return "mine"
 
+    @property
+    def compare_to_clinvar_url(self) -> str:
+        base = reverse('classification_export_api')
+        params = {
+            "share_level": "public",
+            "build": GenomeBuildManager.get_current_genome_build().name,
+            "type": "clinvar_compare",
+            "include_labs": ",".join([lab.group_name for lab in self.labs])
+        }
+        return base + "?" + urlencode(params)
+
     @lazy
-    def shared_classifications(self):
+    def shared_classifications(self) -> QuerySet[Classification]:
         return Classification.objects.filter(allele__isnull=False, lab__in=self.labs, withdrawn=False, share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS)
 
     @lazy
