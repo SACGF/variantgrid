@@ -41,7 +41,7 @@ def _process_imported_wiki(uploaded_file) -> Tuple[ImportedWikiCollection, List[
         modified = make_aware(modified)
         iw = ImportedWiki(collection=wiki_collection,
                           match_column_value=row[wiki_collection.match_column_name],
-                          markdown=row["Markdown"],
+                          markdown=row["Markdown"] or '',
                           username=row["User"],
                           created=created,
                           modified=modified)
@@ -78,8 +78,8 @@ class ImportGeneWikiCollection(ImportTask):
         gs_matcher = GeneSymbolMatcher()
         user_matcher = UserMatcher(uploaded_file.user)
         for iw in records:
-            if gene_symbol := gs_matcher.get_gene_symbol_id(iw.match_column_value):
-                gs_wiki, created = GeneSymbolWiki.objects.get_or_create(gene_symbol=gene_symbol)
+            if gene_symbol_id := gs_matcher.get_gene_symbol_id(iw.match_column_value):
+                gs_wiki, created = GeneSymbolWiki.objects.get_or_create(gene_symbol_id=gene_symbol_id)
                 _create_or_modify_wiki(user_matcher, iw, gs_wiki, created)
                 matched_records.append(iw)
 
