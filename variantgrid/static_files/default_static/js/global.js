@@ -925,3 +925,10 @@ function _formatJson(jsonObj) {
         return ($('<span>', {class:'js-obj', html: html}));
     }
 }
+
+function diffToggle(e) {
+    let diffBox = $(e).closest('.diff-box');
+    let mode = diffBox.find('[name=diff-mode]:checked').val();
+    diffBox.find('[data-diff-mode]').hide();
+    diffBox.find(`[data-diff-mode=${mode}]`).show();
+}

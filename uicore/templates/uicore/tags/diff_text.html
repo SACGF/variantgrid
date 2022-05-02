@@ -1,1 +1,16 @@
-<nomin class="diff-text">{% for diff_segment in diffs %}<span class="diff-text-{{ diff_segment.operation_name }}">{{ diff_segment.text }}</span>{% endfor %}</nomin>
+<div class="diff-box">
+    <div class="btn-group btn-group-toggle mb-2" data-toggle="buttons">
+      <label class="btn btn-outline-secondary btn-sm">
+        <input type="radio" name="diff-mode" value="before" onclick="diffToggle(this)"> Before
+      </label>
+        <label class="btn btn-outline-secondary active btn-sm">
+        <input type="radio" name="diff-mode" value="diff" checked onclick="diffToggle(this)"> Diff
+      </label>
+          <label class="btn btn-outline-secondary btn-sm">
+        <input type="radio" name="diff-mode" value="after" onclick="diffToggle(this)"> After
+      </label>
+    </div>
+    <nomin class="diff-text" data-diff-mode="diff">{% for diff_segment in diffs %}<span class="diff-text-{{ diff_segment.operation_name }}">{{ diff_segment.text }}</span>{% endfor %}</nomin>
+    <div class="collapse" data-diff-mode="before" style="color:#888;">{{ before }}</div>
+    <div class="collapse" data-diff-mode="after">{{ after }}</div>
+</div>

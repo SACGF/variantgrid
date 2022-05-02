@@ -1016,11 +1016,12 @@ ul.compact {
 .diff-text {
   display: inline-block;
   .diff-text-subtract {
+    color: #aaa;
     border-radius: 2px;
-    background-color: #FFCCCC
+    background-color: #FFEEEE;
   }
   .diff-text-add {
     border-radius: 2px;
-    background-color: #AAFFAA
+    background-color: #AAFFAA;
   }
 }

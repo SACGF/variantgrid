@@ -53,19 +53,20 @@
                 {% for data_change in change_group.changes %}
                     <div class="change {% if data_change.is_large and not change_group.ignore_before %}large-change{% else %}mini-change{% endif %}">
                         <span class="key-change"><span class="key">{{ data_change.key }}</span>.{{ data_change.attribute }}:</span>
-                        {% if not change_group.ignore_before %}
-                            {% if data_change.is_large and data_change.before and data_change.after %}
-                                {% diff_text data_change.before data_change.after %}
-                            {% else %}&#160;
+                        {% if data_change.is_large and data_change.before and data_change.after %}
+                            {% diff_text data_change.before data_change.after %}
+                        {% else %}
+                            {% if not change_group.ignore_before %}
+                                {% if data_change.is_large %}<br/>{% else %}&#160;{% endif %}
                                 {{ data_change.before | format_value }}
                                 {% if data_change.is_large %}<br/><i class="fas fa-arrow-down text-secondary my-2"></i><br/>
                                 {% else %}<i class="fas fa-arrow-right text-secondary mx-2"></i>{% endif %}
+                            {% else %}
+                                <span class="change-arrow"><i class="fas fa-arrow-right mx-2 text-secondary"></i></span>
                             {% endif %}
-                        {% else %}
-                            <span class="change-arrow"><i class="fas fa-arrow-right mx-2 text-secondary"></i></span>
+                            {% if data_change.resolution %}<span class="resolution">{{ data_change.resolution.label }}</span> {{ data_change.after }}
+                            {% else %}{{ data_change.after | format_value }}{% endif %}
                         {% endif %}
-                        {% if data_change.resolution %}<span class="resolution">{{ data_change.resolution.label }}</span> {{ data_change.after }}
-                        {% else %}{{ data_change.after | format_value }}{% endif %}
                     </div>
                 {%  endfor %}
             </td>

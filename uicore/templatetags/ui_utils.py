@@ -536,4 +536,4 @@ class TagUtils:
 
 @register.inclusion_tag(name="diff_text", filename="uicore/tags/diff_text.html")
 def diff_text_html(a: str, b: str):
-    return {"diffs": diff_text(a, b)}
+    return {"diffs": diff_text(a, b), "before": a, "after": b}
