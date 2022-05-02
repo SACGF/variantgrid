@@ -68,7 +68,7 @@ class PageViewsMiddleware:
 
                         # hack to split up classification ID when it's in the form of "classification_id.modification_timestamp"
                         if classification_id := all_params.get("classification_id"):
-                            if isinstance(classification_id, str) or isinstance(classification_id, float):
+                            if isinstance(classification_id, (str, float)):
                                 check_for_parts = str(classification_id)
                                 parts = check_for_parts.split(".")
                                 all_params["classification_id"] = int(parts[0])
