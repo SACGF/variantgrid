@@ -91,7 +91,7 @@
                     {% labelled label="Reason for Continued Discordance" %}{{ report.get_continued_discordance_reason_display }}{% endlabelled %}
                 {% endif %}
                 {% if report.resolution == 'D' %}
-                    {% labelled label="Continued Discordance N   otes" %}
+                    {% labelled label="Continued Discordance Notes" %}
                         {% if report.continued_discordance_text %}<span class="textarea-readonly">{{ report.continued_discordance_text }}</span>{% else %}<span class="no-value">-</span>{% endif %}
                     {% endlabelled %}
                 {% endif %}
