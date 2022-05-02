@@ -78,7 +78,7 @@
 <div class="container">
     {% lab_picker view_name="classification_dashboard" selected_lab=dlab.lab_id all_option=True %}
 </div>
-
+<div class="container">
     {% if not dlab.lab_id %}
         {% labelled row_css="my-4" label="Email Preview" admin_only=True %}
             <div class="link-toolbar">
