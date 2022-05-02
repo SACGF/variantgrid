@@ -7,7 +7,7 @@ celery==5.2.3
 ConfigArgParse==1.5.3
 cyvcf2==0.30.14
 Django==4.0.2
-django-amazon-ses==4.0.0
+django-amazon-ses==4.0.1
 django_auth_ldap==4.0.0
 django_autocomplete_light==3.9.1
 django_cache_memoize==0.1.10
