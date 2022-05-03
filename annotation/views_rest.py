@@ -1,4 +1,6 @@
 from django.http.response import Http404
+from django.utils.decorators import method_decorator
+from django.views.decorators.cache import never_cache
 from rest_framework.generics import RetrieveAPIView
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -25,6 +27,7 @@ class VariantAnnotationView(APIView):
         return Response(serializer.data)
 
 
+@method_decorator(never_cache, name='get')
 class ManualVariantEntryCollectionView(RetrieveAPIView):
     serializer_class = ManualVariantEntryCollectionSerializer
     lookup_field = 'pk'
