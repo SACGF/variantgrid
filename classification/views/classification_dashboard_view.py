@@ -147,6 +147,9 @@ class ClassificationDashboard:
             classification_flag_types.internal_review,
             classification_flag_types.significance_change
         ])
+        internal_review = FlagCollection.filter_for_open_flags(qs=vcqs, flag_types=[classification_flag_types.internal_review])
+        significance_change = FlagCollection.filter_for_open_flags(qs=vcqs, flag_types=[classification_flag_types.significance_change])
+
         unshared = FlagCollection.filter_for_open_flags(qs=vcqs, flag_types=[
             classification_flag_types.unshared_flag
         ])
@@ -160,6 +163,8 @@ class ClassificationDashboard:
             ])
 
         return {
+            "internal_review": internal_review.count(),
+            "significance_change": significance_change.count(),
             "discordant": discordant.count(),
             "variant_matching": variant_matching.count(),
             "comments": comments.count(),

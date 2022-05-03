@@ -254,8 +254,8 @@
 
     {% endif %}
 
-    <a href="#flagged-classifications" class="toggle-link" data-toggle="collapse">Advanced: show flagged classifications</a>
-    <div id="flagged-classifications" class="collapse">
+
+
     {% page_help_embedded title="Flagged Classifications" %}
         <p>
             This page will list all classifications belonging to your lab(s) that have flags raised against them.
@@ -266,35 +266,43 @@
         </p>
     {% end_page_help_embedded %}
 
-    <a class="download-link type-csv" href="{% url 'classification_dashboard_download' dlab.lab_id %}">Download all issues requiring action</a>
-    <p class="text-info">For instructions on how to fix the outstanding actions, click on the icons in the flag column for each classification.</p>
+    {% if dlab.counts.internal_review %}{% labelled hint="tiny" label="Outstanding Internal Reviews" %}{{ dlab.counts.internal_review }}{% endlabelled %}{% endif %}
+    {% if dlab.counts.significance_change %}{% labelled hint="tiny" label="Outstanding Clinical Significance Changes" %}{{ dlab.counts.significance_change }}{% endlabelled %}{% endif %}
+    {% if dlab.counts.clinvar_exclude %}{% labelled hint="tiny" label="Classifications Excluded from ClinVar" %}{{ dlab.counts.clinvar_exclude }}{% endlabelled %}{% endif %}
 
-    <div class="mt-4">
+    <p><a href="#flagged-classifications" class="toggle-link" data-toggle="collapse">Show details</a></p>
 
-        {% ui_register_tab_embedded tab_set="classification_issues" label="Suggestion/Internal Review/Clin Change" badge=dlab.counts.comments %}
-            <table id="classifications-comment" data-datatable-url="{% url 'classification_datatables' %}" class="sticky-header classification-table" data-datatable-data="classificationComments"></table>
-        {% end_ui_register_tab_embedded %}
+    <div id="flagged-classifications" class="collapse">
+        <p><br/><a class="download-link type-csv" href="{% url 'classification_dashboard_download' dlab.lab_id %}">Download all issues requiring action</a></p>
 
-        {% ui_register_tab_embedded tab_set="classification_issues" label="Variant Matching Issues" badge=dlab.counts.variant_matching %}
-            <table id="classifications-matching" data-datatable-url="{% url 'classification_datatables' %}" class="sticky-header classification-table" data-datatable-data="classificationMatchingVariant"></table>
-        {% end_ui_register_tab_embedded %}
+        <p class="text-info">For instructions on how to fix the outstanding actions, click on the icons in the flag column for each classification.</p>
 
-        {% ui_register_tab_embedded tab_set="classification_issues" label="Unshared" badge=dlab.counts.unshared %}
-            <table id="classifications-unshared" data-datatable-url="{% url 'classification_datatables' %}" class="sticky-header classification-table" data-datatable-data="classificationUnshared"></table>
-        {% end_ui_register_tab_embedded %}
+        <div class="mt-4">
 
-        {% if clinvar_export_enabled %}
-            {% ui_register_tab_embedded tab_set="classification_issues" label="Exclude from ClinVar" badge=dlab.counts.clinvar_exclude %}
-                <table id="classifications-exclude-clinvar" data-datatable-url="{% url 'classification_datatables' %}" class="sticky-header classification-table" data-datatable-data="classificationExcludeClinVar"></table>
+            {% ui_register_tab_embedded tab_set="classification_issues" label="Suggestion/Internal Review/Clin Change" badge=dlab.counts.comments %}
+                <table id="classifications-comment" data-datatable-url="{% url 'classification_datatables' %}" class="sticky-header classification-table" data-datatable-data="classificationComments"></table>
             {% end_ui_register_tab_embedded %}
-        {% endif %}
 
-        {% ui_register_tab_embedded tab_set="classification_issues" label="Withdrawn" badge=dlab.counts.withdrawn %}
-            <table id="classifications-withdrawn" data-datatable-url="{% url 'classification_datatables' %}" class="sticky-header classification-table" data-datatable-data="classificationWithdrawn"></table>
-        {% end_ui_register_tab_embedded %}
+            {% ui_register_tab_embedded tab_set="classification_issues" label="Variant Matching Issues" badge=dlab.counts.variant_matching %}
+                <table id="classifications-matching" data-datatable-url="{% url 'classification_datatables' %}" class="sticky-header classification-table" data-datatable-data="classificationMatchingVariant"></table>
+            {% end_ui_register_tab_embedded %}
 
-        {% ui_render_tabs tab_set="classification_issues" %}
-    </div>
+            {% ui_register_tab_embedded tab_set="classification_issues" label="Unshared" badge=dlab.counts.unshared %}
+                <table id="classifications-unshared" data-datatable-url="{% url 'classification_datatables' %}" class="sticky-header classification-table" data-datatable-data="classificationUnshared"></table>
+            {% end_ui_register_tab_embedded %}
+
+            {% if clinvar_export_enabled %}
+                {% ui_register_tab_embedded tab_set="classification_issues" label="Exclude from ClinVar" badge=dlab.counts.clinvar_exclude %}
+                    <table id="classifications-exclude-clinvar" data-datatable-url="{% url 'classification_datatables' %}" class="sticky-header classification-table" data-datatable-data="classificationExcludeClinVar"></table>
+                {% end_ui_register_tab_embedded %}
+            {% endif %}
+
+            {% ui_register_tab_embedded tab_set="classification_issues" label="Withdrawn" badge=dlab.counts.withdrawn %}
+                <table id="classifications-withdrawn" data-datatable-url="{% url 'classification_datatables' %}" class="sticky-header classification-table" data-datatable-data="classificationWithdrawn"></table>
+            {% end_ui_register_tab_embedded %}
+
+            {% ui_render_tabs tab_set="classification_issues" %}
+        </div>
     </div>
 
 </div>
