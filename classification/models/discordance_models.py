@@ -472,7 +472,7 @@ class DiscordanceReportSummaries:
         counts = sorted([DiscordanceReportSummaryCount(lab=key, count=value) for key, value in by_lab.items()])
         if internal_count:
             counts.insert(0, DiscordanceReportSummaryCount(lab=None, count=internal_count))
-        counts = counts
+
         return DiscordanceReportSummaries(perspective=perspective, summaries=summaries, counts=counts)
 
 
