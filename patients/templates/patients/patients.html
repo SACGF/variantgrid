@@ -1,5 +1,6 @@
 {% extends menu_patients_base %}
 {% load static %}
+{% load crispy_forms_tags %}
 {% block title %}Patients{% endblock title %}
 
 {% block head %}
@@ -377,7 +378,7 @@ $(document).ready(function() {
             <div id="sample-node-container"></div>
             <fieldset class="form-fields">
                 <legend>Create New Patient</legend>
-                {{ form.as_p }}
+                {% crispy form %}
                 <div class="buttons">
                     <button class="btn btn-primary">Create Patient</button>
                     <button id="reset-form" type='button' class="btn btn-secondary">reset</button>
