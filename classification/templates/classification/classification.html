@@ -7,7 +7,7 @@
 {% load ui_help %}
 {% load ui_menu_bars %}
 
-{% block title %}{{ site_name }}: Classification{% endblock %}
+{% block title %}Classification{% endblock %}
 {% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
 {% block head %}
 <script>
@@ -64,7 +64,6 @@
 
     function getPageTitle(record) {
         // Not much space in tabs so move gene symbol to front
-        let siteName = "{{ site_name }}";
         let summaryList = [];
         let geneSymbol = record.data.gene_symbol;
         if (geneSymbol) {
@@ -82,8 +81,7 @@
                 summaryList.push("- " + gHGVS.value);
             }
         }
-        let summary = summaryList.join(" ");
-        return siteName + ": " +  summary;
+        return summaryList.join(" ");
     }
 
 </script>
