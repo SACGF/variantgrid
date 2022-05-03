@@ -40,14 +40,14 @@
         $("#family-phenotype-container").slideDown();
     }
     $(document).ready(() => {
-        var form = $("form#patient-form");
+        let form = $("form#patient-form");
         $("#patient-tabs").tabs();
 
         // Patient Attachments
         window.fileupload_ready = function () {
-            var $form = $('#fileupload');
+            let $form = $('#fileupload');
             {% if existing_files %}
-                var existingFiles = {{ existing_files | jsonify }};
+                let existingFiles = {{ existing_files | jsonify }};
                 $form.fileupload('option', 'done').call($form, $.Event('done'), {result: {files: existingFiles}});
             {% endif %}
 
