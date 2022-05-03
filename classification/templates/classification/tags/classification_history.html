@@ -71,6 +71,8 @@
                 {%  endfor %}
             </td>
         </tr>
+    {% empty %}
+        <tr><td colspan="4" class="table-empty"><span class="no-value">No data to show</span></td></tr>
     {%  endfor %}
     </tbody>
 </table>

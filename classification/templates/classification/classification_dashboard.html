@@ -96,6 +96,9 @@
         <div data-toggle="ajax" href="{% url 'classification_dashboard_graph_detail' dlab.lab_id %}">
             <div class="loading-message" style="height:381px">Loading Graph</div>
         </div>
+        <div>
+            <label>See recent activity for</label>: {% for lab in dlab.labs %}{% if not forloop.first %}, {% endif %}<a href="{% url 'activity_lab' lab.pk %}">{% lab lab %}</a>{% endfor %}
+        </div>
 
         {% comment %}section only makes sense for where Shared is king{% endcomment %}
         {% page_help_embedded title="Classification Counts" %}
@@ -251,7 +254,7 @@
 
     {% endif %}
 
-    <a href="#flagged-classifications" class="toggle-link" data-toggle="collapse">Advanced: show Flagged Classifications</a>
+    <a href="#flagged-classifications" class="toggle-link" data-toggle="collapse">Advanced: show flagged classifications</a>
     <div id="flagged-classifications" class="collapse">
     {% page_help_embedded title="Flagged Classifications" %}
         <p>

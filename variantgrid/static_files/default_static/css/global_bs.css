@@ -106,14 +106,15 @@ table.dataTable tr.child td.child fieldset.form-fields > * > *:nth-child(2) {
   width: calc(100% - 100px);
 }
 
-table.dataTable td.dataTables_empty {
-  font-size: 16px;
+table.dataTable td.dataTables_empty, td.table-empty {
+  font-size: 16px !important;
   padding-top: 22px;
   padding-bottom: 12px;
   color: #BBBBBB !important;
   font-style: italic;
+  text-align: center;
 }
-table.dataTable td.dataTables_empty:before {
+table.dataTable td.dataTables_empty:before, td.table-empty:before {
   display: inline-block;
   font-style: normal;
   font-variant: normal;
