@@ -14,6 +14,7 @@ from django.shortcuts import render, get_object_or_404
 from django.urls.base import reverse
 from django.utils import timezone
 from django.utils.timesince import timesince
+from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_POST
 from django_downloadview import PathDownloadView
 from jfu.http import upload_receive, UploadResponse, JFUResponse
@@ -184,6 +185,7 @@ def get_file_dicts_list(upload_settings):
     return file_dicts
 
 
+@never_cache
 def upload_poll(request):
     upload_settings, _ = UploadSettings.objects.get_or_create(user=request.user)
     return JsonResponse(get_file_dicts_list(upload_settings), safe=False)

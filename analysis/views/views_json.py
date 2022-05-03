@@ -7,6 +7,7 @@ from django.conf import settings
 from django.db.models import Max
 from django.http.response import JsonResponse
 from django.shortcuts import get_object_or_404
+from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_POST
 
 from analysis.models import AnalysisVariable, AnalysisTemplate, AnalysisTemplateType, NodeCount, \
@@ -42,6 +43,7 @@ def clone_analysis(request, analysis_id):
     return JsonResponse({"analysis_id": new_analysis.pk})
 
 
+@never_cache
 def analysis_node_versions(request, analysis_id):
     """ Returns a dict of {'node_versions' : [node.pk, node.version, node.appearance_version]} """
     analysis = get_analysis_or_404(request.user, analysis_id)
@@ -88,6 +90,7 @@ class NodeUpdate(NodeJSONPostView):
 NODE_TYPES_HASH = None
 
 
+@never_cache
 def node_data(request, analysis_id, node_id):
     node = get_node_subclass_or_404(request.user, node_id)
     return JsonResponse(get_rendering_dict(node))
@@ -334,6 +337,7 @@ def analysis_reload(request, analysis_id):
     return JsonResponse({})
 
 
+@never_cache
 def nodes_status(request, analysis_id):
     analysis = get_analysis_or_404(request.user, analysis_id)
     nodes = json.loads(request.GET['nodes'])

@@ -19,7 +19,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.test.client import RequestFactory
 from django.urls.base import reverse
 from django.utils import timezone
-from django.views.decorators.cache import cache_page
+from django.views.decorators.cache import cache_page, never_cache
 from django.views.decorators.http import require_POST
 from django.views.decorators.vary import vary_on_cookie
 from htmlmin.decorators import not_minified_response
@@ -489,6 +489,7 @@ def node_errors(request, analysis_id, analysis_version, node_id, node_version, e
     return render(request, template, context)
 
 
+@never_cache
 def node_load(request, analysis_id, node_id):
     """ loads main grid area, and triggers loading of node editor
         we can't cache this as the node version may have changed since last visit """
