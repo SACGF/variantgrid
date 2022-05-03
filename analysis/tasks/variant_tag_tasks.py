@@ -33,8 +33,8 @@ def _liftover_variant_tag(variant_tag: VariantTag):
 
     # Assign allele to VariantTag
     if variant_tag.allele is None:
-        variant_allele.allele = variant_allele.allele
-        variant_allele.save()
+        variant_tag.allele = variant_allele.allele
+        variant_tag.save()
 
     allele_source = VariantAlleleSource.objects.create(variant_allele=variant_allele)
     create_liftover_pipelines(admin_bot(), allele_source, ImportSource.WEB, variant_tag.genome_build)
