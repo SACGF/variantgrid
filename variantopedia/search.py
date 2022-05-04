@@ -7,7 +7,7 @@ from typing import Set, Iterable, Union, Optional, Match, List, Any, Dict
 
 from django.conf import settings
 from django.contrib.auth.models import User
-from django.core.exceptions import ObjectDoesNotExist
+from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 from django.db.models import QuerySet
 from django.db.models.query_utils import Q
 from django.urls.base import reverse
@@ -788,13 +788,18 @@ def search_experiment(search_string: str, **kwargs) -> Iterable[Experiment]:
 
 def search_external_pk(search_string: str, user: User, **kwargs):
     # Returns related objects
-    # TODO: Handle user permissions on this??
     RELATED_OBJECT_FIELDS = ["case", "pathologytestorder", "patient"]
     results = []
     for external_pk in ExternalPK.objects.filter(code__iexact=search_string):
         for f in RELATED_OBJECT_FIELDS:
             try:
                 obj = getattr(external_pk, f)
+                try:
+                    obj.check_can_view(user)
+                except PermissionDenied:
+                    continue  # Don't add to results
+                except AttributeError:
+                    pass  # No permissions - ok to add to results
                 results.append(obj)
             except ObjectDoesNotExist:
                 pass
