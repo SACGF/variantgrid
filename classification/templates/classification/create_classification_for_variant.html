@@ -85,10 +85,10 @@
                     refreshAutoPopulate();
                 } else {
                     values = data.data;
-                    console.log(values);
+                    // console.log(values);
                     EKeys.load().then(eKeys => {
                         let patchDom = $('#auto-populate').LoadingOverlay('hide').empty();
-                        console.log(patchDom);
+                        // console.log(patchDom);
                         for (let entry of values) {
                             let {key, blob, source} = entry;
                             let eKey = eKeys.key(key);

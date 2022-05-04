@@ -61,7 +61,11 @@ fieldset.form-fields {
     {% endfor %}
     {% if empty_transcript_option %}
         <tr class="radio-row">
-            <td>    <input type='radio' name='transcript_choice' value=''>
+            <td>    <input type='radio' name='transcript_choice' value=''
+                    {% if not vts.transcript_data  %}
+                           checked='1'
+                    {% endif %}
+                    >
             <td colspan=1000>{{ empty_transcript_option }}
     
     {% endif %}
@@ -105,11 +109,9 @@ $(document).ready(function() {
         setTranscriptInfo(transcriptId);
     });
     transcriptRadio.appendTo(container);
-    
-    
-    {% if vts.initial_transcript_id %}
-    setTranscriptInfo("{{ vts.initial_transcript_id }}");
-    {% endif %}
+
+    const initialTranscript = "{{ vts.initial_transcript_id }}";
+    setTranscriptInfo(initialTranscript);
 });
 </script>
 </div>
