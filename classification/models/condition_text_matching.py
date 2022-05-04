@@ -321,11 +321,13 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
                 pass
 
         if not gene_symbol:
-            report_message("Classification has blank or unrecognised gene symbol, cannot link it to condition text", extra_data={
-                "target": gene_symbol_str or "<blank>",
-                "classification_id": classification.id,
-                "gene_symbol": gene_symbol_str
-            })
+            if gene_symbol_str:
+                report_message("Classification has unrecognised gene symbol, cannot link it to condition text",
+                               extra_data={
+                                   "target": gene_symbol_str or "<blank>",
+                                   "classification_id": classification.id,
+                                   "gene_symbol": gene_symbol_str
+                               })
             return
 
         raw_condition_text = cm.get(SpecialEKeys.CONDITION) or ""
