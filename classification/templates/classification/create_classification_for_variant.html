@@ -31,12 +31,12 @@
 </style>
 <script>
     function transcriptFunc(transcriptId, data) {
-        var TRANSCRIPTS_TYPES = ["refseq_transcript_accession", "ensembl_transcript_accession"];
-        for (var i=0 ; i < TRANSCRIPTS_TYPES.length ; ++i) {
-            var transcriptType = TRANSCRIPTS_TYPES[i];
-            var inputSelector = "input[name=" + transcriptType + "]";
-            var selector = $(inputSelector, ".classification-form");
-            var transcriptId = "";
+        let TRANSCRIPTS_TYPES = ["refseq_transcript_accession", "ensembl_transcript_accession"];
+        for (let i=0 ; i < TRANSCRIPTS_TYPES.length ; ++i) {
+            let transcriptType = TRANSCRIPTS_TYPES[i];
+            let inputSelector = "input[name=" + transcriptType + "]";
+            let selector = $(inputSelector, ".classification-form");
+            let transcriptId = "";
             if (data) {
                 transcriptId = data[transcriptType] || "";
             }
@@ -130,7 +130,7 @@
 
     $(document).ready(() => {
         const VARIANT_ID = {{ variant.pk }};
-        var createClassificationButton = $("button#create-variant-classification");
+        let createClassificationButton = $("button#create-variant-classification");
         createClassificationButton.button();
 
         function restrictSamples() {
@@ -142,13 +142,13 @@
 
         restrictSamples();
 
-        var sampleForm = $("#{{ variant_sample_autocomplete_form.sample.auto_id }}");
+        let sampleForm = $("#{{ variant_sample_autocomplete_form.sample.auto_id }}");
         sampleForm.change(function() {
             restrictSamples();
-            var sampleId = $(this).val();
+            let sampleId = $(this).val();
 
             $("input[name=sample_id]", ".classification-form").val(sampleId);
-            var zygositySpan = $("span#zygosity");
+            let zygositySpan = $("span#zygosity");
             zygositySpan.empty()
 
             if (!sampleId) return;
@@ -158,7 +158,7 @@
                 url: Urls.variant_zygosity_for_sample(sampleId, VARIANT_ID),
                 success: function(data) {
                     MISSING = '.';
-                    var zygosity_html;
+                    let zygosity_html;
                     if (data.zygosity == MISSING) {
                         zygosity_html = "This sample does not contain the variant.";
                     } else {
