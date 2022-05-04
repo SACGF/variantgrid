@@ -224,7 +224,7 @@ class AutopopulateView(APIView):
 
 @require_POST
 def create_classification(request):
-    return redirect(create_classification_object(request).get_absolute_url() + "?edit=true")
+    return redirect(create_classification_object(request).get_edit_url())
 
 
 def create_classification_object(request) -> Classification:

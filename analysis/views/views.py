@@ -911,4 +911,4 @@ def create_classification_for_analysis(request, analysis_id):
         # Remove "Requires classification" tag
         VariantTag.objects.filter(variant=classification.variant, analysis=analysis,
                                   tag_id=settings.TAG_REQUIRES_CLASSIFICATION).delete()
-    return redirect(classification)
+    return redirect(classification.get_edit_url())
