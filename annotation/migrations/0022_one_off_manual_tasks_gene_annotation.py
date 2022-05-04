@@ -5,6 +5,11 @@ from django.db import migrations
 from manual.operations.manual_operations import ManualOperation
 
 
+def _check_has_existing_samples(apps):
+    Sample = apps.get_model("snpdb", "Sample")
+    return Sample.objects.all().exists()
+
+
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -13,5 +18,6 @@ class Migration(migrations.Migration):
 
     operations = [
         ManualOperation(task_id=ManualOperation.task_id_manage(["gene_annotation", "--missing"])),
-        ManualOperation(task_id=ManualOperation.task_id_manage(["calculate_sample_stats"])),
+        ManualOperation(task_id=ManualOperation.task_id_manage(["calculate_sample_stats"]),
+                        test=_check_has_existing_samples),
     ]

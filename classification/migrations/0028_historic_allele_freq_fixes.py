@@ -5,6 +5,11 @@ from django.db import migrations
 from manual.operations.manual_operations import ManualOperation
 
 
+def _check_has_classifications_with_allele_frequency(apps):
+    Classification = apps.get_model("classification", "Classification")
+    return Classification.objects.filter(evidence__icontains='allele_frequency').exists()
+
+
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -12,5 +17,6 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        ManualOperation.operation_manage(["fix_allele_frequency_history"])
+        ManualOperation.operation_manage(["fix_allele_frequency_history"],
+                                         test=_check_has_classifications_with_allele_frequency)
     ]

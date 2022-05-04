@@ -5,6 +5,11 @@ from django.db import migrations
 from manual.operations.manual_operations import ManualOperation
 
 
+def _check_has_analysis(apps):
+    Analysis = apps.get_model("analysis", "Analysis")
+    return Analysis.objects.filter(analysistemplaterun__isnull=False).exists()
+
+
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -13,5 +18,6 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        ManualOperation(task_id=ManualOperation.task_id_manage(["fix_analysis_permissions"]))
+        ManualOperation(task_id=ManualOperation.task_id_manage(["fix_analysis_permissions"]),
+                        test=_check_has_analysis)
     ]

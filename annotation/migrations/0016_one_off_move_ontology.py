@@ -5,10 +5,11 @@ from django.db import migrations
 from manual.operations.manual_operations import ManualOperation
 
 
-def _test_no_ontology(apps):
-    # If we have no ontology - need to do rematching
+def _test_patients_but_no_ontology(apps):
+    # If we have patients but no ontology - need to do rematching
     OntologyTerm = apps.get_model("ontology", "OntologyTerm")
-    return not OntologyTerm.objects.exists()
+    PatientTextPhenotype = apps.get_model("annotation", "PatientTextPhenotype")
+    return PatientTextPhenotype.objects.exists() and not OntologyTerm.objects.exists()
 
 
 def _one_off_move_ontology(apps, schema_editor):
@@ -54,6 +55,7 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        ManualOperation(task_id=ManualOperation.task_id_manage(["match_patient_phenotypes", "--clear"]), test=_test_no_ontology),
+        ManualOperation(task_id=ManualOperation.task_id_manage(["match_patient_phenotypes", "--clear"]),
+                        test=_test_patients_but_no_ontology),
         migrations.RunPython(_one_off_move_ontology)
     ]

@@ -9,6 +9,11 @@ from django.db import migrations, models
 from manual.operations.manual_operations import ManualOperation
 
 
+def _check_existing_vcf(apps):
+    VCF = apps.get_model("snpdb", "VCF")
+    return VCF.objects.all().exists()
+
+
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -149,5 +154,5 @@ class Migration(migrations.Migration):
                 'unique_together': {('sample_a', 'sample_b')},
             },
         ),
-        ManualOperation(task_id=ManualOperation.task_id_manage(["somalier_existing_vcfs"]))
+        ManualOperation(task_id=ManualOperation.task_id_manage(["somalier_existing_vcfs"]), test=_check_existing_vcf)
     ]

@@ -5,6 +5,15 @@ from django.db import migrations
 from manual.operations.manual_operations import ManualOperation
 
 
+def _check_has_flags_of_interest(apps):
+    Flag = apps.get_model("flags", "Flag")
+    flags_of_interest = Flag.objects.filter(flag_type__in=[
+        "classification_transcript_version_change",
+        "matching_variant_warning_flag",
+    ]).filter(data__isnull=True)
+    return flags_of_interest.exists()
+
+
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -13,5 +22,6 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        ManualOperation(task_id=ManualOperation.task_id_manage(["fix_matching_flags", "--apply"]))
+        ManualOperation(task_id=ManualOperation.task_id_manage(["fix_matching_flags", "--apply"]),
+                        test=_check_has_flags_of_interest)
     ]
