@@ -4,6 +4,7 @@ from collections import defaultdict
 from typing import Tuple, Dict, Optional
 
 import celery
+from django.conf import settings
 from django.db.models.query_utils import Q
 
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
@@ -14,9 +15,12 @@ from annotation.models import SampleVariantAnnotationStats, SampleGeneAnnotation
 from annotation.models.damage_enums import PathogenicityImpact
 from annotation.models.models import InvalidAnnotationVersionError, VCFAnnotationStats
 from eventlog.models import create_event
+from library.django_utils import thread_safe_unique_together_get_or_create
 from library.enums.log_level import LogLevel
+from library.git import Git
 from library.log_utils import get_traceback
-from snpdb.models import Sample, SampleStats, ImportStatus, SampleStatsPassingFilter, VCF, Variant
+from snpdb.models import Sample, SampleStats, ImportStatus, SampleStatsPassingFilter, VCF, Variant, \
+    SampleStatsCodeVersion
 from snpdb.models import Zygosity
 from snpdb.models.models_genome import GenomeBuild
 
@@ -43,10 +47,25 @@ def calculate_vcf_stats(vcf_id, annotation_version_id):
         raise
 
 
+def _get_sample_stats_code_version() -> SampleStatsCodeVersion:
+    """
+        Version | Notes on sample stats code changes
+        0 - Set for historical versions created before code_version added
+        1 - Existing code when code_version added
+    """
+    code_version, _ = thread_safe_unique_together_get_or_create(SampleStatsCodeVersion,
+                                                                name="SampleStats",
+                                                                version=1,
+                                                                code_git_hash=Git(settings.BASE_DIR).hash)
+    return code_version
+
+
 def _create_stats_per_sample(vcf: VCF, annotation_version) -> Tuple[Dict, Optional[Dict]]:
     vav_kwargs = {"variant_annotation_version": annotation_version.variant_annotation_version}
     ega_kwargs = {"gene_annotation_version": annotation_version.gene_annotation_version}
     cv_kwargs = {"clinvar_version": annotation_version.clinvar_version}
+
+    code_version = _get_sample_stats_code_version()
 
     STATS_CLASSES = {
         SAMPLE_STATS: (SampleStats, SampleStatsPassingFilter, {}),
@@ -64,9 +83,12 @@ def _create_stats_per_sample(vcf: VCF, annotation_version) -> Tuple[Dict, Option
         klass.objects.filter(sample__in=samples).delete()
         pf_klass.objects.filter(sample__in=samples).delete()
         for sample in samples:
-            stats_per_sample[sample][st] = klass.objects.create(sample=sample, **extra_kwargs)
+            stats_per_sample[sample][st] = klass.objects.create(sample=sample, code_version=code_version,
+                                                                **extra_kwargs)
             if vcf.has_filters:
-                stats_passing_filters_per_sample[sample][st] = pf_klass.objects.create(sample=sample, **extra_kwargs)
+                stats_passing_filters_per_sample[sample][st] = pf_klass.objects.create(sample=sample,
+                                                                                       code_version=code_version,
+                                                                                       **extra_kwargs)
     return stats_per_sample, stats_passing_filters_per_sample
 
 

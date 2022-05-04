@@ -9,13 +9,15 @@
 """
 from django.db import models
 from django.db.models.deletion import CASCADE
+from django_extensions.db.models import TimeStampedModel
 
 from annotation.models.models import VariantAnnotationVersion, ClinVarVersion, GeneAnnotationVersion
-from snpdb.models import Sample
+from snpdb.models import Sample, SampleStatsCodeVersion
 from snpdb.models.models_enums import BuiltInFilters
 
 
-class AbstractVariantAnnotationStats(models.Model):
+class AbstractVariantAnnotationStats(TimeStampedModel):
+    code_version = models.ForeignKey(SampleStatsCodeVersion, on_delete=CASCADE)
     variant_annotation_version = models.ForeignKey(VariantAnnotationVersion, on_delete=CASCADE)
 
     variant_dbsnp_count = models.IntegerField(default=0)
@@ -55,7 +57,8 @@ class AbstractVariantAnnotationStats(models.Model):
         return count
 
 
-class AbstractGeneAnnotationStats(models.Model):
+class AbstractGeneAnnotationStats(TimeStampedModel):
+    code_version = models.ForeignKey(SampleStatsCodeVersion, on_delete=CASCADE)
     gene_annotation_version = models.ForeignKey(GeneAnnotationVersion, on_delete=CASCADE)
     gene_count = models.IntegerField(default=0)
 
@@ -81,7 +84,8 @@ class AbstractGeneAnnotationStats(models.Model):
         return count
 
 
-class AbstractClinVarAnnotationStats(models.Model):
+class AbstractClinVarAnnotationStats(TimeStampedModel):
+    code_version = models.ForeignKey(SampleStatsCodeVersion, on_delete=CASCADE)
     sample = models.ForeignKey(Sample, on_delete=CASCADE)
     clinvar_version = models.ForeignKey(ClinVarVersion, on_delete=CASCADE)
     clinvar_count = models.IntegerField(default=0)

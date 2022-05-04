@@ -16,6 +16,7 @@ from django.db.models.signals import pre_delete
 from django.dispatch.dispatcher import receiver
 from django.shortcuts import get_object_or_404
 from django.urls.base import reverse
+from django_extensions.db.models import TimeStampedModel
 from guardian.shortcuts import get_objects_for_user
 from lazy import lazy
 
@@ -455,9 +456,21 @@ class VCFAlleleSource(AlleleSource):
                      extra_data={'vcf_id': self.vcf.pk, 'allele_count': self.get_allele_qs().count()})
 
 
-class AbstractVariantStats(models.Model):
-    """ Base class used for Cohort/Sample stats
+class SampleStatsCodeVersion(TimeStampedModel):
+    """ Track the version and code used to calculate sample stats, in case there are bugs/changes needed """
+    name = models.TextField()
+    version = models.IntegerField()
+    code_git_hash = models.TextField()
+
+    class Meta:
+        unique_together = ("name", "version", "code_git_hash")
+
+
+class AbstractVariantStats(TimeStampedModel):
+    """ Base class used for Cohort/Sample stats (note don't have Cohort stats yet)
         @see also annotation.models.models_sample_stats """
+
+    code_version = models.ForeignKey(SampleStatsCodeVersion, on_delete=CASCADE)
     import_status = models.CharField(max_length=1, choices=ImportStatus.choices, default=ImportStatus.CREATED)
     variant_count = models.IntegerField(default=0)
     snp_count = models.IntegerField(default=0)
