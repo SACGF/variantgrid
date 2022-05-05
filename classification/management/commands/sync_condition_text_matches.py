@@ -27,6 +27,7 @@ class Command(BaseCommand):
         if options["orphans"]:
             print("Removing orphans")
             total_deleted = 0
+            ct_total_deleted = 0
             for ct in ConditionText.objects.all():
                 classifications_for_gene_symbol: Dict[str, int] = defaultdict(int)
                 for ctm in list(ct.conditiontextmatch_set.all()):
@@ -44,8 +45,13 @@ class Command(BaseCommand):
                         delete_qs.delete()
                         found_records = True
 
+                if not ct.conditiontextmatch_set.filter(classification__isnull=False).exists():
+                    found_records += 1
+                    ct.delete()
+                    ct_total_deleted += 1
+
                 if found_records:
-                    print(f"Total deleted - {total_deleted}")
+                    print(f"Total parent / child records deleted - {ct_total_deleted} / {total_deleted}")
             return
 
         if options["reset"]:
