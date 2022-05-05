@@ -46,7 +46,7 @@
         <h5 class="my-4">Import into {{ site_name }} Details</h5>
         {% comment %}Typically there should only be 1 import_run, so optimise the display for that{% endcomment %}
         {% for import_run in import_runs %}
-
+            {% if not forloop.first %}<hr/>{% endif %}
             {% labelled label="Import Date" %}{% timestamp import_run.created %}{% endlabelled %}
             {% comment %}For all the fields that are rare occurances, don't bother to show them unless they've actually occurred in this import{% endcomment %}
             {% if import_run.row_count_already_withdrawn %}{% labelled label="Classifications that have been previously withdrawn" %}

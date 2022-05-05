@@ -354,6 +354,26 @@ TableFormat.timestamp = (data, type, row) => {
     }
 };
 
+TableFormat.sizeBytes = (data, type, row) => {
+    if (data) {
+        let unit = 'bytes';
+        let value = data;
+        if (value > 1024) {
+            value = value / 1024;
+            unit = 'KB';
+            if (value > 1024) {
+                value = value / 1024;
+                unit = 'MB'
+            }
+        }
+        value = Math.round(value);
+
+        return $('<span>', {class:'text-monospace', text: `${value} ${unit}`}).prop('outerHTML');
+    } else {
+        return '';
+    }
+};
+
 TableFormat.timeAgo = (data, type, row) => {
     if (data) {
         return $('<data>', {class:'convert-timestamp time-ago', 'data-timestamp':data, text:data}).prop('outerHTML');

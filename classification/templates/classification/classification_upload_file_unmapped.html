@@ -53,6 +53,44 @@
                         {% labelled label="Upload File" %}
                             <input type="file" name="file">
                         {% endlabelled %}
+                        {% if user.is_superuser and server_files %}
+                            <hr/>
+                            <div class="text-center">OR</div>
+                            <label class="admin-only">These files are at the upload location but may not have been imported yet</label>
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Filename</th>
+                                        <th>Modified</th>
+                                        <th>Size</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>
+                                            <label class="form-check-label ml-3">
+                                                <input class="form-check-input" type="radio" name="import-existing" value="" checked="checked">
+                                                Upload File
+                                            </label>
+                                        </td>
+                                        <td>-</td>
+                                        <td>-</td>
+                                    </tr>
+                                {% for server_file in server_files %}
+                                    <tr>
+                                        <td>
+                                            <label class="form-check-label ml-3">
+                                                <input class="form-check-input" type="radio" name="import-existing" value="{{ server_file.filename }}">
+                                                {{ server_file.filename }}
+                                            </label>
+                                        </td>
+                                        <td>{% timestamp server_file.modified %}</td>
+                                        <td>{{ server_file.size | bytes }}</td>
+                                    </tr>
+                                {% endfor %}
+                                </tbody>
+                            </table>
+                        {% endif %}
                     </div>
                     <div class="card-footer">
                         <input type="submit" class="btn btn-primary">

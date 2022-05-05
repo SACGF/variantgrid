@@ -563,7 +563,6 @@ function createMessage(className, message) {
     return errorMessageUl;
 }
 
-
 function checkLoggedIn(loggedInHandler, loggedOutHandler) {
     // call server to check if authenticated & call appropriate handler
     $.ajax({
@@ -663,6 +662,7 @@ function limitLengthSpan(text, limit) {
         return $('<span>', {text: text});
     }
 }
+
 function limitLength(text, limit) {
     if (text && text.length > limit) {
         return text.substring(0, limit) + '...';

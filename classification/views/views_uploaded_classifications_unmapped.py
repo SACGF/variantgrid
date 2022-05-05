@@ -1,6 +1,8 @@
+import datetime
 import os
 import re
-from typing import List, Iterable
+from dataclasses import dataclass
+from typing import List, Iterable, Tuple, Any, Dict, Optional, Set
 
 import django
 from django.contrib import messages
@@ -13,7 +15,7 @@ from django.urls import reverse
 from django.utils.timezone import now
 from django.views import View
 
-from classification.models import ClassificationImportRun
+from classification.models import ClassificationImportRun, resolve_uploaded_url_to_handle, FileHandle
 from classification.models.uploaded_classifications_unmapped import UploadedClassificationsUnmapped, UploadedClassificationsUnmappedStatus
 from classification.tasks.classification_import_map_and_insert_task import ClassificationImportMapInsertTask
 from library.django_utils import get_url_from_view_path
@@ -25,13 +27,17 @@ from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
 
 class UploadedClassificationsUnmappedColumns(DatatableConfig[UploadedClassificationsUnmapped]):
 
+    def effective_date_set(self, row: Dict[str, Any]):
+        return (row.get('effective_modified') or row.get('created')).timestamp()
+
     def __init__(self, request):
         super().__init__(request)
 
         self.rich_columns = [
             RichColumn(key="id", label="ID", orderable=True, default_sort=SortOrder.DESC, client_renderer="idRenderer"),
             RichColumn(key="filename", orderable=True, client_renderer='fileDownloaderRenderer'),
-            RichColumn(key="created", label='Created', orderable=True, client_renderer='TableFormat.timestamp'),
+            RichColumn(key="effective_modified", label='Modified', orderable=True, client_renderer='TableFormat.timestamp', extra_columns=['created'], sort_keys=['created'], renderer=self.effective_date_set),
+            RichColumn(key="file_size", label='Size', orderable=True, client_renderer='TableFormat.sizeBytes'),
             RichColumn(key="status", label="Status", orderable=True, renderer=lambda x: UploadedClassificationsUnmappedStatus(x["status"]).label),
             RichColumn(key="comment", client_renderer='TableFormat.text')
         ]
@@ -94,15 +100,66 @@ def view_uploaded_classification_unmapped_detail(request: HttpRequest, uploaded_
     return http_response
 
 
+@dataclass
+class S3File:
+    filename: str
+    modified: Any
+    size: Any
+
+    def __str__(self):
+        return f"{self.filename} {self.modified} {self.size}"
+
+
+@dataclass(frozen=True)
+class FileMeta:
+    name: str
+    modified: datetime
+    size: int
+
+    @staticmethod
+    def from_unmapped(unmapped: UploadedClassificationsUnmapped) -> Optional['FileMeta']:
+        if unmapped.effective_modified and unmapped.file_size:
+            return FileMeta(
+                name=unmapped.filename,
+                modified=unmapped.effective_modified,
+                size=unmapped.file_size
+            )
+
+    @staticmethod
+    def from_file_handle(handle: FileHandle) -> 'FileMeta':
+        return FileMeta(
+            name=handle.filename,
+            modified=handle.modified,
+            size=handle.size
+        )
+
+
 class UploadedClassificationsUnmappedView(View):
 
     def get(self, request, **kwargs):
         user: User = request.user
         if lab_id := kwargs.get('lab_id'):
-            selected_lab = Lab.valid_labs_qs(user=user, admin_check=True).get(pk=lab_id)
-            return render(request, 'classification/classification_upload_file_unmapped.html', {
+            selected_lab: Lab = Lab.valid_labs_qs(user=user, admin_check=True).get(pk=lab_id)
+            context = {
                 "selected_lab": selected_lab
-            })
+            }
+
+            if upload_location := selected_lab.upload_location:
+                if server_address := resolve_uploaded_url_to_handle(selected_lab.upload_location):
+                    existing: Set[FileMeta] = set()
+                    for unmapped in UploadedClassificationsUnmapped.objects.filter(lab=selected_lab):
+                        if meta := FileMeta.from_unmapped(unmapped):
+                            existing.add(meta)
+
+                    server_files: List[FileHandle] = list()
+                    for file in server_address.list():
+                        meta = FileMeta.from_file_handle(file)
+                        if meta not in existing:
+                            server_files.append(file)
+
+                    context["server_files"] = server_files
+
+            return render(request, 'classification/classification_upload_file_unmapped.html', context)
         else:
             selected_lab = UserSettings.get_for_user(user).default_lab_safe()
             return HttpResponseRedirect(reverse("classification_upload_unmapped_lab", kwargs={"lab_id": selected_lab.pk}))
@@ -124,74 +181,59 @@ class UploadedClassificationsUnmappedView(View):
             if not lab.is_member(user=requests.user, admin_check=True):
                 raise PermissionError("User does not have access to lab")
 
-            protocol, path = lab.upload_location.split("://", maxsplit=1)
+            if server_address := resolve_uploaded_url_to_handle(lab.upload_location):
+                sub_file: FileHandle
 
-            if protocol == "s3":
-                parts = path.split("/", maxsplit=1)
-                bucket = parts[0]
-                file_directory_within_bucket = parts[1] if len(parts) > 1 else None
+                if existing_file := requests.POST.get('import-existing'):
+                    sub_file = server_address.sub_file(existing_file)
+                    if not sub_file.exists:
+                        raise ValueError(f"File {existing_file} does not appear to exist")
 
-                file_obj = requests.FILES.get('file')
-                if not file_obj:
-                    raise ValueError("No Upload File attached")
-
-                # if not file_obj.name.endswith('.json'):
-                #    raise ValueError("Only MVL .json uploads are supported")
-
-                # do your validation here e.g. file size/type check
-
-                # organize a path for the file in bucket
-                file_path_within_bucket: str
-                # synthesize a full file path; note that we included the filename
-                if file_directory_within_bucket:
-                    file_path_within_bucket = os.path.join(
-                        file_directory_within_bucket,
-                        filename_safe(file_obj.name)
-                    )
                 else:
-                    file_path_within_bucket = filename_safe(file_obj.name)
-
-                media_storage = S3Boto3Storage(bucket_name=bucket)
-
-                media_storage.save(file_path_within_bucket, file_obj)
-                file_url = media_storage.url(file_path_within_bucket)
+                    file_obj = requests.FILES.get('file')
+                    if not file_obj:
+                        raise ValueError("No File Provided")
+                    sub_file = server_address.save(file_obj)
 
                 status = UploadedClassificationsUnmappedStatus.Pending if lab.upload_automatic else UploadedClassificationsUnmappedStatus.Manual
                 user: User = requests.user
                 uploaded_file = UploadedClassificationsUnmapped.objects.create(
-                    url=file_url,
-                    filename=file_obj.name,
+                    url=sub_file.clean_url,
+                    filename=sub_file.filename,
                     user=requests.user,
                     lab=lab,
-                    status=status
+                    status=status,
+                    effective_modified=sub_file.modified,
+                    file_size=sub_file.size
                 )
 
-                if not lab.upload_automatic:
+                if lab.upload_automatic:
+                    task = ClassificationImportMapInsertTask.si(uploaded_file.pk)
+                    task.apply_async()
+                    return HttpResponseRedirect(reverse("classification_upload_unmapped_status", kwargs={
+                        "uploaded_classification_unmapped_id": uploaded_file.pk}))
+                else:
                     # if no automatic process of automated file,
-                    admin_url = get_url_from_view_path(f"/admin/classification/uploadedfilelab/{uploaded_file.pk}/change")
+                    admin_url = get_url_from_view_path(
+                        f"/admin/classification/uploadedfilelab/{uploaded_file.pk}/change")
                     notifier = NotificationBuilder(
                         message="File Uploaded"
-                    ).add_header(":file_folder: File Uploaded").\
-                        add_field("For Lab", lab.name).\
-                        add_field("By User", user.username).\
-                        add_field("Path", "s3://" + bucket + "/" + file_path_within_bucket).\
+                    ).add_header(":file_folder: File Uploaded"). \
+                        add_field("For Lab", lab.name). \
+                        add_field("By User", user.username). \
+                        add_field("Path", sub_file.clean_url). \
                         add_markdown(f"*URL:* <{admin_url}>")
 
                     # Soon going to replace this with automated import
 
                     notifier.add_markdown("This file will need to be handled manually!")
                     messages.add_message(requests, messages.INFO,
-                                         f"File {file_obj.name} uploaded for {lab.name}. This file will be uploaded after manual review.")
+                                         f"File {sub_file.filename} uploaded for {lab.name}. This file will be uploaded after manual review.")
 
                     notifier.send()
-
-                else:
-                    task = ClassificationImportMapInsertTask.si(uploaded_file.pk)
-                    task.apply_async()
-                    return HttpResponseRedirect(reverse("classification_upload_unmapped_status", kwargs={"uploaded_classification_unmapped_id": uploaded_file.pk}))
-
             else:
                 raise ValueError("Only s3 storage is currently supported for lab uploads")
+
         except ValueError as ve:
             report_exc_info()
             messages.add_message(requests, messages.ERROR, str(ve))

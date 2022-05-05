@@ -534,6 +534,23 @@ class TagUtils:
         return None
 
 
+@register.filter()
+def bytes(bytes: Optional[int]):
+    if not bytes:
+        return '-'
+    else:
+        unit = 'bytes'
+        value = bytes
+        if value > 1024:
+            value = value / 1024.0
+            unit = 'KB'
+            if value > 1024:
+                value = value / 1024.0
+                unit = 'MB'
+            value = round(value)
+    return SafeString(f'<span class="text-monospace">{value:,}</span> {unit}')
+
+
 @register.inclusion_tag(name="diff_text", filename="uicore/tags/diff_text.html")
 def diff_text_html(a: str, b: str):
     return {"diffs": diff_text(a, b), "before": a, "after": b}
