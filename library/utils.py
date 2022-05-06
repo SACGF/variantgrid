@@ -1032,21 +1032,79 @@ class DiffTextSegment:
         else:
             return self.operation
 
+    def __str__(self):
+        return f"{self.operation} {self.text}"
 
-def diff_text(a: str, b: str) -> List[DiffTextSegment]:
-    segments: List[DiffTextSegment] = list()
-    last_operation = None
-    last_text = ''
-    for diff_char in difflib.Differ().compare(a, b):
-        operation = diff_char[0]
-        text_char = diff_char[2]
-        if operation != last_operation:
-            if text_char:
-                if last_text:
-                    segments.append(DiffTextSegment(operation=last_operation, text=last_text))
-                last_operation = operation
-                last_text = ''
-        last_text += text_char
-    if last_text:
-        segments.append(DiffTextSegment(operation=last_operation, text=last_text))
-    return segments
+
+class DiffBuilder:
+
+    def __init__(self):
+        self.diff_segments: List[DiffTextSegment] = list()
+        self.same_text = ''
+        self.add_text = ''
+        self.sub_text = ''
+
+    def apply(self):
+        if sub_text := self.sub_text:
+            self.diff_segments.append(DiffTextSegment(operation='-', text=sub_text))
+        if add_text := self.add_text:
+            self.diff_segments.append(DiffTextSegment(operation='+', text=add_text))
+        if same_text := self.same_text:
+            self.diff_segments.append(DiffTextSegment(operation=' ', text=same_text))
+        self.sub_text = ''
+        self.add_text = ''
+        self.same_text = ''
+
+    def _has_pending_add_subtract(self):
+        return bool(self.add_text) or bool(self.sub_text)
+
+    def _has_pending_same(self):
+        return bool(self.same_text)
+
+    def append(self, diff_text: str):
+        operation = diff_text[0]
+        text = diff_text[2:]
+        if operation == '?':
+            # '? 'line not present in either input sequence
+            # Lines beginning with ‘?’ attempt to guide the eye to intraline differences,
+            # and were not present in either input sequence. These lines can be confusing if the sequences contain tab characters.
+            return
+        if operation == ' ':
+            if self._has_pending_add_subtract():
+                if not text.strip():
+                    # if we have "bear down" -> "fat dog" it would result in -bear +fat (same space) -down +dog
+                    # much cleaner to have that as -"bear down" +"fat dog"
+                    # might need to look into having whitespace_text that we track separately
+                    self.sub_text += text
+                    self.add_text += text
+                    return
+
+                self.apply()
+            self.same_text += text
+        else:
+            if self._has_pending_same():
+                self.apply()
+            if operation == '-':
+                self.sub_text += text
+            else:
+                self.add_text += text
+
+    def __iter__(self):
+        return iter(self.diff_segments)
+
+    def __bool__(self):
+        return bool(self.diff_segments)
+
+
+def diff_text(a: str, b: str) -> DiffBuilder:
+
+    def _tokenize(text: str) -> List[str]:
+        return re.split('(\s)', text)
+
+    diff_builder = DiffBuilder()
+    for diff_chars in difflib.Differ().compare(_tokenize(a), _tokenize(b)):
+        diff_builder.append(diff_chars)
+    diff_builder.apply()
+    print(diff_builder.diff_segments)
+    return diff_builder
+
