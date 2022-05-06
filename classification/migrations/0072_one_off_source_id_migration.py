@@ -10,6 +10,8 @@ def migrate_source_id(apps, schema_editor):
     EvidenceKey = apps.get_model("classification", "EvidenceKey")
 
     classifications_with_source_id_evidence_qs = Classification.objects.filter(evidence__source_id__value__isnull=False)
+    print()
+    print(f"{classifications_with_source_id_evidence_qs.count()} records to update")
     for classification in classifications_with_source_id_evidence_qs:
         source_id_val = classification.evidence.get('source_id').get('value')
         if not classification.last_source_id:
@@ -37,8 +39,8 @@ def migrate_source_id(apps, schema_editor):
     EvidenceKey.objects.filter(key='source_id').delete()
     log.append("Removing EvidenceKey source_id")
     with open('source_id_migration.log', 'w') as log_file:
-        log_file.writelines(log)
-    print("Check source_id_migration.log for details on migration. Delete (or archieve) the file to tidy up.")
+        log_file.writelines([line + '\n' for line in log])
+    print("Check source_id_migration.log for details on migration. Delete (or archive) the file to tidy up.")
 
 
 class Migration(migrations.Migration):
