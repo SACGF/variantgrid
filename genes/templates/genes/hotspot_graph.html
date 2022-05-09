@@ -147,12 +147,12 @@
 
 
             let geneThickness = yMax / 5;
-            let domainThickness = geneThickness * 1.2;
+            let domainThickness = geneThickness; // by default no extra thickness
             let geneYTop = 0;
             let geneYBottom = geneYTop - geneThickness;
-            let domainPadding = (domainThickness - geneThickness) / 2;
-            let domainYTop = geneYTop + domainPadding;
-            let domainYBottom = geneYBottom - domainPadding;
+            // make domain lie entirely below, as it was sometimes obscuring classifications on top
+            let domainYTop = geneYTop;
+            let domainYBottom = geneYBottom - (domainThickness - geneThickness);
 
             // Need to give domains consistent colors
             let colorIndex = 0;
