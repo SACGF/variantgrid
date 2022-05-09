@@ -29,7 +29,8 @@ class FlagPermissionLevel(str, ChoicesEnum):
     NO_PERM = '0'
     USERS = 'U'
     OWNER = 'O'
-    ADMIN = 'A'
+    ADMIN = 'X'
+    SYSTEM = 'A'
 
     @property
     def level(self):
@@ -39,6 +40,8 @@ class FlagPermissionLevel(str, ChoicesEnum):
             return 2
         if self == FlagPermissionLevel.ADMIN:
             return 3
+        if self == FlagPermissionLevel.SYSTEM:
+            return 4
         return 0
 
     def __lt__(self, other):
@@ -71,7 +74,7 @@ class FlagType(TimeStampedModel, ModelUtilsMixin):
     # details on how to fix the flag (only shown to people who can edit it).
     help_text = models.TextField(default='')
 
-    raise_permission = models.TextField(max_length=1, choices=FlagPermissionLevel.choices(), default=FlagPermissionLevel.ADMIN.value)
+    raise_permission = models.TextField(max_length=1, choices=FlagPermissionLevel.choices(), default=FlagPermissionLevel.SYSTEM.value)
 
     def __str__(self):
         return self.label
@@ -276,18 +279,15 @@ class FlagCollection(models.Model, GuardianPermissionsMixin):
         return label
 
     def permission_level(self, user: User) -> FlagPermissionLevel:
+        if user == admin_bot():
+            return FlagPermissionLevel.SYSTEM
         if user.is_superuser:
-            # return owner instead of admin as admin currently really means automatic set by code
-            return FlagPermissionLevel.OWNER
+            return FlagPermissionLevel.ADMIN
 
         so = self.source_object
         if not so:
             return FlagPermissionLevel.NO_PERM
         return so.flag_user_permission(user)
-
-    def is_owner_or_admin(self, user: User) -> bool:
-        permission = self.permission_level(user)
-        return permission in (FlagPermissionLevel.ADMIN, FlagPermissionLevel.OWNER)
 
     def flags(self, user: User = None, only_open=False) -> QuerySet[Flag]:
         if not user:
@@ -328,11 +328,6 @@ class FlagCollection(models.Model, GuardianPermissionsMixin):
             flag_collections = flag_collections.filter(flag_type__in=flag_types)
 
         return qs.filter(flag_collection__in=Subquery(flag_collections.values('collection')))
-
-    @staticmethod
-    def filter_for_starred(qs: QuerySet, user: User) -> QuerySet:
-        starred = FlagWatch.objects.filter(user=user).values('flag_collection').distinct()
-        return qs.filter(flag_collection__in=starred)
 
     def close_open_flags_of_type(
             self,
@@ -515,41 +510,14 @@ class FlagCollection(models.Model, GuardianPermissionsMixin):
 
         return flag
 
-    def set_watcher(self, user: User, watch: bool):
-        if watch:
-            FlagWatch.objects.get_or_create(flag_collection=self, user=user)
-        else:
-            FlagWatch.objects.filter(flag_collection=self, user=user).delete()
-
-    def is_watcher(self, user: User):
-        return FlagWatch.objects.filter(flag_collection=self, user=user).exists()
-
-    def unseen_flag_activity(self, user: User) -> Optional[int]:
-        """
-        Returns None if not watching
-        Otherwise returns how many flag comments that have not been seen (including 0)
-        """
-        fw = FlagWatch.objects.filter(flag_collection=self, user=user).first()
-        if not fw:
-            return None
-        #FIXME filter to only flags that the user can see
-        #excludes flags
-        return FlagComment.objects.filter(flag__collection=self, created__gte=fw.since).exclude(user=user).count()
+    # note that unseen flag activity is no longer supported (well was never really supported, can look at supporting
+    # it properly one day)
 
 
 def fetch_flag_infos(flag_collections: List[FlagCollection], flags: Iterable[Flag], user: User = None) -> FlagInfos:
     flag_infos = FlagInfos(flag_collections=flag_collections, flags=flags)
     flag_collection_extra_info_signal.send(sender=FlagCollection, flag_infos=flag_infos, user=user)
     return flag_infos
-
-
-class FlagWatch(models.Model):
-    flag_collection = models.ForeignKey(FlagCollection, on_delete=CASCADE)
-    user = models.ForeignKey(User, on_delete=CASCADE)
-    since = models.DateTimeField(default=now)
-
-    class Meta:
-        unique_together = ('flag_collection', 'user')
 
 
 class FlagComment(TimeStampedModel):

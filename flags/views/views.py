@@ -8,7 +8,7 @@ from django.utils.timezone import now
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from flags.models import Flag, FlagComment, FlagType, FlagCollection, FlagWatch, FlagPermissionLevel
+from flags.models import Flag, FlagComment, FlagType, FlagCollection, FlagPermissionLevel
 from flags.models.enums import FlagStatus
 from flags.models.models import FlagResolution, FlagTypeResolution, fetch_flag_infos
 from library.django_utils import ensure_timezone_aware
@@ -157,8 +157,7 @@ class FlagHelper:
     def is_viewable_flag(self, flag: Flag) -> bool:
         if flag.user_private and \
             flag.user != self.user and \
-            not flag.collection.is_owner_or_admin(self.user):
-
+            flag.collection.permission_level(self.user) < FlagPermissionLevel.OWNER:
             return False
         return True
 
@@ -305,8 +304,8 @@ class FlagHelper:
                 # maybe replace it with a hook that can alter the information?
                 if not (settings.CLINVAR_EXPORT or {}).get("mode") and flag_type.pk == "classification_not_public":
                     # this disables anyone from raising a new flag of this type, but wont break any existing flags
-                    json_entry["permission"] = FlagPermissionLevel.ADMIN
-                    json_entry["raise_permission"] = FlagPermissionLevel.ADMIN
+                    json_entry["permission"] = FlagPermissionLevel.SYSTEM
+                    json_entry["raise_permission"] = FlagPermissionLevel.SYSTEM
                     json_entry["comments_enabled"] = False
 
                 flag_types.append(json_entry)
@@ -354,7 +353,6 @@ class FlagsView(APIView):
         if history:
             # user has now seen the flags, mark them as such
             history = int(history)
-            FlagWatch.objects.filter(flag_collection=history, user=request.user).update(since=now())
             flag_helper.include_history(history)
 
         if since:
