@@ -44,7 +44,7 @@
         {% for _, row in vsi.locus_counts_df.iterrows %}
             <tr><td><a class='hover-link' href="{% url 'view_variant' row.variant_id %}">{{ row.variant }}</a> {% if row.description %}({{ row.description }}){% endif %}</td>
                 <td>{{ row.Total }}</td>
-                <td>{{ row.HOM_REF }}</td>
+                <td>{{ row.REF }}</td>
                 <td>{{ row.HET }}</td>
                 <td>{{ row.HOM_ALT }}</td>
 
