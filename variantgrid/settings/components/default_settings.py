@@ -493,7 +493,7 @@ ROLLBAR = {
 SLACK = {
     'enabled': get_secret('SLACK.enabled'),
     'admin_callback_url': get_secret('SLACK.admin_callback_url'),
-    'emoji': ':dna:'  #overwrite the emoji for different environments
+    'emoji': ':dna:'  # overwrite the emoji for different environments
 }
 
 # if true, automated health checks will post to Slack if enabled
