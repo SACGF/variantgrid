@@ -39,6 +39,9 @@ class PageViewsMiddleware:
         return response
 
     def is_special_case(self, request, view_func, view_args, view_kwargs) -> Optional[ViewEvent]:
+        if 'classification' not in settings.LOG_ACTIVITY_APPS:
+            return
+
         # check to HTTP_X_REQUESTED_WITH as that implies it's a browser performing the request so hopefully we skip it when it's being performed by the API
         if request.path_info == '/classification/api/classifications/v1/record/' and request.method == 'POST' and request.META.get('HTTP_X_REQUESTED_WITH') == 'XMLHttpRequest':
             data = json.loads(request.body)
