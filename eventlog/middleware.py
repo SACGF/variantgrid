@@ -1,9 +1,14 @@
+import json
+from typing import Optional
+
 from django.conf import settings
 from django.http.response import HttpResponseRedirectBase
 from django.urls import resolve
+
+from auth.session_refresh import VariantGridSessionRefresh
 from eventlog.models import ViewEvent
 
-IGNORE_SEGMENTS = {"api", "datatable", "citations_json"}
+IGNORE_SEGMENTS = {"api", "datatable", "citations_json"}  # this should be mostly redundant to is_ajax call
 IGNORE_TEXT = {"detail", "metrics"}
 IGNORE_VIEW_NAME_SUFFIX = {"_detail", "_autocomplete"}
 IGNORE_PARAMETERS = {"csrfmiddlewaretoken"}
@@ -21,9 +26,11 @@ class PageViewsMiddleware:
 
         response = self.get_response(request)
         # don't record redirects, as the view that we're redirected to will be enough
-        if not isinstance(response, HttpResponseRedirectBase):
-            if hasattr(request, 'view_event'):
-                if view_event := request.view_event:
+        if hasattr(request, 'view_event'):
+            view_event: Optional[ViewEvent]
+            if view_event := request.view_event:
+                # if a user got taken directly to something from a search, record it
+                if not isinstance(response, HttpResponseRedirectBase) or view_event.view_name == 'variantopedia:search':
                     view_event.save()
 
         # Code to be executed for each request/response after
@@ -31,7 +38,36 @@ class PageViewsMiddleware:
 
         return response
 
+    def is_special_case(self, request, view_func, view_args, view_kwargs) -> Optional[ViewEvent]:
+        # check to HTTP_X_REQUESTED_WITH as that implies it's a browser performing the request so hopefully we skip it when it's being performed by the API
+        if request.path_info == '/classification/api/classifications/v1/record/' and request.method == 'POST' and request.META.get('HTTP_X_REQUESTED_WITH') == 'XMLHttpRequest':
+            data = json.loads(request.body)
+            if isinstance(data, dict) and data.get('source') == 'form':
+                all_params = {'classification_id': data.get('id').get('record_id'), **data.get('patch')}
+                if data.get('delete') is not None:
+                    all_params['delete'] = data.get('delete')
+                if data.get('publish') is not None:
+                    all_params['publish'] = data.get('publish')
+
+                return ViewEvent(
+                    user=request.user,
+                    view_name=resolve(request.path_info).view_name,
+                    args=all_params,
+                    path=request.get_full_path(),
+                    method=request.method,
+                    referer=request.headers.get('Referer')
+                )
+
+            pass
+
     def process_view(self, request, view_func, view_args, view_kwargs):
+        if special_view_event := self.is_special_case(request, view_func, view_args, view_kwargs):
+            request.view_event = special_view_event
+            return
+
+        if VariantGridSessionRefresh.is_ajax(request):
+            return
+
         parts = request.path_info.split('/')
         if len(parts) > 1:
             if any(ignore_text in request.path_info for ignore_text in IGNORE_TEXT):
@@ -75,6 +111,7 @@ class PageViewsMiddleware:
                                 if len(parts) > 1:
                                     all_params["modification_timestamp"] = float(parts[1])
 
+                        # call then later captures this and saves it to the DB (if appropriate)
                         request.view_event = ViewEvent(
                             user=request.user,
                             view_name=f"{app}:{url_obj.view_name}",

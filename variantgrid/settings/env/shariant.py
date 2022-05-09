@@ -67,7 +67,7 @@ REST_FRAMEWORK = {
 
 # user logging
 MIDDLEWARE += ('eventlog.middleware.PageViewsMiddleware', )
-LOG_ACTIVITY_APPS = {"classification", "variantopedia", "snpdb"}
+LOG_ACTIVITY_APPS = {"classification", "variantopedia", "snpdb", "genes"}
 
 #OIDC_DRF_AUTH_BACKEND = 'auth.backend.VariantGridOIDCAuthenticationBackend'
 

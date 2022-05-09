@@ -41,7 +41,7 @@ ROLLBAR['enabled'] = False
 # INSTALLED_APPS.append('debug_toolbar')
 
 MIDDLEWARE += ('eventlog.middleware.PageViewsMiddleware', )
-LOG_ACTIVITY_APPS = {"classification", "variantopedia", "snpdb"}
+LOG_ACTIVITY_APPS = {"classification", "variantopedia", "snpdb", "genes"}
 
 VARIANT_CLASSIFICATION_OMNI_IMPORTER_APP_DIR = "/Users/jamesandrews/Projects/VariantGrid/shariant-omni-importer"
 VARIANT_CLASSIFICATION_OMNI_IMPORTER_PUBLISH_LEVEL = "logged_in_users"
