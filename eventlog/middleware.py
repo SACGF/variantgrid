@@ -54,7 +54,7 @@ class PageViewsMiddleware:
 
                 return ViewEvent(
                     user=request.user,
-                    view_name=resolve(request.path_info).view_name,
+                    view_name='classification:classification_api',
                     args=all_params,
                     path=request.get_full_path(),
                     method=request.method,
