@@ -11,6 +11,40 @@
     {% end_page_help_embedded %}
 {% endif %}
 
+<div id='locus' class="container">
+    <h4>Locus</h4>
+    <p>
+    Reference - Homozygous reference calls are only reported in samples uploaded in multi-sample VCF files, when another sample has a variant at this locus.<br>
+    Variants - REF for a variants means the depth/quality was below the zygosity calling threshold. These may be somatic or artifacts.
+    </p>
+
+    <table class="table">
+        <thead>
+        <tr><th>Allele</th>
+            <th>Total</th>
+            <th>Hom Ref</th>
+            <th>Het</th>
+            <th>Hom</th>
+            {% if vsi.has_unknown_zygosity %}
+                <th>Unknown</th>
+            {% endif %}
+        </thead>
+    {% for _, row in vsi.locus_counts_df.iterrows %}
+        <tr><td><a class='hover-link' href="{% url 'view_variant' row.variant_id %}">{{ row.variant }}</a> {% if row.description %}({{ row.description }}){% endif %}</td>
+            <td>{{ row.Total }}</td>
+            <td>{{ row.REF }}</td>
+            <td>{{ row.HET }}</td>
+            <td>{{ row.HOM_ALT }}</td>
+
+            {% if vsi.has_unknown_zygosity %}
+            <td>{{ row.Unknown }}</td>
+            {% endif %}
+
+    {% endfor %}
+    </table>
+</div>
+
+
 
 {% if vsi.has_observations %}
     <script type="text/javascript" src="{% static 'js/lib/plotly-latest.min.js' %}"></script>
@@ -22,39 +56,6 @@
             height: auto !important;
         }
     </style>
-
-    <div id='locus' class="container">
-        <h4>Locus</h4>
-        <p>
-        Reference - Homozygous reference calls are only reported in samples uploaded in multi-sample VCF files, when another sample has a variant at this locus.<br>
-        Variants - REF for a variants means the depth/quality was below the zygosity calling threshold. These may be somatic or artifacts.
-        </p>
-
-        <table class="table">
-            <thead>
-            <tr><th>Allele</th>
-                <th>Total</th>
-                <th>Hom Ref</th>
-                <th>Het</th>
-                <th>Hom</th>
-                {% if vsi.has_unknown_zygosity %}
-                    <th>Unknown</th>
-                {% endif %}
-            </thead>
-        {% for _, row in vsi.locus_counts_df.iterrows %}
-            <tr><td><a class='hover-link' href="{% url 'view_variant' row.variant_id %}">{{ row.variant }}</a> {% if row.description %}({{ row.description }}){% endif %}</td>
-                <td>{{ row.Total }}</td>
-                <td>{{ row.REF }}</td>
-                <td>{{ row.HET }}</td>
-                <td>{{ row.HOM_ALT }}</td>
-
-                {% if vsi.has_unknown_zygosity %}
-                <td>{{ row.Unknown }}</td>
-                {% endif %}
-
-        {% endfor %}
-        </table>
-    </div>
 
     <h3>Samples</h3>
 

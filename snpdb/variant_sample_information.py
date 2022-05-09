@@ -36,17 +36,16 @@ class VariantSampleInformation:
         self.visible_rows = []
         for row in values_qs:
             pk = row["variant"]
-            zygosity = row["zygosity"]
-            if zygosity:
+            if zygosity := row.get("zygosity"):
                 locus_counter[pk][zygosity] += 1
+            else:
+                locus_counter[pk][Zygosity.UNKNOWN_ZYGOSITY] += 0  # Need an entry to make it show...
 
-            patient = row["sample__patient"]
-            if patient:
+            if patient := row.get("sample__patient"):
                 locus_patients[pk].add(patient)
 
             if variant.pk == pk:
-                sample_id = row["sample"]
-                if sample_id:
+                if sample_id := row.get("sample"):
                     num_observations += 1
 
                     if sample_id in self.user_sample_ids:
@@ -62,11 +61,7 @@ class VariantSampleInformation:
                                            "num_invisible_observations": num_invisible_observations}
 
         self.has_observations = num_observations > 0
-        if self.has_observations:
-            self.locus_counts_df = self._get_locus_counts(variant.pk, locus_counter)
-        else:
-            self.locus_counts_df = None
-
+        self.locus_counts_df = self._get_locus_counts(variant.pk, locus_counter)
         self.patient_ids = locus_patients[variant.pk]
 
     @property
@@ -81,8 +76,9 @@ class VariantSampleInformation:
     @staticmethod
     def _get_sample_values_for_variant_via_cohort_genotype(locus_qs):
         """ This is the new, preferred way - as it gets all of the samples for a VCF at once """
-        COHORT_PATH = "variant__cohortgenotype__collection__cohort"
-        qs = locus_qs.filter(**{COHORT_PATH + "__vcf__isnull": False})  # Only VCFs
+        no_cohort = Q(variant__cohortgenotype__isnull=True)
+        vcf_cohort = Q(variant__cohortgenotype__collection__cohort__vcf__isnull=False)
+        qs = locus_qs.filter(no_cohort | vcf_cohort)  # Only VCF CohortGenotypes (not generated cohorts)
         return qs.values("variant",
                          "variant__alt",
                          "variant__cohortgenotype__collection",
@@ -102,6 +98,12 @@ class VariantSampleInformation:
         for cg_values in values_qs:
             variant = cg_values["variant"]
             cgc_id = cg_values["variant__cohortgenotype__collection"]
+            if cgc_id is None:
+                yield {
+                    "variant": variant,
+                }
+                continue
+
             vcf_name = cg_values["variant__cohortgenotype__collection__cohort__vcf__name"]
             samples_zygosity = cg_values["variant__cohortgenotype__samples_zygosity"]
             num_samples = len(samples_zygosity)
