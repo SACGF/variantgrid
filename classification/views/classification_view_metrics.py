@@ -38,8 +38,11 @@ class Counted(Generic[T]):
         return self.count < other.count
 
 
+@dataclass(frozen=True)
 class ViewMetricsType:
     counts: List[Counted[Any]]
+    name: str
+    model_id: str
 
 
 @dataclass(frozen=True)
@@ -138,6 +141,30 @@ class ViewEventCounts:
             id_to_count[values.get('user')] += values.get('total')  # just want to count once per unique user
 
         return sorted((Counted(pk, count, ViewEventCounts.resolver_for_model(User)) for pk, count in id_to_count.items()), reverse=True)
+
+    def view_metrics(self) -> List[ViewMetricsType]:
+        return [
+            ViewMetricsType(
+                counts=self.gene_symbol_views,
+                name="Gene Symbol",
+                model_id="gene_symbol"
+            ),
+            ViewMetricsType(
+                counts=self.allele_views,
+                name="Alleles",
+                model_id="allele_id"
+            ),
+            ViewMetricsType(
+                counts=self.classification_views,
+                name="Classifications",
+                model_id="classification_id"
+            ),
+            ViewMetricsType(
+                counts=self.discordance_report_views,
+                name="Discordance Reports",
+                model_id="discordance_report_id"
+            )
+        ]
 
     def recent_views(self) -> QuerySet[ViewEvent]:
         return ViewEvent.objects.filter(self.base_filter).order_by('-created')

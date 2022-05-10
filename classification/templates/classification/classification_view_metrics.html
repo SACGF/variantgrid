@@ -35,93 +35,31 @@
         <p>Most Active Users count how many pages the user viewed across the last 30 days</p>
     {% end_page_help_embedded %}
 
-    <div class="card mt-4">
-        <div class="card-header">Most Viewed Gene Symbol Pages <span class="float-right">unique viewers</span></div>
-        <ul class="list-group">
-        {% for ccount in counts.gene_symbol_views|slice:"10" %}
-            <li class="list-group-item d-flex justify-content-between align-items-center">
-                {% with gene_symbol=ccount.resolve %}
-                    {% if gene_symbol.get_absolute_url %}
-                    <a class="hover-link" href="{{ gene_symbol.get_absolute_url }}">{{ gene_symbol }}</a>
-                    {% else %}
-                        <span class="no-value">{{ ccount.resolve }}</span>
-                    {% endif %}
-                    <span>
-                        <a class="mr-1"
-                            data-toggle="ajax-modal"
-                            data-title="All views of Gene Symbol ({{ ccount.pk }}) {{ page_suffix }}"
-                            data-href="{% url 'classification_view_metrics_detail' %}?days={{ days }}&exclude_admin={{ exclude_admin|jsonify }}&gene_symbol={{ ccount.pk }}">Show Views</a>
-                        <span class="badge badge-primary badge-pill">{{ ccount.count }}</span>
-                    </span>
-                {% endwith %}
-            </li>
-        {% endfor %}
-        </ul>
-    </div>
-
-    <div class="card mt-4">
-        <div class="card-header">Most Viewed Alleles <span class="float-right">unique viewers</span></div>
-        <ul class="list-group">
-        {% for ccount in counts.allele_views|slice:"10" %}
-            <li class="list-group-item d-flex justify-content-between align-items-center">
-                {% with allele=ccount.resolve %}
-                    <a class="hover-link" href="{{ allele.get_absolute_url }}">{{ ccount.resolve }}</a>
-                    <span>
-                        <a class="mr-1"
-                            data-toggle="ajax-modal"
-                            data-title="All views of Allele ({{ ccount.pk }}) {{ page_suffix }}"
-                            data-href="{% url 'classification_view_metrics_detail' %}?days={{ days }}&exclude_admin={{ exclude_admin|jsonify }}&allele_id={{ ccount.pk }}">Show Views</a>
-                        <span class="badge badge-primary badge-pill">{{ ccount.count }}</span>
-                    </span>
-                {% endwith %}
-            </li>
-        {% endfor %}
-        </ul>
-    </div>
-
-    <div class="card mt-4">
-        <div class="card-header">Most Viewed Classifications <span class="float-right">unique viewers</span></div>
-        <ul class="list-group">
-        {% for ccount in counts.classification_views|slice:"10" %}
-            <li class="list-group-item d-flex justify-content-between align-items-center">
-                <span>
-                    {% classification_quick ccount.resolve %}
-                    {{ ccount.resolve.allele }}
-                </span>
-                <span>
-                    <a class="mr-1"
-                        data-toggle="ajax-modal"
-                        data-title="All views of Classification ({{ ccount.pk }}) {{ page_suffix }}"
-                        data-href="{% url 'classification_view_metrics_detail' %}?days={{ days }}&exclude_admin={{ exclude_admin|jsonify }}&classification_id={{ ccount.pk }}">Show Views</a>
-                    <span class="badge badge-primary badge-pill">{{ ccount.count }}</span>
-                </span>
-            </li>
-        {% endfor %}
-        </ul>
-    </div>
-
-    <div class="card mt-4">
-        <div class="card-header">Most Viewed Discordance Reports <span class="float-right">unique viewers</span></div>
-        <ul class="list-group">
-        {% for ccount in counts.discordance_report_views|slice:"10" %}
-            <li class="list-group-item d-flex justify-content-between align-items-center">
-                {% with discordance_report=ccount.resolve %}
-                    <span>
-                        <a class="hover-link" href="{{ discordance_report.get_absolute_url }}">{{ ccount.resolve }}</a>
-                        {{ discordance_report.clinical_context.allele }}
-                    </span>
-                    <span>
-                        <a class="mr-1"
-                            data-toggle="ajax-modal"
-                            data-title="All views of Discordance REport ({{ ccount.pk }}) {{ page_suffix }}"
-                            data-href="{% url 'classification_view_metrics_detail' %}?days={{ days }}&exclude_admin={{ exclude_admin|jsonify }}&discordance_report_id={{ ccount.pk }}">Show Views</a>
-                        <span class="badge badge-primary badge-pill">{{ ccount.count }}</span>
-                    </span>
-                {% endwith %}
-            </li>
-        {% endfor %}
-        </ul>
-    </div>
+    {% for view_metrics in counts.view_metrics %}
+        <div class="card mt-4">
+            <div class="card-header">Most Viewed {{ view_metrics.name }} <span class="float-right">unique viewers</span></div>
+            <ul class="list-group">
+            {% for ccount in view_metrics.counts|slice:"10" %}
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    {% with object=ccount.resolve %}
+                        {% if object.get_absolute_url %}
+                        <a class="hover-link" href="{{ object.get_absolute_url }}">{{ object }}</a>
+                        {% else %}
+                            <span class="no-value">{{ ccount.resolve }}</span>
+                        {% endif %}
+                        <span>
+                            <a class="mr-1"
+                                data-toggle="ajax-modal"
+                                data-title="All views of {{ view_metrics.name }} ({{ ccount.pk }}) {{ page_suffix }}"
+                                data-href="{% url 'classification_view_metrics_detail' %}?days={{ days }}&exclude_admin={{ exclude_admin|jsonify }}&{{ view_metrics.model_id }}={{ ccount.pk }}">Show Views</a>
+                            <span class="badge badge-primary badge-pill">{{ ccount.count }}</span>
+                        </span>
+                    {% endwith %}
+                </li>
+            {% endfor %}
+            </ul>
+        </div>
+    {% endfor %}
 
     <div class="card mt-4">
         <div class="card-header">Most Viewed Pages <span class="float-right">unique viewers</span></div>
