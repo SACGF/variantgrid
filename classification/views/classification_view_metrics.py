@@ -15,6 +15,7 @@ from django.utils.timezone import now
 from lazy import lazy
 from classification.models import Classification, DiscordanceReport
 from eventlog.models import ViewEvent
+from genes.models import GeneSymbol
 from library.django_utils import require_superuser
 from snpdb.models import Allele
 from snpdb.views.views import staff_only
@@ -35,6 +36,10 @@ class Counted(Generic[T]):
 
     def __lt__(self, other):
         return self.count < other.count
+
+
+class ViewMetricsType:
+    counts: List[Counted[Any]]
 
 
 @dataclass(frozen=True)
@@ -88,7 +93,10 @@ class ViewEventCounts:
     @staticmethod
     def resolver_for_model(model: Model):
         def resolver(pk: Any):
-            return model.objects.filter(pk=pk).first()
+            if first := model.objects.filter(pk=pk).first():
+                return first
+            else:
+                return f"{pk}"
         return resolver
 
     @lazy
@@ -102,6 +110,10 @@ class ViewEventCounts:
     @lazy
     def allele_views(self) -> List[Counted[Allele]]:
         return self.count_field("allele_id", ViewEventCounts.resolver_for_model(Allele))
+
+    @lazy
+    def gene_symbol_views(self) -> List[Counted[GeneSymbol]]:
+        return self.count_field("gene_symbol", ViewEventCounts.resolver_for_model(GeneSymbol))
 
     @lazy
     def page_views(self) -> List[Counted[str]]:
@@ -144,8 +156,11 @@ class ViewEventCounts:
             views = views.filter(args__allele_id=int(allele_id))
         elif discordance_report_id := request.GET.get('discordance_report_id'):
             views = views.filter(args__discordance_report_id=int(discordance_report_id))
+        elif gene_symbol_id := request.GET.get('gene_symbol'):
+            views = views.filter(args__gene_symbol=gene_symbol_id)
         elif user_id := request.GET.get('user_id'):
             views = views.filter(user=user_id)
+
         return views
 
 

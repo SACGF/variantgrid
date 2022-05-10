@@ -36,6 +36,30 @@
     {% end_page_help_embedded %}
 
     <div class="card mt-4">
+        <div class="card-header">Most Viewed Gene Symbol Pages <span class="float-right">unique viewers</span></div>
+        <ul class="list-group">
+        {% for ccount in counts.gene_symbol_views|slice:"10" %}
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+                {% with gene_symbol=ccount.resolve %}
+                    {% if gene_symbol.get_absolute_url %}
+                    <a class="hover-link" href="{{ gene_symbol.get_absolute_url }}">{{ gene_symbol }}</a>
+                    {% else %}
+                        <span class="no-value">{{ ccount.resolve }}</span>
+                    {% endif %}
+                    <span>
+                        <a class="mr-1"
+                            data-toggle="ajax-modal"
+                            data-title="All views of Gene Symbol ({{ ccount.pk }}) {{ page_suffix }}"
+                            data-href="{% url 'classification_view_metrics_detail' %}?days={{ days }}&exclude_admin={{ exclude_admin|jsonify }}&gene_symbol={{ ccount.pk }}">Show Views</a>
+                        <span class="badge badge-primary badge-pill">{{ ccount.count }}</span>
+                    </span>
+                {% endwith %}
+            </li>
+        {% endfor %}
+        </ul>
+    </div>
+
+    <div class="card mt-4">
         <div class="card-header">Most Viewed Alleles <span class="float-right">unique viewers</span></div>
         <ul class="list-group">
         {% for ccount in counts.allele_views|slice:"10" %}
