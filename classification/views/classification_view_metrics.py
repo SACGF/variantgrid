@@ -88,7 +88,8 @@ class ViewEventCounts:
                 .filter(**{f"{field_name}__isnull": False})\
                 .annotate(total=Count('pk'))\
                 .order_by():
-            id_to_count[values.get(field_name)] += 1  # just want to count once per unique user
+            if non_blank := values.get(field_name):
+                id_to_count[non_blank] += 1  # just want to count once per unique user
             # TODO limit the number of results we look at? (though wont work if we want unique users)
 
         return sorted((Counted(pk, count, resolver) for pk, count in id_to_count.items()), reverse=True)
@@ -96,10 +97,13 @@ class ViewEventCounts:
     @staticmethod
     def resolver_for_model(model: Model):
         def resolver(pk: Any):
-            if first := model.objects.filter(pk=pk).first():
-                return first
+            if pk:
+                if first := model.objects.filter(pk=pk).first():
+                    return first
+                else:
+                    return f"{pk}"
             else:
-                return f"{pk}"
+                return "blank"
         return resolver
 
     @lazy
