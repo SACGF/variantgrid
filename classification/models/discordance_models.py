@@ -56,7 +56,7 @@ class DiscordanceReport(TimeStampedModel):
         return reverse('discordance_report', kwargs={"discordance_report_id": self.pk})
 
     def __str__(self):
-        return f"Discordance Report ({self.pk})"
+        return f"({self.pk}) Discordance Report ({self.clinical_context.allele:CA}) {self.get_resolution_display() or 'Discordant'}"
 
     @property
     def metrics_logging_key(self) -> Tuple[str, Any]:

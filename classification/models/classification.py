@@ -50,6 +50,7 @@ from library.log_utils import report_exc_info, report_event
 from library.utils import empty_dict, empty_to_none, nest_dict, cautious_attempt_html_to_text, DebugTimer
 from ontology.models import OntologyTerm, OntologySnake, OntologyTermRelation
 from snpdb.clingen_allele import populate_clingen_alleles_for_variants
+from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import Variant, Lab, Sample
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_variant import AlleleSource, Allele, VariantCoordinate, VariantAllele
@@ -2266,6 +2267,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         return self._generate_c_hgvs_extra(genome_build).format()
 
     def __str__(self) -> str:
+        """
         if self.variant:
             variant_details = str(self.variant)
         else:
@@ -2277,9 +2279,14 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                     break
             variant_details_list.append("(not linked to variant)")
             variant_details = " ".join(variant_details_list)
+        """
+        genome_build = GenomeBuildManager.get_current_genome_build()
+        cached_c_hgvs = self.get_c_hgvs(genome_build=genome_build)
+        if not cached_c_hgvs:
+            cached_c_hgvs = self.get(SpecialEKeys.C_HGVS)
 
         clinical_significance = self.get_clinical_significance_display() or "Unclassified"
-        return f"({str(self.id)}) {variant_details}: {clinical_significance} by {self.user}"
+        return f"({str(self.id)}) {cached_c_hgvs} {clinical_significance}"
 
     @staticmethod
     def check_can_create_no_classification_via_web_form(_user: User):
