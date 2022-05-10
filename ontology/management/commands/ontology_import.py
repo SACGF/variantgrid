@@ -33,7 +33,7 @@ GENE_RELATIONS = {
     "http://purl.obolibrary.org/obo/RO_0004020": "disease has basis in dysfunction of",
     "http://purl.obolibrary.org/obo/RO_0004026": "disease has location",
     "http://purl.obolibrary.org/obo/RO_0004027": "disease has inflammation site",
-    "http://purl.obolibrary.org/obo/RO_0004030": "disease arises from structure"
+    "http://purl.obolibrary.org/obo/RO_0004030": "disease arises from structure",
 }
 
 MATCH_TYPES = {
