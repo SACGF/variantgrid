@@ -38,36 +38,39 @@ class PageViewsMiddleware:
 
         return response
 
-    def is_special_case(self, request, view_func, view_args, view_kwargs) -> Optional[ViewEvent]:
-        if 'classification' not in settings.LOG_ACTIVITY_APPS:
-            return
+    # This code adds too much complexity and redundancy to the logging ()
+    # leave classification activity to the
 
-        # check to HTTP_X_REQUESTED_WITH as that implies it's a browser performing the request so hopefully we skip it when it's being performed by the API
-        if request.path_info == '/classification/api/classifications/v1/record/' and request.method == 'POST' and request.META.get('HTTP_X_REQUESTED_WITH') == 'XMLHttpRequest':
-            data = json.loads(request.body)
-            if isinstance(data, dict) and data.get('source') == 'form':
-                all_params = {'classification_id': data.get('id').get('record_id'), **data.get('patch')}
-                if data.get('delete') is not None:
-                    all_params['delete'] = data.get('delete')
-                if data.get('publish') is not None:
-                    all_params['publish'] = data.get('publish')
-
-                return ViewEvent(
-                    user=request.user,
-                    # doesn't match any actual view name, just trying to be explicit
-                    view_name='classification:classification_form',
-                    args=all_params,
-                    path=request.get_full_path(),
-                    method=request.method,
-                    referer=request.headers.get('Referer')
-                )
-
-            pass
+    # def is_special_case(self, request, view_func, view_args, view_kwargs) -> Optional[ViewEvent]:
+    #     if 'classification' not in settings.LOG_ACTIVITY_APPS:
+    #         return
+    #
+    #     # check to HTTP_X_REQUESTED_WITH as that implies it's a browser performing the request so hopefully we skip it when it's being performed by the API
+    #     if request.path_info == '/classification/api/classifications/v1/record/' and request.method == 'POST' and request.META.get('HTTP_X_REQUESTED_WITH') == 'XMLHttpRequest':
+    #         data = json.loads(request.body)
+    #         if isinstance(data, dict) and data.get('source') == 'form':
+    #             all_params = {'classification_id': data.get('id').get('record_id'), **data.get('patch')}
+    #             if data.get('delete') is not None:
+    #                 all_params['delete'] = data.get('delete')
+    #             if data.get('publish') is not None:
+    #                 all_params['publish'] = data.get('publish')
+    #
+    #             return ViewEvent(
+    #                 user=request.user,
+    #                 # doesn't match any actual view name, just trying to be explicit
+    #                 view_name='classification:classification_form',
+    #                 args=all_params,
+    #                 path=request.get_full_path(),
+    #                 method=request.method,
+    #                 referer=request.headers.get('Referer')
+    #             )
+    #
+    #         pass
 
     def process_view(self, request, view_func, view_args, view_kwargs):
-        if special_view_event := self.is_special_case(request, view_func, view_args, view_kwargs):
-            request.view_event = special_view_event
-            return
+        # if special_view_event := self.is_special_case(request, view_func, view_args, view_kwargs):
+        #     request.view_event = special_view_event
+        #     return
 
         if VariantGridSessionRefresh.is_ajax(request):
             return
