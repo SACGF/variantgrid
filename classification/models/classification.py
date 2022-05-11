@@ -884,10 +884,11 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
 
     def allele_classification_changed(self):
         """ Notifies all variants linked to allele that the classification has changed """
-        for variant_allele in self.allele.variant_alleles():
-            variants_classification_changed_signal.send(sender=Classification,
-                                                        variants=[variant_allele.variant],
-                                                        genome_build=variant_allele.genome_build)
+        if allele := self.allele:
+            for variant_allele in self.allele.variant_alleles():
+                variants_classification_changed_signal.send(sender=Classification,
+                                                            variants=[variant_allele.variant],
+                                                            genome_build=variant_allele.genome_build)
 
     @property
     def share_level_enum(self) -> ShareLevel:
