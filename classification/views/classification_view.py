@@ -90,6 +90,7 @@ class ClassificationView(APIView):
                 per_json_data = list()
                 for record_data in records:
                     result = importer.insert(record_data, import_run=classification_import_run)
+                    result.notify_if_required()
                     if classification_import_run:
                         classification_import_run.increment_status(result.status)
                     per_json_data.append(result)

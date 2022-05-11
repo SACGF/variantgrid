@@ -12,6 +12,7 @@ from classification.enums import SpecialEKeys
 from classification.models.evidence_mixin import VCPatch, VCStore
 from flags.models import FlagCollection
 from genes.models import GeneSymbol, Gene, Transcript
+from library.log_utils import NotificationBuilder
 from library.utils import VarsDict
 from snpdb.models import VariantCoordinate, Allele, Lab
 
@@ -70,6 +71,15 @@ class ClassificationPatchResponse(VarsDict):
 
     def append_warning(self, code: str, message: str, key: Optional[str] = None):
         self.warnings.append(PatchMessage(code=code, message=message, key=key))
+
+    def notify_if_required(self):
+        if self.status == ClassificationPatchStatus.ALREADY_WITHDRAWN:
+            id_str: Optional[str] = "Unknown"
+            if c_json := self.classification_json:
+                id_str = c_json.get('id')
+            nb = NotificationBuilder("Import Problem")
+            nb.add_markdown(f":ghost: Record {id_str} was in an import, but that record has been withdrawn")
+            nb.send()
 
     def to_json(self):
         # we have two modes, just from the patch, and from the API where we send a bunch of data

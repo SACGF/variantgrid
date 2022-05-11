@@ -62,8 +62,6 @@ class ClassificationImportRun(TimeStampedModel):
             self.row_count_update += 1
         elif status == ClassificationPatchStatus.DELETED:
             self.row_count_delete += 1
-        elif status == ClassificationPatchStatus.ALREADY_WITHDRAWN:
-            self.row_count_already_withdrawn += 1
         elif status == ClassificationPatchStatus.NO_CHANGE:
             self.row_count_no_change += 1
         elif status == ClassificationPatchStatus.WITHDRAWN:
