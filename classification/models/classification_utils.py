@@ -369,6 +369,9 @@ def classification_gene_symbol_filter(gene_symbol: Union[str, GeneSymbol]) -> Op
                 evidence_q_list.append(Q(published_evidence__gene_symbol__value__iexact=symbol))
 
             t_qs = Transcript.objects.filter(transcriptversion__gene_version__gene__in=genes).distinct()
+            evidence_q_list.append(Q(classification__transcript_version_grch37__transcript__in=t_qs))
+            evidence_q_list.append(Q(classification__transcript_version_grch38__transcript__in=t_qs))
+            """
             for transcript_id, annotation_consortium in t_qs.values_list("identifier", "annotation_consortium"):
                 e_key = SpecialEKeys.ANNOTATION_CONSORTIUM_KEYS[annotation_consortium]
                 # We want to match transcript versions (ie X should match X, X.1, X.2 etc)
@@ -379,7 +382,7 @@ def classification_gene_symbol_filter(gene_symbol: Union[str, GeneSymbol]) -> Op
                 q_regex = Q(**{f"published_evidence__{e_key}__value__regex": regex})
                 # Run both quick startwith and regex queries (only slightly slower than original startswith)
                 evidence_q_list.append(q_transcript_startswith & q_regex)
-
+            """
             match_evidence = reduce(operator.or_, evidence_q_list)
             return match_gene | match_evidence
 

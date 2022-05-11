@@ -28,6 +28,7 @@ from library.log_utils import report_exc_info
 from library.utils import clean_string
 from snpdb.clingen_allele import get_clingen_allele_from_hgvs, get_clingen_allele_for_variant, \
     ClinGenAlleleServerException, ClinGenAlleleAPIException
+from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import Variant, ClinGenAllele
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_variant import VariantCoordinate
@@ -305,6 +306,21 @@ class CHGVS:
                     version = int(version)
                 return TranscriptParts(identifier=m.group(1), version=version)
         return TranscriptParts(identifier=None, version=None)
+
+    def transcript_version_model(self, genome_build: Optional[GenomeBuild] = None) -> Optional[TranscriptVersion]:
+        """
+        :param genome_build: Must be provided if genome_build isn't already part of the CHGVS object
+        :return: The extract TranscriptVersion if it's in our database, otherwise None
+        """
+        parts = self.transcript_parts
+        if parts.identifier and parts.version:
+            if not genome_build:
+                genome_build = self.genome_build
+                if not genome_build:
+                    raise ValueError("No genome_build provided for transcript_version_model")
+
+            if transcript := Transcript.objects.filter(identifier=parts.identifier).first():
+                return TranscriptVersion.objects.filter(genome_build=genome_build, transcript=transcript, version=parts.version).first()
 
     def diff(self, other: 'CHGVS') -> CHGVSDiff:
         cdiff = CHGVSDiff.SAME

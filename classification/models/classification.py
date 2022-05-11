@@ -43,7 +43,7 @@ from flags.models import Flag, FlagPermissionLevel, FlagStatus
 from flags.models.models import FlagsMixin, FlagCollection, FlagTypeContext, \
     flag_collection_extra_info_signal, FlagInfos
 from genes.hgvs import HGVSMatcher, CHGVS, chgvs_diff_description, CHGVSDiff, HGVSNameExtra
-from genes.models import Gene
+from genes.models import Gene, TranscriptVersion
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
 from library.guardian_utils import clear_permissions
 from library.log_utils import report_exc_info, report_event
@@ -444,6 +444,9 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
     chgvs_grch37_full = models.TextField(blank=True, null=True)
     chgvs_grch38_full = models.TextField(blank=True, null=True)
 
+    transcript_version_grch37 = models.ForeignKey(TranscriptVersion, null=True, blank=True, on_delete=SET_NULL, related_name='classification_37')
+    transcript_version_grch38 = models.ForeignKey(TranscriptVersion, null=True, blank=True, on_delete=SET_NULL, related_name='classification_38')
+
     sample = models.ForeignKey(Sample, null=True, blank=True, on_delete=SET_NULL)  # Won't always have this
     classification_import = models.ForeignKey(ClassificationImport, null=True, on_delete=CASCADE)
     user = models.ForeignKey(User, on_delete=PROTECT)
@@ -678,6 +681,22 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         classification_withdraw_signal.send(Classification, classification=self)
         return True
 
+    def update_transcripts(self) -> int:
+        """
+        Updates the cached transcripts, save() still need to be called
+        :return: the number of transcripts successfully set (even if they didn't change)
+        """
+        self.transcript_version_grch37 = CHGVS(self.chgvs_grch37).transcript_version_model(genome_build=GenomeBuild.grch37())
+        self.transcript_version_grch38 = CHGVS(self.chgvs_grch37).transcript_version_model(genome_build=GenomeBuild.grch38())
+
+        transcript_counts = 0
+        if self.transcript_version_grch37:
+            transcript_counts += 1
+        if self.transcript_version_grch38:
+            transcript_counts += 1
+        return transcript_counts
+
+
     def update_cached_c_hgvs(self) -> int:
         """
         :return: Returns length of the c.hgvs if successfully updated caches
@@ -703,6 +722,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             self.chgvs_grch38 = None
             self.chgvs_grch38_full = None
 
+        self.update_transcripts()
         self.update_allele()
 
         # if we had a previously opened flag match warning - don't re-open
