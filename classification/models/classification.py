@@ -687,7 +687,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         :return: the number of transcripts successfully set (even if they didn't change)
         """
         self.transcript_version_grch37 = CHGVS(self.chgvs_grch37).transcript_version_model(genome_build=GenomeBuild.grch37())
-        self.transcript_version_grch38 = CHGVS(self.chgvs_grch37).transcript_version_model(genome_build=GenomeBuild.grch38())
+        self.transcript_version_grch38 = CHGVS(self.chgvs_grch38).transcript_version_model(genome_build=GenomeBuild.grch38())
 
         transcript_counts = 0
         if self.transcript_version_grch37:
