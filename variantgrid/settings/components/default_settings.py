@@ -882,8 +882,8 @@ COMPRESS_ENABLED = True
 # Standard SECRETS
 # Config used to talk directly to keycloak
 KEYCLOAK_SYNC_DETAILS = None
-# Config used to upload to Shariant
-SYNC_DETAILS = None
+# Config used to upload to Shariant, keys are SyncDestination.config['sync_details']
+SYNC_DETAILS = {}
 # Config used if using AWS email
 AWS_SES_ACCESS_KEY_ID = None
 AWS_SES_SECRET_ACCESS_KEY = None
@@ -927,7 +927,14 @@ def get_shariant_sync_secrets() -> dict:
     """
     SYNC_DETAILS = get_shariant_sync_secrets()
     """
-    return get_secrets("SYNC", ["enabled", "username", "password", "host", "oauth_url", "client_id"])
+    sync_fields = ["enabled", "username", "password", "host", "oauth_url", "client_id"]
+    sync = get_secret("SYNC")
+    # New SYNC keys are SyncDestination.config['sync_details'] - old one was only 1 level deep
+    # Check whether it's old sync field
+    if set(sync.keys()) == set(sync_fields):
+        raise ValueError("Old secret 'SYNC' detected - need to use SyncDestination.config['sync_details'] as keys")
+
+    return {sd: get_secrets(f"SYNC.{sd}", sync_fields) for sd in sync}
 
 
 def get_aws_secrets() -> dict:

@@ -57,8 +57,7 @@ def batch_iterator_end(iterable: Iterable[T], batch_size: int = 10) -> Iterable[
 
 
 def sync_shariant_upload(sync_destination: SyncDestination, full_sync: bool = False, max_rows: Optional[int] = None) -> SyncRun:
-    config = sync_destination.config
-    shariant = OAuthConnector.shariant_oauth_connector()
+    shariant = OAuthConnector.shariant_oauth_connector(config["sync_details"])
 
     filters = config.get('filters', {})
     mapping = config.get('mapping', {})
