@@ -10,8 +10,8 @@ from requests_oauthlib.oauth2_session import OAuth2Session
 class OAuthConnector:
 
     @staticmethod
-    def shariant_oauth_connector():
-        sync_details = settings.SYNC_DETAILS
+    def shariant_oauth_connector(sync_details):
+        sync_details = settings.SYNC_DETAILS[sync_details]
         return OAuthConnector(**sync_details)
 
     @staticmethod
