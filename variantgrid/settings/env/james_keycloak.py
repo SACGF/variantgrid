@@ -2,7 +2,7 @@
 See https://bitbucket.org/sacgf/variantgrid/wiki/Annotation%20Setup
 (test)
 """
-GDAL_LIBRARY_PATH="/opt/homebrew/Cellar/gdal/3.4.1_2/lib/libgdal.30.dylib"
+GDAL_LIBRARY_PATH="/opt/homebrew/Cellar/gdal/3.4.2_2/lib/libgdal.30.dylib"
 GEOS_LIBRARY_PATH="/opt/homebrew/Cellar/geos/3.10.2/lib/libgeos_c.dylib"
 # IMPORTANT : THE BELOW IMPORTS ARE USED TO APPLY THEIR RESPECTIVE SETTINGS VALUES
 from variantgrid.settings.components.celery_settings import *  # pylint: disable=wildcard-import, unused-wildcard-import
@@ -39,7 +39,7 @@ AUTHENTICATION_BACKENDS = (
 
 MIDDLEWARE += (
     'auth.session_refresh.VariantGridSessionRefresh',
-    'debug_toolbar.middleware.DebugToolbarMiddleware',
+#    'debug_toolbar.middleware.DebugToolbarMiddleware',
     'auth.oidc_error_handler.HandleOIDC400Middleware',
 )
 
@@ -178,7 +178,7 @@ if _SHARIANT_MODE:
     TEMPLATES[0]["DIRS"].insert(0, SHARIANT_TEMPLATES_DIR)
     SITE_NAME = "Shariant"
 
-INSTALLED_APPS.append('debug_toolbar')
+# INSTALLED_APPS.append('debug_toolbar')
 
 #SAPATH_APP = 'sapath.apps.SapathConfig'
 #INSTALLED_APPS += [SAPATH_APP]
