@@ -1,9 +1,12 @@
-from typing import Dict, Union
+import datetime
+from dataclasses import dataclass
+from typing import Dict, Union, Any
 
 from django import template
 from django.contrib.auth.models import User
+from lazy import lazy
 
-from snpdb.models import AvatarDetails
+from snpdb.models import AvatarDetails, Lab
 from snpdb.models.models_user_settings import UserSettings
 
 register = template.Library()
@@ -20,26 +23,62 @@ def has_group_or_admin(user, group_name):
 
 
 @register.inclusion_tag("snpdb/tags/user.html", takes_context=True)
-def user(context, u: User, show_avatar=False, show_email=False, show_last_login=False, role='user', size='normal'):
-    user_cache: Dict[int, UserSettings] = context.get("_user_cache")
-    if not user_cache:
-        user_cache = dict()
-        context["_user_cache"] = user_cache
-    us: UserSettings = user_cache.get(u.id)
-    if not us:
-        us = UserSettings.get_for_user(u)
-        user_cache[u.id] = us
+def user(context, u: User, show_avatar=False, show_email=False, show_last_login=False, show_orgs=False, role='user', size='normal'):
+
+    @dataclass(frozen=True)
+    class UserDetails:
+        context: Any
+        user: User
+        role: str
+        size: str
+        show_orgs: bool
+        show_avatar: bool
+        show_email: bool
+        show_last_login: bool
+
+        @lazy
+        def avatar(self):
+            return AvatarDetails.avatar_for(self.user)
+
+        @property
+        def preferred_label(self):
+            return self.avatar.preferred_label
+
+        @property
+        def last_login(self) -> datetime:
+            return self.user.last_login
+
+        @property
+        def email(self):
+            return self.user.email
+
+        @property
+        def orgs_str(self):
+            orgs = sorted({lab.organization for lab in Lab.valid_labs_qs(self.user).select_related('organization')})
+            return ", ".join([org.name for org in orgs])
+
+        @lazy
+        def user_settings(self) -> UserSettings:
+            user_cache: Dict[int, UserSettings] = self.context.get("_user_cache")
+            if not user_cache:
+                user_cache = dict()
+                self.context["_user_cache"] = user_cache
+            us: UserSettings = user_cache.get(self.user.id)
+            if not us:
+                us = UserSettings.get_for_user(self.user)
+                user_cache[self.user.id] = us
+            return us
+
+        @property
+        def email_weekly_updates(self):
+            return self.user_settings.email_weekly_updates
+
+        @property
+        def email_discordance_updates(self):
+            return self.user_settings.email_discordance_updates
 
     return {
-        "user": u,
-        "role": role,
-        "avatar": AvatarDetails.avatar_for(u),
-        "show_email": show_email,
-        "show_avatar": show_avatar,
-        "show_last_login": show_last_login,
-        "email_weekly": us.email_weekly_updates,
-        "email_discordance": us.email_discordance_updates,
-        "size": size,
+        "user_details": UserDetails(context=context, user=u, show_avatar=show_avatar, show_orgs=show_orgs, show_email=show_email, show_last_login=show_last_login, role=role, size=size)
     }
 
 

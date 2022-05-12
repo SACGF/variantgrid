@@ -86,7 +86,7 @@
         <ul class="list-group">
         {% for ccount in counts.active_users|slice:"10" %}
             <li class="list-group-item d-flex justify-content-between align-items-center">
-                {% user ccount.resolve %}
+                {% user ccount.resolve show_orgs=True %}
                 <span>
                      <a class="mr-1"
                         data-toggle="ajax-modal"

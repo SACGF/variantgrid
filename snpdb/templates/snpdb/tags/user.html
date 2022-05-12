@@ -2,20 +2,22 @@
 {% load static %}
 {% load user_tags %}
 <div class="d-flex">
-    {% avatar2 avatar size=size %}
+    {% avatar2 user_details.avatar size=user_details.size %}
     <div style="line-height:1.3" class="flex-grow align-self-center">
-        {% if show_email and user.email %}
-            <a class="hover-link" href="mailto:{{user.email}}" title="{{ user.email }}">{{ avatar.preferred_label }}</a>
+        {% if user_details.show_email and user_details.email %}
+            <a class="hover-link" href="mailto:{{user_details.email}}" title="{{ user_details.email }}">{{ user_details.preferred_label }}</a>
         {% else %}
-            {{ avatar.preferred_label }}
+            {{ user_details.preferred_label }}
         {% endif %}
-
-        {% if show_last_login %}
+        {% if user_details.show_orgs %}
+            <span class="text-info">{{ user_details.orgs_str }}</span>
+        {% endif %}
+        {% if user_details.show_last_login %}
             <br/>
-            <span class="timestamp">{% timestamp user.last_login time_ago=True %}</span>
-            {% if email_weekly %}<i class="far fa-envelope ml-1" title="Receives weekly updates" data-toggle="tooltip"></i>{% endif %}
-            {% if email_discordance %}<i class="far fa-bell ml-1" title="Receives discordance updates" data-toggle="tooltip"></i>{% endif %}
+            <span class="timestamp">{% timestamp user_details.last_login time_ago=True %}</span>
+            {% if user_details.email_weekly_updates %}<i class="far fa-envelope ml-1" title="Receives weekly updates" data-toggle="tooltip"></i>{% endif %}
+            {% if user_details.email_discordance_updates %}<i class="far fa-bell ml-1" title="Receives discordance updates" data-toggle="tooltip"></i>{% endif %}
         {% endif %}
-        {% if role == 'head' %}<i class="far fa-star ml-1" title="User is lab head" data-toggle="tooltip"></i>{% endif %}
+        {% if user_details.role == 'head' %}<i class="far fa-star ml-1" title="User is lab head" data-toggle="tooltip"></i>{% endif %}
     </div>
 </div>

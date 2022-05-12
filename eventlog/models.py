@@ -14,6 +14,7 @@ from library.utils import empty_dict
 
 
 class ViewEvent(TimeStampedModel):
+    # ViewEvent isn't an accurate name since it's also used for POST
     user = models.ForeignKey(User, null=True, on_delete=SET_NULL)
     view_name = models.TextField()
     args = models.JSONField(null=False, blank=True, default=empty_dict)
