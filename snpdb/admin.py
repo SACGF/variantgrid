@@ -164,7 +164,8 @@ class ClinVarKeyAdmin(ModelAdminBasics):
         return super(ClinVarKeyAdmin, self).get_form(request, obj, widgets={
             'id': admin.widgets.AdminTextInputWidget(),
             'api_key': admin.widgets.AdminTextInputWidget(),
-            'org_id': admin.widgets.AdminTextInputWidget()
+            'org_id': admin.widgets.AdminTextInputWidget(),
+            'name': admin.widgets.AdminTextInputWidget()
         }, **kwargs)
 
 
