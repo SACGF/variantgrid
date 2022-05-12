@@ -585,7 +585,7 @@ function checkLoggedIn(loggedInHandler, loggedOutHandler) {
 const JS_DATE_FORMAT_DETAILED = 'YYYY-MM-DD HH:mm:ss ZZ';
 const JS_DATE_FORMAT_SECONDS = 'YYYY-MM-DD HH:mm:ss';
 const JS_DATE_FORMAT_SCIENTIFIC = 'YYYY-MM-DD HH:mm';
-const JS_DATE_FORMAT = 'lll';
+const JS_DATE_FORMAT = 'YYYY-MM-DD HH:mm'; //'lll';
 function configureTimestamps() {
     $.timeago.settings.allowFuture = true;
     $.timeago.settings.strings = {
@@ -628,7 +628,7 @@ function convertTimestampDom(elem) {
         let newElement = $('<time>', {'datetime': m.toISOString(), text: m.format(JS_DATE_FORMAT_SECONDS)});
         elem.replaceWith(newElement);
     } else {
-        let newElement = $('<time>', {'datetime': m.toISOString(), text: m.format(JS_DATE_FORMAT)});
+        let newElement = $('<time>', {'datetime': m.toISOString(), class:'timestamp', text: m.format(JS_DATE_FORMAT)});
         elem.replaceWith(newElement);
     }
 }
