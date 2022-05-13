@@ -109,7 +109,7 @@
                 {% for view_event in counts.recent_views|slice:10 %}
                     <tr>
                         <td style="min-width:140px">{% timestamp view_event.created %}</td>
-                        <td>{% user view_event.user size="tiny" %}</td>
+                        <td>{% user view_event.user show_orgs=True size="tiny" %}</td>
                         <td>{{ view_event.view_name }}</td>
                         <td>
                             {% if not view_event.is_get %}<label>{{ view_event.method }}</label>{% endif %}
