@@ -190,7 +190,7 @@ ANNOTATION = {
             "dbnsfp": "annotation_data/GRCh37/dbNSFP4.0a.grch37.stripped.gz",
             "dbscsnv": "annotation_data/GRCh37/dbscSNV1.1_GRCh37.txt.gz",
             "gnomad2": "annotation_data/GRCh37/gnomad2.1.1_GRCh37_combined_af.vcf.bgz",
-            "mastermind": "annotation_data/GRCh37/mastermind_cited_variants_reference-2021.04.02-grch37.vcf.gz",
+            "mastermind": "annotation_data/GRCh37/mastermind_cited_variants_reference-2022.04.02-grch37.vcf.gz",
             "maxentscan": "annotation_data/all_builds/maxentscan",
             'phastcons100way': "annotation_data/GRCh37/hg19.100way.phastCons.bw",
             'phastcons46way': "annotation_data/GRCh37/hg19.phastCons46way.placental.bw",
@@ -222,7 +222,7 @@ ANNOTATION = {
             "dbscsnv": "annotation_data/GRCh38/dbscSNV1.1_GRCh38.txt.gz",
             "gnomad2": "annotation_data/GRCh38/gnomad2.1.1_GRCh38_combined_af.vcf.bgz",
             "gnomad3": "annotation_data/GRCh38/gnomad3.1_GRCh38_merged.vcf.bgz",
-            "mastermind": "annotation_data/GRCh38/mastermind_cited_variants_reference-2021.04.02-grch38.vcf.gz",
+            "mastermind": "annotation_data/GRCh38/mastermind_cited_variants_reference-2022.04.02-grch38.vcf.gz",
             "maxentscan": "annotation_data/all_builds/maxentscan",
             'phastcons100way': "annotation_data/GRCh38/hg38.phastCons100way.bw",
             'phastcons46way': None,  # n/a for GRCh38
