@@ -26,8 +26,8 @@ set -e
 # tabix -s 1 -b 2 -e 2 dbNSFP4.3a_grch38.gz
 
 
-IN_FILE=dbNSFP4.3a.grch38.gz
-OUT_FILE=dbNSFP4.03.grch38.stripped.gz
+IN_FILE=dbNSFP4.3a_grch38.gz
+OUT_FILE=dbNSFP4.3a_grch38.stripped.gz
 
 # Header needs to start with #
 (echo -n "#" ; zcat ${IN_FILE} | cut -f 1,2,3,4,15,69,74,84,104,107,119,156,640 ) | bgzip > ${OUT_FILE}
