@@ -1,3 +1,5 @@
+from typing import Set
+
 from django.conf import settings
 from django.dispatch import receiver
 from django.urls import reverse
@@ -7,6 +9,7 @@ from classification.models import DiscordanceReport, discordance_change_signal, 
     DiscordanceReportSummary
 from library.django_utils import get_url_from_view_path
 from library.log_utils import NotificationBuilder
+from snpdb.models import Lab
 from snpdb.utils import LabNotificationBuilder
 
 
@@ -38,12 +41,17 @@ def send_discordance_notification(discordance_report: DiscordanceReport):
         notification.add_field(label="c.HGVS", value=c_hgvs_str)
 
         sig_lab: DiscordanceReportSummary.LabClinicalSignificances
+        reported_labs: Set[Lab] = set()
         for sig_lab in report_summary.lab_significances:
             notification.add_field(f"{sig_lab.lab} - classify this as", "\n".join([clin_sig_key.pretty_value(cs) for cs in sig_lab.clinical_significances]))
+            reported_labs.add(sig_lab.lab)
 
         withdrawn_labs = sorted({lab for lab, involvement in discordance_report.involved_labs.items() if involvement == DiscordanceReport.LabInvolvement.WITHDRAWN})
         for withdrawn_lab in withdrawn_labs:
-            notification.add_field(label=f"{sig_lab.lab} - classify this as", value="_WITHDRAWN_")
+            # if a lab is both still in the discordance with non-withdrawn classifications and with withdrawn classifications
+            # don't count them both times.
+            if withdrawn_lab not in reported_labs:
+                notification.add_field(label=f"{sig_lab.lab} - classify this as", value="_WITHDRAWN_")
 
         notification.add_markdown(f"Full details of the overlap can be seen here : <{report_url}>")
         notification.send()
