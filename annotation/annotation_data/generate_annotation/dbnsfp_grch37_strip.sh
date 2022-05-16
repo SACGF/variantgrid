@@ -25,8 +25,8 @@ set -e
 # zgrep -h -v ^#chr dbNSFP4.3a_variant.chr* | awk '$8 != "." ' | sort -T /path/to/tmp_folder -k8,8 -k9,9n - | cat h - | bgzip -c > dbNSFP4.3a_grch37.gz
 # tabix -s 8 -b 9 -e 9 dbNSFP4.3a_grch37.gz
 
-IN_FILE=dbNSFP4.3a_grch37.gz
-OUT_FILE=dbNSFP4.3a_grch37.stripped.gz
+IN_FILE=dbNSFP4.3a.grch37.gz
+OUT_FILE=dbNSFP4.3a.grch37.stripped.gz
 
 # Header needs to start with #
 (echo -n "#" ; zcat ${IN_FILE} | cut -f 3,4,5,6,8,9,15,69,74,84,104,107,119,156,640 ) | bgzip > ${OUT_FILE}
