@@ -10,12 +10,12 @@ set -e
 # Get column names from dbNSFP data file
 # df = pd.read_csv("./dbNSFP4.3a_grch37.gz", sep='\t', index_col=None, nrows=0)
 # vep_fields = 'GERP++_RS,Interpro_domain,CADD_raw_rankscore,REVEL_rankscore,BayesDel_noAF_rankscore,ClinPred_rankscore,VEST4_rankscore,MetaLR_rankscore'
-# columns = ['ref', 'alt',  'hg19_chr', 'hg19_pos(1-based)', 'Ensembl_transcriptid'] + vep_fields.split(",")
+# columns = ['ref', 'alt', 'aaref', 'aaalt', 'hg19_chr', 'hg19_pos(1-based)', 'Ensembl_transcriptid'] + vep_fields.split(",")
 # cols = []
 # for i in columns:
 #    cols.append(list(df.columns).index(i) + 1)
 # ",".join([str(c) for c in sorted(cols)])
-# columns are: '3,4,8,9,15,69,74,84,104,107,119,156,640'
+# columns are: '3,4,5,6,8,9,15,69,74,84,104,107,119,156,640'
 
 
 # Download 4.3 from https://sites.google.com/site/jpopgen/dbNSFP
@@ -29,6 +29,6 @@ IN_FILE=dbNSFP4.3a_grch37.gz
 OUT_FILE=dbNSFP4.3a_grch37.stripped.gz
 
 # Header needs to start with #
-(echo -n "#" ; zcat ${IN_FILE} | cut -f 3,4,8,9,15,69,74,84,104,107,119,156,640 ) | bgzip > ${OUT_FILE}
+(echo -n "#" ; zcat ${IN_FILE} | cut -f 3,4,5,6,8,9,15,69,74,84,104,107,119,156,640 ) | bgzip > ${OUT_FILE}
 tabix -s 3 -b 4 -e 4 ${OUT_FILE} # cols are: 1=ref, 2=alt, 3=chr, 4=pos
 
