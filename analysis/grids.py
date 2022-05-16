@@ -454,9 +454,7 @@ class NodeColumnSummaryGrid(DataFrameJqGrid):
         self.extra_config.update({'sortname': 'Counts',
                                   'sortorder': 'desc'})
 
-        # Only want to
-        variantgrid_column = VariantGridColumn.objects.filter(variant_column=variant_column).first()
-        if variantgrid_column:
+        if VariantGridColumn.objects.filter(variant_column=variant_column).exists():
             self.extra_config["create_filter_child_links"] = True
 
     def get_dataframe(self):
