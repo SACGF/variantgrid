@@ -30,5 +30,5 @@ OUT_FILE=dbNSFP4.3a_grch37.stripped.gz
 
 # Header needs to start with #
 (echo -n "#" ; zcat ${IN_FILE} | cut -f 3,4,5,6,8,9,15,69,74,84,104,107,119,156,640 ) | bgzip > ${OUT_FILE}
-tabix -s 3 -b 4 -e 4 ${OUT_FILE} # cols are: 1=ref, 2=alt, 3=chr, 4=pos
+tabix -s 5 -b 6 -e 6 ${OUT_FILE} # cols are: 1=ref, 2=alt, 3=chr, 4=pos
 
