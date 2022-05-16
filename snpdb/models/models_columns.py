@@ -11,9 +11,9 @@ from snpdb.models.models_enums import ColumnAnnotationLevel, VCFInfoTypes
 
 
 class VariantGridColumn(models.Model):
-    """ Used to populate analysis VariantGrid with annotation.
+    """ Holds info about columns used in VariantGrid analyses
 
-        Normally, we take a Variant queryset and get values queryset using "variant_column" """
+        "variant_column" is a django path (eg variantannotation__) passed to a Variant values queryset to return data """
     grid_column_name = models.TextField(primary_key=True)
     variant_column = models.TextField()
     annotation_level = models.CharField(max_length=1, choices=ColumnAnnotationLevel.choices, null=True)

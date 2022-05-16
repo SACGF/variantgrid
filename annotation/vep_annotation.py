@@ -25,6 +25,7 @@ class VEPConfig:
         self.annotation_consortium = genome_build.annotation_consortium
         self.genome_build = genome_build
         self.vep_data = genome_build.settings["vep_config"]
+        self.columns_version = self.vep_data["columns_version"]
 
     def __getitem__(self, key):
         """ Throws KeyError if missing """
@@ -36,7 +37,8 @@ def _get_dbnsfp_plugin_command(genome_build: GenomeBuild, vc: VEPConfig):
     """ Build from ColumnVEPField.source_field where vep_plugin = DBNSFP """
 
     dbnsfp_data_path = vc["dbnsfp"]
-    fields = ColumnVEPField.get_source_fields(genome_build, vep_plugin=VEPPlugin.DBNSFP)
+    q = ColumnVEPField.get_columns_version_q(vc.columns_version)
+    fields = ColumnVEPField.get_source_fields(genome_build, q, vep_plugin=VEPPlugin.DBNSFP)
     joined_columns = ",".join(fields)
     return f"dbNSFP,{dbnsfp_data_path},{joined_columns}"
 
@@ -108,12 +110,17 @@ def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, an
     if settings.ANNOTATION_VEP_DISTANCE is not None:
         cmd.extend(["--distance", str(settings.ANNOTATION_VEP_DISTANCE)])
 
-    # Plugins that require data
+    # Plugins that require data - ok for these to fail when retrieving vep config
     PLUGINS = {VEPPlugin.MASTERMIND: lambda: f"Mastermind,{vc['mastermind']},1",  # 1 to not filter
                VEPPlugin.MAXENTSCAN: lambda: f"MaxEntScan,{vc['maxentscan']}",
                VEPPlugin.DBNSFP: lambda: _get_dbnsfp_plugin_command(genome_build, vc),
                VEPPlugin.DBSCSNV: lambda: f"dbscSNV,{vc['dbscsnv']}",
                VEPPlugin.SPLICEAI: lambda: f"SpliceAI,snv={vc['spliceai_snv']},indel={vc['spliceai_indel']}"}
+
+    if vc.columns_version >= 2:
+        cmd.extend(["--plugin", "NMD"])
+        loftee_path = settings.ANNOTATION_VEP_PLUGINS_DIR
+        PLUGINS[VEPPlugin.LOFTEE] = lambda: f"LoF,loftee_path:{loftee_path},human_ancestor_fa:{vc['human_ancestor_fa']}"
 
     for vep_plugin, plugin_arg_func in PLUGINS.items():
         try:
@@ -225,6 +232,7 @@ def vep_dict_to_variant_annotation_version_kwargs(vep_config, vep_version_dict: 
     genome_build = vep_config.genome_build
     kwargs["genome_build"] = genome_build
     kwargs["annotation_consortium"] = vep_config.annotation_consortium
+    kwargs["columns_version"] = vep_config.columns_version
     distance = getattr(settings, "ANNOTATION_VEP_DISTANCE", None)
     if distance is None:
         distance = 5000

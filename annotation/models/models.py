@@ -25,7 +25,7 @@ from annotation.models.damage_enums import Polyphen2Prediction, FATHMMPrediction
     SIFTPrediction, PathogenicityImpact, MutationAssessorPrediction
 from annotation.models.models_enums import AnnotationStatus, CitationSource, \
     VariantClass, ColumnAnnotationCategory, VEPPlugin, VEPCustom, ClinVarReviewStatus, VEPSkippedReason, \
-    ManualVariantEntryType, HumanProteinAtlasAbundance
+    ManualVariantEntryType, HumanProteinAtlasAbundance, LOFTEEConfidence
 from genes.models import GeneSymbol, Gene, TranscriptVersion, Transcript, GeneAnnotationRelease
 from genes.models_enums import AnnotationConsortium
 from library.django_utils import object_is_referenced
@@ -318,6 +318,9 @@ class ColumnVEPField(models.Model):
     vep_plugin = models.CharField(max_length=1, choices=VEPPlugin.choices, null=True)
     vep_custom = models.CharField(max_length=1, choices=VEPCustom.choices, null=True)
     source_field_has_custom_prefix = models.BooleanField(default=False)
+    # We can use these min/max versions to turn on/off columns over time
+    min_vep_columns_version = models.IntegerField(null=True)
+    max_vep_columns_version = models.IntegerField(null=True)
 
     @property
     def vep_info_field(self):
@@ -332,13 +335,20 @@ class ColumnVEPField(models.Model):
         return vif
 
     @staticmethod
+    def get_columns_version_q(columns_version: int) -> Q:
+        q_min = Q(min_vep_columns_version__isnull=True) | Q(min_vep_columns_version__lte=columns_version)
+        q_max = Q(max_vep_columns_version__isnull=True) | Q(max_vep_columns_version__gte=columns_version)
+        return q_min & q_max
+
+    @staticmethod
     def filter_for_build(genome_build: GenomeBuild):
         """ genome_build = NULL (no build) or matches provided build """
         return ColumnVEPField.objects.filter(Q(genome_build=genome_build) | Q(genome_build__isnull=True))
 
     @staticmethod
-    def get_source_fields(genome_build: GenomeBuild, **columnvepfield_kwargs):
-        qs = ColumnVEPField.filter_for_build(genome_build).filter(**columnvepfield_kwargs).distinct("source_field")
+    def get_source_fields(genome_build: GenomeBuild, *columnvepfield_args, **columnvepfield_kwargs):
+        qs = ColumnVEPField.filter_for_build(genome_build)
+        qs = qs.filter(*columnvepfield_args, **columnvepfield_kwargs).distinct("source_field")
         return list(qs.values_list("source_field", flat=True).order_by("source_field"))
 
 
@@ -355,6 +365,7 @@ class VariantAnnotationVersion(SubVersionPartition):
     last_checked_date = models.DateTimeField(null=True)
 
     vep = models.IntegerField()
+    columns_version = models.IntegerField(default=1)
     ensembl = models.TextField()
     # can be eg: ensembl=97.378db18 ensembl-variation=97.26a059c ensembl-io=97.dc917e1 ensembl-funcgen=97.24f4d3c
     ensembl_funcgen = models.TextField()
@@ -382,18 +393,8 @@ class VariantAnnotationVersion(SubVersionPartition):
         """ Often you don't care what annotation version you use, only that variant annotation version is this one """
         return self.annotationversion_set.last()
 
-    @property
-    def pathogenicity_tools_version(self) -> int:
-        """ We've changed how this is handled over time """
-        if self.dbnsfp.startswith("4.0"):
-            return 1
-        elif self.dbnsfp.startswith("4.3"):
-            return 2
-        else:
-            raise ValueError(f"Don't know how to handle dbNSFP version '{self.dbnsfp}'")
-
     def get_functional_prediction_pathogenic_levels(self) -> Dict:
-        if self.pathogenicity_tools_version == 1:
+        if self.columns_version == 1:
             return {
                 'sift': SIFTPrediction.get_damage_or_greater_levels(),
                 'fathmm_pred_most_damaging': FATHMMPrediction.get_damage_or_greater_levels(),
@@ -401,7 +402,9 @@ class VariantAnnotationVersion(SubVersionPartition):
                 'mutation_taster_pred_most_damaging': MutationTasterPrediction.get_damage_or_greater_levels(),
                 'polyphen2_hvar_pred_most_damaging': Polyphen2Prediction.get_damage_or_greater_levels(),
             }
-        raise ValueError(f"Don't know fields for {self.pathogenicity_tools_version=}")
+        elif self.columns_version == 2:
+            return {}  # none used
+        raise ValueError(f"Don't know fields for {self.columns_version=}")
 
     @lazy
     def _vep_config(self) -> Dict:
@@ -554,6 +557,7 @@ class AbstractVariantAnnotation(models.Model):
     amino_acids = models.TextField(null=True, blank=True)
     cadd_phred = models.FloatField(null=True, blank=True)
     canonical = models.BooleanField(null=True, blank=True)
+    nmd_escaping_variant = models.BooleanField(null=True, blank=True)
     codons = models.TextField(null=True, blank=True)
     consequence = models.TextField(null=True, blank=True)
     distance = models.IntegerField(null=True, blank=True)
@@ -569,6 +573,12 @@ class AbstractVariantAnnotation(models.Model):
     impact = models.CharField(max_length=1, choices=PathogenicityImpact.CHOICES, null=True, blank=True)
     interpro_domain = models.TextField(null=True, blank=True)
     intron = models.TextField(null=True, blank=True)
+    # LOFTEE
+    lof = models.CharField(max_length=1, choices=LOFTEEConfidence.choices, null=True, blank=True)
+    lof_filter = models.TextField(null=True, blank=True)
+    lof_flags = models.TextField(null=True, blank=True)
+    lof_info = models.TextField(null=True, blank=True)
+    # LoF Tool
     loftool = models.FloatField(null=True, blank=True)
     maxentscan_alt = models.FloatField(null=True, blank=True)
     maxentscan_diff = models.FloatField(null=True, blank=True)
@@ -675,6 +685,14 @@ class VariantAnnotation(AbstractVariantAnnotation):
     mastermind_count_2_cdna_prot = models.IntegerField(null=True, blank=True)
     mastermind_count_3_aa_change = models.IntegerField(null=True, blank=True)
     mastermind_mmid3 = models.TextField(null=True, blank=True)  # gene:key for mastermind_count_3_aa_change
+
+    # dbNSFP pathogenicity rank scores (variant only)
+    cadd_raw_rankscore = models.FloatField(null=True, blank=True)
+    revel_rankscore = models.FloatField(null=True, blank=True)
+    bayesdel_noaf_rankscore = models.FloatField(null=True, blank=True)
+    clinpred_rankscore = models.FloatField(null=True, blank=True)
+    vest4_rankscore = models.FloatField(null=True, blank=True)
+    metalr_rankscore = models.FloatField(null=True, blank=True)
 
     # Not all builds have all phylop/phastcons
     phylop_30_way_mammalian = models.FloatField(null=True, blank=True)

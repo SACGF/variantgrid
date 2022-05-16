@@ -178,8 +178,11 @@ class BulkVEPVCFAnnotationInserter:
         self.ignored_vep_fields = self.VEP_NOT_COPIED_FIELDS.copy()
 
         vc = VEPConfig(self.genome_build)
+        q_columns_version = ColumnVEPField.get_columns_version_q(vc.columns_version)
+        vep_source_qs = ColumnVEPField.filter_for_build(self.genome_build)
+
         # Sort to have consistent VCF headers
-        for cvf in ColumnVEPField.filter_for_build(self.genome_build).order_by("source_field"):
+        for cvf in vep_source_qs.filter(q_columns_version).order_by("source_field"):
             try:
                 if cvf.vep_custom:  # May not be configured
                     prefix = cvf.get_vep_custom_display()
@@ -204,6 +207,13 @@ class BulkVEPVCFAnnotationInserter:
                              self.DB_IGNORED_COLUMNS)
         if self.annotation_run.annotation_consortium == AnnotationConsortium.REFSEQ:
             ignore_columns.update(self.VEP_NOT_COPIED_REFSEQ_ONLY)
+
+        # Find the ones that don't apply to this version, and exclude them
+        vc = VEPConfig(self.genome_build)
+        qs = ColumnVEPField.filter_for_build(self.genome_build)
+        q_not_this_version = ~ColumnVEPField.get_columns_version_q(vc.columns_version)
+        vep_fields_not_this_version = qs.filter(q_not_this_version).values_list("column", flat=True)
+        ignore_columns.update(vep_fields_not_this_version)
 
         for c in list(ignore_columns):
             if c.endswith("_id"):

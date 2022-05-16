@@ -1,3 +1,4 @@
+import copy
 import os
 from uuid import uuid4
 
@@ -20,10 +21,15 @@ from snpdb.tests.utils.vcf_testing_utils import slowly_create_loci_and_variants_
 TEST_IMPORT_PROCESSING_DIR = os.path.join(settings.PRIVATE_DATA_ROOT, 'import_processing',
                                           "test", str(uuid4()))
 
+ANNOTATION = copy.deepcopy(settings.ANNOTATION)
+ANNOTATION[settings.BUILD_GRCH37]["vep_config"]["columns_version"] = 1
+ANNOTATION[settings.BUILD_GRCH38]["vep_config"]["columns_version"] = 1
+
 
 @override_settings(IMPORT_PROCESSING_DIR=TEST_IMPORT_PROCESSING_DIR,
                    VARIANT_ZYGOSITY_GLOBAL_COLLECTION="global",
-                   ANNOTATION_VEP_FAKE_VERSION=True)
+                   ANNOTATION_VEP_FAKE_VERSION=True,
+                   ANNOTATION=ANNOTATION)
 class TestAnnotationVCF(TestCase):
     TEST_DATA_DIR = os.path.join(settings.BASE_DIR, "annotation/tests/test_data")
     TEST_ANNOTATION_VCF_GRCH37 = os.path.join(TEST_DATA_DIR, "test_grch37.vep_annotated.vcf")
@@ -32,6 +38,7 @@ class TestAnnotationVCF(TestCase):
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
+
         cls.variant_annotation_versions_by_build = {}
 
         VCFS = {
@@ -123,8 +130,9 @@ class TestAnnotationVCF(TestCase):
         self.assertEqual(va.dbsnp_rs_id, "rs776172390")
         self.assertEqual(va.consequence, 'stop_gained')
         self.assertEqual(va.symbol, "ARHGAP11A")
-        self.assertEqual(va.predictions_num_pathogenic, 1)
-        self.assertEqual(va.predictions_num_benign, 0)
+        if va.version.columns_version == 1:
+            self.assertEqual(va.predictions_num_pathogenic, 1)
+            self.assertEqual(va.predictions_num_benign, 0)
 
         # 2 | 20 | -5 | 20 | 0.05 | 0.17 | 0.01 | 0.04 | OR4F5
         va = VariantAnnotation.objects.get(variant_id=131165)
