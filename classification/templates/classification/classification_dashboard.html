@@ -103,8 +103,9 @@
         {% comment %}section only makes sense for where Shared is king{% endcomment %}
         {% page_help_embedded title="Classification Counts" %}
             <p>
-            See the grand total of classifications provided by your lab.
+            See the grand total of classifications provided by your lab, the progress of ClinVar submissions, and a comparison between your lab's classifications and ClinVar's.
             </p>
+
         {% end_page_help_embedded %}
 
         {% labelled hint="tiny" label="Matched & Shared Classifications" %}
@@ -126,9 +127,6 @@
                 {% endif %}
             {% endlabelled %}
         {% endif %}
-        {% labelled hint="tiny" label="Downloads" %}
-            <a href="{{ dlab.compare_to_clinvar_url }}" class="download-link">Classifications compared with ClinVar</a>
-        {% endlabelled %}
 
         {% if 'condition_matchings_lab'|is_view_enabled %}
             {% labelled hint="tiny"  label="Classifications without Standard Condition" %}
@@ -137,11 +135,16 @@
             {% endlabelled %}
         {% endif %}
 
+        {% labelled hint="tiny" label="Downloads" %}
+            <a href="{{ dlab.compare_to_clinvar_url }}" class="download-link">Classifications compared with ClinVar</a>
+        {% endlabelled %}
+
     {% endif %}
 
     {% if 'discordance_report'|is_view_enabled %}
         {% page_help_embedded title="Outstanding Discordances" %}
-            Below is a list of all outstanding discordances where your lab is involved.
+            <p>Below is a list of all outstanding discordances where your lab is involved.</p>
+             <p>If you have discordances you can filter based on which other labs are involved - which will also display any contact details that lab has provided for resolving discordances.</p>
         {% end_page_help_embedded %}
 
         {% if not dlab.discordance_summaries %}
@@ -258,8 +261,8 @@
 
     {% page_help_embedded title="Flagged Classifications" %}
         <p>
-            This page will list all classifications belonging to your lab(s) that have flags raised against them.
-            Each classification flag indicates that there is an action that needs to be performed against the classification.
+            This section show you how many classifications belonging to your lab(s) that have flags raised against them.<br/>
+            Click "Show details" to see the specific classifications.<br/>
             Clicking on each flag will give you instructions on what needs to be done to resolve it.
         </p><p>
             Flags range from issues with variant matching, to discordances or suggestions.
