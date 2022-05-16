@@ -33,6 +33,7 @@ ANNOTATION[BUILD_GRCH37]["vep_config"].update({
     'phastcons46way': None,
     'phylop100way': None,
     'phylop46way': None,
+    "dbnsfp": "annotation_data/GRCh37/dbNSFP4.3a_grch37.stripped.gz",
     "spliceai_snv": "annotation_data/GRCh37/spliceai_scores.raw.snv.head_100.hg19.vcf.gz",
     "spliceai_indel": "annotation_data/GRCh37/spliceai_scores.raw.indel.head_100.hg19.vcf.gz",
 })
@@ -41,6 +42,7 @@ ANNOTATION[BUILD_GRCH38]["vep_config"].update({
     'phastcons30way': None,
     'phylop100way': None,
     'phylop30way': None,
+    "dbnsfp": "annotation_data/GRCh38/dbNSFP4.3a_grch38.stripped.gz",
     "spliceai_snv": "annotation_data/GRCh38/spliceai_scores.raw.snv.head_100.hg38.vcf.gz",
     "spliceai_indel": "annotation_data/GRCh38/spliceai_scores.raw.indel.head_100.hg38.vcf.gz",
 })
