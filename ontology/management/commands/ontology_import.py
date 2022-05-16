@@ -35,6 +35,8 @@ GENE_RELATIONS = {
     "http://purl.obolibrary.org/obo/RO_0004027": "disease has inflammation site",
     "http://purl.obolibrary.org/obo/RO_0004030": "disease arises from structure",
     "http://purl.obolibrary.org/obo/RO_0004003": "has material basis in germline mutation in",
+    "http://purl.obolibrary.org/obo/RO_0004004": "has material basis in somatic mutation in",
+    "http://purl.obolibrary.org/obo/RO_0004028": "realized in response to stimulus"
 }
 
 MATCH_TYPES = {
@@ -85,7 +87,7 @@ def load_mondo(filename: str, force: bool):
         context="mondo_file",
         import_source=OntologyService.MONDO,
         force_update=force,
-        processor_version=14)
+        processor_version=15)
 
     ontology_builder.ensure_hash_changed(data_hash=file_hash)  # don't re-import if hash hasn't changed
     ontology_builder.cache_everything()
