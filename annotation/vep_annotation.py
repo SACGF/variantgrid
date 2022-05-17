@@ -270,7 +270,7 @@ def vep_dict_to_variant_annotation_version_kwargs(vep_config, vep_version_dict: 
 def get_vep_variant_annotation_version_kwargs(genome_build: GenomeBuild):
     vep_config = VEPConfig(genome_build)
     if settings.ANNOTATION_VEP_FAKE_VERSION:
-        return get_fake_vep_version(genome_build, vep_config.annotation_consortium)
+        return get_fake_vep_version(genome_build, vep_config.annotation_consortium, vep_config.columns_version)
 
     vep_version_dict = get_vep_version(genome_build, vep_config.annotation_consortium)
     kwargs = vep_dict_to_variant_annotation_version_kwargs(vep_config, vep_version_dict)

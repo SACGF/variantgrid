@@ -12,7 +12,7 @@ from annotation.models.damage_enums import SIFTPrediction, FATHMMPrediction, \
     PathogenicityImpact
 from annotation.models.models import ColumnVEPField, VariantAnnotation, \
     VariantTranscriptAnnotation, VariantAnnotationVersion
-from annotation.models.models_enums import VariantClass
+from annotation.models.models_enums import VariantClass, LOFTEEConfidence
 from annotation.vep_annotation import VEPConfig
 from genes.models import TranscriptVersion, GeneVersion
 from genes.models_enums import AnnotationConsortium
@@ -106,7 +106,7 @@ class BulkVEPVCFAnnotationInserter:
             logging.warning("BulkVEPVCFAnnotationInserter: Not actually inserting variants")
 
         self.vep_columns = self._get_vep_columns_from_csq(infos)
-        logging.debug("CSQ: %s", self.vep_columns)
+        logging.info("CSQ: %s", self.vep_columns)
         self._setup_vep_fields_and_db_columns(validate_columns)
 
     @staticmethod
@@ -152,11 +152,13 @@ class BulkVEPVCFAnnotationInserter:
             "hgnc_id": format_hgnc_id,
             "impact": get_choice_formatter_func(PathogenicityImpact.CHOICES),
             "interpro_domain": remove_empty_multiples,
+            "lof": get_choice_formatter_func({LOFTEEConfidence.HC: "HC", LOFTEEConfidence.LC: "LC"}),
             "mastermind_count_1_cdna": get_clean_and_pick_single_value_func(operator.itemgetter(0), int),
             "mastermind_count_2_cdna_prot": get_clean_and_pick_single_value_func(operator.itemgetter(1), int),
             "mastermind_count_3_aa_change": get_clean_and_pick_single_value_func(operator.itemgetter(2), int),
             "mutation_assessor_pred_most_damaging": get_most_damaging_func(MutationAssessorPrediction),
             "mutation_taster_pred_most_damaging": get_most_damaging_func(MutationTasterPrediction),
+            "nmd_escaping_variant": format_nmd_escaping_variant,
             # conservation fields are from BigWig, which can return multiple entries
             # for deletions. Higher = more conserved, so for rare disease filtering taking max makes sense
             "phastcons_100_way_vertebrate": format_pick_highest_float,
@@ -213,6 +215,8 @@ class BulkVEPVCFAnnotationInserter:
         qs = ColumnVEPField.filter_for_build(self.genome_build)
         q_not_this_version = ~ColumnVEPField.get_columns_version_q(vc.columns_version)
         vep_fields_not_this_version = qs.filter(q_not_this_version).values_list("column", flat=True)
+        print("*" * 40)
+        print(f"{vep_fields_not_this_version=}")
         ignore_columns.update(vep_fields_not_this_version)
 
         for c in list(ignore_columns):
@@ -580,3 +584,7 @@ def get_most_damaging_func(klass):
         return klass.get_most_damaging(prediction_list)
 
     return get_most_damaging
+
+
+def format_nmd_escaping_variant(value) -> bool:
+    return value == "NMD_escaping_variant"

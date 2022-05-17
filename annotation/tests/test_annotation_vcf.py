@@ -8,9 +8,9 @@ from django.test.utils import override_settings
 
 from annotation.annotation_versions import get_variant_annotation_version, \
     get_annotation_range_lock_and_unannotated_count
-from annotation.models import VariantAnnotation
+from annotation.models import VariantAnnotation, LOFTEEConfidence
 from annotation.models.damage_enums import PathogenicityImpact
-from annotation.models.models import AnnotationRun, VariantAnnotationVersion
+from annotation.models.models import AnnotationRun, VariantAnnotationVersion, VariantTranscriptAnnotation
 from annotation.vcf_files.import_vcf_annotations import import_vcf_annotations
 from annotation.vep_annotation import vep_parse_version_line, get_vep_version_from_vcf, \
     vep_dict_to_variant_annotation_version_kwargs, VEPVersionMismatchError, VEPConfig
@@ -24,7 +24,6 @@ TEST_IMPORT_PROCESSING_DIR = os.path.join(settings.PRIVATE_DATA_ROOT, 'import_pr
 ANNOTATION = copy.deepcopy(settings.ANNOTATION)
 ANNOTATION[settings.BUILD_GRCH37]["vep_config"]["columns_version"] = 1
 ANNOTATION[settings.BUILD_GRCH38]["vep_config"]["columns_version"] = 1
-
 
 @override_settings(IMPORT_PROCESSING_DIR=TEST_IMPORT_PROCESSING_DIR,
                    VARIANT_ZYGOSITY_GLOBAL_COLLECTION="global",
@@ -66,7 +65,7 @@ class TestAnnotationVCF(TestCase):
         annotation_range_lock, _ = get_annotation_range_lock_and_unannotated_count(vav)
         annotation_range_lock.save()
         annotation_run = AnnotationRun.objects.create(annotation_range_lock=annotation_range_lock,
-                                                      vcf_annotated_filename=TestAnnotationVCF.TEST_ANNOTATION_VCF_GRCH38)
+                                                      vcf_annotated_filename=self.TEST_ANNOTATION_VCF_GRCH38)
 
         with self.assertRaises(VEPVersionMismatchError):
             import_vcf_annotations(annotation_run, delete_temp_files=False)
@@ -82,15 +81,13 @@ class TestAnnotationVCF(TestCase):
         annotation_range_lock, _ = get_annotation_range_lock_and_unannotated_count(vav)
         annotation_range_lock.save()
         annotation_run = AnnotationRun.objects.create(annotation_range_lock=annotation_range_lock,
-                                                      vcf_annotated_filename=TestAnnotationVCF.TEST_ANNOTATION_VCF_GRCH37)
-        import_vcf_annotations(annotation_run, delete_temp_files=False)
+                                                      vcf_annotated_filename=self.TEST_ANNOTATION_VCF_GRCH37)
+        import_vcf_annotations(annotation_run, delete_temp_files=False, vep_version_check=False)
 
         # Verify a few fields
         va = VariantAnnotation.objects.get(variant_id=13629762)
         self.assertEqual(va.impact, PathogenicityImpact.MODERATE)
         self.assertEqual(va.dbsnp_rs_id, "rs145886106")
-        self.assertEqual(va.predictions_num_pathogenic, 2)
-        self.assertEqual(va.predictions_num_benign, 3)
         self.assertTrue("COSV" in va.cosmic_id)
         self.assertTrue("COSM" in va.cosmic_legacy_id)
         self.assertAlmostEqual(va.gnomad_af, 0.000145)
@@ -99,6 +96,18 @@ class TestAnnotationVCF(TestCase):
         self.assertEqual(va.dbsnp_rs_id, "rs776172390")
         self.assertEqual(va.consequence, 'stop_gained')
         self.assertEqual(va.symbol, "ARHGAP11A")
+
+        self._test_extra_grch37()
+
+    def _test_extra_grch37(self):
+        """ Columns_version specific tests """
+
+        # This is testing columns_version 1
+        va = VariantAnnotation.objects.get(variant_id=13629762)
+        self.assertEqual(va.predictions_num_pathogenic, 2)
+        self.assertEqual(va.predictions_num_benign, 3)
+
+        va = VariantAnnotation.objects.get(variant_id=13638004)
         self.assertEqual(va.predictions_num_pathogenic, 1)
         self.assertEqual(va.predictions_num_benign, 0)
 
@@ -113,15 +122,13 @@ class TestAnnotationVCF(TestCase):
         annotation_range_lock, _ = get_annotation_range_lock_and_unannotated_count(vav)
         annotation_range_lock.save()
         annotation_run = AnnotationRun.objects.create(annotation_range_lock=annotation_range_lock,
-                                                      vcf_annotated_filename=TestAnnotationVCF.TEST_ANNOTATION_VCF_GRCH38)
-        import_vcf_annotations(annotation_run, delete_temp_files=False)
+                                                      vcf_annotated_filename=self.TEST_ANNOTATION_VCF_GRCH38)
+        import_vcf_annotations(annotation_run, delete_temp_files=False, vep_version_check=False)
 
         # Verify a few fields
         va = VariantAnnotation.objects.get(variant_id=24601)
         self.assertEqual(va.impact, PathogenicityImpact.MODERATE)
         self.assertEqual(va.dbsnp_rs_id, "rs145886106")
-        self.assertEqual(va.predictions_num_pathogenic, 2)
-        self.assertEqual(va.predictions_num_benign, 3)
         self.assertEqual(va.cosmic_legacy_id, "COSM7286401")  # Test it has collapsed dupes
         self.assertAlmostEqual(va.gnomad_af, 0.000354913)
         self.assertEqual(va.gnomad_filtered, False)  # Test it converted FILTER properly to bool
@@ -130,9 +137,6 @@ class TestAnnotationVCF(TestCase):
         self.assertEqual(va.dbsnp_rs_id, "rs776172390")
         self.assertEqual(va.consequence, 'stop_gained')
         self.assertEqual(va.symbol, "ARHGAP11A")
-        if va.version.columns_version == 1:
-            self.assertEqual(va.predictions_num_pathogenic, 1)
-            self.assertEqual(va.predictions_num_benign, 0)
 
         # 2 | 20 | -5 | 20 | 0.05 | 0.17 | 0.01 | 0.04 | OR4F5
         va = VariantAnnotation.objects.get(variant_id=131165)
@@ -148,13 +152,64 @@ class TestAnnotationVCF(TestCase):
 
         # RPE65:G197E | 1&1&1
         va = VariantAnnotation.objects.get(variant_id=131167)
-        self.assertEqual(va.mutation_assessor_pred_most_damaging, 'M')
-        self.assertEqual(va.polyphen2_hvar_pred_most_damaging, 'D')
+        self._test_extra_grch38()
+
+    def _test_extra_grch38(self):
+        """ Do columns_version specific stuff """
+        # This is testing columns_version 1
+        va = VariantAnnotation.objects.get(variant_id=24601)
+        self.assertEqual(va.predictions_num_pathogenic, 2)
+        self.assertEqual(va.predictions_num_benign, 3)
+
+        va = VariantAnnotation.objects.get(variant_id=42)
+        self.assertEqual(va.predictions_num_pathogenic, 1)
+        self.assertEqual(va.predictions_num_benign, 0)
+
+        va = VariantAnnotation.objects.get(variant_id=131167)
         self.assertEqual(va.mastermind_count_1_cdna, 1)
         self.assertEqual(va.mastermind_count_2_cdna_prot, 1)
         self.assertEqual(va.mastermind_count_3_aa_change, 1)
         self.assertEqual(va.mastermind_mmid3, "RPE65:G197E")
+        self.assertEqual(va.mutation_assessor_pred_most_damaging, 'M')
+        self.assertEqual(va.polyphen2_hvar_pred_most_damaging, 'D')
 
+
+ANNOTATION = copy.deepcopy(settings.ANNOTATION)
+ANNOTATION[settings.BUILD_GRCH37]["vep_config"]["columns_version"] = 2
+ANNOTATION[settings.BUILD_GRCH38]["vep_config"]["columns_version"] = 2
+
+@override_settings(IMPORT_PROCESSING_DIR=TEST_IMPORT_PROCESSING_DIR,
+                   VARIANT_ZYGOSITY_GLOBAL_COLLECTION="global",
+                   ANNOTATION_VEP_FAKE_VERSION=True,
+                   ANNOTATION=ANNOTATION)
+class TestAnnotationVCF2(TestAnnotationVCF):
+    TEST_DATA_DIR = os.path.join(settings.BASE_DIR, "annotation/tests/test_data")
+    TEST_ANNOTATION_VCF_GRCH37 = os.path.join(TEST_DATA_DIR, "test_columns_version2_grch37.vep_annotated.vcf")
+    TEST_ANNOTATION_VCF_GRCH38 = os.path.join(TEST_DATA_DIR, "test_columns_version2_grch38.vep_annotated.vcf")
+
+    def _test_extra_grch37(self):
+        # This is testing columns_version 2
+        pass
+
+    def _test_extra_grch38(self):
+        # This is testing columns_version 2
+        va = VariantAnnotation.objects.get(variant_id=24601)
+        self.assertAlmostEqual(va.metalr_rankscore, 0.80456)
+        self.assertAlmostEqual(va.revel_rankscore, 0.69527)
+        self.assertAlmostEqual(va.vest4_rankscore, 0.56662)
+        self.assertAlmostEqual(va.bayesdel_noaf_rankscore, 0.63287)
+        self.assertAlmostEqual(va.cadd_raw_rankscore, 0.41304)
+        self.assertAlmostEqual(va.clinpred_rankscore, 0.15198)
+
+        va = VariantAnnotation.objects.get(variant_id=42)
+        self.assertEqual(va.lof, LOFTEEConfidence.HC)
+        self.assertFalse(va.nmd_escaping_variant)  # Default
+
+        vta = VariantTranscriptAnnotation.objects.get(variant_id=42, hgvs_c='NM_199357.3:c.1417C>T')
+        self.assertTrue(vta.nmd_escaping_variant)
+
+
+class TestVEPVersion(TestCase):
     def test_parse_vep_version(self):
         LINES = [
             '##VEP="v97" time="2019-08-12 22:39:56" cache="/data/annotation/VEP/vep_cache/homo_sapiens/97_GRCh38" ensembl=97.378db18 ensembl-variation=97.26a059c ensembl-io=97.dc917e1 ensembl-funcgen=97.24f4d3c 1000genomes="phase3" COSMIC="88" ClinVar="201904" ESP="V2-SSA137" HGMD-PUBLIC="20184" assembly="GRCh38.p12" dbSNP="151" gencode="GENCODE 31" genebuild="2014-07" gnomAD="r2.1" polyphen="2.2.2" regbuild="1.0" sift="sift5.2.2"',
@@ -165,3 +220,4 @@ class TestAnnotationVCF(TestCase):
                 vep_parse_version_line(line)
             except:
                 self.fail(f"vep_parse_version_line died on line: {line}")
+

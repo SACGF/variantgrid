@@ -11,7 +11,7 @@ from annotation.vcf_files.bulk_vep_vcf_annotation_inserter import BulkVEPVCFAnno
 from annotation.vep_annotation import vep_check_version_match
 
 
-def import_vcf_annotations(annotation_run: AnnotationRun, insert_variants=True,
+def import_vcf_annotations(annotation_run: AnnotationRun, insert_variants=True, vep_version_check=True,
                            delete_temp_files=settings.VARIANT_ANNOTATION_DELETE_TEMP_FILES_ON_SUCCESS):
     import cyvcf2
     from library.vcf_utils import cyvcf2_header_types
@@ -20,7 +20,8 @@ def import_vcf_annotations(annotation_run: AnnotationRun, insert_variants=True,
     annotation_run.upload_attempts += 1
     annotation_run.save()
 
-    vep_check_version_match(annotation_run.variant_annotation_version, annotation_run.vcf_annotated_filename)
+    if vep_version_check:
+        vep_check_version_match(annotation_run.variant_annotation_version, annotation_run.vcf_annotated_filename)
     vcf_reader = cyvcf2.VCF(annotation_run.vcf_annotated_filename)
     header_types = cyvcf2_header_types(vcf_reader)
     infos = header_types["INFO"]

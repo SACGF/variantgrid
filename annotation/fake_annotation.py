@@ -20,12 +20,13 @@ from snpdb.models.models_genome import GenomeBuild
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_loci_and_variants_for_vcf
 
 
-def get_fake_vep_version(genome_build: GenomeBuild, annotation_consortium):
+def get_fake_vep_version(genome_build: GenomeBuild, annotation_consortium, columns_version: int):
     fake_version = {"genome_build": genome_build,
-                    "annotation_consortium": annotation_consortium}
+                    "annotation_consortium": annotation_consortium,
+                    "columns_version": columns_version}
     for f in VariantAnnotationVersion._meta.fields:  # @UndefinedVariable
-        if f.name == "id":
-            continue  # Don't set PK
+        if f.name in ("id", "columns_version"):
+            continue  # Don't set these
         if isinstance(f, IntegerField):
             value = -1
         elif isinstance(f, TextField):
@@ -56,7 +57,7 @@ def get_fake_annotation_version(genome_build: GenomeBuild):
                                                                               "gene_annotation_import": gene_annotation_import,
                                                                           })[0]
 
-    vav_kwargs = get_fake_vep_version(genome_build, AnnotationConsortium.ENSEMBL)
+    vav_kwargs = get_fake_vep_version(genome_build, AnnotationConsortium.ENSEMBL, 2)
     vav_kwargs["gene_annotation_release"] = gene_annotation_release
     variant_annotation_version = VariantAnnotationVersion.objects.create(**vav_kwargs)
     create_ontology_test_data()
