@@ -1327,10 +1327,10 @@ class GeneAnnotationRelease(models.Model):
 
     @staticmethod
     def get_for_latest_annotation_versions_for_builds() -> List['GeneAnnotationRelease']:
-        """ """
+        from annotation.models import VariantAnnotationVersion
         gene_annotation_releases = []
         for genome_build in GenomeBuild.builds_with_annotation().order_by("name"):
-            if vav := genome_build.latest_variant_annotation_version:
+            if vav := VariantAnnotationVersion.latest(genome_build):
                 if vav.gene_annotation_release:
                     gene_annotation_releases.append(vav.gene_annotation_release)
         return gene_annotation_releases

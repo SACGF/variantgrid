@@ -781,7 +781,7 @@ class HotspotGraphView(TemplateView):
         if transcript_id:
             transcript = Transcript.objects.get(pk=transcript_id)
         elif gene_id or gene_symbol_id:
-            vav = self.genome_build.latest_variant_annotation_version
+            vav = VariantAnnotationVersion.latest(self.genome_build)
             if gene_id:
                 gene = get_object_or_404(Gene, identifier=gene_id)
                 transcript = PfamSequenceIdentifier.get_transcript_for_gene(gene, vav)

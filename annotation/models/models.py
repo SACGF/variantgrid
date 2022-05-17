@@ -363,6 +363,7 @@ class VariantAnnotationVersion(SubVersionPartition):
     # GeneAnnotationRelease - imported GTF we can use to get gene/transcript versions that match VEP
     gene_annotation_release = models.ForeignKey(GeneAnnotationRelease, null=True, on_delete=CASCADE)
     last_checked_date = models.DateTimeField(null=True)
+    active = models.BooleanField(default=True)
 
     vep = models.IntegerField()
     columns_version = models.IntegerField(default=1)
@@ -386,8 +387,9 @@ class VariantAnnotationVersion(SubVersionPartition):
     distance = models.IntegerField(default=5000)  # VEP --distance parameter
 
     @staticmethod
-    def latest(genome_build):
-        return VariantAnnotationVersion.objects.filter(genome_build=genome_build).order_by("annotation_date").last()
+    def latest(genome_build, active=True):
+        qs = VariantAnnotationVersion.objects.filter(genome_build=genome_build, active=active)
+        return qs.order_by("annotation_date").last()
 
     def get_any_annotation_version(self):
         """ Often you don't care what annotation version you use, only that variant annotation version is this one """
@@ -426,9 +428,13 @@ class VariantAnnotationVersion(SubVersionPartition):
     def has_phylop_46_way_mammalian(self) -> bool:
         return self._vep_config.get("phylop46way")
 
+    def short_string(self) -> str:
+        """ Short VEP description """
+        return f"v{self.pk} {self.vep} {self.get_annotation_consortium_display()}"
+
     def __str__(self):
         super_str = super().__str__()
-        return f"{super_str} VEP: {self.vep}/{self.get_annotation_consortium_display()}/{self.genome_build_id}"
+        return f"{super_str} VEP: {self.vep} / {self.get_annotation_consortium_display()}/{self.genome_build_id}"
 
 
 @receiver(pre_delete, sender=VariantAnnotationVersion)
@@ -982,6 +988,14 @@ class AnnotationVersion(models.Model):
             sql = annotation_version.sql_partition_transformer(sql)
         return sql
 
+    @lazy
+    def is_valid(self) -> bool:
+        try:
+            self.validate()
+            return True
+        except InvalidAnnotationVersionError:
+            return False
+
     def validate(self):
         missing_sub_annotations = []
         for field in self.SUB_ANNOTATIONS:
@@ -1000,8 +1014,11 @@ class AnnotationVersion(models.Model):
                 raise InvalidAnnotationVersionError(different_msg)
 
     @staticmethod
-    def latest(genome_build: GenomeBuild, validate=True):
-        av: AnnotationVersion = AnnotationVersion.objects.filter(genome_build=genome_build).order_by("annotation_date").last()
+    def latest(genome_build: GenomeBuild, validate=True, active=True) -> Optional['AnnotationVersion']:
+        av_qs = AnnotationVersion.objects.filter(genome_build=genome_build)
+        if active:
+            av_qs = av_qs.exclude(variant_annotation_version__active=False)
+        av: AnnotationVersion = av_qs.order_by("annotation_date").last()
         if validate:
             if av is None:
                 raise AnnotationVersion.DoesNotExist(f"Warning: GenomeBuild {genome_build} has no annotation version!")
