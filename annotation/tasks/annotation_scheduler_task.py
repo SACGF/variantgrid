@@ -13,7 +13,7 @@ from snpdb.models import GenomeBuild, ImportStatus, Sample, VCF
 
 
 @celery.shared_task
-def annotation_scheduler():
+def annotation_scheduler(active=True):
     """ This is run on scheduling_single_worker queue to avoid race conditions """
     LOCK_EXPIRE = 60 * 5  # 5 minutes
     lock_id = "annotation-scheduler-lock"
@@ -27,7 +27,7 @@ def annotation_scheduler():
             try:
                 logging.info("Got the lock for annotation scheduler")
                 for genome_build in GenomeBuild.builds_with_annotation():
-                    annotation_version = AnnotationVersion.latest(genome_build)
+                    annotation_version = AnnotationVersion.latest(genome_build, active=active)
                     variant_annotation_version = annotation_version.variant_annotation_version
                     while True:
                         range_lock = _handle_variant_annotation_version(variant_annotation_version)
