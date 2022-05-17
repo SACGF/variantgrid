@@ -5,6 +5,7 @@
 {% load js_tags %}
 {% load jqgrid_tags %}
 {% load ui_utils %}
+{% load ui_tabs_builder %}
 {% block title %}Annotation Status{% endblock title %}
 {% block submenu %}{% menu_bar_annotations %}{% endblock submenu %}
 {% block head %}
@@ -12,12 +13,12 @@
 <script type="text/javascript" src="{% static 'js/lib/plotly-latest.min.js' %}"></script>
 <script type="text/javascript" src="{% static 'js/plotly_helper.js' %}"></script>
 <script>
-    var filter_data = {"status": "", "genome_build": ""}
+    let filter_data = {"status": "", "genome_build": ""}
     $(document).ready(() => {
         let genomeBuildSummaryJSON = {{ genome_build_summary | jsonify }};
 
-        function showSummaryGraph(buildName, buildData) {
-            let selector = "build-" + buildName + "-summary-graph";
+        function showSummaryGraph(buildVersionName, buildData) {
+            let selector = "build-" + buildVersionName + "-summary-graph";
             let data = [];
             let summary_and_colors = [
                 ["Queued", 'rgb(50, 50, 50)'],
@@ -43,7 +44,7 @@
                 data.push(trace);
             }
 
-            var layout = {
+            let layout = {
                 width: 800,
                 height: 100,
                 barmode: 'stack',
@@ -71,7 +72,11 @@
 
         for (let buildName in genomeBuildSummaryJSON) {
             let buildData = genomeBuildSummaryJSON[buildName];
-            showSummaryGraph(buildName, buildData);
+            for (let vavId in buildData) {
+                let buildVersionName = buildName + "-" + vavId;
+                let vavData = buildData[vavId];
+                showSummaryGraph(buildVersionName, vavData);
+            }
         }
 
         $('.table-filter').change(() => {
@@ -91,32 +96,33 @@
     <div class="container-table">
         {% page_help 'annotation/variant_annotation_runs_help' 'Variant Annotation Runs' %}
 
-        {% for build_name, field_counts in genome_build_field_counts.items %}
+        {% for build_name, vav_field_counts in genome_build_field_counts.items %}
             <form method="post" id='vcf-form'>
                 {% csrf_token %}
                 <div id="build-{{ build_name }}-details" class="card mt-4">
                     <div class="card-header">{{ build_name }}</div>
-                    <div class="card-body">
-                        <div id="build-{{ build_name }}-details">
-                            <div id="build-{{ build_name }}-summary-graph"></div>
-                            {% for field, count in field_counts.items %}
-                                {% labelled label=field %}{{ count }}{% endlabelled %}
-                            {% endfor %}
-                        </div>
+                        {% ui_register_tabs tab_set=build_name %}
+                        {% for vav, field_counts in vav_field_counts.items %}
+                            {% ui_register_tab_embedded tab_set=build_name label=vav.short_string %}
+                                <div id="build-{{ build_name }}-{{ vav.pk }}-summary-graph"></div>
+                                {% for field, count in field_counts.items %}
+                                    {% labelled label=field %}{{ count }}{% endlabelled %}
+                                {% endfor %}
+
+                                {% if genome_build_summary|get_item:build_name|get_item:'Running' or genome_build_summary|get_item:build_name|get_item:'Queued' or genome_build_summary|get_item:build_name|get_item:'Error'%}
+                                <div class="btn-toolbar">
+                                    {% if genome_build_summary|get_item:build_name|get_item:'Running' or genome_build_summary|get_item:build_name|get_item:'Queued' %}
+                                        <button name="set-non-finished-to-error-{{ build_name }}" class="btn btn-danger">Set non-finished runs to Error</button>
+                                    {% endif %}
+                                    {% if genome_build_summary|get_item:build_name|get_item:'Error' %}
+                                        <button name="retry-annotation-runs-{{ build_name }}" class="btn btn-danger">Retry all failed runs</button>
+                                    {% endif  %}
+                                </div>
+                                {% endif %}
+                            {% end_ui_register_tab_embedded %}
+                        {% endfor %}
+                        {% ui_render_tabs tab_set=build_name %}
                     </div>
-                    {% if genome_build_summary|get_item:build_name|get_item:'Running' or genome_build_summary|get_item:build_name|get_item:'Queued' or genome_build_summary|get_item:build_name|get_item:'Error'%}
-                    <div class="card-footer">
-                        <div class="btn-toolbar">
-                            {% if genome_build_summary|get_item:build_name|get_item:'Running' or genome_build_summary|get_item:build_name|get_item:'Queued' %}
-                                <button name="set-non-finished-to-error-{{ build_name }}" class="btn btn-danger">Set non-finished runs to Error</button>
-                            {% endif %}
-                            {% if genome_build_summary|get_item:build_name|get_item:'Error' %}
-                                <button name="retry-annotation-runs-{{ build_name }}" class="btn btn-danger">Retry all failed runs</button>
-                            {% endif  %}
-                        </div>
-                    </div>
-                    {% endif %}
-                </div>
             </form>
         {% endfor %}
         <div class="mt-4">

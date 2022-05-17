@@ -290,10 +290,14 @@ def annotation_versions(request):
         except:
             log_traceback()
 
+        try:
+            latest = AnnotationVersion.latest(genome_build)
+        except AnnotationVersion.DoesNotExist:
+            latest = None
         qs = AnnotationVersion.objects.filter(genome_build=genome_build).order_by("-annotation_date")
         vep_command = get_vep_command("in.vcf", "out.vcf", genome_build, genome_build.annotation_consortium)
         vep_command = " ".join(vep_command).replace(" -", "\n")
-        anno_versions[genome_build.name] = (vep_command, qs)
+        anno_versions[genome_build.name] = (vep_command, qs, latest)
 
     context = {"annotation_versions": anno_versions}
     return render(request, "annotation/annotation_versions.html", context)
@@ -341,8 +345,8 @@ def view_version_diff(request, version_diff_id):
 def variant_annotation_runs(request):
     as_display = dict(AnnotationStatus.choices)
 
-    genome_build_field_counts = {}
-    genome_build_summary = {}
+    genome_build_field_counts = defaultdict(dict)
+    genome_build_summary = defaultdict(dict)
 
     if request.method == "POST":
         for genome_build in GenomeBuild.builds_with_annotation():
@@ -370,17 +374,20 @@ def variant_annotation_runs(request):
                 messages.add_message(request, messages.INFO, message)
 
     for genome_build in GenomeBuild.builds_with_annotation():
-        qs = AnnotationRun.objects.filter(annotation_range_lock__version__genome_build=genome_build)
-        field_counts = get_field_counts(qs, "status")
-        summary_data = Counter()
-        for field, count in field_counts.items():
-            summary = AnnotationStatus.get_summary_state(field)
-            summary_data[summary] += count
+        for vav in VariantAnnotationVersion.objects.filter(genome_build=genome_build).order_by("-annotation_date"):
+            qs = AnnotationRun.objects.filter(annotation_range_lock__version=vav)
+            field_counts = get_field_counts(qs, "status")
+            summary_data = Counter()
+            for field, count in field_counts.items():
+                summary = AnnotationStatus.get_summary_state(field)
+                summary_data[summary] += count
 
-        genome_build_summary[genome_build.pk] = summary_data
-        genome_build_field_counts[genome_build.pk] = {as_display[k]: v for k, v in field_counts.items()}
-    context = {"genome_build_summary": genome_build_summary,
-               "genome_build_field_counts": genome_build_field_counts}
+            genome_build_summary[genome_build.pk][vav.pk] = summary_data
+            genome_build_field_counts[genome_build.pk][vav] = {as_display[k]: v for k, v in field_counts.items()}
+    context = {
+        "genome_build_summary": dict(genome_build_summary),
+        "genome_build_field_counts": dict(genome_build_field_counts),
+    }
     return render(request, "annotation/variant_annotation_runs.html", context)
 
 
