@@ -216,3 +216,4 @@ class ManualVariantEntryType(models.TextChoices):
 class LOFTEEConfidence(models.TextChoices):
     LC = "l", "Low Confidence"
     HC = "h", "High Confidence"
+    OS = "o", "Other Splice"
