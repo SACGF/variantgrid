@@ -2,6 +2,7 @@ import json
 from typing import Optional
 
 from django.conf import settings
+from django.contrib.auth.models import User
 from django.http.response import HttpResponseRedirectBase
 from django.urls import resolve
 
@@ -119,11 +120,17 @@ class PageViewsMiddleware:
                                     all_params["modification_timestamp"] = float(parts[1])
 
                         # call then later captures this and saves it to the DB (if appropriate)
-                        request.view_event = ViewEvent(
-                            user=request.user,
-                            view_name=f"{app}:{url_obj.view_name}",
-                            args=all_params,
-                            path=request.get_full_path(),
-                            method=request.method,
-                            referer=request.headers.get('Referer')
-                        )
+                        user: Optional[User] = None
+                        if request_user := request.user:
+                            if request_user.is_authenticated:
+                                user = request_user
+
+                        if user:
+                            request.view_event = ViewEvent(
+                                user=user,
+                                view_name=f"{app}:{url_obj.view_name}",
+                                args=all_params,
+                                path=request.get_full_path(),
+                                method=request.method,
+                                referer=request.headers.get('Referer')
+                            )
