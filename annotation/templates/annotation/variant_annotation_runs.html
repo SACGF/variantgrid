@@ -109,16 +109,19 @@
                                     {% labelled label=field %}{{ count }}{% endlabelled %}
                                 {% endfor %}
 
-                                {% if genome_build_summary|get_item:build_name|get_item:'Running' or genome_build_summary|get_item:build_name|get_item:'Queued' or genome_build_summary|get_item:build_name|get_item:'Error'%}
-                                <div class="btn-toolbar">
-                                    {% if genome_build_summary|get_item:build_name|get_item:'Running' or genome_build_summary|get_item:build_name|get_item:'Queued' %}
-                                        <button name="set-non-finished-to-error-{{ build_name }}" class="btn btn-danger">Set non-finished runs to Error</button>
+                                {% with vav_summary=genome_build_summary|get_item:build_name|get_item:vav.pk %}
+                                    {% if vav_summary|get_item:'Running' or vav_summary|get_item:'Queued' or vav_summary|get_item:'Error'%}
+                                    <div class="btn-toolbar">
+                                        {% if vav_summary|get_item:'Running' or vav_summary|get_item:'Queued' %}
+                                            <button name="set-non-finished-to-error-{{ build_name }}-{{ vav.pk }}" class="btn btn-danger">Set non-finished runs to Error</button>
+                                        {% endif %}
+                                        {% if vav_summary|get_item:'Error' %}
+                                            <button name="retry-annotation-runs-{{ build_name }}-{{ vav.pk }}" class="btn btn-danger">Retry all failed runs</button>
+                                        {% endif  %}
+                                    </div>
                                     {% endif %}
-                                    {% if genome_build_summary|get_item:build_name|get_item:'Error' %}
-                                        <button name="retry-annotation-runs-{{ build_name }}" class="btn btn-danger">Retry all failed runs</button>
-                                    {% endif  %}
-                                </div>
-                                {% endif %}
+                                {% endwith %}
+
                             {% end_ui_register_tab_embedded %}
                         {% endfor %}
                         {% ui_render_tabs tab_set=build_name %}

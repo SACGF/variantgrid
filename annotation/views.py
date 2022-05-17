@@ -350,28 +350,29 @@ def variant_annotation_runs(request):
 
     if request.method == "POST":
         for genome_build in GenomeBuild.builds_with_annotation():
-            annotation_runs = AnnotationRun.objects.filter(annotation_range_lock__version__genome_build=genome_build)
-            message = None
-            if f"set-non-finished-to-error-{genome_build.name}" in request.POST:
-                num_errored = 0
-                non_finished_statuses = [AnnotationStatus.FINISHED, AnnotationStatus.ERROR]
-                for annotation_run in annotation_runs.exclude(status__in=non_finished_statuses):
-                    if celery_task := annotation_run.task_id:
-                        logging.info("Terminating celery job '%s'", celery_task)
-                        app.control.revoke(celery_task, terminate=True)  # @UndefinedVariable
-                    annotation_run.error_exception = "Manually failed"
-                    annotation_run.save()
-                    num_errored += 1
-                message = f"{genome_build} - set {num_errored} annotation runs to Error"
-            elif f"retry-annotation-runs-{genome_build.name}" in request.POST:
-                num_retrying = 0
-                for annotation_run in annotation_runs.filter(status=AnnotationStatus.ERROR):
-                    annotation_run_retry(annotation_run)
-                    num_retrying += 1
-                message = f"{genome_build} - retrying {num_retrying} annotation runs."
+            for vav in VariantAnnotationVersion.objects.filter(genome_build=genome_build):
+                annotation_runs = AnnotationRun.objects.filter(annotation_range_lock__version=vav)
+                message = None
+                if f"set-non-finished-to-error-{genome_build.name}-{vav.pk}" in request.POST:
+                    num_errored = 0
+                    non_finished_statuses = [AnnotationStatus.FINISHED, AnnotationStatus.ERROR]
+                    for annotation_run in annotation_runs.exclude(status__in=non_finished_statuses):
+                        if celery_task := annotation_run.task_id:
+                            logging.info("Terminating celery job '%s'", celery_task)
+                            app.control.revoke(celery_task, terminate=True)  # @UndefinedVariable
+                        annotation_run.error_exception = "Manually failed"
+                        annotation_run.save()
+                        num_errored += 1
+                    message = f"{genome_build} - set {num_errored} annotation runs to Error"
+                elif f"retry-annotation-runs-{genome_build.name}-{vav.pk}" in request.POST:
+                    num_retrying = 0
+                    for annotation_run in annotation_runs.filter(status=AnnotationStatus.ERROR):
+                        annotation_run_retry(annotation_run)
+                        num_retrying += 1
+                    message = f"{genome_build} - retrying {num_retrying} annotation runs."
 
-            if message:
-                messages.add_message(request, messages.INFO, message)
+                if message:
+                    messages.add_message(request, messages.INFO, message)
 
     for genome_build in GenomeBuild.builds_with_annotation():
         for vav in VariantAnnotationVersion.objects.filter(genome_build=genome_build).order_by("-annotation_date"):
