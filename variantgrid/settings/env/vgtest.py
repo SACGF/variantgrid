@@ -36,6 +36,15 @@ ANNOTATION[BUILD_GRCH38].update({
     "reference_fasta": os.path.join(_ANNOTATION_FASTA_BASE_DIR, "GCF_000001405.39_GRCh38.p13_genomic.fna.gz"),
 })
 
+ANNOTATION[BUILD_GRCH37]["vep_config"].update({
+    "columns_version": 2,
+    "dbnsfp": "annotation_data/GRCh37/dbNSFP4.3a.grch37.stripped.gz",
+})
+ANNOTATION[BUILD_GRCH38]["vep_config"].update({
+    "columns_version": 2,
+    "dbnsfp": "annotation_data/GRCh38/dbNSFP4.3a.grch38.stripped.gz",
+})
+
 ANNOTATION_VCF_DUMP_DIR = os.path.join(ANNOTATION_REFERENCE_BASE_DIR, 'scratch')
 
 GENES_DEFAULT_CANONICAL_TRANSCRIPT_COLLECTION_ID = 1  # MedEx
