@@ -761,7 +761,7 @@ def view_lab(request, lab_id: int):
                     #except:
                     #    report_exc_info()
                     #    messages.add_message(request, messages.ERROR, "Unable to send test notification")
-                return redirect(reverse('view_lab', kwargs={"pk":pk}))
+                return redirect(reverse('view_lab', kwargs={"lab_id": lab_id}))
             else:
                 raise ValueError(f"Un-supported debug method {debug_method}")
         else:
