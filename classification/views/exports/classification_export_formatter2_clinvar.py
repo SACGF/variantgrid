@@ -59,7 +59,6 @@ class ClinVarCompareRow(ExportRow):
         "risk_factor": "R",
         "drug_response": "D",
         "Conflicting_interpretations_of_pathogenicity": "Conflicting",
-        "Conflicting_interpretations_of_pathogenicity|_association": "Conflicting"
     }
     CLINSIG_BUCKETS = {
         "B": 1,
@@ -114,7 +113,8 @@ class ClinVarCompareRow(ExportRow):
         cs_set: Set[str] = set()
         if clinvar := self.clinvar:
             if cs := clinvar.clinical_significance:
-                for part in cs.split(","):
+                cs = cs.replace(",", "|")
+                for part in cs.split("|"):
                     part = part.strip()
                     if part.startswith("_"):
                         part = part[1:]
@@ -158,6 +158,8 @@ class ClinVarCompareRow(ExportRow):
         our_clins: Set[str] = self.server_clinical_significance_set
         clinvar_clins: Set[str] = self.clinvar_clinical_significance_set
         clinvar_clins.discard("not_provided")
+        clinvar_clins.discard("other")
+        clinvar_clins.discard("association")
 
         if not clinvar_clins:
             return ClinVarCompareValue.NOVEL
