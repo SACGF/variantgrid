@@ -43,7 +43,7 @@ from flags.models import Flag, FlagPermissionLevel, FlagStatus
 from flags.models.models import FlagsMixin, FlagCollection, FlagTypeContext, \
     flag_collection_extra_info_signal, FlagInfos
 from genes.hgvs import HGVSMatcher, CHGVS, chgvs_diff_description, CHGVSDiff, HGVSNameExtra
-from genes.models import Gene, TranscriptVersion
+from genes.models import Gene, TranscriptVersion, Transcript
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
 from library.guardian_utils import clear_permissions
 from library.log_utils import report_exc_info, report_event
@@ -686,8 +686,25 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         Updates the cached transcripts, save() still need to be called
         :return: the number of transcripts successfully set (even if they didn't change)
         """
-        self.transcript_version_grch37 = CHGVS(self.chgvs_grch37).transcript_version_model(genome_build=GenomeBuild.grch37())
-        self.transcript_version_grch38 = CHGVS(self.chgvs_grch38).transcript_version_model(genome_build=GenomeBuild.grch38())
+
+        def resolve_transcript(c_hgvs: str, genome_build: GenomeBuild):
+            if c_hgvs:
+                return CHGVS(c_hgvs).transcript_version_model(genome_build=genome_build)
+            else:
+                if transcript := self.transcript:
+                    transcript_parts = transcript.split('.')
+                    if len(transcript_parts) == 2:
+                        identifier = transcript_parts[0]
+                        try:
+                            version = int(transcript_parts[1])
+                            if transcript_obj := Transcript.objects.filter(identifier=identifier).first():
+                                return TranscriptVersion.objects.filter(genome_build=genome_build, transcript=transcript, version=version).first()
+                        except ValueError:
+                            pass
+            return None
+
+        self.transcript_version_grch37 = resolve_transcript(self.chgvs_grch37, GenomeBuild.grch37())
+        self.transcript_version_grch38 = resolve_transcript(self.chgvs_grch38, GenomeBuild.grch38())
 
         transcript_counts = 0
         if self.transcript_version_grch37:

@@ -255,7 +255,7 @@ class ClassificationAdmin(ModelAdminBasics):
             self.message_user(request, f'Records with missing or invalid builds/coordinates : {invalid_record_count}')
         self.message_user(request, f'Records revalidating : {valid_record_count}')
 
-    @admin_action("Matching: Re-Calculate c.hgvs")
+    @admin_action("Matching: Re-Calculate c.hgvs, transcripts")
     def recalculate_cached_chgvs(self, request, queryset: QuerySet[Classification]):
         for vc in queryset:
             vc.update_cached_c_hgvs()

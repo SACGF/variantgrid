@@ -176,6 +176,7 @@ class PHGVS:
 class CHGVS:
     """
     Technically this is HGVS now as it will accept c. p. g. n. etc
+    This is one of the first helper classes I created on this project and it's a bit of a mess
     """
     HGVS_REGEX = re.compile('(.*?)(?:[(](.*?)[)])?:([a-z][.].*)')
     NUM_PART = re.compile('^[a-z][.]([0-9]+)(.*?)$')
@@ -225,6 +226,10 @@ class CHGVS:
         # just as "gene" wasn't accurate, migrate to gene_symbol
         return self.gene
 
+    @gene_symbol.setter
+    def gene_symbol(self, gene_symbol):
+        self.gene = str(gene_symbol)
+
     @property
     def variant(self) -> Optional[str]:
         # variant is a better name for what comes after the c. than "raw_c"
@@ -239,6 +244,18 @@ class CHGVS:
             new_full_chgvs = f'{self.transcript}({gene_symbol}):{self.raw_c}'
             return CHGVS(new_full_chgvs)
         # if there's no transcript we're invalid, not much we can do
+        return self
+
+    def with_transcript_version(self, version: int) -> 'CHGVS':
+        if self.transcript_parts:
+            transcript = self.transcript_parts.identifier
+            if transcript and self.raw_c:
+                full_c_hgvs: str
+                if gene := self.gene:
+                    full_c_hgvs = f'{transcript}.{version}({gene}):{self.raw_c}'
+                else:
+                    full_c_hgvs = f'{transcript}.{version}:{self.raw_c}'
+                return CHGVS(full_c_hgvs)
         return self
 
     @lazy
