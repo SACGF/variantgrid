@@ -20,21 +20,12 @@ def _new_vep_column_version(apps, schema_editor):
     ColumnVEPField.objects.filter(column__in=VERSION_1).update(max_vep_columns_version=1)
 
     DBNSFP = 'd'
-    LOFTEE = "t"
     NMD = "N"
     PATHOGENICITY_PREDICTIONS = 'P'
 
     COLUMN_VEP_FIELD = [
         {'column': 'nmd_escaping_variant', 'vep_plugin': NMD, 'variant_grid_column_id': 'nmd_escaping_variant',
          'source_field': 'NMD', 'category': PATHOGENICITY_PREDICTIONS, 'min_vep_columns_version': 2},
-        {'column': 'lof', 'vep_plugin': LOFTEE, 'variant_grid_column_id': 'lof',
-         'source_field': 'LoF', 'category': PATHOGENICITY_PREDICTIONS, 'min_vep_columns_version': 2},
-        {'column': 'lof_filter', 'vep_plugin': LOFTEE, 'variant_grid_column_id': 'lof_filter',
-         'source_field': 'LoF_filter', 'category': PATHOGENICITY_PREDICTIONS, 'min_vep_columns_version': 2},
-        {'column': 'lof_flags', 'vep_plugin': LOFTEE, 'variant_grid_column_id': 'lof_flags',
-         'source_field': 'LoF_flags', 'category': PATHOGENICITY_PREDICTIONS, 'min_vep_columns_version': 2},
-        {'column': 'lof_info', 'vep_plugin': LOFTEE, 'variant_grid_column_id': 'lof_info',
-         'source_field': 'LoF_info', 'category': PATHOGENICITY_PREDICTIONS, 'min_vep_columns_version': 2},
         {'column': 'cadd_raw_rankscore', 'vep_plugin': DBNSFP, 'variant_grid_column_id': 'cadd_raw_rankscore',
          'source_field': 'CADD_raw_rankscore', 'category': PATHOGENICITY_PREDICTIONS, 'min_vep_columns_version': 2},
         {'column': 'revel_rankscore', 'vep_plugin': DBNSFP, 'variant_grid_column_id': 'revel_rankscore',
@@ -54,9 +45,8 @@ def _new_vep_column_version(apps, schema_editor):
 
 def _reverse_new_vep_column_version(apps, schema_editor):
     ColumnVEPField = apps.get_model("annotation", "ColumnVEPField")
-    NEW_COLUMNS = ['nmd_escaping_variant', 'lof', 'lof_filter', 'lof_flags', 'lof_info', 'cadd_raw_rankscore',
-                   'revel_rankscore', 'bayesdel_noaf_rankscore', 'clinpred_rankscore', 'vest4_rankscore',
-                   'metalr_rankscore']
+    NEW_COLUMNS = ['nmd_escaping_variant', 'cadd_raw_rankscore', 'revel_rankscore', 'bayesdel_noaf_rankscore',
+                   'clinpred_rankscore', 'vest4_rankscore', 'metalr_rankscore']
 
     ColumnVEPField.objects.filter(column__in=NEW_COLUMNS).delete()
 

@@ -15,38 +15,6 @@ def _new_vep_columns(apps, schema_editor):
          'description': 'Predicts if a stop_gained variant could escape NMD. True if any of the following are met: 1. Variant is in last exon 2. Variant is less than 50 bases upstream of the penultimate (second to the last ) exon. 3. Variant falls in the first 100 coding bases. 4. Transcript has only 1 exon (no introns)',
          'model_field': True,
          'queryset_field': True},
-        {'grid_column_name': 'lof',
-         'variant_column': 'variantannotation__lof',
-         'annotation_level': 'T',
-         'width': None,
-         'label': 'LoF',
-         'description': '<a href="https://www.nature.com/articles/s41586-020-2308-7">LOFTEE</a> - Loss-Of-Function Transcript Effect Estimator - High or low confidence call',
-         'model_field': True,
-         'queryset_field': True},
-        {'grid_column_name': 'lof_filter',
-         'variant_column': 'variantannotation__lof_filter',
-         'annotation_level': 'T',
-         'width': None,
-         'label': 'LoF Filter',
-         'description': '<a href="https://www.nature.com/articles/s41586-020-2308-7">LOFTEE</a> - Loss-Of-Function Transcript Effect Estimator - Reason for LoF not being HC',
-         'model_field': True,
-         'queryset_field': True},
-        {'grid_column_name': 'lof_flags',
-         'variant_column': 'variantannotation__lof_flags',
-         'annotation_level': 'T',
-         'width': None,
-         'label': 'LoF flags',
-         'description': '<a href="https://www.nature.com/articles/s41586-020-2308-7">LOFTEE</a> - Loss-Of-Function Transcript Effect Estimator - Possible warning flags for LoF',
-         'model_field': True,
-         'queryset_field': True},
-        {'grid_column_name': 'lof_info',
-         'variant_column': 'variantannotation__lof_info',
-         'annotation_level': 'T',
-         'width': None,
-         'label': 'LoF Info',
-         'description': '<a href="https://www.nature.com/articles/s41586-020-2308-7">LOFTEE</a> - Loss-Of-Function Transcript Effect Estimator - Info used for LoF annotation',
-         'model_field': True,
-         'queryset_field': True},
 
         # dbNSFP
         {'grid_column_name': 'cadd_raw_rankscore',
@@ -104,9 +72,8 @@ def _new_vep_columns(apps, schema_editor):
 
 def _reverse_new_vep_columns(apps, schema_editor):
     VariantGridColumn = apps.get_model("snpdb", "VariantGridColumn")
-    NEW_COLUMNS = ['nmd_escaping_variant', 'lof', 'lof_filter', 'lof_flags', 'lof_info', 'cadd_raw_rankscore',
-                   'revel_rankscore', 'bayesdel_noaf_rankscore', 'clinpred_rankscore', 'vest4_rankscore',
-                   'metalr_rankscore']
+    NEW_COLUMNS = ['nmd_escaping_variant', 'cadd_raw_rankscore', 'revel_rankscore', 'bayesdel_noaf_rankscore',
+                   'clinpred_rankscore', 'vest4_rankscore', 'metalr_rankscore']
 
     VariantGridColumn.objects.filter(grid_column_name__in=NEW_COLUMNS).delete()
 

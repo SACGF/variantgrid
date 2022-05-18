@@ -133,7 +133,6 @@ class VEPPlugin(models.TextChoices):
     DBSCSNV = 'v', 'dbscSNV'
     GRANTHAM = 'g', 'Grantham'
     LOFTOOL = 'l', 'LoFtool'
-    LOFTEE = "t", "LOFTEE"
     MASTERMIND = 'n', 'Mastermind'
     MAXENTSCAN = 'm', 'MaxEntScan'
     NMD = "N", 'NMD'
@@ -212,8 +211,3 @@ class ManualVariantEntryType(models.TextChoices):
     VARIANT = "v", "Variant"
     UNKNOWN = "u", "Unknown"
 
-
-class LOFTEEConfidence(models.TextChoices):
-    LC = "l", "Low Confidence"
-    HC = "h", "High Confidence"
-    OS = "o", "Other Splice"

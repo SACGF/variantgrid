@@ -119,8 +119,6 @@ def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, an
 
     if vc.columns_version >= 2:
         cmd.extend(["--plugin", "NMD"])
-        loftee_path = settings.ANNOTATION_VEP_PLUGINS_DIR
-        PLUGINS[VEPPlugin.LOFTEE] = lambda: f"LoF,loftee_path:{loftee_path},human_ancestor_fa:{vc['human_ancestor_fa']}"
 
     for vep_plugin, plugin_arg_func in PLUGINS.items():
         try:

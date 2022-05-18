@@ -12,7 +12,7 @@ from annotation.models.damage_enums import SIFTPrediction, FATHMMPrediction, \
     PathogenicityImpact
 from annotation.models.models import ColumnVEPField, VariantAnnotation, \
     VariantTranscriptAnnotation, VariantAnnotationVersion
-from annotation.models.models_enums import VariantClass, LOFTEEConfidence
+from annotation.models.models_enums import VariantClass
 from annotation.vep_annotation import VEPConfig
 from genes.models import TranscriptVersion, GeneVersion
 from genes.models_enums import AnnotationConsortium
@@ -136,9 +136,6 @@ class BulkVEPVCFAnnotationInserter:
         # COSMIC v90 (5/9/2019) switched to COSV (build independent identifiers)
         extract_cosmic = get_extract_existing_variation("COSV")
         extract_dbsnp = get_extract_existing_variation("rs")
-        format_lof = get_choice_formatter_func({LOFTEEConfidence.HC: "HC",
-                                                LOFTEEConfidence.LC: "LC",
-                                                LOFTEEConfidence.OS: "OS"})
 
         # Some annotations return multiple results eg 2 frequencies eg "0.6764&0.2433"
         # Need to work out what to do (eg pick max)
@@ -155,7 +152,6 @@ class BulkVEPVCFAnnotationInserter:
             "hgnc_id": format_hgnc_id,
             "impact": get_choice_formatter_func(PathogenicityImpact.CHOICES),
             "interpro_domain": remove_empty_multiples,
-            "lof": format_lof,
             "mastermind_count_1_cdna": get_clean_and_pick_single_value_func(operator.itemgetter(0), int),
             "mastermind_count_2_cdna_prot": get_clean_and_pick_single_value_func(operator.itemgetter(1), int),
             "mastermind_count_3_aa_change": get_clean_and_pick_single_value_func(operator.itemgetter(2), int),

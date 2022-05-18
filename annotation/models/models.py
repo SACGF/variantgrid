@@ -25,7 +25,7 @@ from annotation.models.damage_enums import Polyphen2Prediction, FATHMMPrediction
     SIFTPrediction, PathogenicityImpact, MutationAssessorPrediction
 from annotation.models.models_enums import AnnotationStatus, CitationSource, \
     VariantClass, ColumnAnnotationCategory, VEPPlugin, VEPCustom, ClinVarReviewStatus, VEPSkippedReason, \
-    ManualVariantEntryType, HumanProteinAtlasAbundance, LOFTEEConfidence
+    ManualVariantEntryType, HumanProteinAtlasAbundance
 from genes.models import GeneSymbol, Gene, TranscriptVersion, Transcript, GeneAnnotationRelease
 from genes.models_enums import AnnotationConsortium
 from library.django_utils import object_is_referenced
@@ -579,12 +579,6 @@ class AbstractVariantAnnotation(models.Model):
     impact = models.CharField(max_length=1, choices=PathogenicityImpact.CHOICES, null=True, blank=True)
     interpro_domain = models.TextField(null=True, blank=True)
     intron = models.TextField(null=True, blank=True)
-    # LOFTEE
-    lof = models.CharField(max_length=1, choices=LOFTEEConfidence.choices, null=True, blank=True)
-    lof_filter = models.TextField(null=True, blank=True)
-    lof_flags = models.TextField(null=True, blank=True)
-    lof_info = models.TextField(null=True, blank=True)
-    # LoF Tool
     loftool = models.FloatField(null=True, blank=True)
     maxentscan_alt = models.FloatField(null=True, blank=True)
     maxentscan_diff = models.FloatField(null=True, blank=True)

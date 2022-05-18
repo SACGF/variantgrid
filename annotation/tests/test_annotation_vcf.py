@@ -8,7 +8,7 @@ from django.test.utils import override_settings
 
 from annotation.annotation_versions import get_variant_annotation_version, \
     get_annotation_range_lock_and_unannotated_count
-from annotation.models import VariantAnnotation, LOFTEEConfidence
+from annotation.models import VariantAnnotation
 from annotation.models.damage_enums import PathogenicityImpact
 from annotation.models.models import AnnotationRun, VariantAnnotationVersion, VariantTranscriptAnnotation
 from annotation.vcf_files.import_vcf_annotations import import_vcf_annotations
@@ -200,10 +200,6 @@ class TestAnnotationVCF2(TestAnnotationVCF):
         self.assertAlmostEqual(va.bayesdel_noaf_rankscore, 0.63287)
         self.assertAlmostEqual(va.cadd_raw_rankscore, 0.41304)
         self.assertAlmostEqual(va.clinpred_rankscore, 0.15198)
-
-        va = VariantAnnotation.objects.get(variant_id=42)
-        self.assertEqual(va.lof, LOFTEEConfidence.HC)
-        self.assertFalse(va.nmd_escaping_variant)  # Default
 
         vta = VariantTranscriptAnnotation.objects.get(variant_id=42, hgvs_c='NM_199357.3:c.1417C>T')
         self.assertTrue(vta.nmd_escaping_variant)
