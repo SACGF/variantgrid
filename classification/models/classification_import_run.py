@@ -45,11 +45,12 @@ class ClassificationImportRun(TimeStampedModel):
 
     def __str__(self):
         parts = []
+        parts.append(f"(run_id={self.pk})")
         if file := self.from_file:
             parts.append(file.filename)
         else:
             parts.append(self.identifier)
-        parts.append(f"({self.row_count})")
+        parts.append(f"(rows:{self.row_count})")
         return "".join(parts)
 
     def increment_status(self, status: ClassificationPatchStatus):
