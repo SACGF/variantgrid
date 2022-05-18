@@ -102,6 +102,15 @@ def _new_vep_columns(apps, schema_editor):
     bulk_insert_class_data(apps, "snpdb", [("VariantGridColumn", VARIANT_GRID_COLUMN)])
 
 
+def _reverse_new_vep_columns(apps, schema_editor):
+    VariantGridColumn = apps.get_model("snpdb", "VariantGridColumn")
+    NEW_COLUMNS = ['nmd_escaping_variant', 'lof', 'lof_filter', 'lof_flags', 'lof_info', 'cadd_raw_rankscore',
+                   'revel_rankscore', 'bayesdel_noaf_rankscore', 'clinpred_rankscore', 'vest4_rankscore',
+                   'metalr_rankscore']
+
+    VariantGridColumn.objects.filter(grid_column_name__in=NEW_COLUMNS).delete()
+
+
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -109,5 +118,5 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RunPython(_new_vep_columns),
+        migrations.RunPython(_new_vep_columns, reverse_code=_reverse_new_vep_columns),
     ]

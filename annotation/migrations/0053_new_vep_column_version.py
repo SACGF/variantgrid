@@ -54,8 +54,9 @@ def _new_vep_column_version(apps, schema_editor):
 
 def _reverse_new_vep_column_version(apps, schema_editor):
     ColumnVEPField = apps.get_model("annotation", "ColumnVEPField")
-    NEW_COLUMNS = ['nmd_escaping_variant', 'lof', 'lof_filter', 'lof_flags', 'lof_info', 'cadd_raw_rankscore', 'revel_rankscore',
-     'bayesdel_noaf_rankscore', 'clinpred_rankscore', 'vest4_rankscore', 'metalr_rankscore']
+    NEW_COLUMNS = ['nmd_escaping_variant', 'lof', 'lof_filter', 'lof_flags', 'lof_info', 'cadd_raw_rankscore',
+                   'revel_rankscore', 'bayesdel_noaf_rankscore', 'clinpred_rankscore', 'vest4_rankscore',
+                   'metalr_rankscore']
 
     ColumnVEPField.objects.filter(column__in=NEW_COLUMNS).delete()
 
