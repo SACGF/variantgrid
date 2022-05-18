@@ -164,9 +164,9 @@ class ClinVarCompareRow(ExportRow):
         clinvar_unknown_clins: Set[str]
         clinvar_clins, clinvar_unknown_clins = self.clinvar_clinical_significance_set
 
-        if not clinvar_clins and not clinvar_unknown_clins:
+        if (not clinvar_clins) and (not clinvar_unknown_clins):
             return ClinVarCompareValue.NOVEL
-        if not clinvar_clins and clinvar_unknown_clins:
+        if (not clinvar_clins) and clinvar_unknown_clins:
             return ClinVarCompareValue.UNKNOWN
         if not our_clins:
             return ClinVarCompareValue.UNCLASSIFIED
@@ -193,7 +193,7 @@ class ClinVarCompareRow(ExportRow):
         compare_values = [compare_single(sc) for sc in our_clins]
         lowest_value = min(compare_values)
 
-        if lowest_value == ClinVarCompareValue.AGREEMENT and len(clinvar_clins) > 1:
+        if lowest_value == ClinVarCompareValue.AGREEMENT and (len(clinvar_clins) + len(clinvar_unknown_clins)) > 1:
             return ClinVarCompareValue.OVERLAP
         else:
             if clinvar_unknown_clins:
