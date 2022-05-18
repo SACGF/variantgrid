@@ -698,7 +698,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                         try:
                             version = int(transcript_parts[1])
                             if transcript_obj := Transcript.objects.filter(identifier=identifier).first():
-                                return TranscriptVersion.objects.filter(genome_build=genome_build, transcript=transcript, version=version).first()
+                                return TranscriptVersion.objects.filter(genome_build=genome_build, transcript=transcript_obj, version=version).first()
                         except ValueError:
                             pass
             return None
