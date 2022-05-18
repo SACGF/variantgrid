@@ -52,6 +52,14 @@ def _new_vep_column_version(apps, schema_editor):
     bulk_insert_class_data(apps, "annotation", [("ColumnVEPField", COLUMN_VEP_FIELD)])
 
 
+def _reverse_new_vep_column_version(apps, schema_editor):
+    ColumnVEPField = apps.get_model("annotation", "ColumnVEPField")
+    NEW_COLUMNS = ['nmd_escaping_variant', 'lof', 'lof_filter', 'lof_flags', 'lof_info', 'cadd_raw_rankscore', 'revel_rankscore',
+     'bayesdel_noaf_rankscore', 'clinpred_rankscore', 'vest4_rankscore', 'metalr_rankscore']
+
+    ColumnVEPField.objects.filter(column__in=NEW_COLUMNS).delete()
+
+
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -60,5 +68,5 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RunPython(_new_vep_column_version),
+        migrations.RunPython(_new_vep_column_version, reverse_code=_reverse_new_vep_column_version),
     ]
