@@ -58,7 +58,8 @@ class ClinVarCompareRow(ExportRow):
         "Benign/Likely_benign": ["B", "LB"],
         "risk_factor": "R",
         "drug_response": "D",
-        "Conflicting_interpretations_of_pathogenicity": "Conflicting"
+        "Conflicting_interpretations_of_pathogenicity": "Conflicting",
+        "Conflicting_interpretations_of_pathogenicity|_association": "Conflicting"
     }
     CLINSIG_BUCKETS = {
         "B": 1,
