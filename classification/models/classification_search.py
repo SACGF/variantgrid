@@ -49,7 +49,7 @@ def search_classifications(sender: Any, search_input: SearchInput, **kwargs) -> 
 
     # check for source ID but only for labs that the user belongs to
     vcm_source_ids = vcm_qs.filter(classification__lab__in=Lab.valid_labs_qs(search_input.user, admin_check=True)).filter(
-        published_evidence__source_id__value=search_string).values('classification')
+        classification__last_source_id=search_string).values('classification')
 
     # convert from modifications back to Classification so absolute_url returns the editable link
     qs = Classification.objects.filter(Q(pk__in=vcm_ids) | Q(pk__in=vcm_source_ids))
