@@ -4,5 +4,5 @@
 {% if relationship.source_term == term %}<span class="text-muted text-monospace">{{ term.id }}</span>{% else %}{% ontology_term relationship.source_term %}{% endif %}
 <div class="text-center d-inline-block mx-2 hover-detail" title="Extra" data-content="{{ relationship.extra }}">{{ relationship.relation_display }}</div>
 {% if relationship.dest_term == term %}<span class="text-muted text-monospace">{{ term.id }}</span>{% else %}{% ontology_term relationship.dest_term %}{% endif %}
-<span class="text-muted d-inline-block hover-detail" title="Import {{ relationship.from_import.import_source }}" data-content="Last imported: {{ relationship.from_import.processed_date }}<br/>Context: {{ relationship.from_import.context }}</br>Filename: {{ relationship.from_import.filename }}">&nbsp;from <span style="word-break: break-all">{{ relationship.from_import.import_source }}</span></span>
+<span class="text-muted d-inline-block hover-detail" title="Import {{ relationship.from_import.import_source }}" data-content="Last imported: {% timestamp relationship.from_import.processed_date text_only=True %}<br/>Context: {{ relationship.from_import.context }}</br>Filename: {{ relationship.from_import.filename }}">&nbsp;from <span style="word-break: break-all">{{ relationship.from_import.import_source }}</span></span>
 {% if low_quality %} ({{ quality }})</div>{% endif %}

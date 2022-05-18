@@ -1,1 +1,6 @@
-{% if timestamp %}<data class="convert-timestamp {{ css_class }}" data-timestamp="{{ timestamp }}">{{ timestamp }}</data>{% else %}<span class="no-value">-</span>{% endif %}
+{% if text_only %}{% if timestamp %}{{ datetime|date:"Y-m-d" }}{% else %}-{% endif %}{% else %}
+{% if timestamp %}
+    <data class="convert-timestamp {{ css_class }}" data-timestamp="{{ timestamp }}">{{ timestamp }}</data>
+{% else %}
+    <span class="no-value">-</span>
+{% endif %}{% endif %}

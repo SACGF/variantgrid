@@ -1,4 +1,5 @@
 import collections.abc
+import datetime
 import json
 import re
 import urllib
@@ -145,7 +146,7 @@ def code_shell(data: str):
 
 
 @register.inclusion_tag("uicore/tags/timestamp.html")
-def timestamp(timestamp, time_ago: bool = False, show_seconds: bool = False):
+def timestamp(timestamp, time_ago: bool = False, show_seconds: bool = False, text_only: bool = False):
     css_classes = list()
     if time_ago:
         css_classes.append('time-ago')
@@ -156,8 +157,10 @@ def timestamp(timestamp, time_ago: bool = False, show_seconds: bool = False):
         if not isinstance(timestamp, (int, float)):
             timestamp = timestamp.timestamp()
         return {
+            "datetime": datetime.datetime.fromtimestamp(timestamp),
             "timestamp": timestamp,
-            "css_class": " ".join(css_classes)
+            "css_class": " ".join(css_classes),
+            "text_only": text_only
         }
     return {}
 
