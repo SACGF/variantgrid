@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Set, Optional, Iterable, List
+from typing import Set, Optional, Iterable, List, Tuple
 
 from django.http import HttpRequest
 from django.urls import reverse
@@ -36,7 +36,7 @@ class ClinVarCompareValue(int, Enum):
             ClinVarCompareValue.DISCORDANT: "discordant",
             ClinVarCompareValue.CONFIDENCE: "confidence",
             ClinVarCompareValue.UNKNOWN: "unknown",
-            ClinVarCompareValue.OVERLAP: "overlap",
+            ClinVarCompareValue.OVERLAP: "intersection",
             ClinVarCompareValue.AGREEMENT: "agreement",
             ClinVarCompareValue.NOVEL: "novel",
             ClinVarCompareValue.NOT_CALCULATED: "error"
@@ -57,8 +57,7 @@ class ClinVarCompareRow(ExportRow):
         "Pathogenic/Likely_pathogenic": ["P", "LP"],
         "Benign/Likely_benign": ["B", "LB"],
         "risk_factor": "R",
-        "drug_response": "D",
-        "Conflicting_interpretations_of_pathogenicity": "Conflicting",
+        "drug_response": "D"
     }
     CLINSIG_BUCKETS = {
         "B": 1,
@@ -108,9 +107,10 @@ class ClinVarCompareRow(ExportRow):
         return cs_set
 
     @lazy
-    def clinvar_clinical_significance_set(self) -> Set[str]:
+    def clinvar_clinical_significance_set(self) -> Tuple[Set[str], Set[str]]:
         clinvar: ClinVar
         cs_set: Set[str] = set()
+        unknown_set: Set[str] = set()
         if clinvar := self.clinvar:
             if cs := clinvar.clinical_significance:
                 cs = cs.replace(",", "|")
@@ -118,13 +118,15 @@ class ClinVarCompareRow(ExportRow):
                     part = part.strip()
                     if part.startswith("_"):
                         part = part[1:]
-                    m_parts = ClinVarCompareRow.CLINSIG_TO_VGSIG.get(part, part)
-                    if isinstance(m_parts, str):
-                        cs_set.add(m_parts)
+                    if m_parts := ClinVarCompareRow.CLINSIG_TO_VGSIG.get(part):
+                        if isinstance(m_parts, str):
+                            cs_set.add(m_parts)
+                        else:
+                            for m_part in m_parts:
+                                cs_set.add(m_part)
                     else:
-                        for m_part in m_parts:
-                            cs_set.add(m_part)
-        return cs_set
+                        unknown_set.add(part)
+        return cs_set, unknown_set
 
     @export_column("Clinical Significances")
     def servers_clinical_significance(self) -> str:
@@ -133,8 +135,10 @@ class ClinVarCompareRow(ExportRow):
 
     @export_column("ClinVar Clinical Significances")
     def clinvar_clinical_significance(self) -> str:
-        (cs_list := list(self.clinvar_clinical_significance_set)).sort()
-        return ";".join(cs_list)
+        known, unknown = self.clinvar_clinical_significance_set
+        (cs_list := (list(known) + list(unknown))).sort()
+        if cs_list:
+            return ";".join(cs_list)
 
     def clinvar_clinical_significance_raw(self) -> str:
         if clinvar := self.clinvar:
@@ -156,18 +160,18 @@ class ClinVarCompareRow(ExportRow):
     @export_column("Comparison")
     def diff_value(self) -> ClinVarCompareValue:
         our_clins: Set[str] = self.server_clinical_significance_set
-        clinvar_clins: Set[str] = self.clinvar_clinical_significance_set
-        clinvar_clins.discard("not_provided")
-        clinvar_clins.discard("other")
-        clinvar_clins.discard("association")
+        clinvar_clins: Set[str]
+        clinvar_unknown_clins: Set[str]
+        clinvar_clins, clinvar_unknown_clins = self.clinvar_clinical_significance_set
 
-        if not clinvar_clins:
+        if not clinvar_clins and not clinvar_unknown_clins:
             return ClinVarCompareValue.NOVEL
+        if not clinvar_clins and clinvar_unknown_clins:
+            return ClinVarCompareValue.UNKNOWN
         if not our_clins:
             return ClinVarCompareValue.UNCLASSIFIED
 
-        if "Conflicting" in clinvar_clins:
-            return ClinVarCompareValue.UNKNOWN
+        has_unknown = any(clin_sig.startswith("?") for clin_sig in clinvar_clins)
 
         # simplify VUS_A/B/C to just VUS
         our_clins = {"VUS" if sc.startswith("VUS") else sc for sc in our_clins}
@@ -192,6 +196,8 @@ class ClinVarCompareRow(ExportRow):
         if lowest_value == ClinVarCompareValue.AGREEMENT and len(clinvar_clins) > 1:
             return ClinVarCompareValue.OVERLAP
         else:
+            if clinvar_unknown_clins:
+                return ClinVarCompareValue.UNKNOWN
             return lowest_value
 
     @lazy
