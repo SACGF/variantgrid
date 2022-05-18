@@ -269,9 +269,9 @@
         </p>
     {% end_page_help_embedded %}
 
-    {% if dlab.counts.internal_review %}{% labelled hint="tiny" label="Outstanding Internal Reviews" %}{{ dlab.counts.internal_review | number:'I' }}{% endlabelled %}{% endif %}
-    {% if dlab.counts.significance_change %}{% labelled hint="tiny" label="Outstanding Clinical Significance Changes" %}{{ dlab.counts.significance_change | number:'W' }}{% endlabelled %}{% endif %}
-    {% if dlab.counts.clinvar_exclude %}{% labelled hint="tiny" label="Classifications Excluded from ClinVar" %}{{ dlab.counts.clinvar_exclude | number }}{% endlabelled %}{% endif %}
+    {% labelled hint="tiny" label="Classifications in Internal Review" %}{{ dlab.counts.internal_review | number:'W' }}{% endlabelled %}
+    {% labelled hint="tiny" label="Classifications with Outstanding Clinical Significance Changes" %}{{ dlab.counts.significance_change | number:'W' }}{% endlabelled %}
+    {% labelled hint="tiny" label="Classifications Excluded from ClinVar" %}{{ dlab.counts.clinvar_exclude | number }}{% endlabelled %}
 
     <p><a href="#flagged-classifications" class="toggle-link" data-toggle="collapse">Show details</a></p>
 
