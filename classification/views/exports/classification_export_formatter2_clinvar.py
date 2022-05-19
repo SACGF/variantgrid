@@ -136,10 +136,14 @@ class ClinVarCompareRow(ExportRow):
     @export_column("ClinVar Clinical Significances")
     def clinvar_clinical_significance(self) -> str:
         known, unknown = self.clinvar_clinical_significance_set
-        (cs_list := (list(known) + list(unknown))).sort()
-        if cs_list:
-            return ";".join(cs_list)
+        resolved_values = sorted(known)
+        if unknown:
+            resolved_values.append("?")
 
+        if resolved_values:
+            return ";".join(resolved_values)
+
+    @export_column("ClinVar Clinical Significances Raw")
     def clinvar_clinical_significance_raw(self) -> str:
         if clinvar := self.clinvar:
             return clinvar.clinical_significance
