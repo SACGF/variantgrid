@@ -1,4 +1,5 @@
 import datetime
+import logging
 from collections import defaultdict
 from functools import total_ordering, reduce
 from operator import __and__
@@ -268,7 +269,7 @@ class FlagCollection(models.Model, GuardianPermissionsMixin):
 
         if not self._source_object:
             # appears to be an orphaned set
-            report_message('Could not find source object for FlagCollection', extra_data={'flag_collection_id': self.id})
+            logging.warning(f'Could not find source object for FlagCollection {self.id}')
 
         return self._source_object
 
