@@ -704,6 +704,14 @@ def clin_sig_change_data(request):
         all_flags_qs = Flag.objects.filter(flag_type=classification_flag_types.significance_change)
         flag: Flag
         for flag in all_flags_qs.order_by('-created'):
+            source: Optional[Classification] = None
+            flag_collection = flag.collection
+            if source_obj := flag_collection.source_object:
+                if isinstance(flag_collection.source_object, Classification):
+                    source = source_obj
+            if not source:
+                continue
+
             flag_comment: FlagComment
             cs_from: str = 'ERROR'
             cs_to: str = 'ERROR'
@@ -714,33 +722,24 @@ def clin_sig_change_data(request):
             discordance_dates: List[datetime] = list()
             other_labs: Set[Lab] = set()
 
-            flag_collection = flag.collection
-            if source := flag_collection.source_object:
-                if isinstance(source, Classification):
-                    c_hgvs = source.get_c_hgvs(genome_build=GenomeBuildManager.get_current_genome_build())
-                    org = source.lab.organization.name
-                    lab = source.lab.name
-                    url = get_url_from_view_path(source.get_absolute_url())
-                    classification_created = source.created
+            c_hgvs = source.get_c_hgvs(genome_build=GenomeBuildManager.get_current_genome_build())
+            org = source.lab.organization.name
+            lab = source.lab.name
+            url = get_url_from_view_path(source.get_absolute_url())
+            classification_created = source.created
 
-                    # get earliest discordance
-                    first_discordance: Flag
-                    for discordance in Flag.objects.filter(collection=source.flag_collection_safe,
-                                                           flag_type=classification_flag_types.discordant).order_by(
-                            'created'):
-                        discordance_dates.append(discordance.created)
+            # get earliest discordance
+            first_discordance: Flag
+            for discordance in Flag.objects.filter(collection=source.flag_collection_safe,
+                                                   flag_type=classification_flag_types.discordant).order_by(
+                    'created'):
+                discordance_dates.append(discordance.created)
 
-                    if allele := source.allele:
-                        cl: Classification
-                        for cl in Classification.objects.filter(variant__in=allele.variants):
-                            if cl.lab != source.lab and cl.created < flag.created:
-                                other_labs.add(cl.lab)
-
-                else:
-                    continue
-            else:
-                # the classification has been deleted
-                continue
+            if allele := source.allele:
+                cl: Classification
+                for cl in Classification.objects.filter(variant__in=allele.variants):
+                    if cl.lab != source.lab and cl.created < flag.created:
+                        other_labs.add(cl.lab)
 
             for index, flag_comment in enumerate(flag.flagcomment_set.order_by('created')):
                 if text := flag_comment.text:
@@ -749,7 +748,9 @@ def clin_sig_change_data(request):
                             cs_from = de_number(match.group('from'))
                             cs_to = de_number(match.group('to'))
                         else:
-                            print(text)
+                            cs_from = "See Comments"
+                            cs_to = "See Comments"
+                            comments.append(text)
                     else:
                         comments.append(text)
                 if flag_comment and flag_comment.resolution:
