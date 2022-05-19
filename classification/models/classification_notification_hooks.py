@@ -51,7 +51,7 @@ def send_discordance_notification(discordance_report: DiscordanceReport):
             # if a lab is both still in the discordance with non-withdrawn classifications and with withdrawn classifications
             # don't count them both times.
             if withdrawn_lab not in reported_labs:
-                notification.add_field(label=f"{withdrawn_lab.lab} - classify this as", value="_WITHDRAWN_")
+                notification.add_field(label=f"{withdrawn_lab} - classify this as", value="_WITHDRAWN_")
 
         notification.add_markdown(f"Full details of the overlap can be seen here : <{report_url}>")
         notification.send()
