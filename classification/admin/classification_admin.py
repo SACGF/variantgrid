@@ -1,6 +1,7 @@
 import json
 from typing import Set
 
+from django.conf import settings
 from django.contrib import admin, messages
 from django.contrib.admin import RelatedFieldListFilter, BooleanFieldListFilter
 from django.db.models import QuerySet
@@ -108,11 +109,11 @@ class ClassificationImportRunAdmin(ModelAdminBasics):
 
     @admin_list_column(short_description="Created", order_field="created")
     def created_detailed(self, obj: ClassificationImportRun):
-        return obj.created.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+        return self.format_datetime(obj.created)
 
     @admin_list_column(short_description="Modified", order_field="modified")
     def modified_detailed(self, obj: ClassificationImportRun):
-        return obj.modified.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+        return self.format_datetime(obj.modified)
 
     @admin_action(short_description="Mark Unfinished")
     def mark_unfinished(self, request, queryset: QuerySet[ClassificationImportRun]):
@@ -163,11 +164,11 @@ class ClassificationAdmin(ModelAdminBasics):
 
     @admin_list_column(short_description="Created", order_field="created")
     def created_detailed(self, obj: Classification):
-        return obj.created.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+        return self.format_datetime(obj.created)
 
     @admin_list_column(short_description="Modified", order_field="modified")
     def modified_detailed(self, obj: Classification):
-        return obj.modified.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+        return self.format_datetime(obj.modified)
 
     @admin_list_column(short_description="Allele", order_field="allele")
     def allele_fallback(self, obj: Classification):

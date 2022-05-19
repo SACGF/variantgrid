@@ -1,6 +1,8 @@
 import inspect
 from typing import Optional, List, Iterator
 
+import pytz
+from django.conf import settings
 from django.contrib import admin, messages
 from django.db import models
 from django.db.models import AutoField, ForeignKey, DateTimeField
@@ -10,6 +12,8 @@ from django_json_widget.widgets import JSONEditorWidget
 from guardian.admin import GuardedModelAdminMixin
 
 # https://stackoverflow.com/questions/41228687/how-to-decorate-admin-actions-in-django-action-name-used-as-dict-key
+from lazy import lazy
+
 from library.utils import delimited_row
 
 
@@ -151,6 +155,14 @@ class ModelAdminBasics(admin.ModelAdmin):
 
         cls.actions = ['export_as_csv'] + actions
         return super().__new__(cls)
+
+    @lazy
+    def tz(self):
+        return pytz.timezone(settings.TIME_ZONE)
+
+    def format_datetime(self, datetime) -> str:
+        default_timezoned = datetime.astimezone(self.tz)
+        return f"{default_timezoned.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}"
 
     def is_readonly_field(self, f) -> bool:
         if not f.editable:
