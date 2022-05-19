@@ -9,7 +9,7 @@ from lazy import lazy
 
 from annotation.models.damage_enums import SIFTPrediction, FATHMMPrediction, \
     MutationAssessorPrediction, MutationTasterPrediction, Polyphen2Prediction, \
-    PathogenicityImpact
+    PathogenicityImpact, ALoFTPrediction
 from annotation.models.models import ColumnVEPField, VariantAnnotation, \
     VariantTranscriptAnnotation, VariantAnnotationVersion
 from annotation.models.models_enums import VariantClass
@@ -142,6 +142,8 @@ class BulkVEPVCFAnnotationInserter:
         self.field_formatters = {
             "af_1kg": format_pick_highest_float,
             "af_uk10k": format_pick_highest_float,
+            "aloft_pred": get_choice_formatter_func(ALoFTPrediction.choices),
+            "aloft_high_confidence": format_aloft_high_confidence,
             "cosmic_count": format_pick_highest_int,
             "cosmic_id": extract_cosmic,
             "cosmic_legacy_id": remove_empty_multiples,
@@ -587,3 +589,12 @@ def get_most_damaging_func(klass):
 
 def format_nmd_escaping_variant(value) -> bool:
     return value == "NMD_escaping_variant"
+
+
+def format_aloft_high_confidence(value) -> bool:
+    high_confidence = None
+    if value == "High Confidence":
+        high_confidence = True
+    elif value == "Low Confidence":
+        high_confidence = False
+    return high_confidence

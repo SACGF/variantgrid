@@ -22,7 +22,7 @@ from lazy import lazy
 
 from annotation.external_search_terms import get_variant_search_terms, get_variant_pubmed_search_terms
 from annotation.models.damage_enums import Polyphen2Prediction, FATHMMPrediction, MutationTasterPrediction, \
-    SIFTPrediction, PathogenicityImpact, MutationAssessorPrediction
+    SIFTPrediction, PathogenicityImpact, MutationAssessorPrediction, ALoFTPrediction
 from annotation.models.models_enums import AnnotationStatus, CitationSource, \
     VariantClass, ColumnAnnotationCategory, VEPPlugin, VEPCustom, ClinVarReviewStatus, VEPSkippedReason, \
     ManualVariantEntryType, HumanProteinAtlasAbundance
@@ -693,6 +693,12 @@ class VariantAnnotation(AbstractVariantAnnotation):
     clinpred_rankscore = models.FloatField(null=True, blank=True)
     vest4_rankscore = models.FloatField(null=True, blank=True)
     metalr_rankscore = models.FloatField(null=True, blank=True)
+    # ALoFT (from dbNSFP)
+    aloft_prob_tolerant = models.FloatField(null=True, blank=True)
+    aloft_prob_recessive = models.FloatField(null=True, blank=True)
+    aloft_prob_dominant = models.FloatField(null=True, blank=True)
+    aloft_pred = models.CharField(max_length=1, choices=ALoFTPrediction.choices, null=True, blank=True)
+    aloft_high_confidence = models.BooleanField(null=True, blank=True)
 
     # Not all builds have all phylop/phastcons
     phylop_30_way_mammalian = models.FloatField(null=True, blank=True)

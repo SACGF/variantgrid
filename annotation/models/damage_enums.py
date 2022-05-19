@@ -1,3 +1,4 @@
+from django.db import models
 from django.db.models.query_utils import Q
 
 from annotation.models.models_enums import VariantClass
@@ -147,3 +148,9 @@ class MutationAssessorPrediction(AbstractPathogenicity):
     ]
     MINIMUM_FLAG_DAMAGE_LEVEL = MEDIUM
     VARIANT_PATH = "variantannotation__mutation_assessor_pred_most_damaging"
+
+
+class ALoFTPrediction(models.TextChoices):
+    TOLERANT = "t", "Tolerant"
+    RECESSIVE = "r", "Recessive"
+    DOMINANT = "d", "Dominant"
