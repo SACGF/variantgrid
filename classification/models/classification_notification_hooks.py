@@ -27,9 +27,9 @@ def send_discordance_notification(discordance_report: DiscordanceReport):
     )
     clin_sig_key = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE)
 
-    labs_str = ", ".join(str(lab) for lab in sorted(all_labs))
+    labs_str = "\n".join(str(lab) for lab in sorted(all_labs))
     nb = NotificationBuilder("Discordance notifications")
-    nb.add_markdown(f":wave: Sending Discordance Report {discordance_report.pk} notification to {labs_str}")
+    nb.add_markdown(f":wave: Sending Discordance Report (DR_{discordance_report.pk}) notification to {labs_str}")
     nb.send()
 
     for lab in all_labs:
