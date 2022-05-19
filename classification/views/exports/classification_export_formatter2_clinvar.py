@@ -36,7 +36,7 @@ class ClinVarCompareValue(int, Enum):
             ClinVarCompareValue.DISCORDANT: "discordant",
             ClinVarCompareValue.CONFIDENCE: "confidence",
             ClinVarCompareValue.UNKNOWN: "unknown",
-            ClinVarCompareValue.OVERLAP: "intersection",
+            ClinVarCompareValue.OVERLAP: "agreement (partial)",
             ClinVarCompareValue.AGREEMENT: "agreement",
             ClinVarCompareValue.NOVEL: "novel",
             ClinVarCompareValue.NOT_CALCULATED: "error"
