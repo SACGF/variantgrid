@@ -345,7 +345,7 @@ class BulkVEPVCFAnnotationInserter:
         # Pick High confidence, then Recessive over Dominant
         PREFERENCES = {
             "aloft_high_confidence": ["High", "Low", "."],
-            "aloft_pred": ["Recessive", "Dominant", "."],
+            "aloft_pred": ["Recessive", "Dominant", "Tolerant", "."],
         }
 
         def aloft_preferences(val):
