@@ -90,7 +90,7 @@
                                         {% for step in snake.show_steps %}
                                             <div class="text-center d-inline-block mx-2 hover-detail"
                                                  title="Import {{ step.relation.from_import.import_source }}"
-                                                data-content="Last imported: {{ step.relation.from_import.processed_date }}<br/>
+                                                data-content="Last imported: {% timestamp step.relation.from_import.processed_date text_only=True %}<br/>
                                                 Context: {{ step.relation.from_import.context }}</br>
                                                 Filename: {{ step.relation.from_import.filename }}">&nbsp
                                                 {{ step.relation.relation_display }}
