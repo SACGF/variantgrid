@@ -9,8 +9,9 @@ from django.test.utils import override_settings
 from annotation.annotation_versions import get_variant_annotation_version, \
     get_annotation_range_lock_and_unannotated_count
 from annotation.models import VariantAnnotation
-from annotation.models.damage_enums import PathogenicityImpact
+from annotation.models.damage_enums import PathogenicityImpact, ALoFTPrediction
 from annotation.models.models import AnnotationRun, VariantAnnotationVersion, VariantTranscriptAnnotation
+from annotation.vcf_files.bulk_vep_vcf_annotation_inserter import BulkVEPVCFAnnotationInserter
 from annotation.vcf_files.import_vcf_annotations import import_vcf_annotations
 from annotation.vep_annotation import vep_parse_version_line, get_vep_version_from_vcf, \
     vep_dict_to_variant_annotation_version_kwargs, VEPVersionMismatchError, VEPConfig
@@ -201,11 +202,21 @@ class TestAnnotationVCF2(TestAnnotationVCF):
         self.assertAlmostEqual(va.cadd_raw_rankscore, 0.41304)
         self.assertAlmostEqual(va.clinpred_rankscore, 0.15198)
 
+        va = VariantAnnotation.objects.get(variant_id=42)
+        self.assertEqual(va.aloft_high_confidence, True)
+        self.assertEqual(va.aloft_pred, ALoFTPrediction.RECESSIVE)
+        self.assertAlmostEqual(va.aloft_prob_dominant, 0.13585)
+        self.assertAlmostEqual(va.aloft_prob_recessive, 0.81255)
+        self.assertAlmostEqual(va.aloft_prob_tolerant, 0.0516)
+
         vta = VariantTranscriptAnnotation.objects.get(variant_id=42, hgvs_c='NM_199357.3:c.1417C>T')
         self.assertTrue(vta.nmd_escaping_variant)
 
 
-class TestVEPVersion(TestCase):
+class TestVEP(TestCase):
+    """ Random VEP annotation methods """
+    maxDiff = None
+
     def test_parse_vep_version(self):
         LINES = [
             '##VEP="v97" time="2019-08-12 22:39:56" cache="/data/annotation/VEP/vep_cache/homo_sapiens/97_GRCh38" ensembl=97.378db18 ensembl-variation=97.26a059c ensembl-io=97.dc917e1 ensembl-funcgen=97.24f4d3c 1000genomes="phase3" COSMIC="88" ClinVar="201904" ESP="V2-SSA137" HGMD-PUBLIC="20184" assembly="GRCh38.p12" dbSNP="151" gencode="GENCODE 31" genebuild="2014-07" gnomAD="r2.1" polyphen="2.2.2" regbuild="1.0" sift="sift5.2.2"',
@@ -216,4 +227,65 @@ class TestVEPVersion(TestCase):
                 vep_parse_version_line(line)
             except:
                 self.fail(f"vep_parse_version_line died on line: {line}")
+
+    def test_aloft_pick_single(self):
+        aloft_data = {
+            "aloft_prob_tolerant": ".&0.0516&.&.&.&",
+            "aloft_prob_recessive": ".&0.81255&.&.&.&",
+            "aloft_prob_dominant": ".&0.13585&.&.&.&",
+            "aloft_pred": ".&Recessive&.&.&.&",
+            "aloft_high_confidence": ".&High&.&.&.&",
+            "aloft_ensembl_transcript": "ENST00000565905&ENST00000361627&ENST00000567348&ENST00000563864&ENST00000543522",
+        }
+        BulkVEPVCFAnnotationInserter._pick_aloft_values(aloft_data)
+        expected_aloft = {
+            "aloft_prob_tolerant": "0.0516",
+            "aloft_prob_recessive": "0.81255",
+            "aloft_prob_dominant": "0.13585",
+            "aloft_pred": "Recessive",
+            "aloft_high_confidence": "High",
+            "aloft_ensembl_transcript": "ENST00000361627",
+        }
+        self.assertDictEqual(aloft_data, expected_aloft)
+
+    def test_aloft_pick_recessive_2_highs(self):
+        aloft_data = {
+            "aloft_prob_tolerant": "0.123&0.0516&.&.&.&",
+            "aloft_prob_recessive": "0.123&0.81255&.&.&.&",
+            "aloft_prob_dominant": "0.123&0.13585&.&.&.&",
+            "aloft_pred": "Dominant&Recessive&.&.&.&",
+            "aloft_high_confidence": "High&High&.&.&.&",
+            "aloft_ensembl_transcript": "ENST00000565905&ENST00000361627&ENST00000567348&ENST00000563864&ENST00000543522",
+        }
+        BulkVEPVCFAnnotationInserter._pick_aloft_values(aloft_data)
+        expected_aloft = {
+            "aloft_prob_tolerant": "0.0516",
+            "aloft_prob_recessive": "0.81255",
+            "aloft_prob_dominant": "0.13585",
+            "aloft_pred": "Recessive",
+            "aloft_high_confidence": "High",
+            "aloft_ensembl_transcript": "ENST00000361627",
+        }
+        self.assertDictEqual(aloft_data, expected_aloft)
+
+    def test_aloft_pick_high_dominant(self):
+        aloft_data = {
+            "aloft_prob_tolerant": "0.123&0.0516&.&.&.&",
+            "aloft_prob_recessive": "0.123&0.81255&.&.&.&",
+            "aloft_prob_dominant": "0.123&0.13585&.&.&.&",
+            "aloft_pred": "Dominant&Recessive&.&.&.&",
+            "aloft_high_confidence": "High&Low&.&.&.&",
+            "aloft_ensembl_transcript": "ENST00000565905&ENST00000361627&ENST00000567348&ENST00000563864&ENST00000543522",
+        }
+        BulkVEPVCFAnnotationInserter._pick_aloft_values(aloft_data)
+        expected_aloft = {
+            "aloft_prob_tolerant": "0.123",
+            "aloft_prob_recessive": "0.123",
+            "aloft_prob_dominant": "0.123",
+            "aloft_pred": "Dominant",
+            "aloft_high_confidence": "High",
+            "aloft_ensembl_transcript": "ENST00000565905",
+        }
+        self.assertDictEqual(aloft_data, expected_aloft)
+
 

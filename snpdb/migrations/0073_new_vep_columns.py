@@ -106,6 +106,15 @@ def _new_vep_columns(apps, schema_editor):
          'description': '<a href="https://www.nature.com/articles/s41467-017-00443-5">ALoFT</a> Confidence level of Aloft_pred is "High Confidence" (p < 0.05)',
          'model_field': True,
          'queryset_field': True},
+        {'grid_column_name': 'aloft_ensembl_transcript',
+         'variant_column': 'variantannotation__aloft_ensembl_transcript',
+         'annotation_level': 'V',
+         'width': None,
+         'label': 'ALoFT chosen transcript',
+         'description': '<a href="https://www.nature.com/articles/s41467-017-00443-5">ALoFT</a> Ensembl transcript of most damaging prediction chosen.',
+         'model_field': True,
+         'queryset_field': True},
+
     ]
 
 

@@ -699,6 +699,7 @@ class VariantAnnotation(AbstractVariantAnnotation):
     aloft_prob_dominant = models.FloatField(null=True, blank=True)
     aloft_pred = models.CharField(max_length=1, choices=ALoFTPrediction.choices, null=True, blank=True)
     aloft_high_confidence = models.BooleanField(null=True, blank=True)
+    aloft_ensembl_transcript = models.TextField(null=True, blank=True)  # Transcript of most damaging prediction chosen
 
     # Not all builds have all phylop/phastcons
     phylop_30_way_mammalian = models.FloatField(null=True, blank=True)

@@ -22,6 +22,7 @@ def _new_vep_column_version(apps, schema_editor):
     DBNSFP = 'd'
     NMD = "N"
     PATHOGENICITY_PREDICTIONS = 'P'
+    ALOFT_PROCESSING = "Most damaging transcript prediction chosen, and Ensembl transcript stored."
 
     COLUMN_VEP_FIELD = [
         {'column': 'nmd_escaping_variant', 'vep_plugin': NMD, 'variant_grid_column_id': 'nmd_escaping_variant',
@@ -40,15 +41,23 @@ def _new_vep_column_version(apps, schema_editor):
          'source_field': 'MetaLR_rankscore', 'category': PATHOGENICITY_PREDICTIONS, 'min_vep_columns_version': 2},
         # ALoFT
         {'column': 'aloft_prob_tolerant', 'vep_plugin': DBNSFP, 'variant_grid_column_id': 'aloft_prob_tolerant',
-         'source_field': 'Aloft_prob_Tolerant', 'category': PATHOGENICITY_PREDICTIONS, 'min_vep_columns_version': 2},
+         'source_field': 'Aloft_prob_Tolerant', 'source_field_processing_description': ALOFT_PROCESSING,
+         'category': PATHOGENICITY_PREDICTIONS, 'min_vep_columns_version': 2},
         {'column': 'aloft_prob_recessive', 'vep_plugin': DBNSFP, 'variant_grid_column_id': 'aloft_prob_recessive',
-         'source_field': 'Aloft_prob_Recessive', 'category': PATHOGENICITY_PREDICTIONS, 'min_vep_columns_version': 2},
+         'source_field': 'Aloft_prob_Recessive', 'source_field_processing_description': ALOFT_PROCESSING,
+         'category': PATHOGENICITY_PREDICTIONS, 'min_vep_columns_version': 2},
         {'column': 'aloft_prob_dominant', 'vep_plugin': DBNSFP, 'variant_grid_column_id': 'aloft_prob_dominant',
-         'source_field': 'Aloft_prob_Dominant', 'category': PATHOGENICITY_PREDICTIONS, 'min_vep_columns_version': 2},
+         'source_field': 'Aloft_prob_Dominant', 'source_field_processing_description': ALOFT_PROCESSING,
+         'category': PATHOGENICITY_PREDICTIONS, 'min_vep_columns_version': 2},
         {'column': 'aloft_pred', 'vep_plugin': DBNSFP, 'variant_grid_column_id': 'aloft_pred',
-         'source_field': 'Aloft_pred', 'category': PATHOGENICITY_PREDICTIONS, 'min_vep_columns_version': 2},
+         'source_field': 'Aloft_pred', 'source_field_processing_description': ALOFT_PROCESSING,
+         'category': PATHOGENICITY_PREDICTIONS, 'min_vep_columns_version': 2},
         {'column': 'aloft_high_confidence', 'vep_plugin': DBNSFP, 'variant_grid_column_id': 'aloft_high_confidence',
-         'source_field': 'Aloft_Confidence', 'category': PATHOGENICITY_PREDICTIONS, 'min_vep_columns_version': 2},
+         'source_field': 'Aloft_Confidence', 'source_field_processing_description': ALOFT_PROCESSING,
+         'category': PATHOGENICITY_PREDICTIONS, 'min_vep_columns_version': 2},
+        {'column': 'aloft_ensembl_transcript', 'vep_plugin': DBNSFP, 'variant_grid_column_id': 'aloft_ensembl_transcript',
+         'source_field': 'Ensembl_transcriptid', 'source_field_processing_description': ALOFT_PROCESSING,
+         'category': PATHOGENICITY_PREDICTIONS, 'min_vep_columns_version': 2},
     ]
 
     bulk_insert_class_data(apps, "annotation", [("ColumnVEPField", COLUMN_VEP_FIELD)])
@@ -58,7 +67,8 @@ def _reverse_new_vep_column_version(apps, schema_editor):
     ColumnVEPField = apps.get_model("annotation", "ColumnVEPField")
     NEW_COLUMNS = ['nmd_escaping_variant', 'cadd_raw_rankscore', 'revel_rankscore', 'bayesdel_noaf_rankscore',
                    'clinpred_rankscore', 'vest4_rankscore', 'metalr_rankscore', 'aloft_prob_tolerant',
-                   'aloft_prob_recessive', 'aloft_prob_dominant', 'aloft_pred', 'aloft_high_confidence']
+                   'aloft_prob_recessive', 'aloft_prob_dominant', 'aloft_pred', 'aloft_high_confidence',
+                   'aloft_ensembl_transcript']
 
     ColumnVEPField.objects.filter(column__in=NEW_COLUMNS).delete()
 
