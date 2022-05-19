@@ -72,7 +72,7 @@ class UploadedClassificationsUnmapped(TimeStampedModel):
     file_size = models.IntegerField(null=True, blank=True)
 
     def __str__(self):
-        return f"{self.lab} {self.filename}"
+        return f"(file_id={self.pk}) {self.lab} {self.filename} {self.created}"
 
     def validation_list_objs(self) -> Iterable[UploadedClassificationsUnmappedValidationRow]:
         if messages := self.validation_list.get('messages'):
