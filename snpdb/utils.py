@@ -6,6 +6,7 @@ from django.contrib.auth.models import Group, User
 
 from email_manager.models import EmailLog
 from library.log_utils import NotificationBuilder, send_notification
+from library.utils import empty_to_none
 from snpdb.models import Lab, UserSettings
 
 
@@ -33,7 +34,7 @@ class LabNotificationBuilder(NotificationBuilder):
 
     def send(self):
         self.sent = True
-        if slack_web_hook := self.lab.slack_webhook:
+        if slack_web_hook := empty_to_none(self.lab.slack_webhook):
             # send to lab's external slack
             send_notification(message=self.message, blocks=self.as_slack(), slack_webhook_url=slack_web_hook)
 
