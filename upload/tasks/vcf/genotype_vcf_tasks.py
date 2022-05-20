@@ -92,7 +92,7 @@ class VCFCheckAnnotationTask(ImportVCFStepTask):
     def process_items(self, upload_step):
         uploaded_vcf = upload_step.get_uploaded_vcf()
         pending_annotation = UploadedVCFPendingAnnotation.objects.create(uploaded_vcf=uploaded_vcf)
-        annotation_version = AnnotationVersion.latest(upload_step.genome_build)
+        annotation_version = AnnotationVersion.latest(upload_step.genome_build, active=False)
         variant_annotation_version = annotation_version.variant_annotation_version
         lowest_unannotated_variant_id = get_lowest_unannotated_variant_id(variant_annotation_version)
         pending_annotation.attempt_schedule_annotation_stage_steps(lowest_unannotated_variant_id)
