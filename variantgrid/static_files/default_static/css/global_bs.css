@@ -1000,4 +1000,20 @@ ul.compact li:before {
   background-color: #AAFFAA;
 }
 
+.addition {
+  background-color: #e6ffe6;
+}
+
+.deletion {
+  background-color: #e6e6ff;
+}
+
+.modification {
+  background-color: #ffe6e6;
+}
+
+.addition.deletion {
+  background-color: #ffe6e6;
+}
+
 /*# sourceMappingURL=global_bs.css.map */
