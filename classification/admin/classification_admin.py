@@ -528,7 +528,7 @@ class DiscordanceReportAdmin(ModelAdminBasics):
     def send_notification(self, request, queryset):
         ds: DiscordanceReport
         for ds in queryset:
-            send_discordance_notification(ds)
+            send_discordance_notification(ds, cause="Admin Send discordance notification")
 
     @admin_action("Re-calculate")
     def re_calculate(self, request, queryset):

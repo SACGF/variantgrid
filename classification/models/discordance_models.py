@@ -27,7 +27,7 @@ from genes.hgvs import CHGVS
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import Lab, GenomeBuild, UserSettings
 
-discordance_change_signal = django.dispatch.Signal()  # args: "discordance_report"
+discordance_change_signal = django.dispatch.Signal()  # args: "discordance_report", "cause"
 
 
 class DiscordanceReport(TimeStampedModel):
@@ -107,7 +107,7 @@ class DiscordanceReport(TimeStampedModel):
         for drc in DiscordanceReportClassification.objects.filter(report=self):  # type: DiscordanceReportClassification
             drc.close()
 
-        discordance_change_signal.send(DiscordanceReport, discordance_report=self)
+        discordance_change_signal.send(DiscordanceReport, discordance_report=self, cause=cause_text)
 
     @transaction.atomic
     def unresolve_close(self, user: User, continued_discordance_reason: str, continued_discordance_text: str):
@@ -152,7 +152,7 @@ class DiscordanceReport(TimeStampedModel):
             self.close(expected_resolution=DiscordanceReportResolution.CONCORDANT, cause_text=cause_text)
         else:
             if newly_added_labs:  # change is significant
-                discordance_change_signal.send(DiscordanceReport, discordance_report=self)
+                discordance_change_signal.send(DiscordanceReport, discordance_report=self, cause=f"Newly added labs {newly_added_labs}")
 
     @property
     def all_actively_involved_labs(self) -> Set[Lab]:

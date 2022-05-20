@@ -1,4 +1,4 @@
-from typing import Set
+from typing import Set, Optional
 
 from django.conf import settings
 from django.dispatch import receiver
@@ -14,12 +14,12 @@ from snpdb.utils import LabNotificationBuilder
 
 
 @receiver(discordance_change_signal, sender=DiscordanceReport)
-def notify_discordance_change(discordance_report: DiscordanceReport, **kwargs):
+def notify_discordance_change(discordance_report: DiscordanceReport, cause: str, **kwargs):
     if settings.DISCORDANCE_ENABLED:
-        send_discordance_notification(discordance_report=discordance_report)
+        send_discordance_notification(discordance_report=discordance_report, cause=cause)
 
 
-def send_discordance_notification(discordance_report: DiscordanceReport):
+def send_discordance_notification(discordance_report: DiscordanceReport, cause: Optional[str] = None):
     all_labs = discordance_report.involved_labs.keys()
     # all_lab_names = ", ".join(lab.name for lab in all_labs)
     report_url = get_url_from_view_path(
@@ -30,6 +30,7 @@ def send_discordance_notification(discordance_report: DiscordanceReport):
     labs_str = "\n".join(str(lab) for lab in sorted(all_labs))
     nb = NotificationBuilder("Discordance notifications")
     nb.add_markdown(f":wave: Sending Discordance Report (DR_{discordance_report.pk}) notification to {labs_str}")
+    nb.add_markdown(f"Trigger for notification: {cause}")
     nb.send()
 
     for lab in all_labs:
