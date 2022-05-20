@@ -27,10 +27,10 @@ def send_discordance_notification(discordance_report: DiscordanceReport, cause: 
     )
     clin_sig_key = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE)
 
-    labs_str = "\n".join(str(lab) for lab in sorted(all_labs))
+    labs_str = "\n".join(f"* {lab}" for lab in sorted(all_labs))
     nb = NotificationBuilder("Discordance notifications")
     nb.add_markdown(f":fire_engine: :email: Sending Discordance Report <{report_url}|(DR_{discordance_report.pk})> notification to\n{labs_str}")
-    nb.add_markdown(f"Trigger for notification: {cause}")
+    nb.add_field(f"Trigger for notification", cause)
     nb.send()
 
     for lab in all_labs:
