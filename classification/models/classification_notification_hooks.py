@@ -29,7 +29,7 @@ def send_discordance_notification(discordance_report: DiscordanceReport, cause: 
 
     labs_str = "\n".join(str(lab) for lab in sorted(all_labs))
     nb = NotificationBuilder("Discordance notifications")
-    nb.add_markdown(f":wave: Sending Discordance Report (DR_{discordance_report.pk}) notification to {labs_str}")
+    nb.add_markdown(f":fire_engine: :email: Sending Discordance Report <{report_url}|(DR_{discordance_report.pk})> notification to\n{labs_str}")
     nb.add_markdown(f"Trigger for notification: {cause}")
     nb.send()
 
@@ -62,7 +62,3 @@ def send_discordance_notification(discordance_report: DiscordanceReport, cause: 
 
         notification.add_markdown(f"Full details of the overlap can be seen here : <{report_url}>")
         notification.send()
-
-    labs_notified = ", ".join(sorted([lab.name for lab in all_labs]))
-    NotificationBuilder(message=f"Discordance Notification <{report_url}> sent to {labs_notified}")\
-        .add_markdown(f":fire_engine: :email: Discordance Notification <{report_url}> sent to {labs_notified}").send()

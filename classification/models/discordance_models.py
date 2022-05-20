@@ -152,7 +152,8 @@ class DiscordanceReport(TimeStampedModel):
             self.close(expected_resolution=DiscordanceReportResolution.CONCORDANT, cause_text=cause_text)
         else:
             if newly_added_labs:  # change is significant
-                discordance_change_signal.send(DiscordanceReport, discordance_report=self, cause=f"Newly added labs {newly_added_labs}")
+                newly_added_labs_str = ", ".join(newly_added_labs)
+                discordance_change_signal.send(DiscordanceReport, discordance_report=self, cause=f"Newly added labs {newly_added_labs_str}")
 
     @property
     def all_actively_involved_labs(self) -> Set[Lab]:
