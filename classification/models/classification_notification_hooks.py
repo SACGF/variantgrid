@@ -29,7 +29,8 @@ def send_discordance_notification(discordance_report: DiscordanceReport, cause: 
 
     labs_str = "\n".join(f"* {lab}" for lab in sorted(all_labs))
     nb = NotificationBuilder("Discordance notifications")
-    nb.add_markdown(f":fire_engine: :email: Sending Discordance Report <{report_url}|(DR_{discordance_report.pk})> notification to\n{labs_str}")
+    nb.add_markdown(f":fire_engine: :email: Sending Discordance Report <{report_url}|(DR_{discordance_report.pk})> notifications to")
+    nb.add_field(f"Labs", labs_str)
     nb.add_field(f"Trigger for notification", cause)
     nb.send()
 
