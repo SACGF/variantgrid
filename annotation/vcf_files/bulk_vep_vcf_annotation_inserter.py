@@ -332,7 +332,7 @@ class BulkVEPVCFAnnotationInserter:
                 aloft_prob_dominant     .&0.13585&.&.&.&
                 aloft_pred              .&Recessive&.&.&.&
                 aloft_high_confidence        .&High&.&.&.&
-                ensembl_transcript    ENST00000565905&ENST00000361627&ENST00000567348&ENST00000563864&ENST00000543522
+                aloft_ensembl_transcript    ENST00000565905&ENST00000361627&ENST00000567348&ENST00000563864&ENST00000543522
 
             So when we pull a consistent column out of all fields
         """
@@ -353,6 +353,9 @@ class BulkVEPVCFAnnotationInserter:
 
         aloft_options = sorted(aloft_options, key=aloft_preferences)
         best_aloft = aloft_options[0]
+        # ensembl_transcript will always be populated, but we don't really want it if the other ALoFT fields are empty
+        if best_aloft["aloft_pred"] == ".":
+            best_aloft["aloft_ensembl_transcript"] = "."
         raw_db_data.update(best_aloft)
 
     def get_gene_id(self, vep_transcript_data):
