@@ -1,0 +1,41 @@
+{% extends "uicore/page/base.html" %}
+{% load classification_tags %}
+{% load ontology_tags %}
+{% load ui_menu_bars %}
+{% load ui_help %}
+{% load ui_utils %}
+{% load ui_tabs_builder %}
+{% load english_tags %}
+{% load js_tags %}
+{% block title %}Clinvar Export{% endblock %}
+{% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
+{% block content %}
+    <div class="container">
+        {% if all_keys.count > 1 %}
+            <div class="btn-group mb-4" role="group" aria-label="ClinVar Key Picker">
+                {% for key in all_keys %}
+                    <button onclick="window.open('{% url 'clinvar_match' key.pk %}', '_self')"
+                    class="btn {% if key.pk == clinvar_key.pk %}btn-secondary font-weight-bold{% else %}btn-outline-secondary{% endif %}">{{ key.label }}
+                    </button>
+                {% endfor %}
+            </div>
+        {% endif %}
+        <p>
+            This page will let you match data vs what's in ClinVar
+        </p>
+        <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+            <div class="card">
+                <div class="card-header">File Upload</div>
+                <div class="card-body">
+                    {% labelled label="Upload File" %}
+                        <input type="file" name="file">
+                    {% endlabelled %}
+                </div>
+                <div class="card-footer">
+                    <input type="submit" class="btn btn-primary" value="Compare" />
+                </div>
+            </div>
+        </form>
+    </div>
+{% endblock %}
