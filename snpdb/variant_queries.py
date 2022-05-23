@@ -6,18 +6,18 @@ from django.db.models import QuerySet
 from django.db.models.query_utils import Q
 
 from analysis.models import VariantTag
-from annotation.annotation_version_querysets import get_variant_queryset_for_latest_annotation_version
+from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
+from annotation.models import AnnotationVersion
 from genes.models import GeneSymbol, Gene
 from snpdb.models import VariantZygosityCountCollection
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_variant import VariantAllele
 
 
-def get_variant_queryset_for_gene_symbol(gene_symbol: GeneSymbol, genome_build: GenomeBuild, traverse_aliases: bool = False):
+def get_variant_queryset_for_gene_symbol(gene_symbol: GeneSymbol, annotation_version: AnnotationVersion, traverse_aliases: bool = False):
     """
-
     :param gene_symbol: Gene Symbol to search on
-    :param genome_build: Genome Build
+    :param annotation_version: Annotation Version
     :param traverse_aliases: If true, will see if the gene_symbol has aliases, will not
     :return:
     """
@@ -29,7 +29,7 @@ def get_variant_queryset_for_gene_symbol(gene_symbol: GeneSymbol, genome_build: 
     else:
         genes = set(gene_symbol.genes)
 
-    qs = get_variant_queryset_for_latest_annotation_version(genome_build)
+    qs = get_variant_queryset_for_annotation_version(annotation_version)
     return qs.filter(variantgeneoverlap__gene__in=genes)
 
 

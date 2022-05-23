@@ -14,7 +14,9 @@ from snpdb.models.models_genome import GenomeBuild
 
 def get_variant_annotation_version(genome_build: GenomeBuild):
     kwargs = get_vep_variant_annotation_version_kwargs(genome_build)
-    variant_annotation_version, created = VariantAnnotationVersion.objects.get_or_create(**kwargs)
+    # When creating, don't set as active as it won't have all the annotation done - that will be done manually
+    variant_annotation_version, created = VariantAnnotationVersion.objects.get_or_create(**kwargs,
+                                                                                         defaults={"active": False})
 
     now = timezone.now()
     if created:

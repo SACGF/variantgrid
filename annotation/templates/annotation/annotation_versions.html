@@ -16,6 +16,7 @@
                     <thead>
                         <tr>
                             <th>Version</th>
+                            <th>Status</th>
                             <th>Annotation Date</th>
                             <th>Variant</th>
                             <th>Gene</th>
@@ -24,16 +25,29 @@
                         </tr>
                     </thead>
                     <tbody>
-                    {% for av in av_data.1 %}
-                        <tr>
-                        <td>{{ av.pk }}</td>
-                        <td>{% timestamp av.annotation_date %}</td>
-                        <td>{{ av.variant_annotation_version|default_if_none:'' }}</td>
-                        <td>{{ av.gene_annotation_version|default_if_none:'' }}</td>
-                        <td>{{ av.clinvar_version|default_if_none:'' }}</td>
-                        <td>{{ av.human_protein_atlas_version|default_if_none:'' }}</td>
-                        </tr>
-                    {% endfor %}
+                    {% with latest=av_data.2 %}
+                        {% for av in av_data.1 %}
+                            <tr>
+                                <td>{{ av.pk }}</td>
+                                <td>
+                                    {% if av.variant_annotation_version.active is False %}
+                                        Inactive
+                                    {% elif not av.is_valid %}
+                                        Invalid
+                                    {% else %}
+                                        {% if av == latest %}
+                                            Latest
+                                        {% endif %}
+                                    {% endif %}
+                                </td>
+                                <td>{% timestamp av.annotation_date %}</td>
+                                <td>{{ av.variant_annotation_version|default_if_none:'' }}</td>
+                                <td>{{ av.gene_annotation_version|default_if_none:'' }}</td>
+                                <td>{{ av.clinvar_version|default_if_none:'' }}</td>
+                                <td>{{ av.human_protein_atlas_version|default_if_none:'' }}</td>
+                            </tr>
+                        {% endfor %}
+                    {% endwith %}
                     </tbody>
                 </table>
 

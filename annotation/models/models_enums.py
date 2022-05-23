@@ -135,6 +135,7 @@ class VEPPlugin(models.TextChoices):
     LOFTOOL = 'l', 'LoFtool'
     MASTERMIND = 'n', 'Mastermind'
     MAXENTSCAN = 'm', 'MaxEntScan'
+    NMD = "N", 'NMD'
     SPLICEAI = 'a', 'SpliceAI'
     SPLICEREGION = 's', 'SpliceRegion'
 
@@ -209,3 +210,4 @@ class ManualVariantEntryType(models.TextChoices):
     HGVS = "h", "HGVS"
     VARIANT = "v", "Variant"
     UNKNOWN = "u", "Unknown"
+

@@ -48,7 +48,8 @@ class CheckStartAnnotationTask(ImportVCFStepTask):
 
     def process_items(self, upload_step):
         if upload_step.pipeline_inserted_unknown_variants():
-            annotation_scheduler.apply_async()  # @UndefinedVariable
+            task = annotation_scheduler.si(active=False)
+            task.apply_async()  # @UndefinedVariable
         return 0
 
 

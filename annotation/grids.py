@@ -112,6 +112,7 @@ class VariantAnnotationVersionColumns(DatatableConfig[VariantAnnotationVersion])
             RichColumn(key="annotation_consortium", orderable=True, renderer=lambda x: AnnotationConsortium(x['annotation_consortium']).label),
             RichColumn(key="created", client_renderer='TableFormat.timestamp', orderable=True),
             RichColumn(key="last_checked_date", client_renderer='TableFormat.timestamp', orderable=True),
+            RichColumn(key="columns_version", label="Columns Version", orderable=True),
             RichColumn(key="gene_annotation_release__version", label="Gene Annotation Release Version", orderable=True),
             RichColumn(key="ensembl", orderable=True),
             RichColumn(key="ensembl_funcgen", orderable=True),

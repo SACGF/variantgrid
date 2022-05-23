@@ -101,6 +101,7 @@ class Allele(FlagsMixin, models.Model):
         """ Used by to write VCF coordinates during liftover. Can be slow (API call)
             If you know a VariantAllele exists for your build, use variant_for_build(genome_build).as_tuple() """
 
+        from annotation.models import VariantAnnotationVersion
         from snpdb.models.models_dbsnp import DbSNP
         from genes.hgvs import get_hgvs_variant_tuple
 
@@ -125,8 +126,7 @@ class Allele(FlagsMixin, models.Model):
                 va = self.variantallele_set.all().first()
                 if va is None:
                     raise ValueError("Allele contains no VariantAlleles at all! Cannot liftover")
-                dbsnp = DbSNP.get_for_variant(va.variant, va.genome_build.latest_variant_annotation_version)
-                if dbsnp:
+                if dbsnp := DbSNP.get_for_variant(va.variant, VariantAnnotationVersion.latest(va.genome_build)):
                     g_hgvs = dbsnp.get_g_hgvs(genome_build, alt=va.variant.alt)
                     conversion_tool = AlleleConversionTool.DBSNP
 
@@ -464,11 +464,13 @@ class Variant(models.Model):
         return Variant.objects.filter(variantallele__allele=allele)
 
     def get_canonical_transcript_annotation(self, genome_build) -> Optional['VariantTranscriptAnnotation']:
-        vav = genome_build.latest_variant_annotation_version
+        from annotation.models import VariantAnnotationVersion
+        vav = VariantAnnotationVersion.latest(genome_build)
         return self.varianttranscriptannotation_set.filter(version=vav, canonical=True).first()
 
     def get_best_variant_transcript_annotation(self, genome_build) -> Optional['VariantTranscriptAnnotation']:
-        vav = genome_build.latest_variant_annotation_version
+        from annotation.models import VariantAnnotationVersion
+        vav = VariantAnnotationVersion.latest(genome_build)
         if can := self.varianttranscriptannotation_set.filter(version=vav, canonical=True).first():
             return can
         if version := self.varianttranscriptannotation_set.filter(version=vav).first():

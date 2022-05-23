@@ -179,10 +179,6 @@ class GenomeBuild(models.Model, SortMetaOrderingMixin):
             msg = f"Annotation settings 'vep_config.annotation_consortium' must be present and one of {choices}: {e}"
             raise ValueError(msg)
 
-    @lazy
-    def latest_variant_annotation_version(self):
-        return self.variantannotationversion_set.order_by("annotation_date").last()
-
     @property
     def reference_fasta(self):
         return self.get_settings_file("reference_fasta")

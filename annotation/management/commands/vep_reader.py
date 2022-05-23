@@ -19,15 +19,37 @@ class Command(BaseCommand):
         vep_columns = BulkVEPVCFAnnotationInserter._get_vep_columns_from_csq(infos)
         #print(vep_columns)
 
+        ALOFT = ["Aloft_Confidence", "Aloft_pred", "Aloft_prob_Dominant", "Aloft_prob_Recessive", "Aloft_prob_Tolerant"]
+
+        count = 0
+        num_found = 0
         for v in reader:
-            #print(v)
+            count += 1
             csq = v.INFO.get("CSQ")
+            found_in_variant = False
+            found_in_transcript = False
 
             for transcript_csq in csq.split(","):
                 td = dict(zip(vep_columns, transcript_csq.split("|")))
-                # print(td)
-                if mane_select := td.get("MANE_SELECT"):
-                    print(f'mane_select={mane_select}, {td["HGVSc"]}')
+                for aloft_key in ALOFT:
+                    if info_val := td[aloft_key]:
+                        values = info_val.split("&")
+                        if any([v and v != '.' for v in values]):
+                            found_in_transcript = True
+                            print(f"{aloft_key}={info_val=}")
+                if found_in_transcript:
+                    print("-----")
+                    found_in_variant = True
+                    found_in_transcript = False
+
+            if found_in_variant:
+                num_found += 1
+                print("=" * 50)
+
+                #if mane_select := td.get("MANE_SELECT"):
+                #    print(f'mane_select={mane_select}, {td["HGVSc"]}')
 
                 #if td["PICK"]:
                 #    print(f'{td["SYMBOL"]} {td["HGVSc"]}, impact: {td["IMPACT"]}, revel: {td["REVEL_score"]}')
+
+        print(f"{count=} variants, {num_found=}")

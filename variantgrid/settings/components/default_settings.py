@@ -165,9 +165,12 @@ ANNOTATION_VEP_ARGS = []  # ["--buffer_size", "1000"] # default = 5000
 ANNOTATION_VEP_BASE_DIR = os.path.join(ANNOTATION_BASE_DIR, "VEP")
 ANNOTATION_VEP_CODE_DIR = os.path.join(ANNOTATION_VEP_BASE_DIR, "ensembl-vep")
 ANNOTATION_VEP_CACHE_DIR = os.path.join(ANNOTATION_VEP_BASE_DIR, "vep_cache")
+ANNOTATION_VEP_PLUGINS_DIR = os.path.join(ANNOTATION_VEP_CACHE_DIR, "Plugins")  # Default location
+
 # @see https://asia.ensembl.org/info/docs/tools/vep/script/vep_options.html#opt_pick_order
 ANNOTATION_VEP_PICK_ORDER = None
 ANNOTATION_VEP_DISTANCE = 5000  # VEP --distance arg (default=5000) - how far up/downstream to assign to a transcript
+ANNOTATION_VEP_COLUMNS_VERSION = 1  # 1 = original version, 2 = May 2022
 
 _ANNOTATION_FASTA_BASE_DIR = os.path.join(ANNOTATION_BASE_DIR, "fasta")
 
@@ -186,6 +189,7 @@ ANNOTATION = {
         # so you can change just that variable and have everything else work
         # The names correspond to VEPPlugin or VEPCustom entries (but lower case)
         "vep_config": {
+            "columns_version": 1,
             "cosmic": "annotation_data/GRCh37/CosmicCodingMuts_v95_20211101_grch37.normal.vcf.gz",
             "dbnsfp": "annotation_data/GRCh37/dbNSFP4.0a.grch37.stripped.gz",
             "dbscsnv": "annotation_data/GRCh37/dbscSNV1.1_GRCh37.txt.gz",
@@ -217,6 +221,7 @@ ANNOTATION = {
         # so you can change just that variable and have everything else work
         # The names correspond to VEPPlugin or VEPCustom entries (but lower case)
         "vep_config": {
+            "columns_version": 1,
             "cosmic": "annotation_data/GRCh38/CosmicCodingMuts_v95_20211101_grch38.normal.vcf.gz",
             "dbnsfp": "annotation_data/GRCh38/dbNSFP4.0a.grch38.stripped.gz",
             "dbscsnv": "annotation_data/GRCh38/dbscSNV1.1_GRCh38.txt.gz",
@@ -282,7 +287,7 @@ ANNOTATION_CACHED_WEB_RESOURCES = [
 ]
 
 VARIANT_ANNOTATION_TRANSCRIPT_PREFERENCES = ['lrg_identifier', 'refseq_transcript_accession', 'ensembl_transcript_accession']
-VARIANT_ANNOTATION_DELETE_TEMP_FILES_ON_SUCCESS = not DEBUG
+VARIANT_ANNOTATION_DELETE_TEMP_FILES_ON_SUCCESS = True  # not DEBUG
 # If true, then if we don't have a specific transcript version, we'll match it to the closest one we can
 VARIANT_TRANSCRIPT_VERSION_BEST_ATTEMPT = True
 

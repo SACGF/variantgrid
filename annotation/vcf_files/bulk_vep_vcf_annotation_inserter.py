@@ -9,7 +9,7 @@ from lazy import lazy
 
 from annotation.models.damage_enums import SIFTPrediction, FATHMMPrediction, \
     MutationAssessorPrediction, MutationTasterPrediction, Polyphen2Prediction, \
-    PathogenicityImpact
+    PathogenicityImpact, ALoFTPrediction
 from annotation.models.models import ColumnVEPField, VariantAnnotation, \
     VariantTranscriptAnnotation, VariantAnnotationVersion
 from annotation.models.models_enums import VariantClass
@@ -94,6 +94,10 @@ class BulkVEPVCFAnnotationInserter:
         "REFSEQ_OFFSET",
     ]
 
+    # These are present in columns_version > 2
+    ALOFT_COLUMNS = ['aloft_prob_tolerant', 'aloft_prob_recessive', 'aloft_prob_dominant',
+                     'aloft_pred', 'aloft_high_confidence', 'aloft_ensembl_transcript']
+
     def __init__(self, annotation_run, infos=None, insert_variants=True, validate_columns=True):
         self.annotation_run = annotation_run
         self.rows_processed = 0
@@ -106,7 +110,8 @@ class BulkVEPVCFAnnotationInserter:
             logging.warning("BulkVEPVCFAnnotationInserter: Not actually inserting variants")
 
         self.vep_columns = self._get_vep_columns_from_csq(infos)
-        logging.debug("CSQ: %s", self.vep_columns)
+        self.aloft_columns = False
+        logging.info("CSQ: %s", self.vep_columns)
         self._setup_vep_fields_and_db_columns(validate_columns)
 
     @staticmethod
@@ -136,40 +141,49 @@ class BulkVEPVCFAnnotationInserter:
         # COSMIC v90 (5/9/2019) switched to COSV (build independent identifiers)
         extract_cosmic = get_extract_existing_variation("COSV")
         extract_dbsnp = get_extract_existing_variation("rs")
+        format_empty_as_none = get_format_empty_as_none(empty_values=EMPTY_VALUES)
 
         # Some annotations return multiple results eg 2 frequencies eg "0.6764&0.2433"
         # Need to work out what to do (eg pick max)
         self.field_formatters = {
             "af_1kg": format_pick_highest_float,
             "af_uk10k": format_pick_highest_float,
-            "gnomad2_liftover_af": format_pick_highest_float,
+            # ALoFT comes as multiple values, so "." won't have already been ignored, so need to handle
+            "aloft_prob_tolerant": format_empty_as_none,
+            "aloft_prob_recessive": format_empty_as_none,
+            "aloft_prob_dominant": format_empty_as_none,
+            "aloft_pred": get_choice_formatter_func(ALoFTPrediction.choices, empty_values=["."]),
+            "aloft_high_confidence": format_aloft_high_confidence,
+            "aloft_ensembl_transcript": format_empty_as_none,
             "cosmic_count": format_pick_highest_int,
             "cosmic_id": extract_cosmic,
             "cosmic_legacy_id": remove_empty_multiples,
             "dbsnp_rs_id": extract_dbsnp,
-            'gnomad_popmax': str.upper,  # nfe -> NFE
+            "fathmm_pred_most_damaging": get_most_damaging_func(FATHMMPrediction),
+            "gnomad2_liftover_af": format_pick_highest_float,
+            "gnomad_popmax": str.upper,  # nfe -> NFE
             "hgnc_id": format_hgnc_id,
-            "sift": format_vep_sift_to_choice,
-            "variant_class": get_choice_formatter_func(VariantClass.choices),
-            'fathmm_pred_most_damaging': get_most_damaging_func(FATHMMPrediction),
-            'impact': get_choice_formatter_func(PathogenicityImpact.CHOICES),
-            'interpro_domain': remove_empty_multiples,
-            'mastermind_count_1_cdna': get_clean_and_pick_single_value_func(operator.itemgetter(0), int),
-            'mastermind_count_2_cdna_prot': get_clean_and_pick_single_value_func(operator.itemgetter(1), int),
-            'mastermind_count_3_aa_change': get_clean_and_pick_single_value_func(operator.itemgetter(2), int),
-            'mutation_assessor_pred_most_damaging': get_most_damaging_func(MutationAssessorPrediction),
-            'mutation_taster_pred_most_damaging': get_most_damaging_func(MutationTasterPrediction),
-            'polyphen2_hvar_pred_most_damaging': get_most_damaging_func(Polyphen2Prediction),
+            "impact": get_choice_formatter_func(PathogenicityImpact.CHOICES),
+            "interpro_domain": remove_empty_multiples,
+            "mastermind_count_1_cdna": get_clean_and_pick_single_value_func(operator.itemgetter(0), int),
+            "mastermind_count_2_cdna_prot": get_clean_and_pick_single_value_func(operator.itemgetter(1), int),
+            "mastermind_count_3_aa_change": get_clean_and_pick_single_value_func(operator.itemgetter(2), int),
+            "mutation_assessor_pred_most_damaging": get_most_damaging_func(MutationAssessorPrediction),
+            "mutation_taster_pred_most_damaging": get_most_damaging_func(MutationTasterPrediction),
+            "nmd_escaping_variant": format_nmd_escaping_variant,
             # conservation fields are from BigWig, which can return multiple entries
             # for deletions. Higher = more conserved, so for rare disease filtering taking max makes sense
-            'phylop_30_way_mammalian': format_pick_highest_float,
-            'phylop_46_way_mammalian': format_pick_highest_float,
-            'phylop_100_way_vertebrate': format_pick_highest_float,
-            'phastcons_30_way_mammalian': format_pick_highest_float,
-            'phastcons_46_way_mammalian': format_pick_highest_float,
-            'phastcons_100_way_vertebrate': format_pick_highest_float,
-            'somatic': format_vep_somatic,
-            'topmed_af': format_pick_highest_float,
+            "phastcons_100_way_vertebrate": format_pick_highest_float,
+            "phastcons_30_way_mammalian": format_pick_highest_float,
+            "phastcons_46_way_mammalian": format_pick_highest_float,
+            "phylop_100_way_vertebrate": format_pick_highest_float,
+            "phylop_30_way_mammalian": format_pick_highest_float,
+            "phylop_46_way_mammalian": format_pick_highest_float,
+            "polyphen2_hvar_pred_most_damaging": get_most_damaging_func(Polyphen2Prediction),
+            "sift": format_vep_sift_to_choice,
+            "somatic": format_vep_somatic,
+            "topmed_af": format_pick_highest_float,
+            "variant_class": get_choice_formatter_func(VariantClass.choices),
         }
         if self.genome_build == GenomeBuild.grch38():
             self.field_formatters["gnomad_filtered"] = gnomad_filtered_func
@@ -178,8 +192,11 @@ class BulkVEPVCFAnnotationInserter:
         self.ignored_vep_fields = self.VEP_NOT_COPIED_FIELDS.copy()
 
         vc = VEPConfig(self.genome_build)
+        q_columns_version = ColumnVEPField.get_columns_version_q(vc.columns_version)
+        vep_source_qs = ColumnVEPField.filter_for_build(self.genome_build)
+
         # Sort to have consistent VCF headers
-        for cvf in ColumnVEPField.filter_for_build(self.genome_build).order_by("source_field"):
+        for cvf in vep_source_qs.filter(q_columns_version).order_by("source_field"):
             try:
                 if cvf.vep_custom:  # May not be configured
                     prefix = cvf.get_vep_custom_display()
@@ -204,6 +221,13 @@ class BulkVEPVCFAnnotationInserter:
                              self.DB_IGNORED_COLUMNS)
         if self.annotation_run.annotation_consortium == AnnotationConsortium.REFSEQ:
             ignore_columns.update(self.VEP_NOT_COPIED_REFSEQ_ONLY)
+
+        # Find the ones that don't apply to this version, and exclude them
+        vc = VEPConfig(self.genome_build)
+        qs = ColumnVEPField.filter_for_build(self.genome_build)
+        q_not_this_version = ~ColumnVEPField.get_columns_version_q(vc.columns_version)
+        vep_fields_not_this_version = qs.filter(q_not_this_version).values_list("column", flat=True)
+        ignore_columns.update(vep_fields_not_this_version)
 
         for c in list(ignore_columns):
             if c.endswith("_id"):
@@ -250,6 +274,11 @@ class BulkVEPVCFAnnotationInserter:
             "version_id": self.annotation_run.variant_annotation_version.pk,
             "annotation_run_id": self.annotation_run.pk,
         }
+        self.aloft_columns = self._has_all_aloft_columns(self.all_variant_columns)
+
+    @staticmethod
+    def _has_all_aloft_columns(columns) -> bool:
+        return all([ac in columns for ac in BulkVEPVCFAnnotationInserter.ALOFT_COLUMNS])
 
     def get_sql_csv_header(self, base_table_name):
         if base_table_name == VariantAnnotationVersion.VARIANT_GENE_OVERLAP:
@@ -279,6 +308,9 @@ class BulkVEPVCFAnnotationInserter:
                     if raw_value is not None:
                         raw_db_data[c] = raw_value
 
+        if self.aloft_columns and self._has_all_aloft_columns(raw_db_data):
+            self._pick_aloft_values(raw_db_data)
+
         db_data = {}
         for c, value in raw_db_data.items():
             formatter = self.field_formatters.get(c)
@@ -291,6 +323,40 @@ class BulkVEPVCFAnnotationInserter:
             db_data[c] = value
 
         return db_data
+
+    @staticmethod
+    def _pick_aloft_values(raw_db_data: dict):
+        """ ALoFT produces values for multiple transcripts, ie raw values before formatting:
+                aloft_prob_tolerant     .&0.0516&.&.&.&
+                aloft_prob_recessive    .&0.81255&.&.&.&
+                aloft_prob_dominant     .&0.13585&.&.&.&
+                aloft_pred              .&Recessive&.&.&.&
+                aloft_high_confidence        .&High&.&.&.&
+                aloft_ensembl_transcript    ENST00000565905&ENST00000361627&ENST00000567348&ENST00000563864&ENST00000543522
+
+            So when we pull a consistent column out of all fields
+        """
+
+        aloft_cols = [raw_db_data[a].split("&") for a in BulkVEPVCFAnnotationInserter.ALOFT_COLUMNS]
+        aloft_options = []
+        for aloft_option in zip(*aloft_cols):
+            aloft_options.append(dict(zip(BulkVEPVCFAnnotationInserter.ALOFT_COLUMNS, aloft_option)))
+
+        # Pick High confidence, then Recessive over Dominant
+        PREFERENCES = {
+            "aloft_high_confidence": ["High", "Low", "."],
+            "aloft_pred": ["Recessive", "Dominant", "Tolerant", "."],
+        }
+
+        def aloft_preferences(val):
+            return [prefs.index(val[k]) for k, prefs in PREFERENCES.items()]
+
+        aloft_options = sorted(aloft_options, key=aloft_preferences)
+        best_aloft = aloft_options[0]
+        # ensembl_transcript will always be populated, but we don't really want it if the other ALoFT fields are empty
+        if best_aloft["aloft_pred"] == ".":
+            best_aloft["aloft_ensembl_transcript"] = "."
+        raw_db_data.update(best_aloft)
 
     def get_gene_id(self, vep_transcript_data):
         gene_id = None
@@ -531,10 +597,13 @@ def format_vep_somatic(raw_value):
     return "1" in raw_value
 
 
-def get_choice_formatter_func(choices):
+def get_choice_formatter_func(choices, empty_values=None):
     lookup = invert_dict(dict(choices))
 
     def format_choice(raw_value):
+        if empty_values is not None:
+            if raw_value in empty_values:
+                return None
         return lookup[raw_value]
 
     return format_choice
@@ -570,3 +639,24 @@ def get_most_damaging_func(klass):
         return klass.get_most_damaging(prediction_list)
 
     return get_most_damaging
+
+
+def get_format_empty_as_none(empty_values: set):
+    def format_empty_as_none(val):
+        if val in empty_values:
+            val = None
+        return val
+    return format_empty_as_none
+
+
+def format_nmd_escaping_variant(value) -> bool:
+    return value == "NMD_escaping_variant"
+
+
+def format_aloft_high_confidence(value) -> bool:
+    high_confidence = None
+    if value == "High":
+        high_confidence = True
+    elif value == "Low":
+        high_confidence = False
+    return high_confidence

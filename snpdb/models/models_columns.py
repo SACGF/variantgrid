@@ -1,8 +1,10 @@
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.db import models
+from django.db.models import Q
 from django.db.models.deletion import CASCADE
 from guardian.shortcuts import get_objects_for_group
+from lazy import lazy
 from model_utils.models import TimeStampedModel
 
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsAutoInitialSaveMixin
@@ -11,9 +13,9 @@ from snpdb.models.models_enums import ColumnAnnotationLevel, VCFInfoTypes
 
 
 class VariantGridColumn(models.Model):
-    """ Used to populate analysis VariantGrid with annotation.
+    """ Holds info about columns used in VariantGrid analyses
 
-        Normally, we take a Variant queryset and get values queryset using "variant_column" """
+        "variant_column" is a django path (eg variantannotation__) passed to a Variant values queryset to return data """
     grid_column_name = models.TextField(primary_key=True)
     variant_column = models.TextField()
     annotation_level = models.CharField(max_length=1, choices=ColumnAnnotationLevel.choices, null=True)
@@ -29,6 +31,13 @@ class VariantGridColumn(models.Model):
             annotation_level_class = ColumnAnnotationLevel(self.annotation_level).label
             css_classes.append("%s-column" % annotation_level_class.lower())
         return " ".join(css_classes)
+
+    @lazy
+    def columns_version_description(self) -> str:
+        q = Q(max_vep_columns_version__isnull=False) | Q(max_vep_columns_version__isnull=False)
+        if cvf := self.columnvepfield_set.filter(q).first():
+            return cvf.columns_version_description
+        return ""
 
     def __str__(self):
         return self.grid_column_name
