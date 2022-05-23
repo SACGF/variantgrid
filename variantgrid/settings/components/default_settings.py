@@ -287,7 +287,7 @@ ANNOTATION_CACHED_WEB_RESOURCES = [
 ]
 
 VARIANT_ANNOTATION_TRANSCRIPT_PREFERENCES = ['lrg_identifier', 'refseq_transcript_accession', 'ensembl_transcript_accession']
-VARIANT_ANNOTATION_DELETE_TEMP_FILES_ON_SUCCESS = not DEBUG
+VARIANT_ANNOTATION_DELETE_TEMP_FILES_ON_SUCCESS = True  # not DEBUG
 # If true, then if we don't have a specific transcript version, we'll match it to the closest one we can
 VARIANT_TRANSCRIPT_VERSION_BEST_ATTEMPT = True
 
