@@ -172,107 +172,76 @@
             </div>
         </div>
 
-        <div class='card mt-4'>
-            <div class="card-header align-center">
-                <div class="color-box transcript-column">&nbsp;</div>
-                <div class="annotation-level-title"><b>Transcript Level</b> Annotated by an <a class="hover-link" href="{% url 'variant_annotation_runs' %}">Variant Annotation Run</a> - can have different values per transcript</div>
-            </div>
-            <div class="card-body">
-                <table class='annotations-table table'>
-                {% for v, columnvepfield in columns_and_vep_by_annotation_level.T.items %}
-                    <tr class='annotation-row'>
-                        <th>{{ v.pk }}
-                        <td>
-                        {% if columnvepfield %}
-                            <div class='vep-category vep-category-{{ columnvepfield.category }}'>
-                                {{ columnvepfield.get_category_display }}
-                            </div>
-                        {% endif %}
-                        </td>
-                        <td>
-                        {% if columnvepfield %}
-                            <div class='vep-source-field'>
-                                {{ columnvepfield.source_field }}
-                                {% if columnvepfield.source_field_processing_description %}
-                                    ({{ columnvepfield.source_field_processing_description }})
+        {% for annotation_level, columns_and_vep in columns_and_vep_by_annotation_level.items %}
+            <div class='card mt-4'>
+                <div class="card-header align-center">
+                    <div class="color-box {{ annotation_level|lower }}-column">&nbsp;</div>
+                    <div class="annotation-level-title"><b>{{ annotation_level }} Level</b> Annotated by an <a class="hover-link" href="{% url 'variant_annotation_runs' %}">Variant Annotation Run</a> - can have different values per transcript</div>
+                </div>
+                <div class="card-body">
+                    <table class='annotations-table table'>
+                    {% for v, columnvepfield in columns_and_vep.items %}
+                        <tr class='annotation-row'>
+                            <th>{{ v.pk }}
+                            <td>
+                            {% if columnvepfield %}
+                                <div class='vep-category vep-category-{{ columnvepfield.category }}'>
+                                    {{ columnvepfield.get_category_display }}
+                                </div>
+                            {% endif %}
+                            </td>
+                            <td>
+                            {% if columnvepfield %}
+                                <div class='vep-source-field'>
+                                    {{ columnvepfield.source_field }}
+                                    {% if columnvepfield.source_field_processing_description %}
+                                        ({{ columnvepfield.source_field_processing_description }})
+                                    {% endif %}
+                                </div>
+                            {% endif %}
+                            </td>
+                            <td>
+                            {% if columnvepfield %}
+                                <div class='vep-source-field'>
+                                    {% if columnvepfield.vep_plugin %}
+                                        Plugin: <b>{{ columnvepfield.get_vep_plugin_display }}</b>
+                                    {% endif %}
+
+                                    {% if columnvepfield.vep_custom %}
+                                        (custom)
+                                    {% endif %}
+                                </div>
+                                {% if columnvepfield.min_vep_columns_version or columnvepfield.max_vep_columns_version %}
+                                    <div>
+                                        Note:
+                                        <b>
+                                        {% if columnvepfield.min_vep_columns_version %}
+                                            columns version >= {{ columnvepfield.min_vep_columns_version }}
+                                        {% endif %}
+                                        {% if columnvepfield.min_vep_columns_version and columnvepfield.max_vep_columns_version %}
+                                            and
+                                        {% endif %}
+                                        {% if columnvepfield.max_vep_columns_version %}
+                                            columns version <= {{ columnvepfield.max_vep_columns_version }}
+                                        {% endif %}
+                                        only
+                                        </b>
+                                    </div>
                                 {% endif %}
-                            </div>
-                        {% endif %}
-                        </td>
-                        <td>
-                        {% if columnvepfield %}
-                            <div class='vep-source-field'>
-                                {% if columnvepfield.vep_plugin %}
-                                    Plugin: <b>{{ columnvepfield.get_vep_plugin_display }}</b>
-                                {% endif %}
 
-                                {% if columnvepfield.vep_custom %}
-                                    (custom)
-                                {% endif %}
-                            </div>
-                        {% endif %}
-                        </td>
-                        <td>{{ v.description | safe }}
-                        {% if columnvepfield.vep_plugin == 'd' %}
-                            Note: Values from dbNSFP are calculated for GRCh38 and lifted over to GRCh37.
-                        {% endif %}
-                        </td>
-                     </tr>
-                {% endfor %}
-                </table>
+                            {% endif %}
+                            </td>
+                            <td>{{ v.description | safe }}
+                            {% if columnvepfield.vep_plugin == 'd' %}
+                                Note: Values from dbNSFP are calculated for GRCh38 and lifted over to GRCh37.
+                            {% endif %}
+                            </td>
+                         </tr>
+                    {% endfor %}
+                    </table>
+                </div>
             </div>
-        </div>
-
-
-        <div class="card mt-4">
-            <div class="card-header align-center">
-                <div class="color-box variant-column">&nbsp;</div>
-                <div class="annotation-level-title"><b>Variant Level</b> Annotated by an <a class="hover-link" href="{% url 'variant_annotation_runs' %}">Variant Annotation Run</a></div>
-            </div>
-            <div class="card-body">
-        <table class='annotations-table table'>
-        {% for v, columnvepfield in columns_and_vep_by_annotation_level.V.items %}
-            <tr class='annotation-row'>
-                <th>{{ v.pk }}
-                <td>
-                {% if columnvepfield %}
-                        <div class='vep-category vep-category-{{ columnvepfield.category }}'>
-                            {{ columnvepfield.get_category_display }}
-                        </div>
-                {% endif %}
-                </td>
-                <td>
-                {% if columnvepfield %}
-                    <div class='vep-source-field'>
-                        {{ columnvepfield.source_field }}
-                        {% if columnvepfield.source_field_processing_description %}
-                            ({{ columnvepfield.source_field_processing_description }})
-                        {% endif %}
-                    </div>
-                {% endif %}                    
-                </td>
-                <td>
-                {% if columnvepfield %}
-                    <div class='vep-source-field'>
-                        {% if columnvepfield.vep_plugin %}
-                            Plugin: <b>{{ columnvepfield.get_vep_plugin_display }}</b>
-                        {% endif %}
-
-                        {% if columnvepfield.vep_custom %}
-                            (custom)
-                        {% endif %}
-                    </div>
-                {% endif %}
-                </td>
-                <td>{{ v.description | safe }}
-                {% if columnvepfield.vep_plugin == 'd' %}
-                    Note: Values from dbNSFP are calculated for GRCh38 and lifted over to GRCh37.
-                {% endif %}
-                </td>
         {% endfor %}
-        </table>
-        </div>
-        </div>
 
         <div class="card mt-4">
             <div class="card-header align-center">

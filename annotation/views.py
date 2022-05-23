@@ -436,14 +436,14 @@ def view_annotation_descriptions(request, genome_build_name=None):
     genome_build = UserSettings.get_genome_build_or_default(request.user, genome_build_name)
     variantgrid_columns_by_annotation_level = defaultdict(list)
     vep_annotation_levels = [ColumnAnnotationLevel.TRANSCRIPT_LEVEL, ColumnAnnotationLevel.VARIANT_LEVEL]
-    columns_and_vep_by_annotation_level = defaultdict(dict)
+    columns_and_vep_by_annotation_level = {al.label: {} for al in vep_annotation_levels}
 
     vep_qs = ColumnVEPField.filter_for_build(genome_build)
     for vgc in VariantGridColumn.objects.all().order_by("grid_column_name"):
         if vgc.annotation_level in vep_annotation_levels:
             # For Transcript/Variant that use VEP - only show if visible in that build
             if vep := vep_qs.filter(variant_grid_column=vgc).first():
-                columns_and_vep_by_annotation_level[vgc.annotation_level][vgc] = vep
+                columns_and_vep_by_annotation_level[vgc.get_annotation_level_display()][vgc] = vep
         else:
             variantgrid_columns_by_annotation_level[vgc.annotation_level].append(vgc)
 
