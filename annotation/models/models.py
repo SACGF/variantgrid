@@ -334,6 +334,15 @@ class ColumnVEPField(models.Model):
             vif = self.get_vep_custom_display() + "_" + vif
         return vif
 
+    @lazy
+    def columns_version_description(self) -> str:
+        limits = []
+        if self.min_vep_columns_version:
+            limits.append(f"column version >= {self.min_vep_columns_version}")
+        if self.max_vep_columns_version:
+            limits.append(f"column version <= {self.max_vep_columns_version}")
+        return " and ".join(limits)
+
     @staticmethod
     def get_columns_version_q(columns_version: int) -> Q:
         q_min = Q(min_vep_columns_version__isnull=True) | Q(min_vep_columns_version__lte=columns_version)

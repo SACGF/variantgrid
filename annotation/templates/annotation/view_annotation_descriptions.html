@@ -214,18 +214,7 @@
                                 {% if columnvepfield.min_vep_columns_version or columnvepfield.max_vep_columns_version %}
                                     <div>
                                         Note:
-                                        <b>
-                                        {% if columnvepfield.min_vep_columns_version %}
-                                            columns version >= {{ columnvepfield.min_vep_columns_version }}
-                                        {% endif %}
-                                        {% if columnvepfield.min_vep_columns_version and columnvepfield.max_vep_columns_version %}
-                                            and
-                                        {% endif %}
-                                        {% if columnvepfield.max_vep_columns_version %}
-                                            columns version <= {{ columnvepfield.max_vep_columns_version }}
-                                        {% endif %}
-                                        only
-                                        </b>
+                                        <b>{{ columnvepfield.columns_version_description }}</b> only
                                     </div>
                                 {% endif %}
 
