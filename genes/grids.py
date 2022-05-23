@@ -125,13 +125,15 @@ class GeneSymbolVariantsGrid(AbstractVariantGrid):
         super().__init__(user)
 
         user_settings = UserSettings.get_for_user(user)
-        fields, override, _ = get_custom_column_fields_override_and_sample_position(user_settings.columns)
+        genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
+        annotation_version = AnnotationVersion.latest(genome_build)
+        fields, override, _ = get_custom_column_fields_override_and_sample_position(user_settings.columns,
+                                                                                    annotation_version)
         self.fields = self._get_non_gene_fields(fields)
         self.update_overrides(override)
 
         gene_symbol = get_object_or_404(GeneSymbol, pk=gene_symbol)
-        genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
-        genes_qs = get_variant_queryset_for_gene_symbol(gene_symbol, genome_build)
+        genes_qs = get_variant_queryset_for_gene_symbol(gene_symbol, annotation_version)
         queryset = variant_qs_filter_has_internal_data(genes_qs, genome_build)
         if extra_filters:
             # Hotspot filters

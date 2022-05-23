@@ -5,7 +5,8 @@ from django.http import HttpRequest
 from django.shortcuts import get_object_or_404
 
 from analysis.models import VariantTag, Analysis
-from annotation.annotation_version_querysets import get_variant_queryset_for_latest_annotation_version
+from annotation.annotation_version_querysets import get_variant_queryset_for_latest_annotation_version, \
+    get_variant_queryset_for_annotation_version
 from annotation.models import AnnotationVersion
 from genes.hgvs import HGVSMatcher
 from library.jqgrid_user_row_config import JqGridUserRowConfig
@@ -65,13 +66,15 @@ class AllVariantsGrid(AbstractVariantGrid):
 
     def __init__(self, user, **kwargs):
         user_settings = UserSettings.get_for_user(user)
-        fields, override, _ = get_custom_column_fields_override_and_sample_position(user_settings.columns)
+        annotation_version = AnnotationVersion.latest(user_settings.default_genome_build)
+        fields, override, _ = get_custom_column_fields_override_and_sample_position(user_settings.columns,
+                                                                                    annotation_version)
         self.fields = fields
         super().__init__(user)
         self.update_overrides(override)
 
         extra_filters = kwargs.pop("extra_filters", {})
-        queryset = get_variant_queryset_for_latest_annotation_version(user_settings.default_genome_build)
+        queryset = get_variant_queryset_for_annotation_version(annotation_version)
         queryset, count_column = VariantZygosityCountCollection.annotate_global_germline_counts(queryset)
 
         filter_kwargs = {}
@@ -102,11 +105,12 @@ class NearbyVariantsGrid(AbstractVariantGrid):
         variant = get_object_or_404(Variant, pk=variant_id)
 
         user_settings = UserSettings.get_for_user(user)
-        fields, override, _ = get_custom_column_fields_override_and_sample_position(user_settings.columns)
+        annotation_version = AnnotationVersion.latest(user_settings.default_genome_build)
+        fields, override, _ = get_custom_column_fields_override_and_sample_position(user_settings.columns,
+                                                                                    annotation_version)
         self.fields = fields
         self.update_overrides(override)
 
-        annotation_version = AnnotationVersion.latest(user_settings.default_genome_build)
         region_filters = get_nearby_qs(variant, annotation_version)
         queryset = region_filters[region_type]
         self.queryset = queryset.values(*self.get_queryset_field_names())
@@ -211,7 +215,9 @@ class TaggedVariantGrid(AbstractVariantGrid):
         qs, _ = VariantZygosityCountCollection.annotate_global_germline_counts(qs)
         qs = qs.filter(VariantTag.variants_for_build_q(genome_build, tags_qs, tag_ids))
         user_settings = UserSettings.get_for_user(user)
-        fields, override, _ = get_custom_column_fields_override_and_sample_position(user_settings.columns)
+        annotation_version = AnnotationVersion.latest(genome_build)
+        fields, override, _ = get_custom_column_fields_override_and_sample_position(user_settings.columns,
+                                                                                    annotation_version)
         fields.remove("tags")
         self.fields = fields
         self.update_overrides(override)

@@ -1,12 +1,19 @@
 from django.contrib.auth.models import User
+from django.db.models import Q
 
+from annotation.models import AnnotationVersion, ColumnVEPField
 from library.jqgrid_sql import get_overrides
 from snpdb.models import CustomColumn, CustomColumnsCollection
 from snpdb.models.models_enums import ColumnAnnotationLevel
 
 
-def get_custom_column_fields_override_and_sample_position(custom_columns_collection: CustomColumnsCollection):
-    columns_queryset = CustomColumn.objects.filter(custom_columns_collection=custom_columns_collection)
+def get_custom_column_fields_override_and_sample_position(custom_columns_collection: CustomColumnsCollection,
+                                                          annotation_version: AnnotationVersion):
+    q_cvf = ColumnVEPField.get_columns_version_q(annotation_version.variant_annotation_version.columns_version)
+    cvf_qs = ColumnVEPField.objects.filter(q_cvf)
+    q_columns_this_version = Q(column__columnvepfield__isnull=True) | Q(column__columnvepfield__in=cvf_qs)
+    columns_queryset = CustomColumn.objects.filter(q_columns_this_version,
+                                                   custom_columns_collection=custom_columns_collection)
     columns_queryset = columns_queryset.select_related("column").order_by("sort_order")
     fields = []
     sample_columns_position = None

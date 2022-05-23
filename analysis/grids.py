@@ -228,7 +228,8 @@ class VariantGrid(JqGridSQL):
     @staticmethod
     def _get_fields_and_overrides(node: AnalysisNode, af_show_in_percent: bool) -> Tuple[List, Dict]:
         ccc = node.analysis.custom_columns_collection
-        fields, overrides, sample_columns_position = get_custom_column_fields_override_and_sample_position(ccc)
+        annotation_version = node.analysis.annotation_version
+        fields, overrides, sample_columns_position = get_custom_column_fields_override_and_sample_position(ccc, annotation_version)
         fields.extend(node.get_extra_columns())
         overrides.update(node.get_extra_colmodel_overrides())
         if af_show_in_percent:

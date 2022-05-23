@@ -5,6 +5,7 @@ from django import template
 
 from analysis.models import VariantTag
 from analysis.models.nodes.node_counts import get_node_count_colors
+from annotation.models import AnnotationVersion
 from library import tag_utils
 from library.django_utils import get_field_counts
 from snpdb.models import UserTagColors, GenomeBuild
@@ -103,7 +104,8 @@ def tag_counts_filter(context, genome_build: GenomeBuild,
                       click_func=None, show_all_func=None, gene_symbol=None, any_tag_button=True):
     tag_kwargs = {}
     if gene_symbol:
-        gene_variant_qs = get_variant_queryset_for_gene_symbol(gene_symbol=gene_symbol, genome_build=genome_build,
+        annotation_version = AnnotationVersion.latest(genome_build)
+        gene_variant_qs = get_variant_queryset_for_gene_symbol(gene_symbol, annotation_version,
                                                                traverse_aliases=True)
         tag_kwargs["variant_qs"] = gene_variant_qs
     variant_tags_qs = VariantTag.get_for_build(genome_build=genome_build, **tag_kwargs)
