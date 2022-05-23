@@ -114,10 +114,7 @@ def _new_vep_columns(apps, schema_editor):
          'description': '<a href="https://www.nature.com/articles/s41467-017-00443-5">ALoFT</a> Ensembl transcript of most damaging prediction chosen.',
          'model_field': True,
          'queryset_field': True},
-
     ]
-
-
 
     bulk_insert_class_data(apps, "snpdb", [("VariantGridColumn", VARIANT_GRID_COLUMN)])
 
