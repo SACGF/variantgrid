@@ -141,15 +141,23 @@ def server_status(request):
             worker_names.extend(settings.CELERY_SEQAUTO_WORKER_NAMES)
 
         i = app.control.inspect()
+        ping = strip_celery_from_keys(i.ping())
         stats = strip_celery_from_keys(i.stats())
         active = strip_celery_from_keys(i.active())
         scheduled = strip_celery_from_keys(i.scheduled())
 
         for worker in worker_names:
-            data = stats.get(worker)
-            num_workers = 0
+            num_workers = "?"
             status = 'ERROR - no workers found'
             ok = False
+
+            # Sometimes stats fails - just use ping
+            pong = ping.get(worker, {})
+            if pong.get("ok") == "pong":
+                status = "OK"
+                ok = True
+
+            data = stats.get(worker)
             if data:
                 processes = data.get("pool", {}).get("processes")
                 if processes:

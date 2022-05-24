@@ -1,3 +1,5 @@
+import logging
+import time
 from typing import List, Tuple
 
 import celery
@@ -53,3 +55,9 @@ def heartbeat():
     if settings.HEARTBEAT_URL:
         _ = requests.get(settings.HEARTBEAT_URL)
         # we're not overly concerned with the response
+
+
+@celery.shared_task
+def sleep_task(seconds: int):
+    time.sleep(seconds)
+    logging.info("Done sleeping...")
