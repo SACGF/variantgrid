@@ -14,27 +14,6 @@
 	{% endif %}
 
 {% endblock docreadyjs %}
-
-{% block inlinejs %}
-    {{ block.super }}
-
-	function gene_list_genes_grid_init_func(grid, pagerId, args) {
-		var download_genes_grid = function() {
-			var url = Urls.gene_list_genes_grid(args.gene_list_id, 'download');
-			window.location = url;
-		}
-
-		grid.jqGrid('navButtonAdd', pagerId, {
-			        caption : "Download",
-			        buttonicon : "ui-icon-arrowthickstop-1-s",
-			        onClickButton : download_genes_grid,
-			        position : "first",
-			        title : "Export",
-			        cursor : "pointer"
-		});
-	}
-{% endblock inlinejs %}
-
 {% block node_editor_tab_links_second %}
 {% if node.status == 'R' %}
 	{% if node.has_gene_coverage != None %}
@@ -75,7 +54,7 @@
                 {% endif %}
                 <div id="gene-list-genes">
                     {%  for gene_list in gene_lists %}
-                        {% jqgrid 'gene_list_genes_grid' 'gene_list' False None 'jqgrid/jqgrid.html' 'gene_list_genes_grid_init_func' False gene_list_id=gene_list.pk %}
+                        {% jqgrid 'gene_list_genes_grid' 'gene_list' False None 'jqgrid/jqgrid.html' False download_grid_json_as_csv=True gene_list_id=gene_list.pk %}
                     {%  endfor %}
                 </div>
                 <div id="gene-coverage">
@@ -83,7 +62,7 @@
                         <b>{{ sample }}</b>
                         {% if cov %}
                         <div>Showing genes in gene list. <a href='{% url 'view_qc' cov.qcgenecoverage.qc.pk %}'>Full coverage</a></div>
-                        {% jqgrid 'gene_coverage_collection_gene_list_grid' 'GeneCoverage' search=False gene_coverage_collection_id=cov.pk gene_list_id_list=gene_list_id_list %}
+                        {% jqgrid 'gene_coverage_collection_gene_list_grid' 'GeneCoverage' search=False download_grid_json_as_csv=True gene_coverage_collection_id=cov.pk gene_list_id_list=gene_list_id_list %}
                         {% else %}
                             Sample has no coverage.
                         {% endif %}
@@ -93,7 +72,7 @@
             {% else %}
                 {% for gene_list in gene_lists %}
                     <h3>{{ gene_list }}</h3>
-                    {% jqgrid 'gene_list_genes_grid' gene_list.pk search=False init_func='gene_list_genes_grid_init_func' gene_list_id=gene_list.pk %}
+                    {% jqgrid 'gene_list_genes_grid' gene_list.pk search=False download_grid_json_as_csv=True gene_list_id=gene_list.pk %}
                 {% endfor %}
 
                 <div>No coverage information available.</div>
