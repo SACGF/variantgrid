@@ -57,8 +57,9 @@ from variantopedia.server_status import get_dashboard_notices
 from variantopedia.tasks.server_status_tasks import notify_server_status_now
 
 
-def variants(request):
-    context = {}
+def variants(request, genome_build_name=None):
+    genome_build = UserSettings.get_genome_build_or_default(request.user, genome_build_name)
+    context = {"genome_build": genome_build}
     return render(request, "variantopedia/variants.html", context)
 
 

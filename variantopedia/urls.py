@@ -7,6 +7,8 @@ from variantopedia.grids import AllVariantsGrid, NearbyVariantsGrid, TaggedVaria
 
 urlpatterns = [
     perm_path('variants', views.variants, name='variants'),
+    perm_path('variants/<genome_build_name>', views.variants, name='genome_build_variants'),
+
     perm_path('dashboard', views.dashboard, name='dashboard'),
     perm_path('server_status', views.server_status, name='server_status'),
     perm_path('server_status_activity/detail/<int:days_ago>', views.server_status_activity,
@@ -50,7 +52,7 @@ urlpatterns = [
     perm_path('nearby/grid/<variant_id>/<region_type>/<slug:op>/',
               JQGridView.as_view(grid=NearbyVariantsGrid, csv_download=True),
               name='nearby_variants_grid'),
-    perm_path('all_variants/grid/<slug:op>/', JQGridView.as_view(grid=AllVariantsGrid, csv_download=True),
+    perm_path('all_variants/grid/<genome_build_name>/<slug:op>/', JQGridView.as_view(grid=AllVariantsGrid, csv_download=True),
               name='all_variants_grid'),
     perm_path('tags/grid/<genome_build_name>/<slug:op>/',
               JQGridView.as_view(grid=VariantTagsGrid, delete_row=True), name='variant_tags_grid'),

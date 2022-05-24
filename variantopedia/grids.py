@@ -64,9 +64,10 @@ class AllVariantsGrid(AbstractVariantGrid):
         'tags_global': {'classes': 'no-word-wrap', 'formatter': 'tagsGlobalFormatter', 'sortable': False},
     }
 
-    def __init__(self, user, **kwargs):
+    def __init__(self, user, genome_build_name, **kwargs):
         user_settings = UserSettings.get_for_user(user)
-        annotation_version = AnnotationVersion.latest(user_settings.default_genome_build)
+        genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
+        annotation_version = AnnotationVersion.latest(genome_build)
         fields, override, _ = get_custom_column_fields_override_and_sample_position(user_settings.columns,
                                                                                     annotation_version)
         self.fields = fields
@@ -87,7 +88,8 @@ class AllVariantsGrid(AbstractVariantGrid):
         else:
             filter_kwargs[count_column + "__gt"] = 0  # By default only show those that have samples
 
-        queryset = queryset.filter(**filter_kwargs)
+        q_contigs = Variant.get_contigs_q(genome_build)
+        queryset = queryset.filter(q_contigs, **filter_kwargs)
         self.queryset = queryset.values(*self.get_queryset_field_names())
         self.extra_config.update({'sortname': count_column,
                                   'sortorder': "desc",
