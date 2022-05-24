@@ -4,7 +4,6 @@ from typing import Iterable, Dict, Any, Union, List, Optional
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.utils import timezone
-from django.utils.timezone import now
 from rest_framework.response import Response
 from rest_framework.views import APIView
 

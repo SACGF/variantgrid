@@ -1107,4 +1107,3 @@ def diff_text(a: str, b: str) -> DiffBuilder:
     diff_builder.apply()
     print(diff_builder.diff_segments)
     return diff_builder
-

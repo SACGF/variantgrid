@@ -10,8 +10,6 @@ from django.http import HttpResponse, StreamingHttpResponse
 from django.utils.encoding import smart_str
 from django_json_widget.widgets import JSONEditorWidget
 from guardian.admin import GuardedModelAdminMixin
-
-# https://stackoverflow.com/questions/41228687/how-to-decorate-admin-actions-in-django-action-name-used-as-dict-key
 from lazy import lazy
 
 from library.utils import delimited_row
@@ -21,6 +19,8 @@ def admin_action(short_description: str):
     """
     Decorator, if used in ModelAdminBasics, marks function as something that can be done on selected rows.
     As a bonus will also send an info message confirming to the user how many rows were selected for the action
+
+    From https://stackoverflow.com/questions/41228687/how-to-decorate-admin-actions-in-django-action-name-used-as-dict-key
     """
 
     def decorator(method):

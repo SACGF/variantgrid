@@ -210,4 +210,3 @@ class ManualVariantEntryType(models.TextChoices):
     HGVS = "h", "HGVS"
     VARIANT = "v", "Variant"
     UNKNOWN = "u", "Unknown"
-

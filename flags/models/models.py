@@ -12,14 +12,12 @@ from django.db.models import Q
 from django.db.models.deletion import CASCADE, PROTECT
 from django.db.models.expressions import Subquery
 from django.db.models.query import QuerySet
-from django.utils.timezone import now
 from django_extensions.db.models import TimeStampedModel
 from lazy import lazy
 
 from flags.models.enums import FlagStatus
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
 from library.guardian_utils import admin_bot
-from library.log_utils import report_message
 from library.utils import empty_dict, ModelUtilsMixin, ChoicesEnum
 
 flag_collection_extra_info_signal = django.dispatch.Signal()  # args: "flag_infos", "user"

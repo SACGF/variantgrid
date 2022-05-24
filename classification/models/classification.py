@@ -713,7 +713,6 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             transcript_counts += 1
         return transcript_counts
 
-
     def update_cached_c_hgvs(self) -> int:
         """
         :return: Returns length of the c.hgvs if successfully updated caches

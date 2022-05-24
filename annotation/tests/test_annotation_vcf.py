@@ -287,5 +287,3 @@ class TestVEP(TestCase):
             "aloft_ensembl_transcript": "ENST00000565905",
         }
         self.assertDictEqual(aloft_data, expected_aloft)
-
-

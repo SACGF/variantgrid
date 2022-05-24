@@ -38,7 +38,6 @@ def _variant_wiki_column(apps, schema_editor):
                                             sort_order=gene_description.sort_order+1)
 
 
-
 class Migration(migrations.Migration):
 
     dependencies = [
