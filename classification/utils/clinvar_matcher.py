@@ -232,18 +232,19 @@ class ClinVarLegacyRow:
 
         if c_hgvs := self.c_hgvs_with_gene_symbol:
             # allow for some transcript version increases
-            test_c_hgvs: CHGVS
-            c_hgvs_strs: List[str] = list()
-            for attempt_increase in range(-3, 3):
-                if c_hgvs.transcript_parts.version + attempt_increase >= 1:
-                    if test_c_hgvs := c_hgvs.with_transcript_version(c_hgvs.transcript_parts.version + attempt_increase):
-                        c_hgvs_strs.append(str(test_c_hgvs))
+            if c_hgvs.transcript_parts.version:
+                test_c_hgvs: CHGVS
+                c_hgvs_strs: List[str] = list()
+                for attempt_increase in range(-3, 3):
+                    if c_hgvs.transcript_parts.version + attempt_increase >= 1:
+                        if test_c_hgvs := c_hgvs.with_transcript_version(c_hgvs.transcript_parts.version + attempt_increase):
+                            c_hgvs_strs.append(str(test_c_hgvs))
 
-            if c_hgvs_strs:
-                if allele_ids := set(Classification.objects.filter(evidence__c_hgvs__value__in=c_hgvs_strs, lab__in=self.labs).values_list('allele', flat=True)):
-                    alleles = Allele.objects.filter(pk__in=allele_ids)
-                    for allele in alleles:
-                        allele_to_match_types[allele].add(ClinVarLegacyAlleleMatchType.VARIANT_PREFERRED_IMPORTED_C_HGVS)
+                if c_hgvs_strs:
+                    if allele_ids := set(Classification.objects.filter(evidence__c_hgvs__value__in=c_hgvs_strs, lab__in=self.labs).values_list('allele', flat=True)):
+                        alleles = Allele.objects.filter(pk__in=allele_ids)
+                        for allele in alleles:
+                            allele_to_match_types[allele].add(ClinVarLegacyAlleleMatchType.VARIANT_PREFERRED_IMPORTED_C_HGVS)
 
         all_matches: [ClinVarLegacyMatches] = list()
         for allele, match_types in allele_to_match_types.items():
