@@ -81,7 +81,7 @@ class Test(URLTestCase):
         build_name_kwargs = {"genome_build_name": self.grch37.name}
 
         GRID_LIST_URLS = [
-            ("all_variants_grid", {}, self.variant),
+            ("all_variants_grid", build_name_kwargs, self.variant),
             ("variant_tags_grid", build_name_kwargs, self.variant_tag),
             ("tagged_variant_grid", build_name_kwargs, self.variant),
         ]
