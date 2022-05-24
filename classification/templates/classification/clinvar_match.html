@@ -21,7 +21,7 @@
             </div>
         {% endif %}
         <p>
-            This page will let you match data vs what's in ClinVar
+            This page will let you match data a ClinVar export file with data within {{ site_name }}.
         </p>
         <form method="post" enctype="multipart/form-data">
             {% csrf_token %}
@@ -31,11 +31,52 @@
                     {% labelled label="Upload File" %}
                         <input type="file" name="file">
                     {% endlabelled %}
+                    <p>{{ 'W'|severity_icon }} The matching process takes a few minutes, please be patient.</p>
                 </div>
                 <div class="card-footer">
                     <input type="submit" class="btn btn-primary" value="Compare" />
                 </div>
             </div>
         </form>
+
+        {% if rows %}
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>SCV</th>
+                        <th>VariantID</th>
+                        <th>c.HGVS</th>
+                        <th>Condition</th>
+                        <th>Matches</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for row in rows %}
+                    <tr>
+                        <td>{{ row.scv }}</td>
+                        <td><a href="https://ncbi.nlm.nih.gov/clinvar/variation/{{ row.variant_clinvar_id }}" target="_blank">{{ row.variant_clinvar_id }}</a></td>
+                        <td>{% c_hgvs row.c_hgvs_with_gene_symbol %}</td>
+                        <td>{% for term in row.ontology_terms %}<div>{% ontology_term term %}</div>{% endfor %}</td>
+                        <td>
+                        {% with matches=row.find_variant_grid_allele %}
+                            {% for match in matches %}
+                            <div>
+                                <a href="{{ match.allele.get_absolute_url }}">{{ match.allele }}</a>
+                                {{ match.match_types }}
+                                {% for clinvar_export_match in match.clinvar_export_matches %}
+                                    <div>
+                                    <a href="{{ clinvar_export_match.clinvar_export.get_absolute_url }}" target="_blank">{{ clinvar_export_match.clinvar_export }}</a>
+                                    {{ clinvar_export_match.match_types }}
+                                    </div>
+                                {% endfor %}
+                            </div>
+                            {% endfor %}
+                        {% endwith %}
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        {% endif %}
     </div>
 {% endblock %}

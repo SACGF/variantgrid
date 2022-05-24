@@ -17,27 +17,44 @@ from snpdb.models import GenomeBuild, Variant, Allele, ClinVarKey
 from variantopedia.search import search_hgvs, SearchResult, ClassifyVariant
 import re
 
-C_HGVS_AND_P_DOT = re.compile(r"(?P<c_hgvs>,*?) ?(?P<p_hgvs>/(p[.].*))")
+C_HGVS_AND_P_DOT = re.compile(r"^(?P<c_hgvs>.+?)( \((?P<p_hgvs>p[.].+)\))?$")
 
 
-class ClinVarLegacyMatchType(str, Enum):
+class ClinVarLegacyAlleleMatchType(str, Enum):
     CLINVAR_VARIANT_ID = "clinvar_variant_id"
     VARIANT_PREFERRED_VARIANT = "variant_preferred_variant"
     VARIANT_PREFERRED_IMPORTED_C_HGVS = "variant_preferred_imported_c_hgvs"
+
+    def __str__(self):
+        return self.value
+
+    def __repr__(self):
+        return self.value
+
+
+class ClinVarLegacyExportMatchType(str, Enum):
+    C_HGVS_MATCHES = "c_hgvs_matches"
+    CONDITION_MATCHES = "condition_matches"
+    CLINICAL_SIGNIFICANCE_MATCHES = "clinical_significance_matches"
+    SCV_MATCHES = "scv_matches"
+
+    def __str__(self):
+        return self.value
+
+    def __repr__(self):
+        return self.value
 
 
 @dataclass
 class ClinVarLegacyMatch:
     clinvar_export: ClinVarExport
-    c_hgvs_matches: bool
-    condition_matches: bool
-    clin_sig_matches: bool
+    match_types: Set[ClinVarLegacyExportMatchType]
 
 
 @dataclass
 class ClinVarLegacyMatches:
     allele: Allele
-    match_types: Set[ClinVarLegacyMatchType]
+    match_types: Set[ClinVarLegacyAlleleMatchType]
     classifications: List[Classification]
     clinvar_export_matches: List[ClinVarLegacyMatch]
 
@@ -152,19 +169,20 @@ class ClinVarLegacyRow:
     @lazy
     def ontology_terms(self) -> List[OntologyTerm]:
         terms: List[OntologyTerm] = list()
-        if individual_terms := self.condition_identifier.split(';'):
-            for individual_term in individual_terms:
-                if individual_term.startswith("Human Phenotype Ontology:"):
-                    individual_term = individual_term.split(":", maxsplit=1)[1]
-                terms.append(OntologyTerm.get_or_stub(individual_term))
+        if condition_identifier := self.condition_identifier.strip():
+            if individual_terms := condition_identifier.split(';'):
+                for individual_term in individual_terms:
+                    if individual_term.startswith("Human Phenotype Ontology:"):
+                        individual_term = individual_term.split(":", maxsplit=1)[1]
+                    terms.append(OntologyTerm.get_or_stub(individual_term))
         return terms
 
     def find_variant_grid_allele(self) -> List[ClinVarLegacyMatches]:
-        allele_to_match_types: Dict[Allele, Set[ClinVarLegacyMatchType]] = defaultdict(set)
+        allele_to_match_types: Dict[Allele, Set[ClinVarLegacyAlleleMatchType]] = defaultdict(set)
 
         if clinvar_annotation := ClinVar.objects.filter(clinvar_variation_id=self.variant_clinvar_id).order_by('-version').first():
             if allele := clinvar_annotation.variant.allele:
-                allele_to_match_types[allele].add(ClinVarLegacyMatchType.CLINVAR_VARIANT_ID)
+                allele_to_match_types[allele].add(ClinVarLegacyAlleleMatchType.CLINVAR_VARIANT_ID)
 
         try:
             if results := search_hgvs(self.c_hgvs_preferred_str, user=admin_bot(), genome_build=GenomeBuild.grch38(), variant_qs=Variant.objects.all()):
@@ -178,10 +196,13 @@ class ClinVarLegacyRow:
                         variant = result.variant
                     if variant:
                         if allele := variant.allele:
-                            allele_to_match_types[allele].add(ClinVarLegacyMatchType.VARIANT_PREFERRED_VARIANT)
+                            allele_to_match_types[allele].add(ClinVarLegacyAlleleMatchType.VARIANT_PREFERRED_VARIANT)
         except InvalidHGVSName:
             pass
         except NotImplementedError:
+            pass
+        except Variant.MultipleObjectsReturned:
+            # feel this really needs to be handled
             pass
 
         if c_hgvs := self.c_hgvs_with_gene_symbol:
@@ -193,7 +214,7 @@ class ClinVarLegacyRow:
                     if allele_ids := set(Classification.objects.filter(evidence__c_hgvs__value=str(c_hgvs), lab__in=self.labs).values_list('allele', flat=True)):
                         alleles = Allele.objects.filter(pk__in=allele_ids)
                         for allele in alleles:
-                            allele_to_match_types[allele].add(ClinVarLegacyMatchType.VARIANT_PREFERRED_IMPORTED_C_HGVS)
+                            allele_to_match_types[allele].add(ClinVarLegacyAlleleMatchType.VARIANT_PREFERRED_IMPORTED_C_HGVS)
 
         all_matches: [ClinVarLegacyMatches] = list()
         for allele, match_types in allele_to_match_types.items():
@@ -203,27 +224,30 @@ class ClinVarLegacyRow:
                 if clinvar_exports := ClinVarExport.objects.filter(clinvar_allele=clinvar_allele):
                     for clinvar_export in clinvar_exports:
 
-                        condition_matches = False
-                        clin_sig_matches = False
-                        c_hgvs_matches = False
+                        export_match_types: Set[ClinVarLegacyExportMatchType] = set()
 
                         if classification_based_on := clinvar_export.classification_based_on:
                             clinical_significance = classification_based_on.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
-                            clin_sig_matches = clinical_significance == self.clinical_significance_code
-                            c_hgvs_matches = CHGVS(classification_based_on.get(SpecialEKeys.C_HGVS)) == self.c_hgvs_with_gene_symbol
+                            if clinical_significance == self.clinical_significance_code:
+                                export_match_types.add(ClinVarLegacyExportMatchType.CLINICAL_SIGNIFICANCE_MATCHES)
+                            if CHGVS(classification_based_on.get(SpecialEKeys.C_HGVS)) == self.c_hgvs_with_gene_symbol:
+                                export_match_types.add(ClinVarLegacyExportMatchType.CONDITION_MATCHES)
 
                         umbrella = clinvar_export.condition_resolved
                         for term in self.ontology_terms:
                             if OntologySnake.snake_from(term, umbrella, max_depth=3):
-                                condition_matches = True
+                                export_match_types.add(ClinVarLegacyExportMatchType.CONDITION_MATCHES)
+                                break
+
+                        if clinvar_export.scv == self.scv:
+                            export_match_types.add(ClinVarLegacyExportMatchType.SCV_MATCHES)
 
                         clinvar_export_match = ClinVarLegacyMatch(
                             clinvar_export=clinvar_export,
-                            c_hgvs_matches=c_hgvs_matches,
-                            condition_matches=condition_matches,
-                            clin_sig_matches=clin_sig_matches
+                            match_types=export_match_types
                         )
                         clinvar_export_matches.append(clinvar_export_match)
+
             ccwm = ClinVarLegacyMatches(
                 allele=allele,
                 match_types=match_types,
