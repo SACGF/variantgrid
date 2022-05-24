@@ -83,7 +83,7 @@ class ClinVarExport(TimeStampedModel):
         super().__init__(*args, **kwargs)
 
     def __str__(self):
-        parts = [f"CVE({self.pk})"]
+        parts = [f"ClinVarExport ({self.pk})"]
         if self.scv:
             parts.append(self.scv)
         return " ".join(parts)

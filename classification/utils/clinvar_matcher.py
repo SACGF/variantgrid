@@ -7,10 +7,11 @@ from lazy import lazy
 from pyhgvs import InvalidHGVSName
 from annotation.models import ClinVar
 from classification.enums import SpecialEKeys
-from classification.models import Classification, ClinVarExport, ClinVarAllele
+from classification.management.commands import clinvar_export
+from classification.models import Classification, ClinVarExport, ClinVarAllele, EvidenceKey, EvidenceKeyMap
 from genes.hgvs import CHGVS
 from library.guardian_utils import admin_bot
-from ontology.models import OntologyTerm, OntologySnake
+from ontology.models import OntologyTerm, OntologySnake, OntologyTermRelation
 from snpdb.models import GenomeBuild, Variant, Allele, ClinVarKey
 from variantopedia.search import search_hgvs, SearchResult, ClassifyVariant
 import re
@@ -20,9 +21,9 @@ C_HGVS_AND_P_DOT = re.compile(r"^(?P<c_hgvs>.+?)( \((?P<p_hgvs>p[.].+)\))?$")
 
 
 class ClinVarLegacyAlleleMatchType(str, Enum):
-    CLINVAR_VARIANT_ID = "clinvar_variant_id"
-    VARIANT_PREFERRED_VARIANT = "variant_preferred_variant"
-    VARIANT_PREFERRED_IMPORTED_C_HGVS = "variant_preferred_imported_c_hgvs"
+    CLINVAR_VARIANT_ID = "ClinVar VariantID matches"
+    VARIANT_PREFERRED_VARIANT = "ClinVar c.HGVS matches"
+    VARIANT_PREFERRED_IMPORTED_C_HGVS = "imported c.HGVS matches"
 
     def __str__(self):
         return self.value
@@ -32,10 +33,9 @@ class ClinVarLegacyAlleleMatchType(str, Enum):
 
 
 class ClinVarLegacyExportMatchType(str, Enum):
-    C_HGVS_MATCHES = "c_hgvs_matches"
-    CONDITION_MATCHES = "condition_matches"
-    CLINICAL_SIGNIFICANCE_MATCHES = "clinical_significance_matches"
-    SCV_MATCHES = "scv_matches"
+    CONDITION_MATCHES = "condition matches"
+    CLINICAL_SIGNIFICANCE_MATCHES = "clin sig matches"
+    SCV_MATCHES = "SCV matches"
 
     def __str__(self):
         return self.value
@@ -49,6 +49,11 @@ class ClinVarLegacyMatch:
     clinvar_export: ClinVarExport
     match_types: Set[ClinVarLegacyExportMatchType]
 
+    @property
+    def clinical_significance(self) -> str:
+        if based_on := self.clinvar_export.classification_based_on:
+            return EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE).pretty_value(based_on.get(SpecialEKeys.CLINICAL_SIGNIFICANCE))
+        return ''
 
 @dataclass
 class ClinVarLegacyMatches:
@@ -90,6 +95,10 @@ class ClinVarLegacyRow:
     clinvar_key: ClinVarKey
     data: Dict[str, str]
 
+    @lazy
+    def clinvar_export(self) -> Optional[ClinVarExport]:
+        return ClinVarExport.objects.filter(scv=self.scv_no_version).first()
+
     @staticmethod
     def from_data_str(clinvar_key: ClinVarKey, data_str: str):
         return ClinVarLegacyRow(clinvar_key=clinvar_key, data=json.loads(data_str))
@@ -108,6 +117,14 @@ class ClinVarLegacyRow:
     @property
     def scv(self):
         return self.get_column(ClinVarLegacyColumn.SCV)
+
+    @property
+    def scv_no_version(self):
+        return self.scv.split('.')[0]
+
+    @property
+    def scv_version(self):
+        return self.scv.split('.')[1]
 
     @property
     def variant_clinvar_id(self):
@@ -215,20 +232,24 @@ class ClinVarLegacyRow:
 
         if c_hgvs := self.c_hgvs_with_gene_symbol:
             # allow for some transcript version increases
-            for attempt_increase in range(0, 3):
-                if attempt_increase and c_hgvs.transcript_parts.version:
-                    c_hgvs = c_hgvs.with_transcript_version(c_hgvs.transcript_parts.version + attempt_increase)
-                if c_hgvs:
-                    if allele_ids := set(Classification.objects.filter(evidence__c_hgvs__value=str(c_hgvs), lab__in=self.labs).values_list('allele', flat=True)):
-                        alleles = Allele.objects.filter(pk__in=allele_ids)
-                        for allele in alleles:
-                            allele_to_match_types[allele].add(ClinVarLegacyAlleleMatchType.VARIANT_PREFERRED_IMPORTED_C_HGVS)
+            test_c_hgvs: CHGVS
+            c_hgvs_strs: List[str] = list()
+            for attempt_increase in range(-3, 3):
+                if c_hgvs.transcript_parts.version + attempt_increase >= 1:
+                    if test_c_hgvs := c_hgvs.with_transcript_version(c_hgvs.transcript_parts.version + attempt_increase):
+                        c_hgvs_strs.append(str(test_c_hgvs))
+
+            if c_hgvs_strs:
+                if allele_ids := set(Classification.objects.filter(evidence__c_hgvs__value__in=c_hgvs_strs, lab__in=self.labs).values_list('allele', flat=True)):
+                    alleles = Allele.objects.filter(pk__in=allele_ids)
+                    for allele in alleles:
+                        allele_to_match_types[allele].add(ClinVarLegacyAlleleMatchType.VARIANT_PREFERRED_IMPORTED_C_HGVS)
 
         all_matches: [ClinVarLegacyMatches] = list()
         for allele, match_types in allele_to_match_types.items():
             classifications = list(Classification.objects.filter(lab__in=self.labs, allele=allele))
             clinvar_export_matches: List[ClinVarLegacyMatch] = list()
-            if clinvar_allele := ClinVarAllele.objects.filter(allele=allele, clinvar_key=self.clinvar_key):
+            if clinvar_allele := ClinVarAllele.objects.filter(allele=allele, clinvar_key=self.clinvar_key).first():
                 if clinvar_exports := ClinVarExport.objects.filter(clinvar_allele=clinvar_allele):
                     for clinvar_export in clinvar_exports:
 
@@ -241,13 +262,16 @@ class ClinVarLegacyRow:
                             if CHGVS(classification_based_on.get(SpecialEKeys.C_HGVS)) == self.c_hgvs_with_gene_symbol:
                                 export_match_types.add(ClinVarLegacyExportMatchType.CONDITION_MATCHES)
 
-                        umbrella = clinvar_export.condition_resolved
+                        umbrella = clinvar_export.condition_resolved.terms
                         for term in self.ontology_terms:
-                            if OntologySnake.snake_from(term, umbrella, max_depth=3):
-                                export_match_types.add(ClinVarLegacyExportMatchType.CONDITION_MATCHES)
-                                break
+                            if mondo_term := OntologyTermRelation.as_mondo(term):
+                                term = mondo_term
+                            for umbrella_term in umbrella:
+                                if term == umbrella_term or OntologySnake.check_if_ancestor(descendant=term, ancestor=umbrella_term, max_levels=2):
+                                    export_match_types.add(ClinVarLegacyExportMatchType.CONDITION_MATCHES)
+                                    break
 
-                        if clinvar_export.scv == self.scv:
+                        if clinvar_export.scv == self.scv_no_version:
                             export_match_types.add(ClinVarLegacyExportMatchType.SCV_MATCHES)
 
                         clinvar_export_match = ClinVarLegacyMatch(
