@@ -12,7 +12,7 @@ from classification.views.classification_email_view import summary_email_preview
 from classification.views.classification_export_view import ClassificationApiExportView
 from classification.views.classification_overlaps_view import view_overlaps, post_clinical_context, \
     view_clinical_context, view_overlaps_detail
-from classification.views.clinvar_export_view import ClinVarMatchView
+from classification.views.clinvar_export_view import ClinVarMatchView, clinvar_match_detail
 from classification.views.views_uploaded_classifications_unmapped import UploadedClassificationsUnmappedView, \
     UploadedClassificationsUnmappedColumns, download_classification_unmapped_file, \
     view_uploaded_classification_unmapped, view_uploaded_classification_unmapped_detail
@@ -65,6 +65,7 @@ urlpatterns = [
 
     perm_path('clinvar_match', ClinVarMatchView.as_view(), name='clinvar_match'),
     perm_path('clinvar_match/<str:clinvar_key_id>', ClinVarMatchView.as_view(), name='clinvar_match'),
+    perm_path('clinvar_match/<str:clinvar_key_id>/match_detail', clinvar_match_detail, name='clinvar_match_detail'),
 
     perm_path('clinvar_export_summary', clinvar_export_view.clinvar_export_summary, name='clinvar_key_summary'),  # version that lets you pick which clinvarkey if you access to multiple
     perm_path('clinvar_export_summary/<str:clinvar_key_id>', clinvar_export_view.clinvar_export_summary, name='clinvar_key_summary'),

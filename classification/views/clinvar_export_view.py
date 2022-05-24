@@ -389,11 +389,21 @@ class ClinVarMatchView(View):
 
         file_obj = io_string = io.StringIO(request.FILES.get('file').read().decode("utf-8"))
         clinvar_legacy_rows = ClinVarLegacyRow.load_file(file_obj, clinvar_key)
-        #for clinvar_legacy_row in clinvar_legacy_rows:
-        #    print(clinvar_legacy_row.find_variant_grid_allele())
 
         return render(request, 'classification/clinvar_match.html', {
             'all_keys': ClinVarKey.clinvar_keys_for_user(request.user),
             'clinvar_key': clinvar_key,
             'rows': clinvar_legacy_rows
         })
+
+
+def clinvar_match_detail(request, clinvar_key_id: str):
+    clinvar_key: ClinVarKey = get_object_or_404(ClinVarKey, pk=clinvar_key_id)
+    clinvar_key.check_user_can_access(request.user)
+
+    # TODO should this be a post?
+    data_str = request.GET.get('data_str')
+
+    return render(request, 'classification/clinvar_match_detail.html', {
+        'matches': ClinVarLegacyRow.from_data_str(clinvar_key, data_str).find_variant_grid_allele()
+    })

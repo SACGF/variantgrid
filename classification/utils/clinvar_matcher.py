@@ -3,10 +3,8 @@ from collections import defaultdict
 from dataclasses import dataclass
 from enum import Enum
 from typing import Dict, List, Optional, Set, Iterator
-
 from lazy import lazy
 from pyhgvs import InvalidHGVSName
-
 from annotation.models import ClinVar
 from classification.enums import SpecialEKeys
 from classification.models import Classification, ClinVarExport, ClinVarAllele
@@ -16,6 +14,7 @@ from ontology.models import OntologyTerm, OntologySnake
 from snpdb.models import GenomeBuild, Variant, Allele, ClinVarKey
 from variantopedia.search import search_hgvs, SearchResult, ClassifyVariant
 import re
+import json
 
 C_HGVS_AND_P_DOT = re.compile(r"^(?P<c_hgvs>.+?)( \((?P<p_hgvs>p[.].+)\))?$")
 
@@ -90,6 +89,14 @@ class ClinVarLegacyColumn(str, Enum):
 class ClinVarLegacyRow:
     clinvar_key: ClinVarKey
     data: Dict[str, str]
+
+    @staticmethod
+    def from_data_str(clinvar_key: ClinVarKey, data_str: str):
+        return ClinVarLegacyRow(clinvar_key=clinvar_key, data=json.loads(data_str))
+
+    @property
+    def data_str(self) -> str:
+        return json.dumps(self.data)
 
     def get_column(self, field_name: str):
         return self.data[field_name]
@@ -178,6 +185,7 @@ class ClinVarLegacyRow:
         return terms
 
     def find_variant_grid_allele(self) -> List[ClinVarLegacyMatches]:
+
         allele_to_match_types: Dict[Allele, Set[ClinVarLegacyAlleleMatchType]] = defaultdict(set)
 
         if clinvar_annotation := ClinVar.objects.filter(clinvar_variation_id=self.variant_clinvar_id).order_by('-version').first():
