@@ -1,7 +1,9 @@
 {% for match in matches %}
     <div>
         <a href="{{ match.allele.get_absolute_url }}">{{ match.allele }}</a>
-        {{ match.match_types }}
+        {{ match.match_types }}<br/>
+        Classifications Count: {{ match.classifications|length }}
+
         {% for clinvar_export_match in match.clinvar_export_matches %}
             <div>
             <a href="{{ clinvar_export_match.clinvar_export.get_absolute_url }}" target="_blank">{{ clinvar_export_match.clinvar_export }}</a>
