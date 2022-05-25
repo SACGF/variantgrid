@@ -1,10 +1,11 @@
 import json
 import logging
 import random
-from collections import defaultdict
+from collections import defaultdict, Counter
 
+from celery.result import AsyncResult
 from django.conf import settings
-from django.db.models import Max
+from django.db.models import Max, F
 from django.http.response import JsonResponse
 from django.shortcuts import get_object_or_404
 from django.views.decorators.cache import never_cache
@@ -32,6 +33,7 @@ from ontology.models import OntologyTermRelation, OntologyTerm
 from ontology.serializers import OntologyTermSerializer
 from snpdb.models import Tag, BuiltInFilters, GenomeBuild, Sample
 from snpdb.tasks.clingen_tasks import populate_clingen_alleles_from_allele_source
+from variantgrid.celery import app
 
 
 @require_POST
@@ -361,6 +363,30 @@ def nodes_status(request, analysis_id):
         data["counts"] = counts
         node_status_list.append(data)
     return JsonResponse({"node_status": node_status_list})
+
+
+@never_cache
+def nodes_tasks(request, analysis_id):
+    """ Returns a dict of node tasks states / counts """
+    QUEUE_NAME = 'celery@analysis_workers'
+    analysis = get_analysis_or_404(request.user, analysis_id)
+    inspect = app.control.inspect([QUEUE_NAME])
+    active = inspect.active()[QUEUE_NAME]
+    active_jobs = {a["id"] for a in active}
+
+    summary = Counter()
+    node_qs = analysis.analysisnode_set.filter(visible=True, status__in=NodeStatus.LOADING_STATUSES,
+                                               nodetask__version=F("version"))
+    for celery_task in node_qs.values_list("nodetask__celery_task", flat=True):
+        status = "QUEUED"
+        if celery_task:
+            if celery_task in active_jobs:
+                status = "ACTIVE"
+            else:
+                result = AsyncResult(celery_task)
+                status = result.status
+        summary[status] += 1
+    return JsonResponse(dict(summary))
 
 
 @require_POST

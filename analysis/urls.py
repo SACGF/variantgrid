@@ -43,6 +43,7 @@ urlpatterns = [
     perm_path('<int:analysis_id>/nodes/copy/', views_json.nodes_copy, name='nodes_copy'),
     perm_path('<int:analysis_id>/nodes/delete/', views_json.nodes_delete, name='nodes_delete'),
     perm_path('<int:analysis_id>/nodes/status/', views_json.nodes_status, name='nodes_status'),
+    perm_path('<int:analysis_id>/node/tasks/', views_json.nodes_tasks, name='nodes_tasks'),
 
     perm_path('<int:analysis_id>/create_filter_child/<int:node_id>/', views_json.create_filter_child, name='create_filter_child'),
     perm_path('<int:analysis_id>/create_extra_filter_child/<int:node_id>/<slug:extra_filters>/', views_json.create_extra_filter_child, name='create_extra_filter_child'),

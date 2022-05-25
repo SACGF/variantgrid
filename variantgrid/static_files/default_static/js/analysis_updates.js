@@ -1,6 +1,7 @@
 
-function AnalysisMessagePoller(url) {
-	this.url = url;
+function AnalysisMessagePoller(node_status_url, task_status_url) {
+	this.node_status_url = node_status_url;
+	this.task_status_url = task_status_url;
 	this.update_frequency = 1000;
 	this.observed_nodes = {};
 	this.update = function() {
@@ -8,12 +9,12 @@ function AnalysisMessagePoller(url) {
 		const nodes = Object.keys(this.observed_nodes);
 		if (nodes.length) {
 			this.send_requests(nodes);
-		}	
+		}
 	};
 
 	this.send_requests = function(nodes) {
 		const that = this;
-		const on_success_function = function (data, status, xhr) {
+		const on_node_status_success_function = function (data, status, xhr) {
 			const nodeStatusList = data.node_status;
 			if (nodeStatusList) {
 				that.process_nodes(nodeStatusList);
@@ -36,9 +37,37 @@ function AnalysisMessagePoller(url) {
 		$.ajax({
 		    type: "GET",
 		    data: data,
-		    url: this.url,
-		    success: on_success_function,
+		    url: this.node_status_url,
+		    success: on_node_status_success_function,
 		});
+
+        if (this.task_status_url) {
+            const on_task_status_success_function = function (data, status, xhr) {
+                let numActive = data["ACTIVE"] || 0;
+                let numQueued = data["QUEUED"] || 0;
+                let analysisTasksSpan = $("#analysis-tasks");
+                if (numActive || numQueued) {
+                    $("#analysis-tasks-active", analysisTasksSpan).text(numActive);
+                    let analysisQueueSpan = $("#analysis-tasks-queued", analysisTasksSpan);
+                    if (numQueued) {
+                        analysisQueueSpan.text(` (Q: ${numQueued})`);
+                    } else {
+                        analysisQueueSpan.empty();
+                    }
+                    let title = `Active tasks: ${numActive}, Queued: ${numQueued}`;
+                    analysisTasksSpan.attr("title", title);
+                    analysisTasksSpan.show()
+                } else {
+                    analysisTasksSpan.hide()
+                }
+            }
+
+            $.ajax({
+                type: "GET",
+                url: this.task_status_url,
+                success: on_task_status_success_function,
+            });
+        }
 	};
 
 	this.process_nodes = function(nodeStatusList) {

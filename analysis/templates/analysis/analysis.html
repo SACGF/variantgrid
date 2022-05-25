@@ -57,6 +57,18 @@
         font-weight: bold;
     }
 
+    #analysis-tasks {
+        display: none;
+    }
+
+    #analysis-tasks-active {
+        color: #00aa00;
+    }
+
+    #analysis-tasks-queued {
+        color: #5e5e5e;
+    }
+
 	{% render_rgb_css 'node-count-' node_count_colors %}
     {% render_node_count_colors_css %}
 </style>
@@ -75,7 +87,7 @@
     // We reset the timeout, so only save after a period of inactivity
 	var panelResizeTimeout;
 	var panelResizeUpdateDelay = 150;
-	messagePoller = new AnalysisMessagePoller(Urls.nodes_status(ANALYSIS_ID));
+	messagePoller = new AnalysisMessagePoller(Urls.nodes_status(ANALYSIS_ID), Urls.nodes_tasks(ANALYSIS_ID));
 
 	var secondWindow; // set to window in dual screen mode
 	var saveSettingsOnResize = true;
@@ -232,6 +244,11 @@
                     {% endif %}
                     </div>
                     <span id="analysis-genome-build">{{ analysis.genome_build }}</span>
+                    <span id="analysis-tasks">
+                        Jobs:
+                        <span id="analysis-tasks-active"></span>
+                        <span id="analysis-tasks-queued"></span>
+                    </span>
                 </div>
 
             <div id="analysis-container" class="ui-layout-center">
