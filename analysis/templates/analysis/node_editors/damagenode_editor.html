@@ -55,10 +55,20 @@
         accordionForm(damageForm);
 
         setupSlider($("#id_splice_min"), $("#splice-slider"), $("input#enable-splice"));
-        setupSlider($("#id_cadd_score_min"), $("#cadd-slider"), $("input#enable-cadd"));
-        setupSlider($("#id_revel_score_min"), $("#revel-slider"), $("input#enable-revel"));
         setupSlider($("#id_cosmic_count_min"), $("#cosmic-count-slider"), $("input#enable-cosmic-count"));
-        setupSlider($("#id_damage_predictions_min"), $("#damage-predictions-min-slider"), $("input#damage-predictions-min"));
+        setupSlider($("#id_damage_predictions_min"), $("#damage-predictions-min-slider"), $("input#enable-damage-predictions"));
+
+        {% if node.columns_version == 1 %}
+            setupSlider($("#id_cadd_score_min"), $("#cadd-slider"), $("input#enable-cadd"));
+            setupSlider($("#id_revel_score_min"), $("#revel-slider"), $("input#enable-revel"));
+        {% elif node.columns_version == 2 %}
+        setupSlider($("#id_bayesdel_noaf_rankscore_min"), $("#bayesdel_noaf_rankscore-slider"), $("input#enable-bayesdel_noaf_rankscore"));
+        setupSlider($("#id_cadd_raw_rankscore_min"), $("#cadd_raw_rankscore-slider"), $("input#enable-cadd_raw_rankscore"));
+        setupSlider($("#id_clinpred_rankscore_min"), $("#clinpred_rankscore-slider"), $("input#enable-clinpred_rankscore"));
+        setupSlider($("#id_metalr_rankscore_min"), $("#metalr_rankscore-slider"), $("input#enable-metalr_rankscore"));
+        setupSlider($("#id_revel_rankscore_min"), $("#revel_rankscore-slider"), $("input#enable-revel_rankscore"));
+        setupSlider($("#id_vest4_rankscore_min"), $("#vest4_rankscore-slider"), $("input#enable-vest4_rankscore"));
+        {% endif %}
 
         if (showRequiredFilter) {
             $(".filter-required").show();
@@ -114,12 +124,13 @@
                 <td class="collapse filter-required">{{ form.splice_allow_null }}</td>
             </tr>
             <tr>
-                <th>{{ form.cadd_score_min.label }}</th>
-                <td>{{ form.cadd_score_min.errors }}
-                    <input id="enable-cadd" title="Enable CADD slider" class="enable-slider" type="checkbox" />
+                <th>{{ form.damage_predictions_min.label }}</th>
+                <td>
+                    {{ form.damage_predictions_min.errors }}
+                    <input id="enable-damage-predictions" title="Enable Damage Predictions slider" class="enable-slider" type="checkbox" />
                     <span class='slider-container'>
                         <div class="display-flex">
-                            <div id="cadd-slider" class='slider'></div>
+                            <div id="damage-predictions-min-slider" class='slider'></div>
                             <div class='label slider-value'></div>
                         </div>
                         <div class='slider-labels'>
@@ -128,29 +139,156 @@
                         </div>
                     </span>
                 </td>
-                <td class="collapse filter-required">{{ form.cadd_score_required }}</td>
-                <td class="collapse filter-required">{{ form.cadd_score_allow_null }}</td>
+                <td class="collapse filter-required">{{ form.damage_predictions_required }}</td>
+                <td class="collapse filter-required">{{ form.damage_predictions_allow_null }}</td>
             </tr>
-
-            <tr>
-                <th>{{ form.revel_score_min.label }}</th>
-                <td>{{ form.revel_score_min.errors }}
-                    <input id="enable-revel"  title="Enable Revel slider" class="enable-slider" type="checkbox" />
-                    <span class='slider-container'>
-                        <div class="display-flex">
-                            <div id="revel-slider" class='slider'></div>
-                            <div class='label slider-value'></div>
-                        </div>
-                        <div class='slider-labels'>
-                            <span class='label min-value left'></span>
-                            <span class='label max-value right'></span>
-                        </div>
-                    </span>
-                </td>
-                <td class="collapse filter-required">{{ form.revel_score_required }}</td>
-                <td class="collapse filter-required">{{ form.revel_score_allow_null }}</td>
-            </tr>
-
+            {% if node.columns_version == 1 %}
+                <tr>
+                    <th>{{ form.cadd_score_min.label }}</th>
+                    <td>{{ form.cadd_score_min.errors }}
+                        <input id="enable-cadd" title="Enable CADD slider" class="enable-slider" type="checkbox" />
+                        <span class='slider-container'>
+                            <div class="display-flex">
+                                <div id="cadd-slider" class='slider'></div>
+                                <div class='label slider-value'></div>
+                            </div>
+                            <div class='slider-labels'>
+                                <span class='label min-value left'></span>
+                                <span class='label max-value right'></span>
+                            </div>
+                        </span>
+                    </td>
+                    <td class="collapse filter-required">{{ form.cadd_score_required }}</td>
+                    <td class="collapse filter-required">{{ form.cadd_score_allow_null }}</td>
+                </tr>
+                <tr>
+                    <th>{{ form.revel_score_min.label }}</th>
+                    <td>{{ form.revel_score_min.errors }}
+                        <input id="enable-revel"  title="Enable Revel slider" class="enable-slider" type="checkbox" />
+                        <span class='slider-container'>
+                            <div class="display-flex">
+                                <div id="revel-slider" class='slider'></div>
+                                <div class='label slider-value'></div>
+                            </div>
+                            <div class='slider-labels'>
+                                <span class='label min-value left'></span>
+                                <span class='label max-value right'></span>
+                            </div>
+                        </span>
+                    </td>
+                    <td class="collapse filter-required">{{ form.revel_score_required }}</td>
+                    <td class="collapse filter-required">{{ form.revel_score_allow_null }}</td>
+                </tr>
+            {% elif node.columns_version == 2 %}
+                <tr>
+                    <th>{{ form.bayesdel_noaf_rankscore_min.label }}</th>
+                    <td>{{ form.bayesdel_noaf_rankscore_min.errors }}
+                        <input id="enable-bayesdel_noaf_rankscore"  title="Enable BayesDel slider" class="enable-slider" type="checkbox" />
+                        <span class='slider-container'>
+                            <div class="display-flex">
+                                <div id="bayesdel_noaf_rankscore-slider" class='slider'></div>
+                                <div class='label slider-value'></div>
+                            </div>
+                            <div class='slider-labels'>
+                                <span class='label min-value left'></span>
+                                <span class='label max-value right'></span>
+                            </div>
+                        </span>
+                    </td>
+                    <td class="collapse filter-required">{{ form.bayesdel_noaf_rankscore_required }}</td>
+                    <td class="collapse filter-required">{{ form.bayesdel_noaf_rankscore_allow_null }}</td>
+                </tr>
+                <tr>
+                    <th>{{ form.cadd_raw_rankscore_min.label }}</th>
+                    <td>{{ form.cadd_raw_rankscore_min.errors }}
+                        <input id="enable-cadd_raw_rankscore"  title="Enable CADD slider" class="enable-slider" type="checkbox" />
+                        <span class='slider-container'>
+                            <div class="display-flex">
+                                <div id="cadd_raw_rankscore-slider" class='slider'></div>
+                                <div class='label slider-value'></div>
+                            </div>
+                            <div class='slider-labels'>
+                                <span class='label min-value left'></span>
+                                <span class='label max-value right'></span>
+                            </div>
+                        </span>
+                    </td>
+                    <td class="collapse filter-required">{{ form.cadd_raw_rankscore_required }}</td>
+                    <td class="collapse filter-required">{{ form.cadd_raw_rankscore_allow_null }}</td>
+                </tr>
+                <tr>
+                    <th>{{ form.clinpred_rankscore_min.label }}</th>
+                    <td>{{ form.clinpred_rankscore_min.errors }}
+                        <input id="enable-clinpred_rankscore"  title="Enable ClinPRed slider" class="enable-slider" type="checkbox" />
+                        <span class='slider-container'>
+                            <div class="display-flex">
+                                <div id="clinpred_rankscore-slider" class='slider'></div>
+                                <div class='label slider-value'></div>
+                            </div>
+                            <div class='slider-labels'>
+                                <span class='label min-value left'></span>
+                                <span class='label max-value right'></span>
+                            </div>
+                        </span>
+                    </td>
+                    <td class="collapse filter-required">{{ form.clinpred_rankscore_required }}</td>
+                    <td class="collapse filter-required">{{ form.clinpred_rankscore_allow_null }}</td>
+                </tr>
+                <tr>
+                    <th>{{ form.metalr_rankscore_min.label }}</th>
+                    <td>{{ form.metalr_rankscore_min.errors }}
+                        <input id="enable-metalr-rankscore"  title="Enable MetaLR slider" class="enable-slider" type="checkbox" />
+                        <span class='slider-container'>
+                            <div class="display-flex">
+                                <div id="metalr_rankscore-slider" class='slider'></div>
+                                <div class='label slider-value'></div>
+                            </div>
+                            <div class='slider-labels'>
+                                <span class='label min-value left'></span>
+                                <span class='label max-value right'></span>
+                            </div>
+                        </span>
+                    </td>
+                    <td class="collapse filter-required">{{ form.metalr_rankscore_required }}</td>
+                    <td class="collapse filter-required">{{ form.metalr_rankscore_allow_null }}</td>
+                </tr>
+                <tr>
+                    <th>{{ form.revel_rankscore_min.label }}</th>
+                    <td>{{ form.revel_rankscore_min.errors }}
+                        <input id="enable-revel_rankscore"  title="Enable Revel Rankscore slider" class="enable-slider" type="checkbox" />
+                        <span class='slider-container'>
+                            <div class="display-flex">
+                                <div id="revel_rankscore-slider" class='slider'></div>
+                                <div class='label slider-value'></div>
+                            </div>
+                            <div class='slider-labels'>
+                                <span class='label min-value left'></span>
+                                <span class='label max-value right'></span>
+                            </div>
+                        </span>
+                    </td>
+                    <td class="collapse filter-required">{{ form.revel_rankscore_required }}</td>
+                    <td class="collapse filter-required">{{ form.revel_rankscore_allow_null }}</td>
+                </tr>
+                <tr>
+                    <th>{{ form.vest4_rankscore_min.label }}</th>
+                    <td>{{ form.vest4_rankscore_min.errors }}
+                        <input id="enable-vest4_rankscore"  title="Enable VEST4 Rankscore slider" class="enable-slider" type="checkbox" />
+                        <span class='slider-container'>
+                            <div class="display-flex">
+                                <div id="vest4_rankscore-slider" class='slider'></div>
+                                <div class='label slider-value'></div>
+                            </div>
+                            <div class='slider-labels'>
+                                <span class='label min-value left'></span>
+                                <span class='label max-value right'></span>
+                            </div>
+                        </span>
+                    </td>
+                    <td class="collapse filter-required">{{ form.vest4_rankscore_required }}</td>
+                    <td class="collapse filter-required">{{ form.vest4_rankscore_allow_null }}</td>
+                </tr>
+            {% endif %}
             <tr>
                 <th>{{ form.cosmic_count_min.label }}</th>
                 <td>{{ form.cosmic_count_min.errors }}
@@ -170,25 +308,20 @@
                 <td class="collapse filter-required"> <!-- cosmic_count is non-nullable --> </td>
             </tr>
 
-            <tr>
-                <th>{{ form.damage_predictions_min.label }}</th>
-                <td>
-                    {{ form.damage_predictions_min.errors }}
-                    <input id="damage-predictions-min" title="Enable Damage Predictions slider" class="enable-slider" type="checkbox" />
-                    <span class='slider-container'>
-                        <div class="display-flex">
-                            <div id="damage-predictions-min-slider" class='slider'></div>
-                            <div class='label slider-value'></div>
-                        </div>
-                        <div class='slider-labels'>
-                            <span class='label min-value left'></span>
-                            <span class='label max-value right'></span>
-                        </div>
-                    </span>
-                </td>
-                <td class="collapse filter-required">{{ form.damage_predictions_required }}</td>
-                <td class="collapse filter-required">{{ form.damage_predictions_allow_null }}</td>
-            </tr>
+            {% if node.columns_version == 2 %}
+                <tr>
+                    <th>ALoFT</th>
+                    <td>{{ form.aloft.errors }} {{ form.aloft }}</td>
+                    <td class="collapse filter-required">{{ form.aloft_required }}</td>
+                    <td class="collapse filter-required">{{ form.aloft_allow_null }}</td>
+                </tr>
+                <tr>
+                    <th title="Nonsense Mediated Decay Escaping Variant">NMD Escaping variant</th>
+                    <td>{{ form.nmd_escaping_variant.errors }} {{ form.nmd_escaping_variant }}</td>
+                    <td class="collapse filter-required">{{ form.nmd_escaping_variant_required }}</td>
+                    <td class="collapse filter-required"> <!-- nmd_escaping_variant is non-nullable --> </td>
+                </tr>
+            {% endif %}
 
             <tr>
                 <th>{{ form.protein_domain.label }}</th>
@@ -212,9 +345,14 @@
 	</form>
 
     <div>
-        Note: Damage, CADD and REVEL settings do not filter indels.
+        Note:
+        {% if node.columns_version == 1%}
+            Damage, CADD and REVEL only apply to non-synonymous SNVs (ie not indels or intergenic)
+        {% else %}
+            Pathogenicity predictions only apply to non-synonymous SNVs (ie not indels or intergenic)
+        {% endif %}
         MODERATE* does not include missense variants, so we suggest you use MODERATE* in combination with one or more
-        of the REVEL, CADD or Damage Predictor options to include damaging missense variants.
+        of the Pathogenicity Predictors to include damaging missense variants.
         <a target="_blank" href="{{ help_url }}analysis/nodes.html#{{ node.get_node_class_label|slugify }}">
             See help for details.
         </a>

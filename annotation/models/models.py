@@ -4,7 +4,7 @@ import os
 import re
 from collections import defaultdict
 from datetime import datetime, timedelta
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Callable
 
 from Bio import Entrez
 from Bio.Data.IUPACData import protein_letters_1to3
@@ -404,17 +404,20 @@ class VariantAnnotationVersion(SubVersionPartition):
         """ Often you don't care what annotation version you use, only that variant annotation version is this one """
         return self.annotationversion_set.last()
 
-    def get_functional_prediction_pathogenic_levels(self) -> Dict:
+    def get_pathogenic_prediction_funcs(self) -> Dict[str, Callable]:
         if self.columns_version == 1:
             return {
-                'sift': SIFTPrediction.get_damage_or_greater_levels(),
-                'fathmm_pred_most_damaging': FATHMMPrediction.get_damage_or_greater_levels(),
-                'mutation_assessor_pred_most_damaging': MutationAssessorPrediction.get_damage_or_greater_levels(),
-                'mutation_taster_pred_most_damaging': MutationTasterPrediction.get_damage_or_greater_levels(),
-                'polyphen2_hvar_pred_most_damaging': Polyphen2Prediction.get_damage_or_greater_levels(),
+                'sift': lambda d: d in SIFTPrediction.get_damage_or_greater_levels(),
+                'fathmm_pred_most_damaging': lambda d: d in FATHMMPrediction.get_damage_or_greater_levels(),
+                'mutation_assessor_pred_most_damaging': lambda d: d in MutationAssessorPrediction.get_damage_or_greater_levels(),
+                'mutation_taster_pred_most_damaging': lambda d: d in MutationTasterPrediction.get_damage_or_greater_levels(),
+                'polyphen2_hvar_pred_most_damaging': lambda d: d in Polyphen2Prediction.get_damage_or_greater_levels(),
             }
         elif self.columns_version == 2:
-            return {}  # none used
+            pathogenic_rankscore = 0.85
+            pathogenic_prediction_columns = ['bayesdel_noaf_rankscore', 'cadd_raw_rankscore', 'clinpred_rankscore',
+                                             'revel_rankscore', 'metalr_rankscore', 'vest4_rankscore']
+            return {c: lambda d: d >= pathogenic_rankscore for c in pathogenic_prediction_columns}
         raise ValueError(f"Don't know fields for {self.columns_version=}")
 
     @lazy

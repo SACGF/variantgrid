@@ -5,10 +5,18 @@ from typing import Optional
 
 from django.db import models
 from django.db.models.query_utils import Q
+from lazy import lazy
 
 from analysis.models.nodes.analysis_node import AnalysisNode
-from annotation.models.damage_enums import PathogenicityImpact
+from annotation.models.damage_enums import PathogenicityImpact, ALoFTPrediction
 from annotation.models.models import VariantAnnotation
+
+
+class ALoFTPredictionOptions(models.TextChoices):
+    """ Slightly different options in dropdown from annotation values """
+    DAMAGING = "a", "Recessive / Dominant"
+    RECESSIVE = ALoFTPrediction.RECESSIVE, "Recessive"
+    DOMINANT = ALoFTPrediction.DOMINANT, "Dominant"
 
 
 class DamageNode(AnalysisNode):
@@ -19,6 +27,20 @@ class DamageNode(AnalysisNode):
     splice_required = models.BooleanField(default=False)
     splice_allow_null = models.BooleanField(default=True)
 
+    cosmic_count_min = models.IntegerField(null=True, blank=True)
+    cosmic_count_required = models.BooleanField(default=False)
+
+    protein_domain = models.BooleanField(default=False)
+    protein_domain_required = models.BooleanField(default=False)
+
+    published = models.BooleanField(default=False)
+    published_required = models.BooleanField(default=False)
+
+    damage_predictions_min = models.IntegerField(null=True, blank=True)
+    damage_predictions_required = models.BooleanField(default=False)
+    damage_predictions_allow_null = models.BooleanField(default=True)
+
+    # Columns v1
     cadd_score_min = models.IntegerField(null=True, blank=True)
     cadd_score_required = models.BooleanField(default=False)
     cadd_score_allow_null = models.BooleanField(default=True)
@@ -27,27 +49,65 @@ class DamageNode(AnalysisNode):
     revel_score_required = models.BooleanField(default=False)
     revel_score_allow_null = models.BooleanField(default=True)
 
-    cosmic_count_min = models.IntegerField(null=True, blank=True)
-    cosmic_count_required = models.BooleanField(default=False)
+    # Columns v2
+    bayesdel_noaf_rankscore_min = models.FloatField(null=True, blank=True)
+    bayesdel_noaf_rankscore_required = models.BooleanField(default=False)
+    bayesdel_noaf_rankscore_allow_null = models.BooleanField(default=True)
 
-    damage_predictions_min = models.IntegerField(null=True, blank=True)
-    damage_predictions_required = models.BooleanField(default=False)
-    damage_predictions_allow_null = models.BooleanField(default=True)
+    cadd_raw_rankscore_min = models.FloatField(null=True, blank=True)
+    cadd_raw_rankscore_required = models.BooleanField(default=False)
+    cadd_raw_rankscore_allow_null = models.BooleanField(default=True)
 
-    protein_domain = models.BooleanField(default=False)
-    protein_domain_required = models.BooleanField(default=False)
+    clinpred_rankscore_min = models.FloatField(null=True, blank=True)
+    clinpred_rankscore_required = models.BooleanField(default=False)
+    clinpred_rankscore_allow_null = models.BooleanField(default=True)
 
-    published = models.BooleanField(default=False)
-    published_required = models.BooleanField(default=False)
+    metalr_rankscore_min = models.FloatField(null=True, blank=True)
+    metalr_rankscore_required = models.BooleanField(default=False)
+    metalr_rankscore_allow_null = models.BooleanField(default=True)
+
+    revel_rankscore_min = models.FloatField(null=True, blank=True)
+    revel_rankscore_required = models.BooleanField(default=False)
+    revel_rankscore_allow_null = models.BooleanField(default=True)
+
+    vest4_rankscore_min = models.FloatField(null=True, blank=True)
+    vest4_rankscore_required = models.BooleanField(default=False)
+    vest4_rankscore_allow_null = models.BooleanField(default=True)
+
+    nmd_escaping_variant = models.BooleanField(default=False)
+    nmd_escaping_variant_required = models.BooleanField(default=False)
+
+    aloft = models.CharField(max_length=1, choices=ALoFTPredictionOptions.choices, null=True, blank=True)
+    aloft_required = models.BooleanField(default=False)
+    aloft_allow_null = models.BooleanField(default=True)
 
     def modifies_parents(self):
-        return any([self.impact_min, self.splice_min, self.cadd_score_min, self.revel_score_min,
-                    self.cosmic_count_min, self.damage_predictions_min, self.protein_domain, self.published])
+        _ALL_VERSIONS = [self.impact_min, self.splice_min, self.cosmic_count_min, self.damage_predictions_min,
+                         self.protein_domain, self.published]
+        _COLUMNS_VERSION = {
+            1: [self.cadd_score_min, self.revel_score_min, ],
+            2: [self.bayesdel_noaf_rankscore_min, self.cadd_raw_rankscore_min, self.clinpred_rankscore_min,
+                self.metalr_rankscore_min, self.revel_rankscore_min, self.vest4_rankscore_min,
+                self.nmd_escaping_variant, self.aloft],
+        }
+        modifiers = _ALL_VERSIONS + _COLUMNS_VERSION.get(self.columns_version, [])
+        return any(modifiers)
 
     def has_required(self):
-        return any([self.impact_required, self.splice_required, self.cadd_score_required, self.revel_score_required,
-                    self.cosmic_count_required, self.damage_predictions_required,
-                    self.protein_domain_required, self.published_required])
+        _ALL_VERSIONS = [self.impact_required, self.splice_required, self.cosmic_count_required,
+                         self.damage_predictions_required, self.protein_domain_required, self.published_required]
+        _COLUMNS_VERSION = {
+            1: [self.cadd_score_required, self.revel_score_required],
+            2: [self.bayesdel_noaf_rankscore_required, self.cadd_raw_rankscore_required,
+                self.clinpred_rankscore_required, self.metalr_rankscore_required, self.revel_rankscore_required,
+                self.vest4_rankscore_required, self.nmd_escaping_variant_required, self.aloft_required],
+        }
+        required = _ALL_VERSIONS + _COLUMNS_VERSION.get(self.columns_version, [])
+        return any(required)
+
+    @lazy
+    def columns_version(self):
+        return self.analysis.annotation_version.variant_annotation_version.columns_version
 
     def _get_node_q(self) -> Optional[Q]:
         or_filters = []
@@ -88,30 +148,56 @@ class DamageNode(AnalysisNode):
             else:
                 or_filters.append(q_splicing)
 
-        if self.cadd_score_min is not None:
-            q_cadd = Q(variantannotation__cadd_phred__gte=self.cadd_score_min)
-            if self.cadd_score_required:
-                if self.cadd_score_allow_null:
-                    q_cadd |= Q(variantannotation__cadd_phred__isnull=True)
-                and_filters.append(q_cadd)
-            else:
-                or_filters.append(q_cadd)
+        if self.columns_version == 1:
+            if self.cadd_score_min is not None:
+                q_cadd = Q(variantannotation__cadd_phred__gte=self.cadd_score_min)
+                if self.cadd_score_required:
+                    if self.cadd_score_allow_null:
+                        q_cadd |= Q(variantannotation__cadd_phred__isnull=True)
+                    and_filters.append(q_cadd)
+                else:
+                    or_filters.append(q_cadd)
 
-        if self.revel_score_min:
-            q_revel = Q(variantannotation__revel_score__gte=self.revel_score_min)
-            if self.revel_score_required:
-                if self.revel_score_allow_null:
-                    q_revel |= Q(variantannotation__revel_score__isnull=True)
-                and_filters.append(q_revel)
-            else:
-                or_filters.append(q_revel)
+            if self.revel_score_min:
+                q_revel = Q(variantannotation__revel_score__gte=self.revel_score_min)
+                if self.revel_score_required:
+                    if self.revel_score_allow_null:
+                        q_revel |= Q(variantannotation__revel_score__isnull=True)
+                    and_filters.append(q_revel)
+                else:
+                    or_filters.append(q_revel)
+        elif self.columns_version == 2:
+            # Rank score path predictors
+            vav = self.analysis.annotation_version.variant_annotation_version
+            for path_prediction in vav.get_pathogenic_prediction_funcs():
+                if score_min := getattr(self, path_prediction, None):
+                    q_path = Q(**{f"variantannotation__{path_prediction}__gte": score_min})
+                    if getattr(self, f"{path_prediction}_required"):
+                        if getattr(self, f"{path_prediction}_allow_null"):
+                            q_path |= Q(**{f"variantannotation__{path_prediction}__isnull": True})
+                        and_filters.append(q_path)
+                    else:
+                        or_filters.append(q_path)
 
-        if self.cosmic_count_min is not None:
-            q_cosmic_count = Q(variantannotation__cosmic_count__gte=self.cosmic_count_min)
-            if self.cosmic_count_required:
-                and_filters.append(q_cosmic_count)
-            else:
-                or_filters.append(q_cosmic_count)
+            if self.nmd_escaping_variant:
+                q_nmd = Q(variantannotation__nmd_escaping_variant=self.nmd_escaping_variant)
+                if self.nmd_escaping_variant_required:
+                    and_filters.append(q_nmd)
+                else:
+                    or_filters.append(q_nmd)
+
+            if self.aloft:
+                q_aloft = Q(variantannotation__aloft_high_confidence=True)
+                ALOFT_OPTIONS = {
+                    ALoFTPredictionOptions.DAMAGING: [ALoFTPrediction.RECESSIVE, ALoFTPrediction.DOMINANT],
+                }
+                q_aloft &= Q(variantannotation__aloft_pred__in=ALOFT_OPTIONS.get(self.aloft, [self.aloft]))
+                if self.aloft_required:
+                    if self.aloft_allow_null:
+                        q_aloft |= Q(variantannotation__aloft_pred__isnull=True)
+                    and_filters.append(q_aloft)
+                else:
+                    or_filters.append(q_aloft)
 
         if self.damage_predictions_min is not None:
             q_damage = Q(variantannotation__predictions_num_pathogenic__gte=self.damage_predictions_min)
@@ -122,6 +208,13 @@ class DamageNode(AnalysisNode):
                 and_filters.append(q_damage)
             else:
                 or_filters.append(q_damage)
+
+        if self.cosmic_count_min is not None:
+            q_cosmic_count = Q(variantannotation__cosmic_count__gte=self.cosmic_count_min)
+            if self.cosmic_count_required:
+                and_filters.append(q_cosmic_count)
+            else:
+                or_filters.append(q_cosmic_count)
 
         if self.protein_domain:
             protein_domains_fields_or = []
@@ -159,7 +252,7 @@ class DamageNode(AnalysisNode):
     @property
     def num_prediction_fields(self) -> int:
         vav = self.analysis.annotation_version.variant_annotation_version
-        return len(vav.get_functional_prediction_pathogenic_levels())
+        return len(vav.get_pathogenic_prediction_funcs())
 
     def _get_method_summary(self):
         if self.modifies_parents():

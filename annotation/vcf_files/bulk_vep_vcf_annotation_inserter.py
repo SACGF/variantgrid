@@ -211,7 +211,7 @@ class BulkVEPVCFAnnotationInserter:
                 logging.warning("Skipping custom %s due to missing settings", cvf.vep_info_field)
 
         vav = self.annotation_run.variant_annotation_version
-        self.prediction_pathogenic_values = vav.get_functional_prediction_pathogenic_levels()
+        self.prediction_pathogenic_funcs = vav.get_pathogenic_prediction_funcs()
 
     def _setup_vep_fields_and_db_columns(self, validate_columns):
         self._add_vep_field_handlers()
@@ -395,16 +395,16 @@ class BulkVEPVCFAnnotationInserter:
 
     def _add_calculated_num_predictions(self, transcript_data):
         num_pathogenic = 0
-        num_benign = 0
-        for field, path_values in self.prediction_pathogenic_values.items():
+        num_not_pathogenic = 0
+        for field, path_func in self.prediction_pathogenic_funcs.items():
             value = transcript_data.get(field)
             if value is not None:
-                if value in path_values:
+                if path_func(value):
                     num_pathogenic += 1
                 else:
-                    num_benign += 1
+                    num_not_pathogenic += 1
         transcript_data["predictions_num_pathogenic"] = num_pathogenic
-        transcript_data["predictions_num_benign"] = num_benign
+        transcript_data["predictions_num_benign"] = num_not_pathogenic
 
     @staticmethod
     def _add_calculated_maxentscan(transcript_data):
