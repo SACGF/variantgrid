@@ -33,9 +33,14 @@
         height: 25px;
 		margin-left: 15px;
 	}
+
+	.individual-pathogenic-prediction {
+	    display: none;
+	}
 </style>
 <script>
     var showRequiredFilter = {{ node.has_required | jsonify }};
+    var hasIndividualPathogenicPredictions = {{ node.has_individual_pathogenic_predictions | jsonify }};
 
     function toggleRequiredFilter() {
         showRequiredFilter = !showRequiredFilter;
@@ -47,6 +52,11 @@
             let frInputs = $("input", ".filter-required");
             frInputs.prop("checked", false);
         }
+    }
+
+    function showIndividualPathogenicPredictions() {
+        $(".individual-pathogenic-prediction").show();
+        $("#show-individual-pathogenic-prediction").hide();
     }
 
     $(document).ready(function() {
@@ -72,6 +82,9 @@
 
         if (showRequiredFilter) {
             $(".filter-required").show();
+        }
+        if (hasIndividualPathogenicPredictions) {
+            showIndividualPathogenicPredictions();
         }
     });
 </script>
@@ -124,7 +137,11 @@
                 <td class="collapse filter-required">{{ form.splice_allow_null }}</td>
             </tr>
             <tr>
-                <th>{{ form.damage_predictions_min.label }}</th>
+                <th>{{ form.damage_predictions_min.label }}
+                    <span class="hover-detail" data-toggle="tooltip"
+                          title="{{ node.damage_predictions_description }}">
+                    <i class="far fa-question-circle"></i></span>
+                </th>
                 <td>
                     {{ form.damage_predictions_min.errors }}
                     <input id="enable-damage-predictions" title="Enable Damage Predictions slider" class="enable-slider" type="checkbox" />
@@ -142,8 +159,15 @@
                 <td class="collapse filter-required">{{ form.damage_predictions_required }}</td>
                 <td class="collapse filter-required">{{ form.damage_predictions_allow_null }}</td>
             </tr>
+            <tr id="show-individual-pathogenic-prediction">
+                <td colspan="2">
+                    <a class="hover-link" href="javascript:showIndividualPathogenicPredictions()">Show Individual Pathogenic Predictions</a>
+                </td>
+                <td></td>
+                <td></td>
+            </tr>
             {% if node.columns_version == 1 %}
-                <tr>
+                <tr class="individual-pathogenic-prediction">
                     <th>{{ form.cadd_score_min.label }}</th>
                     <td>{{ form.cadd_score_min.errors }}
                         <input id="enable-cadd" title="Enable CADD slider" class="enable-slider" type="checkbox" />
@@ -161,7 +185,7 @@
                     <td class="collapse filter-required">{{ form.cadd_score_required }}</td>
                     <td class="collapse filter-required">{{ form.cadd_score_allow_null }}</td>
                 </tr>
-                <tr>
+                <tr class="individual-pathogenic-prediction">
                     <th>{{ form.revel_score_min.label }}</th>
                     <td>{{ form.revel_score_min.errors }}
                         <input id="enable-revel"  title="Enable Revel slider" class="enable-slider" type="checkbox" />
@@ -180,7 +204,7 @@
                     <td class="collapse filter-required">{{ form.revel_score_allow_null }}</td>
                 </tr>
             {% elif node.columns_version == 2 %}
-                <tr>
+                <tr class="individual-pathogenic-prediction">
                     <th>{{ form.bayesdel_noaf_rankscore_min.label }}</th>
                     <td>{{ form.bayesdel_noaf_rankscore_min.errors }}
                         <input id="enable-bayesdel_noaf_rankscore"  title="Enable BayesDel slider" class="enable-slider" type="checkbox" />
@@ -198,7 +222,7 @@
                     <td class="collapse filter-required">{{ form.bayesdel_noaf_rankscore_required }}</td>
                     <td class="collapse filter-required">{{ form.bayesdel_noaf_rankscore_allow_null }}</td>
                 </tr>
-                <tr>
+                <tr class="individual-pathogenic-prediction">
                     <th>{{ form.cadd_raw_rankscore_min.label }}</th>
                     <td>{{ form.cadd_raw_rankscore_min.errors }}
                         <input id="enable-cadd_raw_rankscore"  title="Enable CADD slider" class="enable-slider" type="checkbox" />
@@ -216,7 +240,7 @@
                     <td class="collapse filter-required">{{ form.cadd_raw_rankscore_required }}</td>
                     <td class="collapse filter-required">{{ form.cadd_raw_rankscore_allow_null }}</td>
                 </tr>
-                <tr>
+                <tr class="individual-pathogenic-prediction">
                     <th>{{ form.clinpred_rankscore_min.label }}</th>
                     <td>{{ form.clinpred_rankscore_min.errors }}
                         <input id="enable-clinpred_rankscore"  title="Enable ClinPRed slider" class="enable-slider" type="checkbox" />
@@ -234,7 +258,7 @@
                     <td class="collapse filter-required">{{ form.clinpred_rankscore_required }}</td>
                     <td class="collapse filter-required">{{ form.clinpred_rankscore_allow_null }}</td>
                 </tr>
-                <tr>
+                <tr class="individual-pathogenic-prediction">
                     <th>{{ form.metalr_rankscore_min.label }}</th>
                     <td>{{ form.metalr_rankscore_min.errors }}
                         <input id="enable-metalr-rankscore"  title="Enable MetaLR slider" class="enable-slider" type="checkbox" />
@@ -252,7 +276,7 @@
                     <td class="collapse filter-required">{{ form.metalr_rankscore_required }}</td>
                     <td class="collapse filter-required">{{ form.metalr_rankscore_allow_null }}</td>
                 </tr>
-                <tr>
+                <tr class="individual-pathogenic-prediction">
                     <th>{{ form.revel_rankscore_min.label }}</th>
                     <td>{{ form.revel_rankscore_min.errors }}
                         <input id="enable-revel_rankscore"  title="Enable Revel Rankscore slider" class="enable-slider" type="checkbox" />
@@ -270,7 +294,7 @@
                     <td class="collapse filter-required">{{ form.revel_rankscore_required }}</td>
                     <td class="collapse filter-required">{{ form.revel_rankscore_allow_null }}</td>
                 </tr>
-                <tr>
+                <tr class="individual-pathogenic-prediction">
                     <th>{{ form.vest4_rankscore_min.label }}</th>
                     <td>{{ form.vest4_rankscore_min.errors }}
                         <input id="enable-vest4_rankscore"  title="Enable VEST4 Rankscore slider" class="enable-slider" type="checkbox" />

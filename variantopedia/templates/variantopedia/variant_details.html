@@ -4,6 +4,7 @@
 {% load fieldset_tags %}
 {% load ui_utils %}
 {% load ui_help %}
+{% load settings_tags %}
 <script>
     $(document).ready(function() {
         Flags.instance.init({userId: '{{user.id}}'});
@@ -42,18 +43,23 @@ function gnomadGeneConstraintRetrieval(content) {
     return retrievalSummary;
 }
 
+var pathogenicity_rankscore_threshold = [
+    {% settings_value 'ANNOTATION_MAX_BENIGN_RANKSCORE' %},
+    {% settings_value 'ANNOTATION_MIN_PATHOGENIC_RANKSCORE' %}
+]
+
 var CODE_THRESHOLDS = {
     "revel_score": [0.15, 0.75],
     "cadd_phred": [10, 20],
     "grantham": [57, 105],
     "gerp_pp_rs": [0, 3],
     //
-    "cadd_raw_rankscore": [0.15, 0.85],
-    "revel_rankscore": [0.15, 0.85],
-    "bayesdel_noaf_rankscore": [0.15, 0.85],
-    "clinpred_rankscore": [0.15, 0.85],
-    "vest4_rankscore": [0.15, 0.85],
-    "metalr_rankscore": [0.15, 0.85],
+    "cadd_raw_rankscore": pathogenicity_rankscore_threshold,
+    "revel_rankscore": pathogenicity_rankscore_threshold,
+    "bayesdel_noaf_rankscore": pathogenicity_rankscore_threshold,
+    "clinpred_rankscore": pathogenicity_rankscore_threshold,
+    "vest4_rankscore": pathogenicity_rankscore_threshold,
+    "metalr_rankscore": pathogenicity_rankscore_threshold,
     "maxentscan_percent_diff_ref": [-150, -70, 70, 150],
     "phastcons_100_way_vertebrate": [0.85],
     "phastcons_46_way_mammalian": [0.85],

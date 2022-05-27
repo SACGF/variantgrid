@@ -93,7 +93,7 @@ class DamageNode(AnalysisNode):
         modifiers = _ALL_VERSIONS + _COLUMNS_VERSION.get(self.columns_version, [])
         return any(modifiers)
 
-    def has_required(self):
+    def has_required(self) -> bool:
         _ALL_VERSIONS = [self.impact_required, self.splice_required, self.cosmic_count_required,
                          self.damage_predictions_required, self.protein_domain_required, self.published_required]
         _COLUMNS_VERSION = {
@@ -104,6 +104,18 @@ class DamageNode(AnalysisNode):
         }
         required = _ALL_VERSIONS + _COLUMNS_VERSION.get(self.columns_version, [])
         return any(required)
+
+    def has_individual_pathogenic_predictions(self) -> bool:
+        _COLUMNS_VERSION = {
+            1: [self.cadd_score_min, self.revel_score_min, ],
+            2: [self.bayesdel_noaf_rankscore_min, self.cadd_raw_rankscore_min, self.clinpred_rankscore_min,
+                self.metalr_rankscore_min, self.revel_rankscore_min, self.vest4_rankscore_min],
+        }
+        pathogenic_predictions = _COLUMNS_VERSION.get(self.columns_version, [])
+        return any(pathogenic_predictions)
+
+    def damage_predictions_description(self) -> str:
+        return self.analysis.annotation_version.variant_annotation_version.damage_predictions_description
 
     @lazy
     def columns_version(self):

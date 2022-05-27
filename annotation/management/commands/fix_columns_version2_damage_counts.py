@@ -1,6 +1,7 @@
 import operator
 from functools import reduce
 
+from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.db.models import Case, Value, IntegerField, When, Q, Sum, F
 
@@ -9,7 +10,7 @@ from annotation.models import VariantAnnotationVersion, VariantAnnotation
 
 class Command(BaseCommand):
     def handle(self, *args, **options):
-        pathogenic_rankscore = 0.85
+        pathogenic_rankscore = settings.ANNOTATION_MIN_PATHOGENIC_RANKSCORE
         patho_kwargs = {
             'bayesdel_pathogenic': Case(
                 When(bayesdel_noaf_rankscore__gte=pathogenic_rankscore, then=Value(1)),

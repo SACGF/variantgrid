@@ -414,11 +414,22 @@ class VariantAnnotationVersion(SubVersionPartition):
                 'polyphen2_hvar_pred_most_damaging': lambda d: d in Polyphen2Prediction.get_damage_or_greater_levels(),
             }
         elif self.columns_version == 2:
-            pathogenic_rankscore = 0.85
+            pathogenic_rankscore = settings.ANNOTATION_MIN_PATHOGENIC_RANKSCORE
             pathogenic_prediction_columns = ['bayesdel_noaf_rankscore', 'cadd_raw_rankscore', 'clinpred_rankscore',
                                              'revel_rankscore', 'metalr_rankscore', 'vest4_rankscore']
             return {c: lambda d: d >= pathogenic_rankscore for c in pathogenic_prediction_columns}
         raise ValueError(f"Don't know fields for {self.columns_version=}")
+
+    @lazy
+    def damage_predictions_description(self) -> str:
+        pathogenic_prediction = list(self.get_pathogenic_prediction_funcs())
+        columns = ", ".join(pathogenic_prediction)
+        description = ""
+        if self.columns_version == 1:
+            description = f"Count of {columns} at the most damaging level."
+        elif self.columns_version == 2:
+            description = f"Count of {columns} that exceed {settings.ANNOTATION_MIN_PATHOGENIC_RANKSCORE}"
+        return description
 
     @lazy
     def _vep_config(self) -> Dict:
