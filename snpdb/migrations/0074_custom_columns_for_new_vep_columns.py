@@ -16,6 +16,7 @@ _NEW_COLUMNS = [
     'aloft_prob_dominant',
     'aloft_high_confidence',
     'aloft_ensembl_transcript',
+    'nmd_escaping_variant',
 ]
 
 
@@ -41,7 +42,7 @@ def _custom_columns_for_new_vep_columns(apps, schema_editor):
 def _reverse_custom_columns_for_new_vep_columns(apps, schema_editor):
     CustomColumn = apps.get_model("snpdb", "CustomColumn")
 
-    CustomColumn.objects.filter(column__grid_column_name__in=_NEW_COLUMNS)
+    CustomColumn.objects.filter(column__grid_column_name__in=_NEW_COLUMNS).delete()
 
 
 class Migration(migrations.Migration):
