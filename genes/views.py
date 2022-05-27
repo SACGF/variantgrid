@@ -23,7 +23,7 @@ from lazy import lazy
 
 from analysis.models import VariantTag
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
-from annotation.models.models import AnnotationVersion, Citation, VariantAnnotation
+from annotation.models.models import AnnotationVersion, Citation, VariantAnnotation, VariantAnnotationVersion
 from annotation.models.molecular_consequence_enums import MolecularConsequenceColors
 from classification.enums import ShareLevel
 from classification.models import ClassificationModification, Classification
