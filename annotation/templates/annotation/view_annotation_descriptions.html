@@ -211,18 +211,19 @@
                                         (custom)
                                     {% endif %}
                                 </div>
-                                {% if columnvepfield.min_vep_columns_version or columnvepfield.max_vep_columns_version %}
-                                    <div>
-                                        Note:
-                                        <b>{{ columnvepfield.columns_version_description }}</b> only
-                                    </div>
-                                {% endif %}
-
                             {% endif %}
                             </td>
                             <td>{{ v.description | safe }}
+                            {% if columnvepfield.min_vep_columns_version or columnvepfield.max_vep_columns_version %}
+                                <div>
+                                    Note:
+                                    <b>{{ columnvepfield.columns_version_description }}</b> only
+                                </div>
+                            {% endif %}
                             {% if columnvepfield.vep_plugin == 'd' %}
-                                Note: Values from dbNSFP are calculated for GRCh38 and lifted over to GRCh37.
+                                <div>
+                                Note: Values from dbNSFP are for non-synonymous SNVs only (no indels or intergenic)
+                                </div>
                             {% endif %}
                             </td>
                          </tr>
