@@ -465,6 +465,9 @@ class SampleStatsCodeVersion(TimeStampedModel):
     class Meta:
         unique_together = ("name", "version", "code_git_hash")
 
+    def __str__(self):
+        return f"{self.name} v{self.version}, git: {self.code_git_hash}, {self.created}"
+
 
 class AbstractVariantStats(TimeStampedModel):
     """ Base class used for Cohort/Sample stats (note don't have Cohort stats yet)
