@@ -13,9 +13,26 @@
             <div class="card-header">Unreleased 2022</div>
             <div class="card-body">
                 <ul>
-                {% if url_name_visible.analysis %}
-                    <li>Analysis - new columns: variant wiki, gene wiki (added to all columns)</li>
-                {% endif %}
+                    <li>Annotation - new columns - <a href="https://www.nature.com/articles/s41467-017-00443-5">ALoFT</a>, NMD Escaping Variant</li>
+                    <li>Annotation - VEP (v106), updated Mastermind, COSMIC</li>
+                    <li>Annotation - Pathogenicity Predictions have changed:
+                        <ul>
+                            <li>New columns added: BayesDel (NoAF), CADD (raw), ClinPred, REVEL, MetaLR, VEST4.
+
+                                <p>These are "rankscores" ie scores scaled 0->1 based on all of the scores in non-synonymous SNVs. There is 1 score per variant (not per transcript)</p>
+                                <p>
+                                    Previously, we used levels (eg DAMAGING, BENIGN etc), but these were made by taking genome-wide thresholds, and it has been shown that this varies considerably per-gene.
+                                    We plan on developing further refinements here, eg being able to automatically use this tool/cutoff for these genes, a different tool/cutoff for other genes etc.
+                                </p>
+                            </li>
+                            <li>Old columns removed: FATHMM, Mutation Assessor, Mutation Taster, Polyphen2, CADD Phred, REVEL Score</li>
+                        </ul>
+                    </li>
+                    {% if url_name_visible.analysis %}
+                        <li>Analysis - EffectNode - has been changed to use the new pathogenicity columns, it automatically switches based on the annotation version used.</li>
+                        <li>Analysis - new columns: variant wiki, gene wiki (added to all columns)</li>
+                    {% endif %}
+
                     <li>Bug fixes</li>
                 </ul>
             </div>
