@@ -417,7 +417,7 @@ class VariantAnnotationVersion(SubVersionPartition):
             pathogenic_rankscore = settings.ANNOTATION_MIN_PATHOGENIC_RANKSCORE
             pathogenic_prediction_columns = ['bayesdel_noaf_rankscore', 'cadd_raw_rankscore', 'clinpred_rankscore',
                                              'revel_rankscore', 'metalr_rankscore', 'vest4_rankscore']
-            return {c: lambda d: d >= pathogenic_rankscore for c in pathogenic_prediction_columns}
+            return {c: lambda d: float(d) >= pathogenic_rankscore for c in pathogenic_prediction_columns}
         raise ValueError(f"Don't know fields for {self.columns_version=}")
 
     @lazy
