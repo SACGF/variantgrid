@@ -18,7 +18,7 @@ from classification.views.classification_view import BulkInserter
 
 def sync_shariant_download(sync_destination: SyncDestination, full_sync: bool = False) -> SyncRun:
     config = sync_destination.config
-    shariant = OAuthConnector.shariant_oauth_connector()
+    shariant = OAuthConnector.shariant_oauth_connector(config["sync_details"])
 
     required_build = config.get('genome_build', 'GRCh37')
     params = {'share_level': 'public',
