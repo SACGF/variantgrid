@@ -40,6 +40,6 @@ def setup_postgres(connection, **kwargs):  # pylint: disable=unused-argument
     if connection.vendor != 'postgresql':
         return
 
-    # Timeout statements after 20 minutes.
+    # Timeout statements after 10 minutes.
     with connection.cursor() as cursor:
-        cursor.execute("SET statement_timeout TO 1200000;")
+        cursor.execute("SET statement_timeout TO 600000;")

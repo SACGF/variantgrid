@@ -653,6 +653,14 @@ function setupGrid(config_url, analysisId, nodeId, versionId, unique_code, gridC
                         }
                     }
                 }
+                // You can only have 1 active grid request
+                data["loadBeforeSend"] = function(xhr) {
+                    window.activeGridRequestXHR = xhr;
+                }
+                if (window.activeGridRequestXHR) {
+                    window.activeGridRequestXHR.abort();
+                    window.activeGridRequestXHR = null;
+                }
 
                 const grid = getGrid(nodeId, unique_code);
                 grid.jqGrid(data).navGrid(pagerId,
@@ -708,6 +716,10 @@ function setupGrid(config_url, analysisId, nodeId, versionId, unique_code, gridC
 }
 
 function gridLoadError(jqXHR, textStatus, errorThrown) {
+    if (errorThrown == "abort") {
+        console.log("task aborted...");
+        return; // manually aborted
+    }
     let errorMessage = errorThrown;
     const rj = jqXHR.responseJSON;
     if (rj) {

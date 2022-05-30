@@ -1,9 +1,11 @@
 import logging
 import re
+import time
 from io import StringIO
 from urllib.parse import urlencode
 
 from django.contrib.postgres.aggregates.general import StringAgg
+from django.core.cache import cache
 from django.http.response import Http404, StreamingHttpResponse, HttpResponseRedirect
 from django.urls import reverse
 from django.utils.decorators import method_decorator
@@ -15,7 +17,7 @@ from vcf.model import _Substitution, _Record, make_calldata_tuple, _Call
 from analysis import grids
 from analysis.models import AnalysisNode
 from analysis.views.analysis_permissions import get_node_subclass_or_non_fatal_exception
-from analysis.views.node_json_view import NodeJSONGetView
+from analysis.views.node_json_view import NodeJSONGetView, NodeJSONViewMixin
 from annotation.models import VariantTranscriptAnnotation
 from genes.models import CanonicalTranscriptCollection
 from library.constants import WEEK_SECS
@@ -27,7 +29,28 @@ from snpdb.vcf_export_utils import get_vcf_header_from_contigs
 
 
 @method_decorator([cache_page(WEEK_SECS), vary_on_cookie], name='get')
-class NodeGridHandler(NodeJSONGetView):
+class NodeGridHandler(NodeJSONViewMixin):
+    def get(self, request, *args, **kwargs):
+        """ This can be a really expensive operation (ie a few mins)
+            And users can sometimes click multiple times, causing the DB to get slow running the same query
+            multiple times, interfering with itself - so make a per-user lock, and redirect any further calls
+            which should hopefully hit the cache next time
+        """
+        LOCK_EXPIRE = 60 * 10  # 10 mins
+        url = f"{request.path}?" + urlencode(request.GET.dict())
+        lock_id = f"{url}_{request.user}"
+        if cache.add(lock_id, "true", LOCK_EXPIRE):  # Acquire lock
+            try:
+                logging.info("Got the lock...")
+                response = self.get_response(request, *args, **kwargs)
+            finally:
+                cache.delete(lock_id)  # release lock
+        else:
+            logging.info("Don't have lock - going to sleep then retry...")
+            time.sleep(2)
+            response = HttpResponseRedirect(url)
+        return response
+
     def _get_node(self, request, **kwargs) -> AnalysisNode:
         return _node_from_request(request)
 
@@ -40,7 +63,6 @@ class NodeGridHandler(NodeJSONGetView):
             params = request.GET.dict()
             params.update({"node_id": grid_node_id, "version_id": grid_node_version})
             url += "?" + urlencode(params)
-            logging.warning(url)
             ret = HttpResponseRedirect(url)
         return ret
 
