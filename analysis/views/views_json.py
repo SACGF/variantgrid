@@ -368,25 +368,28 @@ def nodes_status(request, analysis_id):
 @never_cache
 def nodes_tasks(request, analysis_id):
     """ Returns a dict of node tasks states / counts """
-    QUEUE_NAME = 'celery@analysis_workers'
+    NODE_NAME = 'celery@analysis_workers'
     analysis = get_analysis_or_404(request.user, analysis_id)
-    inspect = app.control.inspect([QUEUE_NAME])
-    active = inspect.active()[QUEUE_NAME]
-    active_jobs = {a["id"] for a in active}
+    inspect = app.control.inspect([NODE_NAME])
+    if active := inspect.active():
+        active_jobs = {a["id"] for a in active[NODE_NAME]}
 
-    summary = Counter()
-    node_qs = analysis.analysisnode_set.filter(visible=True, status__in=NodeStatus.LOADING_STATUSES,
-                                               nodetask__version=F("version"))
-    for celery_task in node_qs.values_list("nodetask__celery_task", flat=True):
-        status = "QUEUED"
-        if celery_task:
-            if celery_task in active_jobs:
-                status = "ACTIVE"
-            else:
-                result = AsyncResult(celery_task)
-                status = result.status
-        summary[status] += 1
-    return JsonResponse(dict(summary))
+        summary = Counter()
+        node_qs = analysis.analysisnode_set.filter(visible=True, status__in=NodeStatus.LOADING_STATUSES,
+                                                   nodetask__version=F("version"))
+        for celery_task in node_qs.values_list("nodetask__celery_task", flat=True):
+            status = "QUEUED"
+            if celery_task:
+                if celery_task in active_jobs:
+                    status = "ACTIVE"
+                else:
+                    result = AsyncResult(celery_task)
+                    status = result.status
+            summary[status] += 1
+        data = dict(summary)
+    else:
+        data = {"error": f"No analysis workers found!"}
+    return JsonResponse(data)
 
 
 @require_POST

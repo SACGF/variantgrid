@@ -61,6 +61,10 @@
         display: none;
     }
 
+    #analysis-tasks-error {
+        color: #ff253a;
+    }
+
     #analysis-tasks-active {
         color: #00aa00;
     }
@@ -246,6 +250,7 @@
                     <span id="analysis-genome-build">{{ analysis.genome_build }}</span>
                     <span id="analysis-tasks">
                         Jobs:
+                        <span id="analysis-tasks-error"></span>
                         <span id="analysis-tasks-active"></span>
                         <span id="analysis-tasks-queued"></span>
                     </span>
