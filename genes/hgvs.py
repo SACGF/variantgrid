@@ -907,6 +907,15 @@ class HGVSMatcher:
             return f"{contig}:{g_hgvs}"
         return g_hgvs
 
+    def variant_coordinate_to_g_hgvs(self, variant_coordinate: VariantCoordinate) -> HGVSName:
+        """ So we can convert w/o needing a variant object """
+        (chrom, offset, ref, alt) = variant_coordinate
+        hgvs_name = pyhgvs.variant_to_hgvs_name(chrom, offset, ref, alt, self.genome_build.genome_fasta.fasta,
+                                                transcript=None)
+        contig = self.genome_build.chrom_contig_mappings[variant_coordinate.chrom]
+        hgvs_name.chrom = contig.refseq_accession
+        return hgvs_name
+
     def variant_to_c_hgvs_extra(self, variant: Variant, transcript_name: str) -> HGVSNameExtra:
         if transcript_name:
             return self._variant_to_hgvs_extra(variant, transcript_name)
