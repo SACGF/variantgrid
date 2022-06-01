@@ -76,10 +76,11 @@ span.attach-label {
 
 span.detach-label {
 	position: absolute;
-	top: -5px;
+	top: 0px;
 	left: 0px;
 	width: 18px;
 	height: 18px;
+	line-height: 18px;
 	text-align: center;
 	color: white;
 	font-weight: bold;
@@ -611,11 +612,12 @@ span.gene-list-security {
 #node-count-legend {
 	position: absolute;
 	left: 0px;
-	bottom: 0px;
+	bottom: 10px;
 	cursor: default;
 }
 
 .legend-row {
+	min-height: 20px;
 	margin: 5px;
 }
 

@@ -1,5 +1,4 @@
-{% extends "snpdb/base.html" %}
-{% comment %}Should get to work on extends "uicore/page/base.html"{% endcomment %}
+{% extends "uicore/page/base.html" %}
 {% load static %}
 {% load tz %}
 {% load analysis_node_tags %}
@@ -10,6 +9,7 @@
 <script src="{% static 'js/lib/jquery.jsPlumb-1.4.1-all-min.js' %}"></script>
 <script type="text/javascript" src="{% static 'js/lib/d3.v2.js' %}"></script>
 <script type="text/javascript" src="{% static 'js/lib/multidraggable.js' %}"></script>
+<script src="{% static 'js/lib/jquery-3.3.1/jquery.layout-1.4.4.js' %}"></script>
 
 {% include "analysis/analysis_includes.html" %}
 
@@ -20,7 +20,7 @@
 
 <link rel="stylesheet" href="{% static 'css/nodes.css' %}">
 <link rel="stylesheet" href="{% static 'css/analysis_nodes.css' %}">
-<style type="text/css">
+<style>
     html, body {
         height: 100%;
         min-height: 100%;
@@ -28,12 +28,28 @@
         padding: 0;
     }
 
+    .nav-side-bar {
+        display: none;
+    }
+
+    .main-content {
+        margin-left: 0px;
+        padding-top: 49px;
+    }
+
     #analysis-toolbar {
+        width: 100%;
+        z-index: 9999;
+        position: absolute;
+        top: 0px;
+        left: 0px;
+        border-bottom: 2px solid black;
         padding: 5px;
+        background-color: white;
     }
 
     .ui-layout-pane {
-        padding: 2px;
+        padding: 0px;
         border: 0px;
     }
 
@@ -51,6 +67,11 @@
 
     #analysis-template-version label {
         font-weight: bold;
+    }
+
+    #analysis-info {
+        overflow: visible;
+        white-space: nowrap;
     }
 
     #analysis-genome-build {
@@ -213,7 +234,7 @@
         </div>
     {% endif %}
         <div id="analysis-and-toolbar-container" class="ui-layout-center noselect">
-            <div id="analysis-toolbar" class="ui-layout-north">
+            <div id="analysis-toolbar">
             {% if has_write_permission %}
                 <div id="node-types">{{ node_classes_form.node_types }}</div>
             {% endif %}
@@ -247,26 +268,26 @@
                     <a id="dual-screen-button" class="toolbar-button" href="javascript:startDualScreenMode()" title="Dual Screen Mode"></a>
                     {% endif %}
                     </div>
-                    <span id="analysis-genome-build">{{ analysis.genome_build }}</span>
-                    <span id="analysis-tasks">
-                        Jobs:
-                        <span id="analysis-tasks-error"></span>
-                        <span id="analysis-tasks-active"></span>
-                        <span id="analysis-tasks-queued"></span>
+                    <span id="analysis-info">
+                        <span id="analysis-genome-build">{{ analysis.genome_build }}</span>
+                        <span id="analysis-tasks">
+                            Jobs:
+                            <span id="analysis-tasks-error"></span>
+                            <span id="analysis-tasks-active"></span>
+                            <span id="analysis-tasks-queued"></span>
+                        </span>
                     </span>
                 </div>
 
-            <div id="analysis-container" class="ui-layout-center">
+            <div id="analysis-container">
                 <div>
                     {% include "analysis/svg_dropshadow.html" %}
                 </div>
                 <div id="overscroll" class='overlay'>
                     <div id="analysis"></div>
                 </div>
-
-                <div id='node-count-legend' title='Modify node counts in analysis settings (cog icon)'>
-                </div>
             </div>
+            <div id='node-count-legend' title='Modify node counts in analysis settings (cog icon)'></div>
         </div>
         <div id="right-panel" class="ui-layout-east">
             <div>&nbsp;</div>

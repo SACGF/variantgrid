@@ -653,6 +653,11 @@ function setupGrid(config_url, analysisId, nodeId, versionId, unique_code, gridC
                         }
                     }
                 }
+                // height: auto screws up on firefox
+                if (typeof(data["height"]) === "undefined" || data["height"] === "auto") {
+                    data["height"] = null;
+                }
+
                 // You can only have 1 active grid request
                 data["loadBeforeSend"] = function(xhr) {
                     window.activeGridRequestXHR = xhr;

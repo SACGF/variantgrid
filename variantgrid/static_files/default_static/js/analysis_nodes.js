@@ -819,6 +819,11 @@ function drawCountLegend(nodeCountTypes) {
 			legend.append(row);
         }
     }
+
+    // Absolute positioning can sometimes get thrown off after resizing contents
+    let rowHeight = 31;
+    let numRows = 1 + nodeCountTypes.length
+    legend.height(rowHeight * numRows);
 }
 
 

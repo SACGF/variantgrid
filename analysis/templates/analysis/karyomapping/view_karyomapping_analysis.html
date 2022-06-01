@@ -2,18 +2,14 @@
 {% load static %}
 {% load model_tags %}
 {% block title %}Karyomapping{% endblock title %}
-
-{% block css %}
-{{ block.super }}
-#double-helix-container { 
+{% block head %}
+<style>
+#double-helix-container {
     width: 100%;
     text-align: center;
 }
-{% endblock css %}
-
-{% block jshead %}
-    {{ block.super }}
-    
+</style>
+<script>
     function createDoubleHelixLoader(container) {
         var canvasAttributes = {class : 'node-load-animation'};
         var canvas = $("<canvas />", canvasAttributes);
@@ -22,7 +18,7 @@
         canvas.DoubleHelix({fps: 20, spinSpeed: 4});
         container.append(canvas);
     }
-    
+
     function openKaryomapGene(pk) {
         var container = $("#karyomap-gene-container");
         container.empty();
@@ -30,23 +26,21 @@
         var doubleHelixContainer = $("<div id='double-helix-container' />");
         container.append(doubleHelixContainer);
         createDoubleHelixLoader(doubleHelixContainer);
-        
+
         container.load(Urls.view_karyomapping_gene(pk), function() {
             doubleHelixContainer.remove();
         });
     }
-    
-{% endblock jshead %}
-{% block jsdocumentready %}
-    {{ block.super }}
 
-    $("#karyomapping-tabs").tabs();
+    $(document).ready(() => {
+        $("#karyomapping-tabs").tabs();
 
-    {% if created_karyomapping_gene %}
-    openKaryomapGene("{{ created_karyomapping_gene.pk }}");
-    {% endif %}
-    
-{% endblock jsdocumentready %}
+        {% if created_karyomapping_gene %}
+        openKaryomapGene("{{ created_karyomapping_gene.pk }}");
+        {% endif %}
+    });
+</script>
+{% endblock head %}
 
 {% block submenu_page_content %}
 <script type="text/javascript" src="{% static 'js/lib/double-helix.jquery.js' %}"></script>
@@ -107,6 +101,5 @@
 
 <div id='karyomap-gene-container'>
 </div>
-
 
 {% endblock submenu_page_content %}

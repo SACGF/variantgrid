@@ -58,12 +58,8 @@ def settings_context_processor(request):
         "menu_variants_base",
     ]
 
-    if Clinician.user_is_clinician(request.user):
-        for base_template in MENU_BASE_TEMPLATES:
-            context[base_template] = "snpdb/clinician_view_base.html"
-    else:
-        DEFAULT_TEMPLATE_PATTERN = "snpdb/menu/%s.html"
-        for base_template in MENU_BASE_TEMPLATES:
-            context[base_template] = DEFAULT_TEMPLATE_PATTERN % base_template
+    DEFAULT_TEMPLATE_PATTERN = "snpdb/menu/%s.html"
+    for base_template in MENU_BASE_TEMPLATES:
+        context[base_template] = DEFAULT_TEMPLATE_PATTERN % base_template
 
     return context

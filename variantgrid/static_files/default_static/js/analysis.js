@@ -96,7 +96,7 @@ function layoutAnalysisPanels(showAnalysisVariables, initialGridAndEditorWidth, 
         centerLayoutParams.onresize = resizePanel;  // save panel widths
     }
 
-    $('div#content').layout();
+    $('div.main-content').layout();
     $('div#analysis-outer-container').layout({
         north: {
             size: "15%",
@@ -111,11 +111,6 @@ function layoutAnalysisPanels(showAnalysisVariables, initialGridAndEditorWidth, 
                 // Setting minSize in this pane cases 'InternalError: too much recursion' with sizeMidPanes
                 // So we'll just reset min size upon loading each time
         }
-    });
-    $('div#analysis-and-toolbar-container').layout({
-        north: {
-            minSize: 32,
-        },
     });
 
     // Make clicking the background send a "click event" but not if you click on the .window
@@ -497,7 +492,7 @@ function loadGridAndEditorForNode(nodeId, extra_filters, fromSelectNode) {
 function layout_analysis_editor_and_grid() {
     //console.log("editor_and_grid layout panels...");
 
-    if (typeof(resizePanel) == 'undefined') { // Defined in anaylsis, missing in stand alone
+    if (typeof(resizePanel) == 'undefined') { // Defined in analysis, missing in stand alone
         //console.log("resizePanel = null");
         resizePanel = null;
     }

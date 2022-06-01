@@ -6,8 +6,6 @@
 <!-- Importing headers due to stand alone window -->
 <link href="{% static 'js/lib/jquery-ui-1.12.1.custom/jquery-ui.min.css' %}" rel="stylesheet">
 <link href="{% static 'js/lib/jquery-ui-1.12.1.custom/jquery-ui.theme.css' %}" rel="stylesheet">
-<!-- test me, this didn't used to include global.css -->
-<link href="{% static 'css/global.css' %}" rel="stylesheet">
 
 <link rel="shortcut icon" href="{% static 'favicon.ico' %}" />
 <script type="text/javascript" src="{% static 'js/lib/jquery-3.3.1/jquery-3.3.1.min.js' %}"></script>
@@ -17,15 +15,6 @@
 <script src="{% static 'js/lib/jquery.blockUI.js' %}"></script>
 {% include "analysis/analysis_includes.html" %}
 {% endif %}
-
-<style type="text/css">
-	html, body, #analysis-editor-and-grid, #grid-and-editor-container {
-		height: 100%;
-		min-height: 100%;
-		margin: 0;
-		padding: 0;
-	}
-</style>
 <script>
 	var GRID = "grid";
 	var EDITOR = "editor";
@@ -89,8 +78,14 @@
 
 	});
 </script>
+<style>
+/* Grid keeps getting cut off, make a bottom margin size of top bar */
+#node-grid-container {
+    margin-bottom: 50px;
+}
+</style>
 <div id="grid-and-editor-container">
-	<div id="node-editor-container" class="ui-layout-north">
+	<div id="node-editor-container">
 		<div style='display: none' class='cancel-node-loading'>
 			<button>Cancel</button> - Cancel loading node.
 		</div> 
@@ -98,7 +93,7 @@
 		<div class="node-editor" id="no-editor">
 		</div>
 	</div>
-	<div class="ui-layout-center">
+	<div id="node-grid-container">
 		<div id="error-container">
 		</div>
 		<div id="node-data-container">

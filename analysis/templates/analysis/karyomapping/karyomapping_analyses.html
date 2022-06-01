@@ -1,10 +1,9 @@
-{% extends "uicore/page/base.html" %}
-{% load ui_menu_bars %}
+{% extends menu_analysis_base %}
 {% load ui_utils %}
 {% load crispy_forms_field %}
-{% block submenu %}{% menu_bar_analysis %}{% endblock %}
 {% block title %}Karyomapping{% endblock title %}
 {% block head %}
+<script>
     $(document).ready(() => {
         $("button#new-karyomapping-analysis").click(function() {
             var trioId = $("#id_trio").val();
@@ -12,31 +11,29 @@
             window.location = url;
         });
     });
+</script>
 {% endblock head %}
-{% block content %}
-    <div class="container-table">
-        <h3>Karyomapping</h3>
-        <div class="container no-gutters no-padding">
-            <form>
-                <div class="card">
-                    <div class="card-header">Create</div>
-                    <div class="card-body">
-                        {% labelled label="Trio" %}{{ trio_form.trio }} {{ trio_form.media }}{% endlabelled %}
-                        {% comment %}
-                        <label>Trio</label>
-                        <span>{% crispy_field trio_form.trio %} {{ trio_form.media }}</span>
-                        {% endcomment %}
-                        <button class="btn btn-primary" id='new-karyomapping-analysis' type='button'><i class="fas fa-plus-circle"></i> Create for Trio</button>
-                    </div>
+{% block submenu_page_content %}
+    <h3>Karyomapping</h3>
+    <div class="container no-gutters no-padding">
+        <form>
+            <div class="card">
+                <div class="card-header">Create</div>
+                <div class="card-body">
+                    {% labelled label="Trio" %}{{ trio_form.trio }} {{ trio_form.media }}{% endlabelled %}
+                    {% comment %}
+                    <label>Trio</label>
+                    <span>{% crispy_field trio_form.trio %} {{ trio_form.media }}</span>
+                    {% endcomment %}
+                    <button class="btn btn-primary" id='new-karyomapping-analysis' type='button'><i class="fas fa-plus-circle"></i> Create for Trio</button>
                 </div>
-            </form>
-        </div>
-
-        <div class="mt-4">
-            {% load jqgrid_tags %}
-            {% user_data_grid_filter 'karyomapping_analyses' 'KaryomappingAnalyses' %}
-            {% jqgrid 'karyomapping_analyses_grid' 'karyomapping_analyses' search=False delete=True %}
-        </div>
+            </div>
+        </form>
     </div>
 
-{% endblock content %}
+    <div class="mt-4">
+        {% load jqgrid_tags %}
+        {% user_data_grid_filter 'karyomapping_analyses' 'KaryomappingAnalyses' %}
+        {% jqgrid 'karyomapping_analyses_grid' 'karyomapping_analyses' search=False delete=True %}
+    </div>
+{% endblock submenu_page_content %}
