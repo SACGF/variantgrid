@@ -8,7 +8,7 @@ from annotation.annotation_version_querysets import get_variant_queryset_for_ann
 from annotation.citations import get_citations
 from annotation.models.damage_enums import FATHMMPrediction, \
     MutationTasterPrediction, Polyphen2Prediction, SIFTPrediction, \
-    MutationAssessorPrediction
+    MutationAssessorPrediction, ALoFTPrediction
 from annotation.models.models import VariantAnnotation, AnnotationVersion, GeneSymbolPubMedCount
 from annotation.models.models_enums import VariantClass, ClinVarReviewStatus
 from annotation.transcripts_annotation_selections import VariantTranscriptSelections
@@ -219,7 +219,8 @@ def get_evidence_fields_for_variant(genome_build: GenomeBuild, variant: Variant,
                 evidence = evidence_variant_columns
 
             evidence[evidence_key.key] = {'col': variantgrid_column.variant_column,
-                                          'immutable': evidence_key.immutable}
+                                          'immutable': evidence_key.immutable,
+                                          'note': variantgrid_column.ekey_note}
 
     ekey_formatters = ekey_from_vg_column_formatters()
     # Populate from query 1st so can be overwritten
@@ -326,11 +327,12 @@ def get_evidence_fields_from_preferred_transcript(
             for evidence_key, transcript_config in evidence_transcript_columns.items():
                 variant_column = transcript_config['col']
                 immutable = transcript_config['immutable']
+                note = transcript_config['note']
                 # Getting out of dict directly, not joining via queryset
                 transcript_column = variant_column.replace("variantannotation__", "")
                 value = transcript_data.get(transcript_column)
                 if value is not None:
-                    set_evidence(data, evidence_key, value, immutable, ekey_formatters)
+                    set_evidence(data, evidence_key, value, immutable, ekey_formatters, note=note)
 
             gene_symbol = transcript_version.gene_version.gene_symbol
             data[SpecialEKeys.INTERNAL_SAMPLES_20X_COVERAGE] = get_20x_gene_coverage(gene_symbol)
@@ -390,16 +392,17 @@ def get_evidence_fields_from_preferred_transcript(
     return data
 
 
-def set_evidence(data: AutopopulateData, evidence_key, value, immutable, ekey_formatters):
+def set_evidence(data: AutopopulateData, evidence_key, value, immutable, ekey_formatters, note=None):
     formatter = ekey_formatters.get(evidence_key)
     if formatter:
         value = formatter(value)
 
+    value_dict = {'value': value}
+    if note:
+        value_dict["note"] = note
     if immutable:
-        data[evidence_key] = {'value': value, 'immutable': SubmissionSource.VARIANT_GRID}
-    else:
-        data[evidence_key] = value
-
+        value_dict['immutable'] = SubmissionSource.VARIANT_GRID
+    data[evidence_key] = value_dict
 
 def _get_mastermind_summary(variant_values: dict) -> Optional[str]:
     mastermind_summary: Optional[str] = None
@@ -426,6 +429,27 @@ def _get_spliceai_summary(variant_values: dict):
     return spliceai_summary
 
 
+def _get_aloft_summary(variant_values: dict):
+    """ Summarise ALoFT fields into 1 field  """
+
+    if pred_value := variant_values.get("variantannotation__aloft_pred"):
+        pred_value = dict(ALoFTPrediction.choices)[pred_value]
+        if variant_values.get("variantannotation__aloft_high_confidence"):
+            confidence = "High"
+        else:
+            confidence = "Low"
+        prob_fields = {VariantAnnotation.ALOFT_FIELDS[f]: variant_values[f"variantannotation__{f}"] for f
+                       in ["aloft_prob_tolerant", "aloft_prob_recessive", "aloft_prob_dominant"]}
+        probabilities = ", ".join([f"{k}: {v}" for k, v in prob_fields.items()])
+        transcript_value = variant_values["variantannotation__aloft_ensembl_transcript"]
+
+        aloft_summary = f"{pred_value} ({confidence} confidence), "
+        aloft_summary += f"Probabilities: ({probabilities}), Transcript: {transcript_value}"
+    else:
+        aloft_summary = None
+    return aloft_summary
+
+
 def get_evidence_fields_from_variant_query(
         variant: Variant,
         evidence_variant_columns,
@@ -437,6 +461,7 @@ def get_evidence_fields_from_variant_query(
     # Retrieve fields for Mastermind/SpliceAI summaries
     va_fields_for_summaries = []
     va_fields_for_summaries.extend(VariantAnnotation.MASTERMIND_FIELDS)
+    va_fields_for_summaries.extend(VariantAnnotation.ALOFT_FIELDS)
     va_fields_for_summaries.extend(itertools.chain.from_iterable(VariantAnnotation.SPLICEAI_DS_DP.values()))
 
     qs = get_variant_queryset_for_annotation_version(annotation_version=annotation_version)
@@ -452,21 +477,19 @@ def get_evidence_fields_from_variant_query(
     for evidence_key, variant_data in evidence_variant_columns.items():
         variant_column = variant_data['col']
         immutable = variant_data['immutable']
+        note = variant_data['note']
         value = values.get(variant_column)
-        set_evidence(data, evidence_key, value, immutable, ekey_formatters)
+        set_evidence(data, evidence_key, value, immutable, ekey_formatters, note=note)
 
     # VariantGridColumn 'pubmed' is transcript level so not set above
     data[SpecialEKeys.LITERATURE] = _get_mastermind_summary(values)
+    data[SpecialEKeys.ALOFT] = _get_aloft_summary(values)
     data[SpecialEKeys.SPLICEAI] = _get_spliceai_summary(values)
 
     # If gnomad_af is not populated, fall back on gnomAD2 liftover AF
     if SpecialEKeys.GNOMAD_AF not in data:
         if g2_af := values.get(gnomad2_liftover_af):
-            value = {
-                "value": g2_af,
-                "note": "gnomAD AF not found, using gnomad2 liftover AF",
-            }
-            set_evidence(data, SpecialEKeys.GNOMAD_AF, value, False, ekey_formatters)
+            set_evidence(data, SpecialEKeys.GNOMAD_AF, g2_af, False, ekey_formatters, note=note)
     return data
 
 

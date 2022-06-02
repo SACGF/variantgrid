@@ -765,6 +765,15 @@ class VariantAnnotation(AbstractVariantAnnotation):
         GnomADPopulation.SOUTH_ASIAN: 'gnomad_sas_af',
     }
 
+    ALOFT_FIELDS = {
+        "aloft_pred": "Pred",
+        "aloft_high_confidence": "High Confidence",
+        "aloft_prob_tolerant": "Tol",
+        "aloft_prob_recessive": "Rec",
+        "aloft_prob_dominant": "Dom",
+        "aloft_ensembl_transcript": "Transcript",
+    }
+
     MASTERMIND_FIELDS = {
         "mastermind_count_1_cdna": "cDNA",
         "mastermind_count_2_cdna_prot": "cDNA/Prot",

@@ -32,6 +32,7 @@ class SpecialEKeys:
     ALLELE_DEPTH = 'allele_depth'
     ALLELE_FREQUENCY = 'allele_frequency'
     ALLELE_ORIGIN = "allele_origin"
+    ALOFT = "aloft"
     ANCESTRY = "ancestry"
     CAPTURE_METHOD = "capture_method"
     CLINGEN_ALLELE_ID = "clingen_allele_id"

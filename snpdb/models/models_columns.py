@@ -1,3 +1,5 @@
+from typing import Optional
+
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.db import models
@@ -38,6 +40,15 @@ class VariantGridColumn(models.Model):
         if cvf := self.columnvepfield_set.filter(q).first():
             return cvf.columns_version_description
         return ""
+
+    @property
+    def ekey_note(self) -> Optional[str]:
+        """ Add a note on field when autopopulating classificaiton """
+        # From columns version 2, we switched to rank scores - need to document this in EKey note
+        note = None
+        if self.pk.endswith("_rankscore"):
+            note = "Rankscore (0-1) of all non-synonymous SNVs in dbNSFP"
+        return note
 
     def __str__(self):
         return self.grid_column_name
