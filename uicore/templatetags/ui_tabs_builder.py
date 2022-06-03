@@ -4,6 +4,7 @@ from typing import List, Any, Optional
 from django import template
 from django.http import HttpRequest
 from django.template.base import FilterExpression
+from django.utils.text import slugify
 
 from uicore.templatetags.ui_utils import parse_tag, TagUtils
 
@@ -167,9 +168,8 @@ class LocalTabContent(template.Node):
         if not label:
             raise ValueError("UI Tab requires a value for 'label'")
 
-        # FIXME just replace everything that's not A-Z 0-9 and make sure dont start with a number
-        tab_id = 't' + label.replace(' ', '-').replace('/', '_').replace('!', 'not').replace('=', '_')
-
+        # Needs to not start with a number
+        tab_id = 't' + slugify(label)
         tab_key = f"ui-tab-{tab_set}"
         builder: TabBuilder = context.get(tab_key)
         if not builder:
