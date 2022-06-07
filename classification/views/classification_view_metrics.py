@@ -13,12 +13,12 @@ from django.http.response import HttpResponseBase
 from django.shortcuts import render
 from django.utils.timezone import now
 from lazy import lazy
+
 from classification.models import Classification, DiscordanceReport
 from eventlog.models import ViewEvent
 from genes.models import GeneSymbol
 from library.django_utils import require_superuser
 from snpdb.models import Allele
-from snpdb.views.views import staff_only
 
 T = TypeVar("T")
 

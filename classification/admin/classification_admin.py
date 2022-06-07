@@ -1,7 +1,6 @@
 import json
 from typing import Set
 
-from django.conf import settings
 from django.contrib import admin, messages
 from django.contrib.admin import RelatedFieldListFilter, BooleanFieldListFilter
 from django.db.models import QuerySet

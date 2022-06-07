@@ -4,7 +4,6 @@ from django.apps import apps
 from django.conf import settings
 from django.contrib.sites.models import Site
 
-from patients.models import Clinician
 from snpdb.models import SiteMessage
 from uicore.utils.form_helpers import FORM_HELPER_HELPER
 from variantgrid.perm_path import get_visible_url_names

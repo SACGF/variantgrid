@@ -3,6 +3,8 @@ from typing import Dict, Any, Optional, Set, Mapping
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.db import transaction
+from django.utils.timezone import now
+
 from classification.enums import ShareLevel, ForceUpdate, SubmissionSource, SpecialEKeys
 from classification.models import ClassificationImport, Classification, ClassificationProcessError, ClassificationRef, \
     EvidenceMixin, classification_flag_types, ClassificationJsonParams, ClassificationModification, \
@@ -12,8 +14,6 @@ from classification.tasks.classification_import_task import process_classificati
 from eventlog.models import create_event
 from library.log_utils import report_message, report_exc_info
 from library.utils import DebugTimer
-from django.utils.timezone import now
-
 from snpdb.models import GenomeBuild, ImportSource
 
 

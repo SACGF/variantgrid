@@ -1,16 +1,18 @@
+import json
+import pathlib
 import subprocess
 from pathlib import Path
 from typing import List, Dict
+
 import ijson
-import json
 from celery import Task
 from django.conf import settings
+
 from classification.enums import SubmissionSource
 from classification.models import UploadedClassificationsUnmapped, UploadedClassificationsUnmappedStatus
 from classification.models.classification_import_run import ClassificationImportRun
-from library.log_utils import report_message, NotificationBuilder, report_exc_info
+from library.log_utils import report_message, NotificationBuilder
 from library.utils import batch_iterator, pretty_label
-import pathlib
 from variantgrid.celery import app
 
 

@@ -1,12 +1,12 @@
 import contextlib
 import datetime
+import re
 from abc import ABC, abstractmethod
 from io import BytesIO
 from os import PathLike
 from pathlib import Path
 from typing import Iterator, Optional, Union, List
 from zipfile import ZipFile
-import re
 
 
 class FileHandle(ABC):

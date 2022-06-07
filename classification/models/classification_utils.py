@@ -8,7 +8,6 @@ from typing import List, Set, Optional, Union, Any, Dict, Iterable
 from django.contrib.auth.models import User
 from django.db.models import Q
 
-from classification.enums import SpecialEKeys
 from classification.models.evidence_mixin import VCPatch, VCStore
 from flags.models import FlagCollection
 from genes.models import GeneSymbol, Gene, Transcript

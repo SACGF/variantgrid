@@ -4,6 +4,7 @@ from django.db import migrations
 
 from manual.operations.manual_operations import ManualOperation
 
+
 def _check_has_columns_version2(apps):
     VariantAnnotationVersion = apps.get_model("annotation", "VariantAnnotationVersion")
     return VariantAnnotationVersion.objects.filter(columns_version=2).exists()

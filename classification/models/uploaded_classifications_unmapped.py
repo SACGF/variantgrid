@@ -1,4 +1,5 @@
 from typing import Union, Optional, Dict, List, Tuple, Any, Iterable
+
 from django.contrib.auth.models import User
 from django.db import models
 from lazy import lazy
@@ -6,7 +7,6 @@ from model_utils.models import TimeStampedModel
 
 from classification.models.uploaded_file_types import FileHandle, resolve_uploaded_url_to_handle
 from snpdb.models import Lab
-import re
 
 
 class UploadedClassificationsUnmappedStatus(models.TextChoices):

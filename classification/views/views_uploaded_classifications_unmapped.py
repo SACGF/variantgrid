@@ -1,8 +1,6 @@
 import datetime
-import os
-import re
 from dataclasses import dataclass
-from typing import List, Iterable, Tuple, Any, Dict, Optional, Set
+from typing import List, Iterable, Any, Dict, Optional, Set
 
 import django
 from django.contrib import messages
@@ -16,11 +14,11 @@ from django.utils.timezone import now
 from django.views import View
 
 from classification.models import ClassificationImportRun, resolve_uploaded_url_to_handle, FileHandle
-from classification.models.uploaded_classifications_unmapped import UploadedClassificationsUnmapped, UploadedClassificationsUnmappedStatus
+from classification.models.uploaded_classifications_unmapped import UploadedClassificationsUnmapped, \
+    UploadedClassificationsUnmappedStatus
 from classification.tasks.classification_import_map_and_insert_task import ClassificationImportMapInsertTask
 from library.django_utils import get_url_from_view_path
 from library.log_utils import NotificationBuilder, report_exc_info
-from library.utils import filename_safe
 from snpdb.models import Lab, UserSettings
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
 
@@ -170,7 +168,6 @@ class UploadedClassificationsUnmappedView(View):
         django.utils.encoding.force_text1 = django.utils.encoding.force_str
         django.utils.encoding.smart_text = django.utils.encoding.smart_str
 
-        from storages.backends.s3boto3 import S3Boto3Storage
         lab_id: int
         try:
             lab_id = kwargs.get('lab_id')

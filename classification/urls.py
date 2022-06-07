@@ -12,9 +12,6 @@ from classification.views.classification_email_view import summary_email_preview
 from classification.views.classification_export_view import ClassificationApiExportView
 from classification.views.classification_overlaps_view import view_overlaps, post_clinical_context, \
     view_clinical_context, view_overlaps_detail
-from classification.views.views_uploaded_classifications_unmapped import UploadedClassificationsUnmappedView, \
-    UploadedClassificationsUnmappedColumns, download_classification_unmapped_file, \
-    view_uploaded_classification_unmapped, view_uploaded_classification_unmapped_detail
 from classification.views.classification_view import ClassificationView, LabGeneClassificationCountsView
 from classification.views.classification_view_metrics import view_classification_metrics, \
     view_page_metrics_detail
@@ -26,6 +23,9 @@ from classification.views.evidence_keys_view import EvidenceKeysView
 from classification.views.hgvs_issues_view import view_hgvs_issues, download_hgvs_issues, AlleleColumns, \
     download_liftover_report
 from classification.views.views import classification_import_tool, AutopopulateView
+from classification.views.views_uploaded_classifications_unmapped import UploadedClassificationsUnmappedView, \
+    UploadedClassificationsUnmappedColumns, download_classification_unmapped_file, \
+    view_uploaded_classification_unmapped, view_uploaded_classification_unmapped_detail
 from snpdb.views.datatable_view import DatabaseTableView
 from variantgrid.perm_path import perm_path
 

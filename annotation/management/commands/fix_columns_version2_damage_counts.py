@@ -3,7 +3,7 @@ from functools import reduce
 
 from django.conf import settings
 from django.core.management.base import BaseCommand
-from django.db.models import Case, Value, IntegerField, When, Q, Sum, F
+from django.db.models import Case, Value, IntegerField, When, Q, F
 
 from annotation.models import VariantAnnotationVersion, VariantAnnotation
 

@@ -404,6 +404,7 @@ def set_evidence(data: AutopopulateData, evidence_key, value, immutable, ekey_fo
         value_dict['immutable'] = SubmissionSource.VARIANT_GRID
     data[evidence_key] = value_dict
 
+
 def _get_mastermind_summary(variant_values: dict) -> Optional[str]:
     mastermind_summary: Optional[str] = None
     if mastermind_mmid3 := variant_values.get("variantannotation__mastermind_mmid3"):

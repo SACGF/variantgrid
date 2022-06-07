@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Set, Optional, Iterable, List, Tuple
+from typing import Set, Optional, List, Tuple
 
 from django.http import HttpRequest
 from django.urls import reverse
@@ -7,7 +7,7 @@ from lazy import lazy
 
 from annotation.models import ClinVar, ClinVarVersion
 from classification.enums import SpecialEKeys
-from classification.views.classification_export_utils import ExportFormatter, AlleleGroup
+from classification.views.classification_export_utils import ExportFormatter
 from classification.views.exports.classification_export_decorator import register_classification_exporter
 from classification.views.exports.classification_export_filter import ClassificationFilter, AlleleData
 from classification.views.exports.classification_export_formatter2 import ClassificationExportFormatter2

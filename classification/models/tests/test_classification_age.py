@@ -1,4 +1,5 @@
 from django.test import TestCase
+
 from classification.models.classification_patcher import patch_fuzzy_age
 
 
