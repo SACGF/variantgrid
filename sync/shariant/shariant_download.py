@@ -71,6 +71,8 @@ def sync_shariant_download(sync_destination: SyncDestination, full_sync: bool = 
 
         source_url = shariant.url(f'classification/classification/{record_id}')
         data = record.get('data')
+        if data is None:
+            raise ValueError(f"Classification from {source_url} had data=None!")
         data = sanitize_data(known_keys, data, source_url)
 
         lab_group_name = meta.get('lab_id')
