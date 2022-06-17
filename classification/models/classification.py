@@ -900,7 +900,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
 
     def allele_classification_changed(self):
         """ Notifies all variants linked to allele that the classification has changed """
-        if allele := self.allele:
+        if self.allele:
             for variant_allele in self.allele.variant_alleles():
                 variants_classification_changed_signal.send(sender=Classification,
                                                             variants=[variant_allele.variant],

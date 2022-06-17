@@ -147,7 +147,7 @@ class CompHet(AbstractTrioInheritance):
         return parent, comp_het_q, two_hit_genes
 
     def get_arg_q_dict(self) -> Dict[Optional[str], Q]:
-        parent, comp_het_q, two_hit_genes = self._get_parent_comp_het_q_and_two_hit_genes()
+        _, comp_het_q, two_hit_genes = self._get_parent_comp_het_q_and_two_hit_genes()
         variant_annotation_version = self.node.analysis.annotation_version.variant_annotation_version
         comp_het_genes = VariantTranscriptAnnotation.get_overlapping_genes_q(variant_annotation_version, two_hit_genes)
         cgc = self.node.trio.cohort.cohort_genotype_collection

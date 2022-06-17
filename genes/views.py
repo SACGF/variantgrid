@@ -365,7 +365,7 @@ def view_gene_symbol(request, gene_symbol: str, genome_build_name: Optional[str]
 def view_classifications(request, gene_symbol: str, genome_build_name: str):
 
     genome_build = GenomeBuild.get_from_fuzzy_string(genome_build_name)
-    gene_symbol=get_object_or_404(GeneSymbol, pk=gene_symbol)
+    gene_symbol = get_object_or_404(GeneSymbol, pk=gene_symbol)
 
     view_info = GeneSymbolViewInfo(
         gene_symbol=gene_symbol,

@@ -1099,7 +1099,7 @@ class DiffBuilder:
 def diff_text(a: str, b: str) -> DiffBuilder:
 
     def _tokenize(text: str) -> List[str]:
-        return re.split('(\s)', text)
+        return re.split(r'(\s)', text)
 
     diff_builder = DiffBuilder()
     for diff_chars in difflib.Differ().compare(_tokenize(a), _tokenize(b)):

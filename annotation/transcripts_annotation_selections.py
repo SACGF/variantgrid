@@ -141,7 +141,7 @@ class VariantTranscriptSelections:
             transcripts_list = list(variant.varianttranscriptannotation_set.filter(version=vav))
 
             for vsta in transcripts_list:
-                if transcript := vsta.transcript:
+                if vsta.transcript:
                     t_data = get_transcript_data(vsta, representative_transcript)
                     self.transcript_data.append(t_data)
 

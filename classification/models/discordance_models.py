@@ -89,7 +89,7 @@ class DiscordanceReport(TimeStampedModel):
     @transaction.atomic
     def close(self, expected_resolution: Optional[str] = None, cause_text: str = ''):
         """
-        @param expected_resolution this will be calculated, but if provided a ValueError will be raised if it doesn't match
+        @param expected_resolution will be calculated, but if provided a ValueError will be raised if it doesn't match
         @param cause_text reason this discordance is being closed
         """
         if self.clinical_context.is_discordant():
@@ -184,17 +184,15 @@ class DiscordanceReport(TimeStampedModel):
         if (not only_if_necessary) or self.has_significance_changed():
             report = DiscordanceReport(clinical_context=self.clinical_context, cause_text=cause)
             report.save()
-            # if we're creating a new discordance report after a "Continued Discordance" we want to grab the state from as it was at the time
-            # the previous report was closed, not the current date
-            for last_id in DiscordanceReportClassification.objects.filter(
-                    report=self,
-                    clinical_context_final=self.clinical_context
-                    ).values_list('classification_final', flat=True):
-
-                DiscordanceReportClassification(
+            # if we're creating a new discordance report after a "Continued Discordance" we want to grab the
+            # state from as it was at the time the previous report was closed, not the current date
+            drc_qs = DiscordanceReportClassification.objects.filter(report=self,
+                                                                    clinical_context_final=self.clinical_context)
+            for last_id in drc_qs.values_list('classification_final', flat=True):
+                DiscordanceReportClassification.objects.create(
                     report=self,
                     classification_original=ClassificationModification.objects.get(pk=last_id)
-                ).save()
+                )
 
             # the report might even auto-close itself if the change brought it into concordance
             report.update(cause_text=cause)
@@ -250,7 +248,8 @@ class DiscordanceReport(TimeStampedModel):
 
     @staticmethod
     def apply_flags_to_context(clinical_context: ClinicalContext):
-        # this is now the one function that applies and closes discordance flags to classifications and clinical contexts
+        # this is now the one function that applies and closes discordance flags
+        # to classifications and clinical contexts
         discordant_classifications: Set[int] = set()
         is_in_discordance = False
         if latest_report := DiscordanceReport.latest_report(clinical_context):

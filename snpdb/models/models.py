@@ -275,7 +275,7 @@ class ClinVarKey(TimeStampedModel):
             try:
                 re.compile(key)
             except:
-                raise ValidationError({'assertion_method_lookup': ValidationError(f'%s is not a valid regular expression', params={'key': key})})
+                raise ValidationError({'assertion_method_lookup': ValidationError('%s is not a valid regular expression', params={'key': key})})
             if assertion_dict != "acmg" and (not isinstance(assertion_dict, dict) or 'citation' not in assertion_dict or 'method' not in assertion_dict):
                 raise ValidationError({'assertion_method_lookup': ValidationError('%s must have value for citation (db,id or url) and method', params={'key': key})})
 

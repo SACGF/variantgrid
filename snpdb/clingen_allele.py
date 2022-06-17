@@ -486,7 +486,8 @@ def link_allele_to_existing_variants(allele: Allele, conversion_tool,
                                                             defaults=defaults)
                 if va.allele != allele:  # Existing!
                     if not va.allele.merge(conversion_tool, allele):
-                        logging.warning(f"Couldn't merge 2xAlleles (ClinGen Allele Registry) - Allele IDs: {va.allele_id} and {allele.id}")
+                        logging.warning("Couldn't merge 2xAlleles (ClinGen Allele Registry) - Allele IDs: %s and %s",
+                                        va.allele_id, allele.id)
 
                 variant_allele_by_build[genome_build] = va
         except Variant.DoesNotExist:

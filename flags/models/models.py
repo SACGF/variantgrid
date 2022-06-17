@@ -267,7 +267,7 @@ class FlagCollection(models.Model, GuardianPermissionsMixin):
 
         if not self._source_object:
             # appears to be an orphaned set
-            logging.warning(f'Could not find source object for FlagCollection {self.id}')
+            logging.warning('Could not find source object for FlagCollection %s', self.id)
 
         return self._source_object
 
