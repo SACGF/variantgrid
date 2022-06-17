@@ -174,6 +174,12 @@ class OntologyImport(TimeStampedModel):
     processed_date = models.DateTimeField(auto_created=True)
     completed = models.BooleanField(default=False)
 
+    def __str__(self):
+        name = f"OntologyImport ({self.pk}) - {self.import_source}: {self.filename} ({self.created.date()})"
+        if not self.completed:
+            name += " (incomplete)"
+        return name
+
 
 class OntologyTerm(TimeStampedModel):
 
