@@ -8,6 +8,8 @@ import re
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import Optional, List, Dict, Set, Union, Tuple, Iterable
+from psqlextra.types import PostgresPartitioningMethod
+from psqlextra.models import PostgresPartitionedModel
 
 from cache_memoize import cache_memoize
 from django.contrib.postgres.fields import ArrayField
@@ -361,7 +363,7 @@ class OntologyTermRelationManager(models.Manager):
         return qs.select_related("source_term", "dest_term", "from_import")
 
 
-class OntologyTermRelation(TimeStampedModel):
+class OntologyTermRelation(PostgresPartitionedModel, TimeStampedModel):
     """
     Relationship between two terms, is generally considered to be bi-directional (or at the very least
     code typically checks relationships in both directions)
@@ -370,16 +372,18 @@ class OntologyTermRelation(TimeStampedModel):
     and we have quite a lot.
     """
     objects = OntologyTermRelationManager()
-    source_term = models.ForeignKey(OntologyTerm, on_delete=CASCADE, related_name="subject")
+    source_term = models.ForeignKey(OntologyTerm, on_delete=CASCADE, related_name="subject2")
     dest_term = models.ForeignKey(OntologyTerm, on_delete=CASCADE)
     relation = models.TextField()
     extra = models.JSONField(null=True, blank=True)
     from_import = models.ForeignKey(OntologyImport, on_delete=PROTECT)
 
-    class Meta:
-        unique_together = ("source_term", "dest_term", "relation")
+    class PartitioningMeta:
+        method = PostgresPartitioningMethod.LIST
+        key = ["from_import_id"]
 
-    # as in we can have multiple copies, up to code to try to not duplicate
+    class Meta:
+        unique_together = ("from_import", "source_term", "dest_term", "relation")
 
     def __str__(self):
         name = f"{self.source_term} -> ({self.relation}) -> {self.dest_term}"
