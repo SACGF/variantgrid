@@ -13,10 +13,7 @@ class FileHandle(ABC):
 
     @abstractmethod
     def _data_handle(self):
-        """
-        Return handle to an open file or storage, anything that you can call .read() on
-        """
-        pass
+        """ Return handle to an open file or storage, anything that you can call .read() on """
 
     @property
     @abstractmethod
@@ -151,7 +148,7 @@ class FileHandleS3(FileHandle):
 
 
 UPLOADED_S3_TEMP_URL = re.compile(r"https:\/\/(?P<bucket>.*?)\.s3\.amazonaws\.com/(?P<file>.*?)(?:\?AWSAccessKeyId.*|$)")
-UPLOADED_S3_CLEAN_URL = re.compile("s3:\/\/(?P<bucket>.*?)\/(?P<file>.*)")
+UPLOADED_S3_CLEAN_URL = re.compile(r"s3:\/\/(?P<bucket>.*?)\/(?P<file>.*)")
 
 
 def resolve_uploaded_url_to_handle(url: str) -> FileHandle:
