@@ -121,7 +121,7 @@ class CompHet(AbstractTrioInheritance):
         return self.NO_VARIANT, {Zygosity.HET}, {Zygosity.HET}
 
     @cache_memoize(DAY_SECS, args_rewrite=lambda s: (s.node.pk, s.node.version))
-    def _get_parent_comp_het_q_and_two_hit_genes(self):
+    def _get_comp_het_q_and_two_hit_genes(self):
         cohort_genotype_collection = self.node.trio.cohort.cohort_genotype_collection
 
         parent = self.node.get_single_parent()
@@ -144,10 +144,10 @@ class CompHet(AbstractTrioInheritance):
         parent_genes_qs = parent_genes_qs.values_list("varianttranscriptannotation__gene")
         two_hits = parent_genes_qs.annotate(gene_count=Count("pk")).filter(gene_count__gte=2)
         two_hit_genes = set(two_hits.values_list("varianttranscriptannotation__gene", flat=True).distinct())
-        return parent, comp_het_q, two_hit_genes
+        return comp_het_q, two_hit_genes
 
     def get_arg_q_dict(self) -> Dict[Optional[str], Q]:
-        _, comp_het_q, two_hit_genes = self._get_parent_comp_het_q_and_two_hit_genes()
+        comp_het_q, two_hit_genes = self._get_comp_het_q_and_two_hit_genes()
         variant_annotation_version = self.node.analysis.annotation_version.variant_annotation_version
         comp_het_genes = VariantTranscriptAnnotation.get_overlapping_genes_q(variant_annotation_version, two_hit_genes)
         cgc = self.node.trio.cohort.cohort_genotype_collection
@@ -164,7 +164,7 @@ class CompHet(AbstractTrioInheritance):
         return f"Proband: HET, and >=2 hits from genes where ({mum_but_not_dad}) OR ({dad_but_not_mum})"
 
     def get_contigs(self) -> Optional[Set[Contig]]:
-        _, _, two_hit_genes = self._get_parent_comp_het_q_and_two_hit_genes()
+        _, two_hit_genes = self._get_comp_het_q_and_two_hit_genes()
         contig_qs = Contig.objects.filter(transcriptversion__genome_build=self.node.trio.genome_build,
                                           transcriptversion__gene_version__gene__in=two_hit_genes)
         return set(contig_qs.distinct())
