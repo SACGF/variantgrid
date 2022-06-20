@@ -3,17 +3,21 @@ A series of models that currently stores the combination of MONDO, OMIM, HPO & H
 (Note that HGNC is included just to model relationships, please use GeneSymbol for all your GeneSymbol needs).
 """
 import functools
+import logging
 import operator
 import re
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import Optional, List, Dict, Set, Union, Tuple, Iterable
+
+from django.db.models.signals import post_save
+from django.dispatch import receiver
 from psqlextra.types import PostgresPartitioningMethod
 from psqlextra.models import PostgresPartitionedModel
 
 from cache_memoize import cache_memoize
 from django.contrib.postgres.fields import ArrayField
-from django.db import models
+from django.db import models, connection
 from django.db.models import PROTECT, CASCADE, QuerySet, Q
 from django.urls import reverse
 from lazy import lazy
@@ -170,17 +174,85 @@ class OntologyImport(TimeStampedModel):
     """
     import_source = models.TextField()
     filename = models.TextField()
+    version = models.IntegerField()
     context = models.TextField()
     hash = models.TextField()
     processor_version = models.IntegerField(default=1)
     processed_date = models.DateTimeField(auto_created=True)
     completed = models.BooleanField(default=False)
 
+    class Meta:
+        unique_together = ('import_source', 'filename', 'version')
+
+    def save(self, **kwargs):
+        created = not self.pk
+        super().save(**kwargs)
+        if created and OntologyVersion.in_ontology_version(self):
+            logging.info("Creating new OntologyTermRelation partition")
+            import_source_id = self.pk
+            connection.schema_editor().add_list_partition(
+                model=OntologyTermRelation,
+                name=f"import_source_{import_source_id}",
+                values=[import_source_id],
+            )
+            # Avoid circular import
+            from annotation.models import AnnotationVersion
+            AnnotationVersion.new_sub_version(None)
+
     def __str__(self):
         name = f"OntologyImport ({self.pk}) - {self.import_source}: {self.filename} ({self.created.date()})"
         if not self.completed:
             name += " (incomplete)"
         return name
+
+
+class OntologyVersion(TimeStampedModel):
+    """ This is used by annotation.AnnotationVersion to keep track of different OntologyImports
+        so we can load historical versions of OntologyTermRelation """
+
+    gencc_import = models.ForeignKey(OntologyImport, on_delete=PROTECT, related_name="gencc_ontology_version")
+    mondo_import = models.ForeignKey(OntologyImport, on_delete=PROTECT, related_name="mondo_ontology_version")
+    hp_owl_import = models.ForeignKey(OntologyImport, on_delete=PROTECT, related_name="hp_owl_ontology_version")
+    hp_phenotype_to_genes_import = models.ForeignKey(OntologyImport, on_delete=PROTECT,
+                                                     related_name="hp_phenotype_to_genes_ontology_version")
+    class Meta:
+        unique_together = ('gencc_import', 'mondo_import', 'hp_owl_import', 'hp_phenotype_to_genes_import')
+
+    ONTOLOGY_IMPORTS = {
+        "gencc_import": ('gencc', 'https://search.thegencc.org/download/action/submissions-export-csv'),
+        "mondo_import": ('MONDO', 'mondo.json'),
+        "hp_owl_import": ('HP', 'hp.owl'),
+        "hp_phenotype_to_genes_import": ('HP', 'phenotype_to_genes.txt'),
+    }
+
+    @staticmethod
+    def in_ontology_version(ontology_import: OntologyImport) -> bool:
+        versioned = defaultdict(set)
+        for (import_source, filename) in OntologyVersion.ONTOLOGY_IMPORTS.values():
+            versioned[import_source].add(filename)
+        return ontology_import.filename in versioned[import_source]
+
+    @staticmethod
+    def latest() -> Optional['OntologyVersion']:
+        oi_qs = OntologyImport.objects.all()
+        kwargs = {}
+        for field, (import_source, filename) in OntologyVersion.ONTOLOGY_IMPORTS.items():
+            kwargs[field] = oi_qs.filter(import_source=import_source, filename=filename).order_by("version").last()
+
+        if all(kwargs.values()):
+            ontology_version = OntologyVersion.objects.create(**kwargs)
+        else:
+            ontology_version = None
+        return ontology_version
+
+    def get_ontology_imports(self):
+        return [self.gencc_import, self.mondo_import, self.hp_owl_import, self.hp_phenotype_to_genes_import]
+
+    def get_ontology_terms(self):
+        return OntologyTermRelation.objects.filter(from_import__in=self.get_ontology_imports())
+
+    def __str__(self):
+        return f"{self.pk}: " + " / ".join((str(f) for f in self.get_ontology_imports()))
 
 
 class OntologyTerm(TimeStampedModel):

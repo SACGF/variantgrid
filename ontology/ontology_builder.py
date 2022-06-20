@@ -1,10 +1,8 @@
-import logging
 from dataclasses import dataclass
 from datetime import timedelta, datetime
 from enum import Enum
 from typing import Optional, Dict, List, TypeVar, Generic, Iterable, Type
 
-from django.db import connection
 from django.db.models import Model
 from django.utils import timezone
 from lazy import lazy
@@ -236,15 +234,7 @@ class OntologyBuilder:
         """
 
         CachedObj.bulk_apply(OntologyTerm, self.terms.values(), ["name", "definition", "extra", "aliases", "from_import", "modified"], verbose=verbose)
-        if self.relations:
-            logging.info("Creating new OntologyTermRelation partition")
-            import_source_id = self._ontology_import.pk
-            connection.schema_editor().add_list_partition(
-                model=OntologyTermRelation,
-                name=f"import_source_{import_source_id}",
-                values=[import_source_id],
-            )
-            CachedObj.bulk_apply(OntologyTermRelation, self.relations.values(), ["extra", "from_import", "modified"], verbose=verbose)
+        CachedObj.bulk_apply(OntologyTermRelation, self.relations.values(), ["extra", "from_import", "modified"], verbose=verbose)
 
         # Now to find previous imports - and their terms that weren't updated by this import (and purge them if requested)
         old_imports = set(OntologyImport.objects.filter(context=self.context, import_source=self.import_source).values_list("pk", flat=True))
