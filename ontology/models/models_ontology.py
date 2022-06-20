@@ -10,15 +10,13 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Optional, List, Dict, Set, Union, Tuple, Iterable
 
-from django.db.models.signals import post_save
-from django.dispatch import receiver
 from psqlextra.types import PostgresPartitioningMethod
 from psqlextra.models import PostgresPartitionedModel
 
 from cache_memoize import cache_memoize
 from django.contrib.postgres.fields import ArrayField
 from django.db import models, connection
-from django.db.models import PROTECT, CASCADE, QuerySet, Q
+from django.db.models import PROTECT, CASCADE, QuerySet, Q, Max
 from django.urls import reverse
 from lazy import lazy
 from model_utils.models import TimeStampedModel, now
@@ -36,6 +34,7 @@ class OntologyImportSource:
     OMIM = "OMIM"
     HPO = "HP"
     HGNC = "HGNC"
+    GENCC = 'gencc'
 
 
 class OntologyService(models.TextChoices):
@@ -186,6 +185,13 @@ class OntologyImport(TimeStampedModel):
 
     def save(self, **kwargs):
         created = not self.pk
+        if created and not self.version:
+            # Assign version to be next highest
+            existing_ontology = OntologyImport.objects.filter(import_source=self.import_source,
+                                                              filename=self.filename)
+            data = existing_ontology.aggregate(Max("version"))
+            self.version = data.get("version__max", 0) + 1
+
         super().save(**kwargs)
         if created and OntologyVersion.in_ontology_version(self):
             logging.info("Creating new OntologyTermRelation partition")
@@ -195,6 +201,8 @@ class OntologyImport(TimeStampedModel):
                 name=f"import_source_{import_source_id}",
                 values=[import_source_id],
             )
+
+            OntologyVersion.latest()  # Create new version with this import in it
             # Avoid circular import
             from annotation.models import AnnotationVersion
             AnnotationVersion.new_sub_version(None)
@@ -219,10 +227,10 @@ class OntologyVersion(TimeStampedModel):
         unique_together = ('gencc_import', 'mondo_import', 'hp_owl_import', 'hp_phenotype_to_genes_import')
 
     ONTOLOGY_IMPORTS = {
-        "gencc_import": ('gencc', 'https://search.thegencc.org/download/action/submissions-export-csv'),
-        "mondo_import": ('MONDO', 'mondo.json'),
-        "hp_owl_import": ('HP', 'hp.owl'),
-        "hp_phenotype_to_genes_import": ('HP', 'phenotype_to_genes.txt'),
+        "gencc_import": (OntologyImportSource.GENCC, 'https://search.thegencc.org/download/action/submissions-export-csv'),
+        "mondo_import": (OntologyImportSource.MONDO, 'mondo.json'),
+        "hp_owl_import": (OntologyImportSource.HPO, 'hp.owl'),
+        "hp_phenotype_to_genes_import": (OntologyImportSource.HPO, 'phenotype_to_genes.txt'),
     }
 
     @staticmethod
@@ -239,7 +247,10 @@ class OntologyVersion(TimeStampedModel):
         for field, (import_source, filename) in OntologyVersion.ONTOLOGY_IMPORTS.items():
             kwargs[field] = oi_qs.filter(import_source=import_source, filename=filename).order_by("version").last()
 
-        if all(kwargs.values()):
+        values = list(kwargs.values())
+        if all(values):
+            last_date = max([oi.created for oi in values])
+            kwargs["created"] = last_date
             ontology_version = OntologyVersion.objects.create(**kwargs)
         else:
             ontology_version = None
@@ -252,7 +263,8 @@ class OntologyVersion(TimeStampedModel):
         return OntologyTermRelation.objects.filter(from_import__in=self.get_ontology_imports())
 
     def __str__(self):
-        return f"{self.pk}: " + " / ".join((str(f) for f in self.get_ontology_imports()))
+        date_str = self.created.strftime("%d %B %Y")
+        return f"v{self.pk}. ({date_str})"
 
 
 class OntologyTerm(TimeStampedModel):
