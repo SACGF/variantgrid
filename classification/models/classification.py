@@ -1945,7 +1945,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         # Summary
         data = content['data']
 
-        if self.variant:
+        if self.allele:
             content["allele"] = self.get_allele_info()
 
         if self.sample:
@@ -2069,19 +2069,27 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         return None
 
     def get_allele_info(self) -> Optional[Dict[str, Any]]:
-        if not self.variant or not self.variant.allele:
+        if not self.allele:
             return None
 
         allele_info = {}
         try:
-            allele: Allele = self.variant.allele
+            allele: Allele = self.allele
             allele_info["id"] = allele.pk
             if allele.clingen_allele:
                 allele_info[SpecialEKeys.CLINGEN_ALLELE_ID] = str(allele.clingen_allele)
 
             genome_builds = {}
-            valid_builds = GenomeBuild.builds_with_annotation()
-            for variant_allele in allele.variantallele_set.filter(genome_build__in=valid_builds):
+            valid_builds = GenomeBuild.builds_with_annotation_cached()
+            for variant_allele in allele.variantallele_set.filter(genome_build__in=valid_builds)\
+                    .select_related(
+                        'variant',
+                        'variant__locus',
+                        'variant__locus__ref',
+                        'variant__locus__contig',
+                        'variant__alt',
+                        'genome_build'
+                    ):
                 variant = variant_allele.variant
                 hgvs_matcher = HGVSMatcher(genome_build=variant_allele.genome_build)
                 g_hgvs = hgvs_matcher.variant_to_g_hgvs(variant)

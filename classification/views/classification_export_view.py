@@ -271,7 +271,14 @@ class ClassificationApiExportView(APIView):
                 qs = qs.filter(reduce(operator.or_, acceptable_transcripts))
 
         formatter: BaseExportFormatter
-        qs = qs.select_related('classification', 'classification__lab', 'classification__clinical_context')
+        qs = qs.select_related(
+            'classification',
+            'classification__lab',
+            'classification__lab__organization',
+            'classification__clinical_context',
+            'classification__allele',
+            'classification__allele__clingen_allele',
+            'classification__flag_collection')
 
         if allele := request.query_params.get('allele'):
             qs = qs.filter(classification__allele_id=int(allele))
