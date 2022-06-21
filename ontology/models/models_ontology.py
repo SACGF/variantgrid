@@ -190,7 +190,7 @@ class OntologyImport(TimeStampedModel):
             existing_ontology = OntologyImport.objects.filter(import_source=self.import_source,
                                                               filename=self.filename)
             data = existing_ontology.aggregate(Max("version"))
-            self.version = data.get("version__max", 0) + 1
+            self.version = (data.get("version__max") or 0) + 1
 
         super().save(**kwargs)
         if created and OntologyVersion.in_ontology_version(self):
@@ -201,11 +201,6 @@ class OntologyImport(TimeStampedModel):
                 name=f"import_source_{import_source_id}",
                 values=[import_source_id],
             )
-
-            OntologyVersion.latest()  # Create new version with this import in it
-            # Avoid circular import
-            from annotation.models import AnnotationVersion
-            AnnotationVersion.new_sub_version(None)
 
     def __str__(self):
         name = f"OntologyImport ({self.pk}) - {self.import_source}: {self.filename} ({self.created.date()})"
@@ -251,7 +246,11 @@ class OntologyVersion(TimeStampedModel):
         if all(values):
             last_date = max([oi.created for oi in values])
             kwargs["created"] = last_date
-            ontology_version = OntologyVersion.objects.create(**kwargs)
+            created, ontology_version = OntologyVersion.objects.get_or_create(**kwargs)
+            if created:
+                # Avoid circular import
+                from annotation.models import AnnotationVersion
+                AnnotationVersion.new_sub_version(None)
         else:
             ontology_version = None
         return ontology_version
