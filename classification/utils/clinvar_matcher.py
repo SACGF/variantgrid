@@ -131,8 +131,15 @@ class ClinVarLegacyRow:
         return int(self.get_column(ClinVarLegacyColumn.VariationID))
 
     @property
-    def variant_description(self):
+    def variant_description_str(self) -> Optional[str]:
         return self.get_column(ClinVarLegacyColumn.Your_variant_description_HGVS)
+
+    @property
+    def variant_description(self) -> Optional[CHGVS]:
+        if cd := self.variant_description_str:
+            c_hgvs = CHGVS(cd)
+            c_hgvs.gene_symbol = self.submitted_gene
+            return c_hgvs
 
     @property
     def variant_preferred(self):
@@ -185,6 +192,10 @@ class ClinVarLegacyRow:
             c_hgvs.gene_symbol = self.submitted_gene
             return c_hgvs
         return None
+
+    @property
+    def c_hgvs_differs(self) -> bool:
+        return self.c_hgvs_with_gene_symbol != self.variant_description
 
     @property
     def clinical_significance_code(self) -> str:

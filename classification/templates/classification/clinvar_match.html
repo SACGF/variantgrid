@@ -73,6 +73,10 @@
                         <td><a href="https://ncbi.nlm.nih.gov/clinvar/variation/{{ row.variant_clinvar_id }}" target="_blank">{{ row.variant_clinvar_id }}</a></td>
                         <td style="max-width:250px">
                             <div class="mb-1">{% c_hgvs row.c_hgvs_with_gene_symbol %}</div>
+                            {% if row.c_hgvs_differs %}
+                                <div class="text-info">Submitted as</div>
+                                <div>{% c_hgvs row.c_hgvs_with_gene_symbol %}</div>
+                            {% endif %}
                             {% for term in row.ontology_terms %}<div style="font-size:10px">{% ontology_term term %}</div>{% endfor %}
                             <div>{{ row.clinical_significance }}</div>
                         </td>
