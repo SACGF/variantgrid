@@ -8,7 +8,8 @@ from pyhgvs import InvalidHGVSName
 from annotation.models import ClinVar
 from classification.enums import SpecialEKeys
 from classification.management.commands import clinvar_export
-from classification.models import Classification, ClinVarExport, ClinVarAllele, EvidenceKey, EvidenceKeyMap
+from classification.models import Classification, ClinVarExport, ClinVarAllele, EvidenceKey, EvidenceKeyMap, \
+    ConditionResolved
 from genes.hgvs import CHGVS
 from library.guardian_utils import admin_bot
 from ontology.models import OntologyTerm, OntologySnake, OntologyTermRelation
@@ -51,7 +52,6 @@ class ClinVarLegacyMatch:
     Specifically between a LegacyMatch (which will reference many of these) with a ClinVarExport in Shariant
     This will allow us to match up the two
     """
-
     clinvar_export: ClinVarExport
     match_types: Set[ClinVarLegacyExportMatchType]
 
@@ -61,6 +61,12 @@ class ClinVarLegacyMatch:
             return EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE).pretty_value(based_on.get(SpecialEKeys.CLINICAL_SIGNIFICANCE))
         return ''
 
+    @lazy
+    def condition(self) -> Optional[ConditionResolved]:
+        if cm := self.clinvar_export.classification_based_on:
+            if cons := cm.classification.condition_resolution_obj:
+                return cons
+        return self.clinvar_export.condition_resolved
 
 @dataclass
 class ClinVarLegacyMatches:
@@ -103,8 +109,6 @@ class ClinVarLegacyRow:
     Legacy refers to this is the export from ClinVar for a lab prior to using Shariant
     We want to match up the reocrds with ones within
     """
-
-
     clinvar_key: ClinVarKey
     data: Dict[str, str]
 

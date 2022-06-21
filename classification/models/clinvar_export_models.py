@@ -104,11 +104,6 @@ class ClinVarExport(TimeStampedModel):
         self.condition = new_condition.to_json()
         lazy.invalidate(self, '_condition_resolved')
 
-    @property
-    def classification_condition_resolved(self) -> Optional[ConditionResolved]:
-        if cbo := self.classification_based_on:
-            return cbo.classification.condition_resolution_obj
-
     def update_classification(self, new_classification_based_on: Optional[ClassificationModification]):
         if self.classification_based_on != new_classification_based_on:
             lazy.invalidate(self, 'submission_body')
