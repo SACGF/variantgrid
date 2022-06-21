@@ -319,6 +319,7 @@ URLS_NAME_REGISTER.update({  # Disable selected snpdb urls
     "jfu_delete": False,
     "download_uploaded_file": False,
     "clinvar_key_summary": True,
+    "clinvar_match": True,
 
     "condition_matchings": True,
     "condition_match_test": True,

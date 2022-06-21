@@ -846,6 +846,7 @@ _URLS_NAME_REGISTER_OVERRIDE = {
     "classification_import_tool": False,
     "condition_aliases": False,
     "clinvar_key_summary": False,
+    "clinvar_match": False,
     "condition_matchings": False,
     "condition_match_test": False
 }
