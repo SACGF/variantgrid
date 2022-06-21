@@ -72,11 +72,16 @@
                         <td>{{ row.scv_no_version }}<br/>Version: {{ row.scv_version }}<br/>{% if row.clinvar_export %}<br/><a href="{{ row.clinvar_export.get_absolute_url }}">{{ row.clinvar_export }}</a>{% endif %}</td>
                         <td><a href="https://ncbi.nlm.nih.gov/clinvar/variation/{{ row.variant_clinvar_id }}" target="_blank">{{ row.variant_clinvar_id }}</a></td>
                         <td style="max-width:250px">
-                            <div class="mb-1">{% c_hgvs row.c_hgvs_with_gene_symbol %}</div>
-                            {% if row.c_hgvs_differs %}
-                                <div class="text-info">Submitted as</div>
-                                <div>{% c_hgvs row.c_hgvs_with_gene_symbol %}</div>
-                            {% endif %}
+                            <div class="mb-1">
+                                <div class="d-flex">
+                                    <div class="text-right text-info mr-2" style="width:80px">Submitted</div>
+                                    <div class="flex-grow">{% c_hgvs row.variant_description %}</div>
+                                </div>
+                                <div class="d-flex">
+                                    <div class="text-right text-info mr-2" style="width:80px">Normalised</div>
+                                    <div class="flex-grow">{% c_hgvs row.c_hgvs_with_gene_symbol %}</div>
+                                </div>
+                            </div>
                             {% for term in row.ontology_terms %}<div style="font-size:10px">{% ontology_term term %}</div>{% endfor %}
                             <div>{{ row.clinical_significance }}</div>
                         </td>
