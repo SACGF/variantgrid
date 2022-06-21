@@ -1087,7 +1087,7 @@ class AnnotationVersion(models.Model):
                 "gene_annotation_version": latest_for_build(GeneAnnotationVersion, genome_build, "gene_annotation_release__genome_build"),
                 "clinvar_version": latest_for_build(ClinVarVersion, genome_build),
                 "human_protein_atlas_version": latest(HumanProteinAtlasAnnotationVersion, 'annotation_date'),
-                "ontology_version": latest(OntologyVersion, 'version'),
+                "ontology_version": latest(OntologyVersion, 'pk'),
             }
 
             # There is a slight race condition here between is_referenced and saving the object, but
