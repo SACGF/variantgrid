@@ -82,6 +82,15 @@ class ClinVarExport(TimeStampedModel):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+    def __str__(self):
+        parts = [f"ClinVarExport ({self.pk})"]
+        if self.scv:
+            parts.append(self.scv)
+        return " ".join(parts)
+
+    def __repr__(self):
+        return str(self)
+
     @lazy
     def _condition_resolved(self) -> ConditionResolved:
         return ConditionResolved.from_dict(self.condition)

@@ -8,12 +8,14 @@ from django.http.response import HttpResponseBase
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
 from django.utils.timezone import now
+from django.views import View
 from lazy import lazy
 from pytz import timezone
 
 from classification.enums import SpecialEKeys
 from classification.models import ClinVarExport, ClinVarExportBatch, ClinVarExportBatchStatus, \
     EvidenceKeyMap, ClinVarExportStatus, ClinVarExportSubmission
+from classification.utils.clinvar_matcher import ClinVarLegacyRow
 from classification.views.classification_dashboard_view import ClassificationDashboard
 from genes.hgvs import CHGVS
 from library.cache import timed_cache
@@ -22,6 +24,7 @@ from library.utils import html_to_text, export_column, ExportRow
 from snpdb.models import ClinVarKey, Lab, Allele, GenomeBuild
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
 from uicore.json.json_types import JsonDataType
+import io
 
 
 @timed_cache(size_limit=30, ttl=60)
@@ -356,4 +359,51 @@ def clinvar_export_detail(request: HttpRequest, clinvar_export_id: int) -> HttpR
         'clinvar_export': clinvar_export,
         'classification': clinvar_export.classification_based_on,
         'interpretation_summary': interpretation_summary
+    })
+
+
+class ClinVarMatchView(View):
+
+    def get(self, request, **kwargs):
+        clinvar_key_id = kwargs.get('clinvar_key_id')
+        clinvar_key: ClinVarKey
+        if not clinvar_key_id:
+            if clinvar_key := ClinVarKey.clinvar_keys_for_user(request.user).first():
+                return redirect(reverse('clinvar_match', kwargs={'clinvar_key_id': clinvar_key.pk}))
+            else:
+                # page has special support if no clinvar key is available to the user
+                return render(request, 'classification/clinvar_key_summary_none.html')
+
+        clinvar_key = get_object_or_404(ClinVarKey, pk=clinvar_key_id)
+        clinvar_key.check_user_can_access(request.user)
+
+        return render(request, 'classification/clinvar_match.html', {
+            'all_keys': ClinVarKey.clinvar_keys_for_user(request.user),
+            'clinvar_key': clinvar_key
+        })
+
+    def post(self, request, **kwargs):
+        clinvar_key_id = kwargs.get('clinvar_key_id')
+        clinvar_key: ClinVarKey = get_object_or_404(ClinVarKey, pk=clinvar_key_id)
+        clinvar_key.check_user_can_access(request.user)
+
+        file_obj = io_string = io.StringIO(request.FILES.get('file').read().decode("utf-8"))
+        clinvar_legacy_rows = ClinVarLegacyRow.load_file(file_obj, clinvar_key)
+
+        return render(request, 'classification/clinvar_match.html', {
+            'all_keys': ClinVarKey.clinvar_keys_for_user(request.user),
+            'clinvar_key': clinvar_key,
+            'rows': clinvar_legacy_rows
+        })
+
+
+def clinvar_match_detail(request, clinvar_key_id: str):
+    clinvar_key: ClinVarKey = get_object_or_404(ClinVarKey, pk=clinvar_key_id)
+    clinvar_key.check_user_can_access(request.user)
+
+    # TODO should this be a post?
+    data_str = request.GET.get('data_str')
+
+    return render(request, 'classification/clinvar_match_detail.html', {
+        'matches': ClinVarLegacyRow.from_data_str(clinvar_key, data_str).find_variant_grid_allele()
     })

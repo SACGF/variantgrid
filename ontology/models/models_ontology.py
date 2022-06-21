@@ -763,6 +763,9 @@ class OntologySnake:
 
 class OntologySnakes:
 
+    def __bool__(self):
+        return bool(self.snakes)
+
     def __init__(self, snakes: List[OntologySnake]):
         self.snakes = snakes
 

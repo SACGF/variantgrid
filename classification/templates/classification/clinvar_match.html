@@ -1,0 +1,116 @@
+{% extends "uicore/page/base.html" %}
+{% load classification_tags %}
+{% load ontology_tags %}
+{% load ui_menu_bars %}
+{% load ui_help %}
+{% load ui_utils %}
+{% load ui_tabs_builder %}
+{% load english_tags %}
+{% load js_tags %}
+{% block title %}Clinvar Export{% endblock %}
+{% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
+{% block content %}
+    <div class="container">
+        {% if all_keys.count > 1 %}
+            <div class="btn-group mb-4" role="group" aria-label="ClinVar Key Picker">
+                {% for key in all_keys %}
+                    <button onclick="window.open('{% url 'clinvar_match' key.pk %}', '_self')"
+                    class="btn {% if key.pk == clinvar_key.pk %}btn-secondary font-weight-bold{% else %}btn-outline-secondary{% endif %}">{{ key.label }}
+                    </button>
+                {% endfor %}
+            </div>
+        {% endif %}
+        <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+            <div class="card">
+                <div class="card-header">File Upload</div>
+                <div class="card-body">
+                    {% labelled label="Upload File" %}
+                        <input type="file" name="file">
+                    {% endlabelled %}
+                    <p>{{ 'W'|severity_icon }} The matching process takes a few minutes, please be patient.</p>
+                </div>
+                <div class="card-footer">
+                    <input type="submit" class="btn btn-primary" value="Compare" />
+                </div>
+            </div>
+        </form>
+
+        {% page_help_embedded title="ClinVar Matching" %}
+            <p>This page allows admins to compare a lab's pre-existing ClinVar export details against records in {{ site_name }}.</p>
+            <p>As of right now it will show you matches, but not give you the ability to assign the SCVs.</p>
+            <p>ClinVar Details shows you the c.HGVS as it was normalised by ClinVar, condition ID(s) that were assigned, and the clinical significance.</p>
+            <p>Matches to Alleles can be based on
+                <ul>
+                    <li>ClinVar VariantID matches : the {{ site_name }} annotation process matched this ClinVar VariantID to our Allele</li>
+                    <li>ClinVar c.HGVS matches : using the search function using the ClinVar c.HGVS found this record</li>
+                    <li>imported c.HGVS matches : by trying 3 lower and higher transcript versions, did the c.HGVS as it was provided by the lab match the c.hgvs evidence key (e.g. as it was imported to us without normalisation)</li>
+                </ul>
+            </p>
+            <p>If the matched Alleles have associated ClinVarExports for the ClinVarkey the following will also be checked
+                <ul>
+                    <li>condition matches : If the condition provided to ClinVar is equal or a descendant of the condition umbrella.</li>
+                    <li>clin sig matches : If the clinical significance as it is in ClinVar matches exactly the value as it is in {{ site_name }}.</li>
+                    <li>SCV matches : If the ClinVarExport has already been assigned a SCV, does it match.</li>
+                </ul>
+            </p>
+        {% end_page_help_embedded %}
+
+        {% if rows %}
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>SCV</th>
+                        <th>ClinVar<br/>VariantID</th>
+                        <th style="min-width:250px">ClinVar Details</th>
+                        <th style="min-width:250px">Matches</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for row in rows %}
+                    <tr>
+                        <td>{{ row.scv_no_version }}<br/>Version: {{ row.scv_version }}<br/>{% if row.clinvar_export %}<br/><a href="{{ row.clinvar_export.get_absolute_url }}">{{ row.clinvar_export }}</a>{% endif %}</td>
+                        <td><a href="https://ncbi.nlm.nih.gov/clinvar/variation/{{ row.variant_clinvar_id }}" target="_blank">{{ row.variant_clinvar_id }}</a></td>
+                        <td style="max-width:250px">
+                            <div class="mb-1">{% c_hgvs row.c_hgvs_with_gene_symbol %}</div>
+                            {% for term in row.ontology_terms %}<div style="font-size:10px">{% ontology_term term %}</div>{% endfor %}
+                            <div>{{ row.clinical_significance }}</div>
+                        </td>
+                        <td style="min-width:300px">
+                            <div data-clinvar-row="{{ row.data_str }}">Queued</div>
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            <script>
+                function loadNext() {
+                    let first_data_dom = $('[data-clinvar-row]').first();
+                    let data = first_data_dom.attr('data-clinvar-row');
+                    let url = Urls.clinvar_match_detail('{{ clinvar_key.pk }}');
+                    first_data_dom.html($('<i class="fa fa-spinner"></i>'));
+
+                    $.ajax({
+                        type: "GET",
+                        url: url,
+                        async: true,
+                        data: {
+                            data_str: data
+                        },
+                        success: (results, textStatus, jqXHR) => {
+                            // TODO provide the ability for a cache token, so we only reload data if something's changed
+                            first_data_dom.replaceWith(results);
+                            loadNext();
+                        },
+                        error: (call, status, text) => {
+                            first_data_dom.replaceWith($('<div>', {class: 'ajax-error', html:[severityIcon('C'), "Error Loading Data"]}));
+                        },
+                        complete: (jqXHR, textStatus) => {}
+                    });
+
+                }
+                loadNext();
+            </script>
+        {% endif %}
+    </div>
+{% endblock %}
