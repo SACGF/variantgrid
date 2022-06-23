@@ -34,7 +34,8 @@ app.conf.beat_schedule = {}
 
 # Runs Sync as declared in the Sync table
 # As of 2019-July it's only uploading to shariant
-if settings.SYNC_DETAILS and any(sd["enabled"] for sd in settings.SYNC_DETAILS.values()):
+SYNC_DETAILS = getattr(settings, "SYNC_DETAILS", {})
+if SYNC_DETAILS and any(sd["enabled"] for sd in SYNC_DETAILS.values()):
     app.conf.beat_schedule['sync_data'] = {
         'task': 'sync.tasks.sync_tasks.sync_all',
         'schedule': HOUR_SECS,
