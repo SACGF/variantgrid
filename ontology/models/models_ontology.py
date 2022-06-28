@@ -209,63 +209,6 @@ class OntologyImport(TimeStampedModel):
         return name
 
 
-class OntologyVersion(TimeStampedModel):
-    """ This is used by annotation.AnnotationVersion to keep track of different OntologyImports
-        so we can load historical versions of OntologyTermRelation """
-
-    gencc_import = models.ForeignKey(OntologyImport, on_delete=PROTECT, related_name="gencc_ontology_version")
-    mondo_import = models.ForeignKey(OntologyImport, on_delete=PROTECT, related_name="mondo_ontology_version")
-    hp_owl_import = models.ForeignKey(OntologyImport, on_delete=PROTECT, related_name="hp_owl_ontology_version")
-    hp_phenotype_to_genes_import = models.ForeignKey(OntologyImport, on_delete=PROTECT,
-                                                     related_name="hp_phenotype_to_genes_ontology_version")
-    class Meta:
-        unique_together = ('gencc_import', 'mondo_import', 'hp_owl_import', 'hp_phenotype_to_genes_import')
-
-    ONTOLOGY_IMPORTS = {
-        "gencc_import": (OntologyImportSource.GENCC, 'https://search.thegencc.org/download/action/submissions-export-csv'),
-        "mondo_import": (OntologyImportSource.MONDO, 'mondo.json'),
-        "hp_owl_import": (OntologyImportSource.HPO, 'hp.owl'),
-        "hp_phenotype_to_genes_import": (OntologyImportSource.HPO, 'phenotype_to_genes.txt'),
-    }
-
-    @staticmethod
-    def in_ontology_version(ontology_import: OntologyImport) -> bool:
-        versioned = defaultdict(set)
-        for (import_source, filename) in OntologyVersion.ONTOLOGY_IMPORTS.values():
-            versioned[import_source].add(filename)
-        return ontology_import.filename in versioned[import_source]
-
-    @staticmethod
-    def latest() -> Optional['OntologyVersion']:
-        oi_qs = OntologyImport.objects.all()
-        kwargs = {}
-        for field, (import_source, filename) in OntologyVersion.ONTOLOGY_IMPORTS.items():
-            kwargs[field] = oi_qs.filter(import_source=import_source, filename=filename).order_by("version").last()
-
-        values = list(kwargs.values())
-        if all(values):
-            last_date = max([oi.created for oi in values])
-            kwargs["created"] = last_date
-            created, ontology_version = OntologyVersion.objects.get_or_create(**kwargs)
-            if created:
-                # Avoid circular import
-                from annotation.models import AnnotationVersion
-                AnnotationVersion.new_sub_version(None)
-        else:
-            ontology_version = None
-        return ontology_version
-
-    def get_ontology_imports(self):
-        return [self.gencc_import, self.mondo_import, self.hp_owl_import, self.hp_phenotype_to_genes_import]
-
-    def get_ontology_terms(self):
-        return OntologyTermRelation.objects.filter(from_import__in=self.get_ontology_imports())
-
-    def __str__(self):
-        date_str = self.created.strftime("%d %B %Y")
-        return f"v{self.pk}. ({date_str})"
-
-
 class OntologyTerm(TimeStampedModel):
 
     """
@@ -583,6 +526,63 @@ class OntologyTermRelation(PostgresPartitionedModel, TimeStampedModel):
                 moi.add(source["mode_of_inheritance"])
                 submitters.add(source["submitter"])
         return list(sorted(moi)), list(sorted(submitters))
+
+
+class OntologyVersion(TimeStampedModel):
+    """ This is used by annotation.AnnotationVersion to keep track of different OntologyImports
+        so we can load historical versions of OntologyTermRelation """
+
+    gencc_import = models.ForeignKey(OntologyImport, on_delete=PROTECT, related_name="gencc_ontology_version")
+    mondo_import = models.ForeignKey(OntologyImport, on_delete=PROTECT, related_name="mondo_ontology_version")
+    hp_owl_import = models.ForeignKey(OntologyImport, on_delete=PROTECT, related_name="hp_owl_ontology_version")
+    hp_phenotype_to_genes_import = models.ForeignKey(OntologyImport, on_delete=PROTECT,
+                                                     related_name="hp_phenotype_to_genes_ontology_version")
+    class Meta:
+        unique_together = ('gencc_import', 'mondo_import', 'hp_owl_import', 'hp_phenotype_to_genes_import')
+
+    ONTOLOGY_IMPORTS = {
+        "gencc_import": (OntologyImportSource.GENCC, 'https://search.thegencc.org/download/action/submissions-export-csv'),
+        "mondo_import": (OntologyImportSource.MONDO, 'mondo.json'),
+        "hp_owl_import": (OntologyImportSource.HPO, 'hp.owl'),
+        "hp_phenotype_to_genes_import": (OntologyImportSource.HPO, 'phenotype_to_genes.txt'),
+    }
+
+    @staticmethod
+    def in_ontology_version(ontology_import: OntologyImport) -> bool:
+        versioned = defaultdict(set)
+        for (import_source, filename) in OntologyVersion.ONTOLOGY_IMPORTS.values():
+            versioned[import_source].add(filename)
+        return ontology_import.filename in versioned[import_source]
+
+    @staticmethod
+    def latest() -> Optional['OntologyVersion']:
+        oi_qs = OntologyImport.objects.all()
+        kwargs = {}
+        for field, (import_source, filename) in OntologyVersion.ONTOLOGY_IMPORTS.items():
+            kwargs[field] = oi_qs.filter(import_source=import_source, filename=filename).order_by("version").last()
+
+        values = list(kwargs.values())
+        if all(values):
+            last_date = max([oi.created for oi in values])
+            kwargs["created"] = last_date
+            created, ontology_version = OntologyVersion.objects.get_or_create(**kwargs)
+            if created:
+                # Avoid circular import
+                from annotation.models import AnnotationVersion
+                AnnotationVersion.new_sub_version(None)
+        else:
+            ontology_version = None
+        return ontology_version
+
+    def get_ontology_imports(self):
+        return [self.gencc_import, self.mondo_import, self.hp_owl_import, self.hp_phenotype_to_genes_import]
+
+    def get_ontology_terms(self):
+        return OntologyTermRelation.objects.filter(from_import__in=self.get_ontology_imports())
+
+    def __str__(self):
+        date_str = self.created.strftime("%d %B %Y")
+        return f"v{self.pk}. ({date_str})"
 
 
 @dataclass
