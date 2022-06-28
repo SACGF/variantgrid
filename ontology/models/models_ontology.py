@@ -439,23 +439,6 @@ class OntologyTermRelation(PostgresPartitionedModel, TimeStampedModel):
         return OntologyRelation.DISPLAY_NAMES.get(self.relation, self.relation)
 
     @staticmethod
-    def parents_of(source_term: OntologyTerm) -> QuerySet:
-        """
-        QuerySet of OntologyTerms representing parents of this term.
-        Note that MONDO terms very often have multiple parents
-        """
-        parent_ids = OntologyTermRelation.objects.filter(source_term=source_term, relation=OntologyRelation.IS_A).values_list("dest_term", flat=True)
-        return OntologyTerm.objects.filter(id__in=parent_ids).order_by("-id")
-
-    @staticmethod
-    def children_of(term: OntologyTerm) -> QuerySet:
-        """
-        QuerySet of OntologyTerms representing children of this term
-        """
-        children_ids = OntologyTermRelation.objects.filter(dest_term=term, relation=OntologyRelation.IS_A).values_list("source_term", flat=True)
-        return OntologyTerm.objects.filter(id__in=children_ids).order_by("-id")
-
-    @staticmethod
     def as_mondo(term: OntologyTerm) -> Optional[OntologyTerm]:
         if term.ontology_service == OntologyService.MONDO:
             return term
