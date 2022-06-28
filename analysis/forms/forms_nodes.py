@@ -36,7 +36,7 @@ from genes.models import GeneListCategory, CustomTextGeneList, GeneList, PanelAp
 from library.django_utils.autocomplete_utils import ModelSelect2, ModelSelect2Multiple
 from library.forms import NumberInput
 from library.utils import md5sum_str
-from ontology.models import OntologyTerm, OntologyTermRelation
+from ontology.models import OntologyTerm
 from patients.models_enums import GnomADPopulation
 from snpdb.forms import GenomeBuildAutocompleteForwardMixin
 from snpdb.models import GenomicInterval, ImportStatus, Sample, VCFFilter, Tag
@@ -516,7 +516,8 @@ class MOINodeForm(BaseNodeForm):
         self.fields['sample'].queryset = Sample.objects.filter(pk__in=self.instance.get_sample_ids())
 
         # Dynamically add fields
-        moi_list, submitters = OntologyTermRelation.moi_and_submitters()
+        ontology_version = self.instance.analysis.annotation_version.ontology_version
+        moi_list, submitters = ontology_version.moi_and_submitters()
         moi_initial = {}
         moi_related = self.instance.moinodemodeofinheritance_set
         if moi_related.exists():
@@ -556,7 +557,8 @@ class MOINodeForm(BaseNodeForm):
         for ot in self.cleaned_data["mondo"]:
             ontology_term_set.create(ontology_term=ot)
 
-        moi_list, submitters = OntologyTermRelation.moi_and_submitters()
+        ontology_version = self.instance.analysis.annotation_version.ontology_version
+        moi_list, submitters = ontology_version.moi_and_submitters()
         RELATED = [
             ("moinodemodeofinheritance_set", "mode_of_inheritance", "moi_", moi_list),
             ("moinodesubmitter_set", "submitter", "submitter_", submitters),

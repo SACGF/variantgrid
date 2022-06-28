@@ -9,7 +9,7 @@ from rest_framework.views import APIView
 from genes.models import GeneListGeneSymbol, create_fake_gene_list
 from genes.serializers import GeneListGeneSymbolSerializer
 from library.constants import WEEK_SECS
-from ontology.models import OntologyTerm, OntologySnake, GeneDiseaseClassification
+from ontology.models import OntologyTerm, OntologySnake, GeneDiseaseClassification, OntologyVersion
 from ontology.ontology_matching import OntologyMatching
 from ontology.serializers import OntologyTermRelationSerializer
 
@@ -31,12 +31,13 @@ class SearchMondoText(APIView):
 class OntologyTermGeneListView(APIView):
     def get(self, request, *args, **kwargs):
         term_slug = self.kwargs['term']
+        ontology_version = OntologyVersion.latest()
         ontology_term = OntologyTerm.get_from_slug(term_slug)
 
         name = str(ontology_term)
         gene_list = create_fake_gene_list(name=name, user=None)
         gene_list_genes = []
-        for gene_symbol in OntologySnake.gene_symbols_for_terms([ontology_term.pk]):
+        for gene_symbol in ontology_version.gene_symbols_for_terms([ontology_term.pk]):
             glg = GeneListGeneSymbol(gene_list=gene_list, original_name=gene_symbol, gene_symbol=gene_symbol)
             gene_list_genes.append(glg)
 

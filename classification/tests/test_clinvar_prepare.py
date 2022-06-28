@@ -107,7 +107,7 @@ class TestClinVarExportModels(TestCase):
 
         # test all new groups
         established = MockEstablished(unique_id=1, condition=simple_bad_heart, candidate=7)
-        condition_num_grouper = ConditionGroupPrepareMergerTest(established_candidates={established, })
+        condition_num_grouper = ConditionGroupPrepareMergerTest(established_candidates={established})
 
         # these two groups should merge
         condition_num_grouper.add_new_candidate(group_toe)

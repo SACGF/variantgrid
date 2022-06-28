@@ -29,7 +29,7 @@ from analysis.views.analysis_permissions import get_analysis_or_404, get_node_su
     get_node_subclass_or_non_fatal_exception
 from analysis.views.node_json_view import NodeJSONPostView
 from library.django_utils import require_superuser
-from ontology.models import OntologyTermRelation, OntologyTerm
+from ontology.models import OntologyTerm, OntologyVersion
 from ontology.serializers import OntologyTermSerializer
 from snpdb.models import Tag, BuiltInFilters, GenomeBuild, Sample
 from snpdb.tasks.clingen_tasks import populate_clingen_alleles_from_allele_source
@@ -310,13 +310,13 @@ def create_selected_child(request, analysis_id, node_id):
     return JsonResponse(data)
 
 
-def get_sample_patient_gene_disease_data(sample: Sample):
+def get_sample_patient_gene_disease_data(sample: Sample, ontology_version: OntologyVersion):
     data = {
         "patient_id": sample.patient_id
     }
     if sample.patient:
         all_terms = OntologyTerm.objects.filter(pk__in=sample.patient.get_ontology_term_ids())
-        gene_disease_qs = OntologyTermRelation.gene_disease_relations()
+        gene_disease_qs = ontology_version.gene_disease_relations()
         gene_disease_terms = all_terms.filter(subject__in=gene_disease_qs).distinct()
         data["patient"] = str(sample.patient)
         data["total_terms"] = all_terms.count()
@@ -324,11 +324,12 @@ def get_sample_patient_gene_disease_data(sample: Sample):
     return data
 
 
-def sample_patient_gene_disease(request, sample_id):
+def sample_patient_gene_disease(request, sample_id, ontology_version_id):
     """ For a sample, return patient MONDO terms that are associated with gene/disease
         Used by MOI Node """
     sample = Sample.get_for_user(request.user, sample_id)
-    data = get_sample_patient_gene_disease_data(sample)
+    ontology_version = get_object_or_404(OntologyVersion, pk=ontology_version_id)
+    data = get_sample_patient_gene_disease_data(sample, ontology_version)
     return JsonResponse(data)
 
 

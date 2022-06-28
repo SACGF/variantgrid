@@ -70,10 +70,11 @@ class PhenotypeNode(AnalysisNode):
         return self.text_phenotype or self.get_gene_symbols_qs().exists()
 
     def get_gene_symbols_qs(self):
+        ontology_version = self.analysis.annotation_version.ontology_version
         if self.accordion_panel == self.PANEL_PATIENT and self.patient:
-            gene_symbols_qs = self.patient.get_gene_symbols()
+            gene_symbols_qs = self.patient.get_gene_symbols(ontology_version)
         else:
-            gene_symbols_qs = OntologySnake.cached_gene_symbols_for_terms_tuple(tuple(self.get_ontology_term_ids()))
+            gene_symbols_qs = ontology_version.cached_gene_symbols_for_terms_tuple(tuple(self.get_ontology_term_ids()))
         return gene_symbols_qs
 
     def get_ontology_term_ids(self):
