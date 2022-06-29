@@ -202,7 +202,7 @@ class MOINodeView(NodeView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         if self.object.sample:
-            ontology_version = self.object.annotation_version.ontology_version
+            ontology_version = self.object.analysis.annotation_version.ontology_version
             context["sample_patient_gene_disease"] = get_sample_patient_gene_disease_data(self.object.sample,
                                                                                           ontology_version)
         return context

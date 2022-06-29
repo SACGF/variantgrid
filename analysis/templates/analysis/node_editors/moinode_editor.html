@@ -116,7 +116,7 @@
 
     function changeSample() {
         let sampleId = $("#id_sample", "form#moi-node").val();
-        let ontologyVersionId = {{ node.annotation_version.ontology_version_id }};
+        let ontologyVersionId = {{ node.analysis.annotation_version.ontology_version_id }};
         if (sampleId) {
             $.ajax({
                 type: "GET",
