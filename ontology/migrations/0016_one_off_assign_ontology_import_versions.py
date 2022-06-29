@@ -19,16 +19,17 @@ def _one_off_assign_ontology_import_versions(apps, schema_editor):
         OntologyImport.objects.bulk_update(records, ["version"], batch_size=2000)
 
     # Find the latest for each ontology import - if they all exist make a version
+    gencc_filenames = ['https://search.thegencc.org/download/action/submissions-export-csv', 'gencc-submissions.csv']
     ONTOLOGY_IMPORTS = {
-        "gencc_import": ('gencc', 'https://search.thegencc.org/download/action/submissions-export-csv'),
-        "mondo_import": ('MONDO', 'mondo.json'),
-        "hp_owl_import": ('HP', 'hp.owl'),
-        "hp_phenotype_to_genes_import": ('HP', 'phenotype_to_genes.txt'),
+        "gencc_import": ('gencc', gencc_filenames),
+        "mondo_import": ('MONDO', ['mondo.json']),
+        "hp_owl_import": ('HP', ['hp.owl']),
+        "hp_phenotype_to_genes_import": ('HP', ['phenotype_to_genes.txt']),
     }
     oi_qs = OntologyImport.objects.all()
     kwargs = {}
-    for field, (import_source, filename) in ONTOLOGY_IMPORTS.items():
-        kwargs[field] = oi_qs.filter(import_source=import_source, filename=filename).order_by("version").last()
+    for field, (import_source, filenames) in ONTOLOGY_IMPORTS.items():
+        kwargs[field] = oi_qs.filter(import_source=import_source, filename__=filenames).order_by("pk").last()
 
     if all(kwargs.values()):
         OntologyVersion.objects.get_or_create(**kwargs)

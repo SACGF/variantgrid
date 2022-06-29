@@ -26,7 +26,8 @@ def create_ontology_test_data():
 def create_test_ontology_version() -> OntologyVersion:
     kwargs = {}
     now = timezone.now()
-    for field, (import_source, filename) in OntologyVersion.ONTOLOGY_IMPORTS.items():
+    for field, (import_source, filenames) in OntologyVersion.ONTOLOGY_IMPORTS.items():
+        filename = filenames[0]
         oi, _ = OntologyImport.objects.get_or_create(import_source=import_source, filename=filename,
                                                      defaults={"processed_date": now})
         kwargs[field] = oi

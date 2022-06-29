@@ -510,25 +510,27 @@ class OntologyVersion(TimeStampedModel):
         unique_together = ('gencc_import', 'mondo_import', 'hp_owl_import', 'hp_phenotype_to_genes_import')
 
     ONTOLOGY_IMPORTS = {
-        "gencc_import": (OntologyImportSource.GENCC, 'https://search.thegencc.org/download/action/submissions-export-csv'),
-        "mondo_import": (OntologyImportSource.MONDO, 'mondo.json'),
-        "hp_owl_import": (OntologyImportSource.HPO, 'hp.owl'),
-        "hp_phenotype_to_genes_import": (OntologyImportSource.HPO, 'phenotype_to_genes.txt'),
+        "gencc_import": (OntologyImportSource.GENCC,
+                         ['https://search.thegencc.org/download/action/submissions-export-csv',
+                          'gencc-submissions.csv']),
+        "mondo_import": (OntologyImportSource.MONDO, ['mondo.json']),
+        "hp_owl_import": (OntologyImportSource.HPO, ['hp.owl']),
+        "hp_phenotype_to_genes_import": (OntologyImportSource.HPO, ['phenotype_to_genes.txt']),
     }
 
     @staticmethod
     def in_ontology_version(ontology_import: OntologyImport) -> bool:
         versioned = defaultdict(set)
-        for (import_source, filename) in OntologyVersion.ONTOLOGY_IMPORTS.values():
-            versioned[import_source].add(filename)
+        for (import_source, filenames) in OntologyVersion.ONTOLOGY_IMPORTS.values():
+            versioned[import_source].extend(filenames)
         return ontology_import.filename in versioned[ontology_import.import_source]
 
     @staticmethod
     def latest() -> Optional['OntologyVersion']:
         oi_qs = OntologyImport.objects.all()
         kwargs = {}
-        for field, (import_source, filename) in OntologyVersion.ONTOLOGY_IMPORTS.items():
-            kwargs[field] = oi_qs.filter(import_source=import_source, filename=filename).order_by("version").last()
+        for field, (import_source, filenames) in OntologyVersion.ONTOLOGY_IMPORTS.items():
+            kwargs[field] = oi_qs.filter(import_source=import_source, filename__in=filenames).order_by("pk").last()
 
         values = list(kwargs.values())
         if all(values):
