@@ -178,9 +178,11 @@ def annotation_detail(request):
     ontology_relationship_counts = dict()
     for first_index, first_service in enumerate(ontology_services):
         for second_service in ontology_services[first_index:]:
-            join_count = OntologyTermRelation.objects.filter(source_term__ontology_service=first_service, dest_term__ontology_service=second_service).count()
+            join_count = OntologyTermRelation.objects.filter(source_term__ontology_service=first_service,
+                                                             dest_term__ontology_service=second_service).count()
             if first_service != second_service:
-                reverse_count = OntologyTermRelation.objects.filter(source_term__ontology_service=second_service, dest_term__ontology_service=first_service).count()
+                reverse_count = OntologyTermRelation.objects.filter(source_term__ontology_service=second_service,
+                                                                    dest_term__ontology_service=first_service).count()
                 join_count += reverse_count
             ontology_relationship_counts[f"{first_service}{second_service}"] = join_count
             ontology_relationship_counts[f"{second_service}{first_service}"] = join_count

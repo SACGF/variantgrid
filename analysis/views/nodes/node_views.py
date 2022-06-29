@@ -36,7 +36,6 @@ from classification.models.classification import Classification
 from classification.views.classification_datatables import ClassificationColumns
 from library.django_utils import highest_pk
 from library.jqgrid import JqGrid
-from ontology.models import OntologySnake
 from snpdb.models.models_variant import Variant
 
 
@@ -203,7 +202,9 @@ class MOINodeView(NodeView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         if self.object.sample:
-            context["sample_patient_gene_disease"] = get_sample_patient_gene_disease_data(self.object.sample)
+            ontology_version = self.object.annotation_version.ontology_version
+            context["sample_patient_gene_disease"] = get_sample_patient_gene_disease_data(self.object.sample,
+                                                                                          ontology_version)
         return context
 
 
@@ -248,11 +249,11 @@ class PhenotypeNodeView(NodeView):
         })
         return context
 
-    @staticmethod
-    def _get_no_gene_warnings(label: str, terms) -> Optional[str]:
+    def _get_no_gene_warnings(self, label: str, terms) -> Optional[str]:
         terms_without_genes = set()
+        ontology_version = self.object.analysis.annotation_version.ontology_version
         for ontology_term in terms:
-            if not OntologySnake.cached_gene_symbols_for_terms_tuple((ontology_term,)).exists():
+            if not ontology_version.cached_gene_symbols_for_terms_tuple((ontology_term,)).exists():
                 terms_without_genes.add(str(ontology_term))
         warning = None
         if terms_without_genes:

@@ -116,10 +116,11 @@
 
     function changeSample() {
         let sampleId = $("#id_sample", "form#moi-node").val();
+        let ontologyVersionId = {{ node.annotation_version.ontology_version_id }};
         if (sampleId) {
             $.ajax({
                 type: "GET",
-                url: Urls.sample_patient_gene_disease(sampleId),
+                url: Urls.sample_patient_gene_disease(sampleId, ontologyVersionId),
                 success: function(data) {
                     populateMOIPatient(sampleId, data, true);
                 }

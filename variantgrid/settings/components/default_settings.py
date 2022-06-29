@@ -75,15 +75,13 @@ AVATAR_THUMB_FORMAT = "PNG"
 
 MANAGERS = ADMINS
 
-BACKEND_ENGINE = "postgres"
-
 CONN_MAX_AGE = 60  # Reuse DB connections
 
 DEFAULT_AUTO_FIELD = "django.db.models.AutoField"
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.postgresql',
+        'ENGINE': 'psqlextra.backend',
         'NAME': get_secret('DB.name'),
         'USER': get_secret('DB.user'),
         'PASSWORD': get_secret('DB.password'),
@@ -646,6 +644,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'django.contrib.admin',
+    "django.contrib.postgres",
     # 3rd party libraries
     'dal',  # Django Autocomplete Light v3
     'dal_select2',  # DAL Plugin
@@ -660,6 +659,7 @@ INSTALLED_APPS = [
     'guardian',
     'jfu',
     'leaflet',
+    "psqlextra",
     'rest_framework',
     'termsandconditions',
     'crispy_forms',  # used to make bootstrap compatible forms

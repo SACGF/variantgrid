@@ -83,7 +83,7 @@ def get_samples_dict(df):
 
 
 def link_records(cuff_diff_file):
-    EXPRESSION_SCRIPTS_DIR = os.path.join(settings.BASE_DIR, "expression", "dbscripts", settings.BACKEND_ENGINE)
+    EXPRESSION_SCRIPTS_DIR = os.path.join(settings.BASE_DIR, "expression", "dbscripts", "postgres")
 
     if cuff_diff_file.annotation_level == AnnotationLevel.GENE:
         script_name = 'link_cuffdiff_gene_ids.sql'

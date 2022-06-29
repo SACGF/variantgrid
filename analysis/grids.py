@@ -21,7 +21,7 @@ from library.pandas_jqgrid import DataFrameJqGrid
 from library.unit_percent import get_allele_frequency_formatter
 from library.utils import md5sum_str
 from ontology.grids import AbstractOntologyGenesGrid
-from ontology.models import OntologyTermRelation, GeneDiseaseClassification
+from ontology.models import OntologyTermRelation, GeneDiseaseClassification, OntologyVersion
 from patients.models_enums import Zygosity
 from snpdb.grid_columns.custom_columns import get_custom_column_fields_override_and_sample_position, \
     get_variantgrid_extra_alias_and_select_columns
@@ -542,6 +542,9 @@ class NodeOntologyGenesGrid(AbstractOntologyGenesGrid):
     def __init__(self, user, analysis_id, node_id, version):
         self.node = get_node_subclass_or_404(user, node_id, version=version)
         super().__init__()
+
+    def _get_ontology_version(self) -> OntologyVersion:
+        return self.node.analysis.annotation_version.ontology_version
 
     def _get_ontology_term_ids(self):
         return self.node.get_ontology_term_ids()

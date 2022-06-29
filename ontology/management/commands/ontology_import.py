@@ -16,7 +16,7 @@ from genes.models import HGNC
 from library.file_utils import file_md5sum
 from ontology.gencc import load_gencc
 from ontology.models import OntologyService, OntologyRelation, OntologyTerm, OntologyImportSource, OntologyImport, \
-    OntologyTermRelation
+    OntologyTermRelation, OntologyVersion
 from ontology.ontology_builder import OntologyBuilder, OntologyBuilderDataUpToDateException
 
 """
@@ -602,3 +602,6 @@ class Command(BaseCommand):
 
         if filename := options.get("omim_frequencies"):
             print("THIS FILE IS DEPRECATED, please use phenotype_to_genes.txt instead")
+
+        # Create a new OntologyVersion with all the new imports
+        OntologyVersion.latest()

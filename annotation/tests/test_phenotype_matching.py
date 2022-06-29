@@ -2,7 +2,7 @@ from django.test import TestCase
 
 from annotation.phenotype_matcher import PhenotypeMatcher
 from ontology.models import OntologyService
-from ontology.tests.test_data_ontology import create_ontology_test_data
+from ontology.tests.test_data_ontology import create_ontology_test_data, create_test_ontology_version
 from patients.models import Patient
 
 
@@ -11,6 +11,7 @@ class TestPhenotypeMatching(TestCase):
     @classmethod
     def setUpTestData(cls):
         create_ontology_test_data()
+        create_test_ontology_version()
         cls.phenotype_matcher = PhenotypeMatcher()
 
     def create_patient_match_phenotypes(self, phenotype):

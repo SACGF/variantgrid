@@ -22,14 +22,30 @@ from snpdb.tests.utils.vcf_testing_utils import slowly_create_loci_and_variants_
 TEST_IMPORT_PROCESSING_DIR = os.path.join(settings.PRIVATE_DATA_ROOT, 'import_processing',
                                           "test", str(uuid4()))
 
-ANNOTATION = copy.deepcopy(settings.ANNOTATION)
-ANNOTATION[settings.BUILD_GRCH37]["vep_config"]["columns_version"] = 1
-ANNOTATION[settings.BUILD_GRCH38]["vep_config"]["columns_version"] = 1
+TEST_ANNOTATION = copy.deepcopy(settings.ANNOTATION)
+# I didn't have the phasCons/phyloP data on my laptop when I generated the test VCFs, so need to disable
+TEST_ANNOTATION[settings.BUILD_GRCH37]["vep_config"].update({
+    "phastcons100way": None,
+    "phastcons46way": None,
+    "phylop100way": None,
+    "phylop46way": None,
+})
+TEST_ANNOTATION[settings.BUILD_GRCH38]["vep_config"].update({
+    "phastcons100way": None,
+    "phastcons30way": None,
+    "phylop100way": None,
+    "phylop30way": None,
+})
+
+ANNOTATION_COLUMNS_V1 = copy.deepcopy(TEST_ANNOTATION)
+ANNOTATION_COLUMNS_V1[settings.BUILD_GRCH37]["vep_config"]["columns_version"] = 1
+ANNOTATION_COLUMNS_V1[settings.BUILD_GRCH38]["vep_config"]["columns_version"] = 1
+
 
 @override_settings(IMPORT_PROCESSING_DIR=TEST_IMPORT_PROCESSING_DIR,
                    VARIANT_ZYGOSITY_GLOBAL_COLLECTION="global",
                    ANNOTATION_VEP_FAKE_VERSION=True,
-                   ANNOTATION=ANNOTATION)
+                   ANNOTATION=ANNOTATION_COLUMNS_V1)
 class TestAnnotationVCF(TestCase):
     TEST_DATA_DIR = os.path.join(settings.BASE_DIR, "annotation/tests/test_data")
     TEST_ANNOTATION_VCF_GRCH37 = os.path.join(TEST_DATA_DIR, "test_grch37.vep_annotated.vcf")
@@ -175,14 +191,15 @@ class TestAnnotationVCF(TestCase):
         self.assertEqual(va.polyphen2_hvar_pred_most_damaging, 'D')
 
 
-ANNOTATION = copy.deepcopy(settings.ANNOTATION)
-ANNOTATION[settings.BUILD_GRCH37]["vep_config"]["columns_version"] = 2
-ANNOTATION[settings.BUILD_GRCH38]["vep_config"]["columns_version"] = 2
+ANNOTATION_COLUMNS_V2 = copy.deepcopy(TEST_ANNOTATION)
+ANNOTATION_COLUMNS_V2[settings.BUILD_GRCH37]["vep_config"]["columns_version"] = 2
+ANNOTATION_COLUMNS_V2[settings.BUILD_GRCH38]["vep_config"]["columns_version"] = 2
+
 
 @override_settings(IMPORT_PROCESSING_DIR=TEST_IMPORT_PROCESSING_DIR,
                    VARIANT_ZYGOSITY_GLOBAL_COLLECTION="global",
                    ANNOTATION_VEP_FAKE_VERSION=True,
-                   ANNOTATION=ANNOTATION)
+                   ANNOTATION=ANNOTATION_COLUMNS_V2)
 class TestAnnotationVCF2(TestAnnotationVCF):
     TEST_DATA_DIR = os.path.join(settings.BASE_DIR, "annotation/tests/test_data")
     TEST_ANNOTATION_VCF_GRCH37 = os.path.join(TEST_DATA_DIR, "test_columns_version2_grch37.vep_annotated.vcf")

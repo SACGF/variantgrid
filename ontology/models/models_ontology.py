@@ -3,6 +3,7 @@ A series of models that currently stores the combination of MONDO, OMIM, HPO & H
 (Note that HGNC is included just to model relationships, please use GeneSymbol for all your GeneSymbol needs).
 """
 import functools
+import logging
 import operator
 import re
 from collections import defaultdict
@@ -11,11 +12,13 @@ from typing import Optional, List, Dict, Set, Union, Tuple, Iterable
 
 from cache_memoize import cache_memoize
 from django.contrib.postgres.fields import ArrayField
-from django.db import models
-from django.db.models import PROTECT, CASCADE, QuerySet, Q
+from django.db import models, connection
+from django.db.models import PROTECT, CASCADE, QuerySet, Q, Max
 from django.urls import reverse
 from lazy import lazy
 from model_utils.models import TimeStampedModel, now
+from psqlextra.models import PostgresPartitionedModel
+from psqlextra.types import PostgresPartitioningMethod
 
 from genes.models import GeneSymbol
 from library.cache import timed_cache
@@ -30,6 +33,7 @@ class OntologyImportSource:
     OMIM = "OMIM"
     HPO = "HP"
     HGNC = "HGNC"
+    GENCC = 'gencc'
 
 
 class OntologyService(models.TextChoices):
@@ -168,11 +172,34 @@ class OntologyImport(TimeStampedModel):
     """
     import_source = models.TextField()
     filename = models.TextField()
+    version = models.IntegerField()
     context = models.TextField()
     hash = models.TextField()
     processor_version = models.IntegerField(default=1)
     processed_date = models.DateTimeField(auto_created=True)
     completed = models.BooleanField(default=False)
+
+    class Meta:
+        unique_together = ('import_source', 'filename', 'version')
+
+    def save(self, **kwargs):
+        created = not self.pk
+        if created and not self.version:
+            # Assign version to be next highest
+            existing_ontology = OntologyImport.objects.filter(import_source=self.import_source,
+                                                              filename=self.filename)
+            data = existing_ontology.aggregate(Max("version"))
+            self.version = (data.get("version__max") or 0) + 1
+
+        super().save(**kwargs)
+        if created and OntologyVersion.in_ontology_version(self):
+            logging.info("Creating new OntologyTermRelation partition")
+            import_source_id = self.pk
+            connection.schema_editor().add_list_partition(
+                model=OntologyTermRelation,
+                name=f"import_source_{import_source_id}",
+                values=[import_source_id],
+            )
 
     def __str__(self):
         name = f"OntologyImport ({self.pk}) - {self.import_source}: {self.filename} ({self.created.date()})"
@@ -361,7 +388,7 @@ class OntologyTermRelationManager(models.Manager):
         return qs.select_related("source_term", "dest_term", "from_import")
 
 
-class OntologyTermRelation(TimeStampedModel):
+class OntologyTermRelation(PostgresPartitionedModel, TimeStampedModel):
     """
     Relationship between two terms, is generally considered to be bi-directional (or at the very least
     code typically checks relationships in both directions)
@@ -370,16 +397,18 @@ class OntologyTermRelation(TimeStampedModel):
     and we have quite a lot.
     """
     objects = OntologyTermRelationManager()
-    source_term = models.ForeignKey(OntologyTerm, on_delete=CASCADE, related_name="subject")
+    source_term = models.ForeignKey(OntologyTerm, on_delete=CASCADE, related_name="subject2")
     dest_term = models.ForeignKey(OntologyTerm, on_delete=CASCADE)
     relation = models.TextField()
     extra = models.JSONField(null=True, blank=True)
     from_import = models.ForeignKey(OntologyImport, on_delete=PROTECT)
 
-    class Meta:
-        unique_together = ("source_term", "dest_term", "relation")
+    class PartitioningMeta:
+        method = PostgresPartitioningMethod.LIST
+        key = ["from_import_id"]
 
-    # as in we can have multiple copies, up to code to try to not duplicate
+    class Meta:
+        unique_together = ("from_import", "source_term", "dest_term", "relation")
 
     def __str__(self):
         name = f"{self.source_term} -> ({self.relation}) -> {self.dest_term}"
@@ -407,23 +436,6 @@ class OntologyTermRelation(TimeStampedModel):
     @property
     def relation_display(self):
         return OntologyRelation.DISPLAY_NAMES.get(self.relation, self.relation)
-
-    @staticmethod
-    def parents_of(source_term: OntologyTerm) -> QuerySet:
-        """
-        QuerySet of OntologyTerms representing parents of this term.
-        Note that MONDO terms very often have multiple parents
-        """
-        parent_ids = OntologyTermRelation.objects.filter(source_term=source_term, relation=OntologyRelation.IS_A).values_list("dest_term", flat=True)
-        return OntologyTerm.objects.filter(id__in=parent_ids).order_by("-id")
-
-    @staticmethod
-    def children_of(term: OntologyTerm) -> QuerySet:
-        """
-        QuerySet of OntologyTerms representing children of this term
-        """
-        children_ids = OntologyTermRelation.objects.filter(dest_term=term, relation=OntologyRelation.IS_A).values_list("source_term", flat=True)
-        return OntologyTerm.objects.filter(id__in=children_ids).order_by("-id")
 
     @staticmethod
     def as_mondo(term: OntologyTerm) -> Optional[OntologyTerm]:
@@ -480,22 +492,103 @@ class OntologyTermRelation(TimeStampedModel):
                 moi_summary.append(f"{moi} ({' '.join(classification_submitters)})")
         return moi_summary
 
-    @staticmethod
-    def gene_disease_relations() -> QuerySet:
-        return OntologyTermRelation.objects.filter(relation=OntologyRelation.RELATED,
-                                                   extra__strongest_classification__isnull=False)
+
+OntologyList = Optional[Union[QuerySet, List[OntologyTerm]]]
+
+
+class OntologyVersion(TimeStampedModel):
+    """ This is used by annotation.AnnotationVersion to keep track of different OntologyImports
+        so we can load historical versions of OntologyTermRelation """
+
+    gencc_import = models.ForeignKey(OntologyImport, on_delete=PROTECT, related_name="gencc_ontology_version")
+    mondo_import = models.ForeignKey(OntologyImport, on_delete=PROTECT, related_name="mondo_ontology_version")
+    hp_owl_import = models.ForeignKey(OntologyImport, on_delete=PROTECT, related_name="hp_owl_ontology_version")
+    hp_phenotype_to_genes_import = models.ForeignKey(OntologyImport, on_delete=PROTECT,
+                                                     related_name="hp_phenotype_to_genes_ontology_version")
+
+    class Meta:
+        unique_together = ('gencc_import', 'mondo_import', 'hp_owl_import', 'hp_phenotype_to_genes_import')
+
+    ONTOLOGY_IMPORTS = {
+        "gencc_import": (OntologyImportSource.GENCC, 'https://search.thegencc.org/download/action/submissions-export-csv'),
+        "mondo_import": (OntologyImportSource.MONDO, 'mondo.json'),
+        "hp_owl_import": (OntologyImportSource.HPO, 'hp.owl'),
+        "hp_phenotype_to_genes_import": (OntologyImportSource.HPO, 'phenotype_to_genes.txt'),
+    }
 
     @staticmethod
+    def in_ontology_version(ontology_import: OntologyImport) -> bool:
+        versioned = defaultdict(set)
+        for (import_source, filename) in OntologyVersion.ONTOLOGY_IMPORTS.values():
+            versioned[import_source].add(filename)
+        return ontology_import.filename in versioned[ontology_import.import_source]
+
+    @staticmethod
+    def latest() -> Optional['OntologyVersion']:
+        oi_qs = OntologyImport.objects.all()
+        kwargs = {}
+        for field, (import_source, filename) in OntologyVersion.ONTOLOGY_IMPORTS.items():
+            kwargs[field] = oi_qs.filter(import_source=import_source, filename=filename).order_by("version").last()
+
+        values = list(kwargs.values())
+        if all(values):
+            last_date = max([oi.created for oi in values])
+            ontology_version, created = OntologyVersion.objects.get_or_create(**kwargs,
+                                                                              defaults={"created": last_date})
+            if created:
+                # Avoid circular import
+                from annotation.models import AnnotationVersion
+                AnnotationVersion.new_sub_version(None)
+        else:
+            ontology_version = None
+            missing_fields = [field for field, value in kwargs.items() if value is None]
+            if missing_fields:
+                msg = "OntologyVersion.latest() - missing fields: %s", ", ".join(missing_fields)
+                raise OntologyVersion.DoesNotExist(msg)
+        return ontology_version
+
+    def get_ontology_imports(self):
+        return [self.gencc_import, self.mondo_import, self.hp_owl_import, self.hp_phenotype_to_genes_import]
+
+    def get_ontology_terms(self):
+        return OntologyTermRelation.objects.filter(from_import__in=self.get_ontology_imports())
+
+    def gene_disease_relations(self) -> QuerySet:
+        return self.get_ontology_terms().filter(relation=OntologyRelation.RELATED,
+                                                extra__strongest_classification__isnull=False)
+
     @cache_memoize(WEEK_SECS)
-    def moi_and_submitters() -> Tuple[List[str], List[str]]:
+    def moi_and_submitters(self) -> Tuple[List[str], List[str]]:
         """ Cached lists of MOI/Submitters from GenCC gene/disease extra JSON """
         moi = set()
         submitters = set()
-        for extra in OntologyTermRelation.gene_disease_relations().values_list("extra", flat=True):
+        for extra in self.gene_disease_relations().values_list("extra", flat=True):
             for source in extra["sources"]:
                 moi.add(source["mode_of_inheritance"])
                 submitters.add(source["submitter"])
         return list(sorted(moi)), list(sorted(submitters))
+
+    @cache_memoize(DAY_SECS)
+    def cached_gene_symbols_for_terms_tuple(self, terms_tuple: Tuple[int]) -> QuerySet:
+        """ Slightly restricted signature so we can cache it """
+        return self.gene_symbols_for_terms(terms_tuple)
+
+    def gene_symbols_for_terms(self, terms: OntologyList) -> QuerySet:
+        """ This is uncached, see also: cached_gene_symbols_for_terms """
+        gene_symbol_names = set()
+        otr_qs = self.get_ontology_terms()
+        for term in terms:
+            if isinstance(term, str):
+                term = OntologyTerm.get_or_stub(term)
+                if term.is_stub:
+                    return GeneSymbol.objects.none()
+            gene_symbol_snakes = OntologySnake.snake_from(term=term, to_ontology=OntologyService.HGNC, otr_qs=otr_qs)
+            gene_symbol_names.update([snake.leaf_term.name for snake in gene_symbol_snakes])
+        return GeneSymbol.objects.filter(symbol__in=gene_symbol_names)
+
+    def __str__(self):
+        date_str = self.created.strftime("%d %B %Y")
+        return f"v{self.pk}. ({date_str})"
 
 
 @dataclass
@@ -509,9 +602,6 @@ class OntologySnakeStep:
     @property
     def source_term(self) -> OntologyTerm:
         return self.relation.other_end(self.dest_term)
-
-
-OntologyList = Optional[Union[QuerySet, List[OntologyTerm]]]
 
 
 class OntologySnake:
@@ -573,7 +663,7 @@ class OntologySnake:
         if descendant.ontology_service != ancestor.ontology_service:
             raise ValueError(f"Can only check for ancestry within the same ontology service, not {descendant.ontology_service} vs {ancestor.ontology_service}")
 
-        seen: Set[OntologyTerm] = {descendant, }
+        seen: Set[OntologyTerm] = {descendant}
         new_snakes: List[OntologySnake] = list([OntologySnake(source_term=descendant)])
         valid_snakes: List[OntologySnake] = []
         level = 0
@@ -605,13 +695,16 @@ class OntologySnake:
     @staticmethod
     def snake_from(term: OntologyTerm, to_ontology: OntologyService,
                    min_classification: Optional[GeneDiseaseClassification] = GeneDiseaseClassification.STRONG,
-                   max_depth: int = 1) -> 'OntologySnakes':
+                   max_depth: int = 1, otr_qs: QuerySet[OntologyTermRelation] = None) -> 'OntologySnakes':
         """
         Returns the smallest snake/paths from source term to the desired OntologyService
         Ignores IS_A paths
         """
         if term.ontology_service == to_ontology:
             return OntologySnakes([OntologySnake(source_term=term)])
+
+        if otr_qs is None:
+            otr_qs = OntologyTermRelation.objects.all()
 
         seen: Set[OntologyTerm] = set()
         seen.add(term)
@@ -638,8 +731,8 @@ class OntologySnake:
                     by_leafs[snake.leaf_term] = snake
             all_leafs = by_leafs.keys()
 
-            outgoing = OntologyTermRelation.objects.filter(source_term__in=all_leafs).exclude(dest_term__in=seen).filter(q_relation)
-            incoming = OntologyTermRelation.objects.filter(dest_term__in=all_leafs).exclude(source_term__in=seen).filter(q_relation)
+            outgoing = otr_qs.filter(source_term__in=all_leafs).exclude(dest_term__in=seen).filter(q_relation)
+            incoming = otr_qs.filter(dest_term__in=all_leafs).exclude(source_term__in=seen).filter(q_relation)
             if to_ontology == OntologyService.HGNC:
                 outgoing = outgoing.exclude(dest_term__ontology_service=OntologyService.HPO)
                 incoming = incoming.exclude(source_term__ontology_service=OntologyService.HPO)
@@ -702,25 +795,6 @@ class OntologySnake:
         gene_ontology = OntologyTerm.get_gene_symbol(gene_symbol)
         return OntologySnake.snake_from(term=gene_ontology, to_ontology=desired_ontology,
                                         max_depth=max_depth, min_classification=min_classification)
-
-    @staticmethod
-    @cache_memoize(DAY_SECS)
-    def cached_gene_symbols_for_terms_tuple(terms_tuple: Tuple[int]) -> QuerySet:
-        """ Slightly restricted signature so we can cache it """
-        return OntologySnake.gene_symbols_for_terms(terms_tuple)
-
-    @staticmethod
-    def gene_symbols_for_terms(terms: OntologyList) -> QuerySet:
-        """ This is uncached, see also: cached_gene_symbols_for_terms """
-        gene_symbol_names = set()
-        for term in terms:
-            if isinstance(term, str):
-                term = OntologyTerm.get_or_stub(term)
-                if term.is_stub:
-                    return GeneSymbol.objects.none()
-            gene_symbol_snakes = OntologySnake.snake_from(term=term, to_ontology=OntologyService.HGNC)
-            gene_symbol_names.update([snake.leaf_term.name for snake in gene_symbol_snakes])
-        return GeneSymbol.objects.filter(symbol__in=gene_symbol_names)
 
     @staticmethod
     def has_gene_relationship(term: Union[OntologyTerm, str], gene_symbol: Union[GeneSymbol, str], quality: Optional[GeneDiseaseClassification] = GeneDiseaseClassification.STRONG) -> bool:

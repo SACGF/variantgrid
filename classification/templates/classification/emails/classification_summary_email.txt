@@ -1,6 +1,7 @@
 {% load static %}
 {% load classification_tags %}
 {% load english_tags %}
+{% load ui_menus %}
 Hello Shariant User,
 
 You can login to Shariant here {% absolute_url 'classifications' %}

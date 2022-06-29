@@ -6,6 +6,7 @@ Bio
 cdot
 celery
 ConfigArgParse
+coreapi
 cyvcf2>=0.30.14
 Django
 django-amazon-ses
@@ -24,6 +25,7 @@ django-guardian
 django_htmlmin
 django-leaflet
 django_model_utils
+django-postgres-extra
 django_recaptcha
 django-registration-redux
 django-rest-framework
@@ -59,6 +61,7 @@ pysam
 python_dateutil
 python_Levenshtein
 pytz
+pyvcf3
 redis
 reportlab
 requests

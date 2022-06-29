@@ -71,7 +71,7 @@ class CachedObj(Generic[T]):
         if verbose:
             print(f"{model} Inserting {len(created):,}")
             print(f"{model} Modifying {len(modified):,}")
-        batch_size = 10000
+        batch_size = 2000
         if created:
             model.objects.bulk_create(created, batch_size=batch_size)
         if modified:
@@ -120,15 +120,13 @@ class OntologyBuilder:
 
     def cache_everything(self):
         """
-        Call this to prefetch all data from the previous import, should greatly
+        Call this to prefetch all data from the previous import, should greatly reduce time taken
         """
         print("About to pre-cache all Ontology")
         for t in OntologyTerm.objects.all():
             self.terms[t.id] = CachedObj(t)
 
-        for tr in OntologyTermRelation.objects.all():
-            self.relations[RelationKey.from_existing(tr)] = CachedObj(tr)
-
+        # We always insert a new OntologyTermRelation (to allow versions according to import)
         self.full_cache = True
         print("Cache complete")
 
@@ -160,7 +158,8 @@ class OntologyBuilder:
         if not self.full_cache and (in_db := OntologyTermRelation.objects.filter(
                 source_term_id=rk.source,
                 dest_term_id=rk.dest,
-                relation=rk.relation
+                relation=rk.relation,
+                from_import=self._ontology_import
         ).first()):
             cached = CachedObj(in_db)
             self.relations[rk] = cached
@@ -226,27 +225,30 @@ class OntologyBuilder:
         if aliases is not None or primary_source:
             term.aliases = aliases or list()
 
-    def complete(self, purge_old_relationships=True, purge_old_terms=False, verbose=True):
+    def complete(self, purge_old_relationships=False, purge_old_terms=False, verbose=True):
         """
-        :purge_old If True will mark OntologyTermGeneRelations not included in this import (but included in a previous import
-        with the same context and ontology service) as deleted
-        Will also complain about other records not included in this import but wont delete them
+        :purge_old If True will mark OntologyTermGeneRelations not included in this import (but included in a previous
+        import with the same context and ontology service) as deleted
+        Will also complain about other records not included in this import but won't delete them
         """
 
-        CachedObj.bulk_apply(OntologyTerm, self.terms.values(), ["name", "definition", "extra", "aliases", "from_import", "modified"], verbose=verbose)
-        CachedObj.bulk_apply(OntologyTermRelation, self.relations.values(), ["extra", "from_import", "modified"], verbose=verbose)
+        CachedObj.bulk_apply(OntologyTerm, self.terms.values(),
+                             ["name", "definition", "extra", "aliases", "from_import", "modified"], verbose=verbose)
+        CachedObj.bulk_apply(OntologyTermRelation, self.relations.values(),
+                             ["extra", "from_import", "modified"], verbose=verbose)
 
-        # Now to find previous imports - and their terms that weren't updated by this import (and purge them if requested)
-        old_imports = set(OntologyImport.objects.filter(context=self.context, import_source=self.import_source).values_list("pk", flat=True))
+        # Now to find previous imports - and terms that weren't updated by this import (and purge them if requested)
+        oi_qs = OntologyImport.objects.filter(context=self.context, import_source=self.import_source)
+        old_imports = set(oi_qs.values_list("pk", flat=True))
         if self._ontology_import.pk in old_imports:
             old_imports.remove(self._ontology_import.pk)
 
         for model in [OntologyTermRelation, OntologyTerm]:
-
-            olds = model.objects.filter(from_import__in=old_imports)
-            count = olds.count()
+            # we only delete relations, assume terms are going to persist forever or at work be marked deprecated
             if (model == OntologyTermRelation and purge_old_relationships) or \
-                    (model == OntologyTerm and purge_old_terms):  # we only delete relations, assume terms are going to persist forever or at work be marked deprecated
+                    (model == OntologyTerm and purge_old_terms):
+                olds = model.objects.filter(from_import__in=old_imports)
+                count = olds.count()
                 if count:
                     if verbose:
                         print(f"{model} Deleting {count:,}")

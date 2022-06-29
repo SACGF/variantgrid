@@ -43,11 +43,11 @@ class HasPhenotypeDescriptionMixin:
             terms = []
         return terms
 
-    def get_gene_symbols(self) -> QuerySet:
+    def get_gene_symbols(self, ontology_version) -> QuerySet:
         from genes.models import Gene
 
         if self.phenotype_description:
-            gene_qs = self.phenotype_description.get_gene_symbols()
+            gene_qs = self.phenotype_description.get_gene_symbols(ontology_version)
         else:
             gene_qs = Gene.objects.none()
         return gene_qs

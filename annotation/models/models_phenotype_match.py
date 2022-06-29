@@ -7,7 +7,7 @@ from django.db.models import QuerySet
 from django.db.models.deletion import CASCADE, SET_NULL
 
 from library.constants import DAY_SECS
-from ontology.models import OntologyTerm, OntologySnake
+from ontology.models import OntologyTerm, OntologyVersion
 from patients.models import Patient
 
 PATIENT_TPM_PATH = "patient_text_phenotype__phenotype_description__textphenotypesentence__text_phenotype__textphenotypematch"
@@ -49,9 +49,9 @@ class PhenotypeDescription(models.Model):
         ot_qs = ot_qs.order_by("text_phenotype__textphenotypematch__ontology_term_id")
         return ot_qs.values_list("text_phenotype__textphenotypematch__ontology_term_id", flat=True)
 
-    def get_gene_symbols(self) -> QuerySet:
+    def get_gene_symbols(self, ontology_version) -> QuerySet:
         terms = tuple(self.get_ontology_term_ids())
-        gene_symbols = OntologySnake.cached_gene_symbols_for_terms_tuple(terms)
+        gene_symbols = ontology_version.cached_gene_symbols_for_terms_tuple(terms)
         return gene_symbols
 
     def __str__(self):
@@ -97,7 +97,9 @@ class TextPhenotypeMatch(models.Model):
 
     def to_dict(self):
         """ This is what's sent as JSON back to client for highlighting and grids """
-        gene_symbols_qs = OntologySnake.cached_gene_symbols_for_terms_tuple((self.ontology_term.pk,))
+
+        ontology_version = OntologyVersion.latest()
+        gene_symbols_qs = ontology_version.cached_gene_symbols_for_terms_tuple((self.ontology_term.pk,))
         gene_symbols = list(gene_symbols_qs.values_list("symbol", flat=True))
         accession = str(self.ontology_term)
         return {
