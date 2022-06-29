@@ -54,7 +54,7 @@ nltk
 numpy
 oauthlib
 pandas
-pronto
+pronto>=2.4.7
 psycopg2
 PyPDF2
 pysam
