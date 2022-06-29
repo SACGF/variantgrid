@@ -68,9 +68,9 @@ class AnnotationRunColumns(DatatableConfig):
         return qs
 
     def filter_queryset(self, qs: QuerySet) -> QuerySet:
-        if genome_build_str := self.get_query_param("genome_build"):
-            genome_build = GenomeBuild.get_name_or_alias(genome_build_str)
-            qs = qs.filter(annotation_range_lock__version__genome_build=genome_build)
+        if variant_annotation_version_id := self.get_query_param("variant_annotation_version_id"):
+            variant_annotation_version = VariantAnnotationVersion.objects.get(pk=variant_annotation_version_id)
+            qs = qs.filter(annotation_range_lock__version=variant_annotation_version)
         if status_str := self.get_query_param("status"):
             if status_str == "outstanding":
                 qs = qs.exclude(status__in={AnnotationStatus.FINISHED})

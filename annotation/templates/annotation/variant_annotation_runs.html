@@ -13,7 +13,7 @@
 <script type="text/javascript" src="{% static 'js/lib/plotly-latest.min.js' %}"></script>
 <script type="text/javascript" src="{% static 'js/plotly_helper.js' %}"></script>
 <script>
-    let filter_data = {"status": "", "genome_build": ""}
+    let filter_data = {"status": "", "variant_annotation_version_id": ""}
     $(document).ready(() => {
         let genomeBuildSummaryJSON = {{ genome_build_summary | jsonify }};
 
@@ -88,7 +88,7 @@
     }
     function datatableFilter(data) {
         data.status = $('#status-filter').val();
-        data.genome_build = $('input[name="genome_build_filter"]:checked').val();
+        data.variant_annotation_version_id = $('input[name="variant_annotation_version_filter"]:checked').val();
     }
 </script>
 {% endblock head %}
@@ -129,15 +129,17 @@
             </form>
         {% endfor %}
         <div class="mt-4">
-            {% labelled label="Genome Build" %}
+            {% labelled label="Version" %}
             <div class="btn-group btn-group-toggle" data-toggle="buttons">
                 <label class="btn btn-outline-primary active">
-                    <input class="table-filter" type="radio" name="genome_build_filter" value="" autocomplete="off" checked> All
+                    <input class="table-filter" type="radio" name="variant_annotation_version_filter" value="" autocomplete="off" checked> All
                 </label>
-                {% for build_name in genome_build_field_counts.keys %}
-                    <label class="btn btn-outline-primary">
-                        <input class="table-filter" type="radio" name="genome_build_filter" value="{{ build_name }}" autocomplete="off"> {{ build_name }}
-                    </label>
+                {% for build_name, vav_field_counts in genome_build_field_counts.items %}
+                    {% for vav in vav_field_counts.keys %}
+                        <label class="btn btn-outline-primary">
+                            <input class="table-filter" type="radio" name="variant_annotation_version_filter" value="{{ vav.pk }}" autocomplete="off"> {{ vav.short_string }} ({{ vav.genome_build }})
+                        </label>
+                    {% endfor %}
                 {% endfor %}
             </div>
             {% endlabelled %}
