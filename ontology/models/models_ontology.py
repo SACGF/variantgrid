@@ -397,7 +397,7 @@ class OntologyTermRelation(PostgresPartitionedModel, TimeStampedModel):
     and we have quite a lot.
     """
     objects = OntologyTermRelationManager()
-    source_term = models.ForeignKey(OntologyTerm, on_delete=CASCADE, related_name="subject2")
+    source_term = models.ForeignKey(OntologyTerm, on_delete=CASCADE, related_name="subject")
     dest_term = models.ForeignKey(OntologyTerm, on_delete=CASCADE)
     relation = models.TextField()
     extra = models.JSONField(null=True, blank=True)
