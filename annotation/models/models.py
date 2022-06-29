@@ -991,7 +991,7 @@ class AnnotationVersionManager(models.Manager):
 class AnnotationVersion(models.Model):
     # Old style Postgres partitions (inherits)
     SUB_ANNOTATIONS_INHERITANCE_PARTITIONING = ['variant_annotation_version', 'gene_annotation_version',
-                                                   'clinvar_version', 'human_protein_atlas_version']
+                                                'clinvar_version', 'human_protein_atlas_version']
     SUB_ANNOTATIONS_DECLARATIVE_PARTITIONING = ['ontology_version']
     SUB_ANNOTATIONS = SUB_ANNOTATIONS_INHERITANCE_PARTITIONING + SUB_ANNOTATIONS_DECLARATIVE_PARTITIONING
     objects = AnnotationVersionManager()  # Always select_related

@@ -10,9 +10,6 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Optional, List, Dict, Set, Union, Tuple, Iterable
 
-from psqlextra.types import PostgresPartitioningMethod
-from psqlextra.models import PostgresPartitionedModel
-
 from cache_memoize import cache_memoize
 from django.contrib.postgres.fields import ArrayField
 from django.db import models, connection
@@ -20,6 +17,8 @@ from django.db.models import PROTECT, CASCADE, QuerySet, Q, Max
 from django.urls import reverse
 from lazy import lazy
 from model_utils.models import TimeStampedModel, now
+from psqlextra.models import PostgresPartitionedModel
+from psqlextra.types import PostgresPartitioningMethod
 
 from genes.models import GeneSymbol
 from library.cache import timed_cache
