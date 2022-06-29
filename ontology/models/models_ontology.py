@@ -534,14 +534,18 @@ class OntologyVersion(TimeStampedModel):
         values = list(kwargs.values())
         if all(values):
             last_date = max([oi.created for oi in values])
-            kwargs["created"] = last_date
-            created, ontology_version = OntologyVersion.objects.get_or_create(**kwargs)
+            ontology_version, created = OntologyVersion.objects.get_or_create(**kwargs,
+                                                                              defaults={"created": last_date})
             if created:
                 # Avoid circular import
                 from annotation.models import AnnotationVersion
                 AnnotationVersion.new_sub_version(None)
         else:
             ontology_version = None
+            missing_fields = [field for field, value in kwargs.items() if value is None]
+            if missing_fields:
+                msg = "OntologyVersion.latest() - missing fields: %s", ", ".join(missing_fields)
+                raise OntologyVersion.DoesNotExist(msg)
         return ontology_version
 
     def get_ontology_imports(self):

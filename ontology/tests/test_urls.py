@@ -7,6 +7,7 @@ from django.utils import timezone
 from annotation.tests.test_data_fake_genes import create_fake_transcript_version
 from library.django_utils.unittest_utils import URLTestCase
 from ontology.models import OntologyImport, OntologyService, OntologyTerm
+from ontology.tests.test_data_ontology import create_test_ontology_version
 from snpdb.models import GenomeBuild
 
 
@@ -30,6 +31,8 @@ class Test(URLTestCase):
         index += 1
         _ = OntologyTerm.objects.get_or_create(id="HGNC:10471", name=cls.gene_symbol, from_import=ontology_import,
                                                index=index, ontology_service=OntologyService.HGNC)[0]
+
+        create_test_ontology_version()
 
     def testUrls(self):
         """ No permissions to test """

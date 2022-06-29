@@ -14,7 +14,7 @@ from annotation.models.models import VariantAnnotationVersion, ClinVarVersion, \
 from genes.models import GeneAnnotationImport
 from genes.models_enums import AnnotationConsortium
 from ontology.models import OntologyImport
-from ontology.tests.test_data_ontology import create_ontology_test_data
+from ontology.tests.test_data_ontology import create_ontology_test_data, create_test_ontology_version
 from snpdb.models import Variant
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_loci_and_variants_for_vcf
@@ -72,11 +72,15 @@ def get_fake_annotation_version(genome_build: GenomeBuild):
     human_protein_atlas_version = HumanProteinAtlasAnnotationVersion.objects.get_or_create(filename="fake_hpa",
                                                                                            md5_hash="not_a_real_hash",
                                                                                            hpa_version=0.42)[0]
+
+    ontology_version = create_test_ontology_version()
+    print(f"Ontology version {ontology_version.pk}")
     av, _ = AnnotationVersion.objects.get_or_create(genome_build=genome_build,
                                                     variant_annotation_version=variant_annotation_version,
                                                     gene_annotation_version=gene_annotation_version,
                                                     clinvar_version=clinvar_version,
-                                                    human_protein_atlas_version=human_protein_atlas_version)
+                                                    human_protein_atlas_version=human_protein_atlas_version,
+                                                    ontology_version=ontology_version)
     return av
 
 
