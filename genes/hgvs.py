@@ -900,21 +900,34 @@ class HGVSMatcher:
         hgvs_extra = self._variant_to_hgvs_extra(variant=variant, transcript_name=transcript_name)
         return hgvs_extra.format(max_ref_length=max_ref_length)
 
-    def variant_to_g_hgvs(self, variant: Variant):
-        g_hgvs = self.variant_to_hgvs(variant)
-        contig = variant.locus.contig.refseq_accession
-        if contig:
-            return f"{contig}:{g_hgvs}"
-        return g_hgvs
+    @staticmethod
+    def _fast_variant_coordinate_go_g_hgvs(refseq_accession, offset, ref, alt) -> str:
+        """ This only works for SNPs (ie not indels etc) """
+        return f"{refseq_accession}:g.{offset}{ref}>{alt}"
 
-    def variant_coordinate_to_g_hgvs(self, variant_coordinate: VariantCoordinate) -> HGVSName:
+    def variant_to_g_hgvs(self, variant: Variant) -> str:
+        refseq_accession = variant.locus.contig.refseq_accession
+        if variant.alt.length != 1 or variant.is_indel:
+            g_hgvs = self.variant_to_hgvs(variant)
+            g_hgvs_str = f"{refseq_accession}:{g_hgvs}"
+        else:
+            g_hgvs_str = self._fast_variant_coordinate_go_g_hgvs(refseq_accession, variant.locus.position,
+                                                                 variant.locus.ref.seq, variant.alt.seq)
+        return g_hgvs_str
+
+    def variant_coordinate_to_g_hgvs(self, variant_coordinate: VariantCoordinate) -> str:
         """ So we can convert w/o needing a variant object """
         (chrom, offset, ref, alt) = variant_coordinate
-        hgvs_name = pyhgvs.variant_to_hgvs_name(chrom, offset, ref, alt, self.genome_build.genome_fasta.fasta,
-                                                transcript=None)
-        contig = self.genome_build.chrom_contig_mappings[variant_coordinate.chrom]
-        hgvs_name.chrom = contig.refseq_accession
-        return hgvs_name
+        contig = self.genome_build.chrom_contig_mappings[chrom]
+        alt_length = len(alt)
+        if alt_length == 1 and len(ref) == alt_length:
+            hgvs_str = self._fast_variant_coordinate_go_g_hgvs(contig.refseq_accession, offset, ref, alt)
+        else:
+            hgvs_name = pyhgvs.variant_to_hgvs_name(chrom, offset, ref, alt, self.genome_build.genome_fasta.fasta,
+                                                    transcript=None)
+            hgvs_name.chrom = contig.refseq_accession
+            hgvs_str = hgvs_name.format()
+        return hgvs_str
 
     def variant_to_c_hgvs_extra(self, variant: Variant, transcript_name: str) -> HGVSNameExtra:
         if transcript_name:
