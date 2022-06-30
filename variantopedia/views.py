@@ -381,7 +381,7 @@ def search(request):
             details = f"'{search_string}' calculated {len(results)} results."
             create_event(request.user, 'search', details=details)
 
-            # don't auto load
+            # don't auto load unless there is only 1 preferred result
             if preferred_result := search_results.single_preferred_result():
                 return redirect(preferred_result.record)
 

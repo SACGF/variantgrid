@@ -602,7 +602,7 @@ class HGVSMatcher:
         cache.set(key, True, timeout=WEEK_SECS)
 
     def get_variant_tuple(self, hgvs_string: str) -> VariantCoordinate:
-        return self.get_variant_tuple_used_transcript_and_method(hgvs_string)[0]
+        return self.get_variant_tuple_used_transcript_kind_and_method(hgvs_string)[0]
 
     @staticmethod
     def _get_sort_key_transcript_version_and_methods(version, prefer_pyhgvs=True, closest=False):
@@ -684,12 +684,14 @@ class HGVSMatcher:
         sort_key = self._get_sort_key_transcript_version_and_methods(version, prefer_pyhgvs=prefer_pyhgvs, closest=closest)
         return sorted(tv_and_method, key=sort_key)
 
-    def get_variant_tuple_used_transcript_and_method(self, hgvs_string: str) -> Tuple[VariantCoordinate, str, str]:
+    def get_variant_tuple_used_transcript_kind_and_method(self, hgvs_string: str) -> \
+            Tuple[VariantCoordinate, str, str, str]:
         """ Returns variant_tuple and method for HGVS resolution = """
 
         used_transcript_accession = None
         method = None
         hgvs_name = HGVSName(hgvs_string)
+        kind = hgvs_name.kind
         if self._is_lrg(hgvs_name):
             variant_tuple, method = self._lrg_get_variant_tuple(hgvs_string)
         elif hgvs_name.kind in ('c', 'n'):
@@ -757,7 +759,7 @@ class HGVSMatcher:
 
         if Variant.is_ref_alt_reference(ref, alt):
             alt = Variant.REFERENCE_ALT
-        return VariantCoordinate(chrom, position, ref, alt), used_transcript_accession, method
+        return VariantCoordinate(chrom, position, ref, alt), used_transcript_accession, kind, method
 
     def _get_hgvs_and_pyhgvs_transcript(self, hgvs_string: str):
         hgvs_name = HGVSName(hgvs_string)
