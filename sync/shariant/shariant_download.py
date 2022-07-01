@@ -109,7 +109,7 @@ def sync_shariant_download(sync_destination: SyncDestination, full_sync: bool = 
         response = requests.get(shariant.url('classification/api/classifications/export'),
                                 auth=shariant.auth(),
                                 params=params,
-                                stream=True)
+                                stream=False)
 
         last_modified = response.headers.get('Last-Modified')
         evidence_keys = EvidenceKeyMap.instance()
