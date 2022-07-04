@@ -10,7 +10,7 @@ register = template.Library()
 
 def count_items(items: Union[List, QuerySet, int]) -> int:
     item_count: int
-    if isinstance(items, list):
+    if hasattr(items, '__len__'):
         item_count = len(items)
     elif isinstance(items, QuerySet):
         item_count = items.count()

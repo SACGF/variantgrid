@@ -24,6 +24,10 @@ Hello Shariant User,
             {% endif %}
         </li>
        {% endcomment %}
+        {% if lab_summary.pending_changes_count %}
+            <li>Has {{ lab_summary.pending_changes_count }} outstanding pending classification changes agreed upon during discordance resolution</li>
+        {% endif %}
+
         {% if lab_summary.discordance_report_summaries|length %}
         <li>This lab is involved in a total of {% count lab_summary.discordance_report_summaries '1 discordance' 'discordances' %}</li>
         <ul>
@@ -59,9 +63,21 @@ Hello Shariant User,
                                 {% endfor %}
                             </td> {% comment %}do inline style for c.hgvs{% endcomment %}
                             <td>
-                                {% for lab_cs in discordance_report_summary.lab_significances %}
-                                    <div>{% lab lab_cs.lab your_lab=lab_cs.is_internal %} -
-                                    {% for clin_sig in lab_cs.clinical_significances %}{% if not forloop.first %}, {% endif %}{% clinical_significance_inline clin_sig %}{% endfor %}
+                                {% if discordance_report_summary.is_pending_concordance %}
+                                    <div style="color:#6c6;font-weight:bold">Pending Concordance</div>
+                                {% endif %}
+                                {% for lab_summ in discordance_report_summary.lab_significances %}
+                                    <div {% if lab_summ.clinical_significance_to == 'withdrawn' %}style="opacity:0.6"{% endif %}>
+                                        <span style="display:inline-block;margin-right:6px">
+                                            {% lab lab_summ.lab your_lab=lab_summ.is_internal %}
+                                            {% if lab_summ.count > 1 %}<span class="d-inline-block mx-1 text-muted">x</span>{{ lab_summ.count }}{% endif %}
+                                        </span>
+                                        {% if lab_summ.changed %}
+                                            {% clinical_significance_inline lab_summ.clinical_significance_from %} -> {% clinical_significance_inline lab_summ.clinical_significance_to %}
+                                            {% if lab_summ.pending %}(Pending){% endif %}
+                                        {% else %}
+                                            {% clinical_significance_inline lab_summ.clinical_significance_from %}
+                                        {% endif %}
                                     </div>
                                 {% endfor %}
                             </td>

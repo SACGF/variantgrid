@@ -60,7 +60,7 @@
     </thead>
     <tbody>
         {% for group in classification_groups %}
-            {% classification_group_row group=group %}
+            {% classification_group_row group=group show_pending_changes=show_pending_changes %}
         {% endfor %}
     </tbody>
 </table>

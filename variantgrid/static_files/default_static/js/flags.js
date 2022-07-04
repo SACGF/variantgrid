@@ -841,6 +841,15 @@ let Flags = (function () {
                         as "Completed" to record the fact that a review has recently taken place.<br/>
                         Please record any internal reviews while a classification is marked as discordant.
                         </div>`);
+                    } else if (this.flag_type === 'classification_pending_changes') {
+                        return $(`<div>
+                        Mark this classification as having important changes not yet reflected in this system.
+                        </div>`);
+                    } else if (this.flag_type === 'classification_not_public') {
+                        return $(`<div>
+                        Raise this flag to stop this specific record from being sent to ClinVar.<br/>
+                        ClinVar exclusion patterns can be setup by administrators if required.
+                        </div>`);
                     }
                     return $('<div>');
                 }
@@ -913,6 +922,12 @@ let Flags = (function () {
                     <li>This Discordance flag will automatically be closed when concordance is reached.
                     </ol></div>
                     `);
+                } else if (this.flag_type === 'classification_pending_changes') {
+                    return $(`<div>
+                    This classification has outstanding changes to apply.<br/>
+                    If a subsequent sync to this system provides a new clinical significance this flag will automatically close.<br/>
+                    Otherwise it can be closed manually if the flag was raised in error or circumstances have changed.
+                    </div>`);
                 } else if (this.flag_type === 'classification_unshared') {
                     return $(`<div>
                     This classification is not yet shared outside of your lab or institution.

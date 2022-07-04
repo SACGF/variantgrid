@@ -17,7 +17,7 @@ from classification.enums.discordance_enums import DiscordanceReportResolution
 from classification.models import Classification, classification_flag_types, \
     DiscordanceReportClassification, DiscordanceReport, DiscordanceReportSummaries, UserPerspective
 from email_manager.models import EmailLog
-from flags.models import FlagCollection
+from flags.models import FlagCollection, Flag
 from library.log_utils import report_exc_info, report_message
 from snpdb.models import Lab, UserSettings, GenomeBuild
 
@@ -61,16 +61,25 @@ class EmailLabSummaryData:
         return DiscordanceReportSummaries.create(perspective=UserPerspective.for_lab(lab=self.lab, genome_build=self.genome_build), discordance_reports=dr_qs)
 
     @lazy
-    def flagged_variants(self):
-        vcqs = FlagCollection.filter_for_open_flags(
+    def flagged_variants(self) -> QuerySet[Flag]:
+        return FlagCollection.filter_for_open_flags(
             Classification.objects.filter(lab=self.lab).exclude(withdrawn=True)
         ).order_by('-created')
 
-        return vcqs
-
     @lazy
-    def flagged_variants_count(self):
+    def pending_changes(self) -> QuerySet[Flag]:
+        return FlagCollection.filter_for_open_flags(
+            Classification.objects.filter(lab=self.lab).exclude(withdrawn=True),
+            flag_types=[classification_flag_types.classification_pending_changes]
+        ).order_by('-created')
+
+    @property
+    def flagged_variants_count(self) -> int:
         return self.flagged_variants.count()
+
+    @property
+    def pending_changes_count(self) -> int:
+        return self.pending_changes.count()
 
     @lazy
     def imported_30_days_count(self):

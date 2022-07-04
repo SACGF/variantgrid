@@ -135,8 +135,8 @@ class Flag(TimeStampedModel):
     @transaction.atomic()
     def flag_action(self,
                     resolution: FlagResolution = None,
-                    user: User = None,
-                    comment: str = None,
+                    user: Optional[User] = None,
+                    comment: Optional[str] = None,
                     permission_check: bool = True,
                     first_comment: bool = False):
 
@@ -179,6 +179,10 @@ class Flag(TimeStampedModel):
 
     def __str__(self):
         return f"{self.flag_type} ({self.resolution})"
+
+    @property
+    def last_comment(self) -> Optional['FlagComment']:
+        return self.flagcomment_set.order_by('-created').first()
 
 
 class FlagInfos:
@@ -331,14 +335,17 @@ class FlagCollection(models.Model, GuardianPermissionsMixin):
     def close_open_flags_of_type(
             self,
             flag_type: FlagType,
-            comment: str = None,
-            user: User = None,
-            resolution: FlagResolution = None,
-            data: dict = None) -> int:
+            comment: Optional[str] = None,
+            user: Optional[User] = None,
+            resolution: Optional[FlagResolution] = None,
+            data: Optional[Dict] = None) -> int:
         """
         For admin usage, closes all open flags of a certain type
         @param flag_type close all flags of this type
         @param comment (optional) If provided, a FlagComment will be made for each flag we close
+        @param user The user to attribute this to, will default to admin_bot
+        @param resolution The specific resolution to use, will default to the first with a status of CLOSED
+        @param data Will only close flags that match this data if provided
         @return: The number of flags closed, typically should be 0 or 1 but could be more
         """
 
@@ -417,7 +424,7 @@ class FlagCollection(models.Model, GuardianPermissionsMixin):
         :param user_private: (Not currently used)
         :param permission_check: Should we check to see if the user has permission to open the flag
         :param reopen: If True will re-open a closed flag (if there is one) rather than create a new flag. Will be treated as True for only_one types of flags.
-        :param reopen_if_bot_closed: If True, and there's an existing flag that was closed by admin_bot, act as if reopen=True
+        :param reopen_if_bot_closed: If True, and there's an existing flag that was closed by admin_bot, act as if reopen=True (but will not re-open if a user closed)
         :param add_comment_if_open: If re-opening a closed flag, should the comment still be added?
         :param data: data for the flag, when looking for existing flags we check to see if they have this data.
         :param close_other_data: If we find a flag of the same type that has data different to the data provided, close it
@@ -566,9 +573,9 @@ class FlagsMixin(models.Model):
     def close_open_flags_of_type(
             self,
             flag_type: FlagType,
-            comment=None,
-            resolution: FlagResolution = None,
-            data: dict = None):
+            comment: Optional[str] = None,
+            resolution: Optional[FlagResolution] = None,
+            data: Optional[Dict] = None):
         if not self.flag_collection:
             return False
         fc = self.flag_collection_safe

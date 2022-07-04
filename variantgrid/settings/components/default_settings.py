@@ -848,7 +848,8 @@ _URLS_NAME_REGISTER_OVERRIDE = {
     "clinvar_key_summary": False,
     "clinvar_match": False,
     "condition_matchings": False,
-    "condition_match_test": False
+    "condition_match_test": False,
+    "discordance_reports": False
 }
 URLS_NAME_REGISTER = defaultdict(lambda: _URLS_NAME_REGISTER_DEFAULT, _URLS_NAME_REGISTER_OVERRIDE)
 

@@ -630,7 +630,7 @@ def published(sender,
 
 
 @receiver(flag_comment_action, sender=Flag)
-def check_for_discordance(sender, flag_comment: FlagComment, old_resolution: FlagResolution, **kwargs):
+def check_for_withdrawn(sender, flag_comment: FlagComment, old_resolution: FlagResolution, **kwargs):
     """
     Keeps condition_text_match in sync with the classifications when withdraws start/finish
     """

@@ -17,14 +17,21 @@
 <script type="text/javascript" src="{% static 'js/plotly_helper.js' %}"></script>
 <script>
     // for showing issues
+    function classificationReviews(data) {
+        data.flags = JSON.stringify(['classification_pending_changes', 'classification_internal_review', 'classification_suggestion']);
+        data.labs = {{ dlab.lab_ids_str | jsonify }};
+    }
+
+    function classificationSigChanges(data) {
+        data.flags = JSON.stringify(['classification_significance_change']);
+        data.labs = {{ dlab.lab_ids_str | jsonify }};
+    }
+
     function classificationMatchingVariant(data) {
         data.flags = JSON.stringify(['classification_matching_variant', 'classification_matching_variant_warning', 'classification_transcript_version_change']);
         data.labs = {{ dlab.lab_ids_str | jsonify }};
     }
-    function classificationComments(data) {
-        data.flags = JSON.stringify(['classification_suggestion', 'classification_internal_review', 'classification_significance_change']);
-        data.labs = {{ dlab.lab_ids_str | jsonify }};
-    }
+
     function classificationUnshared(data) {
         data.flags = JSON.stringify(['classification_unshared']);
         data.labs = {{ dlab.lab_ids_str | jsonify }};
@@ -37,43 +44,16 @@
         data.flags = JSON.stringify(['classification_not_public']);
         data.labs = {{ dlab.lab_ids_str | jsonify }};
     }
-    $(document).ready(() => {
-        $('a[data-toggle="tab"]').on('shown.bs.tab', function (event) {
-            Flags.instance.init({userId: '{{user.id}}', filter: '.active', forceRender: true});
-        });
-        $('.dataTable').on('draw.dt', () => {
-            Flags.instance.init({userId: '{{user.id}}', filter: '.active', forceRender: true});
-        });
 
-        $('input[name=discordances-filter]').click(() => {
-            let selected = $("input[name=discordances-filter]:checked").val();
+     $(document).ready(() => {
+         $('a[data-toggle="tab"]').on('shown.bs.tab', function (event) {
+             Flags.instance.init({userId: '{{user.id}}', filter: '.active', forceRender: true});
+         });
+         $('.dataTable').on('draw.dt', () => {
+             Flags.instance.init({userId: '{{user.id}}', filter: '.active', forceRender: true});
+         });
+     });
 
-            $('.contact-details').hide();
-            $(`.contact-details[data-lab=${selected}]`).show();
-            $('.discordance-row').each((index, row) => {
-                row = $(row);
-                let show = false;
-                if (selected == "all") {
-                    show = true;
-                } else {
-                    let data_labs = row.attr('data-labs')
-                    if (selected == "internal") {
-                        show = data_labs == 'internal'
-                    } else {
-                        let labs = data_labs.split(";");
-                        show = labs.includes(selected);
-                    }
-                }
-                if (show) {
-
-                    row.show();
-                } else {
-
-                    row.hide();
-                }
-            });
-        });
-    });
 </script>
 <div class="container">
     {% lab_picker view_name="classification_dashboard" selected_lab=dlab.lab_id all_option=True %}
@@ -112,7 +92,7 @@
             {{ dlab.shared_classifications.count | number:'S' }}
         {% endlabelled %}
 
-        {% labelled hint="tiny"  label="Unique Alleles" %}
+        {% labelled hint="tiny" label="Unique Alleles" %}
             {{ dlab.unique_classified_alleles_count | number:'S' }}
         {% endlabelled %}
         {% if 'clinvar_key_summary'|is_view_enabled %}
@@ -144,84 +124,16 @@
     {% if 'discordance_report'|is_view_enabled %}
         {% page_help_embedded title="Outstanding Discordances" %}
             <p>Below is a list of all outstanding discordances where your lab is involved.</p>
-             <p>If you have discordances you can filter based on which other labs are involved - which will also display any contact details that lab has provided for resolving discordances.</p>
         {% end_page_help_embedded %}
 
         {% if not dlab.discordance_summaries %}
             <div class="no-value">There are no outstanding discordances for this lab {{ 'S' | severity_icon }}</div>
         {% else %}
-
-            <ul class="list-group mb-4">
-                <li class="list-group-item">
-                    <label class="form-check" for="discordances-filter-all">
-                        <input class="form-check-input" type="radio" name="discordances-filter" id="discordances-filter-all" value="all" checked />
-                        <span class="form-check-label">
-                        {% if summaries.count == 1 %}
-                            Show the 1 discordance
-                        {% else %}
-                            Show all {{ dlab.discordance_summaries.summaries.count }} discordances <span class="text-info">(Use the below filters to show discordances with specific labs)</span>
-                        {% endif %}
-                        </span>
-                    </label>
-                </li>
-                {% for lab_count in dlab.discordance_summaries.counts %}
-                <li class="list-group-item">
-                    {% if lab_count.is_internal %}
-                        <label class="form-check" for="discordances-filter-internal">
-                            <input class="form-check-input" type="radio" name="discordances-filter" id="discordances-filter-internal" value="internal" />
-                            <span class="form-check-label">
-
-                                Discordances only within {{ dlab.discordance_summaries.labs_quick_str }} account for <strong>{{ lab_count.count }}</strong> of these discordances
-                            </span>
-                        </label>
-                    {% else %}
-                        <label class="form-check" for="discordances-filter-{{ lab_count.lab.pk }}">
-                            <input class="form-check-input" type="radio" name="discordances-filter" id="discordances-filter-{{ lab_count.lab.pk }}" value="{{ lab_count.lab.pk }}" />
-                            <span class="form-check-label">
-                                <span style="font-weight:500">{% lab lab_count.lab %}</span> are involved in <strong>{{ lab_count.count }}</strong> of these discordances
-                            </span>
-                            {% with contact=lab_count.lab.contact_details %}
-                                {% if contact %}
-                                    <div class="float-right">
-                                        {% if contact.website %}<i class="fas fa-globe"></i>{% endif %}
-                                        {% if contact.email %}<i class="fas fa-envelope"></i>{% endif %}
-                                        {% if contact.phone %}<i class="fas fa-phone"></i>{% endif %}
-                                    </div>
-                                {% endif %}
-                            {% endwith %}
-                        </label>
-                    {% endif %}
-                </li>
-                {% endfor %}
-            </ul>
-
-            {% for lab_count in dlab.discordance_summaries.counts %}
-                {% with lab=lab_count.lab %}
-                    {% if lab.id != dlab.lab_id %}
-                        {% with contact=lab.contact_details %}
-                            {% if contact %}
-                                <div class="contact-details mb-4" style="display:none" data-lab="{{ lab.id }}">
-
-                                    {% if contact.website %}
-                                        {% labelled label="Website" hint="tiny" %}<a href="{{ contact.website }}">{{ contact.website }}</a>{% endlabelled %}
-                                    {% endif %}
-                                    {% if contact.name %}
-                                        {% labelled label="Contact Person" hint="tiny" %}{{ contact.name }}{% endlabelled %}
-                                    {% endif %}
-                                    {% if contact.phone %}
-                                        {% labelled label="Contact Phone" hint="tiny" %}{{ contact.phone }}{% endlabelled %}
-                                    {% endif %}
-                                    {% if contact.email %}
-                                        {% labelled label="Contact Email" hint="tiny" %}<a href="mailto:{{ contact.email }}">{{ contact.email }}</a>{% endlabelled %}
-                                    {% endif %}
-                                </div>
-                            {% endif %}
-                        {% endwith %}
-                    {% endif %}
-                {% endwith %}
-            {% endfor %}
-
-
+            {% labelled label="Outstanding Discordances" hint="tiny" %}
+                <div>{{ dlab.discordance_summaries.summaries|length| number:'W' }}</div>
+                {% if dlab.discordance_summaries.summaries|length > 3 %}<div>Showing most recent 3</div>{% endif %}
+                <div><a class="hover-link" href="{% url 'discordance_reports'  dlab.lab_id %}"><small class="form-text">Review all discordances here</small></a></div>
+            {% endlabelled %}
             <table class="table">
                 <thead>
                     <tr>
@@ -232,24 +144,8 @@
                     </tr>
                 </thead>
                 <tbody>
-                {% for summary in dlab.discordance_summaries.summaries %}
-                {% comment %}TODO fix internal{% endcomment %}
-                    <tr class="discordance-row" data-labs="{% if summary.is_internal %}internal{% else %}{{ summary.all_actively_involved_labs_ids }}{% endif %}">
-                        <td class="text-center"><a href="{% url 'discordance_report' summary.discordance_report.id %}" class="hover-link">DR_{{ summary.discordance_report.id }}</a></td>
-                        <td>{% timestamp summary.discordance_report.created %}</td>
-                        <td>{% for c_hgvs_val in summary.c_hgvses %}
-                            <div>{% c_hgvs c_hgvs_val %}</div>
-                            {% endfor %}
-
-                        </td>
-                        <td style="width:40%">{% for lab_summ in summary.lab_significances %}
-                            <div>
-                                <span class="d-inline-block mr-2" style="min-width:150px">{% lab lab_summ.lab your_lab=lab_summ.is_internal %}</span>
-                                {% for cs in lab_summ.clinical_significances %}{% clinical_significance cs %}{% endfor %}
-                            </div>
-                            {% endfor %}
-                        </td>
-                    </tr>
+                {% for summary in dlab.discordance_summaries.summaries|slice:":3" %}
+                    {% discordance_report_row summary filter=False %}
                 {% endfor %}
                 </tbody>
             </table>
@@ -269,6 +165,7 @@
         </p>
     {% end_page_help_embedded %}
 
+    {% labelled hint="tiny" label="Classifications with Pending Changes" %}{{ dlab.counts.pending_changes | number:'W' }}{% endlabelled %}
     {% labelled hint="tiny" label="Classifications in Internal Review" %}{{ dlab.counts.internal_review | number:'W' }}{% endlabelled %}
     {% labelled hint="tiny" label="Classifications with Outstanding Clinical Significance Changes" %}{{ dlab.counts.significance_change | number:'W' }}{% endlabelled %}
     {% labelled hint="tiny" label="Classifications Excluded from ClinVar" %}{{ dlab.counts.clinvar_exclude | number }}{% endlabelled %}
@@ -282,8 +179,12 @@
 
         <div class="mt-4">
 
-            {% ui_register_tab_embedded tab_set="classification_issues" label="Suggestion/Internal Review/Clin Change" badge=dlab.counts.comments %}
-                <table id="classifications-comment" data-datatable-url="{% url 'classification_datatables' %}" class="sticky-header classification-table" data-datatable-data="classificationComments"></table>
+            {% ui_register_tab_embedded tab_set="classification_issues" label="Pending/Review/Suggestion" badge=dlab.counts.pending_changes|add:dlab.counts.internal_review|add:dlab.counts.suggestions %}
+                <table id="classifications-matching" data-datatable-url="{% url 'classification_datatables' %}" class="sticky-header classification-table" data-datatable-data="classificationReviews"></table>
+            {% end_ui_register_tab_embedded %}
+
+            {% ui_register_tab_embedded tab_set="classification_issues" label="Clin Change" badge=dlab.counts.significance_change %}
+                <table id="classifications-comment" data-datatable-url="{% url 'classification_datatables' %}" class="sticky-header classification-table" data-datatable-data="classificationSigChanges"></table>
             {% end_ui_register_tab_embedded %}
 
             {% ui_register_tab_embedded tab_set="classification_issues" label="Variant Matching Issues" badge=dlab.counts.variant_matching %}

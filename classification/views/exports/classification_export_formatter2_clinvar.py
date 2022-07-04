@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Set, Optional, List, Tuple
+from typing import Set, Optional, List, Tuple, Dict, Any
 
 from django.http import HttpRequest
 from django.urls import reverse
@@ -7,6 +7,7 @@ from lazy import lazy
 
 from annotation.models import ClinVar, ClinVarVersion
 from classification.enums import SpecialEKeys
+from classification.models import EvidenceKeyMap
 from classification.views.classification_export_utils import ExportFormatter
 from classification.views.exports.classification_export_decorator import register_classification_exporter
 from classification.views.exports.classification_export_filter import ClassificationFilter, AlleleData
@@ -58,15 +59,6 @@ class ClinVarCompareRow(ExportRow):
         "Benign/Likely_benign": ["B", "LB"],
         "risk_factor": "R",
         "drug_response": "D"
-    }
-    CLINSIG_BUCKETS = {
-        "B": 1,
-        "LB": 1,
-        "VUS": 2,
-        "LP": 3,
-        "P": 3,
-        "R": 4,
-        "D": 5
     }
 
     def __init__(self, allele_group: AlleleData, clinvar_version: ClinVarVersion):
@@ -181,12 +173,12 @@ class ClinVarCompareRow(ExportRow):
         our_clins = {"VUS" if sc.startswith("VUS") else sc for sc in our_clins}
 
         lowest_value = ClinVarCompareValue.NOT_CALCULATED
-        clingen_buckets = {ClinVarCompareRow.CLINSIG_BUCKETS.get(cs, -1) for cs in clinvar_clins}
+        clingen_buckets = {EvidenceKeyMap.clinical_significance_to_bucket().get(cs, -1) for cs in clinvar_clins}
 
         def compare_single(server_clin: str) -> ClinVarCompareValue:
             nonlocal clinvar_clins
             nonlocal clingen_buckets
-            server_bucket = ClinVarCompareRow.CLINSIG_BUCKETS.get(server_clin, 0)
+            server_bucket = EvidenceKeyMap.clinical_significance_to_bucket().get(server_clin, 0)
             if server_clin in clinvar_clins:
                 return ClinVarCompareValue.AGREEMENT
             elif server_bucket in clingen_buckets:

@@ -54,5 +54,11 @@ def published(sender, classification, previously_published, newly_published, use
                 flag_type=classification_flag_types.significance_change,
                 comment=f'Classification changed from {old_label} to {new_label}'
             )
+            # note we don't care if the clin sig was was changed to agreed upon value per the flag
+            # just that it was changed
+            classification.flag_collection_safe.close_open_flags_of_type(
+                flag_type=classification_flag_types.classification_pending_changes,
+                comment=f'Classification was changed to {new_label}'
+            )
 
     debug_timer.tick("Update share flags")

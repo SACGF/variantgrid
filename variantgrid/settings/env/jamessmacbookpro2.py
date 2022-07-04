@@ -20,6 +20,7 @@ AWS_SES_ACCESS_KEY_ID, AWS_SES_SECRET_ACCESS_KEY, AWS_SES_REGION = \
         [aws_dict[k] for k in ('AWS_SES_ACCESS_KEY_ID', 'AWS_SES_SECRET_ACCESS_KEY', 'AWS_SES_REGION')]
 
 KEYCLOAK_SYNC_DETAILS = get_keycloak_sync_secrets()
+SYNC_DETAILS = get_shariant_sync_secrets()
 """
 
 aws_s3_dict = get_s3_secrets()
@@ -319,7 +320,8 @@ URLS_NAME_REGISTER.update({  # Disable selected snpdb urls
     "condition_matchings": True,
     "condition_match_test": True,
     "classification_import_upload": True,
-    "classification_view_metrics": True
+    "classification_view_metrics": True,
+    "discordance_reports": True,
 })
 
 # mimic shariant

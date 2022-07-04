@@ -1,0 +1,44 @@
+{% load js_tags %}
+{% load classification_tags %}
+<tr class="discordance-row" {% if filter %}data-labs="{% if summary.is_internal %}internal{% else %}{{ summary.all_actively_involved_labs_ids }}{% endif %}{% endif %}">
+    <td class="text-center">
+        {% if is_selected %}<i class="fas fa-hand-point-right"></i>{% timestamp old_report.report_started_date %}DR_{{ summary.discordance_report.id }}
+        {% else %}<a href="{% url 'discordance_report' summary.discordance_report.id %}" class="hover-link">DR_{{ summary.discordance_report.id }}</a>
+        {% endif %}
+    </td>
+    <td>{% timestamp summary.discordance_report.created %}</td>
+    <td>{% for c_hgvs_val in summary.c_hgvses %}
+        <div>{% c_hgvs c_hgvs_val %}</div>
+        {% endfor %}
+
+    </td>
+    <td style="width:40%">
+        <div class="font-weight-bold mb-1">
+            {% if summary.discordance_report.resolution %}
+                {% if summary.discordance_report.resolution == "C" %}
+                    <span class="text-success">{{ summary.discordance_report.get_resolution_display }}</span>
+                {% else %}
+                    <span class="text-danger">{{ summary.discordance_report.get_resolution_display }}</span>
+                {% endif %}
+            {% elif summary.is_pending_concordance %}
+                <span class="text-success">Pending Concordance</span>
+            {% else %}
+                <span class="no-value">Active Discordance</span>
+            {% endif %}
+        </div>
+        {% for lab_summ in summary.lab_significances %}
+            <div {% if lab_summ.clinical_significance_to == 'withdrawn' %}style="opacity:0.6"{% endif %}>
+                <span class="d-inline-block mr-2">
+                    {% lab lab_summ.lab your_lab=lab_summ.is_internal %}
+                    {% if lab_summ.count > 1 %}<span class="d-inline-block mx-1 text-muted">x</span>{{ lab_summ.count }}{% endif %}
+                </span>
+                {% if lab_summ.changed %}
+                    {% clinical_significance lab_summ.clinical_significance_from %} <i class="fas fa-arrow-right mx-2 text-secondary"></i> {% clinical_significance lab_summ.clinical_significance_to %}
+                    {% if lab_summ.pending %}<div title="This is an agreed upon pending change" class="flag flag-classification_pending_changes hover-detail ml-1" style="position:relative; top: 5px"></div>{% endif %}
+                {% else %}
+                    {% clinical_significance lab_summ.clinical_significance_from %}
+                {% endif %}
+            </div>
+        {% endfor %}
+    </td>
+</tr>

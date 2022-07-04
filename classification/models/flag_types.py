@@ -68,5 +68,11 @@ class ClassificationFlagTypes:
     def classification_not_public(self) -> FlagType:
         return FlagType.objects.get(pk='classification_not_public')
 
+    @lazy
+    def classification_pending_changes(self) -> FlagType:
+        return FlagType.objects.get(pk='classification_pending_changes')
+
+    CLASSIFICATION_PENDING_CHANGES_CLIN_SIG_KEY = "to_clin_sig"
+
 
 classification_flag_types = ClassificationFlagTypes()

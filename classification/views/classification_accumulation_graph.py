@@ -10,8 +10,7 @@ from dateutil import relativedelta
 from django.http import StreamingHttpResponse
 
 from classification.enums import ShareLevel
-from classification.models import classification_flag_types, Classification, ClassificationModification
-from classification.models.clinical_context_models import CS_TO_NUMBER
+from classification.models import classification_flag_types, Classification, ClassificationModification, EvidenceKeyMap
 from flags.models import FlagComment
 from library.utils import delimited_row, IteratableStitcher, IterableTransformer
 from snpdb.models import Lab
@@ -130,7 +129,7 @@ class AlleleSummary:
             all_values = set()
             all_buckets = set()
             for summary in self.not_withdrawn:
-                if bucket := CS_TO_NUMBER.get(summary.clinical_significance, None):
+                if bucket := EvidenceKeyMap.clinical_significance_to_bucket().get(summary.clinical_significance, None):
                     all_buckets.add(bucket)
                     all_values.add(summary.clinical_significance)
             if len(all_buckets) >= 2:

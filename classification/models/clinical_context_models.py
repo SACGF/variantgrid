@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from enum import Enum
-from typing import List, Optional, Iterable, Set
+from typing import List, Optional, Iterable, Set, Dict
 
 import django.dispatch
 from django.conf import settings
@@ -12,13 +12,13 @@ from django.dispatch.dispatcher import receiver
 from django.utils.timezone import now
 from django_extensions.db.models import TimeStampedModel
 from lazy import lazy
-
 from classification.enums import ShareLevel, SpecialEKeys
 from classification.enums.clinical_context_enums import ClinicalContextStatus
 from classification.models.classification import Classification, \
     ClassificationModification
 from classification.models.classification_import_run import ClassificationImportRun, \
     classification_imports_complete_signal
+from flags.models import Flag, FlagResolution, FlagStatus
 from flags.models.models import FlagsMixin, FlagCollection, FlagTypeContext, \
     flag_collection_extra_info_signal, FlagInfos
 from library.django_utils import get_url_from_view_path
@@ -28,17 +28,7 @@ from snpdb.models.models_variant import Allele
 
 clinical_context_signal = django.dispatch.Signal()  # args: "clinical_context", "status", "is_significance_change", "cause"
 
-CS_TO_NUMBER = {
-    'B': 1,
-    'LB': 1,
-    'VUS': 2,
-    'VUS_A': 2,
-    'VUS_B': 2,
-    'VUS_C': 2,
-    'LP': 3,
-    'P': 3,
-    'R': 4
-}
+# TODO, consider moving this into the clinical significance evidence key options rather than hardcoded
 SPECIAL_VUS = {
     'VUS_A': 1,
     'VUS_B': 2,
@@ -86,15 +76,71 @@ class DiscordanceLevel(str, Enum):
         return "overlap-single"
 
 
+@dataclass(frozen=True)
+class _DiscordanceCalculationRow:
+    lab: Lab
+    clinical_significance: str
+    shared: bool
+
+
 @dataclass
 class DiscordanceStatus:
     level: DiscordanceLevel
     lab_count: int
     lab_count_all: int
     counted_classifications: int
+    pending_concordance: bool = False
+
+    @property
+    def is_discordant(self):
+        return self.level == DiscordanceLevel.DISCORDANT
+
+    @staticmethod
+    def cs_buckets():
+        from classification.models import EvidenceKeyMap
+        return EvidenceKeyMap.clinical_significance_to_bucket()
 
     @staticmethod
     def calculate(modifications: Iterable[ClassificationModification]) -> 'DiscordanceStatus':
+        base_status = DiscordanceStatus._calculate_rows([
+            _DiscordanceCalculationRow(
+                lab=vcm.classification.lab,
+                clinical_significance=vcm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE),
+                shared=vcm.share_level_enum.is_discordant_level
+            ) for vcm in modifications
+        ])
+        if not base_status.is_discordant:
+            # no need to check flags for pending changes if we're not discordant when looking at all entries
+            # the common case by far
+            return base_status
+
+        # we're discordant, check to see if there are pending changes AND if those pending changes would bring us into discordance
+        # if so, just mark "pending_concordance" as true
+        from classification.models import ClassificationFlagTypes, classification_flag_types
+        flag_collections = {mod.classification.flag_collection_id: mod for mod in modifications}
+        if pending_flags := Flag.objects.filter(collection__in=flag_collections.keys(),
+                                                flag_type=classification_flag_types.classification_pending_changes,
+                                                resolution__status=FlagStatus.OPEN):
+
+            clin_sig_overrides: Dict[int, str] = dict()
+            for flag in pending_flags:
+                clin_sig_overrides[flag_collections[flag.collection_id].pk] = flag.data.get(
+                    ClassificationFlagTypes.CLASSIFICATION_PENDING_CHANGES_CLIN_SIG_KEY) or None
+
+            override_status = DiscordanceStatus._calculate_rows([
+                _DiscordanceCalculationRow(
+                    lab=vcm.classification.lab,
+                    clinical_significance=clin_sig_overrides.get(vcm.pk) if vcm.pk in clin_sig_overrides else vcm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE),
+                    shared=vcm.share_level_enum.is_discordant_level
+                ) for vcm in modifications
+            ])
+            if not override_status.is_discordant:
+                base_status.pending_concordance = True
+
+        return base_status
+
+    @staticmethod
+    def _calculate_rows(rows: Iterable[_DiscordanceCalculationRow]) -> 'DiscordanceStatus':
         cs_scores: Set[int] = set()  # clin sig to score, all VUSs are 3
         cs_vuses: Set[int] = set()  # all the different VUS A,B,C values
         cs_values: Set[str] = set()   # all the different clinical sig values
@@ -103,13 +149,14 @@ class DiscordanceStatus:
 
         level: Optional[DiscordanceLevel]
         counted_classifications = 0
-        for vcm in modifications:
-            all_labs.add(vcm.classification.lab)
-            clin_sig = vcm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
-            if vcm.share_level_enum.is_discordant_level and vcm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE) is not None:
-                if strength := CS_TO_NUMBER.get(clin_sig):
+        for row in rows:
+            all_labs.add(row.lab)
+            clin_sig = row.clinical_significance
+            if clin_sig and row.shared:
+                # if vcm.share_level_enum.is_discordant_level and vcm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE) is not None:
+                if strength := DiscordanceStatus.cs_buckets().get(clin_sig):
                     counted_classifications += 1
-                    shared_labs.add(vcm.classification.lab)
+                    shared_labs.add(row.lab)
                     cs_scores.add(strength)
                     cs_values.add(clin_sig)
                 if vus_special := SPECIAL_VUS.get(clin_sig):
@@ -175,22 +222,30 @@ class ClinicalContext(FlagsMixin, TimeStampedModel):
         """
         deprecated, try to use DiscordanceLevels instead
         """
-        status = self.calculate_discordance_status()
+        status = self.discordance_status
         level = status.level
         if level == DiscordanceLevel.DISCORDANT:
             return ClinicalContextStatus.DISCORDANT
         else:
             return ClinicalContextStatus.CONCORDANT
 
+    @property
+    def is_pending_concordance(self):
+        return self.discordance_status.pending_concordance
+
     def calculate_discordance_status(self) -> DiscordanceStatus:
         return DiscordanceStatus.calculate(self.classification_modifications)
 
     @lazy
+    def discordance_status(self) -> DiscordanceStatus:
+        return DiscordanceStatus.calculate(self.classification_modifications)
+
+    @lazy
     def relevant_classification_count(self) -> int:
-        return len([vcm for vcm in self.classification_modifications if CS_TO_NUMBER.get(vcm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE))])
+        return len([vcm for vcm in self.classification_modifications if DiscordanceStatus.cs_buckets().get(vcm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE))])
 
     def is_discordant(self):
-        return self.status == ClinicalContextStatus.DISCORDANT
+        return self.status == DiscordanceLevel.DISCORDANT
 
     @lazy
     def latest_report(self) -> Optional['DiscordanceReport']:
@@ -205,10 +260,12 @@ class ClinicalContext(FlagsMixin, TimeStampedModel):
         Updates this ClinicalContext with the new status and applies flags where appropriate.
         :param cause: A human readable string to be showed to the users as to what started or stopped a discordance (if relevant)
         typically will be "Lab X submitted a new variant"
-        :param cause_code: A finite list of codes as to what triggered the discordance (not currently used)
+        :param cause_code: A finite list of codes as to what triggered the discordance
         """
+        lazy.invalidate(self, 'discordance_status')
+
         old_status = self.status
-        new_status = self.calculate_status()
+        new_status = self.discordance_status.level
         is_significance_change = old_status != new_status
         is_simple_new = old_status is None and new_status == ClinicalContextStatus.CONCORDANT
         allele_url = get_url_from_view_path(self.allele.get_absolute_url())
@@ -260,7 +317,7 @@ class ClinicalContext(FlagsMixin, TimeStampedModel):
             nb = NotificationBuilder("ClinicalContext changed")
             nb.add_markdown(
                 f":fire_engine: ClinicalGrouping for allele <{allele_url}|{allele_url}> changed from {old_status} -> {new_status} "
-                f"lab notifications should follow")
+                f"\nLab notifications should follow")
             nb.send()
 
         clinical_context_signal.send(sender=ClinicalContext, clinical_context=self, status=new_status, is_significance_change=is_significance_change, cause=cause)

@@ -275,17 +275,14 @@
     &.flag-classification_not_public {
         background-image: url(/static/icons/flags/world-ban.png);
     }
+    &.flag-classification_pending_changes {
+        background-image: url(/static/icons/flags/pending_changes.png);
+    }
     &.flag-settings {
         background-image: url(/static/icons/flags/settings.svg);
     }
     &.add {
         background-image: url(/static/icons/gear.svg);
-    }
-    &.watch {
-        background-image: url(/static/icons/flags/star_outline.svg);
-        &.watching {
-            background-image: url(/static/icons/flags/star_filled.svg);
-        }
     }
     &.timeline {
         background-image: url(/static/icons/flags/calendar-with-a-clock-time-tools.svg);

@@ -620,6 +620,14 @@ span.cs {
 .cs-lp { background-color: #ffdddd }
 .cs-p { background-color: #ffcccc }
 .cs- { background-color: #f0f0f0 }
+.cs-pending {
+  background: repeating-linear-gradient(
+    -45deg,
+    #ddd,
+    #ddd 10px,
+    #eee 10px,
+    #eee 20px)
+}
 
 .cs-card {
   text-align: center;
@@ -1009,6 +1017,16 @@ ul.compact {
 .fa-spinner {
   animation:spin 3s steps(8) infinite;
 }
+.fa-hand-point-right {
+  margin-right: 6px;
+}
+table .fa-hand-point-right {
+  position: relative;
+  left: -20px;
+  width: 0;
+  margin: 0;
+}
+
 @keyframes spin {
     from { transform:rotate(0deg); }
     to { transform:rotate(360deg); }

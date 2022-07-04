@@ -114,9 +114,12 @@ class PageViewsMiddleware:
                             if isinstance(classification_id, (str, float)):
                                 check_for_parts = str(classification_id)
                                 parts = check_for_parts.split(".")
-                                all_params["classification_id"] = int(parts[0])
-                                if len(parts) > 1:
-                                    all_params["modification_timestamp"] = float(parts[1])
+                                try:
+                                    all_params["classification_id"] = int(parts[0])
+                                    if len(parts) > 1:
+                                        all_params["modification_timestamp"] = float(parts[1])
+                                except ValueError:
+                                    pass
 
                         # call then later captures this and saves it to the DB (if appropriate)
                         user: Optional[User] = None

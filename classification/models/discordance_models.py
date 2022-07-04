@@ -10,6 +10,7 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.db import models, transaction
 from django.db.models.deletion import PROTECT, CASCADE
+from django.dispatch import receiver
 from django.urls.base import reverse
 from django.utils.timezone import now
 from django_extensions.db.models import TimeStampedModel
@@ -20,7 +21,8 @@ from classification.enums.classification_enums import SpecialEKeys, ClinicalSign
 from classification.enums.discordance_enums import DiscordanceReportResolution, ContinuedDiscordanceReason
 from classification.models.classification import ClassificationModification, Classification
 from classification.models.clinical_context_models import ClinicalContext
-from classification.models.flag_types import classification_flag_types
+from classification.models.flag_types import classification_flag_types, ClassificationFlagTypes
+from flags.models import flag_comment_action, Flag, FlagResolution
 from flags.models.enums import FlagStatus
 from flags.models.models import FlagComment
 from genes.hgvs import CHGVS
@@ -33,8 +35,9 @@ discordance_change_signal = django.dispatch.Signal()  # args: "discordance_repor
 class DiscordanceReport(TimeStampedModel):
 
     resolution = models.TextField(default=DiscordanceReportResolution.ONGOING, choices=DiscordanceReportResolution.CHOICES, max_length=1, null=True, blank=True)
+    # TODO remove continued discordane reason, it should be redundant to notes
     continued_discordance_reason = models.TextField(choices=ContinuedDiscordanceReason.CHOICES, max_length=1, null=True, blank=True)
-    continued_discordance_text = models.TextField(null=True, blank=True)
+    notes = models.TextField(null=False, blank=True, default='')
 
     clinical_context = models.ForeignKey(ClinicalContext, on_delete=PROTECT)
 
@@ -82,6 +85,8 @@ class DiscordanceReport(TimeStampedModel):
             return 'Concordant'
         if self.resolution == DiscordanceReportResolution.CONTINUED_DISCORDANCE:
             return 'Continued Discordance'
+        if self.is_pending_concordance:
+            return 'Pending Concordance'
         if self.resolution == DiscordanceReportResolution.ONGOING:
             return 'In Discordance'
         return ''
@@ -108,13 +113,6 @@ class DiscordanceReport(TimeStampedModel):
             drc.close()
 
         discordance_change_signal.send(DiscordanceReport, discordance_report=self, cause=cause_text)
-
-    @transaction.atomic
-    def unresolve_close(self, user: User, continued_discordance_reason: str, continued_discordance_text: str):
-        self.report_closed_by = user
-        self.continued_discordance_reason = continued_discordance_reason
-        self.continued_discordance_text = continued_discordance_text
-        self.close(expected_resolution=DiscordanceReportResolution.CONTINUED_DISCORDANCE, cause_text="Unable to resolve")
 
     @transaction.atomic
     def update(self, cause_text: str = ''):
@@ -308,6 +306,13 @@ class DiscordanceReport(TimeStampedModel):
             c_hgvs.add(cm.c_hgvs_best(genome_build))
         return sorted(c_hgvs)
 
+    @property
+    def is_pending_concordance(self):
+        return self.clinical_context.discordance_status.pending_concordance
+
+
+# TODO all the below classes are utilites, consider moving them out
+
 
 @dataclass(frozen=True)
 class UserPerspective:
@@ -321,6 +326,14 @@ class UserPerspective:
             genome_build = UserSettings.get_for(lab=lab).default_genome_build or GenomeBuild.grch38()
         return UserPerspective(your_labs={lab, }, genome_build=genome_build, is_admin_mode=False)
 
+    @staticmethod
+    def for_user(user: User):
+        return UserPerspective(
+            your_labs=set(Lab.valid_labs_qs(user)),
+            genome_build=GenomeBuildManager.get_current_genome_build(),
+            is_admin_mode=user.is_superuser
+        )
+
     @property
     def labs_if_not_admin(self) -> Set[Lab]:
         if self.is_admin_mode:
@@ -329,6 +342,8 @@ class UserPerspective:
 
 
 class DiscordanceReportSummary:
+
+    # TODO merge this with DiscordanceReportViewTemplate?
 
     def __init__(self, discordance_report: DiscordanceReport, perspective: UserPerspective):
         self.discordance_report = discordance_report
@@ -342,8 +357,12 @@ class DiscordanceReportSummary:
         return ";".join(str(lab.pk) for lab in self.all_actively_involved_labs)
 
     @property
-    def is_valid(self) -> bool:
-        return self.perspective.is_admin_mode or bool(self.all_actively_involved_labs.intersection(self.perspective.your_labs))
+    def is_active(self) -> bool:
+        return (self.perspective.is_admin_mode or bool(self.all_actively_involved_labs.intersection(self.perspective.your_labs))) and self.discordance_report.resolution is None
+
+    @property
+    def is_valid_including_withdraws(self) -> bool:
+        return self.perspective.is_admin_mode or bool(set(self.discordance_report.involved_labs.keys()).intersection(self.perspective.your_labs))
 
     @property
     def other_labs(self) -> Set[Lab]:
@@ -390,29 +409,91 @@ class DiscordanceReportSummary:
     def c_hgvses(self) -> List[CHGVS]:
         return sorted({candidate.c_hgvs_best(genome_build=self.perspective.genome_build) for candidate in self._cm_candidates})
 
-    @dataclass
-    class LabClinicalSignificances:
+    @property
+    def is_pending_concordance(self):
+        return self.discordance_report.is_pending_concordance
+
+    @dataclass(frozen=True)
+    class LabClinicalSignificanceGroup:
         lab: Lab
-        clinical_significances: Iterable[str]  # values are clinical significance strings
+        clinical_significance_from: str
+        clinical_significance_to: str
+        pending: bool = False
+
+    @dataclass(frozen=True)
+    class LabClinicalSignificances:
+        group: 'DiscordanceReportSummary.LabClinicalSignificanceGroup'
         is_internal: bool
+        count: int
+
+        @property
+        def lab(self):
+            return self.group.lab
+
+        @property
+        def clinical_significance_from(self):
+            return self.group.clinical_significance_from
+
+        @property
+        def clinical_significance_to(self):
+            return self.group.clinical_significance_to
+
+        @property
+        def changed(self):
+            return self.group.clinical_significance_from != self.group.clinical_significance_to
+
+        @property
+        def pending(self):
+            # TODO rename to has_pending_changes
+            return self.group.pending
+
+        @property
+        def sort_key(self):
+            from classification.models import EvidenceKeyMap
+            key = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE)
+            return self.is_internal, self.lab, key.classification_sorter_value(self.clinical_significance_from), key.classification_sorter_value(self.clinical_significance_to), self.pending
 
         def __lt__(self, other):
-            if self.is_internal != other.is_internal:
-                return self.is_internal
-            return self.lab < other.lab
+            return self.sort_key < other.sort_key
 
     @lazy
     def lab_significances(self) -> List[LabClinicalSignificances]:
-        lab_to_class: Dict[Lab, Set[str]] = defaultdict(set)
-        for drc in DiscordanceReportClassification.objects.filter(report=self.discordance_report):
-            effective_c: Classification = drc.classification_effective.classification
-            if not effective_c.withdrawn:
-                lab_to_class[effective_c.lab].add(drc.classification_effective.get(SpecialEKeys.CLINICAL_SIGNIFICANCE))
+        group_counts: Dict[DiscordanceReportSummary.LabClinicalSignificanceGroup, int] = defaultdict(int)
+        for drc in DiscordanceReportClassification.objects.filter(report=self.discordance_report).select_related(
+            'classification_original',
+            'classification_original__classification',
+            'classification_original__classification__lab',
+            'classification_original__classification__lab__organization',
+            'classification_final'
+        ):
+            clinical_significance_from = drc.classification_original.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
+            clinical_significance_to: Optional[str] = None
+            pending: bool = False
+            if drc.withdrawn_effective:
+                clinical_significance_to = 'withdrawn'
+            else:
+                if not self.discordance_report.resolution:
+                    # classification is still outstanding, check to see if there pending changes
+                    if flag := drc.classification_original.classification.flag_collection.get_open_flag_of_type(classification_flag_types.classification_pending_changes):
+                        clinical_significance_to = flag.data.get(ClassificationFlagTypes.CLASSIFICATION_PENDING_CHANGES_CLIN_SIG_KEY) or "unknown"
+                        pending = True
 
-        from classification.models import EvidenceKeyMap
-        clin_sig = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE)
+                if not clinical_significance_to:
+                    clinical_significance_to = drc.classification_effective.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
 
-        return sorted([DiscordanceReportSummary.LabClinicalSignificances(lab=k, clinical_significances=clin_sig.sort_values(v), is_internal=k in self.perspective.labs_if_not_admin) for k, v in lab_to_class.items()])
+            # FIXME, also check for pending changes if classification isn't closed yet!
+            group_counts[DiscordanceReportSummary.LabClinicalSignificanceGroup(
+                lab=drc.classification_original.classification.lab,
+                clinical_significance_from=clinical_significance_from,
+                clinical_significance_to=clinical_significance_to,
+                pending=pending
+            )] += 1
+
+        return sorted([DiscordanceReportSummary.LabClinicalSignificances(
+            group=group,
+            is_internal=group.lab in self.perspective.labs_if_not_admin,
+            count=count
+        ) for group, count in group_counts.items()])
 
 
 @dataclass(frozen=True)
@@ -438,7 +519,12 @@ class DiscordanceReportSummaryCount:
 class DiscordanceReportSummaries:
     perspective: UserPerspective
     summaries: List[DiscordanceReportSummary]
+    inactive_summaries: List[DiscordanceReportSummary]
+
     counts: List[DiscordanceReportSummaryCount]
+
+    def __len__(self):
+        return len(self.summaries)
 
     def __bool__(self):
         return bool(self.summaries)
@@ -453,27 +539,35 @@ class DiscordanceReportSummaries:
         else:
             return "your assigned labs"
 
+    @property
+    def genome_build(self) -> GenomeBuild:
+        return self.perspective.genome_build
+
     @staticmethod
     def create(perspective: UserPerspective, discordance_reports: Iterable[DiscordanceReport]) -> 'DiscordanceReportSummaries':
         internal_count = 0
         by_lab: Dict[Lab, int] = defaultdict(int)
         summaries: List[DiscordanceReportSummary] = list()
+        inactive_summaries: List[DiscordanceReportSummary] = list()
 
         for dr in discordance_reports:
             summary = DiscordanceReportSummary(discordance_report=dr, perspective=perspective)
-            if summary.is_valid:
-                summaries.append(summary)
-                if summary.is_internal:
-                    internal_count += 1
+            if summary.is_valid_including_withdraws:
+                if summary.is_active:
+                    summaries.append(summary)
+                    if summary.is_internal:
+                        internal_count += 1
+                    else:
+                        for lab in summary.other_labs:
+                            by_lab[lab] += 1
                 else:
-                    for lab in summary.other_labs:
-                        by_lab[lab] += 1
+                    inactive_summaries.append(summary)
 
         counts = sorted([DiscordanceReportSummaryCount(lab=key, count=value) for key, value in by_lab.items()])
         if internal_count:
             counts.insert(0, DiscordanceReportSummaryCount(lab=None, count=internal_count))
 
-        return DiscordanceReportSummaries(perspective=perspective, summaries=summaries, counts=counts)
+        return DiscordanceReportSummaries(perspective=perspective, summaries=summaries, inactive_summaries=inactive_summaries, counts=counts)
 
 
 class DiscordanceAction:

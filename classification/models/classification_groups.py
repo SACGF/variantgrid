@@ -9,6 +9,8 @@ from classification.enums import SpecialEKeys, CriteriaEvaluation, ShareLevel
 from classification.models import ClassificationModification, EvidenceKeyMap, CuratedDate, ConditionResolved, \
     classification_flag_types
 from classification.models.evidence_mixin import CriteriaStrength
+from classification.models.flag_types import ClassificationFlagTypes
+from flags.models import Flag, FlagStatus
 from genes.hgvs import CHGVS, PHGVS
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import Allele, GenomeBuild
@@ -41,12 +43,31 @@ class MultiValues(Generic[D]):
         return MultiValues(values=values, uniform=uniform)
 
 
+class ClassificationGroupUtils:
+
+    def __init__(self, modifications: Iterable[ClassificationModification]):
+        self.modifications = modifications
+
+    @lazy
+    def _pending_changes_flag_map(self) -> Dict[int, str]:
+        mod_id_to_clin_sig: Dict[int, str] = dict()
+        flag_collections_ids = {mod.classification.flag_collection_id: mod.id for mod in self.modifications}
+        flags = Flag.objects.filter(collection__in=flag_collections_ids, flag_type=classification_flag_types.classification_pending_changes, resolution__status=FlagStatus.OPEN)
+        for flag in flags:
+            mod_id_to_clin_sig[flag_collections_ids[flag.collection_id]] = flag.data.get(ClassificationFlagTypes.CLASSIFICATION_PENDING_CHANGES_CLIN_SIG_KEY) if flag.data else 'Unknown'
+        return mod_id_to_clin_sig
+
+    def pending_changes_for(self, modification: ClassificationModification) -> Optional[str]:
+        return self._pending_changes_flag_map.get(modification.pk)
+
+
 class ClassificationGroup:
 
     def __init__(self,
                  modifications: Iterable[ClassificationModification],
                  genome_build: GenomeBuild,
-                 group_id: Optional[int] = None):
+                 group_id: Optional[int] = None,
+                 group_utils: Optional[ClassificationGroupUtils] = None):
 
         # filter out modifications that share the same (non None) patient id
         # as in we don't want to show multiple records for the same patient
@@ -55,6 +76,7 @@ class ClassificationGroup:
         modification_result = list()
         seen_patient_ids = set()
         self.excluded_record_count = 0
+        self.group_utils = group_utils
 
         for modification in modification_list:
             if patient_id := modification.get(SpecialEKeys.PATIENT_ID):
@@ -102,6 +124,12 @@ class ClassificationGroup:
         return self.most_recent.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
 
     @property
+    def clinical_significance_effective(self):
+        if override := self.clinical_significance_override:
+            return "pending"
+        return self.clinical_significance or ''
+
+    @property
     def clinical_grouping(self) -> str:
         return self.most_recent.classification.clinical_grouping_name
 
@@ -129,6 +157,17 @@ class ClassificationGroup:
         if self.most_recent.share_level in ShareLevel.DISCORDANT_LEVEL_KEYS:
             if cc := self.most_recent.classification.clinical_context:
                 return cc.is_discordant()
+
+    @property
+    def clinical_significance_override(self):
+        if utils := self.group_utils:
+            for mod in self.modifications:
+                if changed_clin_sig := utils.pending_changes_for(mod):
+                    # note if there's multiple different clin sigs, we don't show that
+                    # it should not generally occur, users can expand the group to see the individual flags
+                    # if needed
+                    return changed_clin_sig
+        return None
 
     @staticmethod
     def c_hgvs_for(cm: ClassificationModification, genome_build: GenomeBuild) -> CHGVS:
@@ -292,6 +331,7 @@ class ClassificationGroups:
 
         # clinical significance, clin grouping, org
         sorted_by_clin_sig = list(classification_modifications)
+        group_utils = ClassificationGroupUtils(sorted_by_clin_sig)
         e_key_clin_sig = evidence_keys.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
         sorted_by_clin_sig.sort(key=e_key_clin_sig.classification_sorter)
         for clin_sig, group1 in groupby(sorted_by_clin_sig, clin_significance):
@@ -310,7 +350,7 @@ class ClassificationGroups:
                         group4 = list(group4)
                         group4.sort(key=condition_sorter)
                         for _, group5 in groupby(group4, condition_grouper):
-                            actual_group = ClassificationGroup(modifications=group5, genome_build=genome_build, group_id=len(groups) + 1)
+                            actual_group = ClassificationGroup(modifications=group5, genome_build=genome_build, group_id=len(groups) + 1, group_utils=group_utils)
                             actual_group.clinical_significance_score = e_key_clin_sig.classification_sorter_value(clin_sig)
                             groups.append(actual_group)
         self.groups = groups

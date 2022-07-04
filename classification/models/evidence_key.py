@@ -8,7 +8,7 @@ from django.db.models.deletion import SET_NULL
 from django_extensions.db.models import TimeStampedModel
 from lazy import lazy
 
-from classification.enums import CriteriaEvaluation, SubmissionSource
+from classification.enums import CriteriaEvaluation, SubmissionSource, SpecialEKeys
 from classification.enums.classification_enums import EvidenceCategory, \
     EvidenceKeyValueType, ShareLevel
 from classification.models.evidence_mixin import VCBlobDict, VCPatchValue, VCPatch, VCDbRefDict
@@ -208,6 +208,12 @@ class EvidenceKey(TimeStampedModel):
     def option_dictionary(self) -> Dict[str, str]:
         if options := self.virtual_options:
             return {x.get('key'): x.get('label') for x in options}
+        else:
+            return dict()
+
+    def option_dictionary_property(self, property: str) -> Dict[str, Any]:
+        if options := self.virtual_options:
+            return {x.get('key'): x.get(property) for x in options if property in x}
         else:
             return dict()
 
@@ -456,6 +462,11 @@ class EvidenceKeyMap:
         acmg_crit = [eKey for eKey in self.criteria() if eKey.namespace is None]
         acmg_crit.sort(key=lambda k: k.pretty_label.lower())
         return acmg_crit
+
+    @staticmethod
+    @timed_cache(ttl=60)
+    def clinical_significance_to_bucket():
+        return EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE).option_dictionary_property("bucket")
 
 
 class WipeMode(Enum):

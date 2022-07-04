@@ -272,17 +272,14 @@
 .flag.flag-classification_not_public {
   background-image: url(/static/icons/flags/world-ban.png);
 }
+.flag.flag-classification_pending_changes {
+  background-image: url(/static/icons/flags/pending_changes.png);
+}
 .flag.flag-settings {
   background-image: url(/static/icons/flags/settings.svg);
 }
 .flag.add {
   background-image: url(/static/icons/gear.svg);
-}
-.flag.watch {
-  background-image: url(/static/icons/flags/star_outline.svg);
-}
-.flag.watch.watching {
-  background-image: url(/static/icons/flags/star_filled.svg);
 }
 .flag.timeline {
   background-image: url(/static/icons/flags/calendar-with-a-clock-time-tools.svg);
@@ -353,7 +350,7 @@ a.navigation-bar {
     background: none !important;
 }
 .edit-flag-dialog {
-
+    
     overflow-y: hidden;
     display: flex;
     flex-direction: column;
@@ -370,7 +367,7 @@ a.navigation-bar {
         overflow-y: auto;
         height: 486px;
         flex-grow: 1;
-
+        
         & > .description {
             margin: 0 1em 2px 1em;
             position: relative;

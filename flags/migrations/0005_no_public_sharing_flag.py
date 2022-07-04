@@ -22,13 +22,6 @@ def create_not_public(apps, schema_editor):
         }
     )
 
-    """
-    id = models.TextField(primary_key=True)
-    label = models.TextField()
-    description = models.TextField()
-    status = models.TextField(max_length=1, default=FlagStatus.OPEN, choices=FlagStatus.CHOICES)
-    """
-
     dont_share, _ = FlagResolution.objects.get_or_create(
         id="np_dont_share",
         defaults={

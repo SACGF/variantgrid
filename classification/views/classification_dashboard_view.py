@@ -1,4 +1,4 @@
-from typing import Optional, List
+from typing import Optional, List, Tuple, Iterable
 from urllib.parse import urlencode
 
 from django.conf import settings
@@ -88,24 +88,30 @@ class ClassificationDashboard:
         return ClinVarExport.objects.none()
 
     @lazy
-    def discordance_summaries(self) -> DiscordanceReportSummaries:
-        # WARNING, this will count discordances that involve the lab in a classification, but one that has
-        # has changed clinical context
-        discordant_c = DiscordanceReportClassification.objects\
-            .filter(classification_original__classification__lab__in=self.labs)\
-            .filter(classification_original__classification__withdrawn=False)\
-            .order_by('report_id').values_list('report_id', flat=True)
-        dr_qs = DiscordanceReport.objects.filter(pk__in=discordant_c, resolution=DiscordanceReportResolution.ONGOING)\
-            .order_by('-created')
-
+    def perspective(self) -> UserPerspective:
         genome_build = GenomeBuildManager.get_current_genome_build()
         perspective: UserPerspective
         if len(self.labs) == 1:
             perspective = UserPerspective.for_lab(self.labs[0], genome_build=genome_build)
         else:
-            perspective = UserPerspective(your_labs=set(self.labs), genome_build=genome_build, is_admin_mode=self.user.is_superuser)
+            perspective = UserPerspective(your_labs=set(self.labs), genome_build=genome_build,
+                                          is_admin_mode=self.user.is_superuser)
+        return perspective
 
-        return DiscordanceReportSummaries.create(perspective=perspective, discordance_reports=dr_qs)
+    @lazy
+    def discordance_summaries(self) -> DiscordanceReportSummaries:
+        # Has changed from just finding the active discordances to discordances withdrawn from and
+        # resolved discordances - so they can be listed in history
+
+        # FIXME DiscordanceReports should really be handled with Guardian permissions rather than looking
+        # at the individual labs involved
+        discordant_c = DiscordanceReportClassification.objects\
+            .filter(classification_original__classification__lab__in=self.labs)\
+            .order_by('report_id').values_list('report_id', flat=True)
+        # .filter(classification_original__classification__withdrawn=False)  used to
+        dr_qs = DiscordanceReport.objects.filter(pk__in=discordant_c).order_by('-created')
+
+        return DiscordanceReportSummaries.create(perspective=self.perspective, discordance_reports=dr_qs)
 
     @lazy
     def classifications_wout_standard_text(self) -> int:
@@ -143,13 +149,12 @@ class ClassificationDashboard:
             classification_flag_types.matching_variant_warning_flag,
             classification_flag_types.transcript_version_change_flag
         ])
-        comments = FlagCollection.filter_for_open_flags(qs=vcqs, flag_types=[
+        suggestions = FlagCollection.filter_for_open_flags(qs=vcqs, flag_types=[
             classification_flag_types.suggestion,
-            classification_flag_types.internal_review,
-            classification_flag_types.significance_change
         ])
         internal_review = FlagCollection.filter_for_open_flags(qs=vcqs, flag_types=[classification_flag_types.internal_review])
         significance_change = FlagCollection.filter_for_open_flags(qs=vcqs, flag_types=[classification_flag_types.significance_change])
+        pending_changes = FlagCollection.filter_for_open_flags(qs=vcqs, flag_types=[classification_flag_types.classification_pending_changes])
 
         unshared = FlagCollection.filter_for_open_flags(qs=vcqs, flag_types=[
             classification_flag_types.unshared_flag
@@ -165,10 +170,11 @@ class ClassificationDashboard:
 
         return {
             "internal_review": internal_review.count(),
+            "pending_changes": pending_changes.count(),
             "significance_change": significance_change.count(),
             "discordant": discordant.count(),
             "variant_matching": variant_matching.count(),
-            "comments": comments.count(),
+            "suggestions": suggestions.count(),
             "unshared": unshared.count(),
             "withdrawn": withdrawn.count(),
             "clinvar_exclude": clinvar_exclude.count()

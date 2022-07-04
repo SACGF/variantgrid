@@ -66,7 +66,7 @@ class BulkClassificationInserter:
     @transaction.atomic
     def insert(
             self,
-            data: dict,
+            data: Dict,
             record_id: Optional[str] = None,
             submission_source: Optional[SubmissionSource] = None,
             import_run: Optional[ClassificationImportRun] = None) -> ClassificationPatchResponse:

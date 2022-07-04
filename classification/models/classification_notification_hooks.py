@@ -49,17 +49,13 @@ def send_discordance_notification(discordance_report: DiscordanceReport, cause: 
         notification.add_field(label="c.HGVS", value=c_hgvs_str)
 
         sig_lab: DiscordanceReportSummary.LabClinicalSignificances
-        reported_labs: Set[Lab] = set()
         for sig_lab in report_summary.lab_significances:
-            notification.add_field(f"{sig_lab.lab} - classify this as", "\n".join([clin_sig_key.pretty_value(cs) for cs in sig_lab.clinical_significances]))
-            reported_labs.add(sig_lab.lab)
+            if sig_lab.changed:
+                notification.add_field(f"{sig_lab.lab} - classify this as", f"{clin_sig_key.pretty_value(sig_lab.clinical_significance_from)} -> {clin_sig_key.pretty_value(sig_lab.clinical_significance_to)}")
+            else:
+                notification.add_field(f"{sig_lab.lab} - classify this as", clin_sig_key.pretty_value(sig_lab.clinical_significance_from))
 
-        withdrawn_labs = sorted({lab for lab, involvement in discordance_report.involved_labs.items() if involvement == DiscordanceReport.LabInvolvement.WITHDRAWN})
-        for withdrawn_lab in withdrawn_labs:
-            # if a lab is both still in the discordance with non-withdrawn classifications and with withdrawn classifications
-            # don't count them both times.
-            if withdrawn_lab not in reported_labs:
-                notification.add_field(label=f"{withdrawn_lab} - classify this as", value="_WITHDRAWN_")
+        # don't want to include notes in email as the text might be too sensitive
 
         notification.add_markdown(f"Full details of the overlap can be seen here : <{report_url}>")
         notification.send()

@@ -12,7 +12,7 @@ from django.utils.safestring import mark_safe
 from annotation.manual_variant_entry import check_can_create_variants, CreateManualVariantForbidden
 from classification.enums import SpecialEKeys
 from classification.enums.classification_enums import ShareLevel
-from classification.models import ConditionTextMatch, ConditionResolved
+from classification.models import ConditionTextMatch, ConditionResolved, DiscordanceReportSummary
 from classification.models.classification import ClassificationModification, Classification
 from classification.models.classification_groups import ClassificationGroup, ClassificationGroups
 from classification.models.classification_ref import ClassificationRef
@@ -43,14 +43,15 @@ def condition_match(condition_match: ConditionTextMatch, indent=0):
 
 
 @register.inclusion_tag("classification/tags/classification_group_row.html")
-def classification_group_row(group: ClassificationGroup, sub_row: Optional[int] = None, sub_index: Optional[int] = None):
+def classification_group_row(group: ClassificationGroup, sub_row: Optional[int] = None, sub_index: Optional[int] = None, show_pending_changes: Optional[bool] = True):
     return {
         "group": group,
         "row_class": f"cc-{sub_row} collapse" if sub_row else "",
         "sub_index": sub_index,
         "show_username": settings.VARIANT_CLASSIFICATION_GRID_SHOW_USERNAME,
         "show_allele_origin": settings.VARIANT_CLASSIFICATION_GRID_SHOW_ORIGIN,
-        "show_specimen_id": settings.VARIANT_CLASSIFICAITON_SHOW_SPECIMEN_ID
+        "show_specimen_id": settings.VARIANT_CLASSIFICAITON_SHOW_SPECIMEN_ID,
+        "show_pending_changes": show_pending_changes
     }
 
 
@@ -64,7 +65,8 @@ def classification_groups(
         link_discordance_reports: bool = False,
         genome_build: Optional[GenomeBuild] = None,
         title: Optional[str] = None,
-        context_object: Optional[Model] = None):
+        context_object: Optional[Model] = None,
+        show_pending_changes: Optional[bool] = True):
     """
     :param context: Auto included
     :param classification_modifications: The classification modifications to render
@@ -75,6 +77,7 @@ def classification_groups(
     :param genome_build: Preferred genome build
     :param title: Heading to give the table
     :param context_object: If all these records are from an allele, provide "allele" if from a discordance report provide "discordance_report" etc
+    :param show_pending_changes: If true, check for pending changes flags and
     """
 
     groups = ClassificationGroups(classification_modifications, genome_build=genome_build)
@@ -86,6 +89,7 @@ def classification_groups(
         "genome_build": groups.genome_build,
         "table_id": str(uuid.uuid4()).replace("-", "_"),
         "show_allele_origin": settings.VARIANT_CLASSIFICATION_GRID_SHOW_ORIGIN,
+        "show_pending_changes": show_pending_changes
     }
     ordered_classifications = list(groups.modifications)
     # classifications are sorted by group, display them so they're sorted by date
@@ -490,6 +494,12 @@ def condition(condition_obj: ConditionResolved, limit: Optional[int] = 100):
     return {"condition": condition_obj, "limit": limit}
 
 
+# look at removing this
 @register.inclusion_tag("classification/tags/discordance_report.html")
 def discordance_report(discordance_report: DiscordanceReport):
     return {"discordance_report": discordance_report}
+
+
+@register.inclusion_tag("classification/tags/discordance_report_row.html")
+def discordance_report_row(discordance_report_summary: DiscordanceReportSummary, selected: DiscordanceReport, filter:bool = False):
+    return {"summary": discordance_report_summary, "filter": filter, "is_selected": discordance_report_summary.discordance_report == selected}

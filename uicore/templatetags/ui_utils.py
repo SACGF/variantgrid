@@ -305,7 +305,8 @@ def render_labelled(parser, token):
         label=kwargs.get('label'),
         show_prefix=kwargs.get('show_prefix'),
         size=kwargs.get('size'),
-        admin_only=kwargs.get('admin_only')
+        admin_only=kwargs.get('admin_only'),
+        button=kwargs.get('button')
     )
 
 
@@ -315,13 +316,15 @@ class ModalTag(template.Node):
                  label: FilterExpression = None,
                  show_prefix: FilterExpression = None,
                  size: FilterExpression = None,
-                 admin_only: FilterExpression = None):
+                 admin_only: FilterExpression = None,
+                 button: FilterExpression = None):
         self.nodelist = nodelist
         self.id = id
         self.label = label
         self.show_prefix = show_prefix
         self.size = size
         self.admin_only = admin_only
+        self.button = button
 
     def render(self, context):
         admin_only_bool = TagUtils.value_bool(context, self.admin_only)
@@ -338,7 +341,13 @@ class ModalTag(template.Node):
             link += '<i class="fas fa-key" title="Admin only functionality"></i>'
 
         show_prefix_bool = TagUtils.value_bool(context, self.show_prefix, True)
-        link += f'<a href="#{id_str}" data-toggle="modal" class="modal-link">{"Show " if show_prefix_bool else ""}{label_str}</a>'
+        show_label_str = ("Show " if show_prefix_bool else "") + label_str
+
+        if TagUtils.value_bool(context, self.button):
+            link += f'<button class="btn btn-outline-primary" href="#{id_str}" data-toggle="modal">{show_label_str}</button>'
+        else:
+            link += f'<a href="#{id_str}" data-toggle="modal" class="modal-link">{"Show " if show_prefix_bool else ""}{label_str}</a>'
+
         link += "</div>"
 
         size_str = TagUtils.value_str(context, self.size, "xl")
