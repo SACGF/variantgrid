@@ -341,7 +341,7 @@ class UserPerspective:
         return self.your_labs
 
 
-class DiscordanceReportSummary:
+class DiscordanceReportRowData:
 
     # TODO merge this with DiscordanceReportViewTemplate?
 
@@ -422,7 +422,7 @@ class DiscordanceReportSummary:
 
     @dataclass(frozen=True)
     class LabClinicalSignificances:
-        group: 'DiscordanceReportSummary.LabClinicalSignificanceGroup'
+        group: 'DiscordanceReportRowData.LabClinicalSignificanceGroup'
         is_internal: bool
         count: int
 
@@ -458,7 +458,7 @@ class DiscordanceReportSummary:
 
     @lazy
     def lab_significances(self) -> List[LabClinicalSignificances]:
-        group_counts: Dict[DiscordanceReportSummary.LabClinicalSignificanceGroup, int] = defaultdict(int)
+        group_counts: Dict[DiscordanceReportRowData.LabClinicalSignificanceGroup, int] = defaultdict(int)
         for drc in DiscordanceReportClassification.objects.filter(report=self.discordance_report).select_related(
             'classification_original',
             'classification_original__classification',
@@ -482,14 +482,14 @@ class DiscordanceReportSummary:
                     clinical_significance_to = drc.classification_effective.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
 
             # FIXME, also check for pending changes if classification isn't closed yet!
-            group_counts[DiscordanceReportSummary.LabClinicalSignificanceGroup(
+            group_counts[DiscordanceReportRowData.LabClinicalSignificanceGroup(
                 lab=drc.classification_original.classification.lab,
                 clinical_significance_from=clinical_significance_from,
                 clinical_significance_to=clinical_significance_to,
                 pending=pending
             )] += 1
 
-        return sorted([DiscordanceReportSummary.LabClinicalSignificances(
+        return sorted([DiscordanceReportRowData.LabClinicalSignificances(
             group=group,
             is_internal=group.lab in self.perspective.labs_if_not_admin,
             count=count
@@ -516,10 +516,10 @@ class DiscordanceReportSummaryCount:
 
 
 @dataclass(frozen=True)
-class DiscordanceReportSummaries:
+class DiscordanceReportTableData:
     perspective: UserPerspective
-    summaries: List[DiscordanceReportSummary]
-    inactive_summaries: List[DiscordanceReportSummary]
+    summaries: List[DiscordanceReportRowData]
+    inactive_summaries: List[DiscordanceReportRowData]
 
     counts: List[DiscordanceReportSummaryCount]
 
@@ -544,14 +544,14 @@ class DiscordanceReportSummaries:
         return self.perspective.genome_build
 
     @staticmethod
-    def create(perspective: UserPerspective, discordance_reports: Iterable[DiscordanceReport]) -> 'DiscordanceReportSummaries':
+    def create(perspective: UserPerspective, discordance_reports: Iterable[DiscordanceReport]) -> 'DiscordanceReportTableData':
         internal_count = 0
         by_lab: Dict[Lab, int] = defaultdict(int)
-        summaries: List[DiscordanceReportSummary] = list()
-        inactive_summaries: List[DiscordanceReportSummary] = list()
+        summaries: List[DiscordanceReportRowData] = list()
+        inactive_summaries: List[DiscordanceReportRowData] = list()
 
         for dr in discordance_reports:
-            summary = DiscordanceReportSummary(discordance_report=dr, perspective=perspective)
+            summary = DiscordanceReportRowData(discordance_report=dr, perspective=perspective)
             if summary.is_valid_including_withdraws:
                 if summary.is_active:
                     summaries.append(summary)
@@ -567,7 +567,7 @@ class DiscordanceReportSummaries:
         if internal_count:
             counts.insert(0, DiscordanceReportSummaryCount(lab=None, count=internal_count))
 
-        return DiscordanceReportSummaries(perspective=perspective, summaries=summaries, inactive_summaries=inactive_summaries, counts=counts)
+        return DiscordanceReportTableData(perspective=perspective, summaries=summaries, inactive_summaries=inactive_summaries, counts=counts)
 
 
 class DiscordanceAction:

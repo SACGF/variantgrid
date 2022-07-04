@@ -6,7 +6,7 @@ from django.urls import reverse
 
 from classification.enums import SpecialEKeys
 from classification.models import DiscordanceReport, discordance_change_signal, EvidenceKeyMap, UserPerspective, \
-    DiscordanceReportSummary
+    DiscordanceReportRowData
 from library.django_utils import get_url_from_view_path
 from library.log_utils import NotificationBuilder
 from snpdb.models import Lab
@@ -38,7 +38,7 @@ def send_discordance_notification(discordance_report: DiscordanceReport, cause: 
         notification = LabNotificationBuilder(lab=lab, message=f"Discordance Update (DR_{discordance_report.id})")
 
         user_perspective = UserPerspective.for_lab(lab=lab)
-        report_summary = DiscordanceReportSummary(discordance_report=discordance_report, perspective=user_perspective)
+        report_summary = DiscordanceReportRowData(discordance_report=discordance_report, perspective=user_perspective)
         if resolution_text := discordance_report.resolution_text:
             notification.add_markdown(f"The below overlap is now marked as *{resolution_text}*")
         # notification.add_markdown(f"The labs {all_lab_names} are involved in the following discordance:")
@@ -48,7 +48,7 @@ def send_discordance_notification(discordance_report: DiscordanceReport, cause: 
         c_hgvs_str = "\n".join((str(chgvs) for chgvs in report_summary.c_hgvses))
         notification.add_field(label="c.HGVS", value=c_hgvs_str)
 
-        sig_lab: DiscordanceReportSummary.LabClinicalSignificances
+        sig_lab: DiscordanceReportRowData.LabClinicalSignificances
         for sig_lab in report_summary.lab_significances:
             if sig_lab.changed:
                 notification.add_field(f"{sig_lab.lab} - classify this as", f"{clin_sig_key.pretty_value(sig_lab.clinical_significance_from)} -> {clin_sig_key.pretty_value(sig_lab.clinical_significance_to)}")

@@ -15,7 +15,7 @@ from termsandconditions.decorators import terms_required
 from classification.enums import ShareLevel
 from classification.enums.discordance_enums import DiscordanceReportResolution
 from classification.models import classification_flag_types, ClinVarExport, DiscordanceReportClassification, \
-    DiscordanceReport, ConditionText, ConditionTextMatch, DiscordanceReportSummaries, UserPerspective
+    DiscordanceReport, ConditionText, ConditionTextMatch, DiscordanceReportTableData, UserPerspective
 from classification.models.classification import Classification, \
     ClassificationModification
 from classification.models.clinvar_export_sync import clinvar_export_sync
@@ -99,7 +99,7 @@ class ClassificationDashboard:
         return perspective
 
     @lazy
-    def discordance_summaries(self) -> DiscordanceReportSummaries:
+    def discordance_summaries(self) -> DiscordanceReportTableData:
         # Has changed from just finding the active discordances to discordances withdrawn from and
         # resolved discordances - so they can be listed in history
 
@@ -111,7 +111,7 @@ class ClassificationDashboard:
         # .filter(classification_original__classification__withdrawn=False)  used to
         dr_qs = DiscordanceReport.objects.filter(pk__in=discordant_c).order_by('-created')
 
-        return DiscordanceReportSummaries.create(perspective=self.perspective, discordance_reports=dr_qs)
+        return DiscordanceReportTableData.create(perspective=self.perspective, discordance_reports=dr_qs)
 
     @lazy
     def classifications_wout_standard_text(self) -> int:

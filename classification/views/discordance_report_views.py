@@ -15,7 +15,7 @@ from classification.enums import SpecialEKeys
 from classification.enums.discordance_enums import ContinuedDiscordanceReason, DiscordanceReportResolution
 from classification.models import ClassificationModification, DiscordanceReportClassification, ClinicalContext, \
     EvidenceKeyMap, flag_types, classification_flag_types, ClinicalContextRecalcTrigger, discordance_change_signal, \
-    UserPerspective, DiscordanceReportSummary
+    UserPerspective, DiscordanceReportRowData
 from classification.models.discordance_models import DiscordanceReport
 from classification.models.evidence_key import EvidenceKeyOption
 from classification.views.classification_dashboard_view import ClassificationDashboard
@@ -92,10 +92,10 @@ class DiscordanceReportTemplateData:
     def report_history(self) -> QuerySet[DiscordanceReport]:
         return DiscordanceReport.objects.filter(clinical_context=self.report.clinical_context).order_by('-report_started_date')
 
-    def report_history_summary(self) -> List[DiscordanceReportSummary]:
+    def report_history_summary(self) -> List[DiscordanceReportRowData]:
         perspective = UserPerspective.for_user(self.user)
         return [
-            DiscordanceReportSummary(
+            DiscordanceReportRowData(
                 discordance_report=report,
                 perspective=perspective
             ) for report in self.report_history

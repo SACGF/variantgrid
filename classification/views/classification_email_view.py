@@ -15,7 +15,7 @@ from lazy import lazy
 
 from classification.enums.discordance_enums import DiscordanceReportResolution
 from classification.models import Classification, classification_flag_types, \
-    DiscordanceReportClassification, DiscordanceReport, DiscordanceReportSummaries, UserPerspective
+    DiscordanceReportClassification, DiscordanceReport, DiscordanceReportTableData, UserPerspective
 from email_manager.models import EmailLog
 from flags.models import FlagCollection, Flag
 from library.log_utils import report_exc_info, report_message
@@ -46,7 +46,7 @@ class EmailLabSummaryData:
         return UserSettings.get_genome_build_or_default(self.user)
 
     @lazy
-    def discordance_report_summaries(self) -> DiscordanceReportSummaries:
+    def discordance_report_summaries(self) -> DiscordanceReportTableData:
         discordant_vcs = FlagCollection.filter_for_open_flags(
             Classification.objects.filter(lab=self.lab),
             flag_types=[classification_flag_types.discordant]
@@ -58,7 +58,7 @@ class EmailLabSummaryData:
             report__resolution=DiscordanceReportResolution.ONGOING).values_list('report', flat=True)
         dr_qs = DiscordanceReport.objects.filter(pk__in=report_ids).order_by('-id')
 
-        return DiscordanceReportSummaries.create(perspective=UserPerspective.for_lab(lab=self.lab, genome_build=self.genome_build), discordance_reports=dr_qs)
+        return DiscordanceReportTableData.create(perspective=UserPerspective.for_lab(lab=self.lab, genome_build=self.genome_build), discordance_reports=dr_qs)
 
     @lazy
     def flagged_variants(self) -> QuerySet[Flag]:
