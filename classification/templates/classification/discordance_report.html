@@ -174,6 +174,7 @@
                         <input type="hidden" name="resolution" id="resolution" value="X" />
                         {% csrf_token %}
                         <div class="m-4">
+                            <p>{{ 'I' | severity_icon }} Use this dialog during or after a discussion with the other involved labs. If changes to classifications are agreed upon, they all need to be entered here at the same time.</p>
                             <h5>{{ data.resolve_label }}</h5>
                             <p class="text-info">
                                 Upon discussing this discordance with all relevant labs, if labs agree to re-classify, select the new clinical significance next to that lab.<br/>
