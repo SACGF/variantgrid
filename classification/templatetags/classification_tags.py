@@ -501,5 +501,5 @@ def discordance_report(discordance_report: DiscordanceReport):
 
 
 @register.inclusion_tag("classification/tags/discordance_report_row.html")
-def discordance_report_row(discordance_report_summary: DiscordanceReportSummary, selected: DiscordanceReport, filter:bool = False):
+def discordance_report_row(discordance_report_summary: DiscordanceReportSummary, selected: Optional[DiscordanceReport] = None, filter: bool = False):
     return {"summary": discordance_report_summary, "filter": filter, "is_selected": discordance_report_summary.discordance_report == selected}
