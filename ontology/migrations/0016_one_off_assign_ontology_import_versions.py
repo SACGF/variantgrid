@@ -29,7 +29,7 @@ def _one_off_assign_ontology_import_versions(apps, schema_editor):
     oi_qs = OntologyImport.objects.all()
     kwargs = {}
     for field, (import_source, filenames) in ONTOLOGY_IMPORTS.items():
-        kwargs[field] = oi_qs.filter(import_source=import_source, filename__=filenames).order_by("pk").last()
+        kwargs[field] = oi_qs.filter(import_source=import_source, filename__in=filenames).order_by("pk").last()
 
     if all(kwargs.values()):
         OntologyVersion.objects.get_or_create(**kwargs)
