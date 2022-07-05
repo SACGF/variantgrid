@@ -374,6 +374,7 @@ class ExportFormatter(BaseExportFormatter):
         self.started = datetime.utcnow()
         self.row_count = 0
         self.started = datetime.utcnow()
+        self.report_params = self.report_stats_params()
 
         if self.since and optimize_since:
             # This mess is to find all the alleles that have:
@@ -664,15 +665,28 @@ class ExportFormatter(BaseExportFormatter):
             return flag_collection_id in self.discordant_collections
         return False
 
+    def report_stats_params(self) -> Dict[str, Any]:
+        params = dict()
+        if request := get_current_request():
+            params["url"] = request.path_info
+            for key, value in request.GET.items():
+                params[key] = value
+        return params
+
+
     def report_stats(self, row_count: int):
         # don't report bots downloading
         if self.user.groups.filter(name=bot_group().name):
             return
 
+        params = self.report_params
+        if not params:
+            params = self.report_stats_params()
+
         end = datetime.utcnow()
         body_parts = [f":simple_smile: {self.user.username}"]
-        if request := get_current_request():
-            body_parts.append(f"URL : `{request.path_info}`")
+        if url := params.get('url'):
+            body_parts.append(f"URL : `{url}`")
         body_parts.append(f"Filename : *{self.filename()}*")
         body_parts.append(f"Rows Downloaded : *{row_count}*")
 
@@ -680,8 +694,9 @@ class ExportFormatter(BaseExportFormatter):
             .add_header(":arrow_down: Classification Download Completed")\
             .add_markdown("\n".join(body_parts), indented=True)
         if request := get_current_request():
-            for key, value in request.GET.items():
-                nb.add_field(key, value)
+            for key, value in params:
+                if key != 'url':
+                    nb.add_field(key, value)
         nb.add_field("Duration", str((end - self.started).seconds) + " seconds")
         nb.send()
 
