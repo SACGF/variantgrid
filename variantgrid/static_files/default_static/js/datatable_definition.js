@@ -203,11 +203,14 @@ let DataTableDefinition = (function() {
             let dataTable = dom.DataTable(dtParams);
             this.dataTable = dataTable;
 
-            dom.on('error.dt', function ( e, settings, techNote, message ) {
+            dom.on('error.dt', function (e, settings, techNote, message ) {
                 Rollbar.warning("DataTables error " + message);
-                    console.log( 'An error has been reported by DataTables: ', message );
-                }
-            );
+                dom.replaceWith($(`
+                    <div class="w-100 m-4 p-4 rounded border border-danger text-center">
+                        <p class="text-danger"><i class="fas fa-bomb"></i> There was an error loading this table.<br/><br/><a class="font-weight-bold" href="javascript:window.location.reload(true)">Click Here to reload the page.</a></p>
+                    </div>`)
+                );
+            });
 
             let tableId = this.tableId;
             let lengthKey = this.lengthKey;
