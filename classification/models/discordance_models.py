@@ -97,7 +97,7 @@ class DiscordanceReport(TimeStampedModel):
         @param expected_resolution will be calculated, but if provided a ValueError will be raised if it doesn't match
         @param cause_text reason this discordance is being closed
         """
-        if self.clinical_context.is_discordant():
+        if self.clinical_context.discordance_status.is_discordant:
             self.resolution = DiscordanceReportResolution.CONTINUED_DISCORDANCE
         else:
             self.resolution = DiscordanceReportResolution.CONCORDANT
@@ -144,7 +144,7 @@ class DiscordanceReport(TimeStampedModel):
 
         # contents of existing_vms are now presumably records that changed clinical groupings
 
-        if not self.clinical_context.is_discordant():
+        if not self.clinical_context.discordance_status.is_discordant:
             # hey we've reached concordance, let's close this
             # close will fire off a notification event
             self.close(expected_resolution=DiscordanceReportResolution.CONCORDANT, cause_text=cause_text)

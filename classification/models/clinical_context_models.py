@@ -245,6 +245,7 @@ class ClinicalContext(FlagsMixin, TimeStampedModel):
         return len([vcm for vcm in self.classification_modifications if DiscordanceStatus.cs_buckets().get(vcm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE))])
 
     def is_discordant(self):
+        # WARNING: THIS IS APPLIES TO CACHED STATUS ONLY
         return self.status == DiscordanceLevel.DISCORDANT
 
     @lazy
