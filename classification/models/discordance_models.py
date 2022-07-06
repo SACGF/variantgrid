@@ -359,8 +359,9 @@ class DiscordanceReportRowData:
         return ";".join(str(lab.pk) for lab in self.all_actively_involved_labs)
 
     @property
-    def is_active(self) -> bool:
-        return (self.perspective.is_admin_mode or bool(self.all_actively_involved_labs.intersection(self.perspective.your_labs))) and self.discordance_report.resolution is None
+    def is_requiring_attention(self) -> bool:
+        return (self.perspective.is_admin_mode or bool(self.all_actively_involved_labs.intersection(self.perspective.your_labs))) \
+               and self.discordance_report.resolution is None and not self.discordance_report.is_pending_concordance
 
     @property
     def is_valid_including_withdraws(self) -> bool:
@@ -555,7 +556,7 @@ class DiscordanceReportTableData:
         for dr in discordance_reports:
             summary = DiscordanceReportRowData(discordance_report=dr, perspective=perspective)
             if summary.is_valid_including_withdraws:
-                if summary.is_active:
+                if summary.is_requiring_attention:
                     summaries.append(summary)
                     if summary.is_internal:
                         internal_count += 1
