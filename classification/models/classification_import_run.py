@@ -8,7 +8,6 @@ from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.utils.timezone import now
 from model_utils.models import TimeStampedModel
-
 from classification.models.classification_utils import ClassificationPatchStatus
 from classification.models.uploaded_classifications_unmapped import UploadedClassificationsUnmapped
 from library.log_utils import NotificationBuilder
@@ -41,6 +40,7 @@ class ClassificationImportRun(TimeStampedModel):
     row_count_un_withdrawn = models.IntegerField(default=0)
     row_count_already_withdrawn = models.IntegerField(default=0)
     row_count_unknown = models.IntegerField(default=0)
+    missing_row_count = models.IntegerField(null=True, blank=True)
     logging_version = models.IntegerField(default=0)
 
     def __str__(self):
@@ -52,6 +52,11 @@ class ClassificationImportRun(TimeStampedModel):
             parts.append(self.identifier)
         parts.append(f"(rows:{self.row_count})")
         return "".join(parts)
+
+    def apply_missing_row_count(self) -> int:
+        if from_file := self.from_file:
+            from classification.models import Classification
+            self.missing_row_count = Classification.objects.filter(lab=from_file.lab, withdrawn=False).exclude(from_file=from_file).count()
 
     def increment_status(self, status: ClassificationPatchStatus):
         self.row_count += 1
