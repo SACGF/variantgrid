@@ -41,6 +41,7 @@ class ExportFormatterVCF(ExportFormatter):
         if self.encoding == VCFEncoding.FULL:
             return urllib.parse.quote(value)
         else:
+            value = value.replace('[', '').replace(']', '')  # square brackets used for org name but might cause issues
             value = value.replace(' ', '_').replace('\t', '_').replace('\n', '_')
             value = value.replace(';', ':')
             value = value.replace(',', '.')
@@ -102,7 +103,7 @@ class ExportFormatterVCF(ExportFormatter):
         conditions = []
 
         for record in vcms:
-            lab_names.append(self.vcf_safe(record.classification.lab.name))
+            lab_names.append(self.vcf_safe(str(record.classification.lab)))
             cs = record.get(SpecialEKeys.CLINICAL_SIGNIFICANCE, None)
             if cs:
                 cs_counts[cs] = cs_counts.get(cs, 0) + 1
