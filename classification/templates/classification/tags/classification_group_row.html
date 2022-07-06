@@ -1,11 +1,11 @@
 {% load classification_tags %}
 {% load js_tags %}
 <tr class="{{ row_class }}" style="{% if group.clinical_grouping == "not-shared" %}opacity:0.5;{% endif %}{% if group.is_withdrawn %}text-decoration:line-through;{% endif %}cursor:pointer">
-    <td style="width:150px;" data-order="{% if group.clinical_grouping == "not-shared" %}AA{% endif %}{{ group.lab }}">
+    <td style="width:150px;" data-order="{% if group.clinical_grouping == "not-shared" %}AA{% endif %}{{ group.lab.name }}">
         {% if group.clinical_grouping != "default" %}
             <span class="font-weight-bold text-secondary text-uppercase">{{ group.clinical_grouping }} </span>
         {% endif %}
-        &#32;<span class="font-weight-bold">{{ group.lab }}</span>
+        &#32;<span class="font-weight-bold">{% lab group.lab %}</span>
         {% if show_username %}
             {% for user in group.users %}
                 <div class="text-secondary mt-1">{{ user.username }}</div>
@@ -81,7 +81,7 @@
     {% endwith %}
     {% if not sub_index %}
         <td>{% comment %}Latest Imported as{% endcomment %}
-            <label style="display: inline-block; min-width:140px; text-align: right">Imported {{ group.most_recent | get_item:'genome_build' | default_if_none:'(No genome build provided)' }}</label>&nbsp; {% c_hgvs group.most_recent.c_parts %}<br/>
+            <label style="display: inline-block; min-width:140px; text-align: right">Imported {{ group.most_recent | get_item:'genome_build' | default_if_none:'(No genome build provided)' }}</label>&nbsp;{% c_hgvs group.most_recent.c_parts %}<br/>
             <label style="display: inline-block; min-width:140px; text-align: right">Resolved GRCh37</label>&nbsp; {% c_hgvs group.most_recent.classification.chgvs_grch37 %}<br/>
             <label style="display: inline-block; min-width:140px; text-align: right">Resolved GRCh38</label>&nbsp; {% c_hgvs group.most_recent.classification.chgvs_grch38 %}
         </td>

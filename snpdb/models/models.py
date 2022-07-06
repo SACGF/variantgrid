@@ -193,7 +193,8 @@ class Organization(models.Model):
     def __str__(self):
         return self.name
 
-    def shortest_name(self):
+    @property
+    def shortest_name(self) -> str:
         return self.short_name or self.name
 
     @lazy

@@ -73,6 +73,8 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
 
         return {
             "id": row.get('classification__id'),
+            # should we start using short names?
+            "org_name": row.get('classification__lab__organization__short_name') or row.get('classification__lab__organization__name'),
             "lab_name": row.get('classification__lab__name'),
             "lab_record_id": row.get('classification__lab_record_id'),
             "share_level": row.get('classification__share_level'),
@@ -95,7 +97,7 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
             RichColumn(
                 key='classification__id',
                 # share_level_sort annotated column
-                sort_keys=['share_level_sort', 'classification__lab__name', 'classification__lab_record_id'],
+                sort_keys=['share_level_sort', 'classification__lab__organization__name', 'classification__lab__name', 'classification__lab_record_id'],
                 name='id',
                 label='ID',
                 orderable=True,
@@ -103,6 +105,8 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
                 client_renderer='VCTable.identifier',
                 extra_columns=[
                     'classification__id',
+                    'classification__lab__organization__short_name',
+                    'classification__lab__organization__name',
                     'classification__lab__name',
                     'classification__lab_record_id',
                     'classification__share_level'

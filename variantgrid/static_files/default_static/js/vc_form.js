@@ -2164,6 +2164,7 @@ VCTable.evidence_key = (key_name, data, type, row) => {
 };
 VCTable.identifier = (data, type, row) => {
     let id = data.id;
+    let org_name = data.org_name;
     let lab_name = data.lab_name;
     let lab_record_id = data.lab_record_id;
     let shareLevel = data.share_level;
@@ -2171,14 +2172,12 @@ VCTable.identifier = (data, type, row) => {
     let shareInfo = EKeys.shareLevelInfo(shareLevel);
     let icon = $('<img>', {src: shareInfo.icon, class:'share-icon'});
 
-    let record_id = `${lab_name} / ${lab_record_id}`;
-
     let link = $('<a>', {
         href: Urls.view_classification(id),
         class: 'hover-link',
         html: [
             icon,
-            $('<span>', {text: lab_name}),
+            $('<span>', {text: `[${org_name}] ${lab_name}`}),
             ' / ',
             limitLengthSpan(lab_record_id, 50)
         ]

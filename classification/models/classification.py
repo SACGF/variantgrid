@@ -1891,6 +1891,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             'lab_record_id': self.lab_record_id,
             'institution_name': self.lab.organization.name,
             'lab_id': self.lab.group_name,
+            'org_name': self.lab.organization.shortest_name,
             'lab_name': self.lab.name,
             'title': title,
             'publish_level': self.share_level,

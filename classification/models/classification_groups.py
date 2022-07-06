@@ -13,7 +13,7 @@ from classification.models.flag_types import ClassificationFlagTypes
 from flags.models import Flag, FlagStatus
 from genes.hgvs import CHGVS, PHGVS
 from snpdb.genome_build_manager import GenomeBuildManager
-from snpdb.models import Allele, GenomeBuild
+from snpdb.models import Allele, GenomeBuild, Lab
 
 D = TypeVar("D")
 
@@ -134,12 +134,8 @@ class ClassificationGroup:
         return self.most_recent.classification.clinical_grouping_name
 
     @property
-    def organization(self) -> str:
-        return self.most_recent.classification.lab.organization.name
-
-    @property
-    def lab(self) -> str:
-        return self.most_recent.classification.lab.name
+    def lab(self) -> Lab:
+        return self.most_recent.classification.lab
 
     @property
     def users(self) -> List[User]:
