@@ -84,6 +84,13 @@ class ClinVarExportSync:
         return self._config.get('mode') != "prod"
 
     @property
+    def submission_url(self) -> str:
+        if self.is_test:
+            return "https://submit.ncbi.nlm.nih.gov/apitest/v1/submissions/"
+        else:
+            return "https://submit.ncbi.nlm.nih.gov/api/v1/submissions/"
+
+    @property
     def api_key(self) -> Optional[str]:
         return self._config.get('api_key')
 
@@ -143,25 +150,22 @@ class ClinVarExportSync:
         if not batch.submission_identifier:
             batch.status = ClinVarExportBatchStatus.UPLOADING
             batch.save()
-            url = "https://submit.ncbi.nlm.nih.gov/api/v1/submissions/"
-            if self.is_test:
-                url += "?dry-run=true"
 
             clinvar_request = self._send_data(
                 batch=batch,
                 request_type=ClinVarExportRequestType.INITIAL_SUBMISSION,
                 json_data=batch.to_json(),
-                url=url)
+                url=self.submission_url)
 
         else:
-            if self.is_test:
-                raise ValueError("ClinVarExport test is set to True, but attempted to perform an action other than initial submission")
+            #if self.is_test:
+            #    raise ValueError("ClinVarExport test is set to True, but attempted to perform an action other than initial submission")
 
             if not batch.file_url:
                 clinvar_request = self._send_data(
                     batch=batch,
                     request_type=ClinVarExportRequestType.POLLING_SUBMISSION,
-                    url=f"https://submit.ncbi.nlm.nih.gov/api/v1/submissions/{batch.submission_identifier}/actions/")
+                    url=f"{self.submission_url}/{batch.submission_identifier}/actions/")
             else:
                 clinvar_request = self._send_data(
                     batch=batch,
@@ -195,7 +199,9 @@ class ClinVarExportSync:
     def _handle_polling(self, clinvar_request: ClinVarExportRequest) -> ClinVarResponseOutcome:
         if (response_json := clinvar_request.response_json) and (actions := response_json.get("actions")):
             for action_json in actions:
-                for response_json in action_json.get("responses"):
+                responses = action_json.get("responses")
+                if responses:
+                    response_json = responses[0]
                     status = response_json.get('status')
                     if status == "processing":
                         return ClinVarResponseOutcome.ASK_AGAIN_LATER
@@ -206,6 +212,10 @@ class ClinVarExportSync:
                                 clinvar_request.submission_batch.save()
                                 # don't need to wait before requesting the file
                                 return ClinVarResponseOutcome.ASK_AGAIN_NOW
+                else:
+                    # only expect responses to be an empty array if we're submitting to test
+                    if action_json.get("targetDb") == "clinvar-test":
+                        return ClinVarResponseOutcome.COMPLETE
 
         # couldn't find "processing" or still in progress, this is unexpected
         raise ValueError(f"Processing of JSON for request {clinvar_request.pk} couldn't find status of processing or file")
@@ -281,7 +291,14 @@ class ClinVarExportSync:
                 return self._handle_initial_submission(clinvar_request)
 
             elif clinvar_request.request_type == ClinVarExportRequestType.POLLING_SUBMISSION:
-                return self._handle_polling(clinvar_request)
+                polling = self._handle_polling(clinvar_request)
+                if self.is_test:
+                    if polling == ClinVarResponseOutcome.COMPLETE:
+                        batch = clinvar_request.submission_batch
+                        # TODO, make a ClinVarExportBatchStatus of TESTED?
+                        batch.status = ClinVarExportBatchStatus.SUBMITTED
+                        batch.save()
+                return polling
 
             elif clinvar_request.request_type == ClinVarExportRequestType.RESPONSE_FILES:
                 return self._handle_response_file(clinvar_request)
