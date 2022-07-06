@@ -265,8 +265,8 @@ class ClinicalContext(FlagsMixin, TimeStampedModel):
         """
         lazy.invalidate(self, 'discordance_status')
 
-        old_status = self.status
-        new_status = self.discordance_status.level
+        old_status: ClinicalContextStatus = self.status
+        new_status: ClinicalContextStatus = self.calculate_status()
         is_significance_change = old_status != new_status
         is_simple_new = old_status is None and new_status == ClinicalContextStatus.CONCORDANT
         allele_url = get_url_from_view_path(self.allele.get_absolute_url())

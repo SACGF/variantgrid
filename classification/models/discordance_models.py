@@ -115,7 +115,7 @@ class DiscordanceReport(TimeStampedModel):
         discordance_change_signal.send(DiscordanceReport, discordance_report=self, cause=cause_text)
 
     @transaction.atomic
-    def update(self, cause_text: str = ''):
+    def update(self, cause_text: str = '', force_notify: bool = False):
         if not self.is_active:
             raise ValueError('Cannot update non active Discordance Report')
 
@@ -152,6 +152,8 @@ class DiscordanceReport(TimeStampedModel):
             if newly_added_labs:  # change is significant
                 newly_added_labs_str = ", ".join(str(lab) for lab in newly_added_labs)
                 discordance_change_signal.send(DiscordanceReport, discordance_report=self, cause=f"{cause_text} and newly added labs {newly_added_labs_str}")
+            elif force_notify:
+                discordance_change_signal.send(DiscordanceReport, discordance_report=self, cause=cause_text)
 
     @property
     def all_actively_involved_labs(self) -> Set[Lab]:
@@ -174,7 +176,7 @@ class DiscordanceReport(TimeStampedModel):
         return bool(user_labs.intersection(self.involved_labs.keys()))
 
     @transaction.atomic
-    def create_new_report(self, only_if_necessary: bool = True, cause: str = ''):
+    def create_new_report(self, only_if_necessary: bool = True, cause: str = '') -> 'DiscordanceReport':
         if not self.resolution == DiscordanceReportResolution.CONTINUED_DISCORDANCE:
             raise ValueError(f'Should only call create_new_report from the latest report, only if resolution = {DiscordanceReportResolution.CONTINUED_DISCORDANCE}')
 
@@ -188,12 +190,12 @@ class DiscordanceReport(TimeStampedModel):
                                                                     clinical_context_final=self.clinical_context)
             for last_id in drc_qs.values_list('classification_final', flat=True):
                 DiscordanceReportClassification.objects.create(
-                    report=self,
+                    report=report,
                     classification_original=ClassificationModification.objects.get(pk=last_id)
                 )
-
-            # the report might even auto-close itself if the change brought it into concordance
-            report.update(cause_text=cause)
+            # we've made a new report - always want to notify
+            # (the report might even auto-close itself if the change brought it into concordance)
+            report.update(cause_text=cause, force_notify=True)
         return report
 
     def has_significance_changed(self):
