@@ -63,7 +63,7 @@ class RowID(ExportRow):
 
     @export_column()
     def lab(self):
-        return self.vc.lab.name
+        return str(self.vc.lab)
 
     @export_column()
     def lab_record_id(self):
