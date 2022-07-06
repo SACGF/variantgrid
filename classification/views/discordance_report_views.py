@@ -246,19 +246,21 @@ def discordance_report_view(request: HttpRequest, discordance_report_id: int) ->
                                 comment="Changed back to original value in Discordance Report action"
                             )
 
-                # generate fresh to get rid of cached db objects and cached calculations
-                data = data.refreshed()
-                if data.is_pending_concordance:
-                    # a bit messy to call the signal here directly
-                    # was listening for the individual flags to be raised, but then since it's typically multiple flags raised at once
-                    # it was hard to stop multiple notifications going out
-                    discordance_change_signal.send(DiscordanceReport, discordance_report=data.report, cause="Pending Concordance")
+            # generate fresh to get rid of cached db objects and cached calculations
+            data = data.refreshed()
 
             resolution = request.POST.get("resolution")
             if resolution == "discordant":
                 report.report_closed_by = request.user
                 report.continued_discordance_reason = ContinuedDiscordanceReason.DIFFERENT_CURATION_METHODS
                 report.close(expected_resolution=DiscordanceReportResolution.CONTINUED_DISCORDANCE, cause_text="Unable to resolve")
+            elif data.is_pending_concordance:
+                # a bit messy to call the signal here directly
+                # was listening for the individual flags to be raised, but then since it's typically multiple flags raised at once
+                # it was hard to stop multiple notifications going out
+                discordance_change_signal.send(DiscordanceReport, discordance_report=data.report, cause="Pending Concordance")
+            else:
+                raise ValueError(f"Expected resolution of {resolution} but allele {report.clinical_context.allele_id} is not pending concordance")
 
         elif action == "reopen":
             newly_opened = data.report.create_new_report(only_if_necessary=False, cause='Discordance manually re-opened')
