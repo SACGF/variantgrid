@@ -32,6 +32,12 @@ from snpdb.models import Lab, GenomeBuild, UserSettings
 discordance_change_signal = django.dispatch.Signal()  # args: "discordance_report", "cause"
 
 
+class NotifyLevel(str, Enum):
+    NEVER_NOTIFY = "never-notify"
+    NOTIFY_IF_CHANGE = "notify-if-change"
+    ALWAYS_NOTIFY = "always-notify"
+
+
 class DiscordanceReport(TimeStampedModel):
 
     resolution = models.TextField(default=DiscordanceReportResolution.ONGOING, choices=DiscordanceReportResolution.CHOICES, max_length=1, null=True, blank=True)
@@ -115,7 +121,7 @@ class DiscordanceReport(TimeStampedModel):
         discordance_change_signal.send(DiscordanceReport, discordance_report=self, cause=cause_text)
 
     @transaction.atomic
-    def update(self, cause_text: str = '', force_notify: bool = False):
+    def update(self, cause_text: str = '', notify_level: NotifyLevel = NotifyLevel.NOTIFY_IF_CHANGE):
         if not self.is_active:
             raise ValueError('Cannot update non active Discordance Report')
 
@@ -149,11 +155,13 @@ class DiscordanceReport(TimeStampedModel):
             # close will fire off a notification event
             self.close(expected_resolution=DiscordanceReportResolution.CONCORDANT, cause_text=cause_text)
         else:
-            if newly_added_labs:  # change is significant
+            if notify_level == NotifyLevel.NEVER_NOTIFY:
+                pass
+            elif notify_level == NotifyLevel.ALWAYS_NOTIFY:
+                discordance_change_signal.send(DiscordanceReport, discordance_report=self, cause=cause_text)
+            elif newly_added_labs:  # change is significant
                 newly_added_labs_str = ", ".join(str(lab) for lab in newly_added_labs)
                 discordance_change_signal.send(DiscordanceReport, discordance_report=self, cause=f"{cause_text} and newly added labs {newly_added_labs_str}")
-            elif force_notify:
-                discordance_change_signal.send(DiscordanceReport, discordance_report=self, cause=cause_text)
 
     @property
     def all_actively_involved_labs(self) -> Set[Lab]:
@@ -176,28 +184,18 @@ class DiscordanceReport(TimeStampedModel):
         return bool(user_labs.intersection(self.involved_labs.keys()))
 
     @transaction.atomic
-    def create_new_report(self, only_if_necessary: bool = True, cause: str = '') -> 'DiscordanceReport':
+    def reopen_continued_discordance(self, cause: str = '') -> 'DiscordanceReport':
         if not self.resolution == DiscordanceReportResolution.CONTINUED_DISCORDANCE:
             raise ValueError(f'Should only call create_new_report from the latest report, only if resolution = {DiscordanceReportResolution.CONTINUED_DISCORDANCE}')
 
-        report = None
-        if (not only_if_necessary) or self.has_significance_changed():
-            report = DiscordanceReport(clinical_context=self.clinical_context, cause_text=cause)
-            report.save()
-            # if we're creating a new discordance report after a "Continued Discordance" we want to grab the
-            # state from as it was at the time the previous report was closed, not the current date
-            drc_qs = DiscordanceReportClassification.objects.filter(report=self,
-                                                                    clinical_context_final=self.clinical_context)
-            for last_id in drc_qs.values_list('classification_final', flat=True):
-                DiscordanceReportClassification.objects.create(
-                    report=report,
-                    classification_original=ClassificationModification.objects.get(pk=last_id)
-                )
-            # we've made a new report - always want to notify
-            # (the report might even auto-close itself if the change brought it into concordance)
-            report.update(cause_text=cause, force_notify=True)
+        report = DiscordanceReport(clinical_context=self.clinical_context, cause_text=cause)
+        report.save()
+        # there used to be code that would create a new discordance report at the state the old "continued discordance" report was in
+        # but that's very confusing as the data won't match the created date aka "discordance detected date"
+        report.update(cause_text=cause, notify_level=NotifyLevel.ALWAYS_NOTIFY)
         return report
 
+    @property
     def has_significance_changed(self):
         existing_vms = {}
         for dr in DiscordanceReportClassification.objects.filter(report=self):
@@ -214,6 +212,22 @@ class DiscordanceReport(TimeStampedModel):
 
         if existing_vms:
             return True
+        return False
+
+    @property
+    def should_reopen_continued_discordance(self):
+        if not self.clinical_context.discordance_status.is_discordant:
+            # what was once "continued discordance" is concordant, re-open so we can instantly close it
+            return True
+
+        existing_labs: Set[Lab] = set()
+        for drc in self.discordancereportclassification_set.all():
+            existing_labs.add(drc.classification_original.classification.lab)
+
+        # a new lab has submitted since continued discordance
+        for cc in self.clinical_context.classifications_qs:
+            if cc.lab not in existing_labs:
+                return True
         return False
 
     @staticmethod
@@ -233,7 +247,9 @@ class DiscordanceReport(TimeStampedModel):
                     pass
                 elif latest_report.resolution == DiscordanceReportResolution.CONTINUED_DISCORDANCE:
                     # create a new report if data has changed significantly
-                    return latest_report.create_new_report(only_if_necessary=True, cause=f'Change after previous report marked as continued discordance - {cause}')
+                    if latest_report.should_reopen_continued_discordance:
+                        return latest_report.reopen_continued_discordance(cause=f'Change after previous report marked as continued discordance - {cause}')
+                    return None
 
             if clinical_context.is_discordant():
                 report = DiscordanceReport(clinical_context=clinical_context, cause_text=cause)

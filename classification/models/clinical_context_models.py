@@ -218,12 +218,12 @@ class ClinicalContext(FlagsMixin, TimeStampedModel):
     def flag_type_context(self) -> FlagTypeContext:
         return FlagTypeContext.objects.get(pk='clinical_context')
 
-    def calculate_status(self) -> str:
+    def calculate_status(self) -> ClinicalContextStatus:
         """
         deprecated, try to use DiscordanceLevels instead
+        (but be careful there is an 'invalidate' calculate_status)
         """
-        status = self.discordance_status
-        level = status.level
+        level = self.discordance_status.level
         if level == DiscordanceLevel.DISCORDANT:
             return ClinicalContextStatus.DISCORDANT
         else:
@@ -238,6 +238,8 @@ class ClinicalContext(FlagsMixin, TimeStampedModel):
 
     @lazy
     def discordance_status(self) -> DiscordanceStatus:
+        # TODO this is awkwardly named as it calculates (at least the first time)
+        # Need to distinguish between this and database cached is_discordant
         return DiscordanceStatus.calculate(self.classification_modifications)
 
     @lazy
@@ -246,7 +248,7 @@ class ClinicalContext(FlagsMixin, TimeStampedModel):
 
     def is_discordant(self):
         # WARNING: THIS IS APPLIES TO CACHED STATUS ONLY
-        return self.status == DiscordanceLevel.DISCORDANT
+        return self.status == ClinicalContextStatus.DISCORDANT
 
     @lazy
     def latest_report(self) -> Optional['DiscordanceReport']:
@@ -285,6 +287,8 @@ class ClinicalContext(FlagsMixin, TimeStampedModel):
         cause = self.pending_cause or cause
 
         if ongoing_import and self.status != new_status and old_status is not None:
+            # Important - this pending status is not to do with "Pending Changes"
+            # It's
             if new_status != self.pending_status:
                 # only update the cause if we're going to end up with a new status
                 self.pending_cause = cause
@@ -342,11 +346,11 @@ class ClinicalContext(FlagsMixin, TimeStampedModel):
         return ClinicalContext.objects.filter(allele=variant.allele).order_by('created')
 
     @property
-    def classifications_qs(self) -> QuerySet:
+    def classifications_qs(self) -> QuerySet[Classification]:
         return Classification.objects.filter(clinical_context=self, share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS, withdrawn=False)
 
     @property
-    def classifications_associated_qs(self) -> QuerySet:
+    def classifications_associated_qs(self) -> QuerySet[Classification]:
         return Classification.objects.filter(clinical_context=self)
 
     @property
