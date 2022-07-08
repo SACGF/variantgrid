@@ -33,7 +33,7 @@ from genes.models_enums import AnnotationConsortium, GeneSymbolAliasSource
 from library.constants import WEEK_SECS
 from library.django_utils import require_superuser, get_field_counts
 from library.log_utils import log_traceback
-from ontology.models import OntologyTerm, OntologyService, OntologyImport, OntologyTermRelation
+from ontology.models import OntologyTerm, OntologyService, OntologyImport, OntologyVersion
 from snpdb.models import VariantGridColumn, SomalierConfig, GenomeBuild, VCF, UserSettings, ColumnAnnotationLevel
 from variantgrid.celery import app
 
@@ -174,18 +174,20 @@ def annotation_detail(request):
         count = OntologyTerm.objects.filter(ontology_service=service).count()
         ontology_counts.append({"service": service, "count": count})
 
-    ontology_services = [OntologyService.MONDO, OntologyService.OMIM, OntologyService.HPO, OntologyService.HGNC]
     ontology_relationship_counts = dict()
-    for first_index, first_service in enumerate(ontology_services):
-        for second_service in ontology_services[first_index:]:
-            join_count = OntologyTermRelation.objects.filter(source_term__ontology_service=first_service,
-                                                             dest_term__ontology_service=second_service).count()
-            if first_service != second_service:
-                reverse_count = OntologyTermRelation.objects.filter(source_term__ontology_service=second_service,
-                                                                    dest_term__ontology_service=first_service).count()
-                join_count += reverse_count
-            ontology_relationship_counts[f"{first_service}{second_service}"] = join_count
-            ontology_relationship_counts[f"{second_service}{first_service}"] = join_count
+    if ontology_version := OntologyVersion.latest():
+        otr_qs = ontology_version.get_ontology_terms()
+        ontology_services = [OntologyService.MONDO, OntologyService.OMIM, OntologyService.HPO, OntologyService.HGNC]
+        for first_index, first_service in enumerate(ontology_services):
+            for second_service in ontology_services[first_index:]:
+                join_count = otr_qs.filter(source_term__ontology_service=first_service,
+                                           dest_term__ontology_service=second_service).count()
+                if first_service != second_service:
+                    reverse_count = otr_qs.filter(source_term__ontology_service=second_service,
+                                                  dest_term__ontology_service=first_service).count()
+                    join_count += reverse_count
+                ontology_relationship_counts[f"{first_service}{second_service}"] = join_count
+                ontology_relationship_counts[f"{second_service}{first_service}"] = join_count
 
     ontology_imports = list()
     for context in ["mondo_file", "gencc_file", "hpo_file", "omim_file", "biomart_omim_aliases", "phenotype_to_genes"]:

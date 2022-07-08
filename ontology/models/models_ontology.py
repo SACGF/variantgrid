@@ -515,7 +515,9 @@ class OntologyVersion(TimeStampedModel):
                           'gencc-submissions.csv']),
         "mondo_import": (OntologyImportSource.MONDO, ['mondo.json']),
         "hp_owl_import": (OntologyImportSource.HPO, ['hp.owl']),
-        "hp_phenotype_to_genes_import": (OntologyImportSource.HPO, ['phenotype_to_genes.txt']),
+        "hp_phenotype_to_genes_import": (OntologyImportSource.HPO,
+                                         ['phenotype_to_genes.txt',
+                                          'OMIM_ALL_FREQUENCIES_diseases_to_genes_to_phenotypes.txt']),
     }
 
     @staticmethod
