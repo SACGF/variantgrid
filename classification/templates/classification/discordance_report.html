@@ -227,78 +227,26 @@
             {% endif %}
         {% endif %}
 
-        <h4>History of this Allele's Discordance Reports</h4>
 
-        <table class="table">
-            <thead>
-                <tr>
-                    <th style="width:100px">ID</th>
-                    <th class="text-left">Discordance Detected</th>
-                    <th class="text-left">c.HGVS ({{ data.genome_build.name }})</th>
-                    <th class="text-left" style="width:40%">Lab / Clinical Significances</th>
-                </tr>
-            </thead>
-            <tbody>
-            {% for summary in data.report_history_summary %}
-                {% discordance_report_row summary filter=False selected=data.report %}
-            {% endfor %}
-            </tbody>
-        </table>
-
-        {% comment %}
-        <table class="table">
-            <thead>
-                <tr><th>Opened At</th><th>Closed At</th><th>Resolution</th></tr>
-            </thead>
-            <tbody>
-            {% for old_report in data.report_history %}
-                <tr>
-                    <td class="timestamp">
-                        {% if old_report.pk == data.report.pk %}
-                        <i class="fas fa-hand-point-right"></i>{% timestamp old_report.report_started_date %}
-                        {% elif old_report.pk %}
-                        <a class="hover-link" href="{% url 'discordance_report' old_report.pk %}">{% timestamp old_report.report_started_date %}</a>
-                        {% endif %}
-                    </td>
-                    <td class="timestamp">{% timestamp old_report.report_completed_date %}</td>
-                    <td>{% if old_report.resolution %}{{ old_report.resolution_text }}{% else %}<span class="no-value">Active Discordance</span>{% endif %}</td>
-                </tr>
-            {% endfor %}
-            </tbody>
-        </table>
-            {% endcomment %}
-
-            {% comment %}
-
-            <h4>Actions</h4>
-            <div class="btn-toolbar">
-                <button type="button" class="btn btn-outline-danger" onclick="toggleUnable()">Unable to Resolve Discordance</button>
-            </div>
-            <div id="discordance-reasons" style="display:none">
-                <form onsubmit="return confirmUnable()" method="post">
-                    {% csrf_token %}
-                    <input type="hidden" name="action" value="close" />
-                    <div class="card mt-4">
-                        <div class="card-header">Continued Discordance</div>
-                        <div class="card-body">
-                            <p>Only mark the report as "Unable to Resolve Discordance" after all other attempts to reach concordance have failed.</p>
-                            Please select the primary reason why concordance could not be reached:
-                            {% for reason in continued_discordance_reasons %}
-                            <div class="form-check">
-                                <label class="form-check-label" for="reason-{{ reason.key }}">
-                                    <input class="form-check-input" type="radio" name="continued_discordance_reason" id="reason-{{ reason.key }}" value="{{ reason.key }}"/>
-                                    {{ reason.label }}
-                                </label>
-                            </div>
-                            {% endfor %}
-                            <textarea class="form-control mt-2" name="continued_discordance_text" placeholder="Please enter any additional notes here."></textarea>
-                        </div>
-                        <div class="card-footer">
-                            <button class="btn btn-danger">Confirm Unable to Resolve Discordance</button>
-                        </div>
-                    </div>
-                </form>
-            </div>
-            {% endcomment %}
+        <h4>History of this Clinical Grouping's Discordance Reports</h4>
+        {% if data.has_history %}
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th style="width:100px">ID</th>
+                        <th class="text-left">Discordance Detected</th>
+                        <th class="text-left">c.HGVS ({{ data.genome_build.name }})</th>
+                        <th class="text-left" style="width:40%">Lab / Clinical Significances</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for summary in data.report_history_summary %}
+                    {% discordance_report_row summary filter=False selected=data.report %}
+                {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <div class="no-value">This is the first discordance recorded for this Allele</div>
+        {% endif %}
 
 {% endblock content %}

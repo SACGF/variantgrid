@@ -92,6 +92,10 @@ class DiscordanceReportTemplateData:
     def report_history(self) -> QuerySet[DiscordanceReport]:
         return DiscordanceReport.objects.filter(clinical_context=self.report.clinical_context).order_by('-report_started_date')
 
+    @property
+    def has_history(self) -> bool:
+        return self.report_history.count() > 1
+
     def report_history_summary(self) -> List[DiscordanceReportRowData]:
         perspective = UserPerspective.for_user(self.user)
         return [
