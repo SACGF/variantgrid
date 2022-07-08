@@ -4,17 +4,22 @@
 
 {% for ccg in clinical_contexts %}
     {% with discordance_status=ccg.calculate_discordance_status %}
-        <div class="my-1 alert overlap-{{ discordance_status.level.value }}">
+        <div class="my-1 alert overlap-{{ discordance_status.level.value }}{% if discordance_status.pending_concordance %} cs-pending{% endif %}">
         {% if ccg.pending_status %}(Pending) {% endif %}
         {% if ccg.latest_report and ccg.latest_report.resolution != 'C' %}
-            <a href="{% url 'discordance_report' ccg.latest_report.id %}">{% if not ccg.is_default %}<span class="font-weight-bold">{{ ccg.name }}</span> {% endif %}
-                Status :
-                {% if discordance_status.lab_count == 1 %}Single Lab, {% endif %}
-                {{ ccg.latest_report.status }} (Click for Discordance Report)</a>
+            <a href="{% url 'discordance_report' ccg.latest_report.id %}">
+                {% if not ccg.is_default %}<span class="font-weight-bold">{{ ccg.name }}</span> {% endif %}
+            Status :
+                {% if discordance_status.pending_concordance %}Pending Concordance
+                {% else %}
+                    {% if discordance_status.lab_count == 1 %}Single Lab, {% endif %}
+                    {{ ccg.latest_report.status }}
+                {% endif %}
+            (Click for Discordance Report)</a>
         {% else %}
-                {% if not ccg.is_default %}<span class="font-weight-bold">{{ ccg.name }}</span> {% endif %}Status :
-                {% if discordance_status.lab_count == 1 %}Single Lab, {% endif %}
-                <span>{{ discordance_status.level.label }}</span>
+            {% if not ccg.is_default %}<span class="font-weight-bold">{{ ccg.name }}</span> {% endif %}Status :
+            {% if discordance_status.lab_count == 1 %}Single Lab, {% endif %}
+            <span>{{ discordance_status.level.label }}</span>
         {% endif %}
         </div>
     {% endwith %}
