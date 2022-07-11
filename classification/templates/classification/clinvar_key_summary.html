@@ -68,12 +68,19 @@
             }
         }
         function renderId(data, type, row) {
-            let content = [$('<span/>', {text:data.genome_build}), $("<br/>"), $('<span/>', {text: data.c_hgvs})];
+            let content = [$('<span/>', {text: data.genome_build}), $("<br/>"), $('<span/>', {text: data.c_hgvs})];
             // let id = data.id;
             // let elem = $('<a/>', {href: `/classification/clinvar_export/${id}`, html: content, class:'id-link'});
             let elem = $('<span>', {html: content});
             return elem.prop('outerHTML');
-        };
+        }
+        function renderBatches(data, type, row) {
+            if (!data) {
+                return $('<span>', {text: '-', class:'no-value'}).prop('outerHTML');
+            } else {
+                return $('<span>', {text: data.join(", "), class:'text-monospace'}).prop('outerHTML');
+            }
+        }
     </script>
     <style>
         .clinvar-export-table .dt-id {

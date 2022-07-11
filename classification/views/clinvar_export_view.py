@@ -1,4 +1,5 @@
 import json
+from collections import defaultdict
 from typing import Dict, Any, Optional, Iterable
 
 from django.conf import settings
@@ -81,6 +82,19 @@ class ClinVarExportColumns(DatatableConfig[ClinVarExport]):
         allele = allele_for(row["clinvar_allele__allele"])
         return f"{allele:CA}"
 
+    def pre_render(self, qs: QuerySet[ClinVarExport]):
+        # find all the batches these records are in
+        # do this once rather than per row
+        super().pre_render(qs)
+        export_to_batches = defaultdict(list)
+        for export_id, batch_id in ClinVarExportSubmission.objects.filter(clinvar_export__in=qs.values_list("id", flat=True)).order_by(
+            "-submission_batch").values_list("clinvar_export", "submission_batch"):
+            export_to_batches[export_id].append(batch_id)
+        self.export_to_batches = export_to_batches
+
+    def batches(self, row: Dict[str, Any]) -> JsonDataType:
+        return self.export_to_batches.get(row.get("id"))
+
     def render_c_hgvs(self, row: Dict[str, Any]) -> JsonDataType:
         if row["classification_based_on__classification__variant"]:
             genome_build = row["classification_based_on__published_evidence__genome_build__value"]
@@ -114,6 +128,7 @@ class ClinVarExportColumns(DatatableConfig[ClinVarExport]):
 
     def __init__(self, request: HttpRequest):
         super().__init__(request)
+        self.export_to_batches = dict()
 
         self.search_box_enabled = True
         self.expand_client_renderer = DatatableConfig._row_expand_ajax('clinvar_export_detail')
@@ -141,6 +156,7 @@ class ClinVarExportColumns(DatatableConfig[ClinVarExport]):
                        search=["condition__display_text"],
                        sort_keys=["condition__sort_text"]
             ),
+            RichColumn(name="batches", label="In Batche IDs", renderer=self.batches, client_renderer='renderBatches', orderable=False, search=False, extra_columns=["id"]),
             RichColumn("status", label="Sync Status", client_renderer='renderStatus', sort_keys=["status_sort"], orderable=True, search=False),
             RichColumn("scv", label="SCV", orderable=True),
         ]
