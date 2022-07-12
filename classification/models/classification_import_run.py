@@ -56,7 +56,7 @@ class ClassificationImportRun(TimeStampedModel):
     def apply_missing_row_count(self) -> int:
         if from_file := self.from_file:
             from classification.models import Classification
-            self.missing_row_count = Classification.objects.filter(lab=from_file.lab, withdrawn=False).exclude(from_file=from_file).count()
+            self.missing_row_count = Classification.objects.filter(lab=from_file.lab, withdrawn=False).exclude(last_import_run__from_file=from_file).count()
 
     def increment_status(self, status: ClassificationPatchStatus):
         self.row_count += 1
