@@ -15,7 +15,7 @@ class FlagDelta:
         self.resolved = 0
 
     def __lt__(self, other):
-        return self.flag_type < other.flag_type
+        return self.flag_type.label < other.flag_type.label
 
 
 def flag_chanced_since(since) -> List[FlagDelta]:
