@@ -3,7 +3,7 @@ from collections import defaultdict
 from typing import Dict, Any, Optional, Iterable
 
 from django.conf import settings
-from django.db.models import QuerySet, When, Value, Case, IntegerField, Count
+from django.db.models import QuerySet, When, Value, Case, IntegerField, Count, Q
 from django.http import HttpResponse, StreamingHttpResponse, HttpRequest
 from django.http.response import HttpResponseBase
 from django.shortcuts import render, redirect, get_object_or_404
@@ -93,16 +93,15 @@ class ClinVarExportColumns(DatatableConfig[ClinVarExport]):
         self.export_to_batches = export_to_batches
 
     def power_search(self, qs: QuerySet[ClinVarExport], search_string: str) -> QuerySet[ClinVarExport]:
-        if search_string.startswith("batch:"):
-            try:
-                batch_id = int(search_string[6:])
-                submissions = ClinVarExportSubmission.objects.filter(submission_batch_id=batch_id).values_list("clinvar_export_id", flat=True)
-                # filter rather than just return submissions to make sure user has permission to see items that belong to the batch
-                return qs.filter(pk__in=submissions)
-            except ValueError:
-                return ClinVarExport.objects.none()
-        else:
-            return super().power_search(qs, search_string)
+        try:
+            batch_id = int(search_string)
+            submissions = ClinVarExportSubmission.objects.filter(submission_batch_id=batch_id).values_list("clinvar_export_id", flat=True)
+            # filter rather than just return submissions to make sure user has permission to see items that belong to the batch
+            # also make sure an individual export doesn't have the batch ID
+            return qs.filter(Q(pk__in=submissions) | Q(pk=batch_id))
+        except ValueError:
+            pass
+        return super().power_search(qs, search_string)
 
 
     def batches(self, row: Dict[str, Any]) -> JsonDataType:
