@@ -92,6 +92,19 @@ class ClinVarExportColumns(DatatableConfig[ClinVarExport]):
             export_to_batches[export_id].append(batch_id)
         self.export_to_batches = export_to_batches
 
+    def power_search(self, qs: QuerySet[ClinVarExport], search_string: str) -> QuerySet[ClinVarExport]:
+        if search_string.startswith("batch:"):
+            try:
+                batch_id = int(search_string[6:])
+                submissions = ClinVarExportSubmission.objects.filter(submission_batch_id=batch_id).values_list("clinvar_export_id", flat=True)
+                # filter rather than just return submissions to make sure user has permission to see items that belong to the batch
+                return qs.filter(pk__in=submissions)
+            except ValueError:
+                return ClinVarExport.objects.none()
+        else:
+            return super().power_search(qs, search_string)
+
+
     def batches(self, row: Dict[str, Any]) -> JsonDataType:
         return self.export_to_batches.get(row.get("id"))
 
