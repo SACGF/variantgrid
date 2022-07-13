@@ -147,6 +147,8 @@ class ClassificationMeta(ExportRow):
             return 'active discordance'
         elif self.discordance_status == DiscordanceReportStatus.CONTINUED:
             return 'continued discordance'
+        elif self.discordance_status == DiscordanceReportStatus.PENDING_CONCORDANCE:
+            return 'pending concordance'
         else:
             return self.discordance_status
 

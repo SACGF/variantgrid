@@ -103,7 +103,6 @@ class ClinVarExportColumns(DatatableConfig[ClinVarExport]):
             pass
         return super().power_search(qs, search_string)
 
-
     def batches(self, row: Dict[str, Any]) -> JsonDataType:
         return self.export_to_batches.get(row.get("id"))
 

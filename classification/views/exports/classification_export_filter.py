@@ -153,6 +153,7 @@ class DiscordanceReportStatus(str, Enum):
     """
     ON_GOING = 'ongoing'
     CONTINUED = 'continued'
+    PENDING_CONCORDANCE = 'pending'
 
 
 @dataclass
@@ -335,9 +336,20 @@ class ClassificationFilter:
         discordance_status: Dict[int, DiscordanceReportStatus] = dict()
         for cc in ClinicalContext.objects.filter(status=ClinicalContextStatus.DISCORDANT):
             dr = DiscordanceReport.latest_report(cc)
-            if dr.resolution in {DiscordanceReportResolution.CONTINUED_DISCORDANCE, DiscordanceReportResolution.ONGOING}:
+
+            status: Optional[DiscordanceReportStatus] = None
+            if dr.resolution == DiscordanceReportResolution.CONCORDANT:
+                pass
+            if dr.is_pending_concordance:
+                status = DiscordanceReportStatus.PENDING_CONCORDANCE
+            elif dr.resolution == DiscordanceReportResolution.CONTINUED_DISCORDANCE:
+                status = DiscordanceReportStatus.CONTINUED
+            else:
+                status = DiscordanceReportStatus.ON_GOING
+
+            if status:
                 for c in dr.actively_discordant_classification_ids():
-                    discordance_status[c] = DiscordanceReportStatus.ON_GOING if dr.resolution == DiscordanceReportResolution.ONGOING else DiscordanceReportStatus.CONTINUED
+                    discordance_status[c] = status
 
         return discordance_status
 

@@ -1,5 +1,5 @@
 class DiscordanceReportResolution:
-    ONGOING = None
+    ONGOING = None  # FIX ME, rename to Active Discordance
     CONCORDANT = 'C'
     CONTINUED_DISCORDANCE = 'D'
 

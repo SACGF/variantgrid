@@ -214,10 +214,13 @@ class MVLEntry(ExportRow):
 
         discordant_count = 0
         continued_discordance_count = 0
+        pending_discordance_count = 0
         for cms in self.data.cms:
             if discordance_status := self.data.source.is_discordant(cms):
                 if discordance_status == DiscordanceReportStatus.CONTINUED:
                     continued_discordance_count += 1
+                elif discordance_status == DiscordanceReportStatus.PENDING_CONCORDANCE:
+                    pending_discordance_count += 1
                 else:
                     discordant_count += 1
 
@@ -226,6 +229,10 @@ class MVLEntry(ExportRow):
             warnings.append(warning)
         if continued_discordance_count:
             warning = f'Warning <b>{continued_discordance_count} ' + ('records are' if continued_discordance_count > 1 else 'record is') + ' in continued discordance</b>'
+            warnings.append(warning)
+        if pending_discordance_count:
+            warning = f'Warning <b>{pending_discordance_count} ' + (
+                'records are' if pending_discordance_count > 1 else 'record is') + ' in pending concordance (discordance resolution has been agreed but not yet applied)</b>'
             warnings.append(warning)
 
         if len(self.classifications_values.all) > 1:
