@@ -19,8 +19,6 @@ class FlagDelta:
 
 
 def flag_chanced_since(since) -> List[FlagDelta]:
-    # used to ignore flags that weren't 2 minutes old in case they were going to auto close
-    # but makes testing difficult
     #min_age = datetime.utcnow().replace(tzinfo=timezone.utc) - timedelta(
     #    minutes=2)  # give records 2 minutes to matching properly before reporting
     time_range_q = Q(created__gte=since)# & Q(created__lte=min_age)
