@@ -178,21 +178,22 @@ class ClassificationImportMapInsertTask(Task):
                         for record in ijson.items(file_handle, 'records.item'):
                             yield record
 
-                    for batch in batch_iterator(row_generator(), batch_size=50):
-                        # record the import
-                        import_run = ClassificationImportRun.record_classification_import(
-                            identifier=import_id,
-                        )
-                        import_run.from_file = upload_file
+                    import_run = ClassificationImportRun.record_classification_import(
+                        identifier=import_id,
+                    )
+                    import_run.from_file = upload_file
 
+                    for batch in batch_iterator(row_generator(), batch_size=50):
                         bci = BulkClassificationInserter(user=user)
                         for row in batch:
                             response = bci.insert(data=row, submission_source=SubmissionSource.API, import_run=import_run)
                             response.notify_if_required()
                             import_run.increment_status(response.status)
-                        import_run.apply_missing_row_count()
                         import_run.save()
                         bci.finish()
+
+                    import_run.apply_missing_row_count()
+                    import_run.save()
 
                     ClassificationImportRun.record_classification_import(
                         identifier=import_id,
