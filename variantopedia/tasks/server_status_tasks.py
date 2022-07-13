@@ -1,4 +1,5 @@
 from collections import defaultdict
+from datetime import timedelta
 from random import randint
 from typing import Optional
 
@@ -9,6 +10,7 @@ from django.utils.timezone import now
 
 from annotation.models import ClinVarVersion
 from classification.models import Classification
+from flags.models.flag_health_check import flag_chanced_since
 from library.django_utils import get_url_from_view_path
 from library.guardian_utils import admin_bot
 from library.log_utils import NotificationBuilder
@@ -30,6 +32,8 @@ def notify_server_status():
 def notify_server_status_now(detailed: bool = True):
     dashboard_notices = get_dashboard_notices(admin_bot(), days_ago=1)
     url = get_url_from_view_path(reverse('server_status')) + '?activeTab=server_status_activity_detail_1'
+    right_now = now()
+    day_ago = right_now - timedelta(days=1)
 
     heading_emoji = ":male-doctor:" if randint(0, 1) else ":female-doctor:"
     nb = NotificationBuilder(message="Health Check")
@@ -78,6 +82,18 @@ def notify_server_status_now(detailed: bool = True):
     if zeros:
         lines.append(f":open_file_folder: 0 : {', '.join(zeros)}")
 
+    # only put this in health check and not regular
+    # server status since
+    flag_deltas = flag_chanced_since(day_ago)
+    for flag_delta in flag_deltas:
+        parts = []
+        if flag_delta.added:
+            parts.append(f"*+{flag_delta.added}*")
+        if flag_delta.resolved:
+            parts.append(f"*-{flag_delta.resolved}*")
+        joined_parts = "/".join(parts)
+        lines.append(f":flags: {joined_parts} : Flag {flag_delta.flag_type}")
+
     nb.add_header(f"{heading_emoji} Health Check")
     nb.add_markdown(f"*In the <{url}|last 24 hours>*")
     nb.add_markdown("\n".join(lines), indented=True)
@@ -118,7 +134,6 @@ def notify_server_status_now(detailed: bool = True):
 
         annotation_ages = list()
         # others we might want to check date of
-        right_now = now()
 
         # when we have an array, only report on the first instance that's been imported
         # e.g. if we import OMIM directly from OMIM, we don't care how old the biomart omim file is
