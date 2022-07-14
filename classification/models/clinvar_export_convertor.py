@@ -325,10 +325,12 @@ class ClinVarExportConverter:
             comment_parts.append(acmg_summary)
 
         if comment_parts:
-            data["comment"] = "\n\n".join(comment_parts)
+            full_comment = " ".join(comment_parts)
+            full_comment = full_comment.replace("\n", " ")
+            data["comment"] = full_comment
 
         if date_last_evaluated := self.value(SpecialEKeys.CURATION_DATE):
-            # FIXME fall back to other date types? or at least raising a warning
+            # FIXME fall back to other date types? or at least raising a warning if not a valid looking date
             data["dateLastEvaluated"] = date_last_evaluated
 
         if mode_of_inheritance := self.clinvar_value(SpecialEKeys.MODE_OF_INHERITANCE):
