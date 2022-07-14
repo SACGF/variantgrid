@@ -524,7 +524,7 @@ class OntologyVersion(TimeStampedModel):
     def in_ontology_version(ontology_import: OntologyImport) -> bool:
         versioned = defaultdict(set)
         for (import_source, filenames) in OntologyVersion.ONTOLOGY_IMPORTS.values():
-            versioned[import_source].extend(filenames)
+            versioned[import_source].update(filenames)
         return ontology_import.filename in versioned[ontology_import.import_source]
 
     @staticmethod
