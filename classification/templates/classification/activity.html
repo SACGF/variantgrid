@@ -76,7 +76,7 @@
     {% end_page_help_embedded %}
     {% if import_details %}
         {% if not import_details.last_import_run and not import_details.last_source_id %}
-            {% labelled label="Import Details" value_css="no-value" %}No imports details are available for this record.{% endlabelled %}
+            {% labelled label="Import Details" value_css="no-value" %}No imports details are available for this record regardless of if there were changes.{% endlabelled %}
         {% else %}
             {% labelled label="Last Imported Date" %}
                 {% timestamp import_details.last_import_run.created %}
