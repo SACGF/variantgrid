@@ -78,9 +78,11 @@
         {% if not import_details.last_import_run and not import_details.last_source_id %}
             {% labelled label="Import Details" value_css="no-value" %}No imports details are available for this record.{% endlabelled %}
         {% else %}
-            {% labelled label="Last Imported Date" %}{% timestamp import_details.last_import_run.created %}{% endlabelled %}
-            {% labelled label="Last Imported File" %}{{ import_details.last_import_run.from_file.filename }}{% endlabelled %}
-            {% labelled label="Last Imported ID (within file)" %}{{ import_details.last_source_id }}{% endlabelled %}
+            {% labelled label="Last Imported Date" %}
+                {% timestamp import_details.last_import_run.created %}
+                <small class="form-text text-info">This is the most recent date this classification was seen in an import file.</small>
+            {% endlabelled %}
+            {% labelled label="Last Imported Source ID" %}{{ import_details.last_source_id }}{% endlabelled %}
         {% endif %}
     {% endif %}
     {% labelled label="Data as of" %}{% timestamp now time_ago=True %}{% endlabelled %}
