@@ -74,6 +74,15 @@
         A blank value in the Record or Who column implies it's the same as the value above it.
         </p>
     {% end_page_help_embedded %}
+    {% if import_details %}
+        {% if not import_details.last_import_run and not import_details.last_source_id %}
+            {% labelled label="Import Details" value_css="no-value" %}No imports details are available for this record.{% endlabelled %}
+        {% else %}
+            {% labelled label="Last Imported Date" %}{% timestamp import_details.last_import_run.created %}{% endlabelled %}
+            {% labelled label="Last Imported File" %}{{ import_details.last_import_run.from_file.filename }}{% endlabelled %}
+            {% labelled label="Last Imported ID (within file)" %}{{ import_details.last_source_id }}{% endlabelled %}
+        {% endif %}
+    {% endif %}
     {% labelled label="Data as of" %}{% timestamp now time_ago=True %}{% endlabelled %}
     {% classification_changes changes %}
     {% if load_older_url %}<br/><a class="btn btn-outline-primary" href="{{ load_older_url }}">Load Older</a>{% endif %}

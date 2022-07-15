@@ -291,13 +291,15 @@ def classification_history(request, classification_id: Any):
     #  changes page will show things before they were submitted and not hide values
     #  so need to restrict to people who've always had access to the record
     ref.check_security(must_be_writable=True)
+    classification: Classification = ref.record
 
-    changes = ClassificationChanges.list_changes(classifications=[ref.record], limit=100)
+    changes = ClassificationChanges.list_changes(classifications=[classification], limit=100)
     context = {
         'changes': changes,
         'can_create_classifications': Classification.can_create_via_web_form(request.user),
         'now': now(),
-        'page_title': f'Classification Activity ({ref.lab_record_id})'
+        'page_title': f'Classification Activity ({classification.lab_record_id})',
+        'import_details': classification
     }
     return render(request, 'classification/activity.html', context)
 
