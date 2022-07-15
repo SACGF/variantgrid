@@ -73,7 +73,7 @@ if settings.ALLELE_VALIDATION:
 if settings.DISCORDANCE_EMAIL:
     app.conf.beat_schedule['discordance-emails-weekly'] = {
         'task': 'classification.views.classification_email_view.send_summary_emails',
-        'schedule': crontab(hour=16, minute=0, day_of_week='fri')
+        'schedule': crontab(hour=10, minute=0, day_of_week='mon')
     }
 
 # Server monitoring tasks - send RollBar warnings
