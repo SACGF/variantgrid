@@ -284,7 +284,7 @@ class ClinVarLegacyRow:
 
         all_matches: [ClinVarLegacyMatches] = list()
         for allele, match_types in allele_to_match_types.items():
-            classifications = list(Classification.objects.filter(lab__in=self.labs, allele=allele))
+            classifications = list(Classification.objects.filter(lab__in=self.labs, allele=allele, withdrawn=False))
             clinvar_export_matches: List[ClinVarLegacyMatch] = list()
             if clinvar_allele := ClinVarAllele.objects.filter(allele=allele, clinvar_key=self.clinvar_key).first():
                 if clinvar_exports := ClinVarExport.objects.filter(clinvar_allele=clinvar_allele):
