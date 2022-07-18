@@ -26,7 +26,7 @@ from library.log_utils import log_traceback, report_event
 from patients.models import FakeData, Patient, Specimen
 from patients.models_enums import Sex
 from snpdb.models.models import Tag, LabProject
-from snpdb.models.models_enums import ImportStatus, VariantsType, ProcessingStatus
+from snpdb.models.models_enums import ImportStatus, VariantsType, ProcessingStatus, SampleFileType
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_genomic_interval import GenomicIntervalsCollection
 from snpdb.models.models_variant import Variant, VariantCollection, AlleleSource
@@ -268,7 +268,6 @@ class Sample(SortByPKMixin, models.Model):
     # TODO: A sample may have >1 specimens (eg tumor/normal subtraction)
     specimen = models.ForeignKey(Specimen, null=True, blank=True, on_delete=SET_NULL)
     import_status = models.CharField(max_length=1, choices=ImportStatus.choices, default=ImportStatus.CREATED)
-    bam_file_path = models.TextField(null=True, blank=True)
     variants_type = models.CharField(max_length=1, choices=VariantsType.choices, default=VariantsType.UNKNOWN)
 
     @property
@@ -423,6 +422,21 @@ class Sample(SortByPKMixin, models.Model):
         not_already_deleting = ~Q(import_status=ImportStatus.DELETING)
         sample_mask = vcfs_marked_for_deletion & not_already_deleting
         return Sample.objects.filter(sample_mask).update(import_status=ImportStatus.MARKED_FOR_DELETION)
+
+
+class SampleFilePath(models.Model):
+    """ Objects like a BAM/CRAM that can be associated with a sample """
+    sample = models.ForeignKey(Sample, on_delete=CASCADE)
+    file_type = models.CharField(max_length=1, null=True, blank=True, choices=SampleFileType.choices)
+    label = models.TextField(null=True, blank=True)
+    file_path = models.TextField()
+
+    def __str__(self):
+        if self.label:
+            label = f" ({self.label}) "
+        else:
+            label = ''
+        return f"{self.sample}: {label}{self.file_path}"
 
 
 class SampleTag(models.Model):
