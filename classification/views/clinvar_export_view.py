@@ -7,7 +7,6 @@ from django.http import HttpResponse, StreamingHttpResponse, HttpRequest
 from django.http.response import HttpResponseBase
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
-from django.utils import timezone
 from django.views import View
 from lazy import lazy
 
@@ -19,7 +18,7 @@ from classification.views.classification_dashboard_view import ClassificationDas
 from genes.hgvs import CHGVS
 from library.cache import timed_cache
 from library.django_utils import add_save_message, get_url_from_view_path
-from library.utils import html_to_text, export_column, ExportRow
+from library.utils import html_to_text, export_column, ExportRow, local_date_string
 from snpdb.models import ClinVarKey, Lab, Allele, GenomeBuild
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
 from uicore.json.json_types import JsonDataType
@@ -325,7 +324,7 @@ def clinvar_export_download(request: HttpRequest, clinvar_key_id: str) -> HttpRe
             ClinVarExport.objects.filter(clinvar_allele__clinvar_key=clinvar_key).order_by('-id')
         )
 
-    date_str = timezone.now().localtime().strftime("%Y-%m-%d")
+    date_str = local_date_string()
     response = StreamingHttpResponse(rows(), content_type='text/csv')
     response['Content-Disposition'] = f'attachment; filename="export_batches_{date_str}.csv"'
     return response

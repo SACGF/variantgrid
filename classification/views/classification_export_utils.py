@@ -23,7 +23,7 @@ from flags.models.models import Flag
 from genes.hgvs import CHGVS
 from library.guardian_utils import bot_group
 from library.log_utils import log_traceback, report_exc_info, report_message, NotificationBuilder
-from library.utils import delimited_row, DebugTimer
+from library.utils import delimited_row, DebugTimer, local_date_string
 from snpdb.models import Contig
 from snpdb.models.flag_types import allele_flag_types
 from snpdb.models.models_genome import GenomeBuild, GenomeBuildContig
@@ -432,7 +432,7 @@ class ExportFormatter(BaseExportFormatter):
         if prefix:
             parts.append(prefix)
         if include_date:
-            parts.append(now().localtime().strftime("%Y-%m-%d"))
+            parts.append(local_date_string())
         if include_genome_build:
             parts.append(self.genome_build.name)
         if suffix:

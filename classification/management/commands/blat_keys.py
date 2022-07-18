@@ -16,9 +16,9 @@ import os
 import re
 
 from django.core.management.base import BaseCommand
-from django.utils import timezone
 
 from classification.models.evidence_key import EvidenceKey
+from library.utils import local_date_string
 
 
 class Command(BaseCommand):
@@ -56,7 +56,7 @@ class Command(BaseCommand):
     @staticmethod
     def rewrite_migration_script(migration_script, replace):
         this_script = os.path.basename(__file__)
-        now = timezone.now().strftime("%Y-%m-%d")
+        now = local_date_string()
         dependency_lines = Command.get_dependency_lines(migration_script, replace)
         dependencies = "".join(dependency_lines)
 

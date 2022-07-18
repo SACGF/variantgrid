@@ -126,6 +126,11 @@ def import_class(full_class_path):
     return getattr(mod, classname)
 
 
+def local_date_string() -> str:
+    """ Returns eg '2022-07-18' """
+    return timezone.now().localtime().strftime("%Y-%m-%d")
+
+
 class Struct:
 
     def __init__(self, **entries):
@@ -985,21 +990,21 @@ class ExportRow:
 
     @classmethod
     def streaming_csv(cls, data: Iterable[Any], filename: str, categories: Optional[Dict[str, Any]] = None):
-        date_time = timezone.now().localtime().strftime("%Y-%m-%d")
+        date_str = local_date_string()
 
         response = StreamingHttpResponse(cls.csv_generator(data, categories=categories), content_type='text/csv')
-        response['Content-Disposition'] = f'attachment; filename="{filename}_{settings.SITE_NAME}_{date_time}.csv"'
+        response['Content-Disposition'] = f'attachment; filename="{filename}_{settings.SITE_NAME}_{date_str}.csv"'
         return response
 
     @classmethod
     def streaming_json(cls, data: Iterable[Any], filename: str, records_key: str = None, categories: Optional[Dict[str, Any]] = None):
-        date_time = timezone.now().localtime().strftime("%Y-%m-%d")
+        date_str = local_date_string()
 
         if not records_key:
             records_key = filename.replace(" ", "_")
 
         response = StreamingHttpResponse(cls.json_generator(data, records_key, categories=categories), content_type='application/json')
-        response['Content-Disposition'] = f'attachment; filename="{filename}_{settings.SITE_NAME}_{date_time}.json"'
+        response['Content-Disposition'] = f'attachment; filename="{filename}_{settings.SITE_NAME}_{date_str}.json"'
         return response
 
 
