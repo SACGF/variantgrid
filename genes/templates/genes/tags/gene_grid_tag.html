@@ -1367,15 +1367,17 @@ function addGeneAnnotationReleaseColumn(releaseId, data, selectElement) {
 
 
 function setGeneAnnotationReleaseCell(cell, geneIdList) {
+    $(cell).empty();
     if (geneIdList.length) {
-        $(cell).empty();
         for (let i = 0; i < geneIdList.length ; ++i) {
             let geneId = geneIdList[i];
             let geneUrl = $("<a/>").text(geneId).attr("href", Urls.view_gene(geneId));
             geneUrl.appendTo(cell);
         }
     } else {
-        cell.text("-");
+        let warningMessage = $("<i class='fas fa-exclamation-circle'></i>");
+        warningMessage.attr("title", "This symbol was not matched to a release symbol, no filtering will be performed");
+        warningMessage.appendTo(cell);
     }
 }
 
@@ -1441,6 +1443,11 @@ function handleBatchRetrieveGeneIdentifiersForRelease(releaseId, geneIdRequests,
     }
 
     let releaseClass = "gene-annotation-release-" + releaseId;
+    console.log("handleBatchRetrieveGeneIdentifiersForRelease");
+    console.log("gene symbols:");
+    console.log(geneSymbols);
+    console.log("returned identifiers:");
+    console.log(returnedGeneIdentifiers);
 
     for (let i=0 ; i<geneSymbols.length; ++i) {
         let geneSymbol = geneSymbols[i];
