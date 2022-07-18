@@ -673,7 +673,6 @@ class ExportFormatter(BaseExportFormatter):
                 params[key] = value
         return params
 
-
     def report_stats(self, row_count: int):
         # don't report bots downloading
         if self.user.groups.filter(name=bot_group().name):

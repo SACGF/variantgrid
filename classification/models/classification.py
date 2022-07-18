@@ -2756,6 +2756,7 @@ class ClassificationDateType:
     def is_fallback(self) -> bool:
         return self.name == "Created"
 
+
 class CuratedDate:
     """
     CuratedDate is a bit misleading, keeps the most relevant filled in date for a classification.
