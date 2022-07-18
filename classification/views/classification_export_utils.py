@@ -432,7 +432,7 @@ class ExportFormatter(BaseExportFormatter):
         if prefix:
             parts.append(prefix)
         if include_date:
-            parts.append(now().strftime("%Y-%m-%d"))
+            parts.append(now().localtime().strftime("%Y-%m-%d"))
         if include_genome_build:
             parts.append(self.genome_build.name)
         if suffix:

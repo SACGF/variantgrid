@@ -985,7 +985,7 @@ class ExportRow:
 
     @classmethod
     def streaming_csv(cls, data: Iterable[Any], filename: str, categories: Optional[Dict[str, Any]] = None):
-        date_time = timezone.now().strftime("%Y-%m-%d")
+        date_time = timezone.now().localtime().strftime("%Y-%m-%d")
 
         response = StreamingHttpResponse(cls.csv_generator(data, categories=categories), content_type='text/csv')
         response['Content-Disposition'] = f'attachment; filename="{filename}_{settings.SITE_NAME}_{date_time}.csv"'
@@ -993,7 +993,7 @@ class ExportRow:
 
     @classmethod
     def streaming_json(cls, data: Iterable[Any], filename: str, records_key: str = None, categories: Optional[Dict[str, Any]] = None):
-        date_time = timezone.now().strftime("%Y-%m-%d")
+        date_time = timezone.now().localtime().strftime("%Y-%m-%d")
 
         if not records_key:
             records_key = filename.replace(" ", "_")

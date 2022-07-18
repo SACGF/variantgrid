@@ -325,7 +325,7 @@ def clinvar_export_download(request: HttpRequest, clinvar_key_id: str) -> HttpRe
             ClinVarExport.objects.filter(clinvar_allele__clinvar_key=clinvar_key).order_by('-id')
         )
 
-    date_str = timezone.now().strftime("%Y-%m-%d")
+    date_str = timezone.now().localtime().strftime("%Y-%m-%d")
     response = StreamingHttpResponse(rows(), content_type='text/csv')
     response['Content-Disposition'] = f'attachment; filename="export_batches_{date_str}.csv"'
     return response

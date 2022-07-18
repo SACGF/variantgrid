@@ -186,7 +186,7 @@ class ClassificationFilter:
 
     @lazy
     def date_str(self) -> str:
-        return now().strftime("%Y-%m-%d")
+        return now().localtime().strftime("%Y-%m-%d")
 
     @staticmethod
     def _string_to_group_name(model: Type[Union[Lab, Organization]], group_names: str) -> Union[Set[Lab], Set[Organization]]:
