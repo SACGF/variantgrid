@@ -226,7 +226,11 @@ class ClinVarLegacyRow:
                 for individual_term in individual_terms:
                     if individual_term.startswith("Human Phenotype Ontology:"):
                         individual_term = individual_term.split(":", maxsplit=1)[1]
-                    terms.append(OntologyTerm.get_or_stub(individual_term))
+                    try:
+                        terms.append(OntologyTerm.get_or_stub(individual_term))
+                    except ValueError:
+                        # might be a bunch of ontologies that we don't support
+                        pass
         return terms
 
     def find_variant_grid_allele(self) -> List[ClinVarLegacyMatches]:
