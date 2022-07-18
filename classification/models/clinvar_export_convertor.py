@@ -322,7 +322,7 @@ class ClinVarExportConverter:
             comment_parts.append(interpret.strip())
 
         if self.clinvar_key.inject_acmg_description and (acmg_summary := self.classification_based_on.criteria_strength_summary()):
-            comment_parts.append(acmg_summary)
+            comment_parts.append(f"ACMG/AMP criteria applied: {acmg_summary}")
 
         if comment_parts:
             full_comment = " ".join(comment_parts)
