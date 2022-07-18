@@ -586,8 +586,7 @@ def nearby_variants_tab(request, variant_id, annotation_version_id):
         "distance": distance,
         "distance_str": str(distance)
     }
-    context.update(get_nearby_summaries(request.user, variant, annotation_version,
-                                        distance=distance, clinical_significance=True))
+    context.update(get_nearby_summaries(request.user, variant, annotation_version, distance=distance))
     return render(request, "variantopedia/nearby_variants_tab.html", context)
 
 
