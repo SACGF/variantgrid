@@ -1,8 +1,10 @@
 import json
+import re
 from datetime import timedelta
 
 from django.contrib import messages, admin
-from django.db.models import QuerySet
+from django.db.models import QuerySet, TextField, Q
+from django.db.models.functions import Length, Cast
 from django.http import HttpResponse, HttpRequest
 from django.utils import timezone
 
@@ -43,10 +45,45 @@ class ClinVarClassificationAgeFilter(admin.SimpleListFilter):
         return queryset
 
 
+class InterpretationSummaryLengthFilter(admin.SimpleListFilter):
+    title = 'Interpretation Summary Length'
+    parameter_name = 'interpretation_summary_length'
+    default_value = None
+    SUFFIX_MAP = {
+        "=": "",
+        "<": "__lt",
+        "<=": "__lte",
+        ">": "__gt",
+        ">=": "__gte"
+    }
+
+    def lookups(self, request, models_admin):
+        return [
+            ('=0', 'Empty'),
+            ('<200', '199 or less characters'),
+            ('>=200', '200+ characters'),
+            ('>=300', '300+ characters')
+        ]
+
+    def queryset(self, request, queryset: QuerySet[ClinVarExport]):
+        if length_check := self.value():
+            if match := re.match("(.*?)([0-9]+)", length_check):
+                direction = match.group(1)
+                length = int(match.group(2))
+                queryset = queryset.annotate(interpretation_summary_length=Length(Cast('classification_based_on__published_evidence__interpretation_summary', output_field=TextField())))
+                length_q = Q(**{f"interpretation_summary_length{InterpretationSummaryLengthFilter.SUFFIX_MAP[direction]}": length})
+                if (direction == '=' and length == 0) or direction.startswith('<'):
+                    length_q = length_q | Q(classification_based_on__published_evidence__interpretation_summary__isnull=True)
+                queryset = queryset.filter(length_q)
+            else:
+                raise ValueError(f"Internal error, can't parse {length_check}")
+        return queryset
+
+
 @admin.register(ClinVarExport)
 class ClinVarExportAdmin(ModelAdminBasics):
     list_display = ("pk", "clinvar_allele", "status", "classification_based_on", "classification_created", "condition_smart", "scv", "latest_batch", "created", "modified")
-    list_filter = (('clinvar_allele__clinvar_key', admin.RelatedFieldListFilter), ('status', AllValuesChoicesFieldListFilter), ClinVarClassificationAgeFilter)
+    list_filter = (('clinvar_allele__clinvar_key', admin.RelatedFieldListFilter), ('status', AllValuesChoicesFieldListFilter), ClinVarClassificationAgeFilter, InterpretationSummaryLengthFilter)
     search_fields = ('pk', "scv")
     inlines = (ClinVarExportSubmissionAdmin, )
     list_select_related = ('classification_based_on', )
