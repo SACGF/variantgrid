@@ -296,8 +296,8 @@ class ClinVarLegacyRow:
                             clinical_significance = classification_based_on.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
                             if clinical_significance == self.clinical_significance_code:
                                 export_match_types.add(ClinVarLegacyExportMatchType.CLINICAL_SIGNIFICANCE_MATCHES)
-                            if CHGVS(classification_based_on.get(SpecialEKeys.C_HGVS)) == self.c_hgvs_with_gene_symbol:
-                                export_match_types.add(ClinVarLegacyExportMatchType.CONDITION_MATCHES)
+                            #if CHGVS(classification_based_on.get(SpecialEKeys.C_HGVS)) == self.c_hgvs_with_gene_symbol:
+                            #    export_match_types.add(ClinVarLegacyExportMatchType.C_HGVS_MATCHES)
 
                         umbrella = clinvar_export.condition_resolved.terms
                         for term in self.ontology_terms:
