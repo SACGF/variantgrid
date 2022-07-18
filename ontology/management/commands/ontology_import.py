@@ -87,7 +87,7 @@ def load_mondo(filename: str, force: bool):
         context="mondo_file",
         import_source=OntologyService.MONDO,
         force_update=force,
-        processor_version=15)
+        processor_version=16)
 
     ontology_builder.ensure_hash_changed(data_hash=file_hash)  # don't re-import if hash hasn't changed
     ontology_builder.cache_everything()
@@ -111,6 +111,7 @@ def load_mondo(filename: str, force: bool):
 
                     if meta := node.get("meta"):
                         label = node.get("lbl")
+                        deprecated = meta.get("deprecated")
                         extra = dict()
 
                         defn = meta.get("definition", {}).get("val")
@@ -194,7 +195,8 @@ def load_mondo(filename: str, force: bool):
                             definition=defn,
                             extra=meta,
                             aliases=aliases,
-                            primary_source=True
+                            primary_source=True,
+                            deprecated=deprecated
                         )
 
                 # copy of id for gene symbol to gene symbol
@@ -602,6 +604,10 @@ class Command(BaseCommand):
 
         if filename := options.get("omim_frequencies"):
             print("THIS FILE IS DEPRECATED, please use phenotype_to_genes.txt instead")
+
+        print("If your instance uses Condition Text Matching, you might want to run:")
+        print("python3 sync_condition_text_matches --obsolete")
+        print("To make sure no matched terms have become obsolete")
 
         # Create a new OntologyVersion with all the new imports
         OntologyVersion.latest()

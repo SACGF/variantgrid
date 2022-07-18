@@ -13,12 +13,25 @@ class Command(BaseCommand):
     """
 
     def add_arguments(self, parser):
+        parser.add_argument('--obsolete', action='store_true', default=False)
         parser.add_argument('--reset', action='store_true', default=False)
         parser.add_argument('--clear', action='store_true', default=False)
         parser.add_argument('--classifications', action='store_true', default=False)
         parser.add_argument('--orphans', action='store_true', default=False)
 
+    def check_obsoletes(self):
+        for ctm in ConditionTextMatch.objects.filter(condition_xrefs__isnull=False):
+            for term in ctm.condition_xref_terms:
+                if term.is_obsolete:
+                    print(
+                        f"ConditionTextMatch ({ctm.condition_text.lab.name} '{ctm.condition_text.normalized_text}' {ctm.condition_text.pk}) refers to obsolete term {term}")
+
     def handle(self, *args, **options):
+        if options["obsolete"]:
+            print("Checking for obsoletes")
+            self.check_obsoletes()
+            print("Complete")
+            return
         if options["classifications"]:
             print("Updating classifications")
             sync_all_condition_resolutions_to_classifications()

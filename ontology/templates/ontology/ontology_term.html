@@ -26,6 +26,9 @@
             <div class="card-header">{{ term.id }}</div>
             <div class="card-body">
                 {% labelled label="Name" %}{{ term.name }}{% endlabelled %}
+                {% if term.deprecated %}
+                    {% labelled label="Deprecated" %}{{ 'W' | severity_icon }} This term has been deprecated{% endlabelled %}
+                {% endif %}
                 {% labelled label="Definition" value_css="white-space:pre-wrap" %}{{ term.definition }}{% endlabelled %}
                 {% labelled label="Extra" %}
                     {% if term.extra %}

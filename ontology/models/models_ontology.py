@@ -221,6 +221,7 @@ class OntologyTerm(TimeStampedModel):
     definition = models.TextField(null=True, blank=True)
     extra = models.JSONField(null=True, blank=True)
     aliases = ArrayField(models.TextField(blank=False), null=False, blank=True, default=list)
+    deprecated = models.BooleanField(default=False, blank=True)
     from_import = models.ForeignKey(OntologyImport, on_delete=PROTECT)
 
     def __str__(self):
@@ -243,9 +244,10 @@ class OntologyTerm(TimeStampedModel):
 
     @property
     def is_obsolete(self) -> bool:
-        if self.name:
-            return "obsolete" in self.name.lower()
-        return False
+        return self.deprecated
+        # if self.name:
+        #     return "obsolete" in self.name.lower()
+        # return False
 
     @lazy
     def is_leaf(self) -> bool:

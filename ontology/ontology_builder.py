@@ -191,7 +191,8 @@ class OntologyBuilder:
                  definition: Optional[str] = None,
                  extra: Optional[Dict] = None,
                  aliases: Optional[List[str]] = None,
-                 primary_source: bool = True):
+                 primary_source: bool = True,
+                 deprecated: Optional[bool] = None):
 
         cached = self._fetch_term(term_id)
         if not primary_source and cached.status == ModifiedStatus.EXISTING:
@@ -224,6 +225,9 @@ class OntologyBuilder:
 
         if aliases is not None or primary_source:
             term.aliases = aliases or list()
+
+        term.deprecated = deprecated or (name and "obsolete" in name)
+
 
     def complete(self, purge_old_relationships=False, purge_old_terms=False, verbose=True):
         """
