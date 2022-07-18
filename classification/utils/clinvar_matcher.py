@@ -224,8 +224,12 @@ class ClinVarLegacyRow:
         if condition_identifier := self.condition_identifier.strip():
             if individual_terms := condition_identifier.split(';'):
                 for individual_term in individual_terms:
+                    # Fun with ClinVar prefixes
                     if individual_term.startswith("Human Phenotype Ontology:"):
                         individual_term = individual_term.split(":", maxsplit=1)[1]
+                    elif individual_term.startswith("MONDO:MONDO"):
+                        individual_term = individual_term.split(":", maxsplit=1)[1]
+
                     try:
                         terms.append(OntologyTerm.get_or_stub(individual_term))
                     except ValueError:
