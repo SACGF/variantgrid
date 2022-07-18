@@ -4,14 +4,12 @@ from datetime import datetime
 from enum import Enum
 from typing import List, Union, Iterable, Optional, Dict, Tuple, Set, Any, Mapping
 
-from django.conf import settings
 from django.contrib.auth.models import User
 from django.db.models import Q, Count
 from django.db.models.query import QuerySet
 from django.http.response import StreamingHttpResponse
 from django.utils.timezone import now
 from lazy import lazy
-from pytz import timezone
 from threadlocals.threadlocals import get_current_request
 
 from classification.enums import SpecialEKeys
@@ -434,7 +432,7 @@ class ExportFormatter(BaseExportFormatter):
         if prefix:
             parts.append(prefix)
         if include_date:
-            parts.append(now().astimezone(tz=timezone(settings.TIME_ZONE)).strftime("%Y-%m-%d"))
+            parts.append(now().strftime("%Y-%m-%d"))
         if include_genome_build:
             parts.append(self.genome_build.name)
         if suffix:

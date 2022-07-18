@@ -60,7 +60,6 @@ PyPDF2
 pysam
 python_dateutil
 python_Levenshtein
-pytz
 pyvcf3
 redis
 reportlab

@@ -6,14 +6,12 @@ from functools import reduce
 from operator import __or__
 from typing import List, Type, Union, Set, Optional, Dict, Iterator
 
-from django.conf import settings
 from django.contrib.auth.models import User
 from django.db.models import QuerySet, Q
 from django.http import HttpRequest
 from django.utils.timezone import now
 from guardian.shortcuts import get_objects_for_user
 from lazy import lazy
-from pytz import timezone
 
 from classification.enums import ShareLevel, ClinicalContextStatus
 from classification.enums.discordance_enums import DiscordanceReportResolution
@@ -188,7 +186,7 @@ class ClassificationFilter:
 
     @lazy
     def date_str(self) -> str:
-        return now().astimezone(tz=timezone(settings.TIME_ZONE)).strftime("%Y-%m-%d")
+        return now().strftime("%Y-%m-%d")
 
     @staticmethod
     def _string_to_group_name(model: Type[Union[Lab, Organization]], group_names: str) -> Union[Set[Lab], Set[Organization]]:

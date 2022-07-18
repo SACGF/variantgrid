@@ -1,7 +1,7 @@
 import inspect
 from typing import Optional, List, Iterator
 
-import pytz
+from dateutil.tz import gettz
 from django.conf import settings
 from django.contrib import admin, messages
 from django.db import models
@@ -158,7 +158,7 @@ class ModelAdminBasics(admin.ModelAdmin):
 
     @lazy
     def tz(self):
-        return pytz.timezone(settings.TIME_ZONE)
+        return gettz(settings.TIME_ZONE)
 
     def format_datetime(self, datetime) -> str:
         default_timezoned = datetime.astimezone(self.tz)

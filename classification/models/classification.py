@@ -9,8 +9,8 @@ from enum import Enum
 from typing import Any, Dict, List, Union, Optional, Iterable, Callable, Mapping, TypedDict, Tuple, Set
 
 import django.dispatch
-import pytz
 from datetimeutc.fields import DateTimeUTCField
+from dateutil.tz import gettz
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
@@ -2769,7 +2769,7 @@ class CuratedDate:
 
     @lazy
     def timezone(self):
-        return pytz.timezone(settings.TIME_ZONE)
+        return gettz(settings.TIME_ZONE)
 
     def convert_date(self, evidence_key):
         if date_str := self._modification.get(evidence_key):
