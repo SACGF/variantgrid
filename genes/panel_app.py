@@ -11,7 +11,7 @@ from genes.models import PanelAppPanelRelevantDisorders, PanelAppPanel, PanelApp
 from genes.serializers import GeneListGeneSymbolSerializer
 from library.guardian_utils import admin_bot, add_public_group_read_permission
 
-PANEL_APP_PREFIX = "panel-app-"
+PANEL_APP_PREFIX = "panel-app"
 PANEL_APP_LIST_PANELS_PATH = "/api/v1/panels/"
 PANEL_APP_GET_PANEL_API_BASE_PATH = "/api/v1/panels/"
 PANEL_APP_SEARCH_BY_GENES_BASE_PATH = "/api/v1/genes/"
