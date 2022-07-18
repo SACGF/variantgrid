@@ -2,16 +2,14 @@ import json
 from collections import defaultdict
 from typing import Dict, Any, Optional, Iterable
 
-from django.conf import settings
 from django.db.models import QuerySet, When, Value, Case, IntegerField, Count, Q
 from django.http import HttpResponse, StreamingHttpResponse, HttpRequest
 from django.http.response import HttpResponseBase
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
-from django.utils.timezone import now
+from django.utils import timezone
 from django.views import View
 from lazy import lazy
-from pytz import timezone
 
 from classification.enums import SpecialEKeys
 from classification.models import ClinVarExport, ClinVarExportBatch, ClinVarExportBatchStatus, \
@@ -327,9 +325,9 @@ def clinvar_export_download(request: HttpRequest, clinvar_key_id: str) -> HttpRe
             ClinVarExport.objects.filter(clinvar_allele__clinvar_key=clinvar_key).order_by('-id')
         )
 
-    date_str = now().astimezone(tz=timezone(settings.TIME_ZONE)).strftime("%Y-%m-%d")
+    date_str = timezone.now().strftime("%Y-%m-%d")
     response = StreamingHttpResponse(rows(), content_type='text/csv')
-    response['Content-Disposition'] = f'attachment; filename="export_batches_{date_str}.csv"'  # TODO  add in date
+    response['Content-Disposition'] = f'attachment; filename="export_batches_{date_str}.csv"'
     return response
 
 

@@ -32,10 +32,9 @@ from django.core.serializers import serialize
 from django.db import models
 from django.db.models.query import QuerySet
 from django.http import StreamingHttpResponse, HttpRequest
-from django.utils import html
+from django.utils import html, timezone
 from django.utils.functional import SimpleLazyObject
 from django.utils.safestring import SafeString, mark_safe
-from pytz import timezone
 
 from uicore.json.json_types import JsonObjType
 
@@ -986,7 +985,7 @@ class ExportRow:
 
     @classmethod
     def streaming_csv(cls, data: Iterable[Any], filename: str, categories: Optional[Dict[str, Any]] = None):
-        date_time = datetime.now(tz=timezone(settings.TIME_ZONE)).strftime("%Y-%m-%d")
+        date_time = timezone.now().strftime("%Y-%m-%d")
 
         response = StreamingHttpResponse(cls.csv_generator(data, categories=categories), content_type='text/csv')
         response['Content-Disposition'] = f'attachment; filename="{filename}_{settings.SITE_NAME}_{date_time}.csv"'
@@ -994,7 +993,7 @@ class ExportRow:
 
     @classmethod
     def streaming_json(cls, data: Iterable[Any], filename: str, records_key: str = None, categories: Optional[Dict[str, Any]] = None):
-        date_time = datetime.now(tz=timezone(settings.TIME_ZONE)).strftime("%Y-%m-%d")
+        date_time = timezone.now().strftime("%Y-%m-%d")
 
         if not records_key:
             records_key = filename.replace(" ", "_")
