@@ -605,9 +605,9 @@ class Command(BaseCommand):
         if filename := options.get("omim_frequencies"):
             print("THIS FILE IS DEPRECATED, please use phenotype_to_genes.txt instead")
 
-        print("If your instance uses Condition Text Matching, you might want to run:")
-        print("python3 sync_condition_text_matches --obsolete")
-        print("To make sure no matched terms have become obsolete")
+        print("*** If your instance uses Condition Text Matching, you might want to run:")
+        print("python3 menage.py sync_condition_text_matches --obsolete")
+        print("*** To make sure no matched terms have become obsolete")
 
         # Create a new OntologyVersion with all the new imports
         OntologyVersion.latest()
