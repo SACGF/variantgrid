@@ -24,7 +24,7 @@ from json.encoder import JSONEncoder
 from operator import attrgetter
 from typing import TypeVar, Optional, Iterator, Tuple, Any, List, Iterable, Set, Dict, Union, Callable, Type, Generic
 from urllib.parse import urlparse
-
+from django.utils.timezone import localtime
 from bs4 import BeautifulSoup
 from dateutil import parser
 from django.conf import settings
@@ -128,7 +128,7 @@ def import_class(full_class_path):
 
 def local_date_string() -> str:
     """ Returns eg '2022-07-18' """
-    return timezone.now().localtime().strftime("%Y-%m-%d")
+    return localtime(timezone.now()).strftime("%Y-%m-%d")
 
 
 class Struct:
