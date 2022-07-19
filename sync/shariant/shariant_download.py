@@ -70,7 +70,7 @@ def sync_shariant_download(sync_destination: SyncDestination, full_sync: bool = 
         record_id = meta.get('id')
 
         source_url = shariant.url(f'classification/classification/{record_id}')
-        data = record.get('data')
+        data = record.get('data') or {}  # data=None for deleted records returned via 'since' which is patch-like
         data = sanitize_data(known_keys, data, source_url)
 
         lab_group_name = meta.get('lab_id')
