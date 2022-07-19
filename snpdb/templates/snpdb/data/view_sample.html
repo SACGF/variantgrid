@@ -90,6 +90,7 @@ $(document).ready(function() {
             {% if sample.samplestats.import_status == 'S' %}
             <li><a href="#sample-stats">Stats</a></li>
             {% endif %}
+            <li><a href="{% url 'sample_files_tab' sample.pk %}">Files</a></li>
             {% if somalier_enabled and sample.somaliersampleextract.somalierancestry %}
             <li><a href="#sample-ancestry">Ancestry</a></li>
             {% endif %}
