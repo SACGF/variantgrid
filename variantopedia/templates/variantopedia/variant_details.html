@@ -19,11 +19,7 @@
 <script type="text/javascript">
 
 function getBams() {
-    const bams = [];
-    {% if sample.bam_file_path %}
-        bams.push("{{ sample.bam_file_path }}");
-    {% endif %}
-    return bams;
+    return [];
 }
 
 function formatField(select, formatFunc) {

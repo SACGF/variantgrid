@@ -289,7 +289,6 @@ class SampleForm(forms.ModelForm, ROFormMixin):
         read_only = ('genome_build', 'vcf_sample_name', 'import_status')
         widgets = {'vcf_sample_name': TextInput(),
                    'name': TextInput(),
-                   'bam_file_path': TextInput(),
                    'patient': ModelSelect2(url='patient_autocomplete',
                                            attrs={'data-placeholder': 'Patient...'}),
                    'specimen': ModelSelect2(url='specimen_autocomplete',

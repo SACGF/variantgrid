@@ -423,6 +423,10 @@ class Sample(SortByPKMixin, models.Model):
         sample_mask = vcfs_marked_for_deletion & not_already_deleting
         return Sample.objects.filter(sample_mask).update(import_status=ImportStatus.MARKED_FOR_DELETION)
 
+    def get_bam_files(self) -> List[str]:
+        sfp_qs = SampleFilePath.objects.filter(sample=self, file_type=SampleFileType.BAM)
+        return list(sfp_qs.values_list("file_path", flat=True))
+
 
 class SampleFilePath(models.Model):
     """ Objects like a BAM/CRAM that can be associated with a sample """

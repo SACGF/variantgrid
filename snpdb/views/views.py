@@ -221,7 +221,7 @@ def view_vcf(request, vcf_id):
     sample_stats_pass_het_hom_count, _, sample_zygosities_pass = _get_vcf_sample_stats(vcf, SampleStatsPassingFilter)
 
     VCFSampleFormSet = inlineformset_factory(VCF, Sample, extra=0, can_delete=False,
-                                             fields=["vcf_sample_name", "name", "patient", "specimen", "bam_file_path"],
+                                             fields=["vcf_sample_name", "name", "patient", "specimen"],
                                              widgets=SampleForm.Meta.widgets)
 
     post = request.POST or None
@@ -389,6 +389,7 @@ def view_sample(request, sample_id):
         'cohorts': cohorts,
         'has_write_permission': has_write_permission,
         'igv_data': igv_data,
+        "bam_list": sample.get_bam_files(),
         "sample_stats_variant_class_df": sample_stats_variant_class_df,
         "sample_stats_zygosity_df": sample_stats_zygosity_df,
         "related_samples": related_samples
