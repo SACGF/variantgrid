@@ -93,6 +93,14 @@ class VariantsType(models.TextChoices):
     SOMATIC_TYPES = Constant([e[0] for e in (MIXED, SOMATIC_ONLY)])
 
 
+class SampleFileType(models.TextChoices):
+    """ A file linked to a sample """
+    BAM = 'B', 'BAM'
+    CRAM = 'C', 'CRAM'
+    BED = 'E', 'BED'
+    VCF = 'V', 'VCF'
+
+
 class SequenceRole(models.TextChoices):
     ASSEMBLED_MOLECULE = 'AM', "assembled-molecule"
     UNLOCALIZED_SCAFFOLD = 'ULS', "unlocalized-scaffold"

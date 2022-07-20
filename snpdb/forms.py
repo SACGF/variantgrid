@@ -6,7 +6,7 @@ from dal import forward
 from django import forms
 from django.conf import settings
 from django.contrib.auth.models import User
-from django.forms import EmailInput, URLInput
+from django.forms import EmailInput, URLInput, inlineformset_factory, ALL_FIELDS
 from django.forms.forms import DeclarativeFieldsMetaclass
 from django.forms.widgets import TextInput, HiddenInput, NullBooleanSelect
 from guardian import shortcuts
@@ -20,7 +20,7 @@ from library.guardian_utils import DjangoPermission
 from snpdb import models
 from snpdb.models import VCF, Sample, Cohort, UserContact, Tag, UserSettings, GenomicIntervalsCollection, \
     ImportStatus, SettingsInitialGroupPermission, LabUserSettingsOverride, UserSettingsOverride, \
-    OrganizationUserSettingsOverride, CustomColumnsCollection, Project, VariantsType
+    OrganizationUserSettingsOverride, CustomColumnsCollection, Project, VariantsType, SampleFilePath
 from snpdb.models.models import Lab, Organization
 from snpdb.models.models_genome import GenomeBuild
 from uicore.utils.form_helpers import form_helper_horizontal, FormHelperHelper
@@ -289,7 +289,6 @@ class SampleForm(forms.ModelForm, ROFormMixin):
         read_only = ('genome_build', 'vcf_sample_name', 'import_status')
         widgets = {'vcf_sample_name': TextInput(),
                    'name': TextInput(),
-                   'bam_file_path': TextInput(),
                    'patient': ModelSelect2(url='patient_autocomplete',
                                            attrs={'data-placeholder': 'Patient...'}),
                    'specimen': ModelSelect2(url='specimen_autocomplete',
@@ -314,6 +313,15 @@ class SampleForm(forms.ModelForm, ROFormMixin):
                 self.add_error('specimen', msg)
                 self.add_error('patient', msg)
         return cleaned_data
+
+
+SampleFilesFormSet = inlineformset_factory(Sample,
+                                           SampleFilePath,
+                                           can_delete=True,
+                                           fields=ALL_FIELDS,
+                                           widgets={'label': TextInput(),
+                                                    'file_path': TextInput()},
+                                           extra=1)
 
 
 class ProjectChoiceForm(forms.Form):

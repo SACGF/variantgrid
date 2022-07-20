@@ -42,6 +42,7 @@ urlpatterns = [
     perm_path('cohort_sample_edit/<int:cohort_id>', views.cohort_sample_edit, name='cohort_sample_edit'),
     perm_path('trios', views.trios, name='trios'),
     perm_path('view_trio/<int:pk>', views.view_trio, name='view_trio'),
+    perm_path('sample_files_tab/<int:sample_id>', views.sample_files_tab, name='sample_files_tab'),
     perm_path('sample_variants_tab/<int:sample_id>', views.sample_variants_tab, name='sample_variants_tab'),
     perm_path('sample_variants_gene_detail/<int:sample_id>/<gene_symbol>', views.sample_variants_gene_detail, name='sample_variants_gene_detail'),
     perm_path('sample_graphs_tab/<int:sample_id>', views.sample_graphs_tab, name='sample_graphs_tab'),

@@ -1,6 +1,7 @@
 """ AnalysisNode is the base class that all analysis nodes inherit from. """
 import logging
 import operator
+from collections import defaultdict
 from functools import reduce
 from random import random
 from time import time
@@ -35,7 +36,7 @@ from library.django_utils import thread_safe_unique_together_get_or_create
 from library.log_utils import report_event
 from library.utils import format_percent
 from snpdb.models import BuiltInFilters, Sample, Variant, VCFFilter, Wiki, Cohort, VariantCollection, \
-    ProcessingStatus, GenomeBuild, AlleleSource, Contig
+    ProcessingStatus, GenomeBuild, AlleleSource, Contig, SampleFilePath
 from snpdb.variant_collection import write_sql_to_variant_collection
 
 
@@ -185,11 +186,11 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
         return self._get_visible_samples_from_cohort(cohorts, visibility)
 
     def get_bams_dict(self):
-        bams_dict = {}
-        for sample in self.get_samples():
-            if sample.bam_file_path:
-                bams_dict[sample.pk] = sample.bam_file_path
-        return bams_dict
+        bams_dict = defaultdict(set)
+        sfp_qs = SampleFilePath.objects.filter(sample__in=self.get_samples())
+        for sample_id, file_path in sfp_qs.values_list("sample_id", "file_path"):
+            bams_dict[sample_id].add(file_path)
+        return {k: list(v) for k, v in bams_dict.items()}
 
     def get_connection_data(self, parent):
         """ Return dict of source_id/target_id for sending as JSON """

@@ -54,7 +54,7 @@ from patients.forms import PatientForm
 from patients.models import Patient, Clinician
 from patients.views import get_patient_upload_csv
 from snpdb import forms
-from snpdb.bam_file_path import get_example_replacements
+from snpdb.sample_file_path import get_example_replacements
 from snpdb.forms import SampleChoiceForm, VCFChoiceForm, \
     UserSettingsOverrideForm, UserForm, UserContactForm, SampleForm, TagForm, SettingsInitialGroupPermissionForm, \
     OrganizationForm, LabForm, LabUserSettingsOverrideForm, OrganizationUserSettingsOverrideForm
@@ -221,7 +221,7 @@ def view_vcf(request, vcf_id):
     sample_stats_pass_het_hom_count, _, sample_zygosities_pass = _get_vcf_sample_stats(vcf, SampleStatsPassingFilter)
 
     VCFSampleFormSet = inlineformset_factory(VCF, Sample, extra=0, can_delete=False,
-                                             fields=["vcf_sample_name", "name", "patient", "specimen", "bam_file_path"],
+                                             fields=["vcf_sample_name", "name", "patient", "specimen"],
                                              widgets=SampleForm.Meta.widgets)
 
     post = request.POST or None
@@ -389,11 +389,30 @@ def view_sample(request, sample_id):
         'cohorts': cohorts,
         'has_write_permission': has_write_permission,
         'igv_data': igv_data,
+        "bam_list": sample.get_bam_files(),
         "sample_stats_variant_class_df": sample_stats_variant_class_df,
         "sample_stats_zygosity_df": sample_stats_zygosity_df,
         "related_samples": related_samples
     }
     return render(request, 'snpdb/data/view_sample.html', context)
+
+
+def sample_files_tab(request, sample_id):
+    sample = Sample.get_for_user(request.user, sample_id)
+    sample_files_formset = forms.SampleFilesFormSet(request.POST or None, instance=sample)
+    if request.method == "POST":
+        valid = sample_files_formset.is_valid()
+        if valid:
+            sample_files_formset.save()
+        add_save_message(request, valid, "Sample Files")
+
+    context = {
+        "sample": sample,
+        "sample_files_formset": sample_files_formset,
+        'has_write_permission': sample.can_write(request.user),
+    }
+    return render(request, 'snpdb/data/sample_files_tab.html', context)
+
 
 
 def sample_variants_tab(request, sample_id):

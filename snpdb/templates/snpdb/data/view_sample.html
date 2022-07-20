@@ -26,29 +26,13 @@
         width: 100%;
     }
 
-    #bam-files-path-container > * {
-        float: left;
-    }
-
-    #bam-files-path-container .igv-link-container > * {
-        float: left;
-    }
-
     .sample-gene-list-link div {
         margin-left: 2px;
-    }
-
-    #id_bam_file_path {
-        width: 80%;
     }
 </style>
 <script>
 function getBams() {
-    const bams = [];
-    const bamFilePath = $("#id_bam_file_path").val();
-    if (bamFilePath) {
-        bams.push(bamFilePath);
-    }
+    const bams = {{ bam_list | jsonify }};
     return bams;
 }
 
@@ -70,34 +54,8 @@ function setPatientLink() {
 }
 
 
-function setIGVLink() {
-    const bfpl = $("<span id='bam-files-path-container'></span>");
-    const bamFilePathSelector = $("#id_bam_file_path");
-    const parentContainer = bamFilePathSelector.parent();
-    const kids = parentContainer.children();
-    kids.each(function() {
-        $(this).appendTo(bfpl);
-    });
-    parentContainer.append(bfpl);
-    bfpl.append("<div id='igv-link-container'></div>");
-    parentContainer.append("<div class='clear'></div>");
-
-    function setBamFilesPathLink() {
-        const lc = $("#igv-link-container");
-        lc.empty();
-        if (bamFilePathSelector.val()) {
-            const igvLinkHMTL = create_igv_link('', 'getBams');
-            lc.append(igvLinkHMTL);
-            $('.igv-link-container', bfpl).append("<div>Open BAM in IGV</div>");
-        }
-    }
-    setBamFilesPathLink();
-    bamFilePathSelector.change(setBamFilesPathLink);
-}
-
 $(document).ready(function() {
     setPatientLink();
-    setIGVLink();
 
     $("#sample-tabs").tabs();
 
@@ -132,6 +90,7 @@ $(document).ready(function() {
             {% if sample.samplestats.import_status == 'S' %}
             <li><a href="#sample-stats">Stats</a></li>
             {% endif %}
+            <li><a href="{% url 'sample_files_tab' sample.pk %}">Files</a></li>
             {% if somalier_enabled and sample.somaliersampleextract.somalierancestry %}
             <li><a href="#sample-ancestry">Ancestry</a></li>
             {% endif %}

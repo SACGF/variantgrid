@@ -19,8 +19,8 @@ from seqauto.models import SampleSheetCombinedVCFFile, VCFFile, VCFFromSequencin
     SampleFromSequencingSample, QCGeneList
 from seqauto.signals import backend_vcf_import_start_signal
 from snpdb.models import VCF, ImportStatus, Sample, VCFFilter, \
-    Cohort, CohortSample, UserSettings, VCFSourceSettings
-from snpdb.models.models_enums import ImportSource, VariantsType
+    Cohort, CohortSample, UserSettings, VCFSourceSettings, SampleFilePath
+from snpdb.models.models_enums import ImportSource, VariantsType, SampleFileType
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.tasks.cohort_genotype_tasks import create_cohort_genotype_collection
 from upload.models import UploadedVCF, PipelineFailedJobTerminateEarlyException, \
@@ -360,7 +360,8 @@ def link_samples_and_vcfs_to_sequencing(backend_vcf, replace_existing=False):
                     modified_sample = True
 
             if bam_file := sequencing_sample.get_single_bam():
-                sample.bam_file_path = bam_file.path
+                SampleFilePath.objects.get_or_create(sample=sample, file_path=bam_file.path,
+                                                     file_type=SampleFileType.BAM)
                 modified_sample = True
 
             if modified_sample:

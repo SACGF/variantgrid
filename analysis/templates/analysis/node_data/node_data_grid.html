@@ -51,8 +51,8 @@ function getBams() {
     const SAMPLE_BAMS = {{ bams_dict | jsonify }};
     const bams = [];
     for (let k in SAMPLE_BAMS) {
-        let v = SAMPLE_BAMS[k];
-        bams.push(v);
+        let sample_bam_list = SAMPLE_BAMS[k];  // now a list - ie can be multiple per sample
+        bams.push(...sample_bam_list);
     }
     return bams;
 }

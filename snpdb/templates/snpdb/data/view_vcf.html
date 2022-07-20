@@ -73,19 +73,6 @@ function showBulkSet() {
     $("div#bulk-set-form-container").slideDown('slow');
 }
 
-function setBamPath() {
-    const bamPattern = $("input#bam_pattern").val();
-    $("tr.sample-row").each(function() {
-        const nameTD = $("td.sample-name", this);
-        const name = $("input", nameTD).val();
-        const data = {"name": name};
-        const bfp = format(bamPattern, data);
-        const bamTD = $("td.bam_file_path", this);
-        $("input", bamTD).val(bfp);
-    });
-
-}
-
 {% if vcf.import_status == 'S' and vcf.cohort %}
     function subCohortClick() {
         let sampleIdList = [];
@@ -234,8 +221,6 @@ function drawZygosityGraphs() {
 $(document).ready(function() {
     $("div#bulk-set-form-container").hide();
 
-    $("#set-bam-path-button").click(setBamPath);
-
     $("button#vcf-submit-button").click(function () {
         $("form#vcf-form").submit();
     });
@@ -340,24 +325,9 @@ $(document).ready(function() {
 
         <div id="samples">
             <div id='sample-list-top-links'>
-                <div class="left">                
+                <div>
                     <a href="{% url 'get_patient_upload_csv_for_vcf' vcf.pk %}"><img width=24px height=24px src="{% static 'icons/report_icon.jpg' %}" /> Patient record upload CSV template.</a>
                 </div>
-                <div class="left">
-                    <a id="show-bulk-set-link" href="javascript:showBulkSet()">Bulk Set Bam files</a>
-                </div>
-                <div class="clear"></div>
-            </div>
-            <div id="bulk-set-form-container">
-                <b>Bulk Set Fields</b>
-                <form id='bulk-set-form'>
-                    <table>
-                    <tr>
-                    <th>BAM path</th>
-                    <td><input id='bam_pattern' type='text' value='/data/{name}.bam'></input>
-                    <td><button id='set-bam-path-button' class="btn btn-secondary" type='button'>Set Bam Path</button>
-                    </table>
-                </form>
             </div>
 
             {{ samples_form.management_form }}
@@ -375,7 +345,6 @@ $(document).ready(function() {
                     <th>Name
                     <th>Patient
                     <th>Specimen
-                    <th>BAM path
                 </tr>
             </thead>
             {% for form in samples_form %}
@@ -415,7 +384,6 @@ $(document).ready(function() {
                         </div>
                     </td>
                     <td>{{ form.specimen }}{{ form.specimen.errors }}</td>
-                    <td class="bam_file_path">{{ form.bam_file_path }}{{ form.bam_file_path.errors }}</td>
                 </tr>
                 
             {% endfor %}
