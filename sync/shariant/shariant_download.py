@@ -72,27 +72,6 @@ def sync_shariant_download(sync_destination: SyncDestination, full_sync: bool = 
         source_url = shariant.url(f'classification/classification/{record_id}')
         data = record.get('data') or {}  # data=None for deleted records returned via 'since' which is patch-like
         data = sanitize_data(known_keys, data, source_url)
-
-        if lab_group_name := meta.get('lab_id'):
-            lab = Lab.objects.filter(group_name=lab_group_name).first()
-
-            # in case we screwed up exclude, don't want to accidentally import over our own records with shariant copy
-            if lab and not lab.external:
-                return None
-
-            if not lab:
-                parts = lab_group_name.split('/')
-                org, _ = Organization.objects.get_or_create(group_name=parts[0], defaults={"name": parts[0]})
-                australia, _ = Country.objects.get_or_create(name='Australia')
-                Lab.objects.create(
-                    group_name=lab_group_name,
-                    name=meta.get('lab_name'),
-                    organization=org,
-                    city='Unknown',
-                    country=australia,
-                    external=True,
-                )
-
         data = {
             "id": record.get('id'),
             "publish": record.get('publish'),
@@ -100,6 +79,27 @@ def sync_shariant_download(sync_destination: SyncDestination, full_sync: bool = 
         }
         if delete := record.get('delete'):
             data['delete'] = delete
+            return data
+
+        lab_group_name = meta.get('lab_id')
+        lab = Lab.objects.filter(group_name=lab_group_name).first()
+
+        # in case we screwed up exclude, don't want to accidentally import over our own records with shariant copy
+        if lab and not lab.external:
+            return None
+
+        if not lab:
+            parts = lab_group_name.split('/')
+            org, _ = Organization.objects.get_or_create(group_name=parts[0], defaults={"name": parts[0]})
+            australia, _ = Country.objects.get_or_create(name='Australia')
+            Lab.objects.create(
+                group_name=lab_group_name,
+                name=meta.get('lab_name'),
+                organization=org,
+                city='Unknown',
+                country=australia,
+                external=True,
+            )
         return data
 
     run = SyncRun(destination=sync_destination, status=SyncStatus.IN_PROGRESS)
