@@ -123,6 +123,7 @@ class ClassificationTestCaseViews(TestCase):
             "institution_name": "InstX",
             "lab_id": "instx/labby",
             "lab_name": "Labby",
+            "org_name": "InstX",
             #"lab_record_id": "test_123456",
             #"last_edited": 1590471912.520569,
             "messages": [
@@ -180,6 +181,7 @@ class ClassificationTestCaseViews(TestCase):
             'institution_name': 'InstX',
             'lab_id': 'instx/labby',
             'lab_name': 'Labby',
+            'org_name': 'InstX',
             'title': 'instx/labby/test_123456',
             'publish_level': 'lab',
             'published_version': None,
