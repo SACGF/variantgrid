@@ -13,6 +13,7 @@ from classification.models import Classification
 from flags.models.flag_health_check import flag_chanced_since
 from library.django_utils import get_url_from_view_path
 from library.guardian_utils import admin_bot
+from library.health_check import populate_health_check
 from library.log_utils import NotificationBuilder
 from library.utils import pretty_label, count
 from ontology.models import OntologyImport
@@ -96,6 +97,8 @@ def notify_server_status_now(detailed: bool = True):
 
     nb.add_header(f"{heading_emoji} Health Check")
     nb.add_markdown(f"*In the <{url}|last 24 hours>*")
+    populate_health_check(nb)
+
     nb.add_markdown("\n".join(lines), indented=True)
 
     if detailed:

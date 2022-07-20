@@ -850,6 +850,19 @@ def segment(iterable: Iterable[P], filter: Callable[[P], bool]) -> Tuple[List[P]
     return passes, fails
 
 
+def flatten_nested_lists(iterable) -> List:
+    # collapses lists of lists, and filters out Nones
+    def _flatten_generator(flatten_me):
+        for item in flatten_me:
+            if isinstance(item, list):
+                for sub_item in _flatten_generator(item):
+                    yield sub_item
+            elif item is not None:
+                yield item
+
+    return list(_flatten_generator(iterable))
+
+
 def export_column(label: Optional[str] = None, sub_data: Optional[Type] = None, categories: Dict[str, Any] = None):
     """
     Extend ExportRow and annotate methods with export_column.

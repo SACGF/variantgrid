@@ -5,4 +5,4 @@ class SyncConfig(AppConfig):
     name = 'sync'
 
     def ready(self):
-        pass
+        from sync.signals import sync_health_check
