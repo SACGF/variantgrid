@@ -72,9 +72,16 @@ def sync_shariant_download(sync_destination: SyncDestination, full_sync: bool = 
         source_url = shariant.url(f'classification/classification/{record_id}')
         data = record.get('data') or {}  # data=None for deleted records returned via 'since' which is patch-like
         data = sanitize_data(known_keys, data, source_url)
+        data = {
+            "id": record.get('id'),
+            "publish": record.get('publish'),
+            "data": data,
+        }
+        if delete := record.get('delete'):
+            data['delete'] = delete
+            return data
 
         lab_group_name = meta.get('lab_id')
-
         lab = Lab.objects.filter(group_name=lab_group_name).first()
 
         # in case we screwed up exclude, don't want to accidentally import over our own records with shariant copy
@@ -92,14 +99,6 @@ def sync_shariant_download(sync_destination: SyncDestination, full_sync: bool = 
                 country='Australia',
                 external=True,
             )
-
-        data = {
-            "id": record.get('id'),
-            "publish": record.get('publish'),
-            "data": data,
-        }
-        if delete := record.get('delete'):
-            data['delete'] = delete
         return data
 
     run = SyncRun(destination=sync_destination, status=SyncStatus.IN_PROGRESS)
