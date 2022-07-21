@@ -27,8 +27,7 @@ class SelectPathologyTestForm(forms.Form):
 class SelectPathologyTestVersionForm(forms.Form):
     pathology_test_version = forms.ModelChoiceField(queryset=PathologyTestVersion.objects.all(),
                                                     widget=ModelSelect2(url='pathology_test_version_autocomplete',
-                                                                        attrs={
-                                                                            'data-placeholder': 'Pathology Test Version...'}))
+                                                                        attrs={'data-placeholder': 'Pathology Test Version...'}))
 
 
 class PathologyTestVersionForm(forms.ModelForm):

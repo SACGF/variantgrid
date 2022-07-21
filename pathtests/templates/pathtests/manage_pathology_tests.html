@@ -87,12 +87,12 @@ $("#new-pathology-test").click(showForm);
     <table id='jump-box'>
         <tr><th>Pathology Test:</th>
             <td>
-                <form id='pathology-test-form'>{{ pathology_test_form.as_p }}{{ pathology_test_version_form.media }} </form>
+                <form id='pathology-test-form'>{{ pathology_test_form.as_p }}{{ pathology_test_form.media }} </form>
             </td>
         </tr>
         <tr><th>Historical Test:</th>
             <td>
-                <form id='pathology-test-version-form'>{{ pathology_test_version_form.as_p }} </form>
+                <form id='pathology-test-version-form'>{{ pathology_test_version_form.as_p }}{{ pathology_test_version_form.media }} </form>
             </td>
         </tr>
     </table>
