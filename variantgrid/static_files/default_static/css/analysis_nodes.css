@@ -616,6 +616,12 @@ span.gene-list-security {
 	cursor: default;
 }
 
+@-moz-document url-prefix() {
+	#node-count-legend {
+    	bottom: 40px; /* Mozilla cuts off at bottom */
+	}
+}
+
 .legend-row {
 	min-height: 20px;
 	margin: 5px;
