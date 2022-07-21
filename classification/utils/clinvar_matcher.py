@@ -304,9 +304,10 @@ class ClinVarLegacyRow:
                             if mondo_term := OntologyTermRelation.as_mondo(term):
                                 term = mondo_term
                             for umbrella_term in umbrella:
-                                if term == umbrella_term or OntologySnake.check_if_ancestor(descendant=term, ancestor=umbrella_term, max_levels=2):
-                                    export_match_types.add(ClinVarLegacyExportMatchType.CONDITION_MATCHES)
-                                    break
+                                if umbrella_term.ontology_service == term.ontology_service:
+                                    if term == umbrella_term or OntologySnake.check_if_ancestor(descendant=term, ancestor=umbrella_term, max_levels=2):
+                                        export_match_types.add(ClinVarLegacyExportMatchType.CONDITION_MATCHES)
+                                        break
 
                         if clinvar_export.scv == self.scv_no_version:
                             export_match_types.add(ClinVarLegacyExportMatchType.SCV_MATCHES)
