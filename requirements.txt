@@ -8,7 +8,7 @@ celery==5.2.3
 ConfigArgParse==1.5.3
 coreapi==2.3.3
 cyvcf2==0.30.14
-Django==4.0.4
+Django==4.0.6
 django-amazon-ses==4.0.1
 django_autocomplete_light==3.9.1
 django_cache_memoize==0.1.10
@@ -55,7 +55,7 @@ oauthlib==3.1.0
 pandas==1.4.0
 pronto==2.4.7
 psycopg2==2.9.3
-PyPDF2==1.26.0
+PyPDF2==2.6.0
 pysam==0.18.0
 python_dateutil==2.8.2
 python_Levenshtein==0.12.2
