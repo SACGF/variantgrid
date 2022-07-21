@@ -91,10 +91,17 @@ class Company(models.Model):
 
     @staticmethod
     def get_our_company():
+        from genes.models import GeneListCategory
+
         company = None
         company_name = getattr(settings, "COMPANY", None)
         if company_name:
-            company, _ = Company.objects.get_or_create(name=company_name)
+            company, created = Company.objects.get_or_create(name=company_name)
+            if created:
+                pathology_test_category = GeneListCategory.get_or_create_category(GeneListCategory.PATHOLOGY_TEST)
+                pathology_test_category.company = company
+                pathology_test_category.save()
+
         return company
 
     def __str__(self):

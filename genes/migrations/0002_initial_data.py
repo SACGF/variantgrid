@@ -5,7 +5,7 @@ from django.db import migrations
 
 def genelist_categories(apps, schema_editor):
     CATEGORIES = ["CustomText",
-                  "Diagnostic",
+                  "PathologyTest",
                   "NodeCustomText",
                   "SampleGeneList",
                   "Uploaded"]

@@ -5,6 +5,7 @@ from django.template import Library
 from genes.forms import GeneListCategoryAutocompleteForm, NamedCustomGeneListForm, GeneSymbolForm, \
     GeneAnnotationReleaseForm, panel_app_server_autocomplete_form_factory
 from genes.models import GeneInfo, GeneListCategory, PanelAppServer, GeneAnnotationRelease
+from library.log_utils import log_traceback
 from ontology.forms import HPOForm, OMIMForm
 from pathtests.forms import ActivePathologyTestForm, SelectPathologyTestVersionForm
 from pathtests.models import PathologyTest
@@ -77,6 +78,7 @@ def gene_grid(context, columns_from_url=None,
                                         "form_css_class": "pathology-test-version-form"}
                 categories.append(historical_test_data)
             except:
+                log_traceback()
                 pass
 
         gene_list_category_filter = ~Q(company=company)  # Skip as already added
