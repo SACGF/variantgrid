@@ -49,8 +49,11 @@ def get_dashboard_notices(user: User, days_ago: int) -> dict:
     analyses = Analysis.filter_for_user(user)
     analyses_created = analyses.filter(created__gte=start_time)
     analyses_modified = analyses.filter(created__lt=start_time, modified__gte=start_time)
+
+    # NOW DONE VIA HEALTH CHECK
     classifications_of_interest = Classification.dashboard_report_classifications_of_interest(since=start_time)
     new_classification_count = Classification.dashboard_report_new_classifications(since=start_time)
+    #END DONE BY HEALTH CHECK
 
     return {
         "active_users": active_users,

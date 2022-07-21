@@ -24,6 +24,9 @@ from json.encoder import JSONEncoder
 from operator import attrgetter
 from typing import TypeVar, Optional, Iterator, Tuple, Any, List, Iterable, Set, Dict, Union, Callable, Type, Generic
 from urllib.parse import urlparse
+
+from django.core.exceptions import FieldDoesNotExist
+from django.db.models import Model
 from django.utils.timezone import localtime
 from bs4 import BeautifulSoup
 from dateutil import parser
@@ -691,6 +694,22 @@ class ArrayLength(models.Func):
     MyModel.objects.all().annotate(field_len=ArrayLength('field')).order_by('field_len')
     """
     function = 'CARDINALITY'
+
+
+def model_has_field(model: Model, field_name: str) -> bool:
+    is_id_check = field_name.endswith('_id')
+    try:
+        if field_name.endswith('_id'):
+            field = model._meta.get_field(field_name.strip('_id'))
+            if field.is_relation:
+                return True
+        else:
+            _ = model._meta.get_field(field_name)
+            return True
+    except FieldDoesNotExist:
+        pass
+
+    return False
 
 
 @dataclass

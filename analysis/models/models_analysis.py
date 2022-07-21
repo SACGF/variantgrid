@@ -48,6 +48,10 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
     template_type = models.CharField(max_length=1, choices=AnalysisTemplateType.choices, null=True, blank=True)
     node_queryset_filter_contigs = models.BooleanField(default=False)
 
+    class Meta:
+        verbose_name = 'Analysis'
+        verbose_name_plural = 'Analyses'
+
     def __str__(self):
         name = self.name or f"Analysis {self.pk}"
         if self.description:

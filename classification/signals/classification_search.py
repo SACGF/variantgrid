@@ -39,6 +39,7 @@ def search_classifications(sender: Any, search_input: SearchInput, **kwargs) -> 
     if slash_index > 0:
         lab_name = search_string[:slash_index].strip()
         lab_record_id = search_string[slash_index + 1:].strip()
+        # TODO handle org in square brackets
         if lab_name and lab_record_id:
             q_lab_name = Q(classification__lab__name=lab_name)
             q_lab_record = Q(classification__lab_record_id=lab_record_id)

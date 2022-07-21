@@ -83,6 +83,10 @@ class VCF(models.Model):
     # We don't want some VCFs to add to variant zygosity count (see VCFSourceSettings)
     variant_zygosity_count = models.BooleanField(default=True)
 
+    class Meta:
+        verbose_name = 'VCF'
+        verbose_name_plural = 'VCFs'
+
     @lazy
     def has_filters(self):
         return self.vcffilter_set.exists()

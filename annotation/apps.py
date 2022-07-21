@@ -21,7 +21,8 @@ class AnnotationConfig(AppConfig):
         from Bio import Entrez
         from django.conf import settings
         from annotation.models import CachedWebResource
-        from annotation.signals import clinvar_citations_post_save_handler
+        from annotation.signals.signals import clinvar_citations_post_save_handler
+        from annotation.signals import clinvar_annotation_health_check  # pylint: disable=unused-import
         # pylint: enable=import-outside-toplevel
 
         # Entrez wants both email and API key
@@ -35,7 +36,7 @@ class AnnotationConfig(AppConfig):
         try:
             GeneCountType = self.get_model('GeneCountType')
             if _has_classification_gene_count_type(GeneCountType):
-                from annotation.signals import gene_counts_classification_withdraw_handler, \
+                from annotation.signals.signals import gene_counts_classification_withdraw_handler, \
                     gene_counts_classification_publish_handler
                 from classification.models import Classification, \
                     classification_withdraw_signal, classification_post_publish_signal

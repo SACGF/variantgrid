@@ -1,6 +1,7 @@
 import logging
 import time
-from typing import List, Tuple
+from dataclasses import dataclass
+from typing import List, Tuple, Optional
 
 import celery
 import requests
@@ -10,7 +11,31 @@ from library.file_utils import get_disk_usage
 from library.log_utils import report_message
 
 
-def get_disk_messages(directories_list: List[str] = None, info_messages=False) -> List[Tuple[str, str]]:
+@dataclass
+class DiskUsage:
+    mount_point: str
+    available_kb: int
+    # human readable below
+    available_nice: str
+    percent_nice: str
+
+    @property
+    def has_safe_capacity(self):
+        return self.available_kb >= settings.SERVER_MIN_DISK_WARNING_GIGS * 1000000
+
+    @property
+    def as_status_message(self) -> Tuple[str, str]:
+        message = f"Mount point '{self.mount_point}' ({self.percent_nice} used, {self.available_nice} available)"
+        if self.has_safe_capacity:
+            status = "info"
+        else:
+            status = "warning"
+            message += f" is below minimum of {settings.SERVER_MIN_DISK_WARNING_GIGS}G"
+
+        return status, message
+
+
+def get_disk_usage_objects(directories_list: Optional[List[str]] = None) -> List[DiskUsage]:
     if directories_list is None:
         directories_list = [settings.BASE_DIR, settings.UPLOAD_DIR, settings.ANNOTATION_VCF_DUMP_DIR]
 
@@ -21,6 +46,7 @@ def get_disk_messages(directories_list: List[str] = None, info_messages=False) -
     nice_disk_usage = get_disk_usage(human_readable=True)
     handled_mount_points = set()
     low_disk_messages = []
+    disk_usages: List[DiskUsage] = list()
     for mount_point, data in disk_usage.items():
         for d in directories_list:
             if mount_point in handled_mount_points:
@@ -30,16 +56,24 @@ def get_disk_messages(directories_list: List[str] = None, info_messages=False) -
                 available = int(data["avail"])
                 percent = data["percent"]
                 nice_available = nice_disk_usage[mount_point]["avail"]
-                message = f"Mount point '{mount_point}' ({percent} used, {nice_available} available)"
-                if available > minimum_kb:
-                    status = "info"
-                else:
-                    status = "warning"
-                    message += f" is below minimum of {minimum_gigs}G"
 
-                if status == "warning" or info_messages:
-                    low_disk_messages.append((status, message))
-    return low_disk_messages
+                disk_usages.append(
+                    DiskUsage(
+                        mount_point=mount_point,
+                        available_kb=available,
+                        percent_nice=percent,
+                        available_nice=nice_available
+                    )
+                )
+    return disk_usages
+
+
+def get_disk_messages(directories_list: List[str] = None, info_messages=False) -> List[Tuple[str, str]]:
+    disk_usages = get_disk_usage_objects(directories_list)
+    if not info_messages:
+        disk_usages = [du for du in disk_usages if not du.has_safe_capacity]
+
+    return [du.as_status_message for du in disk_usages]
 
 
 @celery.shared_task

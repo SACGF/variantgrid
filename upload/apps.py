@@ -5,7 +5,7 @@ class UploadConfig(AppConfig):
 
     def ready(self):
         # pylint: disable=import-outside-toplevel
-        from annotation.signals import annotation_run_complete_signal
+        from annotation.signals.signals import annotation_run_complete_signal
         from upload.signals.signal_handlers import annotation_run_complete_signal_handler
         # pylint: enable=import-outside-toplevel
 

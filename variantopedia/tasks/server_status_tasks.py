@@ -97,7 +97,10 @@ def notify_server_status_now(detailed: bool = True):
 
     nb.add_header(f"{heading_emoji} Health Check")
     nb.add_markdown(f"*In the <{url}|last 24 hours>*")
-    populate_health_check(nb)
+
+    # just need to sort out the order and grouping of health check
+    # and it can replace all of these hardcoded references
+    # populate_health_check(nb)
 
     nb.add_markdown("\n".join(lines), indented=True)
 
@@ -107,15 +110,6 @@ def notify_server_status_now(detailed: bool = True):
             overall_lines.append(f":floppy_disk: {message}")
         if not overall_lines:
             overall_lines.append(":floppy_disk: _Disk Usage Unknown_")
-
-        total_shared = Classification.dashboard_total_shared_classifications()
-        total_unshared = Classification.dashboard_total_unshared_classifications()
-        total = total_unshared + total_shared
-        if total:
-            percent_shared = 100.0 * float(total_shared) / float(total)
-            overall_lines.append(
-                f":blue_book: {total:,} : Classifications - {int(percent_shared)}% shared"
-            )
 
         def emoji_for_age(days: int) -> str:
             if days <= 60:
@@ -162,8 +156,6 @@ def notify_server_status_now(detailed: bool = True):
                 annotation_ages.append(message)
 
         overall_lines.extend(annotation_ages)
-
-    # TODO add other important annotation ages like ClinVar
 
         nb.add_markdown("*Overall*")
         nb.add_markdown("\n".join(overall_lines), indented=True)
