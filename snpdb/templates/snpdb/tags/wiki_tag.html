@@ -11,32 +11,32 @@
   <link rel="stylesheet" href="{% static 'js/lib/toastui/toastui-editor.min.css' %}" />
 <script>
 function initWiki() {
-    var wikiId = $("#wiki-{{ uuid }}");
-    var wikiSaveButton = $(".wiki-save", wikiId).button();
-    
-    var events = {};
+    const wikiId = $("#wiki-{{ uuid }}");
+    const wikiSaveButton = $(".wiki-save", wikiId).button();
+
+    let events = {};
     {% if has_write_permission %}
     events['change'] = function() { wikiSaveButton.show(); };
     {% endif %}
-    
-    var editor = new toastui.Editor({
-      el: document.querySelector('.editSection', wikiId),
-      initialEditType: 'markdown',
-      previewStyle: 'vertical',
-      initialValue: `{{ wiki.markdown|jsstring }}`, // ES6 template string as could be multi-line
-      initialEditType: 'wysiwyg',
-      height: '300px',
-      events: events,
-      usageStatistics: false,
+
+    const editor = new toastui.Editor({
+        el: document.querySelector('.editSection', wikiId),
+        initialEditType: 'markdown',
+        previewStyle: 'vertical',
+        initialValue: `{{ wiki.markdown|jsstring }}`, // ES6 template string as could be multi-line
+        initialEditType: 'wysiwyg',
+        height: '300px',
+        events: events,
+        usageStatistics: false,
     });
 
     $(".show-wiki-link", wikiId).hide();
     $(".editSection", wikiId).show();
 
     wikiSaveButton.click(function() {
-        var wikiContent = editor.getMarkdown();
-        var data = 'markdown=' + encodeURIComponent(wikiContent);
-        var saveMessage = $(".saving-message", wikiId);
+        const wikiContent = editor.getMarkdown();
+        const data = 'markdown=' + encodeURIComponent(wikiContent);
+        const saveMessage = $(".saving-message", wikiId);
         wikiSaveButton.hide();
         saveMessage.show();
         

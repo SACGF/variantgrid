@@ -21,7 +21,7 @@ class FlagDelta:
 def flag_chanced_since(since) -> List[FlagDelta]:
     #min_age = datetime.utcnow().replace(tzinfo=timezone.utc) - timedelta(
     #    minutes=2)  # give records 2 minutes to matching properly before reporting
-    time_range_q = Q(created__gte=since)# & Q(created__lte=min_age)
+    time_range_q = Q(created__gte=since)  # & Q(created__lte=min_age)
 
     new_comments = FlagComment.objects.filter(time_range_q)
     # find all flags that have had comments added in the time range

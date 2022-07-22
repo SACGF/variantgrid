@@ -414,7 +414,6 @@ def sample_files_tab(request, sample_id):
     return render(request, 'snpdb/data/sample_files_tab.html', context)
 
 
-
 def sample_variants_tab(request, sample_id):
     sample = Sample.get_for_user(request.user, sample_id)
     analysis = None

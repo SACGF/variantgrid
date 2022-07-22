@@ -228,7 +228,6 @@ class OntologyBuilder:
 
         term.deprecated = deprecated or (name and "obsolete" in name)
 
-
     def complete(self, purge_old_relationships=False, purge_old_terms=False, verbose=True):
         """
         :purge_old If True will mark OntologyTermGeneRelations not included in this import (but included in a previous
