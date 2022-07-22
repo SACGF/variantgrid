@@ -43,7 +43,6 @@ HTSeq
 ijson
 kombu
 lazy
-lxml
 Markdown
 matplotlib
 more_itertools
