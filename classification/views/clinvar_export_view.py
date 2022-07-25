@@ -311,7 +311,7 @@ class ClinVarExportSummary(ExportRow):
     @export_column("Classification Imported/Created")
     def classification_imported_created(self):
         if classification := self.classification:
-            return classification.created.strftime('%Y-%m-%d')
+            return classification.classification.created.strftime('%Y-%m-%d')
 
     @export_column("Sync Status")
     def sync_status(self):
