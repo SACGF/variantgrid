@@ -335,6 +335,17 @@ class ClinVarExportSummary(ExportRow):
         if submission := self.latest_submission:
             submission.submission_batch.get_status_display()
 
+    @export_column("Errors")
+    def errors(self):
+        if json_body := self.clinvar_export.submission_full:
+            if errors := json_body.all_messages.errors():
+                return "\n".join(["* " + error.text for error in errors])
+
+    ## This column is a bit much
+    # @export_column("JSON")
+    # def json(self):
+    #     if json_version := self.clinvar_export.submission_full:
+    #         return json.dumps(json_version.pure_json(), indent=4)
 
 def clinvar_export_download(request: HttpRequest, clinvar_key_id: str) -> HttpResponseBase:
     clinvar_key: ClinVarKey = get_object_or_404(ClinVarKey, pk=clinvar_key_id)
