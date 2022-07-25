@@ -81,6 +81,7 @@ class BulkClassificationInserter:
         data_copy = dict()
         data_copy.update(data)
         data = data_copy
+        record_ref: Optional[ClassificationRef] = None
 
         try:
             record_ref: ClassificationRef
@@ -378,12 +379,12 @@ class BulkClassificationInserter:
 
         except ClassificationProcessError as ve:
             # expected error
-            report_exc_info()
+            report_exc_info({"target": str(record_ref) if record_ref else "unknown"})
             patch_response.internal_error = ve
             return patch_response
         except Exception as e:
             # unexpected error
-            report_exc_info()
+            report_exc_info({"target": str(record_ref) if record_ref else "unknown"})
             patch_response.internal_error = e
             return patch_response
 

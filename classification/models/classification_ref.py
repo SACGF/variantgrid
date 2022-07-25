@@ -35,6 +35,17 @@ class ClassificationRef:
         self.cached_version = None
         self.cached_record = None
 
+    def __str__(self):
+        parts = []
+        if self.rid:
+            parts.append(self.rid)
+        else:
+            if self.lab:
+                parts.append(self.lab.group_name)
+            if self.lab_record_id:
+                parts.append(self.lab_record_id)
+        return "/".join(parts)
+
     @lazy
     def record(self) -> Classification:
         """
