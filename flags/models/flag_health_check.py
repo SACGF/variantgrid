@@ -1,10 +1,10 @@
 # NOTE it would be ideal for this to react to notification instead of having to be called directly
-from datetime import datetime, timedelta, timezone
-from typing import Dict, List
+from datetime import datetime
+from typing import Dict, List, Optional, Iterable
 
 from django.db.models import Q
 
-from flags.models import FlagType, FlagComment, Flag, FlagStatus
+from flags.models import FlagType, FlagComment, Flag, FlagStatus, FlagTypeContext
 
 
 class FlagDelta:
@@ -18,18 +18,19 @@ class FlagDelta:
         return self.flag_type.label < other.flag_type.label
 
 
-def flag_chanced_since(since) -> List[FlagDelta]:
-    #min_age = datetime.utcnow().replace(tzinfo=timezone.utc) - timedelta(
-    #    minutes=2)  # give records 2 minutes to matching properly before reporting
+def flag_chanced_since(since: datetime, flag_types: Optional[Iterable[FlagType]] = None) -> List[FlagDelta]:
+    # TODO take a NOW date
     time_range_q = Q(created__gte=since)  # & Q(created__lte=min_age)
+    if not flag_types:
+        flag_types = FlagType.objects.all()
 
     new_comments = FlagComment.objects.filter(time_range_q)
     # find all flags that have had comments added in the time range
     modified_flags = Flag.objects.filter(pk__in=new_comments.values_list("flag_id", flat=True))
     # now want to exclude flags that were created and then closed in that time
     modified_flags = modified_flags.exclude(
-        Q(created__gte=since) & Q(resolution__status__in=[FlagStatus.CLOSED, FlagStatus.REJECTED]))\
-            .select_related("resolution", "flag_type")
+        Q(created__gte=since) & Q(resolution__status__in=[FlagStatus.CLOSED, FlagStatus.REJECTED])
+    ).filter(flag_type__in=flag_types).select_related("resolution", "flag_type")
 
     # also need to filter out flags that were open before since and are still open now (likewise for closed)
     # to know that we need to find the most recent flag comment from before closing, and the last flag comment
