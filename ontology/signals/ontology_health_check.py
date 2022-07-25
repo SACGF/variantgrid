@@ -9,7 +9,7 @@ from ontology.models import OntologyImport
 @receiver(signal=health_check_signal)
 def ontology_health_check(sender, health_request: HealthCheckRequest, **kwargs):
     checks = list()
-    warning_age = timedelta(days=30)
+    warning_age = timedelta(days=60)
     for contexts in [
         ("mondo_file", "MONDO"),
         # OMIM can be loaded from 2 difference sources depending on OMIM license
@@ -25,6 +25,7 @@ def ontology_health_check(sender, health_request: HealthCheckRequest, **kwargs):
             ).order_by('-processed_date').values_list('processed_date', flat=True).first():
                 check = HealthCheckAge(
                     name=label,
+                    now=health_request.now,
                     last_performed=last_import,
                     warning_age=warning_age
                 )
@@ -32,6 +33,7 @@ def ontology_health_check(sender, health_request: HealthCheckRequest, **kwargs):
         if not check:
             check = HealthCheckAge(
                     name=contexts[0][1],
+                    now=health_request.now,
                     last_performed=None,
                     warning_age=warning_age
                 )

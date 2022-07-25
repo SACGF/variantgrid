@@ -2,7 +2,9 @@ from typing import List
 
 from django.dispatch import receiver
 
-from classification.models import Classification
+from classification.models import Classification, classification_flag_types
+from flags.models import FlagType
+from flags.models.flag_health_check import flag_chanced_since
 from library.health_check import health_check_signal, \
     HealthCheckRequest, HealthCheckTotalAmount, HealthCheckRecentActivity
 
@@ -42,3 +44,29 @@ def classification_health_check_activity(sender, health_request: HealthCheckRequ
             sub_type="Of Interest"
         )
     ]
+
+
+@receiver(signal=health_check_signal)
+def classification_flag_health_check_activity(sender, health_request: HealthCheckRequest, **kwargs):
+    flag_deltas = flag_chanced_since(
+        health_request.since,
+        flag_types=FlagType.objects.filter(context=classification_flag_types.classification_flag_context)
+    )
+    checks = list()
+    for flag_delta in flag_deltas:
+
+        parts = []
+        if flag_delta.added:
+            parts.append(f"+{flag_delta.added}")
+        if flag_delta.resolved:
+            parts.append(f"-{flag_delta.resolved}")
+
+        if parts:
+            checks.append(
+                HealthCheckRecentActivity(
+                    emoji=":flags:",
+                    name=f"Flag {flag_delta.flag_type}",
+                    amount=" / ".join(parts)
+                )
+            )
+    return checks

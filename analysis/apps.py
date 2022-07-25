@@ -8,6 +8,8 @@ class AnalysisConfig(AppConfig):
         # pylint: disable=import-outside-toplevel
         from analysis.models import VariantTag
         from analysis.signals.signal_handlers import variant_tag_create, variant_tag_delete
+
+        # imported to activate receivers
         from analysis.signals import analysis_health_check  # pylint: disable=unused-import
         # pylint: enable=import-outside-toplevel
 

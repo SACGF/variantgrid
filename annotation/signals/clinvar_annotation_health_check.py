@@ -16,7 +16,8 @@ def ontology_health_check(sender, health_request: HealthCheckRequest, **kwargs):
         checks.append(
             HealthCheckAge(
                 name=f"ClinVar {genome_build}",
-                warning_age=timedelta(days=30),
+                now=health_request.now,
+                warning_age=timedelta(days=60),
                 last_performed=latest_clinvar
             )
         )

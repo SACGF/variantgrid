@@ -22,6 +22,8 @@ class AnnotationConfig(AppConfig):
         from django.conf import settings
         from annotation.models import CachedWebResource
         from annotation.signals.signals import clinvar_citations_post_save_handler
+
+        # imported to activate receivers
         from annotation.signals import clinvar_annotation_health_check  # pylint: disable=unused-import
         # pylint: enable=import-outside-toplevel
 

@@ -6,10 +6,12 @@ class OntologyConfig(AppConfig):
     name = 'ontology'
 
     def ready(self):
+        # pylint: disable=import-outside-toplevel
         from annotation.models import CachedWebResource
         from ontology.signals.signals import gencc_post_save_handler
 
         post_save.connect(gencc_post_save_handler, sender=CachedWebResource)
-        # pylint: disable=import-outside-toplevel
+
+        # imported to activate receivers
         from ontology.signals import ontology_health_check  # pylint: disable=unused-import
         # pylint: enable=import-outside-toplevel

@@ -18,6 +18,7 @@ def sync_health_check(sender, health_request, **kwargs):
         responses.append(
             HealthCheckAge(
                 name=sync_destination.name,
+                now=health_request.now,
                 last_performed=last_successful_sync_run,
                 warning_age=timedelta(days=1)
             )

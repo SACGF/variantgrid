@@ -10,6 +10,7 @@ from django.utils.timezone import localtime
 
 from library.log_utils import NotificationBuilder, report_message
 from library.utils import segment, flatten_nested_lists, model_has_field
+from uicore.templatetags import ui_utils
 
 
 class HealthCheckRequest:
@@ -29,6 +30,10 @@ class HealthCheckStat(ABC):
         return [str(item) for item in items]
 
     @classmethod
+    def is_recent_activity(cls):
+        return False
+
+    @classmethod
     def sort_order(cls):
         return 0
 
@@ -37,13 +42,21 @@ class HealthCheckStat(ABC):
 class HealthCheckRecentActivity(HealthCheckStat):
     emoji: str
     name: str
-    amount: int
+    amount: Union[int, str]
     sub_type: Optional[str] = None
     extra: Optional[str] = None
     stand_alone: bool = False
 
     # Consider this taking a QuerySet of the objects instead
     # that way Server Status web page could use them
+
+    @classmethod
+    def is_recent_activity(cls):
+        return True
+
+    @property
+    def is_zero(self):
+        return self.amount == 0 or self.amount is None or self.amount == ""
 
     def __str__(self):
         amount_str = self.amount
@@ -105,6 +118,33 @@ class HealthCheckRecentActivity(HealthCheckStat):
             ))
         return response
 
+    @classmethod
+    def to_lines(cls, items: List['HealthCheckRecentActivity'], health_request: HealthCheckRequest) -> List[str]:
+        items = sorted(items, key=lambda hc: (hc.name, hc.sub_type))
+        zeros: List[HealthCheckRecentActivity] = list()
+        stand_alone: List[HealthCheckRecentActivity] = list()
+        values: List[HealthCheckRecentActivity] = list()
+        for item in items:
+            if item.stand_alone:
+                stand_alone.append(item)
+            elif item.is_zero:
+                zeros.append(item)
+            else:
+                values.append(item)
+
+        output = list()
+        for stand_alone_hc in stand_alone:
+            output.append(str(stand_alone_hc))
+        for valued in values:
+            output.append(str(valued))
+        if zeros:
+            flattened_empty = list()
+            for name, hc_sub_types in itertools.groupby(zeros, key=lambda hc: hc.name):
+                flattened_empty.append(name + " " + "/".join(hc.sub_type for hc in hc_sub_types))
+            all_empty = ", ".join(flattened_empty)
+            output.append(f":open_file_folder: 0 : {all_empty}")
+        return output
+
 
 @dataclass
 class HealthCheckTotalAmount(HealthCheckStat):
@@ -121,34 +161,6 @@ class HealthCheckTotalAmount(HealthCheckStat):
         if self.extra:
             result = f"{result} - {self.extra}"
         return result
-
-    @classmethod
-    def sort_order(cls):
-        return 1
-
-
-@dataclass
-class HealthCheckAge(HealthCheckStat):
-    name: str
-    last_performed: Optional[datetime]
-    warning_age: timedelta
-
-    @property
-    def last_performed_tz(self):
-        if self.last_performed:
-            return localtime(self.last_performed)
-
-    @classmethod
-    def to_lines(cls, items: List, health_request: HealthCheckRequest) -> List[str]:
-        return [item.str_with_now(health_request.now) for item in items]
-
-    def str_with_now(self, now: datetime):
-        if not self.last_performed_tz:
-            return f":dizzy_face: Never Run : {self.name}"
-        return f":neutral_face: {(now - self.last_performed_tz).days} days old : {self.name}"
-
-    def __str__(self):
-        return self.str_with_now(datetime.now())
 
     @classmethod
     def sort_order(cls):
@@ -172,6 +184,76 @@ class HealthCheckCapacity(HealthCheckStat):
 
 
 @dataclass
+class HealthCheckAge(HealthCheckStat):
+    name: str
+    now: datetime
+    last_performed: Optional[datetime]
+    warning_age: timedelta
+
+    _NEVER_RUN_AGE = 100000
+
+    @property
+    def last_performed_tz(self):
+        if self.last_performed:
+            return localtime(self.last_performed)
+
+    @property
+    def age(self) -> Optional[timedelta]:
+        if last_performed_tz := self.last_performed_tz:
+            return self.now - last_performed_tz
+        else:
+            return None
+
+    @property
+    def age_in_days(self):
+        if age := self.age:
+            return self.age.days
+        return HealthCheckAge._NEVER_RUN_AGE
+
+    def __str__(self):
+        if not self.last_performed_tz:
+            return f":dizzy_face: Never Run : {self.name}"
+        emoji = HealthCheckAge._face_for_age(self.age_in_days, self.warning_age)
+        return f"{emoji} {self.age_in_days} days old : {self.name}"
+
+    _MULTIPLIER_TO_FACE = {
+        0: ":simple_smile:",
+        1: ":neutral_face:",
+        2: ":cry:",
+        3: ":rage:"
+    }
+
+    @staticmethod
+    def _face_for_age(age_days: int, warning_age: timedelta):
+        warning_age_days = warning_age.days
+        # TODO handle warning age under 1 day
+        if age_days <= 1:
+            return ":smile:"
+        return HealthCheckAge._MULTIPLIER_TO_FACE.get(int(age_days / warning_age_days), ":exploding_head:")
+
+    @classmethod
+    def sort_order(cls):
+        return 4
+
+    @classmethod
+    def to_lines(cls, items: List['HealthCheckAge'], health_request: HealthCheckRequest) -> List[str]:
+        lines: List[str] = list()
+        items = sorted(items, key=lambda hc: (hc.warning_age, hc.age_in_days, hc.name))
+        for warning_age, warning_age_grouped in itertools.groupby(items, key=lambda hc: hc.warning_age):
+            for current_age, current_and_warning_grouped in itertools.groupby(warning_age_grouped, key=lambda hc: hc.age_in_days):
+                item_names = ", ".join(item.name for item in current_and_warning_grouped)
+                if current_age == HealthCheckAge._NEVER_RUN_AGE:
+                    lines.append(f":dizzy_face: Never Run : {item_names}")
+                else:
+                    if 1 < current_age <= warning_age.days:
+                        pass  # don't notify if everything is within date range
+                    else:
+                        emoji = HealthCheckAge._face_for_age(current_age, warning_age)
+                        lines.append(f"{emoji} {current_age} day{'s' if current_age != 1 else ''} old : {item_names}")
+        return lines
+
+
+@dataclass
 class HealthCheckCustom(HealthCheckStat):
     text: str
 
@@ -180,7 +262,7 @@ class HealthCheckCustom(HealthCheckStat):
 
     @classmethod
     def sort_order(cls):
-        return 4
+        return 5
 
 
 health_check_signal = django.dispatch.Signal()
@@ -201,11 +283,21 @@ def populate_health_check(notification: NotificationBuilder, since: Optional[dat
     for exec in exceptions:
         notification.add_markdown(f"Exception generating health check: {exec}")
 
+    checks = sorted(checks, key=lambda hc: hc.sort_order())
     grouped_checks = [(key, list(values)) for key, values in itertools.groupby(checks, lambda check: type(check))]
     grouped_checks = sorted(grouped_checks, key=lambda gc: gc[0].sort_order())
-    lines = list()
+    recent_lines = list()
+    overall_lines = list()
     for check_type, checks_typed in grouped_checks:
-        lines.extend(check_type.to_lines(checks_typed, health_request=health_request))
+        section_lines = check_type.to_lines(checks_typed, health_request=health_request)
+        if check_type.is_recent_activity():
+            recent_lines.extend(section_lines)
+        else:
+            overall_lines.extend(section_lines)
 
-    if lines:
-        notification.add_markdown("\n".join(lines), indented=True)
+    if recent_lines:
+        notification.add_markdown("\n".join(recent_lines), indented=True)
+
+    if overall_lines:
+        notification.add_markdown("*Overall*")
+        notification.add_markdown("\n".join(overall_lines), indented=True)
