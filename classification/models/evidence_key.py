@@ -365,6 +365,10 @@ class EvidenceKeyMap:
         return EvidenceKeyMap.instance().get(key)
 
     @staticmethod
+    def pretty_value_for(item, key: str) -> str:
+        return EvidenceKeyMap.cached_key(key).pretty_value(item.get(key))
+
+    @staticmethod
     def _ordered_keys() -> List[EvidenceKey]:
         # sort in code (rather than sql) as pretty_label isn't available normally
         key_entries = list(EvidenceKey.objects.all())

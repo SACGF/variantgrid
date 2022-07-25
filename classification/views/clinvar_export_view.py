@@ -7,6 +7,7 @@ from django.http import HttpResponse, StreamingHttpResponse, HttpRequest
 from django.http.response import HttpResponseBase
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
+from django.utils.timezone import now
 from django.views import View
 from lazy import lazy
 
@@ -290,7 +291,27 @@ class ClinVarExportSummary(ExportRow):
     @export_column("Clinical Significance")
     def clinical_significance(self):
         if classification := self.classification:
-            return EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE).pretty_value(classification.get(SpecialEKeys.CLINICAL_SIGNIFICANCE))
+            return EvidenceKeyMap.pretty_value_for(classification, SpecialEKeys.CLINICAL_SIGNIFICANCE)
+
+    @export_column("Affected Status")
+    def affected_status(self):
+        if classification := self.classification:
+            return EvidenceKeyMap.pretty_value_for(classification, SpecialEKeys.AFFECTED_STATUS)
+
+    @export_column("Mode of Inheritance")
+    def mode_of_inheritance(self):
+        if classification := self.classification:
+            return EvidenceKeyMap.pretty_value_for(classification, SpecialEKeys.MODE_OF_INHERITANCE)
+
+    @export_column("Curation Date")
+    def curation_date(self):
+        if classification := self.classification:
+            return EvidenceKeyMap.pretty_value_for(classification, SpecialEKeys.CURATION_DATE)
+
+    @export_column("Classification Imported/Created")
+    def classification_imported_created(self):
+        if classification := self.classification:
+            return classification.created.strftime('%Y-%m-%d')
 
     @export_column("Sync Status")
     def sync_status(self):
