@@ -173,7 +173,7 @@ class BulkClassificationInserter:
                 if operation == 'create' and record_ref.exists():
                     raise ClassificationProcessError('Record already exists, cannot create')
 
-                if operation in ('patch', 'patch_empty') and not record_ref.exists():
+                if operation in ('patch', 'patch-empty') and not record_ref.exists():
                     raise ClassificationProcessError('Record does not exist, cannot patch')
 
                 if operation in ('create', 'upsert', 'overwrite') and not record_ref.exists():
