@@ -17,6 +17,7 @@
         }
         let test = $('#test').prop('checked');
         let lab = $('#lab').val();
+        let operation = $('#operation').val();
         let record_id = $('#record_id').val();
         let delete_mode = $('#delete').prop('checked');
         let publish = $('#publish').val();
@@ -76,7 +77,7 @@
                 };
                 valid = false;
             }
-            envelope["data"] = data;
+            envelope[operation] = data;
             
             if (publish) {
                 envelope["publish"] = publish;
@@ -237,7 +238,14 @@ div.json {
                     Delete
                 </label>
             </div>
-
+        {% endlabelled %}
+        {% labelled label="Operation" %}
+            <select id="operation" class="form-control">
+                <option selected value="data">Upsert</option>
+                <option value="patch">Patch</option>
+                <option value="patch-empty">Patch Empty</option>
+                <option value="create">Create</option>
+            </select>
         {% endlabelled %}
         {% labelled label="Lab" %}
             <select id="lab" class="form-control">

@@ -134,7 +134,7 @@ class BulkClassificationInserter:
                 except ValueError:
                     pass
 
-            for op in ['create', 'upsert', 'overwrite', 'data', 'patch']:
+            for op in ['create', 'upsert', 'overwrite', 'data', 'patch', 'patch-empty']:
                 op_data = data.pop(op, None)
                 if op == 'data':
                     op = 'upsert'
@@ -173,7 +173,7 @@ class BulkClassificationInserter:
                 if operation == 'create' and record_ref.exists():
                     raise ClassificationProcessError('Record already exists, cannot create')
 
-                if operation == 'patch' and not record_ref.exists():
+                if operation in ('patch', 'patch_empty') and not record_ref.exists():
                     raise ClassificationProcessError('Record does not exist, cannot patch')
 
                 if operation in ('create', 'upsert', 'overwrite') and not record_ref.exists():
@@ -232,6 +232,7 @@ class BulkClassificationInserter:
                                                          source=source,
                                                          save=save,
                                                          make_patch_fields_immutable=immutable,
+                                                         leave_existing_values=operation.endswith('-empty'),
                                                          ignore_if_only_patching=ignore_if_only_patch)
 
                     patch_response.status = ClassificationPatchStatus.UPDATE if patch_response.modified_keys else ClassificationPatchStatus.NO_CHANGE
