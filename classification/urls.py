@@ -51,11 +51,11 @@ urlpatterns = [
     # this is uploading the entire import file, distinct from attaching a file to a classification
     perm_path('classification/import_upload', UploadedClassificationsUnmappedView.as_view(), name="classification_upload_unmapped"),
     # TODO move file lab into another subfolder as it gets a bit confused with upload page
-    perm_path('classification/import_upload/<str:lab_id>', UploadedClassificationsUnmappedView.as_view(), name="classification_upload_unmapped_lab"),
     perm_path('classification/import_upload/file/<int:uploaded_classification_unmapped_id>', view_uploaded_classification_unmapped, name="classification_upload_unmapped_status"),
     perm_path('classification/import_upload/file/<int:uploaded_classification_unmapped_id>/detail', view_uploaded_classification_unmapped_detail, name="classification_upload_unmapped_status_detail"),
     perm_path('classification/import_upload/datatable', DatabaseTableView.as_view(column_class=UploadedClassificationsUnmappedColumns), name='classification_upload_unmapped_datatable'),
     perm_path('classification/import_upload/download/<int:uploaded_classification_unmapped_id>', download_classification_unmapped_file, name='classification_upload_unmapped_download'),
+    perm_path('classification/import_upload/<str:lab_id>', UploadedClassificationsUnmappedView.as_view(), name="classification_upload_unmapped_lab"),
 
     perm_path('classification/create', views.create_classification, name='create_classification'),
     perm_path('classification/create_from_hgvs/<genome_build_name>/<hgvs_string>', views.create_classification_from_hgvs, name='create_classification_from_hgvs'),
@@ -83,6 +83,7 @@ urlpatterns = [
     perm_path('clinvar_export_batch/<int:clinvar_export_batch_id>/download', clinvar_export_view.clinvar_export_batch_download, name='clinvar_export_batch_download'),
 
     perm_path('condition_matchings', condition_matchings_view, name='condition_matchings'),
+    perm_path('condition_matchings/<str:lab_id>', condition_matchings_view, name='condition_matchings_lab'),
     perm_path('condition_matchings/<str:lab_id>', condition_matchings_view, name='condition_matchings_lab'),
     perm_path('condition_matching/datatable/<str:lab_id>', DatabaseTableView.as_view(column_class=ConditionTextColumns), name='condition_text_datatable'),
     perm_path('condition_matching/<int:pk>', condition_matching_view, name='condition_matching'),

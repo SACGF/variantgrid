@@ -11,7 +11,7 @@
     <script>
         function datatableFilter(data) {
             {% if lab_picker.selected_lab %}
-            data.lab_id = {{ selected_lab.pk }};
+            data.lab_id = {{ lab_picker.selected_lab.pk }};
             {% endif %}
         }
         function fileDownloaderRenderer(data, type, row) {
