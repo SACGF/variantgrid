@@ -10,7 +10,7 @@ from django.utils.timezone import now
 from classification.enums import SubmissionSource
 from classification.models import ClassificationModification, Classification, classification_flag_types
 from flags.models import FlagComment, Flag, FlagResolution
-from library.utils import IterableTransformer, IteratableStitcher
+from library.utils import IterableTransformer, IterableStitcher
 from snpdb.models import Allele, Lab
 
 
@@ -156,7 +156,7 @@ class ClassificationChanges:
             classification_flag_types.unshared_flag
         ]).select_related('flag', 'flag__flag_type', 'flag__collection', 'resolution', 'user').order_by('-created')[:limit+1]
 
-        stitcher = IteratableStitcher(
+        stitcher = IterableStitcher(
             iterables=[
                 IterableTransformer(vcm_qs, ClassificationChanges.from_object),
                 IterableTransformer(flags_qs, ClassificationChanges.from_object)

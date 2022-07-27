@@ -623,7 +623,7 @@ class IterableTransformer(Generic[T], Iterable[T]):
         return self._IteratorTransformer(iter(self.iterable), self.transform)
 
 
-class IteratableStitcher(Generic[T], Iterable[T]):
+class IterableStitcher(Generic[T], Iterable[T]):
     """
     Given a list of SORTED iterables, will give you the smallest element from any of them
     """
@@ -632,8 +632,8 @@ class IteratableStitcher(Generic[T], Iterable[T]):
 
         class _CachedIterator:
 
-            def __init__(self, iteratable):
-                self.iterator = iter(iteratable)
+            def __init__(self, iterable):
+                self.iterator = iter(iterable)
                 self.finished = False
                 self.cache = None
                 self.fetch_next()
@@ -650,12 +650,12 @@ class IteratableStitcher(Generic[T], Iterable[T]):
             def preview(self):
                 return self.cache
 
-        def __init__(self, iteratables: List[Iterable[T]], comparison):
-            self.iterators = [self._CachedIterator(iterable) for iterable in iteratables]
+        def __init__(self, iterables: List[Iterable[T]], comparison):
+            self.iterators = [self._CachedIterator(iterable) for iterable in iterables]
             self.comparison = comparison
 
         def __next__(self):
-            min_ci: Optional[IteratableStitcher._IteratorStitcher._CachedIterator] = None
+            min_ci: Optional[IterableStitcher._IteratorStitcher._CachedIterator] = None
             min_value: Any = None
 
             for ci in self.iterators:
@@ -675,7 +675,7 @@ class IteratableStitcher(Generic[T], Iterable[T]):
         self.comparison = comparison
 
     def __iter__(self) -> Iterator[T]:
-        return self._IteratorStitcher(iteratables=self.iterables, comparison=self.comparison)
+        return self._IteratorStitcher(iterables=self.iterables, comparison=self.comparison)
 
 
 class Constant:
@@ -697,7 +697,7 @@ class ArrayLength(models.Func):
     function = 'CARDINALITY'
 
 
-def model_has_field(model: Model, field_name: str) -> bool:
+def model_has_field(model: Type[Model], field_name: str) -> bool:
     is_id_check = field_name.endswith('_id')
     try:
         if field_name.endswith('_id'):

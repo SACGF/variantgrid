@@ -12,7 +12,7 @@ from django.http import StreamingHttpResponse
 from classification.enums import ShareLevel
 from classification.models import classification_flag_types, Classification, ClassificationModification, EvidenceKeyMap
 from flags.models import FlagComment
-from library.utils import delimited_row, IteratableStitcher, IterableTransformer
+from library.utils import delimited_row, IterableStitcher, IterableTransformer
 from snpdb.models import Lab
 
 
@@ -263,7 +263,7 @@ class ClassificationAccumulationGraph:
         running_accum = self._RunningAccumulation(mode=self.mode)
         sub_totals: List[ClassificationAccumulationGraph._SummarySnapshot] = list()
 
-        stitcher = IteratableStitcher[ClassificationSummary](
+        stitcher = IterableStitcher[ClassificationSummary](
             iterables=[
                 self.withdrawn_iterable(),
                 self.classification_iterable()

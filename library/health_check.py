@@ -1,19 +1,27 @@
 import itertools
-from abc import ABC, abstractmethod
+from abc import ABC
 from dataclasses import dataclass
 from datetime import timedelta, datetime
-from typing import List, Union, Optional
+from typing import List, Union, Optional, Type
 
 import django.dispatch
 from django.db.models import Model, Q
 from django.utils.timezone import localtime
 
-from library.log_utils import NotificationBuilder, report_message
+from library.log_utils import NotificationBuilder
 from library.utils import segment, flatten_nested_lists, model_has_field
-from uicore.templatetags import ui_utils
+
+
+"""
+HealthChecks are generated nightly and posted in Slack.
+In future these classes might be extended to show the data live on a webpage
+"""
 
 
 class HealthCheckRequest:
+    """
+    Class that gives context of the HealthRequest, specifically the time window that we care about
+    """
 
     def __init__(self, since: datetime, now: Optional[datetime] = None):
         self.since = since
@@ -27,25 +35,29 @@ class HealthCheckStat(ABC):
 
     @classmethod
     def to_lines(cls, items: List, health_request: HealthCheckRequest) -> List[str]:
+        # given a list of items of this class, generate lines of output
         return [str(item) for item in items]
 
     @classmethod
     def is_recent_activity(cls):
+        # indicates if this state represents time within a window (e.g. 3 records updates in 24 hours)
+        # or more of a snapshot state (e.g. 10,343 records in total)
         return False
 
     @classmethod
     def sort_order(cls):
+        # how this stat should be sorted with other stats
         return 0
 
 
 @dataclass
 class HealthCheckRecentActivity(HealthCheckStat):
-    emoji: str
-    name: str
-    amount: Union[int, str]
-    sub_type: Optional[str] = None
-    extra: Optional[str] = None
-    stand_alone: bool = False
+    emoji: str  # The Slack Emoji to put next to the message
+    name: str  # The name of the model we're reporting on
+    amount: Union[int, str]   # how many records were created/updated/deleted etc
+    sub_type: Optional[str] = None   # if we're talking about created/updated or deleted
+    extra: Optional[str] = None   # extra text (not used for grouping)
+    stand_alone: bool = False  # should this always be reported on in its own line
 
     # Consider this taking a QuerySet of the objects instead
     # that way Server Status web page could use them
@@ -56,6 +68,7 @@ class HealthCheckRecentActivity(HealthCheckStat):
 
     @property
     def is_zero(self):
+        # if is_zero (and not stand_alone) then the record can be summarised
         return self.amount == 0 or self.amount is None or self.amount == ""
 
     def __str__(self):
@@ -76,10 +89,19 @@ class HealthCheckRecentActivity(HealthCheckStat):
     @staticmethod
     def simple_report(
             health_request: HealthCheckRequest,
-            model: Model,
+            model: Type[Model],
             emoji: str,
             created: bool = False,
             modified: bool = False) -> List['HealthCheckRecentActivity']:
+        """
+        Makes a recent activity record for a given model
+        :param health_request: The request that gives us the time window
+        :param model: The model to report create and/or updated
+        :param emoji: Emoji that represents the model
+        :param created: If true, report on new records : model must have a column called created or date
+        :param modified: If true, report on modified records (that weren't also created in the time window) : model must have a column called modified
+        :return: One or two health check stats depending on if created and/or modified are true
+        """
         name = model.__name__
         name += "es" if name.endswith("s") else "s"
 
@@ -113,13 +135,15 @@ class HealthCheckRecentActivity(HealthCheckStat):
                     created__lt=health_request.since,
                     modified__gte=health_request.since,
                     modified__lte=health_request.now).count(),
-
                 sub_type="Modified"
             ))
         return response
 
     @classmethod
     def to_lines(cls, items: List['HealthCheckRecentActivity'], health_request: HealthCheckRequest) -> List[str]:
+        """
+        Display standalone lines at the front, and then non-zero items per line, then all the zeros in one line
+        """
         items = sorted(items, key=lambda hc: (hc.name, hc.sub_type))
         zeros: List[HealthCheckRecentActivity] = list()
         stand_alone: List[HealthCheckRecentActivity] = list()
@@ -148,6 +172,7 @@ class HealthCheckRecentActivity(HealthCheckStat):
 
 @dataclass
 class HealthCheckTotalAmount(HealthCheckStat):
+    # Represents a total amount, e.g. number of records in total
     emoji: str
     name: str
     amount: int
@@ -169,6 +194,7 @@ class HealthCheckTotalAmount(HealthCheckStat):
 
 @dataclass
 class HealthCheckCapacity(HealthCheckStat):
+    # Used to represent available disk space
     name: str
     used: str
     available: str
@@ -185,10 +211,11 @@ class HealthCheckCapacity(HealthCheckStat):
 
 @dataclass
 class HealthCheckAge(HealthCheckStat):
+    # Used to report on datasets that should be periodically refreshed
     name: str
     now: datetime
-    last_performed: Optional[datetime]
-    warning_age: timedelta
+    last_performed: Optional[datetime]  # when was this last run, None if never run
+    warning_age: timedelta  # how old can this item be before the user should be warned, causes increasingly angry faces when exceeded
 
     _NEVER_RUN_AGE = 100000
 
@@ -207,7 +234,7 @@ class HealthCheckAge(HealthCheckStat):
     @property
     def age_in_days(self):
         if age := self.age:
-            return self.age.days
+            return age.days
         return HealthCheckAge._NEVER_RUN_AGE
 
     def __str__(self):
@@ -280,8 +307,8 @@ def populate_health_check(notification: NotificationBuilder, since: Optional[dat
 
     stats = flatten_nested_lists([hc[1] for hc in health_check_signal.send_robust(sender=None, health_request=health_request)])
     checks, exceptions = segment(stats, lambda s: isinstance(s, HealthCheckStat))
-    for exec in exceptions:
-        notification.add_markdown(f"Exception generating health check: {exec}")
+    for ex in exceptions:
+        notification.add_markdown(f"Exception generating health check: {ex}")
 
     checks = sorted(checks, key=lambda hc: hc.sort_order())
     grouped_checks = [(key, list(values)) for key, values in itertools.groupby(checks, lambda check: type(check))]

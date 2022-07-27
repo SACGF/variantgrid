@@ -1,7 +1,5 @@
-from typing import List
-
 from django.dispatch import receiver
-
+from classification.enums import ShareLevel
 from classification.models import Classification, classification_flag_types
 from flags.models import FlagType
 from flags.models.flag_health_check import flag_chanced_since
@@ -10,9 +8,10 @@ from library.health_check import health_check_signal, \
 
 
 @receiver(signal=health_check_signal)
-def classifications_health_check_count(sender, health_request, **kwargs):
-    total_shared = Classification.dashboard_total_shared_classifications()
-    total_unshared = Classification.dashboard_total_unshared_classifications()
+def classifications_health_check_count(sender, health_request: HealthCheckRequest, **kwargs):
+    total_classification_qs = Classification.objects.filter(lab__external=False, withdrawn=False, created__lte=health_request.now).exclude(lab__name__icontains='legacy')
+    total_shared = total_classification_qs.count()
+    total_unshared = total_classification_qs.filter(share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS)
     total = total_unshared + total_shared
     if total:
         percent_shared = 100.0 * float(total_shared) / float(total)
@@ -27,6 +26,7 @@ def classifications_health_check_count(sender, health_request, **kwargs):
 
 @receiver(signal=health_check_signal)
 def classification_health_check_activity(sender, health_request: HealthCheckRequest, **kwargs):
+    # TODO, also want to restrict this data based on now (not too much of an issue if now() is pretty much now)
     classifications_of_interest = Classification.dashboard_report_classifications_of_interest(since=health_request.since)
     new_classification_count = Classification.dashboard_report_new_classifications(since=health_request.since)
 

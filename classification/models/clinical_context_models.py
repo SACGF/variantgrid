@@ -85,6 +85,13 @@ class _DiscordanceCalculationRow:
 
 @dataclass
 class DiscordanceStatus:
+    """
+    There's a bit of confusion due to evolution of discordance status
+    DiscordanceStatus: gives absolute full context about a clinical grouping
+    DiscordanceLevel: an enum that covers all states, e.g. no submissions, single submission, overlap confidence
+    DiscordanceReportStatus: how the user left the DiscordanceReport
+    ClinicalContextStatus: saved on the clinical grouping and saved to the database, maybe it should be repalced with DiscordanceLevel?
+    """
     level: DiscordanceLevel
     lab_count: int
     lab_count_all: int
