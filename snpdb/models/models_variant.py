@@ -136,7 +136,7 @@ class Allele(FlagsMixin, models.Model):
 
         return conversion_tool, variant_tuple
 
-    def merge(self, conversion_tool, other_allele: "Allele") -> bool:
+    def merge(self, allele_linking_tool, other_allele: "Allele") -> bool:
         """ Merge other_allele into this allele """
 
         if self == other_allele:
@@ -151,7 +151,7 @@ class Allele(FlagsMixin, models.Model):
 
         AlleleMergeLog.objects.create(old_allele=other_allele,
                                       new_allele=self,
-                                      conversion_tool=conversion_tool,
+                                      allele_linking_tool=allele_linking_tool,
                                       success=can_merge,
                                       message=merge_log_message)
 
@@ -176,7 +176,7 @@ class Allele(FlagsMixin, models.Model):
                 try:
                     va.allele = self
                     va.error = None  # clear any errors
-                    va.conversion_tool = conversion_tool
+                    va.allele_linking_tool = allele_linking_tool
                     va.save()
                 except IntegrityError:
                     logging.warning("VariantAllele exists with allele/build/variant of %s/%s/%s - deleting this one",
@@ -212,12 +212,14 @@ class Allele(FlagsMixin, models.Model):
             if v37:
                 self.close_open_flags_of_type(allele_flag_types.missing_37)
             else:
-                self.flag_collection_safe.get_or_create_open_flag_of_type(flag_type=allele_flag_types.missing_37, only_if_new=True)
+                self.flag_collection_safe.get_or_create_open_flag_of_type(flag_type=allele_flag_types.missing_37,
+                                                                          only_if_new=True)
 
             if v38:
                 self.close_open_flags_of_type(allele_flag_types.missing_38)
             else:
-                self.flag_collection_safe.get_or_create_open_flag_of_type(flag_type=allele_flag_types.missing_38, only_if_new=True)
+                self.flag_collection_safe.get_or_create_open_flag_of_type(flag_type=allele_flag_types.missing_38,
+                                                                          only_if_new=True)
 
         allele_validate_signal.send(sender=Allele, allele=self)
 
@@ -236,7 +238,7 @@ class AlleleMergeLog(TimeStampedModel):
     """ Keep track of calls to Allele.merge() """
     old_allele = models.ForeignKey(Allele, related_name="old_allele_merge", on_delete=CASCADE)
     new_allele = models.ForeignKey(Allele, related_name="new_allele_merge", on_delete=CASCADE)
-    conversion_tool = models.CharField(max_length=2, choices=AlleleConversionTool.choices)
+    allele_linking_tool = models.CharField(max_length=2, choices=AlleleConversionTool.choices)
     success = models.BooleanField(default=True)
     message = models.TextField(null=True)
 
@@ -523,7 +525,7 @@ class VariantAllele(TimeStampedModel):
     genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)
     allele = models.ForeignKey(Allele, on_delete=CASCADE)
     origin = models.CharField(max_length=1, choices=AlleleOrigin.choices)
-    conversion_tool = models.CharField(max_length=2, choices=AlleleConversionTool.choices)
+    allele_linking_tool = models.CharField(max_length=2, choices=AlleleConversionTool.choices)
     error = models.JSONField(null=True)  # Only set on error
 
     class Meta:
@@ -542,7 +544,7 @@ class VariantAllele(TimeStampedModel):
         return False
 
     def __str__(self):
-        return f"{self.allele} - {self.variant_id}({self.genome_build}/{self.conversion_tool})"
+        return f"{self.allele} - {self.variant_id}({self.genome_build}/{self.allele_linking_tool})"
 
 
 class VariantCollection(RelatedModelsPartitionModel):

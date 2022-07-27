@@ -21,7 +21,7 @@ def create_mock_allele(variant: Variant, genome_build: GenomeBuild):
         genome_build=genome_build,
         allele=allele,
         origin=AlleleOrigin.IMPORTED_TO_DATABASE,
-        conversion_tool=AlleleConversionTool.DBSNP
+        allele_linking_tool=AlleleConversionTool.DBSNP
     )
     return allele
 

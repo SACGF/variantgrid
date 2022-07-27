@@ -74,7 +74,7 @@
                                         {% for amr in allele_merge_log_qs %}
                                             <tr>
                                                 <td class="text-center">{{ amr.created }}</td>
-                                                <td class="text-center">{{ amr.get_conversion_tool_display }}</td>
+                                                <td class="text-center">{{ amr.get_allele_linking_tool_display }}</td>
                                                 <td class="text-center">{{ amr.success|yesno:"Success,Failure" }}
                                                 <td class="text-center">{{ amr.message }}</td>
                                                 <td class="text-center">

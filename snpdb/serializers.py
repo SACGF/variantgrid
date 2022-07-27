@@ -83,7 +83,7 @@ class VariantAlleleSerializer(serializers.ModelSerializer):
     genome_build = GenomeBuildSerializer()
     allele = AlleleSerializer()
     origin = serializers.SerializerMethodField()
-    conversion_tool = serializers.SerializerMethodField()
+    allele_linking_tool = serializers.SerializerMethodField()
 
     class Meta:
         model = VariantAllele
@@ -92,8 +92,8 @@ class VariantAlleleSerializer(serializers.ModelSerializer):
     def get_origin(self, obj):
         return obj.get_origin_display()
 
-    def get_conversion_tool(self, obj):
-        return obj.get_conversion_tool_display()
+    def get_allele_linking_tool(self, obj):
+        return obj.get_allele_linking_tool_display()
 
     @staticmethod
     def data_with_link_data(variant_allele: 'VariantAllele') -> Dict[str, Any]:

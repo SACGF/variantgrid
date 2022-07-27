@@ -2104,8 +2104,8 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 }
                 # origin / conversion tool etc a little bit too detailed for end users downloading this
                 """
-                if variant_allele.conversion_tool:
-                    build_info["conversion_tool"] = variant_allele.get_conversion_tool_display()
+                if variant_allele.allele_linking_tool:
+                    build_info["conversion_tool"] = variant_allele.get_allele_linking_tool_display()
 
                 if variant_allele.error:
                     build_info["error"] = variant_allele.error

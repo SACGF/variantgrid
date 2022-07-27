@@ -451,10 +451,10 @@ def get_clingen_allele_from_hgvs(hgvs_string, require_allele_id=True,
         return ClinGenAllele(api_response=api_response)
 
 
-def link_allele_to_existing_variants(allele: Allele, conversion_tool,
+def link_allele_to_existing_variants(allele: Allele, allele_linking_tool,
                                      known_variants=None) -> Dict[GenomeBuild, VariantAllele]:
     """ known_variants - be able to pass in variants you already know are linked to Allele. Workaround to deal with
-        ClinGen Allele registry accepting a coordinate (eg NC_000001.10:g.145299792A>G GRCh37) and retrieving record
+        ClinGen Allele registry accepting a coordinate (e.g. NC_000001.10:g.145299792A>G GRCh37) and retrieving record
         CA1051218 but the API response won't have GRCh37 in it! """
     if known_variants is None:
         known_variants = {}
@@ -479,20 +479,21 @@ def link_allele_to_existing_variants(allele: Allele, conversion_tool,
 
             if variant:
                 defaults = {"origin": AlleleOrigin.variant_origin(variant, allele, genome_build),
-                            "conversion_tool": conversion_tool,
+                            "allele_linking_tool": allele_linking_tool,
                             "allele": allele}
                 va, _ = VariantAllele.objects.get_or_create(variant=variant,
                                                             genome_build=genome_build,
                                                             defaults=defaults)
                 if va.allele != allele:  # Existing!
-                    if not va.allele.merge(conversion_tool, allele):
+                    if not va.allele.merge(allele_linking_tool, allele):
                         logging.warning("Couldn't merge 2xAlleles (ClinGen Allele Registry) - Allele IDs: %s and %s",
                                         va.allele_id, allele.id)
 
                 variant_allele_by_build[genome_build] = va
         except Variant.DoesNotExist:
             pass  # Variant may not be created for build
-        except (Contig.ContigNotInBuildError, GenomeFasta.ContigNotInFastaError, ClinGenAllele.ClinGenBuildNotInResponseError) as e:
+        except (Contig.ContigNotInBuildError, GenomeFasta.ContigNotInFastaError,
+                ClinGenAllele.ClinGenBuildNotInResponseError) as e:
             logging.error(e)
 
     return variant_allele_by_build

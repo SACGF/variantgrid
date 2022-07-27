@@ -67,7 +67,7 @@ class BulkAlleleLinkingVCFProcessor(BulkMinimalVCFProcessor):
                                allele_id=allele_id,
                                genome_build=self.genome_build,
                                origin=origin,
-                               conversion_tool=self.liftover.conversion_tool)
+                               allele_linking_tool=self.liftover.conversion_tool)
             variant_alleles.append(va)
 
         if liftover_errors:

@@ -23,7 +23,7 @@
                 {% endlabelled %}
             {% endif %}
             {% labelled label='Origin' hint="chunky" %}{{ variant_allele.get_origin_display }}{% endlabelled%}
-            {% labelled label='Linked to Allele via' hint="chunky" %}{{ variant_allele.get_conversion_tool_display }}{% endlabelled%}
+            {% labelled label='Linked to Allele via' hint="chunky" %}{{ variant_allele.get_allele_linking_tool_display }}{% endlabelled%}
             <a class="toggle-link" data-toggle="collapse" href=".quick-links">Quick Links</a>
             <div class="quick-links collapse" id="quick-links-{{ variant_allele.pk }}">Loading ...</div>
         </div>
@@ -50,7 +50,7 @@
                 </p>
                 {% if liftover_error.variant %}
                     <p>
-                        {{ liftover_error.liftover.get_conversion_tool_display }} returned:
+                        {{ liftover_error.liftover.get_allele_linking_tool_display }} returned:
                         <a href="{% url 'view_variant' liftover_error.variant.pk %}">{{ liftover_error.variant }}</a>
                          which is NOT linked to this allele.
                     </p>
