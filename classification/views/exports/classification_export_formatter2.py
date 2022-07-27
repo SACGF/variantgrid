@@ -123,7 +123,6 @@ class ClassificationExportFormatter2(ABC):
             yield footer
 
     def _yield_streaming_entry_bytes(self, source: peekable) -> Iterator[bytes]:
-        raise ValueError("Made up error")
         for entry in self._yield_streaming_entry_str(source):
             yield "\n".join(entry).encode()
 
@@ -144,7 +143,7 @@ class ClassificationExportFormatter2(ABC):
 
     def _streaming_zip(self) -> StreamingHttpResponse:
         # Had some issues with stream_zip telling macOS couldn't extract file, but then being able to manually extract the downloaded file fine
-        # not sure if the error is on macOs, stream_zip or my implementation, so using non streaming version for now
+        # not sure if the error is on macOS, stream_zip or my implementation, so using non streaming version for now
         response = StreamingHttpResponse(stream_zip(self._yield_streaming_zip_entries()), content_type='application/zip')
         response['Content-Disposition'] = f'attachment; filename="{self.filename(extension_override="zip")}"'
         return response

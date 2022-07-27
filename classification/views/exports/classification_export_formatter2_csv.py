@@ -45,6 +45,7 @@ class FormatDetailsCSV:
         else:
             return set()
 
+
 class RowID(ExportRow):
 
     def __init__(self, cm: ClassificationModification, allele_data: AlleleData, message: Optional[str] = None):
