@@ -181,7 +181,7 @@ class VariantTagsGrid(JqGridUserRowConfig):
         before_colmodels = [
             {'index': 'variant_string', 'name': 'variant_string',
              'label': 'Variant', 'formatter': 'formatVariantTagFirstColumn'},
-            {'index': 'view_genome_build', 'name': 'view_genome_build', 'label': 'Genome Build'},
+            {'index': 'view_genome_build', 'name': 'view_genome_build', 'label': 'Genome Build', 'sortable': False},
         ]
         colmodels = super().get_colmodels(remove_server_side_only=remove_server_side_only)
         return before_colmodels + colmodels
