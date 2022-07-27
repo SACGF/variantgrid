@@ -10,7 +10,9 @@
 {% block head %}
     <script>
         function datatableFilter(data) {
+            {% if lab_picker.selected_lab %}
             data.lab_id = {{ selected_lab.pk }};
+            {% endif %}
         }
         function fileDownloaderRenderer(data, type, row) {
             let pk = row['id'];
@@ -34,21 +36,21 @@
             {% endif %}
         {% end_page_help_embedded %}
 
-        {% lab_picker view_name="classification_upload_unmapped_lab" selected_lab=selected_lab %}
-        {% if selected_lab.upload_location %}
+        {% lab_picker data=lab_picker %}
+        {% if lab_picker.selected_lab.upload_location %}
              <form method="post" enctype="multipart/form-data">
                 {% csrf_token %}
                 <div class="card">
                     <div class="card-header">File Upload</div>
                     <div class="card-body">
-                        {% if selected_lab.upload_automatic %}
+                        {% if lab_picker.selected_lab.upload_automatic %}
                             <p class="text-info">Once the file is uploaded it will be automatically processed.</p>
                         {% else %}
                             <p class="text-info">Once the file is uploaded it will be manually reviewed and processed over the next few days.</p>
                         {% endif %}
-                        {% if selected_lab.upload_instructions %}<p class="text-info">{{ upload_instructions }}</p>{% endif %}
+                        {% if lab_picker.selected_lab.upload_instructions %}<p class="text-info">{{ upload_instructions }}</p>{% endif %}
                         {% if user.is_superuser %}
-                            {% labelled label="Destination" value_css="admin-only" %}{{ selected_lab.upload_location }}{% endlabelled %}
+                            {% labelled label="Destination" value_css="admin-only" %}{{ lab_picker.selected_lab.upload_location }}{% endlabelled %}
                         {% endif %}
                         {% labelled label="Upload File" %}
                             <input type="file" name="file">
@@ -100,7 +102,7 @@
             <h4>File Upload History</h4>
             <table data-datatable-url="{% url 'classification_upload_unmapped_datatable' %}" data-datatable-data='datatableFilter' class="import-table sticky-header" responsive="true"></table>
         {% else %}
-            <p>{{ 'warning' | severity_icon }} Your lab "{{ selected_lab.name }}" has not been configured for file uploads. Please contact a {{ site_name }} administrator if you believe this is required.</p>
+            <p>{{ 'warning' | severity_icon }} Your lab "{{ lab_picker.selected_lab.name }}" has not been configured for file uploads. Please contact a {{ site_name }} administrator if you believe this is required.</p>
         {% endif %}
     </div>
 {% endblock %}

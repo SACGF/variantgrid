@@ -63,7 +63,7 @@
             Classifications that haven't had their condition text resolved cannot be uploaded to ClinVar.
         {% end_page_help_embedded %}
 
-        {% lab_picker view_name="condition_matchings_lab" selected_lab=selected_lab all_option=True %}
+        {% lab_picker data=dlab.lab_picker %}
 
         {% labelled hint="tiny" label="Classifications w Standard Condition" %}
             {{ dlab.classifications_with_standard_text | number:'success' }}
@@ -117,6 +117,6 @@
                 </div>
             </div>
         </div>
-        <table id="condition-text-datatable" class="condition-text-datatable sticky-header" data-datatable-url="{% url 'condition_text_datatable' selected_lab %}" data-datatable-data="datatableFilter"></table>
+        <table id="condition-text-datatable" class="condition-text-datatable sticky-header" data-datatable-url="{% url 'condition_text_datatable' dlab.lab_picker.selection %}" data-datatable-data="datatableFilter"></table>
     </div>
 {% endblock %}

@@ -15,10 +15,11 @@ from lazy import lazy
 
 from classification.enums.discordance_enums import DiscordanceReportResolution
 from classification.models import Classification, classification_flag_types, \
-    DiscordanceReportClassification, DiscordanceReport, DiscordanceReportTableData, UserPerspective
+    DiscordanceReportClassification, DiscordanceReport, DiscordanceReportTableData
 from email_manager.models import EmailLog
 from flags.models import FlagCollection, Flag
 from library.log_utils import report_exc_info, report_message
+from snpdb.lab_picker import LabPickerData
 from snpdb.models import Lab, UserSettings, GenomeBuild
 
 EmailOutput = collections.namedtuple('EmailOutput', 'subject html text')
@@ -58,7 +59,10 @@ class EmailLabSummaryData:
             report__resolution=DiscordanceReportResolution.ONGOING).values_list('report', flat=True)
         dr_qs = DiscordanceReport.objects.filter(pk__in=report_ids).order_by('-id')
 
-        return DiscordanceReportTableData.create(perspective=UserPerspective.for_lab(lab=self.lab, genome_build=self.genome_build), discordance_reports=dr_qs)
+        return DiscordanceReportTableData.create(
+            perspective=LabPickerData.for_lab(self.lab, user=self.user),
+            discordance_reports=dr_qs
+        )
 
     @lazy
     def flagged_variants(self) -> QuerySet[Flag]:

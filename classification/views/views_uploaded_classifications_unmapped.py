@@ -19,6 +19,7 @@ from classification.models.uploaded_classifications_unmapped import UploadedClas
 from classification.tasks.classification_import_map_and_insert_task import ClassificationImportMapInsertTask
 from library.django_utils import get_url_from_view_path
 from library.log_utils import NotificationBuilder, report_exc_info
+from snpdb.lab_picker import LabPickerData
 from snpdb.models import Lab, UserSettings
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
 
@@ -135,32 +136,33 @@ class FileMeta:
 class UploadedClassificationsUnmappedView(View):
 
     def get(self, request, **kwargs):
-        user: User = request.user
-        if lab_id := kwargs.get('lab_id'):
-            selected_lab: Lab = Lab.valid_labs_qs(user=user, admin_check=True).get(pk=lab_id)
-            context = {
-                "selected_lab": selected_lab
-            }
+        lab_picker = LabPickerData.from_request(
+            request=request,
+            selection=kwargs.get('lab_id'),
+            view_name='classification_upload_unmapped_lab',
+            multi_select=False)
 
-            if upload_location := selected_lab.upload_location:
-                if server_address := resolve_uploaded_url_to_handle(selected_lab.upload_location):
-                    existing: Set[FileMeta] = set()
-                    for unmapped in UploadedClassificationsUnmapped.objects.filter(lab=selected_lab):
-                        if meta := FileMeta.from_unmapped(unmapped):
-                            existing.add(meta)
+        if redirect_response := lab_picker.check_redirect():
+            return redirect_response
 
-                    server_files: List[FileHandle] = list()
-                    for file in server_address.list():
-                        meta = FileMeta.from_file_handle(file)
-                        if meta not in existing:
-                            server_files.append(file)
+        context = {"lab_picker": lab_picker}
+        selected_lab = lab_picker.selected_lab
+        if upload_location := selected_lab.upload_location:
+            if server_address := resolve_uploaded_url_to_handle(selected_lab.upload_location):
+                existing: Set[FileMeta] = set()
+                for unmapped in UploadedClassificationsUnmapped.objects.filter(lab=selected_lab):
+                    if meta := FileMeta.from_unmapped(unmapped):
+                        existing.add(meta)
 
-                    context["server_files"] = server_files
+                server_files: List[FileHandle] = list()
+                for file in server_address.list():
+                    meta = FileMeta.from_file_handle(file)
+                    if meta not in existing:
+                        server_files.append(file)
 
-            return render(request, 'classification/classification_upload_file_unmapped.html', context)
-        else:
-            selected_lab = UserSettings.get_for_user(user).default_lab_safe()
-            return HttpResponseRedirect(reverse("classification_upload_unmapped_lab", kwargs={"lab_id": selected_lab.pk}))
+                context["server_files"] = server_files
+
+        return render(request, 'classification/classification_upload_file_unmapped.html', context)
 
     def post(self, requests, **kwargs):
         # lazily have s3boto3 requirements
@@ -168,16 +170,12 @@ class UploadedClassificationsUnmappedView(View):
         django.utils.encoding.force_text1 = django.utils.encoding.force_str
         django.utils.encoding.smart_text = django.utils.encoding.smart_str
 
-        lab_id: int
+        lab_picker = LabPickerData.from_request(request=requests, selection=kwargs.get('lab_id'))
+        lab = lab_picker.selected_lab
+        if not lab:
+            raise ValueError("Single Lab Required")
+
         try:
-            lab_id = kwargs.get('lab_id')
-            if not lab_id:
-                raise ValueError("Lab required")
-
-            lab = Lab.objects.get(pk=lab_id)
-            if not lab.is_member(user=requests.user, admin_check=True):
-                raise PermissionError("User does not have access to lab")
-
             if server_address := resolve_uploaded_url_to_handle(lab.upload_location):
                 sub_file: FileHandle
 
@@ -235,7 +233,7 @@ class UploadedClassificationsUnmappedView(View):
             report_exc_info()
             messages.add_message(requests, messages.ERROR, str(ve))
 
-        if lab_id := lab_id:
-            return HttpResponseRedirect(reverse("classification_upload_unmapped_lab", kwargs={"lab_id": lab_id}))
+        if lab:
+            return HttpResponseRedirect(reverse("classification_upload_unmapped_lab", kwargs={"lab_id": lab.pk}))
         else:
             return HttpResponseRedirect(reverse("classification_upload_unmapped"))

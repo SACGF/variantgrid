@@ -20,6 +20,7 @@ from genes.hgvs import CHGVS
 from library.cache import timed_cache
 from library.django_utils import add_save_message, get_url_from_view_path
 from library.utils import html_to_text, export_column, ExportRow, local_date_string
+from snpdb.lab_picker import LabPickerData
 from snpdb.models import ClinVarKey, Lab, Allele, GenomeBuild
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
 from uicore.json.json_types import JsonDataType
@@ -387,7 +388,7 @@ def clinvar_export_summary(request: HttpRequest, clinvar_key_id: Optional[str] =
     clinvar_key.check_user_can_access(request.user)
 
     labs = Lab.objects.filter(clinvar_key=clinvar_key).order_by('name')
-    dashboard = ClassificationDashboard(user=request.user, labs=labs)
+    dashboard = ClassificationDashboard(LabPickerData.for_labs(labs, user=request.user))
 
     export_columns = ClinVarExportColumns(request)
     export_batch_columns = ClinVarExportBatchColumns(request)

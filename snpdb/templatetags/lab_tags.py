@@ -4,6 +4,7 @@ from django.conf import settings
 from django.template.library import Library
 
 from library.utils import group_data
+from snpdb.lab_picker import LabPickerData
 from snpdb.models import Lab
 
 register = Library()
@@ -25,19 +26,5 @@ def lab_card(context, lab: Lab, lab_link=True, org_link=True):
 
 
 @register.inclusion_tag("snpdb/tags/lab_picker.html", takes_context=True)
-def lab_picker(context, view_name: str, selected_lab: Optional[Union[Lab, int]] = None, all_option=False):
-    labs_qs = Lab.valid_labs_qs(context.request.user, admin_check=True).select_related('organization')
-    if isinstance(selected_lab, Lab):
-        selected_lab = selected_lab.pk
-
-    internal = labs_qs.filter(external=False)
-    external = labs_qs.filter(external=True)
-
-    return {
-        "all_option": all_option,
-        "internal": sorted(group_data(internal, lambda lab: (lab.organization, lab))),
-        "external": sorted(group_data(external, lambda lab: (lab.organization, lab))),
-        "lab_count": labs_qs.count(),
-        "view_name": view_name,
-        "selected_lab": selected_lab
-    }
+def lab_picker(context, data: LabPickerData):
+    return {"data": data}

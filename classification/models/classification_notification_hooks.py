@@ -5,10 +5,11 @@ from django.dispatch import receiver
 from django.urls import reverse
 
 from classification.enums import SpecialEKeys
-from classification.models import DiscordanceReport, discordance_change_signal, EvidenceKeyMap, UserPerspective, \
+from classification.models import DiscordanceReport, discordance_change_signal, EvidenceKeyMap, \
     DiscordanceReportRowData
 from library.django_utils import get_url_from_view_path
 from library.log_utils import NotificationBuilder
+from snpdb.lab_picker import LabPickerData
 from snpdb.models import Lab
 from snpdb.utils import LabNotificationBuilder
 
@@ -37,7 +38,7 @@ def send_discordance_notification(discordance_report: DiscordanceReport, cause: 
     for lab in all_labs:
         notification = LabNotificationBuilder(lab=lab, message=f"Discordance Update (DR_{discordance_report.id})")
 
-        user_perspective = UserPerspective.for_lab(lab=lab)
+        user_perspective = LabPickerData.for_lab(lab=lab)
         report_summary = DiscordanceReportRowData(discordance_report=discordance_report, perspective=user_perspective)
         if resolution_text := discordance_report.resolution_text:
             notification.add_markdown(f"The below overlap is now marked as *{resolution_text}*")

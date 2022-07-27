@@ -1,4 +1,4 @@
-from typing import Optional, List, Tuple, Iterable
+from typing import Optional, List, Tuple, Iterable, Union
 from urllib.parse import urlencode
 
 from django.conf import settings
@@ -13,9 +13,8 @@ from lazy import lazy
 from termsandconditions.decorators import terms_required
 
 from classification.enums import ShareLevel
-from classification.enums.discordance_enums import DiscordanceReportResolution
 from classification.models import classification_flag_types, ClinVarExport, DiscordanceReportClassification, \
-    DiscordanceReport, ConditionText, ConditionTextMatch, DiscordanceReportTableData, UserPerspective
+    DiscordanceReport, ConditionText, ConditionTextMatch, DiscordanceReportTableData
 from classification.models.classification import Classification, \
     ClassificationModification
 from classification.models.clinvar_export_sync import clinvar_export_sync
@@ -24,39 +23,27 @@ from classification.views.classification_accumulation_graph import \
 from classification.views.classification_export_flags import ExportFormatterFlags
 from flags.models import FlagCollection
 from snpdb.genome_build_manager import GenomeBuildManager
+from snpdb.lab_picker import LabPickerData
 from snpdb.models import Lab, ClinVarKey
 from snpdb.models.models_genome import GenomeBuild
 
 
 class ClassificationDashboard:
 
-    def __init__(self, user: User, lab_id: Optional[int] = 0, labs: Optional[Lab] = None):
-        self.user = user
-        all_labs = Lab.valid_labs_qs(user, admin_check=True).select_related('clinvar_key')
-        if lab_id:
-            self.labs = [all_labs.filter(pk=lab_id).get()]
-        elif labs:
-            # assume safety check not required if given specific set of labs,
-            # user has access to see some data from other labs anyway
-            self.labs = labs
-        else:
-            self.labs = all_labs.exclude(external=True)
-
-        self.labs = sorted(self.labs)
+    def __init__(self, lab_picker: LabPickerData):
+        self.lab_picker = lab_picker
 
     @property
-    def lab_id(self) -> int:
-        if len(self.labs) > 1:
-            return 0
-        return self.labs[0].pk
+    def user(self):
+        return self.lab_picker.user
+
+    @property
+    def labs(self):
+        return self.lab_picker.selected_labs
 
     @lazy
     def lab_ids_str(self) -> str:
-        # Used for classification table filtering
-        if len(self.labs) == 1:
-            return str(self.labs[0].pk)
-        else:
-            return "mine"
+        return ",".join([str(lab.pk) for lab in self.lab_picker.selected_labs])
 
     @property
     def compare_to_clinvar_url(self) -> str:
@@ -65,13 +52,13 @@ class ClassificationDashboard:
             "share_level": "public",
             "build": GenomeBuildManager.get_current_genome_build().name,
             "type": "clinvar_compare",
-            "include_labs": ",".join([lab.group_name for lab in self.labs])
+            "include_labs": ",".join([lab.group_name for lab in self.lab_picker.selected_labs])
         }
         return base + "?" + urlencode(params)
 
     @lazy
     def shared_classifications(self) -> QuerySet[Classification]:
-        return Classification.objects.filter(allele__isnull=False, lab__in=self.labs, withdrawn=False, share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS)
+        return Classification.objects.filter(allele__isnull=False, lab__in=self.lab_picker.selected_labs, withdrawn=False, share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS)
 
     @lazy
     def unique_classified_alleles_count(self) -> int:
@@ -79,7 +66,7 @@ class ClassificationDashboard:
 
     @property
     def clinvar_keys(self) -> List[ClinVarKey]:
-        return sorted(set(lab.clinvar_key for lab in self.labs if lab.clinvar_key))
+        return sorted(set(lab.clinvar_key for lab in self.lab_picker.selected_labs if lab.clinvar_key))
 
     @lazy
     def uploads_to_clinvar_qs(self) -> QuerySet[ClinVarExport]:
@@ -88,15 +75,8 @@ class ClassificationDashboard:
         return ClinVarExport.objects.none()
 
     @lazy
-    def perspective(self) -> UserPerspective:
-        genome_build = GenomeBuildManager.get_current_genome_build()
-        perspective: UserPerspective
-        if len(self.labs) == 1:
-            perspective = UserPerspective.for_lab(self.labs[0], genome_build=genome_build)
-        else:
-            perspective = UserPerspective(your_labs=set(self.labs), genome_build=genome_build,
-                                          is_admin_mode=self.user.is_superuser)
-        return perspective
+    def perspective(self) -> LabPickerData:
+        return self.lab_picker
 
     @lazy
     def discordance_summaries(self) -> DiscordanceReportTableData:
@@ -181,7 +161,7 @@ class ClassificationDashboard:
         }
 
 
-def issues_download(request: HttpRequest, lab_id: int = 0):
+def issues_download(request: HttpRequest, lab_id: Union[int, str] = 0):
     qs = ClassificationModification.objects.filter(
         is_last_edited=True,
         classification__in=Subquery(
@@ -189,8 +169,8 @@ def issues_download(request: HttpRequest, lab_id: int = 0):
                                                                                                   flat=True))
     ).select_related('classification', 'classification__lab')
 
-    if lab_id:
-        qs = qs.filter(classification__lab_id=lab_id)
+    lab_picker = LabPickerData.from_request(request, lab_id)
+    qs = qs.filter(classification__lab_id__in=lab_picker.lab_ids)
 
     exporter = ExportFormatterFlags(
         genome_build=GenomeBuild.grch38(),  # note that genome build for ExportFormatterFlags has no effect
@@ -202,12 +182,11 @@ def issues_download(request: HttpRequest, lab_id: int = 0):
 
 @terms_required
 def classification_dashboard(request: HttpRequest, lab_id: Optional[int] = None) -> HttpResponse:
-    user: User = request.user
-    all_labs = list(Lab.valid_labs_qs(request.user, admin_check=True))
-    if len(all_labs) == 1 and not lab_id:
-        return redirect(reverse('classification_dashboard', kwargs={'lab_id': all_labs[0].pk}))
+    lab_picker = LabPickerData.from_request(request=request, selection=lab_id, view_name='classification_dashboard')
+    if redirect_response := lab_picker.check_redirect():
+        return redirect_response
 
-    dlab = ClassificationDashboard(user=request.user, lab_id=lab_id)
+    dlab = ClassificationDashboard(lab_picker=lab_picker)
 
     return render(request, "classification/classification_dashboard.html", {
         "dlab": dlab,
@@ -217,8 +196,8 @@ def classification_dashboard(request: HttpRequest, lab_id: Optional[int] = None)
     })
 
 
-def classification_dashboard_graph_detail(request: HttpRequest, lab_id: Optional[int] = None) -> HttpResponse:
-    dlab = ClassificationDashboard(user=request.user, lab_id=lab_id)
+def classification_dashboard_graph_detail(request: HttpRequest, lab_id: Optional[Union[int, str]] = None) -> HttpResponse:
+    dlab = ClassificationDashboard(LabPickerData.from_request(request, lab_id))
     return render(request, "classification/classification_dashboard_graph_detail.html", {
         "dlab": dlab
     })

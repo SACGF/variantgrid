@@ -46,7 +46,7 @@
 {% endblock %}
 {% block content %}
     <div class="container">
-        {% lab_picker view_name="discordance_reports" selected_lab=dlab.lab_id all_option=True %}
+        {% lab_picker dlab.lab_picker %}
     </div>
     <div class="container">
         {% page_help_embedded title="Outstanding Discordances" %}

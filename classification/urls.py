@@ -51,7 +51,7 @@ urlpatterns = [
     # this is uploading the entire import file, distinct from attaching a file to a classification
     perm_path('classification/import_upload', UploadedClassificationsUnmappedView.as_view(), name="classification_upload_unmapped"),
     # TODO move file lab into another subfolder as it gets a bit confused with upload page
-    perm_path('classification/import_upload/<int:lab_id>', UploadedClassificationsUnmappedView.as_view(), name="classification_upload_unmapped_lab"),
+    perm_path('classification/import_upload/<str:lab_id>', UploadedClassificationsUnmappedView.as_view(), name="classification_upload_unmapped_lab"),
     perm_path('classification/import_upload/file/<int:uploaded_classification_unmapped_id>', view_uploaded_classification_unmapped, name="classification_upload_unmapped_status"),
     perm_path('classification/import_upload/file/<int:uploaded_classification_unmapped_id>/detail', view_uploaded_classification_unmapped_detail, name="classification_upload_unmapped_status_detail"),
     perm_path('classification/import_upload/datatable', DatabaseTableView.as_view(column_class=UploadedClassificationsUnmappedColumns), name='classification_upload_unmapped_datatable'),
@@ -83,8 +83,8 @@ urlpatterns = [
     perm_path('clinvar_export_batch/<int:clinvar_export_batch_id>/download', clinvar_export_view.clinvar_export_batch_download, name='clinvar_export_batch_download'),
 
     perm_path('condition_matchings', condition_matchings_view, name='condition_matchings'),
-    perm_path('condition_matchings/<int:lab_id>', condition_matchings_view, name='condition_matchings_lab'),
-    perm_path('condition_matching/datatable/<int:lab_id>', DatabaseTableView.as_view(column_class=ConditionTextColumns), name='condition_text_datatable'),
+    perm_path('condition_matchings/<str:lab_id>', condition_matchings_view, name='condition_matchings_lab'),
+    perm_path('condition_matching/datatable/<str:lab_id>', DatabaseTableView.as_view(column_class=ConditionTextColumns), name='condition_text_datatable'),
     perm_path('condition_matching/<int:pk>', condition_matching_view, name='condition_matching'),
 
     perm_path('condition_match_test', condition_match_test_view, name='condition_match_test'),
@@ -105,10 +105,10 @@ urlpatterns = [
 
 
     perm_path('dashboard', classification_dashboard_view.classification_dashboard, name='classification_dashboard'),
-    perm_path('dashboard/<int:lab_id>', classification_dashboard_view.classification_dashboard, name='classification_dashboard'),
-    perm_path('dashboard_graph/<int:lab_id>', classification_dashboard_view.classification_dashboard_graph_detail, name='classification_dashboard_graph_detail'),
+    perm_path('dashboard/<str:lab_id>', classification_dashboard_view.classification_dashboard, name='classification_dashboard'),
+    perm_path('dashboard_graph/<str:lab_id>', classification_dashboard_view.classification_dashboard_graph_detail, name='classification_dashboard_graph_detail'),
     perm_path('dashboard_download', issues_download, name='classification_dashboard_download'),
-    perm_path('dashboard_download/<int:lab_id>', issues_download, name='classification_dashboard_download'),
+    perm_path('dashboard_download/<str:lab_id>', issues_download, name='classification_dashboard_download'),
     # legacy URL
     perm_path('dashboard/all', classification_dashboard_view.classification_dashboard, name="classification_dashboard_all"),
 
@@ -116,7 +116,7 @@ urlpatterns = [
     perm_path('accumulation_data', classification_accumulation_graph.download_report, name="classification_accumulation_data"),
 
     perm_path('discordance_reports', discordance_reports_view, name='discordance_reports'),
-    perm_path('discordance_reports/<int:lab_id>', discordance_reports_view, name='discordance_reports'),
+    perm_path('discordance_reports/<str:lab_id>', discordance_reports_view, name='discordance_reports'),
     # 'classification' is redundant but there'll be other references to these URLs, so keep the URLs valid
     perm_path('classification/discordance_report/<int:discordance_report_id>', discordance_report_view, name='discordance_report_deprecated'),
     perm_path('classification/discordance_report/<int:discordance_report_id>/export', export_discordance_report, name='discordance_export_deprecated'),
@@ -130,8 +130,8 @@ urlpatterns = [
 
     perm_path('clinical_context', post_clinical_context, name='clinical_context'),
     perm_path('overlaps', view_overlaps, name='overlaps'),
-    perm_path('overlaps/<int:lab_id>', view_overlaps, name='overlaps'),
-    perm_path('overlaps_detail/<int:lab_id>', view_overlaps_detail, name='overlaps_detail'),
+    perm_path('overlaps/<str:lab_id>', view_overlaps, name='overlaps'),
+    perm_path('overlaps_detail/<str:lab_id>', view_overlaps_detail, name='overlaps_detail'),
     perm_path('clinical_context/<int:pk>', view_clinical_context, name='clinical_context'),
     perm_path('hgvs_issues', view_hgvs_issues, name='hgvs_issues'),
     perm_path('hgvs_issues/allele/datatable', DatabaseTableView.as_view(column_class=AlleleColumns), name='allele_datatable'),

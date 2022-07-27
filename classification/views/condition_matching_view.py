@@ -1,10 +1,11 @@
-from typing import Optional, List
+from typing import Optional, List, Union
 
 from django.contrib.auth.models import User
 from django.db.models import QuerySet
 from django.shortcuts import render, get_object_or_404, redirect
 from django.urls import reverse
 from guardian.shortcuts import get_objects_for_user
+from lazy import lazy
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -14,6 +15,7 @@ from classification.views.classification_dashboard_view import ClassificationDas
 from library.utils import empty_to_none
 from ontology.models import OntologyTerm
 from ontology.ontology_matching import normalize_condition_text
+from snpdb.lab_picker import LabPickerData
 from snpdb.models import Lab
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
 
@@ -28,30 +30,20 @@ class ConditionTextColumns(DatatableConfig):
             RichColumn(key="classifications_count", label="Classification Count", orderable=True, default_sort=SortOrder.DESC, sort_keys=['classifications_count', '-normalized_text']),
             RichColumn(key="classifications_count_outstanding", label="Classifications Outstanding", default_sort=SortOrder.DESC, orderable=True, sort_keys=['classifications_count_outstanding', '-normalized_text'])
         ]
-        if not self.lab_id:
+        if self.lab_picker.multi_labs_selected:
             self.rich_columns.insert(
                 0,
                 RichColumn(key="lab__name", label='Lab', orderable=True, sort_keys=['lab__name', 'normalized_text'])
             )
 
-    @property
-    def lab_id(self) -> Optional[int]:
-        if lab_id := self.get_query_param("lab_id"):
-            if lab_int := int(lab_id):  # 0 means all user labs
-                return lab_int
-        return None
+    @lazy
+    def lab_picker(self) -> LabPickerData:
+        return LabPickerData.for_user(user=self.user, selection=self.get_query_param("lab_id"))
 
     def get_initial_queryset(self):
         # exclude where we've auto matched and have 0 outstanding left
         cts_qs: QuerySet[ConditionText] = get_objects_for_user(self.user, ConditionText.get_read_perm(), klass=ConditionText, accept_global_perms=True)
-
-        filter_labs = Lab.valid_labs_qs(self.user, admin_check=True)
-        if lab_id := self.lab_id:
-            filter_labs = filter_labs.filter(pk=lab_id)
-        else:
-            filter_labs = filter_labs.filter(external=False)
-
-        cts_qs = cts_qs.filter(lab_id__in=filter_labs)
+        cts_qs = cts_qs.filter(lab_id__in=self.lab_picker.lab_ids)
         return cts_qs
 
     def filter_queryset(self, qs: QuerySet) -> QuerySet:
@@ -67,14 +59,13 @@ class ConditionTextColumns(DatatableConfig):
         return qs
 
 
-def condition_matchings_view(request, lab_id: Optional[int] = None):
-    cd = ClassificationDashboard(request.user, lab_id)
-    if not lab_id and len(cd.labs) == 1:
-        return redirect(reverse('condition_matchings_lab', kwargs={'lab_id': cd.labs[0].pk}))
+def condition_matchings_view(request, lab_id: Optional[Union[str,int]] = None):
+    lab_picker = LabPickerData.from_request(request, lab_id, 'condition_matchings_lab')
+    if redirect_response := lab_picker.check_redirect():
+        return redirect_response
 
     return render(request, 'classification/condition_matchings.html', context={
-        'selected_lab': cd.lab_id,
-        'dlab': cd,
+        'dlab': ClassificationDashboard(lab_picker),
     })
 
 

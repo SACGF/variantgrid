@@ -1,23 +1,21 @@
 {% load ui_utils %}
-{% if lab_count > 1 %}
+{% if data.has_multi_labs %}
     {% labelled label="For Lab" %}
         <div class="form">
             <select id="lab-picker" class="chosen-select">
-                {% if all_option %}<option value="0">All {% if external %}Internal{% endif %} Assigned Labs</option>{% endif %}
-                {% for org_group in internal %}
-                    <optgroup label="{{ org_group.key.name }}">
-                        {% for lab in org_group.values_list %}
-                            <option value="{{ lab.pk }}" {% if lab.pk == selected_lab %}selected{% endif %}>
+                {% if data.multi_select %}<option value="0">All {% if data.has_external %}Internal{% endif %} Assigned Labs</option>{% endif %}
+                {% for org_group in data.org_lab_groups %}
+                    <optgroup label="{% if org_group.external %}EXTERNAL {% endif %}{{ org_group.org }}">
+                        {% if org_group.is_multi_lab and data.multi_select %}
+                            <option value="org-{{ org_group.org.pk }}" {% if org_group.org == data.selected_org %}selected{% endif %}>
+                                - All ({{ org_group.labs|length }}) {{ org_group.org }} Labs -
+                            </option>
+                        {% endif %}
+                        {% for lab in org_group.labs %}
+                            <option value="{{ lab.pk }}" {% if lab == data.selected_lab %}selected{% endif %}>
                                 {{ lab.name }}
-                            </option>{% endfor %}
-                    </optgroup>
-                {% endfor %}
-                {% for org_group in external %}
-                    <optgroup label="EXTERNAL {{ org_group.key.name }}">
-                        {% for lab in org_group.values_list %}
-                            <option value="{{ lab.pk }}" {% if lab.pk == selected_lab %}selected{% endif %}>
-                                {{ lab.name }}
-                            </option>{% endfor %}
+                            </option>
+                        {% endfor %}
                     </optgroup>
                 {% endfor %}
             </select>
@@ -25,7 +23,7 @@
         <script>
             $('#lab-picker').chosen({width:'400px'}).change((change) => {
                 let val = $(change.target).val();
-                let url = Urls.{{ view_name | safe }}(val);
+                let url = Urls.{{ data.view_name | safe }}(val);
                 window.open(url, '_self');
             });
         </script>

@@ -7,9 +7,9 @@
 {% block content %}
 <div class="container">
     {% page_help page_id='classification/overlaps_help' title='Classification Overlaps' %}
-    {% lab_picker view_name='overlaps' selected_lab=selected_lab all_option=True %}
+    {% lab_picker data=lab_picker_data %}
 
-    <div data-toggle="ajax" href="{% url 'overlaps_detail' selected_lab %}">
+    <div data-toggle="ajax" href="{% url 'overlaps_detail' lab_picker_data.selection %}">
         <div class="loading-message">Loading Overlaps, this may take a while.</div>
     </div>
 

@@ -56,7 +56,7 @@
 
 </script>
 <div class="container">
-    {% lab_picker view_name="classification_dashboard" selected_lab=dlab.lab_id all_option=True %}
+    {% lab_picker data=dlab.lab_picker %}
 </div>
 <div class="container">
     {% if not dlab.lab_id %}
@@ -73,14 +73,13 @@
             This graphs shows how many shared classifications your lab has submitted over time.
         {% end_page_help_embedded %}
 
-        <div data-toggle="ajax" href="{% url 'classification_dashboard_graph_detail' dlab.lab_id %}">
+        <div data-toggle="ajax" href="{% url 'classification_dashboard_graph_detail' dlab.lab_picker.selection %}">
             <div class="loading-message" style="height:381px">Loading Graph</div>
         </div>
         <div>
             <label>See recent activity for</label>: {% for lab in dlab.labs %}{% if not forloop.first %}, {% endif %}<a href="{% url 'activity_lab' lab.pk %}">{% lab lab %}</a>{% endfor %}
         </div>
 
-        {% comment %}section only makes sense for where Shared is king{% endcomment %}
         {% page_help_embedded title="Classification Counts" %}
             <p>
             See the grand total of classifications provided by your lab, the progress of ClinVar submissions, and a comparison between your lab's classifications and ClinVar's.
@@ -111,14 +110,13 @@
         {% if 'condition_matchings_lab'|is_view_enabled %}
             {% labelled hint="tiny"  label="Classifications without Standard Condition" %}
                 {{ dlab.classifications_wout_standard_text | number:'W' }}
-                <a class="hover-link" href="{% url 'condition_matchings_lab' dlab.lab_id %}"><small class="form-text">Review your lab's unresolved condition text here</small></a>
+                <a class="hover-link" href="{% url 'condition_matchings_lab' dlab.lab_picker.selection %}"><small class="form-text">Review your lab's unresolved condition text here</small></a>
             {% endlabelled %}
         {% endif %}
 
         {% labelled hint="tiny" label="Downloads" %}
             <a href="{{ dlab.compare_to_clinvar_url }}" class="download-link">Classifications compared with ClinVar</a>
         {% endlabelled %}
-
     {% endif %}
 
     {% if 'discordance_report'|is_view_enabled %}
@@ -132,7 +130,7 @@
             {% labelled label="Outstanding Discordances" hint="tiny" %}
                 <div>{{ dlab.discordance_summaries.summaries|length| number:'W' }}</div>
                 {% if dlab.discordance_summaries.summaries|length > 3 %}<div>Showing most recent 3</div>{% endif %}
-                <div><a class="hover-link" href="{% url 'discordance_reports'  dlab.lab_id %}"><small class="form-text">Review all discordances here</small></a></div>
+                <div><a class="hover-link" href="{% url 'discordance_reports' dlab.lab_picker.selection %}"><small class="form-text">Review all discordances here</small></a></div>
             {% endlabelled %}
             <table class="table">
                 <thead>
@@ -173,7 +171,7 @@
     <p><a href="#flagged-classifications" class="toggle-link" data-toggle="collapse">Show details</a></p>
 
     <div id="flagged-classifications" class="collapse">
-        <p><br/><a class="download-link type-csv" href="{% url 'classification_dashboard_download' dlab.lab_id %}">Download all issues requiring action</a></p>
+        <p><br/><a class="download-link type-csv" href="{% url 'classification_dashboard_download' dlab.lab_picker.selection %}">Download all issues requiring action</a></p>
 
         <p class="text-info">For instructions on how to fix the outstanding actions, click on the icons in the flag column for each classification.</p>
 

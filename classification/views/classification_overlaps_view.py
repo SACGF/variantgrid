@@ -16,29 +16,22 @@ from classification.models.classification import Classification
 from classification.models.clinical_context_models import ClinicalContext
 from classification.models.flag_types import classification_flag_types
 from library.django_utils import require_superuser
+from snpdb.lab_picker import LabPickerData
 from snpdb.models import Allele, Lab
 from snpdb.models.models_variant import Variant
 
 
-def view_overlaps(request: HttpRequest, lab_id: Optional[int] = None) -> Response:
-    user = request.user
-    user: User = request.user
+def view_overlaps(request: HttpRequest, lab_id = None) -> Response:
+    lab_picker = LabPickerData.from_request(request, lab_id, 'overlaps')
+    if redirect_data := lab_picker.check_redirect():
+        return redirect_data
 
-    all_labs = list(Lab.valid_labs_qs(request.user, admin_check=True))
-    if len(all_labs) == 1 and not lab_id:
-        return redirect(reverse('overlaps', kwargs={'lab_id': all_labs[0].pk}))
-
-    context = {
-        "selected_lab": lab_id or 0,
-        "labs": all_labs
-    }
-
-    return render(request, "classification/overlaps.html", context)
+    return render(request, "classification/overlaps.html", {"lab_picker_data": lab_picker})
 
 
-def view_overlaps_detail(request: HttpRequest, lab_id: Optional[int] = None) -> Response:
-    user = request.user
-    allele_and_vcs = AlleleOverlap.overlaps_for_user(user, lab_id=lab_id)
+def view_overlaps_detail(request: HttpRequest, lab_id = None) -> Response:
+    lab_picker = LabPickerData.from_request(request, lab_id)
+    allele_and_vcs = AlleleOverlap.overlaps_for_user(lab_picker)
     overlap_counts = OverlapCounts(allele_and_vcs)
 
     context = {

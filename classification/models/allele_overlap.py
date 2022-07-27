@@ -13,6 +13,7 @@ from classification.models import ClassificationModification, DiscordanceReport
 from classification.models.clinical_context_models import ClinicalContext, DiscordanceLevel, DiscordanceStatus
 from genes.hgvs import CHGVS
 from library.guardian_utils import admin_bot
+from snpdb.lab_picker import LabPickerData
 from snpdb.models import Allele, GenomeBuild, UserSettings, Lab
 
 
@@ -142,24 +143,15 @@ class AlleleOverlap:
         return groups
 
     @staticmethod
-    def overlaps_for_user(user: User, lab_id: Optional[int] = None) -> List['AlleleOverlap']:
-        if user is None:
-            user = admin_bot()
-        genome_build = UserSettings.get_for_user(user).default_genome_build
-        labs = set(Lab.valid_labs_qs(user, admin_check=True))
-        lab_ids = set(lab.id for lab in labs)
-        if lab_id:
-            if lab_id in lab_ids:
-                lab_ids = set([lab_id])
-            else:
-                raise ValueError(f"You do not have access to lab id {lab_id}")
-
+    def overlaps_for_user(lab_picker: LabPickerData) -> List['AlleleOverlap']:
+        genome_build = UserSettings.get_for_user(lab_picker.user).default_genome_build
+        lab_ids = lab_picker.lab_ids
         # find all overlaps, then see if user is allowed to see them and if user wants to see them (lab restriction)
 
         allele_qs = Allele.objects.annotate(classification__count=Count('classification')).filter(classification__count__gte=2)
 
         cm_qs: QuerySet[ClassificationModification]
-        cm_qs = ClassificationModification.latest_for_user(user=user, published=True).filter(classification__allele_id__in=Subquery(allele_qs.values("pk")))\
+        cm_qs = ClassificationModification.latest_for_user(user=lab_picker.user, published=True).filter(classification__allele_id__in=Subquery(allele_qs.values("pk")))\
             .select_related('classification', 'classification__allele', 'classification__clinical_context', 'classification__lab')
 
         allele_to_cms = defaultdict(list)

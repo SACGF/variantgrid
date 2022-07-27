@@ -14,8 +14,8 @@ from lazy import lazy
 from classification.enums import SpecialEKeys
 from classification.enums.discordance_enums import ContinuedDiscordanceReason, DiscordanceReportResolution
 from classification.models import ClassificationModification, DiscordanceReportClassification, ClinicalContext, \
-    EvidenceKeyMap, flag_types, classification_flag_types, ClinicalContextRecalcTrigger, discordance_change_signal, \
-    UserPerspective, DiscordanceReportRowData
+    EvidenceKeyMap, classification_flag_types, discordance_change_signal, \
+    DiscordanceReportRowData
 from classification.models.discordance_models import DiscordanceReport
 from classification.models.evidence_key import EvidenceKeyOption
 from classification.views.classification_dashboard_view import ClassificationDashboard
@@ -24,16 +24,16 @@ from classification.views.exports.classification_export_filter import Classifica
 from classification.views.exports.classification_export_formatter2_csv import FormatDetailsCSV
 from genes.hgvs import CHGVS
 from snpdb.genome_build_manager import GenomeBuildManager
+from snpdb.lab_picker import LabPickerData
 from snpdb.models import Lab, GenomeBuild, Allele
 
 
-def discordance_reports_view(request: HttpRequest, lab_id: Optional[int] = None) -> HttpResponseBase:
-    user: User = request.user
-    all_labs = list(Lab.valid_labs_qs(request.user, admin_check=True))
-    if len(all_labs) == 1 and not lab_id:
-        return redirect(reverse('discordance_reports', kwargs={'lab_id': all_labs[0].pk}))
+def discordance_reports_view(request: HttpRequest, lab_id: Optional[str] = None) -> HttpResponseBase:
+    lab_picker = LabPickerData.from_request(request=request, selection=lab_id, view_name='discordance_reports')
+    if redirect_response := lab_picker.check_redirect():
+        return redirect_response
 
-    dlab = ClassificationDashboard(user=request.user, lab_id=lab_id)
+    dlab = ClassificationDashboard(lab_picker=lab_picker)
     context = {
         "dlab": dlab
     }
@@ -97,7 +97,7 @@ class DiscordanceReportTemplateData:
         return self.report_history.count() > 1
 
     def report_history_summary(self) -> List[DiscordanceReportRowData]:
-        perspective = UserPerspective.for_user(self.user)
+        perspective = LabPickerData.for_user(self.user)
         return [
             DiscordanceReportRowData(
                 discordance_report=report,

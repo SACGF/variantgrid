@@ -27,6 +27,7 @@ from flags.models.enums import FlagStatus
 from flags.models.models import FlagComment
 from genes.hgvs import CHGVS
 from snpdb.genome_build_manager import GenomeBuildManager
+from snpdb.lab_picker import LabPickerData
 from snpdb.models import Lab, GenomeBuild, UserSettings
 
 discordance_change_signal = django.dispatch.Signal()  # args: "discordance_report", "cause"
@@ -332,38 +333,11 @@ class DiscordanceReport(TimeStampedModel):
 # TODO all the below classes are utilites, consider moving them out
 
 
-@dataclass(frozen=True)
-class UserPerspective:
-    your_labs: Set[Lab]
-    genome_build: GenomeBuild
-    is_admin_mode: bool
-
-    @staticmethod
-    def for_lab(lab: Lab, genome_build: Optional[GenomeBuild] = None):
-        if not genome_build:
-            genome_build = UserSettings.get_for(lab=lab).default_genome_build or GenomeBuild.grch38()
-        return UserPerspective(your_labs={lab, }, genome_build=genome_build, is_admin_mode=False)
-
-    @staticmethod
-    def for_user(user: User):
-        return UserPerspective(
-            your_labs=set(Lab.valid_labs_qs(user)),
-            genome_build=GenomeBuildManager.get_current_genome_build(),
-            is_admin_mode=user.is_superuser
-        )
-
-    @property
-    def labs_if_not_admin(self) -> Set[Lab]:
-        if self.is_admin_mode:
-            return set()
-        return self.your_labs
-
-
 class DiscordanceReportRowData:
 
     # TODO merge this with DiscordanceReportViewTemplate?
 
-    def __init__(self, discordance_report: DiscordanceReport, perspective: UserPerspective):
+    def __init__(self, discordance_report: DiscordanceReport, perspective: LabPickerData):
         self.discordance_report = discordance_report
         self.perspective = perspective
 
@@ -536,7 +510,7 @@ class DiscordanceReportSummaryCount:
 
 @dataclass(frozen=True)
 class DiscordanceReportTableData:
-    perspective: UserPerspective
+    perspective: LabPickerData
     summaries: List[DiscordanceReportRowData]
     inactive_summaries: List[DiscordanceReportRowData]
 
@@ -563,7 +537,7 @@ class DiscordanceReportTableData:
         return self.perspective.genome_build
 
     @staticmethod
-    def create(perspective: UserPerspective, discordance_reports: Iterable[DiscordanceReport]) -> 'DiscordanceReportTableData':
+    def create(perspective: LabPickerData, discordance_reports: Iterable[DiscordanceReport]) -> 'DiscordanceReportTableData':
         internal_count = 0
         by_lab: Dict[Lab, int] = defaultdict(int)
         summaries: List[DiscordanceReportRowData] = list()

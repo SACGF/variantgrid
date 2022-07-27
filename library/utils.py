@@ -444,6 +444,7 @@ class Group(Generic[Key, Value]):
 
 
 def group_data(data: Iterable[Data], key_func: Callable[[Data], Tuple[Key, Value]]) -> List[Group[Key, Value]]:
+    # deprecated, use itertools groupby
     group_dict = defaultdict(set)
     for element in data:
         key, value = key_func(element)
