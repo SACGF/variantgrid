@@ -1,11 +1,10 @@
 import itertools
 from dataclasses import dataclass
-from enum import Enum
-from typing import Optional, Union, List, Set, Iterator, Tuple, Iterable
+from typing import Optional, Union, List, Set, Iterator, Iterable
 
 from django.contrib.auth.models import User
 from django.db.models import QuerySet
-from django.http import HttpRequest
+from django.http import HttpRequest, HttpResponseRedirect
 from django.shortcuts import redirect
 from django.urls import reverse
 from lazy import lazy
@@ -26,7 +25,7 @@ class OrgLabGroup:
 @dataclass(frozen=True)
 class LabSelection:
     """
-    Just used to simply LabPickerData
+    Used to simply LabPickerData, tracks which labs the view has access to, and which ones are selected
     """
     all_labs: List[Lab]
     selected_labs: Set[Lab]
@@ -35,6 +34,12 @@ class LabSelection:
 
     @staticmethod
     def from_user(user: User, selection: Union[str, int]) -> 'LabSelection':
+        """
+        Provide a user, a lab selection string. Method ensures use has access to the selection
+        :param user: The user
+        :param selection: primary key of a lab, or "org-{org_id}" or 0 or blank to indicate all labs the user can access
+        :return: A LabSelection
+        """
         all_labs = Lab.valid_labs_qs(user=user, admin_check=True).exclude(organization__active=False).order_by(
             'organization__name', 'name')
         seleced_labs: QuerySet[Lab]
@@ -66,7 +71,7 @@ class LabSelection:
             raise ValueError(f"You do not have access to lab selection : {selection}")
 
         return LabSelection(
-            all_labs=all_labs,
+            all_labs=list(all_labs),
             selected_labs=set(selected_labs),
             selected_org=selected_org,
             selected_all=selected_all
@@ -74,25 +79,36 @@ class LabSelection:
 
     @staticmethod
     def single_lab(lab: Lab) -> 'LabSelection':
+        """
+        Use just when the user is not relevant
+        :param lab: The lab to be selected, no checks performed
+        """
         return LabSelection(
             all_labs=[lab],
-            selected_labs={lab,},
+            selected_labs={lab, },
             selected_org=None,
             selected_all=False
         )
 
     @staticmethod
     def multi_lab(labs: Iterable[Lab]) -> 'LabSelection':
+        """
+       Use just when the user is not relevant
+       :param labs: The lab to be selected, no checks performed
+       """
         labs = list(labs)
         return LabSelection(
-            all_labs=[labs],
+            all_labs=labs,
             selected_labs=set(labs),
             selected_org=None,
-            selected_all=None
+            selected_all=False
         )
 
     @property
     def selection(self) -> Union[str, int]:
+        """
+        Generates a value that can be used to generate another LabSelection for the same labs.
+        """
         if self.selected_all:
             return 0
         if self.selected_org:
@@ -104,14 +120,16 @@ class LabSelection:
 class LabPickerData:
     """
     TODO: This class has taken over from UserPerspective, maybe it should be renamed?
-    Useful for pages with lab pickers OR
-    for data that works on one or multiple labs
+    Useful for managing: pages with lab pickers
+    Methods which can operate on one or more labs: e.g. allele graph
+    Helper methods for getting genome build
+    Can be user focused or lab focused (e.g. for lab wide notifications)
     """
 
-    lab_selection: LabSelection
-    user: Optional[User] = None
-    view_name: Optional[str] = None
-    multi_select: bool = True
+    lab_selection: LabSelection  # what labs are available to the user, and what ones have been selected by the user
+    user: Optional[User] = None  # the user who we're seeing the POV of
+    view_name: Optional[str] = None  # useful for when the page needs to be reloaded if lab changes
+    multi_select: bool = True  # can we select multiple labs on this page
 
     @property
     def selection(self):
@@ -144,7 +162,9 @@ class LabPickerData:
         view_name: Optional[str] = None,
         multi_select: bool = True
     ) -> 'LabPickerData':
-        # All this currently does is
+        """
+        Just calls for_user with request.user, but could do more in future
+        """
         return LabPickerData.for_user(
             user=request.user,
             selection=selection,
@@ -198,7 +218,7 @@ class LabPickerData:
             return set(self.all_labs)
 
     @property
-    def selected_lab(self) -> Lab:
+    def selected_lab(self) -> Optional[Lab]:
         if len(self.selected_labs) == 1:
             return list(self.selected_labs)[0]
         return None
@@ -216,7 +236,7 @@ class LabPickerData:
         if self.all_labs:
             first_org = self.all_labs[1].organization
             for lab in self.all_labs[1:]:
-                if lab.org != first_org:
+                if lab.organization != first_org:
                     return True
         return False
 
@@ -234,13 +254,23 @@ class LabPickerData:
         for org, labs in itertools.groupby(self.external_labs, lambda l: l.organization):
             yield OrgLabGroup(org, list(labs), external=True)
 
-    def check_redirect(self):
+    def check_redirect(self) -> Optional[HttpResponseRedirect]:
+        """
+        LabPicker pages redirect to a specific URL if only one lab is available, e.g. if
+        /classifications/foo (shows all labs, but the user only has access to lab 3) calling this will generate
+        /classifications/foo/3
+        Also (and more importantly) for pages that don't support multi_select
+        :return:
+        """
         if len(self.all_labs) == 1 and self.selection is None:
             return redirect(reverse(self.view_name, kwargs={'lab_id': self.selected_lab.pk}))
-        if not self.multi_select and not self.selected_lab: # need only 1 lab selected in this case
+        if not self.multi_select and not self.selected_lab:  # need only 1 lab selected in this case
             default_lab = UserSettings.get_for_user(self.user).default_lab_safe()
             return redirect(reverse(self.view_name, kwargs={'lab_id': default_lab.pk}))
 
     @property
     def lab_ids(self) -> Set[int]:
+        """
+        :return: A set of selected lab.pks
+        """
         return {lab.pk for lab in self.selected_labs}

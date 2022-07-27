@@ -6,7 +6,7 @@
                 {% if data.multi_select %}<option value="0">All {% if data.has_external %}Internal{% endif %} Assigned Labs</option>{% endif %}
                 {% for org_group in data.org_lab_groups %}
                     <optgroup label="{% if org_group.external %}EXTERNAL {% endif %}{{ org_group.org }}">
-                        {% if org_group.is_multi_lab and data.multi_select %}
+                        {% if org_group.is_multi_lab and data.multi_select and data.has_multi_orgs %}
                             <option value="org-{{ org_group.org.pk }}" {% if org_group.org == data.selected_org %}selected{% endif %}>
                                 - All ({{ org_group.labs|length }}) {{ org_group.org }} Labs -
                             </option>
