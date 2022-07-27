@@ -47,6 +47,7 @@ from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_user_settings import UserSettings
 from snpdb.serializers import VariantAlleleSerializer
 from snpdb.variant_sample_information import VariantSampleInformation
+from upload.models import ModifiedImportedVariant
 from upload.upload_stats import get_vcf_variant_upload_stats
 from variantgrid.celery import app
 from variantgrid.tasks.server_monitoring_tasks import get_disk_messages
@@ -598,11 +599,13 @@ def variant_sample_information(request, variant_id, genome_build_name):
     variant = get_object_or_404(Variant, pk=variant_id)
     genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
     vsi = VariantSampleInformation(request.user, variant, genome_build)
+    other_loci_variants_by_multiallelic = ModifiedImportedVariant.get_other_loci_variants_by_multiallelic(variant)
 
     context = {
         "variant": variant,
         "vsi": vsi,
         "visible_rows": vsi.visible_rows,
+        "other_loci_variants_by_multiallelic": other_loci_variants_by_multiallelic,
         "has_samples_in_other_builds": Sample.objects.exclude(vcf__genome_build=genome_build).exists(),
     }
     return render(request, "variantopedia/variant_sample_information.html", context)

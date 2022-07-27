@@ -611,6 +611,19 @@ class ModifiedImportedVariant(models.Model):
         old_variant = cls.get_old_variant_from_tuple(chrom, position, ref, "")
         return Variant.objects.filter(modifiedimportedvariant__old_variant_formatted__startswith=old_variant).distinct()
 
+    @classmethod
+    def get_other_loci_variants_by_multiallelic(cls, variant: Variant) -> Dict[str, Set['ModifiedImportedVariant']]:
+        """ Variants that were once on the same row of a VCF but were split into separate loci """
+
+        miv_qs = variant.modifiedimportedvariant_set.filter(old_multiallelic__isnull=False)
+        other_loci_variants_by_multiallelic = {}
+        for old_multiallelic in miv_qs.distinct("old_multiallelic").values_list("old_multiallelic", flat=True):
+            other_miv_qs = ModifiedImportedVariant.objects.filter(old_multiallelic=old_multiallelic)
+            other_miv_qs = other_miv_qs.exclude(variant__locus=variant.locus)
+            if variants := {miv.variant for miv in other_miv_qs}:
+                other_loci_variants_by_multiallelic[old_multiallelic] = variants
+        return other_loci_variants_by_multiallelic
+
 
 class VCFSkippedContigs(VCFImportInfo):
     has_more_details = True

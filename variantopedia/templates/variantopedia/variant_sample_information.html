@@ -44,6 +44,27 @@
     </table>
 </div>
 
+{% if other_loci_variants_by_multiallelic %}
+    <div id='other_loci_variants_by_multiallelic' class="container">
+        <h4>Variants from multi-allelic VCF records</h4>
+        <p>
+            Multi-allelic VCF records are split then separately normalized. This may cause records that were on a line
+            together in a VCF to now have different loci.
+        </p>
+
+
+
+        {% for multiallelic, other_variants in other_loci_variants_by_multiallelic.items %}
+            <b>{{ multiallelic }}</b>
+
+            <ul>
+            {% for ov in other_variants %}
+                <li><a href="{{ ov.get_absolute_url }}">{{ ov }}</a></li>
+            {% endfor %}
+            </ul>
+        {% endfor %}
+    </div>
+{% endif %}
 
 
 {% if vsi.has_observations %}
