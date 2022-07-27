@@ -175,6 +175,7 @@ class Allele(FlagsMixin, models.Model):
             for va in other_allele.variantallele_set.all():
                 try:
                     va.allele = self
+                    va.error = None  # clear any errors
                     va.conversion_tool = conversion_tool
                     va.save()
                 except IntegrityError:

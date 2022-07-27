@@ -23,7 +23,7 @@
                 {% endlabelled %}
             {% endif %}
             {% labelled label='Origin' hint="chunky" %}{{ variant_allele.get_origin_display }}{% endlabelled%}
-            {% labelled label='Conversion Tool' hint="chunky" %}{{ variant_allele.get_conversion_tool_display }}{% endlabelled%}
+            {% labelled label='Linked to Allele via' hint="chunky" %}{{ variant_allele.get_conversion_tool_display }}{% endlabelled%}
             <a class="toggle-link" data-toggle="collapse" href=".quick-links">Quick Links</a>
             <div class="quick-links collapse" id="quick-links-{{ variant_allele.pk }}">Loading ...</div>
         </div>
