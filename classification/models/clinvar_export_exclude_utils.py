@@ -87,7 +87,7 @@ class ExcludeRecord:
         (If so, let's not muck around with it)
         """
         if flag := self.existing_flag:
-            if last_comment := flag.flagcomment_set.order_by('created').first():
+            if last_comment := flag.flagcomment_set.order_by('-created').first():
                 return last_comment.user != admin_bot()
         return False
 
