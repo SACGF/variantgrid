@@ -42,7 +42,7 @@ class MOINode(AncestorSampleMixin, AnalysisNode):
         """ Filtered by node settings """
         gene_disease_relations = []
         ontology_terms = self._get_all_ontology_term_ids()
-        gene_disease_qs = self.analysis.annotation_version.ontology_version.gene_disease_relations()
+        gene_disease_qs = self.analysis.annotation_version.ontology_version.get_gene_disease_relations_qs()
         gene_disease_qs = gene_disease_qs.filter(source_term__in=ontology_terms)
 
         valid_classifications = set(GeneDiseaseClassification.get_above_min(self.min_classification))

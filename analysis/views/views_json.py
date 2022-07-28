@@ -316,7 +316,7 @@ def get_sample_patient_gene_disease_data(sample: Sample, ontology_version: Ontol
     }
     if sample.patient:
         all_terms = OntologyTerm.objects.filter(pk__in=sample.patient.get_ontology_term_ids())
-        gene_disease_qs = ontology_version.gene_disease_relations()
+        gene_disease_qs = ontology_version.get_gene_disease_relations_qs()
         gene_disease_terms = all_terms.filter(subject__in=gene_disease_qs).distinct()
         data["patient"] = str(sample.patient)
         data["total_terms"] = all_terms.count()

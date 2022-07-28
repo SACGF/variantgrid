@@ -559,7 +559,7 @@ class OntologyVersion(TimeStampedModel):
     def get_ontology_terms(self):
         return OntologyTermRelation.objects.filter(from_import__in=self.get_ontology_imports())
 
-    def gene_disease_relations(self) -> QuerySet:
+    def get_gene_disease_relations_qs(self) -> QuerySet:
         return self.get_ontology_terms().filter(relation=OntologyRelation.RELATED,
                                                 extra__strongest_classification__isnull=False)
 
@@ -568,7 +568,7 @@ class OntologyVersion(TimeStampedModel):
         """ Cached lists of MOI/Submitters from GenCC gene/disease extra JSON """
         moi = set()
         submitters = set()
-        for extra in self.gene_disease_relations().values_list("extra", flat=True):
+        for extra in self.get_gene_disease_relations_qs().values_list("extra", flat=True):
             for source in extra["sources"]:
                 moi.add(source["mode_of_inheritance"])
                 submitters.add(source["submitter"])
