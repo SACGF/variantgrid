@@ -61,10 +61,10 @@ def get_fake_annotation_version(genome_build: GenomeBuild):
     vav_kwargs["gene_annotation_release"] = gene_annotation_release
     variant_annotation_version = VariantAnnotationVersion.objects.create(**vav_kwargs)
     create_ontology_test_data()
-    last_ontology_import = OntologyImport.objects.last()
+    ontology_version = create_test_ontology_version()
 
     gene_annotation_version = GeneAnnotationVersion.objects.get_or_create(gene_annotation_release=gene_annotation_release,
-                                                                          last_ontology_import=last_ontology_import,
+                                                                          ontology_version=ontology_version,
                                                                           gnomad_import_date=timezone.now())[0]
     clinvar_version = ClinVarVersion.objects.get_or_create(filename="fake_clinvar.vcf",
                                                            md5_hash="not_a_real_hash",
@@ -73,7 +73,6 @@ def get_fake_annotation_version(genome_build: GenomeBuild):
                                                                                            md5_hash="not_a_real_hash",
                                                                                            hpa_version=0.42)[0]
 
-    ontology_version = create_test_ontology_version()
     print(f"Ontology version {ontology_version.pk}")
     av, _ = AnnotationVersion.objects.get_or_create(genome_build=genome_build,
                                                     variant_annotation_version=variant_annotation_version,

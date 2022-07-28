@@ -9,7 +9,8 @@ from annotation.models import GeneAnnotationVersion, OntologyImport, OntologyTer
 from genes.gene_matching import ReleaseGeneMatcher
 from genes.models import GeneAnnotationRelease, GnomADGeneConstraint
 from library.django_utils.django_file_utils import get_import_processing_filename
-from ontology.models import OntologyService, OntologySnake, GeneDiseaseClassification, OntologyTermRelation
+from ontology.models import OntologyService, GeneDiseaseClassification, OntologyTermRelation, \
+    OntologyVersion
 from upload.vcf.sql_copy_files import write_sql_copy_csv, sql_copy_csv
 
 
@@ -19,9 +20,12 @@ class Command(BaseCommand):
     TERM_JOIN_STRING = " | "
 
     def add_arguments(self, parser):
+        gar_ov_help = "gene-annotation-release and ontology-version are optional but must be specified together"
+
         parser.add_argument('--force', action="store_true", help="Force create new GeneAnnotation for same release")
         group = parser.add_mutually_exclusive_group(required=True)
-        group.add_argument('--gene-annotation-release', type=int)
+        group.add_argument('--gene-annotation-release', type=int, help=gar_ov_help)
+        group.add_argument('--ontology-version', type=int, help=gar_ov_help)
         group.add_argument('--missing', action="store_true",
                            help="Automatically create for latest AnnotationVersions for each build if missing")
         group.add_argument('--add-new-to-existing', action="store_true",
@@ -32,6 +36,7 @@ class Command(BaseCommand):
 
         force = options["force"]
         gar_id = options["gene_annotation_release"]
+        ov_id = options["ontology_version"]
         missing = options["missing"]
         add_new_to_existing = options["add_new_to_existing"]
         self._validate_has_required_data()
@@ -43,25 +48,37 @@ class Command(BaseCommand):
         gene_symbols = set(GnomADGeneConstraint.objects.all().values_list("gene_symbol_id", flat=True))
 
         if gar_id:
+            if not ov_id:
+                raise ValueError("You must specify ontology-version when gene-annotation-release is specified")
+            ontology_version = OntologyVersion.objects.get(pk=ov_id)
             gene_annotation_release = GeneAnnotationRelease.objects.get(pk=gar_id)
             if not force and GeneAnnotationVersion.objects.filter(gene_annotation_release=gene_annotation_release).exists():
                 raise ValueError("Existing GeneAnnotationVersion for gene_annotation_release={} exists! Use --force?")
-            self._create_gene_annotation_version(gene_annotation_release, gene_symbols)
-        else:
+            self._create_gene_annotation_version(gene_annotation_release, ontology_version, gene_symbols)
+        elif missing:
+            if ov_id is not None:
+                raise ValueError("Only specify ontology-version when gene-annotation-release also specified")
+
             for genome_build in GenomeBuild.builds_with_annotation():
                 av = AnnotationVersion.latest(genome_build, validate=False)
-                if av.gene_annotation_version:
-                    print(f"Skipping {av} - already has GeneAnnotation")
-                    continue
-
                 if not av.variant_annotation_version:
                     raise InvalidAnnotationVersionError(f"AnnotationVersion {av} has no VariantAnnotationVersion set")
 
+                if not av.ontology_version:
+                    raise InvalidAnnotationVersionError(f"AnnotationVersion {av} has no OntologyVersion set")
+
+                if av.gene_annotation_version:
+                    if av.ontology_version == av.gene_annotation_version.ontology_version:
+                        print(f"Skipping {av} - already has GeneAnnotation")
+                        continue
+                    else:
+                        print("AV ontology version != existing gene annotation ontology version")
+
                 gar = av.variant_annotation_version.gene_annotation_release
                 if not gar:
-                    raise InvalidAnnotationVersionError(f"VariantAnnotationVersion {av.variant_annotation_version} needs to be assinged an GeneAnnotationRelease")
+                    raise InvalidAnnotationVersionError(f"VariantAnnotationVersion {av.variant_annotation_version} needs to be assigned an GeneAnnotationRelease")
 
-                self._create_gene_annotation_version(gar, gene_symbols)
+                self._create_gene_annotation_version(gar, av.ontology_version, gene_symbols)
 
     @staticmethod
     def _validate_has_required_data():
@@ -84,15 +101,6 @@ class Command(BaseCommand):
         print("Updating existing gene annotation...")
         print("Loading HGNC data...")
 
-        # Loop through HGNC - save into a dict
-        hgnc_data = defaultdict(dict)
-        for hgnc_ot in OntologyTerm.objects.filter(ontology_service=OntologyService.HGNC):
-            gene_symbol = hgnc_ot.name
-            snake = OntologySnake.terms_for_gene_symbol(hgnc_ot.name, OntologyService.MONDO, max_depth=0)
-            uc_symbol = gene_symbol.upper()
-            hgnc_data[uc_symbol]["mondo_terms"] = self.TERM_JOIN_STRING.join((str(lt) for lt in snake.leafs()))
-            hgnc_data[uc_symbol]["gene_disease"] = self._get_gene_disease(gene_symbol, Command.TERM_JOIN_STRING)
-
         # Then go through
         for ga_version in GeneAnnotationVersion.objects.all():
             print(f"Updating GeneAnnotationVersion: {ga_version}")
@@ -100,6 +108,15 @@ class Command(BaseCommand):
             for ga in ga_version.geneannotation_set.all():
                 ga_by_gene_id[ga.gene_id] = ga
             print("Loaded existing gene annotation, matching to HGNC")
+
+            hgnc_data = defaultdict(dict)
+            for hgnc_ot in OntologyTerm.objects.filter(ontology_service=OntologyService.HGNC):
+                gene_symbol = hgnc_ot.name
+                snake = ga_version.ontology_version.terms_for_gene_symbol(hgnc_ot.name, OntologyService.MONDO,
+                                                                          max_depth=0)
+                uc_symbol = gene_symbol.upper()
+                hgnc_data[uc_symbol]["mondo_terms"] = self.TERM_JOIN_STRING.join((str(lt) for lt in snake.leafs()))
+                hgnc_data[uc_symbol]["gene_disease"] = self._get_gene_disease(gene_symbol, Command.TERM_JOIN_STRING)
 
             gene_annotation = []
             for uc_symbol, data in hgnc_data.items():
@@ -119,15 +136,15 @@ class Command(BaseCommand):
         print(f"Completed: {timezone.now()}")
 
     @staticmethod
-    def _get_gene_disease(gene_symbol, delimiter: str):
+    def _get_gene_disease(ontology_version, gene_symbol, delimiter: str):
         moderate_or_above = GeneDiseaseClassification.get_above_min(GeneDiseaseClassification.MODERATE)
         supportive_or_below = [gdc.label for gdc in reversed(GeneDiseaseClassification)
                                if gdc.label not in moderate_or_above]
 
         diseases_supportive_or_below = []
         diseases_moderate_or_above = []
-        for otr in OntologySnake.gene_disease_relations(gene_symbol,
-                                                        min_classification=GeneDiseaseClassification.LIMITED):
+        for otr in ontology_version.gene_disease_relations(gene_symbol,
+                                                           min_classification=GeneDiseaseClassification.LIMITED):
             disease = otr.source_term.name
             moi_classifications = otr.get_gene_disease_moi_classifications()
             moi_supportive_or_below = otr.get_moi_summary(moi_classifications, supportive_or_below)
@@ -142,12 +159,13 @@ class Command(BaseCommand):
         gene_disease_moderate_or_above = delimiter.join(diseases_moderate_or_above)
         return gene_disease_supportive_or_below, gene_disease_moderate_or_above
 
-    def _create_gene_annotation_version(self, gene_annotation_release, gene_symbols):
+    def _create_gene_annotation_version(self, gene_annotation_release, ontology_version, gene_symbols):
         gnomad_gene_constraint = GnomADGeneConstraint.objects.first()
 
         # Only 1 of each of Gnomad (CachedWebResource - deleted upon reload)
+        # When you create GeneAnnotationVersion (sub version) it automatically creates/bumps a new annotation version
         gav = GeneAnnotationVersion.objects.create(gene_annotation_release=gene_annotation_release,
-                                                   last_ontology_import=OntologyImport.objects.order_by("pk").last(),
+                                                   ontology_version=ontology_version,
                                                    gnomad_import_date=gnomad_gene_constraint.cached_web_resource.created)
 
         # 1st we need to make sure all symbols are matched in a GeneAnnotationRelease (HGNC already done)
@@ -161,10 +179,12 @@ class Command(BaseCommand):
             service_terms = {}
             gene_symbol = hgnc_ot.name
             for ontology_service in [OntologyService.OMIM, OntologyService.HPO, OntologyService.MONDO]:
-                snake = OntologySnake.terms_for_gene_symbol(gene_symbol, ontology_service, max_depth=0)
+                snake = ontology_version.terms_for_gene_symbol(gene_symbol, ontology_service, max_depth=0)
                 service_terms[ontology_service] = self.TERM_JOIN_STRING.join((str(lt) for lt in snake.leafs()))
 
-            gene_disease_supportive_or_below, gene_disease_moderate_or_above = self._get_gene_disease(gene_symbol, Command.TERM_JOIN_STRING)
+            gene_disease_supportive_or_below, gene_disease_moderate_or_above = self._get_gene_disease(ontology_version,
+                                                                                                      gene_symbol,
+                                                                                                      Command.TERM_JOIN_STRING)
             if not (any(service_terms.values()) or
                     gene_disease_supportive_or_below or gene_disease_moderate_or_above):
                 continue  # Skip who cares

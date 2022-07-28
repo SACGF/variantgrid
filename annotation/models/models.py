@@ -227,7 +227,7 @@ class CachedCitation(TimeStampedModel):
 class GeneAnnotationVersion(SubVersionPartition):
     RECORDS_BASE_TABLE_NAMES = ["annotation_geneannotation"]
     gene_annotation_release = models.ForeignKey(GeneAnnotationRelease, on_delete=CASCADE)
-    last_ontology_import = models.ForeignKey(OntologyImport, on_delete=PROTECT)
+    ontology_version = models.ForeignKey(OntologyVersion, null=True, on_delete=PROTECT)
     gnomad_import_date = models.DateTimeField()
 
     @property
@@ -1050,6 +1050,12 @@ class AnnotationVersion(models.Model):
             if vav_gar_id != gene_gar_id:
                 different_msg = f"GeneAnnotationRelease is different fro Variant {vav_gar_id} vs Gene: {gene_gar_id}"
                 raise InvalidAnnotationVersionError(different_msg)
+
+        ov_id = self.ontology_version_id
+        gav_ov_id = self.gene_annotation_version.ontology_version_id
+        if (ov_id and gav_ov_id) and (ov_id != gav_ov_id):
+            msg = f"OntologyVersion {ov_id} != GeneAnnotationVersion OntologyVersion {gav_ov_id}"
+            raise InvalidAnnotationVersionError(msg)
 
     @staticmethod
     def latest(genome_build: GenomeBuild, validate=True, active=True) -> Optional['AnnotationVersion']:

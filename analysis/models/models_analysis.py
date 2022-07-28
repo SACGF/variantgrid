@@ -132,10 +132,13 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
     def get_warnings(self) -> List[str]:
         warnings = []
         if self.annotation_version:
-            latest_av = AnnotationVersion.latest(self.genome_build)
-            if self.annotation_version != latest_av:
-                warnings.append(f"Using AnnotationVersion {self.annotation_version} while most recent version "
-                                f"for build is : {latest_av}.")
+            try:
+                latest_av = AnnotationVersion.latest(self.genome_build)
+                if self.annotation_version != latest_av:
+                    warnings.append(f"Using AnnotationVersion {self.annotation_version} while most recent version "
+                                    f"for build is : {latest_av}.")
+            except InvalidAnnotationVersionError as e:
+                warnings.append(str(e))
         return warnings
 
     def is_valid(self):

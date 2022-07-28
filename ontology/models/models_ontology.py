@@ -592,6 +592,18 @@ class OntologyVersion(TimeStampedModel):
             gene_symbol_names.update([snake.leaf_term.name for snake in gene_symbol_snakes])
         return GeneSymbol.objects.filter(symbol__in=gene_symbol_names)
 
+    def terms_for_gene_symbol(self, gene_symbol: Union[str, GeneSymbol], desired_ontology: OntologyService,
+                              max_depth=1, min_classification: Optional[GeneDiseaseClassification] = None) -> 'OntologySnakes':
+        otr_qs = self.get_ontology_terms()
+        return OntologySnake.terms_for_gene_symbol(gene_symbol, desired_ontology, max_depth=max_depth,
+                                                   min_classification=min_classification, otr_qs=otr_qs)
+
+    def gene_disease_relations(self, gene_symbol: Union[str, GeneSymbol],
+                               min_classification: GeneDiseaseClassification = None) -> List[OntologyTermRelation]:
+        snake = self.terms_for_gene_symbol(gene_symbol, OntologyService.MONDO,
+                                           max_depth=0, min_classification=min_classification)
+        return snake.leaf_relations(ontology_relation=OntologyRelation.RELATED)
+
     def __str__(self):
         date_str = self.created.strftime("%d %B %Y")
         return f"v{self.pk}. ({date_str})"
@@ -792,7 +804,8 @@ class OntologySnake:
 
     @staticmethod
     def terms_for_gene_symbol(gene_symbol: Union[str, GeneSymbol], desired_ontology: OntologyService,
-                              max_depth=1, min_classification: Optional[GeneDiseaseClassification] = None) -> 'OntologySnakes':
+                              max_depth=1, min_classification: Optional[GeneDiseaseClassification] = None,
+                              otr_qs: QuerySet[OntologyTermRelation] = None) -> 'OntologySnakes':
         # FIXME, can the min_classification default to STRONG and other code can filter it out?
         """ max_depth: How many steps in snake path to go through """
         # TODO, do this with hooks
@@ -800,7 +813,8 @@ class OntologySnake:
         update_gene_relations(gene_symbol)
         gene_ontology = OntologyTerm.get_gene_symbol(gene_symbol)
         return OntologySnake.snake_from(term=gene_ontology, to_ontology=desired_ontology,
-                                        max_depth=max_depth, min_classification=min_classification)
+                                        max_depth=max_depth, min_classification=min_classification,
+                                        otr_qs=otr_qs)
 
     @staticmethod
     def has_gene_relationship(term: Union[OntologyTerm, str], gene_symbol: Union[GeneSymbol, str], quality: Optional[GeneDiseaseClassification] = GeneDiseaseClassification.STRONG) -> bool:
@@ -832,13 +846,6 @@ class OntologySnake:
         except ValueError:
             report_exc_info()
             return False
-
-    @staticmethod
-    def gene_disease_relations(gene_symbol: Union[str, GeneSymbol],
-                               min_classification: GeneDiseaseClassification = None) -> List[OntologyTermRelation]:
-        snake = OntologySnake.terms_for_gene_symbol(gene_symbol, OntologyService.MONDO,
-                                                    max_depth=0, min_classification=min_classification)
-        return snake.leaf_relations(ontology_relation=OntologyRelation.RELATED)
 
 
 class OntologySnakes:

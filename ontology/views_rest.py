@@ -58,7 +58,8 @@ class OntologyTermGeneListView(APIView):
 class GeneDiseaseRelationshipView(APIView):
     def get(self, request, *args, **kwargs):
         data = []
-        for otr in OntologySnake.gene_disease_relations(self.kwargs['gene_symbol'],
+        ontology_version = OntologyVersion.latest()
+        for otr in ontology_version.gene_disease_relations(self.kwargs['gene_symbol'],
                                                         min_classification=GeneDiseaseClassification.DISPUTED):
             data.append(OntologyTermRelationSerializer(otr).data)
         return Response(data)

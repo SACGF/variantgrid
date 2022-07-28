@@ -295,7 +295,7 @@ def annotation_versions(request):
             log_traceback()
 
         try:
-            latest = AnnotationVersion.latest(genome_build)
+            latest = AnnotationVersion.latest(genome_build, validate=False)
         except AnnotationVersion.DoesNotExist:
             latest = None
         qs = AnnotationVersion.objects.filter(genome_build=genome_build).order_by("-annotation_date")
