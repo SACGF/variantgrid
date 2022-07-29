@@ -181,7 +181,7 @@ class HealthCheckTotalAmount(HealthCheckStat):
     def __str__(self):
         amount_str = self.amount
         if self.amount:
-            amount_str = f"*{amount_str}*"
+            amount_str = f"*{amount_str:,}*"
         result = f"{self.emoji} {amount_str} : {self.name}"
         if self.extra:
             result = f"{result} - {self.extra}"
@@ -305,10 +305,13 @@ def populate_health_check(notification: NotificationBuilder, since: Optional[dat
         since = now - timedelta(days=1)
     health_request = HealthCheckRequest(since=since, now=now)
 
-    stats = flatten_nested_lists([hc[1] for hc in health_check_signal.send_robust(sender=None, health_request=health_request)])
-    checks, exceptions = segment(stats, lambda s: isinstance(s, HealthCheckStat))
-    for ex in exceptions:
-        notification.add_markdown(f"Exception generating health check: {ex}")
+    results = list()
+    for caller, result in health_check_signal.send_robust(sender=None, health_request=health_request):
+        if isinstance(result, Exception):
+            notification.add_markdown(f"Exception generating health check by {caller}: {result}")
+        else:
+            results.append(result)
+    checks: List[HealthCheckStat] = flatten_nested_lists(results)
 
     checks = sorted(checks, key=lambda hc: hc.sort_order())
     grouped_checks = [(key, list(values)) for key, values in itertools.groupby(checks, lambda check: type(check))]

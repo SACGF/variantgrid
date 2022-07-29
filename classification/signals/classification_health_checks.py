@@ -10,11 +10,10 @@ from library.health_check import health_check_signal, \
 @receiver(signal=health_check_signal)
 def classifications_health_check_count(sender, health_request: HealthCheckRequest, **kwargs):
     total_classification_qs = Classification.objects.filter(lab__external=False, withdrawn=False, created__lte=health_request.now).exclude(lab__name__icontains='legacy')
-    total_shared = total_classification_qs.count()
-    total_unshared = total_classification_qs.filter(share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS)
-    total = total_unshared + total_shared
+    total = total_classification_qs.count()
+    total_shared = total_classification_qs.filter(share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS).count()
     if total:
-        percent_shared = 100.0 * float(total_shared) / float(total)
+        percent_shared = 100.0 * (float(total_shared) / float(total))
 
         return HealthCheckTotalAmount(
             emoji=":blue_book:",
