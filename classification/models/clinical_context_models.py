@@ -98,6 +98,12 @@ class DiscordanceStatus:
     counted_classifications: int
     pending_concordance: bool = False
 
+    def __str__(self):
+        if self.pending_concordance:
+            return "Pending Concordance"
+        else:
+            return self.level.label
+
     @property
     def is_discordant(self):
         return self.level == DiscordanceLevel.DISCORDANT

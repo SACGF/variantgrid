@@ -26,19 +26,6 @@
                 <span class="no-value">Active Discordance</span>
             {% endif %}
         </div>
-        {% for lab_summ in summary.lab_significances %}
-            <div {% if lab_summ.clinical_significance_to == 'withdrawn' %}style="opacity:0.6"{% endif %}>
-                <span class="d-inline-block mr-2">
-                    {% lab lab_summ.lab your_lab=lab_summ.is_internal %}
-                    {% if lab_summ.count > 1 %}<span class="d-inline-block mx-1 text-muted">x</span>{{ lab_summ.count }}{% endif %}
-                </span>
-                {% if lab_summ.changed %}
-                    {% clinical_significance lab_summ.clinical_significance_from %} <i class="fas fa-arrow-right mx-2 text-secondary"></i> {% clinical_significance lab_summ.clinical_significance_to %}
-                    {% if lab_summ.pending %}<div title="This is an agreed upon pending change" class="flag flag-classification_pending_changes hover-detail ml-1" style="position:relative; top: 5px"></div>{% endif %}
-                {% else %}
-                    {% clinical_significance lab_summ.clinical_significance_from %}
-                {% endif %}
-            </div>
-        {% endfor %}
+        {% classification_lab_summaries summary.lab_significances %}
     </td>
 </tr>

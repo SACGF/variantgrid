@@ -964,19 +964,19 @@ ul.compact li:before {
 }
 
 .overlap-discordant {
-  background-color: #ebb;
+  color: #b44;
 }
 
 .overlap-concordant_confidence {
-  background-color: #fff3cd;
+  color: #ccc39d;
 }
 
 .overlap-concordant_agreement, .overlap-concordant_agreement_diff_vus {
-  background-color: #88dd88;
+  color: #88dd88;
 }
 
 .overlap-single_submission, .overlap-no_entries {
-  background-color: #ccc;
+  color: #ccc;
 }
 
 .fa-spinner {

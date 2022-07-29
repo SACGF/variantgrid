@@ -13,9 +13,6 @@ from classification.views.classification_export_view import ClassificationApiExp
 from classification.views.classification_overlaps_view import view_overlaps, post_clinical_context, \
     view_clinical_context, view_overlaps_detail
 from classification.views.clinvar_export_view import ClinVarMatchView, clinvar_match_detail
-from classification.views.views_uploaded_classifications_unmapped import UploadedClassificationsUnmappedView, \
-    UploadedClassificationsUnmappedColumns, download_classification_unmapped_file, \
-    view_uploaded_classification_unmapped, view_uploaded_classification_unmapped_detail
 from classification.views.classification_view import ClassificationView, LabGeneClassificationCountsView
 from classification.views.classification_view_metrics import view_classification_metrics, \
     view_page_metrics_detail

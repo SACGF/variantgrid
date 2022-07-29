@@ -6,7 +6,7 @@ from django.urls import reverse
 
 from classification.enums import SpecialEKeys
 from classification.models import DiscordanceReport, discordance_change_signal, EvidenceKeyMap, \
-    DiscordanceReportRowData
+    DiscordanceReportRowData, ClassificationLabSummary
 from library.django_utils import get_url_from_view_path
 from library.log_utils import NotificationBuilder
 from snpdb.lab_picker import LabPickerData
@@ -49,7 +49,7 @@ def send_discordance_notification(discordance_report: DiscordanceReport, cause: 
         c_hgvs_str = "\n".join((str(chgvs) for chgvs in report_summary.c_hgvses))
         notification.add_field(label="c.HGVS", value=c_hgvs_str)
 
-        sig_lab: DiscordanceReportRowData.LabClinicalSignificances
+        sig_lab: ClassificationLabSummary
         for sig_lab in report_summary.lab_significances:
             if sig_lab.changed:
                 notification.add_field(f"{sig_lab.lab} - classify this as", f"{clin_sig_key.pretty_value(sig_lab.clinical_significance_from)} -> {clin_sig_key.pretty_value(sig_lab.clinical_significance_to)}")

@@ -455,7 +455,7 @@ def group_data(data: Iterable[Data], key_func: Callable[[Data], Tuple[Key, Value
     return flat
 
 
-def group_by_key(qs: Iterable, key: attrgetter) -> Iterator[Tuple[Any, List]]:
+def group_by_key(qs: Iterable, key: Callable) -> Iterator[Tuple[Any, List]]:
     """
     Provide a sorted iterable value (like a queryset) and an attrgetter for getting values from it.
     Each time the attrgetter returns a value different from before, it will return a list

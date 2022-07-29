@@ -12,7 +12,8 @@ from django.utils.safestring import mark_safe
 from annotation.manual_variant_entry import check_can_create_variants, CreateManualVariantForbidden
 from classification.enums import SpecialEKeys
 from classification.enums.classification_enums import ShareLevel
-from classification.models import ConditionTextMatch, ConditionResolved, DiscordanceReportRowData
+from classification.models import ConditionTextMatch, ConditionResolved, DiscordanceReportRowData, \
+    ClassificationLabSummary
 from classification.models.classification import ClassificationModification, Classification
 from classification.models.classification_groups import ClassificationGroup, ClassificationGroups
 from classification.models.classification_ref import ClassificationRef
@@ -503,3 +504,8 @@ def discordance_report(discordance_report: DiscordanceReport):
 @register.inclusion_tag("classification/tags/discordance_report_row.html")
 def discordance_report_row(discordance_report_summary: DiscordanceReportRowData, selected: Optional[DiscordanceReport] = None, filter: bool = False):
     return {"summary": discordance_report_summary, "filter": filter, "is_selected": discordance_report_summary.discordance_report == selected}
+
+
+@register.inclusion_tag("classification/tags/classification_lab_summaries.html")
+def classification_lab_summaries(lab_classification_summaries: Iterable[ClassificationLabSummary], shared: bool = True):
+    return {"lab_classification_summaries": lab_classification_summaries, "shared": shared}

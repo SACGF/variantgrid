@@ -10,7 +10,6 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.db import models, transaction
 from django.db.models.deletion import PROTECT, CASCADE
-from django.dispatch import receiver
 from django.urls.base import reverse
 from django.utils.timezone import now
 from django_extensions.db.models import TimeStampedModel
@@ -20,15 +19,15 @@ from more_itertools import first
 from classification.enums.classification_enums import SpecialEKeys, ClinicalSignificance
 from classification.enums.discordance_enums import DiscordanceReportResolution, ContinuedDiscordanceReason
 from classification.models.classification import ClassificationModification, Classification
+from classification.models.classification_lab_summaries import ClassificationLabSummaryEntry, ClassificationLabSummary
 from classification.models.clinical_context_models import ClinicalContext
 from classification.models.flag_types import classification_flag_types, ClassificationFlagTypes
-from flags.models import flag_comment_action, Flag, FlagResolution
 from flags.models.enums import FlagStatus
 from flags.models.models import FlagComment
 from genes.hgvs import CHGVS
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.lab_picker import LabPickerData
-from snpdb.models import Lab, GenomeBuild, UserSettings
+from snpdb.models import Lab, GenomeBuild
 
 discordance_change_signal = django.dispatch.Signal()  # args: "discordance_report", "cause"
 
@@ -406,52 +405,9 @@ class DiscordanceReportRowData:
     def is_pending_concordance(self):
         return self.discordance_report.is_pending_concordance
 
-    @dataclass(frozen=True)
-    class LabClinicalSignificanceGroup:
-        lab: Lab
-        clinical_significance_from: str
-        clinical_significance_to: str
-        pending: bool = False
-
-    @dataclass(frozen=True)
-    class LabClinicalSignificances:
-        group: 'DiscordanceReportRowData.LabClinicalSignificanceGroup'
-        is_internal: bool
-        count: int
-
-        @property
-        def lab(self):
-            return self.group.lab
-
-        @property
-        def clinical_significance_from(self):
-            return self.group.clinical_significance_from
-
-        @property
-        def clinical_significance_to(self):
-            return self.group.clinical_significance_to
-
-        @property
-        def changed(self):
-            return self.group.clinical_significance_from != self.group.clinical_significance_to
-
-        @property
-        def pending(self):
-            # TODO rename to has_pending_changes
-            return self.group.pending
-
-        @property
-        def sort_key(self):
-            from classification.models import EvidenceKeyMap
-            key = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE)
-            return self.is_internal, self.lab, key.classification_sorter_value(self.clinical_significance_from), key.classification_sorter_value(self.clinical_significance_to), self.pending
-
-        def __lt__(self, other):
-            return self.sort_key < other.sort_key
-
     @lazy
-    def lab_significances(self) -> List[LabClinicalSignificances]:
-        group_counts: Dict[DiscordanceReportRowData.LabClinicalSignificanceGroup, int] = defaultdict(int)
+    def lab_significances(self) -> List[ClassificationLabSummary]:
+        group_counts: Dict[ClassificationLabSummaryEntry, int] = defaultdict(int)
         for drc in DiscordanceReportClassification.objects.filter(report=self.discordance_report).select_related(
             'classification_original',
             'classification_original__classification',
@@ -474,15 +430,14 @@ class DiscordanceReportRowData:
                 if not clinical_significance_to:
                     clinical_significance_to = drc.classification_effective.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
 
-            # FIXME, also check for pending changes if classification isn't closed yet!
-            group_counts[DiscordanceReportRowData.LabClinicalSignificanceGroup(
+            group_counts[ClassificationLabSummaryEntry(
                 lab=drc.classification_original.classification.lab,
                 clinical_significance_from=clinical_significance_from,
                 clinical_significance_to=clinical_significance_to,
                 pending=pending
             )] += 1
 
-        return sorted([DiscordanceReportRowData.LabClinicalSignificances(
+        return sorted([ClassificationLabSummary(
             group=group,
             is_internal=group.lab in self.perspective.labs_if_not_admin,
             count=count

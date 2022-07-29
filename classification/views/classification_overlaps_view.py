@@ -1,6 +1,6 @@
 import re
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Union
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -11,7 +11,7 @@ from django.urls import reverse
 from requests.models import Response
 
 from classification.models import ClassificationRef, ClinicalContextRecalcTrigger
-from classification.models.allele_overlap import AlleleOverlap, OverlapCounts, OverlapSet
+from classification.models.allele_overlaps import OverlapsCalculator
 from classification.models.classification import Classification
 from classification.models.clinical_context_models import ClinicalContext
 from classification.models.flag_types import classification_flag_types
@@ -29,17 +29,10 @@ def view_overlaps(request: HttpRequest, lab_id = None) -> Response:
     return render(request, "classification/overlaps.html", {"lab_picker_data": lab_picker})
 
 
-def view_overlaps_detail(request: HttpRequest, lab_id = None) -> Response:
-    lab_picker = LabPickerData.from_request(request, lab_id)
-    allele_and_vcs = AlleleOverlap.overlaps_for_user(lab_picker)
-    overlap_counts = OverlapCounts(allele_and_vcs)
-
-    context = {
-        "overlap_sets": OverlapSet.as_sets(allele_and_vcs),
-        "overlap_counts": overlap_counts
-    }
-
-    return render(request, "classification/overlaps_detail.html", context)
+def view_overlaps_detail(request: HttpRequest, lab_id: Optional[Union[str, int]] = None) -> Response:
+    return render(request, "classification/overlaps_detail.html", {
+        "overlaps": OverlapsCalculator(perspective=LabPickerData.from_request(request, lab_id))
+    })
 
 
 # POST only
