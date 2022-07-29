@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Set, Optional, List, Tuple, Dict, Any
+from typing import Set, Optional, List, Tuple, Dict, Any, Callable
 
 from django.http import HttpRequest
 from django.urls import reverse
@@ -203,8 +203,7 @@ class ClinVarCompareRow(ExportRow):
 
     @lazy
     def clinvar(self) -> Optional[ClinVar]:
-        # do we want to try all clinvar versions?
-        return ClinVar.objects.filter(variant=self.allele_group.variant, version=self.clinvar_version).first()
+        return self.allele_group["clinvar"]
 
 
 @register_classification_exporter("clinvar_compare")
@@ -215,6 +214,19 @@ class ClassificationExportFormatter2ClinVarCompare(ClassificationExportFormatter
         return ClassificationExportFormatter2ClinVarCompare(
             classification_filter=ClassificationFilter.from_request(request)
         )
+
+    def batch_pre_cache(self) -> Optional[Callable[[List[AlleleData]], None]]:
+        # do we want to try all clinvar versions?
+        def handle_batch(batch: List[AlleleData]):
+            variant_to_batches = dict()
+            for ad in batch:
+                if variant := ad.variant:
+                    variant_to_batches[variant.pk] = ad
+            clinvars = ClinVar.objects.filter(variant__in=variant_to_batches.keys(), version=self.clinvar_version)
+            for clinvar in clinvars:
+                if ad := variant_to_batches.get(clinvar.variant_id):
+                    ad["clinvar"] = clinvar
+        return handle_batch
 
     @lazy
     def clinvar_version(self) -> ClinVarVersion:

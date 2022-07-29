@@ -4,7 +4,7 @@ from datetime import datetime
 from enum import Enum
 from functools import reduce
 from operator import __or__
-from typing import List, Type, Union, Set, Optional, Dict, Iterator
+from typing import List, Type, Union, Set, Optional, Dict, Iterator, Any, Callable
 
 from django.contrib.auth.models import User
 from django.db.models import QuerySet, Q
@@ -70,6 +70,21 @@ class AlleleData:
 
     cached_allele: Optional[Allele] = None
     cached_variant: Optional[Variant] = None
+    cached_data: Dict[str, Any] = None
+
+    def __setitem__(self, key, value):
+        if not self.cached_data:
+            self.cached_data = dict()
+        self.cached_data[key] = value
+
+    def __getitem__(self, item):
+        if cached_data := self.cached_data:
+            return cached_data.get(item)
+
+    def __contains__(self, item):
+        if cached_data := self.cached_data:
+            return item in cached_data
+        return False
 
     @staticmethod
     def pre_process(batch: List['AlleleData']):
@@ -501,13 +516,7 @@ class ClassificationFilter:
         if allele_data:
             yield allele_data
 
-    def allele_data_filtered_pre_processed(self) -> Iterator[AlleleData]:
-        for batch in batch_iterator(self.allele_data_filtered(), batch_size=100):
-            AlleleData.pre_process(batch)
-            for data in batch:
-                yield data
-
-    def allele_data_filtered(self) -> Iterator[AlleleData]:
+    def _allele_data_filtered(self) -> Iterator[AlleleData]:
         """
         Main method of getting data out of ClassificationFilter
         Is only AlleleData with classifications that have passed since checks and errors
@@ -515,3 +524,11 @@ class ClassificationFilter:
         for allele_data in self._allele_data():
             if self._passes_since(allele_data):
                 yield allele_data
+
+    def allele_data_filtered_pre_processed(self, batch_processor: Optional[Callable[[List[AlleleData]], None]] = None) -> Iterator[AlleleData]:
+        for batch in batch_iterator(self._allele_data_filtered(), batch_size=100):
+            AlleleData.pre_process(batch)
+            if batch_processor:
+                batch_processor(batch)
+            for data in batch:
+                yield data

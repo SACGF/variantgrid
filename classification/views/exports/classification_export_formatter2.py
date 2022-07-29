@@ -2,7 +2,7 @@ import zipfile
 from abc import ABC, abstractmethod
 from datetime import datetime
 from io import StringIO
-from typing import Optional, List, Iterator, Tuple, Any
+from typing import Optional, List, Iterator, Tuple, Any, Callable
 
 from django.http import HttpResponse, StreamingHttpResponse
 from django.http.response import HttpResponseBase
@@ -87,7 +87,7 @@ class ClassificationExportFormatter2(ABC):
 
     def _peekable_data(self) -> peekable:  # peekable[List[str]]
         def row_iterator():
-            for allele_data in self.classification_filter.allele_data_filtered_pre_processed():
+            for allele_data in self.classification_filter.allele_data_filtered_pre_processed(self.batch_pre_cache()):
                 if rows := self.row(allele_data):
                     yield rows
         return peekable(row_iterator())
@@ -177,7 +177,7 @@ class ClassificationExportFormatter2(ABC):
         try:
             for header in self.header():
                 yield header
-            for allele_data in self.classification_filter.allele_data_filtered_pre_processed():
+            for allele_data in self.classification_filter.allele_data_filtered_pre_processed(self.batch_pre_cache()):
 
                 row_data = self.row(allele_data)
                 for row in row_data:
@@ -198,6 +198,14 @@ class ClassificationExportFormatter2(ABC):
         Filename extension, e.g. csv, json
         """
         pass
+
+    def batch_pre_cache(self) -> Optional[Callable[[List[AlleleData]], None]]:
+        """
+        If there's some data you'll have to fetch for every row, you can alternatively fetch all the ones you need given
+        a batch to reduce database calls
+        :return: A method to run over a list of AlleleData
+        """
+        return None
 
     def header(self) -> List[str]:
         """
