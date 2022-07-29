@@ -720,8 +720,7 @@ def process_bam_files_and_records(seqauto_run, existing_bam_files, existing_bam_
         exists = bam_path in existing_bam_files
         data_state = get_data_state(unaligned_reads.data_state, exists)
 
-        bam = existing_bam_records.get(bam_path)
-        if bam:
+        if bam := existing_bam_records.get(bam_path):
             if bam.data_state != data_state:
                 logging.info("Bam %s data state changed from %s->%s", bam, bam.data_state, data_state)
                 bam.data_state = data_state
@@ -729,7 +728,7 @@ def process_bam_files_and_records(seqauto_run, existing_bam_files, existing_bam_
         else:
             if DataState.should_create_new_record(data_state):
                 name = name_from_filename(bam_path)
-                aligner = BamFile.get_aligner_from_bam_file(bam)
+                aligner = BamFile.get_aligner_from_bam_file(bam_path)
                 sequencing_run = unaligned_reads.fastq_r1.sequencing_run
                 bam = BamFile.objects.create(sequencing_run=sequencing_run,
                                              unaligned_reads=unaligned_reads,
