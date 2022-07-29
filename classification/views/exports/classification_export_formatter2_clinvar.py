@@ -78,14 +78,14 @@ class ClinVarCompareRow(ExportRow):
 
     @export_column("c.HGVS")
     def c_hgvs(self) -> str:
-        for cm in self.allele_group.cms:
+        for cm in self.allele_group.cms_regardless_of_issues:
             if c_hgvs := cm.c_hgvs_best(self.allele_group.genome_build):
                 if full_c_hgvs := c_hgvs.full_c_hgvs:
                     return full_c_hgvs
 
     @export_column("Gene Symbol")
     def gene_symbol(self) -> str:
-        for cm in self.allele_group.cms:
+        for cm in self.allele_group.cms_regardless_of_issues:
             if c_hgvs := cm.c_hgvs_best(self.allele_group.genome_build):
                 if gene_symbol := c_hgvs.gene_symbol:
                     return gene_symbol
@@ -204,8 +204,7 @@ class ClinVarCompareRow(ExportRow):
     @lazy
     def clinvar(self) -> Optional[ClinVar]:
         # do we want to try all clinvar versions?
-        variant_ids = list(VariantAllele.objects.filter(allele_id=self.allele_group.allele_id).values_list('variant_id', flat=True))
-        return ClinVar.objects.filter(variant__in=variant_ids, version=self.clinvar_version).first()
+        return ClinVar.objects.filter(variant=self.allele_group.variant, version=self.clinvar_version).first()
 
 
 @register_classification_exporter("clinvar_compare")
