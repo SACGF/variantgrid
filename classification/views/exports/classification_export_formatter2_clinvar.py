@@ -93,7 +93,7 @@ class ClinVarCompareRow(ExportRow):
     @lazy
     def server_clinical_significance_set(self) -> Set[str]:
         cs_set: Set[str] = set()
-        for cm in self.allele_group.cms:
+        for cm in self.allele_group.cms_regardless_of_issues:
             if classified := cm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE):
                 cs_set.add(classified)
         return cs_set
@@ -196,6 +196,11 @@ class ClinVarCompareRow(ExportRow):
                 return ClinVarCompareValue.UNKNOWN
             return lowest_value
 
+    @export_column("Our Server Resolution Issues")
+    def issues(self) -> str:
+        if issues := self.allele_group.issues:
+            return "\n".join(sorted(set(issue.message for issue in issues)))
+
     @lazy
     def clinvar(self) -> Optional[ClinVar]:
         # do we want to try all clinvar versions?
@@ -226,7 +231,7 @@ class ClassificationExportFormatter2ClinVarCompare(ClassificationExportFormatter
         return [ExportFormatter.write_single_row(ClinVarCompareRow.csv_header())]
 
     def row(self, allele_data: AlleleData) -> List[str]:
-        if allele_data.cms and allele_data.allele_id:
+        if allele_data.allele_id:
             return [ExportFormatter.write_single_row(ClinVarCompareRow(allele_data, self.clinvar_version).to_csv())]
         else:
             return list()

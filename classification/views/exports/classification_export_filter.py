@@ -47,6 +47,9 @@ class ClassificationIssue:
         else:
             return None
 
+    def __repr__(self):
+        return self.message
+
     @property
     def has_issue(self):
         return self.withdrawn or self.transcript_version or self.matching_warning or self.c_37_not_38 or self.not_matched
@@ -63,7 +66,7 @@ class AlleleData:
     """
     source: 'ClassificationFilter'
     allele_id: int
-    all_cms: List[ClassificationIssue] = field(default_factory=list)
+    all_cms: List[ClassificationIssue] = field(default_factory=list)  # misleading name, should be all_ci or something
 
     cached_allele: Optional[Allele] = None
     cached_variant: Optional[Variant] = None
@@ -104,6 +107,10 @@ class AlleleData:
     def cms(self) -> List[ClassificationModification]:
         # The classifications that should be exported (passed validation, not withdrawn)
         return [ci.classification for ci in self.all_cms if not ci.has_issue]
+
+    @property
+    def cms_regardless_of_issues(self) -> List[ClassificationModification]:
+        return [ci.classification for ci in self.all_cms]
 
     @property
     def issues(self) -> List[ClassificationIssue]:
