@@ -1060,3 +1060,7 @@ table .fa-hand-point-right {
 .addition.deletion {
   background-color: #ffe6e6;
 }
+
+// put drop down infront of loading
+.chosen-drop{z-index:100001 !important;}
+.chosen-search{z-index:1010 !important;}

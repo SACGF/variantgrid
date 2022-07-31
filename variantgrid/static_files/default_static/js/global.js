@@ -309,7 +309,7 @@ function loadAjaxBlock(dom, url) {
     // give ajax 300 ms to load before we start showing the spinner
     let spinnerTimeout = window.setTimeout(() => {
         showingOverlay = true;
-        dom.LoadingOverlay('show');
+        dom.LoadingOverlay('show', {zIndex: 100000});
     }, 300);
 
     $.ajax({
