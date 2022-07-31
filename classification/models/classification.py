@@ -2419,7 +2419,7 @@ class ClassificationConsensus:
             self.vcm: Optional[ClassificationModification] = None
             if allele:
                 variants = allele.variants
-            vcms = list(ClassificationModification.latest_for_user(user=user, variant=variants, published=True).all())
+            vcms = list(ClassificationModification.latest_for_user(user=user, variant=variants, published=True).filter(classification__lab__external=False).all())
             if vcms:
                 vcms.sort(key=lambda vcm: vcm.curated_date)
                 self.vcm = vcms[-1]
