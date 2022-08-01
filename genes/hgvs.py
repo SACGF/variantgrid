@@ -773,8 +773,11 @@ class HGVSMatcher:
         return hgvs_name, transcript
 
     def matches_reference(self, hgvs_name) -> bool:
+        """ Reference was provided, and matches our genome """
         hgvs, transcript = self._get_hgvs_and_pyhgvs_transcript(hgvs_name)
-        return pyhgvs.matches_ref_allele(hgvs, self.genome_build.genome_fasta.fasta, transcript)
+        if hgvs.ref_allele:
+            return pyhgvs.matches_ref_allele(hgvs, self.genome_build.genome_fasta.fasta, transcript)
+        return False
 
     def get_transcript_id(self, hgvs_name, transcript_version=False) -> str:
         _hgvs, transcript = self._get_hgvs_and_pyhgvs_transcript(hgvs_name)
