@@ -266,8 +266,7 @@ class DatatableConfig(Generic[DC]):
         return None
 
     def ordering(self, qs: QuerySet) -> QuerySet[DC]:
-        """ Get parameters from the request and prepare order by clause
-        """
+        """ Get parameters from the request and prepare order by clause """
         #  'order[0][column]': ['0'], 'order[0][dir]': ['asc']
 
         sort_by_list = list()
@@ -289,8 +288,8 @@ class DatatableConfig(Generic[DC]):
             if col.default_sort:
                 if col.name not in sorted_set:
                     sort_by_list += col.sort_string(col.default_sort == SortOrder.DESC)
-            break
 
+        sort_by_list.append("pk")  # Ensure we always have a 'tie breaker' and thus consistent sort order for paging
         return qs.order_by(*sort_by_list)
 
     def pre_render(self, qs: QuerySet[DC]):
