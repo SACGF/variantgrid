@@ -167,7 +167,7 @@ class Citation(models.Model):
         return self.citation_source, self.citation_id.rjust(10, '0')
 
     def __lt__(self, other):
-        self._sort_key < other._sort_key
+        return self._sort_key < other._sort_key
 
     @staticmethod
     def citations_from_text(text):
