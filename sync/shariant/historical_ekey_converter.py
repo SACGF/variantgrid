@@ -1,10 +1,11 @@
-from collections import Mapping
-from django.contrib.auth.models import User
 import copy
+from typing import Mapping, Any
 
-from library.utils import is_not_none
-from classification.models.evidence_key import EvidenceKey, EvidenceKeyValueType
+from django.contrib.auth.models import User
+
 from classification.models.classification import Classification
+from classification.models.evidence_key import EvidenceKey, EvidenceKeyValueType
+from library.utils import is_not_none
 
 
 class HistoricalEKeyConverter:
@@ -41,8 +42,8 @@ class HistoricalEKeyConverter:
                                           EvidenceKeyValueType.INTEGER: int},
         EvidenceKeyValueType.INTEGER: {EvidenceKeyValueType.FREE_ENTRY: str,
                                        EvidenceKeyValueType.FLOAT: float},
-        EvidenceKeyValueType.PERCENT: {EvidenceKeyValueType.UNIT: lambda p: float(p) / 100},
-        EvidenceKeyValueType.UNIT: {EvidenceKeyValueType.PERCENT: lambda u: 100 * float(u)},
+        # EvidenceKeyValueType.PERCENT: {EvidenceKeyValueType.UNIT: lambda p: float(p) / 100},
+        # EvidenceKeyValueType.UNIT: {EvidenceKeyValueType.PERCENT: lambda u: 100 * float(u)},
     }
 
     def __init__(self):
@@ -70,6 +71,17 @@ class HistoricalEKeyConverter:
                             raise NotImplementedError(msg)
 
                     self.historical_to_shariant[historical_key] = (shariant_key, to_shariant)
+
+    @staticmethod
+    def _tidy_cell(valueObj: Any):
+        if isinstance(valueObj, dict):
+            if not valueObj:
+                return None
+
+            for part in ['value', 'note']:
+                if part not in valueObj:
+                    valueObj[part] = None
+        return valueObj
 
     @staticmethod
     def _convert_keys(data, key_mappings, add_note=False):
@@ -104,9 +116,9 @@ class HistoricalEKeyConverter:
                             notes.append(f"Converted from: '{from_key}'='{from_value}'")
                             valueObj["note"] = ". ".join(notes)
 
-                        converted_data[to_key] = valueObj
+                        converted_data[to_key] = HistoricalEKeyConverter._tidy_cell(valueObj)
             else:
-                converted_data[from_key] = data[from_key]  # Straight copy
+                converted_data[from_key] = HistoricalEKeyConverter._tidy_cell(data[from_key])  # Straight copy
 
         return converted_data
 

@@ -96,7 +96,7 @@ def sync_shariant_upload(sync_destination: SyncDestination, full_sync: bool = Fa
 
         data = insert_nones(data)
         data = historical_converter.to_shariant(vcm, data)
-        formatted_json['data'] = data
+        formatted_json['overwrite'] = data
         formatted_json['publish'] = share_level
         formatted_json['delete'] = raw_json.get('withdrawn', False)
 
