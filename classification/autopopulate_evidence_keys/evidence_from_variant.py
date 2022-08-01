@@ -430,7 +430,7 @@ def _get_spliceai_summary(variant_values: dict):
     return spliceai_summary
 
 
-def _get_aloft_summary(variant_values: dict):
+def _get_aloft_summary(variant_values: dict) -> Optional[str]:
     """ Summarise ALoFT fields into 1 field  """
 
     if pred_value := variant_values.get("variantannotation__aloft_pred"):
