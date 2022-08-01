@@ -106,10 +106,10 @@ def classification_auto_populate_fields(
     )
     classification.annotation_version = auto_data.annotation_version
     return classification.patch_value(auto_data.data,
-                               user=classification.user,
-                               source=SubmissionSource.VARIANT_GRID,
-                               leave_existing_values=leave_existing_values,
-                               save=save)
+                                      user=classification.user,
+                                      source=SubmissionSource.VARIANT_GRID,
+                                      leave_existing_values=leave_existing_values,
+                                      save=save)
 
 
 def get_curation_system():
