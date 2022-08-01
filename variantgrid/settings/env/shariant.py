@@ -104,6 +104,7 @@ DEBUG = False
 ALLOWED_HOSTS = ['*']
 CSRF_TRUSTED_ORIGINS=['https://test.shariant.org.au', 'https://shariant.org.au', 'https://www.shariant.org.au']
 
+ANNOTATION_GENE_ANNOTATION_VERSION_ENABLED = False  # Only used for analysis optimisation
 _ANNOTATION_BASE_DIR = "/data/annotation"  # Set this to where you downloaded annotation (${ANNOTATION_BASE_DIR} from wiki)
 ANNOTATION_VCF_DUMP_DIR = os.path.join(_ANNOTATION_BASE_DIR, 'annotation_scratch')
 ANNOTATION_VEP_PERLBREW_RUNNER_SCRIPT = os.path.join(BASE_DIR, "scripts", "perlbrew_runner.sh")

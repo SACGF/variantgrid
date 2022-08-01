@@ -2,6 +2,7 @@ from collections import defaultdict
 from typing import Tuple, Dict, List
 
 from django.apps import apps
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.db import models
 from django.db.models import Model, Q, Count
@@ -121,6 +122,10 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
                 msg = f"Analysis setting '{field}' is not set. "
                 msg += "<a href='javascript:analysisSettings()'>Open Analysis Settings</a>"
                 errors.append(msg)
+
+        if not settings.ANNOTATION_GENE_ANNOTATION_VERSION_ENABLED:
+            errors.append("System incorrectly configured - speak to your systems administrator. "
+                          "settings.ANNOTATION_GENE_ANNOTATION_VERSION_ENABLED=False, it must be set for analysis")
 
         try:
             if self.annotation_version:

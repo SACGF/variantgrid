@@ -1,10 +1,11 @@
 import os
 from collections import defaultdict, Counter
 
+from django.conf import settings
 from django.core.management import BaseCommand
 from django.utils import timezone
 
-from annotation.models import GeneAnnotationVersion, OntologyImport, OntologyTerm, GenomeBuild, AnnotationVersion, \
+from annotation.models import GeneAnnotationVersion, OntologyTerm, GenomeBuild, AnnotationVersion, \
     InvalidAnnotationVersionError, GeneAnnotation
 from genes.gene_matching import ReleaseGeneMatcher
 from genes.models import GeneAnnotationRelease, GnomADGeneConstraint
@@ -32,6 +33,8 @@ class Command(BaseCommand):
                            help="Add new columns gene/disease and MONDO terms to existing gene annotation")
 
     def handle(self, *args, **options):
+        if not settings.ANNOTATION_GENE_ANNOTATION_VERSION_ENABLED:
+            raise ValueError("settings.ANNOTATION_GENE_ANNOTATION_VERSION is disabled.")
         print(f"Started: {timezone.now()}")
 
         force = options["force"]

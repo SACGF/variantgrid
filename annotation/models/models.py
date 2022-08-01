@@ -31,7 +31,7 @@ from genes.models_enums import AnnotationConsortium
 from library.django_utils import object_is_referenced
 from library.django_utils.django_partition import RelatedModelsPartitionModel
 from library.utils import invert_dict
-from ontology.models import OntologyImport, OntologyVersion
+from ontology.models import OntologyVersion
 from patients.models_enums import GnomADPopulation
 from snpdb.models import GenomeBuild, Variant, VariantGridColumn, Q, VCF, DBSNP_PATTERN, VARIANT_PATTERN
 from snpdb.models.models_enums import ImportStatus
@@ -989,11 +989,6 @@ class AnnotationVersionManager(models.Manager):
 # We re-use this, if nobody has referenced it - as you may eg update
 # variant/gene/clinvar annotations every 6 months etc and no point having so many sub-versions
 class AnnotationVersion(models.Model):
-    # Old style Postgres partitions (inherits)
-    SUB_ANNOTATIONS_INHERITANCE_PARTITIONING = ['variant_annotation_version', 'gene_annotation_version',
-                                                'clinvar_version', 'human_protein_atlas_version']
-    SUB_ANNOTATIONS_DECLARATIVE_PARTITIONING = ['ontology_version']
-    SUB_ANNOTATIONS = SUB_ANNOTATIONS_INHERITANCE_PARTITIONING + SUB_ANNOTATIONS_DECLARATIVE_PARTITIONING
     objects = AnnotationVersionManager()  # Always select_related
     annotation_date = models.DateTimeField(auto_now=True)
     genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)
@@ -1003,11 +998,23 @@ class AnnotationVersion(models.Model):
     human_protein_atlas_version = models.ForeignKey(HumanProteinAtlasAnnotationVersion, null=True, on_delete=PROTECT)
     ontology_version = models.ForeignKey(OntologyVersion, null=True, on_delete=PROTECT)
 
+    @property
+    def sub_annotations_inheritance_partitioning(self) -> List[str]:
+        """ Old style Postgres partitions (inherits) """
+        _sub_list = ['variant_annotation_version', 'clinvar_version', 'human_protein_atlas_version']
+        if settings.ANNOTATION_GENE_ANNOTATION_VERSION_ENABLED:
+            _sub_list.append('gene_annotation_version')
+        return _sub_list
+
+    @property
+    def sub_annotations(self) -> List[str]:
+        _sub_declarative_partitioning_list = ['ontology_version']
+        return self.sub_annotations_inheritance_partitioning + _sub_declarative_partitioning_list
+
     def _get_inheritance_partitioning_sub_annotation_versions(self):
         sub_annotation_versions = []
-        for field in self.SUB_ANNOTATIONS_INHERITANCE_PARTITIONING:
-            annotation_version = getattr(self, field)
-            if annotation_version:
+        for field in self.sub_annotations_inheritance_partitioning:
+            if annotation_version := getattr(self, field):
                 sub_annotation_versions.append(annotation_version)
         return sub_annotation_versions
 
@@ -1036,7 +1043,7 @@ class AnnotationVersion(models.Model):
 
     def validate(self):
         missing_sub_annotations = []
-        for field in self.SUB_ANNOTATIONS:
+        for field in self.sub_annotations:
             field_fk = f"{field}_id"  # Avoid fetching related data
             sub_annotation = getattr(self, field_fk)
             if sub_annotation is None:
@@ -1045,17 +1052,18 @@ class AnnotationVersion(models.Model):
             missing = ", ".join([str(s) for s in missing_sub_annotations])
             raise InvalidAnnotationVersionError(f"AnnotationVersion: {self} missing sub annotations: {missing}")
 
-        if vav_gar_id := self.variant_annotation_version.gene_annotation_release_id:
-            gene_gar_id = self.gene_annotation_version.gene_annotation_release_id
-            if vav_gar_id != gene_gar_id:
-                different_msg = f"GeneAnnotationRelease is different fro Variant {vav_gar_id} vs Gene: {gene_gar_id}"
-                raise InvalidAnnotationVersionError(different_msg)
+        if self.gene_annotation_version:
+            if vav_gar_id := self.variant_annotation_version.gene_annotation_release_id:
+                gene_gar_id = self.gene_annotation_version.gene_annotation_release_id
+                if vav_gar_id != gene_gar_id:
+                    different_msg = f"Inconsistent GeneAnnotationRelease. Variant {vav_gar_id} vs Gene: {gene_gar_id}"
+                    raise InvalidAnnotationVersionError(different_msg)
 
-        ov_id = self.ontology_version_id
-        gav_ov_id = self.gene_annotation_version.ontology_version_id
-        if (ov_id and gav_ov_id) and (ov_id != gav_ov_id):
-            msg = f"OntologyVersion {ov_id} != GeneAnnotationVersion OntologyVersion {gav_ov_id}"
-            raise InvalidAnnotationVersionError(msg)
+            ov_id = self.ontology_version_id
+            gav_ov_id = self.gene_annotation_version.ontology_version_id
+            if (ov_id and gav_ov_id) and (ov_id != gav_ov_id):
+                msg = f"OntologyVersion {ov_id} != GeneAnnotationVersion OntologyVersion {gav_ov_id}"
+                raise InvalidAnnotationVersionError(msg)
 
     @staticmethod
     def latest(genome_build: GenomeBuild, validate=True, active=True) -> Optional['AnnotationVersion']:

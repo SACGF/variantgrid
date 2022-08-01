@@ -143,6 +143,9 @@ VARIANTGRID_APP_DIR = os.path.join(BASE_DIR, "variantgrid")
 
 ### annotation
 
+# GeneAnnotation is only in analyses, as an optimisation to stpre eg per-gene ontology records.
+ANNOTATION_GENE_ANNOTATION_VERSION_ENABLED = True
+
 VG_REFERENCE_DIR = os.path.join(VARIANTGRID_APP_DIR, "data", "reference")
 ANNOTATION_BASE_DIR = "/data/annotation"
 ANNOTATION_VEP_FAKE_VERSION = False  # Overridden in unit tests to not call VEP to get version
