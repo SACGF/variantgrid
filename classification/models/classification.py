@@ -1331,7 +1331,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                     cell.add_validation(code=ValidationCode.UNKNOWN_TRANSCRIPT, severity='warning',
                                         message='Transcript should include version e.g. NM_001256799.1')
 
-        elif e_key == SpecialEKeys.AGE:
+        elif e_key.key == SpecialEKeys.AGE:
             if settings.VARIANT_CLASSIFICATION_AUTOFUZZ_AGE:
                 cell.value = patch_fuzzy_age(value)
 
