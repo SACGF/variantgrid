@@ -1,14 +1,16 @@
 import json
+import re
 from collections import defaultdict
 from typing import Dict, Any, Optional, Iterable
 
+from django.contrib import messages
 from django.db.models import QuerySet, When, Value, Case, IntegerField, Count, Q
 from django.http import HttpResponse, StreamingHttpResponse, HttpRequest
 from django.http.response import HttpResponseBase
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
-from django.utils.timezone import now
 from django.views import View
+from django.views.decorators.http import require_POST
 from lazy import lazy
 
 from classification.enums import SpecialEKeys
@@ -402,6 +404,33 @@ def clinvar_export_summary(request: HttpRequest, clinvar_key_id: Optional[str] =
         'count_batch': export_batch_columns.get_initial_query_params(clinvar_key=clinvar_key_id).count()
     })
 
+
+@require_POST
+def clinvar_export_create_batch(request: HttpRequest, clinvar_key_id: str) -> HttpResponseBase:
+    clinvar_key = get_object_or_404(ClinVarKey, pk=clinvar_key_id)
+    clinvar_key.check_user_can_access(request.user)
+
+    clinvar_export_ids_str = request.POST.get('clinvar_export_ids')
+    all_ids = set(int(cid) for cid in re.compile(r"\d+").findall(clinvar_export_ids_str))
+    clinvar_export_qs = ClinVarExport.objects.filter(clinvar_allele__clinvar_key=clinvar_key, pk__in=all_ids)
+    id_count = clinvar_export_qs.count()
+    if clinvar_export_qs.count() != len(all_ids):
+        # find the IDs that didn't exist for the lab
+        found_ids = set(clinvar_export_qs.values_list('pk', flat=True).all())
+        missing = sorted(all_ids - found_ids)
+        messages.add_message(request, level=messages.ERROR, message=f"Could not find some of the IDs for this ClinVarKey - not creating a batch. Missing IDs : {missing}")
+    elif id_count == 0:
+        messages.add_message(request, level=messages.ERROR, message=f"No IDs provided")
+    else:
+        batches = ClinVarExportBatch.create_batches(clinvar_export_qs, force_update=True)
+        for batch in batches:
+            batch_records_count = batch.clinvarexportsubmission_set.count()
+            messages.add_message(request, level=messages.SUCCESS, message=f"Created Export Batch {batch} with {batch_records_count}")
+            if missing := len(all_ids) - batch_records_count:
+                messages.add_message(request, level=messages.WARNING, message=f"Some records were not added to the batch, already up to date or in error : {missing}")
+        if not batches:
+            messages.add_message(request, level=messages.ERROR, message="All IDs were already in were already up to date or in error")
+    return redirect(reverse('clinvar_key_summary', kwargs={'clinvar_key_id': clinvar_key_id}))
 
 def clinvar_export_detail(request: HttpRequest, clinvar_export_id: int) -> HttpResponseBase:
     clinvar_export = get_object_or_404(ClinVarExport, pk=clinvar_export_id)

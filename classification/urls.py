@@ -70,6 +70,7 @@ urlpatterns = [
 
     perm_path('clinvar_export_summary', clinvar_export_view.clinvar_export_summary, name='clinvar_key_summary'),  # version that lets you pick which clinvarkey if you access to multiple
     perm_path('clinvar_export_summary/<str:clinvar_key_id>', clinvar_export_view.clinvar_export_summary, name='clinvar_key_summary'),
+    perm_path('clinvar_export_summary/<str:clinvar_key_id>/create_batch', clinvar_export_view.clinvar_export_create_batch, name='clinvar_export_create_batch'),
     perm_path('clinvar_export_summary/<str:clinvar_key_id>/download', clinvar_export_view.clinvar_export_download, name='clinvar_key_summary_export_download'),
     perm_path('clinvar_export/datatable', DatabaseTableView.as_view(column_class=clinvar_export_view.ClinVarExportColumns), name='clinvar_exports_datatables'),
     perm_path('clinvar_export/<int:clinvar_export_id>', clinvar_export_view.clinvar_export_review, name='clinvar_export'),

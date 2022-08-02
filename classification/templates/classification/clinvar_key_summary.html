@@ -163,6 +163,15 @@
         <div class="text-info mb-1">Important: the status of ClinVar exports is cached. Recent changes may not be reflected yet.</div>
 
         {% ui_register_tab_embedded tab_set="clinvar_tabs" label="Records" badge=count_records badge_status='success' %}
+            
+            <form method="POST" action="{% url 'clinvar_export_create_batch' clinvar_key.pk %}">
+                {% csrf_token %}
+                {% labelled label="ClinVar Export ID List" %}
+                    <textarea name="clinvar_export_ids" class="form-control"></textarea>
+                    <span class="text-muted">Provide a list of IDs seperated with spaces, tabs, new lines and/or commas.</span>
+                {% endlabelled %}
+                {% labelled label="" %}<button class="btn btn-primary">Create Batch for {{ clinvar_key }}</button>{% endlabelled %}
+            </form>
             <table id="records" data-datatable-url="{% url 'clinvar_exports_datatables' %}" data-datatable-data="records" class="sticky-header clinvar-export-table"></table>
             <div data-toolbar="#records">
                 <a class="download-link" href="{% url 'clinvar_key_summary_export_download' clinvar_key.pk %}">Download</a>
