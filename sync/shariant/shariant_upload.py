@@ -18,7 +18,7 @@ from classification.models.classification import ClassificationModification
 from classification.models.classification_utils import ClassificationJsonParams
 
 # add variant_type to private fields as the key has been deprecated
-SHARIANT_PRIVATE_FIELDS = ['patient_id', 'family_id', 'sample_id', 'patient_summary', 'internal_use', 'variant_type']
+SHARIANT_PRIVATE_FIELDS = ['patient_id', 'family_id', 'sample_id', 'patient_summary', 'internal_use', 'variant_type', 'age_units']
 
 
 def insert_nones(data: Dict) -> Dict:
@@ -98,7 +98,10 @@ def sync_shariant_upload(sync_destination: SyncDestination, full_sync: bool = Fa
         data = historical_converter.to_shariant(vcm, data)
         formatted_json['overwrite'] = data
         formatted_json['publish'] = share_level
-        formatted_json['delete'] = raw_json.get('withdrawn', False)
+        # only allow for withdrawing, doesn't allow for un-withdrawing
+        # but Shariant should get a notification that a withdrawn classification is being re-sent
+        if raw_json.get('withdrawn', False):
+            formatted_json['delete'] = True
 
         return formatted_json
 
