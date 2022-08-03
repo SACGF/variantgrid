@@ -59,16 +59,6 @@ class AlleleAdmin(ModelAdminBasics):
         liftover_alleles(allele_qs=queryset, user=request.user)
         self.message_user(request, message='Liftover queued', level=messages.INFO)
 
-    @admin_action("ClinVar Export Prepare")
-    def prepare_clinvar(self, request, queryset):
-        from classification.models.clinvar_export_prepare import ClinvarAlleleExportPrepare
-        allele: Allele
-        for allele in queryset:
-            export_prepare = ClinvarAlleleExportPrepare(allele=allele)
-            report = export_prepare.update_export_records()
-            for message in report:
-                self.message_user(request, message=f"Allele ({allele}) - {message}", level=messages.INFO)
-
 
 class DefaultBuildFilter(admin.SimpleListFilter):
     title = 'Default Genome Build Filter'
@@ -134,7 +124,7 @@ class ClinVarKeyExcludePatternAdmin(admin.TabularInline):
 
 @admin.register(ClinVarKey)
 class ClinVarKeyAdmin(ModelAdminBasics):
-    list_display = ('id', 'name', 'created', 'modified')
+    list_display = ('id', 'name', 'last_full_run')
     inlines = (ClinVarKeyExcludePatternAdmin,)
 
     def run_ignores(self, request, queryset: QuerySet[ClinVarKey], apply: bool):
@@ -158,6 +148,15 @@ class ClinVarKeyAdmin(ModelAdminBasics):
     @admin_action("Don't Share Flags - Apply")
     def ignore_apply(self, request, queryset: QuerySet[ClinVarKey]):
         self.run_ignores(request, queryset, True)
+
+    @admin_action("ClinVar Export Prepare")
+    def prepare_clinvar(self, request, queryset):
+        from classification.models.clinvar_export_prepare import ClinvarExportPrepare
+        report = ClinvarExportPrepare().update_export_records_for_keys(list(queryset.all()))
+        if len(report) > 10:
+            self.message_user(request, message=f"Showing first 10 messages", level=messages.INFO)
+        for report_row in report[0:10]:
+            self.message_user(request, message=report_row, level=messages.INFO)
 
     def get_form(self, request, obj=None, **kwargs):
 

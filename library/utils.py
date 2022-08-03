@@ -22,7 +22,8 @@ from functools import reduce
 from itertools import islice
 from json.encoder import JSONEncoder
 from operator import attrgetter
-from typing import TypeVar, Optional, Iterator, Tuple, Any, List, Iterable, Set, Dict, Union, Callable, Type, Generic
+from typing import TypeVar, Optional, Iterator, Tuple, Any, List, Iterable, Set, Dict, Union, Callable, Type, Generic, \
+    Collection
 from urllib.parse import urlparse
 
 from django.core.exceptions import FieldDoesNotExist
@@ -254,6 +255,17 @@ def pretty_label(label: str):
             last_space = True
         tidied = tidied + char
     return tidied
+
+
+def pretty_collection(collection: Collection[Any], to_string: Optional[Callable] = None) -> str:
+    try:
+        collection = sorted(collection)
+    except:
+        pass
+    if to_string:
+        collection = (to_string(item) for item in collection)
+
+    return ", ".join(f'{item}' for item in collection)
 
 
 def query_to_array(value):

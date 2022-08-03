@@ -6,7 +6,7 @@ from django.test import TestCase, override_settings
 from classification.enums import SpecialEKeys, SubmissionSource, ShareLevel
 from classification.models import Classification, ClinVarExport, ClinVarExportBatch, ClinVarExportStatus, \
     ClinVarExportRequestType, ClinVarExportRequest, ClinVarExportBatchStatus
-from classification.models.clinvar_export_prepare import ClinvarAlleleExportPrepare
+from classification.models.clinvar_export_prepare import ClinvarExportPrepare
 from classification.models.clinvar_export_sync import clinvar_export_sync, ClinVarResponseOutcome
 from classification.models.tests.test_utils import ClassificationTestUtils
 from library.guardian_utils import admin_bot
@@ -168,7 +168,7 @@ class TestClinVarExport(TestCase):
                                   "resolved_terms": [{"name": "ataxia-telangiectasia with generalized skin pigmentation and early death", "term_id": "MONDO:0008841"}]}
         c.save()
 
-        export_prepare = ClinvarAlleleExportPrepare(allele=allele)
+        export_prepare = ClinvarExportPrepare(allele=allele)
         report = export_prepare.update_export_records()
         for report_line in report:
             print(report_line)

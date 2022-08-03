@@ -210,6 +210,16 @@ function enhanceAndMonitor() {
                     dom: node
                 }).setup();
             }
+        },
+
+        {test: 'form[data-loadscreen=form]',
+            // unsure if this kicks in in time, will have to test and see
+            func: (node) => {
+                $(node).submit((event) => {
+                    $(node).parent('div').LoadingOverlay('show');
+                    debugger;
+                })
+            }
         }
     ];
 

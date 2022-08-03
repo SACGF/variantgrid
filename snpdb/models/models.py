@@ -260,6 +260,7 @@ class ClinVarKey(TimeStampedModel):
     api_key = models.TextField(null=True, blank=True)
     org_id = models.TextField(null=False, blank=True, default='')  # maybe this should have been the id?
     name = models.TextField(blank=True, default='')
+    last_full_run = models.DateTimeField(null=True)
 
     default_affected_status = models.TextField(choices=ClinVarAssertionMethods.choices, null=True, blank=True)
     inject_acmg_description = models.BooleanField(blank=True, default=False)

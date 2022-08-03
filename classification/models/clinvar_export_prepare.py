@@ -1,14 +1,17 @@
+import itertools
 from collections import defaultdict
-from typing import Dict, List, Optional, Set
+from typing import List, Optional, Set, Iterable
 
+from django.utils import timezone
 from django.utils.timezone import now
 
 from classification.enums import ShareLevel
-from classification.models import ClinVarAllele, Classification, ClassificationModification, ClinVarExport, \
+from classification.models import ClinVarAllele, ClassificationModification, ClinVarExport, \
     ConditionResolved, ClinVarExportStatus
 from classification.models.abstract_utils import ConsolidatingMerger
-from library.utils import segment
-from snpdb.models import Allele, ClinVarKey
+from library.utils import pretty_collection
+from snpdb.lab_picker import LabPickerData
+from snpdb.models import Allele, ClinVarKey, Lab
 
 
 class ClassificationModificationCandidate:
@@ -101,68 +104,94 @@ class ClinVarConsolidatingMerger(ConsolidatingMerger[ClinVarExport, Classificati
 ClinVarAlleleExportLog = List[str]
 
 
-class ClinvarAlleleExportPrepare:
+class ClinvarExportPrepare:
 
-    def __init__(self, allele: Allele):
-        self.allele = allele
+    @staticmethod
+    def update_export_records(perspective: Optional[LabPickerData] = None):
+        clinvar_keys: Set[ClinVarKey]
+        if perspective:
+            clinvar_keys = {lab.clinvar_key for lab in perspective.selected_labs if lab.clinvar_key}
+        else:
+            clinvar_keys = set(ClinVarKey.objects.all())
+        if clinvar_keys:
+            return ClinvarExportPrepare.update_export_records_for_keys(clinvar_keys)
 
-    def update_export_records(self) -> ClinVarAlleleExportLog:
+    @staticmethod
+    def _has_condition(cm: ClassificationModification):
+        if resolved_condition := cm.classification.condition_resolution_obj:
+            if len(resolved_condition.terms) >= 1:
+                return True
+        return False
 
-        all_classifications = Classification.objects.filter(
-            withdrawn=False,
-            variant__in=self.allele.variants,
-            share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS
-        )
+    @staticmethod
+    def process_allele(clinvar_key: ClinVarKey, allele: Allele, modifications: Iterable[ClassificationModification]) -> List[str]:
+        clinvar_allele, _ = ClinVarAllele.objects.get_or_create(clinvar_key=clinvar_key, allele=allele)
+        clinvar_merger = ClinVarConsolidatingMerger(clinvar_allele)
 
-        def has_condition(c: Classification):
-            if resolved_condition := c.condition_resolution_obj:
-                if len(resolved_condition.terms) >= 1:
-                    return True
-            return False
+        no_condition_count = 0
+        for mod in modifications:
+            if ClinvarExportPrepare._has_condition(mod):
+                clinvar_merger.add_new_candidate(ClassificationModificationCandidate(mod))
+            else:
+                no_condition_count += 1
+        clinvar_merger.consolidate()
 
-        classifications_condition, classifications_no_conditions = segment(all_classifications, has_condition)
+        total = clinvar_allele.clinvarexport_set.count()
+        in_error = clinvar_allele.clinvarexport_set.filter(status=ClinVarExportStatus.IN_ERROR).count()
+        valid = total - in_error
 
-        clinvar_keys_to_classification: Dict[ClinVarKey, List[ClassificationModification]] = defaultdict(list)
-        for classification in classifications_condition:
-            if clinvar_key := classification.lab.clinvar_key:
-                clinvar_keys_to_classification[clinvar_key].append(classification.last_published_version)
+        clinvar_allele.classifications_missing_condition = no_condition_count
+        clinvar_allele.submissions_valid = valid
+        clinvar_allele.submissions_invalid = in_error
+        clinvar_allele.last_evaluated = now()
+        clinvar_allele.save()
 
-        for existing_clinvar_allele in ClinVarAllele.objects.filter(allele=self.allele):
-            if existing_clinvar_allele.clinvar_key not in clinvar_keys_to_classification:
-                clinvar_keys_to_classification[existing_clinvar_allele.clinvar_key] = list()
+        log = clinvar_merger.log
+        log = [f"{clinvar_key} : {entry}" for entry in log if not entry.startswith("No change")]
 
-        # build up a dictionary of ClinVarKeys to Classifications (within an allele)
-        # then to find the best candidate(s) and update the existing ones
+        if no_condition_count:
+            if no_condition_count == 1:
+                log.append(f"{clinvar_key} : 1 shared classification for {allele} doesn't have resolved conditions")
+            else:
+                log.append(f"{clinvar_key} : {no_condition_count} shared classifications for {allele} don't have resolved conditions")
+
+        return log
+
+    @staticmethod
+    def update_export_records_for_keys(clinvar_keys: Set[ClinVarKey]) -> ClinVarAlleleExportLog:
+        # work on clinvar keys, not on labs, as a user could have access to one lab but the clinvar key might be for 2
+        # and a clinvar key has to get all labs updated or none, can't deal with partial
+        clinvar_labs = Lab.objects.filter(clinvar_key__in=clinvar_keys)
+
+        all_classifications = ClassificationModification.objects.filter(
+            classification__withdrawn=False,
+            classification__share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS,
+            classification__lab__in=clinvar_labs,
+            is_last_published=True
+        ).select_related('classification', 'classification__allele', 'classification__lab', 'classification__lab__clinvar_key').order_by('classification__allele_id', 'classification__lab__clinvar_key_id')
+
         combined_log = list()
 
-        for clinvar_key, classifications in clinvar_keys_to_classification.items():
-            labs = set(clinvar_key.lab_set.all())
-            clinvar_allele, _ = ClinVarAllele.objects.get_or_create(clinvar_key=clinvar_key, allele=self.allele)
-            cp = ClinVarConsolidatingMerger(clinvar_allele)
-            for mod in classifications:
-                cp.add_new_candidate(ClassificationModificationCandidate(mod))
-            cp.consolidate()
+        # need to keep track of which allele, clinvar_key combos we've seen
+        # so we can check all other alleles to make sure they haven't lost candidates
+        clinvar_key_to_processed_alleles = defaultdict(list)
+        for allele, allele_classifications in itertools.groupby(all_classifications, lambda cm: cm.classification.allele):
+            for clinvar_key, clinvar_allele_classifications in itertools.groupby(allele_classifications, lambda cm: cm.classification.lab.clinvar_key):
+                combined_log += ClinvarExportPrepare.process_allele(clinvar_key=clinvar_key, allele=allele, modifications=clinvar_allele_classifications)
+                clinvar_key_to_processed_alleles[clinvar_key].append(allele)
 
-            total = clinvar_allele.clinvarexport_set.count()
-            in_error = clinvar_allele.clinvarexport_set.filter(status=ClinVarExportStatus.IN_ERROR).count()
-            valid = total - in_error
+        # loop through ClinVarAlleles for clinvar key that we didn't find by looking at all the non-withdrawn classifications for that lab
+        # i.e. these will be the alleles that
+        for clinvar_key in clinvar_keys:
+            for allele_id in ClinVarAllele.objects.filter(clinvar_key=clinvar_key).exclude(allele__in=clinvar_key_to_processed_alleles.get(clinvar_key, list())).values_list('allele', flat=True):
+                allele = Allele.objects.get(pk=allele_id)
+                combined_log += ClinvarExportPrepare.process_allele(clinvar_key=clinvar_key, allele=allele, modifications=list())
 
-            no_condition_for_key = [c for c in classifications_no_conditions if c.lab in labs]
+        completed_date = timezone.now()
+        for clinvar_key in clinvar_keys:
+            clinvar_key.last_full_run = completed_date
+            clinvar_key.save()
 
-            clinvar_allele.classifications_missing_condition = len(no_condition_for_key)
-            clinvar_allele.submissions_valid = valid
-            clinvar_allele.submissions_invalid = in_error
-            clinvar_allele.last_evaluated = now()
-            clinvar_allele.save()
-
-            log = cp.log
-            log = [f"{clinvar_key} : {entry}" for entry in log]
-            combined_log += log
-
-        if classifications_no_conditions:
-            combined_log.append(f"{len(classifications_no_conditions)} shared classifications for allele don't have resolved conditions")
-
-        if len(combined_log) == 0:
-            combined_log.append("No new or old ClinVarKeys associated with this Allele")
-
+        if not combined_log:
+            combined_log.append(f"No changes detected to ClinVarExports for {pretty_collection(clinvar_keys)}")
         return combined_log

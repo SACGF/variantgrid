@@ -127,6 +127,12 @@
         {% endif %}
 
         <div data-toggle="ajax" href="{% url 'clinvar_key' clinvar_key.pk %}">Loading</div>
+        {% labelled label="Refresh" admin_only=True %}
+            <form data-loadscreen="form" method="POST" action="{% url 'clinvar_export_refresh' clinvar_key.pk %}">
+                {% csrf_token %}
+                <button class="btn btn-outline-primary" onclick="return window.confirm('This may take a while. Please confirm to proceed.');">Refresh ClinVar Exports for {{ clinvar_key }}</button>
+            </form>
+        {% endlabelled %}
         {% page_help_embedded "Records &amp; Batches" %}
             <p>{{ 'info' | severity_icon }}Important : Changes to classifications are not automatically reflected here. Classifications might be more up to date.</p>
             {% if missing_condition_count %}

@@ -1,7 +1,7 @@
 from django.core.management import BaseCommand
 
 from classification.models import ClinVarExport
-from classification.models.clinvar_export_prepare import ClinvarAlleleExportPrepare
+from classification.models.clinvar_export_prepare import ClinvarExportPrepare
 from snpdb.models import Allele
 
 
@@ -13,12 +13,9 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         if options["prepare"]:
-            for count, allele in enumerate(Allele.objects.all()):
-                report = ClinvarAlleleExportPrepare(allele).update_export_records()
-                if count % 100 == 0:
-                    print(f"Processing Allele no {count}")
-                # print(report)
-            print(f"Completed {count}")
+            print("Preparing all ClinVarExports, this may take a while")
+            report = ClinvarExportPrepare().update_export_records()
+            print("\n".join(report))
 
         if options["mondo"]:
             for clinvar_export in ClinVarExport.objects.filter(condition__display_text__istartswith="OMIM"):
