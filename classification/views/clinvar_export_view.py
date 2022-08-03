@@ -22,6 +22,7 @@ from classification.views.classification_dashboard_view import ClassificationDas
 from genes.hgvs import CHGVS
 from library.cache import timed_cache
 from library.django_utils import add_save_message, get_url_from_view_path
+from library.log_utils import report_event
 from library.utils import html_to_text, export_column, ExportRow, local_date_string
 from snpdb.lab_picker import LabPickerData
 from snpdb.models import ClinVarKey, Lab, Allele, GenomeBuild
@@ -411,10 +412,8 @@ def clinvar_export_refresh(request: HttpRequest, clinvar_key_id: str) -> HttpRes
     clinvar_key = get_object_or_404(ClinVarKey, pk=clinvar_key_id)
     clinvar_key.check_user_can_access(request.user)
     logs = ClinvarExportPrepare.update_export_records_for_keys(clinvar_keys={clinvar_key,})
-    if len(logs) > 10:
-        messages.add_message(request, level=messages.INFO, message="Showing for 10 messages")
-    for message in logs[0:10]:
-        messages.add_message(request, level=messages.INFO, message=message)
+    messages.add_message(request, level=messages.INFO, message="Prepare complete")
+    # TODO, actually store or display the logs somewhere - against the ClinVarAlleles?
     return redirect(reverse('clinvar_key_summary', kwargs={'clinvar_key_id': clinvar_key_id}))
 
 

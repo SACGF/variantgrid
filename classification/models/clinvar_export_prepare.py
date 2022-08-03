@@ -168,7 +168,7 @@ class ClinvarExportPrepare:
             classification__share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS,
             classification__lab__in=clinvar_labs,
             is_last_published=True,
-            allele__isnull=False
+            classification__allele__isnull=False
         ).select_related('classification', 'classification__allele', 'classification__lab', 'classification__lab__clinvar_key').order_by('classification__allele_id', 'classification__lab__clinvar_key_id')
 
         combined_log = list()
