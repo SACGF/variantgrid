@@ -22,7 +22,7 @@ FINISH_IMPORT_VCF_STEP_TASKS_CLASSES = [
 
 ANNOTATION_ENTREZ_EMAIL = 'davmlaw@gmail.com'
 
-ANNOTATION_VEP_PERLBREW_RUNNER_SCRIPT = os.path.expanduser("~/bin/perlbrew_runner.sh")
+ANNOTATION_VEP_PERLBREW_RUNNER_SCRIPT = os.path.join(BASE_DIR, "scripts", "perlbrew_runner.sh")
 ANNOTATION_VEP_ARGS = ["--buffer_size", "1000"]  # default = 5000
 ANNOTATION[BUILD_GRCH38]["enabled"] = True
 ANNOTATION[BUILD_GRCH38]["annotation_consortium"] = "RefSeq"
