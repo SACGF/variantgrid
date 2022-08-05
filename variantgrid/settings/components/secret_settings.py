@@ -19,12 +19,11 @@ def _get_env_variable(key: str) -> Tuple[Any, bool]:
         return None, False
 
 
-def _settings_file():
-    value, found = _get_env_variable('SETTINGS_CONFIG')
-    if found:
-        return value
-    else:
-        return '/etc/variantgrid/settings_config.json'
+def _settings_file() -> str:
+    filename, found = _get_env_variable('SETTINGS_CONFIG')
+    if not found:
+        filename = '/etc/variantgrid/settings_config.json'
+    return filename
 
 
 def _load_settings():
@@ -128,7 +127,10 @@ def get_secret(key: str) -> Optional[Any]:
             logging.warning(f'Warning {key} was loaded from default_settings, migrate to settings config or env variable')
         return value
 
-    raise ValueError(f'No config value found for {key} in settings file {_settings_file()}')
+    settings_filename = _settings_file()
+    if not os.path.exists(settings_filename):
+        raise FileNotFoundError(f"Secret settings file '{settings_filename}' not found")
+    raise ValueError(f"No config value found for {key} in secret settings file '{settings_filename}'")
 
 
 def get_secrets(prefix: str, leafs: List[str]) -> Dict[str, Any]:
