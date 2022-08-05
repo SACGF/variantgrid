@@ -19,13 +19,15 @@ from django.utils import timezone
 from django.utils.timezone import localtime
 from django_extensions.db.models import TimeStampedModel
 from lazy import lazy
+from psqlextra.models import PostgresPartitionedModel
+from psqlextra.types import PostgresPartitioningMethod
 
 from annotation.external_search_terms import get_variant_search_terms, get_variant_pubmed_search_terms
 from annotation.models.damage_enums import Polyphen2Prediction, FATHMMPrediction, MutationTasterPrediction, \
     SIFTPrediction, PathogenicityImpact, MutationAssessorPrediction, ALoFTPrediction
 from annotation.models.models_enums import AnnotationStatus, CitationSource, \
     VariantClass, ColumnAnnotationCategory, VEPPlugin, VEPCustom, ClinVarReviewStatus, VEPSkippedReason, \
-    ManualVariantEntryType, HumanProteinAtlasAbundance
+    ManualVariantEntryType, HumanProteinAtlasAbundance, EssentialGeneCRISPR, EssentialGeneCRISPR2, EssentialGeneGeneTrap
 from genes.models import GeneSymbol, Gene, TranscriptVersion, Transcript, GeneAnnotationRelease
 from genes.models_enums import AnnotationConsortium
 from library.django_utils import object_is_referenced
@@ -305,6 +307,40 @@ class HumanProteinAtlasAnnotation(models.Model):
     gene = models.ForeignKey(Gene, null=True, on_delete=CASCADE)  # Always Ensembl
     tissue_sample = models.ForeignKey(HumanProteinAtlasTissueSample, on_delete=CASCADE)
     value = models.FloatField()
+
+
+class DBNSFPGeneAnnotationVersion(TimeStampedModel):
+    """ @see https://sites.google.com/site/jpopgen/dbNSFP """
+    version = models.TextField(unique=True)
+
+
+class DBNSFPGeneAnnotation(PostgresPartitionedModel, TimeStampedModel):
+    """ @see https://sites.google.com/site/jpopgen/dbNSFP """
+    version = models.ForeignKey(DBNSFPGeneAnnotationVersion, on_delete=CASCADE)
+    gene_symbol = models.ForeignKey(GeneSymbol, on_delete=CASCADE)
+    refseq_transcript = models.ForeignKey(Transcript, null=True, blank=True, on_delete=CASCADE)
+    ensembl_transcript = models.ForeignKey(Transcript, null=True, blank=True, on_delete=CASCADE)
+    pathway_biocarta_full = models.TextField(null=True, blank=True)
+    pathway_consensus_pathdb = models.TextField(null=True, blank=True)
+    pathway_kegg_id = models.TextField(null=True, blank=True)
+    pathway_kegg_full = models.TextField(null=True, blank=True)
+    gwas_trait_association = models.TextField(null=True, blank=True)
+    go_biological_process = models.TextField(null=True, blank=True)
+    go_cellular_component = models.TextField(null=True, blank=True)
+    go_molecular_function = models.TextField(null=True, blank=True)
+    interactions_biogrid = models.TextField(null=True, blank=True)
+    interactions_consensus_pathdb = models.TextField(null=True, blank=True)
+    gnomad_pli = models.FloatField(null=True, blank=True)
+    gnomad_prec = models.FloatField(null=True, blank=True)
+    gnomad_pnull = models.FloatField(null=True, blank=True)
+    loftool = models.FloatField(null=True, blank=True)
+    essential_gene_crispr = models.CharField(max_length=1, null=True, blank=True, choices=EssentialGeneCRISPR.choices)
+    essential_gene_crispr2 = models.CharField(max_length=1, null=True, blank=True, choices=EssentialGeneCRISPR2.choices)
+    essential_gene_gene_trap = models.CharField(max_length=1, null=True, blank=True, choices=EssentialGeneGeneTrap.choices)
+
+    class PartitioningMeta:
+        method = PostgresPartitioningMethod.LIST
+        key = ["version_id"]
 
 
 class ColumnVEPField(models.Model):

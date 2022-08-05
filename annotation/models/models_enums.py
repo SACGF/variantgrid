@@ -210,3 +210,21 @@ class ManualVariantEntryType(models.TextChoices):
     HGVS = "h", "HGVS"
     VARIANT = "v", "Variant"
     UNKNOWN = "u", "Unknown"
+
+
+class EssentialGeneCRISPR(models.TextChoices):
+    ESSENTIAL = "E", "Essential"
+    NON_ESSENTIAL_PHENOTYPE_CHANGING = "N", "Non-essential phenotype-changing"
+
+
+class EssentialGeneCRISPR2(models.TextChoices):
+    ESSENTIAL = "E", "Essential"
+    NON_ESSENTIAL_PHENOTYPE_CHANGING = "N", "Non-essential phenotype-changing"
+    CONTEXT_SPECIFIC_ESSENTIAL = "S", "Context-Specific essential"
+
+
+class EssentialGeneGeneTrap(models.TextChoices):
+    ESSENTIAL = "E", "Essential"
+    NON_ESSENTIAL_PHENOTYPE_CHANGING = "N", "Non-essential phenotype-changing"
+    HAP1_SPECIFIC_ESSENTIAL = "H", "HAP1-Specific essential"
+    KBM7_SPECIFIC_ESSENTIAL = "K", "KBM7-Specific essential"

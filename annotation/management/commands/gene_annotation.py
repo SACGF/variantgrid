@@ -8,7 +8,7 @@ from django.utils import timezone
 from annotation.models import GeneAnnotationVersion, OntologyTerm, GenomeBuild, AnnotationVersion, \
     InvalidAnnotationVersionError, GeneAnnotation
 from genes.gene_matching import ReleaseGeneMatcher
-from genes.models import GeneAnnotationRelease, GnomADGeneConstraint
+from genes.models import GeneAnnotationRelease, GnomADGeneConstraint, ReleaseGeneSymbolGene
 from library.django_utils.django_file_utils import get_import_processing_filename
 from ontology.models import OntologyService, GeneDiseaseClassification, OntologyTermRelation, \
     OntologyVersion
@@ -163,7 +163,7 @@ class Command(BaseCommand):
         return gene_disease_supportive_or_below, gene_disease_moderate_or_above
 
     def _create_gene_annotation_version(self, gene_annotation_release, ontology_version, gene_symbols):
-        gnomad_gene_constraint = GnomADGeneConstraint.objects.first()
+        gnomad_gene_constraint = GnomADGeneConstraint.objects.first()  # Only ever 1
 
         # Only 1 of each of Gnomad (CachedWebResource - deleted upon reload)
         # When you create GeneAnnotationVersion (sub version) it automatically creates/bumps a new annotation version
@@ -206,18 +206,21 @@ class Command(BaseCommand):
                 print(f"Warning: {gene_annotation_release} has no match for '{uc_symbol}' ({service_terms})")
                 missing_genes["ontology"] += 1
 
+        rgsg_qs = ReleaseGeneSymbolGene.objects.filter(release_gene_symbol__release=gene_annotation_release)
+        symbol_to_gene_ids = defaultdict(set)
+        for gene_symbol, gene_id in rgsg_qs.values_list("release_gene_symbol__gene_symbol", "gene_id"):
+            symbol_to_gene_ids[gene_symbol].add(gene_id)
+
         for gene_symbol_id, oe_lof in GnomADGeneConstraint.objects.all().values_list("gene_symbol_id", "oe_lof"):
-            genes_qs = gene_annotation_release.genes_for_symbol(gene_symbol_id)
-            if genes_qs.exists():
-                for gene in genes_qs:
-                    annotation_by_gene[gene]["gnomad_oe_lof"] = oe_lof
+            for gene_id in symbol_to_gene_ids.get(gene_symbol_id, []):
+                annotation_by_gene[gene_id]["gnomad_oe_lof"] = oe_lof
             else:
                 print(f"Warning: {gene_annotation_release} has no match for '{gene_symbol_id}' - GnomADGeneConstraint")
                 missing_genes["gnomad_gene_constraints"] += 1
 
         gene_annotation_records = []
-        for gene, ga_data in annotation_by_gene.items():
-            ga_data["gene_id"] = gene.pk
+        for gene_id, ga_data in annotation_by_gene.items():
+            ga_data["gene_id"] = gene_id
             ga_data["version_id"] = gav.pk
             gene_annotation_records.append(tuple((ga_data.get(k) for k in self.GENE_ANNOTATION_HEADER)))
 
