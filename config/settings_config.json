@@ -33,5 +33,23 @@
   "SLACK": {
     "enabled": false,
     "admin_callback_url": null
+  },
+  "SYNC": {
+    "shariant": {
+      "enabled": false,
+      "username": "",
+      "password": "",
+      "host": "https://shariant.org.au",
+      "oauth_url": "https://shariant.org.au/auth/realms/agha/protocol/openid-connect/token",
+      "client_id": "shariant-client-tools"
+    },
+    "variantgrid_com": {
+      "enabled": false,
+      "username": "",
+      "password": "",
+      "host": "https://variantgrid.com",
+      "oauth_url": "",
+      "client_id": "variantgrid-remote-client"
+    }
   }
 }
