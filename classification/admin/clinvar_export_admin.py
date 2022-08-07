@@ -87,7 +87,7 @@ class ClinVarExportAdmin(ModelAdminBasics):
     search_fields = ('pk', "scv")
     inlines = (ClinVarExportSubmissionAdmin, )
     list_select_related = ('classification_based_on', )
-    list_per_page = 1000
+    list_per_page = 200
 
     def has_add_permission(self, request, obj=None):
         return False
