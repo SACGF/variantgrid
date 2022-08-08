@@ -3,28 +3,29 @@
 {% load ui_utils %}
 <div id="sample-files">
     <script type="text/javascript">
-        var targetParent = $("#sample-files").parent();
+        var targetParent = $("#sample-files").parent();  // var as needs to reload in place
 
         $(document).ready(function() {
+            {% update_django_messages %}
             let options = {
                 target: targetParent,
             };
             $('form#sample-files-form').ajaxForm(options);
-        }
+        });
     </script>
     <div class="container">
         <form id="sample-files-form" method="post" action="{% url 'sample_files_tab' sample.pk %}">
             {% csrf_token %}
             {% crispy sample_files_formset form_helper.horizontal %}
-            <table>
-            {% if has_write_permission %}
-            <td><button id='save-button' class="btn btn-primary">Save</button></td>
-            <td><button id="reset-button" type='reset' class="btn btn-secondary">Reset</button></td>
-            {% else %}
-                You can view but not modify this sample.
-            {% endif %}
-            </tr>
-            </table>
+
+            <div>
+                {% if has_write_permission %}
+                <button id='save-button' class="btn btn-primary">Save</button>
+                <button id="reset-button" type='reset' class="btn btn-secondary">Reset</button>
+                {% else %}
+                    You can view but not modify this sample.
+                {% endif %}
+            </div>
         </form>
     </div>
 </div>

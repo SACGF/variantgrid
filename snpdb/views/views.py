@@ -399,12 +399,15 @@ def view_sample(request, sample_id):
 
 def sample_files_tab(request, sample_id):
     sample = Sample.get_for_user(request.user, sample_id)
-    sample_files_formset = forms.SampleFilesFormSet(request.POST or None, instance=sample)
     if request.method == "POST":
+        sample_files_formset = forms.SampleFilesFormSet(request.POST, instance=sample)
         valid = sample_files_formset.is_valid()
         if valid:
             sample_files_formset.save()
         add_save_message(request, valid, "Sample Files")
+
+    # We shouldn't re-use after POST - so generate fresh
+    sample_files_formset = forms.SampleFilesFormSet(None, instance=sample)
 
     context = {
         "sample": sample,
