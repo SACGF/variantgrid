@@ -75,10 +75,14 @@ class ClinVarEvidenceKey:
             messages = self.messages
             if single:
                 messages += JsonMessages.error(f"\"{self.evidence_key.pretty_label}\" expected single value, got multiple values")
+
             return ValidatedJson(self.values, messages)
 
     def __bool__(self):
         return len(self.values) > 0
+
+    def __len__(self):
+        return len(self.values)
 
 
 # Dictionary definitions, we don't have many since we deal more with ValidatedJSon where a typed dictionary doesn't fit
@@ -333,9 +337,16 @@ class ClinVarExportConverter:
             # FIXME fall back to other date types? or at least raising a warning if not a valid looking date
             data["dateLastEvaluated"] = date_last_evaluated
 
+        messages = JsonMessages()
         if mode_of_inheritance := self.clinvar_value(SpecialEKeys.MODE_OF_INHERITANCE):
-            data["modeOfInheritance"] = mode_of_inheritance.value(single=True)
-        return ValidatedJson(data)
+            # TODO might need the concept of NO_KEY so we can have "mode_of_inheritance": NO_KEY
+            # so we can still put the warning against mode_of_inheritance, but not actually produce it in the real JSON
+            # as ClinVar doesn't accept modeOfInheritance: null
+            if len(mode_of_inheritance) > 1:
+                messages += JsonMessages.warning("ClinVar only accepts a single value for mode of inheritance, have multiple values so omitting")
+            else:
+                data["modeOfInheritance"] = mode_of_inheritance.value(single=True)
+        return ValidatedJson(data, messages)
 
     @property
     def condition_set(self) -> ValidatedJson:
