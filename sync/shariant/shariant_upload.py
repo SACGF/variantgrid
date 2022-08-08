@@ -80,7 +80,6 @@ class ClassificationUploader:
         )
         if apply_filters and self.filters:
             q = QueryJsonFilter.classification_value_filter().convert_to_q(self.filters)
-            print(q)
             qs = qs.filter(q)
 
         if not full_sync:
