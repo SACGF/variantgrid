@@ -493,6 +493,7 @@ def get_visible_variants(user: User, genome_build: GenomeBuild) -> VARIANT_SEARC
 
     annotation_version = AnnotationVersion.latest(genome_build)
     variant_qs = get_variant_queryset_for_annotation_version(annotation_version)
+    variant_qs = variant_qs.filter(Variant.get_contigs_q(genome_build))  # restrict to build
     if settings.SEARCH_VARIANT_REQUIRE_CLASSIFICATION_FOR_NON_ADMIN and not user.is_superuser:
         variant_qs = variant_qs.filter(Classification.get_variant_q(user, genome_build))
 
