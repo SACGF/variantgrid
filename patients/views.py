@@ -73,13 +73,14 @@ def view_patient_contact_tab(request, patient_id):
 
 def view_patient_specimens(request, patient_id):
     patient = Patient.get_for_user(request.user, patient_id)
-    specimen_formset = forms.PatientSpecimenFormSet(request.POST or None, instance=patient)
     if request.method == "POST":
+        specimen_formset = forms.PatientSpecimenFormSet(request.POST, instance=patient)
         valid = specimen_formset.is_valid()
         if valid:
             specimen_formset.save()
         add_save_message(request, valid, "Patient Specimen")
 
+    specimen_formset = forms.PatientSpecimenFormSet(instance=patient)
     context = {"patient": patient,
                "num_specimens": patient.num_specimens,
                "specimen_formset": specimen_formset,

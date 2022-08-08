@@ -975,15 +975,14 @@ def igv_integration(request):
                                                   widgets=widgets,
                                                   max_num=10,
                                                   extra=3)
-    formset = UserDataPrefixFormSet(request.POST or None, instance=request.user)
     if request.method == "POST":
+        formset = UserDataPrefixFormSet(request.POST, instance=request.user)
         valid = formset.is_valid()
         if valid:
             formset.save()
-            # Need to re-create formset so deleted row goes
-            formset = UserDataPrefixFormSet(instance=request.user)
         add_save_message(request, valid, "IGV Integration")
 
+    formset = UserDataPrefixFormSet(instance=request.user)
     context_dict = {'user': request.user,
                     'formset': formset,
                     'example_replacements': get_example_replacements(request.user)}
