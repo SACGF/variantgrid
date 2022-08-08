@@ -3,6 +3,7 @@ from typing import Optional
 from django.contrib import admin
 from sync import models
 from sync.models.models import SyncDestination
+from sync.shariant.shariant_upload import ClassificationUploader
 
 
 class ByDestinationFilter(admin.SimpleListFilter):
@@ -28,6 +29,16 @@ class SyncDestinationAdmin(admin.ModelAdmin):
         for sync_destination in queryset:
             sync_destination.run(full_sync=False, max_rows=max_rows)
             self.message_user(request, message=f"Completed {str(sync_destination)} row limit = {max_rows}")
+
+    def eligible_row_count(self, request, queryset):
+        for destination in queryset:
+            uploader = ClassificationUploader(destination)
+            all_shared_lab_records = uploader.records_to_sync(apply_filters=False, full_sync=True).count()
+            all_filtered_shared_lab_records = uploader.records_to_sync(apply_filters=True, full_sync=True).count()
+            unsynced_filtered_shared_lab_records = uploader.records_to_sync(apply_filters=True, full_sync=False).count()
+
+            self.message_user(request, message=f"{destination} shared classifications for labs / passes filter / not yet synced : {all_shared_lab_records} / {all_filtered_shared_lab_records} / {unsynced_filtered_shared_lab_records}")
+    eligible_row_count.short_description = "Row Counts"
 
     def run_sync(self, request, queryset):
         self._run_sync(request, queryset)
