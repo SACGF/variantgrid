@@ -6,6 +6,7 @@ from django.contrib.admin import RelatedFieldListFilter
 from snpdb.admin_utils import ModelAdminBasics, admin_action
 from sync.models import SyncRun, ClassificationModificationSyncRecord
 from sync.models.models import SyncDestination
+from sync.shariant.shariant_upload import ClassificationUploader
 
 
 @admin.register(SyncDestination)
@@ -22,6 +23,16 @@ class SyncDestinationAdmin(ModelAdminBasics):
         for sync_destination in queryset:
             sync_destination.run(full_sync=False, max_rows=max_rows)
             self.message_user(request, message=f"Completed {str(sync_destination)} row limit = {max_rows}")
+
+    @admin_action("Row Counts")
+    def eligible_row_count(self, request, queryset):
+        for destination in queryset:
+            uploader = ClassificationUploader(destination)
+            all_shared_lab_records = uploader.records_to_sync(apply_filters=False, full_sync=True).count()
+            all_filtered_shared_lab_records = uploader.records_to_sync(apply_filters=True, full_sync=True).count()
+            unsynced_filtered_shared_lab_records = uploader.records_to_sync(apply_filters=True, full_sync=False).count()
+
+            self.message_user(request, message=f"{destination} shared classifications for labs / passes filter / not yet synced : {all_shared_lab_records} / {all_filtered_shared_lab_records} / {unsynced_filtered_shared_lab_records}")
 
     @admin_action("Run now (delta sync)")
     def run_sync(self, request, queryset):
