@@ -399,12 +399,15 @@ def view_sample(request, sample_id):
 
 def sample_files_tab(request, sample_id):
     sample = Sample.get_for_user(request.user, sample_id)
-    sample_files_formset = forms.SampleFilesFormSet(request.POST or None, instance=sample)
     if request.method == "POST":
+        sample_files_formset = forms.SampleFilesFormSet(request.POST, instance=sample)
         valid = sample_files_formset.is_valid()
         if valid:
             sample_files_formset.save()
         add_save_message(request, valid, "Sample Files")
+
+    # We shouldn't re-use after POST - so generate fresh
+    sample_files_formset = forms.SampleFilesFormSet(None, instance=sample)
 
     context = {
         "sample": sample,
@@ -972,15 +975,14 @@ def igv_integration(request):
                                                   widgets=widgets,
                                                   max_num=10,
                                                   extra=3)
-    formset = UserDataPrefixFormSet(request.POST or None, instance=request.user)
     if request.method == "POST":
+        formset = UserDataPrefixFormSet(request.POST, instance=request.user)
         valid = formset.is_valid()
         if valid:
             formset.save()
-            # Need to re-create formset so deleted row goes
-            formset = UserDataPrefixFormSet(instance=request.user)
         add_save_message(request, valid, "IGV Integration")
 
+    formset = UserDataPrefixFormSet(instance=request.user)
     context_dict = {'user': request.user,
                     'formset': formset,
                     'example_replacements': get_example_replacements(request.user)}
