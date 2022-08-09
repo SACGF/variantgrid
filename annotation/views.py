@@ -22,7 +22,7 @@ from annotation.manual_variant_entry import create_manual_variants
 from annotation.models import ClinVar, AnnotationVersion, AnnotationRun, VariantAnnotationVersion, \
     VariantAnnotationVersionDiff
 from annotation.models.models import CachedWebResource, Citation, HumanProteinAtlasAnnotationVersion, \
-    HumanProteinAtlasAnnotation, ColumnVEPField
+    HumanProteinAtlasAnnotation, ColumnVEPField, DBNSFPGeneAnnotationVersion
 from annotation.models.models_enums import AnnotationStatus, CitationSource
 from annotation.models.models_version_diff import VersionDiff
 from annotation.tasks.annotate_variants import annotation_run_retry
@@ -221,6 +221,10 @@ def annotation_detail(request):
     else:
         transcript_version_sequence_info = None
 
+    if dbnsfp_gene_annotation := DBNSFPGeneAnnotationVersion.latest():
+        num_records = dbnsfp_gene_annotation.dbnsfpgeneannotation_set.count()
+        dbnsfp_gene_annotation = f"dbNSFP gene - version: {dbnsfp_gene_annotation.version}, {num_records} records"
+
     somalier = None
     if somalier_enabled := settings.SOMALIER.get("enabled"):
         somalier = _verify_somalier_config()
@@ -252,6 +256,7 @@ def annotation_detail(request):
         "hpa_counts": hpa_counts,
         "transcript_version_sequence_info": transcript_version_sequence_info,
         "transcript_fasta_imports": transcript_fasta_imports,
+        "dbnsfp_gene_annotation": dbnsfp_gene_annotation,
         "num_annotation_columns": VariantGridColumn.objects.count(),
         "cached_web_resources": cached_web_resources,
         "python_command": settings.PYTHON_COMMAND,

@@ -214,6 +214,18 @@ python3 manage.py import_gene_annotation --annotation-consortium=RefSeq --genome
              {% endinstall-instructions %}
         {% endlabelled %}
 
+        {% labelled label="dbNSFP Gene Annotation" %}
+            {% if dbnsfp_gene_annotation %}
+                <div>{{ dbnsfp_gene_annotation }}</div>
+            {% else %}
+                <div class="no-value">Not installed</div>
+            {% endif %}
+            {% install-instructions "dbNSFP gene annotation" installed=dbnsfp_gene_annotation %}
+                <a href="https://sites.google.com/site/jpopgen/dbNSFP">Download dbNSFP (only need dbNSFP4.3_gene.complete.gz) </a>
+                <code>{{ python_command }} manage.py import_dbnsfp_gene_annotation --dbnsfp-version=4.3 dbNSFP4.3_gene.complete.gz</code>
+             {% endinstall-instructions %}
+        {% endlabelled %}
+
         {% labelled label="TranscriptVersion Sequence Info" %}
             {% if transcript_version_sequence_info %}
                 {{ transcript_version_sequence_info }}

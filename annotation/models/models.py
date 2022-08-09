@@ -243,6 +243,10 @@ class DBNSFPGeneAnnotationVersion(TimeStampedModel):
                 values=[version],
             )
 
+    @staticmethod
+    def latest() -> Optional['DBNSFPGeneAnnotationVersion']:
+        return DBNSFPGeneAnnotationVersion.objects.order_by("created").last()
+
 
 class DBNSFPGeneAnnotation(PostgresPartitionedModel, TimeStampedModel):
     """ @see https://sites.google.com/site/jpopgen/dbNSFP """
