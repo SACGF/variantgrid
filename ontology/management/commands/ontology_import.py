@@ -87,7 +87,7 @@ def load_mondo(filename: str, force: bool):
         context="mondo_file",
         import_source=OntologyService.MONDO,
         force_update=force,
-        processor_version=16)
+        processor_version=17)
 
     ontology_builder.ensure_hash_changed(data_hash=file_hash)  # don't re-import if hash hasn't changed
     ontology_builder.cache_everything()
@@ -445,7 +445,7 @@ def load_omim(filename: str, force: bool):
         filename=filename,
         context="omim_file",
         import_source=OntologyImportSource.OMIM,
-        processor_version=4,
+        processor_version=5,
         force_update=force)
 
     file_hash = file_md5sum(filename)
