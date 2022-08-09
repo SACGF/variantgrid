@@ -127,12 +127,6 @@
         {% endif %}
 
         <div data-toggle="ajax" href="{% url 'clinvar_key' clinvar_key.pk %}">Loading</div>
-        {% labelled label="Refresh" admin_only=True %}
-            <form data-loadscreen="form" method="POST" action="{% url 'clinvar_export_refresh' clinvar_key.pk %}">
-                {% csrf_token %}
-                <button class="btn btn-outline-primary" onclick="return window.confirm('This may take a while. Please confirm to proceed.');">Refresh ClinVar Exports for {{ clinvar_key }}</button>
-            </form>
-        {% endlabelled %}
         {% page_help_embedded "Records &amp; Batches" %}
             <p>{{ 'info' | severity_icon }}Important : Changes to classifications are not automatically reflected here. Classifications might be more up to date.</p>
             {% if missing_condition_count %}
@@ -170,14 +164,20 @@
 
         {% ui_register_tab_embedded tab_set="clinvar_tabs" label="Records" badge=count_records badge_status='success' %}
             {% if user.is_superuser %}
-                <form method="POST" action="{% url 'clinvar_export_create_batch' clinvar_key.pk %}">
-                    {% csrf_token %}
-                    {% labelled label="ClinVar Export ID List" admin_only=True %}
-                        <textarea name="clinvar_export_ids" class="form-control"></textarea>
-                        <span class="text-muted">Provide a list of IDs seperated with spaces, tabs, new lines and/or commas.</span>
-                    {% endlabelled %}
-                    {% labelled label="" %}<button class="btn btn-primary">Create Batch for {{ clinvar_key }}</button>{% endlabelled %}
-                </form>
+                {% labelled label="Refresh" admin_only=True %}
+                    <form data-loadscreen=".loading-wrapper" method="POST" action="{% url 'clinvar_export_refresh' clinvar_key.pk %}">
+                        {% csrf_token %}
+                        <button class="btn btn-primary" onclick="return window.confirm('This may take a while. Please confirm to proceed.');">Refresh ClinVar Exports for {{ clinvar_key }}</button>
+                    </form>
+                {% endlabelled %}
+                <hr/>
+                {% labelled label="ClinVar Export ID List" admin_only=True %}
+                    <form method="POST" action="{% url 'clinvar_export_create_batch' clinvar_key.pk %}">
+                        {% csrf_token %}
+                        <textarea placeholder="Provide a list of IDs seperated with spaces, tabs, new lines and/or commas." name="clinvar_export_ids" class="form-control"></textarea>
+                        <button class="btn btn-primary mt-1">Create Batch for {{ clinvar_key }}</button>
+                    </form>
+                {% endlabelled %}
             {% endif %}
             <table id="records" data-datatable-url="{% url 'clinvar_exports_datatables' %}" data-datatable-data="records" class="sticky-header clinvar-export-table"></table>
             <div data-toolbar="#records">
@@ -188,6 +188,8 @@
             <table id="batches" data-datatable-url="{% url 'clinvar_export_batch_datatables' %}" data-datatable-data="batches" class="sticky-header clinvar-export-batches-table"></table>
         {% end_ui_register_tab_embedded %}
 
+        <div class="loading-wrapper">
         {% ui_render_tabs tab_set='clinvar_tabs' %}
+        </div>
     </div>
 {% endblock content %}

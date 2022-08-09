@@ -215,8 +215,11 @@ function enhanceAndMonitor() {
         {test: 'form[data-loadscreen]',
             // unsure if this kicks in in time, will have to test and see
             func: (node) => {
-                $(node).submit((event) => {
-                    $(node).parent('div').LoadingOverlay('show', {fade:false});
+                let $node = $(node);
+                $node.submit((event) => {
+                    let selector = $node.attr('data-loadscreen');
+                    let dom = $node.closest(selector) || $(selector);
+                    dom.LoadingOverlay('show', {fade:false});
                     return true;
                 })
             }
