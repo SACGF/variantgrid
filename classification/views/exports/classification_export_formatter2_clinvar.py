@@ -196,7 +196,7 @@ class ClinVarCompareRow(ExportRow):
                 return ClinVarCompareValue.UNKNOWN
             return lowest_value
 
-    @export_column("Our Server Resolution Issues")
+    @export_column("$site_name Resolution Issues")
     def issues(self) -> str:
         if issues := self.allele_group.issues:
             return "\n".join(sorted(set(issue.message for issue in issues)))

@@ -909,6 +909,9 @@ def export_column(label: Optional[str] = None, sub_data: Optional[Type] = None, 
         # have to cache the line number of the source method, otherwise we just get the line number of this wrapper
         wrapper.line_number = inspect.getsourcelines(method)[1]
         wrapper.label = label or method.__name__
+        if '$site_name' in wrapper.label:
+            wrapper.label = wrapper.label.replace('$site_name', settings.SITE_NAME)
+
         wrapper.__name__ = method.__name__
         wrapper.is_export = True
         wrapper.categories = categories
