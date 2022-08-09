@@ -606,7 +606,7 @@ class Command(BaseCommand):
             print("THIS FILE IS DEPRECATED, please use phenotype_to_genes.txt instead")
 
         print("*** If your instance uses Condition Text Matching, you might want to run:")
-        print("python3 menage.py sync_condition_text_matches --obsolete")
+        print("python3 manage.py sync_condition_text_matches --obsolete")
         print("*** To make sure no matched terms have become obsolete")
 
         # Create a new OntologyVersion with all the new imports
