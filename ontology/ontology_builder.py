@@ -236,7 +236,7 @@ class OntologyBuilder:
         """
 
         CachedObj.bulk_apply(OntologyTerm, self.terms.values(),
-                             ["name", "definition", "extra", "aliases", "from_import", "modified"], verbose=verbose)
+                             ["name", "definition", "extra", "aliases", "from_import", "modified", "deprecated"], verbose=verbose)
         CachedObj.bulk_apply(OntologyTermRelation, self.relations.values(),
                              ["extra", "from_import", "modified"], verbose=verbose)
 
