@@ -72,7 +72,7 @@ class ExcludeRecord:
 
     @lazy
     def existing_flag(self) -> Flag:
-        return self.record.classification.flag_collection_safe.get_flag_of_type(classification_flag_types.classification_not_public)
+        return self.record.classification.flag_collection_safe.get_flag_of_type(classification_flag_types.classification_not_public, open_only=False)
 
     @lazy
     def is_currently_ignored(self) -> bool:
