@@ -226,7 +226,7 @@ class OntologyBuilder:
         if aliases is not None or primary_source:
             term.aliases = aliases or list()
 
-        term.deprecated = deprecated or (name and "obsolete" in name)
+        term.deprecated = deprecated or (name and "obsolete" in name.lower())
 
     def complete(self, purge_old_relationships=False, purge_old_terms=False, verbose=True):
         """
