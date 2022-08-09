@@ -263,9 +263,9 @@
     {% labelled label="Labs" %}
         {% for lab in labs %}
             <div class="form-check-inline">
-                <label class="form-check-label" style="min-width: 200px">
+                <label class="form-check-label" style="min-width: 400px">
                     <input id="lab_selection_{{lab.group_name}}" name="lab_selection" value="{{lab.group_name}}" type="checkbox" class="form-check-input" />
-                    {{ lab.name }}
+                    {{ lab }}
                 </label>
             </div>
         {% endfor %}
