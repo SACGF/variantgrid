@@ -11,7 +11,7 @@ from Bio.Data.IUPACData import protein_letters_1to3
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
-from django.db import models, transaction
+from django.db import models, transaction, connection
 from django.db.models.deletion import PROTECT, CASCADE, SET_NULL
 from django.db.models.signals import pre_delete
 from django.dispatch.dispatcher import receiver
@@ -19,13 +19,15 @@ from django.utils import timezone
 from django.utils.timezone import localtime
 from django_extensions.db.models import TimeStampedModel
 from lazy import lazy
+from psqlextra.models import PostgresPartitionedModel
+from psqlextra.types import PostgresPartitioningMethod
 
 from annotation.external_search_terms import get_variant_search_terms, get_variant_pubmed_search_terms
 from annotation.models.damage_enums import Polyphen2Prediction, FATHMMPrediction, MutationTasterPrediction, \
     SIFTPrediction, PathogenicityImpact, MutationAssessorPrediction, ALoFTPrediction
 from annotation.models.models_enums import AnnotationStatus, CitationSource, \
     VariantClass, ColumnAnnotationCategory, VEPPlugin, VEPCustom, ClinVarReviewStatus, VEPSkippedReason, \
-    ManualVariantEntryType, HumanProteinAtlasAbundance
+    ManualVariantEntryType, HumanProteinAtlasAbundance, EssentialGeneCRISPR, EssentialGeneCRISPR2, EssentialGeneGeneTrap
 from genes.models import GeneSymbol, Gene, TranscriptVersion, Transcript, GeneAnnotationRelease
 from genes.models_enums import AnnotationConsortium
 from library.django_utils import object_is_referenced
@@ -224,10 +226,78 @@ class CachedCitation(TimeStampedModel):
         return record
 
 
+class DBNSFPGeneAnnotationVersion(TimeStampedModel):
+    """ @see https://sites.google.com/site/jpopgen/dbNSFP """
+    version = models.TextField(primary_key=True)
+    md5_hash = models.CharField(max_length=32, unique=True)
+
+    def save(self, **kwargs):
+        created = not self.pk
+        super().save(**kwargs)
+        if created:
+            logging.info("Creating new DBNSFPGeneAnnotation partition")
+            version = self.pk
+            connection.schema_editor().add_list_partition(
+                model=DBNSFPGeneAnnotation,
+                name=f"version_{version}",
+                values=[version],
+            )
+
+    @staticmethod
+    def latest() -> Optional['DBNSFPGeneAnnotationVersion']:
+        return DBNSFPGeneAnnotationVersion.objects.order_by("created").last()
+
+
+class DBNSFPGeneAnnotation(PostgresPartitionedModel, TimeStampedModel):
+    """ @see https://sites.google.com/site/jpopgen/dbNSFP """
+    version = models.ForeignKey(DBNSFPGeneAnnotationVersion, on_delete=CASCADE)
+    gene_symbol = models.ForeignKey(GeneSymbol, on_delete=CASCADE)
+    refseq_transcript = models.ForeignKey(Transcript, related_name="refseq_dbnsfp_gene",
+                                          null=True, blank=True, on_delete=CASCADE)
+    ensembl_transcript = models.ForeignKey(Transcript, related_name="ensembl_dbnsfp_gene",
+                                           null=True, blank=True, on_delete=CASCADE)
+    gene_damage_index_score = models.FloatField(null=True)
+    gene_damage_index_phred = models.FloatField(null=True)
+    phi = models.FloatField(null=True)
+    ghis = models.FloatField(null=True)
+    prec = models.FloatField(null=True)
+    hipred_score = models.FloatField(null=True)
+    gnomad_pli = models.FloatField(null=True, blank=True)
+    gnomad_prec = models.FloatField(null=True, blank=True)
+    gnomad_pnull = models.FloatField(null=True, blank=True)
+    loftool = models.FloatField(null=True, blank=True)
+    gene_indispensability_score = models.FloatField(null=True, blank=True)
+    hipred_prediction = models.BooleanField(null=True)
+    gene_indispensability_pred = models.BooleanField(null=True)
+    pathway_biocarta_full = models.TextField(null=True, blank=True)
+    pathway_consensus_pathdb = models.TextField(null=True, blank=True)
+    pathway_kegg_id = models.TextField(null=True, blank=True)
+    pathway_kegg_full = models.TextField(null=True, blank=True)
+    gwas_trait_association = models.TextField(null=True, blank=True)
+    go_biological_process = models.TextField(null=True, blank=True)
+    go_cellular_component = models.TextField(null=True, blank=True)
+    go_molecular_function = models.TextField(null=True, blank=True)
+    interactions_biogrid = models.TextField(null=True, blank=True)
+    interactions_consensus_pathdb = models.TextField(null=True, blank=True)
+    expression_egenetics = models.TextField(null=True, blank=True)
+    expression_gnf_atlas = models.TextField(null=True, blank=True)
+    essential_gene_crispr = models.CharField(max_length=1, null=True, blank=True,
+                                             choices=EssentialGeneCRISPR.choices)
+    essential_gene_crispr2 = models.CharField(max_length=1, null=True, blank=True,
+                                              choices=EssentialGeneCRISPR2.choices)
+    essential_gene_gene_trap = models.CharField(max_length=1, null=True, blank=True,
+                                                choices=EssentialGeneGeneTrap.choices)
+
+    class PartitioningMeta:
+        method = PostgresPartitioningMethod.LIST
+        key = ["version_id"]
+
+
 class GeneAnnotationVersion(SubVersionPartition):
     RECORDS_BASE_TABLE_NAMES = ["annotation_geneannotation"]
     gene_annotation_release = models.ForeignKey(GeneAnnotationRelease, on_delete=CASCADE)
     ontology_version = models.ForeignKey(OntologyVersion, null=True, on_delete=PROTECT)
+    dbnsfp_gene_version = models.ForeignKey(DBNSFPGeneAnnotationVersion, null=True, on_delete=CASCADE)
     gnomad_import_date = models.DateTimeField()
 
     @property
@@ -245,6 +315,7 @@ class GeneAnnotation(models.Model):
         so that data matches up in analyses """
     version = models.ForeignKey(GeneAnnotationVersion, on_delete=CASCADE)
     gene = models.ForeignKey(Gene, on_delete=CASCADE)
+    dbnsfp_gene = models.ForeignKey(DBNSFPGeneAnnotation, null=True, on_delete=SET_NULL)
     hpo_terms = models.TextField(null=True)
     omim_terms = models.TextField(null=True)
     mondo_terms = models.TextField(null=True)
@@ -602,7 +673,6 @@ class AbstractVariantAnnotation(models.Model):
     impact = models.CharField(max_length=1, choices=PathogenicityImpact.CHOICES, null=True, blank=True)
     interpro_domain = models.TextField(null=True, blank=True)
     intron = models.TextField(null=True, blank=True)
-    loftool = models.FloatField(null=True, blank=True)
     maxentscan_alt = models.FloatField(null=True, blank=True)
     maxentscan_diff = models.FloatField(null=True, blank=True)
     maxentscan_ref = models.FloatField(null=True, blank=True)

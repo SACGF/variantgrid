@@ -12,7 +12,6 @@
 {% load wiki_tags %}
 {% load datatable_tags %}
 {% load gene_disease_tags %}
-{% load gnomad_gene_constraint_tags %}
 {% load panel_app_tags %}
 {% load settings_tags %}
 {% block title %}{{ gene_symbol }}{% endblock title %}
@@ -231,15 +230,6 @@
                 <div class="card mt-4">
                     <div class="card-header">Summary</div>
                     <div class="card-body">
-                        {{ gene_summary }}
-                    </div>
-                </div>
-            {% endif %}
-
-            {% if hgnc %}
-                <div class="card mt-4">
-                    <div class="card-header">HGNC</div>
-                    <div class="card-body">
                         {% labelled label="Approved Name" %}{{ hgnc.approved_name }}{% endlabelled %}
                         {% labelled label="HGNC ID" %}<a href="{{ hgnc.url }}">HGNC:{{ hgnc.pk }}</a> ({{ hgnc.get_status_display }}){% endlabelled %}
                         {% labelled label="Location" %}{{ hgnc.location }}{% endlabelled %}
@@ -249,9 +239,10 @@
                                 ({% for gene_group_id in hgnc.gene_group_id_list %}<a href="https://www.genenames.org/data/genegroup/#!/group/{{ gene_group_id }}">{{ gene_group_id }}</a>{% endfor %})
                             {% endif %}
                         {% endlabelled %}
+                        {% labelled label="Summary" %}{{ gene_summary }}{% endlabelled %}
 
-                        <a class="toggle-link" data-toggle="collapse" href="#more-hgnc">More HGNC...</a>
-                        <div id="more-hgnc" class="collapse">
+                        <a class="toggle-link" data-toggle="collapse" href="#more-external-ids">Show external IDs...</a>
+                        <div id="more-external-ids" class="collapse">
                             {% if hgnc.ccds_list %}
                                 {% labelled label="CCDS" %}
                                     {% for ccds_id in hgnc.ccds_list %}
@@ -280,42 +271,99 @@
                                     {% endfor %}
                                 {% endlabelled %}
                             {% endif %}
-
-                            {% labelled label="Retrieved from HGNC" %}
-                                {{ hgnc.hgnc_import.modified | localtime }} ({{ hgnc.hgnc_import.modified | timesince }} ago)
-                            {% endlabelled %}
                         </div>
+
+                    </div>
+                </div>
+            {% endif %}
+
+            {% if dbnsfp_gene_annotation %}
+                <div class="card mt-4">
+                    <div class="card-header">Gene Tolerance</div>
+                    <div class="card-body">
+                        {% labelled label="GDI (Gene Damage Index Score)" %}{{ dbnsfp_gene_annotation.gene_damage_index_score|floatformat:4 }}. (Phred: {{ dbnsfp_gene_annotation.gene_damage_index_phred|floatformat:4 }}){% endlabelled %}
+                        {% labelled label="Prob Recessive disease" %}{{ dbnsfp_gene_annotation.prec|floatformat:4 }}{% endlabelled %}
+                        {% labelled label="Prob Haploinsufficiency" %}{{ dbnsfp_gene_annotation.phi|floatformat:4 }}{% endlabelled %}
+                        {% labelled label="Gene Haploinsufficiency" %}{{ dbnsfp_gene_annotation.ghis|floatformat:4 }}{% endlabelled %}
+                        {% labelled label="HiPred Haploinsufficiency" %}{{ dbnsfp_gene_annotation.hipred_score|floatformat:4 }} ({{ dbnsfp_gene_annotation.hipred_prediction }}) {% endlabelled %}
+                        {% labelled label="LoFTool" %}{{ dbnsfp_gene_annotation.loftool }}{% endlabelled %}
+                        {% labelled label="gnomAD prob LOF intolerant" %}{{ dbnsfp_gene_annotation.gnomad_pli|floatformat:4 }}{% endlabelled %}
+                        {% labelled label="gnomAD prob LOF HOM" %}{{ dbnsfp_gene_annotation.gnomad_prec|floatformat:4 }}{% endlabelled %}
+                        {% labelled label="gnomAD prob LOF tolerant" %}{{ dbnsfp_gene_annotation.gnomad_pnull|floatformat:4 }}{% endlabelled %}
+                        {% for ggc in gene_symbol.gnomadgeneconstraint_set.all %}
+                            {% labelled label="gnomAD Gene Constraints" %}
+                                <a href="{{ ggc.transcript_url }}">{{ ggc.transcript }}</a> -
+                                pLoF: {{ ggc.oe_lof_summary }}
+                            {% endlabelled %}
+                        {% endfor %}
+
+                        {% labelled label="Gene Indispensability" %}{{ dbnsfp_gene_annotation.gene_indispensability_score|floatformat:4 }} ({{ dbnsfp_gene_annotation.gene_indispensability_pred }}) {% endlabelled %}
+                        {% labelled label="Essential Gene" %}
+                            CRISPR: {{ dbnsfp_gene_annotation.get_essential_gene_crispr_display }}
+                            CRISPR2: {{ dbnsfp_gene_annotation.get_essential_gene_crispr2_display }}
+                            Gene Trap: {{ dbnsfp_gene_annotation.get_essential_gene_gene_trap_display }}
+                        {% endlabelled %}
                     </div>
                 </div>
 
-                {% if hgnc.uniprot_list %}
-                    <div class="card mt-4">
-                        <div class="card-header">UniProt</div>
-                        <div class="card-body">
-                            {% labelled label="UniProt IDs" %}
-                                {% for uniprot_id in hgnc.uniprot_list %}
-                                    <a href="https://www.uniprot.org/uniprot/{{ uniprot_id }}" target="_blank">{{ uniprot_id }}</a>
-                                {% endfor %}
+                <div class="card mt-4">
+                    <div class="card-header">Gene Ontology</div>
+                    <div class="card-body">
+                        {% labelled label="GO process" %}{{ dbnsfp_gene_annotation.go_biological_process }}{% endlabelled %}
+                        {% labelled label="GO cellular" %}{{ dbnsfp_gene_annotation.go_cellular_component }}{% endlabelled %}
+                        {% labelled label="GO mol function" %}{{ dbnsfp_gene_annotation.go_molecular_function }}{% endlabelled %}
+                        {% labelled label="GWAS traits" %}{{ dbnsfp_gene_annotation.gwas_trait_association }}{% endlabelled %}
+                    </div>
+                </div>
+
+                <div class="card mt-4">
+                    <div class="card-header">Expression</div>
+                    <div class="card-body">
+                        {% labelled label="Expression(egenetics)" %}{{ dbnsfp_gene_annotation.expression_egenetics }}{% endlabelled %}
+                        {% labelled label="Expression(GNF/Atlas)" %}{{ dbnsfp_gene_annotation.expression_gnf_atlas }}{% endlabelled %}
+                    </div>
+                </div>
+            {% endif %}
+
+            {% if hgnc and hgnc.uniprot_list %}
+                <div class="card mt-4">
+                    <div class="card-header">UniProt</div>
+                    <div class="card-body">
+                        {% for uniprot in hgnc.uniprot_list %}
+                            {% labelled label="UniProt ID" %}
+                                <a href="https://www.uniprot.org/uniprot/{{ uniprot }}" target="_blank">{{ uniprot }}</a>
                             {% endlabelled %}
-                            <a class="toggle-link" data-toggle="collapse" href="#more-uniprot">More UniProt...</a>
+                            {% labelled label="Function" %}{{ uniprot.function }}{% endlabelled %}
                             <div id="more-uniprot" class="collapse">
-                            {% for uniprot in hgnc.uniprot_list %}
-                                <h4>{{ accession }}</h4>
-                                {% labelled label="Function" %}{{ uniprot.function }}{% endlabelled %}
                                 {% labelled label="Pathway" %}{{ uniprot.pathway }}{% endlabelled %}
                                 {% labelled label="Pathway Interaction DB" %}{{ uniprot.pathway_interaction_db }}{% endlabelled %}
                                 {% labelled label="Reactome" %}{{ uniprot.reactome }}{% endlabelled %}
                                 {% labelled label="Tissue Specificity" %}{{ uniprot.tissue_specificity }}{% endlabelled %}
-                            {% endfor %}
                             </div>
+                        {% endfor %}
+                        <a class="toggle-link" data-toggle="collapse" href="#more-uniprot">More UniProt...</a>
+                    </div>
+                </div>
+            {% endif %}
+
+            {% if dbnsfp_gene_annotation %}
+                <div class="card mt-4">
+                    <div class="card-header">Pathways and Interactions</div>
+                    <div class="card-body">
+                        {% labelled label="BioCarta Pathway" %}{{ dbnsfp_gene_annotation.pathway_biocarta_full }}{% endlabelled %}
+                        {% labelled label="ConsensusPathDB Pathway" %}{{ dbnsfp_gene_annotation.pathway_consensus_pathdb }}{% endlabelled %}
+                        {% labelled label="KEGG IDs" %}{{ dbnsfp_gene_annotation.pathway_kegg_id }}{% endlabelled %}
+                        {% labelled label="KEGG Pathway" %}{{ dbnsfp_gene_annotation.pathway_kegg_full }}{% endlabelled %}
+                        <a class="toggle-link" data-toggle="collapse" href="#interactions">Toggle Interactions...</a>
+                        <div id="interactions" class="collapse">
+                            {% labelled label="BioGRID interactions" %}{{ dbnsfp_gene_annotation.interactions_biogrid }}{% endlabelled %}
+                            {% labelled label="ConsensusPathDB interactions" %}{{ dbnsfp_gene_annotation.interactions_consensus_pathdb }}{% endlabelled %}
                         </div>
                     </div>
-                {% endif %}
+                </div>
             {% endif %}
 
             {% gene_disease gene_symbol %}
-
-            {% gnomad_gene_constraint gene_symbol %}
 
             {% for server in panel_app_servers %}
                 {% panel_app_gene_evidence server gene_symbol %}
@@ -344,17 +392,22 @@
             {% else %}
                 <p>HPO or OMIM terms associated with this gene symbol</p>
             {% endif %}
-
-            {% if citations %}
-                {% load citation_tags %}
-                {% retrieve_cached_citations citations %}
-            {% endif %}
         {% endif %}
 
         {% if show_wiki %}
             <h4>Wiki</h4>
 
             {% wiki_editor gene_symbol.genesymbolwiki class_name='genes.models.GeneSymbolWiki' unique_keyword='gene_symbol_id' unique_value=gene_symbol.pk %}
+            {% if gene_symbol.genesymbolwiki %}
+                <p>
+                Embed Pubmed IDs to have links and abstracts appear below. Examples: <kbd>PMID: 9697696</kbd> or <kbd>PubMed: 9697696</kbd> or <kbd>NCBIBookShelf: NBK447152</kbd> or <kbd>PubMedCentral: 3583621</kbd>
+                </p>
+            {% endif %}
+
+            {% if citations %}
+                {% load citation_tags %}
+                {% retrieve_cached_citations citations %}
+            {% endif %}
         {% endif %}
     </div>
     <div class="{% if classifications_new_grouping %}container{% else %}container-table{% endif %} mt-4">

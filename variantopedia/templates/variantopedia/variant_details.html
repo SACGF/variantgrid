@@ -715,7 +715,6 @@ function applyVariantValues() {
 
                                 <div id="other-predictions" class="collapse">
                                     {% labelled id='mutation_taster_pred_most_damaging' label='Mutation Taster' hint="tiny" %}{% endlabelled %}
-                                    {% labelled id='loftool' label='LOFtool' hint="tiny" %}{% endlabelled %}
                                 </div>
                             {% elif annotation_version.variant_annotation_version.columns_version == 2 %}
                                 {% labelled id='bayesdel_noaf_rankscore' label='BayesDel (No AF) rankscore' hint="tiny" value_css="text-monospace" %}{{ variant_annotation.bayesdel_noaf_rankscore }}{% endlabelled %}

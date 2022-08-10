@@ -36,10 +36,14 @@ class ManualOperation(Operation):
     def database_forwards(self, app_label, schema_editor, from_state, to_state):
         self.run(to_state.apps)
 
-    def run(self, apps):
+    def database_backwards(self, app_label, schema_editor, from_state, to_state):
+        self.run(to_state.apps, reverse=True)
+
+    def run(self, apps, reverse=False):
         """
         Call this to run the operation right away in RunPython
         :param apps: where we can call get_model
+        :param reverse: for when migrating backwards (clean up)
         """
         if self.test:
             if not self.test(apps):
@@ -48,8 +52,11 @@ class ManualOperation(Operation):
         ManualMigrationTask = apps.get_model('manual', 'ManualMigrationTask')
         ManualMigrationRequsted = apps.get_model('manual', 'ManualMigrationRequired')
 
-        task, _ = ManualMigrationTask.objects.get_or_create(pk=self.task_id)
-        ManualMigrationRequsted.objects.create(task=task, note=self.note)
+        if reverse:
+            ManualMigrationTask.objects.filter(pk=self.task_id).delete()
+        else:
+            task, _ = ManualMigrationTask.objects.get_or_create(pk=self.task_id)
+            ManualMigrationRequsted.objects.create(task=task, note=self.note)
 
     @staticmethod
     def operation_manage(args: List[str], note: Optional[str] = None, test: Callable = None):

@@ -6,9 +6,9 @@ from django.core.management import BaseCommand
 from django.utils import timezone
 
 from annotation.models import GeneAnnotationVersion, OntologyTerm, GenomeBuild, AnnotationVersion, \
-    InvalidAnnotationVersionError, GeneAnnotation
+    InvalidAnnotationVersionError, GeneAnnotation, DBNSFPGeneAnnotationVersion
 from genes.gene_matching import ReleaseGeneMatcher
-from genes.models import GeneAnnotationRelease, GnomADGeneConstraint
+from genes.models import GeneAnnotationRelease, GnomADGeneConstraint, ReleaseGeneSymbolGene
 from library.django_utils.django_file_utils import get_import_processing_filename
 from ontology.models import OntologyService, GeneDiseaseClassification, OntologyTermRelation, \
     OntologyVersion
@@ -21,16 +21,20 @@ class Command(BaseCommand):
     TERM_JOIN_STRING = " | "
 
     def add_arguments(self, parser):
-        gar_ov_help = "gene-annotation-release and ontology-version are optional but must be specified together"
+        gar_ov_dbsnfp_help = "gene-annotation-release, ontology-version and dbnsfp-gene-version are optional but must" \
+                             "be specified together"
 
         parser.add_argument('--force', action="store_true", help="Force create new GeneAnnotation for same release")
         group = parser.add_mutually_exclusive_group(required=True)
-        group.add_argument('--gene-annotation-release', type=int, help=gar_ov_help)
-        group.add_argument('--ontology-version', type=int, help=gar_ov_help)
+        group.add_argument('--gene-annotation-release', type=int, help=gar_ov_dbsnfp_help)
+        group.add_argument('--ontology-version', type=int, help=gar_ov_dbsnfp_help)
+        group.add_argument('--dbnsfp-gene-version', help=gar_ov_dbsnfp_help)
         group.add_argument('--missing', action="store_true",
                            help="Automatically create for latest AnnotationVersions for each build if missing")
         group.add_argument('--add-new-to-existing', action="store_true",
                            help="Add new columns gene/disease and MONDO terms to existing gene annotation")
+        group.add_argument('--add-dbnsfp-gene', action="store_true",
+                           help="Add new dbNSFP to existing gene annotation")
 
     def handle(self, *args, **options):
         if not settings.ANNOTATION_GENE_ANNOTATION_VERSION_ENABLED:
@@ -40,12 +44,21 @@ class Command(BaseCommand):
         force = options["force"]
         gar_id = options["gene_annotation_release"]
         ov_id = options["ontology_version"]
+        dbnsfp_gene_version_id = options["dbnsfp_gene_version"]
+
         missing = options["missing"]
-        add_new_to_existing = options["add_new_to_existing"]
         self._validate_has_required_data()
 
-        if add_new_to_existing:
+        if options["add_new_to_existing"]:
             self._add_new_columns_to_existing()
+            return
+
+        dbnsfp_gene_version = DBNSFPGeneAnnotationVersion.objects.all().order_by("created").last()
+        if dbnsfp_gene_version is None:
+            raise InvalidAnnotationVersionError("You need to import DBNSFPGeneAnnotationVersion")
+
+        if options["add_dbnsfp_gene"]:
+            self._add_dbnsfp_gene(dbnsfp_gene_version)
             return
 
         gene_symbols = set(GnomADGeneConstraint.objects.all().values_list("gene_symbol_id", flat=True))
@@ -54,10 +67,12 @@ class Command(BaseCommand):
             if not ov_id:
                 raise ValueError("You must specify ontology-version when gene-annotation-release is specified")
             ontology_version = OntologyVersion.objects.get(pk=ov_id)
+            dbnsfp_gene_version = DBNSFPGeneAnnotationVersion.objects.get(pk=dbnsfp_gene_version_id)
             gene_annotation_release = GeneAnnotationRelease.objects.get(pk=gar_id)
             if not force and GeneAnnotationVersion.objects.filter(gene_annotation_release=gene_annotation_release).exists():
                 raise ValueError("Existing GeneAnnotationVersion for gene_annotation_release={} exists! Use --force?")
-            self._create_gene_annotation_version(gene_annotation_release, ontology_version, gene_symbols)
+            self._create_gene_annotation_version(gene_annotation_release, ontology_version,
+                                                 dbnsfp_gene_version, gene_symbols)
         elif missing:
             if ov_id is not None:
                 raise ValueError("Only specify ontology-version when gene-annotation-release also specified")
@@ -81,7 +96,7 @@ class Command(BaseCommand):
                 if not gar:
                     raise InvalidAnnotationVersionError(f"VariantAnnotationVersion {av.variant_annotation_version} needs to be assigned an GeneAnnotationRelease")
 
-                self._create_gene_annotation_version(gar, av.ontology_version, gene_symbols)
+                self._create_gene_annotation_version(gar, av.ontology_version, dbnsfp_gene_version, gene_symbols)
 
     @staticmethod
     def _validate_has_required_data():
@@ -96,6 +111,31 @@ class Command(BaseCommand):
         otr_qs = OntologyTermRelation.objects.filter(extra__strongest_classification__isnull=False)
         if not otr_qs.exists():
             raise ValueError("You need to import GenCC gene/disease curation (see annotation page)")
+
+    def _add_dbnsfp_gene(self, dbnsfp_gene_version):
+        for ga_version in GeneAnnotationVersion.objects.filter(dbnsfp_gene_version__isnull=True):
+            print(f"Add dbNSFP gene annotation to {ga_version}")
+            ga_by_gene_id = {}
+            for ga in ga_version.geneannotation_set.all():
+                ga_by_gene_id[ga.gene_id] = ga
+
+            rgsg_qs = ReleaseGeneSymbolGene.objects.filter(release_gene_symbol__release=ga_version.gene_annotation_release)
+            symbol_to_gene_ids = defaultdict(set)
+            for gene_symbol, gene_id in rgsg_qs.values_list("release_gene_symbol__gene_symbol", "gene_id"):
+                symbol_to_gene_ids[gene_symbol].add(gene_id)
+
+            # Go through and match all the
+            gene_annotation = []
+            dbnsfp_qs = dbnsfp_gene_version.dbnsfpgeneannotation_set.all()
+            for dbnsfp_gene_id, gene_symbol_id in dbnsfp_qs.values_list("pk", "gene_symbol_id"):
+                for gene_id in symbol_to_gene_ids.get(gene_symbol_id, []):
+                    if ga := ga_by_gene_id.pop(gene_id, None):
+                        ga.dbnsfp_gene_id = dbnsfp_gene_id
+                        gene_annotation.append(ga)
+
+            if gene_annotation:
+                print(f"Updating {len(gene_annotation)} records....")
+                GeneAnnotation.objects.bulk_update(gene_annotation, ["dbnsfp_gene_id"], batch_size=2000)
 
     def _add_new_columns_to_existing(self):
         """ As we only added not changed columns, can just populate existing annotation """
@@ -162,13 +202,15 @@ class Command(BaseCommand):
         gene_disease_moderate_or_above = delimiter.join(diseases_moderate_or_above)
         return gene_disease_supportive_or_below, gene_disease_moderate_or_above
 
-    def _create_gene_annotation_version(self, gene_annotation_release, ontology_version, gene_symbols):
-        gnomad_gene_constraint = GnomADGeneConstraint.objects.first()
+    def _create_gene_annotation_version(self, gene_annotation_release, ontology_version,
+                                        dbnsfp_gene_version, gene_symbols):
+        gnomad_gene_constraint = GnomADGeneConstraint.objects.first()  # Only ever 1
 
         # Only 1 of each of Gnomad (CachedWebResource - deleted upon reload)
         # When you create GeneAnnotationVersion (sub version) it automatically creates/bumps a new annotation version
         gav = GeneAnnotationVersion.objects.create(gene_annotation_release=gene_annotation_release,
                                                    ontology_version=ontology_version,
+                                                   dbnsfp_gene_version=dbnsfp_gene_version,
                                                    gnomad_import_date=gnomad_gene_constraint.cached_web_resource.created)
 
         # 1st we need to make sure all symbols are matched in a GeneAnnotationRelease (HGNC already done)
@@ -206,18 +248,30 @@ class Command(BaseCommand):
                 print(f"Warning: {gene_annotation_release} has no match for '{uc_symbol}' ({service_terms})")
                 missing_genes["ontology"] += 1
 
+        rgsg_qs = ReleaseGeneSymbolGene.objects.filter(release_gene_symbol__release=gene_annotation_release)
+        symbol_to_gene_ids = defaultdict(set)
+        for gene_symbol, gene_id in rgsg_qs.values_list("release_gene_symbol__gene_symbol", "gene_id"):
+            symbol_to_gene_ids[gene_symbol].add(gene_id)
+
+        # Go through and match all the
+        dbnsfp_qs = dbnsfp_gene_version.dbnsfpgeneannotation_set.all()
+        for dbnsfp_gene_id, gene_symbol_id in dbnsfp_qs.values_list("pk", "gene_symbol_id"):
+            for gene_id in symbol_to_gene_ids.get(gene_symbol_id, []):
+                annotation_by_gene[gene_id]["dbnsfp_gene_id"] = dbnsfp_gene_id
+            else:
+                print(f"Warning: {gene_annotation_release} has no match for '{gene_symbol_id}' - dbNSFP Gene Annotation")
+                missing_genes["dbnsfp_gene_annotation"] += 1
+
         for gene_symbol_id, oe_lof in GnomADGeneConstraint.objects.all().values_list("gene_symbol_id", "oe_lof"):
-            genes_qs = gene_annotation_release.genes_for_symbol(gene_symbol_id)
-            if genes_qs.exists():
-                for gene in genes_qs:
-                    annotation_by_gene[gene]["gnomad_oe_lof"] = oe_lof
+            for gene_id in symbol_to_gene_ids.get(gene_symbol_id, []):
+                annotation_by_gene[gene_id]["gnomad_oe_lof"] = oe_lof
             else:
                 print(f"Warning: {gene_annotation_release} has no match for '{gene_symbol_id}' - GnomADGeneConstraint")
                 missing_genes["gnomad_gene_constraints"] += 1
 
         gene_annotation_records = []
-        for gene, ga_data in annotation_by_gene.items():
-            ga_data["gene_id"] = gene.pk
+        for gene_id, ga_data in annotation_by_gene.items():
+            ga_data["gene_id"] = gene_id
             ga_data["version_id"] = gav.pk
             gene_annotation_records.append(tuple((ga_data.get(k) for k in self.GENE_ANNOTATION_HEADER)))
 
