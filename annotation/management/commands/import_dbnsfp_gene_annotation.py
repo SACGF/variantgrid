@@ -6,6 +6,7 @@ from django.core.management import BaseCommand, CommandError
 from annotation.models import DBNSFPGeneAnnotationVersion, DBNSFPGeneAnnotation
 from genes.models import GeneSymbol
 from library.file_utils import file_md5sum
+from library.pandas_utils import df_nan_to_none
 
 
 class Command(BaseCommand):
@@ -31,7 +32,7 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument('--replace', action='store_true', help="Replace existing version if exists")
-        parser.add_argument('--dbnsfp-version', required=True, help="dbNSFP version eg '4.3a'")
+        parser.add_argument('--dbnsfp-version', required=True, help="dbNSFP version eg '4.3'")
         parser.add_argument('dbnsfp_gene_filename')
 
     def handle(self, *args, **options):
@@ -47,6 +48,9 @@ class Command(BaseCommand):
         if not created:
             if replace:
                 logging.warning("--replace option used, deleting existing objects")
+                if dbnsfp_version.geneannotationversion_set.exists():
+                    logging.warning("Gene Annotation relies on this - you will need to re-run:")
+                    logging.warning("python3 manage.py gene_annotation --add-dbnsfp-gene")
                 dbnsfp_version.dbnsfpgeneannotation_set.all().delete()
             else:
                 msg = f"Existing DBNSFPGeneAnnotationVersion = {version}, use --replace to delete existing objects"
@@ -56,10 +60,8 @@ class Command(BaseCommand):
 
     def _import_dbnsfp_gene(self, filename: str, dbnsfp_version):
         records = []
-        # read through and create objects
-        #
         df = pd.read_csv(filename, sep='\t', index_col=None)
-        df = df.replace(".", None)
+        df = df_nan_to_none(df.replace(".", None))
         gene_symbols = GeneSymbol.get_upper_case_lookup()
         new_gene_symbols = set()
 
