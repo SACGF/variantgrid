@@ -662,7 +662,6 @@ class AbstractVariantAnnotation(models.Model):
     impact = models.CharField(max_length=1, choices=PathogenicityImpact.CHOICES, null=True, blank=True)
     interpro_domain = models.TextField(null=True, blank=True)
     intron = models.TextField(null=True, blank=True)
-    loftool = models.FloatField(null=True, blank=True)
     maxentscan_alt = models.FloatField(null=True, blank=True)
     maxentscan_diff = models.FloatField(null=True, blank=True)
     maxentscan_ref = models.FloatField(null=True, blank=True)

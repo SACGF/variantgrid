@@ -100,7 +100,6 @@ def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, an
         # Plugins that don't require data
         "--plugin", "Grantham",
         "--plugin", "SpliceRegion",
-        "--plugin", "LoFtool",
     ]
 
     if settings.ANNOTATION_VEP_PICK_ORDER:
