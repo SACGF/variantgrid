@@ -11,23 +11,34 @@ from library.pandas_utils import df_nan_to_none
 
 class Command(BaseCommand):
     COLUMNS_TO_FIELDS = {
-        "Pathway(BioCarta)_full": "pathway_biocarta_full",
-        "Pathway(ConsensusPathDB)": "pathway_consensus_pathdb",
-        "Pathway(KEGG)_id": "pathway_kegg_id",
-        "Pathway(KEGG)_full": "pathway_kegg_full",
-        "Trait_association(GWAS)": "gwas_trait_association",
-        "GO_biological_process": "go_biological_process",
-        "GO_cellular_component": "go_cellular_component",
-        "GO_molecular_function": "go_molecular_function",
-        "Interactions(BioGRID)": "interactions_biogrid",
-        "Interactions(ConsensusPathDB)": "interactions_consensus_pathdb",
-        "gnomAD_pLI": "gnomad_pli",
-        "gnomAD_pRec": "gnomad_prec",
-        "gnomAD_pNull": "gnomad_pnull",
-        "LoFtool_score": "loftool",
         "Essential_gene_CRISPR": "essential_gene_crispr",
         "Essential_gene_CRISPR2": "essential_gene_crispr2",
         "Essential_gene_gene-trap": "essential_gene_gene_trap",
+        "Expression(GNF/Atlas)": "expression_gnf_atlas",
+        "Expression(egenetics)": "expression_egenetics",
+        "GDI": "gene_damage_index_score",
+        "GDI-Phred": "gene_damage_index_phred",
+        "GHIS": "ghis",
+        "GO_biological_process": "go_biological_process",
+        "GO_cellular_component": "go_cellular_component",
+        "GO_molecular_function": "go_molecular_function",
+        "Gene_indispensability_pred": "gene_indispensability_pred",
+        "Gene_indispensability_score": "gene_indispensability_score",
+        "HIPred": "hipred_prediction",
+        "HIPred_score": "hipred_score",
+        "Interactions(BioGRID)": "interactions_biogrid",
+        "Interactions(ConsensusPathDB)": "interactions_consensus_pathdb",
+        "LoFtool_score": "loftool",
+        "P(HI)": "phi",
+        "P(rec)": "prec",
+        "Pathway(BioCarta)_full": "pathway_biocarta_full",
+        "Pathway(ConsensusPathDB)": "pathway_consensus_pathdb",
+        "Pathway(KEGG)_full": "pathway_kegg_full",
+        "Pathway(KEGG)_id": "pathway_kegg_id",
+        "Trait_association(GWAS)": "gwas_trait_association",
+        "gnomAD_pLI": "gnomad_pli",
+        "gnomAD_pNull": "gnomad_pnull",
+        "gnomAD_pRec": "gnomad_prec",
     }
 
     def add_arguments(self, parser):
@@ -58,6 +69,17 @@ class Command(BaseCommand):
 
         self._import_dbnsfp_gene(filename, dbnsfp_version)
 
+    @staticmethod
+    def format_field(field, value):
+        LOOKUPS = {
+            "gene_indispensability_pred": {"E": True, "N": False},
+            "hipred_prediction": {"Y": True, "N": False},
+        }
+        if value is not None:
+            if lookup := LOOKUPS.get(field):
+                value = lookup[value]
+        return value
+
     def _import_dbnsfp_gene(self, filename: str, dbnsfp_version):
         records = []
         df = pd.read_csv(filename, sep='\t', index_col=None)
@@ -77,7 +99,8 @@ class Command(BaseCommand):
                 "gene_symbol_id": gene_symbol_id,
             }
             for column, field in self.COLUMNS_TO_FIELDS.items():
-                kwargs[field] = row[column]
+                value = row[column]
+                kwargs[field] = self.format_field(field, value)
 
             records.append(DBNSFPGeneAnnotation(**kwargs))
 

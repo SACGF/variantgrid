@@ -23,7 +23,8 @@ from lazy import lazy
 
 from analysis.models import VariantTag
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
-from annotation.models.models import AnnotationVersion, Citation, VariantAnnotation, VariantAnnotationVersion
+from annotation.models.models import AnnotationVersion, Citation, VariantAnnotation, VariantAnnotationVersion, \
+    DBNSFPGeneAnnotationVersion, DBNSFPGeneAnnotation
 from annotation.models.molecular_consequence_enums import MolecularConsequenceColors
 from classification.enums import ShareLevel
 from classification.models import ClassificationModification, Classification
@@ -172,6 +173,13 @@ class GeneSymbolViewInfo:
     @lazy
     def citations(self) -> Union[QuerySet, Iterable[Citation]]:
         return Citation.objects.filter(genesymbolcitation__gene_symbol=self.gene_symbol).distinct()
+
+    @lazy
+    def dbnsfp_gene_annotation(self) -> Optional[DBNSFPGeneAnnotation]:
+        dga = None
+        if dbnsfp_gene_version := DBNSFPGeneAnnotationVersion.latest():
+            dga = self.gene_symbol.dbnsfpgeneannotation_set.filter(version=dbnsfp_gene_version).first()
+        return dga
 
     @lazy
     def gene_summary(self) -> Optional[str]:
@@ -338,6 +346,7 @@ def view_gene_symbol(request, gene_symbol: str, genome_build_name: Optional[str]
         [
             "consortium_genes_and_aliases",
             "citations",
+            "dbnsfp_gene_annotation",
             "gene_symbol",
             "gene_external_urls",
             "gene_in_gene_lists",
