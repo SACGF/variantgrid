@@ -323,6 +323,7 @@
                         {% labelled label="Expression(GNF/Atlas)" %}{{ dbnsfp_gene_annotation.expression_gnf_atlas }}{% endlabelled %}
                     </div>
                 </div>
+            {% endif %}
 
             {% if hgnc and hgnc.uniprot_list %}
                 <div class="card mt-4">
@@ -345,6 +346,7 @@
                 </div>
             {% endif %}
 
+            {% if dbnsfp_gene_annotation %}
                 <div class="card mt-4">
                     <div class="card-header">Pathways and Interactions</div>
                     <div class="card-body">
