@@ -1,6 +1,6 @@
 import logging
-import pandas as pd
 
+import pandas as pd
 from django.core.management import BaseCommand, CommandError
 
 from annotation.models import DBNSFPGeneAnnotationVersion, DBNSFPGeneAnnotation

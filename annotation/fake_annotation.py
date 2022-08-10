@@ -13,7 +13,6 @@ from annotation.models.models import VariantAnnotationVersion, ClinVarVersion, \
     ClinVarCitationsCollection, VariantAnnotation, AnnotationRun, AnnotationRangeLock, GeneAnnotationVersion
 from genes.models import GeneAnnotationImport
 from genes.models_enums import AnnotationConsortium
-from ontology.models import OntologyImport
 from ontology.tests.test_data_ontology import create_ontology_test_data, create_test_ontology_version
 from snpdb.models import Variant
 from snpdb.models.models_genome import GenomeBuild

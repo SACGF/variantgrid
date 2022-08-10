@@ -3,6 +3,7 @@ from typing import Dict, Optional, Iterable, List, TypeVar, Union
 
 import requests
 from django.db.models import QuerySet
+
 from classification.enums.classification_enums import ShareLevel
 from classification.models import EvidenceKeyMap
 from classification.models.classification import ClassificationModification

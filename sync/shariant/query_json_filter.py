@@ -1,6 +1,6 @@
 import operator
 from functools import reduce
-from typing import Optional, Any
+from typing import Any
 
 from django.db.models import Q
 

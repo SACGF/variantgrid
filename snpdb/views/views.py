@@ -54,7 +54,6 @@ from patients.forms import PatientForm
 from patients.models import Patient, Clinician
 from patients.views import get_patient_upload_csv
 from snpdb import forms
-from snpdb.sample_file_path import get_example_replacements
 from snpdb.forms import SampleChoiceForm, VCFChoiceForm, \
     UserSettingsOverrideForm, UserForm, UserContactForm, SampleForm, TagForm, SettingsInitialGroupPermissionForm, \
     OrganizationForm, LabForm, LabUserSettingsOverrideForm, OrganizationUserSettingsOverrideForm
@@ -73,6 +72,7 @@ from snpdb.models import CachedGeneratedFile, VariantGridColumn, UserSettings, \
     VariantZygosityCountCollection, VariantZygosityCountForVCF, ClinVarKey, AvatarDetails, State, SampleStats, \
     SampleStatsPassingFilter
 from snpdb.models.models_enums import ProcessingStatus, ImportStatus, BuiltInFilters
+from snpdb.sample_file_path import get_example_replacements
 from snpdb.tasks.soft_delete_tasks import soft_delete_vcfs
 from snpdb.utils import LabNotificationBuilder
 from upload.models import UploadedVCF

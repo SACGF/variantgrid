@@ -21,7 +21,7 @@ from snpdb.models import Allele, Lab
 from snpdb.models.models_variant import Variant
 
 
-def view_overlaps(request: HttpRequest, lab_id = None) -> Response:
+def view_overlaps(request: HttpRequest, lab_id=None) -> Response:
     lab_picker = LabPickerData.from_request(request, lab_id, 'overlaps')
     if redirect_response := lab_picker.check_redirect():
         return redirect_response

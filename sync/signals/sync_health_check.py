@@ -2,6 +2,7 @@ from datetime import timedelta
 from typing import List
 
 from django.dispatch import receiver
+
 from library.health_check import health_check_signal, HealthCheckAge
 from sync.models import SyncRun, SyncDestination, SyncStatus
 

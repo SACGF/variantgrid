@@ -1,9 +1,6 @@
-from typing import Optional, Union
-
 from django.conf import settings
 from django.template.library import Library
 
-from library.utils import group_data
 from snpdb.lab_picker import LabPickerData
 from snpdb.models import Lab
 

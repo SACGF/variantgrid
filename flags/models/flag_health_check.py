@@ -4,7 +4,7 @@ from typing import Dict, List, Optional, Iterable
 
 from django.db.models import Q
 
-from flags.models import FlagType, FlagComment, Flag, FlagStatus, FlagTypeContext
+from flags.models import FlagType, FlagComment, Flag, FlagStatus
 
 
 class FlagDelta:

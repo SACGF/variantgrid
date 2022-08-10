@@ -2,6 +2,7 @@ from datetime import timedelta
 from typing import Optional
 
 from django.dispatch import receiver
+
 from library.health_check import health_check_signal, HealthCheckRequest, HealthCheckAge
 from ontology.models import OntologyImport
 

@@ -1,4 +1,5 @@
 from django.dispatch import receiver
+
 from library.health_check import health_check_signal, HealthCheckRequest, HealthCheckRecentActivity
 from snpdb.models import VCF
 from variantgrid.perm_path import get_visible_url_names

@@ -21,24 +21,23 @@ from enum import Enum
 from functools import reduce
 from itertools import islice
 from json.encoder import JSONEncoder
-from operator import attrgetter
 from typing import TypeVar, Optional, Iterator, Tuple, Any, List, Iterable, Set, Dict, Union, Callable, Type, Generic, \
     Collection
 from urllib.parse import urlparse
 
-from django.core.exceptions import FieldDoesNotExist
-from django.db.models import Model
-from django.utils.timezone import localtime
 from bs4 import BeautifulSoup
 from dateutil import parser
 from django.conf import settings
+from django.core.exceptions import FieldDoesNotExist
 from django.core.serializers import serialize
 from django.db import models
+from django.db.models import Model
 from django.db.models.query import QuerySet
 from django.http import StreamingHttpResponse, HttpRequest
 from django.utils import html, timezone
 from django.utils.functional import SimpleLazyObject
 from django.utils.safestring import SafeString, mark_safe
+from django.utils.timezone import localtime
 
 from uicore.json.json_types import JsonObjType
 

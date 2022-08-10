@@ -8,6 +8,7 @@ from django.http import HttpRequest, HttpResponseRedirect
 from django.shortcuts import redirect
 from django.urls import reverse
 from lazy import lazy
+
 from snpdb.models import Lab, Organization, GenomeBuild, UserSettings
 
 
