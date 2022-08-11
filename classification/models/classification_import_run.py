@@ -130,6 +130,27 @@ def outstanding_import_check(sender, instance: ClassificationImportRun, **kwargs
         emoji = ":golf:" if instance.status == ClassificationImportRunStatus.COMPLETED else ":skunk:"
         ongoing_message = f" ongoing imports {ongoing_imports}" if ongoing_imports else ""
         nb.add_markdown(f"{emoji} Import {instance.get_status_display()} {instance.identifier} {instance.row_count} rows{ongoing_message if ongoing_imports else ''}")
+        # provide full details of import numbers in notification
+        if instance.row_count_new:
+            nb.add_field("New", instance.row_count_new)
+        if instance.row_count_update:
+            nb.add_field("Updated", instance.row_count_update)
+        if instance.row_count_no_change:
+            nb.add_field("No Change", instance.row_count_no_change)
+        # less likely, but still report them just in case
+        if instance.row_count_un_withdrawn:
+            nb.add_field("Un-Withdrawn", instance.row_count_un_withdrawn)
+        if instance.row_count_already_withdrawn:
+            nb.add_field("Already Withdrawn", instance.row_count_already_withdrawn)
+        if instance.row_count_withdrawn:
+            nb.add_field("Withdrawn", instance.row_count_withdrawn)
+        if instance.row_count_delete:
+            nb.add_field("Deleted", instance.row_count_delete)
+        if instance.row_count_unknown:
+            nb.add_field("Unknown", instance.row_count_unknown)
+        # and always end with
+        nb.add_field("Pre-existing classification not in this import", instance.missing_row_count)
+
         nb.send()
         if not ongoing_imports:
             classification_imports_complete_signal.send(sender=ClassificationImportRun)
