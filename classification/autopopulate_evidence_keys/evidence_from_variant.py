@@ -398,7 +398,7 @@ def set_evidence(data: AutopopulateData, evidence_key, value, immutable, ekey_fo
         value = formatter(value)
 
     value_dict = {'value': value}
-    if note:
+    if value is not None and note:  # Only put note in, if there are values
         value_dict["note"] = note
     if immutable:
         value_dict['immutable'] = SubmissionSource.VARIANT_GRID
