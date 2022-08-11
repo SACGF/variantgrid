@@ -144,6 +144,7 @@ def _reverse_new_dbnsfp_gene_ekeys(apps, schema_editor):
 class Migration(migrations.Migration):
     dependencies = [
         ('classification', '0078_classificationimportrun_missing_row_count'),
+        ('snpdb', '0081_new_dbnsfp_gene_columns'),
     ]
 
     operations = [
