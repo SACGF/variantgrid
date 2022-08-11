@@ -8,10 +8,10 @@ from pyhgvs import HGVSName, InvalidHGVSName
 def _get_gene_and_terms(vta, c_hgvs=True, extra_terms: Optional[List[str]] = None) -> Tuple[str, List]:
     from annotation.models import VariantTranscriptAnnotation
 
+    gene_symbol = None
     if vta.gene:
-        gene_symbol = str(vta.gene.get_gene_symbol(vta.version.genome_build))
-    else:
-        gene_symbol = None
+        if gs := vta.gene.get_gene_symbol(vta.version.genome_build):
+            gene_symbol = str(gs)
 
     terms = []
     if extra_terms:
