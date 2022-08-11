@@ -66,8 +66,7 @@ class ClassificationUploader:
         self.filters = config.get('filters', {})
         mapping = config.get('mapping', {})
 
-        config_key = config["sync_details"]
-        self.shariant = OAuthConnector.shariant_oauth_connector(config_key)
+        self.shariant = OAuthConnector.shariant_oauth_connector(sync_destination.sync_details)
         self.lab_mappings = mapping.get('labs', {})
         self.share_level_mappings = mapping.get('share_levels', {})
         self.user_mappings = mapping.get('users', {})

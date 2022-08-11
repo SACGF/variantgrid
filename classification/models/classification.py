@@ -2168,8 +2168,12 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             vcfe.report()
         return vcfe.variant_coordinate
 
+    @staticmethod
+    def get_url_for_pk(pk):
+        return reverse('view_classification', kwargs={'classification_id': pk})
+
     def get_absolute_url(self):
-        return reverse('view_classification', kwargs={'classification_id': self.pk})
+        return self.get_url_for_pk(self.pk)
 
     def get_edit_url(self) -> str:
         return self.get_absolute_url() + "?edit=true"

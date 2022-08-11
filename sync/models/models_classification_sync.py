@@ -1,3 +1,6 @@
+import os
+from typing import Optional
+
 from django.db import models
 from django.db.models.deletion import CASCADE
 from django.db.models.query import QuerySet
@@ -20,5 +23,17 @@ class ClassificationModificationSyncRecord(TimeStampedModel):
 
     @staticmethod
     def filter_out_synced(qs: QuerySet, destination: SyncDestination):
-        up_to_date = ClassificationModificationSyncRecord.objects.filter(run__destination=destination, success=True).values_list('classification_modification', flat=True)
+        cmsr_qs = ClassificationModificationSyncRecord.objects.filter(run__destination=destination, success=True)
+        up_to_date = cmsr_qs.values_list('classification_modification', flat=True)
         return qs.exclude(pk__in=up_to_date)
+
+    @property
+    def remote_url(self) -> Optional[str]:
+        if not self.success:
+            raise ValueError(f"{self.classification_modification} not successfully synced")
+        url = self.run.destination.sync_details["host"]
+        remote_pk = self.meta["meta"]["id"]
+        path = self.classification_modification.classification.get_url_for_pk(remote_pk)
+        return os.path.join(url, path)
+
+

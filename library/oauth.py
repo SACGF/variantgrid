@@ -11,11 +11,6 @@ class OAuthConnector:
 
     @staticmethod
     def shariant_oauth_connector(sync_details):
-        if not sync_details in settings.SYNC_DETAILS:
-            actual_keys = ", ".join(settings.SYNC_DETAILS.keys()) if settings.SYNC_DETAILS else "No options configured"
-            raise ValueError(f"Could not find sync details '{sync_details}' options are: {actual_keys}")
-
-        sync_details = settings.SYNC_DETAILS[sync_details]
         return OAuthConnector(**sync_details)
 
     @staticmethod

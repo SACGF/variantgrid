@@ -1,5 +1,6 @@
 from typing import Optional
 
+from django.conf import settings
 from django.db import models
 from django.db.models.deletion import CASCADE
 from django_extensions.db.models import TimeStampedModel
@@ -24,6 +25,15 @@ class SyncDestination(models.Model):
     def run(self, full_sync: bool = False, max_rows: Optional[int] = None):
         from sync.sync_runner import run_sync
         run_sync(self, full_sync=full_sync, max_rows=max_rows)
+
+    @property
+    def sync_details(self) -> dict:
+        key = self.config["sync_details"]
+        sd = settings.SYNC_DETAILS.get(key)
+        if not sd:
+            actual_keys = ", ".join(settings.SYNC_DETAILS.keys()) if settings.SYNC_DETAILS else "No options configured"
+            raise ValueError(f"Could not find sync details '{key}' options are: {actual_keys}")
+        return sd
 
     def __str__(self):
         return self.name
