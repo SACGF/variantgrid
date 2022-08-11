@@ -54,7 +54,8 @@ def _get_search_terms(variant_transcripts_list: List, formatter: str = None, **k
     gene_terms = defaultdict(set)
     for vta in variant_transcripts_list:
         gene_symbol, terms = _get_gene_and_terms(vta, **kwargs)
-        gene_terms[gene_symbol].update(terms)
+        if gene_symbol:
+            gene_terms[gene_symbol].update(terms)
 
     searches = []
     for gene_symbol, terms in gene_terms.items():
