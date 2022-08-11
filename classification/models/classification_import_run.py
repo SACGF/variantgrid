@@ -149,7 +149,9 @@ def outstanding_import_check(sender, instance: ClassificationImportRun, **kwargs
         if instance.row_count_unknown:
             nb.add_field("Unknown", instance.row_count_unknown)
         # and always end with
-        nb.add_field("Pre-existing classification not in this import", instance.missing_row_count)
+        if instance.from_file:
+            # can only count missing rows if we're from a file and can inject last file data
+            nb.add_field("Pre-existing not in import", instance.missing_row_count)
 
         nb.send()
         if not ongoing_imports:
