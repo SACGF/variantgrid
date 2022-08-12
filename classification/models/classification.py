@@ -1756,6 +1756,13 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
     def last_published_version(self) -> 'ClassificationModification':
         return ClassificationModification.objects.filter(classification=self, is_last_published=True).first()
 
+    @property
+    def last_published_sync_records(self):
+        records = []
+        if lpv := self.last_published_version:
+            records = lpv.classificationmodificationsyncrecord_set.filter(success=True)
+        return records
+
     @staticmethod
     def validate_evidence(evidence: dict) -> List[Dict]:
         messages = []
