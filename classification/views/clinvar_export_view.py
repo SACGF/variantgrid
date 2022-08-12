@@ -170,7 +170,7 @@ class ClinVarExportColumns(DatatableConfig[ClinVarExport]):
                        search=["condition__display_text"],
                        sort_keys=["condition__sort_text"]
             ),
-            RichColumn(name="batches", label="In Batche IDs", renderer=self.batches, client_renderer='renderBatches', orderable=False, search=False, extra_columns=["id"]),
+            RichColumn(name="batches", label="In Batch IDs", renderer=self.batches, client_renderer='renderBatches', orderable=False, search=False, extra_columns=["id"]),
             RichColumn("status", label="Sync Status", client_renderer='renderStatus', sort_keys=["status_sort"], orderable=True, search=False),
             RichColumn("scv", label="SCV", orderable=True),
         ]
