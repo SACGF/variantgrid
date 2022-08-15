@@ -1,11 +1,14 @@
 import contextlib
 import datetime
 import re
+import tarfile
 from abc import ABC, abstractmethod
 from io import BytesIO
 from os import PathLike
 from pathlib import Path
 from typing import Iterator, Optional, Union, List
+import zipfile
+import tarfile
 from zipfile import ZipFile
 
 
@@ -40,14 +43,19 @@ class FileHandle(ABC):
                 output_file.write(input_file.read())
 
     def download_to_dir(self, download_dir: Path, extract_zip: bool = False):
-        # this is pretty inefficient
-        if extract_zip and self.filename.endswith(".zip"):
-            with self.open() as input_file:
-                zippy = ZipFile(BytesIO(input_file.read()))
+        with self.open() as input_file:
+            if extract_zip and self.filename.endswith(".zip"):
+                zippy = ZipFile(input_file)
                 zippy.extractall(path=download_dir)
-        else:
-            with open(download_dir / self.filename, 'wb') as output_file:
-                with self.open() as input_file:
+            elif extract_zip and (
+                    self.filename.endswith(".tar.gz")
+                    or self.filename.endswith(".tar")
+                    or self.filename.endswith(".tgz")
+            ):
+                with tarfile.open(fileobj=input_file, mode="r:*") as tarry:
+                    tarry.extractall(path=download_dir)
+            else:
+                with open(download_dir / self.filename, 'wb') as output_file:
                     output_file.write(input_file.read())
 
     @abstractmethod
