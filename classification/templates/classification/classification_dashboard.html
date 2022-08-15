@@ -181,7 +181,7 @@
                 <table id="classifications-matching" data-datatable-url="{% url 'classification_datatables' %}" class="sticky-header classification-table" data-datatable-data="classificationReviews"></table>
             {% end_ui_register_tab_embedded %}
 
-            {% ui_register_tab_embedded tab_set="classification_issues" label="Clin Change" badge=dlab.counts.significance_change %}
+            {% ui_register_tab_embedded tab_set="classification_issues" label="Significance Changes" badge=dlab.counts.significance_change %}
                 <table id="classifications-comment" data-datatable-url="{% url 'classification_datatables' %}" class="sticky-header classification-table" data-datatable-data="classificationSigChanges"></table>
             {% end_ui_register_tab_embedded %}
 
