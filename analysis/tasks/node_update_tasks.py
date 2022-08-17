@@ -15,11 +15,6 @@ from library.log_utils import log_traceback, get_traceback
 from snpdb.models import ProcessingStatus
 
 
-@celery.task
-def dummy_task():
-    pass
-
-
 def wait_for_task(celery_task):
     # Normally celery would die with "Never call result.get() within a task!"
     # See http://docs.celeryq.org/en/latest/userguide/tasks.html#task-synchronous-subtasks

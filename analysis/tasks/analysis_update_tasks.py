@@ -1,3 +1,4 @@
+import itertools
 import logging
 import operator
 import uuid
@@ -7,13 +8,12 @@ from typing import List, Set
 
 import celery
 import networkx as nx
-from celery import chord
 from celery.canvas import Signature, chain
 from django.db.models import Q
 
 from analysis.models import Analysis, AnalysisEdge, NodeStatus, NodeTask
 from analysis.models.nodes.node_utils import get_nodes_by_id, get_toposorted_nodes_from_parent_value_data
-from analysis.tasks.node_update_tasks import wait_for_node, dummy_task
+from analysis.tasks.node_update_tasks import wait_for_node
 from library.celery_utils import execute_task
 from library.log_utils import log_traceback
 
@@ -97,21 +97,19 @@ def _get_analysis_update_tasks(analysis_id) -> List:
             analysis.analysisnode_set.filter(q_node_version).update(status=NodeStatus.QUEUED)
 
         if groups:
-            t = chain(groups)
+            t = _get_celery_workflow_task(groups)
             tasks.append(t)
 
     return tasks
 
 
-def _add_jobs_to_groups(jobs, groups):
-    if jobs:
-        if len(jobs) > 1:
-            # Use a chord, as groups don't synchronize inside a chain
-            g = chord(jobs, dummy_task.si())  # @UndefinedVariable
-        else:
-            g = jobs[0]  # @UndefinedVariable
-
-        groups.append(g)
+def _get_celery_workflow_task(groups):
+    # So I used to use a Celery chord to be able to execute things at the same level (group) in parallel
+    # however, it ended up being 3x slower doing it the 'clever' way due to fighting for DB I/O resources
+    # The celery messages could be enormous crashing out RabbitMQ and there would be celery chord jobs
+    # left orphaned and executed every few seconds forever. So - just doing it the dumb way.
+    task = chain(itertools.chain(*groups))
+    return task
 
 
 def _add_jobs_for_group(nodes_to_update, dependencies, grp, groups, existing_cache_jobs) -> Set:
@@ -142,8 +140,8 @@ def _add_jobs_for_group(nodes_to_update, dependencies, grp, groups, existing_cac
             if task:
                 jobs.append(Signature(task, args=args, immutable=True))
 
-    _add_jobs_to_groups(jobs, groups)
-    _add_jobs_to_groups(after_jobs, groups)
+    groups.append(jobs)
+    groups.append(after_jobs)
     return cache_jobs
 
 
