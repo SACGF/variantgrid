@@ -334,8 +334,9 @@ class ClinVarExportConverter:
             data["comment"] = full_comment
 
         if date_last_evaluated := self.value(SpecialEKeys.CURATION_DATE):
-            # FIXME fall back to other date types? or at least raising a warning if not a valid looking date
             data["dateLastEvaluated"] = date_last_evaluated
+        elif date_last_reviewed := self.value(SpecialEKeys.CURATION_VERIFIED_DATE):
+            data["dateLastEvaluated"] = ValidatedJson(date_last_reviewed, JsonMessages.warning("No curation date provided, falling back to curation verified date."))
 
         messages = JsonMessages()
         if mode_of_inheritance := self.clinvar_value(SpecialEKeys.MODE_OF_INHERITANCE):
