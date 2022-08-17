@@ -56,7 +56,7 @@ def flag_chanced_since(since: datetime, flag_types: Optional[Iterable[FlagType]]
         is_flag_open_now = is_open_status(flag.resolution.status)
         # grab latest comment from before since
         if reference_comment := FlagComment.objects.filter(flag=flag, created__lte=since).select_related('resolution').order_by('-created').first():
-            if is_open_status(reference_comment.resolution.status) != is_flag_open_now:
+            if not reference_comment.resolution or is_open_status(reference_comment.resolution.status) != is_flag_open_now:
                 # flag existed before since date, see if the status has changed after the since date
                 count_delta(flag.flag_type, 1 if is_flag_open_now else -1)
         else:
