@@ -207,7 +207,7 @@ class ClassificationAdmin(admin.ModelAdmin):
     def publish_logged_in_users(self, request, queryset):
         self.publish_share_level(request, queryset, ShareLevel.ALL_USERS)
 
-    publish_logged_in_users.short_description = 'Publish - Org'
+    publish_logged_in_users.short_description = 'Publish - Logged in Users'
 
     def publish_org(self, request, queryset):
         self.publish_share_level(request, queryset, ShareLevel.INSTITUTION)
