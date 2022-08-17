@@ -338,7 +338,11 @@ def node_data_grid(request, analysis_id, analysis_version, node_id, node_version
     try:
         node = get_node_subclass_or_404(request.user, node_id, version=node_version)
     except NodeOutOfDateException:
-        return HttpResponseRedirect(reverse("node_load", kwargs={"node_id": node_id}))
+        kwargs = {
+            "analysis_id": analysis_id,
+            "node_id": node_id,
+        }
+        return HttpResponseRedirect(reverse("node_load", kwargs=kwargs))
 
     context = {
         "analysis_id": analysis_id,
