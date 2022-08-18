@@ -51,6 +51,8 @@ def sequencing_data(request):
 def seqauto_runs(request):
     # Only allow button if settings allow, and previous run has finished
     enable_button = request.user.is_staff or settings.SEQAUTO_ALLOW_NON_STAFF_MANUAL_RUN
+    if not enable_button and settings.SEQAUTO_SCAN_GROUP:
+        enable_button = request.user.groups.filter(name=settings.SEQAUTO_SCAN_GROUP).exists()
 
     if request.method == "POST":
         if not enable_button:
