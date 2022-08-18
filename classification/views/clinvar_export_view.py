@@ -1,7 +1,8 @@
 import json
 import re
 from collections import defaultdict
-from typing import Dict, Any, Optional, Iterable
+from dataclasses import dataclass
+from typing import Dict, Any, Optional, Iterable, List
 
 from django.contrib import messages
 from django.db.models import QuerySet, When, Value, Case, IntegerField, Count, Q
@@ -26,7 +27,7 @@ from library.log_utils import report_event
 from library.utils import html_to_text, export_column, ExportRow, local_date_string
 from snpdb.lab_picker import LabPickerData
 from snpdb.models import ClinVarKey, Lab, Allele, GenomeBuild
-from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
+from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder, CellData
 from uicore.json.json_types import JsonDataType
 import io
 
@@ -38,7 +39,7 @@ def allele_for(allele_id: int) -> Allele:
 
 class ClinVarExportBatchColumns(DatatableConfig):
 
-    def render_status(self, row: Dict[str, Any]):
+    def render_status(self, row: CellData):
         return ClinVarExportBatchStatus(row['status']).label
 
     def __init__(self, request):
@@ -79,6 +80,15 @@ def clinvar_export_batch_detail(request, clinvar_export_batch_id: int):
     })
 
 
+def _export_id_to_batch_ids(qs: QuerySet[ClinVarExport]) -> Dict[int, List[int]]:
+    export_to_batches = defaultdict(list)
+    for export_id, batch_id in ClinVarExportSubmission.objects.filter(
+        clinvar_export__in=qs.values_list("id", flat=True)).order_by(
+        "-submission_batch").values_list("clinvar_export", "submission_batch"):
+        export_to_batches[export_id].append(batch_id)
+    return export_to_batches
+
+
 class ClinVarExportColumns(DatatableConfig[ClinVarExport]):
 
     def render_allele(self, row: Dict[str, Any]) -> str:
@@ -88,12 +98,7 @@ class ClinVarExportColumns(DatatableConfig[ClinVarExport]):
     def pre_render(self, qs: QuerySet[ClinVarExport]):
         # find all the batches these records are in
         # do this once rather than per row
-        super().pre_render(qs)
-        export_to_batches = defaultdict(list)
-        for export_id, batch_id in ClinVarExportSubmission.objects.filter(clinvar_export__in=qs.values_list("id", flat=True)).order_by(
-            "-submission_batch").values_list("clinvar_export", "submission_batch"):
-            export_to_batches[export_id].append(batch_id)
-        self.export_to_batches = export_to_batches
+        self.export_to_batches = _export_id_to_batch_ids(qs)
 
     def power_search(self, qs: QuerySet[ClinVarExport], search_string: str) -> QuerySet[ClinVarExport]:
         try:
@@ -106,10 +111,10 @@ class ClinVarExportColumns(DatatableConfig[ClinVarExport]):
             pass
         return super().power_search(qs, search_string)
 
-    def batches(self, row: Dict[str, Any]) -> JsonDataType:
+    def batches(self, row: CellData) -> JsonDataType:
         return self.export_to_batches.get(row.get("id"))
 
-    def render_c_hgvs(self, row: Dict[str, Any]) -> JsonDataType:
+    def render_c_hgvs(self, row: CellData) -> JsonDataType:
         if row["classification_based_on__classification__variant"]:
             genome_build = row["classification_based_on__published_evidence__genome_build__value"]
             c_hgvs_str: str
@@ -234,10 +239,17 @@ def clinvar_export_history(request: HttpRequest, clinvar_export_id: int) -> Http
     })
 
 
+@dataclass
+class ClinVarExportSummaryData:
+    clinvar_export: ClinVarExport
+    batch_ids: Optional[List[int]]
+
+
 class ClinVarExportSummary(ExportRow):
 
-    def __init__(self, clinvar_export: ClinVarExport):
-        self.clinvar_export = clinvar_export
+    def __init__(self, data: ClinVarExportSummaryData):
+        self.clinvar_export = data.clinvar_export
+        self.batch_ids = data.batch_ids
 
     @property
     def classification(self):
@@ -255,14 +267,23 @@ class ClinVarExportSummary(ExportRow):
     def id(self):
         return self.clinvar_export.id
 
-    @export_column("Allele URL")
-    def allele_id(self) -> str:
-        if allele_id := self.classification.classification.allele_id:
-            return get_url_from_view_path(reverse('view_allele', kwargs={"allele_id": allele_id}))
-
-    @export_column("URL")
+    @export_column("URLs")
     def url(self):
-        return get_url_from_view_path(self.clinvar_export.get_absolute_url())
+        parts = list()
+        parts.append(("ClinVar Export", get_url_from_view_path(self.clinvar_export.get_absolute_url())))
+        if modification := self.classification:
+            classification = modification.classification
+            if allele_id := classification.allele_id:
+                parts.append(("Allele", get_url_from_view_path(reverse('view_allele', kwargs={"allele_id": allele_id}))))
+            parts.append(("Classification", get_url_from_view_path(reverse('view_classification', kwargs={"classification_id": classification.pk}))))
+
+        return "\n".join(f"{p[0]} : {p[1]}" for p in parts)
+
+    @export_column("Record ID")
+    def record_id(self):
+        if modification := self.classification:
+            classification = modification.classification
+            return classification.lab.group_name + "/" + classification.lab_record_id
 
     @export_column("Genome Build")
     def genome_build(self):
@@ -270,8 +291,8 @@ class ClinVarExportSummary(ExportRow):
 
     @export_column("ClinGenAllele")
     def clingen_allele(self):
-        if classification := self.classification:
-            if allele := classification.classification.allele:
+        if modification := self.classification:
+            if allele := modification.classification.allele:
                 return str(allele.clingen_allele)
 
     @export_column("c.HGVS")
@@ -285,38 +306,38 @@ class ClinVarExportSummary(ExportRow):
 
     @export_column("Condition")
     def condition(self):
-        if classification := self.classification:
-            return classification.condition_text
+        if modification := self.classification:
+            return modification.condition_text
+
+    @export_column("Affected Status")
+    def affected_status(self):
+        if modification := self.classification:
+            return EvidenceKeyMap.pretty_value_for(modification, SpecialEKeys.AFFECTED_STATUS)
+
+    @export_column("Mode of Inheritance")
+    def mode_of_inheritance(self):
+        if modification := self.classification:
+            return EvidenceKeyMap.pretty_value_for(modification, SpecialEKeys.MODE_OF_INHERITANCE)
+
+    @export_column("Clinical Significance")
+    def clinical_significance(self):
+        if modification := self.classification:
+            return EvidenceKeyMap.pretty_value_for(modification, SpecialEKeys.CLINICAL_SIGNIFICANCE)
 
     @export_column("Interpretation Summary")
     def interpretation_summary(self):
         if classification := self.classification:
             return html_to_text(classification.get(SpecialEKeys.INTERPRETATION_SUMMARY))
 
-    @export_column("Clinical Significance")
-    def clinical_significance(self):
-        if classification := self.classification:
-            return EvidenceKeyMap.pretty_value_for(classification, SpecialEKeys.CLINICAL_SIGNIFICANCE)
-
-    @export_column("Affected Status")
-    def affected_status(self):
-        if classification := self.classification:
-            return EvidenceKeyMap.pretty_value_for(classification, SpecialEKeys.AFFECTED_STATUS)
-
-    @export_column("Mode of Inheritance")
-    def mode_of_inheritance(self):
-        if classification := self.classification:
-            return EvidenceKeyMap.pretty_value_for(classification, SpecialEKeys.MODE_OF_INHERITANCE)
-
     @export_column("Curation Date")
     def curation_date(self):
         if classification := self.classification:
             return EvidenceKeyMap.pretty_value_for(classification, SpecialEKeys.CURATION_DATE)
 
-    @export_column("Classification Imported/Created")
+    @export_column("Classification Submitted to $site_name")
     def classification_imported_created(self):
-        if classification := self.classification:
-            return classification.classification.created.strftime('%Y-%m-%d')
+        if modification := self.classification:
+            return modification.classification.created.strftime('%Y-%m-%d')
 
     @export_column("Sync Status")
     def sync_status(self):
@@ -335,16 +356,21 @@ class ClinVarExportSummary(ExportRow):
         if submission := self.latest_submission:
             return submission.submission_batch_id
 
+    @export_column("All Batch IDs")
+    def batch_ids_all(self):
+        if batch_ids := self.batch_ids:
+            return ",".join(str(batch_id) for batch_id in sorted(batch_ids))
+
     @export_column("Latest Batch Status")
     def batch_status(self):
         if submission := self.latest_submission:
             submission.submission_batch.get_status_display()
 
-    @export_column("Errors")
-    def errors(self):
+    @export_column("Messages")
+    def messages(self):
         if json_body := self.clinvar_export.submission_full:
-            if errors := json_body.all_messages.errors():
-                return "\n".join(["* " + error.text for error in errors])
+            if j_messages := json_body.all_messages:
+                return "\n".join([f"({message.severity.upper()}) {message.text}" for message in j_messages if message.severity != "info"])
 
     ## This column is a bit much
     # @export_column("JSON")
@@ -356,9 +382,12 @@ def clinvar_export_download(request: HttpRequest, clinvar_key_id: str) -> HttpRe
     clinvar_key: ClinVarKey = get_object_or_404(ClinVarKey, pk=clinvar_key_id)
     clinvar_key.check_user_can_access(request.user)
 
+    qs = ClinVarExport.objects.filter(clinvar_allele__clinvar_key=clinvar_key).order_by('-id')
+    export_id_to_batch_ids = _export_id_to_batch_ids(qs)
+
     def rows() -> Iterable[str]:
         return ClinVarExportSummary.csv_generator(
-            ClinVarExport.objects.filter(clinvar_allele__clinvar_key=clinvar_key).order_by('-id')
+            [ClinVarExportSummaryData(ce, export_id_to_batch_ids.get(ce.pk)) for ce in qs]
         )
 
     date_str = local_date_string()
@@ -443,6 +472,7 @@ def clinvar_export_create_batch(request: HttpRequest, clinvar_key_id: str) -> Ht
         if not batches:
             messages.add_message(request, level=messages.ERROR, message="All IDs were already in were already up to date or in error")
     return redirect(reverse('clinvar_key_summary', kwargs={'clinvar_key_id': clinvar_key_id}))
+
 
 def clinvar_export_detail(request: HttpRequest, clinvar_export_id: int) -> HttpResponseBase:
     clinvar_export = get_object_or_404(ClinVarExport, pk=clinvar_export_id)

@@ -50,6 +50,9 @@ class JsonMessages:
     def errors(self) -> List[JsonMessage]:
         return JsonMessages(messages=[mess for mess in self.messages if mess.severity == "error"])
 
+    def warnings(self) -> List[JsonMessage]:
+        return JsonMessages(messages=[mess for mess in self.messages if mess.severity == "warning"])
+
     @staticmethod
     def error(message: str):
         return JsonMessages([JsonMessage(severity="error", text=message)])
