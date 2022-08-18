@@ -6,7 +6,9 @@ from library.utils import string_deterministic_hash
 class SpaceThemedAvatarProvider:
 
     @classmethod
-    def get_avatar_url(cls, user: User, size):
+    def get_avatar_url(cls, user: User, width, height=None):
+        """ signature used to be size but new django-avatar library uses width/height
+            since we ignore it anyway, I provided a default argument for backwards compatability """
         if user.username == 'admin_bot':
             return '/static/icons/users/bot.svg'
         icons = [

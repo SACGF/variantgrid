@@ -11,6 +11,7 @@ cyvcf2==0.30.14
 Django==4.0.7
 django-amazon-ses==4.0.1
 django_autocomplete_light==3.9.1
+django-avatar==7.0.0
 django_cache_memoize==0.1.10
 django-compressor==4.0
 django_crispy_forms==1.14.0
@@ -34,11 +35,10 @@ django-reversion-compare==0.15.0
 easy_thumbnails==2.8.1
 fontawesomefree==5.15.4
 git+https://github.com/davmlaw/django-json-widget#egg=django_json_widget
-git+https://github.com/davmlaw/django-avatar#egg=django-avatar
 git+https://github.com/davmlaw/django-jfu#egg=django-jfu
 git+https://github.com/davmlaw/django-messages/#egg=django-messages
 git+https://github.com/davmlaw/django-starfield#egg=django_starfield
-git+https://github.com/ierror/django-js-reverse#egg=django-js-reverse
+git+https://github.com/davmlaw/django-js-reverse#egg=django-js-reverse
 git+https://github.com/SACGF/hgvs#egg=pyhgvs
 HTSeq==2.0.1
 ijson==3.1.4
