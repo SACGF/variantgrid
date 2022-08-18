@@ -9,12 +9,16 @@ from snpdb.admin_utils import ModelAdminBasics, AllValuesChoicesFieldListFilter
 class FlagCommentAdminTabular(TabularInline):
     model = FlagComment
 
+    fields = ("id", "created", "user", "text", "resolution")
+    readonly_fields = ("created", "resolution",)
+
     def has_add_permission(self, request, obj):
         return False
 
 
 @admin.register(Flag)
 class FlagAdmin(ModelAdminBasics):
+    search_fields = ('pk',)
     list_display = ('id', 'collection', 'flag_type', 'resolution', 'user', 'data', 'created', 'modified')
     list_filter = (('flag_type', RelatedFieldListFilter), ('resolution__status', AllValuesChoicesFieldListFilter), ('user', RelatedFieldListFilter))
     inlines = (FlagCommentAdminTabular,)
