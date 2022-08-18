@@ -4,6 +4,7 @@ from collections import defaultdict
 
 from django.conf import settings
 from django.contrib import messages
+from django.contrib.auth.models import Permission
 from django.core.exceptions import PermissionDenied
 from django.db.models.aggregates import Count
 from django.http.response import HttpResponseRedirect, JsonResponse, HttpResponse
@@ -50,9 +51,12 @@ def sequencing_data(request):
 
 def seqauto_runs(request):
     # Only allow button if settings allow, and previous run has finished
-    enable_button = request.user.is_staff or settings.SEQAUTO_ALLOW_NON_STAFF_MANUAL_RUN
-    if not enable_button and settings.SEQAUTO_SCAN_GROUP:
-        enable_button = request.user.groups.filter(name=settings.SEQAUTO_SCAN_GROUP).exists()
+    enable_button = request.user.is_staff
+    if not enable_button and settings.SEQAUTO_SCAN_PERMISSION:
+        if scan_perm := Permission.objects.filter(codename=settings.SEQAUTO_SCAN_PERMISSION,
+                                                  content_type__app_label='seqauto',
+                                                  content_type__model='seqrun').first():
+            enable_button = request.user.has_perm(scan_perm)
 
     if request.method == "POST":
         if not enable_button:

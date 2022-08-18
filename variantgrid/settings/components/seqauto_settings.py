@@ -3,8 +3,7 @@ from variantgrid.settings.components.default_settings import BASE_DIR, MANAGE_CO
 
 SEQAUTO_ENABLED = False
 SEQAUTO_SCAN_DISKS = True
-SEQAUTO_ALLOW_NON_STAFF_MANUAL_RUN = True
-SEQAUTO_SCAN_GROUP = 'seqauto_scanners'
+SEQAUTO_SCAN_PERMISSION = 'seqauto_scan_initiate'
 SEQAUTO_DIR = os.path.join(BASE_DIR, "seqauto")
 SEQAUTO_SCRIPTS_DIR = os.path.join(SEQAUTO_DIR, "scripts", "test")
 SEQAUTO_SCAN_RESOURCES_DIR = os.path.join(PRIVATE_DATA_ROOT, 'scan_resources')
