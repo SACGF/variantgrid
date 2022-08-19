@@ -574,7 +574,7 @@ class Lab(models.Model):
     def __str__(self):
         name = self.name
         if self.organization:
-            name = f"[{self.organization.shortest_name}] {name}"
+            name = f"{self.organization.shortest_name} / {name}"
         return name
 
 

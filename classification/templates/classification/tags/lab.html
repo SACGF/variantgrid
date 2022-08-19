@@ -1,4 +1,4 @@
 <span style="opacity:{% if is_your_lab %}0.5{% else %}1{% endif %}">
-    <span style="color: #666">[{{ lab.organization.shortest_name }}]</span>
+    <span style="color: #666">{{ lab.organization.shortest_name }} / </span>
     {{ lab.name }}
 </span>

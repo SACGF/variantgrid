@@ -77,7 +77,7 @@
 
     function filterDefaultLab() {
         {% if user_settings.default_lab %}
-            setAutocompleteValue('#id_lab', '{{ user_settings.default_lab.id }}', '{{ user_settings.default_lab.organization.name }} - {{ user_settings.default_lab.name }}');
+            setAutocompleteValue('#id_lab', '{{ user_settings.default_lab.id }}', '{{ user_settings.default_lab.organization.name }} / {{ user_settings.default_lab.name }}');
         {% endif %}
     }
 

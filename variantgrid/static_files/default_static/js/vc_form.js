@@ -2177,7 +2177,7 @@ VCTable.identifier = (data, type, row) => {
         class: 'hover-link',
         html: [
             icon,
-            $('<span>', {text: `[${org_name}] ${lab_name}`}),
+            $('<span>', {text: `${org_name} / ${lab_name}`}),
             ' / ',
             limitLengthSpan(lab_record_id, 50)
         ]
