@@ -221,7 +221,12 @@ python3 manage.py import_gene_annotation --annotation-consortium=RefSeq --genome
                 <div class="no-value">Not installed</div>
             {% endif %}
             {% install-instructions "dbNSFP gene annotation" installed=dbnsfp_gene_annotation %}
-                <a href="https://sites.google.com/site/jpopgen/dbNSFP">Download dbNSFP (only need dbNSFP4.3_gene.complete.gz) </a>
+                {% comment %}
+                    I asked dbNSFP guy to host just the genes gz on their site, so check maybe it's up and we can remove our own hosting of it
+                {% endcomment %}
+                Download <a href="http://variantgrid.com/static/annotation_download/dbNSFP4.3_gene.complete.gz">dbNSFP4.3_gene.complete.gz</a> (43Mb) - hosted on variantgrid.com
+                This is just the gene data extracted from the <a href="https://sites.google.com/site/jpopgen/dbNSFP">dbNSFP</a> release.
+
                 <code>{{ python_command }} manage.py import_dbnsfp_gene_annotation --dbnsfp-version=4.3 dbNSFP4.3_gene.complete.gz</code>
              {% endinstall-instructions %}
         {% endlabelled %}
