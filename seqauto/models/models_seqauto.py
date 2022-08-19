@@ -56,6 +56,9 @@ class SeqAutoRun(TimeStampedModel):
     error_exception = models.TextField(null=True)
     fake_data = models.ForeignKey(FakeData, null=True, on_delete=CASCADE)
 
+    class Meta:
+        permissions = (('seqauto_scan_initiate', 'SeqAuto scan initiate'),)
+
     def save(self, **kwargs):
         self.status = self.get_status()
         super().save(**kwargs)
