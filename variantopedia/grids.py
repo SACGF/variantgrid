@@ -214,8 +214,12 @@ class TaggedVariantGrid(AbstractVariantGrid):
                 tag_ids.append(tag_id)
 
         qs = get_variant_queryset_for_latest_annotation_version(genome_build)
+        qs = qs.filter(Variant.get_contigs_q(genome_build))
         qs, _ = VariantZygosityCountCollection.annotate_global_germline_counts(qs)
-        qs = qs.filter(VariantTag.variants_for_build_q(genome_build, tags_qs, tag_ids))
+        # tags_q = VariantTag.variants_for_build_q(genome_build, tags_qs, tag_ids)
+        # Need to run distinct as tags can be on both sides of same allele
+        tags_q = VariantTag.variants_for_build_non_distinct_q(tags_qs, tag_ids)
+        qs = qs.filter(tags_q).distinct()
         user_settings = UserSettings.get_for_user(user)
         annotation_version = AnnotationVersion.latest(genome_build)
         fields, override, _ = get_custom_column_fields_override_and_sample_position(user_settings.columns,

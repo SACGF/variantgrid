@@ -105,3 +105,12 @@ class VariantTag(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
                                              allele__in=tags_qs.values_list("allele"))
 
         return Q(pk__in=va_qs.values_list("variant"))
+
+    @staticmethod
+    def variants_for_build_non_distinct_q(tags_qs, tag_ids: List[str]) -> Q:
+        """ A faster version than above, but you probably want to call distinct on the queryset """
+        if tags_qs is None:
+            tags_qs = VariantTag.objects.all()
+        if tag_ids:
+            tags_qs = tags_qs.filter(tag__in=tag_ids)
+        return Q(variantallele__allele__varianttag__in=tags_qs)
