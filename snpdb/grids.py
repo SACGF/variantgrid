@@ -1,10 +1,12 @@
+import operator
+import time
+from functools import reduce
+
 from django.conf import settings
 from django.db.models import F
 from django.db.models.aggregates import Count
 from django.db.models.query_utils import Q
-from functools import reduce
 from guardian.shortcuts import get_objects_for_user
-import operator
 
 from library.database_utils import get_queryset_column_names, \
     get_queryset_select_from_where_parts
@@ -313,6 +315,10 @@ class CustomColumnsCollectionListGrid(JqGridUserRowConfig):
 class AbstractVariantGrid(JqGridSQL):
     model = Variant
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._count = None
+
     def column_in_queryset_fields(self, field):
         colmodel = self.get_override(field)
         return colmodel.get("queryset_field", True)
@@ -350,4 +356,6 @@ class AbstractVariantGrid(JqGridSQL):
         return sql, params, column_names, True
 
     def get_count(self):
-        return self.queryset.count()
+        if self._count is None:
+            self._count = self.queryset.count()
+        return self._count
