@@ -341,7 +341,7 @@ class AbstractVariantGrid(JqGridSQL):
         return field_names
 
     def get_sql_params_and_columns(self, request):
-        queryset = self.filter_items(request, self.queryset)
+        queryset = self.get_filtered_queryset(request)
 
         sidx = request.GET.get('sidx', 'id')
         if self.column_in_queryset_fields(sidx):
@@ -364,7 +364,8 @@ class AbstractVariantGrid(JqGridSQL):
         params = []
         return sql, params, column_names, True
 
-    def get_count(self):
+    def get_count(self, request):
         if self._count is None:
-            self._count = self.queryset.count()
+            queryset = self.get_filtered_queryset(request)
+            self._count = queryset.count()
         return self._count

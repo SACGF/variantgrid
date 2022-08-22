@@ -86,7 +86,7 @@ class AllVariantsGrid(AbstractVariantGrid):
                 min_count = 0
             filter_kwargs[count_column + "__gte"] = min_count
         else:
-            filter_kwargs[count_column + "__gt"] = 0  # By default only show those that have samples
+            filter_kwargs[count_column + "__gt"] = 0  # By default, only show those that have samples
 
         q_contigs = Variant.get_contigs_q(genome_build)
         queryset = queryset.filter(q_contigs, **filter_kwargs)

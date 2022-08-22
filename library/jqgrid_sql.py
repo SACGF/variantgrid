@@ -34,11 +34,14 @@ class JqGridSQL(JqGridUserRowConfig):
     paginate = True
 
     @abc.abstractmethod
-    def get_count(self):
+    def get_count(self, request):
         raise NotImplementedError()
 
-    def is_empty(self):
-        return self.get_count() == 0
+    def is_empty(self, request):
+        return self.get_count(request) == 0
+
+    def get_filtered_queryset(self, request):
+        return self.filter_items(request, self.queryset)
 
     @abc.abstractmethod
     def get_sql_params_and_columns(self, request):
@@ -52,12 +55,12 @@ class JqGridSQL(JqGridUserRowConfig):
         paginator = Paginator(items, paginate_by,
                               allow_empty_first_page=self.allow_empty)
 
-        paginator.count = self.get_count()
+        paginator.count = self.get_count(request)
         page = request.GET.get('page', 1)
         return int(page), paginator
 
     def get_items(self, request):
-        if self.is_empty():
+        if self.is_empty(request):
             paginator = Struct(num_pages=0, count=0)
             count = Struct(number=0)
             return paginator, count, []
