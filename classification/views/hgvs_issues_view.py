@@ -392,7 +392,7 @@ def download_liftover_report(request: HttpRequest) -> StreamingHttpResponse:
         ]
         if record != last_record and genome_build and imported_c_hgvs:
             url = get_url_from_view_path(
-                reverse('view_classification', kwargs={'record_id': classification_id}),
+                reverse('view_classification', kwargs={'classification_id': classification_id}),
             )
             return ClassificationResolution(
                 _imported_genome_build=genome_build,
