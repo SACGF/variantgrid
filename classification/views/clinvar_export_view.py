@@ -267,17 +267,23 @@ class ClinVarExportSummary(ExportRow):
     def id(self):
         return self.clinvar_export.id
 
-    @export_column("URLs")
-    def url(self):
-        parts = list()
-        parts.append(("ClinVar Export", get_url_from_view_path(self.clinvar_export.get_absolute_url())))
+    @export_column("ClinVar Export URL")
+    def clinvar_export_url(self):
+        return get_url_from_view_path(self.clinvar_export.get_absolute_url())
+
+    @export_column("Allele URL")
+    def allele_url(self):
         if modification := self.classification:
             classification = modification.classification
             if allele_id := classification.allele_id:
-                parts.append(("Allele", get_url_from_view_path(reverse('view_allele', kwargs={"allele_id": allele_id}))))
-            parts.append(("Classification", get_url_from_view_path(reverse('view_classification', kwargs={"classification_id": classification.pk}))))
+                return get_url_from_view_path(reverse('view_allele', kwargs={"allele_id": allele_id}))
 
-        return "\n".join(f"{p[0]} : {p[1]}" for p in parts)
+    @export_column("Classification URL")
+    def classification_url(self):
+        if modification := self.classification:
+            classification = modification.classification
+            # TODO better to get the version that the export was made on
+            return get_url_from_view_path(reverse('view_classification', kwargs={"classification_id": classification}))
 
     @export_column("Record ID")
     def record_id(self):
@@ -356,15 +362,15 @@ class ClinVarExportSummary(ExportRow):
         if submission := self.latest_submission:
             return submission.submission_batch_id
 
-    @export_column("All Batch IDs")
-    def batch_ids_all(self):
-        if batch_ids := self.batch_ids:
-            return ",".join(str(batch_id) for batch_id in sorted(batch_ids))
-
     @export_column("Latest Batch Status")
     def batch_status(self):
         if submission := self.latest_submission:
             submission.submission_batch.get_status_display()
+
+    @export_column("All Batch IDs")
+    def batch_ids_all(self):
+        if batch_ids := self.batch_ids:
+            return ",".join(str(batch_id) for batch_id in sorted(batch_ids))
 
     @export_column("Messages")
     def messages(self):
