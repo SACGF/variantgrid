@@ -281,9 +281,8 @@ class ClinVarExportSummary(ExportRow):
     @export_column("Classification URL")
     def classification_url(self):
         if modification := self.classification:
-            classification = modification.classification
             # TODO better to get the version that the export was made on
-            return get_url_from_view_path(reverse('view_classification', kwargs={"classification_id": classification}))
+            return get_url_from_view_path(reverse('view_classification', kwargs={"classification_id": modification.classification_id}))
 
     @export_column("Record ID")
     def record_id(self):
