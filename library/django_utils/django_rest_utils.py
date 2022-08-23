@@ -30,7 +30,7 @@ class DynamicFieldsModelSerializer(serializers.ModelSerializer):
         fields = kwargs.pop('fields', None)
         exclude = kwargs.pop('exclude', None)
 
-        super(DynamicFieldsModelSerializer, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
         if fields or exclude:
             existing = set(self.fields)

@@ -137,7 +137,7 @@ class GlobalSettings(SettingsOverride):
     def save(self, *args, **kwargs):
         if not self.pk and GlobalSettings.objects.exists():
             raise ValidationError('There is can be only one GlobalSettings instance')
-        return super(GlobalSettings, self).save(*args, **kwargs)
+        return super().save(*args, **kwargs)
 
     def __str__(self):
         return "Global"

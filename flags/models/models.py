@@ -238,7 +238,7 @@ class FlagCollection(models.Model, GuardianPermissionsMixin):
         )
 
     def __init__(self, *args, **kwargs):
-        super(FlagCollection, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self._extra_info = None
         self._source_object = None
 

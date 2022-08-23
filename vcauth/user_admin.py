@@ -6,7 +6,7 @@ from classification.views.classification_email_view import send_summary_email_to
 
 class CustomUserAdmin(UserAdmin):
     def __init__(self, *args, **kwargs):
-        super(UserAdmin,self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def email_discordance(self, request, queryset):
         count = 0

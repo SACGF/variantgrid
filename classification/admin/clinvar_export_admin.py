@@ -93,7 +93,7 @@ class ClinVarExportAdmin(ModelAdminBasics):
         return False
 
     def get_form(self, request, obj=None, **kwargs):
-        return super(ClinVarExportAdmin, self).get_form(request, obj, widgets={
+        return super().get_form(request, obj, widgets={
             'scv': admin.widgets.AdminTextInputWidget()
         }, **kwargs)
 

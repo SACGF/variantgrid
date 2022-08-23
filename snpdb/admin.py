@@ -161,7 +161,7 @@ class ClinVarKeyAdmin(ModelAdminBasics):
 
     def get_form(self, request, obj=None, **kwargs):
 
-        return super(ClinVarKeyAdmin, self).get_form(request, obj, widgets={
+        return super().get_form(request, obj, widgets={
             'id': admin.widgets.AdminTextInputWidget(),
             'api_key': admin.widgets.AdminTextInputWidget(),
             'org_id': admin.widgets.AdminTextInputWidget(),
@@ -203,7 +203,7 @@ class LabAdmin(ModelAdminBasics):
 
     def get_form(self, request, obj=None, **kwargs):
 
-        return super(LabAdmin, self).get_form(request, obj, widgets={
+        return super().get_form(request, obj, widgets={
             'name': admin.widgets.AdminTextInputWidget(),
             'group_name': admin.widgets.AdminTextInputWidget(),
             'city': admin.widgets.AdminTextInputWidget(),
@@ -268,7 +268,7 @@ class OrganizationAdmin(ModelAdminBasics):
     actions = [fix_group_name]
 
     def get_form(self, request, obj=None, **kwargs):
-        return super(OrganizationAdmin, self).get_form(request, obj, widgets={
+        return super().get_form(request, obj, widgets={
             'name': admin.widgets.AdminTextInputWidget(),
             'short_name': admin.widgets.AdminTextInputWidget(),
             'group_name': admin.widgets.AdminTextInputWidget()

@@ -79,7 +79,7 @@ class EvidenceKey(TimeStampedModel):
     """
 
     def __init__(self, *args, **kwargs):
-        super(EvidenceKey, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.is_dummy = False
         self.default_value = None  # only set by org/lab overrides
         self.exclude_namespace = False  # if the key was in a namespace not used by the lab

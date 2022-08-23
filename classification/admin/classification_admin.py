@@ -326,7 +326,7 @@ class ClassificationAdmin(ModelAdminBasics):
     """
 
     def get_form(self, request, obj=None, **kwargs):
-        return super(ClassificationAdmin, self).get_form(request, obj, widgets={
+        return super().get_form(request, obj, widgets={
             'lab_record_id': admin.widgets.AdminTextInputWidget(),
             'chgvs_grch37': admin.widgets.AdminTextInputWidget(),
             'chgvs_grch37_full': admin.widgets.AdminTextInputWidget(),

@@ -630,7 +630,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         return FlagPermissionLevel.NO_PERM
 
     def __init__(self, *args, **kwargs):
-        super(Classification, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.requires_auto_population = False
 
     # Here to make this interchangeable with a ClassificationRef
@@ -2460,7 +2460,7 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
                        kwargs={'record_id': str(self.classification.id) + '.' + str(self.created.timestamp())})
 
     def __init__(self, *args, **kwargs):
-        super(ClassificationModification, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.cached_evidence = None
 
     @classmethod
