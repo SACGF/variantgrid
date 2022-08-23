@@ -200,7 +200,7 @@ class VariantGrid(JqGridSQL):
         column_names = get_queryset_column_names(values_queryset, new_columns)
         return sql, column_names
 
-    def get_count(self):
+    def get_count(self, request):  # pylint: disable=unused-argument
         """ Used by paginator, set from stored value so that we don't
             have to make another SQL query """
         if self.node_count:
