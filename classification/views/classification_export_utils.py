@@ -691,7 +691,7 @@ class ExportFormatter(BaseExportFormatter):
             .add_header(":arrow_down: Classification Download Completed")\
             .add_markdown("\n".join(body_parts), indented=True)
         if request := get_current_request():
-            for key, value in params:
+            for key, value in params.items():
                 if key != 'url':
                     nb.add_field(key, value)
         nb.add_field("Duration", str((end - self.started).seconds) + " seconds")
