@@ -114,8 +114,9 @@ class ModelAdminBasics(admin.ModelAdmin):
     * Provides support for annotating methods @admin_method
     * Comes with export_as_csv for selected rows
     * Sets a nice default editor for JSONFields
-    * Marks foreign keys as readonly (override is_readonly_field and set value for
-    * autocomplete_fields or raw_id_fields if you need editable foreign fields)
+    * Marks foreign keys as readonly - to prevent generating a million record select
+        (override is_readonly_field and set value for autocomplete_fields or raw_id_fields
+        if you need editable foreign fields)
     """
 
     formfield_overrides = {
@@ -168,6 +169,8 @@ class ModelAdminBasics(admin.ModelAdmin):
         if not f.editable:
             return True  # does this make all the below redundant?
         if isinstance(f, (AutoField, ForeignKey)):
+            if f.name in self.autocomplete_fields:
+                return False
             return True
         if isinstance(f, DateTimeField):
             if f.auto_now or f.auto_now_add:

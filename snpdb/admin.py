@@ -1,6 +1,7 @@
 import re
 from typing import List
 
+from dal_select2.widgets import ModelSelect2
 from django.contrib import admin, messages
 from django.contrib.admin.widgets import AdminTextInputWidget
 from django.db.models import QuerySet
@@ -185,6 +186,7 @@ class LabAdmin(ModelAdminBasics):
     list_per_page = 200
     list_display = ('name', 'group_name', 'organization', 'state', 'country',
                     'external', 'clinvar_key', 'upload_location', 'classification_config')
+    search_fields = ('organization__name', 'name')
 
     fieldsets = (
         ('Basic', {'fields': ('name', 'group_name', 'organization')}),
@@ -274,6 +276,13 @@ class OrganizationAdmin(ModelAdminBasics):
         }, **kwargs)
 
 
+@admin.register(models.LabHead)
+class LabHeadAdmin(ModelAdminBasics):
+    autocomplete_fields = (
+        "lab",
+        "user",
+    )
+
 admin.site.register(models.CachedGeneratedFile, ModelAdminBasics)
 admin.site.register(models.Cohort, ModelAdminBasics)
 admin.site.register(models.CohortGenotypeCollection, ModelAdminBasics)
@@ -284,7 +293,6 @@ admin.site.register(models.CustomColumnsCollection, ModelAdminBasics)
 admin.site.register(models.GenomeBuild, ModelAdminBasics)
 admin.site.register(models.GenomicIntervalsCollection, ModelAdminBasics)
 admin.site.register(models.GlobalSettings, ModelAdminBasics)
-admin.site.register(models.LabHead)
 admin.site.register(models.LabProject)
 admin.site.register(models.Manufacturer)
 admin.site.register(models.Project, ModelAdminBasics)
