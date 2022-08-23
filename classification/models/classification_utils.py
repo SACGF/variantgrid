@@ -235,6 +235,7 @@ class VariantCoordinateFromEvidence:
         """
         from classification.models import classification_flag_types
         self.variant_coordinate = None
+        self.transcript_accession = None
         self.messages = []
         self.matching_flag = classification.flag_collection_safe.get_flag_of_type(
             flag_type=classification_flag_types.matching_variant_flag, open_only=True)
@@ -245,16 +246,21 @@ class VariantCoordinateFromEvidence:
             self.genome_build_str = 'No genome build'
 
     def record(self, value: str, variant_coordinate: Optional[VariantCoordinate] = None,
+               transcript_accession: Optional[str] = None,
                message: Optional[str] = None, error: Optional[str] = None) -> None:
         """
         Record what value we're using (or attempted to use) to get the variant coordinates
         :param value: The source value we tried to extract VariantCoordinate from e.g. a c.hgvs, g.hgvs or variant coordinate string
         :param variant_coordinate: The variant coordinate we processed from the value (or None if we couldn't)
+        :param transcript_accession: Transcript used to resolve HGVS
         :param message: If present, add message
         :param error: If present, indicates the reason why we couldn't extract a variant_coordinate from the value
         """
         if variant_coordinate:
             self.variant_coordinate = variant_coordinate
+
+        if transcript_accession:
+            self.transcript_accession = transcript_accession
 
         if error:
             self.messages.append(f'Attempted to match {self.genome_build_str} {value}, error = {error}')
