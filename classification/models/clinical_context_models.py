@@ -67,13 +67,7 @@ class DiscordanceLevel(str, Enum):
 
     @property
     def css_class(self) -> str:
-        if self in (DiscordanceLevel.CONCORDANT_AGREEMENT, DiscordanceLevel.CONCORDANT_DIFF_VUS):
-            return "overlap-agreement"
-        if self == DiscordanceLevel.CONCORDANT_CONFIDENCE:
-            return "overlap-confidence"
-        if self == DiscordanceLevel.DISCORDANT:
-            return "overlap-discordant"
-        return "overlap-single"
+        return f"overlap-{self.value}"
 
 
 @dataclass(frozen=True)
@@ -97,12 +91,22 @@ class DiscordanceStatus:
     lab_count_all: int
     counted_classifications: int
     pending_concordance: bool = False
+    discordance_report: Optional['DiscordanceReport'] = None
 
     def __str__(self):
         if self.pending_concordance:
             return "Pending Concordance"
+        elif self.discordance_report and self.discordance_report.resolution == 'D':
+            return "Continued Discordance"
         else:
             return self.level.label
+
+    @property
+    def css_class(self):
+        if self.pending_concordance:
+            return 'overlap-pending_concordance'
+        else:
+            return self.level.css_class
 
     @property
     def is_discordant(self):
@@ -114,7 +118,7 @@ class DiscordanceStatus:
         return EvidenceKeyMap.clinical_significance_to_bucket()
 
     @staticmethod
-    def calculate(modifications: Iterable[ClassificationModification]) -> 'DiscordanceStatus':
+    def calculate(modifications: Iterable[ClassificationModification], discordance_report: Optional['DiscordanceReport'] = None) -> 'DiscordanceStatus':
         base_status = DiscordanceStatus._calculate_rows([
             _DiscordanceCalculationRow(
                 lab=vcm.classification.lab,
@@ -150,6 +154,7 @@ class DiscordanceStatus:
             if not override_status.is_discordant:
                 base_status.pending_concordance = True
 
+        base_status.discordance_report = discordance_report
         return base_status
 
     @staticmethod
@@ -247,13 +252,13 @@ class ClinicalContext(FlagsMixin, TimeStampedModel):
         return self.discordance_status.pending_concordance
 
     def calculate_discordance_status(self) -> DiscordanceStatus:
-        return DiscordanceStatus.calculate(self.classification_modifications)
+        return DiscordanceStatus.calculate(self.classification_modifications, self.latest_report)
 
     @lazy
     def discordance_status(self) -> DiscordanceStatus:
         # TODO this is awkwardly named as it calculates (at least the first time)
         # Need to distinguish between this and database cached is_discordant
-        return DiscordanceStatus.calculate(self.classification_modifications)
+        return DiscordanceStatus.calculate(self.classification_modifications, self.latest_report)
 
     @lazy
     def relevant_classification_count(self) -> int:

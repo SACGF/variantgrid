@@ -61,7 +61,7 @@
                                 {% endif %}
                                 <td {% if not forloop.first %}style="border-top-style:dashed"{% endif %}>
                                     {% if grouping.shared %}
-                                        <b class="overlap-{{ grouping.status.level.value }}">{{ grouping.status }}</b>
+                                        <span class="{{ grouping.status.css_class }}">{{ grouping.status }}</span>
                                         <div>{{ grouping.status.lab_count }} Sharing Lab{% plural grouping.status.lab_count %}</div>
                                     {% else %}
                                         <b class="overlap-no_entries">Not-shared Submissions</b>

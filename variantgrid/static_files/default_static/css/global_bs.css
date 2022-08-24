@@ -965,18 +965,27 @@ ul.compact li:before {
 
 .overlap-discordant {
   color: #b44;
+  font-weight: 600;
 }
 
 .overlap-concordant_confidence {
   color: #ccc39d;
+  font-weight: 600;
 }
 
 .overlap-concordant_agreement, .overlap-concordant_agreement_diff_vus {
   color: #88dd88;
+  font-weight: 600;
 }
 
 .overlap-single_submission, .overlap-no_entries {
   color: #ccc;
+  font-weight: 600;
+}
+
+.overlap-pending_concordance {
+  color: #28a745;
+  font-weight: 600;
 }
 
 .fa-spinner {

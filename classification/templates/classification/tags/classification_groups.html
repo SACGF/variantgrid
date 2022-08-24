@@ -6,14 +6,16 @@
     {% with discordance_status=ccg.calculate_discordance_status %}
         <label class="mr-2">Overlap Status {% if not ccg.is_default %}{{ ccg.name }}{% endif %}:</label>
         {% if ccg.pending_status %}<span class="mr-2">(Pending){% endif %}
-        <b class="mr-2 overlap-{{ discordance_status.level.value }}">
+        <span class="mr-2 {{ discordance_status.css_class }}">
             {% comment %}Status: {% endcomment %}
             {% if discordance_status.pending_concordance %}Pending Concordance
             {% else %}
                 {{ discordance_status }}
             {% endif %}
-            {% if discordance_status.lab_count == 1 %} <span class="no-value mr-2">Single Lab</span>{% endif %}
-        </b>
+        </span>
+        {% if discordance_status.level != 'single_submission' %}
+            {% if discordance_status.lab_count == 1 %} <span class="text-muted mr-2">(Single Lab)</span>{% endif %}
+        {% endif %}
         {% if ccg.latest_report and ccg.latest_report.resolution != 'C' %}
             <a href="{% url 'discordance_report' ccg.latest_report.id %}" class="hover-link">Click for Discordance Report</a>
         {% endif %}
