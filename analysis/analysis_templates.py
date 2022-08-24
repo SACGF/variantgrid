@@ -31,6 +31,7 @@ def populate_analysis_from_template_run(template_run):
             # Set the fields (want to do all at once before save)
             for field, value in node_field_values[node.pk].items():
                 setattr(node, field, value)
+                node.update_children = False  # We'll get to them all anyway
                 node.queryset_dirty = True
 
             try:
