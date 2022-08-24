@@ -355,7 +355,7 @@ def view_variant_annotation_history(request, variant_id):
 
 def variant_tags(request, genome_build_name=None):
     genome_build = UserSettings.get_genome_build_or_default(request.user, genome_build_name)
-    variant_tags_qs = VariantTag.objects.filter(analysis__genome_build=genome_build)
+    variant_tags_qs = VariantTag.get_for_build(genome_build)
     tag_counts = sorted(get_field_counts(variant_tags_qs, "tag").items())
     context = {"genome_build": genome_build,
                "tag_counts": tag_counts}
