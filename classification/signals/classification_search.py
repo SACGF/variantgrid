@@ -1,6 +1,6 @@
 import operator
 from functools import reduce
-from typing import Any, Union
+from typing import Any, Union, Optional, List
 
 from django.db.models import Q
 from django.dispatch import receiver
@@ -8,7 +8,7 @@ from django.utils.safestring import SafeString
 
 from classification.enums import SpecialEKeys
 from classification.models import Classification, ClassificationModification, EvidenceKeyMap
-from snpdb.models import Lab
+from snpdb.models import Lab, Organization
 from snpdb.search2 import SearchResponseRecordAbstract, search_signal, SearchInput, SearchResponse
 
 
@@ -37,13 +37,28 @@ def search_classifications(sender: Any, search_input: SearchInput, **kwargs) -> 
     filters = [Q(classification__lab_record_id=search_string)]  # exact match
     slash_index = search_string.find("/")
     if slash_index > 0:
-        lab_name = search_string[:slash_index].strip()
-        lab_record_id = search_string[slash_index + 1:].strip()
-        # TODO handle org in square brackets
-        if lab_name and lab_record_id:
-            q_lab_name = Q(classification__lab__name=lab_name)
-            q_lab_record = Q(classification__lab_record_id=lab_record_id)
-            filters.append(q_lab_name & q_lab_record)
+        parts = [p.strip() for p in search_string.split("/")]
+        org_name: Optional[str] = None
+        lab_name: Optional[str] = None
+        lab_record_id: str = parts[-1]
+
+        if len(parts) >= 2:
+            lab_name = parts[-2]
+        if len(parts) >= 3:
+            org_name = parts[-3]
+
+        if lab_name:
+            org: Optional[Organization] = None
+            if org_name:
+                org = Organization.objects.filter(Q(name=org_name) | Q(short_name=org_name) | Q(group_name=org_name)).first()
+
+            lab_qs = Lab.objects.filter(Q(name=lab_name) | Q(group_name__endswith="/" + lab_name))
+            if org:
+                lab_qs = lab_qs.filter(organization=org)
+
+            if lab_qs:
+                filters.append(Q(classification__lab_record_id=lab_record_id) & Q(classification__lab__in=lab_qs))
+
     q_vcm = reduce(operator.or_, filters)
     vcm_qs = ClassificationModification.filter_for_user(search_input.user).filter(is_last_published=True)
     vcm_ids = vcm_qs.filter(q_vcm).values('classification')
