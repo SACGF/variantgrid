@@ -231,9 +231,8 @@ class GeneSymbolViewInfo:
             annotation_version = AnnotationVersion.latest(self.genome_build)
             gene_variant_qs = get_variant_queryset_for_gene_symbol(self.gene_symbol, annotation_version,
                                                                    traverse_aliases=True)
-            gene_variant_qs, count_column = VariantZygosityCountCollection.annotate_global_germline_counts(
-                gene_variant_qs)
-            has_observed_variants = gene_variant_qs.filter(**{f"{count_column}__gt": 0}).exists()
+            gene_variant_qs, vzcc = VariantZygosityCountCollection.annotate_global_germline_counts(gene_variant_qs)
+            has_observed_variants = gene_variant_qs.filter(**{f"{vzcc.germline_counts_alias}__gt": 0}).exists()
 
             has_tagged_variants = VariantTag.get_for_build(self.genome_build, variant_qs=gene_variant_qs).exists()
 
@@ -768,13 +767,13 @@ class HotspotGraphView(TemplateView):
     def _get_values(self, transcript_version) -> Tuple[int, str, str, str, int]:
         """ :returns hgvs_p, pp, consequence, count, gnomad_af """
         qs = self._get_variant_queryset(transcript_version)
-        qs, count_column = VariantZygosityCountCollection.annotate_global_germline_counts(qs)
-        qs = qs.filter(**{count_column + "__gt": 0})
+        qs, vzcc = VariantZygosityCountCollection.annotate_global_germline_counts(qs)
+        qs = qs.filter(**{f"{vzcc.germline_counts_alias}__gt": 0})
         return qs.values_list("varianttranscriptannotation__hgvs_p",
                               "varianttranscriptannotation__protein_position",
                               "varianttranscriptannotation__consequence",
                               "variantannotation__gnomad_af",
-                              count_column)
+                              vzcc.germline_counts_alias)
 
     @lazy
     def genome_build(self):

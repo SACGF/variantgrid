@@ -1,6 +1,8 @@
+import operator
+from functools import reduce
 from typing import Dict, Any
 
-from django.db.models import TextField, Value, QuerySet
+from django.db.models import TextField, Value, QuerySet, Q
 from django.http import HttpRequest
 from django.shortcuts import get_object_or_404
 
@@ -76,22 +78,25 @@ class AllVariantsGrid(AbstractVariantGrid):
 
         extra_filters = kwargs.pop("extra_filters", {})
         queryset = get_variant_queryset_for_annotation_version(annotation_version)
-        queryset, count_column = VariantZygosityCountCollection.annotate_global_germline_counts(queryset)
+        queryset, vzcc = VariantZygosityCountCollection.annotate_global_germline_counts(queryset)
 
-        filter_kwargs = {}
+        filter_list = [
+            Variant.get_contigs_q(genome_build),
+        ]
         if extra_filters:
-            try:
-                min_count = int(extra_filters.get("min_count"))
-            except TypeError:
-                min_count = 0
-            filter_kwargs[count_column + "__gte"] = min_count
+            if min_count := int(extra_filters.get("min_count", 0)):
+                filter_list.append(Q(**{f"{vzcc.germline_counts_alias}__gte": min_count}))
         else:
-            filter_kwargs[count_column + "__gt"] = 0  # By default, only show those that have samples
+            # benchmarking - I found it much faster to do both of these queries (seems redundant)
+            hom_nonzero = Q(**{f"{vzcc.hom_alias}__gt": 0})
+            het_nonzero = Q(**{f"{vzcc.het_alias}__gt": 0})
+            filter_list.append(hom_nonzero | het_nonzero)
+            filter_list.append(Q(**{f"{vzcc.germline_counts_alias}__gt": 0}))
 
-        q_contigs = Variant.get_contigs_q(genome_build)
-        queryset = queryset.filter(q_contigs, **filter_kwargs)
+        q = reduce(operator.and_, filter_list)
+        queryset = queryset.filter(q)
         self.queryset = queryset.values(*self.get_queryset_field_names())
-        self.extra_config.update({'sortname': count_column,
+        self.extra_config.update({'sortname': vzcc.germline_counts_alias,
                                   'sortorder': "desc",
                                   'shrinkToFit': False})
 

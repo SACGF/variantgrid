@@ -57,7 +57,7 @@ class VariantZygosityCountCollection(RelatedModelsPartitionModel):
                 self.all_zygosity_counts_alias: F(self.ref_alias) + F(self.het_alias) + F(self.hom_alias)}
 
     @staticmethod
-    def annotate_global_germline_counts(qs: QuerySet) -> Tuple[QuerySet, str]:
+    def annotate_global_germline_counts(qs: QuerySet) -> Tuple[QuerySet, 'VariantZygosityCountCollection']:
         try:
             vzcc = VariantZygosityCountCollection.objects.get(name=settings.VARIANT_ZYGOSITY_GLOBAL_COLLECTION)
         except VariantZygosityCountCollection.DoesNotExist:
@@ -65,12 +65,12 @@ class VariantZygosityCountCollection(RelatedModelsPartitionModel):
                           settings.VARIANT_ZYGOSITY_GLOBAL_COLLECTION)
             raise
 
-        return vzcc.annotate_all_germline_counts(qs)
+        return vzcc.annotate_all_germline_counts(qs), vzcc
 
-    def annotate_all_germline_counts(self, qs: QuerySet) -> Tuple[QuerySet, str]:
+    def annotate_all_germline_counts(self, qs: QuerySet) -> QuerySet:
         """ returns annotated_qs, column_name """
         kwargs = self.get_annotation_kwargs()
-        return qs.annotate(**kwargs), self.germline_counts_alias
+        return qs.annotate(**kwargs)
 
     def __str__(self) -> str:
         return self.name

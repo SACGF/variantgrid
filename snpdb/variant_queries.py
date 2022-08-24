@@ -46,8 +46,8 @@ def get_has_variant_tags(genome_build) -> Q:
 
 
 def variant_qs_filter_has_internal_data(variant_qs: QuerySet, genome_build: GenomeBuild) -> QuerySet:
-    qs, count_column = VariantZygosityCountCollection.annotate_global_germline_counts(variant_qs)
-    interesting = [Q(**{f"{count_column}__gt": 0}),
+    qs, vzcc = VariantZygosityCountCollection.annotate_global_germline_counts(variant_qs)
+    interesting = [Q(**{f"{vzcc.germline_counts_alias}__gt": 0}),
                    get_has_classifications_q(genome_build),
                    get_has_variant_tags(genome_build)]
     q = reduce(operator.or_, interesting)
