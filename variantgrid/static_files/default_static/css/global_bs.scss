@@ -1006,20 +1006,20 @@ ul.compact {
     font-weight: 600;
 }
 .overlap-concordant_confidence {
-    color: #ccc39d;
-  font-weight: 600;
+    color: #FFA500;
+    font-weight: 600;
 }
 .overlap-concordant_agreement, .overlap-concordant_agreement_diff_vus {
-    color: #88dd88;
-  font-weight: 600;
+    color: #66aa66;
+    font-weight: 600;
 }
 .overlap-single_submission, .overlap-no_entries {
-    color: #ccc;
-  font-weight: 600;
+    color: #aaa;
+    font-weight: 600;
 }
 .overlap-pending_concordance {
-    color: #28a745;
-  font-weight: 600;
+    color: #287745;
+    font-weight: 600;
 }
 
 .fa-spinner {
@@ -1072,3 +1072,9 @@ table .fa-hand-point-right {
 // put drop down infront of loading
 .chosen-drop{z-index:100001 !important;}
 .chosen-search{z-index:1010 !important;}
+
+a .c-hgvs-body {
+  .c-hgvs-transcript, .c-hgvs-nomen {
+    color: #4444bb;
+  }
+}

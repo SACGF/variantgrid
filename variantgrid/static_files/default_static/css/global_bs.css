@@ -969,22 +969,22 @@ ul.compact li:before {
 }
 
 .overlap-concordant_confidence {
-  color: #ccc39d;
+  color: #FFA500;
   font-weight: 600;
 }
 
 .overlap-concordant_agreement, .overlap-concordant_agreement_diff_vus {
-  color: #88dd88;
+  color: #66aa66;
   font-weight: 600;
 }
 
 .overlap-single_submission, .overlap-no_entries {
-  color: #ccc;
+  color: #aaa;
   font-weight: 600;
 }
 
 .overlap-pending_concordance {
-  color: #28a745;
+  color: #287745;
   font-weight: 600;
 }
 
@@ -1046,6 +1046,10 @@ table .fa-hand-point-right {
 
 .chosen-search {
   z-index: 1010 !important;
+}
+
+a .c-hgvs-body .c-hgvs-transcript, a .c-hgvs-body .c-hgvs-nomen {
+  color: #4444bb;
 }
 
 /*# sourceMappingURL=global_bs.css.map */
