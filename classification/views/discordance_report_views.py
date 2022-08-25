@@ -202,9 +202,9 @@ class DiscordanceReportTemplateData:
 
         lab_clin_sigs: List[_LabClinSig] = list()
         for key, pendings in clin_sig_keys_to_pending.items():
-            if len(pendings) > 0:
+            if len(pendings) > 1:
                 # can't handle pending in multiple directions, just leave it as it was
-                lab_clin_sigs.append(_LabClinSig(lab_clin_sig_key=key, pending_clin_sig=lab_clin_sig_key.clin_sig))
+                lab_clin_sigs.append(_LabClinSig(lab_clin_sig_key=key, pending_clin_sig=key.clin_sig))
             else:
                 lab_clin_sigs.append(_LabClinSig(lab_clin_sig_key=key, pending_clin_sig=list(pendings)[0]))
 
