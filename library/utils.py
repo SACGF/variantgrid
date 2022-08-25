@@ -19,6 +19,7 @@ from datetime import date, datetime, timedelta
 from decimal import Decimal
 from enum import Enum
 from functools import reduce
+from html import escape
 from itertools import islice
 from json.encoder import JSONEncoder
 from typing import TypeVar, Optional, Iterator, Tuple, Any, List, Iterable, Set, Dict, Union, Callable, Type, Generic, \
@@ -1074,7 +1075,7 @@ class DiffTextSegment:
 
     @property
     def effective_text(self):
-        return SafeString(self.text.replace("\n", "<span style='font-size:x-small;opacity:0.5'>&#8726;n</span><br/>"))
+        return SafeString(escape(self.text).replace("\n", "<span style='font-size:x-small;opacity:0.5'>&#8726;n</span><br/>"))
 
     @property
     def operation_name(self):
