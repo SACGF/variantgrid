@@ -1,6 +1,6 @@
 {% comment %}All styles are embedded because this is also used in emails{% endcomment %}
 {% if not c_hgvs.full_c_hgvs %}<span class="no-value">-</span>{% else %}
-<span class="font-family: monospace;">
+<span style="font-family: monospace;">
     {% if c_hgvs.is_desired_build == False or c_hgvs.is_normalised == False %}
 {% comment %}Specfically check for False rather than not as these properties default to None and are rarely populated{% endcomment %}
         <div class="text-info">
