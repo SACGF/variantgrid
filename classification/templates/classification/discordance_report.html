@@ -200,13 +200,13 @@
                                             <td>
                                                 <select class="form-control clin-sig-change" name="{{ lab_clin_sig.lab.pk }}-{{ lab_clin_sig.clin_sig }}">
                                                     {% for clin_sig in data.all_clin_sig_options %}
-                                                        {% if clin_sig.key == lab_clin_sig.clin_sig %}
+                                                        {% if clin_sig.key == lab_clin_sig.pending_clin_sig %}
                                                             <option value="{{ clin_sig.key }}" selected="selected">
-                                                                {{ clin_sig.label }} : NO CHANGE
+                                                                {{ clin_sig.label }}{% if clin_sig.key == lab_clin_sig.clin_sig %} : NO CHANGE{% endif %}
                                                             </option>
                                                         {% else %}
                                                             <option value="{{ clin_sig.key }}">
-                                                                {{ clin_sig.label }}
+                                                                {{ clin_sig.label }}{% if clin_sig.key == lab_clin_sig.clin_sig %} : NO CHANGE{% endif %}
                                                             </option>
                                                         {% endif %}
                                                     {% endfor %}

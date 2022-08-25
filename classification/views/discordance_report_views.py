@@ -1,6 +1,6 @@
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import List, Dict, Optional, Iterable, Tuple
+from typing import List, Dict, Optional, Iterable, Tuple, Set
 
 from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
@@ -15,7 +15,7 @@ from classification.enums import SpecialEKeys
 from classification.enums.discordance_enums import ContinuedDiscordanceReason, DiscordanceReportResolution
 from classification.models import ClassificationModification, DiscordanceReportClassification, ClinicalContext, \
     EvidenceKeyMap, classification_flag_types, discordance_change_signal, \
-    DiscordanceReportRowData
+    DiscordanceReportRowData, ClassificationFlagTypes
 from classification.models.discordance_models import DiscordanceReport
 from classification.models.evidence_key import EvidenceKeyOption
 from classification.views.classification_dashboard_view import ClassificationDashboard
@@ -46,10 +46,28 @@ class DiscordanceNoLongerConsiders:
     classifications: List[ClassificationModification]
 
 
-@dataclass
-class LabClinSig:
+@dataclass(frozen=True)
+class _LabClinSigKey:
     lab: Lab
     clin_sig: str
+
+
+@dataclass(frozen=True)
+class _LabClinSig:
+    lab_clin_sig_key: _LabClinSigKey
+    pending_clin_sig: Optional[str] = None
+
+    @property
+    def lab(self) -> Lab:
+        return self.lab_clin_sig_key.lab
+
+    @property
+    def clin_sig(self) -> str:
+        return self.lab_clin_sig_key.clin_sig
+
+    @property
+    def is_pending(self) -> bool:
+        return self.lab_clin_sig_key != self.pending_clin_sig
 
     def __lt__(self, other):
         if self.lab == other.lab:
@@ -170,17 +188,29 @@ class DiscordanceReportTemplateData:
         return f'{self.c_hgvses[0]}'
 
     @property
-    def lab_clin_sigs(self) -> List[LabClinSig]:
-        active_labs_to_clin_sig = defaultdict(set)
+    def lab_clin_sigs(self) -> List[_LabClinSig]:
+
+        clin_sig_keys_to_pending: Dict[_LabClinSigKey, Set[str]] = defaultdict(set)
         for cm in self.effective_classifications:
-            active_labs_to_clin_sig[cm.classification.lab].add(cm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE))
-        lab_clin_sigs: List[LabClinSig] = list()
-        for lab, clin_sigs in active_labs_to_clin_sig.items():
-            for clin_sig in clin_sigs:
-                lab_clin_sigs.append(LabClinSig(lab=lab, clin_sig=clin_sig))
+            lab = cm.classification.lab
+            clin_sig = cm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
+            pending_clin_sig = clin_sig
+            if pending_change := cm.classification.flag_collection.get_open_flag_of_type(classification_flag_types.classification_pending_changes):
+                pending_clin_sig = pending_change.data.get(ClassificationFlagTypes.CLASSIFICATION_PENDING_CHANGES_CLIN_SIG_KEY)
+            lab_clin_sig_key = _LabClinSigKey(lab=lab, clin_sig=clin_sig)
+            clin_sig_keys_to_pending[lab_clin_sig_key].add(pending_clin_sig)
+
+        lab_clin_sigs: List[_LabClinSig] = list()
+        for key, pendings in clin_sig_keys_to_pending.items():
+            if len(pendings) > 0:
+                # can't handle pending in multiple directions, just leave it as it was
+                lab_clin_sigs.append(_LabClinSig(lab_clin_sig_key=key, pending_clin_sig=lab_clin_sig_key.clin_sig))
+            else:
+                lab_clin_sigs.append(_LabClinSig(lab_clin_sig_key=key, pending_clin_sig=list(pendings)[0]))
+
         return lab_clin_sigs
 
-    def classifications_for_lab_clin_sig(self, lab_clin_sig: LabClinSig):
+    def classifications_for_lab_clin_sig(self, lab_clin_sig: _LabClinSig):
         return [cm for cm in self.effective_classifications if cm.classification.lab == lab_clin_sig.lab and cm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE) == lab_clin_sig.clin_sig]
 
     @property
