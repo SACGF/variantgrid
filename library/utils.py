@@ -1073,6 +1073,10 @@ class DiffTextSegment:
     text: str
 
     @property
+    def effective_text(self):
+        return SafeString(self.text.replace("\n", "<span style='font-size:x-small;opacity:0.5'>&#8726;n</span><br/>"))
+
+    @property
     def operation_name(self):
         if self.operation == ' ':
             return 'same'
@@ -1105,6 +1109,49 @@ class DiffBuilder:
         self.sub_text = ''
         self.add_text = ''
         self.same_text = ''
+
+    def optimize_add(self, subtract: str, add: str):
+        prefix_same: str = ''
+        suffix_same: str = ''
+        while subtract and add and subtract[0] == add[0]:
+            prefix_same += add[0]
+            subtract = subtract[1:]
+            add = add[1:]
+        while subtract and add and subtract[-1] == add[-1]:
+            suffix_same += subtract[-1]
+            subtract = subtract[:-1]
+            add = add[:-1]
+        items = list()
+        if prefix_same:
+            items.append(DiffTextSegment(operation=' ', text=prefix_same))
+        if subtract:
+            items.append(DiffTextSegment(operation='-', text=subtract))
+        if add:
+            items.append(DiffTextSegment(operation='+', text=add))
+        if suffix_same:
+            items.append(DiffTextSegment(operation=' ', text=suffix_same))
+        return items
+
+    def optimize(self):
+        self.apply()
+        optimized = list()
+        check_starts_with = None
+        for element in self.diff_segments:
+            if element.operation == '-':
+                if check_starts_with:
+                    optimized.append(check_starts_with)
+                check_starts_with = element
+            else:
+                if element.operation == '+' and check_starts_with:
+                    if items := self.optimize_add(check_starts_with.text, element.text):
+                        optimized.extend(items)
+                else:
+                    optimized.append(check_starts_with)
+                    optimized.append(element)
+                check_starts_with = None
+        if check_starts_with:
+            optimized.append(check_starts_with)
+        self.diff_segments = optimized
 
     def _has_pending_add_subtract(self):
         return bool(self.add_text) or bool(self.sub_text)
@@ -1155,6 +1202,5 @@ def diff_text(a: str, b: str) -> DiffBuilder:
     diff_builder = DiffBuilder()
     for diff_chars in difflib.Differ().compare(_tokenize(a), _tokenize(b)):
         diff_builder.append(diff_chars)
-    diff_builder.apply()
-    print(diff_builder.diff_segments)
+    diff_builder.optimize()
     return diff_builder
