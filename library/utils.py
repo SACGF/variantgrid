@@ -1093,6 +1093,7 @@ class DiffTextSegment:
 
 
 class DiffBuilder:
+    # TODO, rather than trying to do a bunch of smarts in append() maybe all the smarts are best saved for optimize
 
     def __init__(self):
         self.diff_segments: List[DiffTextSegment] = list()
@@ -1118,10 +1119,10 @@ class DiffBuilder:
             prefix_same += add[0]
             subtract = subtract[1:]
             add = add[1:]
-        while subtract and add and subtract[-1] == add[-1]:
-            suffix_same += subtract[-1]
-            subtract = subtract[:-1]
-            add = add[:-1]
+        # while subtract and add and subtract[-1] == add[-1]:
+        #     suffix_same += subtract[-1]
+        #     subtract = subtract[:-1]
+        #     add = add[:-1]
         items = list()
         if prefix_same:
             items.append(DiffTextSegment(operation=' ', text=prefix_same))
