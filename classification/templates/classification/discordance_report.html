@@ -202,7 +202,10 @@
                                                     {% for clin_sig in data.all_clin_sig_options %}
                                                         {% if clin_sig.key == lab_clin_sig.pending_clin_sig %}
                                                             <option value="{{ clin_sig.key }}" selected="selected">
-                                                                {{ clin_sig.label }}{% if clin_sig.key == lab_clin_sig.clin_sig %} : NO CHANGE{% endif %}
+                                                                {{ clin_sig.label }}
+                                                                    {% if clin_sig.key == lab_clin_sig.clin_sig %} : NO CHANGE
+                                                                    {% elif clin_sig.key == lab_clin_sig.pending_clin_sig %} : ALREADY PENDING
+                                                                    {% endif %}
                                                             </option>
                                                         {% else %}
                                                             <option value="{{ clin_sig.key }}">
