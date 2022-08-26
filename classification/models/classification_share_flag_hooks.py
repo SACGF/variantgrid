@@ -1,13 +1,17 @@
 from django.conf import settings
 from django.db.models.signals import post_save
 from django.dispatch.dispatcher import receiver
+from django.urls import reverse
 
 from classification.enums.classification_enums import ShareLevel, SpecialEKeys, ClinicalSignificance
+from classification.models import ClassificationFlagTypes
 from classification.models.classification import \
     Classification, classification_post_publish_signal, \
     classification_revalidate_signal
 from classification.models.evidence_key import EvidenceKey
 from classification.models.flag_types import classification_flag_types
+from library.django_utils import get_url_from_view_path
+from library.log_utils import NotificationBuilder
 from library.utils import DebugTimer
 
 
@@ -54,6 +58,20 @@ def published(sender, classification, previously_published, newly_published, use
                 flag_type=classification_flag_types.significance_change,
                 comment=f'Classification changed from {old_label} to {new_label}'
             )
+
+            if pending_change_flag := classification.flag_collection_safe.get_flag_of_type(classification_flag_types.classification_pending_changes):
+                if pending_change_value := pending_change_flag.data.get(ClassificationFlagTypes.CLASSIFICATION_PENDING_CHANGES_CLIN_SIG_KEY):
+
+                    class_url = get_url_from_view_path(
+                        reverse('view_classification', kwargs={'classification_id': classification.id}),
+                    )
+
+                    pending_change_label = e_key.pretty_value(pending_change_value)
+                    # is_agreed_change = new_classification != pending_change_value
+                    nb = NotificationBuilder("Pending Change")
+                    nb.add_markdown(f"Classification <{class_url}|{classification.friendly_label}> had a pending change and has now been updated:\n*{old_label}* - old value\n*{pending_change_label}* - pending change\n*{new_label}* - new value")
+                    nb.send()
+
             # note we don't care if the clin sig was was changed to agreed upon value per the flag
             # just that it was changed
             classification.flag_collection_safe.close_open_flags_of_type(

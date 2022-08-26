@@ -55,6 +55,7 @@ class _LabClinSigKey:
 @dataclass(frozen=True)
 class _LabClinSig:
     lab_clin_sig_key: _LabClinSigKey
+    count: int
     pending_clin_sig: Optional[str] = None
 
     @property
@@ -190,7 +191,7 @@ class DiscordanceReportTemplateData:
     @property
     def lab_clin_sigs(self) -> List[_LabClinSig]:
 
-        clin_sig_keys_to_pending: Dict[_LabClinSigKey, Set[str]] = defaultdict(set)
+        clin_sig_keys_to_pending: Dict[_LabClinSigKey, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
         for cm in self.effective_classifications:
             lab = cm.classification.lab
             clin_sig = cm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
@@ -198,15 +199,22 @@ class DiscordanceReportTemplateData:
             if pending_change := cm.classification.flag_collection.get_open_flag_of_type(classification_flag_types.classification_pending_changes):
                 pending_clin_sig = pending_change.data.get(ClassificationFlagTypes.CLASSIFICATION_PENDING_CHANGES_CLIN_SIG_KEY)
             lab_clin_sig_key = _LabClinSigKey(lab=lab, clin_sig=clin_sig)
-            clin_sig_keys_to_pending[lab_clin_sig_key].add(pending_clin_sig)
+            clin_sig_keys_to_pending[lab_clin_sig_key][pending_clin_sig] += 1
 
         lab_clin_sigs: List[_LabClinSig] = list()
+        pendings: Dict[str, int]
         for key, pendings in clin_sig_keys_to_pending.items():
-            if len(pendings) > 1:
-                # can't handle pending in multiple directions, just leave it as it was
-                lab_clin_sigs.append(_LabClinSig(lab_clin_sig_key=key, pending_clin_sig=key.clin_sig))
-            else:
-                lab_clin_sigs.append(_LabClinSig(lab_clin_sig_key=key, pending_clin_sig=list(pendings)[0]))
+            total_count = 0
+            suggested_pending_cs = None
+            for pending_cs, pending_count in pendings.items():
+                total_count += pending_count
+                if suggested_pending_cs:
+                    # can't handle pending in multiple directions, just leave it as it was
+                    suggested_pending_cs = key.clin_sig
+                else:
+                    suggested_pending_cs = pending_cs
+
+            lab_clin_sigs.append(_LabClinSig(lab_clin_sig_key=key, pending_clin_sig=suggested_pending_cs, count=total_count))
 
         return lab_clin_sigs
 

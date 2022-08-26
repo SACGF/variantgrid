@@ -234,6 +234,10 @@ class DiscordanceReport(TimeStampedModel):
     def latest_report(clinical_context: ClinicalContext) -> 'DiscordanceReport':
         return DiscordanceReport.objects.filter(clinical_context=clinical_context).order_by('-created').first()
 
+    @property
+    def is_latest(self):
+        return DiscordanceReport.latest_report(self.clinical_context) == self
+
     @staticmethod
     def update_latest(clinical_context: ClinicalContext, cause: str, update_flags: bool):
         try:
@@ -421,7 +425,7 @@ class DiscordanceReportRowData:
             if drc.withdrawn_effective:
                 clinical_significance_to = 'withdrawn'
             else:
-                if not self.discordance_report.resolution:
+                if self.discordance_report.is_latest:
                     # classification is still outstanding, check to see if there pending changes
                     if flag := drc.classification_original.classification.flag_collection.get_open_flag_of_type(classification_flag_types.classification_pending_changes):
                         clinical_significance_to = flag.data.get(ClassificationFlagTypes.CLASSIFICATION_PENDING_CHANGES_CLIN_SIG_KEY) or "unknown"

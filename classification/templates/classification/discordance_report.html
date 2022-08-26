@@ -13,6 +13,14 @@
 <script>
     let clinSigToBuckets = {{ buckets | jsonify }};
 
+    function notesVal() {
+        let notes = $('#notes').val().trim();
+        return notes.length > 0 ? notes : null;
+    }
+    function isConfirmed() {
+        return $('#discordance-confirm').is(':checked');
+    }
+
     function isDiscordant() {
         let usedBuckets = {};
         $('.clin-sig-change').each((index, elem) => {
@@ -25,7 +33,6 @@
         let resultingStatusDom = $('#resulting-status');
         resultingStatusDom.text(discordant ? "Continued Discordance" : "Pending Concordance");
 
-        let confirmed = $('#discordance-confirm').is(':checked');
         let resolveButton = $('#resolve-button');
         let resolution = $('#resolution');
 
@@ -45,7 +52,8 @@
             resultingStatusDom.addClass("text-success");
         }
         resolveButton.text(discordant ? "Mark as Continued Discordance" : "Mark as Pending Concordance")
-        if (confirmed) {
+
+        if (isConfirmed() && notesVal()) {
             resolveButton.removeClass('disabled');
         } else {
             resolveButton.addClass('disabled');
@@ -53,10 +61,16 @@
     }
 
     function submitCheck() {
-        if ($('#discordance-confirm').is(':checked')) {
-            return;
-        } else {
-            window.alert("All changes must be marked as agreed upon before submitting.")
+        let warnings = [];
+        if (notesVal() == null) {
+            warnings.push("Some text must be provided in notes.");
+        }
+        if (!isConfirmed()) {
+            warnings.push("All changes must be marked as agreed upon.");
+        }
+        if (warnings.length > 0) {
+            let warning = warnings.join("\n");
+            window.alert(`Before submitting:\n${warning}`)
             return false;  // don't submit if checkbox isn't ticked
         }
     }
@@ -194,7 +208,7 @@
                                 <tbody>
                                     {% for lab_clin_sig in data.lab_clin_sigs %}
                                         <tr>
-                                            <td>{% lab lab_clin_sig.lab %}</td>
+                                            <td>{% lab lab_clin_sig.lab %}{% if lab_clin_sig.count > 1 %} x {{ lab_clin_sig.count }}{% endif %}</td>
                                             <td class="cs-{{ lab_clin_sig.clin_sig }} text-center">{{ lab_clin_sig.clin_sig | ekey:"clinical_significance" }}</td>
                                             <td style="vertical-align: middle;"><i class="fas fa-arrow-right"></i></td>
                                             <td>
@@ -221,7 +235,7 @@
                             </table>
                             {% endlabelled %}
                             {% labelled label="Resulting Status" %}<div id="resulting-status" class="font-weight-bold"></div>{% endlabelled %}
-                            {% labelled label="Notes" %}<textarea name="notes" class="form-control">{{ data.report.notes }}</textarea>{% endlabelled %}
+                            {% labelled label="Notes*" %}<textarea id="notes" name="notes" class="form-control">{{ data.report.notes }}</textarea>{% endlabelled %}
                             {% labelled label="" name="confirm" value_css="form-check" %}<label class="form-check-label"><input id="discordance-confirm" class="form-check-input" type="checkbox" />All changes have been agreed upon by the relevant lab(s)</label>{% endlabelled %}
                             <div class="buttons"><button id="resolve-button" class="btn btn-primary" onclick="return submitCheck()">Apply</button></div>
                         </div>
