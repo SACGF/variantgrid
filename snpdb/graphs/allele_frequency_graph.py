@@ -6,7 +6,7 @@ from lazy import lazy
 
 from library.utils import sha1_str
 from snpdb.graphs.graphcache import CacheableGraph
-from snpdb.models import Sample, Variant
+from snpdb.models import Sample, Variant, CohortGenotype
 
 
 class AlleleFrequencyHistogramGraph(CacheableGraph):
@@ -31,12 +31,13 @@ class AlleleFrequencyHistogramGraph(CacheableGraph):
     def get_allele_frequency_values_qs(self):
         qs = self.sample.get_variant_qs()
         qs = qs.filter(Variant.get_no_reference_q())
-        dp_field = self.sample.get_cohort_genotype_alias_and_field("read_depth")
+        _, dp_field = self.sample.get_cohort_genotype_alias_and_field("read_depth")
         qs = qs.filter(**{f"{dp_field}__gte": self.min_read_depth})
         if q := self._get_q():
             qs = qs.filter(q)
 
-        af_field = self.sample.get_cohort_genotype_alias_and_field("allele_frequency")
+        _, af_field = self.sample.get_cohort_genotype_alias_and_field("allele_frequency")
+        qs = qs.exclude(**{af_field: CohortGenotype.MISSING_NUMBER_VALUE})
         return qs.values_list(af_field, flat=True)
 
     def get_title(self):

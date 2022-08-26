@@ -35,7 +35,7 @@ class HomozygosityPercentGraph(CacheableGraph):
     def get_queryset(self):
         qs = self.sample.get_variant_qs()
         qs = qs.filter(Variant.get_no_reference_q())
-        ad_field = self.sample.get_cohort_genotype_alias_and_field("allele_depth")
+        _, ad_field = self.sample.get_cohort_genotype_alias_and_field("allele_depth")
         return qs.filter(**{f"{ad_field}__gte": MIN_DEPTH})
 
     def get_chromosome_zygosity_density_bins(self, bin_size):
