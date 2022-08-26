@@ -222,11 +222,12 @@ class CohortMixin:
         if vcf := self._get_vcf():
             try:
                 uv: UploadedVCF = vcf.uploadedvcf
-                variant_annotation_version = self.analysis.annotation_version.variant_annotation_version
-                if lowest_unannotated_variant := get_lowest_unannotated_variant_id(variant_annotation_version):
-                    if uv.max_variant_id > lowest_unannotated_variant:
-                        errors.append(f"VCF '{vcf}' contains variants that have not finished annotation"
-                                      f" (in variant annotation version={variant_annotation_version})")
+                if uv.max_variant_id:  # Very old VCFs may not have this set
+                    variant_annotation_version = self.analysis.annotation_version.variant_annotation_version
+                    if lowest_unannotated_variant := get_lowest_unannotated_variant_id(variant_annotation_version):
+                        if uv.max_variant_id > lowest_unannotated_variant:
+                            errors.append(f"VCF '{vcf}' contains variants that have not finished annotation"
+                                          f" (in variant annotation version={variant_annotation_version})")
             except UploadedVCF.DoesNotExist:
                 pass
         return errors
