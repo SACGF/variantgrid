@@ -974,7 +974,7 @@ ul.compact li:before {
 }
 
 .overlap-concordant_agreement, .overlap-concordant_agreement_diff_vus {
-  color: #66aa66;
+  color: #287745;
   font-weight: 600;
 }
 
@@ -984,7 +984,7 @@ ul.compact li:before {
 }
 
 .overlap-pending_concordance {
-  color: #287745;
+  color: #66aa66;
   font-weight: 600;
 }
 

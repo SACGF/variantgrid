@@ -67,7 +67,10 @@ class ClinicalGroupingOverlap:
 
     @lazy
     def status(self):
-        return DiscordanceStatus.calculate(self.cms)
+        dr: DiscordanceReport = None
+        if cc := self.clinical_context:
+            dr = DiscordanceReport.latest_report(cc)
+        return DiscordanceStatus.calculate(self.cms, dr)
 
     @lazy
     def discordance_report(self) -> Optional[DiscordanceReport]:
