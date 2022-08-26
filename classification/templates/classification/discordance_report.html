@@ -143,10 +143,11 @@
                 {% if data.report.resolved_text %}
                     {% labelled label="Final Trigger to end Discordance" %}{{ data.report.resolved_text }}{% endlabelled %}
                 {% endif %}
-
+                {% comment %}
                 {% if data.report.continued_discordance_reason %}
                     {% labelled label="Reason for Continued Discordance" %}{{ data.report.get_continued_discordance_reason_display }}{% endlabelled %}
                 {% endif %}
+                {% endcomment %}
                 {% labelled label="Notes" %}
                     {% if data.report.notes %}<nomin><div class="formatted-text">{{ data.report.notes }}</div></nomin>{% else %}<span class="no-value">-</span>{% endif %}
                 {% endlabelled %}

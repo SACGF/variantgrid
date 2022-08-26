@@ -11,8 +11,10 @@ class DiscordanceReportResolution:
 class ContinuedDiscordanceReason:
     UNRESPONSIVE = 'U'
     DIFFERENT_CURATION_METHODS = 'D'
+    NOT_DEFINED = 'X'
 
     CHOICES = (
         (UNRESPONSIVE, 'One or more labs was unresponsive'),
-        (DIFFERENT_CURATION_METHODS, 'Different curation methods are being employed')
+        (DIFFERENT_CURATION_METHODS, 'Different curation methods are being employed'),
+        (NOT_DEFINED, "See notes")
     )

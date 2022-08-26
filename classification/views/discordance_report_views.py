@@ -299,7 +299,7 @@ def discordance_report_view(request: HttpRequest, discordance_report_id: int) ->
             resolution = request.POST.get("resolution")
             if resolution == "discordant":
                 report.report_closed_by = request.user
-                report.continued_discordance_reason = ContinuedDiscordanceReason.DIFFERENT_CURATION_METHODS
+                report.continued_discordance_reason = ContinuedDiscordanceReason.NOT_DEFINED
                 report.close(expected_resolution=DiscordanceReportResolution.CONTINUED_DISCORDANCE, cause_text="Unable to resolve")
             elif data.is_pending_concordance:
                 # a bit messy to call the signal here directly
