@@ -35,7 +35,7 @@ class Command(BaseCommand):
                 if v := c.variant:
                     existing_tuple = v.as_tuple()
                 else:
-                    existing_tuple = tuple()
+                    existing_tuple = None
 
                 genome_build = c.get_genome_build()
                 if genome_build.name == "GRCh37":
@@ -78,8 +78,6 @@ class Command(BaseCommand):
                         transcript_diff += ": LOST EXACT MATCH!"
 
                 if variant_diff or transcript_diff:
-                    count_key = ", ".join([x for x in [variant_diff, transcript_diff] if x])
-
                     def _format_tuple(t):
                         if t:
                             return Variant.format_tuple(*t)
