@@ -26,6 +26,10 @@ class Test(URLTestCase):
                                             organization=organization, group_name="fake_org/fake_lab")[0]
         cls.lab.group.user_set.add(cls.user_owner)
 
+        cls.other_lab = Lab.objects.get_or_create(name="Fake Lab 2", city="Adelaide", country=australia,
+                                            organization=organization, group_name="fake_org/fake_lab2")[0]
+        cls.other_lab.group.user_set.add(cls.user_non_owner)
+
         grch37 = GenomeBuild.get_name_or_alias("GRCh37")
         annotation_version = get_fake_annotation_version(grch37)
         create_fake_variants(grch37)
