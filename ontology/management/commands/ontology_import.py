@@ -16,7 +16,7 @@ from genes.models import HGNC
 from library.file_utils import file_md5sum
 from ontology.gencc import load_gencc
 from ontology.models import OntologyService, OntologyRelation, OntologyTerm, OntologyImportSource, OntologyImport, \
-    OntologyTermRelation, OntologyVersion
+    OntologyTermRelation, OntologyVersion, OntologyTermStatus
 from ontology.ontology_builder import OntologyBuilder, OntologyBuilderDataUpToDateException
 
 """
@@ -196,7 +196,7 @@ def load_mondo(filename: str, force: bool):
                             extra=meta,
                             aliases=aliases,
                             primary_source=True,
-                            deprecated=deprecated
+                            status=OntologyTermStatus.DEPRECATED if deprecated else None
                         )
 
                 # copy of id for gene symbol to gene symbol
@@ -445,7 +445,7 @@ def load_omim(filename: str, force: bool):
         filename=filename,
         context="omim_file",
         import_source=OntologyImportSource.OMIM,
-        processor_version=5,
+        processor_version=6,
         force_update=force)
 
     file_hash = file_md5sum(filename)
@@ -462,20 +462,23 @@ def load_omim(filename: str, force: bool):
         if header != OMIM_EXPECTED_HEADER:
             raise ValueError(f"Header not as expected, got {header}")
 
-        RELEVANT_PREFIXES = {
-            # "Asterisk": "Gene",
-            # "Plus": "Gene and phenotype, combined",
+        PREFIXES = {
+            "Asterisk": "Gene",
+            "Plus": "Gene and phenotype, combined",
             "Number Sign": "Phenotype, molecular basis known",
             "Percent": "Phenotype or locus, molecular basis unknown",
             "NULL": "Other, mainly phenotypes with suspected mendelian basis",
-            # "Caret": "Entry has been removed from the database or moved to another entry"
+            "Caret": "Entry has been removed from the database or moved to another entry"
         }
-
-        #["Number Sign", "Percent", "NULL"]
+        VALID_PREFIXES = {
+            "Number Sign",
+            "Percent",
+            "NULL"
+        }
 
         for row in csv_reader:
             prefix = row[0]
-            omim_type = RELEVANT_PREFIXES.get(prefix)
+            omim_type = PREFIXES.get(prefix)
             if len(row) <= 1 or not omim_type:
                 continue
             mim_number = row[1]
@@ -505,7 +508,8 @@ def load_omim(filename: str, force: bool):
                 definition=None,
                 aliases=aliases,
                 extra=extras,
-                primary_source=True
+                primary_source=True,
+                status=None if prefix in VALID_PREFIXES else OntologyTermStatus.NON_CONDITION
             )
             if moved_to:
                 ontology_builder.add_ontology_relation(

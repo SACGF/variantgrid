@@ -117,7 +117,7 @@
                             {% if auto_match.gene_relationships %}<div>Gene Matches</div>{% endif %}
                             {% if auto_match.direct_reference %}<div>Embedded ID</div>{% endif %}
                             {% if auto_match.text_search %}<div>Text Search</div>{% endif %}<br/>
-                            {% if auto_match.term.is_obsolete %}<div>Obsolete</div>{% endif %}<br/>
+                            {% if auto_match.term.is_obsolete %}<div>{{ auto_match.term.warning_text }}</div>{% endif %}<br/>
                         </td>
                     </tr>
                 {% endfor %}

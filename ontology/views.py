@@ -52,7 +52,4 @@ class OntologyTermView(TemplateView):
             }
 
         messages.add_message(self.request, messages.ERROR, "This term is not stored in our database.")
-        if term.ontology_service == OntologyService.OMIM:
-            messages.add_message(self.request, messages.WARNING, f"{settings.SITE_NAME} only stores 'phenotype' OMIM terms. Maybe this term is an OMIM gene?")
-
         return {"term": term}

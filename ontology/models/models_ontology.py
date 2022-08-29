@@ -13,7 +13,7 @@ from typing import Optional, List, Dict, Set, Union, Tuple, Iterable
 from cache_memoize import cache_memoize
 from django.contrib.postgres.fields import ArrayField
 from django.db import models, connection
-from django.db.models import PROTECT, CASCADE, QuerySet, Q, Max
+from django.db.models import PROTECT, CASCADE, QuerySet, Q, Max, TextChoices
 from django.urls import reverse
 from lazy import lazy
 from model_utils.models import TimeStampedModel, now
@@ -208,8 +208,13 @@ class OntologyImport(TimeStampedModel):
         return name
 
 
-class OntologyTerm(TimeStampedModel):
+class OntologyTermStatus(TextChoices):
+    CONDITION = 'C'  # Also phenotypes are mixed up in there right now
+    DEPRECATED = 'D'
+    NON_CONDITION = 'N'
 
+
+class OntologyTerm(TimeStampedModel):
     """
     id is Term as it should be referenced <prefix>:<zero padded index> e.g.
     MONDO:0000043, OMIM:0000343
@@ -221,7 +226,7 @@ class OntologyTerm(TimeStampedModel):
     definition = models.TextField(null=True, blank=True)
     extra = models.JSONField(null=True, blank=True)
     aliases = ArrayField(models.TextField(blank=False), null=False, blank=True, default=list)
-    deprecated = models.BooleanField(default=False, blank=True)
+    status = models.CharField(max_length=1, default=OntologyTermStatus.CONDITION, choices=OntologyTermStatus.choices)
     from_import = models.ForeignKey(OntologyImport, on_delete=PROTECT)
 
     def __str__(self):
@@ -244,10 +249,19 @@ class OntologyTerm(TimeStampedModel):
 
     @property
     def is_obsolete(self) -> bool:
-        return self.deprecated
-        # if self.name:
-        #     return "obsolete" in self.name.lower()
-        # return False
+        # obsolete covers deprecated, moved, and gene (not the most accurate title)
+        # more so "is not valid for condition"
+        return self.status != OntologyTermStatus.CONDITION
+
+    @property
+    def warning_text(self) -> Optional[str]:
+        if self.status == OntologyTermStatus.DEPRECATED:
+            return "Term is Deprecated"
+        elif self.status == OntologyTermStatus.NON_CONDITION:
+            term_type = (self.extra or dict()).get('type', 'Unknown')
+            return f"Term is of type {term_type}"
+        else:
+            return None
 
     @lazy
     def is_leaf(self) -> bool:

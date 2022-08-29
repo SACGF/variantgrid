@@ -26,8 +26,12 @@
             <div class="card-header">{{ term.id }}</div>
             <div class="card-body">
                 {% labelled label="Name" %}{{ term.name }}{% endlabelled %}
-                {% if term.deprecated %}
-                    {% labelled label="Deprecated" %}{{ 'W' | severity_icon }} This term has been deprecated{% endlabelled %}
+                {% if term.status == 'D' %}
+                    {% labelled label="Warning" %}{{ 'W' | severity_icon }} This term has been deprecated{% endlabelled %}
+                {% elif term.status == 'N' %}
+                    {% labelled label="Warning" %}{{ 'W' | severity_icon }} This term is not suitable to be used as a Condition.
+                        {% if term.extra.type %}<br/>Term is of type "{{ term.extra.type }}"{% endif %}
+                    {% endlabelled %}
                 {% endif %}
                 {% labelled label="Definition" value_css="white-space:pre-wrap" %}{{ term.definition }}{% endlabelled %}
                 {% labelled label="Extra" %}
