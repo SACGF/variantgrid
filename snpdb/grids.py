@@ -1,5 +1,4 @@
 import operator
-import time
 from functools import reduce
 
 from django.conf import settings

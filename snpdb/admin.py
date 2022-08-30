@@ -1,7 +1,6 @@
 import re
 from typing import List
 
-from dal_select2.widgets import ModelSelect2
 from django.contrib import admin, messages
 from django.contrib.admin.widgets import AdminTextInputWidget
 from django.db.models import QuerySet

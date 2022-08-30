@@ -35,5 +35,3 @@ class ClassificationModificationSyncRecord(TimeStampedModel):
         remote_pk = self.meta["meta"]["id"]
         path = self.classification_modification.classification.get_url_for_pk(remote_pk)
         return os.path.join(url, path)
-
-

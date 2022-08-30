@@ -51,7 +51,7 @@ def get_assembly_report_df(build):
 
             mt_grch37 = mt_grch38.copy()
             mt_grch37["UCSC-style-name"] = None  # GRCh37<->hg19 MT are different
-            df = df.append(mt_grch37)
+            df = pd.concat([df, mt_grch37])
 
         elif build == "hg19":
             # See http://hgdownload.soe.ucsc.edu/goldenPath/hg19/bigZips/
@@ -69,7 +69,7 @@ def get_assembly_report_df(build):
             # Length chrM 16571 from
             # http://hgdownload.soe.ucsc.edu/goldenPath/hg19/bigZips/hg19.chrom.sizes
             mt_hg19["Sequence-Length"] = 16571
-            df = df.append(mt_hg19)
+            df = pd.concat([df, mt_hg19])
 
     # We want MT to be at the end of the chromosomes
     # Otherwise snpEFF gives errors about contigs not being in karyotypic order
