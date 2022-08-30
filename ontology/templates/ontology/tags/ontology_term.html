@@ -1,1 +1,1 @@
-<a href="{{ term.get_absolute_url }}"><span class="text-monospace">{{ term.id }}</span>{% if term.name %} &nbsp;{{ term.name }}{% endif %}</a>
+{% if term.is_obsolete %}<span><i class="fas fa-exclamation-triangle text-warning hover-detail" title="{{ term.warning_text }}"></i></span> {% endif %}<a href="{{ term.get_absolute_url }}"><span class="text-monospace">{{ term.id }}</span>{% if term.name %} &nbsp;{{ term.name }}{% endif %}</a>
