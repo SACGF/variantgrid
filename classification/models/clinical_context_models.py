@@ -101,6 +101,43 @@ class DiscordanceStatus:
         else:
             return self.level.label
 
+    """
+            if self == DiscordanceLevel.CONCORDANT_AGREEMENT:
+            return "Concordant (Agreement)"
+        if self == DiscordanceLevel.CONCORDANT_DIFF_VUS:
+            return "Concordant (Agreement Differing VUS)"
+        if self == DiscordanceLevel.CONCORDANT_CONFIDENCE:
+            return "Concordant (Confidence)"
+        if self == DiscordanceLevel.NO_ENTRIES:
+            return "No Shared Submissions"
+        if self == DiscordanceLevel.SINGLE_SUBMISSION:
+            return "Single Shared Submission"
+        if self == DiscordanceLevel.DISCORDANT:
+            return "Discordant"
+    """
+
+    @property
+    def sort_order(self):
+        if self.pending_concordance:
+            return 5
+        elif self.discordance_report and self.discordance_report.resolution == 'D':
+            return 6
+        elif self.discordance_report and self.discordance_report.resolution is None:
+            return 7
+        elif self.level == DiscordanceLevel.CONCORDANT_CONFIDENCE:
+            return 4
+        elif self.level == DiscordanceLevel.CONCORDANT_DIFF_VUS:
+            return 3
+        elif self.level == DiscordanceLevel.CONCORDANT_AGREEMENT:
+            return 2
+        else:
+            # single submissions, no shred submissions, shouldn't appear in overlaps page
+            # and level discordance has already been taken care of
+            return 1
+
+    def __lt__(self, other):
+        return self.sort_order < other.sort_order
+
     @property
     def css_class(self):
         if self.pending_concordance:

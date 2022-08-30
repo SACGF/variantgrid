@@ -66,7 +66,7 @@ class ClinicalGroupingOverlap:
         self.labs.add(cm.classification.lab)
 
     @lazy
-    def status(self):
+    def status(self) -> 'DiscordanceStatus':
         dr: DiscordanceReport = None
         if cc := self.clinical_context:
             dr = DiscordanceReport.latest_report(cc)
@@ -154,18 +154,11 @@ class AlleleOverlap:
     def c_hgvses(self) -> List[CHGVS]:
         return sorted(self._c_hgvses)
 
-    LEVEL_SORT_DICT = {
-        DiscordanceLevel.DISCORDANT: 4,
-        DiscordanceLevel.CONCORDANT_CONFIDENCE: 3,
-        DiscordanceLevel.CONCORDANT_DIFF_VUS: 2,
-        DiscordanceLevel.CONCORDANT_AGREEMENT: 1
-    }
-
     @property
     def _sort_value(self):
         max_level = 0
         for sub_group in self.context_map.values():
-            level = AlleleOverlap.LEVEL_SORT_DICT.get(sub_group.status.level, 0)
+            level = sub_group.status.sort_order
             max_level = max(max_level, level)
 
         return (
