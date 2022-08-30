@@ -98,23 +98,10 @@ class DiscordanceStatus:
             return "Pending Concordance"
         elif self.discordance_report and self.discordance_report.resolution == 'D':
             return "Continued Discordance"
+        elif self.discordance_report and self.discordance_report.resolution == 'C':
+            return "Active Discordance"
         else:
             return self.level.label
-
-    """
-            if self == DiscordanceLevel.CONCORDANT_AGREEMENT:
-            return "Concordant (Agreement)"
-        if self == DiscordanceLevel.CONCORDANT_DIFF_VUS:
-            return "Concordant (Agreement Differing VUS)"
-        if self == DiscordanceLevel.CONCORDANT_CONFIDENCE:
-            return "Concordant (Confidence)"
-        if self == DiscordanceLevel.NO_ENTRIES:
-            return "No Shared Submissions"
-        if self == DiscordanceLevel.SINGLE_SUBMISSION:
-            return "Single Shared Submission"
-        if self == DiscordanceLevel.DISCORDANT:
-            return "Discordant"
-    """
 
     @property
     def sort_order(self):
