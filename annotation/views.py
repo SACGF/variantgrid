@@ -177,7 +177,7 @@ def annotation_detail(request):
     ontology_relationship_counts = dict()
     ontology_services = [OntologyService.MONDO, OntologyService.OMIM, OntologyService.HPO, OntologyService.HGNC]
     if ontology_version := OntologyVersion.latest():
-        otr_qs = ontology_version.get_ontology_terms()
+        otr_qs = ontology_version.get_ontology_term_relations()
         for first_index, first_service in enumerate(ontology_services):
             for second_service in ontology_services[first_index:]:
                 join_count = otr_qs.filter(source_term__ontology_service=first_service,
