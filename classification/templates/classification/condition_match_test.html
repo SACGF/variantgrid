@@ -48,7 +48,8 @@
             </p>
         {% end_page_help_embedded %}
 
-        <a href="{% url 'condition_match_test_download' %}" class="download-link type-csv">Download Auto Matching Attempts</a>
+        <div><a href="{% url 'condition_obsoletes' %}" class="hover-link">See Obsolete Relationships</a></div>
+        <div><a href="{% url 'condition_match_test_download' %}" class="download-link type-csv">Download Auto Matching Attempts</a></div>
         <h4>Test Single Term</h4>
 
         <form method="GET">

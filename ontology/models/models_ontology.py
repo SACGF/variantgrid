@@ -570,13 +570,13 @@ class OntologyVersion(TimeStampedModel):
                 raise OntologyVersion.DoesNotExist(msg)
         return ontology_version
 
-    def get_ontology_imports(self):
+    def get_ontology_imports(self) -> List[OntologyImport]:
         return [self.gencc_import, self.mondo_import, self.hp_owl_import, self.hp_phenotype_to_genes_import]
 
-    def get_ontology_term_relations(self):
+    def get_ontology_term_relations(self) -> QuerySet[OntologyTermRelation]:
         return OntologyTermRelation.objects.filter(from_import__in=self.get_ontology_imports())
 
-    def get_gene_disease_relations_qs(self) -> QuerySet:
+    def get_gene_disease_relations_qs(self) -> QuerySet[OntologyTermRelation]:
         return self.get_ontology_term_relations().filter(relation=OntologyRelation.RELATED,
                                                          extra__strongest_classification__isnull=False)
 
