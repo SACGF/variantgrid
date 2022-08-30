@@ -452,7 +452,7 @@ class OntologyTermRelation(PostgresPartitionedModel, TimeStampedModel):
         return None
 
     @staticmethod
-    def relations_of(term: OntologyTerm) -> List['OntologyTermRelation']:
+    def relations_of(term: OntologyTerm, otr_qs: Optional[QuerySet['OntologyTermRelation']] = None) -> List['OntologyTermRelation']:
         def sort_relationships(rel1, rel2):
             other1 = rel1.other_end(term)
             other2 = rel2.other_end(term)
@@ -464,7 +464,10 @@ class OntologyTermRelation(PostgresPartitionedModel, TimeStampedModel):
                 return -1 if rel1source else 1
             return -1 if other1.index < other2.index else 1
 
-        items = list(OntologyTermRelation.objects.filter(Q(source_term=term) | Q(dest_term=term)))
+        if otr_qs is None:
+            otr_qs = OntologyVersion.latest().get_ontology_term_relations()
+
+        items = list(otr_qs.filter(Q(source_term=term) | Q(dest_term=term)))
         items.sort(key=functools.cmp_to_key(sort_relationships))
         return items
 
@@ -556,12 +559,12 @@ class OntologyVersion(TimeStampedModel):
     def get_ontology_imports(self):
         return [self.gencc_import, self.mondo_import, self.hp_owl_import, self.hp_phenotype_to_genes_import]
 
-    def get_ontology_terms(self):
+    def get_ontology_term_relations(self):
         return OntologyTermRelation.objects.filter(from_import__in=self.get_ontology_imports())
 
     def get_gene_disease_relations_qs(self) -> QuerySet:
-        return self.get_ontology_terms().filter(relation=OntologyRelation.RELATED,
-                                                extra__strongest_classification__isnull=False)
+        return self.get_ontology_term_relations().filter(relation=OntologyRelation.RELATED,
+                                                         extra__strongest_classification__isnull=False)
 
     @cache_memoize(WEEK_SECS)
     def moi_and_submitters(self) -> Tuple[List[str], List[str]]:
@@ -582,7 +585,7 @@ class OntologyVersion(TimeStampedModel):
     def gene_symbols_for_terms(self, terms: OntologyList) -> QuerySet:
         """ This is uncached, see also: cached_gene_symbols_for_terms """
         gene_symbol_names = set()
-        otr_qs = self.get_ontology_terms()
+        otr_qs = self.get_ontology_term_relations()
         for term in terms:
             if isinstance(term, str):
                 term = OntologyTerm.get_or_stub(term)
@@ -594,7 +597,7 @@ class OntologyVersion(TimeStampedModel):
 
     def terms_for_gene_symbol(self, gene_symbol: Union[str, GeneSymbol], desired_ontology: OntologyService,
                               max_depth=1, min_classification: Optional[GeneDiseaseClassification] = None) -> 'OntologySnakes':
-        otr_qs = self.get_ontology_terms()
+        otr_qs = self.get_ontology_term_relations()
         return OntologySnake.terms_for_gene_symbol(gene_symbol, desired_ontology, max_depth=max_depth,
                                                    min_classification=min_classification, otr_qs=otr_qs)
 
@@ -722,7 +725,8 @@ class OntologySnake:
             return OntologySnakes([OntologySnake(source_term=term)])
 
         if otr_qs is None:
-            otr_qs = OntologyTermRelation.objects.all()
+            otr_qs = OntologyVersion.latest().get_ontology_term_relations()
+            # otr_qs = OntologyTermRelation.objects.all()
 
         seen: Set[OntologyTerm] = set()
         seen.add(term)
