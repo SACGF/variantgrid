@@ -16,7 +16,7 @@ from lazy import lazy
 from classification.enums import ShareLevel, ClinicalContextStatus
 from classification.enums.discordance_enums import DiscordanceReportResolution
 from classification.models import ClassificationModification, Classification, classification_flag_types, \
-    DiscordanceReport, ClinicalContext
+    DiscordanceReport, ClinicalContext, ClassificationFlagTypes
 from flags.models import FlagsMixin, Flag, FlagComment, FlagStatus
 from library.utils import batch_iterator, local_date_string
 from snpdb.models import GenomeBuild, Lab, Organization, allele_flag_types, Allele, Variant, VariantAllele

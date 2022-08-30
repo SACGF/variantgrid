@@ -9,7 +9,7 @@ from lazy import lazy
 from annotation.views import simple_citation_html
 from classification.enums import SpecialEKeys
 from classification.models import ClassificationModification, EvidenceKeyMap
-from classification.models.classification_groups import ClassificationGroups
+from classification.models.classification_groups import ClassificationGroups, ClassificationGroupUtils
 from classification.views.classification_export_utils import ConflictStrategy
 from classification.views.exports.classification_export_decorator import register_classification_exporter
 from classification.views.exports.classification_export_filter import AlleleData, ClassificationFilter, \
@@ -98,12 +98,12 @@ class MVLCHGVSData:
     Provides all the data needed to create a row in a MVL
     """
     data: CHGVSData
+    format: FormatDetailsMVL
+    group_utils: ClassificationGroupUtils
 
     @property
     def cms(self) -> [ClassificationModification]:
         return self.data.cms
-
-    format: FormatDetailsMVL
 
 
 @dataclass
@@ -201,8 +201,11 @@ class MVLEntry(ExportRow):
 
     @lazy
     def groups(self) -> ClassificationGroups:
-        return ClassificationGroups(classification_modifications=self.data.cms,
-                                    genome_build=self.data.source.genome_build)
+        return ClassificationGroups(
+            classification_modifications=self.data.cms,
+            genome_build=self.data.source.genome_build,
+            group_utils=self.mvl_data.group_utils
+        )
 
     def warnings(self) -> List[str]:
         warnings: List[str] = list()
@@ -288,6 +291,7 @@ class ClassificationExportFormatter2MVL(ClassificationExportFormatter2):
 
     def __init__(self, classification_filter: ClassificationFilter, format_details: FormatDetailsMVL):
         self.format_details = format_details
+        self.grouping_utils = ClassificationGroupUtils()
         super().__init__(classification_filter=classification_filter)
 
     @classmethod
@@ -304,7 +308,11 @@ class ClassificationExportFormatter2MVL(ClassificationExportFormatter2):
     def row(self, allele_data: AlleleData) -> List[str]:
         c_datas = CHGVSData.split_into_c_hgvs(allele_data, use_full=True)
         return list(MVLEntry.csv_generator(
-            (MVLCHGVSData(c_data, self.format_details) for c_data in c_datas),
+            (MVLCHGVSData(
+                c_data,
+                self.format_details,
+                self.grouping_utils
+            ) for c_data in c_datas),
             delimiter='\t',
             include_header=False
         ))

@@ -17,7 +17,11 @@
         <tr {% if forloop.counter0|divisibleby:2 %}style='background-color:#f8f8f8'{% endif %}>
             <td style='padding:8px'>{{ group.lab }}{% if group.count > 1 %} * {{ group.count }} records{% endif %}</td>
             <td style='font-family:monospace;word-break:break-all;padding:8px'>{{ group.c_hgvs }}</td>
-            <td style='padding:8px'>{{ group.clinical_significance |ekey:'clinical_significance' }}</td>
+            <td style='padding:8px'>
+                {% if group.clinical_significance_override %}
+                    <del>{{ group.clinical_significance | ekey:'clinical_significance' }}</del><br/>{{ group.clinical_significance_override | ekey:'clinical_significance' }} (PENDING)
+                {% else %}{{ group.clinical_significance | ekey:'clinical_significance' }}{% endif %}
+            </td>
             <td style='padding:8px'>{% for condition in group.conditions %}<div>{% condition condition_obj=condition limit=None %}</div>{% empty %}-{% endfor %}</td>
             <td style='padding:8px'>{{ group.zygosities | ekey:'zygosity' }}</td>
             <td style='font-family:monospace;padding:8px'>{% for acmg in group.acmg_criteria %}{% if not forloop.first %}, {% endif %}{{ acmg }}{% empty %}-{% endfor %}</td>

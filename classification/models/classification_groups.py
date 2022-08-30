@@ -45,20 +45,27 @@ class MultiValues(Generic[D]):
 
 class ClassificationGroupUtils:
 
-    def __init__(self, modifications: Iterable[ClassificationModification]):
-        self.modifications = modifications
+    def __init__(self, modifications: Optional[Iterable[ClassificationModification]] = None):
+        self._modifications = modifications
 
     @lazy
     def _pending_changes_flag_map(self) -> Dict[int, str]:
         mod_id_to_clin_sig: Dict[int, str] = dict()
-        flag_collections_ids = {mod.classification.flag_collection_id: mod.id for mod in self.modifications}
-        flags = Flag.objects.filter(collection__in=flag_collections_ids, flag_type=classification_flag_types.classification_pending_changes, resolution__status=FlagStatus.OPEN)
-        for flag in flags:
-            mod_id_to_clin_sig[flag_collections_ids[flag.collection_id]] = flag.data.get(ClassificationFlagTypes.CLASSIFICATION_PENDING_CHANGES_CLIN_SIG_KEY) if flag.data else 'Unknown'
+        flags_qs = Flag.objects.filter(
+            flag_type=classification_flag_types.classification_pending_changes,
+            resolution__status=FlagStatus.OPEN)
+
+        if self._modifications:
+            flag_collections_ids = {mod.classification.flag_collection_id for mod in self._modifications}
+            flags_qs.filter(collection_id__in=flag_collections_ids)
+
+        for flag in flags_qs:
+            mod_id_to_clin_sig[flag.collection_id] = flag.data.get(ClassificationFlagTypes.CLASSIFICATION_PENDING_CHANGES_CLIN_SIG_KEY) if flag.data else 'Unknown'
+
         return mod_id_to_clin_sig
 
     def pending_changes_for(self, modification: ClassificationModification) -> Optional[str]:
-        return self._pending_changes_flag_map.get(modification.pk)
+        return self._pending_changes_flag_map.get(modification.classification.flag_collection_id)
 
 
 class ClassificationGroup:
@@ -126,7 +133,7 @@ class ClassificationGroup:
     @property
     def clinical_significance_effective(self):
         if override := self.clinical_significance_override:
-            return "pending"
+            return "pending"  # TODO, this is "pending" to help with the css class, maybe not best method name
         return self.clinical_significance or ''
 
     @property
@@ -294,7 +301,8 @@ class ClassificationGroups:
 
     def __init__(self,
                  classification_modifications: Iterable[ClassificationModification],
-                 genome_build: Optional[GenomeBuild] = None):
+                 genome_build: Optional[GenomeBuild] = None,
+                 group_utils: Optional[ClassificationGroupUtils] = None):
 
         if not genome_build:
             genome_build = GenomeBuildManager.get_current_genome_build()
@@ -327,7 +335,9 @@ class ClassificationGroups:
 
         # clinical significance, clin grouping, org
         sorted_by_clin_sig = list(classification_modifications)
-        group_utils = ClassificationGroupUtils(sorted_by_clin_sig)
+        if not group_utils:
+            group_utils = ClassificationGroupUtils(sorted_by_clin_sig)
+
         e_key_clin_sig = evidence_keys.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
         sorted_by_clin_sig.sort(key=e_key_clin_sig.classification_sorter)
         for clin_sig, group1 in groupby(sorted_by_clin_sig, clin_significance):
