@@ -98,7 +98,7 @@ class DiscordanceStatus:
             return "Pending Concordance"
         elif self.discordance_report and self.discordance_report.resolution == 'D':
             return "Continued Discordance"
-        elif self.discordance_report and self.discordance_report.resolution == 'C':
+        elif self.discordance_report and self.discordance_report.resolution is None:
             return "Active Discordance"
         else:
             return self.level.label
