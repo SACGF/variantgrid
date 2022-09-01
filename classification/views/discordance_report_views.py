@@ -232,6 +232,10 @@ class DiscordanceReportTemplateData:
         return EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE).virtual_options
 
     @property
+    def bucketless_clin_sig_options(self) -> List[EvidenceKeyOption]:
+        return [sig for sig in self.all_clin_sig_options if sig.get('bucket') is None]
+
+    @property
     def provide_reopen(self) -> bool:
         report = self.report
         if report.resolution == DiscordanceReportResolution.CONTINUED_DISCORDANCE:

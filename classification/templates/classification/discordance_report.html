@@ -23,12 +23,16 @@
 
     function isDiscordant() {
         let usedBuckets = {};
+        let noBuckets = false;
         $('.clin-sig-change').each((index, elem) => {
             let bucket = clinSigToBuckets[$(elem).val()];
             if (bucket) {
                 usedBuckets[bucket] = true;
+            } else {
+                noBuckets = true;
             }
         });
+        $('#no-bucket').collapse(noBuckets ? 'show' : 'hide');
         let discordant = Object.keys(usedBuckets).length > 1;
         let resultingStatusDom = $('#resulting-status');
         resultingStatusDom.text(discordant ? "Continued Discordance" : "Pending Concordance");
@@ -236,6 +240,12 @@
                                     </tbody>
                                 </table>
                                 {% endlabelled %}
+                                <div id="no-bucket" class="collapse">
+                                    <div class="text-info m-4">
+                                        {{ 'i'|severity_icon }} The following clinical significances are not used in discordance calculations:
+                                        {% for clin_sig in data.bucketless_clin_sig_options %}{% if not forloop.first %}, {% endif %}{{ clin_sig.label }}{% endfor %}
+                                    </div>
+                                </div>
                                 {% labelled label="Resulting Status" %}<div id="resulting-status" class="font-weight-bold"></div>{% endlabelled %}
                                 {% labelled label="Notes*" %}<textarea id="notes" name="notes" class="form-control">{{ data.report.notes }}</textarea>{% endlabelled %}
                                 {% labelled label="" name="confirm" value_css="form-check" %}<label class="form-check-label"><input id="discordance-confirm" class="form-check-input" type="checkbox" />All changes have been agreed upon by the relevant lab(s)</label>{% endlabelled %}
