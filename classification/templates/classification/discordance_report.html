@@ -185,60 +185,64 @@
                 {% if data.is_pending_concordance %}<p class="text-info">There are outstanding pending changes for this discordance. When labs re-submit with the agreed changes the discordance should be resolved. There is likely no need to action this.</p>{% endif %}
                 {% modal label="Action Discordance" show_prefix=False button=True %}
                     <form method="post" id="resolve-form">
-                        <input type="hidden" name="action" value="action" />
-                        <input type="hidden" name="resolution" id="resolution" value="X" />
-                        {% csrf_token %}
-                        <div class="m-4">
-                            <p>{{ 'I' | severity_icon }} Use this dialog during or after a discussion with the other involved labs. If changes to classifications are agreed upon, they all need to be entered here at the same time.</p>
-                            <h5>{{ data.resolve_label }}</h5>
-                            <p class="text-info">
-                                Upon discussing this discordance with all relevant labs, if labs agree to re-classify, select the new clinical significance next to that lab.<br/>
-                                IMPORTANT: classifications will still need to be re-submitted to {{ site_name }} with these changes.
-                            </p>
+                        <div class="modal-body">
+                            <input type="hidden" name="action" value="action" />
+                            <input type="hidden" name="resolution" id="resolution" value="X" />
+                            {% csrf_token %}
+                            <div class="m-4">
+                                <p>{{ 'I' | severity_icon }} Use this dialog during or after a discussion with the other involved labs. If changes to classifications are agreed upon, they all need to be entered here at the same time.</p>
+                                <h5>{{ data.resolve_label }}</h5>
+                                <p class="text-info">
+                                    Upon discussing this discordance with all relevant labs, if labs agree to re-classify, select the new clinical significance next to that lab.<br/>
+                                    IMPORTANT: classifications will still need to be re-submitted to {{ site_name }} with these changes.
+                                </p>
 
-                            {% labelled label="Agreed Changes (if any)"%}
-                            <table class="table">
-                                <thead>
-                                    <tr>
-                                        <th>Lab</th>
-                                        <th>Current</th>
-                                        <th></th>
-                                        <th>Change To</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for lab_clin_sig in data.lab_clin_sigs %}
+                                {% labelled label="Agreed Changes (if any)"%}
+                                <table class="table">
+                                    <thead>
                                         <tr>
-                                            <td>{% lab lab_clin_sig.lab %}{% if lab_clin_sig.count > 1 %} x {{ lab_clin_sig.count }}{% endif %}</td>
-                                            <td class="cs-{{ lab_clin_sig.clin_sig }} text-center">{{ lab_clin_sig.clin_sig | ekey:"clinical_significance" }}</td>
-                                            <td style="vertical-align: middle;"><i class="fas fa-arrow-right"></i></td>
-                                            <td>
-                                                <select class="form-control clin-sig-change" name="{{ lab_clin_sig.lab.pk }}-{{ lab_clin_sig.clin_sig }}">
-                                                    {% for clin_sig in data.all_clin_sig_options %}
-                                                        {% if clin_sig.key == lab_clin_sig.pending_clin_sig %}
-                                                            <option value="{{ clin_sig.key }}" selected="selected">
-                                                                {{ clin_sig.label }}
-                                                                    {% if clin_sig.key == lab_clin_sig.clin_sig %} : NO CHANGE
-                                                                    {% elif clin_sig.key == lab_clin_sig.pending_clin_sig %} : ALREADY PENDING
-                                                                    {% endif %}
-                                                            </option>
-                                                        {% else %}
-                                                            <option value="{{ clin_sig.key }}">
-                                                                {{ clin_sig.label }}{% if clin_sig.key == lab_clin_sig.clin_sig %} : NO CHANGE{% endif %}
-                                                            </option>
-                                                        {% endif %}
-                                                    {% endfor %}
-                                                </select>
-                                            </td>
+                                            <th>Lab</th>
+                                            <th>Current</th>
+                                            <th></th>
+                                            <th>Change To</th>
                                         </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                            {% endlabelled %}
-                            {% labelled label="Resulting Status" %}<div id="resulting-status" class="font-weight-bold"></div>{% endlabelled %}
-                            {% labelled label="Notes*" %}<textarea id="notes" name="notes" class="form-control">{{ data.report.notes }}</textarea>{% endlabelled %}
-                            {% labelled label="" name="confirm" value_css="form-check" %}<label class="form-check-label"><input id="discordance-confirm" class="form-check-input" type="checkbox" />All changes have been agreed upon by the relevant lab(s)</label>{% endlabelled %}
-                            <div class="buttons"><button id="resolve-button" class="btn btn-primary" onclick="return submitCheck()">Apply</button></div>
+                                    </thead>
+                                    <tbody>
+                                        {% for lab_clin_sig in data.lab_clin_sigs %}
+                                            <tr>
+                                                <td>{% lab lab_clin_sig.lab %}{% if lab_clin_sig.count > 1 %} x {{ lab_clin_sig.count }}{% endif %}</td>
+                                                <td class="cs-{{ lab_clin_sig.clin_sig }} text-center">{{ lab_clin_sig.clin_sig | ekey:"clinical_significance" }}</td>
+                                                <td style="vertical-align: middle;"><i class="fas fa-arrow-right"></i></td>
+                                                <td>
+                                                    <select class="form-control clin-sig-change" name="{{ lab_clin_sig.lab.pk }}-{{ lab_clin_sig.clin_sig }}">
+                                                        {% for clin_sig in data.all_clin_sig_options %}
+                                                            {% if clin_sig.key == lab_clin_sig.pending_clin_sig %}
+                                                                <option value="{{ clin_sig.key }}" selected="selected">
+                                                                    {{ clin_sig.label }}
+                                                                        {% if clin_sig.key == lab_clin_sig.clin_sig %} : NO CHANGE
+                                                                        {% elif clin_sig.key == lab_clin_sig.pending_clin_sig %} : ALREADY PENDING
+                                                                        {% endif %}
+                                                                </option>
+                                                            {% else %}
+                                                                <option value="{{ clin_sig.key }}">
+                                                                    {{ clin_sig.label }}{% if clin_sig.key == lab_clin_sig.clin_sig %} : NO CHANGE{% endif %}
+                                                                </option>
+                                                            {% endif %}
+                                                        {% endfor %}
+                                                    </select>
+                                                </td>
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                                {% endlabelled %}
+                                {% labelled label="Resulting Status" %}<div id="resulting-status" class="font-weight-bold"></div>{% endlabelled %}
+                                {% labelled label="Notes*" %}<textarea id="notes" name="notes" class="form-control">{{ data.report.notes }}</textarea>{% endlabelled %}
+                                {% labelled label="" name="confirm" value_css="form-check" %}<label class="form-check-label"><input id="discordance-confirm" class="form-check-input" type="checkbox" />All changes have been agreed upon by the relevant lab(s)</label>{% endlabelled %}
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button id="resolve-button" class="btn btn-primary" onclick="return submitCheck()">Apply</button>
                         </div>
                     </form>
                 {% endmodal %}

@@ -355,7 +355,7 @@ class ModalTag(template.Node):
         modal = \
             f"""
                 <div id="{id_str}" class="modal" tabindex="-1">
-                    <div class="modal-dialog modal-dialog-scrollable modal-{size_str}">
+                    <div class="modal-dialog modal-{size_str}">
                         <div class="modal-content">
                             <div class="modal-header">
                                 <h5 class="modal-title">{label_str}</h5>
