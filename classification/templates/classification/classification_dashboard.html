@@ -74,7 +74,7 @@
         {% end_page_help_embedded %}
 
         <div data-toggle="ajax" href="{% url 'classification_dashboard_graph_detail' dlab.lab_picker.selection %}">
-            <div class="loading-message" style="height:381px">Loading Graph</div>
+            <div class="loading-message" style="height:390px">Loading Graph</div>
         </div>
         <div>
             <label>See recent activity for</label>: {% for lab in dlab.labs %}{% if not forloop.first %}, {% endif %}<a href="{% url 'activity_lab' lab.pk %}">{% lab lab %}</a>{% endfor %}
