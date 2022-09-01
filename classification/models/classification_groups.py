@@ -67,6 +67,10 @@ class ClassificationGroupUtils:
     def pending_changes_for(self, modification: ClassificationModification) -> Optional[str]:
         return self._pending_changes_flag_map.get(modification.classification.flag_collection_id)
 
+    @property
+    def any_pending_changes(self) -> bool:
+        return bool(self._pending_changes_flag_map)
+
 
 class ClassificationGroup:
 
