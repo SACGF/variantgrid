@@ -42,7 +42,7 @@ from snpdb.forms import TagForm
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.liftover import create_liftover_pipelines
 from snpdb.models import Variant, Sample, VCF, get_igv_data, Allele, AlleleMergeLog, \
-    AlleleConversionTool, ImportSource, AlleleOrigin, VariantAlleleSource
+    AlleleConversionTool, ImportSource, AlleleOrigin, VariantAlleleSource, VariantGridColumn
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_user_settings import UserSettings
 from snpdb.serializers import VariantAlleleSerializer
@@ -566,8 +566,15 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
     for vt in VariantTag.get_for_build(genome_build, variant_qs=variant.equivalent_variants):
         variant_tags.append(VariantTagSerializer(vt, context={"request": request}).data)
 
+    annotation_description = {}
+    vgc_qs = VariantGridColumn.objects.filter(variant_column__startswith='variantannotation__')
+    for variant_column, description in vgc_qs.values_list("variant_column", "description"):
+        field = variant_column.replace("variantannotation__", "")
+        annotation_description[field] = description
+
     context = {
         "ANNOTATION_PUBMED_SEARCH_TERMS_ENABLED": settings.ANNOTATION_PUBMED_SEARCH_TERMS_ENABLED,
+        "annotation_description": annotation_description,
         "annotation_version": annotation_version,
         "can_create_classification": Classification.can_create_via_web_form(request.user),
         "classifications": latest_classifications,

@@ -84,7 +84,29 @@ function enhanceAndMonitor() {
         }},
 
         // setup popovers
-        {test: '[data-content]', func: (node) => {node.addClass('hover-detail'); node.popover(popoverOpts);}},
+        {test: '[data-content]', func: (node) => {
+                node.addClass('hover-detail');
+                let poOpts = $.extend(true, {}, popoverOpts);  // clone
+                if (node.hasClass("popover-hover-stay")) {
+                    node.on("mouseenter", function () {
+                        let _this = this;
+                        $(this).popover("show");
+                        $(".popover").on("mouseleave", function () {
+                            $(_this).popover('hide');
+                        });
+                    }).on("mouseleave", function () {
+                        let _this = this;
+                        setTimeout(function () {
+                            if (!$(".popover:hover").length) {
+                                $(_this).popover("hide");
+                            }
+                        }, 300);
+                    });
+                    poOpts["trigger"] = "manual";
+                }
+                node.popover(poOpts);
+            }
+        },
 
         // everything with a title (that isn't data-content aka popover) give a tooltip
         {test: '[title]:not([data-content])',

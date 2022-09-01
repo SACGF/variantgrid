@@ -163,7 +163,7 @@ def render_labelled(parser, token):
                             label_css=kwargs.get('label_css'),
                             value_css=kwargs.get('value_css'),
                             row_css=kwargs.get('row_css'),
-                            shorten_label=kwargs.get('shorten_label'),
+                            help=kwargs.get('help'),
                             admin_only=kwargs.get('admin_only'),
                             errors=kwargs.get('errors')
                             )
@@ -178,7 +178,7 @@ class LabelledValueTag(template.Node):
                  label_css: FilterExpression = None,
                  value_css: FilterExpression = None,
                  row_css: FilterExpression = None,
-                 shorten_label: FilterExpression = None,
+                 help: FilterExpression = None,
                  admin_only: FilterExpression = None,
                  errors: FilterExpression = None):
         self.id_prefix = id_prefix
@@ -189,7 +189,7 @@ class LabelledValueTag(template.Node):
         self.label_css = label_css
         self.value_css = value_css
         self.row_css = row_css
-        self.shorten_label = shorten_label
+        self.help = help
         self.admin_only = admin_only
         self.errors = errors
 
@@ -211,22 +211,7 @@ class LabelledValueTag(template.Node):
             else:
                 label = '<i class="fas fa-key" title="Admin only functionality"></i>' + label
 
-        popover = None
-
-        if TagUtils.value_bool(context, self.shorten_label):
-            first_fullstop = label.find('. ')
-            if first_fullstop != -1:
-                first_fullstop += 1
-
-            if first_fullstop == -1:
-                first_fullstop = label.find('</a>')
-                if first_fullstop != -1:
-                    first_fullstop += 4
-
-            if first_fullstop != -1:
-                popover = label
-                label = label[0:first_fullstop]
-
+        help_html = TagUtils.value_str(context, self.help)
         hint = TagUtils.value_str(context, self.hint)
         label_css = ""
         value_css = ""
@@ -278,19 +263,18 @@ class LabelledValueTag(template.Node):
             if errors := filter_errors.resolve(context):
                 for error in errors:
                     output += f'<div class="text-danger">{error}</div>'
+        help_tag = ""
+        if help_html:
+            help_html = help_html.replace('"', "'")  # Used double quotes around data-content
+            help_tag = f' <i class="fas fa-duotone fa-info-circle hover-detail popover-hover-stay" data-toggle="popover" data-html="true" data-content="{help_html}" delay="100"></i>'
 
-        label_tag = f'<label {for_id} class="{label_css}">{label}</label>'
-        if popover:
-            popover = popover.replace('"', '&quot;')
-            label_tag = f'<label {for_id} class="{label_css} hover-detail" data-toggle="popover" data-content="{popover}">{label}</label>'
-
+        label_tag = f'<label {for_id} class="{label_css}">{label}{help_tag}</label>'
         content = f"""{label_tag}<div {div_id} class="{value_css}">{output}</div>"""
 
         if hint == "inline":
             return content
 
         content = f'<div class="{row_css}">{content}</div>'
-
         return content
 
 
