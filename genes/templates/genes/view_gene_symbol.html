@@ -297,7 +297,7 @@
                             {% endlabelled %}
                         {% endfor %}
 
-                        {% labelled label="Gene Indispensability" help=annotation_description.gene_indispensability_score %}{{ dbnsfp_gene_annotation.gene_indispensability_score|floatformat:4 }} ({{ dbnsfp_gene_annotation.gene_indispensability_pred }}) {% endlabelled %}
+                        {% labelled label="Gene Indispensability" help=annotation_description.gene_indispensability_score %}{{ dbnsfp_gene_annotation.gene_indispensability_score|floatformat:4 }} ({{ dbnsfp_gene_annotation.get_gene_indispensability_pred_display }}) {% endlabelled %}
                         {% labelled label="Essential Gene" help=annotation_description.essential_gene %}
                             CRISPR: {{ dbnsfp_gene_annotation.get_essential_gene_crispr_display }}
                             CRISPR2: {{ dbnsfp_gene_annotation.get_essential_gene_crispr2_display }}

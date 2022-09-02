@@ -288,6 +288,13 @@ class DBNSFPGeneAnnotation(PostgresPartitionedModel, TimeStampedModel):
     essential_gene_gene_trap = models.CharField(max_length=1, null=True, blank=True,
                                                 choices=EssentialGeneGeneTrap.choices)
 
+    def get_gene_indispensability_pred_display(self) -> str:
+        if self.gene_indispensability_pred is None:
+            return "n/a"
+        elif self.gene_indispensability_pred:
+            return "Essential"
+        return "LoF tolerant"
+
     class PartitioningMeta:
         method = PostgresPartitioningMethod.LIST
         key = ["version_id"]
