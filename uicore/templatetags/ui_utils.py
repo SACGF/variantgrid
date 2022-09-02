@@ -266,7 +266,7 @@ class LabelledValueTag(template.Node):
         help_tag = ""
         if help_html:
             help_html = help_html.replace('"', "'")  # Used double quotes around data-content
-            help_tag = f' <i class="fas fa-duotone fa-info-circle hover-detail popover-hover-stay" data-toggle="popover" data-html="true" data-content="{help_html}" delay="100"></i>'
+            help_tag = f' <i class="fas fa-duotone fa-info-circle hover-detail popover-hover-stay" data-toggle="popover" popover-header="{label}" data-html="true" data-placement="left" data-content="{help_html}"></i>'
 
         label_tag = f'<label {for_id} class="{label_css}">{label}{help_tag}</label>'
         content = f"""{label_tag}<div {div_id} class="{value_css}">{output}</div>"""

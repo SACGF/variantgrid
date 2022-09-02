@@ -540,7 +540,7 @@ function applyVariantValues() {
                 {% if variant.can_have_annotation and variant_show_canonical_hgvs %}
                     {% labelled id="variant-canonical-c-hgvs" label="Canonical c.HGVS" %}Loading...{% endlabelled %}
                 {% endif %}
-                {% labelled id="allele" label="Allele" %}Loading...{% endlabelled %}
+                {% labelled id="allele" label="Allele" help=annotation_description.allele %}Loading...{% endlabelled %}
                 {% labelled id="quick-links" label="Quick Links" %}Loading...{% endlabelled %}
             </div>
 
@@ -853,7 +853,7 @@ function applyVariantValues() {
                                     <span class="text-secondary">&nbsp;position&nbsp;</span>
                                     <span id="spliceai_pred_dp_dl" class="text-monospace text-right">{{ variant_annotation.spliceai_pred_dp_dl }}</span>
                                 {% endlabelled %}
-                                {% labelled id="spliceai_gene_symbol" label="SpliceAI Gene Symbol'n" help=annotation_description.spliceai_gene_symbol hint="tiny" %}{{ variant_annotation.spliceai_gene_symbol }}{% endlabelled %}
+                                {% labelled id="spliceai_gene_symbol" label="SpliceAI Gene Symbol" help=annotation_description.spliceai_gene_symbol hint="tiny" %}{{ variant_annotation.spliceai_gene_symbol }}{% endlabelled %}
                             {% else %}
                                 {% labelled id='spliceai_none' label='SpliceAI' hint="tiny" value_css="no-value" %}No SpliceAI Data{% endlabelled %}
                             {% endif %}

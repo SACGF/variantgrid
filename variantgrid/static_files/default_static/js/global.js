@@ -55,7 +55,7 @@ function enhanceAndMonitor() {
         html: true,
         trigger: 'hover click',
         title: function() {
-            return 'Help';
+            return $(this).attr('popover-header') || 'Help';
         },
         content: function() {
             return $(this).attr('title');

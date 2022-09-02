@@ -515,6 +515,7 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
     num_clinvar_citations = 0
     clinvar_citations = None
     num_variant_annotation_versions = variant.variantannotation_set.count()
+    user_settings = UserSettings.get_for_user(request.user)
 
     latest_classifications = ClassificationModification.latest_for_user(
         user=request.user,
@@ -567,10 +568,11 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
         variant_tags.append(VariantTagSerializer(vt, context={"request": request}).data)
 
     annotation_description = {}
-    vgc_qs = VariantGridColumn.objects.filter(variant_column__startswith='variantannotation__')
-    for variant_column, description in vgc_qs.values_list("variant_column", "description"):
-        field = variant_column.replace("variantannotation__", "")
-        annotation_description[field] = description
+    if user_settings.tool_tips:
+        annotation_description["allele"] = "An Allele is genome build independent - ie GRCh37 and GRCh38 variants for same change are linked by an allele"
+        vgc_qs = VariantGridColumn.objects.all()
+        for grid_column_name, description in vgc_qs.values_list("grid_column_name", "description"):
+            annotation_description[grid_column_name] = description
 
     context = {
         "ANNOTATION_PUBMED_SEARCH_TERMS_ENABLED": settings.ANNOTATION_PUBMED_SEARCH_TERMS_ENABLED,
