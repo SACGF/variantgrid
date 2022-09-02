@@ -333,7 +333,7 @@ class GeneSymbolViewInfo:
 def export_classifications_gene_symbol(request, gene_symbol: str, genome_build_name: str):
     genome_build = GenomeBuild.get_from_fuzzy_string(genome_build_name)
     gene_symbol_info = GeneSymbolViewInfo(
-        gene_symbol=gene_symbol,
+        gene_symbol=get_object_or_404(GeneSymbol, pk=gene_symbol),
         desired_genome_build=genome_build,
         user=request.user
     )
@@ -439,7 +439,6 @@ def view_transcript(request, transcript_id):
     genome_build_genes = [GenomeBuildGenes(genome_build, sorted(gene_by_build.get(genome_build))) for genome_build in genome_builds]
     transcript_version_details: List[TranscriptVersionDetails] = list()
 
-    build_genes: List[GenomeBuild] = [gene_by_build.get(genome_build) for genome_build in genome_builds]
     build_matcher = {genome_build: HGVSMatcher(genome_build) for genome_build in genome_builds}
     for version in sorted(versions):
         transcript_accession = f"{transcript}.{version}"
