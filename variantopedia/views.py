@@ -569,10 +569,9 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
 
     annotation_description = {}
     if user_settings.tool_tips:
-        annotation_description["allele"] = "An Allele is genome build independent - ie GRCh37 and GRCh38 variants for same change are linked by an allele"
-        vgc_qs = VariantGridColumn.objects.all()
-        for grid_column_name, description in vgc_qs.values_list("grid_column_name", "description"):
-            annotation_description[grid_column_name] = description
+        annotation_description = VariantGridColumn.get_column_descriptions()
+        annotation_description["allele"] = "An Allele is genome build independent - ie GRCh37 and GRCh38 variants for" \
+                                           " the same change are linked by an allele"
 
     context = {
         "ANNOTATION_PUBMED_SEARCH_TERMS_ENABLED": settings.ANNOTATION_PUBMED_SEARCH_TERMS_ENABLED,

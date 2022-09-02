@@ -86,7 +86,7 @@ function enhanceAndMonitor() {
         // setup popovers
         {test: '[data-content]', func: (node) => {
                 node.addClass('hover-detail');
-                let poOpts = $.extend(true, {}, popoverOpts);  // clone
+                let poOpts = Object.assign({}, popoverOpts);  // clone
                 if (node.hasClass("popover-hover-stay")) {
                     node.on("mouseenter", function () {
                         let _this = this;

@@ -49,7 +49,7 @@ from library.django_utils import get_field_counts, add_save_message
 from library.utils import defaultdict_to_dict, LazyAttribute
 from ontology.models import OntologySnake, OntologyService, OntologyTerm
 from seqauto.models import EnrichmentKit
-from snpdb.models import CohortGenotypeCollection, Cohort, VariantZygosityCountCollection, Sample
+from snpdb.models import CohortGenotypeCollection, Cohort, VariantZygosityCountCollection, Sample, VariantGridColumn
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_user_settings import UserSettings
 from snpdb.models.models_variant import Variant
@@ -161,6 +161,7 @@ class GeneSymbolViewInfo:
         self.gene_symbol = gene_symbol
         self.desired_genome_build = desired_genome_build
         self.user = user
+        self.user_settings = UserSettings.get_for_user(user)
 
     @lazy
     def omim_and_hpo_for_gene(self) -> List[Tuple[OntologyTerm, List[OntologyTerm]]]:
@@ -267,6 +268,23 @@ class GeneSymbolViewInfo:
         return gene_external_urls
 
     @lazy
+    def annotation_description(self):
+        descriptions = {}
+        if self.user_settings.tool_tips:
+            descriptions = VariantGridColumn.get_column_descriptions()
+            descriptions["gnomad_gene_constraint"] = """
+            constraint score shown in gnomAD is the ratio of the observed / expected (oe) number of loss-of-function
+            variants in that gene. The expected counts are based on a mutational model that takes sequence context,
+            coverage and methylation into account. Low oe values are indicative of strong intolerance. Range is 90%
+            confidence interval. <a href='http://gnomad-sg.org/help/constraint'>Details at gnomAD</a> """
+            descriptions["essential_gene"] = f"""
+                <p><b>CRISPR:</b> {descriptions['essential_gene_crispr']}</p>
+                <p><b>CRISPR2:</b>{descriptions['essential_gene_crispr2']}</p>
+                <p><b>Gene Trap:</b>{descriptions['essential_gene_gene_trap']}</p>
+            """
+        return descriptions
+
+    @lazy
     def has_gene_coverage(self) -> bool:
         if not settings.VIEW_GENE_SYMBOL_SHOW_GENE_COVERAGE:
             return False
@@ -343,6 +361,7 @@ def view_gene_symbol(request, gene_symbol: str, genome_build_name: Optional[str]
     context = LazyAttribute.lazy_context(
         view_info,
         [
+            "annotation_description",
             "consortium_genes_and_aliases",
             "citations",
             "dbnsfp_gene_annotation",
