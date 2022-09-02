@@ -855,7 +855,7 @@ function applyVariantValues() {
                                 {% endlabelled %}
                                 {% labelled id="spliceai_gene_symbol" label="SpliceAI Gene Symbol" help=annotation_description.spliceai_gene_symbol hint="tiny" %}{{ variant_annotation.spliceai_gene_symbol }}{% endlabelled %}
                             {% else %}
-                                {% labelled id='spliceai_none' label='SpliceAI' hint="tiny" value_css="no-value" %}No SpliceAI Data{% endlabelled %}
+                                {% labelled id='spliceai_none' label='SpliceAI' help=annotation_description.spliceai hint="tiny" value_css="no-value" %}No SpliceAI Data{% endlabelled %}
                             {% endif %}
                         </div>
                     </div>

@@ -572,6 +572,8 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
         annotation_description = VariantGridColumn.get_column_descriptions()
         annotation_description["allele"] = "An Allele is genome build independent - ie GRCh37 and GRCh38 variants for" \
                                            " the same change are linked by an allele"
+        annotation_description["maxentscan"] = "<a href='http://hollywood.mit.edu/burgelab/maxent/Xmaxentscan_scoreseq.html'>MaxEntScan</a> scores for human 5 prime splice sites."
+        annotation_description["spliceai"] = "Deep Learning splicing predictor - see <a href='https://www.sciencedirect.com/science/article/pii/S0092867418316295?via%3Dihub'>SpliceAI</a>"
 
     context = {
         "ANNOTATION_PUBMED_SEARCH_TERMS_ENABLED": settings.ANNOTATION_PUBMED_SEARCH_TERMS_ENABLED,
