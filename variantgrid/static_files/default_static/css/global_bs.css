@@ -553,6 +553,10 @@ span.cs {
   background: repeating-linear-gradient(-45deg, #ddd, #ddd 10px, #eee 10px, #eee 20px);
 }
 
+.cs-withdrawn {
+  opacity: 0.5;
+}
+
 .cs-card {
   text-align: center;
   padding: 0 10px 16px 10px;

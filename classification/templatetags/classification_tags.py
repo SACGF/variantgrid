@@ -176,9 +176,13 @@ def classification_changes(changes):
 @register.inclusion_tag("classification/tags/clinical_significance.html")
 def clinical_significance(value):
     key = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE)
+    label = key.option_dictionary.get(value, value) or "Unclassified"
+    if value == "withdrawn":
+        label = "Withdrawn"
+
     return {
         "key": value.lower(),
-        "label": key.option_dictionary.get(value, value) or "Unclassified"
+        "label": label
     }
 
 @register.inclusion_tag("classification/tags/clinical_significance_inline.html")

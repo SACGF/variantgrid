@@ -628,6 +628,9 @@ span.cs {
     #eee 10px,
     #eee 20px)
 }
+.cs-withdrawn {
+  opacity: 0.5;
+}
 
 .cs-card {
   text-align: center;
@@ -999,7 +1002,14 @@ ul.compact {
     border-radius: 4px;
     background-color: #F0D9ED !important;
 }
-
+/*
+.overlap-container {
+  div:first-of-type {
+    border-radius-top-left: 5px;
+    border-radius-top-right: 5px;
+  }
+}
+*/
 // discordance levels from most disagreeable to least
 .overlap-discordant {
     color: #b44;
