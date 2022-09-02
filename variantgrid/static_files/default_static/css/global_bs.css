@@ -967,6 +967,14 @@ ul.compact li:before {
   background-color: #F0D9ED !important;
 }
 
+/*
+.overlap-container {
+  div:first-of-type {
+    border-radius-top-left: 5px;
+    border-radius-top-right: 5px;
+  }
+}
+*/
 .overlap-discordant {
   color: #b44;
   font-weight: 600;

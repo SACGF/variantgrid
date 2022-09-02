@@ -6,11 +6,11 @@
                 {% lab lab_summ.lab your_lab=lab_summ.is_internal %}
                 {% if lab_summ.count > 1 %}<span class="d-inline-block mx-1 text-muted">x</span>{{ lab_summ.count }}{% endif %}
             </div>
-            <div class="col-5 py-2 cs-{{ lab_summ.clinical_significance_to }}" style="border-radius:5px">
+            <div class="col-5 py-2 cs-{{ lab_summ.clinical_significance_to }}" style="border-radius:5px; padding-left: 8px">
                 {% if lab_summ.changed %}
                     <del>{{ lab_summ.clinical_significance_from|ekey:'clinical_significance' }}</del> <i class="fas fa-arrow-right mx-2 text-secondary"></i>
                     {{ lab_summ.clinical_significance_to|ekey:'clinical_significance' }}
-                    {% if lab_summ.pending %}<div title="This is an agreed upon pending change" class="flag flag-classification_pending_changes hover-detail ml-1" style="position:relative; top: 5px"></div>{% endif %}
+                    {% if lab_summ.pending %}<div title="This is an agreed upon pending change" class="flag flag-classification_pending_changes hover-detail ml-1" style="position:relative; top: 5px; margin-top: -5px"></div>{% endif %}
                 {% else %}
                 {{ lab_summ.clinical_significance_from|ekey:'clinical_significance' }}
                 {% endif %}
