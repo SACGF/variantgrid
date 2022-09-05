@@ -465,7 +465,7 @@ class OntologyTermRelation(PostgresPartitionedModel, TimeStampedModel):
             return -1 if other1.index < other2.index else 1
 
         if otr_qs is None:
-            otr_qs = OntologyVersion.latest().get_ontology_term_relations()
+            otr_qs = OntologyVersion.get_latest_and_live_ontology_qs()
 
         items = list(otr_qs.filter(Q(source_term=term) | Q(dest_term=term)))
         items.sort(key=functools.cmp_to_key(sort_relationships))
@@ -561,6 +561,13 @@ class OntologyVersion(TimeStampedModel):
 
     def get_ontology_term_relations(self):
         return OntologyTermRelation.objects.filter(from_import__in=self.get_ontology_imports())
+
+    @staticmethod
+    def get_latest_and_live_ontology_qs():
+        latest = OntologyVersion.latest()
+        # live relationships of panelappau aren't versioned
+        # TODO could restrict only if we have live enabled in settings
+        return OntologyTermRelation.objects.filter(Q(from_import__in=latest.get_ontology_imports()) | Q(relation='panelappau'))
 
     def get_gene_disease_relations_qs(self) -> QuerySet:
         return self.get_ontology_term_relations().filter(relation=OntologyRelation.RELATED,
@@ -725,7 +732,7 @@ class OntologySnake:
             return OntologySnakes([OntologySnake(source_term=term)])
 
         if otr_qs is None:
-            otr_qs = OntologyVersion.latest().get_ontology_term_relations()
+            otr_qs = OntologyVersion.get_latest_and_live_ontology_qs()
             # otr_qs = OntologyTermRelation.objects.all()
 
         seen: Set[OntologyTerm] = set()
