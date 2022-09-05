@@ -112,6 +112,7 @@ class ClinVarExportConverter:
         classification_flag_types.discordant: JsonMessages.error("Classification is in discordance"),
         classification_flag_types.internal_review: JsonMessages.error("Classification is in internal review"),
         classification_flag_types.classification_outstanding_edits: JsonMessages.error("Classification has un-submitted changes"),
+        classification_flag_types.classification_pending_changes: JsonMessages.error("Classification has pending changes"),
         # classification_flag_types.classification_not_public - this has special handling to include a comment
     }
 
