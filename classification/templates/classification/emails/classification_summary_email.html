@@ -25,7 +25,11 @@ Hello Shariant User,
         </li>
        {% endcomment %}
         {% if lab_summary.pending_changes_count %}
-            <li>Has {{ lab_summary.pending_changes_count }} outstanding pending classification changes agreed upon during discordance resolution</li>
+            <li>
+            {% if lab_summary.pending_changes_count == 1 %}There is 1 outstanding pending classification change that has been agreed upon during discordance resolution</li>
+            {% else %}There are {{ lab_summary.pending_changes_count }} outstanding pending classification changes that have been agreed upon during discordance resolution</li>
+            {% endif %}
+            </li>
         {% endif %}
 
         {% if lab_summary.discordance_report_summaries|length %}
