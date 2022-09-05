@@ -92,6 +92,7 @@ class DiscordanceStatus:
     counted_classifications: int
     pending_concordance: bool = False
     discordance_report: Optional['DiscordanceReport'] = None
+    has_ignored_clin_sigs: bool = False
 
     def __str__(self):
         if self.pending_concordance:
@@ -188,6 +189,7 @@ class DiscordanceStatus:
         cs_values: Set[str] = set()   # all the different clinical sig values
         shared_labs: Set[Lab] = set()   # all the sharing labs
         all_labs: Set[Lab] = set()   # all labs involved (sharing and not sharing, only sharing records determine the status)
+        ignored_clin_sigs: Set[str] = set()  # all clin sigs that we came across but
 
         level: Optional[DiscordanceLevel]
         counted_classifications = 0
@@ -201,6 +203,10 @@ class DiscordanceStatus:
                     shared_labs.add(row.lab)
                     cs_scores.add(strength)
                     cs_values.add(clin_sig)
+                else:
+                    shared_labs.add(row.lab)
+                    ignored_clin_sigs.add(clin_sig)
+
                 if vus_special := SPECIAL_VUS.get(clin_sig):
                     cs_vuses.add(vus_special)
 
@@ -229,7 +235,13 @@ class DiscordanceStatus:
         else:
             level = DiscordanceLevel.CONCORDANT_AGREEMENT
 
-        return DiscordanceStatus(level=level, lab_count=len(shared_labs), lab_count_all=len(all_labs), counted_classifications=counted_classifications)
+        return DiscordanceStatus(
+            level=level,
+            lab_count=len(shared_labs),
+            lab_count_all=len(all_labs),
+            counted_classifications=counted_classifications,
+            has_ignored_clin_sigs=bool(ignored_clin_sigs)
+        )
 
 
 class ClinicalContextRecalcTrigger(Enum):
