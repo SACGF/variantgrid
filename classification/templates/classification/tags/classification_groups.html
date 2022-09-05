@@ -20,8 +20,8 @@
         {% if ccg.latest_report and ccg.latest_report.resolution != 'C' %}
             <a href="{% url 'discordance_report' ccg.latest_report.id %}" class="hover-link">Click for Discordance Report</a>
         {% endif %}
-        {% if discordance_status.ignored_clin_sigs %}
-            {{ 'i'|severity_icon }} The following clinical significances are not used in discordance calculations: {% for clin_sig in data.bucketless_clin_sig_options %}{% if not forloop.first %}, {% endif %}{{ clin_sig.label }}{% endfor %}
+        {% if discordance_status.has_ignored_clin_sigs %}
+            <div>{{ 'i'|severity_icon }} Some clinical significances do not count towards discordance calculations.</div>
         {% endif %}
     {% endwith %}
 {% endfor %}
