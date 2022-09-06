@@ -53,15 +53,15 @@ def send_discordance_notification(discordance_report: DiscordanceReport, cause: 
         for sig_lab in report_summary.lab_significances:
             count_text = ""
             if sig_lab.count > 1:
-                count_text = f"x {sig_lab.count} "
+                count_text = f" x {sig_lab.count} "
             pending_text = ""
             if sig_lab.pending:
                 pending_text = " (PENDING)"
 
             if sig_lab.changed:
-                notification.add_field(f"{sig_lab.lab} {count_text}", f"{clin_sig_key.pretty_value(sig_lab.clinical_significance_from)} -> {clin_sig_key.pretty_value(sig_lab.clinical_significance_to)}{pending_text}")
+                notification.add_field(f"{sig_lab.lab}{count_text}", f"{clin_sig_key.pretty_value(sig_lab.clinical_significance_from)} -> {clin_sig_key.pretty_value(sig_lab.clinical_significance_to)}{pending_text}")
             else:
-                notification.add_field(f"{sig_lab.lab} {count_text}", f"{clin_sig_key.pretty_value(sig_lab.clinical_significance_from)}")
+                notification.add_field(f"{sig_lab.lab}{count_text}", f"{clin_sig_key.pretty_value(sig_lab.clinical_significance_from)}")
 
         # don't want to include notes in email as the text might be too sensitive
 
