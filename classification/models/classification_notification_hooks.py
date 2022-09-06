@@ -53,7 +53,7 @@ def send_discordance_notification(discordance_report: DiscordanceReport, cause: 
         for sig_lab in report_summary.lab_significances:
             count_text = ""
             if sig_lab.count > 1:
-                count_text = f" x {sig_lab.count} "
+                count_text = f" x {sig_lab.count}"
             pending_text = ""
             if sig_lab.pending:
                 pending_text = " (PENDING)"
