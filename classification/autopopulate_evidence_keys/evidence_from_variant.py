@@ -211,12 +211,16 @@ def get_evidence_fields_for_variant(genome_build: GenomeBuild, variant: Variant,
     evidence_transcript_columns = {}  # These need to be copied off TranscriptVersion object
     evidence_variant_columns = {}  # Copied from query
     for evidence_key in evidence_keys_list:
-        variantgrid_column = evidence_key.variantgrid_column
-        if variantgrid_column:
+        if variantgrid_column := evidence_key.variantgrid_column:
             if variantgrid_column.annotation_level == ColumnAnnotationLevel.TRANSCRIPT_LEVEL:
                 evidence = evidence_transcript_columns
             else:
                 evidence = evidence_variant_columns
+
+            # Only include gene annotation columns if we have them
+            if not settings.ANNOTATION_GENE_ANNOTATION_VERSION_ENABLED:
+                if variantgrid_column.annotation_level == ColumnAnnotationLevel.GENE_LEVEL:
+                    continue
 
             evidence[evidence_key.key] = {'col': variantgrid_column.variant_column,
                                           'immutable': evidence_key.immutable,
