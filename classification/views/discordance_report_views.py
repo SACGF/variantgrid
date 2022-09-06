@@ -70,11 +70,12 @@ class _LabClinSig:
     def is_pending(self) -> bool:
         return self.lab_clin_sig_key != self.pending_clin_sig
 
+    @property
+    def _sort_order(self):
+        return EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE).classification_sorter_value(self.clin_sig), self.lab
+
     def __lt__(self, other):
-        if self.lab == other.lab:
-            sorter = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE).classification_sorter_value
-            return sorter(self.clin_sig) < sorter(other.clin_sig)
-        return self.lab < other.lab
+        return self._sort_order < other._sort_order
 
 
 class DiscordanceReportTemplateData:
@@ -215,6 +216,8 @@ class DiscordanceReportTemplateData:
                     suggested_pending_cs = pending_cs
 
             lab_clin_sigs.append(_LabClinSig(lab_clin_sig_key=key, pending_clin_sig=suggested_pending_cs, count=total_count))
+
+        lab_clin_sigs.sort()
 
         return lab_clin_sigs
 
