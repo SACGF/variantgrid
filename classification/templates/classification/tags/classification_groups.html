@@ -21,7 +21,7 @@
             <a href="{% url 'discordance_report' ccg.latest_report.id %}" class="hover-link">Click for Discordance Report</a>
         {% endif %}
         {% if discordance_status.has_ignored_clin_sigs %}
-            <div>{{ 'i'|severity_icon }} Some clinical significances do not count towards discordance calculations.</div>
+            <div>{{ 'i'|severity_icon }} <span class="text-info">Some clinical significances do not count towards discordance calculations.</span></div>
         {% endif %}
     {% endwith %}
 {% endfor %}
