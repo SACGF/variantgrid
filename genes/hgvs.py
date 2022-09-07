@@ -906,7 +906,7 @@ class HGVSMatcher:
         return hgvs_extra.format(max_ref_length=max_ref_length)
 
     @staticmethod
-    def _fast_variant_coordinate_go_g_hgvs(refseq_accession, offset, ref, alt) -> str:
+    def _fast_variant_coordinate_to_g_hgvs(refseq_accession, offset, ref, alt) -> str:
         """ This only works for SNPs (ie not indels etc) """
         return f"{refseq_accession}:g.{offset}{ref}>{alt}"
 
@@ -916,7 +916,7 @@ class HGVSMatcher:
             g_hgvs = self.variant_to_hgvs(variant)
             g_hgvs_str = f"{refseq_accession}:{g_hgvs}"
         else:
-            g_hgvs_str = self._fast_variant_coordinate_go_g_hgvs(refseq_accession, variant.locus.position,
+            g_hgvs_str = self._fast_variant_coordinate_to_g_hgvs(refseq_accession, variant.locus.position,
                                                                  variant.locus.ref.seq, variant.alt.seq)
         return g_hgvs_str
 
@@ -926,7 +926,7 @@ class HGVSMatcher:
         contig = self.genome_build.chrom_contig_mappings[chrom]
         alt_length = len(alt)
         if alt_length == 1 and len(ref) == alt_length:
-            hgvs_str = self._fast_variant_coordinate_go_g_hgvs(contig.refseq_accession, offset, ref, alt)
+            hgvs_str = self._fast_variant_coordinate_to_g_hgvs(contig.refseq_accession, offset, ref, alt)
         else:
             hgvs_name = pyhgvs.variant_to_hgvs_name(chrom, offset, ref, alt, self.genome_build.genome_fasta.fasta,
                                                     transcript=None)
