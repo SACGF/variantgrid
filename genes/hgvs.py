@@ -908,7 +908,11 @@ class HGVSMatcher:
     @staticmethod
     def _fast_variant_coordinate_to_g_hgvs(refseq_accession, offset, ref, alt) -> str:
         """ This only works for SNPs (ie not indels etc) """
-        return f"{refseq_accession}:g.{offset}{ref}>{alt}"
+        if ref == alt:
+            hgvs_allele = f"{ref}="
+        else:
+            hgvs_allele = f"{ref}>{alt}"
+        return f"{refseq_accession}:g.{offset}{hgvs_allele}"
 
     def variant_to_g_hgvs(self, variant: Variant) -> str:
         refseq_accession = variant.locus.contig.refseq_accession
@@ -917,7 +921,7 @@ class HGVSMatcher:
             g_hgvs_str = f"{refseq_accession}:{g_hgvs}"
         else:
             g_hgvs_str = self._fast_variant_coordinate_to_g_hgvs(refseq_accession, variant.locus.position,
-                                                                 variant.locus.ref.seq, variant.alt.seq)
+                                                                 variant.locus.ref.seq, variant.vcf_alt)
         return g_hgvs_str
 
     def variant_coordinate_to_g_hgvs(self, variant_coordinate: VariantCoordinate) -> str:
