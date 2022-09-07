@@ -20,8 +20,9 @@ def _one_off_gene_annotation_assign_ontology_version(apps, schema_editor):
             print("Warning: Could not find OntologyVersion for GeneAnnotationVersion pk={gav.pk}" \
                   f" with ontology versions <= {last_ontology_import_id=}. Using legacy OntologyVersion ({legacy.pk})")
             ov = legacy
-        gav.ontology_version = ov
-        gav.save()
+        if ov:
+            gav.ontology_version = ov
+            gav.save()
 
 
 class Migration(migrations.Migration):
