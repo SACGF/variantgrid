@@ -8,7 +8,7 @@ from django.utils import timezone
 from lazy import lazy
 from model_utils.models import now
 
-from ontology.models import OntologyTermRelation, OntologyTerm, OntologyImport
+from ontology.models import OntologyTermRelation, OntologyTerm, OntologyImport, OntologyTermStatus
 
 
 class OntologyBuilderDataUpToDateException(Exception):
@@ -192,7 +192,7 @@ class OntologyBuilder:
                  extra: Optional[Dict] = None,
                  aliases: Optional[List[str]] = None,
                  primary_source: bool = True,
-                 deprecated: Optional[bool] = None):
+                 status: Optional[OntologyTermStatus] = None):
 
         cached = self._fetch_term(term_id)
         if not primary_source and cached.status == ModifiedStatus.EXISTING:
@@ -226,7 +226,12 @@ class OntologyBuilder:
         if aliases is not None or primary_source:
             term.aliases = aliases or list()
 
-        term.deprecated = deprecated or (name and "obsolete" in name.lower())
+        if not status:
+            if "obsolete" in name.lower():
+                status = OntologyTermStatus.DEPRECATED
+            else:
+                status = OntologyTermStatus.CONDITION
+        term.status = status
 
     def complete(self, purge_old_relationships=False, purge_old_terms=False, verbose=True):
         """
@@ -236,7 +241,7 @@ class OntologyBuilder:
         """
 
         CachedObj.bulk_apply(OntologyTerm, self.terms.values(),
-                             ["name", "definition", "extra", "aliases", "from_import", "modified", "deprecated"], verbose=verbose)
+                             ["name", "definition", "extra", "aliases", "from_import", "modified", "status"], verbose=verbose)
         CachedObj.bulk_apply(OntologyTermRelation, self.relations.values(),
                              ["extra", "from_import", "modified"], verbose=verbose)
 

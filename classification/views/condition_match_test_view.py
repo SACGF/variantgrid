@@ -2,16 +2,18 @@ from datetime import datetime
 from typing import Optional
 
 from django.contrib import messages
+from django.db.models import Q
 from django.db.models.functions import Length
 from django.http import StreamingHttpResponse
 from django.shortcuts import render
 
 from classification.models import ConditionText, top_level_suggestion, condition_matching_suggestions, \
-    ConditionMatchingSuggestion
+    ConditionMatchingSuggestion, ConditionTextMatch
 from genes.models import GeneSymbol
+from library.django_utils import require_superuser
 from library.log_utils import report_exc_info
 from library.utils import delimited_row
-from ontology.models import OntologySnake
+from ontology.models import OntologySnake, OntologyVersion, OntologyTermStatus, OntologyImportSource
 from ontology.ontology_matching import OntologyMatching, SearchText, normalize_condition_text
 
 
@@ -125,3 +127,29 @@ def condition_match_test_view(request):
     }
 
     return render(request, 'classification/condition_match_test.html', context=context)
+
+
+@require_superuser
+def condition_obsoletes_view(request):
+    # find relationships to obsolete terms
+    relationships_qs = OntologyVersion.latest().get_ontology_term_relations()
+    # only care about obsolete relationships from Panel App AU
+    obsolete_relations = relationships_qs\
+        .filter(from_import__import_source=OntologyImportSource.PANEL_APP_AU)\
+        .filter(
+            Q(source_term__status__ne=OntologyTermStatus.CONDITION) | Q(dest_term__status__ne=OntologyTermStatus.CONDITION)
+        )
+
+    obsolete_condition_matches = list()
+    for ctm in ConditionTextMatch.objects.filter(condition_xrefs__isnull=False):
+        for term in ctm.condition_xref_terms:
+            if term.is_obsolete:
+                obsolete_condition_matches.append(ctm)
+                break
+
+    context = {
+        "obsolete_relations": obsolete_relations,
+        "obsolete_condition_matches": obsolete_condition_matches
+    }
+
+    return render(request, 'classification/condition_obsoletes.html', context=context)

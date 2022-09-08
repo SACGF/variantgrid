@@ -16,7 +16,8 @@ from classification.views.clinvar_export_view import ClinVarMatchView, clinvar_m
 from classification.views.classification_view import ClassificationView, LabGeneClassificationCountsView
 from classification.views.classification_view_metrics import view_classification_metrics, \
     view_page_metrics_detail
-from classification.views.condition_match_test_view import condition_match_test_view, condition_match_test_download_view
+from classification.views.condition_match_test_view import condition_match_test_view, \
+    condition_match_test_download_view, condition_obsoletes_view
 from classification.views.condition_matching_view import condition_matching_view, condition_matchings_view, \
     ConditionTextColumns, ConditionTextMatchingAPI
 from classification.views.discordance_report_views import discordance_report_view, export_discordance_report, \
@@ -89,6 +90,8 @@ urlpatterns = [
 
     perm_path('condition_match_test', condition_match_test_view, name='condition_match_test'),
     perm_path('condition_match_test_download', condition_match_test_download_view, name='condition_match_test_download'),
+
+    perm_path('condition_obsoletes', condition_obsoletes_view, name='condition_obsoletes'),
 
     perm_path('diff/', views.view_classification_diff, name='classification_diff'),
     perm_path('redcap_data_dictionary.csv', classification_export_view.redcap_data_dictionary, name='redcap_data_dictionary'),

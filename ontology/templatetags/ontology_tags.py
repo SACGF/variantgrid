@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Union
 
 from django.template import Library
 
@@ -14,8 +14,11 @@ def ontology_meta(data: OntologyMatch):
 
 
 @register.inclusion_tag("ontology/tags/ontology_term.html")
-def ontology_term(data: OntologyTerm):
+def ontology_term(data: Union[OntologyTerm, str]):
+    if isinstance(data, str):
+        data = OntologyTerm.get_or_stub(data)
     return {"term": data}
+
 
 @register.inclusion_tag("ontology/tags/ontology_relationship.html")
 def ontology_relationship(relationship: OntologyTermRelation, term: OntologyTerm):

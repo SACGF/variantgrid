@@ -599,7 +599,7 @@ class ConditionMatchingSuggestion:
                                                                   text=f"We do not store {term.ontology_service}, please verify externally"))
                 elif term.is_obsolete:
                     self.add_message(
-                        ConditionMatchingMessage(severity="error", text=f"{term.id} : is marked as obsolete"))
+                        ConditionMatchingMessage(severity="error", text=f"{term.id} : \"{term.warning_text}\""))
 
     def is_all_leafs(self):
         if terms := self.terms:
