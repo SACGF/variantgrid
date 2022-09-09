@@ -36,7 +36,8 @@ def _update_gene_relations(gene_symbol: str):
         filename = panel_app.url + PANEL_APP_SEARCH_BY_GENES_BASE_PATH + gene_symbol
         ontology_builder = OntologyBuilder(filename=filename, context=str(gene_symbol),
                                            import_source=OntologyImportSource.PANEL_APP_AU,
-                                           processor_version=PANEL_APP_API_PROCESSOR_VERSION)
+                                           processor_version=PANEL_APP_API_PROCESSOR_VERSION,
+                                           versioned=False)
         try:
             ontology_builder.ensure_old(max_age=timedelta(days=settings.PANEL_APP_CACHE_DAYS))
 

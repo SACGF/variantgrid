@@ -80,12 +80,13 @@ class CachedObj(Generic[T]):
 
 class OntologyBuilder:
 
-    def __init__(self, filename: str, context: str, import_source: str, processor_version: int = 1, force_update: bool = False):
+    def __init__(self, filename: str, context: str, import_source: str, processor_version: int = 1, force_update: bool = False, versioned: bool = True):
         """
         :filename: Name of the resource used, only used for logging purposes
         :context: In what context are we inserting records (e.g. full file context, or partial panel app)
         :ontology_service: Service that sources this data, but import is not restricted to this service
         :force_update: If true, the ensure methods don't raise exceptions
+        :versioned: Does the import exist outside of versions (e.g. PanelAppAU that does incremental version updates should have it as False)
         """
         self.start = datetime.now()
         self.filename = filename if ':' in filename else filename.split("/")[-1]
@@ -94,6 +95,7 @@ class OntologyBuilder:
         self.processor_version = processor_version
         self.data_hash = None
         self.force_update = force_update
+        self.versioned = versioned
 
         self.previous_import: Optional[OntologyImport] = OntologyImport.objects.filter(import_source=import_source, context=context, completed=True).order_by('-modified').first()
         if self.previous_import and self.previous_import.processor_version != self.processor_version:
@@ -155,15 +157,20 @@ class OntologyBuilder:
     def _fetch_relation(self, rk: RelationKey) -> CachedObj[OntologyTermRelation]:
         if pre_cached := self.relations.get(rk):
             return pre_cached
-        if not self.full_cache and (in_db := OntologyTermRelation.objects.filter(
+        if not self.full_cache:
+            relation_qs = OntologyTermRelation.objects.filter(
                 source_term_id=rk.source,
                 dest_term_id=rk.dest,
-                relation=rk.relation,
-                from_import=self._ontology_import
-        ).first()):
-            cached = CachedObj(in_db)
-            self.relations[rk] = cached
-            return cached
+                relation=rk.relation)
+            if self.versioned:
+                # if versioned, then the relationship has to be from the same import
+                # otherwise, it can be from any previous import
+                relation_qs = relation_qs.filter(from_import=self._ontology_import)
+
+            if in_db := relation_qs.first():
+                cached = CachedObj(in_db)
+                self.relations[rk] = cached
+                return cached
 
         self._fetch_term(rk.source)
         self._fetch_term(rk.dest)
