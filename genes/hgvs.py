@@ -481,40 +481,27 @@ class HGVSMatcher:
         return self._get_transcript_version_and_pyhgvs_transcript(transcript_name)[1]
 
     @staticmethod
-    def _transcript_position(transcript_version, kind: str, cdna_coord: pyhgvs.CDNACoord) -> int:
-        """ One based (like cDNA coords) """
-        if kind == 'c':
-            if cdna_coord.landmark == pyhgvs.CDNA_START_CODON:
-                # coord is negative for 5'UTR and there is no cDNA position 0
-                offset = transcript_version.fivep_utr_length + 1
-            elif cdna_coord.landmark == pyhgvs.CDNA_STOP_CODON:
-                offset = transcript_version.fivep_utr_length + transcript_version.coding_length
-            else:
-                raise ValueError(f"Unknown CDNACoord landmark: '{cdna_coord.landmark}'")
-        else:
-            # Non coding will have entire transcript as 5'UTR so don't want to shift by that
-            offset = 0
-        return offset + cdna_coord.coord
-
-    @staticmethod
-    def _validate_in_transcript_range(transcript_version, hgvs_name: HGVSName, cdna_coord: pyhgvs.CDNACoord):
+    def _validate_in_transcript_range(pyhgvs_transcript, hgvs_name: HGVSName):
         # @see https://varnomen.hgvs.org/bg-material/numbering/
         # Transcript Flanking: it is not allowed to describe variants in nucleotides beyond the boundaries of the
         # reference sequence using the reference sequence
-        transcript_position = HGVSMatcher._transcript_position(transcript_version, hgvs_name.kind, cdna_coord)
-        within_transcript = 1 <= transcript_position <= transcript_version.length
-        if not within_transcript:
-            raise pyhgvs.InvalidHGVSName(f"'{hgvs_name.format()}' transcript position {transcript_position} is outside "
-                                         f"of {transcript_version} range [1,{transcript_version.length}]")
+        NAMES = {
+            "cdna_start": hgvs_name.cdna_start,
+            "cdna_end": hgvs_name.cdna_end,
+        }
+        for description, cdna_coord in NAMES.items():
+            genomic_coord = pyhgvs_transcript.cdna_to_genomic_coord(cdna_coord)
+            within_transcript = pyhgvs_transcript.tx_position.chrom_start <= genomic_coord <= pyhgvs_transcript.tx_position.chrom_stop
+            if not within_transcript:
+                raise pyhgvs.InvalidHGVSName(f"'{hgvs_name.format()}' {description} {cdna_coord} resolves outside of transcript")
 
     def _pyhgvs_get_variant_tuple(self, hgvs_string: str, transcript_version):
         pyhgvs_transcript = None
         # Check transcript bounds
         if transcript_version:
             hgvs_name = HGVSName(hgvs_string)
-            self._validate_in_transcript_range(transcript_version, hgvs_name, hgvs_name.cdna_start)
-            self._validate_in_transcript_range(transcript_version, hgvs_name, hgvs_name.cdna_end)
             pyhgvs_transcript = self._create_pyhgvs_transcript(transcript_version)
+            self._validate_in_transcript_range(pyhgvs_transcript, hgvs_name)
 
         variant_tuple = pyhgvs.parse_hgvs_name(hgvs_string, self.genome_build.genome_fasta.fasta,
                                                transcript=pyhgvs_transcript,
