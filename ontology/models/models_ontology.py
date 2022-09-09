@@ -260,7 +260,7 @@ class OntologyTerm(TimeStampedModel):
             return "Term is Deprecated"
         elif self.status == OntologyTermStatus.NON_CONDITION:
             term_type = (self.extra or dict()).get('type', 'Unknown')
-            return f"Term is of type {term_type}"
+            return f"Term is of type - {term_type}"
         else:
             return None
 

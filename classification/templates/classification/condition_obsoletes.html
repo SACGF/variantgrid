@@ -11,10 +11,12 @@
 {% block content %}
     <div class="container">
         {% if obsolete_relations %}
-            <h5>Obsolete Condition Relationships</h5>
+            <h5>Obsolete PanelApp Relationships</h5>
+            <div class="mb-4">
             {% for relation in obsolete_relations %}
                 <div>{% ontology_relationship relation relation.source %}</div>
             {% endfor %}
+            </div>
         {% endif %}
 
         {% if obsolete_condition_matches %}

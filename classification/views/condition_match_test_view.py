@@ -13,7 +13,8 @@ from genes.models import GeneSymbol
 from library.django_utils import require_superuser
 from library.log_utils import report_exc_info
 from library.utils import delimited_row
-from ontology.models import OntologySnake, OntologyVersion, OntologyTermStatus, OntologyImportSource
+from ontology.models import OntologySnake, OntologyVersion, OntologyTermStatus, OntologyImportSource, \
+    OntologyTermRelation, OntologyRelation
 from ontology.ontology_matching import OntologyMatching, SearchText, normalize_condition_text
 
 
@@ -132,13 +133,12 @@ def condition_match_test_view(request):
 @require_superuser
 def condition_obsoletes_view(request):
     # find relationships to obsolete terms
-    relationships_qs = OntologyVersion.latest().get_ontology_term_relations()
     # only care about obsolete relationships from Panel App AU
-    obsolete_relations = relationships_qs\
+    obsolete_relations = OntologyTermRelation.objects\
         .filter(from_import__import_source=OntologyImportSource.PANEL_APP_AU)\
         .filter(
             Q(source_term__status__ne=OntologyTermStatus.CONDITION) | Q(dest_term__status__ne=OntologyTermStatus.CONDITION)
-        )
+        ).order_by('-source_term')
 
     obsolete_condition_matches = list()
     for ctm in ConditionTextMatch.objects.filter(condition_xrefs__isnull=False):
