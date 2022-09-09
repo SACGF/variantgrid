@@ -14,7 +14,7 @@ from ontology.ontology_builder import OntologyBuilder, OntologyBuilderDataUpToDa
 
 # increment if you change the logic of parsing ontology terms from PanelApp
 # which will then effectively nullify the cache so the new logic is run
-PANEL_APP_API_PROCESSOR_VERSION = 5
+PANEL_APP_API_PROCESSOR_VERSION = 6
 # with look ahead and behind to make sure we're not in a 7 digit number
 ABANDONED_OMIM_RE = re.compile('(?<![0-9])([0-9]{6})(?![0-9])')
 

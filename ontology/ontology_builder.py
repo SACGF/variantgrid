@@ -253,7 +253,10 @@ class OntologyBuilder:
                              ["extra", "from_import", "modified"], verbose=verbose)
 
         # Now to find previous imports - and terms that weren't updated by this import (and purge them if requested)
-        oi_qs = OntologyImport.objects.filter(context=self.context, import_source=self.import_source)
+        oi_qs = OntologyImport.objects.filter(context=self.context)
+        if self.versioned:
+            oi_qs = oi_qs.filter(import_source=self.import_source)
+
         old_imports = set(oi_qs.values_list("pk", flat=True))
         if self._ontology_import.pk in old_imports:
             old_imports.remove(self._ontology_import.pk)
