@@ -255,6 +255,10 @@ class OntologyTerm(TimeStampedModel):
         return self.status != OntologyTermStatus.CONDITION
 
     @property
+    def is_valid_for_condition(self) -> bool:
+        return self.status == OntologyTermStatus.CONDITION
+
+    @property
     def warning_text(self) -> Optional[str]:
         if self.status == OntologyTermStatus.DEPRECATED:
             return "Term is Deprecated"

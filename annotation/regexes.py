@@ -103,6 +103,9 @@ class DbRefRegexResult:
             term_id = f"{self.db}:{self.idx}"
             if term := OntologyTerm.objects.filter(id=term_id).first():
                 self.summary = term.name
+                if not term.is_valid_for_condition:
+                    self.summary += " (obsolete or not phenotype)"
+
         try:
             if source := CitationSource.CODES.get(self.db):
                 citation, _ = Citation.objects.get_or_create(citation_source=source, citation_id=idx)
