@@ -14,10 +14,11 @@ from genes.hgvs import CHGVS
 from library.utils import html_to_text
 from ontology.models import OntologyTerm, OntologyService
 from snpdb.models import ClinVarKey
-from uicore.json.validated_json import JsonMessages, JSON_MESSAGES_EMPTY, ValidatedJson
+from uicore.json.validated_json import JsonMessages, JSON_MESSAGES_EMPTY, ValidatedJson, JsonMessage
 
 # Code in this file is responsible for converting VariantGrid formatted classifications to ClinVar JSON
 CLINVAR_ACCEPTED_TRANSCRIPTS = {"NM_", "NR_"}
+
 
 class ClinVarEvidenceKey:
     """
@@ -27,8 +28,9 @@ class ClinVarEvidenceKey:
 
     def __init__(self, evidence_key: EvidenceKey, value_obj: Any):
         self.evidence_key = evidence_key
-        self.values = []
-        self.messages = JSON_MESSAGES_EMPTY
+        self.values = list()
+        self.has_conversion_issues = False
+        self.conversion_messages = list()
 
         value: Any
         if isinstance(value_obj, Mapping):
@@ -50,21 +52,37 @@ class ClinVarEvidenceKey:
                                 self.values.append(clinvar)
                             else:
                                 self.values.append(sub_value)
-                                self.messages += JsonMessages.error(f"ADMIN: \"{self.evidence_key.pretty_label}\" value of \"{sub_value}\" doesn't have a ClinVar value")
+                                self.conversion_messages.append(f"ADMIN: \"{self.evidence_key.pretty_label}\" value of \"{sub_value}\" doesn't have a ClinVar equivalent")
                             found = True
                             break
                     if not found:
                         self.values.append(sub_value)
-                        self.messages += JsonMessages.error(f"\"{self.evidence_key.pretty_label}\" value of \"{sub_value}\" isn't a valid value, can't translate to ClinVar")
+                        self.conversion_messages.append(f"\"{self.evidence_key.pretty_label}\" value of \"{sub_value}\" isn't a valid value, can't translate to ClinVar")
             else:
                 raise ValueError(f"ADMIN: Trying to extract value from \"{self.evidence_key.pretty_label}\" that isn't a SELECT or MULTISELECT")
+
+    def _json_conversion_messages(self, severity: str):
+        messages = JSON_MESSAGES_EMPTY
+        for message in self.conversion_messages:
+            messages += JsonMessages.severity(severity=severity, message=message)
+        return messages
 
     def value(self, single: bool = True, optional: bool = False) -> ValidatedJson:
         """
         :param single: Is a single value expected. Adds an error to ValidatedJson if number of values is 2 or more.
         :param optional: Is the value optional, if not adds an error to ValidatedJson if number of values is zero.
         """
-        messages = self.messages
+
+        # if value is optional we can fall back to void with messages
+        # if it's mandatory we need to error out
+
+        messages = JSON_MESSAGES_EMPTY
+        if self.conversion_messages:
+            if optional:
+                return ValidatedJson.make_void(self._json_conversion_messages("warning"))
+            else:
+                return ValidatedJson.make_void(self._json_conversion_messages("error"))
+
         if len(self.values) == 0:
             if not optional:
                 messages += JsonMessages.error(f"No value for required field \"{self.evidence_key.pretty_label}\"")
@@ -72,10 +90,14 @@ class ClinVarEvidenceKey:
         elif len(self.values) == 1:
             return ValidatedJson(self.values[0] if single else self.values, messages)
         else:
-            messages = self.messages
             if single:
-                messages += JsonMessages.error(f"\"{self.evidence_key.pretty_label}\" expected single value, got multiple values")
-
+                # has multiple values but can only fit one value
+                return ValidatedJson.make_void(
+                    JsonMessages.severity(
+                        severity="warning" if optional else "error",
+                        message=f"ClinVar only accepts a single value for \"{self.evidence_key.pretty_label}\". There are multiple values for mode of inheritance against this record, so omitting this field."
+                    )
+                )
             return ValidatedJson(self.values, messages)
 
     def __bool__(self):
@@ -341,10 +363,8 @@ class ClinVarExportConverter:
 
         messages = JsonMessages()
         if mode_of_inheritance := self.clinvar_value(SpecialEKeys.MODE_OF_INHERITANCE):
-            if len(mode_of_inheritance) > 1:
-                data["modeOfInheritance"] = ValidatedJson.make_void(JsonMessages.warning("ClinVar only accepts a single value for mode of inheritance. There are multiple values for mode of inheritance against this record, so omitting this field."))
-            else:
-                data["modeOfInheritance"] = mode_of_inheritance.value(single=True)
+            data["modeOfInheritance"] = mode_of_inheritance.value(single=True, optional=True)
+
         return ValidatedJson(data, messages)
 
     @property

@@ -65,6 +65,10 @@ class JsonMessages:
     def info(message: str):
         return JsonMessages([JsonMessage(severity="info", text=message)])
 
+    @staticmethod
+    def severity(severity: str, message: str):
+        return JsonMessages([JsonMessage(severity=severity, text=message)])
+
     def __add__(self, other) -> 'JsonMessages':
         if not other:
             return self
