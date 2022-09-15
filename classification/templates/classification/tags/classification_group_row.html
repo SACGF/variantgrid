@@ -28,7 +28,7 @@
             </div>
         {% endif %}
     </td>
-    <td style="width:100px;" class="cs-{% if show_pending_changes %}{{ group.clinical_significance_effective|lower }}{% else %}{{ group.clinical_significance|lower }}{% endif %} text-center" data-order="{{ group.clinical_significance_score }}">
+    <td style="width:100px;" class="cs-{{ group.clinical_significance_effective|lower }} text-center" data-order="{{ group.clinical_significance_score }}">
         {% if group.clinical_significance_old %}
             <div><del>{% if group.clinical_significance_old %}{{ group.clinical_significance_old | ekey:"clinical_significance" }}{% else %}Unclassified{% endif %}</del></div>
         {% endif %}
