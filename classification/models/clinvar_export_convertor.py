@@ -341,11 +341,8 @@ class ClinVarExportConverter:
 
         messages = JsonMessages()
         if mode_of_inheritance := self.clinvar_value(SpecialEKeys.MODE_OF_INHERITANCE):
-            # TODO might need the concept of NO_KEY so we can have "mode_of_inheritance": NO_KEY
-            # so we can still put the warning against mode_of_inheritance, but not actually produce it in the real JSON
-            # as ClinVar doesn't accept modeOfInheritance: null
             if len(mode_of_inheritance) > 1:
-                messages += JsonMessages.warning("ClinVar only accepts a single value for mode of inheritance. There are multiple values for mode of inheritance against this record, so omitting this field.")
+                data["modeOfInheritance"] = ValidatedJson.make_void(JsonMessages.warning("ClinVar only accepts a single value for mode of inheritance. There are multiple values for mode of inheritance against this record, so omitting this field."))
             else:
                 data["modeOfInheritance"] = mode_of_inheritance.value(single=True)
         return ValidatedJson(data, messages)

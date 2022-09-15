@@ -933,9 +933,15 @@ function _formatJson(jsonObj) {
                 items.push($('<li>', {class: `list-group-item list-group-item-${bsSeverity}`, html: [severityIcon(message.severity), message.text]}));
             }
             html.push($('<ul>', {class: 'list-group', html: items}));
-            html.push($('<div>', {class: 'js-valid-body', html: _formatJson(jsonObj.wrap)}));
+
+            if (jsonObj.void) {
+                html.push($('<div>', {class: 'js-valid-body', html: $('<span class="no-value">- entry omitted -</span>')}));
+            } else {
+                html.push($('<div>', {class: 'js-valid-body', html: _formatJson(jsonObj.wrap)}));
+            }
             return $('<div>', {class:'js-valid', html:html});
         } else {
+            // could check for void but should never have a void without messages
             return _formatJson(jsonObj.wrap);
         }
     } else {
