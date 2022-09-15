@@ -16,6 +16,7 @@ from classification.enums.discordance_enums import ContinuedDiscordanceReason, D
 from classification.models import ClassificationModification, DiscordanceReportClassification, ClinicalContext, \
     EvidenceKeyMap, classification_flag_types, discordance_change_signal, \
     DiscordanceReportRowData, ClassificationFlagTypes
+from classification.models.classification_groups import ClassificationGroupUtils
 from classification.models.discordance_models import DiscordanceReport
 from classification.models.evidence_key import EvidenceKeyOption
 from classification.views.classification_dashboard_view import ClassificationDashboard
@@ -173,6 +174,15 @@ class DiscordanceReportTemplateData:
     @property
     def effective_classifications(self) -> List[ClassificationModification]:
         return self._effectives_and_not_considered[0]
+
+    @property
+    def group_utils(self) -> List[ClassificationModification]:
+        # TODO, rather than no longer considered, shove that value into clinical significance somehow e.g. "withdrawn"
+        return ClassificationGroupUtils(
+            modifications=self.effective_classifications + self.no_longer_considered,
+            old_modifications=[drc.classification_original for drc in self.report.discordancereportclassification_set.all()],
+            calculate_pending=self.is_latest
+        )
 
     @property
     def no_longer_considered(self) -> List[DiscordanceNoLongerConsiders]:

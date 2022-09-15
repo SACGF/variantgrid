@@ -15,7 +15,8 @@ from classification.enums.classification_enums import ShareLevel
 from classification.models import ConditionTextMatch, ConditionResolved, DiscordanceReportRowData, \
     ClassificationLabSummary
 from classification.models.classification import ClassificationModification, Classification
-from classification.models.classification_groups import ClassificationGroup, ClassificationGroups
+from classification.models.classification_groups import ClassificationGroup, ClassificationGroups, \
+    ClassificationGroupUtils
 from classification.models.classification_ref import ClassificationRef
 from classification.models.clinical_context_models import ClinicalContext
 from classification.models.discordance_models import DiscordanceReport
@@ -51,8 +52,7 @@ def classification_group_row(group: ClassificationGroup, sub_row: Optional[int] 
         "sub_index": sub_index,
         "show_username": settings.VARIANT_CLASSIFICATION_GRID_SHOW_USERNAME,
         "show_allele_origin": settings.VARIANT_CLASSIFICATION_GRID_SHOW_ORIGIN,
-        "show_specimen_id": settings.VARIANT_CLASSIFICAITON_SHOW_SPECIMEN_ID,
-        "show_pending_changes": show_pending_changes
+        "show_specimen_id": settings.VARIANT_CLASSIFICAITON_SHOW_SPECIMEN_ID
     }
 
 
@@ -67,7 +67,7 @@ def classification_groups(
         genome_build: Optional[GenomeBuild] = None,
         title: Optional[str] = None,
         context_object: Optional[Model] = None,
-        show_pending_changes: Optional[bool] = True):
+        group_utils: Optional[ClassificationGroupUtils] = None):
     """
     :param context: Auto included
     :param classification_modifications: The classification modifications to render
@@ -78,10 +78,14 @@ def classification_groups(
     :param genome_build: Preferred genome build
     :param title: Heading to give the table
     :param context_object: If all these records are from an allele, provide "allele" if from a discordance report provide "discordance_report" etc
-    :param show_pending_changes: If true, check for pending changes flags and
+    :param old_classification_modifications: For showing what a discordance report used to be
     """
-
-    groups = ClassificationGroups(classification_modifications, genome_build=genome_build)
+    if not group_utils:
+        group_utils = ClassificationGroupUtils(
+            modifications=classification_modifications,
+            calculate_pending=True
+        )
+    groups = ClassificationGroups(classification_modifications, genome_build=genome_build, group_utils=group_utils)
 
     tag_context = {
         "title": title,
@@ -89,8 +93,7 @@ def classification_groups(
         "user": context.request.user,
         "genome_build": groups.genome_build,
         "table_id": str(uuid.uuid4()).replace("-", "_"),
-        "show_allele_origin": settings.VARIANT_CLASSIFICATION_GRID_SHOW_ORIGIN,
-        "show_pending_changes": show_pending_changes
+        "show_allele_origin": settings.VARIANT_CLASSIFICATION_GRID_SHOW_ORIGIN
     }
     ordered_classifications = list(groups.modifications)
     # classifications are sorted by group, display them so they're sorted by date

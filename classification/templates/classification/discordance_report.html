@@ -167,10 +167,10 @@
         {% url 'discordance_export' data.report.id as download_link %}
         {% url 'activity_discordance' discordance_report_id=report.id as history_link %}
 
-        {% classification_groups data.effective_classifications title="Classifications Considered" download_link=download_link history_link=history_link context_object=data.report show_pending_changes=data.is_latest %}
+        {% classification_groups data.effective_classifications group_utils=data.group_utils title="Classifications Considered" download_link=download_link history_link=history_link context_object=data.report %}
 
         {% for nlc in data.no_longer_considered %}
-            {% classification_groups nlc.classifications title=nlc.reason context_object=report show_pending_changes=data.is_open %}
+            {% classification_groups nlc.classifications group_utils=data.group_utils title=nlc.reason context_object=report %}
         {% endfor %}
 
         {% if data.is_user_editable %}

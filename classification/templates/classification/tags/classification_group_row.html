@@ -29,24 +29,16 @@
         {% endif %}
     </td>
     <td style="width:100px;" class="cs-{% if show_pending_changes %}{{ group.clinical_significance_effective|lower }}{% else %}{{ group.clinical_significance|lower }}{% endif %} text-center" data-order="{{ group.clinical_significance_score }}">
-        {% if show_pending_changes and group.clinical_significance_override %}
-            <del>
-            {% if group.clinical_significance %}
-                {{ group.clinical_significance | ekey:"clinical_significance" }}
-            {% else %}
-                Unclassified
-            {% endif %}
-            </del><br/>
-            {{ group.clinical_significance_override | ekey:"clinical_significance" }}
+        {% if group.clinical_significance_old %}
+            <div><del>{% if group.clinical_significance_old %}{{ group.clinical_significance_old | ekey:"clinical_significance" }}{% else %}Unclassified{% endif %}</del></div>
+        {% endif %}
+        {% if group.clinical_significance_pending %}
+            <div><del>{% if group.clinical_significance %}{{ group.clinical_significance | ekey:"clinical_significance" }}{% else %}Unclassified{% endif %}</del></div>
+            {{ group.clinical_significance_pending | ekey:"clinical_significance" }}
             <div title="Some or all of these classifications have been marked as having pending changes to clinical significance" data-toggle="tooltip" class="flag flag-classification_pending_changes hover-detail mx-1"></div>
         {% else %}
-            {% if group.clinical_significance %}
-                {{ group.clinical_significance | ekey:"clinical_significance" }}
-            {% else %}
-                Unclassified
-            {% endif %}
+            {% if group.clinical_significance %}{{ group.clinical_significance | ekey:"clinical_significance" }}{% else %}Unclassified{% endif %}
         {% endif %}
-        {% if group.is_discordant %}<div title="This row is in discordance with other rows for the same allele" data-toggle="tooltip" class="flag flag-clinical_context_discordance hover-detail mx-1"></div>{% endif %}
     </td>
     <td style="width:186px;">
         {% for condition in group.conditions %}

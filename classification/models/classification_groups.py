@@ -43,14 +43,66 @@ class MultiValues(Generic[D]):
         return MultiValues(values=values, uniform=uniform)
 
 
+@dataclass
+class ClassificationGroupEntry:
+    modification: ClassificationModification
+    genome_build: GenomeBuild
+    clinical_significance_old: Optional[str] = None
+    clinical_significance_pending: Optional[str] = None
+
+    @property
+    def clin_sig(self):
+        return self.modification.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
+
+    @lazy
+    def c_hgvs(self):
+        return ClassificationGroup.c_hgvs_for(self.modification, self.genome_build)
+
+    @property
+    def condition_sorter(self) -> Optional[str]:
+        if resolved := self.modification.classification.condition_resolution_obj:
+            if resolved.terms:
+                return "A" + (resolved.terms[0].name or resolved.terms[0].id).lower()
+        return "Z" + (self.modification.get(SpecialEKeys.CONDITION) or "").lower()
+
+    @lazy
+    def grouping_key(self):
+        clin_sig_sorter = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE).classification_sorter_value
+        return (
+            clin_sig_sorter(self.clin_sig),
+            clin_sig_sorter(self.clinical_significance_old),
+            clin_sig_sorter(self.clinical_significance_pending),
+            self.modification.classification.clinical_grouping_name,
+            self.modification.classification.lab.organization.name,
+            self.modification.classification.lab.name,
+            self.c_hgvs,
+            self.condition_sorter
+        )
+
+    @property
+    def curated_date_check(self) -> 'CuratedDate':
+        return self.modification.curated_date_check
+
+    def __lt__(self, other):
+        if self.grouping_key < other.grouping_key:
+            return True
+
+
 class ClassificationGroupUtils:
 
-    def __init__(self, modifications: Optional[Iterable[ClassificationModification]] = None):
+    def __init__(
+            self,
+            modifications: Optional[Iterable[ClassificationModification]] = None,
+            old_modifications: Optional[Iterable[ClassificationModification]] = None,
+            calculate_pending: bool = True):
         self._modifications = modifications
+        self._old_modifications = old_modifications
+        self.calculate_pending = calculate_pending
 
     @lazy
     def _pending_changes_flag_map(self) -> Dict[int, str]:
         mod_id_to_clin_sig: Dict[int, str] = dict()
+
         flags_qs = Flag.objects.filter(
             flag_type=classification_flag_types.classification_pending_changes,
             resolution__status=FlagStatus.OPEN)
@@ -64,30 +116,57 @@ class ClassificationGroupUtils:
 
         return mod_id_to_clin_sig
 
+    @lazy
+    def _classification_to_old_clin_sig(self) -> Dict[int, str]:
+        old_ids: Dict[int, str] = dict()
+        if self._old_modifications:
+            for om in self._old_modifications:
+                old_ids[om.classification_id] = om.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
+        return old_ids
+
     def pending_changes_for(self, modification: ClassificationModification) -> Optional[str]:
+        if not self.calculate_pending:
+            return None
         return self._pending_changes_flag_map.get(modification.classification.flag_collection_id)
 
     @property
     def any_pending_changes(self) -> bool:
+        if not self.calculate_pending:
+            return False
         return bool(self._pending_changes_flag_map)
+
+    def map(self, modification: ClassificationModification, genome_build: GenomeBuild) -> ClassificationGroupEntry:
+        clinical_significance_old = self._classification_to_old_clin_sig.get(modification.classification_id)
+        clinical_significance_pending = None if not self.calculate_pending else self._pending_changes_flag_map.get(modification.classification.flag_collection_id)
+        clinical_significance_current = modification.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
+        return ClassificationGroupEntry(
+            modification=modification,
+            genome_build=genome_build,
+            clinical_significance_old=clinical_significance_old if clinical_significance_old and clinical_significance_old != clinical_significance_current else None,
+            clinical_significance_pending=clinical_significance_pending if clinical_significance_pending and clinical_significance_pending != clinical_significance_current else None
+        )
 
 
 class ClassificationGroup:
 
     def __init__(self,
-                 modifications: Iterable[ClassificationModification],
+                 group_entries: List[ClassificationGroupEntry],
                  genome_build: GenomeBuild,
-                 group_id: Optional[int] = None,
-                 group_utils: Optional[ClassificationGroupUtils] = None):
+                 group_id: Optional[int] = None):
 
         # filter out modifications that share the same (non None) patient id
         # as in we don't want to show multiple records for the same patient
-        modification_list = list(modifications)
+        first = group_entries[0]
+        # TODO rename ClassificationGroupEntry to match
+        self.clinical_significance_pending = first.clinical_significance_pending
+        self.clinical_significance_old = first.clinical_significance_old
+        self.group_entries = group_entries
+
+        modification_list = [ge.modification for ge in group_entries]
         modification_list.sort(key=ClassificationGroup.sort_modifications, reverse=True)
         modification_result = list()
         seen_patient_ids = set()
         self.excluded_record_count = 0
-        self.group_utils = group_utils
 
         for modification in modification_list:
             if patient_id := modification.get(SpecialEKeys.PATIENT_ID):
@@ -136,7 +215,7 @@ class ClassificationGroup:
 
     @property
     def clinical_significance_effective(self):
-        if override := self.clinical_significance_override:
+        if override := self.clinical_significance_pending:
             return "pending"  # TODO, this is "pending" to help with the css class, maybe not best method name
         return self.clinical_significance or ''
 
@@ -165,17 +244,6 @@ class ClassificationGroup:
             if cc := self.most_recent.classification.clinical_context:
                 return cc.is_discordant()
 
-    @property
-    def clinical_significance_override(self):
-        if utils := self.group_utils:
-            for mod in self.modifications:
-                if changed_clin_sig := utils.pending_changes_for(mod):
-                    # note if there's multiple different clin sigs, we don't show that
-                    # it should not generally occur, users can expand the group to see the individual flags
-                    # if needed
-                    return changed_clin_sig
-        return None
-
     @staticmethod
     def c_hgvs_for(cm: ClassificationModification, genome_build: GenomeBuild) -> CHGVS:
         c_parts: CHGVS
@@ -196,11 +264,9 @@ class ClassificationGroup:
     @lazy
     def c_hgvses(self) -> List[CHGVS]:
         unique_c = set()
-        for cm in self.modifications:
-            unique_c.add(ClassificationGroup.c_hgvs_for(cm, self.genome_build))
-        c_list = list(unique_c)
-        c_list.sort()
-        return c_list
+        for ge in self.group_entries:
+            unique_c.add(ge.c_hgvs)
+        return sorted(unique_c)
 
     @property
     def c_hgvs(self) -> CHGVS:
@@ -295,10 +361,10 @@ class ClassificationGroup:
         all_condition_resolved.sort()
         return all_condition_resolved
 
-    def sub_groups(self) -> Optional[List['ClassificationGroup']]:
-        if len(self.modifications) > 1:
-            return [ClassificationGroup([cm], genome_build=self.genome_build) for cm in self.modifications]
-        return None
+    # def sub_groups(self) -> Optional[List['ClassificationGroup']]:
+    #     if len(self.modifications) > 1:
+    #         return [ClassificationGroup([cm], genome_build=self.genome_build) for cm in self.modifications]
+    #     return None
 
 
 class ClassificationGroups:
@@ -312,64 +378,28 @@ class ClassificationGroups:
             genome_build = GenomeBuildManager.get_current_genome_build()
         self.genome_build = genome_build
 
-        def clin_significance(cm: ClassificationModification) -> Optional[str]:
-            return cm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
-
-        def condition_sorter(cm: ClassificationModification) -> Optional[str]:
-            if resolved := cm.classification.condition_resolution_obj:
-                if resolved.terms:
-                    return "A" + (resolved.terms[0].name or resolved.terms[0].id).lower()
-            return "Z" + (cm.get(SpecialEKeys.CONDITION) or "").lower()
-
-        def condition_grouper(cm: ClassificationModification) -> Any:
-            return cm.classification.condition_resolution_obj is not None, cm.classification.condition_resolution_obj
-
-        cached_chgvs: Dict[int, CHGVS] = dict()
-
-        def c_hgvs_group(cm) -> CHGVS:
-            if existing := cached_chgvs.get(cm.id):
-                return existing
-            c_hgvs = ClassificationGroup.c_hgvs_for(cm, genome_build)
-            cached_chgvs[cm.id] = c_hgvs.without_transcript_version
-            return c_hgvs
-
-        evidence_keys: EvidenceKeyMap = EvidenceKeyMap.instance()
-
-        groups: List[ClassificationGroup] = []
-
-        # clinical significance, clin grouping, org
-        sorted_by_clin_sig = list(classification_modifications)
         if not group_utils:
-            group_utils = ClassificationGroupUtils(sorted_by_clin_sig)
+            group_utils = ClassificationGroupUtils(classification_modifications)
 
-        e_key_clin_sig = evidence_keys.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
-        sorted_by_clin_sig.sort(key=e_key_clin_sig.classification_sorter)
-        for clin_sig, group1 in groupby(sorted_by_clin_sig, clin_significance):
-            group1 = list(group1)
-            # breakup by clinical grouping
-            group1.sort(key=lambda cm: cm.classification.clinical_grouping_name)
-            for _, group2 in groupby(group1, lambda cm: cm.classification.clinical_grouping_name):
-                group2 = list(group2)
-                # break up by org (TODO breakup by lab with optional breakup by org)
-                group2.sort(key=lambda cm: cm.classification.lab.name)
-                for _, group3 in groupby(group2, lambda cm: cm.classification.lab.name):
-                    group3 = list(group3)
-                    # breakup by transcript
-                    group3.sort(key=c_hgvs_group)
-                    for _, group4 in groupby(group3, c_hgvs_group):
-                        group4 = list(group4)
-                        group4.sort(key=condition_sorter)
-                        for _, group5 in groupby(group4, condition_grouper):
-                            actual_group = ClassificationGroup(modifications=group5, genome_build=genome_build, group_id=len(groups) + 1, group_utils=group_utils)
-                            actual_group.clinical_significance_score = e_key_clin_sig.classification_sorter_value(clin_sig)
-                            groups.append(actual_group)
-        self.groups = groups
-        self.groups.sort(key=lambda cg: cg.most_recent_curated)
+        groups: List[ClassificationGroup] = list()
+
+        classification_group_entries = [group_utils.map(m, genome_build) for m in classification_modifications]
+        classification_group_entries.sort()
+        for _, group in groupby(classification_group_entries, lambda x: x.grouping_key):
+            group = list(group)
+            actual_group = ClassificationGroup(
+                group_entries=group,
+                genome_build=genome_build,
+                group_id=len(group) + 1,
+            )
+            groups.append(actual_group)
+        groups.sort(key=lambda cg: cg.most_recent_curated)
         next_sort_order = 1
-        for group in self.groups:
+        for group in groups:
             group.sort_order = next_sort_order
             next_sort_order += 1
-        self.groups.reverse()  # default store records as most recent to least recent
+        groups.reverse()  # default store records as most recent to least recent
+        self.groups = groups
 
     def __iter__(self):
         return iter(self.groups)
