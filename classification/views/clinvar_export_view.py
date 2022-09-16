@@ -345,24 +345,23 @@ class ClinVarExportSummary(ExportRow):
 
     @export_column("Sync Status")
     def sync_status(self):
+        if self.clinvar_export.status == ClinVarExportStatus.UP_TO_DATE:
+            if clinvar_error := self.clinvar_export.last_submission_error:
+                return "ClinVar Error"
         return self.clinvar_export.get_status_display()
 
     @export_column("SCV")
     def scv(self):
         return self.clinvar_export.scv
 
-    @lazy
-    def latest_submission(self) -> ClinVarExportSubmission:
-        return self.clinvar_export.clinvarexportsubmission_set.order_by('-pk').first()
-
     @export_column("Latest Batch ID")
     def batch_id(self):
-        if submission := self.latest_submission:
+        if submission := self.clinvar_export.last_submission:
             return submission.submission_batch_id
 
     @export_column("Latest Batch Status")
     def batch_status(self):
-        if submission := self.latest_submission:
+        if submission := self.clinvar_export.last_submission:
             submission.submission_batch.get_status_display()
 
     @export_column("All Batch IDs")
@@ -372,9 +371,15 @@ class ClinVarExportSummary(ExportRow):
 
     @export_column("Messages")
     def messages(self):
+        all_messages: List[str] = list()
+        if clinvar_error := self.clinvar_export.last_submission_error:
+            all_messages.append(f"(CLINVAR ERROR) {clinvar_error}")
+
         if json_body := self.clinvar_export.submission_full:
             if j_messages := json_body.all_messages:
-                return "\n".join([f"({message.severity.upper()}) {message.text}" for message in j_messages if message.severity != "info"])
+                all_messages += [f"({message.severity.upper()}) {message.text}" for message in j_messages if message.severity != "info"]
+
+        return "\n".join(all_messages)
 
     ## This column is a bit much
     # @export_column("JSON")

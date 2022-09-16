@@ -66,6 +66,26 @@ class ClinVarExport(TimeStampedModel):
     last_evaluated = models.DateTimeField(default=now)
     submission_body_validated = models.JSONField(null=False, blank=False, default=dict)
 
+    @lazy
+    def last_submission(self) -> Optional['ClinVarExportSubmission']:
+        if last_submission := self.clinvarexportsubmission_set.order_by('-created').first():
+            return last_submission
+
+    @property
+    def last_submission_error(self) -> Optional[str]:
+        if last_submission := self.last_submission:
+            if response_json := last_submission.response_json:
+                all_errors: List[str] = list()
+                if errors_list := response_json.get('errors'):
+                    for error in errors_list:
+                        if output := error.get('output'):
+                            if inner_errors := output.get('errors'):
+                                for inner_error in inner_errors:
+                                    all_errors.append(inner_error.get('userMessage'))
+                if all_errors:
+                    return "\n".join(all_errors)
+
+
     def get_absolute_url(self):
         return reverse('clinvar_export', kwargs={'clinvar_export_id': self.pk})
 
@@ -318,7 +338,6 @@ class ClinVarExportSubmissionStatus(TextChoices):
     WAITING = "W", "Waiting"
     SUCCESS = "S", "Success"
     ERROR = "E", "Error"
-    #  REJECTED = "R", "Rejected"  # TODO : add this manually rejected option (only not adding now as need to hot fix)
 
 
 class ClinVarExportSubmission(TimeStampedModel):

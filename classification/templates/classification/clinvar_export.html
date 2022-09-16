@@ -55,6 +55,16 @@
                         {{ clinvar_export.get_status_display }}
                         {% endif %}
                     {% endlabelled %}
+                    {% labelled label="Last Submission Status" %}
+                        {% if clinvar_export.last_submission %}{{ clinvar_export.last_submission.get_status_display }}{% endif %}
+                    {% endlabelled %}
+                    {% with last_error=clinvar_export.last_submission_error %}
+                        {% if last_error %}
+                            {% labelled label="Last Submission Error" %}
+                                <div class="text-danger">{{ last_error }}</div>
+                            {% endlabelled %}
+                        {% endif %}
+                    {% endwith %}
                     <hr/>
                     <div class="text-info mb-4">Modifiable ID and status of the ClinVar Export.</div>
                     {% labelled label="SCV" %}
