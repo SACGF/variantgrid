@@ -179,10 +179,14 @@ class ClassificationGroup:
 
         self.group_id = group_id
         self.genome_build = genome_build
-        self.clinical_significance_score = 0
 
         self.sort_order = 0  # override this once we've sorted all classifications together
         # for the sake of a JavaScript sort
+
+    @lazy
+    def clinical_significance_score(self):
+        sorter = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE).classification_sorter_value
+        return sorter(self.clinical_significance_pending if self.clinical_significance_pending else self.clinical_significance)
 
     @property
     def date_sort_order_str(self) -> str:

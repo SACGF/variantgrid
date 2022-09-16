@@ -67,7 +67,8 @@ def classification_groups(
         genome_build: Optional[GenomeBuild] = None,
         title: Optional[str] = None,
         context_object: Optional[Model] = None,
-        group_utils: Optional[ClassificationGroupUtils] = None):
+        group_utils: Optional[ClassificationGroupUtils] = None,
+        default_sort: Optional[str] = 'c_hgvs'):
     """
     :param context: Auto included
     :param classification_modifications: The classification modifications to render
@@ -79,7 +80,12 @@ def classification_groups(
     :param title: Heading to give the table
     :param context_object: If all these records are from an allele, provide "allele" if from a discordance report provide "discordance_report" etc
     :param old_classification_modifications: For showing what a discordance report used to be
+    :param default_sort: The column to sort by default
     """
+    sort_order_index = 1
+    if default_sort == 'clinical_significance':
+        sort_order_index = 2
+
     if not group_utils:
         group_utils = ClassificationGroupUtils(
             modifications=classification_modifications,
@@ -93,7 +99,8 @@ def classification_groups(
         "user": context.request.user,
         "genome_build": groups.genome_build,
         "table_id": str(uuid.uuid4()).replace("-", "_"),
-        "show_allele_origin": settings.VARIANT_CLASSIFICATION_GRID_SHOW_ORIGIN
+        "show_allele_origin": settings.VARIANT_CLASSIFICATION_GRID_SHOW_ORIGIN,
+        "sort_order_index": sort_order_index
     }
     ordered_classifications = list(groups.modifications)
     # classifications are sorted by group, display them so they're sorted by date

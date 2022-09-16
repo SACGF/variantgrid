@@ -73,7 +73,7 @@
 <script>$(document).ready(() => {
     var tableDom = $('#{{ table_id }}')
     var table = tableDom.DataTable({
-        order: [1, "asc"],
+        order: [{{ sort_order_index }}, "asc"],
         dom: '<"top"><"toolbar"<"custom">{% if paging %}f{% endif %}>rt<"bottom"{% if paging %}<"showing"il>{% endif %}p><"clear">',
         "orderFixed": {
             post: [7, "desc"]
