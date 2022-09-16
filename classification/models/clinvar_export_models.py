@@ -85,7 +85,6 @@ class ClinVarExport(TimeStampedModel):
                 if all_errors:
                     return "\n".join(all_errors)
 
-
     def get_absolute_url(self):
         return reverse('clinvar_export', kwargs={'clinvar_export_id': self.pk})
 

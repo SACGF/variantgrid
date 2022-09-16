@@ -11,6 +11,8 @@
 {% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
 {% block content %}
     <div class="container">
+        <a href="{% url 'clinvar_key_summary' clinvar_export.clinvar_allele.clinvar_key.pk %}" class="hover-link"><i class="fas fa-angle-left"></i>Back to all ClinVar Exports</a>
+
         {% page_help_embedded title='ClinVar Export' %}
             <p>
             This page shows detailed information about a ClinVar Export record and allows individual records to be marked as On Hold and
