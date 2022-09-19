@@ -168,9 +168,18 @@ class DiscordanceReport(TimeStampedModel):
         return {lab for lab, status in self.involved_labs.items() if status == DiscordanceReport.LabInvolvement.ACTIVE}
 
     @lazy
+    def discordance_report_classifications(self) -> List['DiscordanceReportClassification']:
+        return list(self.discordancereportclassification_set.select_related(
+            'classification_original',
+            'classification_original__classification',
+            'classification_final',
+            'classification_final__classification'
+        ).all())
+
+    @lazy
     def involved_labs(self) -> Dict[Lab, LabInvolvement]:
         lab_status: Dict[Lab, DiscordanceReport.LabInvolvement] = dict()
-        for drc in DiscordanceReportClassification.objects.filter(report=self):
+        for drc in self.discordance_report_classifications:
             effective_c: Classification = drc.classification_effective.classification
             lab = effective_c.lab
             status = DiscordanceReport.LabInvolvement.WITHDRAWN if effective_c.withdrawn else DiscordanceReport.LabInvolvement.ACTIVE
@@ -198,7 +207,7 @@ class DiscordanceReport(TimeStampedModel):
     @property
     def has_significance_changed(self):
         existing_vms = {}
-        for dr in DiscordanceReportClassification.objects.filter(report=self):
+        for dr in self.discordance_report_classifications:
             if dr.clinical_context_final == self.clinical_context:
                 existing_vms[dr.classification_final.classification.id] = dr.classification_final.get(SpecialEKeys.CLINICAL_SIGNIFICANCE, None)
 
@@ -221,7 +230,7 @@ class DiscordanceReport(TimeStampedModel):
             return True
 
         existing_labs: Set[Lab] = set()
-        for drc in self.discordancereportclassification_set.all():
+        for drc in self.discordance_report_classifications:
             existing_labs.add(drc.classification_original.classification.lab)
 
         # a new lab has submitted since continued discordance
@@ -313,12 +322,9 @@ class DiscordanceReport(TimeStampedModel):
                 classifications.add(dr.classification_original.classification.id)
         return classifications
 
-    @lazy
+    @property
     def all_classification_modifications(self) -> List[ClassificationModification]:
-        vcms: List[ClassificationModification] = list()
-        for dr in DiscordanceReportClassification.objects.filter(report=self):
-            vcms.append(dr.classification_effective)
-        return vcms
+        return [drc.classification_effective for drc in self.discordance_report_classifications]
 
     def all_c_hgvs(self, genome_build: Optional[GenomeBuild] = None) -> List[CHGVS]:
         if not genome_build:
