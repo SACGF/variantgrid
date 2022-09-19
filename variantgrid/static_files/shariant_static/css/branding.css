@@ -9,7 +9,7 @@
   color: #ddd !important;
   border-color: #ccc !important;
 }
-.bg-theme .fas {
+.bg-theme .fas, .bg-theme .svg-inline--fa {
   color: #ccc !important;
 }
 .bg-theme input {
