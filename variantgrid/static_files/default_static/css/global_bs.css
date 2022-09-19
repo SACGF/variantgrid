@@ -1011,7 +1011,6 @@ ul.compact li:before {
 table .fa-hand-point-right {
   position: relative;
   left: -20px;
-  width: 0;
   margin: 0;
 }
 
