@@ -145,30 +145,7 @@
             </table>
         {% endif %}
 
-        <a data-toggle="collapse" class="toggle-link" href="#past-discordances">Toggle Past Discordances</a>
-        <div class="collapse" id="past-discordances">
-            {% page_help_embedded title="Past Discordances" %}
-                <p>Below is a list of all discordances where your lab was involved.</p>
-            {% end_page_help_embedded %}
-
-            <table class="table">
-                <thead>
-                    <tr>
-                        <th style="width:100px" class="text-center">ID</th>
-                        <th class="text-left">Discordance Detected</th>
-                        <th class="text-left">c.HGVS ({{ dlab.discordance_summaries.genome_build.name }})</th>
-                        <th class="text-center" style="width:50%">Lab / Clinical Significances</th>
-                    </tr>
-                </thead>
-                <tbody>
-                {% for summary in dlab.discordance_summaries.inactive_summaries %}
-                    {% discordance_report_row summary filter=False %}
-                {% empty %}
-                    <tr><td colspan="4" class="table-empty"><span class="no-value">No data to show</span></td></tr>
-                {% endfor %}
-                </tbody>
-            </table>
-        </div>
+        <div data-toggle="ajax-collapse" href="{% url 'discordance_reports_history' dlab.lab_picker.selection %}" title="Past Discordances" data-id="past-discordances"></div>
 
     </div>
 

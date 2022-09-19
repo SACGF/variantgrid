@@ -83,6 +83,26 @@ function enhanceAndMonitor() {
             });
         }},
 
+        {test: '[data-toggle="ajax-collapse"]', func: (node) => {
+            let $node = $(node);
+            let href = $node.attr('href');
+            let dataId = $node.attr('data-id');
+            let title = $node.attr('title');
+            let toggleLink = $(`<a data-toggle="collapse" class="toggle-link" href="#${dataId}">Toggle ${title}</a>`);
+            let ajaxBlob = $(`<div class="collapse mt-2" id="${dataId}"><div class="loading-message">Loading ${title}</div></div>`);
+            $node.replaceWith($('<div>', {html: [toggleLink, ajaxBlob]}));
+
+            window.setTimeout(() => {
+                ajaxBlob.on('show.bs.collapse', () => {
+                    if ($node.attr('loading')) {
+                        return;
+                    }
+                    $node.attr('loading', 1);
+                    loadAjaxBlock(ajaxBlob, href);
+                });
+            });
+        }},
+
         // setup popovers
         {test: '[data-content]', func: (node) => {
                 node.addClass('hover-detail');

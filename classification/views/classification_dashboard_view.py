@@ -91,7 +91,7 @@ class ClassificationDashboard:
         # .filter(classification_original__classification__withdrawn=False)  used to
         dr_qs = DiscordanceReport.objects.filter(pk__in=discordant_c).order_by('-created')
 
-        return DiscordanceReportTableData.create(perspective=self.perspective, discordance_reports=dr_qs)
+        return DiscordanceReportTableData(perspective=self.perspective, discordance_reports=dr_qs)
 
     @lazy
     def classifications_wout_standard_text(self) -> int:

@@ -34,11 +34,17 @@ def discordance_reports_view(request: HttpRequest, lab_id: Optional[str] = None)
     if redirect_response := lab_picker.check_redirect():
         return redirect_response
 
-    dlab = ClassificationDashboard(lab_picker=lab_picker)
-    context = {
-        "dlab": dlab
-    }
-    return render(request, "classification/discordance_reports.html", context)
+    return render(request, "classification/discordance_reports.html", {
+        "dlab": ClassificationDashboard(lab_picker=lab_picker)
+    })
+
+
+def discordance_reports_history_view(request: HttpRequest, lab_id: Optional[str] = None) -> HttpResponseBase:
+    lab_picker = LabPickerData.from_request(request=request, selection=lab_id, view_name='discordance_reports')
+
+    return render(request, "classification/discordance_reports_history.html", {
+        "dlab": ClassificationDashboard(lab_picker=lab_picker)
+    })
 
 
 @dataclass

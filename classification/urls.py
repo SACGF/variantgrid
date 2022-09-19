@@ -21,7 +21,7 @@ from classification.views.condition_match_test_view import condition_match_test_
 from classification.views.condition_matching_view import condition_matching_view, condition_matchings_view, \
     ConditionTextColumns, ConditionTextMatchingAPI
 from classification.views.discordance_report_views import discordance_report_view, export_discordance_report, \
-    discordance_reports_view
+    discordance_reports_view, discordance_reports_history_view
 from classification.views.evidence_keys_view import EvidenceKeysView
 from classification.views.hgvs_issues_view import view_hgvs_issues, download_hgvs_issues, AlleleColumns, \
     download_liftover_report
@@ -120,6 +120,7 @@ urlpatterns = [
 
     perm_path('discordance_reports', discordance_reports_view, name='discordance_reports'),
     perm_path('discordance_reports/<str:lab_id>', discordance_reports_view, name='discordance_reports'),
+    perm_path('discordance_reports/<str:lab_id>/history', discordance_reports_history_view, name='discordance_reports_history'),
     # 'classification' is redundant but there'll be other references to these URLs, so keep the URLs valid
     perm_path('classification/discordance_report/<int:discordance_report_id>', discordance_report_view, name='discordance_report_deprecated'),
     perm_path('classification/discordance_report/<int:discordance_report_id>/export', export_discordance_report, name='discordance_export_deprecated'),
