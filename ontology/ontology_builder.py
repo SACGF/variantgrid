@@ -199,14 +199,15 @@ class OntologyBuilder:
                  extra: Optional[Dict] = None,
                  aliases: Optional[List[str]] = None,
                  primary_source: bool = True,
-                 status: Optional[OntologyTermStatus] = None):
+                 status: Optional[OntologyTermStatus] = None,
+                 trusted_source: bool = True) -> OntologyTerm:
 
         cached = self._fetch_term(term_id)
         if not primary_source and cached.status == ModifiedStatus.EXISTING:
             # record was imported by a different process, so leave it alone
             # e.g. it was imported via an OMIM import but we're just referencing a stub value
             # now from a MONDO import.
-            return
+            return cached.obj
 
         cached.modify(self._ontology_import)
         term = cached.obj
@@ -236,9 +237,12 @@ class OntologyBuilder:
         if not status:
             if "obsolete" in name.lower():
                 status = OntologyTermStatus.DEPRECATED
+            elif not primary_source and not trusted_source:
+                status = OntologyTermStatus.STUB
             else:
                 status = OntologyTermStatus.CONDITION
         term.status = status
+        return term
 
     def complete(self, purge_old_relationships=False, purge_old_terms=False, verbose=True):
         """

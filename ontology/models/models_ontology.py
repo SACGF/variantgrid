@@ -212,6 +212,7 @@ class OntologyTermStatus(TextChoices):
     CONDITION = 'C'  # Also phenotypes are mixed up in there right now
     DEPRECATED = 'D'
     NON_CONDITION = 'N'
+    STUB = 'S'
 
 
 class OntologyTerm(TimeStampedModel):

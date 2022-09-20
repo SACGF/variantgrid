@@ -161,7 +161,7 @@ def load_mondo(filename: str, force: bool):
 
                         for key, relations in term_relation_types.items():
                             unique_relations = list()
-                            for relation in relations:
+                            for x in relations:
                                 if relation not in unique_relations:
                                     unique_relations.append(relation)
 

@@ -15,7 +15,7 @@ from ontology.ontology_builder import OntologyBuilder, OntologyBuilderDataUpToDa
 
 # increment if you change the logic of parsing ontology terms from PanelApp
 # which will then effectively nullify the cache so the new logic is run
-PANEL_APP_API_PROCESSOR_VERSION = 6
+PANEL_APP_API_PROCESSOR_VERSION = 7
 # with look ahead and behind to make sure we're not in a 7 digit number
 ABANDONED_OMIM_RE = re.compile('(?<![0-9])([0-9]{6})(?![0-9])')
 
@@ -73,18 +73,22 @@ def _update_gene_relations_activate(ontology_builder: OntologyBuilder, hgnc_term
     def add_term_if_valid(full_id: str):
         nonlocal ontology_builder
         nonlocal hgnc_term
-        if term := OntologyTerm.objects.filter(id=full_id).first():
-            ontology_builder.add_ontology_relation(
-                source_term_id=term.id,
-                dest_term_id=hgnc_term.id,
-                relation=OntologyRelation.PANEL_APP_AU,
-                extra={
-                    "phenotype_row": phenotype_row,
-                    "evidence": evidence
-                })
-        else:
-            report_message("Found ontology term from PanelApp not in DB", level="error",
-                           extra_data={"target": full_id, "gene_symbol": str(gene_symbol)})
+
+        term = ontology_builder.add_term(
+            term_id=full_id,
+            name="Unknown Term",
+            primary_source=False,
+            trusted_source=False
+        )
+
+        ontology_builder.add_ontology_relation(
+            source_term_id=term.id,
+            dest_term_id=hgnc_term.id,
+            relation=OntologyRelation.PANEL_APP_AU,
+            extra={
+                "phenotype_row": phenotype_row,
+                "evidence": evidence
+            })
 
     for panel_app_result in results:
         if evidence := panel_app_result.get('evidence'):
