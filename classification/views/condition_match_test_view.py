@@ -138,14 +138,14 @@ def condition_obsoletes_view(request):
         .filter(from_import__import_source=OntologyImportSource.PANEL_APP_AU)\
         .filter(
             Q(source_term__status__ne=OntologyTermStatus.CONDITION) | Q(dest_term__status__ne=OntologyTermStatus.CONDITION)
-        ).order_by('-source_term')
+        ).order_by('dest_term__name')
 
     obsolete_relations_gencc = OntologyVersion.latest().get_ontology_term_relations() \
         .filter(from_import__import_source=OntologyImportSource.GENCC) \
         .filter(OntologySnake.gencc_quality_filter(GeneDiseaseClassification.STRONG)) \
         .filter(
             Q(source_term__status__ne=OntologyTermStatus.CONDITION) | Q(dest_term__status__ne=OntologyTermStatus.CONDITION)
-        ).order_by('-source_term')
+        ).order_by('dest_term__name')
 
     obsolete_condition_matches = list()
     for ctm in ConditionTextMatch.objects.filter(condition_xrefs__isnull=False):
