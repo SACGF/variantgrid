@@ -32,6 +32,10 @@
                     {% labelled label="Warning" %}{{ 'W' | severity_icon }} This term is not suitable to be used as a Condition.
                         {% if term.extra.type %}<br/>Term is of type "{{ term.extra.type }}"{% endif %}
                     {% endlabelled %}
+                {% elif term.status == 'S' %}
+                    {% labelled label="Warning" %}{{ 'W' | severity_icon }} This term was referenced by a third party relationship, but has not been loaded from its authorative source.<br/>
+                        The term might be new and not in this system yet, or it may have been referenced incorrectly by the third party.
+                    {% endlabelled %}
                 {% endif %}
                 {% labelled label="Definition" value_css="white-space:pre-wrap" %}{{ term.definition }}{% endlabelled %}
                 {% labelled label="Extra" %}
