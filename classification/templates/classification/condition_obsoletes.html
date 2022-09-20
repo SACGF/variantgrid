@@ -10,10 +10,19 @@
 {% block head %}{% endblock %}
 {% block content %}
     <div class="container">
-        {% if obsolete_relations %}
+        {% if obsolete_relations_panelappau %}
             <h5>Obsolete PanelApp Relationships</h5>
             <div class="mb-4">
-            {% for relation in obsolete_relations %}
+            {% for relation in obsolete_relations_panelappau %}
+                <div>{% ontology_relationship relation relation.source %}</div>
+            {% endfor %}
+            </div>
+        {% endif %}
+
+        {% if obsolete_relations_gencc %}
+            <h5>Obsolete GenCC Relationships</h5>
+            <div class="mb-4">
+            {% for relation in obsolete_relations_gencc %}
                 <div>{% ontology_relationship relation relation.source %}</div>
             {% endfor %}
             </div>
