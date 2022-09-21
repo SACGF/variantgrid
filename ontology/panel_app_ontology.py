@@ -10,7 +10,8 @@ from genes.panel_app import get_panel_app_results_by_gene_symbol_json, PANEL_APP
 from library.cache import timed_cache
 from library.log_utils import report_exc_info, report_message
 from library.utils import md5sum_str, JSON
-from ontology.models import OntologyTerm, OntologyRelation, OntologyImportSource, OntologyTermRelation
+from ontology.models import OntologyTerm, OntologyRelation, OntologyImportSource, OntologyTermRelation, \
+    OntologyTermStatus
 from ontology.ontology_builder import OntologyBuilder, OntologyBuilderDataUpToDateException
 
 # increment if you change the logic of parsing ontology terms from PanelApp
@@ -74,12 +75,15 @@ def _update_gene_relations_activate(ontology_builder: OntologyBuilder, hgnc_term
         nonlocal ontology_builder
         nonlocal hgnc_term
 
-        term = ontology_builder.add_term(
+        term, created = ontology_builder.add_term(
             term_id=full_id,
             name="Unknown Term",
             primary_source=False,
             trusted_source=False
         )
+        if created and term.status == OntologyTermStatus.STUB:
+            report_message("Found ontology term from PanelApp not in DB", level="error",
+                           extra_data={"target": full_id, "gene_symbol": str(gene_symbol)})
 
         ontology_builder.add_ontology_relation(
             source_term_id=term.id,

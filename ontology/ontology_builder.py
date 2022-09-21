@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from datetime import timedelta, datetime
 from enum import Enum
-from typing import Optional, Dict, List, TypeVar, Generic, Iterable, Type
+from typing import Optional, Dict, List, TypeVar, Generic, Iterable, Type, Union
 
 from django.db.models import Model
 from django.utils import timezone
@@ -200,14 +200,18 @@ class OntologyBuilder:
                  aliases: Optional[List[str]] = None,
                  primary_source: bool = True,
                  status: Optional[OntologyTermStatus] = None,
-                 trusted_source: bool = True) -> OntologyTerm:
+                 trusted_source: bool = True) -> Union[OntologyTerm, bool]:
+        """
+        Returns OntologyTerm and boolean indicated True for created, False for already existed
+        TODO: The created boolean will return True on multiple requests to add_term with the same import_builder
+        """
 
         cached = self._fetch_term(term_id)
         if not primary_source and cached.status == ModifiedStatus.EXISTING:
             # record was imported by a different process, so leave it alone
             # e.g. it was imported via an OMIM import but we're just referencing a stub value
             # now from a MONDO import.
-            return cached.obj
+            return cached.obj, False
 
         cached.modify(self._ontology_import)
         term = cached.obj
@@ -242,7 +246,8 @@ class OntologyBuilder:
             else:
                 status = OntologyTermStatus.CONDITION
         term.status = status
-        return term
+
+        return term, cached.status == ModifiedStatus.CREATED
 
     def complete(self, purge_old_relationships=False, purge_old_terms=False, verbose=True):
         """
