@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from enum import IntEnum, Enum
 from functools import total_ordering
-from typing import Dict, List, Any, Optional, Tuple, Set, Union
+from typing import Dict, List, Any, Optional, Tuple, Set, Union, Iterable
 
 import pandas as pd
 from dateutil import relativedelta
@@ -345,7 +345,7 @@ def download_report(request):
     return response
 
 
-def get_accumulation_graph_data(mode: AccumulationReportMode = AccumulationReportMode.Classification, labs: Optional[List[Lab]] = None) -> Dict[str, Any]:
+def get_accumulation_graph_data(mode: AccumulationReportMode = AccumulationReportMode.Classification, labs: Optional[Iterable[Lab]] = None) -> Dict[str, Any]:
     data = list(_iter_report_list(mode=mode, labs=labs))
     header = data[0]
     rows = data[1:]
