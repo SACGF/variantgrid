@@ -266,6 +266,8 @@ class OntologyTerm(TimeStampedModel):
         elif self.status == OntologyTermStatus.NON_CONDITION:
             term_type = (self.extra or dict()).get('type', 'Unknown')
             return f"Term is of type - {term_type}"
+        elif self.status == OntologyTermStatus.STUB:
+            return f"Term was referenced by 3rd party but not yet from our authoritative source"
         else:
             return None
 
