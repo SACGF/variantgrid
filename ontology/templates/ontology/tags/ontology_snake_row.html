@@ -1,0 +1,21 @@
+{% load ontology_tags %}
+{% load js_tags %}
+<tr>
+    <td data-order="{{ source_term.name|default_if_none:'' }}">{% ontology_term source_term show_link=is_source_diff %}</td>
+    <td>
+        {% for step in steps %}
+            {% with relationship=step.relationship %}
+                <div>
+                    {% if not forloop.first %}<br/>{% endif %}
+                    <div class="hover-detail d-inline-block" title="Extra" data-content="{{ relationship.extra }}">{{ relationship.relation_display }}</div>
+                    &nbsp;
+                    <div class="text-muted hover-detail d-inline-block" title="Import {{ relationship.from_import.import_source }}" data-content="Last imported: {% timestamp relationship.from_import.processed_date text_only=True %}<br/>Context: {{ relationship.from_import.context }}</br>Filename: {{ relationship.from_import.filename }}">
+                        <span style="font-size:8pt">source <span style="word-break: break-all"> {{ relationship.from_import.import_source }}</span></span>
+                    </div>
+                    <div>{% if not forloop.last %}{% ontology_term step.dest_term show_link=True %}{% endif %}</div>
+                </div>
+            {% endwith %}
+        {% endfor %}
+    </td>
+    <td data-order="{{ dest_term.name|default_if_none:'' }}">{% ontology_term dest_term show_link=is_dest_diff %}</td>
+</tr>

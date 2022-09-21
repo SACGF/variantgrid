@@ -64,7 +64,7 @@
                     {% endlabelled %}
                 {% endif %}
                 {% if not term.is_stub %}
-                    {% labelled label="Last imported" %}Import {{ term.from_import.id }} - {{ term.from_import.filename }} @ {% timestamp term.from_import.processed_date %}{% endlabelled %}
+                    {% labelled label="Last Imported" %}Import {{ term.from_import.id }} - {{ term.from_import.filename }} @ {% timestamp term.from_import.processed_date %}{% endlabelled %}
 
                     {% labelled label="Relationships" %}
                         <a class="toggle-link" data-toggle="collapse" href="#relationships" {% if relationship_count < 30 %}aria-expanded="true"{% endif %}>Toggle {% count relationship_count singular="Ontology/Gene Relationship" plural="Ontology/Gene Relationships" %}</a>
@@ -73,77 +73,56 @@
                     <div id="relationships" class="collapse {% if relationship_count < 30 %}show{% endif %}">
                         {% if parent_relationships is not None %}
                             <hr />
-                            {% labelled label='<i class="fas fa-sitemap"></i> Parent Terms' %}
-                                {% if parent_relationships %}
-                                    {% if parent_relationships.is_limited %}<i class="fas fa-info-circle text-info"></i> {{ parent_relationships.limit_str }}<br/>{% endif %}
-                                    {% for relationship in parent_relationships %}
-                                        <div class="mt-2">
-                                            {% ontology_relationship relationship term %}
-                                        </div>
-                                    {% endfor %}
-                                {% else %}
-                                    -
-                                {% endif %}
-                            {% endlabelled %}
+                            <div class="mt-4">
+                                {% labelled label='<i class="fas fa-sitemap text-success"></i> Parent Terms' hint="chunky" %}
+                                    {% if parent_relationships %}
+                                        {% if parent_relationships.is_limited %}<i class="fas fa-info-circle text-info"></i> {{ parent_relationships.limit_str }}<br/>{% endif %}
+                                        {% ontology_relationship_table parent_relationships term %}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                {% endlabelled %}
+                            </div>
                         {% endif %}
 
                         {% if gene_relationships is not None %}
-                            <hr/>
-                            {% labelled label="<i class='fas fa-dna'></i> Gene Relationships" %}
-                                {% if gene_relationships %}
-                                    <p class="text-muted">Note that Panel App relationships are only retrieved as needed, and might not be represented
-                                    here yet.</p>
+                            <div class="mt-4">
+                                {% labelled label="<i class='fas fa-dna text-success'></i> Gene Relationships" hint="chunky" %}
+                                    {% if gene_relationships %}
+                                        <p class="text-info">Note that Panel App relationships are only retrieved as needed, and might not be represented
+                                        here yet.</p>
 
-                                    {% if gene_relationships.is_limited %}<i class="fas fa-info-circle text-info"></i> {{ gene_relationships.limit_str }}<br/>{% endif %}
-                                    {% for snake in gene_relationships %}
-                                        <div class="mt-2">
-                                        <span class="text-muted text-monospace">{{ term.id }}</span>
-                                        {% for step in snake.show_steps %}
-                                            <div class="text-center d-inline-block mx-2 hover-detail"
-                                                 title="Import {{ step.relation.from_import.import_source }}"
-                                                data-content="Last imported: {% timestamp step.relation.from_import.processed_date text_only=True %}<br/>
-                                                Context: {{ step.relation.from_import.context }}</br>
-                                                Filename: {{ step.relation.from_import.filename }}">&nbsp
-                                                {{ step.relation.relation_display }}
-                                            </div>
-                                            {% ontology_term step.dest_term %} &nbsp;
-                                        {% endfor %}
-                                        </div>
-                                    {% endfor %}
-                                {% else %}
-                                    -
-                                {% endif %}
-                            {% endlabelled %}
+                                        {% if gene_relationships.is_limited %}<i class="fas fa-info-circle text-info"></i> {{ gene_relationships.limit_str }}<br/>{% endif %}
+                                        {% ontology_snake_table gene_relationships term %}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                {% endlabelled %}
+                            </div>
                         {% endif %}
-                        <hr/>
 
-                        {% labelled label="Direct Relationships" %}
+                        <div class="mt-4">
+                        {% labelled label="<i class='fa-solid fa-arrows-left-right text-success'></i> Direct Relationships" hint="chunky" %}
                             {% if regular_relationships %}
                                 {% if regular_relationships.is_limited %}<i class="fas fa-info-circle text-info"></i> {{ regular_relationships.limit_str }}<br/>{% endif %}
-                                {% for relationship in regular_relationships %}
-                                    <div class="mt-2">
-                                        {% ontology_relationship relationship term %}
-                                    </div>
-                                {% endfor %}
+                                {% ontology_relationship_table regular_relationships term %}
                             {% else %}
                                 -
                             {% endif %}
                         {% endlabelled %}
+                        </div>
 
                         {% if child_relationships is not None %}
-                            <hr/>
-                            {% labelled label='<i class="fas fa-sitemap"></i> Child Terms' %}
-                                {% if child_relationships %}
-                                    {% if child_relationships.is_limited %}<i class="fas fa-info-circle text-info"></i> {{ child_relationships.limit_str }}<br/>{% endif %}
-                                    {% for relationship in child_relationships %}
-                                        <div class="mt-2">
-                                            {% ontology_relationship relationship term %}
-                                        </div>
-                                    {% endfor %}
-                                {% else %}
-                                    -
-                                {% endif %}
-                            {% endlabelled %}
+                            <div class="mt-4">
+                                {% labelled label='<i class="fas fa-sitemap text-success"></i> Child Terms' hint="chunky" %}
+                                    {% if child_relationships %}
+                                        {% if child_relationships.is_limited %}<i class="fas fa-info-circle text-info"></i> {{ child_relationships.limit_str }}<br/>{% endif %}
+                                        {% ontology_relationship_table child_relationships term %}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                {% endlabelled %}
+                            </div>
                         {% endif %}
                     </div>
                 {% endif %}

@@ -648,6 +648,11 @@ class OntologySnakeStep:
     dest_term: OntologyTerm
 
     @property
+    def relationship(self) -> OntologyTermRelation:
+        # relationship is the preferred term, add this property to help migrate over to better wording
+        return self.relation
+
+    @property
     def source_term(self) -> OntologyTerm:
         return self.relation.other_end(self.dest_term)
 

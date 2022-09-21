@@ -1,0 +1,23 @@
+{% load ontology_tags %}
+<table class="table" id="{{ table_id }}">
+    <thead>
+        <tr>
+            <th style="width:35%">Source Term</th>
+            <th>Via</th>
+            <th style="width:35%">Dest Term</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for snake in snakes %}
+            {% ontology_snake_row snake reference_term=reference_term %}
+        {% endfor %}
+    </tbody>
+</table>
+<script>
+    $('#{{ table_id }}').DataTable({
+        dom: 't',
+        bFilter: false,
+        paginate: false,
+        order: [[2, 'asc']],
+    });
+</script>

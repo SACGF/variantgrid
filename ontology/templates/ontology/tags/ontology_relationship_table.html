@@ -1,0 +1,23 @@
+{% load ontology_tags %}
+<table class="table" id="{{ table_id }}">
+    <thead>
+        <tr>
+            <th style="width:35%">Source Term</th>
+            <th>Relationship</th>
+            <th style="width:35%">Dest Term</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for row_relationship in relationships %}
+            {% ontology_relationship_row row_relationship reference_term=reference_term %}
+        {% endfor %}
+    </tbody>
+</table>
+<script>
+    $('#{{ table_id }}').DataTable({
+        dom: 't',
+        bFilter: false,
+        paginate: false,
+        order: [[2, 'asc'], [0, 'asc']],
+    });
+</script>
