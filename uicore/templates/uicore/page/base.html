@@ -79,7 +79,10 @@
 
     <!-- Font Awesome -->
     <link href="{% static 'fontawesomefree/css/all.min.css' %}" rel="stylesheet" type="text/css">
+    {% comment %}
+    This makes icons svgs, which by default breaks clicks, hover overs etc
     <script src="{% static 'fontawesomefree/js/all.min.js' %}"></script>
+    {% endcomment %}
 
     <!-- Datatables -->
     <link rel="stylesheet" type="text/css" href="{% static 'js/lib/datatables/bs4/dt-1.11.4/b-2.2.2/datatables.min.css' %}"/>
