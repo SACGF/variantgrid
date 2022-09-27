@@ -372,8 +372,8 @@ class ClassificationExportFormatter2MVL(ClassificationExportFormatter2):
             return \
 f"""{{
     "username": "{make_json_safe(mvl_json_extra.username)}",
-    "mvlId": "{mvl_json_extra.mvl_id}",
-    "curated": "{make_json_safe(mvl_json_extra.curated)}",
+    "mvlId": {mvl_json_extra.mvl_id},
+    "curated": {make_json_safe(mvl_json_extra.curated)},
     "importOption": "{make_json_safe(mvl_json_extra.import_option)}",
     "molecularVariants": [
 """
