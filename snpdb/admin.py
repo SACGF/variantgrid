@@ -282,11 +282,38 @@ class LabHeadAdmin(ModelAdminBasics):
         "user",
     )
 
+
+@admin.register(models.Country)
+class CountryAdmin(ModelAdminBasics):
+
+    def get_form(self, request, obj=None, **kwargs):
+        return super().get_form(request, obj, widgets={
+            'name': admin.widgets.AdminTextInputWidget(),
+            'short_name': admin.widgets.AdminTextInputWidget()
+        }, **kwargs)
+
+
+@admin.register(models.State)
+class StateAdmin(ModelAdminBasics):
+
+    list_display = ('name', 'country')
+
+    def get_form(self, request, obj=None, **kwargs):
+        return super().get_form(request, obj, widgets={
+            'name': admin.widgets.AdminTextInputWidget(),
+            'short_name': admin.widgets.AdminTextInputWidget()
+        }, **kwargs)
+
+    def is_readonly_field(self, f) -> bool:
+        if f.name == "country":
+            return False
+        return super().is_readonly_field(f)
+
+
 admin.site.register(models.CachedGeneratedFile, ModelAdminBasics)
 admin.site.register(models.Cohort, ModelAdminBasics)
 admin.site.register(models.CohortGenotypeCollection, ModelAdminBasics)
 admin.site.register(models.CohortSample, ModelAdminBasics)
-admin.site.register(models.Country)
 admin.site.register(models.CustomColumn, ModelAdminBasics)
 admin.site.register(models.CustomColumnsCollection, ModelAdminBasics)
 admin.site.register(models.GenomeBuild, ModelAdminBasics)
@@ -300,7 +327,6 @@ admin.site.register(models.SampleLabProject)
 admin.site.register(models.SampleTag, ModelAdminBasics)
 admin.site.register(models.SettingsInitialGroupPermission, ModelAdminBasics)
 admin.site.register(models.SiteMessage, ModelAdminBasics)
-admin.site.register(models.State)
 admin.site.register(models.Tag, ModelAdminBasics)
 admin.site.register(models.Trio, ModelAdminBasics)
 admin.site.register(models.VCF, GuardedModelAdminBasics)
