@@ -322,7 +322,7 @@ class MVLEntry(ExportRow):
     def report_abstract_tsv(self):
         return self._report_abstract()
 
-    @export_column('report abstract', categories={"format": "tsv"})
+    @export_column('reportAbstract', categories={"format": "json"})
     def report_abstract_json(self):
         return self._report_abstract()
 
@@ -359,7 +359,7 @@ class ClassificationExportFormatter2MVL(ClassificationExportFormatter2):
     def header(self):
         # reset first row as we could be split over multiple files
         if self.file_format == FormatDetailsMVLFileFormat.TSV:
-            return [delimited_row(MVLEntry.csv_header(), delimiter='\t')]
+            return [delimited_row(MVLEntry.csv_header(categories={"format": "tsv"}), delimiter='\t')]
         elif self.file_format == FormatDetailsMVLFileFormat.JSON:
 
             def make_json_safe(obj: Any) -> str:
