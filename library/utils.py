@@ -938,7 +938,13 @@ class ExportRow:
                 nonlocal categories
                 export_categories = export_method.categories or dict()
                 for key, value in categories.items():
-                    if not export_categories.get(key) == value:
+                    if export_value := export_categories.get(key):
+                        if isinstance(export_value, set):
+                            if not value in export_value:
+                                return False
+                        else:
+                            return export_value == value
+                    else:
                         return False
                 return True
 
@@ -970,14 +976,28 @@ class ExportRow:
             raise
 
     @classmethod
-    def json_generator(cls, data: Iterable[Any], records_key: str = "records") -> Iterator[str]:
+    def json_generator(cls, data: Iterable[Any], records_key: str = "records", categories: Optional[Dict[str, Any]] = None) -> Iterator[str]:
+        """
+        :param data: Iterable data of either cls or that can be passed to cls's constructor
+        :param records_key:
+        :param categories:
+        :return:
+        """
         first_row = True
         try:
-            yield f'{{"{records_key}": ['
+            if records_key:
+                yield f'{{"{records_key}": ['
+
             for row_data in cls._data_generator(data):
-                yield (', ' if not first_row else '') + json.dumps(row_data.to_json())
+                text = ""
+                if not first_row:
+                    text += ",\n"
                 first_row = False
-            yield ']}}'
+                text += json.dumps(row_data.to_json(categories=categories))
+                yield text
+
+            if records_key:
+                yield ']}}'
         except:
             from library.log_utils import report_exc_info
             report_exc_info(extra_data={"activity": "Exporting"})
@@ -1025,7 +1045,8 @@ class ExportRow:
 
             if value == "":
                 value = None
-            row[method.__name__] = value
+            #row[method.__name__] = value
+            row[method.label or method.__name] = value
 
         return row
 

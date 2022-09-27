@@ -37,8 +37,12 @@
         params.type = format;
 
         if (format === 'mvl') {
+            let mvlFileFormat = $("input[name='mvl_file_format']:checked").val();
+            params.file_format = mvlFileFormat;
+
             let conflictStrategy = $("input[name='conflict_strategy']:checked").val();
             params.conflict_strategy=conflictStrategy;
+
             for (let key of ['b', 'lb', 'vus', 'lp', 'p']) {
                 let full_key = `cs_${key}`;
                 let value = $(`#${full_key}`).val().trim();
@@ -47,6 +51,7 @@
                 }
             }
             params.transcript_strategy = $("input[name='transcript_strategy']:checked").val();
+
 
             let detailLevelChecked = $("input[name='mvl_detail']:checked")
             if (detailLevelChecked.length) {
@@ -340,6 +345,20 @@
             <span class="text-muted">Various versions of Alissa limit how many rows can be in an individual MVL file<br/>
             Minimum value is 100, but can set to 0 to have it all in a single file.</span>
         {% endlabelled %}
+        {% labelled label="MVL File Format" admin_only=True %}
+            <div class="form-check">
+                <label class="form-check-label">
+                    <input checked="true" id="mvl_file_format_tsv" type="radio" name="mvl_file_format" value="tsv" class="form-check-input" />
+                    TSV
+                </label>
+            </div>
+            <div class="form-check">
+                <label class="form-check-label">
+                    <input id="mvl_file_format_json" type="radio" name="mvl_file_format" value="json" class="form-check-input" />
+                    JSON
+                </label>
+            </div>
+        {% endlabelled %}
         {% labelled label="MVL Conflict Strategy" %}
             <div class="form-check">
                 <label class="form-check-label">
@@ -387,22 +406,20 @@
         {% labelled label="Pathogenic" %}
             <input class="form-control" id="cs_p" type="text" placeholder="PATHOGENIC" />
         {% endlabelled %}
-        {% if user.is_superuser %}
-            {% labelled label="VCF Detail Level" admin_only=True %}
-                <div class="form-check">
-                    <label class="form-check-label">
-                        <input checked="true" id="mvl_detail_standard" type="radio" name="mvl_detail" value="standard" class="form-check-input" />
-                        Standard
-                    </label>
-                </div>
-                <div class="form-check">
-                    <label class="form-check-label">
-                        <input id="mvl_detail_shell" type="radio" name="mvl_detail" value="shell" class="form-check-input" />
-                        Minimal (for testing)
-                    </label>
-                </div>
-            {% endlabelled %}
-        {% endif %}
+        {% labelled label="VCF Detail Level" admin_only=True %}
+            <div class="form-check">
+                <label class="form-check-label">
+                    <input checked="true" id="mvl_detail_standard" type="radio" name="mvl_detail" value="standard" class="form-check-input" />
+                    Standard
+                </label>
+            </div>
+            <div class="form-check">
+                <label class="form-check-label">
+                    <input id="mvl_detail_shell" type="radio" name="mvl_detail" value="shell" class="form-check-input" />
+                    Minimal (for testing)
+                </label>
+            </div>
+        {% endlabelled %}
     </div>
     <div class="custom-option" data-format="json">
         {% labelled label="JSON Grouping" %}

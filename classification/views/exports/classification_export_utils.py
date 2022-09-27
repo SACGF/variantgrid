@@ -104,6 +104,11 @@ class CHGVSData:
     different_chgvs: bool = False
     cms: List[ClassificationModification] = field(default_factory=list)
 
+    @property
+    def last_updated(self):
+        # use for reports on modified date, but need more than this to check
+        return max(cm.modified for cm in self.cms)
+
     @staticmethod
     def split_into_c_hgvs(
             allele_data: AlleleData,
