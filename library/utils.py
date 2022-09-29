@@ -936,16 +936,22 @@ class ExportRow:
         if categories:
             def passes_filter(export_method) -> bool:
                 nonlocal categories
-                export_categories = export_method.categories or dict()
+                decorated_values = export_method.categories or dict()
+                # for every requirement of categories
                 for key, value in categories.items():
-                    if export_value := export_categories.get(key):
-                        if isinstance(export_value, set):
-                            if not value in export_value:
+                    # get the decorated value
+                    if decorated_value := decorated_values.get(key):
+                        # handle decorated value being a collection (and matching a single value in that collection)
+                        if isinstance(decorated_value, (set, tuple, list)):
+                            if value not in decorated_value:
                                 return False
-                        else:
-                            return export_value == value
-                    else:
+                        elif decorated_value != value:
+                            return False
+                    # if the requirement for the category is None and there's no value at all in the decorator
+                    # it passes the test
+                    elif value is not None:
                         return False
+
                 return True
 
             export_methods = [em for em in export_methods if passes_filter(em)]
