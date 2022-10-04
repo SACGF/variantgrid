@@ -43,14 +43,14 @@ class ProblemRow(ExportRow):
     def exported_c_hgvs(self):
         return self.cm.get(SpecialEKeys.C_HGVS)
 
-    @export_column("Classification Last Updated")
+    @export_column("Classification Last Updated", format={"tz": "default"})
     def classification_last_updated(self):
-        return self.cm.created.strftime("%Y-%m-%d %H:%M")
+        return self.cm.created
 
-    @export_column("Flag Last Updated")
+    @export_column("Flag Last Updated", format={"tz": "default"})
     def flag_last_updated(self):
         if fc := self.problem.flag_comment:
-            return fc.created.strftime("%Y-%m-%d %H:%M")
+            return fc.created
 
     @export_column("Problem Code")
     def problem_code(self):

@@ -28,6 +28,7 @@ from urllib.parse import urlparse
 
 from bs4 import BeautifulSoup
 from dateutil import parser
+from dateutil.tz import gettz
 from django.conf import settings
 from django.core.exceptions import FieldDoesNotExist
 from django.core.serializers import serialize
@@ -895,22 +896,39 @@ def flatten_nested_lists(iterable) -> List:
     return list(_flatten_generator(iterable))
 
 
-def export_column(label: Optional[str] = None, sub_data: Optional[Type] = None, categories: Dict[str, Any] = None):
+def export_column(label: Optional[str] = None, sub_data: Optional[Type] = None, categories: Dict[str, Any] = None, format: Dict[str, Any] = None):
     """
     Extend ExportRow and annotate methods with export_column.
     The order of defined methods determines the order that the results will appear in an export file
     :param label: The label that will appear in the CSV header (defaults to method name if not provided)
     :param sub_data: An optional SubType of another ExportRow for nested data
     """
+    tz_name = settings.TIME_ZONE
+    use_tz = None
+    if format and (format_tz_name := format.get("tz")):
+        show_tz_in_heading = True
+        if format_tz_name == "default":
+            format_tz_name = settings.TIME_ZONE
+        use_tz = gettz(format_tz_name)
+        tz_name = use_tz.tzname(datetime.now())
 
     def decorator(method):
         def wrapper(*args, **kwargs):
-            return method(*args, **kwargs)
+            result = method(*args, **kwargs)
+            if isinstance(result, datetime):
+                if use_tz:
+                    result = result.astimezone(use_tz)
+                return result.strftime("%Y-%m-%d %H:%M")
+
+            return result
         # have to cache the line number of the source method, otherwise we just get the line number of this wrapper
         wrapper.line_number = inspect.getsourcelines(method)[1]
         wrapper.label = label or method.__name__
         if '$site_name' in wrapper.label:
             wrapper.label = wrapper.label.replace('$site_name', settings.SITE_NAME)
+
+        if use_tz:
+            wrapper.label = f"{wrapper.label} ({tz_name})"
 
         wrapper.__name__ = method.__name__
         wrapper.is_export = True
