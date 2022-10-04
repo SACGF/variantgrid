@@ -2,9 +2,14 @@
 <table class="table" id="{{ table_id }}">
     <thead>
         <tr>
-            <th style="width:35%">Source Term</th>
-            <th>Relationship</th>
-            <th style="width:35%">Destination Term</th>
+            {% if not reference_term %}
+                <th style="width:35%">Source Term</th>
+                <th>Relationship</th>
+                <th style="width:35%">Destination Term</th>
+            {% else %}
+                <th>Relationship</th>
+                <th style="width:50%">Other Term</th>
+            {% endif %}
         </tr>
     </thead>
     <tbody>

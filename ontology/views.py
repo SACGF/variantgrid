@@ -42,9 +42,9 @@ class OntologyTermView(TemplateView):
             return {
                 "term": term,
                 "is_ontology": not is_gene,
-                # gene relationships can be double counted which is a bit misleading
-                "relationship_count": (len(gene_relationships) if gene_relationships else 0) + (len(all_relationships) if all_relationships else 0),
+                "gene_relationship_count": len(gene_relationships) if gene_relationships else 0,
                 "gene_relationships": gene_relationships,
+                "relationship_count": len(all_relationships) if all_relationships else 0,
                 "parent_relationships": LimitedCollection(parent_relationships, 250) if not is_gene else None,
                 "regular_relationships": LimitedCollection(regular_relationships, 250),
                 "child_relationships": LimitedCollection(child_relationships, 250) if not is_gene else None,

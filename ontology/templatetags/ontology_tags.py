@@ -51,13 +51,18 @@ def ontology_relationship_row(relationship: OntologyTermRelation, reference_term
                 low_quality = True
                 quality = strongest
 
+    other_term = None
+    if reference_term:
+        other_term = relationship.other_end(reference_term)
+
     return {
-        "is_source_diff": (not reference_term) or (relationship.source_term != reference_term),
-        "is_dest_diff": (not reference_term) or (relationship.dest_term != reference_term),
+        "other_term": other_term,
+        "dest_term": other_term or relationship.dest_term,
         "relationship": relationship,
+        "reversed": reference_term == relationship.dest_term,
         "low_quality": low_quality,
         "quality": quality,
-        "term": reference_term
+        "reference_term": reference_term
     }
 
 

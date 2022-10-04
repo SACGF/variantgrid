@@ -1,14 +1,18 @@
 {% load ontology_tags %}
 {% load js_tags %}
 <tr {% if low_quality %}style="opacity:0.6"{% endif %}>
-    <td data-order="{{ relationship.source_term.name|default_if_none:'' }}">{% ontology_term relationship.source_term show_link=is_source_diff %}</td>
+    {% if not reference_term %}
+        <td data-order="{{ relationship.source_term.name|default_if_none:'' }}">{% ontology_term relationship.source_term show_link=True %}</td>
+    {% endif %}
     <td data-order="{{ relationship.relation_display }}">
-        {% if low_quality %}<i class="fas fa-exclamation-triangle text-warning hover-detail" title="Low quality relationship"></i>{% endif %}
-        <div class="hover-detail d-inline-block" title="Extra" data-content="{{ relationship.extra }}">{{ relationship.relation_display }} {% if low_quality %} ({{ quality }})</div>{% endif %}</div>
-            &nbsp;
-        <div class="text-muted hover-detail d-inline-block" title="Import {{ relationship.from_import.import_source }}" data-content="Last imported: {% timestamp relationship.from_import.processed_date text_only=True %}<br/>Context: {{ relationship.from_import.context }}</br>Filename: {{ relationship.from_import.filename }}">
+        <div>
+            {% if low_quality %}<i class="fas fa-exclamation-triangle text-warning hover-detail" title="Low quality relationship"></i>{% endif %}
+            <i class="fas fa-exchange-alt mr-2 text-muted hover-detail" title="Inversed" data-content="The relationship is stored in the inverse direction:<br/>{{ dest_term.id }}<br/>{{ relationship.relation_display }}<br/>{{ reference_term.id }}"></i>
+            <div class="hover-detail d-inline-block" title="Extra" data-content="{{ relationship.extra }}">{{ relationship.relation_display }} {% if low_quality %} ({{ quality }}){% endif %}</div>
+        </div>
+        <div class="text-muted hover-detail" title="Import {{ relationship.from_import.import_source }}" data-content="Last imported: {% timestamp relationship.from_import.processed_date text_only=True %}<br/>Context: {{ relationship.from_import.context }}</br>Filename: {{ relationship.from_import.filename }}">
             <span style="font-size:8pt">source <span style="word-break: break-all"> {{ relationship.from_import.import_source }}</span></span>
         </div>
     </td>
-    <td data-order="{{ relationship.dest_term.name|default_if_none:'' }}">{% ontology_term relationship.dest_term show_link=is_dest_diff %}</td>
+    <td data-order="{{ dest_term.name|default_if_none:'' }}">{% ontology_term dest_term show_link=True %}</td>
 </tr>

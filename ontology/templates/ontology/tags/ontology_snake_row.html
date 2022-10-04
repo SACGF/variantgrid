@@ -7,11 +7,16 @@
             {% with relationship=step.relationship %}
                 <div>
                     <div class="my-2">
-                        <i class="fa-solid {% if step.reversed %}fa-arrow-up{% else %}fa-arrow-down{% endif %} ml-2 mr-2 text-muted"></i>
-                        <div class="hover-detail d-inline-block" title="Extra" data-content="{{ relationship.extra }}">{{ relationship.relation_display }}</div>
-                        &nbsp;
-                        <div class="text-muted hover-detail d-inline-block" title="Import {{ relationship.from_import.import_source }}" data-content="Last imported: {% timestamp relationship.from_import.processed_date text_only=True %}<br/>Context: {{ relationship.from_import.context }}</br>Filename: {{ relationship.from_import.filename }}">
-                            <span style="font-size:8pt">source <span style="word-break: break-all"> {{ relationship.from_import.import_source }}</span></span>
+                        <div class="d-flex" style="align-items: center">
+                            <div>
+                                <i class="mx-2 fa-solid {% if step.reversed %}fa-arrow-up{% else %}fa-arrow-down{% endif %} mr-2 text-muted"></i>
+                            </div>
+                            <div class="flex-grow">
+                                <div class="hover-detail" title="Extra" data-content="{{ relationship.extra }}">{{ relationship.relation_display }}</div>
+                                <div class="text-muted hover-detail" title="Import {{ relationship.from_import.import_source }}" data-content="Last imported: {% timestamp relationship.from_import.processed_date text_only=True %}<br/>Context: {{ relationship.from_import.context }}</br>Filename: {{ relationship.from_import.filename }}">
+                                    <span style="font-size:8pt">source <span style="word-break: break-all"> {{ relationship.from_import.import_source }}</span></span>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     <div>{% ontology_term step.dest_term show_link=True %}</div>
