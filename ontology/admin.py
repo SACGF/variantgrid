@@ -20,9 +20,9 @@ class OntologyTermAdmin(ModelAdminBasics):
 
 @admin.register(OntologyImport)
 class OntologyImport(ModelAdminBasics):
-    search_fields = ('filename')
+    search_fields = ('filename',)
     list_display = ('import_source', 'filename', 'processed_date')
-    list_filter = ('import_source', )
+    list_filter = ('import_source',)
 
     def is_readonly_field(self, f) -> bool:
         return True
