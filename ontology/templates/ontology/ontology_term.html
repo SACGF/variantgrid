@@ -95,7 +95,7 @@
                         {% if parent_relationships is not None %}
                             <hr />
                             <div class="mt-4">
-                                {% labelled label='<i class="fas fa-sitemap text-success"></i> Parent Terms of '|add:term.id hint="chunky" %}
+                                {% labelled label="<i class='fas fa-sitemap text-success'></i> Parent Terms" hint="chunky" %}
                                     {% if parent_relationships %}
                                         {% if parent_relationships.is_limited %}<i class="fas fa-info-circle text-info"></i> {{ parent_relationships.limit_str }}<br/>{% endif %}
                                         {% ontology_relationship_table parent_relationships term %}
@@ -107,7 +107,7 @@
                         {% endif %}
 
                         <div class="mt-4">
-                        {% labelled label="<i class='fa-solid fa-arrows-left-right text-success'></i> Direct Relationships of "|add:term.id hint="chunky" %}
+                        {% labelled label="<i class='fa-solid fa-arrows-left-right text-success'></i> Direct Relationships" hint="chunky" %}
                             {% if regular_relationships %}
                                 {% if regular_relationships.is_limited %}<i class="fas fa-info-circle text-info"></i> {{ regular_relationships.limit_str }}<br/>{% endif %}
                                 {% ontology_relationship_table regular_relationships term %}
@@ -119,7 +119,7 @@
 
                         {% if child_relationships is not None %}
                             <div class="mt-4">
-                                {% labelled label='<i class="fas fa-sitemap text-success"></i> Child Terms of '|add:term.id hint="chunky" %}
+                                {% labelled label="<i class='fas fa-sitemap text-success'></i> Child Terms" hint="chunky" %}
                                     {% if child_relationships %}
                                         {% if child_relationships.is_limited %}<i class="fas fa-info-circle text-info"></i> {{ child_relationships.limit_str }}<br/>{% endif %}
                                         {% ontology_relationship_table child_relationships term %}
