@@ -6,7 +6,8 @@
 #     HiSeq 2500: 150203_D00535_0052_AC66RWANXX
 #     HiSeq 4000: 150210_K00111_0013_AH2372BBXX
 #     HiSeq X: 141121_ST-E00107_0356_AH00C3CCXX
-SEQUENCING_RUN_REGEX = r"\d{6}[_-](NS|NB|M|D|SN|K|ST)(.{3,7})_\d{4}_(0{9}-.{5}|.{10})"
+#     NovaSeq 6000: 220923_A01934_0008_BHLL3GDRX2
+SEQUENCING_RUN_REGEX = r"\d{6}[_-](NS|NB|M|D|SN|K|ST|A)(.{3,7})_\d{4}_(0{9}-.{5}|.{10})"
 
 
 def get_sequencer_model_from_name(name):
@@ -27,5 +28,7 @@ def get_sequencer_model_from_name(name):
         model = "HiSeq 4000"
     elif name.startswith("ST"):
         model = "HiSeq X"
+    elif name.startswith("A"):
+        model = "NovaSeq 6000"
 
     return model
