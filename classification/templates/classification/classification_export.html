@@ -38,7 +38,9 @@
 
         if (format === 'mvl') {
             let mvlFileFormat = $("input[name='mvl_file_format']:checked").val();
-            params.file_format = mvlFileFormat;
+            if (mvlFileFormat) {
+                params.file_format = mvlFileFormat;
+            }
 
             let conflictStrategy = $("input[name='conflict_strategy']:checked").val();
             params.conflict_strategy=conflictStrategy;
