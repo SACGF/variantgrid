@@ -673,6 +673,7 @@ class OntologySnakeStep:
     """
     relation: OntologyTermRelation
     dest_term: OntologyTerm
+    reversed: bool = False
 
     @property
     def relationship(self) -> OntologyTermRelation:
@@ -710,7 +711,8 @@ class OntologySnake:
         node = self.source_term
         for path in self.paths:
             node = path.other_end(node)
-            steps.append(OntologySnakeStep(relation=path, dest_term=node))
+            relationship_reversed = path.source_term == node
+            steps.append(OntologySnakeStep(relation=path, dest_term=node, reversed=relationship_reversed))
         return steps
 
     def __str__(self):

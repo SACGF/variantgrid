@@ -17,7 +17,7 @@ def ontology_meta(data: OntologyMatch):
 
 
 @register.inclusion_tag("ontology/tags/ontology_term.html")
-def ontology_term(data: Union[OntologyTerm, str], show_link: bool = True):
+def ontology_term(data: Union[OntologyTerm, str], show_link: bool = True, compact: bool = False):
     if isinstance(data, str):
         data = OntologyTerm.get_or_stub(data)
 
@@ -26,7 +26,8 @@ def ontology_term(data: Union[OntologyTerm, str], show_link: bool = True):
     return {
         "term": data,
         "is_gene": is_gene,
-        "show_link": show_link
+        "show_link": show_link,
+        "compact": compact
     }
 
 

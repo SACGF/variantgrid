@@ -6,5 +6,5 @@
 </a>
 {% else %}
     {% if is_gene %}<span class="text-monospace">{{ term.name }}</span>&nbsp;
-    {% else %}<span class="text-monospace">{{ term.id }}</span>{% if term.name %} {{ term.name }}{% endif %}{% endif %}
+    {% else %}<span class="text-monospace">{{ term.id }}</span>{% if term.name and not compact %} {{ term.name }}{% endif %}{% endif %}
 {% endif %}
