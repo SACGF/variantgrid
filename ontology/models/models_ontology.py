@@ -274,6 +274,13 @@ class OntologyTerm(TimeStampedModel):
     def __str__(self):
         return f"{self.id} {self.name}"
 
+    @property
+    def short(self) -> str:
+        if self.ontology_service == OntologyService.HGNC:
+            return self.name
+        else:
+            return self.id
+
     class Meta:
         unique_together = ("ontology_service", "index")
 

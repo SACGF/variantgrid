@@ -2,7 +2,7 @@
 {% load js_tags %}
 <tr>
     <td>
-        {% ontology_term source_term show_link=is_source_diff %}
+        {% ontology_term source_term show_link=is_source_diff compact=True %}
         {% for step in steps %}
             {% with relationship=step.relationship %}
                 <div>

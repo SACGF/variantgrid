@@ -23,7 +23,8 @@ class OntologyTermView(TemplateView):
             if is_gene:
                 update_gene_relations(term.name)
             else:
-                gene_relationships = LimitedCollection(OntologySnake.snake_from(term=term, to_ontology=OntologyService.HGNC), 250)
+                raw_gene_relationships = sorted(OntologySnake.snake_from(term=term, to_ontology=OntologyService.HGNC), key=lambda snake: snake.leaf_relationship.dest_term.short)
+                gene_relationships = LimitedCollection(raw_gene_relationships, 250)
 
             all_relationships: List[OntologyTermRelation] = OntologyTermRelation.relations_of(term)
             regular_relationships = list()
