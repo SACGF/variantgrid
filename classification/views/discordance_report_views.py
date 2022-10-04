@@ -184,8 +184,13 @@ class DiscordanceReportTemplateData:
     @property
     def group_utils(self) -> List[ClassificationModification]:
         # TODO, rather than no longer considered, shove that value into clinical significance somehow e.g. "withdrawn"
+        no_longer_considered_mods = list()
+        if no_longer_considered := self.no_longer_considered:
+            for nlc in no_longer_considered:
+                no_longer_considered_mods += nlc.classifications
+
         return ClassificationGroupUtils(
-            modifications=self.effective_classifications + self.no_longer_considered,
+            modifications=self.effective_classifications + no_longer_considered_mods,
             old_modifications=[drc.classification_original for drc in self.report.discordancereportclassification_set.all()],
             calculate_pending=self.is_latest
         )
