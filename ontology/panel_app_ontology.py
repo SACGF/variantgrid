@@ -11,7 +11,7 @@ from library.cache import timed_cache
 from library.log_utils import report_exc_info, report_message
 from library.utils import md5sum_str, JSON
 from ontology.models import OntologyTerm, OntologyRelation, OntologyImportSource, OntologyTermRelation, \
-    OntologyTermStatus
+    OntologyTermStatus, OntologyIdNormalized
 from ontology.ontology_builder import OntologyBuilder, OntologyBuilderDataUpToDateException
 
 # increment if you change the logic of parsing ontology terms from PanelApp
@@ -74,6 +74,9 @@ def _update_gene_relations_activate(ontology_builder: OntologyBuilder, hgnc_term
     def add_term_if_valid(full_id: str):
         nonlocal ontology_builder
         nonlocal hgnc_term
+
+        # normalize the ID first as PanelApp is not the authority on the ID layout
+        full_id = OntologyIdNormalized.normalize(full_id).full_id
 
         term, created = ontology_builder.add_term(
             term_id=full_id,

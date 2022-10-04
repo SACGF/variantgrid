@@ -215,6 +215,46 @@ class OntologyTermStatus(TextChoices):
     STUB = 'S'
 
 
+@dataclass
+class OntologyIdNormalized:
+    prefix: str
+    postfix: str
+    full_id: str
+    clean: bool
+
+    @property
+    def num_part(self) -> int:
+        return int(self.postfix)
+
+    @staticmethod
+    def normalize(dirty_id: str) -> 'OntologyIdNormalized':
+        parts = re.split("[:|_]", dirty_id)
+        if len(parts) != 2:
+            raise ValueError(f"Can not convert {dirty_id} to a proper id")
+
+        prefix = parts[0].strip().upper()
+        if prefix == "ORPHANET":  # Orphanet is the one ontology (so far) where the standard is sentance case
+            prefix = "Orphanet"
+        prefix = OntologyService(prefix)
+        postfix = parts[1].strip()
+        try:
+            num_part = int(postfix)
+            clean_id: str
+            if expected_length := OntologyService.EXPECTED_LENGTHS[prefix]:
+                clean_id = OntologyService.index_to_id(prefix, num_part)
+            else:
+                # variable length IDs like DOID
+                clean_id = f"{prefix}:{postfix}"
+
+            return OntologyIdNormalized(prefix=prefix, postfix=postfix, full_id=clean_id, clean=True)
+
+        except ValueError:
+            return OntologyIdNormalized(prefix=prefix, postfix=postfix, full_id=dirty_id, clean=False)
+
+    def __str__(self):
+        return self.full_id
+
+
 class OntologyTerm(TimeStampedModel):
 
     """
@@ -345,43 +385,28 @@ class OntologyTerm(TimeStampedModel):
         return OntologyTerm.get_or_stub(id_str)
 
     @staticmethod
-    def get_or_stub(id_str: str) -> 'OntologyTerm':
+    def get_or_stub(id_str: Union[str, OntologyIdNormalized]) -> 'OntologyTerm':
         """
         Returns an OntologyTerm for the given ID.
         If the OntologyTerm doesn't exist in the database, will create an OntologyTerm but
         WONT persist it to the database
         """
-        parts = re.split("[:|_]", id_str)
-        if len(parts) != 2:
-            raise ValueError(f"Can not convert {id_str} to a proper id")
-
-        prefix = parts[0].strip().upper()
-        if prefix == "ORPHANET":  # Orphanet is the one ontology (so far) where the standard is sentance case
-            prefix = "Orphanet"
-        prefix = OntologyService(prefix)
-        postfix = parts[1].strip()
-        try:
-            num_part = int(postfix)
-            clean_id: str
-            if expected_length := OntologyService.EXPECTED_LENGTHS[prefix]:
-                clean_id = OntologyService.index_to_id(prefix, num_part)
-            else:
-                # variable length IDs like DOID
-                clean_id = f"{prefix}:{postfix}"
-
-            if existing := OntologyTerm.objects.filter(id=clean_id).first():
+        if not isinstance(id_str, OntologyIdNormalized):
+            normal_id = OntologyIdNormalized.normalize(id_str)
+        if normal_id.clean:
+            if existing := OntologyTerm.objects.filter(id=normal_id.full_id).first():
                 return existing
-
             return OntologyTerm(
-                id=clean_id,
-                ontology_service=prefix,
-                index=num_part,
+                id=normal_id.full_id,
+                ontology_service=normal_id.prefix,
+                index=normal_id.num_part,
                 name=""
             )
-        except ValueError:
-            if existing := OntologyTerm.objects.filter(ontology_service=prefix, name__iexact=postfix).first():
+        else:
+            if existing := OntologyTerm.objects.filter(ontology_service=normal_id.prefix, name__iexact=normal_id.postfix).first():
                 return existing
-            raise ValueError(f"Can not convert {id_str} to a proper id")
+            else:
+                raise ValueError(f"Can not convert {id_str} to a proper id")
 
     @property
     def padded_index(self) -> str:
