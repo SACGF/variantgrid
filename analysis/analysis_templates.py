@@ -34,7 +34,6 @@ def populate_analysis_from_template_run(template_run):
                 node.queryset_dirty = True
 
             try:
-                node.update_children = False  # We'll get to them all anyway
                 node.save()
                 error_message = node.get_errors(include_parent_errors=False, flat=True)
             except Exception as e:
