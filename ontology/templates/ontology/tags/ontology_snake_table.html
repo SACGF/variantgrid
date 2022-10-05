@@ -12,11 +12,3 @@
         {% endfor %}
     </tbody>
 </table>
-<script>
-    $('#{{ table_id }}').DataTable({
-        dom: 't',
-        bFilter: false,
-        paginate: false,
-        order: [[2, 'asc']],
-    });
-</script>
