@@ -68,23 +68,25 @@
 
                     {% if gene_relationships is not None %}
                         {% labelled label="Gene Relationships" %}
-                            <a class="toggle-link" data-toggle="collapse" href="#gene-relationships" aria-expanded="true">Toggle Gene Relationships</a>
+                            {% if gene_relationships %}
+                                <a class="toggle-link" data-toggle="collapse" href="#gene-relationships" aria-expanded="true">Toggle Gene Relationships</a>
+                            {% else %}
+                                <div class="no-value">We have no relationships between this term and any gene symbols on file.</div>
+                            {% endif %}
                         {% endlabelled %}
-                        <div id="gene-relationships" class="collapse show">
-                            <div class="mt-4">
-                                {% labelled label="<i class='fas fa-dna text-success'></i> Gene Relationships" hint="chunky" %}
-                                    {% if gene_relationships %}
+                        {% if gene_relationships %}
+                            <div id="gene-relationships" class="collapse show">
+                                <div class="mt-4">
+                                    {% labelled label="<i class='fas fa-dna text-success'></i> Gene Relationships" hint="chunky" %}
                                         <p class="text-info">Note that Panel App relationships are only retrieved as needed, and might not be represented
                                         here yet.</p>
 
                                         {% if gene_relationships.is_limited %}<i class="fas fa-info-circle text-info"></i> {{ gene_relationships.limit_str }}<br/>{% endif %}
                                         {% ontology_snake_table gene_relationships term %}
-                                    {% else %}
-                                        -
-                                    {% endif %}
-                                {% endlabelled %}
+                                    {% endlabelled %}
+                                </div>
                             </div>
-                        </div>
+                        {% endif %}
                     {% endif %}
 
                     {% labelled label="Relationships" %}

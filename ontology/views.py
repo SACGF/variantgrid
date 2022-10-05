@@ -36,19 +36,23 @@ class OntologyTermView(TemplateView):
                         parent_relationships.append(relationship)
                     else:
                         child_relationships.append(relationship)
-                else:
+
+                elif is_gene or relationship.dest_term.ontology_service != OntologyService.HGNC:
+                    # gene symbols go into gene_relationships, no need to list them again in direct relationships
+                    # though currently gene symbols don't do reverse gene_relationships, so still show everyhting that links in gene_symbol
                     regular_relationships.append(relationship)
 
             patients_qs = patients_qs_for_ontology_term(self.request.user, term)
+            has_hierarchy = term.ontology_service in {OntologyService.MONDO, OntologyService.HPO}
             return {
                 "term": term,
                 "is_ontology": not is_gene,
                 "gene_relationship_count": len(gene_relationships) if gene_relationships else 0,
                 "gene_relationships": gene_relationships,
                 "relationship_count": len(all_relationships) if all_relationships else 0,
-                "parent_relationships": LimitedCollection(parent_relationships, 250) if not is_gene else None,
+                "parent_relationships": LimitedCollection(parent_relationships, 250) if has_hierarchy else None,
                 "regular_relationships": LimitedCollection(regular_relationships, 250),
-                "child_relationships": LimitedCollection(child_relationships, 250) if not is_gene else None,
+                "child_relationships": LimitedCollection(child_relationships, 250) if has_hierarchy else None,
                 "patients_qs": patients_qs,
             }
 
