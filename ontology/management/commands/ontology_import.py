@@ -36,7 +36,8 @@ GENE_RELATIONS = {
     "http://purl.obolibrary.org/obo/RO_0004030": "disease arises from structure",
     "http://purl.obolibrary.org/obo/RO_0004003": "has material basis in germline mutation in",
     "http://purl.obolibrary.org/obo/RO_0004004": "has material basis in somatic mutation in",
-    "http://purl.obolibrary.org/obo/RO_0004028": "realized in response to stimulus"
+    "http://purl.obolibrary.org/obo/RO_0004028": "realized in response to stimulus",
+
 }
 
 MATCH_TYPES = {
@@ -110,7 +111,7 @@ def load_mondo(filename: str, force: bool):
                     node_to_mondo[node_id_full] = full_id
 
                     if meta := node.get("meta"):
-                        label = node.get("lbl")
+                        label = node.get("lbl") or ""
                         deprecated = meta.get("deprecated")
                         extra = dict()
 
@@ -129,10 +130,10 @@ def load_mondo(filename: str, force: bool):
 
                         for bp in meta.get("basicPropertyValues", []):
                             val = TermId(bp.get("val"))
-                            if val.type in {"HP", "OMIM"}:
+                            if val.type in {"HP", "OMIM", "MONDO"}:
                                 pred = bp.get("pred")
-                                pred = MATCH_TYPES.get(pred, pred)
-                                term_relation_types[val.id].append(pred)
+                                if pred := MATCH_TYPES.get(pred):
+                                    term_relation_types[val.id].append(pred)
 
                         if xrefs := meta.get("xrefs"):
                             for xref in xrefs:
@@ -160,10 +161,7 @@ def load_mondo(filename: str, force: bool):
                                                 term_relation_types[xref_term.id].append(relation)
 
                         for key, relations in term_relation_types.items():
-                            unique_relations = list()
-                            for x in relations:
-                                if relation not in unique_relations:
-                                    unique_relations.append(relation)
+                            unique_relations = sorted(set(relations))
 
                             ontology_builder.add_term(
                                 term_id=key,
@@ -178,7 +176,7 @@ def load_mondo(filename: str, force: bool):
                                 extra={"all_relations": unique_relations}
                             )
 
-                        #end synonymns
+                        # end synonymns
                         # occasionally split up MONDO name into different aliases
                         if label and "MONDO" in full_id:
                             if ";" in label:
