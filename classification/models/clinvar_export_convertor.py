@@ -5,7 +5,7 @@ from typing import List, Any, Mapping, TypedDict, Union
 
 from lazy import lazy
 
-from annotation.regexes import DbRegexes
+from annotation.regexes import DbRegexes, db_ref_regexes
 from classification.enums import SpecialEKeys, EvidenceKeyValueType, ShareLevel
 from classification.models import ClassificationModification, EvidenceKeyMap, EvidenceKey, \
     MultiCondition, ClinVarExport, classification_flag_types, Classification
@@ -13,7 +13,7 @@ from classification.models.evidence_mixin import VCDbRefDict
 from genes.hgvs import CHGVS
 from library.utils import html_to_text
 from ontology.models import OntologyTerm, OntologyService
-from snpdb.models import ClinVarKey
+from snpdb.models import ClinVarKey, ClinVarCitationsModes
 from uicore.json.validated_json import JsonMessages, JSON_MESSAGES_EMPTY, ValidatedJson, JsonMessage
 
 # Code in this file is responsible for converting VariantGrid formatted classifications to ClinVar JSON
@@ -144,7 +144,7 @@ class ClinVarExportConverter:
         """
         self.clinvar_export_record = clinvar_export_record
 
-    @lazy
+    @property
     def clinvar_key(self) -> ClinVarKey:
         return self.clinvar_export_record.clinvar_allele.clinvar_key
 
@@ -154,7 +154,13 @@ class ClinVarExportConverter:
 
     @property
     def citation_refs(self) -> List[VCDbRefDict]:
-        pubmed_refs = {ref.get('id'): ref for ref in self.classification_based_on.db_refs if ref.get('db') in ClinVarExportConverter.CITATION_DB_MAPPING}
+        xrefs: List
+        if self.clinvar_key.citations_mode == ClinVarCitationsModes.interpretation_summary_only:
+            xrefs = [ref.to_json() for ref in db_ref_regexes.search(self.classification_based_on.get(SpecialEKeys.INTERPRETATION_SUMMARY))]
+        else:
+            xrefs = self.classification_based_on.db_refs
+
+        pubmed_refs = {ref.get('id'): ref for ref in xrefs if ref.get('db') in ClinVarExportConverter.CITATION_DB_MAPPING}
         unique_refs = list(pubmed_refs.values())
         unique_refs.sort(key=lambda x: x.get('id'))
         return unique_refs

@@ -252,6 +252,11 @@ class ClinVarAssertionMethods(TextChoices):
     not_applicable = "not applicable"
 
 
+class ClinVarCitationsModes(TextChoices):
+    all = "all"
+    interpretation_summary_only = "interpret"
+
+
 class ClinVarKey(TimeStampedModel):
     class Meta:
         verbose_name = "ClinVar key"
@@ -265,6 +270,7 @@ class ClinVarKey(TimeStampedModel):
     default_affected_status = models.TextField(choices=ClinVarAssertionMethods.choices, null=True, blank=True)
     inject_acmg_description = models.BooleanField(blank=True, default=False)
     assertion_method_lookup = models.JSONField(null=False, default=dict)
+    citations_mode = models.TextField(choices=ClinVarCitationsModes.choices, default=ClinVarCitationsModes.all)
 
     @property
     def label(self) -> str:

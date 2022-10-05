@@ -13,6 +13,7 @@
     {% labelled label="ClinVar API Key" %}{% if clinvar_key.api_key %}{{ clinvar_key.api_key|secret }}{% else %}{{ 'error' | severity_icon}} <span class="no-value">NOT PROVIDED</span>{% endif %}{% endlabelled %}
     {% labelled label="Inject ACMG into Description" %}{{ clinvar_key.inject_acmg_description | boolean }}{% endlabelled %}
     {% labelled label="Default Affected Status" %}{{ clinvar_key.get_default_affected_status_display }}{% endlabelled %}
+    {% labelled label="Citations Mode" %}{{ clinvar_key.get_citations_mode_display }}{% endlabelled %}
     {% labelled label="Assert Method Configuration" %}{% code_json clinvar_key.assertion_method_lookup %}{% endlabelled %}
 
     {% labelled label="Exclude Patterns" %}
