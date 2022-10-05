@@ -109,6 +109,10 @@ class PageViewsMiddleware:
                             if ignore_me in all_params:
                                 all_params.pop(ignore_me)
 
+                        if app == "ontology" and (term := all_params.get("term")):
+                            # ontology has to replace : with _ so as to not confuse URLs
+                            all_params["term"] = term.replace("_", ":")
+
                         # hack to split up classification ID when it's in the form of "classification_id.modification_timestamp"
                         if classification_id := all_params.get("classification_id"):
                             if isinstance(classification_id, (str, float)):
