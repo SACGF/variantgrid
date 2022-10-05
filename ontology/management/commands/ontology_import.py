@@ -154,6 +154,8 @@ def load_mondo(filename: str, force: bool):
                                 for synonym in synonyms:
                                     pred = synonym.get("pred")
                                     if pred == pred_type:
+                                        # could potentially get name here from exact synonym
+                                        # but there can be multiple
                                         aliases.append(synonym.get("val"))
                                         for xref in synonym.get("xrefs", []):
                                             xref_term = TermId(xref)
@@ -165,8 +167,8 @@ def load_mondo(filename: str, force: bool):
 
                             ontology_builder.add_term(
                                 term_id=key,
-                                name=label,
-                                definition=f"Name copied from xref synonym {full_id}",
+                                name="",
+                                definition="",
                                 primary_source=False
                             )
                             ontology_builder.add_ontology_relation(
