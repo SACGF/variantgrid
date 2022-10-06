@@ -529,11 +529,11 @@ class DiscordanceReportAdmin(ModelAdminBasics):
         for ds in queryset:
             send_discordance_notification(ds, cause="Admin Send discordance notification")
 
-    @admin_action("Re-calculate")
+    @admin_action("Re-calculate latest")
     def re_calculate(self, request, queryset):
         ds: DiscordanceReport
         for ds in queryset:
-            ds.clinical_context.recalc_and_save()
+            ds.clinical_context.recalc_and_save(cause="Admin recalculation", cause_code=ClinicalContextRecalcTrigger.ADMIN)
 
 
 @admin.register(UploadedClassificationsUnmapped)
