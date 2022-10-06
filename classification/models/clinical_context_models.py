@@ -338,49 +338,52 @@ class ClinicalContext(FlagsMixin, TimeStampedModel):
             "delayed": ongoing_import
         }
 
-        cause = self.pending_cause or cause
+        cause = self.pending_cause or cause or "Unknown cause"
 
-        if ongoing_import and self.status != new_status and old_status is not None:
+        if ongoing_import:
+            # always set pending cause, to ensure calculation is re-triggered at the end
+            # because even if the status doesn't change, a new lab might be added to an existing discordance report
+            # so we still need to recaluclate
+
+            self.pending_cause = self.pending_cause or cause
             # Important - this pending status is not to do with "Pending Changes"
-            # It's
-            if new_status != self.pending_status:
+            was_already_pending = self.pending_status != self.status
+            pending_or_old_status = self.pending_status or self.status
+
+            if (not is_simple_new) and (new_status != pending_or_old_status):
                 # only update the cause if we're going to end up with a new status
-                self.pending_cause = cause
                 self.pending_status = new_status
+                if settings.DISCORDANCE_ENABLED:
+                    if new_status != old_status:
+                        nb = NotificationBuilder("PENDING: ClinicalContext changed)")
+                        nb.add_markdown(
+                            f":clock1: ClinicalGrouping for allele <{allele_url}|{allele_url}> would change from {old_status} -> {new_status} but marked as pending due to {ongoing_import}")
+                        nb.send()
+                    else:
+                        nb = NotificationBuilder("PENDING: ClinicalContext changed-back")
+                        nb.add_markdown(
+                            f":clock430: ClinicalGrouping for allele <{allele_url}|{allele_url}> changed back from {self.pending_status} -> {new_status} within {ongoing_import}, no notifications sent")
+                        nb.send()
 
-                nb = NotificationBuilder("PENDING: ClinicalContext changed)")
-                nb.add_markdown(
-                    f":clock1: ClinicalGrouping for allele <{allele_url}|{allele_url}> would change from {old_status} -> {new_status} but marked as pending due to {ongoing_import}")
-                nb.send()
-
+            self.save()
         else:
             # if doing the recalc live OR if delayed but the status has reverted to what it used to be
             # wipe out the old values
-            self.status = new_status
-            if self.pending_status and ongoing_import:
-                nb = NotificationBuilder("PENDING: ClinicalContext changed-back")
+            if settings.DISCORDANCE_ENABLED and is_significance_change and not is_simple_new:
+                nb = NotificationBuilder("ClinicalContext changed")
                 nb.add_markdown(
-                    f":clock430: ClinicalGrouping for allele <{allele_url}|{allele_url}> changed back from {self.pending_status} -> {new_status} within {ongoing_import}, no notifications sent")
+                    f":fire_engine: ClinicalGrouping for allele <{allele_url}|{allele_url}> changed from {old_status} -> {new_status} "
+                    f"\nLab notifications should follow")
                 nb.send()
 
+            self.status = new_status
             self.pending_cause = None
             self.pending_status = None
 
-        self.save()
+            self.save()
 
-        if ongoing_import:
-            # don't send out any signals if calculation is delayed, we don't want to trigger anything until we complete
-            return
-
-        if settings.DISCORDANCE_ENABLED and is_significance_change and not is_simple_new:
-            nb = NotificationBuilder("ClinicalContext changed")
-            nb.add_markdown(
-                f":fire_engine: ClinicalGrouping for allele <{allele_url}|{allele_url}> changed from {old_status} -> {new_status} "
-                f"\nLab notifications should follow")
-            nb.send()
-
-        clinical_context_signal.send(sender=ClinicalContext, clinical_context=self, status=new_status, is_significance_change=is_significance_change, cause=cause)
-        # clinical_context_signal is now in charge of applying all relevant flags to clinical context and classifications
+            # clinical_context_signal is now in charge of applying all relevant flags to clinical context and classifications
+            clinical_context_signal.send(sender=ClinicalContext, clinical_context=self, status=new_status, is_significance_change=is_significance_change, cause=cause)
 
     @property
     def is_default(self) -> bool:

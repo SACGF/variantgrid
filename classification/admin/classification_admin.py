@@ -533,7 +533,7 @@ class DiscordanceReportAdmin(ModelAdminBasics):
     def re_calculate(self, request, queryset):
         ds: DiscordanceReport
         for ds in queryset:
-            ds.update()
+            ds.clinical_context.recalc_and_save()
 
 
 @admin.register(UploadedClassificationsUnmapped)
