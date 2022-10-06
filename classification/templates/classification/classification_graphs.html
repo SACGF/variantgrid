@@ -111,8 +111,9 @@
         {% if user.is_superuser %}
             <div class="my-4">
                 <p class="text-info">Admin classification data downloads.</p>
-                <a class="download-link admin-only d-block my-1" href="{% url 'classification_accumulation_data' %}" class="hover-link download-link">Status over time (Classification)</a>
-                <a class="download-link admin-only d-block my-1" href="{% url 'classification_accumulation_data' %}?mode=allele" class="hover-link download-link">Status over time (Allele)</a>
+                <a class="download-link admin-only d-block my-1" href="{% url 'classification_accumulation_data' %}" class="hover-link download-link">Status over time Weekly (Classification)</a>
+                <a class="download-link admin-only d-block my-1" href="{% url 'classification_accumulation_data' %}?mode=allele" class="hover-link download-link">Status over time Weekly (Allele)</a>
+                <a class="download-link admin-only d-block my-1" href="{% url 'classification_accumulation_data' %}?mode=allele&frequency=1" class="hover-link download-link">Status over time Daily (Allele)</a>
                 <a class="download-link admin-only d-block my-1" href="{% url 'clinical_significance_change_data' %}">Clinical significance change data</a>
                 <a class="admin-only d-block my-1" href="{% url 'lab_gene_classification_counts' %}">Lab gene classification counts</a>
             </div>
