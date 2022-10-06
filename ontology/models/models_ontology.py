@@ -564,9 +564,20 @@ class OntologyVersion(TimeStampedModel):
     hp_owl_import = models.ForeignKey(OntologyImport, on_delete=PROTECT, related_name="hp_owl_ontology_version")
     hp_phenotype_to_genes_import = models.ForeignKey(OntologyImport, on_delete=PROTECT,
                                                      related_name="hp_phenotype_to_genes_ontology_version")
+    omim_import = models.ForeignKey(OntologyImport, on_delete=PROTECT, related_name="omim_ontology_version", null=True, blank=True)
 
     class Meta:
-        unique_together = ('gencc_import', 'mondo_import', 'hp_owl_import', 'hp_phenotype_to_genes_import')
+        unique_together = (
+            'gencc_import',
+            'mondo_import',
+            'hp_owl_import',
+            'hp_phenotype_to_genes_import',
+            'omim_import'  # warning, nulls screw up unique together
+        )
+
+    OPTIONAL_IMPORTS = {
+        'omim_import',
+    }
 
     ONTOLOGY_IMPORTS = {
         "gencc_import": (OntologyImportSource.GENCC,
@@ -577,6 +588,7 @@ class OntologyVersion(TimeStampedModel):
         "hp_phenotype_to_genes_import": (OntologyImportSource.HPO,
                                          ['phenotype_to_genes.txt',
                                           'OMIM_ALL_FREQUENCIES_diseases_to_genes_to_phenotypes.txt']),
+        "omim_import": (OntologyImportSource.OMIM, ['mimTitles.txt'])
     }
 
     @staticmethod
@@ -589,12 +601,16 @@ class OntologyVersion(TimeStampedModel):
     @staticmethod
     def latest() -> Optional['OntologyVersion']:
         oi_qs = OntologyImport.objects.all()
-        kwargs = {}
+        kwargs = dict()
+        missing_fields = set()
         for field, (import_source, filenames) in OntologyVersion.ONTOLOGY_IMPORTS.items():
-            kwargs[field] = oi_qs.filter(import_source=import_source, filename__in=filenames).order_by("pk").last()
+            if ont_import := oi_qs.filter(import_source=import_source, filename__in=filenames).order_by("pk").last():
+                kwargs[field] = ont_import
+            elif field not in OntologyVersion.OPTIONAL_IMPORTS:
+                missing_fields.add(field)
 
-        values = list(kwargs.values())
-        if all(values):
+        if not missing_fields:
+            values = list(kwargs.values())
             last_date = max([oi.created for oi in values])
             ontology_version, created = OntologyVersion.objects.get_or_create(**kwargs,
                                                                               defaults={"created": last_date})
@@ -603,15 +619,18 @@ class OntologyVersion(TimeStampedModel):
                 from annotation.models import AnnotationVersion
                 AnnotationVersion.new_sub_version(None)
         else:
-            ontology_version = None
-            missing_fields = [field for field, value in kwargs.items() if value is None]
-            if missing_fields:
-                msg = "OntologyVersion.latest() - missing fields: %s", ", ".join(missing_fields)
-                raise OntologyVersion.DoesNotExist(msg)
+            msg = "OntologyVersion.latest() - missing fields: %s", ", ".join(missing_fields)
+            raise OntologyVersion.DoesNotExist(msg)
         return ontology_version
 
     def get_ontology_imports(self):
-        return [self.gencc_import, self.mondo_import, self.hp_owl_import, self.hp_phenotype_to_genes_import]
+        return [ont_import for ont_import in [
+            self.gencc_import,
+            self.mondo_import,
+            self.hp_owl_import,
+            self.hp_phenotype_to_genes_import,
+            self.omim_import
+        ] if ont_import is not None]
 
     def get_ontology_term_relations(self):
         return OntologyTermRelation.objects.filter(from_import__in=self.get_ontology_imports())

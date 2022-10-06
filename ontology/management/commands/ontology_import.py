@@ -441,6 +441,7 @@ def load_biomart(filename: str, force: bool):
 
 
 def load_omim(filename: str, force: bool):
+
     ontology_builder = OntologyBuilder(
         filename=filename,
         context="omim_file",
@@ -513,8 +514,8 @@ def load_omim(filename: str, force: bool):
             )
             if moved_to:
                 ontology_builder.add_ontology_relation(
-                    source_term_id=f"OMIM:{mim_number}",
-                    dest_term_id=f"OMIM:{moved_to}",
+                    source_term_id=f"OMIM:{moved_to}",
+                    dest_term_id=f"OMIM:{mim_number}",
                     relation=OntologyRelation.REPLACED
                 )
     ontology_builder.complete(purge_old_terms=True)
