@@ -28,8 +28,8 @@ class ClinVarEvidenceKey:
 
     def __init__(self, evidence_key: EvidenceKey, value_obj: Any):
         self.evidence_key = evidence_key
-        self.values = list()
-        self.has_conversion_issues = False
+        self.valid_values = list()
+        self.invalid_values = list()
         self.conversion_messages = list()
 
         value: Any
@@ -49,17 +49,20 @@ class ClinVarEvidenceKey:
                     for option in options:
                         if option.get('key') == sub_value:
                             if clinvar := option.get('clinvar'):
-                                self.values.append(clinvar)
+                                self.valid_values.append(clinvar)
                             else:
-                                self.values.append(sub_value)
-                                self.conversion_messages.append(f"ADMIN: \"{self.evidence_key.pretty_label}\" value of \"{sub_value}\" doesn't have a ClinVar equivalent")
+                                self.invalid_values.append(sub_value)
+                                self.conversion_messages.append(f"\"{self.evidence_key.pretty_label}\" value of \"{sub_value}\" doesn't have a ClinVar equivalent.")
                             found = True
                             break
                     if not found:
-                        self.values.append(sub_value)
-                        self.conversion_messages.append(f"\"{self.evidence_key.pretty_label}\" value of \"{sub_value}\" isn't a valid value, can't translate to ClinVar")
+                        self.invalid_values.append(sub_value)
+                        self.conversion_messages.append(f"\"{self.evidence_key.pretty_label}\" value of \"{sub_value}\" isn't valid, can't translate to ClinVar.")
             else:
-                raise ValueError(f"ADMIN: Trying to extract value from \"{self.evidence_key.pretty_label}\" that isn't a SELECT or MULTISELECT")
+                raise ValueError(f"ADMIN: Trying to extract value from \"{self.evidence_key.pretty_label}\" that isn't a SELECT or MULTISELECT.")
+
+    def has_conversion_issues(self):
+        return bool(self.conversion_messages)
 
     def _json_conversion_messages(self, severity: str):
         messages = JSON_MESSAGES_EMPTY
@@ -73,38 +76,40 @@ class ClinVarEvidenceKey:
         :param optional: Is the value optional, if not adds an error to ValidatedJson if number of values is zero.
         """
 
-        # if value is optional we can fall back to void with messages
-        # if it's mandatory we need to error out
-
         messages = JSON_MESSAGES_EMPTY
         if self.conversion_messages:
+            # if value is optional we can fall back to void with messages
+            # if it's mandatory we need to error out
             if optional:
-                return ValidatedJson.make_void(self._json_conversion_messages("warning"))
+                messages += self._json_conversion_messages("warning")
             else:
-                return ValidatedJson.make_void(self._json_conversion_messages("error"))
+                messages += self._json_conversion_messages("error")
 
-        if len(self.values) == 0:
+        if len(self.valid_values) == 0:
             if not optional:
-                messages += JsonMessages.error(f"No value for required field \"{self.evidence_key.pretty_label}\"")
-            return ValidatedJson(None if single else [], messages)
-        elif len(self.values) == 1:
-            return ValidatedJson(self.values[0] if single else self.values, messages)
-        else:
+                no_value_message = "No valid ClinVar value" if self.has_conversion_issues else "No value"
+                messages += JsonMessages.error(f"{no_value_message} for required field \"{self.evidence_key.pretty_label}\"")
+            return ValidatedJson.make_void(messages)
+
+        elif len(self.valid_values) == 1:
+            return ValidatedJson(self.valid_values[0] if single else self.valid_values, messages)
+
+        else:  # multiple values
             if single:
-                # has multiple values but can only fit one value
-                return ValidatedJson.make_void(
-                    JsonMessages.severity(
-                        severity="warning" if optional else "error",
-                        message=f"ClinVar only accepts a single value for \"{self.evidence_key.pretty_label}\". There are multiple values for mode of inheritance against this record, so omitting this field."
-                    )
+                messages += JsonMessages.severity(
+                    severity="warning" if optional else "error",
+                    message=f"\"{self.evidence_key.pretty_label}\" within ClinVar only accepts a single value. There are {len(self.valid_values)} valid values against this field, so omitting."
                 )
-            return ValidatedJson(self.values, messages)
+                # has multiple values but can only fit one value
+                return ValidatedJson.make_void(messages)
+            else:  # multiple values and accepts multiple values
+                return ValidatedJson(self.valid_values, messages)
 
     def __bool__(self):
-        return len(self.values) > 0
+        return len(self.valid_values) > 0 or self.has_conversion_issues
 
     def __len__(self):
-        return len(self.values)
+        return len(self.valid_values)
 
 
 # Dictionary definitions, we don't have many since we deal more with ValidatedJSon where a typed dictionary doesn't fit
