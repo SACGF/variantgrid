@@ -61,6 +61,7 @@ class ClinVarEvidenceKey:
             else:
                 raise ValueError(f"ADMIN: Trying to extract value from \"{self.evidence_key.pretty_label}\" that isn't a SELECT or MULTISELECT.")
 
+    @property
     def has_conversion_issues(self):
         return bool(self.conversion_messages)
 
