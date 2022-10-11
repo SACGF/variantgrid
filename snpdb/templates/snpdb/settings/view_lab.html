@@ -14,7 +14,7 @@
 {% block submenu %}{% menu_bar_settings %}{% endblock submenu %}
 {% block content %}
     <div class="container">
-        <h3>{{ lab }}</h3>
+        <h3>{{ lab }} {% admin_link lab %}</h3>
         {% ui_register_tab_embedded label="Lab Activity" tab_set="lab_tabs" %}
             <div class="row">
                 <div class="col-md-6 col-lg-4 mt-4">

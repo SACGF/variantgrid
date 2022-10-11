@@ -830,10 +830,9 @@ const VCForm = (function() {
                 appendLabelHeading('Sample', sampleElement);
             }
 
-            console.log(`UserAdmin = ${this.userAdmin}`);
             if (this.userAdmin) {
                 let adminLinkHref = Urls["admin:classification_classification_change"](this.record.id);
-                let adminLink = $('<a>', {class:'hover-link', html:'<i class="fa-solid fa-key"></i> Admin Screen', href: adminLinkHref});
+                let adminLink = $('<a>', {class:'admin-link', target: '_blank', html: 'Manage', href: adminLinkHref});
                 appendLabelHeading('Admin', adminLink);
             }
 

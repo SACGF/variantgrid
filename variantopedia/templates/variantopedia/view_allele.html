@@ -48,7 +48,7 @@
         <div class="row equal">
             <div class="col col-md-4">
                 <div class="card" id="allele-card">
-                    <div class="card-header">Allele <div class="d-inline-block ml-2" style="position:absolute" data-flags="{{allele.flag_collection_safe.id}}"></div></div>
+                    <div class="card-header">Allele {% admin_link allele %} <div class="d-inline-block ml-2" style="position:absolute" data-flags="{{allele.flag_collection_safe.id}}"></div></div>
                     <div class="card-body">
                         {% labelled label="Internal Allele ID" hint="chunky" %}{{ allele.id }}{% endlabelled %}
                         {% if allele.clingen_allele %}

@@ -15,7 +15,7 @@
 
 {% block content %}
     <div class="container">
-        <h3>{{ organization }}</h3>
+        <h3>{{ organization }} {% admin_link organization %}</h3>
         {% ui_register_tab_embedded label="Member Labs" tab_set="org_tabs" %}
         <div class="row equal">
             {% for lab in organization.lab_set.all %}

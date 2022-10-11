@@ -692,6 +692,24 @@ div.background-image {
   color: #88B;
   cursor: pointer;
 }
+.admin-link {
+    padding-left: 8px;
+    color: #66AA;
+    cursor: pointer;
+    text-decoration: none;
+    text-transform: uppercase;
+    font-size: 8pt;
+    &:hover {
+        text-display: underline;
+    }
+    &::before {
+        position: relative;
+        left: -4px;
+        content: '\f4fe';
+        font-family: 'Font Awesome 6 Free', 'FontAwesome';
+        font-weight: 900;
+    }
+}
 
 .hover-detail {
     color: #446;

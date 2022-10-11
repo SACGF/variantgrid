@@ -6,8 +6,10 @@ from typing import Optional, Any
 
 from django import template
 from django.contrib.auth.models import User
+from django.db.models import Model
 from django.forms.utils import ErrorList
 from django.template.base import FilterExpression, kwarg_re
+from django.urls import reverse, NoReverseMatch
 from django.utils.safestring import SafeString
 
 from library.utils import diff_text
@@ -547,3 +549,19 @@ def bytes(bytes: Optional[int]):
 @register.inclusion_tag(name="diff_text", filename="uicore/tags/diff_text.html")
 def diff_text_html(a: str, b: str):
     return {"diffs": diff_text(a, b), "before": a, "after": b}
+
+
+@register.inclusion_tag(takes_context=True, name="admin_link", filename="uicore/tags/admin_link.html")
+def admin_link(context, object: Model):
+    if not context.request.user.is_superuser:
+        return {}
+    url: Optional[str] = None
+    if isinstance(object, Model):
+        try:
+            model = object._meta.model
+            meta = model._meta
+            path = f"admin:{meta.app_label}_{meta.model_name}_change"
+            url = reverse(path, kwargs={"object_id": object.pk})
+        except NoReverseMatch:
+            pass
+    return {"url": url}
