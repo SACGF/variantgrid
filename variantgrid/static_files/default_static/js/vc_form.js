@@ -812,7 +812,7 @@ const VCForm = (function() {
 
             let p_hgvs = this.value(SpecialEKeys.P_HGVS);
             if (p_hgvs) {
-                p_dot = p_hgvs.indexOf('p.');
+                let p_dot = p_hgvs.indexOf('p.');
                 if (p_dot !== -1) {
                     p_hgvs = p_hgvs.substring(p_dot);
                 }
@@ -823,11 +823,18 @@ const VCForm = (function() {
 
             if (this.record.sample_id) {
                 let href = Urls.view_sample(this.record.sample_id);
-                sampleElement = $('<a>', {class:'hover-link', text: this.record.sample_name, href:href});
+                let sampleElement = $('<a>', {class:'hover-link', text: this.record.sample_name, href:href});
                 sampleElement = $('<span>', {html: [
                     sampleElement,
                 ]})
                 appendLabelHeading('Sample', sampleElement);
+            }
+
+            console.log(`UserAdmin = ${this.userAdmin}`);
+            if (this.userAdmin) {
+                let adminLinkHref = Urls["admin:classification_classification_change"](this.record.id);
+                let adminLink = $('<a>', {class:'hover-link', html:'<i class="fa-solid fa-key"></i> Admin Screen', href: adminLinkHref});
+                appendLabelHeading('Admin', adminLink);
             }
 
             $('<div>', {id:'vc-quick-submit'}).appendTo(jSyncStatus);
@@ -1069,6 +1076,7 @@ const VCForm = (function() {
             jPublishHistory = $(params.publishHistory);
             jLinks = $(params.links);
             jShareButtons = $(params.shareButtons);
+            this.userAdmin = params.userAdmin;
             this.citations = params.citations;
             this.attachmentsEnabled = params.attachmentsEnabled || false;
             

@@ -21,6 +21,7 @@
             let record = {{ record | jsonify }};
             vcform.init(
                 {
+                    userAdmin: {{ user.is_superuser | jsonify }},
                     genomeBuild: "{{ genome_build.pk }}",
                     citations: new Citations($('#citations')),
                     filterBox: $('#vcform-filter-box'),
