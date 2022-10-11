@@ -23,6 +23,7 @@ class VariantTranscriptSelections:
     GNOMAD_GENE_CONSTRAINT_URL = "gnomad_gene_constraint_url"
     REFSEQ_TRANSCRIPT = "refseq_transcript_accession"
     REPRESENTATIVE = "representative"
+    NO_TRANSCRIPT = ''  # Can't be None as needs to be sortable
 
     def __init__(self, variant: Variant,
                  genome_build: GenomeBuild, annotation_version=None,
@@ -40,7 +41,7 @@ class VariantTranscriptSelections:
         self.transcript_data = []  # See docstring in _populate for details
         self.warning_messages = []
         self.error_messages = []
-        self.initial_transcript_id = None
+        self.initial_transcript_id = self.NO_TRANSCRIPT
         self._populate(variant, annotation_version, initial_transcript_id, initial_transcript_column)
         self.other_annotation_consortium_transcripts_warning = None  # set in _add_other_annotation_consortium_transcripts
         if add_other_annotation_consortium_transcripts:
@@ -92,8 +93,8 @@ class VariantTranscriptSelections:
                     data[field] = field_value.replace("&", ", ")
 
             # These always need to be set for sorting
-            data[self.REFSEQ_TRANSCRIPT] = ''
-            data[self.ENSEMBL_TRANSCRIPT] = ''
+            data[self.REFSEQ_TRANSCRIPT] = self.NO_TRANSCRIPT
+            data[self.ENSEMBL_TRANSCRIPT] = self.NO_TRANSCRIPT
             if obj.transcript:
                 ac_key = self._ac_key(obj.transcript.annotation_consortium)
                 data[ac_key] = obj.transcript_accession
@@ -101,10 +102,11 @@ class VariantTranscriptSelections:
             data[self.GENE_SYMBOL] = obj.symbol
             data["gene_id"] = obj.gene_id
 
+            transcript_id = self.NO_TRANSCRIPT
             for col in settings.VARIANT_ANNOTATION_TRANSCRIPT_PREFERENCES:
                 if transcript_id := data.get(col):
-                    data["transcript_id"] = transcript_id
                     break
+            data["transcript_id"] = transcript_id
 
             if obj.transcript_version:
                 data["protein_length"] = obj.transcript_version.protein_length
@@ -141,15 +143,14 @@ class VariantTranscriptSelections:
             transcripts_list = list(variant.varianttranscriptannotation_set.filter(version=vav))
 
             for vsta in transcripts_list:
-                if vsta.transcript:
-                    t_data = get_transcript_data(vsta, representative_transcript)
-                    self.transcript_data.append(t_data)
+                t_data = get_transcript_data(vsta, representative_transcript)
+                self.transcript_data.append(t_data)
 
-                    if vsta.gene_id not in self.gene_annotations:
-                        version_id = annotation_version.gene_annotation_version_id
-                        gene_annotation = vsta.gene.geneannotation_set.filter(version_id=version_id).first()
-                        if gene_annotation:
-                            self.gene_annotations[vsta.gene_id] = model_to_dict(gene_annotation)
+                if vsta.gene_id and vsta.gene_id not in self.gene_annotations:
+                    version_id = annotation_version.gene_annotation_version_id
+                    gene_annotation = vsta.gene.geneannotation_set.filter(version_id=version_id).first()
+                    if gene_annotation:
+                        self.gene_annotations[vsta.gene_id] = model_to_dict(gene_annotation)
         except VariantAnnotation.DoesNotExist:
             # Probably due to variant being annotated - in that case show a warning message
             ar = AnnotationRun.objects.filter(annotation_range_lock__version__genome_build=annotation_version.genome_build,
