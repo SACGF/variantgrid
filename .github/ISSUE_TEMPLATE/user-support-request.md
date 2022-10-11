@@ -3,7 +3,7 @@ name: User Support Request
 about: Request help using Variant Grid
 title: ''
 labels: help wanted
-assignees: sksmi
+assignees: davmlaw
 
 ---
 
