@@ -1,0 +1,48 @@
+{% extends 'admin/change_list.html' %}
+{% load static %}
+{% block object-tools %}
+    <script>
+        function onFormSubmit(form) {
+            let icon = form.getElementsByTagName('I');
+            icon.classList.add('fa-beat');
+            return true;
+        }
+    </script>
+    <style>
+        .admin-action-form {
+            display: inline-block;
+        }
+        .admin-action-form button {
+            display: inline-block;
+            padding: 6px 16px;
+            background: #888;
+            color: white;
+            font-weight: 400;
+            font-size: 12px;
+            letter-spacing: 0.5px;
+            border-radius: 12px;
+            border: none;
+            text-transform: uppercase;
+        }
+        .admin-action-form button:hover {
+            cursor: pointer;
+            background: #777;
+        }
+        .admin-action-form + .admin-action-form {
+            margin-left: 12px;
+        }
+    </style>
+    <link href="{% static 'fontawesomefree/css/all.min.css' %}" rel="stylesheet" type="text/css">
+    {% if model_actions %}
+        <div>
+            {% for model_action in model_actions %}
+                <form action="{{ model_action.url }}" method="POST" onsubmit="onFormSubmit(this)" class="admin-action-form">
+                    {% csrf_token %}
+                    <button type="submit">{{ model_action.label }} <i class="{{ model_action.icon }}"></i></button>
+                </form>
+            {% endfor %}
+        </div>
+    {% endif %}
+    <br />
+    {{ block.super }}
+{% endblock %}

@@ -1,3 +1,4 @@
+import functools
 import inspect
 from typing import Optional, List, Iterator
 
@@ -6,13 +7,14 @@ from django.conf import settings
 from django.contrib import admin, messages
 from django.db import models
 from django.db.models import AutoField, ForeignKey, DateTimeField
-from django.http import HttpResponse, StreamingHttpResponse
+from django.http import HttpResponse, StreamingHttpResponse, HttpResponseRedirect
+from django.urls import path
 from django.utils.encoding import smart_str
 from django_json_widget.widgets import JSONEditorWidget
 from guardian.admin import GuardedModelAdminMixin
 from lazy import lazy
 
-from library.utils import delimited_row
+from library.utils import delimited_row, WrappablePartial
 
 
 def admin_action(short_description: str):
@@ -43,6 +45,30 @@ def admin_action(short_description: str):
     return decorator
 
 
+def admin_model_action(url_slug: str, short_description: Optional[str] = None, icon: Optional[str] = None):
+    """
+    For actions that apply to the whole model rather than a single record
+    """
+    def decorator(method):
+        def wrapper(*args, **kwargs):
+            # empty wrapper, we just want to modify short_description and mark as is_action
+            result = method(*args, **kwargs)
+            if not result:
+                result = HttpResponseRedirect("../")
+            return result
+
+        wrapper.method = method
+        wrapper.url_slug = url_slug
+        wrapper.short_description = short_description
+        wrapper.line_number = inspect.getsourcelines(method)[1]
+        wrapper.icon = icon
+        wrapper.__name__ = method.__name__
+        wrapper.is_model_action = True
+        return wrapper
+
+    return decorator
+
+
 def admin_list_column(short_description: Optional[str] = None, order_field: Optional[str] = None):
     """
     Mark a function as acting like an admin list column
@@ -64,6 +90,16 @@ def admin_list_column(short_description: Optional[str] = None, order_field: Opti
         wrapper.is_list_column = True
         return wrapper
     return decorator
+
+
+def inject_self_to_decorated(wrapped, self_instance):
+    takes_self = False
+    if method_args := inspect.getfullargspec(wrapped.method).args:
+        takes_self = method_args[0] == 'self'
+    if takes_self:
+        return WrappablePartial(wrapped, self_instance)
+    else:
+        return wrapped
 
 
 class AllValuesChoicesFieldListFilter(admin.AllValuesFieldListFilter):
@@ -107,6 +143,31 @@ class AllValuesChoicesFieldListFilter(admin.AllValuesFieldListFilter):
             }
 
 
+def export_as_csv(modeladmin, request, queryset) -> HttpResponse:
+    meta = queryset.model._meta
+    field_names = [field.name for field in meta.fields]
+    if related_fields := [field.name for field in meta.fields if isinstance(field, ForeignKey)]:
+        queryset = queryset.select_related(*related_fields)
+
+    def data_generator() -> Iterator[str]:
+        nonlocal field_names
+        nonlocal queryset
+
+        yield delimited_row(field_names)
+        for qs_obj in queryset:
+            yield delimited_row([getattr(qs_obj, field) for field in field_names])
+
+    response = StreamingHttpResponse(data_generator(), content_type='text/csv')
+    response['Content-Disposition'] = 'attachment; filename={}.csv'.format(meta)
+    return response
+
+
+export_as_csv.short_description = "Export selected as CSV"
+
+# Sets this action to run on every single admin screen
+admin.site.add_action(export_as_csv, 'export_as_csv')
+
+
 class ModelAdminBasics(admin.ModelAdmin):
     """
     Make every Admin class extend this (or GuardedModelAdminBasics)
@@ -125,37 +186,59 @@ class ModelAdminBasics(admin.ModelAdmin):
         # models.ForeignKey: {'widget': ForeignKeyRawIdWidget}
     }
 
-    def export_as_csv(self, request, queryset) -> HttpResponse:
-        meta = self.model._meta
-        field_names = [field.name for field in meta.fields]
-        if related_fields := [field.name for field in meta.fields if isinstance(field, ForeignKey)]:
-            queryset = queryset.select_related(*related_fields)
-
-        def data_generator() -> Iterator[str]:
-            nonlocal field_names
-            nonlocal queryset
-
-            yield delimited_row(field_names)
-            for qs_obj in queryset:
-                yield delimited_row([getattr(qs_obj, field) for field in field_names])
-
-        response = StreamingHttpResponse(data_generator(), content_type='text/csv')
-        response['Content-Disposition'] = 'attachment; filename={}.csv'.format(meta)
-        return response
-
-    export_as_csv.short_description = "Export selected as CSV"
-
     def __new__(cls, *args, **kwargs):
         """
         Sets up actions (methods annotated with @admin_action)
         """
         actions = [func for _, func in inspect.getmembers(cls, lambda x: getattr(x, 'is_action', False))]
-
         if actions:
             actions.sort(key=lambda x: x.line_number)
+        cls.actions = actions
 
-        cls.actions = ['export_as_csv'] + actions
-        return super().__new__(cls)
+        instance = super().__new__(cls)
+
+        model_actions = [func for _, func in inspect.getmembers(cls, lambda x: getattr(x, 'is_model_action', False))]
+        cls.model_urls = list()
+        cls.model_actions = model_actions
+        if model_actions:
+            model_actions.sort(key=lambda x: x.line_number)
+            cls.model_urls = [path(ma.url_slug, inject_self_to_decorated(ma, instance)) for ma in model_actions]
+
+        return instance
+
+    def changelist_view(self, request, extra_context=None):
+        extra_context = extra_context or dict()
+        extra_context["model_actions"] = [{
+            "label": ma.short_description,
+            "url": ma.url_slug,
+            "icon": ma.icon or "fa-solid fa-play"
+        } for ma in self.model_actions]
+        return super().changelist_view(request, extra_context=extra_context)
+
+    def changeform_view(self, request, object_id=None, form_url="", extra_context=None):
+        extra_context = extra_context or dict()
+        all_actions = self.get_actions(request)
+        print(all_actions)
+        extra_context["actions"] = [{
+            "id": a[1],
+            "label": a[2]
+        } for a in all_actions.values() if not a[1] == 'delete_selected']
+        return super().changeform_view(request, object_id, form_url, extra_context)
+
+    def single_page_action(self, request, object_id):
+        action_name = request.POST.get("action")
+        if isinstance(object_id, str):
+            object_id = object_id.replace("_5F", "_")
+
+        action = self.get_action(action_name)
+        response = action[0](self, request, self.model.objects.filter(pk=object_id))
+        if not response:
+            response = HttpResponseRedirect(f"../change/")
+        return response
+
+    def get_urls(self):
+        resulting_urls = [path('<path:object_id>/single_action/', self.single_page_action)] + self.model_urls + super().get_urls()
+        return resulting_urls
 
     @lazy
     def tz(self):

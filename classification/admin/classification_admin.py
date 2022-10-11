@@ -4,6 +4,7 @@ from typing import Set
 from django.contrib import admin, messages
 from django.contrib.admin import RelatedFieldListFilter, BooleanFieldListFilter
 from django.db.models import QuerySet
+from django.http import HttpResponseRedirect
 from django.utils import timezone
 
 from annotation.models.models import AnnotationVersion
@@ -17,7 +18,8 @@ from classification.models.classification import Classification
 from classification.models.classification_import_run import ClassificationImportRun, ClassificationImportRunStatus
 from classification.tasks.classification_import_map_and_insert_task import ClassificationImportMapInsertTask
 from library.guardian_utils import admin_bot
-from snpdb.admin_utils import ModelAdminBasics, admin_action, admin_list_column, AllValuesChoicesFieldListFilter
+from snpdb.admin_utils import ModelAdminBasics, admin_action, admin_list_column, AllValuesChoicesFieldListFilter, \
+    admin_model_action
 from snpdb.models import GenomeBuild, Lab
 
 
@@ -100,8 +102,27 @@ class ClassificationModificationAdmin(admin.TabularInline):
 
 @admin.register(ClassificationImportRun)
 class ClassificationImportRunAdmin(ModelAdminBasics):
+    # change_list_template = 'classification/admin/change_list.html'
     list_display = ['id', 'identifier', 'row_count', 'status', 'from_file', 'created_detailed', 'modified_detailed']
-    list_filter = (('status', AllValuesChoicesFieldListFilter), )
+    list_filter = ('status', )
+
+    @admin_model_action(url_slug="create_dummy/", short_description="Create Dummy Import", icon="fa-solid fa-plus")
+    def create_dummy(self, request):
+        ClassificationImportRun(identifier="Dummy Import").save()
+        self.message_user(request, "Created a dummy import")
+
+    @admin_model_action(url_slug="mark_unfinished/", short_description="Mark OnGoing Imports as Unfinished", icon="fa-regular fa-trash-can")
+    def close_all_open(self, request):
+        ongoing_imports = ClassificationImportRun.objects.filter(status=ClassificationImportRunStatus.ONGOING)
+        if ongoing_imports:
+            for cir in ongoing_imports:
+                cir.status = ClassificationImportRunStatus.UNFINISHED
+                cir.save()
+                self.message_user(request, message=f'Changed import from ongoing to unfinished for {cir.identifier}',
+                                  level=messages.INFO)
+        else:
+            self.message_user(request, message=f'No OnGoing Imports to mark as unfinished',
+                              level=messages.WARNING)
 
     def is_readonly_field(self, f) -> bool:
         return True

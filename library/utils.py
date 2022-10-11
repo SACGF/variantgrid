@@ -1,5 +1,6 @@
 import csv
 import difflib
+import functools
 import hashlib
 import importlib
 import inspect
@@ -1251,3 +1252,26 @@ def diff_text(a: str, b: str) -> DiffBuilder:
         diff_builder.append(diff_chars)
     diff_builder.optimize()
     return diff_builder
+
+
+class WrappablePartial(functools.partial):
+    """
+    functools.partial doesn't work great on decorated methods (complains about lack of __module__)
+    this extension of partial fixes that
+    """
+
+    @property
+    def __module__(self):
+        return self.func.__module__
+
+    @property
+    def __name__(self):
+        return "functools.partial({}, *{}, **{})".format(
+            self.func.__name__,
+            self.args,
+            self.keywords
+        )
+
+    @property
+    def __doc__(self):
+        return self.func.__doc__
