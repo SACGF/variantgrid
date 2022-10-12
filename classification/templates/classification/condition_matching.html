@@ -761,12 +761,9 @@
                 {% labelled label="Lab" %}
                     {% lab condition_text.lab %}
                 {% endlabelled %}
+                {% labelled label="Total Classifications" %}<span class="mono">{{ condition_text.classifications_count }}</span>{% endlabelled %}
+                {% labelled label="Outstanding Classifications" %}<span class="mono" id="count_outstanding">{{ condition_text.classifications_count_outstanding }}</span> &nbsp;<span id="no_outstanding"></span>{% endlabelled %}
             </div>
-
-            <span class="hover-detail" data-toggle="tooltip" title="This shows how many classifications share this condition text, and how many of those require a selected term">
-                Total Classifications : <span class="mono">{{ condition_text.classifications_count }}</span>,
-                Outstanding Classifications : <span class="mono" id="count_outstanding">{{ condition_text.classifications_count_outstanding }}</span> &nbsp;<span id="no_outstanding"></span>
-            </span>
 
             <ul id="condition-list" class="list-group mt-4">
                 <li class="list-group-item">
