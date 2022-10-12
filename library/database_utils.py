@@ -20,13 +20,17 @@ def queryset_to_sql(queryset, pretty=False):
 
     cursor = connection.cursor()
     query, params = queryset.query.sql_with_params()
-    cursor.execute('EXPLAIN ' + query, params)
+    PREFIX = 'select 1 -- '
+    cursor.execute(PREFIX + query, params)
     res = str(cursor.db.ops.last_executed_query(cursor, query, params))
-    assert res.startswith('EXPLAIN ')
-    query_sql = res[len('EXPLAIN '):]
+    assert res.startswith(PREFIX)
+    query_sql = res[len(PREFIX):]
 
     if pretty:
         query_sql = sqlparse.format(query_sql, reindent=True, keyword_case='upper')
+
+    if queryset.query.has_select_fields:
+        assert query_sql.upper().startswith("SELECT"), "Select query startswith SELECT"
 
     return query_sql
 
