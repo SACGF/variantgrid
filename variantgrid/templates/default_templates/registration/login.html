@@ -55,7 +55,7 @@
                     <label>GitHub</label>
                     <p><a href="https://github.com/SACGF/variantgrid">The GitHub project can be found here</a>.</p>
 
-                    <label>Documention</label>
+                    <label>Documentation</label>
                     <p><a href="https://variantgrid.readthedocs.io/en/latest/">Documentation can be found here</a>.</p>
 
                     <hr class="my-4"/>
@@ -74,26 +74,3 @@
     </div>
 
 {% endblock %}
-
-{% comment %}
-    <div class='white-row flex-center-container'>
-        <div class='left-col flex-center-container'>
-            <div id='vg-mission'>
-                <h1>VariantGrid</h1>
-                <p>A <a href="https://github.com/sacgf/variantgrid">source available</a> variant database and web analysis platform.</p>
-            </div>
-        </div>
-        <div id='vg-analysis-box' class='right-col'>
-            <img src="{% static 'images/frontpage/vg-nodes_small.png' %}" />
-        </div>
-        <div class='clear'></div>
-    </div>
-    <p>
-    <a target="_blank" href="{{ help_url }}">Documentation</a>
-    </p>
-    {% if not use_oidc %}
-    <p>
-    Researchers can <a href='{% url "registration_register" %}'>register for a free account</a>, or download a copy to run on a private server.
-    </p>
-    {% endif %}
-{% endcomment %}
