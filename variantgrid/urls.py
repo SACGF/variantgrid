@@ -8,6 +8,7 @@ from django.contrib.staticfiles.urls import staticfiles_urlpatterns
 from django.urls import path
 
 from variantgrid import views
+from variantgrid.views import ContactFormView
 
 admin.autodiscover()
 
@@ -29,6 +30,10 @@ urlpatterns = [
     path('avatar/', include('avatar.urls')),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
+# if contact us
+urlpatterns += [
+    path('contact_us', ContactFormView.as_view(), name='contact_us')
+]
 
 if getattr(settings, "REGISTRATION_OPEN", False):
     registration_include = include('registration.backends.simple.urls')

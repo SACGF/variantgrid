@@ -2,18 +2,21 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.models import User
 from django.contrib.sites.models import Site
+from django import forms
 from django.http.response import HttpResponseServerError, JsonResponse, \
     HttpResponseForbidden
 from django.shortcuts import redirect, render
 from django.template.loader import get_template, render_to_string
+from django.urls import reverse_lazy
 from django.urls.base import resolve, reverse
 from django.urls.exceptions import Resolver404
+from django.views.generic import FormView
 from global_login_required import login_not_required
 
 from library.email import Email
 from library.git import Git
 from library.keycloak import Keycloak, KeycloakError, KeycloakNewUser
-from library.log_utils import report_exc_info
+from library.log_utils import report_exc_info, NotificationBuilder
 from manual.models import Deployment
 from snpdb.forms import KeycloakUserForm
 from snpdb.models import UserSettings
@@ -189,3 +192,59 @@ def keycloak_admin(request):
     }
 
     return render(request, 'keycloak_admin.html', context)
+
+
+class ContactUsForm(forms.Form):
+    name = forms.CharField(max_length=200)
+    email = forms.EmailField(max_length=200)
+    message = forms.CharField(widget=forms.Textarea)
+
+
+@login_not_required
+class ContactFormView(FormView):
+    form_class = ContactUsForm
+    template_name = "registration/contact_us.html"
+
+    def post(self, request, *args, **kwargs):
+        form = ContactUsForm(data=request.POST)
+        context = {"form": form}
+        if form.is_valid():
+            try:
+                self.send_message(form)
+                messages.success(request, "Your details have been sent")
+                context["sent"] = True
+            except:
+                report_exc_info(request=request)
+                # TODO, maybe grab an email from settings at this point?
+                messages.error(request, "There was an error with the contact form. Please try again later")
+
+        return render(request, self.template_name, context)
+
+    def send_message(self, form):
+        nb = NotificationBuilder("Contact Us")
+        nb.add_header("Contact Us")
+        nb.add_field("From", form.cleaned_data.get('name'))
+        nb.add_field("Email", form.cleaned_data.get('email'))
+        nb.add_markdown(form.cleaned_data.get('message'))
+        nb.send()
+
+"""
+def contact_us(request):
+    name = ""
+    email = ""
+    message = ""
+    if request.method == "POST":
+        name = request.POST.get("name")
+        email = request.POST.get("email")
+        message = request.POST.get("message")
+        if not email:
+
+
+    context = {
+        "name": name,
+        "email": email,
+        "message": message
+    }
+
+    return render(request, 'registration/contact_us.html', {})
+"""
