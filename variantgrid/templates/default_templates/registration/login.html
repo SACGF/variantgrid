@@ -49,10 +49,10 @@
                     <div class="mt-3">
                         <label>Need an Account?</label>
                         <p>Researchers can <a href='{% url "registration_register" %}'>register for a free account</a>, or download a copy to run on a private server.</p>
-
-                        <label>Contact Us</label>
-                        <p><a href='{% url "contact_us" %}'>You can Contact Us here</a> to discuss if VariantGrid technology would be useful to you.</p>
-
+                        {% if contact_us_enabled %}
+                            <label>Contact Us</label>
+                            <p><a href='{% url "contact_us" %}'>You can contact us here</a> to discuss if VariantGrid technology would be useful to you.</p>
+                        {% endif %}
                         <hr class="my-4"/>
 
                         <label>GitHub</label>

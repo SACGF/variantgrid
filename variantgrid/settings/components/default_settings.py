@@ -48,6 +48,12 @@ ALLELE_VALIDATION = False
 
 # if None, discordance emails wont be sent
 DISCORDANCE_EMAIL = None
+
+# if None, Emails to admins wont be sent, is the FROM email for emails sent form this server to admins
+ADMIN_EMAIL_NOTIFICATION = None
+# Enable to have contact us functionality
+CONTACT_US_ENABLED = False
+
 ACCOUNTS_EMAIL = None
 # If you change this value you should run 'recalc' for all ClinicalContexts in admin
 DISCORDANCE_ENABLED = False

@@ -33,6 +33,7 @@ def settings_context_processor(request):
         'use_oidc': settings.USE_OIDC,  # whether user is managed by django or externally by open connect
         'user_feedback_enabled': settings.ROLLBAR.get('enabled', False) and settings.USER_FEEDBACK_ENABLED,
         "variant_show_canonical_hgvs": settings.VARIANT_SHOW_CANONICAL_HGVS,
+        "contact_us_enabled": settings.CONTACT_US_ENABLED
     }
 
     if settings.DEBUG:

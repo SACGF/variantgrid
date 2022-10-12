@@ -16,7 +16,7 @@ from global_login_required import login_not_required
 from library.email import Email
 from library.git import Git
 from library.keycloak import Keycloak, KeycloakError, KeycloakNewUser
-from library.log_utils import report_exc_info, NotificationBuilder
+from library.log_utils import report_exc_info, NotificationBuilder, AdminNotificationBuilder
 from manual.models import Deployment
 from snpdb.forms import KeycloakUserForm
 from snpdb.models import UserSettings
@@ -221,7 +221,7 @@ class ContactFormView(FormView):
         return render(request, self.template_name, context)
 
     def send_message(self, form):
-        nb = NotificationBuilder("Contact Us")
+        nb = AdminNotificationBuilder("Contact Us", is_communication=True)
         nb.add_header("Contact Us")
         nb.add_field("From", form.cleaned_data.get('name'))
         nb.add_field("Email", form.cleaned_data.get('email'))
