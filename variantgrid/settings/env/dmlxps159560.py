@@ -5,6 +5,14 @@ from variantgrid.settings.components.seqauto_settings import *  # pylint: disabl
 # import all the base settings #
 ROLLBAR['enabled'] = False
 
+USE_DJANGO_DEBUG_TOOLBAR = True
+if USE_DJANGO_DEBUG_TOOLBAR:
+    INSTALLED_APPS += ['debug_toolbar']
+    MIDDLEWARE = ('debug_toolbar.middleware.DebugToolbarMiddleware',) + MIDDLEWARE
+    INTERNAL_IPS = [
+        '127.0.0.1',
+    ]
+
 #SEQAUTO_ENABLED = True
 AVATAR_CACHE_ENABLED = False  # So we can change etc
 SEQAUTO_SAMPLE_SHEET_EXTRA_COLUMNS = ["SAPOrderNumber", "Sex", "Panel", "R1kDVersion", "RunID", "CaptureID", "RunReference"]

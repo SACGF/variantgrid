@@ -11,7 +11,7 @@ ROLLBAR['enabled'] = False
 USE_DJANGO_DEBUG_TOOLBAR = False
 if USE_DJANGO_DEBUG_TOOLBAR:
     INSTALLED_APPS += ['debug_toolbar']
-    MIDDLEWARE = MIDDLEWARE + ('debug_toolbar.middleware.DebugToolbarMiddleware',)
+    MIDDLEWARE = ('debug_toolbar.middleware.DebugToolbarMiddleware',) + MIDDLEWARE
     INTERNAL_IPS = [
         '127.0.0.1',
     ]

@@ -26,9 +26,13 @@ urlpatterns = [
     path('system/changelog', views.changelog, name='changelog'),
     path('system/keycloak_admin', views.keycloak_admin, name='keycloak_admin'),
     path('terms/', include('termsandconditions.urls')),
-    path('__debug__/', include(debug_toolbar.urls)),
-    path('avatar/', include('avatar.urls')),
+    path('avatar/', include('avatar.urls')),#
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+
+if settings.DEBUG:
+    urlpatterns += [
+        path('__debug__/', include(debug_toolbar.urls)),
+    ]
 
 if settings.CONTACT_US_ENABLED:
     urlpatterns += [

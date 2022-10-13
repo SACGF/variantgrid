@@ -586,7 +586,6 @@ MIDDLEWARE = (
     'threadlocals.middleware.ThreadLocalMiddleware',
     # 'querycount.middleware.QueryCountMiddleware',
     # 'mozilla_django_oidc.middleware.SessionRefresh',
-    # 'debug_panel.middleware.DebugPanelMiddleware',
 )
 HTML_MINIFY = True
 EXCLUDE_FROM_MINIFYING = (
@@ -672,8 +671,6 @@ INSTALLED_APPS = [
     'rest_framework',
     'termsandconditions',
     'crispy_forms',  # used to make bootstrap compatible forms
-    #    'debug_toolbar',
-    #    'debug_panel',
     # Internal apps
     'analysis.apps.AnalysisConfig',
     'annotation.apps.AnnotationConfig',
