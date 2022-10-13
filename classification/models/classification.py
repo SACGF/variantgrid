@@ -195,9 +195,9 @@ def get_extra_info(flag_infos: FlagInfos, user: User, **kwargs) -> None:  # pyli
             'label': vc.friendly_label,
             'vc_id': vc.id
         }
-        if vc.variant:
+        if vc.variant_id:
             context['variant'] = vc.variant_id
-        if vc.clinical_context:
+        if vc.clinical_context_id:
             context['clinical_context'] = vc.clinical_context_id
         if user and vc.can_write(user):
             context['can_write'] = True
