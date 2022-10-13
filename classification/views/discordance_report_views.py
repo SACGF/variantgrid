@@ -39,10 +39,18 @@ def discordance_reports_view(request: HttpRequest, lab_id: Optional[str] = None)
     })
 
 
-def discordance_reports_history_view(request: HttpRequest, lab_id: Optional[str] = None) -> HttpResponseBase:
-    lab_picker = LabPickerData.from_request(request=request, selection=lab_id, view_name='discordance_reports')
+def discordance_reports_active_detail(request: HttpRequest, lab_id: Optional[str] = None) -> HttpResponseBase:
+    lab_picker = LabPickerData.from_request(request=request, selection=lab_id)
 
-    return render(request, "classification/discordance_reports_history.html", {
+    return render(request, "classification/discordance_reports_active_detail.html", {
+        "dlab": ClassificationDashboard(lab_picker=lab_picker)
+    })
+
+
+def discordance_reports_history_detail(request: HttpRequest, lab_id: Optional[str] = None) -> HttpResponseBase:
+    lab_picker = LabPickerData.from_request(request=request, selection=lab_id)
+
+    return render(request, "classification/discordance_reports_history_detail.html", {
         "dlab": ClassificationDashboard(lab_picker=lab_picker)
     })
 
