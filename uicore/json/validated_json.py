@@ -1,7 +1,7 @@
 import copy
 import json
 from dataclasses import dataclass, field
-from typing import List, Iterator, Union
+from typing import List, Iterator, Union, Optional
 
 from lazy import lazy
 
@@ -98,11 +98,12 @@ class ValidatedJson:
     Allowing validation messages to be associated with the parts that caused the problems
     """
     json_data: JsonDataType
+    # note that JsonMessgaes are immutable so JSON_MESSAGES_EMPTY can be provided as a default value
     messages: JsonMessages = JSON_MESSAGES_EMPTY
     void: bool = False
 
     @staticmethod
-    def make_void(messages: JsonMessages):
+    def make_void(messages: Optional[JsonMessages] = JSON_MESSAGES_EMPTY):
         return ValidatedJson(
             json_data=None,
             messages=messages,

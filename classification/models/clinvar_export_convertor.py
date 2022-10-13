@@ -90,6 +90,10 @@ class ClinVarEvidenceKey:
     def __len__(self):
         return len(self.valid_values) + len(self.invalid_values)
 
+    def __bool__(self):
+        # think this is default behaviour for bool
+        return len(self) > 0
+
 
 # Dictionary definitions, we don't have many since we deal more with ValidatedJSon where a typed dictionary doesn't fit
 
