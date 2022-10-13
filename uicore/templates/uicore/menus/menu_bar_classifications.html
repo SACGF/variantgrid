@@ -5,16 +5,16 @@
 {% menu_item 'hgvs_issues' title="HGVS Issues" admin_only=True %}
 {% menu_item 'clinvar_match' title="ClinVar Match" admin_only=True %}
 {% menu_item 'classification_import_tool' title="Import Test" admin_only=True %}
-{% menu_item 'condition_match_test' title="Condition Test" admin_only=True %}
+{% menu_item 'condition_match_test' title="Condition Test" admin_only=True other_urls="condition_obsoletes" %}
 {% menu_item 'classification_view_metrics' title="View Metrics" admin_only=True %}
 {% menu_item 'classification_dashboard' title="Dashboard" icon="fas fa-home" %}{% comment  badge_count=classification_issue_count  %}{% endcomment %}
-{% menu_item 'discordance_reports' title="Discordances" %}
-{% menu_item 'classifications' other_urls='/classification/classification' %}
-{% menu_item 'clinvar_key_summary' title="ClinVar" %}
-{% menu_item 'condition_matchings' title="Condition Matching" %}
+{% menu_item 'discordance_reports' title="Discordances" other_urls="discordance_report" %}
+{% menu_item 'classifications' other_urls='classifications,view_classification' %}
+{% menu_item 'clinvar_key_summary' title="ClinVar" other_urls="clinvar_export" %}
+{% menu_item 'condition_matchings' title="Condition Matching" other_urls="condition_matching" %}
 {% menu_item 'classification_dashboard_lab' title="Dashboard" %}
 {% menu_item 'overlaps' title="Overlaps" %}
 {% menu_item 'labs' %}
 {% menu_item 'classification_graphs' title="Graphs / Stats" %}
 {% menu_item 'classification_export' title="Export" %}
-{% menu_item 'classification_upload_unmapped' title="Upload" other_urls="/classification/classification/import_upload" %}
+{% menu_item 'classification_upload_unmapped' title="Upload" other_urls="classification_upload_unmapped_lab" %}

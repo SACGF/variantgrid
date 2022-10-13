@@ -81,7 +81,7 @@ def menu_item(
         other_url_parts = other_urls.split(',')
         current_url = context.request.path
         for other_url_part in other_url_parts:
-            if current_url.startswith(other_url_part):
+            if current_url.startswith(other_url_part) or current_url_name == other_url_part:
                 is_active = True
                 break
 
