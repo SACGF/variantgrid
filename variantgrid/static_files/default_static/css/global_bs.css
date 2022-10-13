@@ -629,7 +629,7 @@ div.background-image {
 .admin-link::before {
   position: relative;
   left: -4px;
-  content: '\f4fe';
+  content: '\f084';
   font-family: 'Font Awesome 6 Free', 'FontAwesome';
   font-weight: 900;
 }
