@@ -1,10 +1,13 @@
 from typing import Union, List
 
+from cache_memoize import cache_memoize
 from django.conf import settings
 from django.contrib.auth.models import Group, User
 from django.core.exceptions import PermissionDenied
 from django.db.models import Model, QuerySet
 from guardian.shortcuts import get_groups_with_perms, get_users_with_perms, remove_perm, assign_perm
+
+from library.constants import DAY_SECS
 
 
 def is_superuser(user):
@@ -24,6 +27,7 @@ def public_group():
     return g
 
 
+@cache_memoize(timeout=DAY_SECS)
 def admin_bot():
     return User.objects.get(username='admin_bot')
 
