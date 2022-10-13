@@ -30,7 +30,7 @@ class ClinVarEvidenceKey:
         self.evidence_key = evidence_key
         self.valid_values = list()
         self.invalid_values = list()
-        self.conversion_messages = list()
+        self.conversion_messages = JSON_MESSAGES_EMPTY
 
         value: Any
         if isinstance(value_obj, Mapping):
@@ -52,65 +52,43 @@ class ClinVarEvidenceKey:
                                 self.valid_values.append(clinvar)
                             else:
                                 self.invalid_values.append(sub_value)
-                                self.conversion_messages.append(f"\"{self.evidence_key.pretty_label}\" value of \"{sub_value}\" doesn't have a ClinVar equivalent.")
+                                self.conversion_messages += JsonMessages.warning(f"\"{self.evidence_key.pretty_label}\" value of \"{sub_value}\" doesn't have a ClinVar equivalent.")
                             found = True
                             break
                     if not found:
                         self.invalid_values.append(sub_value)
-                        self.conversion_messages.append(f"\"{self.evidence_key.pretty_label}\" value of \"{sub_value}\" isn't valid, can't translate to ClinVar.")
+                        self.conversion_messages += JsonMessages.warning(f"\"{self.evidence_key.pretty_label}\" value of \"{sub_value}\" isn't valid, can't translate to ClinVar.")
             else:
                 raise ValueError(f"ADMIN: Trying to extract value from \"{self.evidence_key.pretty_label}\" that isn't a SELECT or MULTISELECT.")
-
-    @property
-    def has_conversion_issues(self):
-        return bool(self.conversion_messages)
-
-    def _json_conversion_messages(self, severity: str):
-        messages = JSON_MESSAGES_EMPTY
-        for message in self.conversion_messages:
-            messages += JsonMessages.severity(severity=severity, message=message)
-        return messages
 
     def value(self, single: bool = True, optional: bool = False) -> ValidatedJson:
         """
         :param single: Is a single value expected. Adds an error to ValidatedJson if number of values is 2 or more.
         :param optional: Is the value optional, if not adds an error to ValidatedJson if number of values is zero.
         """
+        messages = self.conversion_messages
+        if single and len(self) > 1:
+            messages += JsonMessages.warning(f"\"{self.evidence_key.pretty_label}\" within ClinVar only accepts a single value. Record has the values {self.valid_values + self.invalid_values} for this field.")
 
-        messages = JSON_MESSAGES_EMPTY
-        if self.conversion_messages:
-            # if value is optional we can fall back to void with messages
-            # if it's mandatory we need to error out
-            if optional:
-                messages += self._json_conversion_messages("warning")
-            else:
-                messages += self._json_conversion_messages("error")
+        if not optional:
+            if messages:
+                # if mandatory, then any warnings about conversion have to be upgraded to errors
+                messages += JsonMessages.error("\"{self.evidence_key.pretty_label}\" is mandatory and has conversion issues.")
+            elif not self.valid_values:
+                # if mandatory, we obviously need a value
+                messages += JsonMessages.error("\"{self.evidence_key.pretty_label}\" is mandatory but has no value.")
 
-        if len(self.valid_values) == 0:
-            if not optional:
-                no_value_message = "No valid ClinVar value" if self.has_conversion_issues else "No value"
-                messages += JsonMessages.error(f"{no_value_message} for required field \"{self.evidence_key.pretty_label}\"")
+        if messages:
+            # mandatory or not, if we've had conversion warnings, provide no value to be safe (even if there's potentially valid values)
             return ValidatedJson.make_void(messages)
-
-        elif len(self.valid_values) == 1:
-            return ValidatedJson(self.valid_values[0] if single else self.valid_values, messages)
-
-        else:  # multiple values
-            if single:
-                messages += JsonMessages.severity(
-                    severity="warning" if optional else "error",
-                    message=f"\"{self.evidence_key.pretty_label}\" within ClinVar only accepts a single value. There are {len(self.valid_values)} valid values against this field, so omitting."
-                )
-                # has multiple values but can only fit one value
-                return ValidatedJson.make_void(messages)
-            else:  # multiple values and accepts multiple values
-                return ValidatedJson(self.valid_values, messages)
-
-    def __bool__(self):
-        return len(self.valid_values) > 0 or self.has_conversion_issues
+        elif len(self) == 0:
+            # even when a key is optional, ClinVar sometimes doesn't like the value null being provided, and instead prefers the key to be omitted
+            return ValidatedJson.make_void()
+        else:
+            return ValidatedJson(self.valid_values[0] if single else self.valid_values)
 
     def __len__(self):
-        return len(self.valid_values)
+        return len(self.valid_values) + len(self.invalid_values)
 
 
 # Dictionary definitions, we don't have many since we deal more with ValidatedJSon where a typed dictionary doesn't fit
