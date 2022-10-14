@@ -14,13 +14,12 @@
 {% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
 {% block content %}
     <div class="container">
-        {% lab_picker dlab.lab_picker %}
-    </div>
-    <div class="container">
         {% page_help_embedded title="Outstanding Discordances" %}
             <p>Below is a list of all outstanding discordances where your lab is involved.</p>
              <p>If you have discordances you can filter based on which other labs are involved - which will also display any contact details that lab has provided for resolving discordances.</p>
         {% end_page_help_embedded %}
+
+        {% lab_picker dlab.lab_picker %}
 
         <div data-toggle="ajax" href="{% url 'discordance_reports_active_detail' dlab.lab_picker.selection %}" data-id="active-discordances">
             <div class="loading-message">Loading Discordances</div>
