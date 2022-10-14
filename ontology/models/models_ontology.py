@@ -271,6 +271,8 @@ class OntologyTerm(TimeStampedModel):
     status = models.CharField(max_length=1, default=OntologyTermStatus.CONDITION, choices=OntologyTermStatus.choices)
     from_import = models.ForeignKey(OntologyImport, on_delete=PROTECT)
 
+    move_to_re = re.compile(r"MOVED TO (\d+)")
+
     def __str__(self):
         return f"{self.id} {self.name}"
 
@@ -423,6 +425,13 @@ class OntologyTerm(TimeStampedModel):
     @property
     def url(self):
         return OntologyService.URLS[self.ontology_service].replace("${1}", self.padded_index)
+
+    @property
+    def moved_to(self) -> Optional[str]:
+        if self.name:
+            if match := OntologyTerm.move_to_re.match(self.name):
+                return match.group(1)
+        return None
 
     @staticmethod
     def split_hpo_omim_mondo(ontology_term_ids: Iterable[str]) -> Tuple[QuerySet, QuerySet, QuerySet]:

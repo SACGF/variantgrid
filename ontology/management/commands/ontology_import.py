@@ -446,7 +446,7 @@ def load_omim(filename: str, force: bool):
         filename=filename,
         context="omim_file",
         import_source=OntologyImportSource.OMIM,
-        processor_version=6,
+        processor_version=7,
         force_update=force)
 
     file_hash = file_md5sum(filename)
@@ -493,7 +493,7 @@ def load_omim(filename: str, force: bool):
             if match := MOVED_TO.match(preferred_title):
                 # This will only happen if you uncomment Caret
                 moved_to = match.group(1)
-                preferred_title = f"obsolete, see OMIM:{moved_to}"
+                # preferred_title = f"obsolete, see OMIM:{moved_to}"
             else:
                 # aliases.append(preferred_title)  # other tables don't have the name copied into aliases
                 # so don't do it here
