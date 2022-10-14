@@ -1,47 +1,24 @@
-import logging
 import operator
-from functools import reduce
-from typing import Optional, Iterable
+from typing import Optional
 
 from django.db.models import Q
 
 from analysis.models.nodes.analysis_node import AnalysisNode
-from snpdb.models import VariantCollectionRecord, lazy
+from snpdb.models import lazy
 
 
 class MergeNode(AnalysisNode):
     min_inputs = 1
     max_inputs = AnalysisNode.PARENT_CAP_NOT_SET
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.parents_should_cache = True
-
     def modifies_parents(self):
         return self._num_unique_parents_in_queryset > 1
-
-    def _queryset_requires_distinct(self):
-        # Need distinct when we have multiple Q's OR'd
-        # No need if there are multiple parents but all cached
-        return len(self._unique_parent_q_set) > 1
-
-    def get_cache_task_args_objs_set(self, force_cache=False):
-        cache_task_args_objs = set()
-        if self.is_valid():
-            for p in self.get_non_empty_parents(require_parents_ready=False):
-                # Ensure that parents all have cache. This is only true if the cache is READY - it may be being
-                # written in another task.
-                if p.node_cache is None:
-                    logging.warning("Parent %s didn't have cache!!!", p)
-                    cache_task_args_objs.update(p.get_cache_task_args_objs_set(force_cache=True))
-        return cache_task_args_objs
 
     @lazy
     def _num_unique_parents_in_queryset(self):
         parent_q_dicts = set()
         for p in self.get_non_empty_parents(require_parents_ready=False):
             key = tuple(p.get_arg_q_dict().items())
-            print(f"{key=}")
             parent_q_dicts.add(key)
         return len(parent_q_dicts)
 
@@ -57,38 +34,18 @@ class MergeNode(AnalysisNode):
                     return parent
         return super().get_single_parent()  # Will throw exception due to multiple samples
 
-    @lazy
-    def _unique_parent_q_set(self) -> Iterable[Q]:
-        """ Set to not duplicate Q's (eg from node that doesn't modify parents and that node's parent) """
-        parent_variant_collection_ids = set()
-        unique_parent_q_set = set()
-        for parent in self.get_non_empty_parents():
-            if parent.node_cache:
-                parent_variant_collection_ids.add(parent.node_cache.variant_collection_id)
-            else:
-                unique_parent_q_set.add(parent.get_q())
-
-        if parent_variant_collection_ids:
-            variants_from_cache_qs = VariantCollectionRecord.objects.filter(
-                variant_collection__in=sorted(parent_variant_collection_ids))  # Sort so Q object strings hash the same
-            unique_parent_q_set.add(Q(pk__in=variants_from_cache_qs.values_list("variant_id")))
-
-        # Q objects for the same ultimate query don't hash the same, so remove duplicates via string equality
-        # This can save a distinct
-        if len(unique_parent_q_set) > 1:
-            q_by_string = {str(q): q for q in unique_parent_q_set}
-            return q_by_string.values()
-        return unique_parent_q_set
-
     def _get_arg_q_dict_from_parents_and_node(self):
-        if self._unique_parent_q_set:
-            q = reduce(operator.or_, self._unique_parent_q_set)
-        else:
-            q = self.q_none()
-        return {None: q}
+        arg_q_dict = {}
+        for parent in self.get_non_empty_parents():
+            parent_arg_q_dict = parent.get_arg_q_dict(disable_cache=True)
+            self.merge_arg_q_dicts(arg_q_dict, parent_arg_q_dict, op=operator.or_)
+
+        if not arg_q_dict:
+            arg_q_dict = {None: self.q_none()}
+        return arg_q_dict
 
     def _get_node_q(self) -> Optional[Q]:
-        return None  # No extra filtering needed after get_parent_q()
+        raise NotImplementedError("This should never be called")
 
     def _get_method_summary(self):
         parent_names = ','.join([p.name for p in self.get_parent_subclasses()])
