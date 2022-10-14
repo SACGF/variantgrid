@@ -412,6 +412,7 @@ ANALYSIS_DUAL_SCREEN_MODE_FEATURE_ENABLED = False  # Currently broken
 ANALYSIS_TEMPLATES_AUTO_SAMPLE = "Sample tab auto analysis"
 ANALYSIS_WARN_IF_NO_QC_GENE_LIST_MESSAGE = None  # disabled by default
 ANALYSIS_NODE_CACHE_Q = True
+ANALYSIS_NODE_CACHE_DB = False  # Use NodeCache models
 
 VARIANT_ALLELE_FREQUENCY_CLIENT_SIDE_PERCENT = True  # For analysis Grid/CSV export. VCF export is always unit
 VARIANT_STANDARD_BASES_ONLY = True  # True to reject anything other than A, C, G, T

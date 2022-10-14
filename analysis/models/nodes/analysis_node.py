@@ -437,7 +437,8 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
     @property
     def use_cache(self):
         """ At the moment we only cache when a child requests it """
-        return AnalysisEdge.objects.filter(parent=self, child__parents_should_cache=True).exists()
+        return settings.ANALYSIS_NODE_CACHE_DB and \
+               AnalysisEdge.objects.filter(parent=self, child__parents_should_cache=True).exists()
 
     def write_cache(self, variant_collection: VariantCollection):
         qs = self.get_queryset(disable_cache=True)
@@ -1058,7 +1059,7 @@ class NodeVersion(models.Model):
         return f"{self.node.pk} (v{self.version})"
 
 
-class NodeCache(models.Model):
+class NodeCache(models.Model):#
     node_version = models.OneToOneField(NodeVersion, on_delete=CASCADE)
     variant_collection = models.OneToOneField(VariantCollection, on_delete=CASCADE)
 
