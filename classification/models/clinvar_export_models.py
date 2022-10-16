@@ -197,12 +197,6 @@ class ClinVarExport(TimeStampedModel):
         self.save()
 
 
-@receiver(post_save, sender=ClinVarKey)
-def updated_clinvar_key(sender, instance: ClinVarKey, **kwargs):
-    for export in ClinVarExport.objects.filter(clinvar_allele__clinvar_key=instance):
-        export.update()
-
-
 class ClinVarExportBatchStatus(models.TextChoices):
     """
     Overall status of a submission batch, talking to ClinVar takes a few steps

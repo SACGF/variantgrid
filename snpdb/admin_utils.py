@@ -226,7 +226,6 @@ class ModelAdminBasics(admin.ModelAdmin):
         # provides data to the template so that actions can be added to the top
         extra_context = extra_context or dict()
         all_actions = self.get_actions(request)
-        print(all_actions)
         extra_context["actions"] = [{
             "id": a[1],
             "label": a[2]
