@@ -73,10 +73,10 @@ class ClinVarEvidenceKey:
         if not optional:
             if messages:
                 # if mandatory, then any warnings about conversion have to be upgraded to errors
-                messages += JsonMessages.error("\"{self.evidence_key.pretty_label}\" is mandatory and has conversion issues.")
+                messages += JsonMessages.error(f"\"{self.evidence_key.pretty_label}\" is mandatory but has conversion issues.")
             elif not self.valid_values:
                 # if mandatory, we obviously need a value
-                messages += JsonMessages.error("\"{self.evidence_key.pretty_label}\" is mandatory but has no value.")
+                messages += JsonMessages.error(f"\"{self.evidence_key.pretty_label}\" is mandatory but has no value.")
 
         if messages:
             # mandatory or not, if we've had conversion warnings, provide no value to be safe (even if there's potentially valid values)
