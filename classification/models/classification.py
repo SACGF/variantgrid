@@ -326,7 +326,7 @@ class ConditionResolved:
 
             def format_term(term: OntologyTerm) -> str:
                 if name := term.name:
-                    return f"{term.id} {term.name}"
+                    return f"{term.id} {name}"
                 return term.id
 
             terms = self.terms
@@ -1479,6 +1479,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             :param remove_api_immutable: If True, immutability level (under variantgrid) is removed from all fields. Requires source: SubissionSource.VariantGrid
             :param initial_data: if True, divides c.hgvs to
             :param revalidate_all: if True, runs validation over all fields we have, otherwise only the values being patched
+            :param ignore_if_only_patching: if provided, if only these fields are different in the patch, don't both to patch anything
             :returns: A dict with "messages" (validation errors, warnings etc) and "modified" (fields that actually changed value)
         """
         source = source or SubmissionSource.API

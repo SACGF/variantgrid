@@ -69,14 +69,16 @@ class UsedKey:
 @dataclass
 class KeyProperty:
     key: str
+    # warning, naming this variable "property" causes confusion for the compiler below with @property
+    # doesn't seem to cause any issues during runtime though
     property: str
 
     @property
-    def field(self):
+    def field(self) -> str:
         return f"published_evidence__{self.key}__{self.property}"
 
     @property
-    def count_key(self):
+    def count_key(self) -> str:
         return f"{self.field}__count"
 
     def count_aggregate(self) -> Count:

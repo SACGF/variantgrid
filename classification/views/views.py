@@ -11,6 +11,7 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
+from django.db.models import QuerySet
 from django.http import StreamingHttpResponse
 from django.http.request import HttpRequest
 from django.http.response import HttpResponse
@@ -67,8 +68,8 @@ def activity(request, user_id: Optional[int] = None, lab_id: Optional[int] = Non
 
     user: Optional[User] = None
     lab: Optional[Lab] = None
-    classifications: Optional[Classification] = None
-    base_url: str = None
+    classifications: Optional[List[Classification]] = None
+    base_url: Optional[str] = None
     page_title = 'Classification Activity'
     if user_id:
         if request.user.is_superuser or request.user.pk == user_id:
@@ -440,7 +441,7 @@ def classification_import_tool(request: HttpRequest) -> Response:
     return render(request, 'classification/classification_import_tool.html', context)
 
 
-def classification_qs(request):
+def classification_qs(request) -> QuerySet[ClassificationModification]:
     config = ClassificationColumns(request)
     qs = ClassificationModification.latest_for_user(user=request.user, published=True)
     qs = config.filter_queryset(qs)

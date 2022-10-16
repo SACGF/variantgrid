@@ -249,7 +249,7 @@ class NotificationBuilder:
         self.blocks.append(NotificationBuilder.HeaderBlock(text))
         return self
 
-    def add_field(self, label: str, value: str) -> 'NotificationBuilder':
+    def add_field(self, label: str, value: Union[str, int]) -> 'NotificationBuilder':
         fields_block: Optional[NotificationBuilder.FieldsBlock] = None
         if last_block := self._last_block():
             if isinstance(last_block, NotificationBuilder.FieldsBlock):

@@ -1,6 +1,6 @@
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import List, Optional, Dict, Set, Tuple
+from typing import List, Optional, Dict, Set
 
 from django.db.models import Count, QuerySet, Subquery
 from lazy import lazy
@@ -9,7 +9,7 @@ from classification.enums import SpecialEKeys
 from classification.models import ClassificationModification, ClinicalContext, ClassificationLabSummaryEntry, \
     ClassificationLabSummary, classification_flag_types, ClassificationFlagTypes, DiscordanceReport
 from classification.models.clinical_context_models import DiscordanceStatus, DiscordanceLevel
-from flags.models import Flag, FlagResolution, FlagStatus
+from flags.models import Flag, FlagStatus
 from genes.hgvs import CHGVS
 from library.utils import group_by_key, segment
 from snpdb.lab_picker import LabPickerData
@@ -67,7 +67,7 @@ class ClinicalGroupingOverlap:
 
     @lazy
     def status(self) -> 'DiscordanceStatus':
-        dr: DiscordanceReport = None
+        dr: Optional[DiscordanceReport] = None
         if cc := self.clinical_context:
             dr = DiscordanceReport.latest_report(cc)
         return DiscordanceStatus.calculate(self.cms, dr)
@@ -187,7 +187,7 @@ class OverlapsCalculator:
 
     def __init__(self, perspective: LabPickerData):
         """
-        Calculates classification overlaps (when more than 1 classification is provided from the same allele.
+        Calculates classification overlaps (when more than 1 classification is provided from the same allele.)
         Is the generally split up between
         :param perspective: User must be present in this perspective
         """
@@ -226,7 +226,7 @@ class OverlapsCalculator:
         self.overlaps = all_overlaps
 
     @property
-    def overlap_sets(self) -> List[AlleleOverlap]:
+    def overlap_sets(self) -> List[OverlapSet]:
         segmented = segment(self.overlaps, filter=lambda overlap: overlap.is_multi_lab)
         return [
             OverlapSet(segmented[0], label="Multi-Lab"),

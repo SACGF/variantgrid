@@ -53,7 +53,7 @@ class ClassificationImportRun(TimeStampedModel):
         parts.append(f"(rows:{self.row_count})")
         return "".join(parts)
 
-    def apply_missing_row_count(self) -> int:
+    def apply_missing_row_count(self):
         if from_file := self.from_file:
             from classification.models import Classification
             self.missing_row_count = Classification.objects.filter(lab=from_file.lab, withdrawn=False).exclude(last_import_run__from_file=from_file).count()

@@ -143,12 +143,12 @@ class Struct:
         self.__dict__.update(entries)
 
 
-def time_since(start):
+def time_since(start: datetime) -> timedelta:
     end = time.time()
     return end - start
 
 
-def get_and_log_time_since(start, name=''):
+def get_and_log_time_since(start: datetime, name='') -> timedelta:
     ts = time_since(start)
     if name:
         name += ': '
@@ -156,18 +156,18 @@ def get_and_log_time_since(start, name=''):
     return ts
 
 
-def upper(string):
+def upper(string: str) -> str:
     if string:
         string = str(string).upper()
     return string
 
 
-def is_url(url):
+def is_url(url: str) -> bool:
     parse_result = urlparse(url)
     return bool(parse_result.scheme in ('http', 'https') and parse_result.netloc)
 
 
-def rgb_hex_to_tuples(rgb):
+def rgb_hex_to_tuples(rgb: str):
     rgb = rgb.replace('#', '')
     return bytes.fromhex(rgb)
 
@@ -193,15 +193,15 @@ def get_all_subclasses(cls):
     return all_subclasses
 
 
-def datetime_string_to_date(s):
+def datetime_string_to_date(s: str) -> datetime:
     return parser.parse(s).date()
 
 
-def none_to_blank_string(s):
+def none_to_blank_string(s: Optional[str]) -> str:
     return s or ''
 
 
-def calculate_age(born, died=None):
+def calculate_age(born: datetime, died: Optional[datetime] = None) -> int:
     """ https://stackoverflow.com/a/9754466/295724 """
     age = None
     if born:
@@ -220,6 +220,7 @@ def all_equal(iterable):
 
 
 def empty_dict():
+    # If you want an empty_dict as a default function parameter
     return dict()
 
 
@@ -245,7 +246,7 @@ def empty_to_none(value: T) -> Optional[T]:
     return value
 
 
-def pretty_label(label: str):
+def pretty_label(label: str) -> str:
     label = label.replace('_', ' ')
     tidied = ''
     last_space = True
@@ -283,6 +284,7 @@ def is_not_none(obj):
 
 
 def first(obj):
+    # FIXME, really should check if iterable and return first result of next
     if isinstance(obj, list):
         if len(obj) >= 1:
             return obj[0]
@@ -300,6 +302,10 @@ def get_single_element(sequence):
 
 
 def nest_dict(flat_dict: dict) -> dict:
+    """
+    :param flat_dict: A dictionary where all the keys are in the format of "a.b": x, "a.c": y
+    :return: A nested dictionary e.g. {"a": {"b": x}, {"c": y}}
+    """
     nested = {}
     for full_path, value in flat_dict.items():
         path = full_path.split('.')
@@ -315,13 +321,13 @@ def nest_dict(flat_dict: dict) -> dict:
     return nested
 
 
-def iter_fixed_chunks(iterable, chunk_size):
+def iter_fixed_chunks(iterable: Iterable[Any], chunk_size: int) -> Iterator[List[Any]]:
     """ https://stackoverflow.com/a/22045226 """
     it = iter(iterable)
     return iter(lambda: tuple(islice(it, chunk_size)), ())
 
 
-def nice_class_name(obj_or_klass):
+def nice_class_name(obj_or_klass) -> str:
     if isinstance(obj_or_klass, type):
         klass = obj_or_klass
     else:
@@ -329,15 +335,15 @@ def nice_class_name(obj_or_klass):
     return klass.__name__
 
 
-def single_quote(s):
+def single_quote(s: Any) -> str:
     return f"'{s}'"
 
 
-def double_quote(s):
+def double_quote(s: Any) -> str:
     return f'"{s}"'
 
 
-def filename_safe(filename) -> str:
+def filename_safe(filename: str) -> str:
     keepcharacters = {'.', '_'}
     filename = filename.replace(' ', '_')  # you can never trust spaces
     # leave room for an extension so make sure the filename is 250 characters

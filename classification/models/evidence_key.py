@@ -24,11 +24,13 @@ class EvidenceKeyOption(TypedDict):
     label: Optional[str]
     default: Optional[bool]
     override: Optional[bool]
+    bucket: Optional[int]
     """
     :cvar key: The key for the option (as what will be sorted in the DB)
     :cvar label: The label to display for the option
     :cvar default: Is this the default option - only applies to (ACMG) criteria (e.g. BA1's default is BA, PM2 is PM)
     :cavr override: Is this considered an override strength - only applies to criteria (ACMG) criteria - not default and not "not met"
+    :cvar bucket: Only used for clinical_significance, what discordant bucket does each value fall into
     """
 
 

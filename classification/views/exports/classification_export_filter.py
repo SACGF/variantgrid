@@ -203,7 +203,7 @@ class ClassificationFilter:
     allele: Optional[int] = None
     file_prefix: str = "classifications"
     file_include_date: bool = True
-    starting_query: Optional[QuerySet[Classification]] = None
+    starting_query: Optional[QuerySet[ClassificationModification]] = None
     benchmarking: bool = False
 
     @lazy

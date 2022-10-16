@@ -25,6 +25,9 @@ class CitationStub:
             prefix = CitationSource.PUBMED_CENTRAL.label
         elif self.source == CitationSource.NCBI_BOOKSHELF.value:
             prefix = CitationSource.NCBI_BOOKSHELF.label
+        else:
+            # shouldn't happen, but just in case
+            prefix = self.source
         return f"{prefix}:{self.idx}"
 
     def __lt__(self, other):

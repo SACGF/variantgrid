@@ -259,7 +259,7 @@ class ClinVarExportSync:
                     report_message("ClinVarExportRequest - could not find localKey",
                                    level='error', extra_data={"target": clinvar_request.pk, "localKey": local_key})
 
-            if not submission_json:
+            if not submissions_json:
                 report_message("Expected submissions in ClinVarRequest",
                                level='error', extra_data={"target": clinvar_request.pk})
 

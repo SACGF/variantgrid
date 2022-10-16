@@ -1,5 +1,5 @@
 import json
-from typing import Set
+from typing import Set, Union
 
 from django.contrib import admin, messages
 from django.contrib.admin import RelatedFieldListFilter, BooleanFieldListFilter
@@ -515,11 +515,11 @@ class DiscordanceReportAdmin(ModelAdminBasics):
         e_key_cs = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE)
         sorter = e_key_cs.classification_sorter_value
         sorted_list = sorted(clinical_sigs, key=lambda x: (sorter(x), x))
-        pretty = [e_key_cs.pretty_value(cs) for cs in sorted_list]
+        pretty = ", ".join([e_key_cs.pretty_value(cs) for cs in sorted_list])
         return pretty
 
     @admin_list_column()
-    def days_open(self, obj: DiscordanceReport) -> int:
+    def days_open(self, obj: DiscordanceReport) -> Union[int, str]:
         closed = obj.report_completed_date
         if not closed:
             delta = timezone.now() - obj.report_started_date
@@ -538,8 +538,8 @@ class DiscordanceReportAdmin(ModelAdminBasics):
         for drc in obj.discordancereportclassification_set.all():
             if c := drc.classification_original.classification:
                 labs.add(c.lab)
-        labs = sorted(labs, key=lambda x: x.name)
-        return ", ".join([lab.name for lab in labs])
+        labs_sorted = sorted(labs, key=lambda x: x.name)
+        return ", ".join([lab.name for lab in labs_sorted])
 
     def has_add_permission(self, request):
         return False

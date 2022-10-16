@@ -80,6 +80,8 @@ class _DiscordanceCalculationRow:
 @dataclass
 class DiscordanceStatus:
     """
+    TODO rename DiscordanceStatus to OverlapSummary
+
     There's a bit of confusion due to evolution of discordance status
     DiscordanceStatus: gives absolute full context about a clinical grouping
     DiscordanceLevel: an enum that covers all states, e.g. no submissions, single submission, overlap confidence
