@@ -144,7 +144,10 @@ class ClinVarExportConverter:
     def citation_refs(self) -> List[VCDbRefDict]:
         xrefs: List
         if self.clinvar_key.citations_mode == ClinVarCitationsModes.interpretation_summary_only:
-            xrefs = [ref.to_json() for ref in db_ref_regexes.search(self.classification_based_on.get(SpecialEKeys.INTERPRETATION_SUMMARY))]
+            if text := self.classification_based_on.get(SpecialEKeys.INTERPRETATION_SUMMARY):
+                xrefs = [ref.to_json() for ref in db_ref_regexes.search(self.classification_based_on.get(SpecialEKeys.INTERPRETATION_SUMMARY))]
+            else:
+                xrefs = list()
         else:
             xrefs = self.classification_based_on.db_refs
 
