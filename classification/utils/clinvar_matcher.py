@@ -197,6 +197,8 @@ class ClinVarLegacyRow:
 
     @property
     def c_hgvs_preferred_str(self) -> str:
+        if not self.variant_preferred:
+            return self.variant_preferred
         if match := C_HGVS_AND_P_DOT.match(self.variant_preferred):
             return match.group('c_hgvs')
         else:
@@ -246,18 +248,19 @@ class ClinVarLegacyRow:
                 allele_to_match_types[allele].add(ClinVarLegacyAlleleMatchType.CLINVAR_VARIANT_ID)
 
         try:
-            if results := search_hgvs(self.c_hgvs_preferred_str, user=admin_bot(), genome_build=GenomeBuild.grch38(), variant_qs=Variant.objects.all()):
-                for result in results:
-                    variant: Optional[Variant] = None
-                    if isinstance(result, SearchResult):
-                        result = result.record
-                    if isinstance(result, Variant):
-                        variant = result
-                    elif isinstance(result, ClassifyVariant):
-                        variant = result.variant
-                    if variant:
-                        if allele := variant.allele:
-                            allele_to_match_types[allele].add(ClinVarLegacyAlleleMatchType.VARIANT_PREFERRED_VARIANT)
+            if c_hgvs_preferred_str := self.c_hgvs_preferred_str:
+                if results := search_hgvs(c_hgvs_preferred_str, user=admin_bot(), genome_build=GenomeBuild.grch38(), variant_qs=Variant.objects.all()):
+                    for result in results:
+                        variant: Optional[Variant] = None
+                        if isinstance(result, SearchResult):
+                            result = result.record
+                        if isinstance(result, Variant):
+                            variant = result
+                        elif isinstance(result, ClassifyVariant):
+                            variant = result.variant
+                        if variant:
+                            if allele := variant.allele:
+                                allele_to_match_types[allele].add(ClinVarLegacyAlleleMatchType.VARIANT_PREFERRED_VARIANT)
         except InvalidHGVSName:
             pass
         except NotImplementedError:
