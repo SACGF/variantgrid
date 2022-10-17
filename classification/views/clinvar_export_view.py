@@ -5,7 +5,8 @@ from dataclasses import dataclass
 from typing import Dict, Any, Optional, Iterable, List
 
 from django.contrib import messages
-from django.db.models import QuerySet, When, Value, Case, IntegerField, Count, Q
+from django.db.models import QuerySet, When, Value, Case, IntegerField, Count, Q, TextField
+from django.db.models.functions import Cast
 from django.http import HttpResponse, StreamingHttpResponse, HttpRequest
 from django.http.response import HttpResponseBase
 from django.shortcuts import render, redirect, get_object_or_404
@@ -13,7 +14,6 @@ from django.urls import reverse
 from django.views import View
 from django.views.decorators.http import require_POST
 from lazy import lazy
-
 from classification.enums import SpecialEKeys
 from classification.models import ClinVarExport, ClinVarExportBatch, ClinVarExportBatchStatus, \
     EvidenceKeyMap, ClinVarExportStatus, ClinVarExportSubmission
@@ -102,13 +102,27 @@ class ClinVarExportColumns(DatatableConfig[ClinVarExport]):
 
     def power_search(self, qs: QuerySet[ClinVarExport], search_string: str) -> QuerySet[ClinVarExport]:
         try:
-            batch_id = int(search_string)
-            submissions = ClinVarExportSubmission.objects.filter(submission_batch_id=batch_id).values_list("clinvar_export_id", flat=True)
-            # filter rather than just return submissions to make sure user has permission to see items that belong to the batch
-            # also make sure an individual export doesn't have the batch ID
-            return qs.filter(Q(pk__in=submissions) | Q(pk=batch_id))
+            # if searching on a number could be batch ID or submission ID
+            if search_string.isnumeric():
+                batch_id = int(search_string)
+                submissions = ClinVarExportSubmission.objects.filter(submission_batch_id=batch_id).values_list("clinvar_export_id", flat=True)
+                # filter rather than just return submissions to make sure user has permission to see items that belong to the batch
+                # also make sure an individual export doesn't have the batch ID
+                return qs.filter(Q(pk__in=submissions) | Q(pk=batch_id))
+
+            # if searcing a ClinGenAlleleID
+            elif search_string.startswith("CA"):
+                clingen_number_str = search_string[2:]
+                if clingen_number := int(clingen_number_str): # if user is just typing 0s, don't filter anything yet
+                    return qs.annotate(
+                        clingen_allele_id_str=(Cast('clinvar_allele__allele__clingen_allele_id', output_field=TextField()))
+                    ).filter(clingen_allele_id_str__startswith=str(clingen_number))
+                else:
+                    return qs
         except ValueError:
             pass
+
+        # if searching on a c.hgvs, MONDO ID
         return super().power_search(qs, search_string)
 
     def batches(self, row: CellData) -> JsonDataType:
