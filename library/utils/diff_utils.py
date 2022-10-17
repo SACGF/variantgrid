@@ -51,7 +51,7 @@ class DiffBuilder:
         self.add_text = ''
         self.same_text = ''
 
-    def optimize_add(self, subtract: str, add: str):
+    def optimize_add(self, subtract: str, add: str) -> List[DiffTextSegment]:
         prefix_same: str = ''
         suffix_same: str = ''
         while subtract and add and subtract[0] == add[0]:
@@ -62,7 +62,7 @@ class DiffBuilder:
         #     suffix_same += subtract[-1]
         #     subtract = subtract[:-1]
         #     add = add[:-1]
-        items = list()
+        items: List[DiffTextSegment] = list()
         if prefix_same:
             items.append(DiffTextSegment(operation=' ', text=prefix_same))
         if subtract:

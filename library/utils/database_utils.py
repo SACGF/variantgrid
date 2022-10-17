@@ -1,17 +1,22 @@
+from typing import Iterable, Optional, Tuple, List, Any, Dict
+
 import sqlparse
 from django.db import connection, transaction
 
 
 #970: Added transaction wrapper due to Postgres hanging query
+from django.db.models import QuerySet
+
+
 @transaction.atomic
-def run_sql(sql, params=None):
+def run_sql(sql, params=None) -> Tuple[Any, int]:
     with connection.cursor() as cursor:
         value = cursor.execute(sql, params)  # Remember it only accepts '%s' not %d etc.
         rowcount = cursor.rowcount
         return value, rowcount
 
 
-def queryset_to_sql(queryset, pretty=False):
+def queryset_to_sql(queryset: QuerySet, pretty=False) -> str:
     """ str(queryset.query) doesn't quote variables properly....
 
         From: https://stackoverflow.com/a/47542953
@@ -35,7 +40,7 @@ def queryset_to_sql(queryset, pretty=False):
     return query_sql
 
 
-def get_select_from_where_parts_str(sql_str):
+def get_select_from_where_parts_str(sql_str: str) -> Tuple[str, str, str]:
     from_pos = sql_str.find("FROM")
     where_pos = sql_str.find("WHERE", from_pos)
     if where_pos < 0:
@@ -47,13 +52,13 @@ def get_select_from_where_parts_str(sql_str):
     return select_part, from_part, where_part
 
 
-def get_queryset_select_from_where_parts(qs):
+def get_queryset_select_from_where_parts(qs: QuerySet) -> Tuple[str, str, str]:
     """ Returns (select, from, where) """
     sql_str = queryset_to_sql(qs)
     return get_select_from_where_parts_str(sql_str)
 
 
-def get_queryset_column_names(queryset, extra_columns):
+def get_queryset_column_names(queryset: QuerySet, extra_columns: Iterable[str]) -> List[str]:
     extra_names = list(queryset.query.extra_select)
     field_names = list(queryset.query.values_select)
     annotation_names = list(queryset.query.annotation_select)  # aggregate_select => annotation_select in Django 1.8
@@ -66,7 +71,7 @@ def get_cursor_column_names(cursor):
     return [col[0] for col in cursor.description]
 
 
-def dictfetchall(cursor, column_names=None):
+def dictfetchall(cursor, column_names: Optional[Iterable[str]] = None) -> List[Dict]:
     if column_names is None:
         column_names = get_cursor_column_names(cursor)
 
@@ -84,7 +89,7 @@ def iter_db_results(cursor, array_size=1000):
             yield tup
 
 
-def iter_dictfetchall(cursor, column_names=None):
+def iter_dictfetchall(cursor, column_names: Optional[Iterable[str]] = None) -> Dict:
     if column_names is None:
         column_names = get_cursor_column_names(cursor)
 
@@ -92,7 +97,7 @@ def iter_dictfetchall(cursor, column_names=None):
         yield dict(zip(column_names, row))
 
 
-def sql_delete_qs(qs, batch_size=None):
+def sql_delete_qs(qs, batch_size: Optional[int] = None) -> int:
     """ ** WARNING DANGEROUS ***
         A way to perform deletes in batches, in the DB
         returns rows deleted """

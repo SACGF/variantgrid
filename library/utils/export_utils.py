@@ -122,7 +122,7 @@ class ExportRow:
         :param data: Iterable data of either cls or that can be passed to cls's constructor
         :param records_key:
         :param categories:
-        :return:
+        :return: A generator that will produce several strings, that when concat makes valid Json
         """
         first_row = True
         try:

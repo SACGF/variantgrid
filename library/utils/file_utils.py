@@ -4,6 +4,7 @@ import os
 import subprocess
 from hashlib import md5
 from pathlib import Path
+from typing import Optional
 
 
 def file_or_filename(f, mode='r'):
@@ -32,7 +33,7 @@ def rm_if_exists(path):
         os.unlink(path)
 
 
-def name_from_filename(filename, remove_gz=False):
+def name_from_filename(filename: str, remove_gz=False) -> str:
     """Gets file name without extension or directory"""
     if remove_gz:
         filename = remove_gz_if_exists(filename)
@@ -40,7 +41,7 @@ def name_from_filename(filename, remove_gz=False):
     return name
 
 
-def file_to_array(filename, comment=None, max_lines=None):
+def file_to_array(filename, comment: Optional[str]=None, max_lines: Optional[int]=None):
     array = []
     f_or_f = file_or_filename(filename)
     for i, line in enumerate(f_or_f):
@@ -53,14 +54,14 @@ def file_to_array(filename, comment=None, max_lines=None):
     return array
 
 
-def file_md5sum(filename):
+def file_md5sum(filename: str):
     m = md5()
     with open(filename, "rb") as f:
         m.update(f.read())
     return m.hexdigest()
 
 
-def remove_gz_if_exists(filename):
+def remove_gz_if_exists(filename: str) -> str:
     GZIP_EXTENSIONS = [".gz", ".bgz"]
     for ext in GZIP_EXTENSIONS:
         if filename.endswith(ext):
@@ -69,7 +70,7 @@ def remove_gz_if_exists(filename):
     return filename
 
 
-def get_extension_without_gzip(filename):
+def get_extension_without_gzip(filename: str) -> str:
     filename = remove_gz_if_exists(filename)
     (_, ext) = os.path.splitext(filename)
     return ext[1:]
@@ -85,7 +86,7 @@ class IteratorFile:
     def _grow_chunk(self):
         self.next_chunk = self.next_chunk + next(self.it)
 
-    def read(self, n):
+    def read(self, n: int) -> str:
         if self.next_chunk is None:
             return ''
         try:
@@ -99,7 +100,7 @@ class IteratorFile:
             self.next_chunk = None
             return rv
 
-    def readline(self):
+    def readline(self) -> str:
         if self.next_chunk is None:
             return None
         try:
@@ -115,7 +116,7 @@ class IteratorFile:
             return rv
 
 
-def add_permissions_to_file(filename, add_stat):
+def add_permissions_to_file(filename: str, add_stat: int):
     """ Adds file permission on a existing file path """
     st = os.stat(filename)
     try:
@@ -125,7 +126,7 @@ def add_permissions_to_file(filename, add_stat):
         raise e
 
 
-def open_handle_gzip(filename, mode=None):
+def open_handle_gzip(filename: str, mode=None):
     if filename.endswith(".gz"):
         open_func = gzip.open
     else:

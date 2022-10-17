@@ -1,14 +1,19 @@
 from collections import defaultdict
 from dataclasses import dataclass
 from itertools import islice
-from typing import Iterable, Iterator, List, TypeVar, Any, Generic, Set, Callable, Tuple, Optional, Dict
+from typing import Iterable, Iterator, List, TypeVar, Any, Generic, Set, Callable, Tuple, Optional, Dict, Sequence, \
+    Union
 import operator
 import re
 
 from django.utils.functional import SimpleLazyObject
 
 
-def invert_dict(source_dict):
+DictKey = TypeVar("DictKey")
+DictVal = TypeVar("DictVal")
+
+
+def invert_dict(source_dict: Dict[DictKey, DictVal]) -> Dict[DictVal, DictKey]:
     return {v: k for k, v in source_dict.items()}
 
 
@@ -21,22 +26,27 @@ def invert_dict_of_lists(source_dict):
 
 
 # From https://stackoverflow.com/a/26496899
-def defaultdict_to_dict(d):
+def defaultdict_to_dict(d: defaultdict) -> Dict:
     if isinstance(d, defaultdict):
         d = {k: defaultdict_to_dict(v) for k, v in d.items()}
     return d
 
 
-def sorted_nicely(l):
+def sorted_nicely(l: Iterable) -> Sequence:
     """ Sort the given iterable in the way that humans expect.
         From http://www.codinghorror.com/blog/2007/12/sorting-for-humans-natural-sort-order.html """
-    convert = lambda text: int(text) if text.isdigit() else text
-    alphanum_key = lambda key: [convert(c) for c in re.split('([0-9]+)', key)]
+    def convert(text: str) -> Union[int, str]:
+        return int(text) if text.isdigit() else text
+
+    def alphanum_key(key: str) -> List[str]:
+        return [convert(c) for c in re.split('([0-9]+)', key)]
+
     return sorted(l, key=alphanum_key)
 
 
 def first(obj):
-    # FIXME, really should check if iterable and return first result of next
+    # FIXME, seems inferior to get_single_element in every way
+    # (note this will return None instead of ValueError)
     if isinstance(obj, list):
         if len(obj) >= 1:
             return obj[0]
@@ -44,8 +54,12 @@ def first(obj):
     return obj
 
 
-def get_single_element(sequence):
+T = TypeVar("T")
+
+
+def get_single_element(sequence: Sequence[T]) -> T:
     """ single element from set or list """
+    # FIXME this is probably better done by just trying next( ) and catching and re-throwing the exception if sie is 0
     size = len(sequence)
     if size != 1:
         msg = f"Expected single element sequence, but had {size} entries ({sequence})"
@@ -53,7 +67,7 @@ def get_single_element(sequence):
     return next(iter(sequence))
 
 
-def nest_dict(flat_dict: dict) -> dict:
+def nest_dict(flat_dict: Dict[DictKey, DictVal]) -> Dict[DictKey, DictVal]:
     """
     :param flat_dict: A dictionary where all the keys are in the format of "a.b": x, "a.c": y
     :return: A nested dictionary e.g. {"a": {"b": x}, {"c": y}}
@@ -71,9 +85,6 @@ def nest_dict(flat_dict: dict) -> dict:
                 nest_me[part] = sub_dict
                 nest_me = sub_dict
     return nested
-
-
-T = TypeVar("T")
 
 
 def iter_fixed_chunks(iterable: Iterable[T], chunk_size: int) -> Iterator[List[T]]:
@@ -155,9 +166,12 @@ def all_equal(iterable):
     return all(start == x for x in it)
 
 
-def empty_dict():
+def empty_dict() -> Dict:
     # If you want an empty_dict as a default function parameter
     return dict()
+
+
+TransformInput = TypeVar("TransformInput")
 
 
 class IterableTransformer(Generic[T], Iterable[T]):
@@ -173,7 +187,7 @@ class IterableTransformer(Generic[T], Iterable[T]):
         def __next__(self):
             return self.transform(next(self.iterator))
 
-    def __init__(self, iterable: Iterable, transform):
+    def __init__(self, iterable: Iterable[TransformInput], transform: Callable[[TransformInput], T]):
         self.iterable = iterable
         self.transform = transform
 
@@ -208,7 +222,7 @@ class IterableStitcher(Generic[T], Iterable[T]):
             def preview(self):
                 return self.cache
 
-        def __init__(self, iterables: List[Iterable[T]], comparison):
+        def __init__(self, iterables: List[Iterable[T]], comparison: Callable[[T, T], bool]):
             self.iterators = [self._CachedIterator(iterable) for iterable in iterables]
             self.comparison = comparison
 
@@ -236,9 +250,9 @@ class IterableStitcher(Generic[T], Iterable[T]):
         return self._IteratorStitcher(iterables=self.iterables, comparison=self.comparison)
 
 
-class LimitedCollection:
+class LimitedCollection(Generic[T]):
 
-    def __init__(self, data: List[Any], limit: int):
+    def __init__(self, data: List[T], limit: int):
         if data is None:
             data = []
         self.true_count = len(data)
@@ -258,27 +272,24 @@ class LimitedCollection:
     def __len__(self):
         return self.true_count
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[T]:
         return iter(self.data)
 
-    def __getitem__(self, item):
+    def __getitem__(self, item) -> T:
         return self.data[item]
 
     def __bool__(self):
         return self.true_count > 0
 
 
-P = TypeVar('P')
-
-
-def segment(iterable: Iterable[P], filter: Callable[[P], bool]) -> Tuple[List[P], List[P]]:
+def segment(iterable: Iterable[T], filter: Callable[[T], bool]) -> Tuple[List[T], List[T]]:
     """
     :param iterable An iterable bunch of data to be split into two
     :param filter A filter to run over each element of iterable, to put it into a pass or fail list
     :returns two lists, the first being elements that passed the filter, the second being ones that failed
     """
-    passes: List[P] = list()
-    fails: List[P] = list()
+    passes: List[T] = list()
+    fails: List[T] = list()
     for element in iterable:
         if filter(element):
             passes.append(element)

@@ -58,7 +58,7 @@ def force_json(obj: Any) -> JsonDataType:
 def strip_json(json_values: JsonDataType) -> JsonDataType:
     """
     Remove null, empty strings and false and empty lists from JSON values
-    (contents of arrays wont be affected).
+    (contents of arrays won't be affected).
     Can optimise exports of json data when fields are often blank
     """
     if isinstance(json_values, Mapping):

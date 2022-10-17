@@ -57,14 +57,6 @@ def empty_to_none(value: T) -> Optional[T]:
     return value
 
 
-# def query_to_array(value):
-#     try:
-#         return json.loads(value)
-#     except:
-#         pass
-#     return [p.strip() for p in value.split(',')]
-
-
 def is_not_none(obj):
     return obj is not None
 

@@ -12,12 +12,12 @@ def string_deterministic_hash(s: str) -> int:
     return val
 
 
-def md5sum_str(s):
+def md5sum_str(s: str) -> str:
     s_bytes = s.encode()
     return hashlib.md5(s_bytes).hexdigest()
 
 
-def sha1_str(s):
+def sha1_str(s: str) -> str:
     s_bytes = s.encode()
     return hashlib.sha1(s_bytes).hexdigest()
 

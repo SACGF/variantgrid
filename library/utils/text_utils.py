@@ -49,14 +49,13 @@ def single_quote(s: Any) -> str:
 def double_quote(s: Any) -> str:
     return f'"{s}"'
 
-
-trailing_zeros_strip = re.compile("(.*?[.][0-9]*?)(0+)$")
-
-
 def format_percent(number, is_unit=False) -> str:
     if is_unit:
         number *= 100
     return f"{format_significant_digits(number)}%"
+
+
+trailing_zeros_strip = re.compile("(.*?[.][0-9]*?)(0+)$")
 
 
 def format_significant_digits(a_number, sig_digits=3) -> str:
@@ -82,4 +81,3 @@ def delimited_row(data: list, delimiter: str = ',') -> str:
 def clean_string(input_string: str) -> str:
     """ Removes non-printable characters, strips whitespace """
     return re.sub(f'[^{re.escape(string.printable)}]', '', input_string.strip())
-
