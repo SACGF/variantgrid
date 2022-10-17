@@ -23,7 +23,7 @@ class MergeNode(AnalysisNode):
     def _num_unique_parents_in_queryset(self):
         parent_q_dicts = set()
         for p in self.get_non_empty_parents(require_parents_ready=False):
-            key = tuple(p.get_arg_q_dict().items())
+            key = tuple(((k, tuple(v)) for k, v in p.get_arg_q_dict().items()))
             parent_q_dicts.add(key)
         return len(parent_q_dicts)
 
@@ -46,7 +46,7 @@ class MergeNode(AnalysisNode):
             qs = parent.get_queryset(disable_cache=True)
             q_or.append(Q(pk__in=qs.values_list("pk", flat=True)))
 
-        arg_q_dict[None] = reduce(operator.or_, q_or)
+        arg_q_dict[None] = {reduce(operator.or_, q_or)}
         return arg_q_dict
 
     def _get_node_q(self) -> Optional[Q]:

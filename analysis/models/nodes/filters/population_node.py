@@ -1,6 +1,6 @@
 import operator
 from functools import reduce
-from typing import Optional, Dict, List
+from typing import Optional, Dict, List, Set
 
 from cache_memoize import cache_memoize
 from django.conf import settings
@@ -116,7 +116,7 @@ class PopulationNode(AnalysisNode):
             q = None
         return q
 
-    def _get_node_arg_q_dict(self) -> Dict[Optional[str], Q]:
+    def _get_node_arg_q_dict(self) -> Dict[Optional[str], Set[Q]]:
         """ By default - we assume node implements _get_node_q and none of the filters apply to annotations """
         node_arg_q_dict = {}
         # Internal filters
@@ -129,7 +129,7 @@ class PopulationNode(AnalysisNode):
                 max_samples_from_percent = max(max_samples_from_percent, 1)
                 less_than = Q(**{vzcc.germline_counts_alias + "__lte": max_samples_from_percent})
                 is_null = Q(**{vzcc.germline_counts_alias + "__isnull": True})
-                node_arg_q_dict[vzcc.germline_counts_alias] = less_than | is_null
+                node_arg_q_dict[vzcc.germline_counts_alias] = {less_than | is_null}
 
             if self.max_samples is not None:
                 if self.zygosity == SimpleZygosity.ANY_GERMLINE:
@@ -147,10 +147,10 @@ class PopulationNode(AnalysisNode):
                 less_than = Q(**{column + "__lte": self.max_samples})
                 is_null = Q(**{column + "__isnull": True})
 
-                node_arg_q_dict[column] = less_than | is_null
+                node_arg_q_dict[column] = {less_than | is_null}
 
         if node_q := self._get_node_q():
-            node_arg_q_dict[None] = node_q
+            node_arg_q_dict[None] = {node_q}
         return node_arg_q_dict
 
     @staticmethod

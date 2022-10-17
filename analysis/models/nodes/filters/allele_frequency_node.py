@@ -1,4 +1,4 @@
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Set
 
 from django.db import models
 from django.db.models import Q
@@ -22,7 +22,7 @@ class AlleleFrequencyNode(AncestorSampleMixin, AnalysisNode):
     def modifies_parents(self):
         return NodeAlleleFrequencyFilter.get_sample_arg_q_dict(self, self.sample)
 
-    def _get_node_arg_q_dict(self) -> Dict[Optional[str], Q]:
+    def _get_node_arg_q_dict(self) -> Dict[Optional[str], Set[Q]]:
         return NodeAlleleFrequencyFilter.get_sample_arg_q_dict(self, self.sample)
 
     def _get_method_summary(self):

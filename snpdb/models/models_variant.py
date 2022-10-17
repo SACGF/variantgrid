@@ -572,12 +572,12 @@ class VariantCollection(RelatedModelsPartitionModel):
         vcr_condition = Q(variantcollectionrecord__variant_collection=self)
         return {self.variant_collection_alias: FilteredRelation('variantcollectionrecord', condition=vcr_condition)}
 
-    def get_arg_q_dict(self) -> Dict[Optional[str], Q]:
+    def get_arg_q_dict(self) -> Dict[Optional[str], Set[Q]]:
         if self.status != ProcessingStatus.SUCCESS:
             raise ValueError(f"{self}: status {self.get_status_display()} != SUCCESS")
 
         q = Q(**{f"{self.variant_collection_alias}__isnull": False})
-        return {self.variant_collection_alias: q}
+        return {self.variant_collection_alias: {q}}
 
     def __str__(self):
         return f"VariantCollection: {self.pk} ({self.name})"

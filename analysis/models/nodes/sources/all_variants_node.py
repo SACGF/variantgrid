@@ -1,6 +1,6 @@
 import operator
 from functools import reduce
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Set
 
 from django.conf import settings
 from django.db import models
@@ -21,19 +21,19 @@ class AllVariantsNode(AnalysisNode, AbstractZygosityCountNode):
     min_inputs = 0
     max_inputs = 0
 
-    def _get_node_arg_q_dict(self) -> Dict[Optional[str], Q]:
+    def _get_node_arg_q_dict(self) -> Dict[Optional[str], Set[Q]]:
         """ Restrict to analysis genome build """
 
-        and_q = [Variant.get_contigs_q(self.analysis.genome_build)]
+        and_q = {Variant.get_contigs_q(self.analysis.genome_build)}
 
         if self.gene_symbol:
             genes = list(self.gene_symbol.get_genes())
-            and_q.append(Q(variantgeneoverlap__gene__in=genes))
+            and_q.add(Q(variantgeneoverlap__gene__in=genes))
 
         if not self.reference:
-            and_q.append(Variant.get_no_reference_q())
+            and_q.add(Variant.get_no_reference_q())
 
-        arg_q_dict = {None: reduce(operator.and_, and_q)}
+        arg_q_dict = {None: and_q}
         self.merge_arg_q_dicts(arg_q_dict, self.get_zygosity_count_arg_q_dict())
         return arg_q_dict
 
