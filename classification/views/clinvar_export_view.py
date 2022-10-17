@@ -111,14 +111,16 @@ class ClinVarExportColumns(DatatableConfig[ClinVarExport]):
                 return qs.filter(Q(pk__in=submissions) | Q(pk=batch_id))
 
             # if searcing a ClinGenAlleleID
-            elif search_string.startswith("CA"):
+            elif search_string.upper().startswith("CA"):
                 clingen_number_str = search_string[2:]
-                if clingen_number := int(clingen_number_str): # if user is just typing 0s, don't filter anything yet
-                    return qs.annotate(
-                        clingen_allele_id_str=(Cast('clinvar_allele__allele__clingen_allele_id', output_field=TextField()))
-                    ).filter(clingen_allele_id_str__startswith=str(clingen_number))
-                else:
-                    return qs
+                # make sure we're actually searching on a number and not "cat disease"
+                if clingen_number_str:  # if user is just typing 0s, don't filter anything yet
+                    if clingen_number := int(clingen_number_str):
+                        return qs.annotate(
+                            clingen_allele_id_str=(Cast('clinvar_allele__allele__clingen_allele_id', output_field=TextField()))
+                        ).filter(clingen_allele_id_str__startswith=str(clingen_number))
+                    else:
+                        return qs
         except ValueError:
             pass
 
