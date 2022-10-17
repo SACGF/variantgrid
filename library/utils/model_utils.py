@@ -10,7 +10,7 @@ class ModelUtilsMixin:
     """
 
     @classmethod
-    def get(cls, value):
+    def get(cls: Type[Model], value):
         if value is None:
             return None
         if isinstance(value, cls):

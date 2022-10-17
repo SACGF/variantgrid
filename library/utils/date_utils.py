@@ -3,7 +3,6 @@ from typing import Optional
 from django.utils import timezone
 from django.utils.timezone import localtime
 from datetime import date, datetime, timedelta
-from dateutil import parser
 import time
 
 

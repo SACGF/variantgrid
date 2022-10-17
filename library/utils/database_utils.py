@@ -74,10 +74,10 @@ def dictfetchall(cursor, column_names=None):
 
 
 # From http://code.activestate.com/recipes/137270-use-generators-for-fetching-large-db-record-sets/
-def iter_db_results(cursor, arraysize=1000):
-    'An iterator that uses fetchmany to keep memory usage down'
+def iter_db_results(cursor, array_size=1000):
+    """ An iterator that uses fetchmany to keep memory usage down """
     while True:
-        results = cursor.fetchmany(arraysize)
+        results = cursor.fetchmany(array_size)
         if not results:
             break
         for tup in results:

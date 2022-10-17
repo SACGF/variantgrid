@@ -35,21 +35,11 @@ def none_to_blank_string(s: Optional[str]) -> str:
     return s or ''
 
 
-def join_english_comma(array, last_join_word='and'):
-    string = ''
-    if array:
-        if len(array) > 1:
-            string += ', '.join(array[:-1])
-            string += f" {last_join_word} {array[-1]}"
-        else:
-            string = array[0]
-    return string
-
-
-def upper(string: str) -> str:
-    if string:
-        string = str(string).upper()
-    return string
+# don't think is still being used, would be passed into formatters
+def upper(text: str) -> str:
+    if text:
+        text = str(text).upper()
+    return text
 
 
 def single_quote(s: Any) -> str:
