@@ -98,6 +98,7 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
         self.update_children = True
         self._cached_parents = None
         self._cached_analysis_errors = None
+        self._cache_node_q = settings.ANALYSIS_NODE_CACHE_Q  # Disable for unit tests
 
     def get_subclass(self):
         """ Returns the node loaded as a subclass """
@@ -383,7 +384,7 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
         # for some nodes (Comp HET / pheno) so cache it
         cache_key = self._get_cache_key() + f"q_cache={disable_cache}"
         arg_q_dict: Dict[Optional[str], Q] = {}
-        if settings.ANALYSIS_NODE_CACHE_Q:  # Disable for unit tests
+        if self._cache_node_q:
             arg_q_dict = cache.get(cache_key)
 
         if not arg_q_dict:
@@ -398,7 +399,8 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
                     arg_q_dict = node_arg_q_dict
                 else:
                     arg_q_dict[None] = self.q_all()
-            cache.set(cache_key, arg_q_dict)
+            if self._cache_node_q:
+                cache.set(cache_key, arg_q_dict)
         return arg_q_dict
 
     def get_contigs(self) -> Set[Contig]:

@@ -1,4 +1,5 @@
 import operator
+from functools import reduce
 from typing import Optional
 
 from django.db.models import Q
@@ -10,6 +11,10 @@ from snpdb.models import lazy
 class MergeNode(AnalysisNode):
     min_inputs = 1
     max_inputs = AnalysisNode.PARENT_CAP_NOT_SET
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._cache_node_q = False  # can't pickle querysets
 
     def modifies_parents(self):
         return self._num_unique_parents_in_queryset > 1
@@ -36,12 +41,12 @@ class MergeNode(AnalysisNode):
 
     def _get_arg_q_dict_from_parents_and_node(self):
         arg_q_dict = {}
+        q_or = []
         for parent in self.get_non_empty_parents():
-            parent_arg_q_dict = parent.get_arg_q_dict(disable_cache=True)
-            self.merge_arg_q_dicts(arg_q_dict, parent_arg_q_dict, op=operator.or_)
+            qs = parent.get_queryset(disable_cache=True)
+            q_or.append(Q(pk__in=qs.values_list("pk", flat=True)))
 
-        if not arg_q_dict:
-            arg_q_dict = {None: self.q_none()}
+        arg_q_dict[None] = reduce(operator.or_, q_or)
         return arg_q_dict
 
     def _get_node_q(self) -> Optional[Q]:
