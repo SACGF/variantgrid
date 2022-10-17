@@ -1,6 +1,8 @@
 import operator
+import time
+from collections import defaultdict
 from functools import reduce
-from typing import Optional
+from typing import Optional, Counter
 
 from django.db.models import Q
 
@@ -40,13 +42,44 @@ class MergeNode(AnalysisNode):
         return super().get_single_parent()  # Will throw exception due to multiple samples
 
     def _get_arg_q_dict_from_parents_and_node(self):
+        # Go through and get the common things to all parents
+        start = time.time()
+        parent_arg_q_dict = {}
+        arg_q_count = defaultdict(Counter)
+        for parent in self.get_non_empty_parents():
+            arg_q_dict = parent.get_arg_q_dict(disable_cache=True)
+            parent_arg_q_dict[parent] = arg_q_dict
+
+            for k, and_q_set in arg_q_dict.items():
+                for q in and_q_set:
+                    arg_q_count[k][str(q)] += 1
+
+        num_non_empty_parents = len(parent_arg_q_dict)
+        # Find the ones that are common (in all)
+        all_arg_q_dict = defaultdict(set)
+        for k, q_count in arg_q_count.items():
+            print("-" * 20)
+            print(f"{k=}")
+            for q, count in q_count.items():
+                print(f"{str(q)=}: {count=}")
+                if count == num_non_empty_parents:
+                    all_arg_q_dict[k].add(q)
+
+        print("all_arg_q_dict:")
+        print(all_arg_q_dict)
+
+        # TODO: Go and knock them out of the others, and leave only what's unique
         arg_q_dict = {}
         q_or = []
+
         for parent in self.get_non_empty_parents():
-            qs = parent.get_queryset(disable_cache=True)
+            qs = parent.get_queryset(disable_cache=True)  # TODO: Pass in modified/unique arg_q_dict here
             q_or.append(Q(pk__in=qs.values_list("pk", flat=True)))
 
         arg_q_dict[None] = {reduce(operator.or_, q_or)}
+
+        end = time.time()
+        print(f"merge calculations took {end-start} secs")
         return arg_q_dict
 
     def _get_node_q(self) -> Optional[Q]:

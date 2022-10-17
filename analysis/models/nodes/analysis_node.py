@@ -485,7 +485,7 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
         """ Return the contigs we filter for in this node. None means we don't know how to describe that """
         return None
 
-    def get_queryset(self, extra_filters_q=None, extra_annotation_kwargs=None,
+    def get_queryset(self, extra_filters_q=None, extra_annotation_kwargs=None, arg_q_dict=None,
                      inner_query_distinct=False, disable_cache=False):
         if extra_annotation_kwargs is None:
             extra_annotation_kwargs = {}
@@ -493,8 +493,10 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
         qs = self._get_model_queryset()
         a_kwargs = self.get_annotation_kwargs()
         a_kwargs.update(extra_annotation_kwargs)
-        arg_q_dict = self.get_arg_q_dict(disable_cache=disable_cache)
-        # print(arg_q_dict)
+        if arg_q_dict is None:
+            arg_q_dict = self.get_arg_q_dict(disable_cache=disable_cache)
+            # print(arg_q_dict)
+
         if a_kwargs:
             # If we apply the kwargs at the same time, it can join to the same table twice.
             # We want to go through and apply each annotation then the filters that use it, so that it forces
