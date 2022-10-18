@@ -7,6 +7,8 @@ DISK_FREE_CWD=$(df -Ph . | tail -1 | awk '{print $4}')
 echo "This will take a lot of space - make sure you're have a lot of disk space!"
 echo "You are in $(pwd), on a drive with ${DISK_FREE_CWD} free."
 
+samtools --version &> /dev/null || { echo >&2 "Samtools not installed!"; exit 1; }
+
 echo "Downloading GRCh37 Fasta"
 mkdir -p fasta
 cd fasta
