@@ -402,10 +402,7 @@ def badge(count: Optional[int], status: Optional[str] = None) -> str:
 
     render_status = status
     if count == 0:
-        if status == 'danger':
-            render_status = 'success'
-        elif status == 'success':
-            render_status = 'secondary'
+        render_status = "info"
     return SafeString(f' <span class="d-inline-block ml-1 badge badge-{render_status}">{count}</span>')
 
 
