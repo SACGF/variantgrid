@@ -6,7 +6,8 @@ from django.views.generic import TemplateView
 
 from annotation.models import patients_qs_for_ontology_term
 from library.utils import LimitedCollection
-from ontology.models import OntologyTerm, OntologyTermRelation, OntologyService, OntologySnake, OntologyRelation
+from ontology.models import OntologyTerm, OntologyTermRelation, OntologyService, OntologySnake, OntologyRelation, \
+    GeneDiseaseClassification
 from ontology.panel_app_ontology import update_gene_relations
 
 
@@ -31,16 +32,30 @@ class OntologyTermView(TemplateView):
             parent_relationships = list()
             child_relationships = list()
             for relationship in all_relationships:
+
                 if relationship.relation == OntologyRelation.IS_A:
                     if relationship.source_term == term:
                         parent_relationships.append(relationship)
                     else:
                         child_relationships.append(relationship)
 
-                elif is_gene or relationship.dest_term.ontology_service != OntologyService.HGNC:
-                    # gene symbols go into gene_relationships, no need to list them again in direct relationships
-                    # though currently gene symbols don't do reverse gene_relationships, so still show everyhting that links in gene_symbol
-                    regular_relationships.append(relationship)
+                else:
+                    include_direct_relationship = False
+                    if is_gene:
+                        include_direct_relationship = True
+                    elif relationship.dest_term.ontology_service != OntologyService.HGNC:
+                        include_direct_relationship = True
+                    else:
+                        if extra := relationship.extra:
+                            if strongest := extra.get('strongest_classification'):
+                                allowed_set = GeneDiseaseClassification.get_above_min(GeneDiseaseClassification.STRONG)
+                                if strongest not in allowed_set:
+                                    include_direct_relationship = True
+
+                    if include_direct_relationship:
+                        # gene symbols go into gene_relationships, no need to list them again in direct relationships
+                        # though currently gene symbols don't do reverse gene_relationships, so still show everyhting that links in gene_symbol
+                        regular_relationships.append(relationship)
 
             patients_qs = patients_qs_for_ontology_term(self.request.user, term)
             has_hierarchy = term.ontology_service in {OntologyService.MONDO, OntologyService.HPO}
