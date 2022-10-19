@@ -2,13 +2,15 @@
 <table class="table" id="{{ table_id }}">
     <thead>
         <tr>
-            <th>Relationships</th>
-            <th style="width:50%">Gene Symbol</th>
+            <th style="width:50%; text-align:center">Gene Symbol</th>
+            <th>Via</th>
         </tr>
     </thead>
     <tbody>
-        {% for snake in snakes %}
-            {% ontology_snake_row snake reference_term=reference_term %}
+        {% for snake_row in snakes %}
+            {% ontology_snake_row snake_row.snake reference_term=reference_term row_span=snake_row.row_span %}
         {% endfor %}
     </tbody>
+    <tfoot></tfoot>
 </table>
+<hr/>

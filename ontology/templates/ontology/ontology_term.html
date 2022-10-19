@@ -21,7 +21,14 @@
         });
     </script>
 
-    <div class="container">
+    <div style="position:fixed; background-color:white; z-index:1000; width: 120px; left: 16px; top: 70px">
+        <div style="background-color:white; z-index:1000">
+            <div class="text-monospace">{{ term.id }}</div>
+            <div style="font-size:8pt">{{ term.name }}</div>
+        </div>
+    </div>
+
+    <div class="container" style="position:relative">
         <div class="card">
             <div class="card-header">{{ term.id }}</div>
             <div class="card-body">
@@ -94,19 +101,6 @@
                     {% endlabelled %}
 
                     <div id="relationships" class="collapse {% if relationship_count < 30 %}show{% endif %}">
-                        {% if parent_relationships is not None %}
-                            <hr />
-                            <div class="mt-4">
-                                {% labelled label="<i class='fas fa-sitemap text-success'></i> Parent Terms" hint="chunky" %}
-                                    {% if parent_relationships %}
-                                        {% if parent_relationships.is_limited %}<i class="fas fa-info-circle text-info"></i> {{ parent_relationships.limit_str }}<br/>{% endif %}
-                                        {% ontology_relationship_table parent_relationships term %}
-                                    {% else %}
-                                        -
-                                    {% endif %}
-                                {% endlabelled %}
-                            </div>
-                        {% endif %}
 
                         <div class="mt-4">
                         {% labelled label="<i class='fa-solid fa-arrows-left-right text-success'></i> Direct Relationships" hint="chunky" %}
@@ -119,14 +113,28 @@
                         {% endlabelled %}
                         </div>
 
+                        {% if parent_relationships is not None %}
+                            <hr />
+                            <div class="mt-4">
+                                {% labelled label="<i class='fas fa-sitemap text-success'></i> Parent Terms" hint="chunky" %}
+                                    {% if parent_relationships %}
+                                        {% if parent_relationships.is_limited %}<i class="fas fa-info-circle text-info"></i> {{ parent_relationships.limit_str }}<br/>{% endif %}
+                                        {% ontology_relationship_table parent_relationships term "Parent Term" %}
+                                    {% else %}
+                                         <span class="no-value">This term has no parent terms</span>
+                                    {% endif %}
+                                {% endlabelled %}
+                            </div>
+                        {% endif %}
+
                         {% if child_relationships is not None %}
                             <div class="mt-4">
                                 {% labelled label="<i class='fas fa-sitemap text-success'></i> Child Terms" hint="chunky" %}
                                     {% if child_relationships %}
                                         {% if child_relationships.is_limited %}<i class="fas fa-info-circle text-info"></i> {{ child_relationships.limit_str }}<br/>{% endif %}
-                                        {% ontology_relationship_table child_relationships term %}
+                                        {% ontology_relationship_table child_relationships term "Child Term" %}
                                     {% else %}
-                                        -
+                                        <span class="no-value">This term has no child terms</span>
                                     {% endif %}
                                 {% endlabelled %}
                             </div>

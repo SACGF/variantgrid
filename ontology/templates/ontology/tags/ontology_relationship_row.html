@@ -3,17 +3,21 @@
 <tr {% if low_quality %}style="opacity:0.6"{% endif %}>
     {% if not reference_term %}
         <td data-order="{{ relationship.source_term.name|default_if_none:'' }}">{% ontology_term relationship.source_term show_link=True %}</td>
+    {% else %}
+        <td data-order="{{ dest_term.name|default_if_none:'' }}">{% ontology_term dest_term show_link=True %}</td>
     {% endif %}
     <td data-order="{{ relationship.relation_display }}">
         <div>
             {% if low_quality %}<i class="fas fa-exclamation-triangle text-warning hover-detail" title="Low quality relationship"></i>{% endif %}
             <div class="text-muted d-inline-block" style="font-size:8pt">{{ relationship.source_term.short }}</div>&nbsp;
-            <div class="hover-detail d-inline-block" title="Extra" data-content="{{ relationship.extra }}">{{ relationship.relation_display }} {% if low_quality %} ({{ quality }}){% endif %}</div>&nbsp;
+            <div class="hover-detail d-inline-block font-weight-bold" title="Extra" data-content="{{ relationship.extra }}">{{ relationship.relation_display }} {% if low_quality %} ({{ quality }}){% endif %}</div>&nbsp;
             <div class="text-muted d-inline-block" style="font-size:8pt">{{ relationship.dest_term.short }}</div>
         </div>
         <div class="text-muted hover-detail" title="Import {{ relationship.from_import.import_source }}" data-content="Last imported: {% timestamp relationship.from_import.processed_date text_only=True %}<br/>Context: {{ relationship.from_import.context }}</br>Filename: {{ relationship.from_import.filename }}">
             <span style="font-size:8pt">source <span style="word-break: break-all"> {{ relationship.from_import.import_source }}</span></span>
         </div>
     </td>
-    <td data-order="{{ dest_term.name|default_if_none:'' }}">{% ontology_term dest_term show_link=True %}</td>
+    {% if not reference_term %}
+        <td data-order="{{ dest_term.name|default_if_none:'' }}">{% ontology_term dest_term show_link=True %}</td>
+    {% endif %}
 </tr>

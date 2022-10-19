@@ -1,28 +1,40 @@
 {% load ontology_tags %}
 {% load js_tags %}
 <tr>
+    {% if row_span %}
+        <td style="vertical-align: middle; text-align: center" rowspan="{{ row_span }}">
+            <div style="font-size:8pt"><i class="fa-regular fa-circle" style="font-size:8pt; color:#bbb"></i> {{ source_term.id }} </div>
+            <div class="my-2">to</div>
+            <i class="fa-solid fa-circle mr-1" style="font-size:8pt; color:#bbb"></i><b>{% ontology_term dest_term show_link=is_dest_diff %}</b>
+        </td>
+    {% endif %}
     <td>
-        {% ontology_term source_term show_link=is_source_diff compact=True %}
+        <div>
+            <i class="fa-regular fa-circle" style="position:relative; left:6px; top:2px; font-size:8pt; color:#bbb"></i>
+        </div>
         {% for step in steps %}
             {% with relationship=step.relationship %}
                 <div>
-                    <div class="my-2">
+                    <div>
                         <div class="d-flex" style="align-items: center">
                             <div>
                                 <i class="mx-2 fa-solid {% if step.reversed %}fa-arrow-up{% else %}fa-arrow-down{% endif %} mr-2 text-muted"></i>
                             </div>
                             <div class="flex-grow">
-                                <div class="hover-detail" title="Extra" data-content="{{ relationship.extra }}">{{ relationship.relation_display }}</div>
+                                <div class="hover-detail font-weight-bold" title="Extra" data-content="{{ relationship.extra }}">{{ relationship.relation_display }}</div>
                                 <div class="text-muted hover-detail" title="Import {{ relationship.from_import.import_source }}" data-content="Last imported: {% timestamp relationship.from_import.processed_date text_only=True %}<br/>Context: {{ relationship.from_import.context }}</br>Filename: {{ relationship.from_import.filename }}">
                                     <span style="font-size:8pt">source <span style="word-break: break-all"> {{ relationship.from_import.import_source }}</span></span>
                                 </div>
                             </div>
                         </div>
                     </div>
-                    <div>{% ontology_term step.dest_term show_link=True %}</div>
+                    {% if forloop.last %}
+                        <i class="fa-solid fa-circle" style="position:relative; left:6px; bottom:2px; font-size:8pt; color:#bbb"></i>
+                    {% else %}
+                        <div class="my-2">{% ontology_term step.dest_term show_link=True %}</div>
+                    {% endif %}
                 </div>
             {% endwith %}
         {% endfor %}
     </td>
-    <td data-order="{{ dest_term.name|default_if_none:'' }}">{% ontology_term dest_term show_link=is_dest_diff %}</td>
 </tr>
