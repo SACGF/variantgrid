@@ -88,7 +88,6 @@ class GroupedSnakeRow:
             for snake in grouped_snake.snakes:
                 row_span = len(grouped_snake.snakes) if is_first else 0
                 is_first = False
-                print(f"{snake} {row_span}")
                 yield GroupedSnakeRow(snake=snake, row_span=row_span)
 
 
