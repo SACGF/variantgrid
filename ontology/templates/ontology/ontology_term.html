@@ -89,6 +89,14 @@
                         {% endif %}
                     {% endif %}
 
+                    {% if weak_relationships %}
+                        <div class="mt-4">
+                            {% labelled label="<i class='fas fa-dna text-warning'></i> Weak Gene Relationships" hint="chunky" %}
+                                {% ontology_relationship_table weak_relationships term "Gene Symbol" %}
+                            {% endlabelled %}
+                        </div>
+                    {% endif %}
+
                     {% labelled label="Relationships" %}
                         <a class="toggle-link" data-toggle="collapse" href="#relationships" {% if relationship_count < 30 %}aria-expanded="true"{% endif %}>Toggle Ontology Relationships</a>
                     {% endlabelled %}
@@ -101,7 +109,7 @@
                                 {% if regular_relationships.is_limited %}<i class="fas fa-info-circle text-info"></i> {{ regular_relationships.limit_str }}<br/>{% endif %}
                                 {% ontology_relationship_table regular_relationships term %}
                             {% else %}
-                                -
+                                <span class="no-value">This term has no direct relationship to another ontology term</span>
                             {% endif %}
                         {% endlabelled %}
                         </div>

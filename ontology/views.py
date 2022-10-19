@@ -31,6 +31,7 @@ class OntologyTermView(TemplateView):
             regular_relationships = list()
             parent_relationships = list()
             child_relationships = list()
+            weak_relationships = list()
             for relationship in all_relationships:
 
                 if relationship.relation == OntologyRelation.IS_A:
@@ -50,7 +51,8 @@ class OntologyTermView(TemplateView):
                             if strongest := extra.get('strongest_classification'):
                                 allowed_set = GeneDiseaseClassification.get_above_min(GeneDiseaseClassification.STRONG)
                                 if strongest not in allowed_set:
-                                    include_direct_relationship = True
+                                    # include_direct_relationship = True
+                                    weak_relationships.append(relationship)
 
                     if include_direct_relationship:
                         # gene symbols go into gene_relationships, no need to list them again in direct relationships
@@ -64,6 +66,7 @@ class OntologyTermView(TemplateView):
                 "is_ontology": not is_gene,
                 "gene_relationship_count": len(gene_relationships) if gene_relationships else 0,
                 "gene_relationships": gene_relationships,
+                "weak_relationships": weak_relationships,
                 "relationship_count": len(all_relationships) if all_relationships else 0,
                 "parent_relationships": LimitedCollection(parent_relationships, 250) if has_hierarchy else None,
                 "regular_relationships": LimitedCollection(regular_relationships, 250),
