@@ -1,6 +1,7 @@
 """ AnalysisNode is the base class that all analysis nodes inherit from. """
 import logging
 import operator
+import uuid
 from collections import defaultdict
 from functools import reduce
 from random import random
@@ -288,12 +289,13 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
             raise ValueError(msg)
         return parents[0]
 
-    def get_single_parent_arg_q_dict(self) -> Dict[Optional[str], Set[Q]]:
+    def get_single_parent_arg_q_dict(self) -> Dict[Optional[str], Dict[str, Q]]:
         arg_q_dict = {}
         parent = self.get_single_parent()
         if parent.is_ready():
             if parent.count == 0:
-                arg_q_dict[None] = {self.q_none()}
+                q_none = self.q_none()
+                arg_q_dict[None] = {str(q_none): q_none}
             else:
                 arg_q_dict = parent.get_arg_q_dict()
         else:
@@ -374,7 +376,7 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
                 self.merge_arg_q_dicts(arg_q_dict, node_arg_q_dict)
         return arg_q_dict
 
-    def get_arg_q_dict(self, disable_cache=False) -> Dict[Optional[str], Set[Q]]:
+    def get_arg_q_dict(self, disable_cache=False) -> Dict[Optional[str], Dict[str, Q]]:
         """ A Django Q object representing the Variant filters for this node.
             This is the method to override in subclasses - not get_queryset()
 
@@ -383,7 +385,7 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
         # We need this for node counts, and doing a grid query (each page) - and it can take a few secs to generate
         # for some nodes (Comp HET / pheno) so cache it
         cache_key = self._get_cache_key() + f"q_cache={disable_cache}"
-        arg_q_dict: Dict[Optional[str], Set[Q]] = {}
+        arg_q_dict: Dict[Optional[str], Dict[str, Q]] = {}
         if self._cache_node_q:
             arg_q_dict = cache.get(cache_key)
 
@@ -459,7 +461,7 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
         return NodeCache.objects.filter(node_version=self.node_version,
                                         variant_collection__status=ProcessingStatus.SUCCESS).first()
 
-    def _get_node_cache_arg_q_dict(self) -> Dict[Optional[str], Set[Q]]:
+    def _get_node_cache_arg_q_dict(self) -> Dict[Optional[str], Dict[str, Q]]:
         arg_q_dict = {}
         if self.node_cache:
             arg_q_dict = self.node_cache.variant_collection.get_arg_q_dict()
@@ -470,15 +472,23 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
 
     @staticmethod
     def merge_arg_q_dicts(arg_q_dict, other_arg_q_dict):
-        for k, other_q_set in other_arg_q_dict.items():
-            existing_set = arg_q_dict.get(k, set())
-            arg_q_dict[k] = existing_set | other_q_set
+        for k, other_q_dict in other_arg_q_dict.items():
+            existing_dict = arg_q_dict.get(k, {})
+            existing_dict.update(other_q_dict)
+            arg_q_dict[k] = other_q_dict
 
-    def _get_node_arg_q_dict(self) -> Dict[Optional[str], Set[Q]]:
+    def _get_node_q_hash(self) -> str:
+        """" A Hash such that the same value equals the same Q filter being applied
+             This is so merge node can remove duplicate filters - Q objects that use querysets don't hash the same
+             Default implementation is to use UUID so will never merge them
+        """
+        return str(uuid.uuid4())
+
+    def _get_node_arg_q_dict(self) -> Dict[Optional[str], Dict[str, Q]]:
         """ By default - we assume node implements _get_node_q and none of the filters apply to annotations """
         node_arg_q_dict = {}
         if node_q := self._get_node_q():
-            node_arg_q_dict[None] = {node_q}
+            node_arg_q_dict[None] = {self._get_node_q_hash(): node_q}
         return node_arg_q_dict
 
     def _get_node_contigs(self) -> Optional[Set[Contig]]:
@@ -504,13 +514,14 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
 
             for k, v in a_kwargs.items():
                 qs = qs.annotate(**{k: v})
-                for q in arg_q_dict.get(k, []):
+                for q in arg_q_dict.get(k, {}).values():
+                    print(f"get_queryset(): {q}")
                     qs = qs.filter(q)
 
         q_list = []
         # Anything stored under None means filters that don't rely on annotation - do afterwards
-        if q_set := arg_q_dict.get(None):
-            q_list.extend(q_set)
+        if q_dict := arg_q_dict.get(None):
+            q_list.extend(q_dict.values())
 
         if self.analysis.node_queryset_filter_contigs:
             q_list.append(Q(locus__contig__in=self.get_contigs()))
@@ -1199,14 +1210,14 @@ class NodeAlleleFrequencyFilter(models.Model):
         return af_q
 
     @staticmethod
-    def get_sample_arg_q_dict(node: AnalysisNode, sample: Sample) -> Dict[Optional[str], Set[Q]]:
+    def get_sample_arg_q_dict(node: AnalysisNode, sample: Sample) -> Dict[Optional[str], Dict[str, Q]]:
         arg_q_dict = {}
         if sample:
             try:
                 alias, allele_frequency_path = sample.get_cohort_genotype_alias_and_field("allele_frequency")
                 allele_frequency_percent = sample.vcf.allele_frequency_percent
                 if af_q := node.nodeallelefrequencyfilter.get_q(allele_frequency_path, allele_frequency_percent):
-                    arg_q_dict[alias] = {af_q}
+                    arg_q_dict[alias] = {str(af_q): af_q}
             except NodeAlleleFrequencyFilter.DoesNotExist:
                 pass
         return arg_q_dict

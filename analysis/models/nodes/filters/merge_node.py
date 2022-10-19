@@ -46,24 +46,27 @@ class MergeNode(AnalysisNode):
         start = time.time()
         parent_arg_q_dict = {}
         arg_q_count = defaultdict(Counter)
+        all_q_by_hash = {}
         for parent in self.get_non_empty_parents():
             arg_q_dict = parent.get_arg_q_dict(disable_cache=True)
             parent_arg_q_dict[parent] = arg_q_dict
 
-            for k, and_q_set in arg_q_dict.items():
-                for q in and_q_set:
-                    arg_q_count[k][str(q)] += 1
+            for k, q_dict in arg_q_dict.items():
+                for q_hash, q in q_dict.items():
+                    all_q_by_hash[q_hash] = q
+                    arg_q_count[k][q_hash] += 1
 
         num_non_empty_parents = len(parent_arg_q_dict)
         # Find the ones that are common (in all)
-        all_arg_q_dict = defaultdict(set)
+        all_arg_q_dict = defaultdict(dict)
         for k, q_count in arg_q_count.items():
             print("-" * 20)
             print(f"{k=}")
-            for q, count in q_count.items():
-                print(f"{str(q)=}: {count=}")
+            for q_hash, count in q_count.items():
+                print(f"{q_hash}: {count=}")
                 if count == num_non_empty_parents:
-                    all_arg_q_dict[k].add(q)
+                    q = all_q_by_hash[q_hash]
+                    all_arg_q_dict[k][q_hash] = q
 
         print("all_arg_q_dict:")
         print(all_arg_q_dict)
@@ -76,7 +79,7 @@ class MergeNode(AnalysisNode):
             qs = parent.get_queryset(disable_cache=True)  # TODO: Pass in modified/unique arg_q_dict here
             q_or.append(Q(pk__in=qs.values_list("pk", flat=True)))
 
-        arg_q_dict[None] = {reduce(operator.or_, q_or)}
+        arg_q_dict[None] = {self._get_node_q_hash(): reduce(operator.or_, q_or)}
 
         end = time.time()
         print(f"merge calculations took {end-start} secs")

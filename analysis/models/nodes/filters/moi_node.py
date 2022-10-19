@@ -148,7 +148,7 @@ class MOINode(AncestorSampleMixin, AnalysisNode):
                 moi_genes[source["mode_of_inheritance"]].add(otr.dest_term.name)
         return moi_genes
 
-    def _get_node_arg_q_dict(self) -> Dict[Optional[str], Set[Q]]:
+    def _get_node_arg_q_dict(self) -> Dict[Optional[str], Dict[str, Q]]:
         arg_q_dict = {}
         if self.sample:
             moi_genes = self._get_moi_genes()
@@ -159,12 +159,13 @@ class MOINode(AncestorSampleMixin, AnalysisNode):
                     or_filters.append(q_zygosity & q_genes)
                 else:
                     or_filters.append(q_genes)  # Any zygosity
-            arg_q_dict[self.sample.zygosity_alias] = {reduce(operator.or_, or_filters)}
+            q = reduce(operator.or_, or_filters)
+            arg_q_dict[self.sample.zygosity_alias] = {str(q): q}
         else:
             gene_qs = self._get_gene_qs()
             variant_annotation_version = self.analysis.annotation_version.variant_annotation_version
             q_genes = VariantTranscriptAnnotation.get_overlapping_genes_q(variant_annotation_version, gene_qs)
-            arg_q_dict[None] = {q_genes}
+            arg_q_dict[None] = {str(q_genes): q_genes}
         return arg_q_dict
 
     def _get_node_contigs(self) -> Optional[Set[Contig]]:

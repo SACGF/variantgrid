@@ -172,9 +172,10 @@ class VennNode(AnalysisNode):
     def _get_node_q(self) -> Optional[Q]:
         raise ValueError("VennNode always uses cache - this should never be called!")
 
-    def _get_node_cache_arg_q_dict(self) -> Dict[Optional[str], Set[Q]]:
+    def _get_node_cache_arg_q_dict(self) -> Dict[Optional[str], Dict[str, Q]]:
         if self.set_operation == SetOperations.NONE:
-            return {None: self.q_none()}
+            q_none = self.q_none()
+            return {None: {str(q_none): q_none}}
 
         a, b = self.ordered_parents
         variant_collections = []
@@ -187,8 +188,13 @@ class VennNode(AnalysisNode):
                 raise ValueError(f"{vennode_cache} had status: {vennode_cache.variant_collection.get_status_display()}")
             variant_collections.append(vennode_cache.variant_collection)
 
-        q = Q(variantcollectionrecord__variant_collection__in=variant_collections)
-        return {None: {q}}
+        arg_q_dict = {}
+        if variant_collections:
+            variant_collections = sorted(variant_collections)  # for consistent hash
+            q = Q(variantcollectionrecord__variant_collection__in=variant_collections)
+            arg_q_dict[None] = {str(q): q}
+
+        return arg_q_dict
 
     def _get_method_summary(self):
         return self.get_set_operation_display()

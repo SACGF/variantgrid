@@ -577,7 +577,7 @@ class VariantCollection(RelatedModelsPartitionModel):
             raise ValueError(f"{self}: status {self.get_status_display()} != SUCCESS")
 
         q = Q(**{f"{self.variant_collection_alias}__isnull": False})
-        return {self.variant_collection_alias: {q}}
+        return {self.variant_collection_alias: {str(q): q}}
 
     def __str__(self):
         return f"VariantCollection: {self.pk} ({self.name})"

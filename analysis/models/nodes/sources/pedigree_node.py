@@ -22,7 +22,7 @@ class PedigreeNode(AbstractCohortBasedNode):
             cohort = self.pedigree.cohort
         return cohort
 
-    def _get_node_arg_q_dict(self) -> Dict[Optional[str], Set[Q]]:
+    def _get_node_arg_q_dict(self) -> Dict[Optional[str], Dict[str, Q]]:
         cohort, arg_q_dict = self.get_cohort_and_arg_q_dict()
         if cohort:
             q = None
@@ -30,7 +30,12 @@ class PedigreeNode(AbstractCohortBasedNode):
                 q = self.get_recessive_q(cohort.cohort_genotype_collection)
             elif self.inheritance_model == PedigreeInheritance.AUTOSOMAL_DOMINANT:
                 q = self.get_dominant_q(cohort.cohort_genotype_collection)
-            self.merge_arg_q_dicts(arg_q_dict, {self.cohort_genotype_collection.cohortgenotype_alias: {q}})
+
+            if q:
+                cohort_arg_q_dict = {
+                    self.cohort_genotype_collection.cohortgenotype_alias: {str(q): q}
+                }
+                self.merge_arg_q_dicts(arg_q_dict, cohort_arg_q_dict)
         return arg_q_dict
 
     def get_affected_unaffected_sample_zygosities_dict(self, unaffected_zygosities, affected_zygosities):

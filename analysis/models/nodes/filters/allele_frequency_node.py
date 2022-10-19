@@ -22,7 +22,7 @@ class AlleleFrequencyNode(AncestorSampleMixin, AnalysisNode):
     def modifies_parents(self):
         return NodeAlleleFrequencyFilter.get_sample_arg_q_dict(self, self.sample)
 
-    def _get_node_arg_q_dict(self) -> Dict[Optional[str], Set[Q]]:
+    def _get_node_arg_q_dict(self) -> Dict[Optional[str], Dict[str, Q]]:
         return NodeAlleleFrequencyFilter.get_sample_arg_q_dict(self, self.sample)
 
     def _get_method_summary(self):
