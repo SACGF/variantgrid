@@ -20,7 +20,7 @@ def ontology_meta(data: OntologyMatch):
 
 
 @register.inclusion_tag("ontology/tags/ontology_term.html")
-def ontology_term(data: Union[OntologyTerm, str], show_link: bool = True, compact: bool = False):
+def ontology_term(data: Union[OntologyTerm, str], show_link: bool = True, spaced: bool = False):
     if isinstance(data, str):
         data = OntologyTerm.get_or_stub(data)
 
@@ -30,7 +30,7 @@ def ontology_term(data: Union[OntologyTerm, str], show_link: bool = True, compac
         "term": data,
         "is_gene": is_gene,
         "show_link": show_link,
-        "compact": compact
+        "spaced": spaced
     }
 
 
@@ -130,6 +130,8 @@ def ontology_snake_row(snake: OntologySnake, reference_term: Optional[OntologyTe
 
     return {
         "snake": snake,
+        "top_term": source_term,
+        "bottom_term": dest_term,
         "source_term": source_term if not is_gene else dest_term,
         "dest_term": dest_term if not is_gene else source_term,
         "steps": steps,

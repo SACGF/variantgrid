@@ -1094,4 +1094,17 @@ a .c-hgvs-body .c-hgvs-transcript, a .c-hgvs-body .c-hgvs-nomen {
   word-break: break-word;
 }
 
+@keyframes highlight-select {
+  from {
+    transform: scale(1);
+  }
+  to {
+    transform: scale(1.2);
+  }
+}
+.group-selected .main-icon, .group-selected.main-icon {
+  color: #4a4 !important;
+  animation: highlight-select 1s infinite alternate;
+}
+
 /*# sourceMappingURL=global_bs.css.map */
