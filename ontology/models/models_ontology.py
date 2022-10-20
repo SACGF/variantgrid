@@ -300,6 +300,8 @@ class OntologyTerm(TimeStampedModel):
     def __lt__(self, other):
         if self.ontology_service != other.ontology_service:
             return self.ontology_service < other.ontology_service
+        if self.ontology_service == OntologyService.HGNC:
+            return self.name < other.name
         return self.index < other.index
 
     def get_absolute_url(self):
