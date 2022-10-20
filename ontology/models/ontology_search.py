@@ -13,13 +13,12 @@ class SearchResponseOntology(SearchResponseRecordAbstract[OntologyTerm]):
     def search_type(cls) -> str:
         return "Ontology"
 
-
 @receiver(search_signal, sender=SearchInput)
 def search_ontology(sender: Any, search_input: SearchInput, **kwargs) -> SearchResponse:
     response: SearchResponse[OntologyTerm] = SearchResponse(SearchResponseOntology)
 
     try:
-        if search_input.matches_pattern(r"\w+:\s*.*"):
+        if search_input.matches_pattern(r"\w+[:_]\s*.*"):
             term = OntologyTerm.get_or_stub(search_input.search_string)
             response.mark_valid_search()
             response.add(term)

@@ -265,6 +265,31 @@ function enhanceAndMonitor() {
                     return true;
                 })
             }
+        },
+
+        {test: '.current-record-menu-item',
+            func: (node) => {
+                let $node = $(node);
+                let $moveTo = $('#current-record-spot');
+                if ($moveTo.length == 0) {
+                    $moveTo = $('#current-record-spot-fallback');
+                }
+                $node.addClass('active').detach().appendTo($moveTo);
+            }
+        },
+
+        {test: '[data-group-id]',
+            func: (node) => {
+                let $node = $(node);
+                let dataGroupId = $node.attr('data-group-id');
+                $node.mouseenter(() => {
+                    console.log($(`[data-group-id='${dataGroupId}'`));
+                   $(`[data-group-id='${dataGroupId}'`).addClass('group-selected');
+                });
+                $node.mouseleave(() => {
+                    $(`[data-group-id='${dataGroupId}'`).removeClass('group-selected');
+                });
+            }
         }
     ];
 

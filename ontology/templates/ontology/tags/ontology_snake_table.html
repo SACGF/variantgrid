@@ -2,13 +2,19 @@
 <table class="table" id="{{ table_id }}">
     <thead>
         <tr>
-            <th>Relationships</th>
-            <th style="width:50%">Gene Symbol</th>
+            <th style="width:30%">{% if is_gene %}Ontology Term{% else %}Gene Symbol{% endif %}</th>
+            <th>
+                <div style="margin-left: 6px">Via Relationships<br/>
+                    <i class="fa-solid fa-circle main-icon" style="font-size:8pt; color:#bbb" {% if not is_gene %}data-group-id="{{ reference_term.id }}"{% endif %}></i> = {% if is_gene %}Ontology Term{% else %}{{ reference_term.id }}{% endif %}<br/>
+                    <i class="fa-solid fa-dna main-icon" style="font-size:8pt; color:#bbb" {% if is_gene %}data-group-id="{{ reference_term.id }}"{% endif %}></i> = {% if is_gene %}{{ reference_term.name }}{% else %}Gene Symbol{% endif %}
+                </div>
+            </th>
         </tr>
     </thead>
     <tbody>
-        {% for snake in snakes %}
-            {% ontology_snake_row snake reference_term=reference_term %}
+        {% for snake_row in snakes %}
+            {% ontology_snake_row snake_row.snake reference_term=reference_term row_span=snake_row.row_span weak=snake_row.weak is_gene=is_gene %}
         {% endfor %}
     </tbody>
+    <tfoot></tfoot>
 </table>

@@ -1,28 +1,49 @@
 {% load ontology_tags %}
 {% load js_tags %}
 <tr>
-    <td>
-        {% ontology_term source_term show_link=is_source_diff compact=True %}
+    {% if row_span %}
+        <td data-group-id="{{ dest_term.id }}" style="vertical-align: middle; {% if weak %}background-color:#f7f7f7; opacity: 0.6; font-size: 8pt{% endif %}" rowspan="{{ row_span }}">
+            <i class="main-icon fa-solid {% if is_gene %}fa-circle{% else %}fa-dna{% endif %} mr-1" style="font-size:8pt; color:#bbb"></i>
+            {% ontology_term dest_term show_link=True spaced=True %}
+            {% if weak %}<i class="fa-solid fa-triangle-exclamation text-warning hover-detail" title="All relationships to this Gene Symbol are weak, it will not be considered in condition text matching."></i>{% endif %}
+        </td>
+    {% endif %}
+    <td {% if not snake.is_strong_enough %}style="background-color:#f7f7f7; opacity: 0.6;font-size: 8pt"{% endif %}>
+        <div>
+            <i class="fa-solid fa-circle main-icon" style="position:relative; left:6px; top:2px; font-size:8pt; color:#bbb" data-group-id="{{ top_term.id }}"></i>
+        </div>
         {% for step in steps %}
             {% with relationship=step.relationship %}
                 <div>
-                    <div class="my-2">
+                    <div>
                         <div class="d-flex" style="align-items: center">
                             <div>
-                                <i class="mx-2 fa-solid {% if step.reversed %}fa-arrow-up{% else %}fa-arrow-down{% endif %} mr-2 text-muted"></i>
+                                <i class="mx-2 fa-solid fa-arrow-down mr-2 text-muted"></i>
                             </div>
                             <div class="flex-grow">
-                                <div class="hover-detail" title="Extra" data-content="{{ relationship.extra }}">{{ relationship.relation_display }}</div>
-                                <div class="text-muted hover-detail" title="Import {{ relationship.from_import.import_source }}" data-content="Last imported: {% timestamp relationship.from_import.processed_date text_only=True %}<br/>Context: {{ relationship.from_import.context }}</br>Filename: {{ relationship.from_import.filename }}">
-                                    <span style="font-size:8pt">source <span style="word-break: break-all"> {{ relationship.from_import.import_source }}</span></span>
+                                <div>
+                                    <div class="d-inline-block hover-detail font-weight-bold" title="Extra" data-content="{{ relationship.extra }}">
+                                        {{ relationship.relation_display }}
+                                        {% if relationship.gencc_quality %}
+                                            ({{ relationship.gencc_quality.label }})
+                                        {% endif %}
+                                    </div>
+                                    {% if relationship.gencc_quality %}{% if not relationship.gencc_quality.is_strong_enough %}<i class="ml-1 fa-solid fa-triangle-exclamation text-warning hover-detail" title="This relationship is considered weak"></i>{% endif %}{% endif %}
+                                    {% if step.reversed %} <i class="text-muted ml-2 fa-solid fa-retweet hover-detail" title="Stored as: {{ step.dest_term.id }} {{ relationship.relation_display }} {{ step.source_term.id }}"></i>{% endif %}</div>
+                                    <div class="d-inline-block text-muted hover-detail" style="font-size:0.8rem" title="Import {{ relationship.from_import.import_source }}" data-content="Last imported: {% timestamp relationship.from_import.processed_date text_only=True %}<br/>Context: {{ relationship.from_import.context }}</br>Filename: {{ relationship.from_import.filename }}">
+                                        source {{ relationship.from_import.import_source }}
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
-                    <div>{% ontology_term step.dest_term show_link=True %}</div>
+                    {% if forloop.last %}
+                        <i class="fa-solid fa-dna main-icon" style="position:relative; left:6px; bottom:2px; font-size:8pt; color:#bbb" data-group-id="{{ bottom_term.id }}"></i>
+                    {% else %}
+                        <div class="my-2">{% ontology_term step.dest_term show_link=True %}</div>
+                    {% endif %}
                 </div>
             {% endwith %}
         {% endfor %}
     </td>
-    <td data-order="{{ dest_term.name|default_if_none:'' }}">{% ontology_term dest_term show_link=is_dest_diff %}</td>
 </tr>

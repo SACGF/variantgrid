@@ -1,9 +1,12 @@
+import itertools
 import uuid
-from typing import Optional, Union, Iterable
+from dataclasses import dataclass
+from typing import Optional, Union, Iterable, List, Iterator, Tuple
 from uuid import UUID
 
 from django.template import Library
 
+from library.utils import segment
 from ontology.models import OntologyTerm, OntologyTermRelation, GeneDiseaseClassification, OntologyService, \
     OntologySnake
 from ontology.ontology_matching import OntologyMatch
@@ -17,7 +20,7 @@ def ontology_meta(data: OntologyMatch):
 
 
 @register.inclusion_tag("ontology/tags/ontology_term.html")
-def ontology_term(data: Union[OntologyTerm, str], show_link: bool = True, compact: bool = False):
+def ontology_term(data: Union[OntologyTerm, str], show_link: bool = True, spaced: bool = False):
     if isinstance(data, str):
         data = OntologyTerm.get_or_stub(data)
 
@@ -27,13 +30,14 @@ def ontology_term(data: Union[OntologyTerm, str], show_link: bool = True, compac
         "term": data,
         "is_gene": is_gene,
         "show_link": show_link,
-        "compact": compact
+        "spaced": spaced
     }
 
 
 @register.inclusion_tag("ontology/tags/ontology_relationship_table.html")
-def ontology_relationship_table(relationships: OntologyTermRelation, reference_term: Optional[OntologyTerm] = None):
+def ontology_relationship_table(relationships: OntologyTermRelation, reference_term: Optional[OntologyTerm] = None, other_term_title: str = "Other Term"):
     return {
+        "other_term_title": other_term_title,
         "relationships": relationships,
         "reference_term": reference_term,
         "table_id": str(uuid.uuid4())
@@ -66,27 +70,73 @@ def ontology_relationship_row(relationship: OntologyTermRelation, reference_term
     }
 
 
+@dataclass
+class GroupedSnakes:
+    snakes: List[OntologySnake]
+    destination: OntologyTerm
+
+
+@dataclass
+class GroupedSnakeRow:
+    snake: OntologySnake
+    row_span: int
+    weak: Optional[bool]
+
+    @staticmethod
+    def yield_snakes(grouped_snakes: List['GroupedSnakes']) -> Iterator['GroupedSnakeRow']:
+        for grouped_snake in grouped_snakes:
+            is_first = True
+            for snake in grouped_snake.snakes:
+                row_span = 0
+                weak = None
+                if is_first:
+                    row_span = len(grouped_snake.snakes)
+                    weak = all(not snake.is_strong_enough for snake in grouped_snake.snakes)
+                    is_first = False
+                yield GroupedSnakeRow(snake=snake, row_span=row_span, weak=weak)
+
+
 @register.inclusion_tag("ontology/tags/ontology_snake_table.html")
 def ontology_snake_table(snakes: Iterable[OntologySnake], reference_term: Optional[OntologyTerm]):
 
+    grouped: List[GroupedSnakes] = list()
+
+    is_gene = reference_term.ontology_service == OntologyService.HGNC
+
+    def sort_key(snake: OntologySnake):
+        nonlocal  is_gene
+        if is_gene:
+            return snake.source_term
+        else:
+            return snake.leaf_term
+
+    snakes = sorted(snakes, key=sort_key)
+    for leaf, snakes in itertools.groupby(snakes, sort_key):
+        grouped.append(GroupedSnakes(snakes=list(snakes), destination=leaf))
+
     return {
         "table_id": str(uuid.uuid4()),
-        "snakes": snakes,
-        "reference_term": reference_term
+        "snakes": GroupedSnakeRow.yield_snakes(grouped),
+        "reference_term": reference_term,
+        "is_gene": is_gene
     }
 
 
 @register.inclusion_tag("ontology/tags/ontology_snake_row.html")
-def ontology_snake_row(snake: OntologySnake, reference_term: Optional[OntologyTerm]):
-    steps = snake.show_steps()
+def ontology_snake_row(snake: OntologySnake, reference_term: Optional[OntologyTerm], row_span: int = 1, weak: Optional[bool] = None, is_gene: Optional[bool] = False):
+    steps = steps = snake.show_steps()
     source_term = snake.source_term
     dest_term = steps[-1].dest_term
 
     return {
-        "source_term": source_term,
-        "is_source_diff": (not reference_term) or (source_term != reference_term),
-        "is_dest_diff": (not reference_term) or (dest_term != reference_term),
+        "snake": snake,
+        "top_term": source_term,
+        "bottom_term": dest_term,
+        "source_term": source_term if not is_gene else dest_term,
+        "dest_term": dest_term if not is_gene else source_term,
         "steps": steps,
-        "dest_term": dest_term,
-        "reference_term": reference_term
+        "reference_term": reference_term,
+        "row_span": row_span,
+        "weak": weak,
+        "is_gene": is_gene
     }
