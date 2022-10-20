@@ -30,7 +30,7 @@ class OntologyTermView(TemplateView):
                 term_relationships = list(sorted((snake.reverse() for snake in term_relationships), key=lambda snake: snake.leaf_term))
                 term_relationships = LimitedCollection(term_relationships, 250)
             else:
-                raw_gene_relationships = sorted(OntologySnake.snake_from(term=term, to_ontology=OntologyService.HGNC, min_classification=GeneDiseaseClassification.REFUTED), key=lambda snake: snake.leaf_relationship.dest_term.short)
+                raw_gene_relationships = sorted(OntologySnake.snake_from(term=term, to_ontology=OntologyService.HGNC, min_classification=GeneDiseaseClassification.ANIMAL), key=lambda snake: snake.leaf_relationship.dest_term.short)
                 gene_relationships = LimitedCollection(raw_gene_relationships, 250)
 
             regular_relationships = None
