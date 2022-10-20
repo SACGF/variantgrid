@@ -57,6 +57,11 @@ class GeneListNode(AncestorSampleMixin, GeneCoverageMixin, AnalysisNode):
         getter = GENE_LISTS[self.accordion_panel]
         return [gl for gl in getter() if gl is not None]
 
+    def _get_node_q_hash(self) -> str:
+        # sorted (by string) so it's consistent for hash
+        gene_list_ids = [str(gl.pk) for gl in self.get_gene_lists()]
+        return f"gene_lists=[{','.join(sorted(gene_list_ids))}]"
+
     def _get_node_q(self) -> Optional[Q]:
         # Combine multiple gene lists into 1 query is much faster than OR'ing them together
         genes_ids_qs = GeneList.get_gene_ids_for_gene_lists(self.analysis.gene_annotation_release,

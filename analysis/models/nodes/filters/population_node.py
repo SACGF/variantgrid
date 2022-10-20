@@ -68,14 +68,14 @@ class PopulationNode(AnalysisNode):
     def _get_node_q(self) -> Optional[Q]:
         and_q = []
         if self.filtering_by_population:
-            population_databases = set()
+            population_databases = []
             for field in self.POPULATION_DATABASE_FIELDS:
                 if getattr(self, field):
-                    population_databases.add(field)
+                    population_databases.append(field)
 
             for gnomad_pop in self.populationnodegnomadpopulation_set.all():
                 field = VariantAnnotation.get_gnomad_population_field(gnomad_pop.population)
-                population_databases.add(field)
+                population_databases.append(field)
 
             if population_databases:
                 # The group operation is backwards from what you may expect, as the widget takes MAX

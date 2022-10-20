@@ -1,7 +1,6 @@
 """ AnalysisNode is the base class that all analysis nodes inherit from. """
 import logging
 import operator
-import uuid
 from collections import defaultdict
 from functools import reduce
 from random import random
@@ -475,14 +474,14 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
         for k, other_q_dict in other_arg_q_dict.items():
             existing_dict = arg_q_dict.get(k, {})
             existing_dict.update(other_q_dict)
-            arg_q_dict[k] = other_q_dict
+            arg_q_dict[k] = existing_dict
 
     def _get_node_q_hash(self) -> str:
         """" A Hash such that the same value equals the same Q filter being applied
              This is so merge node can remove duplicate filters - Q objects that use querysets don't hash the same
-             Default implementation is to use UUID so will never merge them
+             Default implementation is to use something unique so will never merge them
         """
-        return str(uuid.uuid4())
+        return self.get_identifier()
 
     def _get_node_arg_q_dict(self) -> Dict[Optional[str], Dict[str, Q]]:
         """ By default - we assume node implements _get_node_q and none of the filters apply to annotations """
@@ -514,13 +513,14 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
 
             for k, v in a_kwargs.items():
                 qs = qs.annotate(**{k: v})
-                for q in arg_q_dict.get(k, {}).values():
-                    print(f"get_queryset(): {q}")
+                for q_hash, q in arg_q_dict.get(k, {}).items():
+                    # print(f"get_queryset(): {q_hash=} {q}")
                     qs = qs.filter(q)
 
         q_list = []
         # Anything stored under None means filters that don't rely on annotation - do afterwards
         if q_dict := arg_q_dict.get(None):
+            # print(f"q_dict(None): {q_dict}")
             q_list.extend(q_dict.values())
 
         if self.analysis.node_queryset_filter_contigs:
