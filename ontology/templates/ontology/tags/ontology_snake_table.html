@@ -2,20 +2,19 @@
 <table class="table" id="{{ table_id }}">
     <thead>
         <tr>
-            <th style="width:25%">Gene Symbol</th>
+            <th style="width:25%">{% if is_gene %}Ontology Term{% else %}Gene Symbol{% endif %}</th>
             <th>
                 <div style="margin-left: 6px">Via Relationships<br/>
-                <i class="fa-solid fa-circle" style="font-size:8pt; color:#bbb"></i> = {{ reference_term.id }}<br/>
-                <i class="fa-solid fa-dna" style="font-size:8pt; color:#bbb"></i> = Gene Symbol
+                    <i class="fa-solid fa-circle" style="font-size:8pt; color:#bbb"></i> = {% if is_gene %}Ontology Term{% else %}{{ reference_term.id }}{% endif %}<br/>
+                    <i class="fa-solid fa-dna" style="font-size:8pt; color:#bbb"></i> = {% if is_gene %}{{ reference_term.name }}{% else %}Gene Symbol{% endif %}
                 </div>
             </th>
         </tr>
     </thead>
     <tbody>
         {% for snake_row in snakes %}
-            {% ontology_snake_row snake_row.snake reference_term=reference_term row_span=snake_row.row_span weak=snake_row.weak %}
+            {% ontology_snake_row snake_row.snake reference_term=reference_term row_span=snake_row.row_span weak=snake_row.weak is_gene=is_gene %}
         {% endfor %}
     </tbody>
     <tfoot></tfoot>
 </table>
-<hr/>

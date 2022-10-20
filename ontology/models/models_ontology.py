@@ -776,6 +776,10 @@ class OntologySnake:
             steps.append(OntologySnakeStep(relation=path, dest_term=node, reversed=relationship_reversed))
         return steps
 
+    def reverse(self) -> 'OntologySnake':
+        # simply reversing leaf and source will reverse the direction of all the relationships inside
+        return OntologySnake(source_term=self.leaf_term, leaf_term=self.source_term, paths=list(reversed(self.paths)))
+
     def __str__(self):
         text = f"{self.source_term}"
         for step in self.show_steps():

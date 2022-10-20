@@ -100,30 +100,41 @@ class GroupedSnakeRow:
 def ontology_snake_table(snakes: Iterable[OntologySnake], reference_term: Optional[OntologyTerm]):
 
     grouped: List[GroupedSnakes] = list()
-    for leaf, snakes in itertools.groupby(snakes, lambda s: s.leaf_term):
+
+    is_gene = reference_term.ontology_service == OntologyService.HGNC
+
+    def sort_key(snake: OntologySnake):
+        nonlocal  is_gene
+        if is_gene:
+            return snake.source_term
+        else:
+            return snake.leaf_term
+
+    snakes = sorted(snakes, key=sort_key)
+    for leaf, snakes in itertools.groupby(snakes, sort_key):
         grouped.append(GroupedSnakes(snakes=list(snakes), destination=leaf))
 
     return {
         "table_id": str(uuid.uuid4()),
         "snakes": GroupedSnakeRow.yield_snakes(grouped),
-        "reference_term": reference_term
+        "reference_term": reference_term,
+        "is_gene": is_gene
     }
 
 
 @register.inclusion_tag("ontology/tags/ontology_snake_row.html")
-def ontology_snake_row(snake: OntologySnake, reference_term: Optional[OntologyTerm], row_span: int = 1, weak: Optional[bool] = None):
-    steps = snake.show_steps()
+def ontology_snake_row(snake: OntologySnake, reference_term: Optional[OntologyTerm], row_span: int = 1, weak: Optional[bool] = None, is_gene: Optional[bool] = False):
+    steps = steps = snake.show_steps()
     source_term = snake.source_term
     dest_term = steps[-1].dest_term
 
     return {
         "snake": snake,
-        "source_term": source_term,
-        "is_source_diff": (not reference_term) or (source_term != reference_term),
-        "is_dest_diff": (not reference_term) or (dest_term != reference_term),
+        "source_term": source_term if not is_gene else dest_term,
+        "dest_term": dest_term if not is_gene else source_term,
         "steps": steps,
-        "dest_term": dest_term,
         "reference_term": reference_term,
         "row_span": row_span,
-        "weak": weak
+        "weak": weak,
+        "is_gene": is_gene
     }

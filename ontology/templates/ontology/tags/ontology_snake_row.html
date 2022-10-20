@@ -3,7 +3,9 @@
 <tr>
     {% if row_span %}
         <td style="vertical-align: middle; {% if weak %}background-color:#f7f7f7; opacity: 0.6; font-size: 8pt{% endif %}" rowspan="{{ row_span }}">
-            <i class="fa-solid fa-dna mr-1" style="font-size:8pt; color:#bbb"></i><b>{% ontology_term dest_term show_link=is_dest_diff %}</b> {% if weak %}<i class="fa-solid fa-triangle-exclamation text-warning hover-detail" title="All relationships to this Gene Symbol are weak, it will not be considered in condition text matching."></i>{% endif %}
+            <i class="fa-solid {% if is_gene %}fa-circle{% else %}fa-dna{% endif %} mr-1" style="font-size:8pt; color:#bbb"></i>
+            {% ontology_term dest_term show_link=True %}
+            {% if weak %}<i class="fa-solid fa-triangle-exclamation text-warning hover-detail" title="All relationships to this Gene Symbol are weak, it will not be considered in condition text matching."></i>{% endif %}
         </td>
     {% endif %}
     <td {% if not snake.is_strong_enough %}style="background-color:#f7f7f7; opacity: 0.6;font-size: 8pt"{% endif %}>
@@ -28,8 +30,9 @@
                                     </div>
                                     {% if relationship.gencc_quality %}{% if not relationship.gencc_quality.is_strong_enough %}<i class="ml-1 fa-solid fa-triangle-exclamation text-warning hover-detail" title="This relationship is considered weak"></i>{% endif %}{% endif %}
                                     {% if step.reversed %} <i class="text-muted ml-2 fa-solid fa-retweet hover-detail" title="Stored as: {{ step.dest_term.id }} {{ relationship.relation_display }} {{ step.source_term.id }}"></i>{% endif %}</div>
-                                <div class="text-muted hover-detail" title="Import {{ relationship.from_import.import_source }}" data-content="Last imported: {% timestamp relationship.from_import.processed_date text_only=True %}<br/>Context: {{ relationship.from_import.context }}</br>Filename: {{ relationship.from_import.filename }}">
-                                    <span style="font-size:0.8rem">source <span style="word-break: break-all"> {{ relationship.from_import.import_source }}</span></span>
+                                    <div class="d-inline-block text-muted hover-detail" style="font-size:0.8rem" title="Import {{ relationship.from_import.import_source }}" data-content="Last imported: {% timestamp relationship.from_import.processed_date text_only=True %}<br/>Context: {{ relationship.from_import.context }}</br>Filename: {{ relationship.from_import.filename }}">
+                                        source {{ relationship.from_import.import_source }}
+                                    </div>
                                 </div>
                             </div>
                         </div>

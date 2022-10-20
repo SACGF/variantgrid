@@ -1,5 +1,5 @@
 {% if show_link %}<a href="{{ term.get_absolute_url }}" class="hover-link">{% endif %}
-    {% if is_gene %}<span style="letter-spacing: 1px" class="{% if show_link %}hover-link{% endif %}">{{ term.name }}</span>&nbsp;
+    {% if is_gene %}<span style="letter-spacing: 1px" class="{% if show_link %}hover-link{% endif %} font-weight-bold">{{ term.name }}</span>&nbsp;
     {% else %}
         <span class="text-monospace {% if term.is_obsolete %}text-danger{% endif %}">{{ term.id }}</span>
         {% if term.is_obsolete %}<span><i class="fas fa-exclamation-triangle text-warning hover-detail mx-1" title="{{ term.warning_text }}"></i></span>{% endif %}
