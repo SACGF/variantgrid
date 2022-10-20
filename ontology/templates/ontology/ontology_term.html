@@ -4,7 +4,7 @@
 {% load ui_menu_bars %}
 {% load ontology_tags %}
 {% load js_tags %}
-{% block submenu %}{% menu_bar_data %}{% endblock %}
+{% block submenu %}{% menu_bar_data current_record=term %}{% endblock %}
 {% load ui_tabs_builder %}
 {% block title %}{{ term.id }}{% endblock title %}
 {% block content %}
@@ -87,14 +87,6 @@
                                 </div>
                             </div>
                         {% endif %}
-                    {% endif %}
-
-                    {% if weak_relationships %}
-                        <div class="mt-4">
-                            {% labelled label="<i class='fas fa-dna text-warning'></i> Weak Gene Relationships" hint="chunky" %}
-                                {% ontology_relationship_table weak_relationships term "Gene Symbol" %}
-                            {% endlabelled %}
-                        </div>
                     {% endif %}
 
                     {% labelled label="Relationships" %}

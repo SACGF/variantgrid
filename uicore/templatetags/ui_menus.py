@@ -114,3 +114,8 @@ def menu_item(
 @register.simple_tag()
 def absolute_url(name, *args, **kwargs) -> str:
     return get_url_from_view_path(reverse(name, args=args, kwargs=kwargs))
+
+
+@register.inclusion_tag("uicore/menus/current_record.html", takes_context=True)
+def current_record(context, current_record: Any):
+    return {"current_record": current_record}

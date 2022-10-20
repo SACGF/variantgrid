@@ -80,15 +80,20 @@ class GroupedSnakes:
 class GroupedSnakeRow:
     snake: OntologySnake
     row_span: int
+    weak: Optional[bool]
 
     @staticmethod
     def yield_snakes(grouped_snakes: List['GroupedSnakes']) -> Iterator['GroupedSnakeRow']:
         for grouped_snake in grouped_snakes:
             is_first = True
             for snake in grouped_snake.snakes:
-                row_span = len(grouped_snake.snakes) if is_first else 0
-                is_first = False
-                yield GroupedSnakeRow(snake=snake, row_span=row_span)
+                row_span = 0
+                weak = None
+                if is_first:
+                    row_span = len(grouped_snake.snakes)
+                    weak = all(not snake.is_strong_enough for snake in grouped_snake.snakes)
+                    is_first = False
+                yield GroupedSnakeRow(snake=snake, row_span=row_span, weak=weak)
 
 
 @register.inclusion_tag("ontology/tags/ontology_snake_table.html")
@@ -106,17 +111,19 @@ def ontology_snake_table(snakes: Iterable[OntologySnake], reference_term: Option
 
 
 @register.inclusion_tag("ontology/tags/ontology_snake_row.html")
-def ontology_snake_row(snake: OntologySnake, reference_term: Optional[OntologyTerm], row_span: int = 1):
+def ontology_snake_row(snake: OntologySnake, reference_term: Optional[OntologyTerm], row_span: int = 1, weak: Optional[bool] = None):
     steps = snake.show_steps()
     source_term = snake.source_term
     dest_term = steps[-1].dest_term
 
     return {
+        "snake": snake,
         "source_term": source_term,
         "is_source_diff": (not reference_term) or (source_term != reference_term),
         "is_dest_diff": (not reference_term) or (dest_term != reference_term),
         "steps": steps,
         "dest_term": dest_term,
         "reference_term": reference_term,
-        "row_span": row_span
+        "row_span": row_span,
+        "weak": weak
     }

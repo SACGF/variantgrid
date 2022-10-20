@@ -155,6 +155,17 @@ class GeneDiseaseClassification(models.TextChoices):
     STRONG = "8", "Strong"
     DEFINITIVE = "9", "Definitive"
 
+    @property
+    def is_strong_enough(self) -> bool:
+        return self in {GeneDiseaseClassification.STRONG, GeneDiseaseClassification.DEFINITIVE}
+
+    @staticmethod
+    def get_by_label(label: str) -> 'GeneDiseaseClassification':
+        for gdc in GeneDiseaseClassification:
+            if gdc.label == label:
+                return gdc
+        raise ValueError(f"No GeneDiseaseClassification for {label}")
+
     @staticmethod
     def get_above_min(min_classification: str) -> List[str]:
         classifications = []
@@ -502,6 +513,13 @@ class OntologyTermRelation(PostgresPartitionedModel, TimeStampedModel):
     def relation_display(self):
         return OntologyRelation.DISPLAY_NAMES.get(self.relation, self.relation)
 
+    @property
+    def gencc_quality(self) -> Optional[GeneDiseaseClassification]:
+        if extra := self.extra:
+            if strongest := extra.get('strongest_classification'):
+                return GeneDiseaseClassification.get_by_label(strongest)
+        return None
+
     @staticmethod
     def as_mondo(term: OntologyTerm) -> Optional[OntologyTerm]:
         if term.ontology_service == OntologyService.MONDO:
@@ -732,6 +750,14 @@ class OntologySnake:
         self.leaf_term = leaf_term or source_term
         self.paths = paths or []
 
+    @property
+    def is_strong_enough(self) -> bool:
+        for path in self.paths:
+            if gencc_quality := path.gencc_quality:
+                if not gencc_quality.is_strong_enough:
+                    return False
+        return True
+
     def snake_step(self, relationship: OntologyTermRelation) -> 'OntologySnake':
         """
         Creates a new OntologySnake with this extra relationship
@@ -830,7 +856,9 @@ class OntologySnake:
         valid_snakes: List[OntologySnake] = []
 
         relation_q_list = [
-            ~Q(relation__in={OntologyRelation.IS_A, OntologyRelation.EXACT_SYNONYM, OntologyRelation.RELATED_SYNONYM}),
+            # the list of relationships below is hardly complete for stopping MONDO <-> OMIM, that's done as an extra step
+            # but filter out the most common ones here (and IS_A as we don't want to go up/down the hierarchy)
+            ~Q(relation__in={OntologyRelation.IS_A, OntologyRelation.EXACT_SYNONYM, OntologyRelation.RELATED_SYNONYM, OntologyRelation.XREF}),
             OntologySnake.gencc_quality_filter(min_classification),
         ]
         q_relation = functools.reduce(operator.and_, relation_q_list)
@@ -863,6 +891,11 @@ class OntologySnake:
                 if relation.source_term == snake.leaf_term or relation.dest_term == snake.leaf_term:
                     other_term = relation.other_end(snake.leaf_term)
 
+                    ontology_services = {snake.leaf_term.ontology_service, other_term.ontology_service}
+                    # Possibly Narrow or Broad would also be valid??
+                    if OntologyService.MONDO in ontology_services and OntologyService.OMIM in ontology_services and relation.relation != OntologyRelation.EXACT:
+                        continue
+
                     new_snake = snake.snake_step(relation)
                     if other_term.ontology_service == to_ontology:
                         valid_snakes.append(new_snake)
@@ -877,7 +910,7 @@ class OntologySnake:
 
     @staticmethod
     def gencc_quality_filter(quality: GeneDiseaseClassification = GeneDiseaseClassification.STRONG) -> Q:
-        gencc_classifications = GeneDiseaseClassification.get_above_min(GeneDiseaseClassification.STRONG)
+        gencc_classifications = GeneDiseaseClassification.get_above_min(quality)
         return ~Q(from_import__import_source='gencc') | Q(extra__strongest_classification__in=gencc_classifications)
 
     @staticmethod

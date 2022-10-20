@@ -24,7 +24,7 @@ class OntologyTermView(TemplateView):
             if is_gene:
                 update_gene_relations(term.name)
             else:
-                raw_gene_relationships = sorted(OntologySnake.snake_from(term=term, to_ontology=OntologyService.HGNC), key=lambda snake: snake.leaf_relationship.dest_term.short)
+                raw_gene_relationships = sorted(OntologySnake.snake_from(term=term, to_ontology=OntologyService.HGNC, min_classification=GeneDiseaseClassification.REFUTED), key=lambda snake: snake.leaf_relationship.dest_term.short)
                 gene_relationships = LimitedCollection(raw_gene_relationships, 250)
 
             all_relationships: List[OntologyTermRelation] = OntologyTermRelation.relations_of(term)
@@ -40,24 +40,10 @@ class OntologyTermView(TemplateView):
                     else:
                         child_relationships.append(relationship)
 
-                else:
-                    include_direct_relationship = False
-                    if is_gene:
-                        include_direct_relationship = True
-                    elif relationship.dest_term.ontology_service != OntologyService.HGNC:
-                        include_direct_relationship = True
-                    else:
-                        if extra := relationship.extra:
-                            if strongest := extra.get('strongest_classification'):
-                                allowed_set = GeneDiseaseClassification.get_above_min(GeneDiseaseClassification.STRONG)
-                                if strongest not in allowed_set:
-                                    # include_direct_relationship = True
-                                    weak_relationships.append(relationship)
-
-                    if include_direct_relationship:
-                        # gene symbols go into gene_relationships, no need to list them again in direct relationships
-                        # though currently gene symbols don't do reverse gene_relationships, so still show everyhting that links in gene_symbol
-                        regular_relationships.append(relationship)
+                elif is_gene or relationship.dest_term.ontology_service != OntologyService.HGNC:
+                    # gene symbols go into gene_relationships, no need to list them again in direct relationships
+                    # though currently gene symbols don't do reverse gene_relationships, so still show everyhting that links in gene_symbol
+                    regular_relationships.append(relationship)
 
             patients_qs = patients_qs_for_ontology_term(self.request.user, term)
             has_hierarchy = term.ontology_service in {OntologyService.MONDO, OntologyService.HPO}
@@ -66,7 +52,6 @@ class OntologyTermView(TemplateView):
                 "is_ontology": not is_gene,
                 "gene_relationship_count": len(gene_relationships) if gene_relationships else 0,
                 "gene_relationships": gene_relationships,
-                "weak_relationships": weak_relationships,
                 "relationship_count": len(all_relationships) if all_relationships else 0,
                 "parent_relationships": LimitedCollection(parent_relationships, 250) if has_hierarchy else None,
                 "regular_relationships": LimitedCollection(regular_relationships, 250),
