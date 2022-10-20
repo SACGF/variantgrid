@@ -39,6 +39,7 @@ def menu_top(context,
     return {
         'url': url,
         'active': is_active,
+        'type': 'top',
         'title': title,
         'id': f'menu-top-{app_names[0]}'
     }
@@ -105,6 +106,7 @@ def menu_item(
         'icon': icon,
         'admin_only': admin_only,
         'active': is_active,
+        'type': 'side',
         'badge_count': badge_count,
         'id': f'submenu-{url_name}',
         'external': external

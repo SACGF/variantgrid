@@ -1082,4 +1082,16 @@ a .c-hgvs-body .c-hgvs-transcript, a .c-hgvs-body .c-hgvs-nomen {
   color: #4444bb;
 }
 
+.current-record-menu-item {
+  display: none;
+}
+
+.current-record-menu-item.active {
+  display: block;
+  margin-left: 8px;
+  margin-right: 16px;
+  text-align: right;
+  word-break: break-word;
+}
+
 /*# sourceMappingURL=global_bs.css.map */

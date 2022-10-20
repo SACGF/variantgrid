@@ -4,7 +4,7 @@
 {% load ui_menu_bars %}
 {% load ontology_tags %}
 {% load js_tags %}
-{% block submenu %}{% menu_bar_data current_record=term %}{% endblock %}
+{% block submenu %}{% menu_bar_data %}{% endblock %}
 {% load ui_tabs_builder %}
 {% block title %}{{ term.id }}{% endblock title %}
 {% block content %}
@@ -20,6 +20,11 @@
             });
         });
     </script>
+
+    <div class="current-record-menu-item">
+        <div class="text-monospace">{{ term.id }}</div>
+        <div style="font-size: 8pt">{{ term.name }}</div>
+    </div>
 
     <div class="container" style="position:relative">
         <div class="card">

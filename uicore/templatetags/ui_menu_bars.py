@@ -39,8 +39,8 @@ def menu_bar_main(context):
 
 
 @register.inclusion_tag("uicore/menus/menu_bar_data.html", takes_context=True)
-def menu_bar_data(context, current_record: Optional[Any] = None):
-    return {"current_record": current_record}
+def menu_bar_data(context):
+    return {}
 
 
 @register.inclusion_tag("uicore/menus/menu_bar_genes.html", takes_context=True)
