@@ -25,8 +25,8 @@ class OntologyTermView(TemplateView):
             if is_gene:
                 update_gene_relations(term.name)
                 # the reverse of gene_relationships
-                term_relationships = OntologySnake.snake_from(term=term, to_ontology=OntologyService.MONDO, min_classification=GeneDiseaseClassification.REFUTED).snakes + \
-                                     OntologySnake.snake_from(term=term, to_ontology=OntologyService.OMIM,  min_classification=GeneDiseaseClassification.REFUTED).snakes
+                term_relationships = OntologySnake.snake_from(term=term, to_ontology=OntologyService.MONDO, min_classification=GeneDiseaseClassification.ANIMAL).snakes + \
+                                     OntologySnake.snake_from(term=term, to_ontology=OntologyService.OMIM,  min_classification=GeneDiseaseClassification.ANIMAL).snakes
                 term_relationships = list(sorted((snake.reverse() for snake in term_relationships), key=lambda snake: snake.leaf_term))
                 term_relationships = LimitedCollection(term_relationships, 250)
             else:
