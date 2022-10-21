@@ -1,5 +1,7 @@
 from enum import Enum
 from typing import Iterable, Optional, Any, Type, Dict, List, Iterator
+
+from dateutil.tz import gettz
 from django.conf import settings
 from django.http import HttpRequest, StreamingHttpResponse
 
@@ -12,13 +14,13 @@ from library.utils.json_utils import JsonObjType
 import re
 
 
-class ExportColumnType(str, Enum):
+class ExportDataType(str, Enum):
     datetime_notz = "datetime_notz"  # if timezone doesn't really matter
     datetime = "datetime"
     any = "any"
 
 
-def export_column(label: Optional[str] = None, sub_data: Optional[Type] = None, categories: Dict[str, Any] = None, data_type: ExportColumnType = ExportColumnType.any):
+def export_column(label: Optional[str] = None, sub_data: Optional[Type] = None, categories: Dict[str, Any] = None, data_type: ExportDataType = ExportDataType.any):
     """
     Extend ExportRow and annotate methods with export_column.
     The order of defined methods determines the order that the results will appear in an export file
@@ -55,25 +57,34 @@ class ExportFormat(str, Enum):
 class ExportSettings:
 
     RE_TZ_FORMAT = re.compile(r".*/(.*/.*)'[)]")
+    UTC = gettz("UTC")
 
     def __init__(self, tz: timezone):
         self.tz = tz
 
-    def format_heading(self, export_format: ExportFormat, data_type: ExportColumnType, label: str) -> str:
-        if data_type == ExportColumnType.datetime:
-            tz_name = str(self.tz)
-            if match := ExportSettings.RE_TZ_FORMAT.match(tz_name):
-                tz_name = match.group(1)
+    def format_heading(self, export_format: ExportFormat, data_type: ExportDataType, label: str) -> str:
+        if export_format == ExportFormat.csv:
+            if data_type == ExportDataType.datetime:
+                tz_name = str(self.tz)
+                if match := ExportSettings.RE_TZ_FORMAT.match(tz_name):
+                    tz_name = match.group(1)
 
-            return f"{label} ({tz_name})"
+                return f"{label} ({tz_name})"
         return label
 
-    def format_value(self, export_format: ExportFormat, data_type: ExportColumnType, value: Any) -> Any:
-        if data_type == ExportColumnType.datetime and isinstance(value, datetime):
-            value = value.astimezone(self.tz)
-            # want to put the timzone in the string %z or %Z BUT... Excel doesn't support that
-            # because the one constant through history is Excel ruins everything
-            return value.strftime("%Y-%m-%d %H:%M")
+    def format_value(self, export_format: ExportFormat, data_type: ExportDataType, value: Any) -> Any:
+        if export_format == ExportFormat.csv:
+            if data_type == ExportDataType.datetime and isinstance(value, datetime):
+                value = value.astimezone(self.tz)
+                # want to put the timzone in the string %z or %Z BUT... Excel doesn't support that
+                # because the one constant through history is Excel ruins everything
+                return value.strftime("%Y-%m-%d %H:%M")
+        elif export_format == ExportFormat.json:
+            # convert to UTF
+            if isinstance(value, datetime):
+                value = value.astimezone(self.tz)
+                return value.isoformat()
+
         return value
 
     @staticmethod
@@ -209,7 +220,9 @@ class ExportRow:
                 row.append(result)
         return row
 
-    def to_json(self, categories: Optional[Dict[str, Any]] = None) -> JsonObjType:
+    def to_json(self, categories: Optional[Dict[str, Any]] = None, export_settings: Optional[ExportSettings] = None) -> JsonObjType:
+        if not export_settings:
+            export_settings = ExportSettings.get_for_request()
         row = dict()
         for method in ExportRow.get_export_methods(self.__class__, categories=categories):
             result = method(self)
@@ -217,12 +230,15 @@ class ExportRow:
             if result is None:
                 value = None
             elif method.sub_data:
-                value = result.to_json(categories=categories)
+                value = result.to_json(categories=categories, export_settings=export_settings)
             else:
                 value = result
 
             if value == "":
                 value = None
+
+            value = export_settings.format_value(export_format=ExportFormat.json, data_type=method.data_type, value=value)
+
             # row[method.__name__] = value
             row[method.label or method.__name] = value
 

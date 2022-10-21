@@ -18,7 +18,7 @@ from flags.models.models import FlagCollection
 from genes.hgvs import CHGVS, chgvs_diff_description
 from library.django_utils import get_url_from_view_path
 from library.guardian_utils import is_superuser
-from library.utils import ExportRow, export_column, ExportColumnType
+from library.utils import ExportRow, export_column, ExportDataType
 from snpdb.models import VariantAllele, allele_flag_types, GenomeBuild, Variant, ClinGenAllele
 from snpdb.models.models_variant import Allele
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
@@ -143,7 +143,7 @@ class FlagReport(ExportRow):
             else:
                 return self.flag.created, None
 
-    @export_column("Date", data_type=ExportColumnType.datetime)
+    @export_column("Date", data_type=ExportDataType.datetime)
     def date(self) -> str:
         if date := self.data[0]:
             return date

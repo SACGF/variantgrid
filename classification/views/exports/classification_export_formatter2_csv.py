@@ -13,7 +13,7 @@ from classification.views.exports.classification_export_filter import AlleleData
     DiscordanceReportStatus
 from classification.views.exports.classification_export_formatter2 import ClassificationExportFormatter2
 from classification.views.exports.classification_export_utils import CitationCounter
-from library.utils import delimited_row, export_column, ExportRow, ExportColumnType
+from library.utils import delimited_row, export_column, ExportRow, ExportDataType
 from snpdb.models import GenomeBuild
 
 
@@ -71,7 +71,7 @@ class RowID(ExportRow):
     def lab_record_id(self):
         return self.vc.lab_record_id
 
-    @export_column(categories={"transient": True}, data_type=ExportColumnType.datetime)
+    @export_column(categories={"transient": True}, data_type=ExportDataType.datetime)
     def server_created_date(self):
         return self.vc.created
 
