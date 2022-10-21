@@ -241,6 +241,7 @@ class SampleMixin(CohortMixin):
     """ Adds sample to query via annotation kwargs, must have a "sample" field """
 
     def _get_annotation_kwargs_for_node(self, **kwargs) -> Dict:
+        kwargs["override"] = False
         annotation_kwargs = super()._get_annotation_kwargs_for_node(**kwargs)
         if self.sample:
             annotation_kwargs.update(self.sample.get_annotation_kwargs(**kwargs))

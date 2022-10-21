@@ -339,6 +339,7 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
             for parent in self.get_non_empty_parents():
                 a_kwargs.update(parent.get_annotation_kwargs(**kwargs))
 
+        kwargs["existing_annotation_kwargs"] = set(a_kwargs.keys())
         a_kwargs.update(self._get_annotation_kwargs_for_node(**kwargs))
         return a_kwargs
 
