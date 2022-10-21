@@ -1,51 +1,44 @@
+from enum import Enum
 from typing import Iterable, Optional, Any, Type, Dict, List, Iterator
-from dateutil.tz import gettz
 from django.conf import settings
 from django.http import HttpRequest, StreamingHttpResponse
 
 from library.utils.text_utils import delimited_row
 from library.utils.date_utils import local_date_string
 import inspect
-from datetime import datetime
+from datetime import datetime, timezone
 import json
 from library.utils.json_utils import JsonObjType
+import re
 
 
-def export_column(label: Optional[str] = None, sub_data: Optional[Type] = None, categories: Dict[str, Any] = None, format: Dict[str, Any] = None):
+class ExportColumnType(str, Enum):
+    datetime_notz = "datetime_notz"  # if timezone doesn't really matter
+    datetime = "datetime"
+    any = "any"
+
+
+def export_column(label: Optional[str] = None, sub_data: Optional[Type] = None, categories: Dict[str, Any] = None, data_type: ExportColumnType = ExportColumnType.any):
     """
     Extend ExportRow and annotate methods with export_column.
     The order of defined methods determines the order that the results will appear in an export file
     :param label: The label that will appear in the CSV header (defaults to method name if not provided)
     :param sub_data: An optional SubType of another ExportRow for nested data
     :param categories: If this export column is only valid in some contexts, provide it here
-    :param format: formatters used to idenfify data type, e.g. {"tz": "default"}
+    :param data_type: Type of data to be printed
     """
-    tz_name = settings.TIME_ZONE
-    use_tz = None
-    if format and (format_tz_name := format.get("tz")):
-        if format_tz_name == "default":
-            format_tz_name = settings.TIME_ZONE
-        use_tz = gettz(format_tz_name)
-        tz_name = use_tz.tzname(datetime.now())
 
     def decorator(method):
         def wrapper(*args, **kwargs):
-            result = method(*args, **kwargs)
-            if isinstance(result, datetime):
-                if use_tz:
-                    result = result.astimezone(use_tz)
-                return result.strftime("%Y-%m-%d %H:%M")
+            return method(*args, **kwargs)
 
-            return result
         # have to cache the line number of the source method, otherwise we just get the line number of this wrapper
         wrapper.line_number = inspect.getsourcelines(method)[1]
         wrapper.label = label or method.__name__
         if '$site_name' in wrapper.label:
             wrapper.label = wrapper.label.replace('$site_name', settings.SITE_NAME)
 
-        if use_tz:
-            wrapper.label = f"{wrapper.label} ({tz_name})"
-
+        wrapper.data_type = data_type
         wrapper.__name__ = method.__name__
         wrapper.is_export = True
         wrapper.categories = categories
@@ -53,6 +46,40 @@ def export_column(label: Optional[str] = None, sub_data: Optional[Type] = None, 
         return wrapper
     return decorator
 
+
+class ExportFormat(str, Enum):
+    csv = "csv"
+    json = "json"
+
+
+class ExportSettings:
+
+    RE_TZ_FORMAT = re.compile(r".*/(.*/.*)'[)]")
+
+    def __init__(self, tz: timezone):
+        self.tz = tz
+
+    def format_heading(self, export_format: ExportFormat, data_type: ExportColumnType, label: str) -> str:
+        if data_type == ExportColumnType.datetime:
+            tz_name = str(self.tz)
+            if match := ExportSettings.RE_TZ_FORMAT.match(tz_name):
+                tz_name = match.group(1)
+
+            return f"{label} ({tz_name})"
+        return label
+
+    def format_value(self, export_format: ExportFormat, data_type: ExportColumnType, value: Any) -> Any:
+        if data_type == ExportColumnType.datetime and isinstance(value, datetime):
+            value = value.astimezone(self.tz)
+            # want to put the timzone in the string %z or %Z BUT... Excel doesn't support that
+            # because the one constant through history is Excel ruins everything
+            return value.strftime("%Y-%m-%d %H:%M")
+        return value
+
+    @staticmethod
+    def get_for_request():
+        from snpdb.user_settings_manager import UserSettingsManager
+        return ExportSettings(tz=UserSettingsManager.get_user_timezone())
 
 class ExportRow:
 
@@ -104,17 +131,21 @@ class ExportRow:
             yield row_data
 
     @classmethod
-    def csv_generator(cls, data: Iterable[Any], delimiter=',', include_header=True, categories: Optional[Dict[str, Any]] = None) -> Iterator[str]:
+    def csv_generator(cls, data: Iterable[Any], delimiter=',', include_header=True, categories: Optional[Dict[str, Any]] = None, export_settings: Optional[ExportSettings] = None) -> Iterator[str]:
+        if not export_settings:
+            export_settings = ExportSettings.get_for_request()
         try:
             if include_header:
-                yield delimited_row(cls.csv_header(categories=categories), delimiter=delimiter)
+                yield delimited_row(cls.csv_header(categories=categories, export_settings=export_settings), delimiter=delimiter)
             for row_data in cls._data_generator(data):
-                yield delimited_row(row_data.to_csv(categories=categories), delimiter=delimiter)
+                yield delimited_row(row_data.to_csv(categories=categories, export_settings=export_settings), delimiter=delimiter)
         except:
             from library.log_utils import report_exc_info
             report_exc_info(extra_data={"activity": "Exporting"})
             yield "** File terminated due to error"
             raise
+
+    # Warning: We don't actually do anything with the formatting of JSON objects
 
     @classmethod
     def json_generator(cls, data: Iterable[Any], records_key: str = "records", categories: Optional[Dict[str, Any]] = None) -> Iterator[str]:
@@ -146,19 +177,24 @@ class ExportRow:
             raise
 
     @classmethod
-    def csv_header(cls, categories: Optional[Dict[str, Any]] = None) -> List[str]:
+    def csv_header(cls, categories: Optional[Dict[str, Any]] = None, export_settings: Optional[ExportSettings] = None) -> List[str]:
+        if not export_settings:
+            export_settings = ExportSettings.get_for_request()
         row = list()
         for method in ExportRow.get_export_methods(cls, categories=categories):
             label = method.label or method.__name__
+            label = export_settings.format_heading(export_format=ExportFormat.csv, data_type=method.data_type, label=label)
             if sub_data := method.sub_data:
-                sub_header = sub_data.csv_header(categories=categories)
+                sub_header = sub_data.csv_header(categories=categories, export_settings=export_settings)
                 for sub in sub_header:
                     row.append(label + "." + sub)
             else:
                 row.append(label)
         return row
 
-    def to_csv(self, categories: Optional[Dict[str, Any]] = None) -> List[str]:
+    def to_csv(self, categories: Optional[Dict[str, Any]] = None, export_settings: Optional[ExportSettings] = None) -> List[str]:
+        if not export_settings:
+            export_settings = ExportSettings.get_for_request()
         row = list()
         for method in ExportRow.get_export_methods(self.__class__, categories=categories):
             result = method(self)
@@ -167,8 +203,9 @@ class ExportRow:
                     for _ in sub_data.csv_header(categories=categories):
                         row.append("")
                 else:
-                    row += result.to_csv()
+                    row += result.to_csv(categories=categories, export_settings=export_settings)
             else:
+                result = export_settings.format_value(export_format=ExportFormat.csv, data_type=method.data_type, value=result)
                 row.append(result)
         return row
 

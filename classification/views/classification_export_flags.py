@@ -8,7 +8,7 @@ from classification.models.classification import ClassificationModification
 from classification.views.classification_export_utils import ExportFormatter
 from flags.models.models import Flag, FlagComment
 from library.django_utils import get_url_from_view_path
-from library.utils import ExportRow, export_column
+from library.utils import ExportRow, export_column, ExportColumnType
 
 
 @dataclass(frozen=True)
@@ -43,11 +43,11 @@ class ProblemRow(ExportRow):
     def exported_c_hgvs(self):
         return self.cm.get(SpecialEKeys.C_HGVS)
 
-    @export_column("Classification Last Updated", format={"tz": "default"})
+    @export_column("Classification Last Updated", data_type=ExportColumnType.datetime)
     def classification_last_updated(self):
         return self.cm.created
 
-    @export_column("Flag Last Updated", format={"tz": "default"})
+    @export_column("Flag Last Updated", data_type=ExportColumnType.datetime)
     def flag_last_updated(self):
         if fc := self.problem.flag_comment:
             return fc.created
