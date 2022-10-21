@@ -2,7 +2,7 @@ import operator
 import time
 from collections import defaultdict
 from functools import reduce
-from typing import Optional, Counter
+from typing import Optional
 
 from django.db.models import Q
 
@@ -41,35 +41,45 @@ class MergeNode(AnalysisNode):
                     return parent
         return super().get_single_parent()  # Will throw exception due to multiple samples
 
+    @staticmethod
+    def _optimise_q_dict(parent_arg_q_dict):
+        # value = set of parent_id that shares Q
+        arg_q_nodes = defaultdict(lambda: defaultdict(set))
+        all_q_by_hash = {}
+
+        for parent, arg_q_dict in parent_arg_q_dict.items():
+            for arg, q_dict in arg_q_dict.items():
+                for q_hash, q in q_dict.items():
+                    arg_q_nodes[arg][q_hash].add(parent.pk)
+                    all_q_by_hash[q_hash] = q
+
+        # Find the q_hash that has the highest count
+        # divide the parents into those that have it and don't
+        # Make an OR query with (   |  )
+        # Add the query to
+        # build an OR
+        # extract it out
+        #
+
+        # arg_q_nodes
+        # Maybe go and sort via count - take the highest
+        for arg, q_dict in arg_q_nodes.items():
+            print(arg)
+            for q_hash, parents in q_dict.items():
+                print(f"{q_hash}: {parents}")
+
+        arg_q_dict = {}
+        return arg_q_dict
+
     def _get_arg_q_dict_from_parents_and_node(self):
         # Go through and get the common things to all parents
         start = time.time()
         parent_arg_q_dict = {}
-        arg_q_count = defaultdict(Counter)
-        all_q_by_hash = {}
         for parent in self.get_non_empty_parents():
             arg_q_dict = parent.get_arg_q_dict(disable_cache=True)
             parent_arg_q_dict[parent] = arg_q_dict
 
-            for k, q_dict in arg_q_dict.items():
-                for q_hash, q in q_dict.items():
-                    all_q_by_hash[q_hash] = q
-                    arg_q_count[k][q_hash] += 1
-
-        num_non_empty_parents = len(parent_arg_q_dict)
-        # Find the ones that are common (in all)
-        all_arg_q_dict = defaultdict(dict)
-        for k, q_count in arg_q_count.items():
-            print("-" * 20)
-            print(f"{k=}")
-            for q_hash, count in q_count.items():
-                print(f"{q_hash}: {count=}")
-                if count == num_non_empty_parents:
-                    q = all_q_by_hash[q_hash]
-                    all_arg_q_dict[k][q_hash] = q
-
-        print("all_arg_q_dict:")
-        print(all_arg_q_dict)
+        self._optimise_q_dict(parent_arg_q_dict)
 
         # TODO: Go and knock them out of the others, and leave only what's unique
         arg_q_dict = {}
