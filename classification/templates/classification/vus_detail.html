@@ -1,0 +1,48 @@
+{% load classification_tags %}
+{% load english_tags %}
+{% load ui_utils %}
+{% load ui_tabs_builder %}
+<h5>VUS Overlaps</h5>
+
+<table class="table">
+    <thead>
+        <tr>
+            <th>c.HGVS</th>
+            <th>Status</th>
+            <th class="text-center" style="width:50%">Lab/Clinical Significance</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for grouping in overlaps.overlaps_vus %}
+            <tr>
+                <td>
+                    <a href="{{ overlap.allele.get_absolute_url }}" class="hover-link">
+                    {% for hgvs in grouping.c_hgvses %}
+                        <div>{% c_hgvs hgvs %}</div>
+                    {% endfor %}
+                    </a>
+                    <br/>
+                    <div>
+                        <a class="hover-link" href="{% url 'classification_diff' %}?allele={{ grouping.allele.pk }}">Show Diffs</a>
+                    </div>
+                </td>
+                <td {% if not forloop.first %}style="border-top-style:dashed"{% endif %}>
+                    {% if grouping.shared %}
+                        <span class="{{ grouping.status.css_class }}">{{ grouping.status }}</span>
+                        <div>{{ grouping.status.lab_count }} Sharing Lab{% plural grouping.status.lab_count %}</div>
+                    {% else %}
+                        <b class="overlap-no_entries">Not-shared Submissions</b>
+                    {% endif %}
+                    {% if grouping.discordance_report %}
+                        <div class="mt-2"><a class="hover-link" href="{{ grouping.discordance_report.get_absolute_url }}">See Discordance Report</a>
+                        </div>
+                    {% endif %}
+                </td>
+                <td {% if not forloop.first %}style="border-top-style:dashed"{% endif %}>
+                    {% classification_lab_summaries grouping.lab_clinical_significances shared=grouping.shared %}
+                </td>
+            </tr>
+            {% empty %}<td colspan="3">No Records</td>
+        {% endfor %}
+    </tbody>
+</table>

@@ -1,0 +1,19 @@
+{% extends "uicore/page/base.html" %}
+{% load ui_menu_bars %}
+{% load ui_help %}
+{% load lab_tags %}
+{% block title %}Overlaps{% endblock %}
+{% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
+{% block content %}
+<div class="container">
+    {% page_help_embedded title='VUS Overlaps' %}
+        You can review which of your classifications have overlaps with other labs where all records are VUS.
+    {% end_page_help_embedded %}
+    {% lab_picker data=lab_picker_data %}
+
+    <div data-toggle="ajax" href="{% url 'vus_detail' lab_picker_data.selection %}">
+        <div class="loading-message">Loading VUS Overlaps, this may take a while.</div>
+    </div>
+
+</div>
+{% endblock %}

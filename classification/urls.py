@@ -12,6 +12,7 @@ from classification.views.classification_email_view import summary_email_preview
 from classification.views.classification_export_view import ClassificationApiExportView
 from classification.views.classification_overlaps_view import view_overlaps, post_clinical_context, \
     view_clinical_context, view_overlaps_detail
+from classification.views.classification_overlaps_vus_view import view_overlaps_vus, view_overlaps_vus_detail
 from classification.views.clinvar_export_view import ClinVarMatchView, clinvar_match_detail
 from classification.views.classification_view import ClassificationView, LabGeneClassificationCountsView
 from classification.views.classification_view_metrics import view_classification_metrics, \
@@ -137,6 +138,9 @@ urlpatterns = [
     perm_path('overlaps', view_overlaps, name='overlaps'),
     perm_path('overlaps/<str:lab_id>', view_overlaps, name='overlaps'),
     perm_path('overlaps_detail/<str:lab_id>', view_overlaps_detail, name='overlaps_detail'),
+    perm_path('vus', view_overlaps_vus, name='vus'),
+    perm_path('vus/<str:lab_id>', view_overlaps_vus, name='vus'),
+    perm_path('vus_detail/<str:lab_id>', view_overlaps_vus_detail, name='vus_detail'),
     perm_path('clinical_context/<int:pk>', view_clinical_context, name='clinical_context'),
     perm_path('hgvs_issues', view_hgvs_issues, name='hgvs_issues'),
     perm_path('hgvs_issues/allele/datatable', DatabaseTableView.as_view(column_class=AlleleColumns), name='allele_datatable'),

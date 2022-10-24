@@ -1,6 +1,6 @@
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import List, Optional, Dict, Set
+from typing import List, Optional, Dict, Set, Iterator
 
 from django.db.models import Count, QuerySet, Subquery
 from lazy import lazy
@@ -85,6 +85,13 @@ class ClinicalGroupingOverlap:
     @property
     def is_multi_lab(self):
         return len(self.labs) > 1
+
+    @property
+    def is_all_vus(self):
+        for group in self.groups:
+            if not group.clinical_significance_to.startswith("VUS"):
+                return False
+        return True
 
     @property
     def _sort_value(self):
@@ -192,9 +199,10 @@ class OverlapsCalculator:
         :param perspective: User must be present in this perspective
         """
         self.calculator_state = OverlapsCalculatorState(perspective=perspective)
-        self.multi_lab_counts: Dict[DiscordanceLevel, int] = defaultdict(int)
-        self.same_lab_counts: Dict[DiscordanceLevel, int] = defaultdict(int)
 
+    @lazy
+    def overlaps(self) -> List[AlleleOverlap]:
+        perspective = self.calculator_state.perspective
         lab_ids = perspective.lab_ids
         # find all overlaps, then see if user is allowed to see them and if user wants to see them (lab restriction)
 
@@ -212,18 +220,23 @@ class OverlapsCalculator:
         for allele, cms in group_by_key(cm_qs, lambda x: x.classification.allele):
             if len(cms) >= 2 and any((cm.classification.lab_id in lab_ids for cm in cms)):
                 overlap = AlleleOverlap(calculator_state=self.calculator_state, allele=allele)
+                all_overlaps.append(overlap)
                 for cm in cms:
                     overlap.add_classification(cm)
-                all_overlaps.append(overlap)
-                for cc in overlap.clinical_groupings:
-                    if cc.shared:
-                        if cc.is_multi_lab:
-                            self.multi_lab_counts[cc.status.level] += 1
-                        else:
-                            self.same_lab_counts[cc.status.level] += 1
 
         all_overlaps.sort(reverse=True)
-        self.overlaps = all_overlaps
+        return all_overlaps
+
+    @property
+    def clinical_groupings_overlaps(self) -> Iterator[ClinicalGroupingOverlap]:
+        for overlap in self.overlaps:
+            for cc in overlap.clinical_groupings:
+                yield cc
+
+    def overlaps_vus(self) -> Iterator[ClinicalGroupingOverlap]:
+        for cc in self.clinical_groupings_overlaps:
+            if cc.is_all_vus and cc.is_multi_lab:
+                yield cc
 
     @property
     def overlap_sets(self) -> List[OverlapSet]:
@@ -233,7 +246,24 @@ class OverlapsCalculator:
             OverlapSet(segmented[1], label="Single-Lab"),
         ]
 
-    # utility methods for the sake of templates
+    @lazy
+    def multi_lab_counts(self) -> Dict[DiscordanceLevel, int]:
+        counts = defaultdict(int)
+        for cc in self.clinical_groupings_overlaps:
+            if cc.shared and cc.is_multi_lab:
+                counts[cc.status.level] += 1
+        return counts
+
+    @lazy
+    def same_lab_counts(self) -> Dict[DiscordanceLevel, int]:
+        counts = defaultdict(int)
+        for cc in self.clinical_groupings_overlaps:
+            if cc.shared and not cc.is_multi_lab:
+                counts[cc.status.level] += 1
+        return counts
+
+    # utility methods for the sake of templates, I'm sure there's a better way to handle these
+
     @property
     def multi_concordant_agreement(self):
         return self.multi_lab_counts[DiscordanceLevel.CONCORDANT_AGREEMENT]
