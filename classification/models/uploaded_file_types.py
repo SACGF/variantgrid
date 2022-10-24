@@ -53,7 +53,29 @@ class FileHandle(ABC):
                     or self.filename.endswith(".tgz")
             ):
                 with tarfile.open(fileobj=input_file, mode="r:*") as tarry:
-                    tarry.extractall(path=download_dir)
+                    
+                    import os
+                    
+                    def is_within_directory(directory, target):
+                        
+                        abs_directory = os.path.abspath(directory)
+                        abs_target = os.path.abspath(target)
+                    
+                        prefix = os.path.commonprefix([abs_directory, abs_target])
+                        
+                        return prefix == abs_directory
+                    
+                    def safe_extract(tar, path=".", members=None, *, numeric_owner=False):
+                    
+                        for member in tar.getmembers():
+                            member_path = os.path.join(path, member.name)
+                            if not is_within_directory(path, member_path):
+                                raise Exception("Attempted Path Traversal in Tar File")
+                    
+                        tar.extractall(path, members, numeric_owner=numeric_owner) 
+                        
+                    
+                    safe_extract(tarry, path=download_dir)
             else:
                 with open(download_dir / self.filename, 'wb') as output_file:
                     output_file.write(input_file.read())
