@@ -33,7 +33,7 @@ from classification.models import Classification, post_delete
 from library.constants import DAY_SECS
 from library.database_utils import queryset_to_sql
 from library.django_utils import thread_safe_unique_together_get_or_create
-from library.log_utils import report_event
+from library.log_utils import report_event, log_traceback
 from library.utils import format_percent
 from snpdb.models import BuiltInFilters, Sample, Variant, VCFFilter, Wiki, Cohort, VariantCollection, \
     ProcessingStatus, GenomeBuild, AlleleSource, Contig, SampleFilePath
@@ -99,6 +99,9 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
         self._cached_parents = None
         self._cached_analysis_errors = None
         self._cache_node_q = settings.ANALYSIS_NODE_CACHE_Q  # Disable for unit tests
+
+    def __lt__(self, other):
+        return self.pk < other.pk
 
     def get_subclass(self):
         """ Returns the node loaded as a subclass """
@@ -402,7 +405,10 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
                 else:
                     arg_q_dict[None] = {}
             if self._cache_node_q:
-                cache.set(cache_key, arg_q_dict)
+                try:
+                    cache.set(cache_key, arg_q_dict)
+                except:
+                    log_traceback()
         return arg_q_dict
 
     def get_contigs(self) -> Set[Contig]:
