@@ -278,6 +278,8 @@ function enhanceAndMonitor() {
             }
         },
 
+        /*
+        // makes .main-icon icons in divs with the same data-group-id glow when one is highlighted
         {test: '[data-group-id]',
             func: (node) => {
                 let $node = $(node);
@@ -291,6 +293,7 @@ function enhanceAndMonitor() {
                 });
             }
         }
+         */
     ];
 
     // run the processors, and check recursively
