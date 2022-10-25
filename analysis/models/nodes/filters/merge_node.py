@@ -58,8 +58,8 @@ class MergeNode(AnalysisNode):
             This only works on arg = None (as those can be re-composed)
         """
 
-        print("split common:")
-        print(parent_arg_q_dict)
+        #print("split common:")
+        #print(parent_arg_q_dict)
 
         arg_q_nodes = defaultdict(set)
         all_q_by_hash = {}
@@ -82,9 +82,9 @@ class MergeNode(AnalysisNode):
         non_combine_parents = parents - combine_parents
 
         if combine_parents:
-            print("-" * 10)
-            print("Combining:")
-            print(combine_q_hash)
+            # print("-" * 10)
+            # print("Combining:")
+            # print(combine_q_hash)
 
             combine_parent_arg_q_dict = {p: parent_arg_q_dict[p] for p in combine_parents}
 
@@ -98,10 +98,10 @@ class MergeNode(AnalysisNode):
             arg_q_dict = parent_arg_q_dict[parent]
             # If there is something else other than None - then we need to run the full queryset
             non_none_keys = [k for k in arg_q_dict.keys() if k is not None]
-            print(f"{parent} - non-none keys: {non_none_keys}")
+            # print(f"{parent} - non-none keys: {non_none_keys}")
 
             if non_none_keys:
-                qs = parent.get_queryset(disable_cache=True)  # Not passing in arg_q_dict - to run full query
+                qs = parent.get_queryset(arg_q_dict=arg_q_dict, disable_cache=True)  # Not passing in arg_q_dict - to run full query
                 or_list.append(Q(pk__in=qs.values_list("pk", flat=True)))
             else:
                 remaining_q_set = arg_q_dict.get(None, {}).values()
@@ -116,10 +116,10 @@ class MergeNode(AnalysisNode):
             for arg, q_hash_set in extract_arg_q_hash.items():
                 if q_dict := arg_q_dict.get(arg, {}):
                     for q_hash in q_hash_set:
-                        print(f"{arg=} removing {q_hash} from {q_dict}")
+                        # print(f"{arg=} removing {q_hash} from {q_dict}")
                         q_dict.pop(q_hash, None)
                     if not q_dict:
-                        print(f"Removing empty '{arg}'")
+                        # print(f"Removing empty '{arg}'")
                         del arg_q_dict[arg]
 
     def _get_merged_q_dict2(self, parent_arg_q_dict):
@@ -157,8 +157,8 @@ class MergeNode(AnalysisNode):
             arg_q_dict = parent.get_arg_q_dict(disable_cache=True)
             parent_arg_q_dict[parent] = arg_q_dict
 
-        arg_q_dict = self._get_merged_q_dict(parent_arg_q_dict)  # Slow old way
-        # arg_q_dict = self._get_merged_q_dict2(parent_arg_q_dict)  # This is just used for testing at the moment
+        # arg_q_dict = self._get_merged_q_dict(parent_arg_q_dict)  # Slow old way
+        arg_q_dict = self._get_merged_q_dict2(parent_arg_q_dict)  # This is just used for testing at the moment
 
         end = time.time()
         print(f"merge calculations took {end-start} secs")
