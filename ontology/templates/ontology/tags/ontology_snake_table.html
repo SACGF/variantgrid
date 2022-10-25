@@ -11,7 +11,7 @@
                         <div><i class="fa-solid fa-dna main-icon mr-1" style="font-size:8pt; color:#bbb"></i> = {% if is_gene %}{{ reference_term.name }}{% else %}<em>Gene Symbol</em>{% endif %}</div>
                     </div>
                     <div>
-                        <label class="ml-2 form-check-label"><input type="checkbox" onclick="$('.redundant').toggleClass('visible-hidden');" /> &nbsp;Show redundant term labels</label>
+                        <label class="ml-2 form-check-label"><input type="checkbox" data-cookie="ontology-redundant-labels" checked="checked" onclick="$('.redundant').toggleClass('visible-hidden');" /> &nbsp;Show redundant term labels</label>
                     </div>
                 </div>
             </th>

@@ -278,6 +278,28 @@ function enhanceAndMonitor() {
             }
         },
 
+        // use to have a checkbox synced to cookie (no save to database required)
+        // checkbox will start as its default, but if a cookie has been set to "true" or "false" and the prop
+        // checked is the opposite of that, the checkbox will be toggled to the other state (firing any change listeners)
+        {test: 'input[type=checkbox][data-cookie]',
+            func: (node) => {
+                let $node = $(node);
+                let cookieName = $node.attr('data-cookie') || $node.attr('id') || $node.attr('name');
+
+                $node.change(() => {
+                   let checked = !!$node.prop('checked');
+                   Cookies.set(cookieName, checked ? 'true' : 'false', {sameSite: 'strict'});
+                });
+
+                let checked = !!$node.prop('checked') ? 'true' : 'false';
+                let existingCookie = Cookies.get(cookieName);
+
+                if (existingCookie && existingCookie != checked) {
+                    $node.click();
+                }
+            }
+        }
+
         /*
         // makes .main-icon icons in divs with the same data-group-id glow when one is highlighted
         {test: '[data-group-id]',
