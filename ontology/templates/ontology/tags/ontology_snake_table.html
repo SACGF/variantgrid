@@ -4,10 +4,15 @@
         <tr>
             <th style="width:30%">{% if is_gene %}Ontology Term{% else %}Gene Symbol{% endif %}</th>
             <th>
-                <div style="margin-left: 6px" class="text-muted">
-                    <div {% if not is_gene %}data-group-id="{{ reference_term.id }}"{% endif %}><i class="fa-solid fa-circle main-icon mr-1" style="font-size:8pt; color:#bbb"></i> {% if is_gene %}<em>Ontology Term</em>{% else %}{{ reference_term.id }}{% endif %}</div>
-                    <div class="my-1"><i class="fa-solid fa-arrow-down text-muted mr-1"></i> Via Relationships<br/></div>
-                    <div {% if is_gene %}data-group-id="{{ reference_term.id }}"{% endif %}><i class="fa-solid fa-dna main-icon mr-1" style="font-size:8pt; color:#bbb"></i> {% if is_gene %}{{ reference_term.name }}{% else %}<em>Gene Symbol</em>{% endif %}</div>
+                <div  style="display:flex; flex-direction: row; align-items: end">
+                    <div style="margin-left: 6px" class="text-muted">
+                        <div><i class="fa-solid fa-circle main-icon mr-1" style="font-size:8pt; color:#bbb"></i> = {% if is_gene %}<em>Ontology Term</em>{% else %}{{ reference_term.id }}{% endif %}</div>
+                        <div class="my-1"><i class="fa-solid fa-arrow-down text-muted mr-1"></i> = Via Relationships<br/></div>
+                        <div><i class="fa-solid fa-dna main-icon mr-1" style="font-size:8pt; color:#bbb"></i> = {% if is_gene %}{{ reference_term.name }}{% else %}<em>Gene Symbol</em>{% endif %}</div>
+                    </div>
+                    <div>
+                        <label class="ml-2 form-check-label"><input type="checkbox" data-cookie="ontology-redundant-labels" checked="checked" onclick="$('.redundant').toggleClass('visible-hidden');" /> &nbsp;Show redundant term labels</label>
+                    </div>
                 </div>
             </th>
         </tr>

@@ -21,14 +21,14 @@
         });
     </script>
 
-    <div class="current-record-menu-item" data-group-id="{{ term.id }}">
+    <div class="current-record-menu-item">
         {% if is_ontology %}
             <div class="text-small text-muted">viewing</div>
             <div><i class="fa-solid fa-circle main-icon mr-1" style="color:#bbb; font-size:8pt"></i><span class="text-monospace">{{ term.id }}</span></div>
             <div style="font-size: 8pt">{{ term.name }}</div>
         {% else %}
             <div class="text-small text-muted">viewing</div>
-            <i data-group-id="{{ term.id }}" class="fas fa-dna main-icon"></i><label>{{ term.name }}</label>
+            <i class="fas fa-dna main-icon"></i><label>{{ term.name }}</label>
         {% endif %}
     </div>
 

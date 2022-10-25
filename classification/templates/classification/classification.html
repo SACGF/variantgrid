@@ -88,9 +88,12 @@
 </script>
 {% endblock %}
 {% block content %}
+    {% comment %} Good functionality to have, but probably best done as a concerted effort across the product
     <div class="current-record-menu-item">
-        <div style="font-size: 8pt">{{ record.lab_record_id }}</div>
+        <div class="text-small text-muted"><i class="fa-regular fa-eye"></i> viewing</div>
+        <div style="font-size: 8pt">{{ record.org_name }} / {{ record.lab_name }} / {{ record.lab_record_id }}</div>
     </div>
+    {% endcomment %}
     <div class="container-fluid position-relative">
         <div id="vc-form">
             <div id="vcform-filter-wrapper" class="inline-form"

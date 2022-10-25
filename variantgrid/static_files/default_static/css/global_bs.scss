@@ -687,6 +687,7 @@ div.background-image {
 
 // still used by wiki (not yet compatible with bootstrap's d-none
 .hidden { display: none }
+.visible-hidden {visibility: hidden}
 
 .toggle-link {
   color: #88B;
@@ -1122,6 +1123,9 @@ a .c-hgvs-body {
   word-break: break-word;
 }
 
+/*
+// used in combination with gloabl.js's main active item
+
 @keyframes highlight-select {
   from {transform: scale(1) }
     to { transform:scale(1.2) }
@@ -1131,3 +1135,4 @@ a .c-hgvs-body {
     color: #4a4 !important;
     animation: highlight-select 1s infinite alternate;
 }
+ */

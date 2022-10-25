@@ -31,13 +31,13 @@ Upload VCFs to:
 
 VariantGrid code is free to use for research and evaluation, while production commercial use requires a [licence](https://github.com/SACGF/variantgrid/blob/master/LICENCE.md), before code becomes fully free/open source in 4 years.
 
-Please contact us for dicussion for support/collaboration.
+Please contact us for discussion for support/collaboration.
 
 ## Other resources
 
 * [User guide at read the docs](https://variantgrid.readthedocs.io/en/latest/)
 * [VariantGrid.com](https://variantgrid.com) main site, and research cloud server
-* [Techniacl Wiki](https://github.com/SACGF/variantgrid/wiki) wiki for installation/maintenance.
+* [Technical Wiki](https://github.com/SACGF/variantgrid/wiki) wiki for installation/maintenance.
 
 ## Installation
 

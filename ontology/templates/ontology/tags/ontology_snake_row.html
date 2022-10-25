@@ -2,7 +2,7 @@
 {% load js_tags %}
 <tr>
     {% if row_span %}
-        <td data-group-id="{{ dest_term.id }}" style="vertical-align: middle; {% if weak %}background-color:#f7f7f7; opacity: 0.6; font-size: 8pt{% endif %}" rowspan="{{ row_span }}">
+        <td style="vertical-align: middle; {% if weak %}background-color:#f7f7f7; opacity: 0.6; font-size: 8pt{% endif %}" rowspan="{{ row_span }}">
             <i class="main-icon fa-solid {% if is_gene %}fa-circle{% else %}fa-dna{% endif %} mr-1" style="font-size:8pt; color:#bbb"></i>
             {% ontology_term dest_term show_link=True spaced=True %}
             {% if weak %}<i class="fa-solid fa-triangle-exclamation text-warning hover-detail" title="All relationships to this Gene Symbol are weak, it will not be considered in condition text matching."></i>{% endif %}
@@ -10,7 +10,7 @@
     {% endif %}
     <td {% if not snake.is_strong_enough %}style="background-color:#f7f7f7; opacity: 0.6;font-size: 8pt"{% endif %}>
         <div>
-            <i class="fa-solid fa-circle main-icon" style="position:relative; left:6px; top:2px; font-size:8pt; color:#bbb" data-group-id="{{ top_term.id }}"></i>
+            <i class="fa-solid fa-circle main-icon" style="position:relative; left:6px; top:2px; font-size:8pt; color:#bbb"></i><div class="d-inline-block text-muted redundant" style="font-size:8pt; margin-left:12px">{{ top_term.id }}</div>
         </div>
         {% for step in steps %}
             {% with relationship=step.relationship %}
@@ -38,7 +38,7 @@
                         </div>
                     </div>
                     {% if forloop.last %}
-                        <i class="fa-solid fa-dna main-icon" style="position:relative; left:6px; bottom:2px; font-size:8pt; color:#bbb" data-group-id="{{ bottom_term.id }}"></i>
+                        <i class="fa-solid fa-dna main-icon" style="position:relative; left:6px; bottom:2px; font-size:9pt; color:#bbb"></i><div class="d-inline-block text-muted redundant" style="font-size:8pt; margin-left:12px">{{ bottom_term.name }}</div>
                     {% else %}
                         <div class="my-2">{% ontology_term step.dest_term show_link=True %}</div>
                     {% endif %}
