@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from datetime import timedelta, datetime
 from enum import Enum
-from typing import Optional, Dict, List, TypeVar, Generic, Iterable, Type, Union
+from typing import Optional, Dict, List, TypeVar, Generic, Iterable, Type, Tuple
 
 from django.db.models import Model
 from django.utils import timezone
@@ -200,7 +200,7 @@ class OntologyBuilder:
                  aliases: Optional[List[str]] = None,
                  primary_source: bool = True,
                  status: Optional[OntologyTermStatus] = None,
-                 trusted_source: bool = True) -> Union[OntologyTerm, bool]:
+                 trusted_source: bool = True) -> Tuple[OntologyTerm, bool]:
         """
         Returns OntologyTerm and boolean indicated True for created, False for already existed
         TODO: The created boolean will return True on multiple requests to add_term with the same import_builder
