@@ -279,7 +279,7 @@ class Migrator:
 
             self.prompt(refresh=False)
 
-        self.run_and_callback(migrations=list(Migrator.STANDARD_MIGRATIONS), callback=lambda success: on_complete(success))
+        self.run_and_callback(migrations=list(Migrator.STANDARD_MIGRATIONS), callback=on_complete)
 
     def run_and_re_prompt(self, migrations: List[SubMigration]):
         self.run_and_callback(migrations, lambda _: self.prompt())

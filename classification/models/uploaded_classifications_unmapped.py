@@ -100,7 +100,7 @@ class UploadedClassificationsUnmapped(TimeStampedModel):
     @property
     def message_counts(self) -> Optional[List[Tuple[str, int]]]:
         if summary := self.validation_summary:
-            entries = [(key, value) for key, value in summary.get("message_counts").items()]
+            entries = list(summary.get("message_counts").items())
             return sorted(entries, key=lambda x: x[0])
 
     @property
