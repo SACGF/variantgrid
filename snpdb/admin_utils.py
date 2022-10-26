@@ -242,7 +242,7 @@ class ModelAdminBasics(admin.ModelAdmin):
         action = self.get_action(action_name)
         response = action[0](self, request, self.model.objects.filter(pk=object_id))
         if not response:
-            response = HttpResponseRedirect(f"../change/")
+            response = HttpResponseRedirect("../change/")
         return response
 
     def get_urls(self):

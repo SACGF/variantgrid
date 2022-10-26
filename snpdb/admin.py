@@ -154,7 +154,7 @@ class ClinVarKeyAdmin(ModelAdminBasics):
         from classification.models.clinvar_export_prepare import ClinvarExportPrepare
         report = ClinvarExportPrepare().update_export_records_for_keys(list(queryset.all()))
         if len(report) > 10:
-            self.message_user(request, message=f"Showing first 10 messages", level=messages.INFO)
+            self.message_user(request, message="Showing first 10 messages", level=messages.INFO)
         for report_row in report[0:10]:
             self.message_user(request, message=report_row, level=messages.INFO)
 

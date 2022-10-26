@@ -9,7 +9,7 @@ def _one_off_add_ontology_versions(apps, _schema_editor):
 
     # There should be 1 made in 0016_one_off_assign_ontology_import_versions if we were able to
     if ontology_version := OntologyVersion.objects.all().first():
-        print(f"Assigning existing ontology_version to existing annotations versions.")
+        print("Assigning existing ontology_version to existing annotations versions.")
         av_qs = AnnotationVersion.objects.filter(variant_annotation_version__isnull=False)
         av_qs.update(ontology_version=ontology_version)
 
