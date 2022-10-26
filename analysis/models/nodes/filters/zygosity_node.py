@@ -29,7 +29,7 @@ class ZygosityNode(AncestorSampleMixin, AnalysisNode):
     def get_zygosity_name(self):
         return dict(ZygosityNodeZygosity.CHOICES)[self.zygosity]
 
-    def _get_node_arg_q_dict(self) -> Dict[Optional[str], Q]:
+    def _get_node_arg_q_dict(self) -> Dict[Optional[str], Dict[str, Q]]:
         if self.zygosity == ZygosityNodeZygosity.MULTIPLE_HIT:
             parent = self.get_single_parent()
             # Need to pass in kwargs in case we have parent (eg VennNode) that doesn't have needed annotation kwargs
@@ -45,7 +45,7 @@ class ZygosityNode(AncestorSampleMixin, AnalysisNode):
             q = Q(**{f"{field}": zygosity})
         if self.exclude:
             q = ~q
-        return {alias: q}
+        return {alias: {str(q): q}}
 
     def _get_method_summary(self):
         if self.modifies_parents():
