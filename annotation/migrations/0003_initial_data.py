@@ -15,7 +15,7 @@ def populate_mutational_signature_info(apps, schema_editor):
     config.read(settings.MUTATIONAL_SIGNATURE_INFO_FILE)
     num_signatures = 0
     for section in config.sections():
-        if m := re.match("Signature (\d+)", section):
+        if m := re.match(r"Signature (\d+)", section):
             num_signatures += 1
             signature_id = int(m.group(1))
             sdata = config[section]
