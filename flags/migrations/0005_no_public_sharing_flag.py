@@ -3,7 +3,7 @@
 from django.db import migrations
 
 
-def create_not_public(apps, schema_editor):
+def create_not_public(apps, _schema_editor):
     FlagType = apps.get_model("flags", "FlagType")
     FlagResolution = apps.get_model("flags", "FlagResolution")
     FlagTypeResolution = apps.get_model("flags", "FlagTypeResolution")

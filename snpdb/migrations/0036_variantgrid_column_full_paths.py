@@ -3,7 +3,7 @@
 from django.db import migrations
 
 
-def variantgrid_column_full_paths(apps, schema_editor):
+def variantgrid_column_full_paths(apps, _schema_editor):
     VariantGridColumn = apps.get_model("snpdb", "VariantGridColumn")
     # Also need to rename filternodes to new columns
     FilterNodeItem = apps.get_model("analysis", "FilterNodeItem")

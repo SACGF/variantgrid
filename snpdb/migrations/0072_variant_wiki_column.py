@@ -4,7 +4,7 @@ from django.db import migrations
 from django.db.models import F
 
 
-def _variant_wiki_column(apps, schema_editor):
+def _variant_wiki_column(apps, _schema_editor):
     # This may have been patched back into some environments manually, so needs to be able to be re-run
     VariantGridColumn = apps.get_model("snpdb", "VariantGridColumn")
     CustomColumnsCollection = apps.get_model("snpdb", "CustomColumnsCollection")

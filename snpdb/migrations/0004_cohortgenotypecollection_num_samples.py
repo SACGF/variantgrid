@@ -3,7 +3,7 @@
 from django.db import migrations, models
 
 
-def one_off_set_cohort_genotype_collection_num_samples(apps, schema_editor):
+def one_off_set_cohort_genotype_collection_num_samples(apps, _schema_editor):
     CohortGenotypeCollection = apps.get_model("snpdb", "CohortGenotypeCollection")
 
     for cg_collection in CohortGenotypeCollection.objects.all():

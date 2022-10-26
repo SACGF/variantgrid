@@ -4,7 +4,7 @@ from django.db import migrations
 from django.db.models import Q
 
 
-def _create_australian_states(apps, schema_editor):
+def _create_australian_states(apps, _schema_editor):
     Country = apps.get_model("snpdb", "Country")
     State = apps.get_model("snpdb", "State")
 
@@ -27,7 +27,7 @@ def _create_australian_states(apps, schema_editor):
         State.objects.get_or_create(name=name, short_name=short_name, population=population, country=australia)
 
 
-def _one_off_assign_labs_to_states(apps, schema_editor):
+def _one_off_assign_labs_to_states(apps, _schema_editor):
     Lab = apps.get_model("snpdb", "Lab")
     State = apps.get_model("snpdb", "State")
     Country = apps.get_model("snpdb", "Country")

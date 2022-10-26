@@ -3,7 +3,7 @@
 from django.db import migrations
 
 
-def _one_off_move_bam_files_to_own_model(apps, schema_editor):
+def _one_off_move_bam_files_to_own_model(apps, _schema_editor):
     Sample = apps.get_model("snpdb", "Sample")
     SampleFilePath = apps.get_model("snpdb", "SampleFilePath")
 

@@ -3,7 +3,7 @@
 from django.db import migrations
 
 
-def genelist_categories(apps, schema_editor):
+def genelist_categories(apps, _schema_editor):
     CATEGORIES = ["CustomText",
                   "PathologyTest",
                   "NodeCustomText",
@@ -15,7 +15,7 @@ def genelist_categories(apps, schema_editor):
         GeneListCategory.objects.get_or_create(name=c)
 
 
-def initial_gene_info(apps, schema_editor):
+def initial_gene_info(apps, _schema_editor):
     GeneInfo = apps.get_model("genes", "GeneInfo")
     GeneListCategory = apps.get_model("genes", "GeneListCategory")
     GENE_INFO_NAME = "GeneInfo"

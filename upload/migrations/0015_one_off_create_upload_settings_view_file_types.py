@@ -3,7 +3,7 @@
 from django.db import migrations
 
 
-def _one_off_add_sequencing_run_field(apps, schema_editor):
+def _one_off_add_sequencing_run_field(apps, _schema_editor):
     UploadSettings = apps.get_model("upload", "UploadSettings")
     UploadSettingsFileType = apps.get_model("upload", "UploadSettingsFileType")
 

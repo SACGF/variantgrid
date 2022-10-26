@@ -21,7 +21,7 @@ def _test_existing_deploy_without_dbnsfp(apps):
     return AnnotationVersion.objects.all().exists() and not DBNSFPGeneAnnotationVersion.objects.all().exists()
 
 
-def _one_off_remove_loftool_vep(apps, schema_editor):
+def _one_off_remove_loftool_vep(apps, _schema_editor):
     ColumnVEPField = apps.get_model("annotation", "ColumnVEPField")
     ColumnVEPField.objects.filter(variant_grid_column='loftool').delete()
 

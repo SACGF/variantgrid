@@ -3,7 +3,7 @@
 from django.db import migrations
 
 
-def _one_off_tags_node_new_config(apps, schema_editor):
+def _one_off_tags_node_new_config(apps, _schema_editor):
     TagNode = apps.get_model("analysis", "TagNode")
     PARENT = 'P'
     THIS_ANALYSIS = 'T'

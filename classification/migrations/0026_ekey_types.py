@@ -4,7 +4,7 @@ from django.db import migrations
 from manual.operations.manual_operations import ManualOperation
 
 
-def _ekey_types(apps, schema_editor):
+def _ekey_types(apps, _schema_editor):
     """ This can be deleted if there is a blat_keys migration after it """
     EvidenceKey = apps.get_model("classification", "EvidenceKey")
 

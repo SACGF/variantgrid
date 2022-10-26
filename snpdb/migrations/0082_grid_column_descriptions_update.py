@@ -3,7 +3,7 @@
 from django.db import migrations
 
 
-def _grid_column_descriptions_update(apps, schema_editor):
+def _grid_column_descriptions_update(apps, _schema_editor):
     VariantGridColumn = apps.get_model("snpdb", "VariantGridColumn")
 
     NEW_DESCRIPTIONS = {

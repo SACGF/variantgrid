@@ -5,7 +5,7 @@ from django.contrib.postgres.operations import CITextExtension
 from django.db import migrations
 
 
-def _citext_message(apps, schema_editor):
+def _citext_message(apps, _schema_editor):
     print("--------")
     print("If this migration fails, you need to install the Postgres 'citex' extension to the DB (as DB superuser)")
     print("sudo su postgres")
@@ -18,6 +18,7 @@ def _citext_message(apps, schema_editor):
     print("Install in Postgresql template1 database, to apply for all newly created databases (eg unit test DB)")
     print("echo 'CREATE EXTENSION IF NOT EXISTS citext;' | psql -d template1")
     print("--------")
+
 
 class Migration(migrations.Migration):
 

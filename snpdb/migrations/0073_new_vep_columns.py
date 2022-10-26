@@ -5,7 +5,7 @@ from django.db import migrations
 from library.django_utils import bulk_insert_class_data
 
 
-def _new_vep_columns(apps, schema_editor):
+def _new_vep_columns(apps, _schema_editor):
     VARIANT_GRID_COLUMN = [
         {'grid_column_name': 'nmd_escaping_variant',
          'variant_column': 'variantannotation__nmd_escaping_variant',
@@ -119,7 +119,7 @@ def _new_vep_columns(apps, schema_editor):
     bulk_insert_class_data(apps, "snpdb", [("VariantGridColumn", VARIANT_GRID_COLUMN)])
 
 
-def _reverse_new_vep_columns(apps, schema_editor):
+def _reverse_new_vep_columns(apps, _schema_editor):
     VariantGridColumn = apps.get_model("snpdb", "VariantGridColumn")
     NEW_COLUMNS = ['nmd_escaping_variant', 'cadd_raw_rankscore', 'revel_rankscore', 'bayesdel_noaf_rankscore',
                    'clinpred_rankscore', 'vest4_rankscore', 'metalr_rankscore', 'aloft_prob_tolerant',

@@ -8,7 +8,8 @@ This script will allow us to determine which "bucket" a clinical significance va
 The numerical value isn't important, just the fact that the values are different.
 """
 
-def populate_buckets(apps, schema_editor):
+
+def populate_buckets(apps, _schema_editor):
     log: List[str] = []
     EvidenceKey = apps.get_model("classification", "EvidenceKey")
     buckets = {

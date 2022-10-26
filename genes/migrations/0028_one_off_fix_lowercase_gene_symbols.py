@@ -5,7 +5,7 @@ from django.db.models import F
 from django.db.models.functions import Upper
 
 
-def _one_off_fix_lowercase_gene_symbols(apps, schema_editor):
+def _one_off_fix_lowercase_gene_symbols(apps, _schema_editor):
     GeneSymbol = apps.get_model("genes", "GeneSymbol")
 
     # Create upper case versions of symbols that don't exist

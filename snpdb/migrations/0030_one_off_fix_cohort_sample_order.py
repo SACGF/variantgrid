@@ -4,7 +4,7 @@ from django.db import migrations
 from django.db.models import F, Max, Value
 
 
-def _one_off_fix_cohort_sample_order(apps, schema_editor):
+def _one_off_fix_cohort_sample_order(apps, _schema_editor):
     Sample = apps.get_model("snpdb", "Sample")
     Cohort = apps.get_model("snpdb", "Cohort")
     CohortSample = apps.get_model("snpdb", "CohortSample")

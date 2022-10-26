@@ -20,7 +20,7 @@ def _get_qc_gene_list_for_sample(apps, sample):
         return None
 
 
-def _fix_seqauto_qc_gene_list(apps, schema_editor):
+def _fix_seqauto_qc_gene_list(apps, _schema_editor):
     """ New fields added:
             QCGeneList
                 * file_last_modified
@@ -83,7 +83,7 @@ def _fix_seqauto_qc_gene_list(apps, schema_editor):
         QCGeneCoverage.objects.bulk_update(qc_gene_coverage_list, ["file_last_modified"], BATCH_SIZE)
 
 
-def _create_sample_gene_lists(apps, schema_editor):
+def _create_sample_gene_lists(apps, _schema_editor):
     """ Creates SampleGeneList for all existing QC GeneLists """
     Sample = apps.get_model("snpdb", "Sample")
     SampleGeneList = apps.get_model("genes", "SampleGeneList")
@@ -103,7 +103,7 @@ def _create_sample_gene_lists(apps, schema_editor):
     print(f"Created {SampleGeneList.objects.count()} SampleGeneLists")
 
 
-def _fix_analysis(apps, schema_editor):
+def _fix_analysis(apps, _schema_editor):
     """ Switch AnalysisNodes from using QCGeneList via Sample to SampleGeneList """
     SampleNode = apps.get_model("analysis", "SampleNode")
     GeneListNode = apps.get_model("analysis", "GeneListNode")

@@ -4,7 +4,7 @@ from django.db import migrations
 from django.db.models import F, Value
 
 
-def _one_off_allele_frequency_filter_percent_to_unit(apps, schema_editor):
+def _one_off_allele_frequency_filter_percent_to_unit(apps, _schema_editor):
     NodeAlleleFrequencyRange = apps.get_model("analysis", "NodeAlleleFrequencyRange")
     NodeAlleleFrequencyRange.objects.all().update(min=F("min") / Value(100.0),
                                                   max=F("max") / Value(100.0))

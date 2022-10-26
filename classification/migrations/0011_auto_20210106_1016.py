@@ -4,7 +4,7 @@ from django.db import migrations
 from django.db.migrations import RunPython
 
 
-def create_source_url_evidence_key(apps, schema_editor):
+def create_source_url_evidence_key(apps, _schema_editor):
     EvidenceKey = apps.get_model("classification", "EvidenceKey")
 
     kwargs = {

@@ -3,12 +3,12 @@
 from django.db import migrations, models
 
 
-def _populate_status(apps, schema_editor):
+def _populate_status(apps, _schema_editor):
     OntologyTerm = apps.get_model("ontology", "OntologyTerm")
     OntologyTerm.objects.filter(deprecated=True).update(status='D')
 
 
-def _dummy_reverse(apps, schema_editor):
+def _dummy_reverse(_apps, _schema_editor):
     pass
 
 

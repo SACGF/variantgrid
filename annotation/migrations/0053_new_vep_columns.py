@@ -5,7 +5,7 @@ from django.db import migrations
 from library.django_utils import bulk_insert_class_data
 
 
-def _new_vep_column_version(apps, schema_editor):
+def _new_vep_column_version(apps, _schema_editor):
     ColumnVEPField = apps.get_model("annotation", "ColumnVEPField")
 
     # Any old ones are now version 1
@@ -63,7 +63,7 @@ def _new_vep_column_version(apps, schema_editor):
     bulk_insert_class_data(apps, "annotation", [("ColumnVEPField", COLUMN_VEP_FIELD)])
 
 
-def _reverse_new_vep_column_version(apps, schema_editor):
+def _reverse_new_vep_column_version(apps, _schema_editor):
     ColumnVEPField = apps.get_model("annotation", "ColumnVEPField")
     NEW_COLUMNS = ['nmd_escaping_variant', 'cadd_raw_rankscore', 'revel_rankscore', 'bayesdel_noaf_rankscore',
                    'clinpred_rankscore', 'vest4_rankscore', 'metalr_rankscore', 'aloft_prob_tolerant',

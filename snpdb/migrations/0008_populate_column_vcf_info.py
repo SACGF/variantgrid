@@ -6,7 +6,7 @@ from django.db.models import F
 from library.django_utils import bulk_insert_class_data
 
 
-def add_tags_global(apps, schema_editor):
+def add_tags_global(apps, _schema_editor):
     VariantGridColumn = apps.get_model("snpdb", "VariantGridColumn")
     CustomColumn = apps.get_model("snpdb", "CustomColumn")
 
@@ -32,7 +32,7 @@ def add_tags_global(apps, schema_editor):
                                     sort_order=tag_column.sort_order + 1)
 
 
-def populate_column_vcf_info(apps, schema_editor):
+def populate_column_vcf_info(apps, _schema_editor):
     COLUMN_VCF_INFO = [
         {'info_id': '1KG_AF', 'column_id': 'af_1kg', 'number': 1, 'type': 'F',
          'description': 'Estimated allele frequency in the range (0,1), based on AC/AN'},

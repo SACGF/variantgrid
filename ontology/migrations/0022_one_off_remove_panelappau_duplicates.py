@@ -3,7 +3,7 @@
 from django.db import migrations
 
 
-def _remove_duplicates(apps, schema_editor):
+def _remove_duplicates(apps, _schema_editor):
     OntologyImport = apps.get_model("ontology", "OntologyImport")
     OntologyTermRelation = apps.get_model("ontology", "OntologyTermRelation")
 

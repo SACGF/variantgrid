@@ -3,7 +3,7 @@
 from django.db import migrations
 
 
-def _one_off_fix_s3_locations(apps, schema_editor):
+def _one_off_fix_s3_locations(apps, _schema_editor):
     """ This can be removed if/when we squish migrations """
     Lab = apps.get_model("snpdb", "Lab")
     for lab in Lab.objects.filter(upload_location__isnull=False):

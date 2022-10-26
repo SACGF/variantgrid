@@ -4,7 +4,7 @@ from django.db import migrations
 from django.db.models import Max
 
 
-def _remove_dupes(apps, schema_editor):
+def _remove_dupes(apps, _schema_editor):
     PanelAppPanelRelevantDisorders = apps.get_model("genes", "PanelAppPanelRelevantDisorders")
 
     newest_rds = PanelAppPanelRelevantDisorders.objects.values("panel_app_panel", "name").annotate(latest_id=Max('id'))

@@ -5,7 +5,7 @@ from django.db import migrations
 from manual.operations.manual_operations import ManualOperation
 
 
-def _one_off_variant_annotation_version_gnomad(apps, schema_editor):
+def _one_off_variant_annotation_version_gnomad(apps, _schema_editor):
     VariantAnnotationVersion = apps.get_model("annotation", "VariantAnnotationVersion")
     # We do our own custom VEP annotation with gnomAD, use that for versions now, update historical ones
     vav_qs = VariantAnnotationVersion.objects.filter(gnomad='r2.1')

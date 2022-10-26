@@ -4,7 +4,7 @@ from django.db import migrations
 from django.db.models import Max
 
 
-def _one_off_rm_dupes_vcf_filter(apps, schema_editor):
+def _one_off_rm_dupes_vcf_filter(apps, _schema_editor):
     VCFFilter = apps.get_model("snpdb", "VCFFilter")
     newest_qs = VCFFilter.objects.values("vcf", "filter_id").annotate(latest_id=Max('id'))
     VCFFilter.objects.exclude(pk__in=newest_qs.values_list("latest_id")).delete()

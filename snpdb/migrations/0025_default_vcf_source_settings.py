@@ -3,7 +3,7 @@
 from django.db import migrations
 
 
-def _default_vcf_source_settings(apps, schema_editor):
+def _default_vcf_source_settings(apps, _schema_editor):
     MIXED = 'M'
     SOMATIC_ONLY = 'S'  # Eg Tumor/Normal subtraction
     VCFSourceSettings = apps.get_model("snpdb", "VCFSourceSettings")

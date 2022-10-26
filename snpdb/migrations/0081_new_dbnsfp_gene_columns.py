@@ -15,7 +15,7 @@ _NEW_COLUMNS = ['pathway_biocarta_full', 'pathway_consensus_pathdb', 'pathway_ke
                 'expression_egenetics', 'expression_gnf_atlas']
 
 
-def _new_dbnsfp_gene_columns(apps, schema_editor):
+def _new_dbnsfp_gene_columns(apps, _schema_editor):
     VARIANT_GRID_COLUMN = [
         {'grid_column_name': 'gene_damage_index_score',
          'variant_column': 'variantannotation__gene__geneannotation__dbnsfp_gene__gene_damage_index_score',
@@ -243,13 +243,13 @@ def _new_dbnsfp_gene_columns(apps, schema_editor):
                       annotation_level='G')
 
 
-def _reverse_new_dbnsfp_gene_columns(apps, schema_editor):
+def _reverse_new_dbnsfp_gene_columns(apps, _schema_editor):
     VariantGridColumn = apps.get_model("snpdb", "VariantGridColumn")
 
     VariantGridColumn.objects.filter(grid_column_name__in=_NEW_COLUMNS).delete()
 
 
-def _custom_columns_for_new_dbnsfp_gene_columns(apps, schema_editor):
+def _custom_columns_for_new_dbnsfp_gene_columns(apps, _schema_editor):
     CustomColumnsCollection = apps.get_model("snpdb", "CustomColumnsCollection")
     CustomColumn = apps.get_model("snpdb", "CustomColumn")
 
@@ -265,7 +265,7 @@ def _custom_columns_for_new_dbnsfp_gene_columns(apps, schema_editor):
         CustomColumn.objects.bulk_create(custom_columns)
 
 
-def _reverse_custom_columns_for_new_dbnsfp_gene_columns(apps, schema_editor):
+def _reverse_custom_columns_for_new_dbnsfp_gene_columns(apps, _schema_editor):
     CustomColumn = apps.get_model("snpdb", "CustomColumn")
     CustomColumn.objects.filter(column__grid_column_name__in=_NEW_COLUMNS).delete()
 

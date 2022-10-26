@@ -17,7 +17,7 @@ def _get_chrom_contig_mappings(contigs) -> Dict[str, 'Contig']:
     return chrom_contig_mappings
 
 
-def _one_off_transcript_version_contig(apps, schema_editor):
+def _one_off_transcript_version_contig(apps, _schema_editor):
     GenomeBuild = apps.get_model("snpdb", "GenomeBuild")
     Contig = apps.get_model("snpdb", "Contig")
     TranscriptVersion = apps.get_model("genes", "TranscriptVersion")

@@ -3,7 +3,7 @@
 from django.db import migrations
 
 
-def _add_new_dbnsfp_gene_ekeys(apps, schema_editor):
+def _add_new_dbnsfp_gene_ekeys(apps, _schema_editor):
     EvidenceKey = apps.get_model("classification", "EvidenceKey")
 
     FLOAT = 'L'
@@ -129,7 +129,7 @@ def _add_new_dbnsfp_gene_ekeys(apps, schema_editor):
     EvidenceKey.objects.bulk_create(new_ekeys)
 
 
-def _reverse_new_dbnsfp_gene_ekeys(apps, schema_editor):
+def _reverse_new_dbnsfp_gene_ekeys(apps, _schema_editor):
     EvidenceKey = apps.get_model("classification", "EvidenceKey")
 
     NEW_EKEYS = [

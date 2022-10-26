@@ -4,7 +4,7 @@ import logging
 from django.db import migrations
 
 
-def _one_off_link_hgnc_and_uniprot(apps, schema_editor):
+def _one_off_link_hgnc_and_uniprot(apps, _schema_editor):
     HGNC = apps.get_model("genes", "HGNC")
     UniProt = apps.get_model("genes", "UniProt")
 

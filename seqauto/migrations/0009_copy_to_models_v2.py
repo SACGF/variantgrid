@@ -9,7 +9,7 @@ from django.utils import timezone
 from library.file_utils import mk_path
 
 
-def _one_off_copy_to_models_v2(apps, schema_editor):
+def _one_off_copy_to_models_v2(apps, _schema_editor):
     OLD_CLASSES_AND_FKS = {
         "SequencingRun": [],  # Will use existing name(PK) which works for new table too
         "SampleSheet": ["sample_sheet_id"],

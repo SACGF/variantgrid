@@ -3,7 +3,7 @@
 from django.db import migrations
 
 
-def _one_off_fix_filter_node_columns(apps, schema_editor):
+def _one_off_fix_filter_node_columns(apps, _schema_editor):
     FilterNodeItem = apps.get_model("analysis", "FilterNodeItem")
     if not FilterNodeItem.objects.exists():
         return

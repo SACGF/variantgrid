@@ -3,7 +3,7 @@
 from django.db import migrations
 
 
-def _one_off_vcf_reload_af_percent(apps, schema_editor):
+def _one_off_vcf_reload_af_percent(apps, _schema_editor):
     VCF = apps.get_model("snpdb", "VCF")
     PERCENT_AF_VERSION = 14
     legacy_reloaded_vcf_qs = VCF.objects.filter(allele_frequency_percent=True,
