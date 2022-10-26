@@ -5,6 +5,7 @@ from django.contrib.admin.widgets import AdminTextInputWidget
 from django.db.models import QuerySet
 from unidecode import unidecode
 
+from classification.models import ClinicalContext
 from snpdb import models
 from snpdb.admin_utils import ModelAdminBasics, GuardedModelAdminBasics, admin_list_column, \
     admin_action
