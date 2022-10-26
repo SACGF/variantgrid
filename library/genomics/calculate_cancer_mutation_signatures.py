@@ -221,10 +221,9 @@ class MutationSignatures:
             input_data_set.append((self.dtype, self.tolerance, self.minimization, sub_freqarray, self.sigdata))
 
         if self.PROCESSES > 1:
-            pool = mp.Pool(self.PROCESSES)
-            results = pool.map(process_worker, input_data_set)
-            pool.close()
-            pool.join()
+            with mp.Pool(self.PROCESSES) as pool:
+                results = pool.map(process_worker, input_data_set)
+                pool.join()
         else:
             results = []
             for x in input_data_set:
