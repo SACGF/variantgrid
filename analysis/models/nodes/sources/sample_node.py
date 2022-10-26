@@ -69,15 +69,17 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
             zyg = ''  # Any
         return zyg
 
-    def _get_node_arg_q_dict(self) -> Dict[Optional[str], Q]:
+    def _get_node_arg_q_dict(self) -> Dict[Optional[str], Dict[str, Q]]:
         arg_q_dict = {}
         if not self.sample:
-            return {None: self.q_none()}
+            q_none = self.q_none()
+            return {None: {str(q_none): q_none}}
 
         # _get_zygosity_q handles no genotype (UNKNOWN)
         if zygosity := self._get_zygosities():
             alias, field = self.sample.get_cohort_genotype_alias_and_field("zygosity")
-            arg_q_dict[alias] = Q(**{f"{field}__in": zygosity})
+            q = Q(**{f"{field}__in": zygosity})
+            arg_q_dict[alias] = {str(q): q}
 
         if self.sample.has_genotype:
             for node_field, ov_field in self.SAMPLE_FIELD_MAPPINGS:
@@ -85,22 +87,24 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
                 if min_value:
                     alias, ov_path = self.sample.get_cohort_genotype_alias_and_field(ov_field)
                     q = Q(**{f"{ov_path}__gte": min_value})
-                    self.merge_arg_q_dicts(arg_q_dict, {alias: q})
+                    self.merge_arg_q_dicts(arg_q_dict, {alias: {str(q): q}})
 
             if self.max_pl is not None:
                 alias, pl_path = self.sample.get_cohort_genotype_alias_and_field("phred_likelihood")
                 q = Q(**{f"{pl_path}__lte": self.max_pl})
-                self.merge_arg_q_dicts(arg_q_dict, {alias: q})
+                self.merge_arg_q_dicts(arg_q_dict, {alias: {str(q): q}})
 
             if sample_arg_q_dict := NodeAlleleFrequencyFilter.get_sample_arg_q_dict(self, self.sample):
                 self.merge_arg_q_dicts(arg_q_dict, sample_arg_q_dict)
 
         if self.restrict_to_qc_gene_list:
             if self.sample_gene_list:
+                q_hash = f"gene_list_{self.sample_gene_list.gene_list_id}"
                 q = self.sample_gene_list.gene_list.get_q(self.analysis.annotation_version.variant_annotation_version)
             else:
                 q = self.q_none()  # Safety - don't show anything if missing
-            self.merge_arg_q_dicts(arg_q_dict, {None: q})
+                q_hash = str(q)
+            self.merge_arg_q_dicts(arg_q_dict, {None: {q_hash: q}})
 
         self.merge_arg_q_dicts(arg_q_dict, self.get_vcf_locus_filters_arg_q_dict())
         return arg_q_dict

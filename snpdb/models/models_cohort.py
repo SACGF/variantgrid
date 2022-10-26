@@ -387,13 +387,15 @@ class CohortGenotypeCollection(RelatedModelsPartitionModel):
 
     def get_annotation_kwargs(self, **kwargs) -> Dict:
         """ For Variant.objects.annotate """
-        common_variants = kwargs.get("common_variants", True)
-
-        collections = [self.pk]
-        if common_variants:
-            collections.append(self.common_collection_id)
-        cgc_condition = Q(cohortgenotype__collection__in=collections)
-        return {self.cohortgenotype_alias: FilteredRelation('cohortgenotype', condition=cgc_condition)}
+        annotation_kwargs = {}
+        already_set = self.cohortgenotype_alias in kwargs.get("existing_annotation_kwargs", set())
+        if not (already_set and kwargs.get("override") is False):
+            collections = [self.pk]
+            if kwargs.get("common_variants", True):
+                collections.append(self.common_collection_id)
+            cgc_condition = Q(cohortgenotype__collection__in=collections)
+            annotation_kwargs[self.cohortgenotype_alias] = FilteredRelation('cohortgenotype', condition=cgc_condition)
+        return annotation_kwargs
 
     def get_sample_zygosity_regex(self, sample_zygosities: dict, sample_require_zygosity: dict):
         """ sample_zygosities_dict = {sample_id : zygosities_set} """

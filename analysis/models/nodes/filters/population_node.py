@@ -68,14 +68,14 @@ class PopulationNode(AnalysisNode):
     def _get_node_q(self) -> Optional[Q]:
         and_q = []
         if self.filtering_by_population:
-            population_databases = set()
+            population_databases = []
             for field in self.POPULATION_DATABASE_FIELDS:
                 if getattr(self, field):
-                    population_databases.add(field)
+                    population_databases.append(field)
 
             for gnomad_pop in self.populationnodegnomadpopulation_set.all():
                 field = VariantAnnotation.get_gnomad_population_field(gnomad_pop.population)
-                population_databases.add(field)
+                population_databases.append(field)
 
             if population_databases:
                 # The group operation is backwards from what you may expect, as the widget takes MAX
@@ -116,7 +116,7 @@ class PopulationNode(AnalysisNode):
             q = None
         return q
 
-    def _get_node_arg_q_dict(self) -> Dict[Optional[str], Q]:
+    def _get_node_arg_q_dict(self) -> Dict[Optional[str], Dict[str, Q]]:
         """ By default - we assume node implements _get_node_q and none of the filters apply to annotations """
         node_arg_q_dict = {}
         # Internal filters
@@ -129,7 +129,8 @@ class PopulationNode(AnalysisNode):
                 max_samples_from_percent = max(max_samples_from_percent, 1)
                 less_than = Q(**{vzcc.germline_counts_alias + "__lte": max_samples_from_percent})
                 is_null = Q(**{vzcc.germline_counts_alias + "__isnull": True})
-                node_arg_q_dict[vzcc.germline_counts_alias] = less_than | is_null
+                q = less_than | is_null
+                node_arg_q_dict[vzcc.germline_counts_alias] = {str(q): q}
 
             if self.max_samples is not None:
                 if self.zygosity == SimpleZygosity.ANY_GERMLINE:
@@ -147,10 +148,11 @@ class PopulationNode(AnalysisNode):
                 less_than = Q(**{column + "__lte": self.max_samples})
                 is_null = Q(**{column + "__isnull": True})
 
-                node_arg_q_dict[column] = less_than | is_null
+                q = less_than | is_null
+                node_arg_q_dict[column] = {str(q): q}
 
         if node_q := self._get_node_q():
-            node_arg_q_dict[None] = node_q
+            node_arg_q_dict[None] = {str(node_q): node_q}
         return node_arg_q_dict
 
     @staticmethod

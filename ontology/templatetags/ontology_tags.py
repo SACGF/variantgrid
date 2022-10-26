@@ -104,7 +104,7 @@ def ontology_snake_table(snakes: Iterable[OntologySnake], reference_term: Option
     is_gene = reference_term.ontology_service == OntologyService.HGNC
 
     def sort_key(snake: OntologySnake):
-        nonlocal  is_gene
+        nonlocal is_gene
         if is_gene:
             return snake.source_term
         else:
