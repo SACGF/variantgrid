@@ -285,7 +285,7 @@ class GeneSymbolAliasesMeta:
 
     def __init__(self, gene_symbol: GeneSymbol):
         self.gene_symbol = gene_symbol
-        self.alias_list: List[GeneSymbolAliasSummary] = list()
+        self.alias_list: List[GeneSymbolAliasSummary] = []
 
         symbol = self.gene_symbol.symbol
 

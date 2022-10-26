@@ -10,7 +10,6 @@ The numerical value isn't important, just the fact that the values are different
 
 
 def populate_buckets(apps, _schema_editor):
-    log: List[str] = []
     EvidenceKey = apps.get_model("classification", "EvidenceKey")
     buckets = {
         'B': 1,
