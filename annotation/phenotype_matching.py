@@ -29,7 +29,7 @@ def get_word_combos_and_spans(words_and_spans: List, max_combo_length: Optional[
 
 def get_word_combos_and_spans_sorted_by_length(words_and_spans, max_combo_length: Optional[int] = None) -> Iterable:
     word_combos_and_spans = get_word_combos_and_spans(words_and_spans, max_combo_length)
-    return reversed(sorted(word_combos_and_spans, key=lambda item: sum([len(i[0]) for i in item])))
+    return reversed(sorted(word_combos_and_spans, key=lambda item: sum(len(i[0]) for i in item)))
 
 
 def get_terms_from_words(text_phenotype, words_and_spans_subset, phenotype_matcher: PhenotypeMatcher):
@@ -290,7 +290,7 @@ def create_phenotype_description(text, phenotype_matcher=None):
                                                    text_phenotype=text_phenotype,
                                                    sentence_offset=sentence_offset)
         if tp_created:
-            has_alpha_numeric = any([x.isalnum() for x in sentence])
+            has_alpha_numeric = any(x.isalnum() for x in sentence)
             if not has_alpha_numeric:  # Impossible to match anything so skip
                 text_phenotype.processed = True
                 text_phenotype.save()

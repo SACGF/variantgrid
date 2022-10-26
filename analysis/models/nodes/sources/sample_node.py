@@ -159,7 +159,7 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
         if NodeAlleleFrequencyFilter.get_sample_arg_q_dict(self, self.sample):
             return True
 
-        return any([getattr(self, f) for f in self.FIELDS_THAT_CHANGE_QUERYSET])
+        return any(getattr(self, f) for f in self.FIELDS_THAT_CHANGE_QUERYSET)
 
     def _get_cached_label_count(self, label):
         """ Input counts can be static, so use cached AnnotationStats if we can """

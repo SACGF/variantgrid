@@ -520,8 +520,7 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
 
             for k, v in a_kwargs.items():
                 qs = qs.annotate(**{k: v})
-                for q_hash, q in arg_q_dict.get(k, {}).items():
-                    # print(f"get_queryset(): {q_hash=} {q}")
+                for q in arg_q_dict.get(k, {}).values():
                     qs = qs.filter(q)
 
         q_list = []
@@ -571,7 +570,7 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
 
     def get_input_count(self):
         parents = self.get_non_empty_parents()
-        return sum([p.get_output_count() for p in parents])
+        return sum(p.get_output_count() for p in parents)
 
     def get_output_count(self):
         # TODO: Move the if not modify parents code in here.

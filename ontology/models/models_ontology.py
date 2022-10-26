@@ -640,7 +640,7 @@ class OntologyVersion(TimeStampedModel):
 
         if not missing_fields:
             values = list(kwargs.values())
-            last_date = max([oi.created for oi in values])
+            last_date = max(oi.created for oi in values)
             ontology_version, created = OntologyVersion.objects.get_or_create(**kwargs,
                                                                               defaults={"created": last_date})
             if created:
