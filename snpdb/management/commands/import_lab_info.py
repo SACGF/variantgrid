@@ -37,7 +37,8 @@ class Command(BaseCommand):
         for _, row in df.iterrows():
             organization, _ = Organization.objects.get_or_create(name=row[INSTITUTION])
 
-            lab = Lab.objects.create(name=row[NAME],
+            lab_name = row[NAME]
+            lab = Lab.objects.create(name=lab_name,
                                      organization=organization,
                                      city=row[CITY],
                                      country=row[COUNTRY],
@@ -52,5 +53,5 @@ class Command(BaseCommand):
                                       involved=row[INVOLVED] == "Y",
                                       date=datetime.date.today())
 
-            print("saved lab '%s'" % row[NAME])
+            print(f"saved lab '{lab_name}'")
         logger.info("saved data")

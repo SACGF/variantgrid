@@ -163,7 +163,7 @@ def export_as_csv(modeladmin, request, queryset) -> HttpResponse:
             yield delimited_row([getattr(qs_obj, field) for field in field_names])
 
     response = StreamingHttpResponse(data_generator(), content_type='text/csv')
-    response['Content-Disposition'] = 'attachment; filename={}.csv'.format(meta)
+    response['Content-Disposition'] = f'attachment; filename={meta}.csv'
     return response
 
 

@@ -366,7 +366,7 @@ def get_evidence_fields_from_preferred_transcript(
             data[SpecialEKeys.C_HGVS] = c_hgvs.full_c_hgvs
     except Exception as e:
         value_obj = {}
-        data.message = 'Could not parse HGVS value %s' % str(e)
+        data.message = f'Could not parse HGVS value {str(e)}'
         data[SpecialEKeys.C_HGVS] = value_obj
 
     # If we classify against a transcript we don't have annotation for, try to grab p.HGVS from ClinGen

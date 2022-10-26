@@ -30,7 +30,7 @@ def match_graph(title, qs, field_label, color, graph_width, graph_height, max_re
         labels.append(n)
         counts.append(count)
 
-    return {'title': "%s<br>Patient Count" % title,
+    return {'title': f"{title}<br>Patient Count",
             'uuid': uuid.uuid4(),
             'graph_width': graph_width,
             'graph_height': graph_height,

@@ -17,7 +17,7 @@ PAIRED_END_READS = ('R1', 'R2')
 
 
 def get_q30_col_name(read):
-    return "%s %% >= Q30" % read
+    return f"{read} % >= Q30"
 
 
 READ_COLUMNS = [get_q30_col_name(read) for read in PAIRED_END_READS]
@@ -71,7 +71,7 @@ def get_sequencing_run_data(sequencing_run, qc_compare_type, include_passed_sequ
     flowcell_qc_qs = flowcell_qc_qs.order_by("sample_sheet__sequencing_run__name")
     ss_path = IlluminaFlowcellQC.get_sequencing_run_path()
     values = ILLUMINA_FLOWCELL_QC_COLUMNS + get_sequencing_run_columns(ss_path, ['name', 'gold_standard'])
-    non_null_kwargs = {"%s__isnull" % f: False for f in values}
+    non_null_kwargs = {f"{f}__isnull": False for f in values}
 
     for data in flowcell_qc_qs.filter(**non_null_kwargs).values(*values):
         for k, v in data.items():
@@ -103,7 +103,7 @@ def get_qc_exec_summary_data(sequencing_run, qc_compare_type, qc_exec_summary, i
     sequencing_sample = "qc__bam_file__unaligned_reads__sequencing_sample__sample_name"
     sequencing_run_columns = get_sequencing_run_columns(ss_path, ['name', 'gold_standard'])
     values = ["pk", sequencing_sample] + qc_exec_summary_columns + coverage_columns + sequencing_run_columns
-    non_null_kwargs = {"%s__isnull" % f: False for f in coverage_columns}
+    non_null_kwargs = {f"{f}__isnull": False for f in coverage_columns}
 
     for data in qc_exec_qs.filter(**non_null_kwargs).values(*values):
         for k, v in data.items():

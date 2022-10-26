@@ -137,7 +137,7 @@ class DbRefRegexResult:
         return self.cregx.db
 
     def to_json(self):
-        jsonny = {'id': '%s: %s' % (self.db, self.idx), 'db': self.db, 'idx': self.idx, 'url': self.url}
+        jsonny = {'id': f'{self.db}: {self.idx}', 'db': self.db, 'idx': self.idx, 'url': self.url}
         if self.summary:
             jsonny['summary'] = self.summary
         if self.internal_id:

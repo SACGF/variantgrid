@@ -173,11 +173,11 @@ class PopulationNode(AnalysisNode):
             max_allele_frequency = self.percent / 100
             for field in self.POPULATION_DATABASE_FIELDS:
                 if getattr(self, field):
-                    filters.append('%s <= %g' % (field, max_allele_frequency))
+                    filters.append(f'{field} <= {max_allele_frequency:g}')
 
             for gnomad_pop in self.populationnodegnomadpopulation_set.all():
                 field = VariantAnnotation.get_gnomad_population_field(gnomad_pop.population)
-                filters.append('%s <= %g' % (field, max_allele_frequency))
+                filters.append(f'{field} <= {max_allele_frequency:g}')
 
             if self.gnomad_hom_alt_max is not None:
                 filters.append(f"gnomad_hom_alt_max <= {self.gnomad_hom_alt_max}")
@@ -194,14 +194,14 @@ class PopulationNode(AnalysisNode):
     def get_node_name(self):
         ops = []
         if self.filtering_by_population:
-            ops.append("<= %g%%" % self.percent)
+            ops.append(f"<= {self.percent:g}%")
         if self.gnomad_hom_alt_max is not None:
             ops.append(f"<= {self.gnomad_hom_alt_max} gnomad hom alt")
 
         if self.use_internal_counts:
             internal_filter_ops = []
             if self.internal_percent != self.EVERYTHING:
-                internal_filter_ops.append("%g%%" % self.internal_percent)
+                internal_filter_ops.append(f"{self.internal_percent:g}%")
             if self.max_samples is not None:
                 zygosity = self.get_zygosity_display()
                 max_samples_desc = f"<= {self.max_samples} samples ({zygosity})"

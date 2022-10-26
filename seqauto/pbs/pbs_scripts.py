@@ -7,7 +7,7 @@ PBS_TEMPLATE = os.path.join(settings.SEQAUTO_DIR, "templates", "pbs_script.templ
 
 
 def get_dependency_flags(*args):
-    deps = ':'.join(["$%s" % b.get_variable_name() for b in args if b])
+    deps = ':'.join([f"${b.get_variable_name()}" for b in args if b])
     if deps:
         dependency_flags = f" -W depend=afterok:{deps} "
     else:

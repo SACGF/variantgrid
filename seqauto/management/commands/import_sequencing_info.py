@@ -49,7 +49,7 @@ class Command(BaseCommand):
                 sequencer = Sequencer.objects.get(name=row[SEQUENCER])
 
                 if sequencer.name is None:
-                    print("no sequencer in database with name %s" % row[SEQUENCER])
+                    print(f"no sequencer in database with name {row[SEQUENCER]}")
 
                     SequencingInfo.objects.create(lab_project=project,
                                                   doi=row[DOI],
@@ -60,7 +60,7 @@ class Command(BaseCommand):
                                                   seq_details=row[SEQ_DETAILS],
                                                   file_type=row[FILE_TYPE],
                                                   file_count=row[FILE_COUNT])
-                    print("saved sequence info for lab '%s'" % row[LAB_NAME])
+                    print(f"saved sequence info for lab '{row[LAB_NAME]}'")
             except:
                 print(f"lab '{row[LAB_NAME]}' does not exist in the database")
 

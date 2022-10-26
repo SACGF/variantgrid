@@ -173,7 +173,7 @@ def rgb_hex_to_tuples(rgb: str):
 
 
 def rgb_to_hex(red, green, blue):
-    return "#%02x%02x%02x" % (red, green, blue)
+    return f"#{red:02x}{green:02x}{blue:02x}"
 
 
 def rgb_invert(rgb):
@@ -598,7 +598,7 @@ def format_significant_digits(a_number, sig_digits=3) -> str:
     if a_number == 0:
         return "0"
     rounded_number = round(a_number, sig_digits - int(math.floor(math.log10(abs(a_number)))) - 1)
-    rounded_number_str = "{:.12f}".format(rounded_number)
+    rounded_number_str = f"{rounded_number:.12f}"
     if match := trailing_zeros_strip.match(rounded_number_str):
         rounded_number_str = match.group(1)
         if rounded_number_str[-1] == '.':
@@ -706,7 +706,7 @@ class Constant:
     def __get__(self, *args):
         return self.value
     def __repr__(self):
-        return '%s(%r)' % (self.__class__.__name__, self.value)
+        return f'{self.__class__.__name__}({self.value!r})'
 
 
 class ArrayLength(models.Func):

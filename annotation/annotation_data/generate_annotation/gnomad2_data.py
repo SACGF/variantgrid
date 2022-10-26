@@ -251,7 +251,7 @@ def calculate_allele_frequency(gnomad_input_vcf, af_output_vcf):
                     if pop_name and af > af_popmax:  # Only use subpops
                         af_popmax = af
                         popmax = pop_name
-                    af = '{:.6f}'.format(af)
+                    af = f'{af:.6f}'
                 else:
                     af = '.'
                 infos.append(af)

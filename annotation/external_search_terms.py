@@ -72,7 +72,7 @@ def _get_search_terms(variant_transcripts_list: List, formatter: str = None, **k
 
     if len(searches) == 1:
         return searches[0]
-    return " OR ".join(["(%s)" % s for s in searches])
+    return " OR ".join([f"({s})" for s in searches])
 
 
 def get_variant_search_terms(variant_transcripts_list: List, extra_terms: Optional[List[str]] = None):
