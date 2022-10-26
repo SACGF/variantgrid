@@ -1,3 +1,4 @@
+from abc import ABC, abstractmethod
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import List, Optional, Dict, Set, Iterator
@@ -40,17 +41,38 @@ class OverlapsCalculatorState:
         return self._collection_to_flag.get(cms.classification.flag_collection_id)
 
 
+class OverlapState(ABC):
+
+    @property
+    @abstractmethod
+    def calculator_state(self):
+        pass
+
+    @property
+    @abstractmethod
+    def c_hgvses(self):
+        pass
+
+
 class ClinicalGroupingOverlap:
     """
     Overlaps detail for a clinical grouping within an allele
     """
 
-    def __init__(self, calculator_state: OverlapsCalculatorState, clinical_context: Optional[ClinicalContext]):
-        self.calculator_state = calculator_state
+    def __init__(self, state: OverlapState, clinical_context: Optional[ClinicalContext]):
+        self.state = state
         self.clinical_context = clinical_context
         self.groups: Dict[ClassificationLabSummaryEntry] = defaultdict(int)
         self.cms = list()
         self.labs = set()
+
+    @property
+    def calculator_state(self):
+        return self.state.calculator_state
+
+    @property
+    def c_hgvses(self):
+        return self.state.c_hgvses
 
     def add_classification(self, cm: ClassificationModification):
         clinical_sig = cm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
@@ -113,7 +135,7 @@ class ClinicalGroupingOverlap:
         ) for group, count in self.groups.items()])
 
 
-class AlleleOverlap:
+class AlleleOverlap(OverlapState):
     """
     Details of all overlaps for clnical groupings within an allele.
     Most of the important details are kept in ClinicalGroupingOverlap, but we like to order things in Allele
@@ -122,7 +144,7 @@ class AlleleOverlap:
     """
 
     def __init__(self, calculator_state: OverlapsCalculatorState, allele: Allele):
-        self.calculator_state = calculator_state
+        self._calculator_state = calculator_state
         self.allele = allele
         self.context_map: Dict[Optional[ClinicalContext], ClinicalGroupingOverlap] = dict()
         self._c_hgvses: Set[CHGVS] = set()
@@ -131,6 +153,10 @@ class AlleleOverlap:
         self.shared_labs = set()
         self.all_labs = set()
         self.classification_count = 0
+
+    @property
+    def calculator_state(self):
+        return self._calculator_state
 
     def add_classification(self, cms: ClassificationModification):
         c_hgvs = cms.classification.c_hgvs_best(preferred_genome_build=self.calculator_state.perspective.genome_build)
@@ -141,7 +167,7 @@ class AlleleOverlap:
         cc = cms.classification.clinical_context if is_shared else None
         cgo = self.context_map.get(cc)
         if not cgo:
-            cgo = ClinicalGroupingOverlap(clinical_context=cc, calculator_state=self.calculator_state)
+            cgo = ClinicalGroupingOverlap(clinical_context=cc, state=self)
             self.context_map[cc] = cgo
         cgo.add_classification(cms)
         if is_shared:

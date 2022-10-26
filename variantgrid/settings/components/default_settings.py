@@ -884,6 +884,7 @@ _URLS_NAME_REGISTER_OVERRIDE = {
     "condition_matchings": False,
     "condition_match_test": False,
     "discordance_reports": False,
+    "vus": False
 }
 URLS_NAME_REGISTER = defaultdict(lambda: _URLS_NAME_REGISTER_DEFAULT, _URLS_NAME_REGISTER_OVERRIDE)
 

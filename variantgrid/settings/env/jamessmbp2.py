@@ -324,6 +324,7 @@ URLS_NAME_REGISTER.update({  # Disable selected snpdb urls
     "classification_upload_unmapped": True,
     "classification_view_metrics": True,
     "discordance_reports": True,
+    "vus": True
 })
 
 # mimic shariant
