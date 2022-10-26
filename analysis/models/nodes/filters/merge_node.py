@@ -1,5 +1,4 @@
 import operator
-import time
 from collections import defaultdict, Counter
 from functools import reduce
 from typing import Optional
@@ -41,25 +40,9 @@ class MergeNode(AnalysisNode):
                     return parent
         return super().get_single_parent()  # Will throw exception due to multiple samples
 
-    def _get_merged_q_dict(self, parent_arg_q_dict):
-        """ This is the old way - used to compare against """
-        q_or = []
-        for parent, arg_q_dict in parent_arg_q_dict.items():
-            qs = parent.get_queryset(disable_cache=True)
-            q_or.append(Q(pk__in=qs.values_list("pk", flat=True)))
-
-        return {
-            None: {self._get_node_q_hash(): reduce(operator.or_, q_or)}
-        }
-
     @staticmethod
     def _split_common_filters(parent_arg_q_dict):
-        """ Find common filters
-            This only works on arg = None (as those can be re-composed)
-        """
-
-        #print("split common:")
-        #print(parent_arg_q_dict)
+        """ Find common filters - this only works on arg = None (as those can be re-composed) """
 
         arg_q_nodes = defaultdict(set)
         all_q_by_hash = {}
@@ -82,10 +65,6 @@ class MergeNode(AnalysisNode):
         non_combine_parents = parents - combine_parents
 
         if combine_parents:
-            # print("-" * 10)
-            # print("Combining:")
-            # print(combine_q_hash)
-
             combine_parent_arg_q_dict = {p: parent_arg_q_dict[p] for p in combine_parents}
 
             extract_arg_q_hash = {None: {combine_q_hash}}
@@ -98,10 +77,10 @@ class MergeNode(AnalysisNode):
             arg_q_dict = parent_arg_q_dict[parent]
             # If there is something else other than None - then we need to run the full queryset
             non_none_keys = [k for k in arg_q_dict.keys() if k is not None]
-            # print(f"{parent} - non-none keys: {non_none_keys}")
 
             if non_none_keys:
-                qs = parent.get_queryset(arg_q_dict=arg_q_dict, disable_cache=True)  # Not passing in arg_q_dict - to run full query
+                # I tried not passing arg_q_dict (to run all where clauses in inner query but it was slower)
+                qs = parent.get_queryset(arg_q_dict=arg_q_dict, disable_cache=True)
                 or_list.append(Q(pk__in=qs.values_list("pk", flat=True)))
             else:
                 remaining_q_set = arg_q_dict.get(None, {}).values()
@@ -116,13 +95,11 @@ class MergeNode(AnalysisNode):
             for arg, q_hash_set in extract_arg_q_hash.items():
                 if q_dict := arg_q_dict.get(arg, {}):
                     for q_hash in q_hash_set:
-                        # print(f"{arg=} removing {q_hash} from {q_dict}")
                         q_dict.pop(q_hash, None)
                     if not q_dict:
-                        # print(f"Removing empty '{arg}'")
                         del arg_q_dict[arg]
 
-    def _get_merged_q_dict2(self, parent_arg_q_dict):
+    def _get_merged_q_dict(self, parent_arg_q_dict):
         all_q_by_hash = {}
         filtered_relation_count = defaultdict(Counter)
         for arg_q_dict in parent_arg_q_dict.values():
@@ -150,19 +127,11 @@ class MergeNode(AnalysisNode):
         return arg_q_dict
 
     def _get_arg_q_dict_from_parents_and_node(self):
-        # Go through and get the common things to all parents
-        start = time.time()
         parent_arg_q_dict = {}
         for parent in self.get_non_empty_parents():
             arg_q_dict = parent.get_arg_q_dict(disable_cache=True)
             parent_arg_q_dict[parent] = arg_q_dict
-
-        # arg_q_dict = self._get_merged_q_dict(parent_arg_q_dict)  # Slow old way
-        arg_q_dict = self._get_merged_q_dict2(parent_arg_q_dict)  # This is just used for testing at the moment
-
-        end = time.time()
-        print(f"merge calculations took {end-start} secs")
-        return arg_q_dict
+        return self._get_merged_q_dict(parent_arg_q_dict)
 
     def _get_node_q(self) -> Optional[Q]:
         raise NotImplementedError("This should never be called")
