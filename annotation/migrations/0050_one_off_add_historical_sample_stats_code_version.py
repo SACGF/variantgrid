@@ -3,7 +3,7 @@
 from django.db import migrations
 
 
-def _one_off_add_historical_sample_stats_code_version(apps, schema_editor):
+def _one_off_add_historical_sample_stats_code_version(apps, _schema_editor):
     SampleStatsCodeVersion = apps.get_model("snpdb", "SampleStatsCodeVersion")
     SampleStats = apps.get_model("snpdb", "SampleStats")
     SampleStatsPassingFilter = apps.get_model("snpdb", "SampleStatsPassingFilter")

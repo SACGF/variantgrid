@@ -115,7 +115,7 @@ def convert_sheet_to_df(sheet, date_on_file: str = None):
     if int(mm) > 12 or int(dd) > 31:
         raise ValueError(f"{sheet}: date indicated in the file name ({date_on_file}) not in format YY-MM-DD")
 
-    date = '20{yy}-{mm}-{dd}T00:00:00+0930'.format(yy=yy, mm=mm, dd=dd)
+    date = f'20{yy}-{mm}-{dd}T00:00:00+0930'
 
     df = pd.read_csv(csv_file, index_col=None, comment='#', skip_blank_lines=True, skipinitialspace=True, dtype=str)
     # Remove empty rows - sometimes left by people editing SampleSheets.csv by hand
@@ -171,7 +171,7 @@ def samplesheet_is_valid(sample_sheet_df):
             for char in row:
                 if char in ILLEGAL_CHARACTERS:
                     msg = "Cannot handle illegal character or whitespace in the sample sheet\n"
-                    msg += "Column: %s, row value: '%s', illegal char = '%s' \n" % (column, row, char)
+                    msg += f"Column: {column}, row value: '{row}', illegal char = '{char}' \n"
                     return False, msg
 
     barcode_lengths = sample_sheet_df["barcode"].str.len().value_counts()

@@ -167,7 +167,7 @@ class DiscordanceStatus:
                                                 flag_type=classification_flag_types.classification_pending_changes,
                                                 resolution__status=FlagStatus.OPEN):
 
-            clin_sig_overrides: Dict[int, str] = dict()
+            clin_sig_overrides: Dict[int, str] = {}
             for flag in pending_flags:
                 clin_sig_overrides[flag_collections[flag.collection_id].pk] = flag.data.get(
                     ClassificationFlagTypes.CLASSIFICATION_PENDING_CHANGES_CLIN_SIG_KEY) or None

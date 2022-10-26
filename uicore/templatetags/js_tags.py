@@ -147,7 +147,7 @@ def code_shell(data: str):
 
 @register.inclusion_tag("uicore/tags/timestamp.html")
 def timestamp(timestamp, time_ago: bool = False, show_seconds: bool = False, text_only: bool = False):
-    css_classes = list()
+    css_classes = []
     if time_ago:
         css_classes.append('time-ago')
     if show_seconds:

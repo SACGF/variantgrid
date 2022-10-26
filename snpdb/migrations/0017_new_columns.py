@@ -5,7 +5,7 @@ from django.db import migrations
 from library.django_utils import bulk_insert_class_data
 
 
-def new_columns(apps, schema_editor):
+def new_columns(apps, _schema_editor):
     VariantGridColumn = apps.get_model("snpdb", "VariantGridColumn")
     CustomColumn = apps.get_model("snpdb", "CustomColumn")
 

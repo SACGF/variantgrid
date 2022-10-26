@@ -178,7 +178,7 @@ class ClinVarLegacyRow:
     @staticmethod
     def load_file(file, clinvar_key: ClinVarKey) -> Iterator['ClinVarLegacyRow']:
         csv_f = csv.reader(file, delimiter='\t')
-        header_indexes: Dict[str, int] = dict()
+        header_indexes: Dict[str, int] = {}
         for row in csv_f:
             if not header_indexes:
                 if len(row) > 1 and row[1] == 'VariationID':
@@ -186,7 +186,7 @@ class ClinVarLegacyRow:
                     # don't process the header row itself as data, now skip to the next row
                     header_indexes = {label: index for index, label in enumerate(row)}
             else:
-                row_dict: Dict[str, str] = dict()
+                row_dict: Dict[str, str] = {}
                 for header_key, index in header_indexes.items():
                     row_dict[header_key] = row[index]
                 yield ClinVarLegacyRow(
@@ -223,7 +223,7 @@ class ClinVarLegacyRow:
 
     @lazy
     def ontology_terms(self) -> List[OntologyTerm]:
-        terms: List[OntologyTerm] = list()
+        terms: List[OntologyTerm] = []
         if condition_identifier := self.condition_identifier.strip():
             if individual_terms := condition_identifier.split(';'):
                 for individual_term in individual_terms:
@@ -274,7 +274,7 @@ class ClinVarLegacyRow:
             # allow for some transcript version increases
             if c_hgvs.transcript_parts.version:
                 test_c_hgvs: CHGVS
-                c_hgvs_strs: List[str] = list()
+                c_hgvs_strs: List[str] = []
                 for attempt_increase in range(-3, 3):
                     if c_hgvs.transcript_parts.version + attempt_increase >= 1:
                         if test_c_hgvs := c_hgvs.with_transcript_version(c_hgvs.transcript_parts.version + attempt_increase):
@@ -286,10 +286,10 @@ class ClinVarLegacyRow:
                         for allele in alleles:
                             allele_to_match_types[allele].add(ClinVarLegacyAlleleMatchType.VARIANT_PREFERRED_IMPORTED_C_HGVS)
 
-        all_matches: [ClinVarLegacyMatches] = list()
+        all_matches: [ClinVarLegacyMatches] = []
         for allele, match_types in allele_to_match_types.items():
             classifications = list(Classification.objects.filter(lab__in=self.labs, allele=allele, withdrawn=False))
-            clinvar_export_matches: List[ClinVarLegacyMatch] = list()
+            clinvar_export_matches: List[ClinVarLegacyMatch] = []
             if clinvar_allele := ClinVarAllele.objects.filter(allele=allele, clinvar_key=self.clinvar_key).first():
                 if clinvar_exports := ClinVarExport.objects.filter(clinvar_allele=clinvar_allele):
                     for clinvar_export in clinvar_exports:

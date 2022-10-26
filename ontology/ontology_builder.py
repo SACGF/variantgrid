@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from datetime import timedelta, datetime
 from enum import Enum
-from typing import Optional, Dict, List, TypeVar, Generic, Iterable, Type, Union
+from typing import Optional, Dict, List, TypeVar, Generic, Iterable, Type, Tuple
 
 from django.db.models import Model
 from django.utils import timezone
@@ -102,8 +102,8 @@ class OntologyBuilder:
             self.previous_import = None  # if previous import was done with an older version of the import code, don't count it
 
         self.full_cache = False
-        self.terms: Dict[str, CachedObj[OntologyTerm]] = dict()
-        self.relations: Dict[RelationKey, CachedObj[OntologyTermRelation]] = dict()
+        self.terms: Dict[str, CachedObj[OntologyTerm]] = {}
+        self.relations: Dict[RelationKey, CachedObj[OntologyTermRelation]] = {}
 
     def ensure_old(self, max_age: timedelta):
         """
@@ -200,7 +200,7 @@ class OntologyBuilder:
                  aliases: Optional[List[str]] = None,
                  primary_source: bool = True,
                  status: Optional[OntologyTermStatus] = None,
-                 trusted_source: bool = True) -> Union[OntologyTerm, bool]:
+                 trusted_source: bool = True) -> Tuple[OntologyTerm, bool]:
         """
         Returns OntologyTerm and boolean indicated True for created, False for already existed
         TODO: The created boolean will return True on multiple requests to add_term with the same import_builder
@@ -218,7 +218,7 @@ class OntologyBuilder:
 
         if aliases:
             # want to maintain order (so don't convert to a set)
-            unique_aliases = list()
+            unique_aliases = []
             for alias in aliases:
                 if alias not in unique_aliases and alias != name:
                     unique_aliases.append(alias)
@@ -236,7 +236,7 @@ class OntologyBuilder:
             term.extra = extra
 
         if aliases is not None or primary_source:
-            term.aliases = aliases or list()
+            term.aliases = aliases or []
 
         if not status:
             if "obsolete" in name.lower():

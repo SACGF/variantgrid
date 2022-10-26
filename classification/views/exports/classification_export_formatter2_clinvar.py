@@ -217,7 +217,7 @@ class ClassificationExportFormatter2ClinVarCompare(ClassificationExportFormatter
     def batch_pre_cache(self) -> Optional[Callable[[List[AlleleData]], None]]:
         # do we want to try all clinvar versions?
         def handle_batch(batch: List[AlleleData]):
-            variant_to_batches = dict()
+            variant_to_batches = {}
             for ad in batch:
                 if variant := ad.variant:
                     variant_to_batches[variant.pk] = ad
@@ -244,4 +244,4 @@ class ClassificationExportFormatter2ClinVarCompare(ClassificationExportFormatter
         if allele_data.allele_id:
             return [ExportFormatter.write_single_row(ClinVarCompareRow(allele_data, self.clinvar_version).to_csv())]
         else:
-            return list()
+            return []

@@ -45,7 +45,7 @@ class LabNotificationBuilder(NotificationBuilder):
         if self.notification_type == LabNotificationBuilder.NotificationType.SLACK_ONLY:
             return
 
-        recipient_list: List[str] = list()
+        recipient_list: List[str] = []
         if lab_email := self.lab.email:
             recipient_list.append(lab_email)
         else:

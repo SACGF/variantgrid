@@ -4,7 +4,7 @@ from django.db import migrations
 from django.db.models import Q
 
 
-def _one_off_flag_uta_transcripts_with_gaps(apps, schema_editor):
+def _one_off_flag_uta_transcripts_with_gaps(apps, _schema_editor):
     """ We downloaded UTA transcripts without alignments, so gaps aren't handled properly """
 
     TranscriptVersion = apps.get_model("genes", "TranscriptVersion")

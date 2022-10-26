@@ -41,7 +41,7 @@ class AlleleAdmin(ModelAdminBasics):
 
     @admin_list_column()
     def variants(self, obj: Allele):
-        genome_builds: List[GenomeBuild] = list()
+        genome_builds: List[GenomeBuild] = []
         for va in VariantAllele.objects.filter(allele=obj).order_by('genome_build'):
             genome_builds.append(va.genome_build)
         if genome_builds:
@@ -170,7 +170,7 @@ class ClinVarKeyAdmin(ModelAdminBasics):
         from classification.models.clinvar_export_prepare import ClinvarExportPrepare
         report = ClinvarExportPrepare().update_export_records_for_keys(list(queryset.all()))
         if len(report) > 10:
-            self.message_user(request, message=f"Showing first 10 messages", level=messages.INFO)
+            self.message_user(request, message="Showing first 10 messages", level=messages.INFO)
         for report_row in report[0:10]:
             self.message_user(request, message=report_row, level=messages.INFO)
 

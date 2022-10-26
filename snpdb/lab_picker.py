@@ -43,7 +43,7 @@ class LabSelection:
         """
         all_labs = Lab.valid_labs_qs(user=user, admin_check=True).exclude(organization__active=False).order_by(
             'organization__name', 'name')
-        seleced_labs: QuerySet[Lab]
+        selected_labs: QuerySet[Lab]
         selected_org: Optional[Organization] = None
         selected_all = False
 
@@ -54,7 +54,7 @@ class LabSelection:
             except ValueError:
                 pass
 
-        if isinstance(selection, int) and not selection == 0:
+        if isinstance(selection, int) and selection != 0:
             # legacy method of just passing LabID around
             selected_labs = all_labs.filter(pk=selection)
         elif isinstance(selection, str) and selection.startswith("org-"):

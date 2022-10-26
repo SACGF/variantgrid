@@ -246,7 +246,7 @@ class MVLEntry(ExportRow):
         )
 
     def warnings(self) -> List[str]:
-        warnings: List[str] = list()
+        warnings: List[str] = []
 
         if self.data.different_chgvs:
             warnings.append('Warning <b>c.hgvs representations are different across transcript versions</b>')
@@ -404,7 +404,7 @@ f"""{{
             # FIXME this will break if split over multiple files
             # and can't even reset first_row in header, due to streaming data pre-generating and peeking as a call
             # to row() can produce multiple rows that should be grouped (so order of header and row aren't guarenteed)
-            output: List[str] = list()
+            output: List[str] = []
             for c_data in c_datas:
                 export_row = MVLCHGVSData(
                     c_data,

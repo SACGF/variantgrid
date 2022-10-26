@@ -189,7 +189,7 @@ class Migrator:
 
     def refresh_migrations(self):
         try:
-            migrations: List[SubMigration] = list()
+            migrations: List[SubMigration] = []
             migrations.extend(Migrator.STANDARD_MIGRATIONS)
 
             command = substitute_aliases(["python", "manage.py", "manual_outstanding"])
@@ -234,7 +234,7 @@ class Migrator:
     def prompt(self, refresh: bool = True):
         if refresh:
             self.refresh_migrations()
-        keys = list()
+        keys = []
         print_purple("-- Welcome to variantgrid upgrader --")
         print("a: automate standard steps (runs git, migrate, collectstatic_js_reverse, collectstatic, deployed)")
         for migration in self.migrations:
@@ -279,7 +279,7 @@ class Migrator:
 
             self.prompt(refresh=False)
 
-        self.run_and_callback(migrations=list(Migrator.STANDARD_MIGRATIONS), callback=lambda success: on_complete(success))
+        self.run_and_callback(migrations=list(Migrator.STANDARD_MIGRATIONS), callback=on_complete)
 
     def run_and_re_prompt(self, migrations: List[SubMigration]):
         self.run_and_callback(migrations, lambda _: self.prompt())

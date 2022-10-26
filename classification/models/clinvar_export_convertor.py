@@ -28,8 +28,8 @@ class ClinVarEvidenceKey:
 
     def __init__(self, evidence_key: EvidenceKey, value_obj: Any):
         self.evidence_key = evidence_key
-        self.valid_values = list()
-        self.invalid_values = list()
+        self.valid_values = []
+        self.invalid_values = []
         self.conversion_messages = JSON_MESSAGES_EMPTY
 
         value: Any
@@ -147,7 +147,7 @@ class ClinVarExportConverter:
             if text := self.classification_based_on.get(SpecialEKeys.INTERPRETATION_SUMMARY):
                 xrefs = [ref.to_json() for ref in db_ref_regexes.search(self.classification_based_on.get(SpecialEKeys.INTERPRETATION_SUMMARY))]
             else:
-                xrefs = list()
+                xrefs = []
         else:
             xrefs = self.classification_based_on.db_refs
 
@@ -213,7 +213,7 @@ class ClinVarExportConverter:
 
     @lazy
     def as_validated_json(self) -> ValidatedJson:
-        data = dict()
+        data = {}
         if self.classification_based_on is None:
             return ValidatedJson(None, JsonMessages.error("No classification is currently associated with this allele and condition"))
         else:
@@ -283,7 +283,7 @@ class ClinVarExportConverter:
                 else:
                     hgvs_errors += JsonMessages.error(f"ClinVar only accepts transcripts starting with one of {CLINVAR_ACCEPTED_TRANSCRIPTS}")
 
-                gene_symbols = list()
+                gene_symbols = []
                 if gene_symbol := self.value(SpecialEKeys.GENE_SYMBOL):
                     gene_symbols.append({"symbol": gene_symbol})
 
@@ -335,12 +335,12 @@ class ClinVarExportConverter:
 
     @property
     def json_clinical_significance(self) -> ValidatedJson:
-        data = dict()
+        data = {}
         if citations := self.citation_refs:
             data["citation"] = [ClinVarExportConverter.citation_to_json(citation) for citation in citations]
         data["clinicalSignificanceDescription"] = self.clinvar_value(SpecialEKeys.CLINICAL_SIGNIFICANCE).value(single=True)
 
-        comment_parts: List[str] = list()
+        comment_parts: List[str] = []
 
         if interpret := self.value(SpecialEKeys.INTERPRETATION_SUMMARY):
             comment_parts.append(interpret.strip())
@@ -366,9 +366,9 @@ class ClinVarExportConverter:
 
     @property
     def condition_set(self) -> ValidatedJson:
-        data = dict()
+        data = {}
         messages = JSON_MESSAGES_EMPTY
-        condition_list = list()
+        condition_list = []
         data["condition"] = condition_list
         if conditions := self.classification_based_on.classification.condition_resolution_obj:
             if len(conditions.terms) >= 2:
@@ -387,7 +387,7 @@ class ClinVarExportConverter:
     def observed_in(self) -> ValidatedJson:
         # can return array, but we only have one
         # (though
-        data = dict()
+        data = {}
         affected_status_value = self.clinvar_value(SpecialEKeys.AFFECTED_STATUS)
         if affected_status_value:
             data["affectedStatus"] = affected_status_value.value(single=True)

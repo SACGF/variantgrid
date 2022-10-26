@@ -212,7 +212,7 @@ class ClassificationExportFormatter2(ABC):
         Return rows to start each file, typically 0 to 1 line
         :return: A list of rows to be \n at the top of each file
         """
-        return list()
+        return []
 
     @abstractmethod
     def row(self, allele_data: AlleleData) -> List[str]:
@@ -227,7 +227,7 @@ class ClassificationExportFormatter2(ABC):
         Return rows to end each file, typically 0
         :return: A list of rows to be \n at the bottom of each file
         """
-        return list()
+        return []
 
     def send_stats(self):
         """

@@ -3,7 +3,7 @@
 from django.db import migrations
 
 
-def rename_variant_classification(apps, schema_editor):
+def rename_variant_classification(apps, _schema_editor):
     FlagTypeContext = apps.get_model("flags", "FlagTypeContext")
     FlagType = apps.get_model("flags", "FlagType")
     FlagTypeResolution = apps.get_model("flags", "FlagTypeResolution")

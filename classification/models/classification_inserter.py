@@ -25,7 +25,7 @@ class BulkClassificationInserter:
         from being published
         """
         self.user = user
-        self._import_for_genome_build: Dict[Any, ClassificationImport] = dict()
+        self._import_for_genome_build: Dict[Any, ClassificationImport] = {}
         self.single_insert = False
         self.api_version = api_version
         self.force_publish = force_publish
@@ -78,7 +78,7 @@ class BulkClassificationInserter:
             raise ClassificationProcessError('If record_id is provided in URL cannot insert more than one record')
 
         self.record_count += 1
-        data_copy = dict()
+        data_copy = {}
         data_copy.update(data)
         data = data_copy
         record_ref: Optional[ClassificationRef] = None

@@ -26,7 +26,7 @@ class OntologyMatch:
         self.term = OntologyTerm.get_or_stub(term_id)
         self.selected: bool = False  # has the user selected this term for whatever context this is
         self.direct_reference: bool = False  # was this term referenced by ID directly, e.g. text is "patient has MONDO:123456" and this is "MONDO:123456"
-        self.gene_relationships: List[OntologySnake] = list()  # in what ways is this related to the gene in question (assuming there is a gene in question)
+        self.gene_relationships: List[OntologySnake] = []  # in what ways is this related to the gene in question (assuming there is a gene in question)
         self.search_engine_score: Optional[int] = None  # was this found from doing a text search on 3rd party search, and if so, what's its ranking
 
     @property
@@ -88,7 +88,7 @@ class OntologyMatch:
 
 
 OPRPHAN_OMIM_TERMS = re.compile("[0-9]{6,}")
-SUFFIX_SKIP_TERMS = {"", "the", "an", "and", "&", "or", "for", "the", "type", "group", "with"}
+SUFFIX_SKIP_TERMS = {"", "the", "an", "and", "&", "or", "for", "type", "group", "with"}
 PREFIX_SKIP_TERMS = SUFFIX_SKIP_TERMS.union({"a"})  # only exclude "A" from prefix, in case it says "type" A
 IGNORE_TERMS = {"ar", "ad", "linked", "xld", "xlr", "disability", "disorder"}  # ignore when the user provides
 # should disease be in this as well?
@@ -145,7 +145,7 @@ class SearchText:  # TODO shold be renamed ConditionSearchText
         text = text.lower()
         tokens = [token.strip() for token in text.split(" ")]
         if deplural:
-            new_tokens = list()
+            new_tokens = []
             for token in tokens:
                 if len(token) >= 5 and token.endswith('s'):  # make sure 5 or more characters long so not acronym
                     token = token[0:-1]
@@ -224,8 +224,8 @@ class OntologyMatching:
     """
 
     def __init__(self, search_term: Optional[str] = None, gene_symbol: Optional[str] = None):
-        self.term_map: Dict[str, OntologyMatch] = dict()
-        self.errors: List[str] = list()
+        self.term_map: Dict[str, OntologyMatch] = {}
+        self.errors: List[str] = []
         self.search_text: Optional[SearchText] = None
         self.sub_type = None
         if search_term:

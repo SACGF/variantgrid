@@ -3,7 +3,7 @@
 from django.db import migrations
 
 
-def _one_off_common_filter_gnomad_version(apps, schema_editor):
+def _one_off_common_filter_gnomad_version(apps, _schema_editor):
     """ This is done to match annotation.0042_one_off_variant_annotation_version_gnomad """
     CohortGenotypeCommonFilterVersion = apps.get_model("snpdb", "CohortGenotypeCommonFilterVersion")
     # We do our own custom VEP annotation with gnomAD, use that for versions now, update historical ones

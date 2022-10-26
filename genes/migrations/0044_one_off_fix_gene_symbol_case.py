@@ -3,7 +3,7 @@
 from django.db import migrations
 
 
-def _change_gene_symbol_case(apps, schema_editor):
+def _change_gene_symbol_case(apps, _schema_editor):
     GeneSymbol = apps.get_model("genes", "GeneSymbol")
     if not GeneSymbol.objects.exists():
         return  # New install

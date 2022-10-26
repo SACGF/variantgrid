@@ -87,7 +87,7 @@ class ClassificationView(APIView):
                         complete_identifier = import_id
                     classification_import_run = ClassificationImportRun.record_classification_import(identifier=import_id)
 
-                per_json_data = list()
+                per_json_data = []
                 for record_data in records:
                     result = importer.insert(record_data, import_run=classification_import_run)
                     result.notify_if_required()

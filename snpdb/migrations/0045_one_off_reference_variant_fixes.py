@@ -23,7 +23,7 @@ def _test_has_bad_alleles_or_seq(apps):
     return Sequence.objects.filter(seq='.').exists()
 
 
-def _one_off_reference_variant_fixes(apps, schema_editor):
+def _one_off_reference_variant_fixes(apps, _schema_editor):
     Variant = apps.get_model("snpdb", "Variant")
     Allele = apps.get_model("snpdb", "Allele")
     Sequence = apps.get_model("snpdb", "Sequence")
@@ -94,7 +94,7 @@ def _one_off_reference_variant_fixes(apps, schema_editor):
 
         # Liftover VCF inserted alt='.' instead of alt='=' (REFERENCE_ALT)
         # These wouldn't have been linked to alleles etc, and liftover pipeline just would have failed
-        (n, deleted) = bad_seq.delete()
+        _, deleted = bad_seq.delete()
         expected = {'snpdb.Sequence', 'snpdb.Variant', 'snpdb.VariantZygosityCount'}
         unexpected_deleted = set(deleted) - expected
         if unexpected_deleted:

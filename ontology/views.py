@@ -33,12 +33,12 @@ class OntologyTermView(TemplateView):
                 gene_relationships = LimitedCollection(raw_gene_relationships, 250)
 
             regular_relationships = None
-            parent_relationships = list()
-            child_relationships = list()
+            parent_relationships = []
+            child_relationships = []
             relationship_count = 0
 
             if not is_gene:
-                regular_relationships = list()
+                regular_relationships = []
                 all_relationships: List[OntologyTermRelation] = OntologyTermRelation.relations_of(term)
                 relationship_count = len(all_relationships)
                 for relationship in all_relationships:

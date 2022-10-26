@@ -329,7 +329,7 @@ class OntologyTerm(TimeStampedModel):
             term_type = (self.extra or dict()).get('type', 'Unknown')
             return f"Term is of type - {term_type}"
         elif self.status == OntologyTermStatus.STUB:
-            return f"Term was referenced by 3rd party but not yet from our authoritative source"
+            return "Term was referenced by 3rd party but not yet from our authoritative source"
         else:
             return None
 
@@ -630,7 +630,7 @@ class OntologyVersion(TimeStampedModel):
     @staticmethod
     def latest() -> Optional['OntologyVersion']:
         oi_qs = OntologyImport.objects.all()
-        kwargs = dict()
+        kwargs = {}
         missing_fields = set()
         for field, (import_source, filenames) in OntologyVersion.ONTOLOGY_IMPORTS.items():
             if ont_import := oi_qs.filter(import_source=import_source, filename__in=filenames).order_by("pk").last():
@@ -640,7 +640,7 @@ class OntologyVersion(TimeStampedModel):
 
         if not missing_fields:
             values = list(kwargs.values())
-            last_date = max([oi.created for oi in values])
+            last_date = max(oi.created for oi in values)
             ontology_version, created = OntologyVersion.objects.get_or_create(**kwargs,
                                                                               defaults={"created": last_date})
             if created:
@@ -894,7 +894,7 @@ class OntologySnake:
             for relation in all_relations:
                 snake = by_leafs.get(relation.source_term) or by_leafs.get(relation.dest_term)
 
-                if relation.source_term == snake.leaf_term or relation.dest_term == snake.leaf_term:
+                if snake.leaf_term in (relation.source_term, relation.dest_term):
                     other_term = relation.other_end(snake.leaf_term)
 
                     ontology_services = {snake.leaf_term.ontology_service, other_term.ontology_service}

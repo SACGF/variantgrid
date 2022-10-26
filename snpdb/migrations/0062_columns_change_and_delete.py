@@ -3,14 +3,14 @@
 from django.db import migrations
 
 
-def _change_hgnc_id(apps, schema_editor):
+def _change_hgnc_id(apps, _schema_editor):
     """ We deleted hgnc_id from variant annotation - go through gene now """
     VariantGridColumn = apps.get_model("snpdb", "VariantGridColumn")
     variant_column = "variantannotation__transcript_version__gene_version__hgnc__id"
     VariantGridColumn.objects.filter(pk='hgnc_id').update(variant_column=variant_column)
 
 
-def _one_off_delete_some_columns(apps, schema_editor):
+def _one_off_delete_some_columns(apps, _schema_editor):
     """ This can be removed if/when we squish migrations """
     VariantGridColumn = apps.get_model("snpdb", "VariantGridColumn")
     DELETE_COLUMNS = [

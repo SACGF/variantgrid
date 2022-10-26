@@ -435,7 +435,7 @@ class CohortGenotypeCollection(RelatedModelsPartitionModel):
         if exclude:
             # Inverting a query via ~Q() leads to extremely slow queries so inverting regex.
             # Use ! (negative lookahead) only works where regex is anchored at start of line
-            regex_string = "^((?!%s))" % regex_string
+            regex_string = f"^((?!{regex_string}))"
 
         # If regex string is all "." (ie everything) then can optimise away
         non_wildcard = regex_string.replace(".", "")

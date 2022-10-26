@@ -3,7 +3,7 @@
 from django.db import migrations
 
 
-def _one_off_set_variant_tag_allele(apps, schema_editor):
+def _one_off_set_variant_tag_allele(apps, _schema_editor):
     VariantAllele = apps.get_model("snpdb", "VariantAllele")
     VariantTag = apps.get_model("analysis", "VariantTag")
 

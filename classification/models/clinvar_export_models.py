@@ -73,7 +73,7 @@ class ClinVarExport(TimeStampedModel):
     def last_submission_error(self) -> Optional[str]:
         if last_submission := self.last_submission:
             if response_json := last_submission.response_json:
-                all_errors: List[str] = list()
+                all_errors: List[str] = []
                 if errors_list := response_json.get('errors'):
                     for error in errors_list:
                         if output := error.get('output'):
@@ -272,7 +272,7 @@ class ClinVarExportBatch(TimeStampedModel):
     @staticmethod
     @transaction.atomic()
     def create_batches(qs: QuerySet[ClinVarExport], force_update: bool = False) -> List['ClinVarExportBatch']:
-        all_batches: List[ClinVarExportBatch] = list()
+        all_batches: List[ClinVarExportBatch] = []
 
         current_batch: Optional[ClinVarExportBatch] = None
         current_batch_size = 0

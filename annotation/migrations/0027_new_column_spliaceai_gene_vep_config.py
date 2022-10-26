@@ -5,7 +5,7 @@ from django.db import migrations
 from library.django_utils import bulk_insert_class_data
 
 
-def _new_vep_annotation_spliceai_gene(apps, schema_editor):
+def _new_vep_annotation_spliceai_gene(apps, _schema_editor):
     COLUMN_VEP_FIELD = [
         {'column': 'spliceai_gene_symbol', 'vep_plugin': 'a', 'source_field_has_custom_prefix': False,
          'source_field_processing_description': None, 'vep_custom': None,

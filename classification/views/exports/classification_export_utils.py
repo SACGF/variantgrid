@@ -55,7 +55,7 @@ class CitationCounter:
         return [str(stub) for stub in sorted(set(self.all_citations.keys()))]
 
     def citations(self) -> List[Citation]:
-        citations: List[Citation] = list()
+        citations: List[Citation] = []
 
         by_source: Dict[str, List[str]] = defaultdict(list)
         for stub in list(self.all_citations.keys()):

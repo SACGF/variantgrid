@@ -4,7 +4,7 @@ from django.db import migrations
 from django.db.models import F
 
 
-def _hgnc_fk_to_gene_symbol(apps, schema_editor):
+def _hgnc_fk_to_gene_symbol(apps, _schema_editor):
     HGNCGeneNames = apps.get_model("genes", "HGNCGeneNames")
     HGNCGeneNames.objects.update(gene_symbol_id=F("approved_symbol"))
 

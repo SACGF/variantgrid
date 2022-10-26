@@ -151,7 +151,7 @@ class ClassificationImportMapInsertTask(Task):
                         if not value:
                             value = "- no messages -"
                         else:
-                            value_lst = list()
+                            value_lst = []
                             for message_type, message_count in value.items():
                                 value_lst.append(f"{message_type}: {message_count}")
                             value = "\n".join(value_lst)

@@ -6,7 +6,7 @@ from django.db.models import F
 from library.django_utils import bulk_insert_class_data
 
 
-def _new_columns_clinvar_conflicting_clinical_significance(apps, schema_editor):
+def _new_columns_clinvar_conflicting_clinical_significance(apps, _schema_editor):
     CustomColumn = apps.get_model("snpdb", "CustomColumn")
     NEW_VARIANT_GRID_COLUMNS = [
         {'grid_column_name': 'conflicting_clinical_significance',

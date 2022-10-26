@@ -3,7 +3,7 @@
 from django.db import migrations
 
 
-def _one_off_convert_skipped_gvcf_to_standard_vcf_info(apps, schema_editor):
+def _one_off_convert_skipped_gvcf_to_standard_vcf_info(apps, _schema_editor):
     VCFSkippedGVCFNonVarBlocks = apps.get_model("upload", "VCFSkippedGVCFNonVarBlocks")
     SimpleVCFImportInfo = apps.get_model("upload", "SimpleVCFImportInfo")
 

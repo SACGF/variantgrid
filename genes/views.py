@@ -210,7 +210,7 @@ class GeneSymbolViewInfo:
         return self.desired_genome_build
 
     def warnings(self) -> List[str]:
-        warnings = list()
+        warnings = []
         if self.gene_version:
             # This page is shown using the users default genome build
             # However - it's possible the gene doesn't exist for a particular genome build.
@@ -262,7 +262,7 @@ class GeneSymbolViewInfo:
 
     @lazy
     def gene_external_urls(self) -> Dict[str, str]:
-        gene_external_urls: Dict[str, str] = dict()
+        gene_external_urls: Dict[str, str] = {}
         for gene in self.gene_symbol.genes:
             gene_external_urls[gene.identifier] = gene.get_external_url()
         return gene_external_urls
@@ -437,7 +437,7 @@ def view_transcript(request, transcript_id):
 
     genome_builds = sorted(gene_by_build.keys())
     genome_build_genes = [GenomeBuildGenes(genome_build, sorted(gene_by_build.get(genome_build))) for genome_build in genome_builds]
-    transcript_version_details: List[TranscriptVersionDetails] = list()
+    transcript_version_details: List[TranscriptVersionDetails] = []
 
     build_matcher = {genome_build: HGVSMatcher(genome_build) for genome_build in genome_builds}
     for version in sorted(versions):

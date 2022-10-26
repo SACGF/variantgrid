@@ -163,7 +163,7 @@ class ClinVarExportColumns(DatatableConfig[ClinVarExport]):
 
     def __init__(self, request: HttpRequest):
         super().__init__(request)
-        self.export_to_batches = dict()
+        self.export_to_batches = {}
 
         self.search_box_enabled = True
         self.expand_client_renderer = DatatableConfig._row_expand_ajax('clinvar_export_detail')
@@ -387,7 +387,7 @@ class ClinVarExportSummary(ExportRow):
 
     @export_column("Messages")
     def messages(self):
-        all_messages: List[str] = list()
+        all_messages: List[str] = []
         if clinvar_error := self.clinvar_export.last_submission_error:
             all_messages.append(f"(CLINVAR ERROR) {clinvar_error}")
 

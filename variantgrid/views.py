@@ -83,7 +83,7 @@ def authenticated(request):
 def version(request):
     git = Git(settings.BASE_DIR)
 
-    deployments = list()
+    deployments = []
     is_first = True
     for deployment in Deployment.objects.order_by('-created').all()[0:10]:
         if is_first:
@@ -115,7 +115,7 @@ def version(request):
             "git_link": deployment_git_link
         })
 
-    weekly_update_users = list()
+    weekly_update_users = []
     if request.user.is_superuser:
         all_users = User.objects.filter(is_active=True, email__isnull=False).order_by('email')
         for user in all_users:

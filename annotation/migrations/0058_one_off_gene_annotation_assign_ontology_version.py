@@ -3,7 +3,7 @@
 from django.db import migrations
 
 
-def _one_off_gene_annotation_assign_ontology_version(apps, schema_editor):
+def _one_off_gene_annotation_assign_ontology_version(apps, _schema_editor):
     GeneAnnotationVersion = apps.get_model("annotation", "GeneAnnotationVersion")
     OntologyVersion = apps.get_model("ontology", "OntologyVersion")
 

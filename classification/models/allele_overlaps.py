@@ -29,7 +29,7 @@ class OverlapsCalculatorState:
     def _collection_to_flag(self):
         # The number of open clinical significance change flags should be limited, so fetch them all to check later
         all_open_pending_changes = Flag.objects.filter(flag_type=classification_flag_types.classification_pending_changes, resolution__status=FlagStatus.OPEN)
-        collection_clin_sig = dict()
+        collection_clin_sig = {}
         for flag in all_open_pending_changes:
             collection_clin_sig[flag.collection_id] = (flag.data or {}).get(ClassificationFlagTypes.CLASSIFICATION_PENDING_CHANGES_CLIN_SIG_KEY)
         return collection_clin_sig
@@ -63,7 +63,7 @@ class ClinicalGroupingOverlap:
         self.state = state
         self.clinical_context = clinical_context
         self.groups: Dict[ClassificationLabSummaryEntry] = defaultdict(int)
-        self.cms = list()
+        self.cms = []
         self.labs = set()
 
     @property
@@ -146,7 +146,7 @@ class AlleleOverlap(OverlapState):
     def __init__(self, calculator_state: OverlapsCalculatorState, allele: Allele):
         self._calculator_state = calculator_state
         self.allele = allele
-        self.context_map: Dict[Optional[ClinicalContext], ClinicalGroupingOverlap] = dict()
+        self.context_map: Dict[Optional[ClinicalContext], ClinicalGroupingOverlap] = {}
         self._c_hgvses: Set[CHGVS] = set()
 
         # need to keep track of the below for sorting
@@ -242,7 +242,7 @@ class OverlapsCalculator:
                             'classification__lab', 'classification__lab__organization') \
             .order_by('classification__allele')
 
-        all_overlaps = list()
+        all_overlaps = []
         for allele, cms in group_by_key(cm_qs, lambda x: x.classification.allele):
             if len(cms) >= 2 and any((cm.classification.lab_id in lab_ids for cm in cms)):
                 overlap = AlleleOverlap(calculator_state=self.calculator_state, allele=allele)

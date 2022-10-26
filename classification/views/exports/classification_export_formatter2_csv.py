@@ -232,7 +232,7 @@ class ClassificationExportFormatter2CSV(ClassificationExportFormatter2):
 
     @lazy
     def _categories(self) -> Optional[Dict]:
-        categories = dict()
+        categories = {}
         if self.format_details.exclude_transient:
             categories["transient"] = None
         if not self.grouping_utils.any_pending_changes:

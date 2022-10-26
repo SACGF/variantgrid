@@ -3,7 +3,7 @@
 from django.db import migrations
 
 
-def _change_all_columns(apps, schema_editor):
+def _change_all_columns(apps, _schema_editor):
     """ This needs to be kept if squishing migrations """
     CustomColumnsCollection = apps.get_model("snpdb", "CustomColumnsCollection")
     CustomColumn = apps.get_model("snpdb", "CustomColumn")
@@ -155,7 +155,7 @@ def _change_all_columns(apps, schema_editor):
     CustomColumn.objects.bulk_create(records)
 
 
-def _change_descriptions(apps, schema_editor):
+def _change_descriptions(apps, _schema_editor):
     VariantGridColumn = apps.get_model("snpdb", "VariantGridColumn")
     COLUMN_DESCRIPTIONS = {
         # Some gene columns explicitly mentioned Ensembl (while we could be using RefSeq annotation)

@@ -2,7 +2,8 @@
 
 from django.db import migrations
 
-def _qc_gene_list_lock_and_rename(apps, schema_editor):
+
+def _qc_gene_list_lock_and_rename(apps, _schema_editor):
     BATCH_SIZE = 2000
     GeneList = apps.get_model("genes", "GeneList")
     QCGeneList = apps.get_model("seqauto", "QCGeneList")

@@ -8,7 +8,7 @@ from django.db import migrations
 from django.db.models import Q
 
 
-def _one_off_allele_37_not_38_data(apps, schema_editor):
+def _one_off_allele_37_not_38_data(apps, _schema_editor):
     Flag = apps.get_model("flags", "Flag")
     FlagType = apps.get_model("flags", "FlagType")
     FLAG_STATUS_OPEN = 'O'

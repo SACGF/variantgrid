@@ -163,7 +163,7 @@ def export_as_csv(modeladmin, request, queryset) -> HttpResponse:
             yield delimited_row([getattr(qs_obj, field) for field in field_names])
 
     response = StreamingHttpResponse(data_generator(), content_type='text/csv')
-    response['Content-Disposition'] = 'attachment; filename={}.csv'.format(meta)
+    response['Content-Disposition'] = f'attachment; filename={meta}.csv'
     return response
 
 
@@ -203,7 +203,7 @@ class ModelAdminBasics(admin.ModelAdmin):
         instance = super().__new__(cls)
 
         model_actions = [func for _, func in inspect.getmembers(cls, lambda x: getattr(x, 'is_model_action', False))]
-        cls.model_urls = list()
+        cls.model_urls = []
         cls.model_actions = model_actions
         if model_actions:
             model_actions.sort(key=lambda x: x.line_number)
@@ -213,7 +213,7 @@ class ModelAdminBasics(admin.ModelAdmin):
 
     def changelist_view(self, request, extra_context=None):
         # provides data to the template so that model wide methods can be added to the top
-        extra_context = extra_context or dict()
+        extra_context = extra_context or {}
         extra_context["model_actions"] = [{
             "label": ma.short_description,
             "url": ma.url_slug,
@@ -223,7 +223,7 @@ class ModelAdminBasics(admin.ModelAdmin):
 
     def changeform_view(self, request, object_id=None, form_url="", extra_context=None):
         # provides data to the template so that actions can be added to the top
-        extra_context = extra_context or dict()
+        extra_context = extra_context or {}
         all_actions = self.get_actions(request)
         extra_context["actions"] = [{
             "id": a[1],
@@ -242,7 +242,7 @@ class ModelAdminBasics(admin.ModelAdmin):
         action = self.get_action(action_name)
         response = action[0](self, request, self.model.objects.filter(pk=object_id))
         if not response:
-            response = HttpResponseRedirect(f"../change/")
+            response = HttpResponseRedirect("../change/")
         return response
 
     def get_urls(self):
@@ -275,8 +275,8 @@ class ModelAdminBasics(admin.ModelAdmin):
         return [f.name for f in self.model._meta.fields if self.is_readonly_field(f)]
 
     def _get_fields(self, request, obj=None, **kwargs) -> List[str]:
-        first: List[str] = list()
-        second: List[str] = list()
+        first: List[str] = []
+        second: List[str] = []
         for f in self.model._meta.fields:
             if isinstance(f, (AutoField, ForeignKey)):
                 # put ids and foreign keys first

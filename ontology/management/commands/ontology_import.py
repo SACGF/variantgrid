@@ -96,8 +96,8 @@ def load_mondo(filename: str, force: bool):
     with open(filename, 'r') as json_file:
         data_file = json.load(json_file)
 
-    node_to_hgnc_id: [str, str] = dict()
-    node_to_mondo: [str, str] = dict()
+    node_to_hgnc_id: [str, str] = {}
+    node_to_mondo: [str, str] = {}
 
     for graph in data_file.get("graphs", []):
 
@@ -113,7 +113,7 @@ def load_mondo(filename: str, force: bool):
                     if meta := node.get("meta"):
                         label = node.get("lbl") or ""
                         deprecated = meta.get("deprecated")
-                        extra = dict()
+                        extra = {}
 
                         defn = meta.get("definition", {}).get("val")
                         if defn:
@@ -125,7 +125,7 @@ def load_mondo(filename: str, force: bool):
                         if synonyms := meta.get("synonyms"):
                             extra["synonyms"] = synonyms
 
-                        aliases = list()
+                        aliases = []
                         term_relation_types: Dict[str, List[str]] = defaultdict(list)
 
                         for bp in meta.get("basicPropertyValues", []):
@@ -522,7 +522,7 @@ def load_omim(filename: str, force: bool):
 
 
 def sync_hgnc():
-    uploads: List[OntologyTerm] = list()
+    uploads: List[OntologyTerm] = []
 
     o_import = OntologyImport.objects.create(
         import_source="HGNC Sync",

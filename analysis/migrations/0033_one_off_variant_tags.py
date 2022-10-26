@@ -5,7 +5,7 @@ from django.db import migrations
 from manual.operations.manual_operations import ManualOperation
 
 
-def _one_off_variant_tags(apps, schema_editor):
+def _one_off_variant_tags(apps, _schema_editor):
     VariantTag = apps.get_model("analysis", "VariantTag")
 
     records = []

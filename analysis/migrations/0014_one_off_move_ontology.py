@@ -13,7 +13,7 @@ def _test_has_legacy_phenotype_node_ontology(apps):
     return PhenotypeNodeOMIM.objects.exists() or PhenotypeNodeHPO.objects.exists()
 
 
-def _one_off_save_phenotype_node_ontology(apps, schema_editor):
+def _one_off_save_phenotype_node_ontology(apps, _schema_editor):
     PhenotypeNodeOMIM = apps.get_model("analysis", "PhenotypeNodeOMIM")
     PhenotypeNodeHPO = apps.get_model("analysis", "PhenotypeNodeHPO")
 

@@ -144,7 +144,7 @@ class EvidenceKey(TimeStampedModel):
         Converts a CriteriaEvaluation options (e.g. CriteriaEvaluation.BENIGN_OPTIONS) and a default strength (e.g. BM)
         to a list of evidence keys with default and override populated appropriately
         """
-        use_options = list()
+        use_options = []
         for entry in options:
             if entry.get('key') == default:
                 entry = entry.copy()
@@ -168,7 +168,7 @@ class EvidenceKey(TimeStampedModel):
                 if self.default_crit_evaluation in (o.get('key') for o in criteria):
                     return EvidenceKey.__special_up_options(criteria, self.default_crit_evaluation)
             print(f"Warning, could not work out what list {self.default_crit_evaluation} fits into")
-            return list()
+            return []
 
         return None
 
@@ -176,7 +176,7 @@ class EvidenceKey(TimeStampedModel):
     def _option_indexes(self) -> Optional[Dict[str, int]]:
         index_map: Optional[Dict[str, int]] = None
         if options := self.virtual_options:
-            index_map = dict()
+            index_map = {}
             for index, option in enumerate(options):
                 index_map[option.get('key')] = index + 1
         return index_map
@@ -211,13 +211,13 @@ class EvidenceKey(TimeStampedModel):
         if options := self.virtual_options:
             return {x.get('key'): x.get('label') for x in options}
         else:
-            return dict()
+            return {}
 
     def option_dictionary_property(self, property: str) -> Dict[str, Any]:
         if options := self.virtual_options:
             return {x.get('key'): x.get(property) for x in options if property in x}
         else:
-            return dict()
+            return {}
 
     @staticmethod
     def dummy_key(key: str) -> 'EvidenceKey':

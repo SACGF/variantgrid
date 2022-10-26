@@ -52,7 +52,7 @@ def classification_flag_health_check_activity(sender, health_request: HealthChec
         health_request.since,
         flag_types=FlagType.objects.filter(context=classification_flag_types.classification_flag_context)
     )
-    checks = list()
+    checks = []
     for flag_delta in flag_deltas:
 
         parts = []

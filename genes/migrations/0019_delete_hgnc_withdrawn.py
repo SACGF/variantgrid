@@ -16,7 +16,7 @@ There is no way to pull down "Symbol withdrawn" via REST (only approved/Entry wi
 from django.db import migrations
 
 
-def delete_hgnc_withdrawn(apps, schema_editor):
+def _delete_hgnc_withdrawn(apps, _schema_editor):
     GeneVersion = apps.get_model("genes", "GeneVersion")
     GeneSymbol = apps.get_model("genes", "GeneSymbol")
     OntologyTerm = apps.get_model("ontology", "OntologyTerm")
@@ -37,5 +37,5 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RunPython(delete_hgnc_withdrawn)
+        migrations.RunPython(_delete_hgnc_withdrawn)
     ]

@@ -3,7 +3,7 @@
 from django.db import migrations
 
 
-def _one_off_proband_het_to_sample(apps, schema_editor):
+def _one_off_proband_het_to_sample(apps, _schema_editor):
     TrioNode = apps.get_model("analysis", "TrioNode")
     SampleNode = apps.get_model("analysis", "SampleNode")
     NodeVersion = apps.get_model("analysis", "NodeVersion")
@@ -78,7 +78,7 @@ def _one_off_proband_het_to_sample(apps, schema_editor):
         old_node.delete()
 
 
-def _one_off_delete_invisible_tag_node(apps, schema_editor):
+def _one_off_delete_invisible_tag_node(apps, _schema_editor):
     # We accidentally left these in
     TagNode = apps.get_model("analysis", "TagNode")
     TagNode.objects.filter(parent_input=True, visible=False).delete()

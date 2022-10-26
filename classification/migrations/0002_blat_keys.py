@@ -2,6 +2,7 @@
 
 from django.db import migrations
 
+
 def blat_keys(apps, schema_editor):
     EvidenceKey = apps.get_model("classification", "EvidenceKey")
 

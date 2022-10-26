@@ -3,7 +3,7 @@
 from django.db import migrations
 
 
-def qc_columns(apps, schema_editor):
+def qc_columns(apps, _schema_editor):
     QCType = apps.get_model("seqauto", "QCType")
     QCColumn = apps.get_model("seqauto", "QCColumn")
 

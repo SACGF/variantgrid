@@ -167,7 +167,7 @@ class SearchResult:
     @staticmethod
     def from_search_result_abs(search_type: str, result: SearchResponseRecordAbstract[Any]):
         genome_builds: Set[GenomeBuild] = set()
-        annotation_consortias: List[str] = list()
+        annotation_consortias: List[str] = []
         if genome_build := result.genome_build:
             genome_builds.add(genome_build)
         if annotation_consortia := result.annotation_consortia:
@@ -248,7 +248,7 @@ class SearchResults:
     def __init__(self, search_string: str, genome_build_preferred: Optional[GenomeBuild] = None):
         self.search_string = search_string
         self.genome_build_preferred = genome_build_preferred
-        self.results: List[SearchResult] = list()
+        self.results: List[SearchResult] = []
         self.search_types: Set[str] = set()
         self.search_errors: Dict[SearchError, Set[GenomeBuild]] = defaultdict(set)
 
@@ -703,11 +703,11 @@ def search_hgvs(search_string: str, user: User, genome_build: GenomeBuild, varia
 
 def search_for_alt_alts(variant_qs: QuerySet, variant_tuple: VariantCoordinate, messages: List[str]) -> VARIANT_SEARCH_RESULTS:
     if not messages:
-        messages = list()
-    variants = list()
+        messages = []
+    variants = []
     results = get_results_from_variant_tuples(variant_qs, variant_tuple, any_alt=True)
     for result in results:
-        this_messages = list()
+        this_messages = []
         this_messages.extend(messages)
         this_messages.append(f"Warning: No results for alt '{variant_tuple.alt}', but found this using alt '{result.alt}'")
         variants.append(SearchResult(record=result, message=this_messages))

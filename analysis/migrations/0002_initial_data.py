@@ -5,7 +5,7 @@ from django.db import migrations
 from library.django_utils import bulk_insert_class_data
 
 
-def _initial_data(apps, schema_editor):
+def _initial_data(apps, _schema_editor):
     NODE_GRAPH_TYPE = [
         {'name': 'Homozygosity percent',
          'required_column': 'observedvariant__zygosity',

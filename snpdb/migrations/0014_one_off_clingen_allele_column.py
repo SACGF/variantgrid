@@ -4,7 +4,7 @@
 from django.db import migrations
 
 
-def _create_columns(apps, schema_editor):
+def _create_columns(apps, _schema_editor):
     VariantGridColumn = apps.get_model("snpdb", "VariantGridColumn")
 
     VARIANT_GRID_COLUMN = [

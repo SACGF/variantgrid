@@ -372,8 +372,8 @@ class ConditionResolved:
             return self.plain_text == other.plain_text
 
     def __lt__(self, other: 'ConditionResolved') -> bool:
-        self_terms = self.terms or list()
-        other_terms = other.terms or list()
+        self_terms = self.terms or []
+        other_terms = other.terms or []
         if len(self_terms) != len(other_terms):
             return len(self_terms) < len(other_terms)
         if len(self_terms) >= 1:
@@ -385,8 +385,8 @@ class ClassificationOutstandingIssues:
 
     def __init__(self, classification: 'Classification'):
         self.classification = classification
-        self.flags = list()
-        self.issues = list()
+        self.flags = []
+        self.issues = []
 
     @property
     def pk(self):
@@ -544,7 +544,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         coi_qs = Classification.objects.filter(flag_q | (time_range_q & missing_chgvs_q))
         coi_qs = coi_qs.order_by('-pk').select_related('lab', 'flag_collection')
 
-        summaries: List[ClassificationOutstandingIssues] = list()
+        summaries: List[ClassificationOutstandingIssues] = []
         c: Classification
         for c in coi_qs:
             coi = ClassificationOutstandingIssues(c)
@@ -1557,8 +1557,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                     patch[e_key].wipe(WipeMode.SET_EMPTY)
 
         if remove_api_immutable:
-            for key in use_evidence.keys():
-                cell = use_evidence[key]
+            for key, cell in use_evidence.items():
                 if cell.immutability == SubmissionSource.API:
                     patch[key].immutability = None
 
@@ -2265,7 +2264,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         return variant_annotation
 
     def c_hgvs_all(self) -> List[CHGVS]:
-        all_chgvs: List[CHGVS] = list()
+        all_chgvs: List[CHGVS] = []
         for genome_build in GenomeBuild.builds_with_annotation_cached():
             if text := self.get_c_hgvs(genome_build):
                 chgvs = CHGVS(full_c_hgvs=text)
@@ -2745,7 +2744,7 @@ class ClassificationConsensus:
             return {}
 
         evidence = self.vcm.published_evidence
-        consensus: Dict[str, Any] = dict()
+        consensus: Dict[str, Any] = {}
         for key in (ekey.key for ekey in keys.all_keys if ekey.copy_consensus):
             for part in ['value', 'note']:
                 blob = evidence.get(key)

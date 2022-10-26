@@ -67,5 +67,5 @@ def grid_export_csv(basename, colmodels, items):
     basename = basename[:MAX_FILE_NAME_LENGTH]
 
     response = StreamingHttpResponse(iter_row_writer(), content_type="text/csv")
-    response['Content-Disposition'] = 'attachment; filename="%s.csv"' % slugify(basename)
+    response['Content-Disposition'] = f'attachment; filename="{slugify(basename)}.csv"'
     return response

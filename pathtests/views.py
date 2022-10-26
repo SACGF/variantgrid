@@ -219,7 +219,7 @@ def handle_modification_requests(post_dict, pathology_test_version, op_key, modi
     gene_modification_info = {}
     for gene_symbol, gene_modification_requests in modification_requests.items():
         # Looks like 'add-ALK' or 'del-ALK'
-        key = '%s-%s' % (op_key, gene_symbol)
+        key = f'{op_key}-{gene_symbol}'
         outcome = None
         op = post_dict.get(key)
         if op == IGNORE:
@@ -284,7 +284,7 @@ def any_accepted_requests(request, gene_addition_requests, gene_deletion_request
     for op_key, modification_requests in op_keys.items():
         for gene_symbol in modification_requests:
             # Looks like 'add-ALK' or 'del-ALK'
-            key = '%s-%s' % (op_key, gene_symbol)
+            key = f'{op_key}-{gene_symbol}'
             op = request.POST.get(key)
             if op == ACCEPT:
                 return True

@@ -77,7 +77,7 @@ class AlleleColumns(DatatableConfig):
         return last_allele
 
     def variant_for(self, row: Dict[str, Any], genome_build: GenomeBuild) -> str:
-        values = list()
+        values = []
         allele = self.get_allele(row["id"])
         variant: Variant
         try:
@@ -328,7 +328,7 @@ class ClassificationResolution(ExportRow):
     def variant(self):
         allele: Allele  # @lazy screws up type hints :(
         if allele := self.allele:
-            parts: List[str] = list()
+            parts: List[str] = []
             clingen_id = ""
             if clingen_allele_id := allele.clingen_allele_id:
                 clingen_id = ClinGenAllele.format_clingen_allele(clingen_allele_id)
@@ -376,7 +376,7 @@ def download_liftover_report(request: HttpRequest) -> StreamingHttpResponse:
         imported_genome_build_col, c_hgvs_imported_col, c_hgvs_37_col, c_hgvs_38_col, 'variant', 'pk', named=True
     )
 
-    last_record = list()
+    last_record = []
     def mapper(data):
         genome_build = getattr(data, imported_genome_build_col)
         imported_c_hgvs = getattr(data, c_hgvs_imported_col)

@@ -32,7 +32,7 @@ class ClassificationIssue:
 
     @property
     def message(self) -> Optional[str]:
-        messages: List[str] = list()
+        messages: List[str] = []
         if self.withdrawn:
             messages.append("Classification has been withdrawn")
         if self.transcript_version or self.matching_warning:
@@ -73,7 +73,7 @@ class AlleleData:
 
     def __setitem__(self, key, value):
         if not self.cached_data:
-            self.cached_data = dict()
+            self.cached_data = {}
         self.cached_data[key] = value
 
     def __getitem__(self, item):
@@ -352,7 +352,7 @@ class ClassificationFilter:
         Ids are not necessarily part of this import
         :return: A set of classification IDs
         """
-        discordance_status: Dict[int, DiscordanceReportStatus] = dict()
+        discordance_status: Dict[int, DiscordanceReportStatus] = {}
         for cc in ClinicalContext.objects.filter(status=ClinicalContextStatus.DISCORDANT):
             dr = DiscordanceReport.latest_report(cc)
 

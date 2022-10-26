@@ -3,12 +3,12 @@
 from django.db import migrations
 
 
-def one_off_delete_old_panel_app_cached_web_resource(apps, schema_editor):
+def one_off_delete_old_panel_app_cached_web_resource(apps, _schema_editor):
     CachedWebResource = apps.get_model("annotation", "CachedWebResource")
     CachedWebResource.objects.filter(name='PanelAppPanels').delete()
 
 
-def panel_app_config(apps, schema_editor):
+def panel_app_config(apps, _schema_editor):
     PanelAppServer = apps.get_model("genes", "PanelAppServer")
 
     PANEL_APP_SERVERS = [

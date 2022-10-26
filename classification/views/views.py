@@ -191,7 +191,7 @@ class AutopopulateView(APIView):
 
         used_keys = set()
         used_keys.add(SpecialEKeys.AUTOPOPULATE)
-        complete_values = list()
+        complete_values = []
 
         for data_subset in auto_data.flatten():
             name = data_subset.name
@@ -210,7 +210,7 @@ class AutopopulateView(APIView):
                     used_keys.add(key)
                     complete_values.append({'key': key, 'blob': blob, 'source': 'copy from latest'})
 
-        key_to_order = dict()
+        key_to_order = {}
         index = 1
         # TODO should probably know the lab with EvidenceKeys
         for ekey in EvidenceKeyMap.instance().all_keys:
@@ -345,7 +345,7 @@ def view_classification(request: HttpRequest, classification_id: str):
 
 
 def view_classification_diff(request):
-    extra_data = dict()
+    extra_data = {}
 
     if history_str := request.GET.get('history'):
         vc_id = int(history_str)
@@ -514,7 +514,7 @@ def classification_file_delete(request, pk):
 
 
 def get_classification_attachment_file_dicts(classification) -> List[Dict]:
-    file_dicts: List[Dict] = list()
+    file_dicts: List[Dict] = []
     vca: ClassificationAttachment
     for vca in classification.classificationattachment_set.all():
         file_dicts.append(vca.get_file_dict())
@@ -720,11 +720,11 @@ def clin_sig_change_data(request):
             flag_comment: FlagComment
             cs_from: str = 'ERROR'
             cs_to: str = 'ERROR'
-            comments: List[str] = list()
+            comments: List[str] = []
             resolution: Optional[str] = 'In Progress'
             classification_created: datetime
             date_raised: datetime = flag.created
-            discordance_dates: List[datetime] = list()
+            discordance_dates: List[datetime] = []
             other_labs: Set[Lab] = set()
 
             c_hgvs = source.get_c_hgvs(genome_build=GenomeBuildManager.get_current_genome_build())

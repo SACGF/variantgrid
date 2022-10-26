@@ -120,7 +120,7 @@ class ClassificationImportRunAdmin(ModelAdminBasics):
                 self.message_user(request, message=f'Changed import from ongoing to unfinished for {cir.identifier}',
                                   level=messages.INFO)
         else:
-            self.message_user(request, message=f'No OnGoing Imports to mark as unfinished',
+            self.message_user(request, message='No OnGoing Imports to mark as unfinished',
                               level=messages.WARNING)
 
     def is_readonly_field(self, f) -> bool:
