@@ -1,13 +1,14 @@
 
 from random import randint
 
-
 import celery
 from django.conf import settings
 from django.urls import reverse
+
+from library.django_utils import get_url_from_view_path
 from library.health_check import populate_health_check
 from library.log_utils import NotificationBuilder
-from library.django_utils import get_url_from_view_path
+
 
 # all the dependencies required by injecting everything into this, no longer needed using signals
 # from django.utils.timezone import now

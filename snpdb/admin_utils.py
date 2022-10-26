@@ -1,4 +1,3 @@
-import functools
 import inspect
 from typing import Optional, List, Iterator
 

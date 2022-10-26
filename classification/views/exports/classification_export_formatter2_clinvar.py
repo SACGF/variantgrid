@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Set, Optional, List, Tuple, Dict, Any, Callable
+from typing import Set, Optional, List, Tuple, Callable
 
 from django.http import HttpRequest
 from django.urls import reverse
@@ -14,7 +14,6 @@ from classification.views.exports.classification_export_filter import Classifica
 from classification.views.exports.classification_export_formatter2 import ClassificationExportFormatter2
 from library.django_utils import get_url_from_view_path
 from library.utils import ExportRow, export_column
-from snpdb.models import VariantAllele
 
 
 class ClinVarCompareValue(int, Enum):

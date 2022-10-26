@@ -20,7 +20,7 @@ from classification.tasks.classification_import_map_and_insert_task import Class
 from library.django_utils import get_url_from_view_path
 from library.log_utils import NotificationBuilder, report_exc_info
 from snpdb.lab_picker import LabPickerData
-from snpdb.models import Lab, UserSettings
+from snpdb.models import Lab
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
 
 

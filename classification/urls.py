@@ -12,10 +12,10 @@ from classification.views.classification_email_view import summary_email_preview
 from classification.views.classification_export_view import ClassificationApiExportView
 from classification.views.classification_overlaps_view import view_overlaps, post_clinical_context, \
     view_clinical_context, view_overlaps_detail
-from classification.views.clinvar_export_view import ClinVarMatchView, clinvar_match_detail
 from classification.views.classification_view import ClassificationView, LabGeneClassificationCountsView
 from classification.views.classification_view_metrics import view_classification_metrics, \
     view_page_metrics_detail
+from classification.views.clinvar_export_view import ClinVarMatchView, clinvar_match_detail
 from classification.views.condition_match_test_view import condition_match_test_view, \
     condition_match_test_download_view, condition_obsoletes_view
 from classification.views.condition_matching_view import condition_matching_view, condition_matchings_view, \

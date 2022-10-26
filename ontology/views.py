@@ -1,6 +1,5 @@
 from typing import List
 
-from django.conf import settings
 from django.contrib import messages
 from django.views.generic import TemplateView
 

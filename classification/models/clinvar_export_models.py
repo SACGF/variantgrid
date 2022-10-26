@@ -3,8 +3,6 @@ from typing import Optional, List, Iterable
 
 from django.db import models, transaction
 from django.db.models import QuerySet, TextChoices
-from django.db.models.signals import post_save
-from django.dispatch import receiver
 from django.urls import reverse
 from django.utils.timezone import now
 from lazy import lazy

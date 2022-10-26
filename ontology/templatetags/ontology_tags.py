@@ -1,12 +1,10 @@
 import itertools
 import uuid
 from dataclasses import dataclass
-from typing import Optional, Union, Iterable, List, Iterator, Tuple
-from uuid import UUID
+from typing import Optional, Union, Iterable, List, Iterator
 
 from django.template import Library
 
-from library.utils import segment
 from ontology.models import OntologyTerm, OntologyTermRelation, GeneDiseaseClassification, OntologyService, \
     OntologySnake
 from ontology.ontology_matching import OntologyMatch

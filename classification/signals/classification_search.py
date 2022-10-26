@@ -1,6 +1,6 @@
 import operator
 from functools import reduce
-from typing import Any, Union, Optional, List
+from typing import Any, Union, Optional
 
 from django.db.models import Q
 from django.dispatch import receiver

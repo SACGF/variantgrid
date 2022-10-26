@@ -1,11 +1,12 @@
-from django.core.management import BaseCommand
-
-from library.utils import ExportRow, export_column, delimited_row
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Dict, List, Optional
+
+from django.core.management import BaseCommand
+
 from classification.models import ConditionTextMatch
 from genes.models import GeneSymbol
+from library.utils import ExportRow, export_column, delimited_row
 from ontology.models import OntologyTerm, OntologySnake, OntologyService
 
 

@@ -2,8 +2,7 @@ from typing import Optional, List, Union
 
 from django.contrib.auth.models import User
 from django.db.models import QuerySet
-from django.shortcuts import render, get_object_or_404, redirect
-from django.urls import reverse
+from django.shortcuts import render, get_object_or_404
 from guardian.shortcuts import get_objects_for_user
 from lazy import lazy
 from rest_framework.response import Response
@@ -16,7 +15,6 @@ from library.utils import empty_to_none
 from ontology.models import OntologyTerm
 from ontology.ontology_matching import normalize_condition_text
 from snpdb.lab_picker import LabPickerData
-from snpdb.models import Lab
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
 
 

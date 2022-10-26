@@ -1,22 +1,23 @@
 import csv
+import json
+import re
 from collections import defaultdict
 from dataclasses import dataclass
 from enum import Enum
 from typing import Dict, List, Optional, Set, Iterator
+
 from lazy import lazy
 from pyhgvs import InvalidHGVSName
+
 from annotation.models import ClinVar
 from classification.enums import SpecialEKeys
-from classification.management.commands import clinvar_export
-from classification.models import Classification, ClinVarExport, ClinVarAllele, EvidenceKey, EvidenceKeyMap, \
+from classification.models import Classification, ClinVarExport, ClinVarAllele, EvidenceKeyMap, \
     ConditionResolved
 from genes.hgvs import CHGVS
 from library.guardian_utils import admin_bot
 from ontology.models import OntologyTerm, OntologySnake, OntologyTermRelation
 from snpdb.models import GenomeBuild, Variant, Allele, ClinVarKey
 from variantopedia.search import search_hgvs, SearchResult, ClassifyVariant
-import re
-import json
 
 C_HGVS_AND_P_DOT = re.compile(r"^(?P<c_hgvs>.+?)( \((?P<p_hgvs>p[.].+)\))?$")
 

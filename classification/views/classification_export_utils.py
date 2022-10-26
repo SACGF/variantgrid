@@ -8,7 +8,6 @@ from django.contrib.auth.models import User
 from django.db.models import Q, Count
 from django.db.models.query import QuerySet
 from django.http.response import StreamingHttpResponse
-from django.utils.timezone import now
 from lazy import lazy
 from threadlocals.threadlocals import get_current_request
 

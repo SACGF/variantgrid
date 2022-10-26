@@ -12,13 +12,14 @@ from django.dispatch.dispatcher import receiver
 from django.utils.timezone import now
 from django_extensions.db.models import TimeStampedModel
 from lazy import lazy
+
 from classification.enums import ShareLevel, SpecialEKeys
 from classification.enums.clinical_context_enums import ClinicalContextStatus
 from classification.models.classification import Classification, \
     ClassificationModification
 from classification.models.classification_import_run import ClassificationImportRun, \
     classification_imports_complete_signal
-from flags.models import Flag, FlagResolution, FlagStatus
+from flags.models import Flag, FlagStatus
 from flags.models.models import FlagsMixin, FlagCollection, FlagTypeContext, \
     flag_collection_extra_info_signal, FlagInfos
 from library.django_utils import get_url_from_view_path

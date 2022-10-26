@@ -4,7 +4,6 @@ from typing import Set, Union
 from django.contrib import admin, messages
 from django.contrib.admin import RelatedFieldListFilter, BooleanFieldListFilter
 from django.db.models import QuerySet
-from django.http import HttpResponseRedirect
 from django.utils import timezone
 
 from annotation.models.models import AnnotationVersion

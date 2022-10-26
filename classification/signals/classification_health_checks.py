@@ -1,4 +1,5 @@
 from django.dispatch import receiver
+
 from classification.enums import ShareLevel
 from classification.models import Classification, classification_flag_types
 from flags.models import FlagType

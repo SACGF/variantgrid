@@ -1,6 +1,6 @@
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import List, Dict, Optional, Iterable, Tuple, Set
+from typing import List, Dict, Optional, Tuple
 
 from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
