@@ -123,7 +123,7 @@ class ValidatedJson:
         if isinstance(data, ValidatedJson):
             return ValidatedJson.recursive_to_json(data.json_data)
         elif isinstance(data, dict):
-            pure_dict = dict()
+            pure_dict = {}
             for key, value in data.items():
                 if isinstance(value, ValidatedJson) and value.void:
                     pass

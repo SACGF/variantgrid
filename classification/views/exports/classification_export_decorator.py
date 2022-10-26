@@ -7,7 +7,7 @@ from classification.views.exports.classification_export_formatter2 import Classi
 ExportFormatterFactory = Callable[[HttpRequest], ClassificationExportFormatter2]
 
 
-_classification_export_registry: Dict[str, ExportFormatterFactory] = dict()
+_classification_export_registry: Dict[str, ExportFormatterFactory] = {}
 
 
 class UnsupportedExportType(Exception):

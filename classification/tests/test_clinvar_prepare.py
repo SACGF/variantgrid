@@ -39,7 +39,7 @@ class ConditionGroupPrepareMergerTest(ConsolidatingMerger[MockEstablished, MockC
     def __init__(self, established_candidates: Set[MockEstablished]):
         super().__init__()
         self._established_candidates = established_candidates
-        self._new_established: List[MockEstablished] = list()
+        self._new_established: List[MockEstablished] = []
         self.next_id = 100
 
     def retrieve_established(self) -> Set[MockEstablished]:

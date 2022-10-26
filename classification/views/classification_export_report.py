@@ -30,7 +30,7 @@ class ExportFormatterReport(ExportFormatter):
     def export(self, as_attachment: bool = True):
         self.prepare_groups()
 
-        row_datas = list()
+        row_datas = []
         # only support 1 record for now
         vcm = self.raw_qs.first()
         row_data = self.row_data(vcm)
@@ -56,7 +56,7 @@ class ExportFormatterReport(ExportFormatter):
         for e_key in e_keys.all_keys:
             blob = evidence.get(e_key.key) or {}
 
-            report_blob = dict()
+            report_blob = {}
             report_blob['value'] = blob.get('value', None)
             report_blob['note'] = blob.get('note', None)
             report_blob['formatted'] = e_key.pretty_value(blob)
@@ -66,7 +66,7 @@ class ExportFormatterReport(ExportFormatter):
         for genome_build in [GenomeBuild.grch37(), GenomeBuild.grch38()]:
             c_hgvs = record.classification.get_c_hgvs(genome_build)
             key = "c_hgvs_" + genome_build.pk.lower()
-            report_blob = dict()
+            report_blob = {}
             report_blob['value'] = c_hgvs
             report_blob['note'] = None
             report_blob['formatted'] = c_hgvs

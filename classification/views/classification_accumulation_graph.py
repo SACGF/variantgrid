@@ -85,7 +85,7 @@ class AlleleSummary:
 
     def __init__(self):
         # key is classification ID
-        self.classifications: Dict[int, ClassificationSummary] = dict()
+        self.classifications: Dict[int, ClassificationSummary] = {}
         self.biggest_status = AlleleStatus.Empty
         self.last_status = AlleleStatus.Empty
         self.not_withdrawn: List[ClassificationSummary] = []
@@ -204,7 +204,7 @@ class ClassificationAccumulationGraph:
             return ShareLevel.ALL_LEVELS
 
     def withdrawn_iterable(self) -> IterableTransformer[ClassificationSummary]:
-        flag_collection_id_to_allele_classification: Dict[int, Tuple[int, int, Optional[str]]] = dict()
+        flag_collection_id_to_allele_classification: Dict[int, Tuple[int, int, Optional[str]]] = {}
 
         flag_qs = FlagComment.objects.filter(flag__flag_type=classification_flag_types.classification_withdrawn) \
             .order_by("created") \
@@ -265,7 +265,7 @@ class ClassificationAccumulationGraph:
 
         time_delta = self.time_delta
         running_accum = self._RunningAccumulation(mode=self.mode)
-        sub_totals: List[ClassificationAccumulationGraph._SummarySnapshot] = list()
+        sub_totals: List[ClassificationAccumulationGraph._SummarySnapshot] = []
 
         stitcher = IterableStitcher[ClassificationSummary](
             iterables=[
@@ -362,8 +362,8 @@ def get_accumulation_graph_data(mode: AccumulationReportMode = AccumulationRepor
     statuses = df.columns[1:5]
     dates = df["Date"].tolist()
 
-    by_lab = list()
-    by_status = list()
+    by_lab = []
+    by_status = []
 
     for lab in labs:
         by_lab.append({

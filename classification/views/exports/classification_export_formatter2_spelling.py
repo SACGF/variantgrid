@@ -40,7 +40,7 @@ class ClassificationSpellingRow(ExportRow):
     @staticmethod
     def fix_word_token(word) -> List[str]:
         for bad_char in RE_HAS_BAD_CHAR.finditer(word):
-            return list()
+            return []
         if "/" in word:
             words = word.split("/")
         else:
@@ -95,7 +95,7 @@ class ClassificationExportFormatter2Spelling(ClassificationExportFormatter2):
         ])]
 
     def row(self, allele_data: AlleleData) -> List[str]:
-        rows: List[str] = list()
+        rows: List[str] = []
         for cm in allele_data.cms:
             spelling_row = ClassificationSpellingRow(cm, self.spell)
             for suspect_word in spelling_row.suspect_words_set:

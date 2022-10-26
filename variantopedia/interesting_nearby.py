@@ -80,7 +80,7 @@ def interesting_summary(qs, user, genome_build, total=True, clinvar=True, classi
     # print(counts)
     summary = None
     if num_variants := counts['total']:
-        classification_types = dict()
+        classification_types = {}
         if classifications:
             classification_types["Classifications"] = "classification"
 

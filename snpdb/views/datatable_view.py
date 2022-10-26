@@ -100,7 +100,7 @@ class RichColumn:
         self.sort_keys = sort_keys
         if orderable is None:
             orderable = bool(sort_keys)
-        self.search = list()
+        self.search = []
         if (search is None or search is True) and key:
             self.search = [key]
         elif search is True and not key:
@@ -153,7 +153,7 @@ class RichColumn:
 
     @property
     def value_columns(self) -> List[str]:
-        columns = list()
+        columns = []
         if key := self.key:
             columns.append(key)
         if self.extra_columns:
@@ -211,7 +211,7 @@ class DatatableConfig(Generic[DC]):
         for rich_col in self.enabled_columns:  # TODO do we want to check not enabled columns too?
             search_cols = search_cols.union(rich_col.search)
 
-        filters: List[Q] = list()
+        filters: List[Q] = []
         for search_col in search_cols:
             filters.append(Q(**{f'{search_col}__icontains': search_string}))
         or_filter = reduce(operator.or_, filters)
@@ -269,7 +269,7 @@ class DatatableConfig(Generic[DC]):
         """ Get parameters from the request and prepare order by clause """
         #  'order[0][column]': ['0'], 'order[0][dir]': ['asc']
 
-        sort_by_list = list()
+        sort_by_list = []
         sorted_set = set()
         for index in range(len(self.enabled_columns)):
             order_key = f'order[{index}][column]'
@@ -341,7 +341,7 @@ class DatabaseTableView(Generic[DC], JSONResponseView):
             render_data = CellData(all_data=row, key=column.key)
             return column.renderer(render_data)
         if column.extra_columns:
-            data_dict = dict()
+            data_dict = {}
             for col in column.value_columns:
                 data_dict[col] = DatabaseTableView.sanitize_value(row.get(col))
             return data_dict

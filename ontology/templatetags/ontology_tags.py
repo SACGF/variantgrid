@@ -97,7 +97,7 @@ class GroupedSnakeRow:
 @register.inclusion_tag("ontology/tags/ontology_snake_table.html")
 def ontology_snake_table(snakes: Iterable[OntologySnake], reference_term: Optional[OntologyTerm]):
 
-    grouped: List[GroupedSnakes] = list()
+    grouped: List[GroupedSnakes] = []
 
     is_gene = reference_term.ontology_service == OntologyService.HGNC
 

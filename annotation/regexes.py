@@ -159,8 +159,8 @@ class DbRefRegexes:
 
     def __init__(self, regexes: List[DbRefRegex]):
         self.regexes = regexes
-        self.prefix_map: Dict[str, DbRefRegex] = dict()
-        prefixes: List[str] = list()
+        self.prefix_map: Dict[str, DbRefRegex] = {}
+        prefixes: List[str] = []
         for regex in self.regexes:
             for prefix in regex.prefixes:
                 prefix = prefix.lower()
@@ -187,7 +187,7 @@ class DbRefRegexes:
         it will still work).
         @param sort If true sorts the results by database and id, otherwise leaves them in order of discovery
         """
-        results: List[DbRefRegexResult] = list()
+        results: List[DbRefRegexResult] = []
 
         def append_result_if_length(db_regex: DbRefRegex, match: Optional[Match]) -> bool:
             """

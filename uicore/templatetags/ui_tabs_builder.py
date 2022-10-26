@@ -36,7 +36,7 @@ class TabBuilder:
         self.tab_set = tab_set
         self.rendered = False
         self.active_tab = 0
-        self.tabs: List[TabBuilderTab] = list()
+        self.tabs: List[TabBuilderTab] = []
 
     def __del__(self):
         if not self.rendered:

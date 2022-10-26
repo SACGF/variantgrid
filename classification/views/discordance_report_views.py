@@ -162,8 +162,8 @@ class DiscordanceReportTemplateData:
 
     @lazy
     def _effectives_and_not_considered(self) -> Tuple[List[ClassificationModification], List[DiscordanceNoLongerConsiders]]:
-        effectives: List[ClassificationModification] = list()
-        withdrawns: List[ClassificationModification] = list()
+        effectives: List[ClassificationModification] = []
+        withdrawns: List[ClassificationModification] = []
         changed_context: Dict[Optional[ClinicalContext], List[ClassificationModification]] = defaultdict(list)
 
         for drc in self.report.discordancereportclassification_set.all().order_by('-created'):
@@ -174,7 +174,7 @@ class DiscordanceReportTemplateData:
             else:
                 effectives.append(drc.classification_effective)
 
-        no_longer_considered: List[DiscordanceNoLongerConsiders] = list()
+        no_longer_considered: List[DiscordanceNoLongerConsiders] = []
         if withdrawns:
             no_longer_considered.append(DiscordanceNoLongerConsiders("Withdrawn", withdrawns))
         if unmatched := changed_context.pop(None, None):
@@ -192,7 +192,7 @@ class DiscordanceReportTemplateData:
     @property
     def group_utils(self) -> List[ClassificationModification]:
         # TODO, rather than no longer considered, shove that value into clinical significance somehow e.g. "withdrawn"
-        no_longer_considered_mods = list()
+        no_longer_considered_mods = []
         if no_longer_considered := self.no_longer_considered:
             for nlc in no_longer_considered:
                 no_longer_considered_mods += nlc.classifications
@@ -227,7 +227,7 @@ class DiscordanceReportTemplateData:
             lab_clin_sig_key = _LabClinSigKey(lab=lab, clin_sig=clin_sig)
             clin_sig_keys_to_pending[lab_clin_sig_key][pending_clin_sig] += 1
 
-        lab_clin_sigs: List[_LabClinSig] = list()
+        lab_clin_sigs: List[_LabClinSig] = []
         pendings: Dict[str, int]
         for key, pendings in clin_sig_keys_to_pending.items():
             total_count = 0
@@ -358,7 +358,7 @@ def discordance_report_view(request: HttpRequest, discordance_report_id: int) ->
 def export_discordance_report(request: HttpRequest, discordance_report_id: int) -> HttpResponseBase:
     report = DiscordanceReport.objects.get(pk=discordance_report_id)
     dcs = DiscordanceReportClassification.objects.filter(report=report)
-    include: [ClassificationModification] = list()
+    include: [ClassificationModification] = []
     for dc in dcs:
         if dc.clinical_context_effective == report.clinical_context and not dc.withdrawn_effective:
             include.append(dc.classification_effective)

@@ -171,7 +171,7 @@ class ClinvarExportPrepare:
             classification__allele__isnull=False
         ).select_related('classification', 'classification__allele', 'classification__lab', 'classification__lab__clinvar_key').order_by('classification__allele_id', 'classification__lab__clinvar_key_id')
 
-        combined_log = list()
+        combined_log = []
 
         # need to keep track of which allele, clinvar_key combos we've seen
         # so we can check all other alleles to make sure they haven't lost candidates

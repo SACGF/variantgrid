@@ -23,7 +23,7 @@ class ConversionSize:
 class Command(BaseCommand):
 
     def handle(self, *args, **options):
-        conversions = list()
+        conversions = []
         update_count = 0
 
         for vc in Classification.objects.all():

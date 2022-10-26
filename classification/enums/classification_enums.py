@@ -193,8 +193,8 @@ _ShareLevelData = typing.NamedTuple('ShareLevelData', [('index', int), ('label',
 @total_ordering
 class ShareLevel(ChoicesEnum):
     _ignore_ = ['ALL_LEVELS', 'DISCORDANT_LEVEL_KEYS']
-    ALL_LEVELS: List['ShareLevel'] = list()
-    DISCORDANT_LEVEL_KEYS: List[str] = list()
+    ALL_LEVELS: List['ShareLevel'] = []
+    DISCORDANT_LEVEL_KEYS: List[str] = []
 
     # These strings have to be <= 16 characters for choice field
     CURRENT_USER = 'user'

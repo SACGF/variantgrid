@@ -73,7 +73,7 @@ class ViewEventCounts:
 
     @property
     def base_filter(self) -> Q:
-        qs: List[Q] = list()
+        qs: List[Q] = []
         if self.exclude_admin:
             qs.append(Q(user__is_superuser=False))
         qs.append(Q(created__gte=self.as_of))

@@ -114,7 +114,7 @@ class KeyCount:
         self.values = ValueCounter()
         self.notes = ValueCounter()
         self.explain = ValueCounter()
-        self.dbrefs: Dict[str, int] = dict()
+        self.dbrefs: Dict[str, int] = {}
 
     def count(self, blob: Optional[VCBlobDict], source: Any):
         if not blob:
@@ -155,7 +155,7 @@ class ExportFormatterKeys(BaseExportFormatter):
 
     def __init__(self, qs: QuerySet, *args, **kwargs):
         self.qs = qs.order_by("-modified")
-        self.key_counters: Dict[str, KeyCount] = dict()
+        self.key_counters: Dict[str, KeyCount] = {}
 
         super().__init__(*args, **kwargs)
 

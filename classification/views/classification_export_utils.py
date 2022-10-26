@@ -109,7 +109,7 @@ class UsedKeyTracker:
         self.user = user
         self.ekeys = ekeys
         self.key_value_formatter = key_value_formatter
-        self.calc_dict: Dict[str, UsedKey] = dict()
+        self.calc_dict: Dict[str, UsedKey] = {}
         self.pretty = pretty
         self.ordered_keys = None
         self.include_explains = include_explains
@@ -123,7 +123,7 @@ class UsedKeyTracker:
             return self.ekeys.all_keys
 
     def all_key_properties(self) -> List[KeyProperty]:
-        all_props: List[KeyProperty] = list()
+        all_props: List[KeyProperty] = []
         properties = ['value', 'note']
         if self.include_explains:
             properties.append('explain')
@@ -173,7 +173,7 @@ class UsedKeyTracker:
 
     def header(self) -> List[str]:
         self.process()
-        cols: List[str] = list()
+        cols: List[str] = []
         for used_key in self.ordered_keys:
             if used_key.has_value:
                 cols.append(self.key_value_formatter.header_for(used_key.ekey, pretty=self.pretty))
@@ -184,7 +184,7 @@ class UsedKeyTracker:
         return cols
 
     def row(self, classification_modification: ClassificationModification) -> List[Optional[str]]:
-        cols: List[Optional[str]] = list()
+        cols: List[Optional[str]] = []
         evidence = classification_modification.get_visible_evidence(self.user)
         for used_key in self.ordered_keys:
             value_obj = evidence.get(used_key.ekey.key)
@@ -280,18 +280,18 @@ class AlleleGroup:
         self.allele_flag_collection_id = allele_flag_collection_id
         self.target_variant = None
         self.genome_build = genome_build
-        self.variant_ids = list()
-        self.data: List[ClassificationModification] = list()
-        self.withdrawn: List[ClassificationModification] = list()
-        self.failed: List[ClassificationModification] = list()
+        self.variant_ids = []
+        self.data: List[ClassificationModification] = []
+        self.withdrawn: List[ClassificationModification] = []
+        self.failed: List[ClassificationModification] = []
         self.source = source
 
     def filter_out_transcripts(self, transcripts: Set[str]) -> List[ClassificationModification]:
         """
         Returns ClassificationModificats there weren't included due to errors
         """
-        passes: List[ClassificationModification] = list()
-        fails: List[ClassificationModification] = list()
+        passes: List[ClassificationModification] = []
+        fails: List[ClassificationModification] = []
 
         for vcm in self.data:
             if vcm.transcript in transcripts:
@@ -367,9 +367,9 @@ class ExportFormatter(BaseExportFormatter):
         self.genome_build = genome_build
         self.used_contigs: Set[Contig] = set()
         self.user = user
-        self.allele_groups: List[AlleleGroup] = list()
+        self.allele_groups: List[AlleleGroup] = []
         self.since = since
-        self.error_message_ids = dict()
+        self.error_message_ids = {}
         self.started = datetime.utcnow()
         self.row_count = 0
         self.started = datetime.utcnow()
@@ -429,7 +429,7 @@ class ExportFormatter(BaseExportFormatter):
                           suffix: str = None,
                           extension: str = 'csv') -> str:
 
-        parts: List[str] = list()
+        parts: List[str] = []
         if prefix:
             parts.append(prefix)
         if include_date:
@@ -491,7 +491,7 @@ class ExportFormatter(BaseExportFormatter):
             # no modifications passed the check, but maybe a flag has changed on the allele of classifications
             # and the flag could be attached to a withdrawn classification even
             # (it could be that the classification is now withdrawn).
-            flag_collection_ids = list()
+            flag_collection_ids = []
             if allele_flag_id := Allele.objects.filter(pk=ag.allele_id).values_list("flag_collection_id", flat=True).first():
                 flag_collection_ids.append(allele_flag_id)
 
@@ -585,7 +585,7 @@ class ExportFormatter(BaseExportFormatter):
 
         process_allele_group(allele_group)
 
-        contig_order: Dict[int, int] = dict()
+        contig_order: Dict[int, int] = {}
         for cbc in GenomeBuildContig.objects.filter(genome_build=self.genome_build).select_related('contig').order_by('order'):
             contig = cbc.contig
             contig_order[contig.id] = len(contig_order)
@@ -665,7 +665,7 @@ class ExportFormatter(BaseExportFormatter):
         return False
 
     def report_stats_params(self) -> Dict[str, Any]:
-        params = dict()
+        params = {}
         if request := get_current_request():
             params["url"] = request.path_info
             for key, value in request.GET.items():
@@ -742,7 +742,7 @@ class ExportFormatter(BaseExportFormatter):
         _ = self.header()
         timer.tick("Header")
 
-        allele_groups = list()
+        allele_groups = []
         for index, allele_group in enumerate(self.row_iterator()):
             allele_groups.append(allele_group)
             if index-1 >= row_limit:

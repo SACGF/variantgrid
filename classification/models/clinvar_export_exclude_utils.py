@@ -144,7 +144,7 @@ class ClinVarExcludePatternUtil:
         if not self.exclude_patterns:
             return None
 
-        matching_patterns: List[ClinVarKeyExcludePattern] = list()
+        matching_patterns: List[ClinVarKeyExcludePattern] = []
         for pattern in self.exclude_patterns:
             value = record.get(pattern.evidence_key)
             if pattern.should_exclude(str(value)):

@@ -8,7 +8,7 @@ def _remove_duplicates(apps, schema_editor):
     OntologyTermRelation = apps.get_model("ontology", "OntologyTermRelation")
 
     all_panelapp = OntologyImport.objects.filter(import_source="PAAU", completed=True).order_by("context", "-created")
-    delete_me = list()
+    delete_me = []
     last_o_imp = None
     for o_imp in all_panelapp:
         if last_o_imp is None or last_o_imp.context != o_imp.context:

@@ -84,7 +84,7 @@ def is_bad_snake(snake: OntologySnake):
 
 
 def get_last_term_symbol_relationships(ontology_term: OntologyTerm) -> Dict[GeneSymbol, MatchRelationship]:
-    data: Dict[GeneSymbol, MatchRelationship] = dict()
+    data: Dict[GeneSymbol, MatchRelationship] = {}
     for snake in OntologySnake.snake_from(ontology_term, to_ontology=OntologyService.HGNC):
         gene_symbol = GeneSymbol(snake.leaf_term.name)
         match_level = MatchLevel.EXACT
@@ -105,7 +105,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
 
-        all_matches: Dict[MatchKey, MatchValue] = dict()
+        all_matches: Dict[MatchKey, MatchValue] = {}
 
         for ct in ConditionTextMatch.objects.filter(gene_symbol__isnull=False, mode_of_inheritance__isnull=True, classification__isnull=True):
             if conditions := ct.condition_xref_terms:
@@ -122,7 +122,7 @@ class Command(BaseCommand):
         all_values = sorted(all_matches.values())
 
         last_term: Optional[OntologyTerm] = None
-        last_term_symbol_relationships: Dict[GeneSymbol, MatchRelationship] = dict()
+        last_term_symbol_relationships: Dict[GeneSymbol, MatchRelationship] = {}
 
         print(delimited_row(MatchValue.csv_header(), delimiter="\t"), end='')
         for match_value in all_values:

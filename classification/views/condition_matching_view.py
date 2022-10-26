@@ -114,10 +114,10 @@ class ConditionTextMatchingAPI(APIView):
 
         data = request.data.get("changes")
         ctm: Optional[ConditionTextMatch] = None
-        errors: List[str] = list()
+        errors: List[str] = []
         for update in data:
             terms = update.get('terms')
-            valid_terms: List[str] = list()
+            valid_terms: List[str] = []
             if terms:
                 terms = [term.strip() for term in terms]
                 for term in terms:

@@ -472,7 +472,7 @@ def segmented_text(text: str, divider: str = ':') -> str:
     if not text:
         return ""
     parts = text.split(divider)
-    output = list()
+    output = []
     for segment in parts[:-1]:
         output.append(f"<span class='text-monospace text-small text-muted'>{escape(segment)}</span>")
         output.append(f"<span class='text-monospace text-muted'>{escape(divider)}</span>")

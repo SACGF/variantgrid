@@ -92,7 +92,7 @@ def condition_match_test_download_view(request):
 def condition_match_test_view(request):
     condition_text = request.GET.get("condition_text")
     gene_symbol_str = request.GET.get("gene_symbol")
-    auto_matches = list()
+    auto_matches = []
     attempted = False
     suggestion = None
     gene_symbol: Optional[GeneSymbol] = None
@@ -147,7 +147,7 @@ def condition_obsoletes_view(request):
             Q(source_term__status__ne=OntologyTermStatus.CONDITION) | Q(dest_term__status__ne=OntologyTermStatus.CONDITION)
         ).order_by('dest_term__name')
 
-    obsolete_condition_matches = list()
+    obsolete_condition_matches = []
     for ctm in ConditionTextMatch.objects.filter(condition_xrefs__isnull=False):
         for term in ctm.condition_xref_terms:
             if term.is_obsolete:

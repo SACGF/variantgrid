@@ -102,8 +102,8 @@ class OntologyBuilder:
             self.previous_import = None  # if previous import was done with an older version of the import code, don't count it
 
         self.full_cache = False
-        self.terms: Dict[str, CachedObj[OntologyTerm]] = dict()
-        self.relations: Dict[RelationKey, CachedObj[OntologyTermRelation]] = dict()
+        self.terms: Dict[str, CachedObj[OntologyTerm]] = {}
+        self.relations: Dict[RelationKey, CachedObj[OntologyTermRelation]] = {}
 
     def ensure_old(self, max_age: timedelta):
         """
@@ -218,7 +218,7 @@ class OntologyBuilder:
 
         if aliases:
             # want to maintain order (so don't convert to a set)
-            unique_aliases = list()
+            unique_aliases = []
             for alias in aliases:
                 if alias not in unique_aliases and alias != name:
                     unique_aliases.append(alias)
@@ -236,7 +236,7 @@ class OntologyBuilder:
             term.extra = extra
 
         if aliases is not None or primary_source:
-            term.aliases = aliases or list()
+            term.aliases = aliases or []
 
         if not status:
             if "obsolete" in name.lower():

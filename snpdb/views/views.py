@@ -1411,7 +1411,7 @@ def labs_graph_detail(request):
         show_unclassified=show_unclassified,
         allele_level=True)
 
-    context = dict()
+    context = {}
     context["vc_org_data"] = vc_org_data_json
 
     graph_data = get_accumulation_graph_data(mode=AccumulationReportMode.Allele)

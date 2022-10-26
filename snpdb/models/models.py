@@ -469,7 +469,7 @@ class Lab(models.Model):
     def lab_users(self) -> List[User]:
         users = list(self.group.user_set.filter(is_active=True))
         heads = set(self.labhead_set.values_list('user_id', flat=True))
-        lab_users: List[LabUser] = list()
+        lab_users: List[LabUser] = []
         for user in users:
             role = 'user'
             if user.id in heads:

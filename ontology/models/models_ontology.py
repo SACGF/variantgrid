@@ -630,7 +630,7 @@ class OntologyVersion(TimeStampedModel):
     @staticmethod
     def latest() -> Optional['OntologyVersion']:
         oi_qs = OntologyImport.objects.all()
-        kwargs = dict()
+        kwargs = {}
         missing_fields = set()
         for field, (import_source, filenames) in OntologyVersion.ONTOLOGY_IMPORTS.items():
             if ont_import := oi_qs.filter(import_source=import_source, filename__in=filenames).order_by("pk").last():

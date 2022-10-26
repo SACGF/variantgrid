@@ -179,7 +179,7 @@ class DiscordanceReport(TimeStampedModel):
 
     @lazy
     def involved_labs(self) -> Dict[Lab, LabInvolvement]:
-        lab_status: Dict[Lab, DiscordanceReport.LabInvolvement] = dict()
+        lab_status: Dict[Lab, DiscordanceReport.LabInvolvement] = {}
         for drc in self.discordance_report_classifications:
             effective_c: Classification = drc.classification_effective.classification
             lab = effective_c.lab
@@ -498,7 +498,7 @@ class DiscordanceReportTableData:
 
     @lazy
     def summaries(self) -> List[DiscordanceReportRowData]:
-        summaries: List[DiscordanceReportRowData] = list()
+        summaries: List[DiscordanceReportRowData] = []
         for dr in self._discordance_reports.filter(resolution__isnull=True):
             summary = DiscordanceReportRowData(discordance_report=dr, perspective=self.perspective)
             if summary.is_valid_including_withdraws:
@@ -524,7 +524,7 @@ class DiscordanceReportTableData:
 
     @lazy
     def inactive_summaries(self) -> List[DiscordanceReportRowData]:
-        inactives: List[DiscordanceReportRowData] = list()
+        inactives: List[DiscordanceReportRowData] = []
         for dr in self._discordance_reports:
             summary = DiscordanceReportRowData(discordance_report=dr, perspective=self.perspective)
             if summary.is_valid_including_withdraws:
@@ -590,7 +590,7 @@ class DiscordanceActionsLog:
     ]
 
     def __init__(self):
-        self.actions = list()
+        self.actions = []
         self.internal_reviewed = None
 
     def add(self, action: DiscordanceAction, date: Optional[datetime] = None):

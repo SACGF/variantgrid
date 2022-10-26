@@ -46,7 +46,7 @@ def get_disk_usage_objects(directories_list: Optional[List[str]] = None) -> List
     nice_disk_usage = get_disk_usage(human_readable=True)
     handled_mount_points = set()
     low_disk_messages = []
-    disk_usages: List[DiskUsage] = list()
+    disk_usages: List[DiskUsage] = []
     for mount_point, data in disk_usage.items():
         for d in directories_list:
             if mount_point in handled_mount_points:

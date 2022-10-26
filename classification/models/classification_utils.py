@@ -45,7 +45,7 @@ class ClassificationPatchStatus(str, Enum):
 class ClassificationPatchResponse(VarsDict):
 
     def __init__(self):
-        self.warnings: List[PatchMessage] = list()
+        self.warnings: List[PatchMessage] = []
         self.modified_keys: Set[str] = set()
         self.classification_json: Optional[Dict] = None
         self.internal_error: Optional[Any] = None
@@ -378,7 +378,7 @@ def classification_gene_symbol_filter(gene_symbol: Union[str, GeneSymbol]) -> Op
         if genes:
             allele_qs = Allele.objects.filter(variantallele__variant__variantannotation__gene__in=genes)
             match_gene = Q(classification__variant__variantallele__allele__in=allele_qs)
-            evidence_q_list = list()
+            evidence_q_list = []
 
             for symbol in symbols:
                 evidence_q_list.append(Q(published_evidence__gene_symbol__value__iexact=symbol))

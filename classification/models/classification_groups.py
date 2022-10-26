@@ -101,7 +101,7 @@ class ClassificationGroupUtils:
 
     @lazy
     def _pending_changes_flag_map(self) -> Dict[int, str]:
-        mod_id_to_clin_sig: Dict[int, str] = dict()
+        mod_id_to_clin_sig: Dict[int, str] = {}
 
         flags_qs = Flag.objects.filter(
             flag_type=classification_flag_types.classification_pending_changes,
@@ -118,7 +118,7 @@ class ClassificationGroupUtils:
 
     @lazy
     def _classification_to_old_clin_sig(self) -> Dict[int, str]:
-        old_ids: Dict[int, str] = dict()
+        old_ids: Dict[int, str] = {}
         if self._old_modifications:
             for om in self._old_modifications:
                 old_ids[om.classification_id] = om.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
@@ -164,7 +164,7 @@ class ClassificationGroup:
 
         modification_list = [ge.modification for ge in group_entries]
         modification_list.sort(key=ClassificationGroup.sort_modifications, reverse=True)
-        modification_result = list()
+        modification_result = []
         seen_patient_ids = set()
         self.excluded_record_count = 0
 
@@ -356,11 +356,11 @@ class ClassificationGroup:
             else:
                 if text := cm.get(SpecialEKeys.CONDITION):
                     all_plain_texts.add(text)
-        all_condition_resolved = list()
+        all_condition_resolved = []
         for term in all_terms:
             all_condition_resolved.append(ConditionResolved(terms=[term], join=None))
         for plain_text in all_plain_texts:
-            all_condition_resolved.append(ConditionResolved(terms=list(), join=None, plain_text=plain_text))
+            all_condition_resolved.append(ConditionResolved(terms=[], join=None, plain_text=plain_text))
 
         all_condition_resolved.sort()
         return all_condition_resolved
@@ -385,7 +385,7 @@ class ClassificationGroups:
         if not group_utils:
             group_utils = ClassificationGroupUtils(classification_modifications)
 
-        groups: List[ClassificationGroup] = list()
+        groups: List[ClassificationGroup] = []
 
         classification_group_entries = [group_utils.map(m, genome_build) for m in classification_modifications]
         classification_group_entries.sort()

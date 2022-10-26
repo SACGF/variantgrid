@@ -154,7 +154,7 @@ class UploadedClassificationsUnmappedView(View):
                     if meta := FileMeta.from_unmapped(unmapped):
                         existing.add(meta)
 
-                server_files: List[FileHandle] = list()
+                server_files: List[FileHandle] = []
                 for file in server_address.list():
                     meta = FileMeta.from_file_handle(file)
                     if meta not in existing:

@@ -69,7 +69,7 @@ class ManualMigrationOutstanding:
 
     @staticmethod
     def outstanding_tasks() -> List['ManualMigrationOutstanding']:
-        outstandings: List[ManualMigrationOutstanding] = list()
+        outstandings: List[ManualMigrationOutstanding] = []
         for task in ManualMigrationTask.objects.all():
             outstanding = ManualMigrationOutstanding.outstanding_task(task)
             if outstanding:
@@ -77,7 +77,7 @@ class ManualMigrationOutstanding:
         return outstandings
 
     def to_json(self) -> Dict[str, Any]:
-        data: Dict[str, Any] = dict()
+        data: Dict[str, Any] = {}
         id_split = self.task.id.split("*", maxsplit=1)
         data["id"] = self.task.id
         data["category"] = id_split[0]

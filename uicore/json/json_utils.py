@@ -91,7 +91,7 @@ class JsonDiffs:
         self.json_diffs = json_diffs
 
     def to_json(self, before_label: str = "before", after_label: str = "after") -> JsonObjType:
-        diff_dict = dict()
+        diff_dict = {}
         for diff in self.json_diffs:
             diff_dict[diff.json_path_short] = {
                 before_label: diff.a,
@@ -101,8 +101,8 @@ class JsonDiffs:
 
     @staticmethod
     def differences(obj1: JsonDataType, obj2: JsonDataType) ->'JsonDiffs':
-        diffs: List['JsonDiff'] = list()
-        JsonDiffs._differences(obj1, obj2, list(), diffs)
+        diffs: List['JsonDiff'] = []
+        JsonDiffs._differences(obj1, obj2, [], diffs)
         diffs.sort()
         return JsonDiffs(diffs)
 

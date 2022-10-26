@@ -62,7 +62,7 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
     def classification_id(self, row: Dict[str, Any]) -> JsonDataType:
         matches: Optional[Dict[str, str]] = None
         if id_filter := self.get_query_param("id_filter"):
-            matches = dict()
+            matches = {}
             id_keys = self.id_columns
             for key in id_keys:
                 value = row.get(f'published_evidence__{key}__value')
@@ -88,7 +88,7 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
         return GenomeBuild.builds_with_annotation_priority(user_settings.default_genome_build)
 
     def __init__(self, request: HttpRequest):
-        self.term_cache: Dict[str, OntologyTerm] = dict()
+        self.term_cache: Dict[str, OntologyTerm] = {}
         super().__init__(request)
 
         user_settings = UserSettings.get_for_user(self.user)
@@ -281,7 +281,7 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
         return all_columns
 
     def filter_queryset(self, qs: QuerySet[ClassificationModification]) -> QuerySet[ClassificationModification]:
-        filters: List[Q] = list()
+        filters: List[Q] = []
         if settings.VARIANT_CLASSIFICATION_GRID_SHOW_USERNAME:
             if user_id := self.get_query_param('user'):
                 filters.append(Q(classification__user__pk=user_id))
@@ -297,7 +297,7 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
 
         if id_filter := self.get_query_param("id_filter"):
             id_keys = self.id_columns
-            ids_contain_q_list: List[Q] = list()
+            ids_contain_q_list: List[Q] = []
             for id_key in id_keys:
                 ids_contain_q_list.append(Q(**{f'published_evidence__{id_key}__value__icontains': id_filter}))
             id_filter_q = reduce(operator.or_, ids_contain_q_list)
