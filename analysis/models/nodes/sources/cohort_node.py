@@ -1,4 +1,4 @@
-from typing import Dict, Optional, List, Set
+from typing import Dict, Optional, List
 
 from django.db import models
 from django.db.models import Q

@@ -1,4 +1,4 @@
-from typing import Optional, List, Dict, Set
+from typing import Optional, List, Dict
 
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import models

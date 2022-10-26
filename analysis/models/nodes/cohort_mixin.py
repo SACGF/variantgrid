@@ -1,7 +1,7 @@
 import operator
 import re
 from functools import reduce
-from typing import List, Dict, Optional, Set, Tuple
+from typing import List, Dict, Optional, Tuple
 
 from django.db.models import Q
 

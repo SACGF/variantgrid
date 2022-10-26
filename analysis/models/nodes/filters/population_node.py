@@ -1,6 +1,6 @@
 import operator
 from functools import reduce
-from typing import Optional, Dict, List, Set
+from typing import Optional, Dict, List
 
 from cache_memoize import cache_memoize
 from django.conf import settings

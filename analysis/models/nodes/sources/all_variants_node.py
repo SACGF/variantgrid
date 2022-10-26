@@ -1,6 +1,4 @@
-import operator
-from functools import reduce
-from typing import Optional, List, Dict, Set
+from typing import Optional, List, Dict
 
 from django.conf import settings
 from django.db import models

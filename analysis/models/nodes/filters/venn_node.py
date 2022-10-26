@@ -1,7 +1,7 @@
 import logging
 import sys
 import traceback
-from typing import Optional, Tuple, Dict, Set
+from typing import Optional, Tuple, Dict
 
 import celery
 from django.db import models
