@@ -88,7 +88,7 @@ class OntologyMatch:
 
 
 OPRPHAN_OMIM_TERMS = re.compile("[0-9]{6,}")
-SUFFIX_SKIP_TERMS = {"", "the", "an", "and", "&", "or", "for", "the", "type", "group", "with"}
+SUFFIX_SKIP_TERMS = {"", "the", "an", "and", "&", "or", "for", "type", "group", "with"}
 PREFIX_SKIP_TERMS = SUFFIX_SKIP_TERMS.union({"a"})  # only exclude "A" from prefix, in case it says "type" A
 IGNORE_TERMS = {"ar", "ad", "linked", "xld", "xlr", "disability", "disorder"}  # ignore when the user provides
 # should disease be in this as well?
