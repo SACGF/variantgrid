@@ -1080,7 +1080,7 @@ class NodeVersion(models.Model):
         return f"{self.node.pk} (v{self.version})"
 
 
-class NodeCache(models.Model):#
+class NodeCache(models.Model):
     node_version = models.OneToOneField(NodeVersion, on_delete=CASCADE)
     variant_collection = models.OneToOneField(VariantCollection, on_delete=CASCADE)
 

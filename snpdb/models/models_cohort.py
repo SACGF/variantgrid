@@ -397,7 +397,6 @@ class CohortGenotypeCollection(RelatedModelsPartitionModel):
             annotation_kwargs[self.cohortgenotype_alias] = FilteredRelation('cohortgenotype', condition=cgc_condition)
         return annotation_kwargs
 
-
     def get_sample_zygosity_regex(self, sample_zygosities: dict, sample_require_zygosity: dict):
         """ sample_zygosities_dict = {sample_id : zygosities_set} """
 
