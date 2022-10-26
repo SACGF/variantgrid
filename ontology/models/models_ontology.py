@@ -894,7 +894,7 @@ class OntologySnake:
             for relation in all_relations:
                 snake = by_leafs.get(relation.source_term) or by_leafs.get(relation.dest_term)
 
-                if relation.source_term == snake.leaf_term or relation.dest_term == snake.leaf_term:
+                if snake.leaf_term in (relation.source_term, relation.dest_term):
                     other_term = relation.other_end(snake.leaf_term)
 
                     ontology_services = {snake.leaf_term.ontology_service, other_term.ontology_service}

@@ -43,8 +43,8 @@ class FileHandle(ABC):
     def download_to_dir(self, download_dir: Path, extract_zip: bool = False):
         with self.open() as input_file:
             if extract_zip and self.filename.endswith(".zip"):
-                zippy = ZipFile(input_file)
-                zippy.extractall(path=download_dir)
+                with ZipFile(input_file) as zippy:
+                    zippy.extractall(path=download_dir)
             elif extract_zip and (
                     self.filename.endswith(".tar.gz")
                     or self.filename.endswith(".tar")
@@ -70,7 +70,7 @@ class FileHandle(ABC):
                     
                         tar.extractall(path, members, numeric_owner=numeric_owner) 
 
-                    safe_extract(tarry, path=download_dir)
+                    safe_extract(tarry, path=str(download_dir))
             else:
                 with open(download_dir / self.filename, 'wb') as output_file:
                     output_file.write(input_file.read())
@@ -152,7 +152,7 @@ class FileHandleS3(FileHandle):
 
     @property
     def clean_url(self) -> str:
-        # s3 can produce a HTTPS path with temporary access token, but if we want the file path longer term
+        # s3 can produce an HTTPS path with temporary access token, but if we want the file path longer term
         # just produce a full s3 file path
         return f"s3://{self.bucket_name}/{self.file}"
 
