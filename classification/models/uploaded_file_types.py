@@ -1,5 +1,6 @@
 import contextlib
 import datetime
+import os
 import re
 import tarfile
 from abc import ABC, abstractmethod
@@ -51,8 +52,6 @@ class FileHandle(ABC):
             ):
                 with tarfile.open(fileobj=input_file, mode="r:*") as tarry:
                     
-                    import os
-                    
                     def is_within_directory(directory, target):
                         
                         abs_directory = os.path.abspath(directory)
@@ -70,8 +69,7 @@ class FileHandle(ABC):
                                 raise Exception("Attempted Path Traversal in Tar File")
                     
                         tar.extractall(path, members, numeric_owner=numeric_owner) 
-                        
-                    
+
                     safe_extract(tarry, path=download_dir)
             else:
                 with open(download_dir / self.filename, 'wb') as output_file:
