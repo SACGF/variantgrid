@@ -9,14 +9,13 @@ from typing import List, Type, Union, Set, Optional, Dict, Iterator, Any, Callab
 from django.contrib.auth.models import User
 from django.db.models import QuerySet, Q
 from django.http import HttpRequest
-from django.utils.timezone import now
 from guardian.shortcuts import get_objects_for_user
 from lazy import lazy
 
 from classification.enums import ShareLevel, ClinicalContextStatus
 from classification.enums.discordance_enums import DiscordanceReportResolution
 from classification.models import ClassificationModification, Classification, classification_flag_types, \
-    DiscordanceReport, ClinicalContext, ClassificationFlagTypes
+    DiscordanceReport, ClinicalContext
 from flags.models import FlagsMixin, Flag, FlagComment, FlagStatus
 from library.utils import batch_iterator, local_date_string
 from snpdb.models import GenomeBuild, Lab, Organization, allele_flag_types, Allele, Variant, VariantAllele

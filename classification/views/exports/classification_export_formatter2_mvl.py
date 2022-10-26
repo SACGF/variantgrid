@@ -1,10 +1,13 @@
+import json
 from dataclasses import dataclass
 from enum import Enum
 from typing import List, Any
+
 from django.http import HttpRequest
 from django.template.loader import render_to_string
 from django.urls import reverse
 from lazy import lazy
+
 from annotation.views import simple_citation_html
 from classification.enums import SpecialEKeys
 from classification.models import ClassificationModification, EvidenceKeyMap
@@ -18,7 +21,6 @@ from classification.views.exports.classification_export_utils import CHGVSData, 
 from library.django_utils import get_url_from_view_path
 from library.utils import delimited_row, export_column, ExportRow
 from snpdb.models import Allele
-import json
 
 
 class FormatDetailsMVLFileFormat(str, Enum):

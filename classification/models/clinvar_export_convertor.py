@@ -14,7 +14,7 @@ from genes.hgvs import CHGVS
 from library.utils import html_to_text
 from ontology.models import OntologyTerm, OntologyService
 from snpdb.models import ClinVarKey, ClinVarCitationsModes
-from uicore.json.validated_json import JsonMessages, JSON_MESSAGES_EMPTY, ValidatedJson, JsonMessage
+from uicore.json.validated_json import JsonMessages, JSON_MESSAGES_EMPTY, ValidatedJson
 
 # Code in this file is responsible for converting VariantGrid formatted classifications to ClinVar JSON
 CLINVAR_ACCEPTED_TRANSCRIPTS = {"NM_", "NR_"}

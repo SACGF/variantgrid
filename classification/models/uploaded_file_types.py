@@ -3,12 +3,9 @@ import datetime
 import re
 import tarfile
 from abc import ABC, abstractmethod
-from io import BytesIO
 from os import PathLike
 from pathlib import Path
 from typing import Iterator, Optional, Union, List
-import zipfile
-import tarfile
 from zipfile import ZipFile
 
 

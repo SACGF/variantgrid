@@ -1,5 +1,3 @@
-from typing import Optional, Any
-
 from django.conf import settings
 from django.template.library import Library
 

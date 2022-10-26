@@ -1,8 +1,7 @@
 from django.contrib import admin
-from django.contrib.admin import TabularInline
 
-from ontology.models import OntologyTerm, OntologyTermRelation, OntologyImport
-from snpdb.admin_utils import ModelAdminBasics, AllValuesChoicesFieldListFilter
+from ontology.models import OntologyTerm, OntologyImport
+from snpdb.admin_utils import ModelAdminBasics
 
 
 @admin.register(OntologyTerm)

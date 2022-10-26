@@ -14,7 +14,7 @@ from library.django_utils import require_superuser
 from library.log_utils import report_exc_info
 from library.utils import delimited_row
 from ontology.models import OntologySnake, OntologyVersion, OntologyTermStatus, OntologyImportSource, \
-    OntologyTermRelation, OntologyRelation, GeneDiseaseClassification
+    OntologyTermRelation, GeneDiseaseClassification
 from ontology.ontology_matching import OntologyMatching, SearchText, normalize_condition_text
 
 

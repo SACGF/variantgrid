@@ -1,13 +1,12 @@
+from django import forms
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.models import User
 from django.contrib.sites.models import Site
-from django import forms
 from django.http.response import HttpResponseServerError, JsonResponse, \
     HttpResponseForbidden
 from django.shortcuts import redirect, render
 from django.template.loader import get_template, render_to_string
-from django.urls import reverse_lazy
 from django.urls.base import resolve, reverse
 from django.urls.exceptions import Resolver404
 from django.views.generic import FormView
@@ -16,7 +15,7 @@ from global_login_required import login_not_required
 from library.email import Email
 from library.git import Git
 from library.keycloak import Keycloak, KeycloakError, KeycloakNewUser
-from library.log_utils import report_exc_info, NotificationBuilder, AdminNotificationBuilder
+from library.log_utils import report_exc_info, AdminNotificationBuilder
 from manual.models import Deployment
 from snpdb.forms import KeycloakUserForm
 from snpdb.models import UserSettings

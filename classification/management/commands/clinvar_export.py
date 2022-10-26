@@ -2,7 +2,6 @@ from django.core.management import BaseCommand
 
 from classification.models import ClinVarExport
 from classification.models.clinvar_export_prepare import ClinvarExportPrepare
-from snpdb.models import Allele
 
 
 class Command(BaseCommand):

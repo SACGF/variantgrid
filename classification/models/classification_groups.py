@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from itertools import groupby
-from typing import Optional, List, Iterable, Any, TypeVar, Generic, Set, Dict
+from typing import Optional, List, Iterable, TypeVar, Generic, Set, Dict
 
 from django.contrib.auth.models import User
 from lazy import lazy

@@ -1,4 +1,4 @@
-from typing import Set, Optional
+from typing import Optional
 
 from django.conf import settings
 from django.dispatch import receiver
@@ -10,7 +10,6 @@ from classification.models import DiscordanceReport, discordance_change_signal, 
 from library.django_utils import get_url_from_view_path
 from library.log_utils import NotificationBuilder
 from snpdb.lab_picker import LabPickerData
-from snpdb.models import Lab
 from snpdb.utils import LabNotificationBuilder
 
 
