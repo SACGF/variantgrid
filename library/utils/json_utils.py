@@ -1,7 +1,7 @@
 import abc
 import json
 from lazy import lazy
-from abc import abstractmethod
+from abc import abstractmethod, ABC
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import Union, Dict, Any, List, Mapping
@@ -79,7 +79,7 @@ def strip_json(json_values: JsonDataType) -> JsonDataType:
     return json_values
 
 
-class JsonPathPart(abc.ABCMeta):
+class JsonPathPart(ABC):
     pass
 
     @property
