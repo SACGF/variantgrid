@@ -3,8 +3,8 @@
 from django.db import migrations
 
 
-def insert_default_report(apps, schema):
-    Organization = EvidenceKey = apps.get_model("snpdb", "Organization")
+def insert_default_report(apps, _schema):
+    Organization = apps.get_model("snpdb", "Organization")
     ClassificationReportTemplate = apps.get_model("classification", "ClassificationReportTemplate")
 
     best_template = ""
