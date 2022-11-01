@@ -7,6 +7,7 @@ from django.db.models import Q
 
 from analysis.models.nodes.analysis_node import AnalysisNode
 from snpdb.models import lazy
+from variantgrid import settings
 
 
 class MergeNode(AnalysisNode):
@@ -15,7 +16,6 @@ class MergeNode(AnalysisNode):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._cache_node_q = False  # can't pickle querysets
 
     def modifies_parents(self):
         return self._num_unique_parents_in_queryset > 1
@@ -79,9 +79,13 @@ class MergeNode(AnalysisNode):
             non_none_keys = [k for k in arg_q_dict.keys() if k is not None]
 
             if non_none_keys:
-                # I tried not passing arg_q_dict (to run all where clauses in inner query but it was slower)
+                print(f"{non_none_keys=}")
+                # I tried not passing arg_q_dict (to run all where clauses in inner query, but it was slower)
                 qs = parent.get_queryset(arg_q_dict=arg_q_dict, disable_cache=True)
-                or_list.append(Q(pk__in=qs.values_list("pk", flat=True)))
+                variant_ids = qs.values_list("pk", flat=True)
+                if parent.count <= settings.ANALYSIS_NODE_MERGE_STORE_ID_SIZE_MAX:
+                    variant_ids = list(variant_ids)  # This will allow us to cache the arg_q_hash
+                or_list.append(Q(pk__in=variant_ids))
             else:
                 remaining_q_set = arg_q_dict.get(None, {}).values()
                 merged_q = reduce(operator.and_, remaining_q_set)
