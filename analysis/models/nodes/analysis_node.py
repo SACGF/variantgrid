@@ -520,14 +520,17 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
 
             for k, v in a_kwargs.items():
                 qs = qs.annotate(**{k: v})
-                for q in arg_q_dict.get(k, {}).values():
+                for q in arg_q_dict.pop(k, {}).values():
                     qs = qs.filter(q)
 
         q_list = []
         # Anything stored under None means filters that don't rely on annotation - do afterwards
-        if q_dict := arg_q_dict.get(None):
+        if q_dict := arg_q_dict.pop(None, {}):
             # print(f"q_dict(None): {q_dict}")
             q_list.extend(q_dict.values())
+
+        if arg_q_dict:
+            raise Exception(f"arg_q_dict filters {arg_q_dict.keys()} not applied (missing annotation_kwargs)")
 
         if self.analysis.node_queryset_filter_contigs:
             q_list.append(Q(locus__contig__in=self.get_contigs()))
