@@ -113,7 +113,7 @@ class PopulationNode(AnalysisNode):
         if and_q:
             q = reduce(operator.and_, and_q)
             if self.keep_internally_classified_pathogenic:
-                classified_variant_ids = self._get_classified_variant_ids(self, q)
+                classified_variant_ids = self._get_classified_variant_ids(q)
                 q |= Q(pk__in=classified_variant_ids)
         else:
             q = None
@@ -158,15 +158,14 @@ class PopulationNode(AnalysisNode):
             node_arg_q_dict[None] = {str(node_q): node_q}
         return node_arg_q_dict
 
-    @staticmethod
-    @cache_memoize(timeout=MINUTE_SECS)
-    def _get_classified_variant_ids(node, q_pop: Q) -> List:
+    @cache_memoize(5 * MINUTE_SECS, args_rewrite=lambda s, _: (s.pk, s.version))
+    def _get_classified_variant_ids(self, q_pop: Q) -> List:
         """ We're going to return a list, so we want it to be as small as possible
             So we want the path/likely path in the parent, but that wouldn't already be caught via low pop """
-        parent = node.get_single_parent()
+        parent = self.get_single_parent()
         qs = parent.get_queryset()
         path_and_likely_path = [ClinicalSignificance.LIKELY_PATHOGENIC, ClinicalSignificance.PATHOGENIC]
-        q_classified = Classification.get_variant_q(node.analysis.user, node.analysis.genome_build,
+        q_classified = Classification.get_variant_q(self.analysis.user, self.analysis.genome_build,
                                                     clinical_significance_list=path_and_likely_path)
         qs = qs.filter(q_classified).exclude(q_pop)
         classified_variant_ids = list(qs.values_list("pk", flat=True))
