@@ -331,14 +331,23 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
             annotation_kwargs.update(self.node_cache.variant_collection.get_annotation_kwargs(**kwargs))
         return annotation_kwargs
 
+    def _has_common_variants(self) -> bool:
+        if self.has_input():
+            return any(parent._has_common_variants() for parent in self.get_non_empty_parents())
+        return True
+
     def get_annotation_kwargs(self, **kwargs) -> Dict:
         """ Passed to Variant QuerySet annotate()
             Can be used w/FilteredRelation to force a join to a partition, in which case you need to use
             the alias given in annotate. @see https://github.com/SACGF/variantgrid/wiki/Data-Partitioning """
-        a_kwargs = {}
-        kwargs.update(self._get_kwargs_for_parent_annotation_kwargs())
+
+        kwargs.update(self._get_kwargs_for_parent_annotation_kwargs(**kwargs))
         # Only apply parent annotation kwargs if you actually use their queryset
+        a_kwargs = {}
         if self.has_input() and self.uses_parent_queryset:
+            if self._has_common_variants():
+                kwargs["common_variants"] = True
+
             for parent in self.get_non_empty_parents():
                 a_kwargs.update(parent.get_annotation_kwargs(**kwargs))
 

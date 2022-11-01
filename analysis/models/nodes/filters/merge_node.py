@@ -1,6 +1,7 @@
 import operator
 from collections import defaultdict, Counter
 from functools import reduce
+from time import time
 from typing import Optional
 
 from django.db.models import Q
@@ -80,11 +81,10 @@ class MergeNode(AnalysisNode):
 
             if non_none_keys:
                 print(f"{non_none_keys=}")
-                # I tried not passing arg_q_dict (to run all where clauses in inner query, but it was slower)
-                qs = parent.get_queryset(arg_q_dict=arg_q_dict, disable_cache=True)
+                # We don't pass in arg_q_dict (ie run all where clauses in inner query)
+                # This has worse best performance but better worse case performance
+                qs = parent.get_queryset(disable_cache=True)
                 variant_ids = qs.values_list("pk", flat=True)
-                if parent.count <= settings.ANALYSIS_NODE_MERGE_STORE_ID_SIZE_MAX:
-                    variant_ids = list(variant_ids)  # This will allow us to cache the arg_q_hash
                 or_list.append(Q(pk__in=variant_ids))
             else:
                 remaining_q_set = arg_q_dict.get(None, {}).values()
@@ -133,7 +133,13 @@ class MergeNode(AnalysisNode):
     def _get_arg_q_dict_from_parents_and_node(self):
         parent_arg_q_dict = {}
         for parent in self.get_non_empty_parents():
-            arg_q_dict = parent.get_arg_q_dict(disable_cache=True)
+            if settings.ANALYSIS_NODE_MERGE_STORE_ID_SIZE_MAX and \
+                    parent.count <= settings.ANALYSIS_NODE_MERGE_STORE_ID_SIZE_MAX:
+                variant_ids = list(parent.get_queryset().values_list("pk", flat=True))
+                q = Q(pk__in=variant_ids)
+                arg_q_dict = {None: {q: q}}
+            else:
+                arg_q_dict = parent.get_arg_q_dict(disable_cache=True)
             parent_arg_q_dict[parent] = arg_q_dict
         return self._get_merged_q_dict(parent_arg_q_dict)
 

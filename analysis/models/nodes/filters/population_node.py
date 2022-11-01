@@ -11,7 +11,6 @@ from lazy import lazy
 
 from analysis.models.enums import GroupOperation
 from analysis.models.nodes.analysis_node import AnalysisNode
-from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
 from annotation.models.models import VariantAnnotation
 from classification.enums import ClinicalSignificance
 from classification.models.classification import Classification
@@ -52,11 +51,15 @@ class PopulationNode(AnalysisNode):
         return any([self.filtering_by_population, self.use_internal_counts,
                     self.gnomad_hom_alt_max, not self.show_gnomad_filtered])
 
-    def _get_kwargs_for_parent_annotation_kwargs(self):
-        kwargs = {}
-        if (self.gnomad_af or self.gnomad_popmax_af) and self.percent <= 5:
-            kwargs["common_variants"] = False
-        return kwargs
+    def _has_common_variants(self) -> bool:
+        rare_only = (self.gnomad_af or self.gnomad_popmax_af) and self.percent <= 5
+        return not rare_only
+
+    def _get_kwargs_for_parent_annotation_kwargs(self, common_variants=None, **kwargs):
+        node_kwargs = {}
+        if not (common_variants or self._has_common_variants()):
+            node_kwargs["common_variants"] = False
+        return node_kwargs
 
     def _get_annotation_kwargs_for_node(self, **kwargs) -> Dict:
         annotation_kwargs = super()._get_annotation_kwargs_for_node(**kwargs)
@@ -110,7 +113,7 @@ class PopulationNode(AnalysisNode):
         if and_q:
             q = reduce(operator.and_, and_q)
             if self.keep_internally_classified_pathogenic:
-                classified_variant_ids = self._get_classified_variant_ids(self.analysis, q)
+                classified_variant_ids = self._get_classified_variant_ids(self, q)
                 q |= Q(pk__in=classified_variant_ids)
         else:
             q = None
@@ -157,11 +160,13 @@ class PopulationNode(AnalysisNode):
 
     @staticmethod
     @cache_memoize(timeout=MINUTE_SECS)
-    def _get_classified_variant_ids(analysis, q_pop: Q) -> List:
-        """ Uses q_pop to only keeps the ones that matter """
-        qs = get_variant_queryset_for_annotation_version(analysis.annotation_version)
+    def _get_classified_variant_ids(node, q_pop: Q) -> List:
+        """ We're going to return a list, so we want it to be as small as possible
+            So we want the path/likely path in the parent, but that wouldn't already be caught via low pop """
+        parent = node.get_single_parent()
+        qs = parent.get_queryset()
         path_and_likely_path = [ClinicalSignificance.LIKELY_PATHOGENIC, ClinicalSignificance.PATHOGENIC]
-        q_classified = Classification.get_variant_q(analysis.user, analysis.genome_build,
+        q_classified = Classification.get_variant_q(node.analysis.user, node.analysis.genome_build,
                                                     clinical_significance_list=path_and_likely_path)
         qs = qs.filter(q_classified).exclude(q_pop)
         classified_variant_ids = list(qs.values_list("pk", flat=True))
