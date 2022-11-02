@@ -146,10 +146,7 @@ def published(sender,
 @receiver(clinical_context_signal, sender=ClinicalContext)
 def clinical_context_update(sender, clinical_context: ClinicalContext, status: str, is_significance_change: bool, cause: str, **kwargs):  # pylint: disable=unused-argument
     if settings.DISCORDANCE_ENABLED:
-
-        discordant_classifications = set()
-        latest = DiscordanceReport.update_latest(clinical_context, cause=cause, update_flags=True)
-
+        DiscordanceReport.update_latest(clinical_context, cause=cause, update_flags=True)
     else:
         clinical_context.flag_collection_safe.close_open_flags_of_type(
             flag_type=classification_flag_types.clinical_context_discordance,

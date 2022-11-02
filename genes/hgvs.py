@@ -527,7 +527,7 @@ class HGVSMatcher:
                 variant_coord = VariantCoordinate(variant_coord.chrom, variant_coord.pos,
                                                   variant_coord.ref, variant_coord.ref)  # ref == alt
             return variant_coord
-        except ClinGenAlleleAPIException as cga_api:
+        except ClinGenAlleleAPIException:
             self.attempt_clingen = False
             raise
         except ClinGenAlleleServerException as cga_se:
@@ -777,7 +777,7 @@ class HGVSMatcher:
         return transcript_id
 
     def _variant_to_hgvs_extra(self, variant: Variant, transcript_name=None) -> HGVSNameExtra:
-        hgvs_name, hgvs_method = self._variant_to_hgvs(variant, transcript_name)
+        hgvs_name, _ = self._variant_to_hgvs(variant, transcript_name)
         # logging.debug("%s -> %s (%s)", variant, hgvs_name, hgvs_method)
         return HGVSNameExtra(hgvs_name)
 
@@ -983,7 +983,7 @@ class HGVSMatcher:
         # GATA2(NM_032638.5):c.1082G>C => transcript=GATA2, gene=NM_032638.5
         # GATA2:c.1082G>C => transcript='', gene=GATA2
 
-        transcript_id, version = TranscriptVersion.get_transcript_id_and_version(hgvs.gene)
+        transcript_id, _ = TranscriptVersion.get_transcript_id_and_version(hgvs.gene)
         if Transcript.objects.filter(pk=transcript_id).exists():  # gene is transcript
             old_transcript = hgvs.transcript
             hgvs.transcript = hgvs.gene

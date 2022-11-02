@@ -19,12 +19,19 @@ class AllVariantsNode(AnalysisNode, AbstractZygosityCountNode):
     min_inputs = 0
     max_inputs = 0
 
+    def _get_annotation_kwargs_for_node(self, **kwargs) -> Dict:
+        annotation_kwargs = super()._get_annotation_kwargs_for_node(**kwargs)
+        if self.get_zygosity_count_arg_q_dict():
+            vzcc = VariantZygosityCountCollection.objects.get(name=settings.VARIANT_ZYGOSITY_GLOBAL_COLLECTION)
+            annotation_kwargs.update(vzcc.get_annotation_kwargs(**kwargs))
+        return annotation_kwargs
+
     def _get_node_arg_q_dict(self) -> Dict[Optional[str], Dict[str, Q]]:
         """ Restrict to analysis genome build """
 
         q_contigs = Variant.get_contigs_q(self.analysis.genome_build)
         q_dict = {
-            str(q_contigs): Variant.get_contigs_q(self.analysis.genome_build),
+            str(q_contigs): q_contigs,
         }
         if self.gene_symbol:
             genes = list(self.gene_symbol.get_genes())

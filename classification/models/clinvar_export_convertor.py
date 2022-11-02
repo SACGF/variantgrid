@@ -330,8 +330,8 @@ class ClinVarExportConverter:
                     expr = re.compile(key, RegexFlag.IGNORECASE)
                     if expr.match(assertion_criteria):
                         return ValidatedJson(criteria, JsonMessages.info(f"Using config for assertion method \"{key}\" : {json.dumps(raw_criteria)}"))
-            else:
-                return ValidatedJson(None, JsonMessages.error(f"No match for assertion method of \"{assertion_criteria}\""))
+
+            return ValidatedJson(None, JsonMessages.error(f"No match for assertion method of \"{assertion_criteria}\""))
 
     @property
     def json_clinical_significance(self) -> ValidatedJson:

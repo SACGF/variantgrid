@@ -331,14 +331,23 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
             annotation_kwargs.update(self.node_cache.variant_collection.get_annotation_kwargs(**kwargs))
         return annotation_kwargs
 
+    def _has_common_variants(self) -> bool:
+        if self.has_input():
+            return any(parent._has_common_variants() for parent in self.get_non_empty_parents())
+        return True
+
     def get_annotation_kwargs(self, **kwargs) -> Dict:
         """ Passed to Variant QuerySet annotate()
             Can be used w/FilteredRelation to force a join to a partition, in which case you need to use
             the alias given in annotate. @see https://github.com/SACGF/variantgrid/wiki/Data-Partitioning """
-        a_kwargs = {}
-        kwargs.update(self._get_kwargs_for_parent_annotation_kwargs())
+
+        kwargs.update(self._get_kwargs_for_parent_annotation_kwargs(**kwargs))
         # Only apply parent annotation kwargs if you actually use their queryset
+        a_kwargs = {}
         if self.has_input() and self.uses_parent_queryset:
+            if self._has_common_variants():
+                kwargs["common_variants"] = True
+
             for parent in self.get_non_empty_parents():
                 a_kwargs.update(parent.get_annotation_kwargs(**kwargs))
 
@@ -520,14 +529,17 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
 
             for k, v in a_kwargs.items():
                 qs = qs.annotate(**{k: v})
-                for q in arg_q_dict.get(k, {}).values():
+                for q in arg_q_dict.pop(k, {}).values():
                     qs = qs.filter(q)
 
         q_list = []
         # Anything stored under None means filters that don't rely on annotation - do afterwards
-        if q_dict := arg_q_dict.get(None):
+        if q_dict := arg_q_dict.pop(None, {}):
             # print(f"q_dict(None): {q_dict}")
             q_list.extend(q_dict.values())
+
+        if arg_q_dict:
+            raise Exception(f"arg_q_dict filters {arg_q_dict.keys()} not applied (missing annotation_kwargs)")
 
         if self.analysis.node_queryset_filter_contigs:
             q_list.append(Q(locus__contig__in=self.get_contigs()))

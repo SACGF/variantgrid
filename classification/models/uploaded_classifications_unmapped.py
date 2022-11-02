@@ -76,7 +76,7 @@ class UploadedClassificationsUnmapped(TimeStampedModel):
 
     def validation_list_objs(self) -> Iterable[UploadedClassificationsUnmappedValidationRow]:
         if messages := self.validation_list.get('messages'):
-            return (UploadedClassificationsUnmappedValidationRow(entry) for entry in self.validation_list.get('messages'))
+            return (UploadedClassificationsUnmappedValidationRow(entry) for entry in messages)
         return []
 
     @property
