@@ -112,51 +112,76 @@ class PopulationNode(AnalysisNode):
 
         if and_q:
             q = reduce(operator.and_, and_q)
-            if self.keep_internally_classified_pathogenic:
-                parent = self.get_single_parent()
-                classified_variant_ids = self._get_parent_classified_variant_ids(parent)
-                q |= Q(pk__in=classified_variant_ids)
         else:
             q = None
         return q
 
     def _get_node_arg_q_dict(self) -> Dict[Optional[str], Dict[str, Q]]:
-        """ By default - we assume node implements _get_node_q and none of the filters apply to annotations """
         node_arg_q_dict = {}
-        # Internal filters
+
+        and_q = []
+
         if self.use_internal_counts:
+            # Internal count filters use filtered relations - so we ideally want to apply against them to reduce the
+            # number of joins. However, if we have keep_internally_classified_pathogenic - we need to apply them with
+            # an OR - so need to put into the standard node_arg_q_dict[None] later
+
             vzcc = VariantZygosityCountCollection.objects.get(name=settings.VARIANT_ZYGOSITY_GLOBAL_COLLECTION)
+            # Max germline can be applied either by percent or from max_samples and zygosity = ANY_GERMLINE
+            max_germline_list = []
+            if self.max_samples is not None:
+                if self.zygosity == SimpleZygosity.ANY_GERMLINE:
+                    max_germline_list.append(self.max_samples)
+                else:
+                    if self.zygosity == SimpleZygosity.ANY_ZYGOSITY:
+                        column = vzcc.all_zygosity_counts_alias
+                    elif self.zygosity == SimpleZygosity.HET:
+                        column = vzcc.het_alias
+                    elif self.zygosity == SimpleZygosity.HOM_ALT:
+                        column = vzcc.hom_alias
+                    else:
+                        msg = f"Unknown SimpleZygosity {self.zygosity}"
+                        raise ValueError(msg)
+
+                    less_than = Q(**{column + "__lte": self.max_samples})
+                    is_null = Q(**{column + "__isnull": True})
+
+                    q = less_than | is_null
+                    if self.keep_internally_classified_pathogenic:
+                        and_q.append(q)
+                    else:
+                        node_arg_q_dict[column] = {str(q): q}
 
             if self.internal_percent != self.EVERYTHING:
                 max_samples_from_percent = int(self.num_samples_for_build * (self.internal_percent / 100))
                 # Min of 1 - so don't filter out self if only copy!
                 max_samples_from_percent = max(max_samples_from_percent, 1)
-                less_than = Q(**{vzcc.germline_counts_alias + "__lte": max_samples_from_percent})
+                max_germline_list.append(max_samples_from_percent)
+
+            if max_germline_list:
+                max_germline = min(max_germline_list)
+                less_than = Q(**{vzcc.germline_counts_alias + "__lte": max_germline})
                 is_null = Q(**{vzcc.germline_counts_alias + "__isnull": True})
                 q = less_than | is_null
-                node_arg_q_dict[vzcc.germline_counts_alias] = {str(q): q}
-
-            if self.max_samples is not None:
-                if self.zygosity == SimpleZygosity.ANY_GERMLINE:
-                    column = vzcc.germline_counts_alias
-                elif self.zygosity == SimpleZygosity.ANY_ZYGOSITY:
-                    column = vzcc.all_zygosity_counts_alias
-                elif self.zygosity == SimpleZygosity.HET:
-                    column = vzcc.het_alias
-                elif self.zygosity == SimpleZygosity.HOM_ALT:
-                    column = vzcc.hom_alias
+                if self.keep_internally_classified_pathogenic:
+                    and_q.append(q)
                 else:
-                    msg = f"Unknown SimpleZygosity {self.zygosity}"
-                    raise ValueError(msg)
-
-                less_than = Q(**{column + "__lte": self.max_samples})
-                is_null = Q(**{column + "__isnull": True})
-
-                q = less_than | is_null
-                node_arg_q_dict[column] = {str(q): q}
+                    node_arg_q_dict[vzcc.germline_counts_alias] = {str(q): q}
 
         if node_q := self._get_node_q():
-            node_arg_q_dict[None] = {str(node_q): node_q}
+            and_q.append(node_q)
+
+        if and_q:
+            or_q = [reduce(operator.and_, and_q)]
+            if self.keep_internally_classified_pathogenic:
+                parent = self.get_single_parent()
+                classified_variant_ids = self._get_parent_classified_variant_ids(parent)
+                or_q.append(Q(pk__in=classified_variant_ids))
+
+            q = reduce(operator.or_, or_q)
+            node_arg_q_dict[None] = {str(q): q}
+
+        print(f"{node_arg_q_dict=}")
         return node_arg_q_dict
 
     @staticmethod
