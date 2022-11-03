@@ -96,7 +96,7 @@ DATABASES = {
 CACHE_HOURS = 48
 TIMEOUT = 60 * 60 * CACHE_HOURS
 REDIS_PORT = 6379
-CACHE_VERSION = 31  # increment to flush caches (eg if invalid due to upgrade)
+CACHE_VERSION = 37  # increment to flush caches (eg if invalid due to upgrade)
 CACHES = {
     'default': {
         "BACKEND": "redis_cache.RedisCache",
@@ -367,6 +367,8 @@ ANALYSIS_DUAL_SCREEN_MODE_FEATURE_ENABLED = False  # Currently broken
 ANALYSIS_TEMPLATES_AUTO_SAMPLE = "Sample tab auto analysis"
 ANALYSIS_WARN_IF_NO_QC_GENE_LIST_MESSAGE = None  # disabled by default
 ANALYSIS_NODE_CACHE_Q = True  # So can turn off in unit tests
+ANALYSIS_NODE_CACHE_DB = False  # Use NodeCache models
+ANALYSIS_NODE_MERGE_STORE_ID_SIZE_MAX = 1000
 
 VARIANT_ALLELE_FREQUENCY_CLIENT_SIDE_PERCENT = True  # For analysis Grid/CSV export. VCF export is always unit
 VARIANT_STANDARD_BASES_ONLY = True  # True to reject anything other than A, C, G, T

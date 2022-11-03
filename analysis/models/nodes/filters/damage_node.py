@@ -53,6 +53,9 @@ class DamageNode(AnalysisNode):
                     self.cosmic_count_required, self.damage_predictions_required,
                     self.protein_domain_required, self.published_required])
 
+    def _get_node_q_hash(self) -> str:
+        return str(self._get_node_q())
+
     def _get_node_q(self) -> Optional[Q]:
         or_filters = []
         and_filters = []
@@ -67,7 +70,8 @@ class DamageNode(AnalysisNode):
         if self.splice_min is not None:
             # [consequence contains 'splice' OR not null splice region] AND [variant class not SNV]
             q_splice_indels = Q(variantannotation__consequence__contains='splice') | Q(variantannotation__splice_region__isnull=False)
-            q_splice_indels &= ~Q(variantannotation__variant_class='SN')
+            # This inner query was very slow - patched back __ne operator - @see snpdb.models.models_vcf.NotEqual
+            q_splice_indels &= Q(variantannotation__variant_class__ne="SN")
             splicing_q_list = [
                 q_splice_indels,
                 Q(variantannotation__dbscsnv_ada_score__gte=self.splice_min),

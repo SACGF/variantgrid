@@ -257,6 +257,10 @@ class GeneSymbolViewInfo:
         has_canonical_gene_coverage = GeneCoverageCanonicalTranscript.get_for_symbol(self.genome_build, self.gene_symbol).exists()
         return has_canonical_gene_coverage
 
+    @property
+    def has_samples_in_other_builds(self) -> bool:
+        return Sample.objects.exclude(vcf__genome_build=self.genome_build).exists()
+
     @lazy
     def gene_in_gene_lists(self) -> bool:
         gene_lists_qs = GeneList.filter_for_user(self.user)
@@ -310,6 +314,7 @@ def view_gene_symbol(request, gene_symbol: str, genome_build_name: Optional[str]
             "genome_build",
             "has_classified_variants",
             "has_gene_coverage",
+            "has_samples_in_other_builds",
             "hgnc",
             "panel_app_servers",
             "omim_and_hpo_for_gene",

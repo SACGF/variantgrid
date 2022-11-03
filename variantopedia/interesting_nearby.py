@@ -12,7 +12,7 @@ from annotation.annotation_version_querysets import get_variant_queryset_for_lat
     get_variant_queryset_for_annotation_version
 from classification.enums import ClinicalSignificance
 from classification.models import Classification
-from snpdb.models import Variant
+from snpdb.models import Variant, VariantZygosityCountCollection
 
 
 def get_method_summaries(variant, distance=None):
@@ -53,6 +53,7 @@ def get_nearby_qs(variant, annotation_version, distance=None):
     if distance is None:
         distance = settings.VARIANT_DETAILS_NEARBY_RANGE
     qs = get_variant_queryset_for_annotation_version(annotation_version)
+    qs, _ = VariantZygosityCountCollection.annotate_global_germline_counts(qs)
     q = Variant.get_no_reference_q() & ~Q(pk=variant.pk)  # Exclude ref and self
     qs = qs.filter(q)
 

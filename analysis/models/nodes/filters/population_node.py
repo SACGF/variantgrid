@@ -1,11 +1,12 @@
-from typing import Optional
+import operator
+from functools import reduce
+from typing import Optional, Dict, List, Set
 
+from cache_memoize import cache_memoize
 from django.conf import settings
 from django.db import models
 from django.db.models.deletion import CASCADE
 from django.db.models.query_utils import Q
-from functools import reduce
-import operator
 
 from lazy import lazy
 
@@ -13,6 +14,7 @@ from analysis.models.enums import GroupOperation
 from analysis.models.nodes.analysis_node import AnalysisNode
 from annotation import population_frequency
 from annotation.models.models import VariantAnnotation
+from library.constants import MINUTE_SECS
 from patients.models_enums import SimpleZygosity, GnomADPopulation
 from snpdb.models import Sample, VariantZygosityCountCollection
 from classification.enums import ClinicalSignificance
@@ -49,17 +51,24 @@ class PopulationNode(AnalysisNode):
     def modifies_parents(self):
         return any([self.filtering_by_population, self.gnomad_hom_alt_max, self.use_internal_counts])
 
+    def _get_annotation_kwargs_for_node(self) -> Dict:
+        annotation_kwargs = super()._get_annotation_kwargs_for_node()
+        if self.use_internal_counts:
+            vzcc = VariantZygosityCountCollection.objects.get(name=settings.VARIANT_ZYGOSITY_GLOBAL_COLLECTION)
+            annotation_kwargs.update(vzcc.get_annotation_kwargs())
+        return annotation_kwargs
+
     def _get_node_q(self) -> Optional[Q]:
         and_q = []
         if self.filtering_by_population:
-            population_databases = set()
+            population_databases = []
             for field in self.POPULATION_DATABASE_FIELDS:
                 if getattr(self, field):
-                    population_databases.add(field)
+                    population_databases.append(field)
 
             for gnomad_pop in self.populationnodegnomadpopulation_set.all():
                 field = VariantAnnotation.get_gnomad_population_field(gnomad_pop.population)
-                population_databases.add(field)
+                population_databases.append(field)
 
             if population_databases:
                 # The group operation is backwards from what you may expect, as the widget takes MAX
@@ -71,7 +80,7 @@ class PopulationNode(AnalysisNode):
                     GroupOperation.ALL: operator.or_,
                     GroupOperation.ANY: operator.and_,
                 }
-                group_operation = OPERATIONS[self.group_operation]
+                group_operation = OPERATIONS[GroupOperation(self.group_operation)]
                 max_allele_frequency = self.percent / 100
                 q_pop = population_frequency.get_population_af_q(max_allele_frequency,
                                                                  population_databases=population_databases,
@@ -83,50 +92,90 @@ class PopulationNode(AnalysisNode):
             q_hom_alt_null = Q(variantannotation__gnomad_hom_alt__isnull=True)
             and_q.append(q_hom_alt_lt | q_hom_alt_null)
 
-        # Internal filters
+        if and_q:
+            q = reduce(operator.and_, and_q)
+        else:
+            q = None
+        return q
+
+    def _get_node_arg_q_dict(self) -> Dict[Optional[str], Dict[str, Q]]:
+        node_arg_q_dict = {}
+
+        and_q = []
+
         if self.use_internal_counts:
-            # Global counts is added to every get_annotation_kwargs()
+            # Internal count filters use filtered relations - so we ideally want to apply against them to reduce the
+            # number of joins. However, if we have keep_internally_classified_pathogenic - we need to apply them with
+            # an OR - so need to put into the standard node_arg_q_dict[None] later
+
             vzcc = VariantZygosityCountCollection.objects.get(name=settings.VARIANT_ZYGOSITY_GLOBAL_COLLECTION)
+            # Max germline can be applied either by percent or from max_samples and zygosity = ANY_GERMLINE
+            max_germline_list = []
+            if self.max_samples is not None:
+                if self.zygosity == SimpleZygosity.ANY_GERMLINE:
+                    max_germline_list.append(self.max_samples)
+                else:
+                    if self.zygosity == SimpleZygosity.ANY_ZYGOSITY:
+                        column = vzcc.all_zygosity_counts_alias
+                    elif self.zygosity == SimpleZygosity.HET:
+                        column = vzcc.het_alias
+                    elif self.zygosity == SimpleZygosity.HOM_ALT:
+                        column = vzcc.hom_alias
+                    else:
+                        msg = f"Unknown SimpleZygosity {self.zygosity}"
+                        raise ValueError(msg)
+
+                    less_than = Q(**{column + "__lte": self.max_samples})
+                    is_null = Q(**{column + "__isnull": True})
+
+                    q = less_than | is_null
+                    if self.keep_internally_classified_pathogenic:
+                        and_q.append(q)
+                    else:
+                        node_arg_q_dict[column] = {str(q): q}
 
             if self.internal_percent != self.EVERYTHING:
                 max_samples_from_percent = int(self.num_samples_for_build * (self.internal_percent / 100))
                 # Min of 1 - so don't filter out self if only copy!
                 max_samples_from_percent = max(max_samples_from_percent, 1)
-                less_than = Q(**{vzcc.germline_counts_alias + "__lte": max_samples_from_percent})
+                max_germline_list.append(max_samples_from_percent)
+
+            if max_germline_list:
+                max_germline = min(max_germline_list)
+                less_than = Q(**{vzcc.germline_counts_alias + "__lte": max_germline})
                 is_null = Q(**{vzcc.germline_counts_alias + "__isnull": True})
-                and_q.append(less_than | is_null)
-
-            if self.max_samples is not None:
-                if self.zygosity == SimpleZygosity.ANY_GERMLINE:
-                    column = vzcc.germline_counts_alias
-                elif self.zygosity == SimpleZygosity.ANY_ZYGOSITY:
-                    column = vzcc.all_zygosity_counts_alias
-                elif self.zygosity == SimpleZygosity.HET:
-                    column = vzcc.het_alias
-                elif self.zygosity == SimpleZygosity.HOM_ALT:
-                    column = vzcc.hom_alias
+                q = less_than | is_null
+                if self.keep_internally_classified_pathogenic:
+                    and_q.append(q)
                 else:
-                    msg = f"Unknown SimpleZygosity {self.zygosity}"
-                    raise ValueError(msg)
+                    node_arg_q_dict[vzcc.germline_counts_alias] = {str(q): q}
 
-                less_than = Q(**{column + "__lte": self.max_samples})
-                is_null = Q(**{column + "__isnull": True})
-
-                and_q.append(less_than | is_null)
+        if node_q := self._get_node_q():
+            and_q.append(node_q)
 
         if and_q:
             or_q = [reduce(operator.and_, and_q)]
             if self.keep_internally_classified_pathogenic:
-                path_and_likely_path = [ClinicalSignificance.LIKELY_PATHOGENIC, ClinicalSignificance.PATHOGENIC]
-                q_classified = Classification.get_variant_q(self.analysis.user, self.analysis.genome_build,
-                                                            clinical_significance_list=path_and_likely_path)
-                or_q.append(q_classified)
+                parent = self.get_single_parent()
+                classified_variant_ids = self._get_parent_classified_variant_ids(parent)
+                or_q.append(Q(pk__in=classified_variant_ids))
 
-            q_node = reduce(operator.or_, or_q)
-            q = reduce(operator.and_, [q_node])
-        else:
-            q = None
-        return q
+            q = reduce(operator.or_, or_q)
+            node_arg_q_dict[None] = {str(q): q}
+
+        print(f"{node_arg_q_dict=}")
+        return node_arg_q_dict
+
+    @staticmethod
+    @cache_memoize(5 * MINUTE_SECS, args_rewrite=lambda p: (p.pk, p.version))
+    def _get_parent_classified_variant_ids(parent) -> List:
+        """ Uses parent pk/version so can be shared with siblings. Doesn't use exclude as that ended up being slow """
+        qs = parent.get_queryset()
+        path_and_likely_path = [ClinicalSignificance.LIKELY_PATHOGENIC, ClinicalSignificance.PATHOGENIC]
+        q_classified = Classification.get_variant_q(parent.analysis.user, parent.analysis.genome_build,
+                                                    clinical_significance_list=path_and_likely_path)
+        qs = qs.filter(q_classified)
+        return list(qs.values_list("pk", flat=True))
 
     def _get_method_summary(self):
         if self.modifies_parents():
@@ -139,6 +188,9 @@ class PopulationNode(AnalysisNode):
             for gnomad_pop in self.populationnodegnomadpopulation_set.all():
                 field = VariantAnnotation.get_gnomad_population_field(gnomad_pop.population)
                 filters.append('%s <= %g' % (field, max_allele_frequency))
+
+            if self.gnomad_hom_alt_max is not None:
+                filters.append(f"gnomad_hom_alt_max <= {self.gnomad_hom_alt_max}")
 
             method_summary = ', '.join(filters)
         else:

@@ -1,15 +1,19 @@
-from typing import Optional, Tuple, List
+import hashlib
+import logging
+import operator
+from functools import reduce
+from typing import Optional, Set, Tuple, List
 
+from cache_memoize import cache_memoize
 from django.db import models
 from django.db.models.deletion import SET_NULL, CASCADE
 from django.db.models.query_utils import Q
-from functools import reduce
-import logging
-import operator
+from lazy import lazy
 
 from analysis.models.nodes.analysis_node import AnalysisNode
 from annotation.models import VariantTranscriptAnnotation, OntologyTerm
 from genes.models import GeneSymbol
+from library.constants import DAY_SECS
 from ontology.models import OntologySnake
 from patients.models import Patient
 
@@ -88,10 +92,19 @@ class PhenotypeNode(AnalysisNode):
         gene_symbols_qs = self.get_gene_symbols_qs()
         return self.analysis.gene_annotation_release.genes_for_symbols(gene_symbols_qs)
 
+    @cache_memoize(DAY_SECS, args_rewrite=lambda s: (s.pk, s.version))
+    def _get_node_q_hash(self) -> str:
+        md5 = hashlib.md5()
+        for ontology_term_id in sorted(self.get_ontology_term_ids()):
+            md5.update(ontology_term_id.encode())
+        return md5.hexdigest()
+
+    @cache_memoize(DAY_SECS, args_rewrite=lambda s: (s.pk, s.version))
     def _get_node_q(self) -> Optional[Q]:
         qs_filters = []
         gene_qs = self.get_gene_qs()
-        qs_filters.append(VariantTranscriptAnnotation.get_overlapping_genes_q(gene_qs))
+        variant_annotation_version = self.analysis.annotation_version.variant_annotation_version
+        qs_filters.append(VariantTranscriptAnnotation.get_overlapping_genes_q(variant_annotation_version, gene_qs))
 
         text_phenotypes = (self.text_phenotype or '').split()
         if text_phenotypes:

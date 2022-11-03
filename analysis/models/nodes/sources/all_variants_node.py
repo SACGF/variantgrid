@@ -1,6 +1,6 @@
 import operator
 from functools import reduce
-from typing import Optional, List
+from typing import Optional, List, Dict, Set
 
 from django.conf import settings
 from django.db import models
@@ -21,20 +21,32 @@ class AllVariantsNode(AnalysisNode, AbstractZygosityCountNode):
     min_inputs = 0
     max_inputs = 0
 
-    def _get_node_q(self) -> Optional[Q]:
+    def _get_annotation_kwargs_for_node(self, **kwargs) -> Dict:
+        annotation_kwargs = super()._get_annotation_kwargs_for_node(**kwargs)
+        if self.get_zygosity_count_arg_q_dict():
+            vzcc = VariantZygosityCountCollection.objects.get(name=settings.VARIANT_ZYGOSITY_GLOBAL_COLLECTION)
+            annotation_kwargs.update(vzcc.get_annotation_kwargs(**kwargs))
+        return annotation_kwargs
+
+    def _get_node_arg_q_dict(self) -> Dict[Optional[str], Dict[str, Q]]:
         """ Restrict to analysis genome build """
 
-        and_q = [Variant.get_contigs_q(self.analysis.genome_build)]
-
+        q_contigs = Variant.get_contigs_q(self.analysis.genome_build)
+        q_dict = {
+            str(q_contigs): q_contigs,
+        }
         if self.gene_symbol:
             genes = list(self.gene_symbol.get_genes())
-            and_q.append(Q(variantgeneoverlap__gene__in=genes))
+            q_gene = Q(variantgeneoverlap__gene__in=genes)
+            q_dict[str(q_gene)] = q_gene
 
         if not self.reference:
-            and_q.append(Variant.get_no_reference_q())
+            q_no_ref = Variant.get_no_reference_q()
+            q_dict[str(q_no_ref)] = q_no_ref
 
-        and_q.extend(self.get_zygosity_count_q_list())
-        return reduce(operator.and_, and_q)
+        arg_q_dict = {None: q_dict}
+        self.merge_arg_q_dicts(arg_q_dict, self.get_zygosity_count_arg_q_dict())
+        return arg_q_dict
 
     def get_node_name(self):
         name = ""

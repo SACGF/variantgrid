@@ -1,15 +1,15 @@
-from typing import Optional
+import logging
+import sys
+import traceback
+from typing import Optional, Tuple, Dict, Set
 
 import celery
 from django.db import models
 from django.db.models.deletion import SET_NULL, CASCADE
 from django.db.models.query_utils import Q
-import logging
-import sys
-import traceback
-
 from django.db.models.signals import post_delete
 from django.dispatch import receiver
+from lazy import lazy
 
 from analysis.models.enums import SetOperations
 from analysis.models.nodes.analysis_node import AnalysisNode, NodeStatus, NodeVersion
@@ -94,7 +94,8 @@ class VennNode(AnalysisNode):
     def get_rendering_args(self):
         return {"venn_flag": self.get_venn_flag()}
 
-    def get_ordered_parents(self):
+    @lazy
+    def ordered_parents(self) -> Tuple[AnalysisNode, AnalysisNode]:
         """ Return left_parent, right_parent """
         parents = self.get_parent_subclasses()
         a, b = parents
@@ -118,10 +119,10 @@ class VennNode(AnalysisNode):
         task_args_objs_set = set()
         if self.is_valid():
             try:
-                a, b = self.get_ordered_parents()
+                a, b = self.ordered_parents
                 for intersection_type in self.get_vennodecache_intersection_types():
-                    vennode_cache, created = VennNodeCache.objects.get_or_create(parent_a_node_version=NodeVersion.get(a),
-                                                                                 parent_b_node_version=NodeVersion.get(b),
+                    vennode_cache, created = VennNodeCache.objects.get_or_create(parent_a_node_version=a.node_version,
+                                                                                 parent_b_node_version=b.node_version,
                                                                                  intersection_type=intersection_type)
 
                     if not created:
@@ -166,27 +167,34 @@ class VennNode(AnalysisNode):
             SetOperations.SYMMETRIC_DIFFERENCE: [VennNodeCache.A_ONLY, VennNodeCache.B_ONLY],
             SetOperations.B_ONLY: [VennNodeCache.INTERSECTION, VennNodeCache.B_ONLY],
         }
-        return INTERSECTIONS[self.set_operation]
+        return INTERSECTIONS[SetOperations(self.set_operation)]
 
     def _get_node_q(self) -> Optional[Q]:
         raise ValueError("VennNode always uses cache - this should never be called!")
 
-    def _get_node_cache_q(self) -> Optional[Q]:
+    def _get_node_cache_arg_q_dict(self) -> Dict[Optional[str], Dict[str, Q]]:
         if self.set_operation == SetOperations.NONE:
-            return self.q_none()
+            q_none = self.q_none()
+            return {None: {str(q_none): q_none}}
 
-        a, b = self.get_ordered_parents()
+        a, b = self.ordered_parents
         variant_collections = []
         for intersection_type in self.get_vennodecache_intersection_types():
-            vennode_cache = VennNodeCache.objects.get(parent_a_node_version=NodeVersion.get(a),
-                                                      parent_b_node_version=NodeVersion.get(b),
+            vennode_cache = VennNodeCache.objects.get(parent_a_node_version=a.node_version,
+                                                      parent_b_node_version=b.node_version,
                                                       intersection_type=intersection_type)
 
             if vennode_cache.variant_collection.status != ProcessingStatus.SUCCESS:
                 raise ValueError(f"{vennode_cache} had status: {vennode_cache.variant_collection.get_status_display()}")
             variant_collections.append(vennode_cache.variant_collection)
 
-        return Q(variantcollectionrecord__variant_collection__in=variant_collections)
+        arg_q_dict = {}
+        if variant_collections:
+            variant_collections = sorted(variant_collections)  # for consistent hash
+            q = Q(variantcollectionrecord__variant_collection__in=variant_collections)
+            arg_q_dict[None] = {str(q): q}
+
+        return arg_q_dict
 
     def _get_method_summary(self):
         return self.get_set_operation_display()
@@ -234,7 +242,7 @@ def post_delete_intersection_cache(sender, instance, **kwargs):  # pylint: disab
         pass  # OK as deleted elsewhere (eg version was bumped and old ones cleaned up)
 
 
-@celery.task
+@celery.shared_task
 def venn_cache_count(vennode_cache_id):
     print(f"venn_cache_count: {vennode_cache_id}")
     try:

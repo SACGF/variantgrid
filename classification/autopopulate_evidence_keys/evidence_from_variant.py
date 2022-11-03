@@ -20,7 +20,7 @@ from library.django_utils import get_choices_formatter
 from library.log_utils import log_traceback
 from seqauto.models import get_20x_gene_coverage
 from snpdb.clingen_allele import get_clingen_allele_for_variant, ClinGenAlleleAPIException
-from snpdb.models import Variant
+from snpdb.models import Variant, VariantZygosityCountCollection
 from snpdb.models.models_clingen_allele import ClinGenAllele
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_enums import ColumnAnnotationLevel
@@ -435,6 +435,7 @@ def get_evidence_fields_from_variant_query(
     va_fields_for_summaries.extend(itertools.chain.from_iterable(VariantAnnotation.SPLICEAI_DS_DP.values()))
 
     qs = get_variant_queryset_for_annotation_version(annotation_version=annotation_version)
+    qs, _ = VariantZygosityCountCollection.annotate_global_germline_counts(qs)
     qs = qs.filter(pk=variant.pk)
     columns = {f"variantannotation__{f}" for f in va_fields_for_summaries}
     columns.update([e['col'] for e in evidence_variant_columns.values()])

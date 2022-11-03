@@ -1,11 +1,13 @@
 """ AnalysisNode is the base class that all analysis nodes inherit from. """
 import logging
 import operator
+from collections import defaultdict
 from functools import reduce
 from random import random
 from time import time
-from typing import Tuple, Sequence, List, Dict, Optional
+from typing import Tuple, Sequence, List, Dict, Optional, Set
 
+from cache_memoize import cache_memoize
 from celery.canvas import Signature
 from django.conf import settings
 from django.core.cache import cache
@@ -27,14 +29,15 @@ from analysis.models.enums import GroupOperation, NodeStatus, NodeColors, NodeEr
 from analysis.models.models_analysis import Analysis
 from analysis.models.nodes.node_counts import get_extra_filters_q, get_node_counts_and_labels_dict
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
+from classification.models import Classification, post_delete
+from library.constants import DAY_SECS
 from library.database_utils import queryset_to_sql
 from library.django_utils import thread_safe_unique_together_get_or_create
-from library.log_utils import report_event
+from library.log_utils import report_event, log_traceback
 from library.utils import format_percent
 from snpdb.models import BuiltInFilters, Sample, Variant, VCFFilter, Wiki, Cohort, VariantCollection, \
     ProcessingStatus, GenomeBuild, AlleleSource
 from snpdb.variant_collection import write_sql_to_variant_collection
-from classification.models import Classification, post_delete
 from variantgrid.celery import app
 
 
@@ -42,9 +45,20 @@ def _default_position():
     return 10 + random() * 50
 
 
+class NodeInheritanceManager(InheritanceManager):
+    def get_queryset(self):
+        queryset = super()._queryset_class(self.model)
+        return queryset.select_related("analysis",
+                                       "analysis__user",
+                                       "analysis__genome_build",
+                                       "analysis__annotation_version",
+                                       "analysis__annotation_version__variant_annotation_version",
+                                       "analysis__annotation_version__variant_annotation_version__gene_annotation_release")
+
+
 class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
     model = Variant
-    objects = InheritanceManager()
+    objects = NodeInheritanceManager()
     analysis = models.ForeignKey(Analysis, on_delete=CASCADE)
     name = models.TextField(blank=True)
     x = models.IntegerField(default=_default_position)
@@ -83,6 +97,12 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
         self.parents_changed = False
         self.queryset_dirty = False
         self.update_children = True
+        self._cached_parents = None
+        self._cached_analysis_errors = None
+        self._cache_node_q = settings.ANALYSIS_NODE_CACHE_Q  # Disable for unit tests
+
+    def __lt__(self, other):
+        return self.pk < other.pk
 
     def get_subclass(self):
         """ Returns the node loaded as a subclass """
@@ -136,6 +156,7 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
             cohorts = sorted(cohorts)
         return cohorts, visibility
 
+    @cache_memoize(DAY_SECS, args_rewrite=lambda s: (s.pk, s.version))
     def get_sample_ids(self) -> List[Sample]:
         return [s.pk for s in self.get_samples()]
 
@@ -214,8 +235,12 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
         return task_args_objs_set
 
     def get_parent_subclasses_and_errors(self):
-        qs = AnalysisNode.objects.filter(children=self.id, children__isnull=False)
-        parents = list(qs.select_subclasses())
+        if self._cached_parents is None:
+            qs = AnalysisNode.objects.filter(children=self.id, children__isnull=False)
+            self._cached_parents = list(qs.select_subclasses())
+
+        parents = self._cached_parents
+
         num_parents = len(parents)
         errors = []
         if self.min_inputs != AnalysisNode.PARENT_CAP_NOT_SET and num_parents < self.min_inputs:
@@ -237,7 +262,7 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
             AnalysisNode.throw_errors_exception(errors)
         return parents
 
-    def get_non_empty_parents(self, require_parents_ready=True):
+    def get_non_empty_parents(self, require_parents_ready=True) -> List['AnalysisNode']:
         """ Returns non-empty (count > 0) parents.
             If require_parents_ready=True, die if parents not ready
             Otherwise, return them as we don't know if they're empty or not """
@@ -267,17 +292,19 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
             raise ValueError(msg)
         return parents[0]
 
-    def get_single_parent_q(self):
+    def get_single_parent_arg_q_dict(self) -> Dict[Optional[str], Dict[str, Q]]:
+        arg_q_dict = {}
         parent = self.get_single_parent()
         if parent.is_ready():
             if parent.count == 0:
-                q = self.q_none()
+                q_none = self.q_none()
+                arg_q_dict[None] = {str(q_none): q_none}
             else:
-                q = parent.get_q()
+                arg_q_dict = parent.get_arg_q_dict()
         else:
             # This should never happen...
             raise ValueError("get_single_parent_q called when single parent not ready!!!")
-        return q
+        return arg_q_dict
 
     def _get_annotation_kwargs_for_node(self) -> Dict:
         """ Override this method per-node.
@@ -326,58 +353,57 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
         return ~AnalysisNode.q_all()
 
     def _get_cache_key(self) -> str:
-        nv = NodeVersion.get(self)
-        return str(nv.pk)
+        return str(self.node_version.pk)
 
-    def get_q(self, disable_cache=False):
+    def _get_arg_q_dict_from_parents_and_node(self):
+        arg_q_dict = self.get_parent_arg_q_dict()
+        if self.modifies_parents():
+            if node_arg_q_dict := self._get_node_arg_q_dict():
+                self.merge_arg_q_dicts(arg_q_dict, node_arg_q_dict)
+        return arg_q_dict
+
+    def get_arg_q_dict(self, disable_cache=False) -> Dict[Optional[str], Dict[str, Q]]:
         """ A Django Q object representing the Variant filters for this node.
-            This is the method to override in subclasses - not get_queryset() as:
+            This is the method to override in subclasses - not get_queryset()
 
-            Chains of filters to a reverse foreign key relationship causes
-            Multiple joins, so use Q objects which are combined at the end
-
-            qs = qs.filter(table_1__val=1)
-            qs = qs.filter(table_2__val=2)
-
-            This is not necessarily equal to:
-
-            qs.filter(table_1__val=1, table_2__val=2)
-
-            @see https://docs.djangoproject.com/en/2/topics/db/queries/#spanning-multi-valued-relationships
+            @see https://github.com/SACGF/variantgrid/wiki/Analysis-Nodes#node-q-objects
         """
         # We need this for node counts, and doing a grid query (each page) - and it can take a few secs to generate
         # for some nodes (Comp HET / pheno) so cache it
         cache_key = self._get_cache_key() + f"q_cache={disable_cache}"
-        q: Optional[Q] = None
-        if settings.ANALYSIS_NODE_CACHE_Q:  # Disable for unit tests
-            q = cache.get(cache_key)
+        arg_q_dict: Dict[Optional[str], Dict[str, Q]] = {}
+        if self._cache_node_q:
+            arg_q_dict = cache.get(cache_key)
 
-        if q is None:
+        if not arg_q_dict:
             if disable_cache is False:
-                if cache_q := self._get_node_cache_q():
-                    return cache_q
+                if cache_arg_q_dict := self._get_node_cache_arg_q_dict():
+                    return cache_arg_q_dict
 
             if self.has_input():
-                q = self.get_parent_q()
-                if self.modifies_parents():
-                    if node_q := self._get_node_q():
-                        q &= node_q
+                arg_q_dict = self._get_arg_q_dict_from_parents_and_node()
             else:
-                q = self.q_all()
-                if node_q := self._get_node_q():
-                    q = node_q
-            cache.set(cache_key, q)
-        return q
+                if node_arg_q_dict := self._get_node_arg_q_dict():
+                    arg_q_dict = node_arg_q_dict
+                else:
+                    arg_q_dict[None] = {}
+            if self._cache_node_q:
+                try:
+                    cache.set(cache_key, arg_q_dict)
+                except:
+                    log_traceback()
+        return arg_q_dict
 
-    def get_parent_q(self):
+    def get_parent_arg_q_dict(self):
         if self.min_inputs == 1:
-            return self.get_single_parent_q()
-        raise NotImplementedError("You need to implement a non-default 'get_parent_q' if you have more than 1 parent")
+            return self.get_single_parent_arg_q_dict()
+        raise NotImplementedError("Implement a non-default 'get_parent_arg_q_dict' if you have more than 1 parent")
 
     @property
     def use_cache(self):
         """ At the moment we only cache when a child requests it """
-        return AnalysisEdge.objects.filter(parent=self, child__parents_should_cache=True).exists()
+        return settings.ANALYSIS_NODE_CACHE_DB and \
+               AnalysisEdge.objects.filter(parent=self, child__parents_should_cache=True).exists()
 
     def write_cache(self, variant_collection: VariantCollection):
         qs = self.get_queryset(disable_cache=True)
@@ -396,47 +422,84 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
         return NodeCache.objects.filter(node_version=self.node_version,
                                         variant_collection__status=ProcessingStatus.SUCCESS).first()
 
-    def _get_node_cache_q(self) -> Optional[Q]:
-        q = None
+    def _get_node_cache_arg_q_dict(self) -> Dict[Optional[str], Dict[str, Q]]:
+        arg_q_dict = {}
         if self.node_cache:
-            q = self.node_cache.variant_collection.get_q()
-        return q
+            arg_q_dict = self.node_cache.variant_collection.get_arg_q_dict()
+        return arg_q_dict
 
     def _get_node_q(self) -> Optional[Q]:
         raise NotImplementedError()
 
-    def _get_unfiltered_queryset(self, **extra_annotation_kwargs):
-        """ Unfiltered means before the get_q() is applied
-            extra_annotation_kwargs is applied AFTER node's annotation kwargs
-        """
-        qs = self._get_model_queryset()
-        a_kwargs = self.get_annotation_kwargs()
-        a_kwargs.update(extra_annotation_kwargs)
-        if a_kwargs:
-            # Clear ordering, @see
-            # https://docs.djangoproject.com/en/3.0/topics/db/aggregation/#interaction-with-default-ordering-or-order-by
-            qs = qs.annotate(**a_kwargs).order_by()
-        return qs
+    @staticmethod
+    def merge_arg_q_dicts(arg_q_dict, other_arg_q_dict):
+        for k, other_q_dict in other_arg_q_dict.items():
+            existing_dict = arg_q_dict.get(k, {})
+            existing_dict.update(other_q_dict)
+            arg_q_dict[k] = existing_dict
 
-    def get_queryset(self, extra_filters_q=None, extra_annotation_kwargs=None,
+    def _get_node_q_hash(self) -> str:
+        """" A Hash such that the same value equals the same Q filter being applied
+             This is so merge node can remove duplicate filters - Q objects that use querysets don't hash the same
+             Default implementation is to use something unique so will never merge them
+        """
+        return self.get_identifier()
+
+    def _get_node_arg_q_dict(self) -> Dict[Optional[str], Dict[str, Q]]:
+        """ By default - we assume node implements _get_node_q and none of the filters apply to annotations """
+        node_arg_q_dict = {}
+        if node_q := self._get_node_q():
+            node_arg_q_dict[None] = {self._get_node_q_hash(): node_q}
+        return node_arg_q_dict
+
+    def get_queryset(self, extra_filters_q=None, extra_annotation_kwargs=None, arg_q_dict=None,
                      inner_query_distinct=False, disable_cache=False):
         if extra_annotation_kwargs is None:
             extra_annotation_kwargs = {}
-        qs = self._get_unfiltered_queryset(**extra_annotation_kwargs)
-        q = self.get_q(disable_cache=disable_cache)
+
+        qs = self._get_model_queryset()
+        a_kwargs = self.get_annotation_kwargs()
+        a_kwargs.update(extra_annotation_kwargs)
+        if arg_q_dict is None:
+            arg_q_dict = self.get_arg_q_dict(disable_cache=disable_cache)
+            # print(arg_q_dict)
+
+        if a_kwargs:
+            # If we apply the kwargs at the same time, it can join to the same table twice.
+            # We want to go through and apply each annotation then the filters that use it, so that it forces
+            # an inner query. Then do next annotation etc
+
+            for k, v in a_kwargs.items():
+                qs = qs.annotate(**{k: v})
+                for q in arg_q_dict.pop(k, {}).values():
+                    qs = qs.filter(q)
+
+        q_list = []
+        # Anything stored under None means filters that don't rely on annotation - do afterwards
+        if q_dict := arg_q_dict.pop(None, {}):
+            # print(f"q_dict(None): {q_dict}")
+            q_list.extend(q_dict.values())
+
+        if arg_q_dict:
+            raise Exception(f"arg_q_dict filters {arg_q_dict.keys()} not applied (missing annotation_kwargs)")
+
         if extra_filters_q:
-            q &= extra_filters_q
-        filtered_qs = qs.filter(q)
+            q_list.append(extra_filters_q)
+        if q_list:
+            q = reduce(operator.and_, q_list)
+            filtered_qs = qs.filter(q)
 
-        if self.queryset_requires_distinct:
-            if inner_query_distinct:
-                qs = qs.filter(pk__in=filtered_qs.values_list("pk", flat=True))
+            if self.queryset_requires_distinct:
+                if inner_query_distinct:
+                    qs = qs.filter(pk__in=filtered_qs.values_list("pk", flat=True))
+                else:
+                    qs = filtered_qs.distinct()
             else:
-                qs = filtered_qs.distinct()
-        else:
-            qs = filtered_qs
+                qs = filtered_qs
 
-        return qs
+        # Clear ordering, @see
+        # https://docs.djangoproject.com/en/3.0/topics/db/aggregation/#interaction-with-default-ordering-or-order-by
+        return qs.order_by()
 
     def get_extra_grid_config(self):
         return {}
@@ -515,10 +578,15 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
             return self.get_parent_subclasses_and_errors()
         return [], []
 
+    def _get_analysis_errors(self) -> List[str]:
+        if self._cached_analysis_errors is None:
+            self._cached_analysis_errors = self.analysis.get_errors()
+        return self._cached_analysis_errors
+
     def get_errors(self, include_parent_errors=True, flat=False):
         """ returns a tuple of (NodeError, str) unless flat=True where it's only string """
         errors = []
-        for analysis_error in self.analysis.get_errors():
+        for analysis_error in self._get_analysis_errors():
             errors.append((NodeErrorSource.ANALYSIS, analysis_error))
 
         _, parent_errors = self.get_parents_and_errors()
@@ -724,17 +792,29 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
 
         counts_to_get -= set(label_counts)
 
-        logging.debug("Node %d.%d cached counts: %s", self.pk, self.version, label_counts)
+        logging.debug("%s cached counts: %s", self, label_counts)
         if counts_to_get:
-            logging.debug("Node %d.%d needs DB request for %s", self.pk, self.version, counts_to_get)
-            retrieved_label_counts = get_node_counts_and_labels_dict(self)
+            logging.debug("%s needs DB request for %s", self, counts_to_get)
+            retrieved_label_counts = get_node_counts_and_labels_dict(self, counts_to_get)
             label_counts.update(retrieved_label_counts)
 
-        node_version = NodeVersion.get(self)
+        node_counts = []
         for label, count in label_counts.items():
-            NodeCount.objects.create(node_version=node_version, label=label, count=count)
+            node_counts.append(NodeCount(node_version=self.node_version, label=label, count=count))
+        if node_counts:
+            NodeCount.objects.bulk_create(node_counts)
 
-        return NodeStatus.READY, label_counts[BuiltInFilters.TOTAL]
+        total_count = label_counts[BuiltInFilters.TOTAL]
+
+        # Single parent nodes should always reduce the number of variants - run a check to make sure the
+        # query wasn't bad and returned more results than it should have
+        parents = list(self.get_non_empty_parents())
+        if len(parents) == 1:
+            parent = parents[0]
+            if parent.count < total_count:
+                raise ValueError(f"Single parent node {self}(pk={self.pk}) had count={total_count} > {parent=}(pk={parent.pk}) count={parent.count=}")
+
+        return NodeStatus.READY, total_count
 
     def _load(self):
         """ Override to do anything interesting """
@@ -840,7 +920,7 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
         try:
             # Have sometimes had race condition where we try to clone a node that has been updated
             # In that case we'll just miss out on the cache
-            original_node_version = NodeVersion.get(self)
+            original_node_version = self.node_version
         except NodeVersion.DoesNotExist:
             original_node_version = None
 
@@ -957,7 +1037,7 @@ class NodeVersion(models.Model):
         return f"{self.node.pk} (v{self.version})"
 
 
-class NodeCache(models.Model):
+class NodeCache(models.Model):#
     node_version = models.OneToOneField(NodeVersion, on_delete=CASCADE)
     variant_collection = models.OneToOneField(VariantCollection, on_delete=CASCADE)
 
@@ -1002,7 +1082,7 @@ class NodeCount(models.Model):
 
     @staticmethod
     def load_for_node(node: AnalysisNode, label: str) -> 'NodeCount':
-        return NodeCount.load_for_node_version(NodeVersion.get(node), label=label)
+        return NodeCount.load_for_node_version(node.node_version, label=label)
 
     def __str__(self):
         return f"NodeCount({self.node_version}, {self.label}) = {self.count}"
@@ -1015,8 +1095,7 @@ class NodeColumnSummaryCacheCollection(models.Model):
 
     @staticmethod
     def get_counts_for_node(node, variant_column, extra_filters):
-        node_version = NodeVersion.get(node)
-        ncscc, created = NodeColumnSummaryCacheCollection.objects.get_or_create(node_version=node_version,
+        ncscc, created = NodeColumnSummaryCacheCollection.objects.get_or_create(node_version=node.node_version,
                                                                                 variant_column=variant_column,
                                                                                 extra_filters=extra_filters)
         if created:
@@ -1065,7 +1144,7 @@ class NodeAlleleFrequencyFilter(models.Model):
     node = models.OneToOneField(AnalysisNode, on_delete=CASCADE)
     group_operation = models.CharField(max_length=1, choices=GroupOperation.choices, default=GroupOperation.ANY)
 
-    def get_q(self, allele_frequency_path: str, allele_frequency_percent: bool):
+    def get_q(self, allele_frequency_path: str, allele_frequency_percent: bool) -> Optional[Q]:
         af_q = None
         try:
             filters = []
@@ -1096,16 +1175,17 @@ class NodeAlleleFrequencyFilter(models.Model):
         return af_q
 
     @staticmethod
-    def get_sample_q(node: AnalysisNode, sample: Sample) -> Optional[Q]:
-        af_q = None
+    def get_sample_arg_q_dict(node: AnalysisNode, sample: Sample) -> Dict[Optional[str], Dict[str, Q]]:
+        arg_q_dict = {}
         if sample:
             try:
-                allele_frequency_path = sample.get_cohort_genotype_field("allele_frequency")
+                alias, allele_frequency_path = sample.get_cohort_genotype_alias_and_field("allele_frequency")
                 allele_frequency_percent = sample.vcf.allele_frequency_percent
-                af_q = node.nodeallelefrequencyfilter.get_q(allele_frequency_path, allele_frequency_percent)
+                if af_q := node.nodeallelefrequencyfilter.get_q(allele_frequency_path, allele_frequency_percent):
+                    arg_q_dict[alias] = {str(af_q): af_q}
             except NodeAlleleFrequencyFilter.DoesNotExist:
                 pass
-        return af_q
+        return arg_q_dict
 
     def get_description(self):
         # TODO: do this properly with group operators etc

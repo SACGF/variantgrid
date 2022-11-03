@@ -1,4 +1,4 @@
-from typing import Dict, Optional, List
+from typing import Dict, Optional, List, Set
 
 from django.db import models
 from django.db.models import Q
@@ -113,30 +113,25 @@ class CohortNode(AbstractCohortBasedNode, AbstractZygosityCountNode):
             annotation_kwargs[self.any_zygosity_count_column] = hom_and_het + F(self.ref_count_column)
         return annotation_kwargs
 
-    def _get_node_q(self) -> Optional[Q]:
-        cohort, q = self.get_cohort_and_q()
+    def _get_node_arg_q_dict(self) -> Dict[Optional[str], Dict[str, Q]]:
+        cohort, arg_q_dict = self.get_cohort_and_arg_q_dict()
         if cohort:
-            q &= self.get_cohort_settings_q(cohort)
-            q &= self.get_vcf_locus_filters_q()
-        return q
+            self.merge_arg_q_dicts(arg_q_dict, self.get_vcf_locus_filters_arg_q_dict())
+            self.merge_arg_q_dicts(arg_q_dict, self.get_cohort_settings_arg_q_dict(cohort))
+        return arg_q_dict
 
-    def get_cohort_settings_q(self, cohort):
-        cohort_genotype_collection = cohort.cohort_genotype_collection
-        and_q = []
+    def get_cohort_settings_arg_q_dict(self, cohort) -> Dict[Optional[str], Dict[str, Q]]:
+        arg_q_dict = {}
         if self.accordion_panel == self.COUNT:
             # Use minimum filters even for sub-cohorts as the min will always be above sub-cohort min
             # And they are a fast integer test, so may be a quicker path
-            and_q.extend(self.get_zygosity_count_q_list())
+            arg_q_dict = self.get_zygosity_count_arg_q_dict()
         elif self.accordion_panel == self.SIMPLE_ZYGOSITY:
-            and_q.extend(self.get_cohort_simple_zygosity_q_list())
+            arg_q_dict = self._get_simple_arg_q_dict()
         elif self.accordion_panel == self.PER_SAMPLE_ZYGOSITY:
-            and_q.extend(self.get_cohort_per_sample_zygosity_q_list(cohort_genotype_collection))
-
-        if and_q:
-            q = reduce(operator.and_, and_q)
-        else:
-            q = self.q_all()
-        return q
+            cgc = cohort.cohort_genotype_collection
+            arg_q_dict = self._get_per_sample_zygosity_arg_q_dict(cgc)
+        return arg_q_dict
 
     @lazy
     def simple_zygosity_columns(self) -> Dict:
@@ -157,13 +152,14 @@ class CohortNode(AbstractCohortBasedNode, AbstractZygosityCountNode):
             min_count = 1
         return min_count
 
-    def get_cohort_simple_zygosity_q_list(self):
-        q_and = []
+    def _get_simple_arg_q_dict(self) -> Dict[Optional[str], Dict[str, Q]]:
+        arg_q_dict = {}
         if self.zygosity:
             if min_count := self._get_simple_zygosity_min_count():
                 column = self.simple_zygosity_columns[self.zygosity]
-                q_and = [Q(**{column + "__gte": min_count})]
-        return q_and
+                q = Q(**{column + "__gte": min_count})
+                arg_q_dict[column] = {str(q): q}
+        return arg_q_dict
 
     def _get_cohort_simple_zygosity_description(self) -> str:
         description = ""
@@ -173,7 +169,7 @@ class CohortNode(AbstractCohortBasedNode, AbstractZygosityCountNode):
                 description = f"{zyg.label} >= {min_count}"
         return description
 
-    def get_cohort_per_sample_zygosity_q_list(self, cohort_genotype_collection):
+    def _get_per_sample_zygosity_arg_q_dict(self, cgc: CohortGenotypeCollection) -> Dict[Optional[str], Dict[str, Q]]:
         sample_zygosities_dict = {}
 
         # Start with zygosity_sample_matches of all dots (as need to handle all
@@ -191,7 +187,10 @@ class CohortNode(AbstractCohortBasedNode, AbstractZygosityCountNode):
 
             sample_zygosities_dict[cnzf.cohort_sample.sample] = zygosities
 
-        return [cohort_genotype_collection.get_zygosity_q(sample_zygosities_dict)]
+        q = cgc.get_zygosity_q(sample_zygosities_dict)
+        return {
+            cgc.cohortgenotype_alias: {str(q): q}
+        }
 
     def _get_cohort_per_sample_zygosity_description(self) -> str:
         return "Per Sample Zygosity"
@@ -281,6 +280,22 @@ class CohortNode(AbstractCohortBasedNode, AbstractZygosityCountNode):
                 self.accordion_panel = self.SIMPLE_ZYGOSITY
 
         return super().save(**kwargs)
+
+    def save_clone(self):
+        filter_collections = list(self.cohortnodezygosityfilterscollection_set.all())
+
+        copy = super().save_clone()
+        for fc in filter_collections:
+            zf_list = list(fc.cohortnodezygosityfilter_set.all())
+            fc.pk = None
+            fc.cohort_node = copy
+            fc.save()
+            for zf in zf_list:
+                zf.pk = None
+                zf.collection = fc
+                zf.save()
+
+        return copy
 
     def __str__(self):
         if self.cohort:

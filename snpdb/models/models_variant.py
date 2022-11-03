@@ -1,6 +1,12 @@
+import collections
+import logging
+import re
+from typing import Optional, Pattern, Tuple, Iterable, Set, Union, Dict
+
+import django.dispatch
 from django.conf import settings
 from django.contrib.auth.models import User
-from django.db import models
+from django.db import models, IntegrityError
 from django.db.models import Value as V, QuerySet, F
 from django.db.models.deletion import CASCADE, DO_NOTHING
 from django.db.models.fields import TextField
@@ -27,13 +33,13 @@ from snpdb.models.flag_types import allele_flag_types
 from snpdb.models.models_clingen_allele import ClinGenAllele
 from snpdb.models.models_genome import Contig, GenomeBuild, GenomeBuildContig
 from snpdb.models.models_enums import AlleleConversionTool, AlleleOrigin, ProcessingStatus
+from snpdb.models.models_genome import Contig, GenomeBuild, GenomeBuildContig
 
-LOCUS_PATTERN = re.compile(r"^([^:]+):(\d+)[,\s]*([GATC]+)$")
+LOCUS_PATTERN = re.compile(r"^([^:]+):(\d+)[,\s]*([GATC]+)$", re.IGNORECASE)
 LOCUS_NO_REF_PATTERN = r"^([^:]+):(\d+)$"
-VARIANT_PATTERN = re.compile(r"^([^:]+):(\d+)[,\s]*([GATC]+)>([GATC]+)$")
-REF_VARIANT_PATTERN = re.compile(r"^([^:]+):(\d+)[,\s]*([GATC]+)>= \(ref\)$")
+VARIANT_PATTERN = re.compile(r"^([^:]+):(\d+)[,\s]*([GATC]+)>(=|[GATC]+)$", re.IGNORECASE)
 
-allele_validate_signal = django.dispatch.Signal(providing_args=["allele"])
+allele_validate_signal = django.dispatch.Signal()  # args: "allele"
 
 
 class Allele(FlagsMixin, models.Model):
@@ -372,7 +378,7 @@ class Variant(models.Model):
 
     @staticmethod
     def is_ref_alt_reference(ref, alt):
-        return ref == alt or alt == '.'
+        return alt in (ref, '.')
 
     @property
     def is_reference(self) -> bool:
@@ -503,7 +509,7 @@ class VariantAllele(TimeStampedModel):
         return f"{self.allele} - {self.variant_id}({self.genome_build}/{self.conversion_tool})"
 
 
-class VariantCollection(RelatedModelsPartitionModel):
+class VariantCollection(RelatedModelsPartitionModel): #
     """ A set of variants - usually used as a cached result """
 
     RECORDS_BASE_TABLE_NAMES = ["snpdb_variantcollectionrecord"]
@@ -521,11 +527,15 @@ class VariantCollection(RelatedModelsPartitionModel):
         vcr_condition = Q(variantcollectionrecord__variant_collection=self)
         return {self.variant_collection_alias: FilteredRelation('variantcollectionrecord', condition=vcr_condition)}
 
-    def get_q(self):
+    def get_arg_q_dict(self) -> Dict[Optional[str], Set[Q]]:
         if self.status != ProcessingStatus.SUCCESS:
             raise ValueError(f"{self}: status {self.get_status_display()} != SUCCESS")
 
-        return Q(**{f"{self.variant_collection_alias}__isnull": False})
+        q = Q(**{f"{self.variant_collection_alias}__isnull": False})
+        return {self.variant_collection_alias: {str(q): q}}
+
+    def __lt__(self, other):
+        return self.pk < other.pk
 
     def __str__(self):
         return f"VariantCollection: {self.pk} ({self.name})"
