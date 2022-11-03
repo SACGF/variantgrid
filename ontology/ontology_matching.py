@@ -29,6 +29,20 @@ class OntologyMatch:
         self.gene_relationships: List[OntologySnake] = []  # in what ways is this related to the gene in question (assuming there is a gene in question)
         self.search_engine_score: Optional[int] = None  # was this found from doing a text search on 3rd party search, and if so, what's its ranking
 
+    def optimize(self):
+        # only have 1 relationship from each source
+        if self.gene_relationships:
+            relationships_by_source: Dict[str, OntologySnake] = {}
+            for snake in self.gene_relationships:
+                import_source = snake.start_source
+                if existing := relationships_by_source.get(import_source):
+                    if len(snake.show_steps()) >= existing.show_steps():
+                        # use the most direct relationship, e.g. least steps
+                        # this new snake has more steps than the previous one, so don't assign
+                        continue
+                relationships_by_source[import_source] = snake
+            self.gene_relationships = list(relationships_by_source.values())
+
     @property
     def text_search(self):
         return self.search_engine_score is not None
@@ -255,16 +269,13 @@ class OntologyMatching:
                 return
 
             snakes = OntologySnake.terms_for_gene_symbol(gene_symbol=gene_symbol, desired_ontology=OntologyService.MONDO, min_classification=GeneDiseaseClassification.STRONG)  # always convert to MONDO for now
-            had_panel_app = False
             for snake in snakes:
-                if snake.show_steps()[0].relation.from_import.import_source == OntologyImportSource.PANEL_APP_AU:
-                    if had_panel_app:
-                        continue
-                    had_panel_app = True
-
                 mondo_term = snake.leaf_term
                 mondo_meta = self.find_or_create(mondo_term.id)
                 mondo_meta.gene_relationships.append(snake)  # assign the snake to the term
+
+        for term in self.term_map.values():
+            term.optimize()
 
     def select_term(self, term: str):
         self.find_or_create(term).selected = True
