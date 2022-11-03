@@ -36,7 +36,7 @@ class OntologyMatch:
             for snake in self.gene_relationships:
                 import_source = snake.start_source
                 if existing := relationships_by_source.get(import_source):
-                    if len(snake.show_steps()) >= existing.show_steps():
+                    if len(snake.show_steps()) >= len(existing.show_steps()):
                         # use the most direct relationship, e.g. least steps
                         # this new snake has more steps than the previous one, so don't assign
                         continue
