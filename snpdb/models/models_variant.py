@@ -554,7 +554,7 @@ class VariantAllele(TimeStampedModel):
         return f"{self.allele} - {self.variant_id}({self.genome_build}/{self.allele_linking_tool})"
 
 
-class VariantCollection(RelatedModelsPartitionModel):
+class VariantCollection(RelatedModelsPartitionModel): #
     """ A set of variants - usually used as a cached result """
 
     RECORDS_BASE_TABLE_NAMES = ["snpdb_variantcollectionrecord"]
@@ -578,6 +578,9 @@ class VariantCollection(RelatedModelsPartitionModel):
 
         q = Q(**{f"{self.variant_collection_alias}__isnull": False})
         return {self.variant_collection_alias: {str(q): q}}
+
+    def __lt__(self, other):
+        return self.pk < other.pk
 
     def __str__(self):
         return f"VariantCollection: {self.pk} ({self.name})"

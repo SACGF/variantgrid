@@ -782,7 +782,7 @@ class OntologySnake:
         # simply reversing leaf and source will reverse the direction of all the relationships inside
         return OntologySnake(source_term=self.leaf_term, leaf_term=self.source_term, paths=list(reversed(self.paths)))
 
-    def __str__(self):
+    def __repr__(self):
         text = f"{self.source_term}"
         for step in self.show_steps():
             forwards = step.relation.dest_term == step.dest_term
@@ -803,6 +803,10 @@ class OntologySnake:
     @property
     def leaf_relationship(self) -> OntologyTermRelation:
         return self.paths[-1]
+
+    @lazy
+    def start_source(self) -> OntologyImportSource:
+        return self.show_steps()[0].relation.from_import.import_source
 
     @staticmethod
     def check_if_ancestor(descendant: OntologyTerm, ancestor: OntologyTerm, max_levels=4) -> List['OntologySnake']:

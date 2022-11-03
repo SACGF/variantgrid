@@ -1,7 +1,6 @@
 import operator
 from collections import defaultdict, Counter
 from functools import reduce
-from time import time
 from typing import Optional
 
 from django.db.models import Q
@@ -55,24 +54,21 @@ class MergeNode(AnalysisNode):
                 all_q_by_hash[q_hash] = q
 
         or_list = []
+        non_combine_parents = set(parent_arg_q_dict.keys())
 
-        # Find ones that are common
-        most_common = sorted(arg_q_nodes.items(), key=lambda x: len(x[1]), reverse=True)[0]
-        combine_q_hash, combine_parents = most_common
-        if len(combine_parents) == 1:
-            combine_parents = set()  # Don't combine any
+        if arg_q_nodes:
+            # Find ones that are common
+            most_common = sorted(arg_q_nodes.items(), key=lambda x: len(x[1]), reverse=True)[0]
+            combine_q_hash, combine_parents = most_common
+            if len(combine_parents) > 1:
+                non_combine_parents -= combine_parents
+                combine_parent_arg_q_dict = {p: parent_arg_q_dict[p] for p in combine_parents}
 
-        parents = set(parent_arg_q_dict.keys())
-        non_combine_parents = parents - combine_parents
-
-        if combine_parents:
-            combine_parent_arg_q_dict = {p: parent_arg_q_dict[p] for p in combine_parents}
-
-            extract_arg_q_hash = {None: {combine_q_hash}}
-            MergeNode._remove_arg_q_hash(combine_parent_arg_q_dict, extract_arg_q_hash)
-            combine_q = all_q_by_hash[combine_q_hash]
-            combine_q &= MergeNode._split_common_filters(combine_parent_arg_q_dict)
-            or_list.append(combine_q)
+                extract_arg_q_hash = {None: {combine_q_hash}}
+                MergeNode._remove_arg_q_hash(combine_parent_arg_q_dict, extract_arg_q_hash)
+                combine_q = all_q_by_hash[combine_q_hash]
+                combine_q &= MergeNode._split_common_filters(combine_parent_arg_q_dict)
+                or_list.append(combine_q)
 
         for parent in non_combine_parents:
             arg_q_dict = parent_arg_q_dict[parent]
@@ -82,7 +78,7 @@ class MergeNode(AnalysisNode):
             if non_none_keys:
                 print(f"{non_none_keys=}")
                 # We don't pass in arg_q_dict (ie run all where clauses in inner query)
-                # This has worse best performance but better worse case performance
+                # This has worse best-case performance but better worse case performance
                 qs = parent.get_queryset(disable_cache=True)
                 variant_ids = qs.values_list("pk", flat=True)
                 or_list.append(Q(pk__in=variant_ids))
