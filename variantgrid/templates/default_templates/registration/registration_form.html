@@ -1,0 +1,18 @@
+{% extends "registration/abstract_login_vg.html" %}
+{% load static %}
+{% load ui_login %}
+{% load ui_utils %}
+{% load crispy_forms_tags %}
+{% block inner_content %}
+    <div class="row" style="display:flex; align-items:center">
+        <div class="col-12 col-lg-7">
+            <div class="jumbo-box">
+                <h1>{{ site_name }}</h1>
+                <p>To start using VariantGrid, please provide details below:</p>
+                <hr />
+                <form method="POST">
+                    {% crispy form %}
+                </form>
+        </div>
+    </div>
+{% endblock %}

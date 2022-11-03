@@ -1,4 +1,12 @@
 ////////////////////////////////////////
+// Global Legcacy
+// Most (but not all) styles in here are now redundant to our use of bootstrap.
+// That's not to say some still aren't in use by old HTML layout that needs to be refactored
+// Styles from this file should be migrated to global_bs.scss if still useful or removed
+// until this file is no more
+////////////////////////////////////////
+
+////////////////////////////////////////
 // Basics
 ////////////////////////////////////////
 
@@ -145,9 +153,6 @@ h3 .hover-link {
     It tries to be compatible with Django form as_p
 */
 
-form label {
-    font-weight: bold;
-}
 input[type='checkbox'], input[type='radio'] {
     cursor: pointer;
 }
@@ -390,10 +395,6 @@ fieldset {
 
 fieldset.form-fields legend {
     width: auto; // was 100% - cutting off top border
-}
-
-label[for] {
-    cursor: pointer;
 }
 
 .labelled {
@@ -787,15 +788,6 @@ table.name-fields {
 // Sub-layouts
 ////////////////////////////////////////
 
-.no-value {
-    color: #BBBBBB !important;
-    font-style: italic;
-    border-color: #dddddd !important;
-}
-.zero-value {
-    color: #AAAAAA;
-}
-
 .box {
     display: inline-block;
     padding: 2px 4px 2px 4px;
@@ -1143,22 +1135,6 @@ a.clinical-context {
 
 // colours
 
-.hgnc {
-    background-color: #99CD83;
-}
-
-.hpo {
-    background-color: #FF8C00;
-}
-
-.omim {
-    background-color: #22529e;
-}
-
-.mondo {
-    background-color: #cce34c;
-}
-
 .sequencer-name-text {
     font-size: .6em;
 }
@@ -1250,10 +1226,6 @@ a.clinical-context {
         padding-top: 15px;
         border-top: 1px dashed lightgray;
     }
-}
-
-.variant-coordinate {
-    word-break: break-all;
 }
 
 /////////////////////////

@@ -2,7 +2,7 @@
 
 from django.db import migrations, models
 
-def _one_off_delete_clingen_disease_validity(apps, schema_editor):
+def _one_off_delete_clingen_disease_validity(apps, _schema_editor):
     # Will cascade delete diseasevalidity - will be re-loaded when visiting annotation page
     CachedWebResource = apps.get_model("annotation", "CachedWebResource")
     CachedWebResource.objects.filter(name="ClinGenDiseaseValidity").delete()

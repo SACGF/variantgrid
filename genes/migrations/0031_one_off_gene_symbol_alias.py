@@ -7,7 +7,7 @@ from django.db.models.functions import Upper
 from manual.operations.manual_operations import ManualOperation
 
 
-def one_off_delete_case_sensitive_aliases(apps, schema_editor):
+def one_off_delete_case_sensitive_aliases(apps, _schema_editor):
     GeneSymbolAlias = apps.get_model("genes", "GeneSymbolAlias")
 
     # Now that we're case insensitive - these do nothing

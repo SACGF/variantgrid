@@ -39,7 +39,7 @@ class Command(BaseCommand):
             count += 1
         print(f"Processed {count} classifications")
 
-        old_group_names = list()
+        old_group_names = []
         for lab in old_legacy_labs:
             old_group_names.append(lab.group_name)
 

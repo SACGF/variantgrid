@@ -3,7 +3,7 @@
 from django.db import migrations
 
 
-def _one_off_move_pheno_match_to_hgnc(apps, schema_editor):
+def _one_off_move_pheno_match_to_hgnc(apps, _schema_editor):
     TextPhenotypeMatch = apps.get_model("annotation", "TextPhenotypeMatch")
     OntologyTerm = apps.get_model("ontology", "OntologyTerm")
     ONTOLOGY_SERVICE_HGNC = "HGNC"

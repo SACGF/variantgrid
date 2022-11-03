@@ -754,10 +754,17 @@
                 </p>
             {% end_page_help_embedded %}
 
-            <span class="hover-detail" data-toggle="tooltip" title="This shows how many classifications share this condition text, and how many of those require a selected term">
-                Total Classifications : <span class="mono">{{ condition_text.classifications_count }}</span>,
-                Outstanding Classifications : <span class="mono" id="count_outstanding">{{ condition_text.classifications_count_outstanding }}</span> &nbsp;<span id="no_outstanding"></span>
-            </span>
+            <div class="mt-3">
+                {% labelled label="Text" %}
+                    {{ condition_text.normalized_text }} {% admin_link condition_text %}
+                {% endlabelled %}
+                {% labelled label="Lab" %}
+                    {% lab condition_text.lab %}
+                {% endlabelled %}
+                {% labelled label="Total Classifications" %}<span class="mono">{{ condition_text.classifications_count }}</span>{% endlabelled %}
+                {% labelled label="Outstanding Classifications" %}<span class="mono" id="count_outstanding">{{ condition_text.classifications_count_outstanding }}</span> &nbsp;<span id="no_outstanding"></span>{% endlabelled %}
+            </div>
+
             <ul id="condition-list" class="list-group mt-4">
                 <li class="list-group-item">
                     <div class="row">
@@ -770,6 +777,7 @@
                 {% condition_match condition_match %}
             </ul>
         </form>
+
         <div class="row">
             <div class="col-8">
                 {% if next_condition_text %}

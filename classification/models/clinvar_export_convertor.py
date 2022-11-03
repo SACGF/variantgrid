@@ -5,7 +5,7 @@ from typing import List, Any, Mapping, TypedDict, Union
 
 from lazy import lazy
 
-from annotation.regexes import DbRegexes
+from annotation.regexes import DbRegexes, db_ref_regexes
 from classification.enums import SpecialEKeys, EvidenceKeyValueType, ShareLevel
 from classification.models import ClassificationModification, EvidenceKeyMap, EvidenceKey, \
     MultiCondition, ClinVarExport, classification_flag_types, Classification
@@ -13,11 +13,12 @@ from classification.models.evidence_mixin import VCDbRefDict
 from genes.hgvs import CHGVS
 from library.utils import html_to_text
 from ontology.models import OntologyTerm, OntologyService
-from snpdb.models import ClinVarKey
+from snpdb.models import ClinVarKey, ClinVarCitationsModes
 from uicore.json.validated_json import JsonMessages, JSON_MESSAGES_EMPTY, ValidatedJson
 
 # Code in this file is responsible for converting VariantGrid formatted classifications to ClinVar JSON
 CLINVAR_ACCEPTED_TRANSCRIPTS = {"NM_", "NR_"}
+
 
 class ClinVarEvidenceKey:
     """
@@ -27,8 +28,9 @@ class ClinVarEvidenceKey:
 
     def __init__(self, evidence_key: EvidenceKey, value_obj: Any):
         self.evidence_key = evidence_key
-        self.values = []
-        self.messages = JSON_MESSAGES_EMPTY
+        self.valid_values = []
+        self.invalid_values = []
+        self.conversion_messages = JSON_MESSAGES_EMPTY
 
         value: Any
         if isinstance(value_obj, Mapping):
@@ -47,42 +49,50 @@ class ClinVarEvidenceKey:
                     for option in options:
                         if option.get('key') == sub_value:
                             if clinvar := option.get('clinvar'):
-                                self.values.append(clinvar)
+                                self.valid_values.append(clinvar)
                             else:
-                                self.values.append(sub_value)
-                                self.messages += JsonMessages.error(f"ADMIN: \"{self.evidence_key.pretty_label}\" value of \"{sub_value}\" doesn't have a ClinVar value")
+                                self.invalid_values.append(sub_value)
+                                self.conversion_messages += JsonMessages.warning(f"\"{self.evidence_key.pretty_label}\" value of \"{sub_value}\" doesn't have a ClinVar equivalent.")
                             found = True
                             break
                     if not found:
-                        self.values.append(sub_value)
-                        self.messages += JsonMessages.error(f"\"{self.evidence_key.pretty_label}\" value of \"{sub_value}\" isn't a valid value, can't translate to ClinVar")
+                        self.invalid_values.append(sub_value)
+                        self.conversion_messages += JsonMessages.warning(f"\"{self.evidence_key.pretty_label}\" value of \"{sub_value}\" isn't valid, can't translate to ClinVar.")
             else:
-                raise ValueError(f"ADMIN: Trying to extract value from \"{self.evidence_key.pretty_label}\" that isn't a SELECT or MULTISELECT")
+                raise ValueError(f"ADMIN: Trying to extract value from \"{self.evidence_key.pretty_label}\" that isn't a SELECT or MULTISELECT.")
 
     def value(self, single: bool = True, optional: bool = False) -> ValidatedJson:
         """
         :param single: Is a single value expected. Adds an error to ValidatedJson if number of values is 2 or more.
         :param optional: Is the value optional, if not adds an error to ValidatedJson if number of values is zero.
         """
-        messages = self.messages
-        if len(self.values) == 0:
-            if not optional:
-                messages += JsonMessages.error(f"No value for required field \"{self.evidence_key.pretty_label}\"")
-            return ValidatedJson(None if single else [], messages)
-        elif len(self.values) == 1:
-            return ValidatedJson(self.values[0] if single else self.values, messages)
+        messages = self.conversion_messages
+        if single and len(self) > 1:
+            messages += JsonMessages.warning(f"\"{self.evidence_key.pretty_label}\" within ClinVar only accepts a single value. Record has the values {self.valid_values + self.invalid_values} for this field.")
+
+        if not optional:
+            if messages:
+                # if mandatory, then any warnings about conversion have to be upgraded to errors
+                messages += JsonMessages.error(f"\"{self.evidence_key.pretty_label}\" is mandatory but has conversion issues.")
+            elif not self.valid_values:
+                # if mandatory, we obviously need a value
+                messages += JsonMessages.error(f"\"{self.evidence_key.pretty_label}\" is mandatory but has no value.")
+
+        if messages:
+            # mandatory or not, if we've had conversion warnings, provide no value to be safe (even if there's potentially valid values)
+            return ValidatedJson.make_void(messages)
+        elif len(self) == 0:
+            # even when a key is optional, ClinVar sometimes doesn't like the value null being provided, and instead prefers the key to be omitted
+            return ValidatedJson.make_void()
         else:
-            messages = self.messages
-            if single:
-                messages += JsonMessages.error(f"\"{self.evidence_key.pretty_label}\" expected single value, got multiple values")
-
-            return ValidatedJson(self.values, messages)
-
-    def __bool__(self):
-        return len(self.values) > 0
+            return ValidatedJson(self.valid_values[0] if single else self.valid_values)
 
     def __len__(self):
-        return len(self.values)
+        return len(self.valid_values) + len(self.invalid_values)
+
+    def __bool__(self):
+        # think this is default behaviour for bool
+        return len(self) > 0
 
 
 # Dictionary definitions, we don't have many since we deal more with ValidatedJSon where a typed dictionary doesn't fit
@@ -112,6 +122,7 @@ class ClinVarExportConverter:
         classification_flag_types.discordant: JsonMessages.error("Classification is in discordance"),
         classification_flag_types.internal_review: JsonMessages.error("Classification is in internal review"),
         classification_flag_types.classification_outstanding_edits: JsonMessages.error("Classification has un-submitted changes"),
+        classification_flag_types.classification_pending_changes: JsonMessages.error("Classification has pending changes"),
         # classification_flag_types.classification_not_public - this has special handling to include a comment
     }
 
@@ -121,7 +132,7 @@ class ClinVarExportConverter:
         """
         self.clinvar_export_record = clinvar_export_record
 
-    @lazy
+    @property
     def clinvar_key(self) -> ClinVarKey:
         return self.clinvar_export_record.clinvar_allele.clinvar_key
 
@@ -131,7 +142,16 @@ class ClinVarExportConverter:
 
     @property
     def citation_refs(self) -> List[VCDbRefDict]:
-        pubmed_refs = {ref.get('id'): ref for ref in self.classification_based_on.db_refs if ref.get('db') in ClinVarExportConverter.CITATION_DB_MAPPING}
+        xrefs: List
+        if self.clinvar_key.citations_mode == ClinVarCitationsModes.interpretation_summary_only:
+            if text := self.classification_based_on.get(SpecialEKeys.INTERPRETATION_SUMMARY):
+                xrefs = [ref.to_json() for ref in db_ref_regexes.search(self.classification_based_on.get(SpecialEKeys.INTERPRETATION_SUMMARY))]
+            else:
+                xrefs = []
+        else:
+            xrefs = self.classification_based_on.db_refs
+
+        pubmed_refs = {ref.get('id'): ref for ref in xrefs if ref.get('db') in ClinVarExportConverter.CITATION_DB_MAPPING}
         unique_refs = list(pubmed_refs.values())
         unique_refs.sort(key=lambda x: x.get('id'))
         return unique_refs
@@ -193,7 +213,7 @@ class ClinVarExportConverter:
 
     @lazy
     def as_validated_json(self) -> ValidatedJson:
-        data = dict()
+        data = {}
         if self.classification_based_on is None:
             return ValidatedJson(None, JsonMessages.error("No classification is currently associated with this allele and condition"))
         else:
@@ -263,7 +283,7 @@ class ClinVarExportConverter:
                 else:
                     hgvs_errors += JsonMessages.error(f"ClinVar only accepts transcripts starting with one of {CLINVAR_ACCEPTED_TRANSCRIPTS}")
 
-                gene_symbols = list()
+                gene_symbols = []
                 if gene_symbol := self.value(SpecialEKeys.GENE_SYMBOL):
                     gene_symbols.append({"symbol": gene_symbol})
 
@@ -310,17 +330,17 @@ class ClinVarExportConverter:
                     expr = re.compile(key, RegexFlag.IGNORECASE)
                     if expr.match(assertion_criteria):
                         return ValidatedJson(criteria, JsonMessages.info(f"Using config for assertion method \"{key}\" : {json.dumps(raw_criteria)}"))
-            else:
-                return ValidatedJson(None, JsonMessages.error(f"No match for assertion method of \"{assertion_criteria}\""))
+
+            return ValidatedJson(None, JsonMessages.error(f"No match for assertion method of \"{assertion_criteria}\""))
 
     @property
     def json_clinical_significance(self) -> ValidatedJson:
-        data = dict()
+        data = {}
         if citations := self.citation_refs:
             data["citation"] = [ClinVarExportConverter.citation_to_json(citation) for citation in citations]
         data["clinicalSignificanceDescription"] = self.clinvar_value(SpecialEKeys.CLINICAL_SIGNIFICANCE).value(single=True)
 
-        comment_parts: List[str] = list()
+        comment_parts: List[str] = []
 
         if interpret := self.value(SpecialEKeys.INTERPRETATION_SUMMARY):
             comment_parts.append(interpret.strip())
@@ -340,20 +360,15 @@ class ClinVarExportConverter:
 
         messages = JsonMessages()
         if mode_of_inheritance := self.clinvar_value(SpecialEKeys.MODE_OF_INHERITANCE):
-            # TODO might need the concept of NO_KEY so we can have "mode_of_inheritance": NO_KEY
-            # so we can still put the warning against mode_of_inheritance, but not actually produce it in the real JSON
-            # as ClinVar doesn't accept modeOfInheritance: null
-            if len(mode_of_inheritance) > 1:
-                messages += JsonMessages.warning("ClinVar only accepts a single value for mode of inheritance. There are multiple values for mode of inheritance against this record, so omitting this field.")
-            else:
-                data["modeOfInheritance"] = mode_of_inheritance.value(single=True)
+            data["modeOfInheritance"] = mode_of_inheritance.value(single=True, optional=True)
+
         return ValidatedJson(data, messages)
 
     @property
     def condition_set(self) -> ValidatedJson:
-        data = dict()
+        data = {}
         messages = JSON_MESSAGES_EMPTY
-        condition_list = list()
+        condition_list = []
         data["condition"] = condition_list
         if conditions := self.classification_based_on.classification.condition_resolution_obj:
             if len(conditions.terms) >= 2:
@@ -372,7 +387,7 @@ class ClinVarExportConverter:
     def observed_in(self) -> ValidatedJson:
         # can return array, but we only have one
         # (though
-        data = dict()
+        data = {}
         affected_status_value = self.clinvar_value(SpecialEKeys.AFFECTED_STATUS)
         if affected_status_value:
             data["affectedStatus"] = affected_status_value.value(single=True)

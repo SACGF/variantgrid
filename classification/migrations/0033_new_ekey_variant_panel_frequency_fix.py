@@ -3,12 +3,13 @@
 from django.db import migrations
 
 
-def _fix_variant_panel_frequency_key(apps, schema_editor):
+def _fix_variant_panel_frequency_key(apps, _schema_editor):
     """ This can be deleted if there is a blat_keys migration after it """
     EvidenceKey = apps.get_model("classification", "EvidenceKey")
     e_key = EvidenceKey.objects.get(key="variant_panel_frequency")
     e_key.value_type = "N"
     e_key.save()
+
 
 class Migration(migrations.Migration):
 

@@ -1,6 +1,6 @@
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import List, Dict, Optional, Iterable, Tuple, Set
+from typing import List, Dict, Optional, Tuple
 
 from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
@@ -16,6 +16,7 @@ from classification.enums.discordance_enums import ContinuedDiscordanceReason, D
 from classification.models import ClassificationModification, DiscordanceReportClassification, ClinicalContext, \
     EvidenceKeyMap, classification_flag_types, discordance_change_signal, \
     DiscordanceReportRowData, ClassificationFlagTypes
+from classification.models.classification_groups import ClassificationGroupUtils
 from classification.models.discordance_models import DiscordanceReport
 from classification.models.evidence_key import EvidenceKeyOption
 from classification.views.classification_dashboard_view import ClassificationDashboard
@@ -33,11 +34,25 @@ def discordance_reports_view(request: HttpRequest, lab_id: Optional[str] = None)
     if redirect_response := lab_picker.check_redirect():
         return redirect_response
 
-    dlab = ClassificationDashboard(lab_picker=lab_picker)
-    context = {
-        "dlab": dlab
-    }
-    return render(request, "classification/discordance_reports.html", context)
+    return render(request, "classification/discordance_reports.html", {
+        "dlab": ClassificationDashboard(lab_picker=lab_picker)
+    })
+
+
+def discordance_reports_active_detail(request: HttpRequest, lab_id: Optional[str] = None) -> HttpResponseBase:
+    lab_picker = LabPickerData.from_request(request=request, selection=lab_id)
+
+    return render(request, "classification/discordance_reports_active_detail.html", {
+        "dlab": ClassificationDashboard(lab_picker=lab_picker)
+    })
+
+
+def discordance_reports_history_detail(request: HttpRequest, lab_id: Optional[str] = None) -> HttpResponseBase:
+    lab_picker = LabPickerData.from_request(request=request, selection=lab_id)
+
+    return render(request, "classification/discordance_reports_history_detail.html", {
+        "dlab": ClassificationDashboard(lab_picker=lab_picker)
+    })
 
 
 @dataclass
@@ -70,11 +85,12 @@ class _LabClinSig:
     def is_pending(self) -> bool:
         return self.lab_clin_sig_key != self.pending_clin_sig
 
+    @property
+    def _sort_order(self):
+        return EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE).classification_sorter_value(self.clin_sig), self.lab
+
     def __lt__(self, other):
-        if self.lab == other.lab:
-            sorter = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE).classification_sorter_value
-            return sorter(self.clin_sig) < sorter(other.clin_sig)
-        return self.lab < other.lab
+        return self._sort_order < other._sort_order
 
 
 class DiscordanceReportTemplateData:
@@ -146,8 +162,8 @@ class DiscordanceReportTemplateData:
 
     @lazy
     def _effectives_and_not_considered(self) -> Tuple[List[ClassificationModification], List[DiscordanceNoLongerConsiders]]:
-        effectives: List[ClassificationModification] = list()
-        withdrawns: List[ClassificationModification] = list()
+        effectives: List[ClassificationModification] = []
+        withdrawns: List[ClassificationModification] = []
         changed_context: Dict[Optional[ClinicalContext], List[ClassificationModification]] = defaultdict(list)
 
         for drc in self.report.discordancereportclassification_set.all().order_by('-created'):
@@ -158,7 +174,7 @@ class DiscordanceReportTemplateData:
             else:
                 effectives.append(drc.classification_effective)
 
-        no_longer_considered: List[DiscordanceNoLongerConsiders] = list()
+        no_longer_considered: List[DiscordanceNoLongerConsiders] = []
         if withdrawns:
             no_longer_considered.append(DiscordanceNoLongerConsiders("Withdrawn", withdrawns))
         if unmatched := changed_context.pop(None, None):
@@ -174,16 +190,26 @@ class DiscordanceReportTemplateData:
         return self._effectives_and_not_considered[0]
 
     @property
+    def group_utils(self) -> List[ClassificationModification]:
+        # TODO, rather than no longer considered, shove that value into clinical significance somehow e.g. "withdrawn"
+        no_longer_considered_mods = []
+        if no_longer_considered := self.no_longer_considered:
+            for nlc in no_longer_considered:
+                no_longer_considered_mods += nlc.classifications
+
+        return ClassificationGroupUtils(
+            modifications=self.effective_classifications + no_longer_considered_mods,
+            old_modifications=[drc.classification_original for drc in self.report.discordancereportclassification_set.all()],
+            calculate_pending=self.is_latest
+        )
+
+    @property
     def no_longer_considered(self) -> List[DiscordanceNoLongerConsiders]:
         return self._effectives_and_not_considered[1]
 
     @property
     def c_hgvses(self) -> List[CHGVS]:
-        c_hgvses = set()
-        cm: ClassificationModification
-        for cm in self.report.all_classification_modifications:
-            c_hgvses.add(cm.c_hgvs_best(self.genome_build))
-        return sorted(c_hgvses)
+        return sorted(set([cm.c_hgvs_best(self.genome_build) for cm in self.report.all_classification_modifications]))
 
     def resolve_label(self):
         return f'{self.c_hgvses[0]}'
@@ -201,7 +227,7 @@ class DiscordanceReportTemplateData:
             lab_clin_sig_key = _LabClinSigKey(lab=lab, clin_sig=clin_sig)
             clin_sig_keys_to_pending[lab_clin_sig_key][pending_clin_sig] += 1
 
-        lab_clin_sigs: List[_LabClinSig] = list()
+        lab_clin_sigs: List[_LabClinSig] = []
         pendings: Dict[str, int]
         for key, pendings in clin_sig_keys_to_pending.items():
             total_count = 0
@@ -215,6 +241,8 @@ class DiscordanceReportTemplateData:
                     suggested_pending_cs = pending_cs
 
             lab_clin_sigs.append(_LabClinSig(lab_clin_sig_key=key, pending_clin_sig=suggested_pending_cs, count=total_count))
+
+        lab_clin_sigs.sort()
 
         return lab_clin_sigs
 
@@ -230,6 +258,10 @@ class DiscordanceReportTemplateData:
     @property
     def all_clin_sig_options(self) -> List[EvidenceKeyOption]:
         return EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE).virtual_options
+
+    @property
+    def bucketless_clin_sig_options(self) -> List[EvidenceKeyOption]:
+        return [sig for sig in self.all_clin_sig_options if sig.get('bucket') is None]
 
     @property
     def provide_reopen(self) -> bool:
@@ -326,7 +358,7 @@ def discordance_report_view(request: HttpRequest, discordance_report_id: int) ->
 def export_discordance_report(request: HttpRequest, discordance_report_id: int) -> HttpResponseBase:
     report = DiscordanceReport.objects.get(pk=discordance_report_id)
     dcs = DiscordanceReportClassification.objects.filter(report=report)
-    include: [ClassificationModification] = list()
+    include: [ClassificationModification] = []
     for dc in dcs:
         if dc.clinical_context_effective == report.clinical_context and not dc.withdrawn_effective:
             include.append(dc.classification_effective)

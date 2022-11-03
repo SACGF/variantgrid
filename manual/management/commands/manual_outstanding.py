@@ -16,7 +16,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         outstanding_tasks = ManualMigrationOutstanding.outstanding_tasks()
-        task_list = list()
+        task_list = []
         for outstanding_task in outstanding_tasks:
             task_list.append(outstanding_task.to_json())
         envelope = {"tasks": task_list}

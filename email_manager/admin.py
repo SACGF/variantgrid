@@ -1,14 +1,15 @@
 from django.contrib import admin
 
 from email_manager.models import EmailLog
+from snpdb.admin_utils import ModelAdminBasics
 
 
 @admin.register(EmailLog)
-class EmailLogAdmin(admin.ModelAdmin):
+class EmailLogAdmin(ModelAdminBasics):
     list_per_page = 500
     ordering = ('-created',)
     list_display = ('created', 'subject', 'recipient_list', 'from_email', 'probably_sent',)
-    search_fields = ('recipient_list',)
+    search_fields = ('recipient_list', 'subject', 'text')
 
     def has_add_permission(self, request, obj=None):
         return False

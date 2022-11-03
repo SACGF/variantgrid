@@ -5,7 +5,7 @@ from django.db import migrations
 from library.django_utils import bulk_insert_class_data
 
 
-def flags_initial_data(apps, schema_editor):
+def flags_initial_data(apps, _schema_editor):
     FLAG_RESOLUTION = [
         {'id': 'rejected', 'description': 'This is rejected', 'label': 'Rejected', 'status': 'R'},
         {'id': 'sc_other', 'description': 'Other, please detail in the comments', 'label': 'Other', 'status': 'C'},

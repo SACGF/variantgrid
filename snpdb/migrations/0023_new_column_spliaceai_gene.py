@@ -5,7 +5,7 @@ from django.db import migrations
 from library.django_utils import bulk_insert_class_data
 
 
-def _new_column_spliceai_gene(apps, schema_editor):
+def _new_column_spliceai_gene(apps, _schema_editor):
     NEW_VARIANT_GRID_COLUMNS = [
         {'grid_column_name': 'spliceai_gene_symbol',
          'variant_column': 'variantannotation__spliceai_gene_symbol',

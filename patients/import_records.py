@@ -317,7 +317,7 @@ def process_record(patient_records, record_id, row):
                 if phenotype_value not in existing_value:  # not already in there
                     # TODO: be more sophisticated?
                     phenotype_lines = [existing_value,
-                                       "-- From Imported CSV on %s:" % timezone.now(),
+                                       f"-- From Imported CSV on {timezone.now()}:",
                                        phenotype_value]
                     updated_phenotype = "\n".join(phenotype_lines)
             else:

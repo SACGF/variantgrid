@@ -1,6 +1,22 @@
 {% load classification_tags %}
 <div {% if not shared %}style="opacity:0.6"{% endif %}>
     {% for lab_summ in lab_classification_summaries %}
+        <div class="w-100 row mt-1">
+            <div class="col-7 py-2 text-right" style="align-self:center">
+                {% lab lab_summ.lab your_lab=lab_summ.is_internal %}
+                {% if lab_summ.count > 1 %}<span class="d-inline-block mx-1 text-muted">x</span>{{ lab_summ.count }}{% endif %}
+            </div>
+            <div class="col-5 py-2 cs-{{ lab_summ.clinical_significance_to }}" style="border-radius:5px; padding-left: 8px">
+                {% if lab_summ.changed %}
+                    <del>{{ lab_summ.clinical_significance_from|ekey:'clinical_significance' }}</del> <i class="fas fa-arrow-right mx-2 text-secondary"></i>
+                    {{ lab_summ.clinical_significance_to|ekey:'clinical_significance' }}
+                    {% if lab_summ.pending %}<div title="This is an agreed upon pending change" class="flag flag-classification_pending_changes hover-detail ml-1" style="position:relative; top: 5px; margin-top: -5px"></div>{% endif %}
+                {% else %}
+                {{ lab_summ.clinical_significance_from|ekey:'clinical_significance' }}
+                {% endif %}
+            </div>
+        </div>
+        {% comment %}
         <div {% if lab_summ.clinical_significance_to == 'withdrawn' %}style="opacity:0.6"{% endif %}>
             <span class="d-inline-block mr-2">
                 {% lab lab_summ.lab your_lab=lab_summ.is_internal %}
@@ -13,5 +29,6 @@
                 {% clinical_significance lab_summ.clinical_significance_from %}
             {% endif %}
         </div>
+        {% endcomment %}
     {% endfor %}
 </div>

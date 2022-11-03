@@ -17,8 +17,17 @@ from markdown import markdown
 from rest_framework.request import Request
 from threadlocals.threadlocals import get_current_request, get_current_user
 
+from email_manager.models import EmailLog
 from eventlog.models import Event
 from library.enums.log_level import LogLevel
+
+
+def get_current_logged_in_user():
+    user: User = get_current_user()
+    if user:
+        if not user.is_authenticated:
+            user = None
+    return user
 
 
 def report_event(name: str, request: Request = None, extra_data: Dict = None):
@@ -86,6 +95,7 @@ def report_exc_info(extra_data=None, request=None, report_externally=True):
 
 
 class NotificationBuilder:
+    # Preference is to use AdminNotificationBuilder or LabNoficationBuilder now
 
     SLACK_EMOJI_RE = re.compile(r"[:][A-Z_]+[:]", re.IGNORECASE)
     DE_P = re.compile(r"<p>(.*?)</p>", re.IGNORECASE | re.DOTALL)
@@ -239,7 +249,7 @@ class NotificationBuilder:
         self.blocks.append(NotificationBuilder.HeaderBlock(text))
         return self
 
-    def add_field(self, label: str, value: str) -> 'NotificationBuilder':
+    def add_field(self, label: str, value: Union[str, int]) -> 'NotificationBuilder':
         fields_block: Optional[NotificationBuilder.FieldsBlock] = None
         if last_block := self._last_block():
             if isinstance(last_block, NotificationBuilder.FieldsBlock):
@@ -280,7 +290,7 @@ class NotificationBuilder:
 
     def send(self):
         self.sent = True
-        Event.objects.create(user=get_current_user(),
+        Event.objects.create(user=get_current_logged_in_user(),
                              app_name='event',  # could potentially look at the stack trace
                              name=self.message,
                              date=timezone.now(),
@@ -291,6 +301,25 @@ class NotificationBuilder:
     def __del__(self):
         if not self.sent:
             report_message(f"Created a NotificationBuilder but did not call send {self.message}")
+
+
+class AdminNotificationBuilder(NotificationBuilder):
+
+    def __init__(self, message: str, is_communication: bool = False):
+        self.is_communication = is_communication
+        super().__init__(message=message)
+
+    def send(self):
+        super().send()
+        email_recipients = [user.email for user in User.objects.filter(is_superuser=True) if user.email]
+
+        if self.is_communication and settings.ADMIN_EMAIL_NOTIFICATION:
+            EmailLog.send_mail(subject=self.message,
+                               html=self.as_html(),
+                               text=self.as_text(),
+                               from_email=settings.ADMIN_EMAIL_NOTIFICATION,
+                               recipient_list=email_recipients,
+                               allow_users_to_see_others=True)
 
 
 def slack_bot_username():

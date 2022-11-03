@@ -1,12 +1,11 @@
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from enum import IntEnum, Enum
 from functools import total_ordering
-from typing import Dict, List, Any, Optional, Tuple, Set, Union
+from typing import Dict, List, Any, Optional, Tuple, Set, Union, Iterable
 
 import pandas as pd
-from dateutil import relativedelta
 from django.http import StreamingHttpResponse
 
 from classification.enums import ShareLevel
@@ -86,7 +85,7 @@ class AlleleSummary:
 
     def __init__(self):
         # key is classification ID
-        self.classifications: Dict[int, ClassificationSummary] = dict()
+        self.classifications: Dict[int, ClassificationSummary] = {}
         self.biggest_status = AlleleStatus.Empty
         self.last_status = AlleleStatus.Empty
         self.not_withdrawn: List[ClassificationSummary] = []
@@ -186,10 +185,16 @@ class ClassificationAccumulationGraph:
 
             return ClassificationAccumulationGraph._SummarySnapshot(at=at, counts=counts)
 
-    def __init__(self, mode: AccumulationReportMode, shared_only: bool = True, labs: Optional[List[Lab]] = None):
+    def __init__(self,
+                 mode: AccumulationReportMode,
+                 shared_only: bool = True,
+                 labs: Optional[List[Lab]] = None,
+                 time_step: Optional[timedelta] = None
+                 ):
         self.mode = mode
         self.shared_only = shared_only
         self.labs = labs
+        self.time_delta = time_step or timedelta(days=7)
 
     @property
     def share_levels(self):
@@ -199,7 +204,7 @@ class ClassificationAccumulationGraph:
             return ShareLevel.ALL_LEVELS
 
     def withdrawn_iterable(self) -> IterableTransformer[ClassificationSummary]:
-        flag_collection_id_to_allele_classification: Dict[int, Tuple[int, int, Optional[str]]] = dict()
+        flag_collection_id_to_allele_classification: Dict[int, Tuple[int, int, Optional[str]]] = {}
 
         flag_qs = FlagComment.objects.filter(flag__flag_type=classification_flag_types.classification_withdrawn) \
             .order_by("created") \
@@ -258,10 +263,9 @@ class ClassificationAccumulationGraph:
 
     def report(self) -> List['ClassificationAccumulationGraph._SummarySnapshot']:
 
-        time_delta = relativedelta.relativedelta(days=7)
-
+        time_delta = self.time_delta
         running_accum = self._RunningAccumulation(mode=self.mode)
-        sub_totals: List[ClassificationAccumulationGraph._SummarySnapshot] = list()
+        sub_totals: List[ClassificationAccumulationGraph._SummarySnapshot] = []
 
         stitcher = IterableStitcher[ClassificationSummary](
             iterables=[
@@ -307,10 +311,11 @@ class ClassificationAccumulationGraph:
 def _iter_report_list(
         mode: AccumulationReportMode = AccumulationReportMode.Classification,
         shared_only: bool = True,
-        labs: Optional[List[Lab]] = None
+        labs: Optional[List[Lab]] = None,
+        time_step: Optional[timedelta] = None
         ):
 
-    cag = ClassificationAccumulationGraph(mode=mode, shared_only=shared_only, labs=labs)
+    cag = ClassificationAccumulationGraph(mode=mode, shared_only=shared_only, labs=labs, time_step=time_step)
     report_data = cag.report()
 
     valid_labs = set()
@@ -339,13 +344,16 @@ def download_report(request):
     shared_only = True
     if request.GET.get('share') == 'all':
         shared_only = False
+    frequency = 7
+    if frequency_param := request.GET.get('frequency'):
+        frequency = int(frequency_param)
 
-    response = StreamingHttpResponse((delimited_row(r) for r in _iter_report_list(mode=mode, shared_only=shared_only)), content_type="text/csv")
+    response = StreamingHttpResponse((delimited_row(r) for r in _iter_report_list(mode=mode, shared_only=shared_only, time_step=timedelta(days=frequency))), content_type="text/csv")
     response['Content-Disposition'] = f'attachment; filename="{mode.value.lower()}_accumulation_report.csv"'
     return response
 
 
-def get_accumulation_graph_data(mode: AccumulationReportMode = AccumulationReportMode.Classification, labs: Optional[List[Lab]] = None) -> Dict[str, Any]:
+def get_accumulation_graph_data(mode: AccumulationReportMode = AccumulationReportMode.Classification, labs: Optional[Iterable[Lab]] = None) -> Dict[str, Any]:
     data = list(_iter_report_list(mode=mode, labs=labs))
     header = data[0]
     rows = data[1:]
@@ -354,8 +362,8 @@ def get_accumulation_graph_data(mode: AccumulationReportMode = AccumulationRepor
     statuses = df.columns[1:5]
     dates = df["Date"].tolist()
 
-    by_lab = list()
-    by_status = list()
+    by_lab = []
+    by_status = []
 
     for lab in labs:
         by_lab.append({

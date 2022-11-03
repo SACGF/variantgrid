@@ -11,6 +11,7 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
+from django.db.models import QuerySet
 from django.http import StreamingHttpResponse
 from django.http.request import HttpRequest
 from django.http.response import HttpResponse
@@ -67,8 +68,8 @@ def activity(request, user_id: Optional[int] = None, lab_id: Optional[int] = Non
 
     user: Optional[User] = None
     lab: Optional[Lab] = None
-    classifications: Optional[Classification] = None
-    base_url: str = None
+    classifications: Optional[List[Classification]] = None
+    base_url: Optional[str] = None
     page_title = 'Classification Activity'
     if user_id:
         if request.user.is_superuser or request.user.pk == user_id:
@@ -188,7 +189,7 @@ class AutopopulateView(APIView):
 
         used_keys = set()
         used_keys.add(SpecialEKeys.AUTOPOPULATE)
-        complete_values = list()
+        complete_values = []
 
         for data_subset in auto_data.flatten():
             name = data_subset.name
@@ -207,7 +208,7 @@ class AutopopulateView(APIView):
                     used_keys.add(key)
                     complete_values.append({'key': key, 'blob': blob, 'source': 'copy from latest'})
 
-        key_to_order = dict()
+        key_to_order = {}
         index = 1
         # TODO should probably know the lab with EvidenceKeys
         for ekey in EvidenceKeyMap.instance().all_keys:
@@ -342,7 +343,7 @@ def view_classification(request: HttpRequest, classification_id: str):
 
 
 def view_classification_diff(request):
-    extra_data = dict()
+    extra_data = {}
 
     if history_str := request.GET.get('history'):
         vc_id = int(history_str)
@@ -440,7 +441,7 @@ def classification_import_tool(request: HttpRequest) -> Response:
     return render(request, 'classification/classification_import_tool.html', context)
 
 
-def classification_qs(request):
+def classification_qs(request) -> QuerySet[ClassificationModification]:
     config = ClassificationColumns(request)
     qs = ClassificationModification.latest_for_user(user=request.user, published=True)
     qs = config.filter_queryset(qs)
@@ -511,7 +512,7 @@ def classification_file_delete(request, pk):
 
 
 def get_classification_attachment_file_dicts(classification) -> List[Dict]:
-    file_dicts: List[Dict] = list()
+    file_dicts: List[Dict] = []
     vca: ClassificationAttachment
     for vca in classification.classificationattachment_set.all():
         file_dicts.append(vca.get_file_dict())
@@ -717,11 +718,11 @@ def clin_sig_change_data(request):
             flag_comment: FlagComment
             cs_from: str = 'ERROR'
             cs_to: str = 'ERROR'
-            comments: List[str] = list()
+            comments: List[str] = []
             resolution: Optional[str] = 'In Progress'
             classification_created: datetime
             date_raised: datetime = flag.created
-            discordance_dates: List[datetime] = list()
+            discordance_dates: List[datetime] = []
             other_labs: Set[Lab] = set()
 
             c_hgvs = source.get_c_hgvs(genome_build=GenomeBuildManager.get_current_genome_build())

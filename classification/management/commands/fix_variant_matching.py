@@ -72,7 +72,7 @@ class Command(BaseCommand):
 
         # setup a temporary import so discordance notifications are not sent out
         try:
-            batch: List[Classification] = list()
+            batch: List[Classification] = []
             for c in qs:
                 if import_keys is not None:
                     import_key = f"{c.get(SpecialEKeys.GENOME_BUILD) or ''}#{c.get(SpecialEKeys.C_HGVS) or ''}"
@@ -85,7 +85,7 @@ class Command(BaseCommand):
 
                 if len(batch) >= batch_size:
                     self.handle_batch(batch)
-                    batch = list()
+                    batch = []
                     print(f"Handled {row_count}")
 
             self.handle_batch(batch)
@@ -113,7 +113,7 @@ class Command(BaseCommand):
         ClassificationImportRun.record_classification_import("variant_rematching", len(batch))
         user = admin_bot()
         if batch:
-            imports_by_genome: Dict[int, ClassificationImport] = dict()
+            imports_by_genome: Dict[int, ClassificationImport] = {}
             for vc in batch:
                 try:
                     genome_build = vc.get_genome_build()

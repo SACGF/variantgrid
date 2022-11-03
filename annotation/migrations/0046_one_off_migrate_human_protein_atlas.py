@@ -3,7 +3,7 @@
 from django.db import migrations
 
 
-def _one_off_migrate_human_protein_atlas(apps, schema_editor):
+def _one_off_migrate_human_protein_atlas(apps, _schema_editor):
     """
         HPA v15 used abundances + scores (FPKM) but we only imported abundances
         Later versions only have scores (nTPM) so we'll put back scores that will keep the historical filters

@@ -5,7 +5,7 @@ from django.db import migrations
 from library.django_utils import bulk_insert_class_data, add_new_columns_after
 
 
-def _new_gene_annotation_columns(apps, schema_editor):
+def _new_gene_annotation_columns(apps, _schema_editor):
     CustomColumn = apps.get_model("snpdb", "CustomColumn")
 
     NEW_VARIANT_GRID_COLUMNS = [

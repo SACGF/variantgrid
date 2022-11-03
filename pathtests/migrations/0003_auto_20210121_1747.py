@@ -4,7 +4,7 @@ import django.db.models.deletion
 from django.db import migrations, models
 
 
-def _gene_to_gene_symbol(apps, schema_editor):
+def _gene_to_gene_symbol(apps, _schema_editor):
     PathologyTestGeneModificationRequest = apps.get_model("pathtests", "PathologyTestGeneModificationRequest")
     GenomeBuild = apps.get_model("snpdb", "GenomeBuild")
 

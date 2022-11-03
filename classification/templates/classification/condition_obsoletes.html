@@ -1,0 +1,59 @@
+{% extends "uicore/page/base.html" %}
+{% load ui_menu_bars %}
+{% load ui_help %}
+{% load ui_utils %}
+{% load lab_tags %}
+{% load classification_tags %}
+{% load ontology_tags %}
+{% block title %}Condition Obsoletes{% endblock %}
+{% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
+{% block head %}{% endblock %}
+{% block content %}
+    <div class="container">
+        {% if obsolete_relations_panelappau %}
+            <h5>Obsolete PanelApp Relationships</h5>
+            <div class="mb-4">
+                {% ontology_relationship_table obsolete_relations_panelappau %}
+            </div>
+        {% endif %}
+
+        {% if obsolete_relations_gencc %}
+            <h5>Obsolete GenCC Relationships</h5>
+            <div class="mb-4">
+            {% ontology_relationship_table obsolete_relations_gencc %}
+            </div>
+        {% endif %}
+
+        {% if obsolete_condition_matches %}
+            <h5>Obsolete Condition Matches</h5>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Lab</th>
+                        <th>Condition Text</th>
+                        <th>Gene/MOI/etc</th>
+                        <th>Term(s)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for text_match in obsolete_condition_matches %}
+                        <tr>
+                            <td>{% lab text_match.condition_text.lab %}</td>
+                            <td><a href="{% url 'condition_matching' text_match.condition_text.pk %}" class="hover-link">
+                                {{ text_match.condition_text.normalized_text }}</a></td>
+                            <td>{% if text_match.gene_symbol %}<span class="text-monospace">{{ text_match.gene_symbol }}</span><br/>{% endif %}
+                                {% if text_match.mode_of_inheritance %}{{ text_match.mode_of_inheritance }}<br/>{% endif %}
+                                {{ text_match.classification|default_if_none:"" }}
+                            </td>
+                            <td>
+                                {% for term in text_match.condition_xrefs %}
+                                    {% ontology_term term %}
+                                {% endfor %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% endif %}
+    </div>
+{% endblock %}

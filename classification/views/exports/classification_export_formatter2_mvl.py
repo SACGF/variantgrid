@@ -1,5 +1,7 @@
+import json
 from dataclasses import dataclass
-from typing import List
+from enum import Enum
+from typing import List, Any
 
 from django.http import HttpRequest
 from django.template.loader import render_to_string
@@ -9,7 +11,7 @@ from lazy import lazy
 from annotation.views import simple_citation_html
 from classification.enums import SpecialEKeys
 from classification.models import ClassificationModification, EvidenceKeyMap
-from classification.models.classification_groups import ClassificationGroups
+from classification.models.classification_groups import ClassificationGroups, ClassificationGroupUtils
 from classification.views.classification_export_utils import ConflictStrategy
 from classification.views.exports.classification_export_decorator import register_classification_exporter
 from classification.views.exports.classification_export_filter import AlleleData, ClassificationFilter, \
@@ -19,6 +21,19 @@ from classification.views.exports.classification_export_utils import CHGVSData, 
 from library.django_utils import get_url_from_view_path
 from library.utils import delimited_row, export_column, ExportRow
 from snpdb.models import Allele
+
+
+class FormatDetailsMVLFileFormat(str, Enum):
+    TSV = "tsv"
+    JSON = "json"
+
+
+@dataclass
+class MVLJSONExtra:
+    username: str = "bcm"
+    mvl_id: int = 1
+    curated: bool = True
+    import_option: str = "MIRROR"
 
 
 class FormatDetailsMVL:
@@ -43,6 +58,8 @@ class FormatDetailsMVL:
         self.compatability_mode = False
         self.conflict_strategy = ConflictStrategy.MOST_PATHOGENIC
         self.is_shell = False
+        self.format: FormatDetailsMVLFileFormat = FormatDetailsMVLFileFormat.TSV
+        self.mvl_json_extra: MVLJSONExtra = MVLJSONExtra()
 
     RAW_SCORE = {
         'B': 1,
@@ -89,6 +106,10 @@ class FormatDetailsMVL:
         if request.query_params.get('mode') == 'compatibility':
             format_details.compatability_mode = True
 
+        if file_format := request.query_params.get('file_format'):
+            format_details.format = FormatDetailsMVLFileFormat(file_format)
+            # TODO allow the JSON extra to be populated
+
         return format_details
 
 
@@ -98,12 +119,12 @@ class MVLCHGVSData:
     Provides all the data needed to create a row in a MVL
     """
     data: CHGVSData
+    format: FormatDetailsMVL
+    group_utils: ClassificationGroupUtils
 
     @property
     def cms(self) -> [ClassificationModification]:
         return self.data.cms
-
-    format: FormatDetailsMVL
 
 
 @dataclass
@@ -155,6 +176,11 @@ class MVLEntry(ExportRow):
     def __init__(self, mvl_data: MVLCHGVSData):
         self.mvl_data = mvl_data
 
+    # @export_column(categories={"format": "json"})
+    # def id(self):
+    # allele ID isn't unique, as a single Allele might still have different transcripts
+    #     return self.mvl_data.data.allele.allele_id
+
     @property
     def formatter(self):
         return self.mvl_data.format
@@ -171,15 +197,27 @@ class MVLEntry(ExportRow):
     def classifications_values(self) -> MVLClinicalSignificance:
         return MVLClinicalSignificance.from_data(self.mvl_data)
 
-    @export_column()
+    @export_column(categories={"format": {"tsv", "json"}})
     def transcript(self):
         return self.data.chgvs.transcript
 
-    @export_column()
-    def c_nomen(self):
+    @export_column("c_nomen", categories={"format": "tsv"})
+    def c_nomen_tsv(self):
         return self.data.chgvs.raw_c
 
-    @export_column()
+    @export_column("cNomen", categories={"format": "json"})
+    def c_nomen_json(self):
+        return self.data.chgvs.raw_c
+
+    @export_column(categories={"format": "json"})
+    def gene(self):
+        return self.data.chgvs.gene_symbol
+
+    @export_column("lastUpdatedOn", categories={"format": "json"})
+    def last_updated_on(self):
+        return self.data.last_updated.isoformat()
+
+    @export_column(categories={"format": {"tsv", "json"}})
     def classification(self):
         if self.formatter.is_shell:
             return 'VOUS'
@@ -201,11 +239,14 @@ class MVLEntry(ExportRow):
 
     @lazy
     def groups(self) -> ClassificationGroups:
-        return ClassificationGroups(classification_modifications=self.data.cms,
-                                    genome_build=self.data.source.genome_build)
+        return ClassificationGroups(
+            classification_modifications=self.data.cms,
+            genome_build=self.data.source.genome_build,
+            group_utils=self.mvl_data.group_utils
+        )
 
     def warnings(self) -> List[str]:
-        warnings: List[str] = list()
+        warnings: List[str] = []
 
         if self.data.different_chgvs:
             warnings.append('Warning <b>c.hgvs representations are different across transcript versions</b>')
@@ -256,8 +297,15 @@ class MVLEntry(ExportRow):
             citations_html += "No citations provided"
         return citations_html
 
-    @export_column('variant information')
-    def variant_information(self):
+    @export_column('variant information', categories={"format": "tsv"})
+    def variant_information_tsv(self):
+        return self._variant_information()
+
+    @export_column('variantInfo', categories={"format": "json"})
+    def variant_information_json(self):
+        return self._variant_information()
+
+    def _variant_information(self):
         if self.formatter.is_shell:
             return 'This is a test'
         groups_html = render_to_string('classification/classification_groups_mvl.html', {"groups": self.groups}) \
@@ -272,11 +320,17 @@ class MVLEntry(ExportRow):
 
         return combined_data
 
-    @export_column('report abstract')
-    def report_abstract(self):
+    @export_column('report abstract', categories={"format": "tsv"})
+    def report_abstract_tsv(self):
+        return self._report_abstract()
+
+    @export_column('reportAbstract', categories={"format": "json"})
+    def report_abstract_json(self):
+        return self._report_abstract()
+
+    def _report_abstract(self):
         if self.formatter.is_shell:
             return 'This is a test'
-
         return self.variant_anchor_tag
 
 
@@ -288,7 +342,13 @@ class ClassificationExportFormatter2MVL(ClassificationExportFormatter2):
 
     def __init__(self, classification_filter: ClassificationFilter, format_details: FormatDetailsMVL):
         self.format_details = format_details
+        self.grouping_utils = ClassificationGroupUtils()
+        self.first_row = True
         super().__init__(classification_filter=classification_filter)
+
+    @property
+    def file_format(self) -> FormatDetailsMVLFileFormat:
+        return self.format_details.format
 
     @classmethod
     def from_request(cls, request: HttpRequest) -> 'ClassificationExportFormatter2MVL':
@@ -299,18 +359,74 @@ class ClassificationExportFormatter2MVL(ClassificationExportFormatter2):
         )
 
     def header(self):
-        return [delimited_row(MVLEntry.csv_header(), delimiter='\t')]
+        # reset first row as we could be split over multiple files
+        if self.file_format == FormatDetailsMVLFileFormat.TSV:
+            return [delimited_row(MVLEntry.csv_header(categories={"format": "tsv"}), delimiter='\t')]
+        elif self.file_format == FormatDetailsMVLFileFormat.JSON:
+
+            def make_json_safe(obj: Any) -> str:
+                if isinstance(obj, bool):
+                    return "true" if obj else "false"
+                return str(obj).replace("\n", "").replace("\"", "")
+
+            # can't juse simple JSON because we don't want to close this off yet
+            mvl_json_extra = self.format_details.mvl_json_extra
+            return \
+f"""{{
+    "username": "{make_json_safe(mvl_json_extra.username)}",
+    "mvlId": {mvl_json_extra.mvl_id},
+    "curated": {make_json_safe(mvl_json_extra.curated)},
+    "importOption": "{make_json_safe(mvl_json_extra.import_option)}",
+    "molecularVariants": [
+"""
+        else:
+            raise ValueError(f"Unexpected file format {self.format_details.format}")
+
+    def footer(self) -> List[str]:
+        if self.file_format == FormatDetailsMVLFileFormat.JSON:
+            return ["\n\t]\n}"]
 
     def row(self, allele_data: AlleleData) -> List[str]:
         c_datas = CHGVSData.split_into_c_hgvs(allele_data, use_full=True)
-        return list(MVLEntry.csv_generator(
-            (MVLCHGVSData(c_data, self.format_details) for c_data in c_datas),
-            delimiter='\t',
-            include_header=False
-        ))
+
+        if self.file_format == FormatDetailsMVLFileFormat.TSV:
+            return list(MVLEntry.csv_generator(
+                (MVLCHGVSData(
+                    c_data,
+                    self.format_details,
+                    self.grouping_utils
+                ) for c_data in c_datas),
+                delimiter='\t',
+                include_header=False,
+                categories={"format": "tsv"}
+            ))
+        elif self.file_format == FormatDetailsMVLFileFormat.JSON:
+            # FIXME this will break if split over multiple files
+            # and can't even reset first_row in header, due to streaming data pre-generating and peeking as a call
+            # to row() can produce multiple rows that should be grouped (so order of header and row aren't guarenteed)
+            output: List[str] = []
+            for c_data in c_datas:
+                export_row = MVLCHGVSData(
+                    c_data,
+                    self.format_details,
+                    self.grouping_utils
+                )
+                row_json = json.dumps(MVLEntry(export_row).to_json(categories={"format": "json"}))
+                if not self.first_row:
+                    row_json = f",{row_json}"
+                self.first_row = False
+                row_json = f"\t\t{row_json}\n"
+                output.append(row_json)
+            return output
 
     def extension(self) -> str:
-        return "tsv"
+        if self.file_format == FormatDetailsMVLFileFormat.TSV:
+            return "tsv"
+        elif self.file_format == FormatDetailsMVLFileFormat.JSON:
+            return "json"
 
     def content_type(self) -> str:
-        return "text/tab-separated-values"
+        if self.file_format == FormatDetailsMVLFileFormat.TSV:
+            return "text/tab-separated-values"
+        elif self.file_format == FormatDetailsMVLFileFormat.JSON:
+            return "application/json"

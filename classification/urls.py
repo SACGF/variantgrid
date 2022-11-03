@@ -12,15 +12,16 @@ from classification.views.classification_email_view import summary_email_preview
 from classification.views.classification_export_view import ClassificationApiExportView
 from classification.views.classification_overlaps_view import view_overlaps, post_clinical_context, \
     view_clinical_context, view_overlaps_detail
-from classification.views.clinvar_export_view import ClinVarMatchView, clinvar_match_detail
 from classification.views.classification_view import ClassificationView, LabGeneClassificationCountsView
 from classification.views.classification_view_metrics import view_classification_metrics, \
     view_page_metrics_detail
-from classification.views.condition_match_test_view import condition_match_test_view, condition_match_test_download_view
+from classification.views.clinvar_export_view import ClinVarMatchView, clinvar_match_detail
+from classification.views.condition_match_test_view import condition_match_test_view, \
+    condition_match_test_download_view, condition_obsoletes_view
 from classification.views.condition_matching_view import condition_matching_view, condition_matchings_view, \
     ConditionTextColumns, ConditionTextMatchingAPI
 from classification.views.discordance_report_views import discordance_report_view, export_discordance_report, \
-    discordance_reports_view
+    discordance_reports_view, discordance_reports_history_detail, discordance_reports_active_detail
 from classification.views.evidence_keys_view import EvidenceKeysView
 from classification.views.hgvs_issues_view import view_hgvs_issues, download_hgvs_issues, AlleleColumns, \
     download_liftover_report
@@ -90,6 +91,8 @@ urlpatterns = [
     perm_path('condition_match_test', condition_match_test_view, name='condition_match_test'),
     perm_path('condition_match_test_download', condition_match_test_download_view, name='condition_match_test_download'),
 
+    perm_path('condition_obsoletes', condition_obsoletes_view, name='condition_obsoletes'),
+
     perm_path('diff/', views.view_classification_diff, name='classification_diff'),
     perm_path('redcap_data_dictionary.csv', classification_export_view.redcap_data_dictionary, name='redcap_data_dictionary'),
     perm_path('classification/<classification_id>/classification.csv', classification_export_view.record_csv, name='classification_csv'),
@@ -117,6 +120,8 @@ urlpatterns = [
 
     perm_path('discordance_reports', discordance_reports_view, name='discordance_reports'),
     perm_path('discordance_reports/<str:lab_id>', discordance_reports_view, name='discordance_reports'),
+    perm_path('discordance_reports/<str:lab_id>/history_detail', discordance_reports_history_detail, name='discordance_reports_history_detail'),
+    perm_path('discordance_reports/<str:lab_id>/active_detail', discordance_reports_active_detail, name='discordance_reports_active_detail'),
     # 'classification' is redundant but there'll be other references to these URLs, so keep the URLs valid
     perm_path('classification/discordance_report/<int:discordance_report_id>', discordance_report_view, name='discordance_report_deprecated'),
     perm_path('classification/discordance_report/<int:discordance_report_id>/export', export_discordance_report, name='discordance_export_deprecated'),

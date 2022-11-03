@@ -3,7 +3,7 @@
 from django.db import migrations
 
 
-def _one_off_gene_list_panel_app(apps, schema_editor):
+def _one_off_gene_list_panel_app(apps, _schema_editor):
     GeneListNodePanelAppPanel = apps.get_model("analysis", "GeneListNodePanelAppPanel")
     for glnpa in GeneListNodePanelAppPanel.objects.filter(panel_app_panel__isnull=True,
                                                           panel_app_panel_local_cache_gene_list__isnull=False):

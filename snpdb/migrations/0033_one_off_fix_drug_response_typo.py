@@ -3,7 +3,7 @@
 from django.db import migrations
 
 
-def _one_off_fix_drug_response_typo(apps, schema_editor):
+def _one_off_fix_drug_response_typo(apps, _schema_editor):
     VariantGridColumn = apps.get_model("snpdb", "VariantGridColumn")
 
     VariantGridColumn.objects.filter(grid_column_name='drug_response').update(label='ClinVar Drug Response')

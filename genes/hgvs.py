@@ -481,40 +481,27 @@ class HGVSMatcher:
         return self._get_transcript_version_and_pyhgvs_transcript(transcript_name)[1]
 
     @staticmethod
-    def _transcript_position(transcript_version, kind: str, cdna_coord: pyhgvs.CDNACoord) -> int:
-        """ One based (like cDNA coords) """
-        if kind == 'c':
-            if cdna_coord.landmark == pyhgvs.CDNA_START_CODON:
-                # coord is negative for 5'UTR and there is no cDNA position 0
-                offset = transcript_version.fivep_utr_length + 1
-            elif cdna_coord.landmark == pyhgvs.CDNA_STOP_CODON:
-                offset = transcript_version.fivep_utr_length + transcript_version.coding_length
-            else:
-                raise ValueError(f"Unknown CDNACoord landmark: '{cdna_coord.landmark}'")
-        else:
-            # Non coding will have entire transcript as 5'UTR so don't want to shift by that
-            offset = 0
-        return offset + cdna_coord.coord
-
-    @staticmethod
-    def _validate_in_transcript_range(transcript_version, hgvs_name: HGVSName, cdna_coord: pyhgvs.CDNACoord):
+    def _validate_in_transcript_range(pyhgvs_transcript, hgvs_name: HGVSName):
         # @see https://varnomen.hgvs.org/bg-material/numbering/
         # Transcript Flanking: it is not allowed to describe variants in nucleotides beyond the boundaries of the
         # reference sequence using the reference sequence
-        transcript_position = HGVSMatcher._transcript_position(transcript_version, hgvs_name.kind, cdna_coord)
-        within_transcript = 1 <= transcript_position <= transcript_version.length
-        if not within_transcript:
-            raise pyhgvs.InvalidHGVSName(f"'{hgvs_name.format()}' transcript position {transcript_position} is outside "
-                                         f"of {transcript_version} range [1,{transcript_version.length}]")
+        NAMES = {
+            "cdna_start": hgvs_name.cdna_start,
+            "cdna_end": hgvs_name.cdna_end,
+        }
+        for description, cdna_coord in NAMES.items():
+            genomic_coord = pyhgvs_transcript.cdna_to_genomic_coord(cdna_coord)
+            within_transcript = pyhgvs_transcript.tx_position.chrom_start <= genomic_coord <= pyhgvs_transcript.tx_position.chrom_stop
+            if not within_transcript:
+                raise pyhgvs.InvalidHGVSName(f"'{hgvs_name.format()}' {description} {cdna_coord} resolves outside of transcript")
 
     def _pyhgvs_get_variant_tuple(self, hgvs_string: str, transcript_version):
         pyhgvs_transcript = None
         # Check transcript bounds
         if transcript_version:
             hgvs_name = HGVSName(hgvs_string)
-            self._validate_in_transcript_range(transcript_version, hgvs_name, hgvs_name.cdna_start)
-            self._validate_in_transcript_range(transcript_version, hgvs_name, hgvs_name.cdna_end)
             pyhgvs_transcript = self._create_pyhgvs_transcript(transcript_version)
+            self._validate_in_transcript_range(pyhgvs_transcript, hgvs_name)
 
         variant_tuple = pyhgvs.parse_hgvs_name(hgvs_string, self.genome_build.genome_fasta.fasta,
                                                transcript=pyhgvs_transcript,
@@ -540,7 +527,7 @@ class HGVSMatcher:
                 variant_coord = VariantCoordinate(variant_coord.chrom, variant_coord.pos,
                                                   variant_coord.ref, variant_coord.ref)  # ref == alt
             return variant_coord
-        except ClinGenAlleleAPIException as cga_api:
+        except ClinGenAlleleAPIException:
             self.attempt_clingen = False
             raise
         except ClinGenAlleleServerException as cga_se:
@@ -790,7 +777,7 @@ class HGVSMatcher:
         return transcript_id
 
     def _variant_to_hgvs_extra(self, variant: Variant, transcript_name=None) -> HGVSNameExtra:
-        hgvs_name, hgvs_method = self._variant_to_hgvs(variant, transcript_name)
+        hgvs_name, _ = self._variant_to_hgvs(variant, transcript_name)
         # logging.debug("%s -> %s (%s)", variant, hgvs_name, hgvs_method)
         return HGVSNameExtra(hgvs_name)
 
@@ -906,9 +893,13 @@ class HGVSMatcher:
         return hgvs_extra.format(max_ref_length=max_ref_length)
 
     @staticmethod
-    def _fast_variant_coordinate_go_g_hgvs(refseq_accession, offset, ref, alt) -> str:
+    def _fast_variant_coordinate_to_g_hgvs(refseq_accession, offset, ref, alt) -> str:
         """ This only works for SNPs (ie not indels etc) """
-        return f"{refseq_accession}:g.{offset}{ref}>{alt}"
+        if ref == alt:
+            hgvs_allele = f"{ref}="
+        else:
+            hgvs_allele = f"{ref}>{alt}"
+        return f"{refseq_accession}:g.{offset}{hgvs_allele}"
 
     def variant_to_g_hgvs(self, variant: Variant) -> str:
         refseq_accession = variant.locus.contig.refseq_accession
@@ -916,8 +907,8 @@ class HGVSMatcher:
             g_hgvs = self.variant_to_hgvs(variant)
             g_hgvs_str = f"{refseq_accession}:{g_hgvs}"
         else:
-            g_hgvs_str = self._fast_variant_coordinate_go_g_hgvs(refseq_accession, variant.locus.position,
-                                                                 variant.locus.ref.seq, variant.alt.seq)
+            g_hgvs_str = self._fast_variant_coordinate_to_g_hgvs(refseq_accession, variant.locus.position,
+                                                                 variant.locus.ref.seq, variant.vcf_alt)
         return g_hgvs_str
 
     def variant_coordinate_to_g_hgvs(self, variant_coordinate: VariantCoordinate) -> str:
@@ -926,7 +917,7 @@ class HGVSMatcher:
         contig = self.genome_build.chrom_contig_mappings[chrom]
         alt_length = len(alt)
         if alt_length == 1 and len(ref) == alt_length:
-            hgvs_str = self._fast_variant_coordinate_go_g_hgvs(contig.refseq_accession, offset, ref, alt)
+            hgvs_str = self._fast_variant_coordinate_to_g_hgvs(contig.refseq_accession, offset, ref, alt)
         else:
             hgvs_name = pyhgvs.variant_to_hgvs_name(chrom, offset, ref, alt, self.genome_build.genome_fasta.fasta,
                                                     transcript=None)
@@ -992,7 +983,7 @@ class HGVSMatcher:
         # GATA2(NM_032638.5):c.1082G>C => transcript=GATA2, gene=NM_032638.5
         # GATA2:c.1082G>C => transcript='', gene=GATA2
 
-        transcript_id, version = TranscriptVersion.get_transcript_id_and_version(hgvs.gene)
+        transcript_id, _ = TranscriptVersion.get_transcript_id_and_version(hgvs.gene)
         if Transcript.objects.filter(pk=transcript_id).exists():  # gene is transcript
             old_transcript = hgvs.transcript
             hgvs.transcript = hgvs.gene

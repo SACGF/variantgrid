@@ -168,16 +168,16 @@ def annotation_detail(request):
         gene_symbol_alias_counts = {GeneSymbolAliasSource(k).label: v for k, v in gene_symbol_alias_counts.items()}
 
     all_ontologies_accounted_for = True
-    ontology_counts = list()
+    ontology_counts = []
     for service in [OntologyService.MONDO, OntologyService.OMIM, OntologyService.HPO, OntologyService.HGNC]:
         # don't report HGNC as it's just there as a stub for other items to relate to
         count = OntologyTerm.objects.filter(ontology_service=service).count()
         ontology_counts.append({"service": service, "count": count})
 
-    ontology_relationship_counts = dict()
+    ontology_relationship_counts = {}
     ontology_services = [OntologyService.MONDO, OntologyService.OMIM, OntologyService.HPO, OntologyService.HGNC]
     if ontology_version := OntologyVersion.latest():
-        otr_qs = ontology_version.get_ontology_terms()
+        otr_qs = ontology_version.get_ontology_term_relations()
         for first_index, first_service in enumerate(ontology_services):
             for second_service in ontology_services[first_index:]:
                 join_count = otr_qs.filter(source_term__ontology_service=first_service,
@@ -189,7 +189,7 @@ def annotation_detail(request):
                 ontology_relationship_counts[f"{first_service}{second_service}"] = join_count
                 ontology_relationship_counts[f"{second_service}{first_service}"] = join_count
 
-    ontology_imports = list()
+    ontology_imports = []
     for context in ["mondo_file", "gencc_file", "hpo_file", "omim_file", "biomart_omim_aliases", "phenotype_to_genes"]:
         last_import = OntologyImport.objects.filter(context=context).order_by('-created').first()
         if not last_import and context != "omim_file":  # don't complain about omim_file not being imported as not available to environments without license
@@ -542,7 +542,7 @@ def citations_json(request, citations_ids_list):
     Request JSON of citations, accepts either variant grid internal citation ids, or PubMed:123456
     """
     citation_ids = citations_ids_list.split("/")
-    citations: List[Citation] = list()
+    citations: List[Citation] = []
     for citation_id in citation_ids:
         parts = citation_id.split(':')
         citation: Citation

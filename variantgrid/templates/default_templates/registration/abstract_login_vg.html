@@ -1,0 +1,52 @@
+{% extends "registration/abstract_login_bs.html" %}
+{% load static %}
+{% load ui_login %}
+{% load ui_utils %}
+{% block head %}
+    {% comment %}  // animation of icons is too distracting
+    <style>
+        @keyframes grow {
+            from {scale: 0; opacity: 0.5;}
+            to {scale: 1; opacity: 1;}
+        }
+        .dot {
+            scale: 0;
+            animation-name: grow;
+            animation-duration: 0.5s;
+            animation-fill-mode: forwards;
+        }
+    </style>
+    {% endcomment %}
+{% endblock %}
+{% block content %}
+    <div class="bg-theme header fixed-top py-2">
+        <div class="container">
+            <img height="50px" src="{% static "images/vg_logo2.png" %}" style="margin-bottom:4px" />
+            <div class="d-inline-block ml-3" style="position:relative; top: 12px;">
+                <div id="emojis" style="font-size:16px; letter-spacing: 4px; color: #555;">
+                    {% comment %}By all means if there's some useful text to put here, you can remove the emoji line{% endcomment %}
+                    <i class="fa-solid fa-dna dot"></i>
+                    <i class="fa-solid fa-vial dot" style="animation-delay: 0.25s"></i>
+                    <i class="fa-solid fa-filter dot" style="animation-delay: 0.5s"></i>
+                    <i class="fa-solid fa-database dot" style="animation-delay: 0.75s"></i>
+                    <i class="fa-solid fa-magnifying-glass-chart dot" style="animation-delay: 1.00s"></i>
+                    <i class="fa-solid fa-person dot" style="animation-delay: 1.25s"></i>
+                    <i class="fa-solid fa-clipboard-check dot" style="animation-delay: 1.50s"></i>
+                </div>
+                <div id="header-text">
+                    VariantGrid - Analysis, Samples, Patients, Classifications
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div style="height: 20vh"></div>
+    <div class="container main-container mt-4">
+        {% block inner_content %}{% endblock %}
+    </div>
+
+    <div class="bg-theme footer fixed-bottom p-4 text-center">
+      Uses VariantGrid Technology
+    </div>
+
+{% endblock %}

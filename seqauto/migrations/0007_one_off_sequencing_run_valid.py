@@ -47,7 +47,7 @@ def _has_errors(apps, sequencing_run):
                 old_sample_links.exists()])
 
 
-def _one_off_sequencing_run_valid(apps, schema_editor):
+def _one_off_sequencing_run_valid(apps, _schema_editor):
     SequencingRun = apps.get_model("seqauto", "SequencingRun")
 
     total_runs = SequencingRun.objects.count()

@@ -4,7 +4,7 @@ from collections import defaultdict, Counter
 from django.db import migrations
 
 
-def _one_off_assign_ontology_import_versions(apps, schema_editor):
+def _one_off_assign_ontology_import_versions(apps, _schema_editor):
     OntologyImport = apps.get_model("ontology", "OntologyImport")
     OntologyVersion = apps.get_model("ontology", "OntologyVersion")
 

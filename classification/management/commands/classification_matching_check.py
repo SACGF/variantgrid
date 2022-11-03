@@ -120,4 +120,3 @@ class Command(BaseCommand):
         end_last_modified = self._get_last_modified()
         if start_last_modified != end_last_modified:
             print(f"Beware - looks like someone edited a classification!!! {start_last_modified=} vs {end_last_modified=}")
-

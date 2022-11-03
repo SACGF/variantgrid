@@ -48,7 +48,7 @@ class MigrationAttemptColumns(DatatableConfig[ManualMigrationAttempt]):
 
     def filter_queryset(self, qs: QuerySet[ManualMigrationAttempt]) -> QuerySet[ManualMigrationAttempt]:
         if self.get_query_param("exclude_standard") == "true":
-            qs = qs.exclude(task_id__in=["git*pull", "manage*migrate", "manage*collectstatic"])
+            qs = qs.exclude(task_id__in=["git*pull", "manage*migrate", "manage*collectstatic", "manage*collectstatic_js_reverse"])
         return qs
 
 

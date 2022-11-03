@@ -2,7 +2,8 @@
 
 from django.db import migrations
 
-def _ekeys_gnomad3(apps, schema_editor):
+
+def _ekeys_gnomad3(apps, _schema_editor):
     EvidenceKey = apps.get_model("classification", "EvidenceKey")
     ek_vg_columns = {
         "gnomad_allele_count": "gnomad_ac",

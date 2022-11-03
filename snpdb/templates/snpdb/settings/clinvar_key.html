@@ -2,7 +2,7 @@
 {% load ui_utils %}
 {% load classification_tags %}
 <h4>ClinVar Key</h4>
-{% labelled label="ClinVar Key Name" %}{{ clinvar_key.label }}{% endlabelled %}
+{% labelled label="ClinVar Key Name" %}{{ clinvar_key.label }}{% admin_link clinvar_key %}{% endlabelled %}
 {% labelled label="Org ID" %}{% if clinvar_key.org_id %}<a href="https://www.ncbi.nlm.nih.gov/clinvar/submitters/{{ clinvar_key.org_id }}/">{{ clinvar_key.org_id }}</a>{% endif %}{% endlabelled %}
 {% labelled label="Configuration" %}<a href="#clinvar-key-config" class='toggle-link' data-toggle="collapse">Toggle Display</a>{% endlabelled %}
 {% if clinvar_key.last_full_run %}{% comment %}Just needed until we run a ClinVarExport post the upgrade that has this value{% endcomment %}
@@ -13,6 +13,7 @@
     {% labelled label="ClinVar API Key" %}{% if clinvar_key.api_key %}{{ clinvar_key.api_key|secret }}{% else %}{{ 'error' | severity_icon}} <span class="no-value">NOT PROVIDED</span>{% endif %}{% endlabelled %}
     {% labelled label="Inject ACMG into Description" %}{{ clinvar_key.inject_acmg_description | boolean }}{% endlabelled %}
     {% labelled label="Default Affected Status" %}{{ clinvar_key.get_default_affected_status_display }}{% endlabelled %}
+    {% labelled label="Citations Mode" %}{{ clinvar_key.get_citations_mode_display }}{% endlabelled %}
     {% labelled label="Assert Method Configuration" %}{% code_json clinvar_key.assertion_method_lookup %}{% endlabelled %}
 
     {% labelled label="Exclude Patterns" %}

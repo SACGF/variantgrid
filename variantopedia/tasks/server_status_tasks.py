@@ -1,13 +1,14 @@
 
 from random import randint
 
-
 import celery
 from django.conf import settings
 from django.urls import reverse
+
+from library.django_utils import get_url_from_view_path
 from library.health_check import populate_health_check
 from library.log_utils import NotificationBuilder
-from library.django_utils import get_url_from_view_path
+
 
 # all the dependencies required by injecting everything into this, no longer needed using signals
 # from django.utils.timezone import now
@@ -61,8 +62,8 @@ def notify_server_status_now():
 #             keys.discard(exclude_key)
 #     sorted_keys = sorted(list(keys))
 #
-#     lines = list()
-#     zeros = list()
+#     lines = []]
+#     zeros = []
 #
 #     for key in sorted_keys:
 #         values = dashboard_notices.get(key)
@@ -118,7 +119,7 @@ def notify_server_status_now():
 #     nb.add_markdown("\n".join(lines), indented=True)
 #
 #     if detailed:
-#         overall_lines = list()
+#         overall_lines = []
 #         for _, message in get_disk_messages(info_messages=True):
 #             overall_lines.append(f":floppy_disk: {message}")
 #         if not overall_lines:
@@ -142,7 +143,7 @@ def notify_server_status_now():
 #                 return None
 #             return f"{emoji_for_age(days)} {days} day{'s' if days != 1 else ''} old : {annotation_name}"
 #
-#         annotation_ages = list()
+#         annotation_ages = []
 #         # others we might want to check date of
 #
 #         # when we have an array, only report on the first instance that's been imported

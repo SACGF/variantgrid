@@ -9,7 +9,6 @@ from typing import List, Type, Union, Set, Optional, Dict, Iterator, Any, Callab
 from django.contrib.auth.models import User
 from django.db.models import QuerySet, Q
 from django.http import HttpRequest
-from django.utils.timezone import now
 from guardian.shortcuts import get_objects_for_user
 from lazy import lazy
 
@@ -33,7 +32,7 @@ class ClassificationIssue:
 
     @property
     def message(self) -> Optional[str]:
-        messages: List[str] = list()
+        messages: List[str] = []
         if self.withdrawn:
             messages.append("Classification has been withdrawn")
         if self.transcript_version or self.matching_warning:
@@ -74,7 +73,7 @@ class AlleleData:
 
     def __setitem__(self, key, value):
         if not self.cached_data:
-            self.cached_data = dict()
+            self.cached_data = {}
         self.cached_data[key] = value
 
     def __getitem__(self, item):
@@ -203,7 +202,7 @@ class ClassificationFilter:
     allele: Optional[int] = None
     file_prefix: str = "classifications"
     file_include_date: bool = True
-    starting_query: Optional[QuerySet[Classification]] = None
+    starting_query: Optional[QuerySet[ClassificationModification]] = None
     benchmarking: bool = False
 
     @lazy
@@ -353,7 +352,7 @@ class ClassificationFilter:
         Ids are not necessarily part of this import
         :return: A set of classification IDs
         """
-        discordance_status: Dict[int, DiscordanceReportStatus] = dict()
+        discordance_status: Dict[int, DiscordanceReportStatus] = {}
         for cc in ClinicalContext.objects.filter(status=ClinicalContextStatus.DISCORDANT):
             dr = DiscordanceReport.latest_report(cc)
 
@@ -387,7 +386,8 @@ class ClassificationFilter:
             flag__flag_type__in={
                 classification_flag_types.classification_withdrawn,
                 classification_flag_types.transcript_version_change_flag,
-                classification_flag_types.matching_variant_warning_flag
+                classification_flag_types.matching_variant_warning_flag,
+                classification_flag_types.classification_pending_changes
             },
             created__gte=self.since
         ))

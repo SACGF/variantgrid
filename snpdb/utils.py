@@ -11,6 +11,10 @@ from snpdb.models import Lab, UserSettings
 
 
 class LabNotificationBuilder(NotificationBuilder):
+    """
+    For notifying members of the lab about an important event.
+    Will email individual users with email enabled, or just the lab_email if one has been provided
+    """
 
     class NotificationType(Enum):
         DISCORDANCE = "Discordance"
@@ -41,7 +45,7 @@ class LabNotificationBuilder(NotificationBuilder):
         if self.notification_type == LabNotificationBuilder.NotificationType.SLACK_ONLY:
             return
 
-        recipient_list: List[str] = list()
+        recipient_list: List[str] = []
         if lab_email := self.lab.email:
             recipient_list.append(lab_email)
         else:

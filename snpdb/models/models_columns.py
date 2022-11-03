@@ -50,6 +50,14 @@ class VariantGridColumn(models.Model):
             note = "Rankscore (0-1) of all non-synonymous SNVs in dbNSFP"
         return note
 
+    @staticmethod
+    def get_column_descriptions() -> dict:
+        annotation_description = {}
+        vgc_qs = VariantGridColumn.objects.all()
+        for grid_column_name, description in vgc_qs.values_list("grid_column_name", "description"):
+            annotation_description[grid_column_name] = description
+        return annotation_description
+
     def __str__(self):
         return self.grid_column_name
 

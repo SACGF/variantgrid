@@ -150,8 +150,8 @@ def create_analysis_from_template(request, genome_build_name):
     data = request.POST.dict()
     tag_uuid = data.pop("tag_uuid")
     analysis_template_key = f"{tag_uuid}-analysis_template"
-    analysis_template_name = data.pop(analysis_template_key)
-    analysis_template = AnalysisTemplate.get_for_user(request.user, analysis_template_name)
+    analysis_template_id = data.pop(analysis_template_key)
+    analysis_template = AnalysisTemplate.get_for_user(request.user, analysis_template_id)
 
     genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
     template_run = AnalysisTemplateRun.create(analysis_template, genome_build, user=request.user)

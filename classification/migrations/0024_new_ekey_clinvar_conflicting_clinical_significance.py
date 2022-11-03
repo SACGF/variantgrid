@@ -3,7 +3,7 @@
 from django.db import migrations
 
 
-def _new_ekey_clinvar_conflicting_clinical_significance(apps, schema_editor):
+def _new_ekey_clinvar_conflicting_clinical_significance(apps, _schema_editor):
     EvidenceKey = apps.get_model("classification", "EvidenceKey")
 
     kwargs = {

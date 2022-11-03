@@ -4,7 +4,7 @@ import numpy as np
 from django.db import migrations, models
 
 
-def _one_off_rvis_gnomad_gene_constraint_np_to_none(apps, schema_editor):
+def _one_off_rvis_gnomad_gene_constraint_np_to_none(apps, _schema_editor):
     """ One off patch of exisitng environments """
     RVIS = apps.get_model("genes", "RVIS")
     GnomADGeneConstraint = apps.get_model("genes", "GnomADGeneConstraint")

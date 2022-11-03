@@ -145,13 +145,14 @@ class TestClinVarExport(TestCase):
             lab=lab,
             lab_record_id="x42",
             data={
-                SpecialEKeys.C_HGVS: {'value': 'NM_000001.2(MADEUP):c.1913G>A'},
+                SpecialEKeys.C_HGVS: {'value': 'NM_000001.2(TECTA):c.1913G>A'},
                 SpecialEKeys.INTERPRETATION_SUMMARY: {'value': 'I have an interpretation summary'},
                 SpecialEKeys.ASSERTION_METHOD: {'value': 'acmg'},
                 SpecialEKeys.MODE_OF_INHERITANCE: {'value': ['autosomal_dominant']},
                 SpecialEKeys.AFFECTED_STATUS: {'value': 'yes'},
                 SpecialEKeys.CLINICAL_SIGNIFICANCE: {'value': 'VUS'},
-                SpecialEKeys.GENOME_BUILD: {'value': 'GRCh37'}
+                SpecialEKeys.GENOME_BUILD: {'value': 'GRCh37'},
+                SpecialEKeys.CONDITION: {'value': 'MONDO:0008841'}
             },
             save=True,
             source=SubmissionSource.API,
@@ -160,18 +161,20 @@ class TestClinVarExport(TestCase):
         c.publish_latest(user=admin_bot(), share_level=ShareLevel.PUBLIC)
 
         c.variant = variant
-        c.chgvs_grch37 = "NM_000001.2(MADEUP):c.1913G>A"
-        c.chgvs_grch37_full = "NM_000001.2(MADEUP):c.1913G>A"
+        c.allele = allele
+        c.chgvs_grch37 = "NM_000001.2(TECTA):c.1913G>A"
+        c.chgvs_grch37_full = "NM_000001.2(TECTA):c.1913G>A"
         c.condition_resolution = {"sort_text": "ataxia-telangiectasia with generalized skin pigmentation and early death",
                                   "display_text": "MONDO:0008841 ataxia-telangiectasia with generalized skin pigmentation and early death",
                                   "resolved_join": None,
                                   "resolved_terms": [{"name": "ataxia-telangiectasia with generalized skin pigmentation and early death", "term_id": "MONDO:0008841"}]}
         c.save()
 
-        export_prepare = ClinvarExportPrepare(allele=allele)
-        report = export_prepare.update_export_records()
+        report = ClinvarExportPrepare.update_export_records()
+        print("----")
         for report_line in report:
             print(report_line)
+        print("----")
 
         clinvar_export: ClinVarExport = ClinVarExport.objects.first()
         print(clinvar_export.submission_body_validated)

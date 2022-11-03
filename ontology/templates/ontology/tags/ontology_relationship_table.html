@@ -1,0 +1,20 @@
+{% load ontology_tags %}
+<table class="table" id="{{ table_id }}">
+    <thead>
+        <tr>
+            {% if not reference_term %}
+                <th style="width:35%">Source Term</th>
+                <th>Relationship</th>
+                <th style="width:35%">Destination Term</th>
+            {% else %}
+                <th style="width:50%">{{ other_term_title }}</th>
+                <th>Relationship</th>
+            {% endif %}
+        </tr>
+    </thead>
+    <tbody>
+        {% for row_relationship in relationships %}
+            {% ontology_relationship_row row_relationship reference_term=reference_term %}
+        {% endfor %}
+    </tbody>
+</table>

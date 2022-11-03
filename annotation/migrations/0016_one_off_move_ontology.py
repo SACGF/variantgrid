@@ -12,7 +12,7 @@ def _test_patients_but_no_ontology(apps):
     return PatientTextPhenotype.objects.exists() and not OntologyTerm.objects.exists()
 
 
-def _one_off_move_ontology(apps, schema_editor):
+def _one_off_move_ontology(apps, _schema_editor):
     TextPhenotypeMatch = apps.get_model("annotation", "TextPhenotypeMatch")
     OntologyTerm = apps.get_model("ontology", "OntologyTerm")
 

@@ -1,5 +1,5 @@
 import json
-from typing import Set
+from typing import Set, Union
 
 from django.contrib import admin, messages
 from django.contrib.admin import RelatedFieldListFilter, BooleanFieldListFilter
@@ -17,7 +17,8 @@ from classification.models.classification import Classification
 from classification.models.classification_import_run import ClassificationImportRun, ClassificationImportRunStatus
 from classification.tasks.classification_import_map_and_insert_task import ClassificationImportMapInsertTask
 from library.guardian_utils import admin_bot
-from snpdb.admin_utils import ModelAdminBasics, admin_action, admin_list_column, AllValuesChoicesFieldListFilter
+from snpdb.admin_utils import ModelAdminBasics, admin_action, admin_list_column, AllValuesChoicesFieldListFilter, \
+    admin_model_action
 from snpdb.models import GenomeBuild, Lab
 
 
@@ -100,8 +101,27 @@ class ClassificationModificationAdmin(admin.TabularInline):
 
 @admin.register(ClassificationImportRun)
 class ClassificationImportRunAdmin(ModelAdminBasics):
+    # change_list_template = 'classification/admin/change_list.html'
     list_display = ['id', 'identifier', 'row_count', 'status', 'from_file', 'created_detailed', 'modified_detailed']
-    list_filter = (('status', AllValuesChoicesFieldListFilter), )
+    list_filter = ('status', )
+
+    @admin_model_action(url_slug="create_dummy/", short_description="Create Dummy Import", icon="fa-solid fa-plus")
+    def create_dummy(self, request):
+        ClassificationImportRun(identifier="Dummy Import").save()
+        self.message_user(request, "Created a dummy import")
+
+    @admin_model_action(url_slug="mark_unfinished/", short_description="Mark OnGoing Imports as Unfinished", icon="fa-regular fa-trash-can")
+    def close_all_open(self, request):
+        ongoing_imports = ClassificationImportRun.objects.filter(status=ClassificationImportRunStatus.ONGOING)
+        if ongoing_imports:
+            for cir in ongoing_imports:
+                cir.status = ClassificationImportRunStatus.UNFINISHED
+                cir.save()
+                self.message_user(request, message=f'Changed import from ongoing to unfinished for {cir.identifier}',
+                                  level=messages.INFO)
+        else:
+            self.message_user(request, message='No OnGoing Imports to mark as unfinished',
+                              level=messages.WARNING)
 
     def is_readonly_field(self, f) -> bool:
         return True
@@ -494,11 +514,11 @@ class DiscordanceReportAdmin(ModelAdminBasics):
         e_key_cs = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE)
         sorter = e_key_cs.classification_sorter_value
         sorted_list = sorted(clinical_sigs, key=lambda x: (sorter(x), x))
-        pretty = [e_key_cs.pretty_value(cs) for cs in sorted_list]
+        pretty = ", ".join([e_key_cs.pretty_value(cs) for cs in sorted_list])
         return pretty
 
     @admin_list_column()
-    def days_open(self, obj: DiscordanceReport) -> int:
+    def days_open(self, obj: DiscordanceReport) -> Union[int, str]:
         closed = obj.report_completed_date
         if not closed:
             delta = timezone.now() - obj.report_started_date
@@ -517,8 +537,8 @@ class DiscordanceReportAdmin(ModelAdminBasics):
         for drc in obj.discordancereportclassification_set.all():
             if c := drc.classification_original.classification:
                 labs.add(c.lab)
-        labs = sorted(labs, key=lambda x: x.name)
-        return ", ".join([lab.name for lab in labs])
+        labs_sorted = sorted(labs, key=lambda x: x.name)
+        return ", ".join([lab.name for lab in labs_sorted])
 
     def has_add_permission(self, request):
         return False
@@ -529,11 +549,11 @@ class DiscordanceReportAdmin(ModelAdminBasics):
         for ds in queryset:
             send_discordance_notification(ds, cause="Admin Send discordance notification")
 
-    @admin_action("Re-calculate")
+    @admin_action("Re-calculate latest")
     def re_calculate(self, request, queryset):
         ds: DiscordanceReport
         for ds in queryset:
-            ds.update()
+            ds.clinical_context.recalc_and_save(cause="Admin recalculation", cause_code=ClinicalContextRecalcTrigger.ADMIN)
 
 
 @admin.register(UploadedClassificationsUnmapped)

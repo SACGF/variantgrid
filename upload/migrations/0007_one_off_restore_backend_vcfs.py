@@ -5,7 +5,7 @@ import pandas as pd
 from django.db import migrations
 
 
-def _one_off_restore_backend_vcfs(apps, schema_editor):
+def _one_off_restore_backend_vcfs(apps, _schema_editor):
     BackEndVCF = apps.get_model("upload", "BackEndVCF")
     backend_vcf_filename = "data/migrations/backend_vcf_new_pks.csv"
     if os.path.exists(backend_vcf_filename):

@@ -285,7 +285,7 @@ class GeneSymbolAliasesMeta:
 
     def __init__(self, gene_symbol: GeneSymbol):
         self.gene_symbol = gene_symbol
-        self.alias_list: List[GeneSymbolAliasSummary] = list()
+        self.alias_list: List[GeneSymbolAliasSummary] = []
 
         symbol = self.gene_symbol.symbol
 
@@ -764,7 +764,7 @@ class TranscriptVersion(SortByPKMixin, models.Model):
             # Sometimes RefSeq transcripts have gaps when aligning to the genome
             # We've modified PyHGVS to be able to handle this
             GAP_CODES = ["cdna_match", "partial", "alignent_gap_error"]
-            if any([gap in self.pyhgvs_data for gap in GAP_CODES]):
+            if any(gap in self.pyhgvs_data for gap in GAP_CODES):
                 return True
             return not self.sequence_length_matches_exon_length_ignoring_poly_a_tail
 
@@ -890,7 +890,7 @@ class TranscriptVersion(SortByPKMixin, models.Model):
 
     @staticmethod
     def _sum_intervals(intervals: List[Tuple]):
-        return sum([b - a for a, b in intervals])
+        return sum(b - a for a, b in intervals)
 
     @lazy
     def pyhgvs_data(self):
@@ -1948,7 +1948,7 @@ class GeneCoverageCollection(RelatedModelsPartitionModel):
                 "gene_symbol_id": gene_symbol_id,
             }
             gc_dict.update(row.to_dict())
-            gc_tup = tuple([gc_dict.get(f, '') for f in GENE_COVERAGE_HEADER])
+            gc_tup = tuple(gc_dict.get(f, '') for f in GENE_COVERAGE_HEADER)
 
             if settings.SEQAUTO_QC_GENE_COVERAGE_STORE_ALL:
                 gene_coverage_tuples.append(gc_tup)

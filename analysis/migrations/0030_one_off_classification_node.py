@@ -3,7 +3,7 @@
 from django.db import migrations
 
 
-def _one_off_classification_node(apps, schema_editor):
+def _one_off_classification_node(apps, _schema_editor):
     ClassificationsNode = apps.get_model("analysis", "ClassificationsNode")
 
     # Copy pasting here so we can reuse code

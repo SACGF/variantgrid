@@ -9,6 +9,7 @@ import django.dispatch
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.db import models, transaction
+from django.db.models import QuerySet
 from django.db.models.deletion import PROTECT, CASCADE
 from django.urls.base import reverse
 from django.utils.timezone import now
@@ -168,9 +169,18 @@ class DiscordanceReport(TimeStampedModel):
         return {lab for lab, status in self.involved_labs.items() if status == DiscordanceReport.LabInvolvement.ACTIVE}
 
     @lazy
+    def discordance_report_classifications(self) -> List['DiscordanceReportClassification']:
+        return list(self.discordancereportclassification_set.select_related(
+            'classification_original',
+            'classification_original__classification',
+            'classification_final',
+            'classification_final__classification'
+        ).all())
+
+    @lazy
     def involved_labs(self) -> Dict[Lab, LabInvolvement]:
-        lab_status: Dict[Lab, DiscordanceReport.LabInvolvement] = dict()
-        for drc in DiscordanceReportClassification.objects.filter(report=self):
+        lab_status: Dict[Lab, DiscordanceReport.LabInvolvement] = {}
+        for drc in self.discordance_report_classifications:
             effective_c: Classification = drc.classification_effective.classification
             lab = effective_c.lab
             status = DiscordanceReport.LabInvolvement.WITHDRAWN if effective_c.withdrawn else DiscordanceReport.LabInvolvement.ACTIVE
@@ -198,7 +208,7 @@ class DiscordanceReport(TimeStampedModel):
     @property
     def has_significance_changed(self):
         existing_vms = {}
-        for dr in DiscordanceReportClassification.objects.filter(report=self):
+        for dr in self.discordance_report_classifications:
             if dr.clinical_context_final == self.clinical_context:
                 existing_vms[dr.classification_final.classification.id] = dr.classification_final.get(SpecialEKeys.CLINICAL_SIGNIFICANCE, None)
 
@@ -221,7 +231,7 @@ class DiscordanceReport(TimeStampedModel):
             return True
 
         existing_labs: Set[Lab] = set()
-        for drc in self.discordancereportclassification_set.all():
+        for drc in self.discordance_report_classifications:
             existing_labs.add(drc.classification_original.classification.lab)
 
         # a new lab has submitted since continued discordance
@@ -313,12 +323,9 @@ class DiscordanceReport(TimeStampedModel):
                 classifications.add(dr.classification_original.classification.id)
         return classifications
 
-    @lazy
+    @property
     def all_classification_modifications(self) -> List[ClassificationModification]:
-        vcms: List[ClassificationModification] = list()
-        for dr in DiscordanceReportClassification.objects.filter(report=self):
-            vcms.append(dr.classification_effective)
-        return vcms
+        return [drc.classification_effective for drc in self.discordance_report_classifications]
 
     def all_c_hgvs(self, genome_build: Optional[GenomeBuild] = None) -> List[CHGVS]:
         if not genome_build:
@@ -467,13 +474,11 @@ class DiscordanceReportSummaryCount:
         return self.lab < other.lab
 
 
-@dataclass(frozen=True)
 class DiscordanceReportTableData:
-    perspective: LabPickerData
-    summaries: List[DiscordanceReportRowData]
-    inactive_summaries: List[DiscordanceReportRowData]
 
-    counts: List[DiscordanceReportSummaryCount]
+    def __init__(self, perspective: LabPickerData, discordance_reports: QuerySet[DiscordanceReport]):
+        self.perspective = perspective
+        self._discordance_reports = discordance_reports
 
     def __len__(self):
         return len(self.summaries)
@@ -491,35 +496,45 @@ class DiscordanceReportTableData:
         else:
             return "your assigned labs"
 
-    @property
-    def genome_build(self) -> GenomeBuild:
-        return self.perspective.genome_build
-
-    @staticmethod
-    def create(perspective: LabPickerData, discordance_reports: Iterable[DiscordanceReport]) -> 'DiscordanceReportTableData':
-        internal_count = 0
-        by_lab: Dict[Lab, int] = defaultdict(int)
-        summaries: List[DiscordanceReportRowData] = list()
-        inactive_summaries: List[DiscordanceReportRowData] = list()
-
-        for dr in discordance_reports:
-            summary = DiscordanceReportRowData(discordance_report=dr, perspective=perspective)
+    @lazy
+    def summaries(self) -> List[DiscordanceReportRowData]:
+        summaries: List[DiscordanceReportRowData] = []
+        for dr in self._discordance_reports.filter(resolution__isnull=True):
+            summary = DiscordanceReportRowData(discordance_report=dr, perspective=self.perspective)
             if summary.is_valid_including_withdraws:
                 if summary.is_requiring_attention:
                     summaries.append(summary)
-                    if summary.is_internal:
-                        internal_count += 1
-                    else:
-                        for lab in summary.other_labs:
-                            by_lab[lab] += 1
-                else:
-                    inactive_summaries.append(summary)
+        return summaries
+
+    @lazy
+    def counts(self) -> List[DiscordanceReportSummaryCount]:
+        internal_count = 0
+        by_lab: Dict[Lab, int] = defaultdict(int)
+        for summary in self.summaries:
+            if summary.is_internal:
+                internal_count += 1
+            else:
+                for lab in summary.other_labs:
+                    by_lab[lab] += 1
 
         counts = sorted([DiscordanceReportSummaryCount(lab=key, count=value) for key, value in by_lab.items()])
         if internal_count:
             counts.insert(0, DiscordanceReportSummaryCount(lab=None, count=internal_count))
+        return counts
 
-        return DiscordanceReportTableData(perspective=perspective, summaries=summaries, inactive_summaries=inactive_summaries, counts=counts)
+    @lazy
+    def inactive_summaries(self) -> List[DiscordanceReportRowData]:
+        inactives: List[DiscordanceReportRowData] = []
+        for dr in self._discordance_reports:
+            summary = DiscordanceReportRowData(discordance_report=dr, perspective=self.perspective)
+            if summary.is_valid_including_withdraws:
+                if not summary.is_requiring_attention:
+                    inactives.append(summary)
+        return inactives
+
+    @property
+    def genome_build(self) -> GenomeBuild:
+        return self.perspective.genome_build
 
 
 class DiscordanceAction:
@@ -575,7 +590,7 @@ class DiscordanceActionsLog:
     ]
 
     def __init__(self):
-        self.actions = list()
+        self.actions = []
         self.internal_reviewed = None
 
     def add(self, action: DiscordanceAction, date: Optional[datetime] = None):

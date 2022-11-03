@@ -20,7 +20,7 @@
             <p><span class="text-info">Import into {{ site_name }} Details</span> details of the import of the mapped data, how many records were new/updates/etc.</p>
         {% end_page_help_embedded %}
         <h5 class="my-4">File Details</h5>
-        {% labelled label="File Name" %}{{ record.file_data.filename }}{% endlabelled %}
+        {% labelled label="File Name" %}{{ record.file_data.filename }}{% admin_link record %}{% endlabelled %}
         {% labelled label="File ID" %}{{ record.pk }}{% endlabelled %}
         {% labelled label="Upload Date" %}{% timestamp record.created %}{% endlabelled %}
         <div data-toggle="ajax" href="{% url 'classification_upload_unmapped_status_detail' record.pk %}">

@@ -55,7 +55,7 @@ function enhanceAndMonitor() {
         html: true,
         trigger: 'hover click',
         title: function() {
-            return 'Help';
+            return $(this).attr('popover-header') || 'Help';
         },
         content: function() {
             return $(this).attr('title');
@@ -83,8 +83,50 @@ function enhanceAndMonitor() {
             });
         }},
 
+        {test: '[data-toggle="ajax-collapse"]', func: (node) => {
+            let $node = $(node);
+            let href = $node.attr('href');
+            let dataId = $node.attr('data-id');
+            let title = $node.attr('title');
+            let toggleLink = $(`<a data-toggle="collapse" class="toggle-link" href="#${dataId}">Toggle ${title}</a>`);
+            let ajaxBlob = $(`<div class="collapse mt-2" id="${dataId}"><div class="loading-message">Loading ${title}</div></div>`);
+            $node.replaceWith($('<div>', {html: [toggleLink, ajaxBlob]}));
+
+            window.setTimeout(() => {
+                ajaxBlob.on('show.bs.collapse', () => {
+                    if ($node.attr('loading')) {
+                        return;
+                    }
+                    $node.attr('loading', 1);
+                    loadAjaxBlock(ajaxBlob, href);
+                });
+            });
+        }},
+
         // setup popovers
-        {test: '[data-content]', func: (node) => {node.addClass('hover-detail'); node.popover(popoverOpts);}},
+        {test: '[data-content]', func: (node) => {
+                node.addClass('hover-detail');
+                let poOpts = Object.assign({}, popoverOpts);  // clone
+                if (node.hasClass("popover-hover-stay")) {
+                    node.on("mouseenter", function () {
+                        let _this = this;
+                        $(this).popover("show");
+                        $(".popover").on("mouseleave", function () {
+                            $(_this).popover('hide');
+                        });
+                    }).on("mouseleave", function () {
+                        let _this = this;
+                        setTimeout(function () {
+                            if (!$(".popover:hover").length) {
+                                $(_this).popover("hide");
+                            }
+                        }, 300);
+                    });
+                    poOpts["trigger"] = "manual";
+                }
+                node.popover(poOpts);
+            }
+        },
 
         // everything with a title (that isn't data-content aka popover) give a tooltip
         {test: '[title]:not([data-content])',
@@ -223,7 +265,57 @@ function enhanceAndMonitor() {
                     return true;
                 })
             }
+        },
+
+        {test: '.current-record-menu-item',
+            func: (node) => {
+                let $node = $(node);
+                let $moveTo = $('#current-record-spot');
+                if ($moveTo.length == 0) {
+                    $moveTo = $('#current-record-spot-fallback');
+                }
+                $node.addClass('active').detach().appendTo($moveTo);
+            }
+        },
+
+        // use to have a checkbox synced to cookie (no save to database required)
+        // checkbox will start as its default, but if a cookie has been set to "true" or "false" and the prop
+        // checked is the opposite of that, the checkbox will be toggled to the other state (firing any change listeners)
+        {test: 'input[type=checkbox][data-cookie]',
+            func: (node) => {
+                let $node = $(node);
+                let cookieName = $node.attr('data-cookie') || $node.attr('id') || $node.attr('name');
+
+                $node.change(() => {
+                   let checked = !!$node.prop('checked');
+                   Cookies.set(cookieName, checked ? 'true' : 'false', {sameSite: 'strict'});
+                });
+
+                let checked = !!$node.prop('checked') ? 'true' : 'false';
+                let existingCookie = Cookies.get(cookieName);
+
+                if (existingCookie && existingCookie != checked) {
+                    $node.click();
+                }
+            }
         }
+
+        /*
+        // makes .main-icon icons in divs with the same data-group-id glow when one is highlighted
+        {test: '[data-group-id]',
+            func: (node) => {
+                let $node = $(node);
+                let dataGroupId = $node.attr('data-group-id');
+                $node.mouseenter(() => {
+                    console.log($(`[data-group-id='${dataGroupId}'`));
+                   $(`[data-group-id='${dataGroupId}'`).addClass('group-selected');
+                });
+                $node.mouseleave(() => {
+                    $(`[data-group-id='${dataGroupId}'`).removeClass('group-selected');
+                });
+            }
+        }
+         */
     ];
 
     // run the processors, and check recursively
@@ -911,9 +1003,15 @@ function _formatJson(jsonObj) {
                 items.push($('<li>', {class: `list-group-item list-group-item-${bsSeverity}`, html: [severityIcon(message.severity), message.text]}));
             }
             html.push($('<ul>', {class: 'list-group', html: items}));
-            html.push($('<div>', {class: 'js-valid-body', html: _formatJson(jsonObj.wrap)}));
+
+            if (jsonObj.void) {
+                html.push($('<div>', {class: 'js-valid-body', html: $('<span class="no-value">- entry omitted -</span>')}));
+            } else {
+                html.push($('<div>', {class: 'js-valid-body', html: _formatJson(jsonObj.wrap)}));
+            }
             return $('<div>', {class:'js-valid', html:html});
         } else {
+            // could check for void but should never have a void without messages
             return _formatJson(jsonObj.wrap);
         }
     } else {

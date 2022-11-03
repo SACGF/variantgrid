@@ -4,8 +4,8 @@ from typing import List
 from django.db import migrations
 
 
-def migrate_source_id(apps, schema_editor):
-    log: List[str] = list()
+def migrate_source_id(apps, _schema_editor):
+    log: List[str] = []
     Classification = apps.get_model("classification", "Classification")
     EvidenceKey = apps.get_model("classification", "EvidenceKey")
 

@@ -25,17 +25,23 @@ Hello Shariant User,
         </li>
        {% endcomment %}
         {% if lab_summary.pending_changes_count %}
-            <li>Has {{ lab_summary.pending_changes_count }} outstanding pending classification changes agreed upon during discordance resolution</li>
+            <li>
+            {% if lab_summary.pending_changes_count == 1 %}There is 1 outstanding pending classification change that has been agreed upon during discordance resolution</li>
+            {% else %}There are {{ lab_summary.pending_changes_count }} outstanding pending classification changes that have been agreed upon during discordance resolution</li>
+            {% endif %}
+            </li>
         {% endif %}
 
         {% if lab_summary.discordance_report_summaries|length %}
         <li>This lab is involved in a total of {% count lab_summary.discordance_report_summaries '1 discordance' 'discordances' %}</li>
         <ul>
             {% for lab_count in lab_summary.discordance_report_summaries.counts %}
-            <li>
-                {% if lab_count.is_internal %}Discordances only within {{ lab_summary.discordance_report_summaries.labs_quick_str }} account for <strong>{{ lab_count.count }}</strong> of these discordances
-                {% else %}<span style="font-weight:600">{% lab lab_count.lab %}</span> are involved in <strong>{{ lab_count.count }}</strong> of these discordances{% endif %}
-            </li>
+                {% if lab_count.lab != lab_summary.lab %}
+                    <li>
+                        {% if lab_count.is_internal %}Discordances only within {{ lab_summary.discordance_report_summaries.labs_quick_str }} account for <strong>{{ lab_count.count }}</strong> of these discordances
+                        {% else %}<span style="font-weight:600">{% lab lab_count.lab %}</span> are involved in <strong>{{ lab_count.count }}</strong> of these discordances{% endif %}
+                    </li>
+                {% endif %}
             {% endfor %}
         </ul>
         {% endif %}

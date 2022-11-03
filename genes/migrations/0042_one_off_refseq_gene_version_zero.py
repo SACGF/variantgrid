@@ -3,7 +3,7 @@
 from django.db import migrations
 
 
-def _one_off_refseq_gene_version_zero(apps, schema_editor):
+def _one_off_refseq_gene_version_zero(apps, _schema_editor):
     # Make RefSeq gene versions 0 instead of 1, so we know they're not real
     GeneVersion = apps.get_model("genes", "GeneVersion")
     GeneVersion.objects.filter(gene__annotation_consortium='R').update(version=0)

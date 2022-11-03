@@ -1,6 +1,6 @@
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import List, Optional, Dict, Set, Tuple
+from typing import List, Optional, Dict, Set
 
 from django.db.models import Count, QuerySet, Subquery
 from lazy import lazy
@@ -9,7 +9,7 @@ from classification.enums import SpecialEKeys
 from classification.models import ClassificationModification, ClinicalContext, ClassificationLabSummaryEntry, \
     ClassificationLabSummary, classification_flag_types, ClassificationFlagTypes, DiscordanceReport
 from classification.models.clinical_context_models import DiscordanceStatus, DiscordanceLevel
-from flags.models import Flag, FlagResolution, FlagStatus
+from flags.models import Flag, FlagStatus
 from genes.hgvs import CHGVS
 from library.utils import group_by_key, segment
 from snpdb.lab_picker import LabPickerData
@@ -28,7 +28,7 @@ class OverlapsCalculatorState:
     def _collection_to_flag(self):
         # The number of open clinical significance change flags should be limited, so fetch them all to check later
         all_open_pending_changes = Flag.objects.filter(flag_type=classification_flag_types.classification_pending_changes, resolution__status=FlagStatus.OPEN)
-        collection_clin_sig = dict()
+        collection_clin_sig = {}
         for flag in all_open_pending_changes:
             collection_clin_sig[flag.collection_id] = (flag.data or {}).get(ClassificationFlagTypes.CLASSIFICATION_PENDING_CHANGES_CLIN_SIG_KEY)
         return collection_clin_sig
@@ -49,7 +49,7 @@ class ClinicalGroupingOverlap:
         self.calculator_state = calculator_state
         self.clinical_context = clinical_context
         self.groups: Dict[ClassificationLabSummaryEntry] = defaultdict(int)
-        self.cms = list()
+        self.cms = []
         self.labs = set()
 
     def add_classification(self, cm: ClassificationModification):
@@ -66,8 +66,8 @@ class ClinicalGroupingOverlap:
         self.labs.add(cm.classification.lab)
 
     @lazy
-    def status(self):
-        dr: DiscordanceReport = None
+    def status(self) -> 'DiscordanceStatus':
+        dr: Optional[DiscordanceReport] = None
         if cc := self.clinical_context:
             dr = DiscordanceReport.latest_report(cc)
         return DiscordanceStatus.calculate(self.cms, dr)
@@ -117,7 +117,7 @@ class AlleleOverlap:
     def __init__(self, calculator_state: OverlapsCalculatorState, allele: Allele):
         self.calculator_state = calculator_state
         self.allele = allele
-        self.context_map: Dict[Optional[ClinicalContext], ClinicalGroupingOverlap] = dict()
+        self.context_map: Dict[Optional[ClinicalContext], ClinicalGroupingOverlap] = {}
         self._c_hgvses: Set[CHGVS] = set()
 
         # need to keep track of the below for sorting
@@ -154,18 +154,11 @@ class AlleleOverlap:
     def c_hgvses(self) -> List[CHGVS]:
         return sorted(self._c_hgvses)
 
-    LEVEL_SORT_DICT = {
-        DiscordanceLevel.DISCORDANT: 4,
-        DiscordanceLevel.CONCORDANT_CONFIDENCE: 3,
-        DiscordanceLevel.CONCORDANT_DIFF_VUS: 2,
-        DiscordanceLevel.CONCORDANT_AGREEMENT: 1
-    }
-
     @property
     def _sort_value(self):
         max_level = 0
         for sub_group in self.context_map.values():
-            level = AlleleOverlap.LEVEL_SORT_DICT.get(sub_group.status.level, 0)
+            level = sub_group.status.sort_order
             max_level = max(max_level, level)
 
         return (
@@ -194,7 +187,7 @@ class OverlapsCalculator:
 
     def __init__(self, perspective: LabPickerData):
         """
-        Calculates classification overlaps (when more than 1 classification is provided from the same allele.
+        Calculates classification overlaps (when more than 1 classification is provided from the same allele.)
         Is the generally split up between
         :param perspective: User must be present in this perspective
         """
@@ -215,7 +208,7 @@ class OverlapsCalculator:
                             'classification__lab', 'classification__lab__organization') \
             .order_by('classification__allele')
 
-        all_overlaps = list()
+        all_overlaps = []
         for allele, cms in group_by_key(cm_qs, lambda x: x.classification.allele):
             if len(cms) >= 2 and any((cm.classification.lab_id in lab_ids for cm in cms)):
                 overlap = AlleleOverlap(calculator_state=self.calculator_state, allele=allele)
@@ -233,7 +226,7 @@ class OverlapsCalculator:
         self.overlaps = all_overlaps
 
     @property
-    def overlap_sets(self) -> List[AlleleOverlap]:
+    def overlap_sets(self) -> List[OverlapSet]:
         segmented = segment(self.overlaps, filter=lambda overlap: overlap.is_multi_lab)
         return [
             OverlapSet(segmented[0], label="Multi-Lab"),

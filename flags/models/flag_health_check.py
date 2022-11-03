@@ -35,7 +35,8 @@ def flag_chanced_since(since: datetime, flag_types: Optional[Iterable[FlagType]]
     # also need to filter out flags that were open before since and are still open now (likewise for closed)
     # to know that we need to find the most recent flag comment from before closing, and the last flag comment
     # just loop through all the possibile candidates for now, and then see if things start to get too wasteful
-    flag_deltas: Dict[FlagType, FlagDelta] = dict()
+    flag_deltas: Dict[FlagType, FlagDelta] = {}
+
     def count_delta(flag_type: FlagType, diff: int):
         delta = flag_deltas.get(flag_type)
         if not delta:

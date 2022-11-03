@@ -12,13 +12,14 @@ from django.dispatch.dispatcher import receiver
 from django.utils.timezone import now
 from django_extensions.db.models import TimeStampedModel
 from lazy import lazy
+
 from classification.enums import ShareLevel, SpecialEKeys
 from classification.enums.clinical_context_enums import ClinicalContextStatus
 from classification.models.classification import Classification, \
     ClassificationModification
 from classification.models.classification_import_run import ClassificationImportRun, \
     classification_imports_complete_signal
-from flags.models import Flag, FlagResolution, FlagStatus
+from flags.models import Flag, FlagStatus
 from flags.models.models import FlagsMixin, FlagCollection, FlagTypeContext, \
     flag_collection_extra_info_signal, FlagInfos
 from library.django_utils import get_url_from_view_path
@@ -80,6 +81,8 @@ class _DiscordanceCalculationRow:
 @dataclass
 class DiscordanceStatus:
     """
+    TODO rename DiscordanceStatus to OverlapSummary
+
     There's a bit of confusion due to evolution of discordance status
     DiscordanceStatus: gives absolute full context about a clinical grouping
     DiscordanceLevel: an enum that covers all states, e.g. no submissions, single submission, overlap confidence
@@ -92,14 +95,39 @@ class DiscordanceStatus:
     counted_classifications: int
     pending_concordance: bool = False
     discordance_report: Optional['DiscordanceReport'] = None
+    has_ignored_clin_sigs: bool = False
 
     def __str__(self):
         if self.pending_concordance:
             return "Pending Concordance"
         elif self.discordance_report and self.discordance_report.resolution == 'D':
             return "Continued Discordance"
+        elif self.discordance_report and self.discordance_report.resolution is None:
+            return "Active Discordance"
         else:
             return self.level.label
+
+    @property
+    def sort_order(self):
+        if self.pending_concordance:
+            return 5
+        elif self.discordance_report and self.discordance_report.resolution == 'D':
+            return 6
+        elif self.discordance_report and self.discordance_report.resolution is None:
+            return 7
+        elif self.level == DiscordanceLevel.CONCORDANT_CONFIDENCE:
+            return 4
+        elif self.level == DiscordanceLevel.CONCORDANT_DIFF_VUS:
+            return 3
+        elif self.level == DiscordanceLevel.CONCORDANT_AGREEMENT:
+            return 2
+        else:
+            # single submissions, no shred submissions, shouldn't appear in overlaps page
+            # and level discordance has already been taken care of
+            return 1
+
+    def __lt__(self, other):
+        return self.sort_order < other.sort_order
 
     @property
     def css_class(self):
@@ -139,7 +167,7 @@ class DiscordanceStatus:
                                                 flag_type=classification_flag_types.classification_pending_changes,
                                                 resolution__status=FlagStatus.OPEN):
 
-            clin_sig_overrides: Dict[int, str] = dict()
+            clin_sig_overrides: Dict[int, str] = {}
             for flag in pending_flags:
                 clin_sig_overrides[flag_collections[flag.collection_id].pk] = flag.data.get(
                     ClassificationFlagTypes.CLASSIFICATION_PENDING_CHANGES_CLIN_SIG_KEY) or None
@@ -164,6 +192,7 @@ class DiscordanceStatus:
         cs_values: Set[str] = set()   # all the different clinical sig values
         shared_labs: Set[Lab] = set()   # all the sharing labs
         all_labs: Set[Lab] = set()   # all labs involved (sharing and not sharing, only sharing records determine the status)
+        ignored_clin_sigs: Set[str] = set()  # all clin sigs that we came across but
 
         level: Optional[DiscordanceLevel]
         counted_classifications = 0
@@ -177,6 +206,10 @@ class DiscordanceStatus:
                     shared_labs.add(row.lab)
                     cs_scores.add(strength)
                     cs_values.add(clin_sig)
+                else:
+                    shared_labs.add(row.lab)
+                    ignored_clin_sigs.add(clin_sig)
+
                 if vus_special := SPECIAL_VUS.get(clin_sig):
                     cs_vuses.add(vus_special)
 
@@ -205,7 +238,13 @@ class DiscordanceStatus:
         else:
             level = DiscordanceLevel.CONCORDANT_AGREEMENT
 
-        return DiscordanceStatus(level=level, lab_count=len(shared_labs), lab_count_all=len(all_labs), counted_classifications=counted_classifications)
+        return DiscordanceStatus(
+            level=level,
+            lab_count=len(shared_labs),
+            lab_count_all=len(all_labs),
+            counted_classifications=counted_classifications,
+            has_ignored_clin_sigs=bool(ignored_clin_sigs)
+        )
 
 
 class ClinicalContextRecalcTrigger(Enum):
@@ -302,49 +341,52 @@ class ClinicalContext(FlagsMixin, TimeStampedModel):
             "delayed": ongoing_import
         }
 
-        cause = self.pending_cause or cause
+        cause = self.pending_cause or cause or "Unknown cause"
 
-        if ongoing_import and self.status != new_status and old_status is not None:
+        if ongoing_import:
+            # always set pending cause, to ensure calculation is re-triggered at the end
+            # because even if the status doesn't change, a new lab might be added to an existing discordance report
+            # so we still need to recaluclate
+
+            self.pending_cause = self.pending_cause or cause
             # Important - this pending status is not to do with "Pending Changes"
-            # It's
-            if new_status != self.pending_status:
+            was_already_pending = self.pending_status != self.status
+            pending_or_old_status = self.pending_status or self.status
+
+            if (not is_simple_new) and (new_status != pending_or_old_status):
                 # only update the cause if we're going to end up with a new status
-                self.pending_cause = cause
                 self.pending_status = new_status
+                if settings.DISCORDANCE_ENABLED:
+                    if new_status != old_status:
+                        nb = NotificationBuilder("PENDING: ClinicalContext changed)")
+                        nb.add_markdown(
+                            f":clock1: ClinicalGrouping for allele <{allele_url}|{allele_url}> would change from {old_status} -> {new_status} but marked as pending due to {ongoing_import}")
+                        nb.send()
+                    else:
+                        nb = NotificationBuilder("PENDING: ClinicalContext changed-back")
+                        nb.add_markdown(
+                            f":clock430: ClinicalGrouping for allele <{allele_url}|{allele_url}> changed back from {self.pending_status} -> {new_status} within {ongoing_import}, no notifications sent")
+                        nb.send()
 
-                nb = NotificationBuilder("PENDING: ClinicalContext changed)")
-                nb.add_markdown(
-                    f":clock1: ClinicalGrouping for allele <{allele_url}|{allele_url}> would change from {old_status} -> {new_status} but marked as pending due to {ongoing_import}")
-                nb.send()
-
+            self.save()
         else:
             # if doing the recalc live OR if delayed but the status has reverted to what it used to be
             # wipe out the old values
-            self.status = new_status
-            if self.pending_status and ongoing_import:
-                nb = NotificationBuilder("PENDING: ClinicalContext changed-back")
+            if settings.DISCORDANCE_ENABLED and is_significance_change and not is_simple_new:
+                nb = NotificationBuilder("ClinicalContext changed")
                 nb.add_markdown(
-                    f":clock430: ClinicalGrouping for allele <{allele_url}|{allele_url}> changed back from {self.pending_status} -> {new_status} within {ongoing_import}, no notifications sent")
+                    f":fire_engine: ClinicalGrouping for allele <{allele_url}|{allele_url}> changed from {old_status} -> {new_status} "
+                    f"\nLab notifications should follow")
                 nb.send()
 
+            self.status = new_status
             self.pending_cause = None
             self.pending_status = None
 
-        self.save()
+            self.save()
 
-        if ongoing_import:
-            # don't send out any signals if calculation is delayed, we don't want to trigger anything until we complete
-            return
-
-        if settings.DISCORDANCE_ENABLED and is_significance_change and not is_simple_new:
-            nb = NotificationBuilder("ClinicalContext changed")
-            nb.add_markdown(
-                f":fire_engine: ClinicalGrouping for allele <{allele_url}|{allele_url}> changed from {old_status} -> {new_status} "
-                f"\nLab notifications should follow")
-            nb.send()
-
-        clinical_context_signal.send(sender=ClinicalContext, clinical_context=self, status=new_status, is_significance_change=is_significance_change, cause=cause)
-        # clinical_context_signal is now in charge of applying all relevant flags to clinical context and classifications
+            # clinical_context_signal is now in charge of applying all relevant flags to clinical context and classifications
+            clinical_context_signal.send(sender=ClinicalContext, clinical_context=self, status=new_status, is_significance_change=is_significance_change, cause=cause)
 
     @property
     def is_default(self) -> bool:

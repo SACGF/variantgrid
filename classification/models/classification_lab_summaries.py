@@ -43,7 +43,7 @@ class ClassificationLabSummary:
     def sort_key(self):
         from classification.models import EvidenceKeyMap
         key = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE)
-        return self.is_internal, self.lab, key.classification_sorter_value(self.clinical_significance_from), key.classification_sorter_value(self.clinical_significance_to), self.pending
+        return key.classification_sorter_value(self.clinical_significance_to), key.classification_sorter_value(self.clinical_significance_from), self.pending, self.is_internal, self.lab
 
     def __lt__(self, other):
         return self.sort_key < other.sort_key

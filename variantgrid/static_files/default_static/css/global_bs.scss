@@ -149,7 +149,7 @@ table.dataTable td.dataTables_empty, td.table-empty {
         font-style: normal;
         font-variant: normal;
         text-rendering: auto;
-        font-family: 'Font Awesome 5 Free', 'FontAwesome';
+        font-family: 'Font Awesome 6 Free', 'FontAwesome';
         font-weight: 900;
         content: "\f1b2";
         opacity: 0.4;
@@ -340,8 +340,10 @@ a.list-group-item-action {
   align-items: center;
   margin-left: 4px;
   margin-right: 4px;
-    & i.fas {
-    margin: 0;
+    & {
+      i.fas, svg-inline--fa {
+        margin: 0;
+    }
   }
 }
 .btn-circle {
@@ -351,9 +353,11 @@ a.list-group-item-action {
   justify-content: center;
   display: inline-flex;
   align-items: center;
-  & i.fas {
-    margin: 0;
-  }
+    & {
+      i.fas, svg-inline--fa {
+        margin: 0;
+      }
+    }
 }
 
 // Undo this bootstrap so drop downs don't get cut off on classification form
@@ -370,7 +374,7 @@ a {
     font-style: normal;
     font-variant: normal;
     text-rendering: auto;
-    font-family: 'Font Awesome 5 Free', 'FontAwesome';
+    font-family: 'Font Awesome 6 Free', 'FontAwesome';
     font-weight: 900;
     content: "\f35d";
     opacity: 0.4;
@@ -381,7 +385,7 @@ a {
     font-style: normal;
     font-variant: normal;
     text-rendering: auto;
-    font-family: 'Font Awesome 5 Free', 'FontAwesome';
+    font-family: 'Font Awesome 6 Free', 'FontAwesome';
     font-weight: 900;
     content: "\f2d0";
     opacity: 0.4;
@@ -392,7 +396,7 @@ a {
     font-style: normal;
     font-variant: normal;
     text-rendering: auto;
-    font-family: 'Font Awesome 5 Free', 'FontAwesome';
+    font-family: 'Font Awesome 6 Free', 'FontAwesome';
     font-weight: 900;
     content: "\f2b6";
     opacity: 0.4;
@@ -403,7 +407,7 @@ a {
     font-style: normal;
     font-variant: normal;
     text-rendering: auto;
-    font-family: 'Font Awesome 5 Free', 'FontAwesome';
+    font-family: 'Font Awesome 6 Free', 'FontAwesome';
     font-weight: 900;
     content: "\f56d";
     opacity: 0.6;
@@ -418,7 +422,7 @@ a {
     font-style: normal;
     font-variant: normal;
     text-rendering: auto;
-    font-family: 'Font Awesome 5 Free', 'FontAwesome';
+    font-family: 'Font Awesome 6 Free', 'FontAwesome';
     font-weight: 900;
     content: "\f137";
     opacity: 0.6;
@@ -434,7 +438,7 @@ a {
     font-style: normal;
     font-variant: normal;
     text-rendering: auto;
-    font-family: 'Font Awesome 5 Free', 'FontAwesome';
+    font-family: 'Font Awesome 6 Free', 'FontAwesome';
     font-weight: 900;
     content: "\f15b";
     opacity: 0.6;
@@ -448,7 +452,7 @@ a {
     font-style: normal;
     font-variant: normal;
     text-rendering: auto;
-    font-family: 'Font Awesome 5 Free', 'FontAwesome';
+    font-family: 'Font Awesome 6 Free', 'FontAwesome';
     font-weight: 900;
     content: "\f105";
     opacity: 0.6;
@@ -505,7 +509,7 @@ a.list-group-item-action.list-group-item-light {
 	&.indicator-plus {
 		.card-header {
 			&:after {
-                font-family: 'Font Awesome 5 Free', 'FontAwesome';
+                font-family: 'Font Awesome 6 Free', 'FontAwesome';
                 font-weight: 900;
 				content: "\f078";
 				// float: left;
@@ -524,7 +528,7 @@ a.list-group-item-action.list-group-item-light {
 		&.round-indicator {
 			.card-header {
 				&:before {
-                    font-family: 'Font Awesome 5 Free', 'FontAwesome';
+                    font-family: 'Font Awesome 6 Free', 'FontAwesome';
                     font-weight: 900;
 					font-size: 12pt;
 					content: "\f077";
@@ -545,7 +549,7 @@ a.list-group-item-action.list-group-item-light {
 		}
 		.card-header {
 			&:before {
-                font-family: 'Font Awesome 5 Free', 'FontAwesome';
+                font-family: 'Font Awesome 6 Free', 'FontAwesome';
                 font-weight: 900;
 				content: "\f068";
 				// float: left;
@@ -564,7 +568,7 @@ a.list-group-item-action.list-group-item-light {
 	&.indicator-chevron {
 		.card-header {
 			&:after {
-                font-family: 'Font Awesome 5 Free', 'FontAwesome';
+                font-family: 'Font Awesome 6 Free', 'FontAwesome';
                 font-weight: 900;
 				content: "\f078";
 				// float: right;
@@ -628,6 +632,9 @@ span.cs {
     #eee 10px,
     #eee 20px)
 }
+.cs-withdrawn {
+  opacity: 0.5;
+}
 
 .cs-card {
   text-align: center;
@@ -680,10 +687,29 @@ div.background-image {
 
 // still used by wiki (not yet compatible with bootstrap's d-none
 .hidden { display: none }
+.visible-hidden {visibility: hidden}
 
 .toggle-link {
   color: #88B;
   cursor: pointer;
+}
+.admin-link {
+    padding-left: 8px;
+    color: #66AA;
+    cursor: pointer;
+    text-decoration: none;
+    text-transform: uppercase;
+    font-size: 8pt;
+    &:hover {
+        text-display: underline;
+    }
+    &::before {
+        position: relative;
+        left: -4px;
+        content: '\f084';
+        font-family: 'Font Awesome 6 Free', 'FontAwesome';
+        font-weight: 900;
+    }
 }
 
 .hover-detail {
@@ -715,7 +741,7 @@ div.background-image {
             position: absolute;
             left: -16px;
             content: '\f056';
-            font-family: 'Font Awesome 5 Free', 'FontAwesome';
+            font-family: 'Font Awesome 6 Free', 'FontAwesome';
             font-weight: 900;
         }
     }
@@ -790,28 +816,28 @@ table.as_table {
 // Condition Aliases
 .dt-status {
     .val-R:before {
-        font-family: 'Font Awesome 5 Free', 'FontAwesome';
+        font-family: 'Font Awesome 6 Free', 'FontAwesome';
         font-weight: 900;
         margin-right: 4px;
         content: "\f058";
         color: green;
     }
     .val-P:before {
-        font-family: 'Font Awesome 5 Free', 'FontAwesome';
+        font-family: 'Font Awesome 6 Free', 'FontAwesome';
         font-weight: 900;
         color: #bbb;
         margin-right: 4px;
         content: "\f111";
     }
     .val-A:before {
-        font-family: 'Font Awesome 5 Free', 'FontAwesome';
+        font-family: 'Font Awesome 6 Free', 'FontAwesome';
         font-weight: 900;
         margin-right: 4px;
         content: "\f544";
         color: #6a6;
     }
     .val-U:before {
-        font-family: 'Font Awesome 5 Free', 'FontAwesome';
+        font-family: 'Font Awesome 6 Free', 'FontAwesome';
         font-weight: 900;
         margin-right: 4px;
         content: "\f057";
@@ -868,7 +894,7 @@ ul.compact {
       text-rendering: auto;
       font-size: 0.4rem;
       font-weight: 900;
-      font-family: 'Font Awesome 5 Free';
+      font-family: 'Font Awesome 6 Free';
       content: "\f111";
       line-height: 0;
     }
@@ -999,7 +1025,14 @@ ul.compact {
     border-radius: 4px;
     background-color: #F0D9ED !important;
 }
-
+/*
+.overlap-container {
+  div:first-of-type {
+    border-radius-top-left: 5px;
+    border-radius-top-right: 5px;
+  }
+}
+*/
 // discordance levels from most disagreeable to least
 .overlap-discordant {
     color: #b44;
@@ -1031,7 +1064,7 @@ ul.compact {
 table .fa-hand-point-right {
   position: relative;
   left: -20px;
-  width: 0;
+  // width: 0;
   margin: 0;
 }
 
@@ -1078,3 +1111,28 @@ a .c-hgvs-body {
     color: #4444bb;
   }
 }
+
+.current-record-menu-item {
+  display: none;
+}
+.current-record-menu-item.active {
+  display: block;
+  margin-left: 8px;
+  margin-right: 16px;
+  text-align: right;
+  word-break: break-word;
+}
+
+/*
+// used in combination with gloabl.js's main active item
+
+@keyframes highlight-select {
+  from {transform: scale(1) }
+    to { transform:scale(1.2) }
+}
+
+.group-selected .main-icon, .group-selected.main-icon,  {
+    color: #4a4 !important;
+    animation: highlight-select 1s infinite alternate;
+}
+ */

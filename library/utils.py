@@ -1,5 +1,6 @@
 import csv
 import difflib
+import functools
 import hashlib
 import importlib
 import inspect
@@ -28,6 +29,7 @@ from urllib.parse import urlparse
 
 from bs4 import BeautifulSoup
 from dateutil import parser
+from dateutil.tz import gettz
 from django.conf import settings
 from django.core.exceptions import FieldDoesNotExist
 from django.core.serializers import serialize
@@ -141,12 +143,12 @@ class Struct:
         self.__dict__.update(entries)
 
 
-def time_since(start):
+def time_since(start: datetime) -> timedelta:
     end = time.time()
     return end - start
 
 
-def get_and_log_time_since(start, name=''):
+def get_and_log_time_since(start: datetime, name='') -> timedelta:
     ts = time_since(start)
     if name:
         name += ': '
@@ -154,24 +156,24 @@ def get_and_log_time_since(start, name=''):
     return ts
 
 
-def upper(string):
+def upper(string: str) -> str:
     if string:
         string = str(string).upper()
     return string
 
 
-def is_url(url):
+def is_url(url: str) -> bool:
     parse_result = urlparse(url)
     return bool(parse_result.scheme in ('http', 'https') and parse_result.netloc)
 
 
-def rgb_hex_to_tuples(rgb):
+def rgb_hex_to_tuples(rgb: str):
     rgb = rgb.replace('#', '')
     return bytes.fromhex(rgb)
 
 
 def rgb_to_hex(red, green, blue):
-    return "#%02x%02x%02x" % (red, green, blue)
+    return f"#{red:02x}{green:02x}{blue:02x}"
 
 
 def rgb_invert(rgb):
@@ -191,15 +193,15 @@ def get_all_subclasses(cls):
     return all_subclasses
 
 
-def datetime_string_to_date(s):
+def datetime_string_to_date(s: str) -> datetime:
     return parser.parse(s).date()
 
 
-def none_to_blank_string(s):
+def none_to_blank_string(s: Optional[str]) -> str:
     return s or ''
 
 
-def calculate_age(born, died=None):
+def calculate_age(born: datetime, died: Optional[datetime] = None) -> int:
     """ https://stackoverflow.com/a/9754466/295724 """
     age = None
     if born:
@@ -218,6 +220,7 @@ def all_equal(iterable):
 
 
 def empty_dict():
+    # If you want an empty_dict as a default function parameter
     return dict()
 
 
@@ -243,7 +246,7 @@ def empty_to_none(value: T) -> Optional[T]:
     return value
 
 
-def pretty_label(label: str):
+def pretty_label(label: str) -> str:
     label = label.replace('_', ' ')
     tidied = ''
     last_space = True
@@ -281,6 +284,7 @@ def is_not_none(obj):
 
 
 def first(obj):
+    # FIXME, really should check if iterable and return first result of next
     if isinstance(obj, list):
         if len(obj) >= 1:
             return obj[0]
@@ -298,6 +302,10 @@ def get_single_element(sequence):
 
 
 def nest_dict(flat_dict: dict) -> dict:
+    """
+    :param flat_dict: A dictionary where all the keys are in the format of "a.b": x, "a.c": y
+    :return: A nested dictionary e.g. {"a": {"b": x}, {"c": y}}
+    """
     nested = {}
     for full_path, value in flat_dict.items():
         path = full_path.split('.')
@@ -313,13 +321,13 @@ def nest_dict(flat_dict: dict) -> dict:
     return nested
 
 
-def iter_fixed_chunks(iterable, chunk_size):
+def iter_fixed_chunks(iterable: Iterable[Any], chunk_size: int) -> Iterator[List[Any]]:
     """ https://stackoverflow.com/a/22045226 """
     it = iter(iterable)
     return iter(lambda: tuple(islice(it, chunk_size)), ())
 
 
-def nice_class_name(obj_or_klass):
+def nice_class_name(obj_or_klass) -> str:
     if isinstance(obj_or_klass, type):
         klass = obj_or_klass
     else:
@@ -327,15 +335,15 @@ def nice_class_name(obj_or_klass):
     return klass.__name__
 
 
-def single_quote(s):
+def single_quote(s: Any) -> str:
     return f"'{s}'"
 
 
-def double_quote(s):
+def double_quote(s: Any) -> str:
     return f'"{s}"'
 
 
-def filename_safe(filename) -> str:
+def filename_safe(filename: str) -> str:
     keepcharacters = {'.', '_'}
     filename = filename.replace(' ', '_')  # you can never trust spaces
     # leave room for an extension so make sure the filename is 250 characters
@@ -590,7 +598,7 @@ def format_significant_digits(a_number, sig_digits=3) -> str:
     if a_number == 0:
         return "0"
     rounded_number = round(a_number, sig_digits - int(math.floor(math.log10(abs(a_number)))) - 1)
-    rounded_number_str = "{:.12f}".format(rounded_number)
+    rounded_number_str = f"{rounded_number:.12f}"
     if match := trailing_zeros_strip.match(rounded_number_str):
         rounded_number_str = match.group(1)
         if rounded_number_str[-1] == '.':
@@ -698,7 +706,7 @@ class Constant:
     def __get__(self, *args):
         return self.value
     def __repr__(self):
-        return '%s(%r)' % (self.__class__.__name__, self.value)
+        return f'{self.__class__.__name__}({self.value!r})'
 
 
 class ArrayLength(models.Func):
@@ -895,22 +903,39 @@ def flatten_nested_lists(iterable) -> List:
     return list(_flatten_generator(iterable))
 
 
-def export_column(label: Optional[str] = None, sub_data: Optional[Type] = None, categories: Dict[str, Any] = None):
+def export_column(label: Optional[str] = None, sub_data: Optional[Type] = None, categories: Dict[str, Any] = None, format: Dict[str, Any] = None):
     """
     Extend ExportRow and annotate methods with export_column.
     The order of defined methods determines the order that the results will appear in an export file
     :param label: The label that will appear in the CSV header (defaults to method name if not provided)
     :param sub_data: An optional SubType of another ExportRow for nested data
     """
+    tz_name = settings.TIME_ZONE
+    use_tz = None
+    if format and (format_tz_name := format.get("tz")):
+        show_tz_in_heading = True
+        if format_tz_name == "default":
+            format_tz_name = settings.TIME_ZONE
+        use_tz = gettz(format_tz_name)
+        tz_name = use_tz.tzname(datetime.now())
 
     def decorator(method):
         def wrapper(*args, **kwargs):
-            return method(*args, **kwargs)
+            result = method(*args, **kwargs)
+            if isinstance(result, datetime):
+                if use_tz:
+                    result = result.astimezone(use_tz)
+                return result.strftime("%Y-%m-%d %H:%M")
+
+            return result
         # have to cache the line number of the source method, otherwise we just get the line number of this wrapper
         wrapper.line_number = inspect.getsourcelines(method)[1]
         wrapper.label = label or method.__name__
         if '$site_name' in wrapper.label:
             wrapper.label = wrapper.label.replace('$site_name', settings.SITE_NAME)
+
+        if use_tz:
+            wrapper.label = f"{wrapper.label} ({tz_name})"
 
         wrapper.__name__ = method.__name__
         wrapper.is_export = True
@@ -936,10 +961,22 @@ class ExportRow:
         if categories:
             def passes_filter(export_method) -> bool:
                 nonlocal categories
-                export_categories = export_method.categories or dict()
+                decorated_values = export_method.categories or dict()
+                # for every requirement of categories
                 for key, value in categories.items():
-                    if not export_categories.get(key) == value:
+                    # get the decorated value
+                    if decorated_value := decorated_values.get(key):
+                        # handle decorated value being a collection (and matching a single value in that collection)
+                        if isinstance(decorated_value, (set, tuple, list)):
+                            if value not in decorated_value:
+                                return False
+                        elif decorated_value != value:
+                            return False
+                    # if the requirement for the category is None and there's no value at all in the decorator
+                    # it passes the test
+                    elif value is not None:
                         return False
+
                 return True
 
             export_methods = [em for em in export_methods if passes_filter(em)]
@@ -970,14 +1007,28 @@ class ExportRow:
             raise
 
     @classmethod
-    def json_generator(cls, data: Iterable[Any], records_key: str = "records") -> Iterator[str]:
+    def json_generator(cls, data: Iterable[Any], records_key: str = "records", categories: Optional[Dict[str, Any]] = None) -> Iterator[str]:
+        """
+        :param data: Iterable data of either cls or that can be passed to cls's constructor
+        :param records_key:
+        :param categories:
+        :return:
+        """
         first_row = True
         try:
-            yield f'{{"{records_key}": ['
+            if records_key:
+                yield f'{{"{records_key}": ['
+
             for row_data in cls._data_generator(data):
-                yield (', ' if not first_row else '') + json.dumps(row_data.to_json())
+                text = ""
+                if not first_row:
+                    text += ",\n"
                 first_row = False
-            yield ']}}'
+                text += json.dumps(row_data.to_json(categories=categories))
+                yield text
+
+            if records_key:
+                yield ']}}'
         except:
             from library.log_utils import report_exc_info
             report_exc_info(extra_data={"activity": "Exporting"})
@@ -1025,7 +1076,8 @@ class ExportRow:
 
             if value == "":
                 value = None
-            row[method.__name__] = value
+            #row[method.__name__] = value
+            row[method.label or method.__name] = value
 
         return row
 
@@ -1206,3 +1258,26 @@ def diff_text(a: str, b: str) -> DiffBuilder:
         diff_builder.append(diff_chars)
     diff_builder.optimize()
     return diff_builder
+
+
+class WrappablePartial(functools.partial):
+    """
+    functools.partial doesn't work great on decorated methods (complains about lack of __module__)
+    this extension of partial fixes that
+    """
+
+    @property
+    def __module__(self):
+        return self.func.__module__
+
+    @property
+    def __name__(self):
+        return "functools.partial({}, *{}, **{})".format(
+            self.func.__name__,
+            self.args,
+            self.keywords
+        )
+
+    @property
+    def __doc__(self):
+        return self.func.__doc__

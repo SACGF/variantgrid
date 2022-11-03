@@ -3,7 +3,7 @@
 from django.db import migrations
 
 
-def _one_off_fix_link_sample_to_sequencing_samples(apps, schema_editor):
+def _one_off_fix_link_sample_to_sequencing_samples(apps, _schema_editor):
     VCFFromSequencingRun = apps.get_model("seqauto", "VCFFromSequencingRun")
     SampleFromSequencingSample = apps.get_model("seqauto", "SampleFromSequencingSample")
 

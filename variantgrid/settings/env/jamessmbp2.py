@@ -42,7 +42,7 @@ ROLLBAR['enabled'] = False
 # INSTALLED_APPS.append('debug_toolbar')
 
 MIDDLEWARE += ('eventlog.middleware.PageViewsMiddleware', )
-LOG_ACTIVITY_APPS = {"classification", "variantopedia", "snpdb", "genes"}
+LOG_ACTIVITY_APPS = {"classification", "variantopedia", "snpdb", "genes", "ontology"}
 
 VARIANT_CLASSIFICATION_OMNI_IMPORTER_APP_DIR = "/Users/jamesandrews/Projects/VariantGrid/shariant-omni-importer"
 VARIANT_CLASSIFICATION_OMNI_IMPORTER_PUBLISH_LEVEL = "logged_in_users"
@@ -177,20 +177,17 @@ ANNOTATION[BUILD_GRCH38]["annotation_consortium"] = "RefSeq"
 
 VARIANT_CLASSIFICATION_WEB_FORM_CREATE_INITIALLY_REQUIRE_SAMPLE = False
 
-_SHARIANT_MODE = True
+_SHARIANT_MODE = False
 if _SHARIANT_MODE:
     LOGIN_REDIRECT_URL = '/classification/dashboard'
 
     SHARIANT_STATIC_FILES_DIR = os.path.join(VARIANTGRID_APP_DIR, "static_files", "shariant_static")
     SHARIANT_TEST_STATIC_FILES_DIR = os.path.join(VARIANTGRID_APP_DIR, "static_files", "shariant_test_static")
-    # STATICFILES_DIRS = (SHARIANT_TEST_STATIC_FILES_DIR, SHARIANT_STATIC_FILES_DIR,) + STATICFILES_DIRS
-    STATICFILES_DIRS = (SHARIANT_STATIC_FILES_DIR,) + STATICFILES_DIRS
+    STATICFILES_DIRS = (SHARIANT_TEST_STATIC_FILES_DIR, SHARIANT_STATIC_FILES_DIR,) + STATICFILES_DIRS
 
     SHARIANT_TEMPLATES_DIR = os.path.join(VARIANTGRID_APP_DIR, "templates/shariant_templates")
     TEMPLATES[0]["DIRS"].insert(0, SHARIANT_TEMPLATES_DIR)
-    SITE_NAME = "Shariant"
-
-#INSTALLED_APPS.append('debug_toolbar')
+    SITE_NAME = "Shariant Dev"
 
 #SAPATH_APP = 'sapath.apps.SapathConfig'
 #INSTALLED_APPS += [SAPATH_APP]

@@ -1,4 +1,5 @@
 from django.dispatch import receiver
+
 from classification.enums import ShareLevel
 from classification.models import Classification, classification_flag_types
 from flags.models import FlagType
@@ -51,7 +52,7 @@ def classification_flag_health_check_activity(sender, health_request: HealthChec
         health_request.since,
         flag_types=FlagType.objects.filter(context=classification_flag_types.classification_flag_context)
     )
-    checks = list()
+    checks = []
     for flag_delta in flag_deltas:
 
         parts = []

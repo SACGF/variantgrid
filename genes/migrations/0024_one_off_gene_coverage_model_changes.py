@@ -4,7 +4,7 @@ from django.db import migrations
 from django.db.models import Value, F
 
 
-def _one_off_gene_coverage_model_changes(apps, schema_editor):
+def _one_off_gene_coverage_model_changes(apps, _schema_editor):
     GeneCoverage = apps.get_model("genes", "GeneCoverage")
     GeneCoverageCanonicalTranscript = apps.get_model("genes", "GeneCoverageCanonicalTranscript")
 

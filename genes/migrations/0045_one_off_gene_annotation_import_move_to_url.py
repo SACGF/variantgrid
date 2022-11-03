@@ -3,7 +3,7 @@
 from django.db import migrations
 
 
-def _one_off_gene_annotation_import_move_to_url(apps, schema_editor):
+def _one_off_gene_annotation_import_move_to_url(apps, _schema_editor):
     GeneAnnotationImport = apps.get_model("genes", "GeneAnnotationImport")
     for gai in GeneAnnotationImport.objects.filter(url__isnull=True):
         gai.url = f"File: {gai.filename}"

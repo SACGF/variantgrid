@@ -179,11 +179,11 @@ class IntersectionNode(AnalysisNode):
 
             # Open a pipe to intersectBed, which also uploads into the VariantCollection
             args = [settings.INTERSECT_BED_SCRIPT, bed_file, str(variant_collection.pk)]
-            intercept_bed_pipe = subprocess.Popen(args, stdin=subprocess.PIPE)  # , stdout=subprocess.PIPE)
-            parent_node = self.get_single_parent()
-            parent_queryset = parent_node.get_queryset()
-            write_qs_to_vcf_file_sort_alphabetically(parent_queryset, intercept_bed_pipe.stdin)
-            intercept_bed_pipe.communicate()
+            with subprocess.Popen(args, stdin=subprocess.PIPE) as intercept_bed_pipe:
+                parent_node = self.get_single_parent()
+                parent_queryset = parent_node.get_queryset()
+                write_qs_to_vcf_file_sort_alphabetically(parent_queryset, intercept_bed_pipe.stdin)
+                intercept_bed_pipe.communicate()
         else:
             super().write_cache(variant_collection)
 

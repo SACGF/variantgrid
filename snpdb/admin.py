@@ -1,7 +1,6 @@
 import re
 from typing import List
 
-from dal_select2.widgets import ModelSelect2
 from django.contrib import admin, messages
 from django.contrib.admin.widgets import AdminTextInputWidget
 from django.db.models import QuerySet
@@ -42,7 +41,7 @@ class AlleleAdmin(ModelAdminBasics):
 
     @admin_list_column()
     def variants(self, obj: Allele):
-        genome_builds: List[GenomeBuild] = list()
+        genome_builds: List[GenomeBuild] = []
         for va in VariantAllele.objects.filter(allele=obj).order_by('genome_build'):
             genome_builds.append(va.genome_build)
         if genome_builds:
@@ -155,7 +154,7 @@ class ClinVarKeyAdmin(ModelAdminBasics):
         from classification.models.clinvar_export_prepare import ClinvarExportPrepare
         report = ClinvarExportPrepare().update_export_records_for_keys(list(queryset.all()))
         if len(report) > 10:
-            self.message_user(request, message=f"Showing first 10 messages", level=messages.INFO)
+            self.message_user(request, message="Showing first 10 messages", level=messages.INFO)
         for report_row in report[0:10]:
             self.message_user(request, message=report_row, level=messages.INFO)
 
@@ -283,11 +282,38 @@ class LabHeadAdmin(ModelAdminBasics):
         "user",
     )
 
+
+@admin.register(models.Country)
+class CountryAdmin(ModelAdminBasics):
+
+    def get_form(self, request, obj=None, **kwargs):
+        return super().get_form(request, obj, widgets={
+            'name': admin.widgets.AdminTextInputWidget(),
+            'short_name': admin.widgets.AdminTextInputWidget()
+        }, **kwargs)
+
+
+@admin.register(models.State)
+class StateAdmin(ModelAdminBasics):
+
+    list_display = ('name', 'country')
+
+    def get_form(self, request, obj=None, **kwargs):
+        return super().get_form(request, obj, widgets={
+            'name': admin.widgets.AdminTextInputWidget(),
+            'short_name': admin.widgets.AdminTextInputWidget()
+        }, **kwargs)
+
+    def is_readonly_field(self, f) -> bool:
+        if f.name == "country":
+            return False
+        return super().is_readonly_field(f)
+
+
 admin.site.register(models.CachedGeneratedFile, ModelAdminBasics)
 admin.site.register(models.Cohort, ModelAdminBasics)
 admin.site.register(models.CohortGenotypeCollection, ModelAdminBasics)
 admin.site.register(models.CohortSample, ModelAdminBasics)
-admin.site.register(models.Country)
 admin.site.register(models.CustomColumn, ModelAdminBasics)
 admin.site.register(models.CustomColumnsCollection, ModelAdminBasics)
 admin.site.register(models.GenomeBuild, ModelAdminBasics)
@@ -301,7 +327,6 @@ admin.site.register(models.SampleLabProject)
 admin.site.register(models.SampleTag, ModelAdminBasics)
 admin.site.register(models.SettingsInitialGroupPermission, ModelAdminBasics)
 admin.site.register(models.SiteMessage, ModelAdminBasics)
-admin.site.register(models.State)
 admin.site.register(models.Tag, ModelAdminBasics)
 admin.site.register(models.Trio, ModelAdminBasics)
 admin.site.register(models.VCF, GuardedModelAdminBasics)

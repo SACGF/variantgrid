@@ -448,8 +448,8 @@ def sequencing_stats(request):
     }
 
     sample_enrichment_kits_df = get_sample_enrichment_kits_df()
-    context = {'num_sequencing_runs': sum([i[1] for i in sr_sequencer]),
-               'num_samples': sum([i[1] for i in ss_sequencer]),
+    context = {'num_sequencing_runs': sum(i[1] for i in sr_sequencer),
+               'num_samples': sum(i[1] for i in ss_sequencer),
                'sequencing_run_info': sequencing_run_info,
                'sequencing_sample_info': sequencing_sample_info,
                'sample_enrichment_kits_df': sample_enrichment_kits_df}

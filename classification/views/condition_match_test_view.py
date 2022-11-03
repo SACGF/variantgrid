@@ -2,16 +2,19 @@ from datetime import datetime
 from typing import Optional
 
 from django.contrib import messages
+from django.db.models import Q
 from django.db.models.functions import Length
 from django.http import StreamingHttpResponse
 from django.shortcuts import render
 
 from classification.models import ConditionText, top_level_suggestion, condition_matching_suggestions, \
-    ConditionMatchingSuggestion
+    ConditionMatchingSuggestion, ConditionTextMatch
 from genes.models import GeneSymbol
+from library.django_utils import require_superuser
 from library.log_utils import report_exc_info
 from library.utils import delimited_row
-from ontology.models import OntologySnake
+from ontology.models import OntologySnake, OntologyVersion, OntologyTermStatus, OntologyImportSource, \
+    OntologyTermRelation, GeneDiseaseClassification
 from ontology.ontology_matching import OntologyMatching, SearchText, normalize_condition_text
 
 
@@ -89,7 +92,7 @@ def condition_match_test_download_view(request):
 def condition_match_test_view(request):
     condition_text = request.GET.get("condition_text")
     gene_symbol_str = request.GET.get("gene_symbol")
-    auto_matches = list()
+    auto_matches = []
     attempted = False
     suggestion = None
     gene_symbol: Optional[GeneSymbol] = None
@@ -125,3 +128,36 @@ def condition_match_test_view(request):
     }
 
     return render(request, 'classification/condition_match_test.html', context=context)
+
+
+@require_superuser
+def condition_obsoletes_view(request):
+    # find relationships to obsolete terms
+    # only care about obsolete relationships from Panel App AU
+    obsolete_relations_panelappau = OntologyTermRelation.objects\
+        .filter(from_import__import_source=OntologyImportSource.PANEL_APP_AU)\
+        .filter(
+            Q(source_term__status__ne=OntologyTermStatus.CONDITION) | Q(dest_term__status__ne=OntologyTermStatus.CONDITION)
+        ).order_by('dest_term__name')
+
+    obsolete_relations_gencc = OntologyVersion.latest().get_ontology_term_relations() \
+        .filter(from_import__import_source=OntologyImportSource.GENCC) \
+        .filter(OntologySnake.gencc_quality_filter(GeneDiseaseClassification.STRONG)) \
+        .filter(
+            Q(source_term__status__ne=OntologyTermStatus.CONDITION) | Q(dest_term__status__ne=OntologyTermStatus.CONDITION)
+        ).order_by('dest_term__name')
+
+    obsolete_condition_matches = []
+    for ctm in ConditionTextMatch.objects.filter(condition_xrefs__isnull=False):
+        for term in ctm.condition_xref_terms:
+            if term.is_obsolete:
+                obsolete_condition_matches.append(ctm)
+                break
+
+    context = {
+        "obsolete_relations_panelappau": obsolete_relations_panelappau,
+        "obsolete_relations_gencc": obsolete_relations_gencc,
+        "obsolete_condition_matches": obsolete_condition_matches
+    }
+
+    return render(request, 'classification/condition_obsoletes.html', context=context)

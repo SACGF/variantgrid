@@ -5,7 +5,7 @@ from django.db import migrations
 from classification.autopopulate_evidence_keys.clinvar_option_updator import ClinVarOptionUpdator
 
 
-def clinical_significance(apps, schema_editor):
+def clinical_significance(apps, _schema_editor):
     options = ClinVarOptionUpdator(apps, "clinical_significance")
     options.set_clinvar_option("B", "Benign")
     options.set_clinvar_option("LB", "Likely benign")
@@ -34,7 +34,8 @@ imprinting : Imprinting
 "Multifactorial inheritance",
 """
 
-def mode_of_inheritance(apps, schema_editor):
+
+def mode_of_inheritance(apps, _schema_editor):
     options = ClinVarOptionUpdator(apps, "mode_of_inheritance")
     options.set_clinvar_option("autosomal_dominant", "Autosomal dominant inheritance")
     options.set_clinvar_option("autosomal_recessive", "Autosomal recessive inheritance")
@@ -56,7 +57,7 @@ def mode_of_inheritance(apps, schema_editor):
     options.set_clinvar_option("multifactorial", "Multifactorial")
 
 
-def allele_origin(apps, schema_editor):
+def allele_origin(apps, _schema_editor):
     options = ClinVarOptionUpdator(apps, "allele_origin")
     options.set_clinvar_option("germline", "germline")
     options.set_clinvar_option("somatic", "somatic")

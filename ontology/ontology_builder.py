@@ -1,14 +1,14 @@
 from dataclasses import dataclass
 from datetime import timedelta, datetime
 from enum import Enum
-from typing import Optional, Dict, List, TypeVar, Generic, Iterable, Type
+from typing import Optional, Dict, List, TypeVar, Generic, Iterable, Type, Tuple
 
 from django.db.models import Model
 from django.utils import timezone
 from lazy import lazy
 from model_utils.models import now
 
-from ontology.models import OntologyTermRelation, OntologyTerm, OntologyImport
+from ontology.models import OntologyTermRelation, OntologyTerm, OntologyImport, OntologyTermStatus
 
 
 class OntologyBuilderDataUpToDateException(Exception):
@@ -80,12 +80,13 @@ class CachedObj(Generic[T]):
 
 class OntologyBuilder:
 
-    def __init__(self, filename: str, context: str, import_source: str, processor_version: int = 1, force_update: bool = False):
+    def __init__(self, filename: str, context: str, import_source: str, processor_version: int = 1, force_update: bool = False, versioned: bool = True):
         """
         :filename: Name of the resource used, only used for logging purposes
         :context: In what context are we inserting records (e.g. full file context, or partial panel app)
         :ontology_service: Service that sources this data, but import is not restricted to this service
         :force_update: If true, the ensure methods don't raise exceptions
+        :versioned: Does the import exist outside of versions (e.g. PanelAppAU that does incremental version updates should have it as False)
         """
         self.start = datetime.now()
         self.filename = filename if ':' in filename else filename.split("/")[-1]
@@ -94,14 +95,15 @@ class OntologyBuilder:
         self.processor_version = processor_version
         self.data_hash = None
         self.force_update = force_update
+        self.versioned = versioned
 
         self.previous_import: Optional[OntologyImport] = OntologyImport.objects.filter(import_source=import_source, context=context, completed=True).order_by('-modified').first()
         if self.previous_import and self.previous_import.processor_version != self.processor_version:
             self.previous_import = None  # if previous import was done with an older version of the import code, don't count it
 
         self.full_cache = False
-        self.terms: Dict[str, CachedObj[OntologyTerm]] = dict()
-        self.relations: Dict[RelationKey, CachedObj[OntologyTermRelation]] = dict()
+        self.terms: Dict[str, CachedObj[OntologyTerm]] = {}
+        self.relations: Dict[RelationKey, CachedObj[OntologyTermRelation]] = {}
 
     def ensure_old(self, max_age: timedelta):
         """
@@ -155,15 +157,20 @@ class OntologyBuilder:
     def _fetch_relation(self, rk: RelationKey) -> CachedObj[OntologyTermRelation]:
         if pre_cached := self.relations.get(rk):
             return pre_cached
-        if not self.full_cache and (in_db := OntologyTermRelation.objects.filter(
+        if not self.full_cache:
+            relation_qs = OntologyTermRelation.objects.filter(
                 source_term_id=rk.source,
                 dest_term_id=rk.dest,
-                relation=rk.relation,
-                from_import=self._ontology_import
-        ).first()):
-            cached = CachedObj(in_db)
-            self.relations[rk] = cached
-            return cached
+                relation=rk.relation)
+            if self.versioned:
+                # if versioned, then the relationship has to be from the same import
+                # otherwise, it can be from any previous import
+                relation_qs = relation_qs.filter(from_import=self._ontology_import)
+
+            if in_db := relation_qs.first():
+                cached = CachedObj(in_db)
+                self.relations[rk] = cached
+                return cached
 
         self._fetch_term(rk.source)
         self._fetch_term(rk.dest)
@@ -192,21 +199,26 @@ class OntologyBuilder:
                  extra: Optional[Dict] = None,
                  aliases: Optional[List[str]] = None,
                  primary_source: bool = True,
-                 deprecated: Optional[bool] = None):
+                 status: Optional[OntologyTermStatus] = None,
+                 trusted_source: bool = True) -> Tuple[OntologyTerm, bool]:
+        """
+        Returns OntologyTerm and boolean indicated True for created, False for already existed
+        TODO: The created boolean will return True on multiple requests to add_term with the same import_builder
+        """
 
         cached = self._fetch_term(term_id)
         if not primary_source and cached.status == ModifiedStatus.EXISTING:
             # record was imported by a different process, so leave it alone
             # e.g. it was imported via an OMIM import but we're just referencing a stub value
             # now from a MONDO import.
-            return
+            return cached.obj, False
 
         cached.modify(self._ontology_import)
         term = cached.obj
 
         if aliases:
             # want to maintain order (so don't convert to a set)
-            unique_aliases = list()
+            unique_aliases = []
             for alias in aliases:
                 if alias not in unique_aliases and alias != name:
                     unique_aliases.append(alias)
@@ -224,9 +236,18 @@ class OntologyBuilder:
             term.extra = extra
 
         if aliases is not None or primary_source:
-            term.aliases = aliases or list()
+            term.aliases = aliases or []
 
-        term.deprecated = deprecated or (name and "obsolete" in name.lower())
+        if not status:
+            if "obsolete" in name.lower():
+                status = OntologyTermStatus.DEPRECATED
+            elif not primary_source and not trusted_source:
+                status = OntologyTermStatus.STUB
+            else:
+                status = OntologyTermStatus.CONDITION
+        term.status = status
+
+        return term, cached.status == ModifiedStatus.CREATED
 
     def complete(self, purge_old_relationships=False, purge_old_terms=False, verbose=True):
         """
@@ -236,12 +257,15 @@ class OntologyBuilder:
         """
 
         CachedObj.bulk_apply(OntologyTerm, self.terms.values(),
-                             ["name", "definition", "extra", "aliases", "from_import", "modified", "deprecated"], verbose=verbose)
+                             ["name", "definition", "extra", "aliases", "from_import", "modified", "status"], verbose=verbose)
         CachedObj.bulk_apply(OntologyTermRelation, self.relations.values(),
                              ["extra", "from_import", "modified"], verbose=verbose)
 
         # Now to find previous imports - and terms that weren't updated by this import (and purge them if requested)
-        oi_qs = OntologyImport.objects.filter(context=self.context, import_source=self.import_source)
+        oi_qs = OntologyImport.objects.filter(context=self.context)
+        if self.versioned:
+            oi_qs = oi_qs.filter(import_source=self.import_source)
+
         old_imports = set(oi_qs.values_list("pk", flat=True))
         if self._ontology_import.pk in old_imports:
             old_imports.remove(self._ontology_import.pk)

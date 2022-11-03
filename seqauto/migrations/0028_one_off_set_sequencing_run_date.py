@@ -7,12 +7,12 @@ from django.db import migrations
 from django.utils.timezone import make_aware
 
 
-def _one_off_set_sequencing_run_date(apps, schema_editor):
+def _one_off_set_sequencing_run_date(apps, _schema_editor):
     SequencingRun = apps.get_model("seqauto", "SequencingRun")
     # Old ones look like: 210226_NB501009_0445_AHV7GVBGXH
-    OLD_REGEX = "^([12]\d{5})_"
+    OLD_REGEX = r"^([12]\d{5})_"
     # New ones look like: Exome_20_001_200612_NB501009_0389_AH7TJTBGXG
-    NEW_REGEX = ".*_([12]\d{5})_"
+    NEW_REGEX = r".*_([12]\d{5})_"
 
     old_pattern = re.compile(OLD_REGEX)
     new_pattern = re.compile(NEW_REGEX)

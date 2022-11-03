@@ -20,7 +20,7 @@ from classification.tasks.classification_import_map_and_insert_task import Class
 from library.django_utils import get_url_from_view_path
 from library.log_utils import NotificationBuilder, report_exc_info
 from snpdb.lab_picker import LabPickerData
-from snpdb.models import Lab, UserSettings
+from snpdb.models import Lab
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
 
 
@@ -154,7 +154,7 @@ class UploadedClassificationsUnmappedView(View):
                     if meta := FileMeta.from_unmapped(unmapped):
                         existing.add(meta)
 
-                server_files: List[FileHandle] = list()
+                server_files: List[FileHandle] = []
                 for file in server_address.list():
                     meta = FileMeta.from_file_handle(file)
                     if meta not in existing:

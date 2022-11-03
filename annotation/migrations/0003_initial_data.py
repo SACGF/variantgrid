@@ -8,14 +8,14 @@ from django.db import migrations
 from library.django_utils import bulk_insert_class_data
 
 
-def populate_mutational_signature_info(apps, schema_editor):
+def populate_mutational_signature_info(apps, _schema_editor):
     MutationalSignatureInfo = apps.get_model("annotation", "MutationalSignatureInfo")
 
     config = configparser.ConfigParser(interpolation=None)
     config.read(settings.MUTATIONAL_SIGNATURE_INFO_FILE)
     num_signatures = 0
     for section in config.sections():
-        if m := re.match("Signature (\d+)", section):
+        if m := re.match(r"Signature (\d+)", section):
             num_signatures += 1
             signature_id = int(m.group(1))
             sdata = config[section]
@@ -32,7 +32,7 @@ def populate_mutational_signature_info(apps, schema_editor):
     print(f"Created info about {num_signatures} mutational signatures")
 
 
-def populate_column_vep_fields(apps, schema_editor):
+def populate_column_vep_fields(apps, _schema_editor):
     COLUMN_VEP_FIELD = [
         {'column': 'af_1kg', 'vep_plugin': None, 'source_field_has_custom_prefix': False,
          'source_field_processing_description': None, 'vep_custom': None, 'variant_grid_column_id': 'af_1kg',

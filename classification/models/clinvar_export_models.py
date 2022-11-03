@@ -3,8 +3,6 @@ from typing import Optional, List, Iterable
 
 from django.db import models, transaction
 from django.db.models import QuerySet, TextChoices
-from django.db.models.signals import post_save
-from django.dispatch import receiver
 from django.urls import reverse
 from django.utils.timezone import now
 from lazy import lazy
@@ -65,6 +63,25 @@ class ClinVarExport(TimeStampedModel):
     status = models.CharField(max_length=1, choices=ClinVarExportStatus.choices, default=ClinVarExportStatus.NEW_SUBMISSION)
     last_evaluated = models.DateTimeField(default=now)
     submission_body_validated = models.JSONField(null=False, blank=False, default=dict)
+
+    @lazy
+    def last_submission(self) -> Optional['ClinVarExportSubmission']:
+        if last_submission := self.clinvarexportsubmission_set.order_by('-created').first():
+            return last_submission
+
+    @property
+    def last_submission_error(self) -> Optional[str]:
+        if last_submission := self.last_submission:
+            if response_json := last_submission.response_json:
+                all_errors: List[str] = []
+                if errors_list := response_json.get('errors'):
+                    for error in errors_list:
+                        if output := error.get('output'):
+                            if inner_errors := output.get('errors'):
+                                for inner_error in inner_errors:
+                                    all_errors.append(inner_error.get('userMessage'))
+                if all_errors:
+                    return "\n".join(all_errors)
 
     def get_absolute_url(self):
         return reverse('clinvar_export', kwargs={'clinvar_export_id': self.pk})
@@ -178,12 +195,6 @@ class ClinVarExport(TimeStampedModel):
         self.save()
 
 
-@receiver(post_save, sender=ClinVarKey)
-def updated_clinvar_key(sender, instance: ClinVarKey, **kwargs):
-    for export in ClinVarExport.objects.filter(clinvar_allele__clinvar_key=instance):
-        export.update()
-
-
 class ClinVarExportBatchStatus(models.TextChoices):
     """
     Overall status of a submission batch, talking to ClinVar takes a few steps
@@ -261,7 +272,7 @@ class ClinVarExportBatch(TimeStampedModel):
     @staticmethod
     @transaction.atomic()
     def create_batches(qs: QuerySet[ClinVarExport], force_update: bool = False) -> List['ClinVarExportBatch']:
-        all_batches: List[ClinVarExportBatch] = list()
+        all_batches: List[ClinVarExportBatch] = []
 
         current_batch: Optional[ClinVarExportBatch] = None
         current_batch_size = 0
@@ -318,7 +329,6 @@ class ClinVarExportSubmissionStatus(TextChoices):
     WAITING = "W", "Waiting"
     SUCCESS = "S", "Success"
     ERROR = "E", "Error"
-    #  REJECTED = "R", "Rejected"  # TODO : add this manually rejected option (only not adding now as need to hot fix)
 
 
 class ClinVarExportSubmission(TimeStampedModel):

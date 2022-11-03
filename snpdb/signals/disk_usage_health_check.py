@@ -6,7 +6,7 @@ from variantgrid.tasks.server_monitoring_tasks import get_disk_usage_objects
 
 @receiver(signal=health_check_signal)
 def disk_usage_health_check(sender, health_request: HealthCheckRequest, **kwargs):
-    checks = list()
+    checks = []
     for disk_usage in get_disk_usage_objects():
         checks.append(HealthCheckCapacity(
             name=f"Mount Point '{disk_usage.mount_point}",

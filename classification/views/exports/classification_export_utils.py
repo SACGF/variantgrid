@@ -25,6 +25,9 @@ class CitationStub:
             prefix = CitationSource.PUBMED_CENTRAL.label
         elif self.source == CitationSource.NCBI_BOOKSHELF.value:
             prefix = CitationSource.NCBI_BOOKSHELF.label
+        else:
+            # shouldn't happen, but just in case
+            prefix = self.source
         return f"{prefix}:{self.idx}"
 
     def __lt__(self, other):
@@ -52,7 +55,7 @@ class CitationCounter:
         return [str(stub) for stub in sorted(set(self.all_citations.keys()))]
 
     def citations(self) -> List[Citation]:
-        citations: List[Citation] = list()
+        citations: List[Citation] = []
 
         by_source: Dict[str, List[str]] = defaultdict(list)
         for stub in list(self.all_citations.keys()):
@@ -103,6 +106,11 @@ class CHGVSData:
     chgvs: CHGVS
     different_chgvs: bool = False
     cms: List[ClassificationModification] = field(default_factory=list)
+
+    @property
+    def last_updated(self):
+        # use for reports on modified date, but need more than this to check
+        return max(cm.modified for cm in self.cms)
 
     @staticmethod
     def split_into_c_hgvs(

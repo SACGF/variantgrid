@@ -2,7 +2,7 @@
 {% load classification_tags %}
 <tr class="discordance-row" {% if filter %}data-labs="{% if summary.is_internal %}internal{% else %}{{ summary.all_actively_involved_labs_ids }}{% endif %}{% endif %}">
     <td class="text-center">
-        {% if is_selected %}<i class="fas fa-hand-point-right"></i>{% timestamp old_report.report_started_date %}DR_{{ summary.discordance_report.id }}
+        {% if is_selected %}<i class="fas fa-hand-point-right"></i>DR_{{ summary.discordance_report.id }}
         {% else %}<a href="{% url 'discordance_report' summary.discordance_report.id %}" class="hover-link">DR_{{ summary.discordance_report.id }}</a>
         {% endif %}
     </td>
@@ -13,7 +13,7 @@
 
     </td>
     <td style="width:40%">
-        <div class="font-weight-bold mb-1">
+        <div class="font-weight-bold mb-1 text-center" style="padding-left:40px">
             {% if summary.discordance_report.resolution %}
                 {% if summary.discordance_report.resolution == "C" %}
                     <span class="text-success">{{ summary.discordance_report.get_resolution_display }}</span>

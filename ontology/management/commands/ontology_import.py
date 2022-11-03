@@ -16,7 +16,7 @@ from genes.models import HGNC
 from library.file_utils import file_md5sum
 from ontology.gencc import load_gencc
 from ontology.models import OntologyService, OntologyRelation, OntologyTerm, OntologyImportSource, OntologyImport, \
-    OntologyTermRelation, OntologyVersion
+    OntologyTermRelation, OntologyVersion, OntologyTermStatus
 from ontology.ontology_builder import OntologyBuilder, OntologyBuilderDataUpToDateException
 
 """
@@ -36,7 +36,8 @@ GENE_RELATIONS = {
     "http://purl.obolibrary.org/obo/RO_0004030": "disease arises from structure",
     "http://purl.obolibrary.org/obo/RO_0004003": "has material basis in germline mutation in",
     "http://purl.obolibrary.org/obo/RO_0004004": "has material basis in somatic mutation in",
-    "http://purl.obolibrary.org/obo/RO_0004028": "realized in response to stimulus"
+    "http://purl.obolibrary.org/obo/RO_0004028": "realized in response to stimulus",
+
 }
 
 MATCH_TYPES = {
@@ -95,8 +96,8 @@ def load_mondo(filename: str, force: bool):
     with open(filename, 'r') as json_file:
         data_file = json.load(json_file)
 
-    node_to_hgnc_id: [str, str] = dict()
-    node_to_mondo: [str, str] = dict()
+    node_to_hgnc_id: [str, str] = {}
+    node_to_mondo: [str, str] = {}
 
     for graph in data_file.get("graphs", []):
 
@@ -110,9 +111,9 @@ def load_mondo(filename: str, force: bool):
                     node_to_mondo[node_id_full] = full_id
 
                     if meta := node.get("meta"):
-                        label = node.get("lbl")
+                        label = node.get("lbl") or ""
                         deprecated = meta.get("deprecated")
-                        extra = dict()
+                        extra = {}
 
                         defn = meta.get("definition", {}).get("val")
                         if defn:
@@ -124,15 +125,15 @@ def load_mondo(filename: str, force: bool):
                         if synonyms := meta.get("synonyms"):
                             extra["synonyms"] = synonyms
 
-                        aliases = list()
+                        aliases = []
                         term_relation_types: Dict[str, List[str]] = defaultdict(list)
 
                         for bp in meta.get("basicPropertyValues", []):
                             val = TermId(bp.get("val"))
-                            if val.type in {"HP", "OMIM"}:
+                            if val.type in {"HP", "OMIM", "MONDO"}:
                                 pred = bp.get("pred")
-                                pred = MATCH_TYPES.get(pred, pred)
-                                term_relation_types[val.id].append(pred)
+                                if pred := MATCH_TYPES.get(pred):
+                                    term_relation_types[val.id].append(pred)
 
                         if xrefs := meta.get("xrefs"):
                             for xref in xrefs:
@@ -153,6 +154,8 @@ def load_mondo(filename: str, force: bool):
                                 for synonym in synonyms:
                                     pred = synonym.get("pred")
                                     if pred == pred_type:
+                                        # could potentially get name here from exact synonym
+                                        # but there can be multiple
                                         aliases.append(synonym.get("val"))
                                         for xref in synonym.get("xrefs", []):
                                             xref_term = TermId(xref)
@@ -160,15 +163,12 @@ def load_mondo(filename: str, force: bool):
                                                 term_relation_types[xref_term.id].append(relation)
 
                         for key, relations in term_relation_types.items():
-                            unique_relations = list()
-                            for relation in relations:
-                                if relation not in unique_relations:
-                                    unique_relations.append(relation)
+                            unique_relations = sorted(set(relations))
 
                             ontology_builder.add_term(
                                 term_id=key,
-                                name=label,
-                                definition=f"Name copied from xref synonym {full_id}",
+                                name="",
+                                definition="",
                                 primary_source=False
                             )
                             ontology_builder.add_ontology_relation(
@@ -178,7 +178,7 @@ def load_mondo(filename: str, force: bool):
                                 extra={"all_relations": unique_relations}
                             )
 
-                        #end synonymns
+                        # end synonymns
                         # occasionally split up MONDO name into different aliases
                         if label and "MONDO" in full_id:
                             if ";" in label:
@@ -196,7 +196,7 @@ def load_mondo(filename: str, force: bool):
                             extra=meta,
                             aliases=aliases,
                             primary_source=True,
-                            deprecated=deprecated
+                            status=OntologyTermStatus.DEPRECATED if deprecated else None
                         )
 
                 # copy of id for gene symbol to gene symbol
@@ -441,11 +441,12 @@ def load_biomart(filename: str, force: bool):
 
 
 def load_omim(filename: str, force: bool):
+
     ontology_builder = OntologyBuilder(
         filename=filename,
         context="omim_file",
         import_source=OntologyImportSource.OMIM,
-        processor_version=5,
+        processor_version=7,
         force_update=force)
 
     file_hash = file_md5sum(filename)
@@ -462,20 +463,23 @@ def load_omim(filename: str, force: bool):
         if header != OMIM_EXPECTED_HEADER:
             raise ValueError(f"Header not as expected, got {header}")
 
-        RELEVANT_PREFIXES = {
-            # "Asterisk": "Gene",
-            # "Plus": "Gene and phenotype, combined",
+        PREFIXES = {
+            "Asterisk": "Gene",
+            "Plus": "Gene and phenotype, combined",
             "Number Sign": "Phenotype, molecular basis known",
             "Percent": "Phenotype or locus, molecular basis unknown",
             "NULL": "Other, mainly phenotypes with suspected mendelian basis",
-            # "Caret": "Entry has been removed from the database or moved to another entry"
+            "Caret": "Entry has been removed from the database or moved to another entry"
         }
-
-        #["Number Sign", "Percent", "NULL"]
+        VALID_PREFIXES = {
+            "Number Sign",
+            "Percent",
+            "NULL"
+        }
 
         for row in csv_reader:
             prefix = row[0]
-            omim_type = RELEVANT_PREFIXES.get(prefix)
+            omim_type = PREFIXES.get(prefix)
             if len(row) <= 1 or not omim_type:
                 continue
             mim_number = row[1]
@@ -489,7 +493,7 @@ def load_omim(filename: str, force: bool):
             if match := MOVED_TO.match(preferred_title):
                 # This will only happen if you uncomment Caret
                 moved_to = match.group(1)
-                preferred_title = f"obsolete, see OMIM:{moved_to}"
+                # preferred_title = f"obsolete, see OMIM:{moved_to}"
             else:
                 # aliases.append(preferred_title)  # other tables don't have the name copied into aliases
                 # so don't do it here
@@ -505,19 +509,20 @@ def load_omim(filename: str, force: bool):
                 definition=None,
                 aliases=aliases,
                 extra=extras,
-                primary_source=True
+                primary_source=True,
+                status=None if prefix in VALID_PREFIXES else OntologyTermStatus.NON_CONDITION
             )
             if moved_to:
                 ontology_builder.add_ontology_relation(
-                    source_term_id=f"OMIM:{mim_number}",
-                    dest_term_id=f"OMIM:{moved_to}",
+                    source_term_id=f"OMIM:{moved_to}",
+                    dest_term_id=f"OMIM:{mim_number}",
                     relation=OntologyRelation.REPLACED
                 )
     ontology_builder.complete(purge_old_terms=True)
 
 
 def sync_hgnc():
-    uploads: List[OntologyTerm] = list()
+    uploads: List[OntologyTerm] = []
 
     o_import = OntologyImport.objects.create(
         import_source="HGNC Sync",

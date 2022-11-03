@@ -9,7 +9,7 @@ from ontology.models import OntologyImport
 
 @receiver(signal=health_check_signal)
 def ontology_health_check(sender, health_request: HealthCheckRequest, **kwargs):
-    checks = list()
+    checks = []
     warning_age = timedelta(days=60)
     for contexts in [
         ("mondo_file", "MONDO"),

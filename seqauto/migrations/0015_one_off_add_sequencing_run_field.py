@@ -3,7 +3,7 @@
 from django.db import migrations
 
 
-def _one_off_add_sequencing_run_field(apps, schema_editor):
+def _one_off_add_sequencing_run_field(apps, _schema_editor):
     CLASSES_PATH_TO_SEQUENCING_RUN = {
         "SequencingRun": "name",
         "SampleSheet": "old_sequencing_run",

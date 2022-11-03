@@ -9,7 +9,7 @@ from snpdb.models import GenomeBuild
 
 @receiver(signal=health_check_signal)
 def ontology_health_check(sender, health_request: HealthCheckRequest, **kwargs):
-    checks = list()
+    checks = []
     for genome_build in [GenomeBuild.grch37(), GenomeBuild.grch38()]:
         latest_clinvar = ClinVarVersion.objects.filter(genome_build=genome_build).order_by(
                 '-annotation_date').values_list('annotation_date', flat=True).first()

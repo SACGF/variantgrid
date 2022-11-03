@@ -250,8 +250,13 @@ class UserSettings:
     _settings_overrides: List[SettingsOverride]
 
     def default_lab_safe(self) -> Lab:
-        if lab := self.default_lab or Lab.valid_labs_qs(self.user).first() or Lab.valid_labs_qs(self.user, admin_check=True).exclude(external=True).first():
+        if lab := self.default_lab:
+            if lab.organization.active:
+                return lab
+
+        if lab := Lab.valid_labs_qs(self.user).first() or Lab.valid_labs_qs(self.user, admin_check=True).exclude(external=True).exclude(organization__active=False).first():
             return lab
+
         raise ValueError("User doesn't have access to any Labs")
 
     @staticmethod

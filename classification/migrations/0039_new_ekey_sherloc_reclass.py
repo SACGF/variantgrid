@@ -3,7 +3,7 @@
 from django.db import migrations
 
 
-def _insert_variant_panel_frequency_key(apps, schema_editor):
+def _insert_variant_panel_frequency_key(apps, _schema_editor):
     """ This can be deleted if there is a blat_keys migration after it """
     EvidenceKey = apps.get_model("classification", "EvidenceKey")
     EvidenceKey.objects.get_or_create(

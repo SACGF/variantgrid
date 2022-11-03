@@ -61,7 +61,7 @@ def user(context, u: User, show_avatar=False, show_email=False, show_last_login=
         def user_settings(self) -> UserSettings:
             user_cache: Dict[int, UserSettings] = self.context.get("_user_cache")
             if not user_cache:
-                user_cache = dict()
+                user_cache = {}
                 self.context["_user_cache"] = user_cache
             us: UserSettings = user_cache.get(self.user.id)
             if not us:

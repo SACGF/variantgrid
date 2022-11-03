@@ -631,7 +631,7 @@ class FastQC(SeqAutoRecord):
     def get_path_from_fastq(fastq):
         base_dir = os.path.dirname(fastq.path)
         name = remove_gz_if_exists(fastq.path)
-        fastqc_dir = "%s_fastqc" % name_from_filename(name)
+        fastqc_dir = f"{name_from_filename(name)}_fastqc"
         path = os.path.join(base_dir, "FastQC", fastqc_dir, "fastqc_data.txt")
         return os.path.abspath(path)
 
@@ -988,7 +988,7 @@ class QCGeneList(SeqAutoRecord):
             custom_text_gene_list.gene_list.save()
 
             if custom_text_gene_list.gene_list.import_status != ImportStatus.SUCCESS:
-                message = "Problem importing QC Gene List %s\n" % self.path
+                message = f"Problem importing QC Gene List {self.path}\n"
                 message += f"Contents: {custom_gene_list_text}"
                 message += f"Error: {custom_text_gene_list.gene_list.error_message}"
                 SeqAutoMessage.objects.create(seqauto_run=seqauto_run,
@@ -1065,7 +1065,7 @@ class QCExecSummary(SeqAutoRecord):
                 columns.append(cc)
 
         if not columns:
-            msg = "Couldn't find non-null coverage columns in QCExecSummary: %r" % self.pk
+            msg = f"Couldn't find non-null coverage columns in QCExecSummary: {self.pk!r}"
             raise ValueError(msg)
 
         return columns
@@ -1300,7 +1300,7 @@ class JobScript(SeqAutoRecord):
     def __str__(self):
         record = self.get_record()
         record_pk = record.pk if record else 'N/A'
-        return "%s: %r" % (self.file_type, record_pk)
+        return f"{self.file_type}: {record_pk!r}"
 
 
 @receiver(post_delete, sender=JobScript)

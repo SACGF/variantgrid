@@ -95,7 +95,8 @@ def load_gencc(file_or_filename, file_hash: str, force: bool, url: str = None) -
                 term_id=gene_id,
                 name=gene_symbol,
                 definition=None,
-                primary_source=False
+                primary_source=False,
+                trusted_source=False  # pretty sure GenCC always refers to actual terms, but just in case
             )
             ontology_builder.add_ontology_relation(
                 source_term_id=mondo_id,

@@ -7,7 +7,7 @@
       color: #ddd !important;
       border-color: #ccc !important;
     }
-    .fas {
+    .fas, .svg-inline--fa {
       color: #ccc !important;
     }
     input {
@@ -72,7 +72,7 @@ nav.navbar a.nav-link {
 
 .navbar-brand {
     background-position-x: 28px;
-    background-image: url("/static/images/Australian Genomics logo_white transp.png");
+    background-image: url("/static/images/Australian_Genomics_logo_white_transp.png");
     margin-right: 0;
 }
 

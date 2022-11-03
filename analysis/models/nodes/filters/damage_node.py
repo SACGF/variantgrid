@@ -121,6 +121,9 @@ class DamageNode(AnalysisNode):
     def columns_version(self):
         return self.analysis.annotation_version.variant_annotation_version.columns_version
 
+    def _get_node_q_hash(self) -> str:
+        return str(self._get_node_q())
+
     def _get_node_q(self) -> Optional[Q]:
         or_filters = []
         and_filters = []

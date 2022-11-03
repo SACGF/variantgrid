@@ -84,7 +84,7 @@ class JQGridView(View):
 
         if op == JQGridViewOp.EDIT:
             if not self.delete_row:
-                msg = "Edit/delete requested but 'delete_row' not set on %s" % nice_class_name(self)
+                msg = f"Edit/delete requested but 'delete_row' not set on {nice_class_name(self)}"
                 raise PermissionDenied(msg)
 
             pk = request.POST['id']

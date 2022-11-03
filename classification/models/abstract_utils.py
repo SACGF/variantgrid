@@ -12,7 +12,7 @@ class ConsolidatingMerger(Generic[EstablishedType, CandidateType]):
     """
 
     def __init__(self):
-        self.collapsed_new_candidates: List[CandidateType] = list()
+        self.collapsed_new_candidates: List[CandidateType] = []
 
     @abstractmethod
     def retrieve_established(self) -> Set[EstablishedType]:
@@ -44,7 +44,7 @@ class ConsolidatingMerger(Generic[EstablishedType, CandidateType]):
         with each other, we only want one of them too.
         Store against the most general condition, so the order of add_group shouldn't matter
         """
-        resulting_candidates: List[CandidateType] = list()
+        resulting_candidates: List[CandidateType] = []
         for existing in self.collapsed_new_candidates:
             if merged := self.combine_candidates_if_possible(existing, candidate):
                 candidate = merged

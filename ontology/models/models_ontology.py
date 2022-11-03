@@ -13,7 +13,7 @@ from typing import Optional, List, Dict, Set, Union, Tuple, Iterable
 from cache_memoize import cache_memoize
 from django.contrib.postgres.fields import ArrayField
 from django.db import models, connection
-from django.db.models import PROTECT, CASCADE, QuerySet, Q, Max
+from django.db.models import PROTECT, CASCADE, QuerySet, Q, Max, TextChoices
 from django.urls import reverse
 from lazy import lazy
 from model_utils.models import TimeStampedModel, now
@@ -155,6 +155,17 @@ class GeneDiseaseClassification(models.TextChoices):
     STRONG = "8", "Strong"
     DEFINITIVE = "9", "Definitive"
 
+    @property
+    def is_strong_enough(self) -> bool:
+        return self in {GeneDiseaseClassification.STRONG, GeneDiseaseClassification.DEFINITIVE}
+
+    @staticmethod
+    def get_by_label(label: str) -> 'GeneDiseaseClassification':
+        for gdc in GeneDiseaseClassification:
+            if gdc.label == label:
+                return gdc
+        raise ValueError(f"No GeneDiseaseClassification for {label}")
+
     @staticmethod
     def get_above_min(min_classification: str) -> List[str]:
         classifications = []
@@ -208,6 +219,53 @@ class OntologyImport(TimeStampedModel):
         return name
 
 
+class OntologyTermStatus(TextChoices):
+    CONDITION = 'C'  # Also phenotypes are mixed up in there right now
+    DEPRECATED = 'D'
+    NON_CONDITION = 'N'
+    STUB = 'S'
+
+
+@dataclass
+class OntologyIdNormalized:
+    prefix: str
+    postfix: str
+    full_id: str
+    clean: bool
+
+    @property
+    def num_part(self) -> int:
+        return int(self.postfix)
+
+    @staticmethod
+    def normalize(dirty_id: str) -> 'OntologyIdNormalized':
+        parts = re.split("[:|_]", dirty_id)
+        if len(parts) != 2:
+            raise ValueError(f"Can not convert {dirty_id} to a proper id")
+
+        prefix = parts[0].strip().upper()
+        if prefix == "ORPHANET":  # Orphanet is the one ontology (so far) where the standard is sentance case
+            prefix = "Orphanet"
+        prefix = OntologyService(prefix)
+        postfix = parts[1].strip()
+        try:
+            num_part = int(postfix)
+            clean_id: str
+            if expected_length := OntologyService.EXPECTED_LENGTHS[prefix]:
+                clean_id = OntologyService.index_to_id(prefix, num_part)
+            else:
+                # variable length IDs like DOID
+                clean_id = f"{prefix}:{postfix}"
+
+            return OntologyIdNormalized(prefix=prefix, postfix=postfix, full_id=clean_id, clean=True)
+
+        except ValueError:
+            return OntologyIdNormalized(prefix=prefix, postfix=postfix, full_id=dirty_id, clean=False)
+
+    def __str__(self):
+        return self.full_id
+
+
 class OntologyTerm(TimeStampedModel):
 
     """
@@ -221,11 +279,20 @@ class OntologyTerm(TimeStampedModel):
     definition = models.TextField(null=True, blank=True)
     extra = models.JSONField(null=True, blank=True)
     aliases = ArrayField(models.TextField(blank=False), null=False, blank=True, default=list)
-    deprecated = models.BooleanField(default=False, blank=True)
+    status = models.CharField(max_length=1, default=OntologyTermStatus.CONDITION, choices=OntologyTermStatus.choices)
     from_import = models.ForeignKey(OntologyImport, on_delete=PROTECT)
+
+    move_to_re = re.compile(r"MOVED TO (\d+)")
 
     def __str__(self):
         return f"{self.id} {self.name}"
+
+    @property
+    def short(self) -> str:
+        if self.ontology_service == OntologyService.HGNC:
+            return self.name
+        else:
+            return self.id
 
     class Meta:
         unique_together = ("ontology_service", "index")
@@ -233,6 +300,8 @@ class OntologyTerm(TimeStampedModel):
     def __lt__(self, other):
         if self.ontology_service != other.ontology_service:
             return self.ontology_service < other.ontology_service
+        if self.ontology_service == OntologyService.HGNC:
+            return self.name < other.name
         return self.index < other.index
 
     def get_absolute_url(self):
@@ -244,10 +313,25 @@ class OntologyTerm(TimeStampedModel):
 
     @property
     def is_obsolete(self) -> bool:
-        return self.deprecated
-        # if self.name:
-        #     return "obsolete" in self.name.lower()
-        # return False
+        # obsolete covers deprecated, moved, and gene (not the most accurate title)
+        # more so "is not valid for condition"
+        return self.status != OntologyTermStatus.CONDITION
+
+    @property
+    def is_valid_for_condition(self) -> bool:
+        return self.status == OntologyTermStatus.CONDITION
+
+    @property
+    def warning_text(self) -> Optional[str]:
+        if self.status == OntologyTermStatus.DEPRECATED:
+            return "Term is Deprecated"
+        elif self.status == OntologyTermStatus.NON_CONDITION:
+            term_type = (self.extra or dict()).get('type', 'Unknown')
+            return f"Term is of type - {term_type}"
+        elif self.status == OntologyTermStatus.STUB:
+            return "Term was referenced by 3rd party but not yet from our authoritative source"
+        else:
+            return None
 
     @lazy
     def is_leaf(self) -> bool:
@@ -323,43 +407,28 @@ class OntologyTerm(TimeStampedModel):
         return OntologyTerm.get_or_stub(id_str)
 
     @staticmethod
-    def get_or_stub(id_str: str) -> 'OntologyTerm':
+    def get_or_stub(id_str: Union[str, OntologyIdNormalized]) -> 'OntologyTerm':
         """
         Returns an OntologyTerm for the given ID.
         If the OntologyTerm doesn't exist in the database, will create an OntologyTerm but
         WONT persist it to the database
         """
-        parts = re.split("[:|_]", id_str)
-        if len(parts) != 2:
-            raise ValueError(f"Can not convert {id_str} to a proper id")
-
-        prefix = parts[0].strip().upper()
-        if prefix == "ORPHANET":  # Orphanet is the one ontology (so far) where the standard is sentance case
-            prefix = "Orphanet"
-        prefix = OntologyService(prefix)
-        postfix = parts[1].strip()
-        try:
-            num_part = int(postfix)
-            clean_id: str
-            if expected_length := OntologyService.EXPECTED_LENGTHS[prefix]:
-                clean_id = OntologyService.index_to_id(prefix, num_part)
-            else:
-                # variable length IDs like DOID
-                clean_id = f"{prefix}:{postfix}"
-
-            if existing := OntologyTerm.objects.filter(id=clean_id).first():
+        if not isinstance(id_str, OntologyIdNormalized):
+            normal_id = OntologyIdNormalized.normalize(id_str)
+        if normal_id.clean:
+            if existing := OntologyTerm.objects.filter(id=normal_id.full_id).first():
                 return existing
-
             return OntologyTerm(
-                id=clean_id,
-                ontology_service=prefix,
-                index=num_part,
+                id=normal_id.full_id,
+                ontology_service=normal_id.prefix,
+                index=normal_id.num_part,
                 name=""
             )
-        except ValueError:
-            if existing := OntologyTerm.objects.filter(ontology_service=prefix, name__iexact=postfix).first():
+        else:
+            if existing := OntologyTerm.objects.filter(ontology_service=normal_id.prefix, name__iexact=normal_id.postfix).first():
                 return existing
-            raise ValueError(f"Can not convert {id_str} to a proper id")
+            else:
+                raise ValueError(f"Can not convert {id_str} to a proper id")
 
     @property
     def padded_index(self) -> str:
@@ -369,6 +438,13 @@ class OntologyTerm(TimeStampedModel):
     @property
     def url(self):
         return OntologyService.URLS[self.ontology_service].replace("${1}", self.padded_index)
+
+    @property
+    def moved_to(self) -> Optional[str]:
+        if self.name:
+            if match := OntologyTerm.move_to_re.match(self.name):
+                return match.group(1)
+        return None
 
     @staticmethod
     def split_hpo_omim_mondo(ontology_term_ids: Iterable[str]) -> Tuple[QuerySet, QuerySet, QuerySet]:
@@ -439,6 +515,13 @@ class OntologyTermRelation(PostgresPartitionedModel, TimeStampedModel):
     def relation_display(self):
         return OntologyRelation.DISPLAY_NAMES.get(self.relation, self.relation)
 
+    @property
+    def gencc_quality(self) -> Optional[GeneDiseaseClassification]:
+        if extra := self.extra:
+            if strongest := extra.get('strongest_classification'):
+                return GeneDiseaseClassification.get_by_label(strongest)
+        return None
+
     @staticmethod
     def as_mondo(term: OntologyTerm) -> Optional[OntologyTerm]:
         if term.ontology_service == OntologyService.MONDO:
@@ -452,7 +535,7 @@ class OntologyTermRelation(PostgresPartitionedModel, TimeStampedModel):
         return None
 
     @staticmethod
-    def relations_of(term: OntologyTerm) -> List['OntologyTermRelation']:
+    def relations_of(term: OntologyTerm, otr_qs: Optional[QuerySet['OntologyTermRelation']] = None) -> List['OntologyTermRelation']:
         def sort_relationships(rel1, rel2):
             other1 = rel1.other_end(term)
             other2 = rel2.other_end(term)
@@ -464,7 +547,10 @@ class OntologyTermRelation(PostgresPartitionedModel, TimeStampedModel):
                 return -1 if rel1source else 1
             return -1 if other1.index < other2.index else 1
 
-        items = list(OntologyTermRelation.objects.filter(Q(source_term=term) | Q(dest_term=term)))
+        if otr_qs is None:
+            otr_qs = OntologyVersion.get_latest_and_live_ontology_qs()
+
+        items = list(otr_qs.filter(Q(source_term=term) | Q(dest_term=term)))
         items.sort(key=functools.cmp_to_key(sort_relationships))
         return items
 
@@ -507,9 +593,20 @@ class OntologyVersion(TimeStampedModel):
     hp_owl_import = models.ForeignKey(OntologyImport, on_delete=PROTECT, related_name="hp_owl_ontology_version")
     hp_phenotype_to_genes_import = models.ForeignKey(OntologyImport, on_delete=PROTECT,
                                                      related_name="hp_phenotype_to_genes_ontology_version")
+    omim_import = models.ForeignKey(OntologyImport, on_delete=PROTECT, related_name="omim_ontology_version", null=True, blank=True)
 
     class Meta:
-        unique_together = ('gencc_import', 'mondo_import', 'hp_owl_import', 'hp_phenotype_to_genes_import')
+        unique_together = (
+            'gencc_import',
+            'mondo_import',
+            'hp_owl_import',
+            'hp_phenotype_to_genes_import',
+            'omim_import'  # warning, nulls screw up unique together
+        )
+
+    OPTIONAL_IMPORTS = {
+        'omim_import',
+    }
 
     ONTOLOGY_IMPORTS = {
         "gencc_import": (OntologyImportSource.GENCC,
@@ -520,6 +617,7 @@ class OntologyVersion(TimeStampedModel):
         "hp_phenotype_to_genes_import": (OntologyImportSource.HPO,
                                          ['phenotype_to_genes.txt',
                                           'OMIM_ALL_FREQUENCIES_diseases_to_genes_to_phenotypes.txt']),
+        "omim_import": (OntologyImportSource.OMIM, ['mimTitles.txt'])
     }
 
     @staticmethod
@@ -533,12 +631,16 @@ class OntologyVersion(TimeStampedModel):
     def latest() -> Optional['OntologyVersion']:
         oi_qs = OntologyImport.objects.all()
         kwargs = {}
+        missing_fields = set()
         for field, (import_source, filenames) in OntologyVersion.ONTOLOGY_IMPORTS.items():
-            kwargs[field] = oi_qs.filter(import_source=import_source, filename__in=filenames).order_by("pk").last()
+            if ont_import := oi_qs.filter(import_source=import_source, filename__in=filenames).order_by("pk").last():
+                kwargs[field] = ont_import
+            elif field not in OntologyVersion.OPTIONAL_IMPORTS:
+                missing_fields.add(field)
 
-        values = list(kwargs.values())
-        if all(values):
-            last_date = max([oi.created for oi in values])
+        if not missing_fields:
+            values = list(kwargs.values())
+            last_date = max(oi.created for oi in values)
             ontology_version, created = OntologyVersion.objects.get_or_create(**kwargs,
                                                                               defaults={"created": last_date})
             if created:
@@ -546,22 +648,32 @@ class OntologyVersion(TimeStampedModel):
                 from annotation.models import AnnotationVersion
                 AnnotationVersion.new_sub_version(None)
         else:
-            ontology_version = None
-            missing_fields = [field for field, value in kwargs.items() if value is None]
-            if missing_fields:
-                msg = "OntologyVersion.latest() - missing fields: %s", ", ".join(missing_fields)
-                raise OntologyVersion.DoesNotExist(msg)
+            msg = "OntologyVersion.latest() - missing fields: %s", ", ".join(missing_fields)
+            raise OntologyVersion.DoesNotExist(msg)
         return ontology_version
 
     def get_ontology_imports(self):
-        return [self.gencc_import, self.mondo_import, self.hp_owl_import, self.hp_phenotype_to_genes_import]
+        return [ont_import for ont_import in [
+            self.gencc_import,
+            self.mondo_import,
+            self.hp_owl_import,
+            self.hp_phenotype_to_genes_import,
+            self.omim_import
+        ] if ont_import is not None]
 
-    def get_ontology_terms(self):
+    def get_ontology_term_relations(self):
         return OntologyTermRelation.objects.filter(from_import__in=self.get_ontology_imports())
 
+    @staticmethod
+    def get_latest_and_live_ontology_qs():
+        latest = OntologyVersion.latest()
+        # live relationships of panelappau aren't versioned
+        # TODO could restrict only if we have live enabled in settings
+        return OntologyTermRelation.objects.filter(Q(from_import__in=latest.get_ontology_imports()) | Q(relation='panelappau'))
+
     def get_gene_disease_relations_qs(self) -> QuerySet:
-        return self.get_ontology_terms().filter(relation=OntologyRelation.RELATED,
-                                                extra__strongest_classification__isnull=False)
+        return self.get_ontology_term_relations().filter(relation=OntologyRelation.RELATED,
+                                                         extra__strongest_classification__isnull=False)
 
     @cache_memoize(WEEK_SECS)
     def moi_and_submitters(self) -> Tuple[List[str], List[str]]:
@@ -582,7 +694,7 @@ class OntologyVersion(TimeStampedModel):
     def gene_symbols_for_terms(self, terms: OntologyList) -> QuerySet:
         """ This is uncached, see also: cached_gene_symbols_for_terms """
         gene_symbol_names = set()
-        otr_qs = self.get_ontology_terms()
+        otr_qs = self.get_ontology_term_relations()
         for term in terms:
             if isinstance(term, str):
                 term = OntologyTerm.get_or_stub(term)
@@ -594,7 +706,7 @@ class OntologyVersion(TimeStampedModel):
 
     def terms_for_gene_symbol(self, gene_symbol: Union[str, GeneSymbol], desired_ontology: OntologyService,
                               max_depth=1, min_classification: Optional[GeneDiseaseClassification] = None) -> 'OntologySnakes':
-        otr_qs = self.get_ontology_terms()
+        otr_qs = self.get_ontology_term_relations()
         return OntologySnake.terms_for_gene_symbol(gene_symbol, desired_ontology, max_depth=max_depth,
                                                    min_classification=min_classification, otr_qs=otr_qs)
 
@@ -616,6 +728,12 @@ class OntologySnakeStep:
     """
     relation: OntologyTermRelation
     dest_term: OntologyTerm
+    reversed: bool = False
+
+    @property
+    def relationship(self) -> OntologyTermRelation:
+        # relationship is the preferred term, add this property to help migrate over to better wording
+        return self.relation
 
     @property
     def source_term(self) -> OntologyTerm:
@@ -634,6 +752,14 @@ class OntologySnake:
         self.leaf_term = leaf_term or source_term
         self.paths = paths or []
 
+    @property
+    def is_strong_enough(self) -> bool:
+        for path in self.paths:
+            if gencc_quality := path.gencc_quality:
+                if not gencc_quality.is_strong_enough:
+                    return False
+        return True
+
     def snake_step(self, relationship: OntologyTermRelation) -> 'OntologySnake':
         """
         Creates a new OntologySnake with this extra relationship
@@ -648,10 +774,15 @@ class OntologySnake:
         node = self.source_term
         for path in self.paths:
             node = path.other_end(node)
-            steps.append(OntologySnakeStep(relation=path, dest_term=node))
+            relationship_reversed = path.source_term == node
+            steps.append(OntologySnakeStep(relation=path, dest_term=node, reversed=relationship_reversed))
         return steps
 
-    def __str__(self):
+    def reverse(self) -> 'OntologySnake':
+        # simply reversing leaf and source will reverse the direction of all the relationships inside
+        return OntologySnake(source_term=self.leaf_term, leaf_term=self.source_term, paths=list(reversed(self.paths)))
+
+    def __repr__(self):
         text = f"{self.source_term}"
         for step in self.show_steps():
             forwards = step.relation.dest_term == step.dest_term
@@ -672,6 +803,10 @@ class OntologySnake:
     @property
     def leaf_relationship(self) -> OntologyTermRelation:
         return self.paths[-1]
+
+    @lazy
+    def start_source(self) -> OntologyImportSource:
+        return self.show_steps()[0].relation.from_import.import_source
 
     @staticmethod
     def check_if_ancestor(descendant: OntologyTerm, ancestor: OntologyTerm, max_levels=4) -> List['OntologySnake']:
@@ -722,7 +857,8 @@ class OntologySnake:
             return OntologySnakes([OntologySnake(source_term=term)])
 
         if otr_qs is None:
-            otr_qs = OntologyTermRelation.objects.all()
+            otr_qs = OntologyVersion.get_latest_and_live_ontology_qs()
+            # otr_qs = OntologyTermRelation.objects.all()
 
         seen: Set[OntologyTerm] = set()
         seen.add(term)
@@ -730,7 +866,9 @@ class OntologySnake:
         valid_snakes: List[OntologySnake] = []
 
         relation_q_list = [
-            ~Q(relation__in={OntologyRelation.IS_A, OntologyRelation.EXACT_SYNONYM, OntologyRelation.RELATED_SYNONYM}),
+            # the list of relationships below is hardly complete for stopping MONDO <-> OMIM, that's done as an extra step
+            # but filter out the most common ones here (and IS_A as we don't want to go up/down the hierarchy)
+            ~Q(relation__in={OntologyRelation.IS_A, OntologyRelation.EXACT_SYNONYM, OntologyRelation.RELATED_SYNONYM, OntologyRelation.XREF}),
             OntologySnake.gencc_quality_filter(min_classification),
         ]
         q_relation = functools.reduce(operator.and_, relation_q_list)
@@ -760,8 +898,13 @@ class OntologySnake:
             for relation in all_relations:
                 snake = by_leafs.get(relation.source_term) or by_leafs.get(relation.dest_term)
 
-                if relation.source_term == snake.leaf_term or relation.dest_term == snake.leaf_term:
+                if snake.leaf_term in (relation.source_term, relation.dest_term):
                     other_term = relation.other_end(snake.leaf_term)
+
+                    ontology_services = {snake.leaf_term.ontology_service, other_term.ontology_service}
+                    # Possibly Narrow or Broad would also be valid??
+                    if OntologyService.MONDO in ontology_services and OntologyService.OMIM in ontology_services and relation.relation != OntologyRelation.EXACT:
+                        continue
 
                     new_snake = snake.snake_step(relation)
                     if other_term.ontology_service == to_ontology:
@@ -777,7 +920,7 @@ class OntologySnake:
 
     @staticmethod
     def gencc_quality_filter(quality: GeneDiseaseClassification = GeneDiseaseClassification.STRONG) -> Q:
-        gencc_classifications = GeneDiseaseClassification.get_above_min(GeneDiseaseClassification.STRONG)
+        gencc_classifications = GeneDiseaseClassification.get_above_min(quality)
         return ~Q(from_import__import_source='gencc') | Q(extra__strongest_classification__in=gencc_classifications)
 
     @staticmethod

@@ -1,4 +1,5 @@
 {% load classification_tags %}
+{% load ui_utils %}
 {% load js_tags %}
 {% load static %}
 
@@ -18,6 +19,9 @@
         {% endif %}
         {% if ccg.latest_report and ccg.latest_report.resolution != 'C' %}
             <a href="{% url 'discordance_report' ccg.latest_report.id %}" class="hover-link">Click for Discordance Report</a>
+        {% endif %}
+        {% if discordance_status.has_ignored_clin_sigs %}
+            <div>{{ 'i'|severity_icon }} <span class="text-info">Some clinical significances do not count towards discordance calculations.</span></div>
         {% endif %}
     {% endwith %}
 {% endfor %}
@@ -62,14 +66,14 @@
     </thead>
     <tbody>
         {% for group in classification_groups %}
-            {% classification_group_row group=group show_pending_changes=show_pending_changes %}
+            {% classification_group_row group=group %}
         {% endfor %}
     </tbody>
 </table>
 <script>$(document).ready(() => {
     var tableDom = $('#{{ table_id }}')
     var table = tableDom.DataTable({
-        order: [1, "asc"],
+        order: [{{ sort_order_index }}, "asc"],
         dom: '<"top"><"toolbar"<"custom">{% if paging %}f{% endif %}>rt<"bottom"{% if paging %}<"showing"il>{% endif %}p><"clear">',
         "orderFixed": {
             post: [7, "desc"]

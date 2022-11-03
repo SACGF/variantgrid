@@ -5,7 +5,7 @@ from django.db import migrations
 from library.django_utils import bulk_insert_class_data
 
 
-def _new_vep_annotation_gnomad3(apps, schema_editor):
+def _new_vep_annotation_gnomad3(apps, _schema_editor):
     # Separate out gnomAD 2 vs 3
     # Make everything from gnomAD2 GRCh37 specific EXCEPT gnomadAF (still want that one)
     ColumnVEPField = apps.get_model("annotation", "ColumnVEPField")

@@ -3,7 +3,7 @@
 from django.db import migrations
 
 
-def _set_alleles(apps, schema_editor):
+def _set_alleles(apps, _schema_editor):
     """ This can be deleted if there is a blat_keys migration after it """
     Classification = apps.get_model("classification", "Classification")
     VariantAllele = apps.get_model("snpdb", "VariantAllele")

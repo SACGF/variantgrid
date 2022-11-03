@@ -1,7 +1,7 @@
 import copy
 import json
 from dataclasses import dataclass, field
-from typing import List, Iterator, Union
+from typing import List, Iterator, Union, Optional
 
 from lazy import lazy
 
@@ -65,6 +65,10 @@ class JsonMessages:
     def info(message: str):
         return JsonMessages([JsonMessage(severity="info", text=message)])
 
+    @staticmethod
+    def severity(severity: str, message: str):
+        return JsonMessages([JsonMessage(severity=severity, text=message)])
+
     def __add__(self, other) -> 'JsonMessages':
         if not other:
             return self
@@ -94,7 +98,17 @@ class ValidatedJson:
     Allowing validation messages to be associated with the parts that caused the problems
     """
     json_data: JsonDataType
+    # note that JsonMessgaes are immutable so JSON_MESSAGES_EMPTY can be provided as a default value
     messages: JsonMessages = JSON_MESSAGES_EMPTY
+    void: bool = False
+
+    @staticmethod
+    def make_void(messages: Optional[JsonMessages] = JSON_MESSAGES_EMPTY):
+        return ValidatedJson(
+            json_data=None,
+            messages=messages,
+            void=True
+        )
 
     def to_json(self) -> JsonDataType:
         """
@@ -102,16 +116,34 @@ class ValidatedJson:
         stripping away representation of the validation messages.
         Use serialize, deserialize to keep the messages.
         """
-        return self.json_data
+        return ValidatedJson.recursive_to_json(self)
+
+    @staticmethod
+    def recursive_to_json(data: JsonDataType) -> JsonDataType:
+        if isinstance(data, ValidatedJson):
+            return ValidatedJson.recursive_to_json(data.json_data)
+        elif isinstance(data, dict):
+            pure_dict = {}
+            for key, value in data.items():
+                if isinstance(value, ValidatedJson) and value.void:
+                    pass
+                else:
+                    pure_dict[key] = ValidatedJson.recursive_to_json(value)
+            return pure_dict
+        elif isinstance(data, list):
+            return [ValidatedJson.recursive_to_json(item) for item in data]
+        else:
+            return data
 
     @staticmethod
     def _serialize(obj) -> JsonDataType:
         if isinstance(obj, ValidatedJson):
-            if obj.messages:
+            if obj.messages or obj.void:
                 return {
                     "*wrapper$": "VJ",
                     "messages": obj.messages,
-                    "wrap": ValidatedJson._serialize(obj.json_data)
+                    "wrap": ValidatedJson._serialize(obj.json_data),
+                    "void": obj.void
                 }
             else:
                 return ValidatedJson._serialize(obj.json_data)
@@ -130,8 +162,11 @@ class ValidatedJson:
     def _deserialize(json_thing: JsonDataType) -> Union[JsonDataType, 'ValidatedJson']:
         if isinstance(json_thing, dict):
             if json_thing.get("*wrapper$") == "VJ":
-                return ValidatedJson(json_data=ValidatedJson._deserialize(json_thing.get('wrap')),
-                                     messages=JsonMessages.deserialize(json_thing.get('messages')))
+                return ValidatedJson(
+                    json_data=ValidatedJson._deserialize(json_thing.get('wrap')),
+                    messages=JsonMessages.deserialize(json_thing.get('messages')),
+                    void=json_thing.get('void') == True
+                )
             else:
                 return {key: ValidatedJson._deserialize(value) for (key, value) in json_thing.items()}
         elif isinstance(json_thing, list):

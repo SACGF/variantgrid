@@ -48,7 +48,7 @@
         <div class="row equal">
             <div class="col col-md-4">
                 <div class="card" id="allele-card">
-                    <div class="card-header">Allele <div class="d-inline-block ml-2" style="position:absolute" data-flags="{{allele.flag_collection_safe.id}}"></div></div>
+                    <div class="card-header">Allele {% admin_link allele %} <div class="d-inline-block ml-2" style="position:absolute" data-flags="{{allele.flag_collection_safe.id}}"></div></div>
                     <div class="card-body">
                         {% labelled label="Internal Allele ID" hint="chunky" %}{{ allele.id }}{% endlabelled %}
                         {% if allele.clingen_allele %}
@@ -60,34 +60,36 @@
                             {% endmodal %}
                             {% if allele_merge_log_qs.exists %}
                                 {% modal label="Allele Merge Log" admin_only=True %}
-                                    <table class="table">
-                                        <thead>
-                                            <tr>
-                                                <th>Date</th>
-                                                <th>Linked to Allele via</th>
-                                                <th>Status</th>
-                                                <th>Message</th>
-                                                <th>Other Allele</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                        {% for amr in allele_merge_log_qs %}
-                                            <tr>
-                                                <td class="text-center">{{ amr.created }}</td>
-                                                <td class="text-center">{{ amr.get_allele_linking_tool_display }}</td>
-                                                <td class="text-center">{{ amr.success|yesno:"Success,Failure" }}
-                                                <td class="text-center">{{ amr.message }}</td>
-                                                <td class="text-center">
-                                                    {% if allele == amr.old_allele %}
-                                                        <a href="{% url 'view_allele' amr.new_allele.pk %}">{{ amr.new_allele }}</a>
-                                                    {% else %}
-                                                        <a href="{% url 'view_allele' amr.old_allele.pk %}">{{ amr.old_allele }}</a>
-                                                    {% endif %}
-                                                </td>
-                                            </tr>
-                                        {% endfor %}
-                                        </tbody>
-                                    </table>
+                                    <div class="modal-body">
+                                        <table class="table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Date</th>
+                                                    <th>Linked to Allele via</th>
+                                                    <th>Status</th>
+                                                    <th>Message</th>
+                                                    <th>Other Allele</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                            {% for amr in allele_merge_log_qs %}
+                                                <tr>
+                                                    <td class="text-center">{{ amr.created }}</td>
+                                                    <td class="text-center">{{ amr.get_allele_linking_tool_display }}</td>
+                                                    <td class="text-center">{{ amr.success|yesno:"Success,Failure" }}
+                                                    <td class="text-center">{{ amr.message }}</td>
+                                                    <td class="text-center">
+                                                        {% if allele == amr.old_allele %}
+                                                            <a href="{% url 'view_allele' amr.new_allele.pk %}">{{ amr.new_allele }}</a>
+                                                        {% else %}
+                                                            <a href="{% url 'view_allele' amr.old_allele.pk %}">{{ amr.old_allele }}</a>
+                                                        {% endif %}
+                                                    </td>
+                                                </tr>
+                                            {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
                                 {% endmodal %}
                             {% endif %}
                         {% elif allele.clingen_error %}

@@ -1,13 +1,12 @@
-from typing import Optional, List, Tuple, Iterable, Union
+from typing import Optional, List, Union
 from urllib.parse import urlencode
 
 from django.conf import settings
-from django.contrib.auth.models import User
 from django.db.models import QuerySet, Sum
 from django.db.models.expressions import Subquery
 from django.http import HttpResponse
 from django.http.request import HttpRequest
-from django.shortcuts import render, redirect
+from django.shortcuts import render
 from django.urls import reverse
 from lazy import lazy
 from termsandconditions.decorators import terms_required
@@ -24,7 +23,7 @@ from classification.views.classification_export_flags import ExportFormatterFlag
 from flags.models import FlagCollection
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.lab_picker import LabPickerData
-from snpdb.models import Lab, ClinVarKey
+from snpdb.models import ClinVarKey
 from snpdb.models.models_genome import GenomeBuild
 
 
@@ -91,7 +90,7 @@ class ClassificationDashboard:
         # .filter(classification_original__classification__withdrawn=False)  used to
         dr_qs = DiscordanceReport.objects.filter(pk__in=discordant_c).order_by('-created')
 
-        return DiscordanceReportTableData.create(perspective=self.perspective, discordance_reports=dr_qs)
+        return DiscordanceReportTableData(perspective=self.perspective, discordance_reports=dr_qs)
 
     @lazy
     def classifications_wout_standard_text(self) -> int:

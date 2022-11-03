@@ -3,7 +3,7 @@
 from django.db import migrations
 
 
-def new_ekey_pubmed_search_terms(apps, schema_editor):
+def new_ekey_pubmed_search_terms(apps, _schema_editor):
     EvidenceKey = apps.get_model("classification", "EvidenceKey")
 
     kwargs = {

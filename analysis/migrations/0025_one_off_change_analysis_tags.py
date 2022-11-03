@@ -3,7 +3,7 @@
 from django.db import migrations
 
 
-def _one_off_change_analysis_tags(apps, schema_editor):
+def _one_off_change_analysis_tags(apps, _schema_editor):
     TagNode = apps.get_model("analysis", "TagNode")
     THIS_ANALYSIS = 'T'
     TagNode.objects.filter(analysis_wide=True).update(mode=THIS_ANALYSIS)

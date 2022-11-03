@@ -1,7 +1,7 @@
 @import url("https://fonts.googleapis.com/css?family=Raleway:400,500");
 html, body {
   font-size: 14px;
-  font-family: "Raleway", serif;
+  font-family: 'Raleway',serif;
 }
 
 nav.navbar {
@@ -126,7 +126,7 @@ nav .nav-link:hover {
   height: 27px;
 }
 
-i.fas {
+i.fas, .svg-inline--fa {
   margin-right: 4px;
 }
 

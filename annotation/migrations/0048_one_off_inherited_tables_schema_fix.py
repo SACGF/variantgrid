@@ -21,7 +21,7 @@ class Migration(migrations.Migration):
                     ORDER BY tablename;
             BEGIN
                 FOR table_record IN tables LOOP
-                EXECUTE format('ALTER TABLE %I 
+                EXECUTE format('ALTER TABLE %I
                 DROP COLUMN IF EXISTS "cadd_raw",
                 DROP COLUMN IF EXISTS "fathmm_pred",
                 DROP COLUMN IF EXISTS "gene_text",
@@ -35,8 +35,8 @@ class Migration(migrations.Migration):
                 DROP COLUMN IF EXISTS "uniparc";', table_record.tablename);
                 END LOOP;
             END$$;
-            
-            
+
+
             DO $$
             DECLARE
                 tables CURSOR FOR
@@ -46,7 +46,7 @@ class Migration(migrations.Migration):
                     ORDER BY tablename;
             BEGIN
                 FOR table_record IN tables LOOP
-                EXECUTE format('ALTER TABLE %I 
+                EXECUTE format('ALTER TABLE %I
                 DROP COLUMN IF EXISTS "cadd_raw",
                 DROP COLUMN IF EXISTS "dbsnp_rs_id",
                 DROP COLUMN IF EXISTS "fathmm_pred",

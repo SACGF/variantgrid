@@ -3,7 +3,7 @@
 from django.db import migrations
 
 
-def _one_off_legacy_vcf_allele_frequency_percent(apps, schema_editor):
+def _one_off_legacy_vcf_allele_frequency_percent(apps, _schema_editor):
     VCF = apps.get_model("snpdb", "VCF")
     VCF.objects.filter(allele_frequency_field__isnull=True).update(allele_frequency_percent=True)
 

@@ -6,6 +6,7 @@ from django.http import HttpRequest
 from lazy import lazy
 
 from classification.models import Classification, ClassificationModification, EvidenceKeyMap
+from classification.models.classification_groups import ClassificationGroupUtils
 from classification.views.classification_export_utils import UsedKeyTracker, KeyValueFormatter
 from classification.views.exports.classification_export_decorator import register_classification_exporter
 from classification.views.exports.classification_export_filter import AlleleData, ClassificationFilter, \
@@ -114,12 +115,20 @@ class ClassificationMeta(ExportRow):
     """
     Deals with the static columns - to be followed by all the evidence key columns
     """
-
-    def __init__(self, cm: ClassificationModification, discordance_status: DiscordanceReportStatus, e_keys: EvidenceKeyMap):
+    def __init__(
+            self,
+            cm: ClassificationModification,
+            discordance_status: DiscordanceReportStatus,
+            pending_clin_sig: Optional[str],
+            e_keys: EvidenceKeyMap):
         self.cm = cm
-        self.vc = cm.classification
         self.discordance_status = discordance_status
+        self.pending_clin_sig = pending_clin_sig
         self.e_keys = e_keys
+
+    @property
+    def vc(self) -> Classification:
+        return self.cm.classification
 
     @export_column(categories={"transient": True})
     def resolved_condition(self):
@@ -153,6 +162,10 @@ class ClassificationMeta(ExportRow):
         else:
             return self.discordance_status
 
+    @export_column(categories={"transient": True, "pending_changes": True})
+    def pending_clinical_significance(self):
+        return self.pending_clin_sig
+
 
 @register_classification_exporter("csv")
 class ClassificationExportFormatter2CSV(ClassificationExportFormatter2):
@@ -161,6 +174,7 @@ class ClassificationExportFormatter2CSV(ClassificationExportFormatter2):
         self.format_details = format_details
         self.errors_io: Optional[StringIO] = None
         self.e_keys = EvidenceKeyMap.cached()
+        self.grouping_utils = ClassificationGroupUtils()
         super().__init__(classification_filter=classification_filter)
 
     @classmethod
@@ -179,7 +193,7 @@ class ClassificationExportFormatter2CSV(ClassificationExportFormatter2):
             include_explains=self.format_details.include_explains,
             ignore_evidence_keys=self.format_details.ignore_evidence_keys
         )
-        #for evidence in self.classification_filter.cms_qs().values_list('published_evidence', flat=True):
+        # for evidence in self.classification_filter.cms_qs().values_list('published_evidence', flat=True):
         #    used_keys.check_evidence(evidence)
         # todo cache cms_qs?
         used_keys.check_evidence_qs(self.classification_filter.cms_qs())
@@ -218,15 +232,22 @@ class ClassificationExportFormatter2CSV(ClassificationExportFormatter2):
 
     @lazy
     def _categories(self) -> Optional[Dict]:
+        categories = {}
         if self.format_details.exclude_transient:
-            return {"transient": None}
-        else:
-            return None
+            categories["transient"] = None
+        if not self.grouping_utils.any_pending_changes:
+            categories["pending_changes"] = None
+        return categories
 
     def to_row(self, vcm: ClassificationModification, allele_data: AlleleData, message=None) -> str:
         row_data = \
             RowID(cm=vcm, allele_data=allele_data, message=message).to_csv(categories=self._categories) + \
-            ClassificationMeta(cm=vcm, discordance_status=self.classification_filter.is_discordant(vcm), e_keys=self.e_keys).to_csv(categories=self._categories) + \
+            ClassificationMeta(
+                cm=vcm,
+                discordance_status=self.classification_filter.is_discordant(vcm),
+                pending_clin_sig=self.grouping_utils.pending_changes_for(vcm),
+                e_keys=self.e_keys
+            ).to_csv(categories=self._categories) + \
             self.used_keys.row(classification_modification=vcm)
 
         return delimited_row(row_data, delimiter=',')

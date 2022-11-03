@@ -4,7 +4,7 @@ from typing import List, Dict
 from django.db import migrations
 
 
-def update_key(apps, schema_editor):
+def update_key(apps, _schema_editor):
     EvidenceKey = apps.get_model("classification", "EvidenceKey")
     if molecular_consequence := EvidenceKey.objects.get(pk="molecular_consequence"):
         options: List[Dict]

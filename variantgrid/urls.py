@@ -8,6 +8,7 @@ from django.contrib.staticfiles.urls import staticfiles_urlpatterns
 from django.urls import path
 
 from variantgrid import views
+from variantgrid.views import ContactFormView
 
 admin.autodiscover()
 
@@ -25,10 +26,18 @@ urlpatterns = [
     path('system/changelog', views.changelog, name='changelog'),
     path('system/keycloak_admin', views.keycloak_admin, name='keycloak_admin'),
     path('terms/', include('termsandconditions.urls')),
-    path('__debug__/', include(debug_toolbar.urls)),
     path('avatar/', include('avatar.urls')),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
+if settings.DEBUG:
+    urlpatterns += [
+        path('__debug__/', include(debug_toolbar.urls)),
+    ]
+
+if settings.CONTACT_US_ENABLED:
+    urlpatterns += [
+        path('contact_us', ContactFormView.as_view(), name='contact_us')
+    ]
 
 if getattr(settings, "REGISTRATION_OPEN", False):
     registration_include = include('registration.backends.simple.urls')

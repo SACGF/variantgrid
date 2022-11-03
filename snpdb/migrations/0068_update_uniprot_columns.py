@@ -3,7 +3,7 @@
 from django.db import migrations
 
 
-def _update_uniprot(apps, schema_editor):
+def _update_uniprot(apps, _schema_editor):
     VariantGridColumn = apps.get_model("snpdb", "VariantGridColumn")
 
     for vgc in VariantGridColumn.objects.filter(variant_column__startswith='variantannotation__uniprot__'):

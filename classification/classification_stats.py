@@ -40,7 +40,7 @@ def get_classification_counts(user: User, show_unclassified=True, unique_alleles
 
 
 def get_classification_counts_allele(qs: QuerySet[ClassificationModification], field: str, possible_values: Iterable[Any]) -> Dict[Any, int]:
-    counts: Dict[Any, int] = dict()
+    counts: Dict[Any, int] = {}
 
     # django doesn't support query set annotations and distinct() at the same time, so have to do this as multiple requests
     qs = qs.order_by('classification__allele_id', '-created').distinct('classification__allele_id')

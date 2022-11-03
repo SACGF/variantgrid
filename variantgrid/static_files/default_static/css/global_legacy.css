@@ -168,11 +168,7 @@ h3 .hover-link {
 
     It tries to be compatible with Django form as_p
 */
-form label {
-  font-weight: bold;
-}
-
-input[type=checkbox], input[type=radio] {
+input[type='checkbox'], input[type='radio'] {
   cursor: pointer;
 }
 
@@ -381,7 +377,7 @@ fieldset legend {
   color: #334466;
 }
 
-.horizontal-fields input[type=text], .horizontal-fields input[type=password], .horizontal-fields input[type=email], .horizontal-fields input[type=number], .horizontal-fields input:not([type]), .horizontal-fields textarea, fieldset.form-fields input[type=text], fieldset.form-fields input[type=password], fieldset.form-fields input[type=email], fieldset.form-fields input[type=number], fieldset.form-fields input:not([type]), fieldset.form-fields textarea {
+.horizontal-fields input[type='text'], .horizontal-fields input[type='password'], .horizontal-fields input[type='email'], .horizontal-fields input[type='number'], .horizontal-fields input:not([type]), .horizontal-fields textarea, fieldset.form-fields input[type='text'], fieldset.form-fields input[type='password'], fieldset.form-fields input[type='email'], fieldset.form-fields input[type='number'], fieldset.form-fields input:not([type]), fieldset.form-fields textarea {
   min-width: 300px;
   border-radius: 4px;
   border: 1px solid #dddddd;
@@ -398,10 +394,6 @@ fieldset legend {
 
 fieldset.form-fields legend {
   width: auto;
-}
-
-label[for] {
-  cursor: pointer;
 }
 
 .labelled.inline {
@@ -536,7 +528,7 @@ li.error {
   border: 0px !important;
 }
 .grid-link .no-entry {
-  opacity: 0.1;
+  opacity: .1;
 }
 
 #node-data-container a.grid-link {
@@ -756,16 +748,6 @@ table.name-fields td:not(:first-of-type), table.name-fields th:not(:first-of-typ
   padding-left: 10px;
 }
 
-.no-value {
-  color: #BBBBBB !important;
-  font-style: italic;
-  border-color: #dddddd !important;
-}
-
-.zero-value {
-  color: #AAAAAA;
-}
-
 .box {
   display: inline-block;
   padding: 2px 4px 2px 4px;
@@ -920,7 +902,7 @@ div#content {
 
 .gnomad-flag-label {
   display: inline;
-  padding: 0.2em 0.6em 0.3em;
+  padding: .2em .6em .3em;
   font-size: 75%;
   font-weight: bold;
   line-height: 1;
@@ -928,7 +910,7 @@ div#content {
   text-align: center;
   white-space: nowrap;
   vertical-align: baseline;
-  border-radius: 0.25em;
+  border-radius: .25em;
   background-color: #5cb85c;
 }
 
@@ -1105,24 +1087,8 @@ a.clinical-context {
   background-image: url(/static/icons/check-mark-green.svg);
 }
 
-.hgnc {
-  background-color: #99CD83;
-}
-
-.hpo {
-  background-color: #FF8C00;
-}
-
-.omim {
-  background-color: #22529e;
-}
-
-.mondo {
-  background-color: #cce34c;
-}
-
 .sequencer-name-text {
-  font-size: 0.6em;
+  font-size: .6em;
 }
 
 .color-box {
@@ -1190,7 +1156,7 @@ a.clinical-context {
   margin-bottom: 0;
 }
 .citation .loading {
-  opacity: 1;
+  opacity: 1.0;
 }
 .citation.failed {
   background-color: #ffcccc;
@@ -1199,10 +1165,6 @@ a.clinical-context {
   margin-top: 15px;
   padding-top: 15px;
   border-top: 1px dashed lightgray;
-}
-
-.variant-coordinate {
-  word-break: break-all;
 }
 
 @keyframes pulse {

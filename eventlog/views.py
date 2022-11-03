@@ -14,7 +14,7 @@ def eventlog_view(view_func):
     """ Probably don't use this as it can add 100ms of time to a page as it does a DB write """
 
     def _wrapped_view(request, *args, **kwargs):
-        app_name = str(view_func.__module__).split('.')[0]
+        app_name = str(view_func.__module__).split('.', maxsplit=1)[0]
         Event.objects.create(user=request.user,
                              app_name=app_name,
                              name=f"viewed_{view_func.__name__}",

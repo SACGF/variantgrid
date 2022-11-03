@@ -1,22 +1,23 @@
 import csv
+import json
+import re
 from collections import defaultdict
 from dataclasses import dataclass
 from enum import Enum
 from typing import Dict, List, Optional, Set, Iterator
+
 from lazy import lazy
 from pyhgvs import InvalidHGVSName
+
 from annotation.models import ClinVar
 from classification.enums import SpecialEKeys
-from classification.management.commands import clinvar_export
-from classification.models import Classification, ClinVarExport, ClinVarAllele, EvidenceKey, EvidenceKeyMap, \
+from classification.models import Classification, ClinVarExport, ClinVarAllele, EvidenceKeyMap, \
     ConditionResolved
 from genes.hgvs import CHGVS
 from library.guardian_utils import admin_bot
 from ontology.models import OntologyTerm, OntologySnake, OntologyTermRelation
 from snpdb.models import GenomeBuild, Variant, Allele, ClinVarKey
 from variantopedia.search import search_hgvs, SearchResult, ClassifyVariant
-import re
-import json
 
 C_HGVS_AND_P_DOT = re.compile(r"^(?P<c_hgvs>.+?)( \((?P<p_hgvs>p[.].+)\))?$")
 
@@ -177,7 +178,7 @@ class ClinVarLegacyRow:
     @staticmethod
     def load_file(file, clinvar_key: ClinVarKey) -> Iterator['ClinVarLegacyRow']:
         csv_f = csv.reader(file, delimiter='\t')
-        header_indexes: Dict[str, int] = dict()
+        header_indexes: Dict[str, int] = {}
         for row in csv_f:
             if not header_indexes:
                 if len(row) > 1 and row[1] == 'VariationID':
@@ -185,7 +186,7 @@ class ClinVarLegacyRow:
                     # don't process the header row itself as data, now skip to the next row
                     header_indexes = {label: index for index, label in enumerate(row)}
             else:
-                row_dict: Dict[str, str] = dict()
+                row_dict: Dict[str, str] = {}
                 for header_key, index in header_indexes.items():
                     row_dict[header_key] = row[index]
                 yield ClinVarLegacyRow(
@@ -197,6 +198,8 @@ class ClinVarLegacyRow:
 
     @property
     def c_hgvs_preferred_str(self) -> str:
+        if not self.variant_preferred:
+            return self.variant_preferred
         if match := C_HGVS_AND_P_DOT.match(self.variant_preferred):
             return match.group('c_hgvs')
         else:
@@ -220,7 +223,7 @@ class ClinVarLegacyRow:
 
     @lazy
     def ontology_terms(self) -> List[OntologyTerm]:
-        terms: List[OntologyTerm] = list()
+        terms: List[OntologyTerm] = []
         if condition_identifier := self.condition_identifier.strip():
             if individual_terms := condition_identifier.split(';'):
                 for individual_term in individual_terms:
@@ -246,18 +249,19 @@ class ClinVarLegacyRow:
                 allele_to_match_types[allele].add(ClinVarLegacyAlleleMatchType.CLINVAR_VARIANT_ID)
 
         try:
-            if results := search_hgvs(self.c_hgvs_preferred_str, user=admin_bot(), genome_build=GenomeBuild.grch38(), variant_qs=Variant.objects.all()):
-                for result in results:
-                    variant: Optional[Variant] = None
-                    if isinstance(result, SearchResult):
-                        result = result.record
-                    if isinstance(result, Variant):
-                        variant = result
-                    elif isinstance(result, ClassifyVariant):
-                        variant = result.variant
-                    if variant:
-                        if allele := variant.allele:
-                            allele_to_match_types[allele].add(ClinVarLegacyAlleleMatchType.VARIANT_PREFERRED_VARIANT)
+            if c_hgvs_preferred_str := self.c_hgvs_preferred_str:
+                if results := search_hgvs(c_hgvs_preferred_str, user=admin_bot(), genome_build=GenomeBuild.grch38(), variant_qs=Variant.objects.all()):
+                    for result in results:
+                        variant: Optional[Variant] = None
+                        if isinstance(result, SearchResult):
+                            result = result.record
+                        if isinstance(result, Variant):
+                            variant = result
+                        elif isinstance(result, ClassifyVariant):
+                            variant = result.variant
+                        if variant:
+                            if allele := variant.allele:
+                                allele_to_match_types[allele].add(ClinVarLegacyAlleleMatchType.VARIANT_PREFERRED_VARIANT)
         except InvalidHGVSName:
             pass
         except NotImplementedError:
@@ -270,7 +274,7 @@ class ClinVarLegacyRow:
             # allow for some transcript version increases
             if c_hgvs.transcript_parts.version:
                 test_c_hgvs: CHGVS
-                c_hgvs_strs: List[str] = list()
+                c_hgvs_strs: List[str] = []
                 for attempt_increase in range(-3, 3):
                     if c_hgvs.transcript_parts.version + attempt_increase >= 1:
                         if test_c_hgvs := c_hgvs.with_transcript_version(c_hgvs.transcript_parts.version + attempt_increase):
@@ -282,10 +286,10 @@ class ClinVarLegacyRow:
                         for allele in alleles:
                             allele_to_match_types[allele].add(ClinVarLegacyAlleleMatchType.VARIANT_PREFERRED_IMPORTED_C_HGVS)
 
-        all_matches: [ClinVarLegacyMatches] = list()
+        all_matches: [ClinVarLegacyMatches] = []
         for allele, match_types in allele_to_match_types.items():
             classifications = list(Classification.objects.filter(lab__in=self.labs, allele=allele, withdrawn=False))
-            clinvar_export_matches: List[ClinVarLegacyMatch] = list()
+            clinvar_export_matches: List[ClinVarLegacyMatch] = []
             if clinvar_allele := ClinVarAllele.objects.filter(allele=allele, clinvar_key=self.clinvar_key).first():
                 if clinvar_exports := ClinVarExport.objects.filter(clinvar_allele=clinvar_allele):
                     for clinvar_export in clinvar_exports:

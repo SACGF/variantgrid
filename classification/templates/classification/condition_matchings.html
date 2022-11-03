@@ -18,7 +18,7 @@
                 textDom = $('<span>', {text: text});
             }
             // FIXME regenerate URLs
-            let aDom = $('<a>', {href:`/classification/condition_matching/${id}`, html: textDom});
+            let aDom = $('<a>', {href:`/classification/condition_matching/${id}`, html: textDom, class: 'hover-link'});
 
             return aDom.prop('outerHTML');
         }

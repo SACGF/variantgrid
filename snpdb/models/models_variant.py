@@ -402,6 +402,13 @@ class Variant(models.Model):
     def is_reference(self) -> bool:
         return self.alt.seq == self.REFERENCE_ALT
 
+    @lazy
+    def vcf_alt(self) -> str:
+        """ Return the base as a string (not as our special REFERENCE_ALT) """
+        if self.is_reference:
+            return self.locus.ref.seq
+        return self.alt.seq
+
     @property
     def is_standard_variant(self) -> bool:
         """ Variant alt sequence is standard [GATCN] (ie not special or reference) """
@@ -547,7 +554,7 @@ class VariantAllele(TimeStampedModel):
         return f"{self.allele} - {self.variant_id}({self.genome_build}/{self.allele_linking_tool})"
 
 
-class VariantCollection(RelatedModelsPartitionModel):
+class VariantCollection(RelatedModelsPartitionModel): #
     """ A set of variants - usually used as a cached result """
 
     RECORDS_BASE_TABLE_NAMES = ["snpdb_variantcollectionrecord"]
@@ -565,12 +572,15 @@ class VariantCollection(RelatedModelsPartitionModel):
         vcr_condition = Q(variantcollectionrecord__variant_collection=self)
         return {self.variant_collection_alias: FilteredRelation('variantcollectionrecord', condition=vcr_condition)}
 
-    def get_arg_q_dict(self) -> Dict[Optional[str], Q]:
+    def get_arg_q_dict(self) -> Dict[Optional[str], Set[Q]]:
         if self.status != ProcessingStatus.SUCCESS:
             raise ValueError(f"{self}: status {self.get_status_display()} != SUCCESS")
 
         q = Q(**{f"{self.variant_collection_alias}__isnull": False})
-        return {self.variant_collection_alias: q}
+        return {self.variant_collection_alias: {str(q): q}}
+
+    def __lt__(self, other):
+        return self.pk < other.pk
 
     def __str__(self):
         return f"VariantCollection: {self.pk} ({self.name})"

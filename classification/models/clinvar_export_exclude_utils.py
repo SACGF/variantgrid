@@ -1,6 +1,6 @@
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from django.contrib.auth.models import User
 from django.db.models import QuerySet
@@ -137,14 +137,14 @@ class ClinVarExcludePatternUtil:
         self.clinvar_key = clinvar_key
         self.exclude_patterns: List[ClinVarKeyExcludePattern] = list(clinvar_key.clinvarkeyexcludepattern_set.all())
 
-    def matching_exclude_patterns(self, record: EvidenceMixin) -> List[ClinVarKeyExcludePattern]:
+    def matching_exclude_patterns(self, record: EvidenceMixin) -> Optional[List[ClinVarKeyExcludePattern]]:
         """
         Return list of exclude patterns that the record has failed
         """
         if not self.exclude_patterns:
             return None
 
-        matching_patterns: List[ClinVarKeyExcludePattern] = list()
+        matching_patterns: List[ClinVarKeyExcludePattern] = []
         for pattern in self.exclude_patterns:
             value = record.get(pattern.evidence_key)
             if pattern.should_exclude(str(value)):

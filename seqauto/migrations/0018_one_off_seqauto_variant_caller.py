@@ -15,7 +15,7 @@ def _get_variant_caller_from_vcf_file(VariantCaller, vcf_path):
     return VariantCaller.objects.get_or_create(name=variant_caller, version=version)[0]
 
 
-def _one_off_seqauto_variant_caller(apps, schema_editor):
+def _one_off_seqauto_variant_caller(apps, _schema_editor):
     SampleSheetCombinedVCFFile = apps.get_model("seqauto", "SampleSheetCombinedVCFFile")
     VCFFile = apps.get_model("seqauto", "VCFFile")
     VCFFromSequencingRun = apps.get_model("seqauto", "VCFFromSequencingRun")

@@ -1,0 +1,38 @@
+{% extends "registration/abstract_login_vg.html" %}
+{% load static %}
+{% load ui_login %}
+{% load ui_utils %}
+{% block inner_content %}
+    <div class="row" style="display:flex; align-items:center">
+        <div class="col-12 col-lg-7">
+            <div class="jumbo-box">
+                <h1>Contact Us</h1>
+                {% for message in messages %}
+                    <div class="alert {{ message.tags }}" role="alert">
+                        {{ message.tags | severity_icon }} {{ message }}
+                    </div>
+                {% endfor %}
+                <div class="mr-4">
+                    {% if sent %}
+                        <p>Thank you for getting in contact with us. We'll get back to you as soon as we can <i class="fa-regular fa-envelope"></i></p>
+                        <p><a href="/">Back to main page</a>.</p>
+                    {% else %}
+                        If you'd like to talk about getting your own instance of VariantGrid up and running, let us know.
+                        <hr class="my-4"/>
+                        <form id='contact_us' method="POST" action="{% url 'contact_us' %}" role="contact">
+                            {% csrf_token %}
+                            {% labelled label="Your Name" errors=form.errors.name %}<input name="name" class="form-control" autofocus value="{{ form.name.value|default_if_none:'' }}"/>{% endlabelled %}
+                            {% labelled label="Your Email" errors=form.errors.email %}<input name="email" type="email" class="form-control" value="{{ form.email.value|default_if_none:'' }}"/>{% endlabelled %}
+                            {% labelled label="Message" errors=form.errors.message %}<textarea name="message" class="form-control" style="min-height:20vh">{{ form.message.value|default_if_none:'' }}</textarea>{% endlabelled %}
+                            {% labelled %}
+                                <button class="btn-login btn btn-primary w-100" type="submit">Send Message</button>
+                            {% endlabelled %}
+                        </form>
+                    {% endif %}
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+{% endblock %}

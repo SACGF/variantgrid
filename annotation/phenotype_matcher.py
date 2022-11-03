@@ -215,7 +215,7 @@ class PhenotypeMatcher:
 
     @staticmethod
     def get_id_from_multi_word_fuzzy_match(lookup: CodePKLookups, words: List[str], text: str, distance: int = 1) -> Optional[CodePK]:
-        potentials: CodePKLookups = dict()
+        potentials: CodePKLookups = {}
         min_length = len(text) - distance
         max_length = len(text) + distance
         for w in words:
@@ -230,7 +230,7 @@ class PhenotypeMatcher:
     def get_id_from_single_word_fuzzy_match(single_words_by_length: Dict[int, CodePKLookups], text: str,
                                             distance: int = 1) -> Optional[CodePK]:
         text_length = len(text)
-        potentials: CodePKLookups = dict()
+        potentials: CodePKLookups = {}
         # Can quickly exclude words that are greater than +/- distance away
         for l in range(text_length - distance, text_length + distance + 1):
             if words := single_words_by_length.get(l):
@@ -370,7 +370,7 @@ class PhenotypeMatcher:
             return OntologyService.HPO, [hpo_pk]
 
         def load_hpo_list_by_names(hpo_name_list) -> OntologyResults:
-            hpo_list: List[CodePK] = list()
+            hpo_list: List[CodePK] = []
             for hpo_name in hpo_name_list:
                 _, hpo = load_hpo_by_name(hpo_name)
                 hpo_list.extend(hpo)

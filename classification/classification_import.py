@@ -133,7 +133,7 @@ def reattempt_variant_matching(user: User, queryset: QuerySet[Classification]) -
     invalid_record_count = 0
     valid_record_count = 0
     valid_this_loop = 0
-    imports_by_genome: Dict[int, ClassificationImport] = dict()
+    imports_by_genome: Dict[int, ClassificationImport] = {}
     max_size = 100
 
     def process_outstanding():

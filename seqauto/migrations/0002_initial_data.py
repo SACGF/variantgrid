@@ -3,7 +3,7 @@
 from django.db import migrations
 
 
-def create_sequencers(apps, schema_editor):
+def create_sequencers(apps, _schema_editor):
     HISEQ = 'H'
     MISEQ = 'M'
 
@@ -26,7 +26,7 @@ def create_sequencers(apps, schema_editor):
                                   data_naming_convention=MISEQ)
 
 
-def qc_columns(apps, schema_editor):
+def qc_columns(apps, _schema_editor):
     QCType = apps.get_model("seqauto", "QCType")
     QCColumn = apps.get_model("seqauto", "QCColumn")
 

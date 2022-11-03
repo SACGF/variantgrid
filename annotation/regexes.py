@@ -103,6 +103,9 @@ class DbRefRegexResult:
             term_id = f"{self.db}:{self.idx}"
             if term := OntologyTerm.objects.filter(id=term_id).first():
                 self.summary = term.name
+                if not term.is_valid_for_condition:
+                    self.summary += " (obsolete or not phenotype)"
+
         try:
             if source := CitationSource.CODES.get(self.db):
                 citation, _ = Citation.objects.get_or_create(citation_source=source, citation_id=idx)
@@ -134,7 +137,7 @@ class DbRefRegexResult:
         return self.cregx.db
 
     def to_json(self):
-        jsonny = {'id': '%s: %s' % (self.db, self.idx), 'db': self.db, 'idx': self.idx, 'url': self.url}
+        jsonny = {'id': f'{self.db}: {self.idx}', 'db': self.db, 'idx': self.idx, 'url': self.url}
         if self.summary:
             jsonny['summary'] = self.summary
         if self.internal_id:
@@ -156,8 +159,8 @@ class DbRefRegexes:
 
     def __init__(self, regexes: List[DbRefRegex]):
         self.regexes = regexes
-        self.prefix_map: Dict[str, DbRefRegex] = dict()
-        prefixes: List[str] = list()
+        self.prefix_map: Dict[str, DbRefRegex] = {}
+        prefixes: List[str] = []
         for regex in self.regexes:
             for prefix in regex.prefixes:
                 prefix = prefix.lower()
@@ -184,7 +187,7 @@ class DbRefRegexes:
         it will still work).
         @param sort If true sorts the results by database and id, otherwise leaves them in order of discovery
         """
-        results: List[DbRefRegexResult] = list()
+        results: List[DbRefRegexResult] = []
 
         def append_result_if_length(db_regex: DbRefRegex, match: Optional[Match]) -> bool:
             """

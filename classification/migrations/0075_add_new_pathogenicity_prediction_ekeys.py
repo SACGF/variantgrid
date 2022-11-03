@@ -3,7 +3,7 @@
 from django.db import migrations
 
 
-def _add_new_pathogenicity_prediction_ekeys(apps, schema_editor):
+def _add_new_pathogenicity_prediction_ekeys(apps, _schema_editor):
     EvidenceKey = apps.get_model("classification", "EvidenceKey")
 
     FREE_ENTRY = 'F'

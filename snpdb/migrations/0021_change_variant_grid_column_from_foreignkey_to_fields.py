@@ -2,7 +2,8 @@
 
 from django.db import migrations
 
-def _change_variant_grid_column_from_foreignkey_to_fields(apps, schema_editor):
+
+def _change_variant_grid_column_from_foreignkey_to_fields(apps, _schema_editor):
     VariantGridColumn = apps.get_model("snpdb", "VariantGridColumn")
 
     # We originally pointed to ForeignKeys (ie "__gene_symbol") but this can cause filters to fail with:

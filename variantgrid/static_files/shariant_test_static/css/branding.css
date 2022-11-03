@@ -6,7 +6,7 @@
   color: #ddd !important;
   border-color: #ccc;
 }
-.bg-theme .fas {
+.bg-theme .fas, .bg-theme .svg-inline--fa {
   color: #ccc !important;
 }
 .bg-theme input {
@@ -32,7 +32,7 @@ body.login-bg-theme {
   position: relative;
   top: 5px;
   left: 15px;
-  content: " WARNING : This TEST site uses mock data.";
+  content: ' WARNING : This TEST site uses mock data.';
   color: white;
   font-weight: bold;
 }
@@ -80,7 +80,7 @@ nav.navbar a.nav-link.active {
 
 .navbar-brand {
   background-position-x: 28px;
-  background-image: url("/static/images/Australian Genomics logo_white transp.png");
+  background-image: url("/static/images/Australian_Genomics_logo_white_transp.png");
   margin-right: 0;
 }
 

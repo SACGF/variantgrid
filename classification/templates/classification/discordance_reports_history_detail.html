@@ -1,0 +1,22 @@
+{% load classification_tags %}
+<div>
+    <p class="text-info">Below is a list of all historic discordances where your lab was involved.</p>
+
+    <table class="table">
+        <thead>
+            <tr>
+                <th style="width:100px" class="text-center">ID</th>
+                <th class="text-left">Discordance Detected</th>
+                <th class="text-left">c.HGVS ({{ dlab.discordance_summaries.genome_build.name }})</th>
+                <th class="text-center" style="width:50%">Lab / Clinical Significances</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for summary in dlab.discordance_summaries.inactive_summaries %}
+            {% discordance_report_row summary filter=False %}
+        {% empty %}
+            <tr><td colspan="4" class="table-empty"><span class="no-value">No data to show</span></td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>

@@ -13,19 +13,23 @@ from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder, C
 
 class AnnotationRunColumns(DatatableConfig):
 
-    def status(self, row: Dict[str, Any]):
+    @staticmethod
+    def status(row: Dict[str, Any]):
         return AnnotationStatus(row["status"]).label
 
-    def format_timedelta(self, cell: CellData):
+    @staticmethod
+    def format_timedelta(cell: CellData):
         delta: timedelta = cell.value
         if delta is None:
             return '-'
-        seconds = delta.total_seconds()
-        hours, remainder = divmod(seconds, 3600)
+        hours, remainder = divmod(delta.total_seconds(), 3600)
         minutes, seconds = divmod(remainder, 60)
-        if int(seconds) == 0:
+        hours = int(hours)
+        minutes = int(minutes)
+        seconds = int(seconds)
+        if seconds == 0:
             return '< 1 second'
-        return '{:02}:{:02}:{:02}'.format(int(hours), int(minutes), int(seconds))
+        return f'{hours:02}:{minutes:02}:{seconds:02}'
 
     def __init__(self, request):
         super().__init__(request)

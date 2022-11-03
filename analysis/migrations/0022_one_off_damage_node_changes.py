@@ -3,7 +3,7 @@
 from django.db import migrations
 
 
-def _one_off_damage_node_changes(apps, schema_editor):
+def _one_off_damage_node_changes(apps, _schema_editor):
     DamageNode = apps.get_model("analysis", "DamageNode")
 
     # Attempt to keep backwards compatibility

@@ -48,6 +48,12 @@ ALLELE_VALIDATION = False
 
 # if None, discordance emails wont be sent
 DISCORDANCE_EMAIL = None
+
+# if None, Emails to admins wont be sent, is the FROM email for emails sent form this server to admins
+ADMIN_EMAIL_NOTIFICATION = None
+# Enable to have contact us functionality
+CONTACT_US_ENABLED = False
+
 ACCOUNTS_EMAIL = None
 # If you change this value you should run 'recalc' for all ClinicalContexts in admin
 DISCORDANCE_ENABLED = False
@@ -94,7 +100,7 @@ DATABASES = {
 CACHE_HOURS = 48
 TIMEOUT = 60 * 60 * CACHE_HOURS
 REDIS_PORT = 6379
-CACHE_VERSION = 33  # increment to flush caches (eg if invalid due to upgrade)
+CACHE_VERSION = 37  # increment to flush caches (eg if invalid due to upgrade)
 CACHES = {
     'default': {
         "BACKEND": "django.core.cache.backends.redis.RedisCache",
@@ -406,6 +412,8 @@ ANALYSIS_DUAL_SCREEN_MODE_FEATURE_ENABLED = False  # Currently broken
 ANALYSIS_TEMPLATES_AUTO_SAMPLE = "Sample tab auto analysis"
 ANALYSIS_WARN_IF_NO_QC_GENE_LIST_MESSAGE = None  # disabled by default
 ANALYSIS_NODE_CACHE_Q = True
+ANALYSIS_NODE_CACHE_DB = False  # Use NodeCache models
+ANALYSIS_NODE_MERGE_STORE_ID_SIZE_MAX = 1000
 
 VARIANT_ALLELE_FREQUENCY_CLIENT_SIDE_PERCENT = True  # For analysis Grid/CSV export. VCF export is always unit
 VARIANT_STANDARD_BASES_ONLY = True  # True to reject anything other than A, C, G, T
@@ -580,7 +588,6 @@ MIDDLEWARE = (
     'threadlocals.middleware.ThreadLocalMiddleware',
     # 'querycount.middleware.QueryCountMiddleware',
     # 'mozilla_django_oidc.middleware.SessionRefresh',
-    # 'debug_panel.middleware.DebugPanelMiddleware',
 )
 HTML_MINIFY = True
 EXCLUDE_FROM_MINIFYING = (
@@ -666,8 +673,6 @@ INSTALLED_APPS = [
     'rest_framework',
     'termsandconditions',
     'crispy_forms',  # used to make bootstrap compatible forms
-    #    'debug_toolbar',
-    #    'debug_panel',
     # Internal apps
     'analysis.apps.AnalysisConfig',
     'annotation.apps.AnnotationConfig',
@@ -847,12 +852,13 @@ _URLS_NAME_REGISTER_DEFAULT = True
 _URLS_NAME_REGISTER_OVERRIDE = {
     "view_patient_contact_tab": False,
     "classification_import_tool": False,
+    "classification_view_metrics": False,
     "condition_aliases": False,
     "clinvar_key_summary": False,
     "clinvar_match": False,
     "condition_matchings": False,
     "condition_match_test": False,
-    "discordance_reports": False
+    "discordance_reports": False,
 }
 URLS_NAME_REGISTER = defaultdict(lambda: _URLS_NAME_REGISTER_DEFAULT, _URLS_NAME_REGISTER_OVERRIDE)
 

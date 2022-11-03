@@ -59,7 +59,7 @@ class EmailLabSummaryData:
             report__resolution=DiscordanceReportResolution.ONGOING).values_list('report', flat=True)
         dr_qs = DiscordanceReport.objects.filter(pk__in=report_ids).order_by('-id')
 
-        return DiscordanceReportTableData.create(
+        return DiscordanceReportTableData(
             perspective=LabPickerData.for_lab(self.lab, user=self.user),
             discordance_reports=dr_qs
         )

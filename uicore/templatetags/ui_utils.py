@@ -6,8 +6,10 @@ from typing import Optional, Any
 
 from django import template
 from django.contrib.auth.models import User
+from django.db.models import Model
 from django.forms.utils import ErrorList
 from django.template.base import FilterExpression, kwarg_re
+from django.urls import reverse, NoReverseMatch
 from django.utils.safestring import SafeString
 
 from library.utils import diff_text
@@ -163,7 +165,7 @@ def render_labelled(parser, token):
                             label_css=kwargs.get('label_css'),
                             value_css=kwargs.get('value_css'),
                             row_css=kwargs.get('row_css'),
-                            shorten_label=kwargs.get('shorten_label'),
+                            help=kwargs.get('help'),
                             admin_only=kwargs.get('admin_only'),
                             errors=kwargs.get('errors')
                             )
@@ -178,7 +180,7 @@ class LabelledValueTag(template.Node):
                  label_css: FilterExpression = None,
                  value_css: FilterExpression = None,
                  row_css: FilterExpression = None,
-                 shorten_label: FilterExpression = None,
+                 help: FilterExpression = None,
                  admin_only: FilterExpression = None,
                  errors: FilterExpression = None):
         self.id_prefix = id_prefix
@@ -189,7 +191,7 @@ class LabelledValueTag(template.Node):
         self.label_css = label_css
         self.value_css = value_css
         self.row_css = row_css
-        self.shorten_label = shorten_label
+        self.help = help
         self.admin_only = admin_only
         self.errors = errors
 
@@ -211,22 +213,7 @@ class LabelledValueTag(template.Node):
             else:
                 label = '<i class="fas fa-key" title="Admin only functionality"></i>' + label
 
-        popover = None
-
-        if TagUtils.value_bool(context, self.shorten_label):
-            first_fullstop = label.find('. ')
-            if first_fullstop != -1:
-                first_fullstop += 1
-
-            if first_fullstop == -1:
-                first_fullstop = label.find('</a>')
-                if first_fullstop != -1:
-                    first_fullstop += 4
-
-            if first_fullstop != -1:
-                popover = label
-                label = label[0:first_fullstop]
-
+        help_html = TagUtils.value_str(context, self.help)
         hint = TagUtils.value_str(context, self.hint)
         label_css = ""
         value_css = ""
@@ -278,19 +265,18 @@ class LabelledValueTag(template.Node):
             if errors := filter_errors.resolve(context):
                 for error in errors:
                     output += f'<div class="text-danger">{error}</div>'
+        help_tag = ""
+        if help_html:
+            help_html = help_html.replace('"', "'")  # Used double quotes around data-content
+            help_tag = f' <i class="fas fa-duotone fa-info-circle hover-detail popover-hover-stay" data-toggle="popover" popover-header="{label}" data-html="true" data-placement="left" data-content="{help_html}"></i>'
 
-        label_tag = f'<label {for_id} class="{label_css}">{label}</label>'
-        if popover:
-            popover = popover.replace('"', '&quot;')
-            label_tag = f'<label {for_id} class="{label_css} hover-detail" data-toggle="popover" data-content="{popover}">{label}</label>'
-
+        label_tag = f'<label {for_id} class="{label_css}">{label}{help_tag}</label>'
         content = f"""{label_tag}<div {div_id} class="{value_css}">{output}</div>"""
 
         if hint == "inline":
             return content
 
         content = f'<div class="{row_css}">{content}</div>'
-
         return content
 
 
@@ -355,7 +341,7 @@ class ModalTag(template.Node):
         modal = \
             f"""
                 <div id="{id_str}" class="modal" tabindex="-1">
-                    <div class="modal-dialog modal-dialog-scrollable modal-{size_str}">
+                    <div class="modal-dialog modal-{size_str}">
                         <div class="modal-content">
                             <div class="modal-header">
                                 <h5 class="modal-title">{label_str}</h5>
@@ -416,10 +402,7 @@ def badge(count: Optional[int], status: Optional[str] = None) -> str:
 
     render_status = status
     if count == 0:
-        if status == 'danger':
-            render_status = 'success'
-        elif status == 'success':
-            render_status = 'secondary'
+        render_status = "info"
     return SafeString(f' <span class="d-inline-block ml-1 badge badge-{render_status}">{count}</span>')
 
 
@@ -489,7 +472,7 @@ def segmented_text(text: str, divider: str = ':') -> str:
     if not text:
         return ""
     parts = text.split(divider)
-    output = list()
+    output = []
     for segment in parts[:-1]:
         output.append(f"<span class='text-monospace text-small text-muted'>{escape(segment)}</span>")
         output.append(f"<span class='text-monospace text-muted'>{escape(divider)}</span>")
@@ -563,3 +546,19 @@ def bytes(bytes: Optional[int]):
 @register.inclusion_tag(name="diff_text", filename="uicore/tags/diff_text.html")
 def diff_text_html(a: str, b: str):
     return {"diffs": diff_text(a, b), "before": a, "after": b}
+
+
+@register.inclusion_tag(takes_context=True, name="admin_link", filename="uicore/tags/admin_link.html")
+def admin_link(context, object: Model):
+    if not context.request.user.is_superuser:
+        return {}
+    url: Optional[str] = None
+    if isinstance(object, Model):
+        try:
+            model = object._meta.model
+            meta = model._meta
+            path = f"admin:{meta.app_label}_{meta.model_name}_change"
+            url = reverse(path, kwargs={"object_id": object.pk})
+        except NoReverseMatch:
+            pass
+    return {"url": url}

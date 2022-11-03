@@ -3,7 +3,7 @@
 from django.db import migrations
 
 
-def _gnomad3_label_fix_remove_rvis(apps, schema_editor):
+def _gnomad3_label_fix_remove_rvis(apps, _schema_editor):
     VariantGridColumn = apps.get_model("snpdb", "VariantGridColumn")
 
     LABELS = {

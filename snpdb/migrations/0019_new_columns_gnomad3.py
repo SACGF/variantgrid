@@ -5,7 +5,7 @@ from django.db import migrations
 from library.django_utils import bulk_insert_class_data
 
 
-def _new_columns_gnomad3(apps, schema_editor):
+def _new_columns_gnomad3(apps, _schema_editor):
     NEW_VARIANT_GRID_COLUMNS = [
         {'grid_column_name': 'gnomad_ac',
          'variant_column': 'variantannotation__gnomad_ac',

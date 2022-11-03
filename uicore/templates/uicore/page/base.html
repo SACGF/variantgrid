@@ -7,7 +7,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-    <link rel="stylesheet" href="{% static 'js/lib/bootstrap/4.5.2/css/bootstrap.min.css' %}">
+    <link href="{% static 'js/lib/bootstrap/4.5.2/css/bootstrap.min.css' %}" rel="stylesheet">
 
     <title>{% block title %}{{ site_name }}{% endblock %}</title>
     {% compress css %}
@@ -71,6 +71,9 @@
     <!-- JQuery, had to move to the top for the sake of autocomplete -->
     <script src="{% static 'js/lib/jquery-3.3.1/jquery-3.3.1.min.js' %}"></script>
 
+    <!-- used to set custom cookies, for functionality not worth setting in the database -->
+    <script src="{% static 'js/lib/js.cookie.min.js' %}"></script>
+
     <!-- lodash for our own usage -->
     <script src="{% static 'js/lib/lodash/4.17.20/lodash.min.js' %}"></script>
 
@@ -79,6 +82,10 @@
 
     <!-- Font Awesome -->
     <link href="{% static 'fontawesomefree/css/all.min.css' %}" rel="stylesheet" type="text/css">
+    {% comment %}
+    This makes icons svgs, which by default breaks clicks, hover overs etc
+    <script src="{% static 'fontawesomefree/js/all.min.js' %}"></script>
+    {% endcomment %}
 
     <!-- Datatables -->
     <link rel="stylesheet" type="text/css" href="{% static 'js/lib/datatables/bs4/dt-1.11.4/b-2.2.2/datatables.min.css' %}"/>
@@ -181,6 +188,7 @@
     <div>
         <div class="nav-side-bar no-gutters">
             <nav class="nav navbar-light" aria-orientation="vertical">
+                <div id="current-record-spot-fallback"></div>
                 {% block submenu %}{% endblock submenu %}
                 {% site_messages site_messages %}
             </nav>

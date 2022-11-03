@@ -12,7 +12,7 @@ from snpdb.genome import reference_contigs
 from snpdb.genome.reference_contigs import get_assembly_report_df
 
 
-def snpdb_initial_data(apps, schema_editor):
+def snpdb_initial_data(apps, _schema_editor):
     SITES = [
         {'id': 2, 'domain': 'localhost', 'name': 'localhost'},
         {'id': 3, 'domain': 'variantgrid.com', 'name': 'variantgrid.com'},
@@ -33,7 +33,7 @@ def snpdb_initial_data(apps, schema_editor):
     bulk_insert_class_data(apps, "snpdb", [("GenomicIntervalsCategory", GENOMIC_INTERVAL_CATEGORIES)])
 
 
-def create_columns(apps, schema_editor):
+def create_columns(apps, _schema_editor):
     CustomColumnsCollection = apps.get_model("snpdb", "CustomColumnsCollection")
     CustomColumn = apps.get_model("snpdb", "CustomColumn")
 
@@ -1399,12 +1399,12 @@ def create_columns(apps, schema_editor):
         CustomColumn.objects.bulk_create(records)
 
 
-def add_requires_classification_tag(apps, schema_editor):
+def add_requires_classification_tag(apps, _schema_editor):
     Tag = apps.get_model("snpdb", "Tag")
     Tag.objects.get_or_create(id=settings.TAG_REQUIRES_CLASSIFICATION)
 
 
-def create_bot_user(apps, schema_editor):
+def create_bot_user(apps, _schema_editor):
     User = apps.get_model("auth", "User")
     User.objects.get_or_create(
         username='admin_bot',
@@ -1420,7 +1420,7 @@ def create_bot_user(apps, schema_editor):
     )
 
 
-def import_contigs(apps, schema_editor):
+def import_contigs(apps, _schema_editor):
     GenomeBuild = apps.get_model("snpdb", "GenomeBuild")
     GenomeBuildContig = apps.get_model("snpdb", "GenomeBuildContig")
     Contig = apps.get_model("snpdb", "Contig")
@@ -1499,7 +1499,7 @@ def import_contigs(apps, schema_editor):
     GenomeBuild.objects.filter(name='GRCh38').update(igv_genome='hg38')
 
 
-def genome_build_accession(apps, schema_editor):
+def genome_build_accession(apps, _schema_editor):
     # Move this pu into main bit
     GenomeBuild = apps.get_model("snpdb", "GenomeBuild")
 
@@ -1514,7 +1514,7 @@ def genome_build_accession(apps, schema_editor):
         genome_build.save()
 
 
-def global_settings(apps, schema_editor):
+def global_settings(apps, _schema_editor):
     GenomeBuild = apps.get_model("snpdb", "GenomeBuild")
     GlobalSettings = apps.get_model("snpdb", "GlobalSettings")
     CustomColumnsCollection = apps.get_model("snpdb", "CustomColumnsCollection")
@@ -1535,7 +1535,7 @@ def global_settings(apps, schema_editor):
                                   default_genome_build=genome_build)
 
 
-def add_global_initial_group_permissions(apps, schema_editor):
+def add_global_initial_group_permissions(apps, _schema_editor):
     Group = apps.get_model("auth", "Group")
     GlobalSettings = apps.get_model("snpdb", "GlobalSettings")
     SettingsInitialGroupPermission = apps.get_model("snpdb", "SettingsInitialGroupPermission")
@@ -1571,7 +1571,7 @@ CREATE TABLE "%(table_name)s" (
     run_sql(sql)
 
 
-def variant_zygosity_count_defaults(apps, schema_editor):
+def variant_zygosity_count_defaults(apps, _schema_editor):
     VariantZygosityCountCollection = apps.get_model("snpdb", "VariantZygosityCountCollection")
 
     vzcc = VariantZygosityCountCollection.objects.create(name="global", description="All uploaded samples")

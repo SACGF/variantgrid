@@ -1,14 +1,64 @@
 import csv
 import io
-from collections import namedtuple
+from dataclasses import dataclass
+from typing import Optional
 
 from classification.enums.classification_enums import SpecialEKeys
 from classification.models.classification import ClassificationModification
 from classification.views.classification_export_utils import ExportFormatter
 from flags.models.models import Flag, FlagComment
 from library.django_utils import get_url_from_view_path
+from library.utils import ExportRow, export_column
 
-Problem = namedtuple('Problem', 'code message')
+
+@dataclass(frozen=True)
+class Problem:
+    code: str
+    message: str
+    flag_comment: Optional[FlagComment] = None
+
+
+@dataclass(frozen=True)
+class ProblemRow(ExportRow):
+    cm: ClassificationModification
+    problem: Problem
+
+    @property
+    def classification(self):
+        return self.cm.classification
+
+    @export_column("URL")
+    def url(self):
+        return get_url_from_view_path(self.classification.get_absolute_url())
+
+    @export_column("Lab")
+    def lab(self):
+        return str(self.classification.lab)
+
+    @export_column("Lab Record ID")
+    def lab_record_id(self):
+        return self.classification.lab_record_id
+
+    @export_column("Imported c.HGVS")
+    def exported_c_hgvs(self):
+        return self.cm.get(SpecialEKeys.C_HGVS)
+
+    @export_column("Classification Last Updated", format={"tz": "default"})
+    def classification_last_updated(self):
+        return self.cm.created
+
+    @export_column("Flag Last Updated", format={"tz": "default"})
+    def flag_last_updated(self):
+        if fc := self.problem.flag_comment:
+            return fc.created
+
+    @export_column("Problem Code")
+    def problem_code(self):
+        return self.problem.code
+
+    @export_column("Problem")
+    def problem(self):
+        return self.problem.message
 
 
 class ExportFormatterFlags(ExportFormatter):
@@ -23,10 +73,7 @@ class ExportFormatterFlags(ExportFormatter):
         super().__init__(*args, **kwargs)
 
     def header(self) -> str:
-        # hard-code columns that aren't in evidence
-
-        header = ['url', 'lab', 'lab_record_id', 'imported_chgvs', 'last updated', 'problem_code', 'problem']
-        return ExportFormatter.write_single_row(header, delimiter=',')
+        return ExportFormatter.write_single_row(ProblemRow.csv_header(), delimiter=',')
 
     def iterate_problems(self, vcm: ClassificationModification):
         evidence = vcm.evidence
@@ -37,7 +84,7 @@ class ExportFormatterFlags(ExportFormatter):
                 for validation in validations:
                     key_label = self.ekeys.get(key).pretty_label
                     code = validation.get('code', '')
-                    code = self.CODE_SUBSTITUTE.get(code, code)
+                    code = ExportFormatterFlags.CODE_SUBSTITUTE.get(code, code)
                     code = (code[0].upper() + code[1:]).replace('_', ' ')
                     message = validation.get('message')
                     yield Problem(code=code, message=f'{key_label}: {message}')
@@ -54,23 +101,15 @@ class ExportFormatterFlags(ExportFormatter):
             if last_comment and last_comment.text:
                 parts.append(last_comment.text)
 
-            yield Problem(code=flag_type.label, message='\n'.join(parts))
+            yield Problem(code=flag_type.label, message='\n'.join(parts), flag_comment=last_comment)
 
     def row(self, vcm: ClassificationModification):
-        vc = vcm.classification
-        url = get_url_from_view_path(vc.get_absolute_url())
-        lab = vc.lab.name
-        lab_record_id = vc.lab_record_id
-        imported_chgvs = vc.get(SpecialEKeys.C_HGVS, None)
-        version = vcm.created.strftime("%Y-%m-%d %H:%M")
-
         out = io.StringIO()
         writer = csv.writer(out, delimiter=',')
 
         for problem in self.iterate_problems(vcm):
-            row = [url, lab, lab_record_id, imported_chgvs, version, problem.code, problem.message]
             self.row_count += 1
-            writer.writerow(row)
+            writer.writerow(ProblemRow(vcm, problem).to_csv())
 
         return out.getvalue()
 

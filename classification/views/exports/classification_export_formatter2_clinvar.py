@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Set, Optional, List, Tuple, Dict, Any, Callable
+from typing import Set, Optional, List, Tuple, Callable
 
 from django.http import HttpRequest
 from django.urls import reverse
@@ -14,7 +14,6 @@ from classification.views.exports.classification_export_filter import Classifica
 from classification.views.exports.classification_export_formatter2 import ClassificationExportFormatter2
 from library.django_utils import get_url_from_view_path
 from library.utils import ExportRow, export_column
-from snpdb.models import VariantAllele
 
 
 class ClinVarCompareValue(int, Enum):
@@ -218,7 +217,7 @@ class ClassificationExportFormatter2ClinVarCompare(ClassificationExportFormatter
     def batch_pre_cache(self) -> Optional[Callable[[List[AlleleData]], None]]:
         # do we want to try all clinvar versions?
         def handle_batch(batch: List[AlleleData]):
-            variant_to_batches = dict()
+            variant_to_batches = {}
             for ad in batch:
                 if variant := ad.variant:
                     variant_to_batches[variant.pk] = ad
@@ -245,4 +244,4 @@ class ClassificationExportFormatter2ClinVarCompare(ClassificationExportFormatter
         if allele_data.allele_id:
             return [ExportFormatter.write_single_row(ClinVarCompareRow(allele_data, self.clinvar_version).to_csv())]
         else:
-            return list()
+            return []

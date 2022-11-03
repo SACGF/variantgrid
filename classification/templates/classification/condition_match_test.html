@@ -48,7 +48,8 @@
             </p>
         {% end_page_help_embedded %}
 
-        <a href="{% url 'condition_match_test_download' %}" class="download-link type-csv">Download Auto Matching Attempts</a>
+        <div><a href="{% url 'condition_obsoletes' %}" class="hover-link">See Obsolete Relationships</a></div>
+        <div><a href="{% url 'condition_match_test_download' %}" class="download-link type-csv">Download Auto Matching Attempts</a></div>
         <h4>Test Single Term</h4>
 
         <form method="GET">
@@ -114,10 +115,10 @@
                             {% if auto_match.term.definition %}<br/><span class="text-muted wy-text-small">{{ auto_match.term.definition }}</span>{% endif %}
                         </td>
                         <td width="200px">
-                            {% if auto_match.gene_relationships %}<div>Gene Matches</div>{% endif %}
+                            {% if auto_match.gene_relationships %}<div>Gene Matches ({% for snake in auto_match.gene_relationships %}{{ snake.start_source }}{% if not forloop.last %}, {% endif %}{% endfor %})</div>{% endif %}
                             {% if auto_match.direct_reference %}<div>Embedded ID</div>{% endif %}
                             {% if auto_match.text_search %}<div>Text Search</div>{% endif %}<br/>
-                            {% if auto_match.term.is_obsolete %}<div>Obsolete</div>{% endif %}<br/>
+                            {% if auto_match.term.is_obsolete %}<div>{{ auto_match.term.warning_text }}</div>{% endif %}<br/>
                         </td>
                     </tr>
                 {% endfor %}

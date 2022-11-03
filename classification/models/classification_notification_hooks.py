@@ -1,4 +1,4 @@
-from typing import Set, Optional
+from typing import Optional
 
 from django.conf import settings
 from django.dispatch import receiver
@@ -10,7 +10,6 @@ from classification.models import DiscordanceReport, discordance_change_signal, 
 from library.django_utils import get_url_from_view_path
 from library.log_utils import NotificationBuilder
 from snpdb.lab_picker import LabPickerData
-from snpdb.models import Lab
 from snpdb.utils import LabNotificationBuilder
 
 
@@ -53,15 +52,15 @@ def send_discordance_notification(discordance_report: DiscordanceReport, cause: 
         for sig_lab in report_summary.lab_significances:
             count_text = ""
             if sig_lab.count > 1:
-                count_text = f"x {sig_lab.count} "
+                count_text = f" x {sig_lab.count}"
             pending_text = ""
             if sig_lab.pending:
                 pending_text = " (PENDING)"
 
             if sig_lab.changed:
-                notification.add_field(f"{sig_lab.lab} {count_text}- classify this as", f"{clin_sig_key.pretty_value(sig_lab.clinical_significance_from)} -> {clin_sig_key.pretty_value(sig_lab.clinical_significance_to)}{pending_text}")
+                notification.add_field(f"{sig_lab.lab}{count_text}", f"{clin_sig_key.pretty_value(sig_lab.clinical_significance_from)} -> {clin_sig_key.pretty_value(sig_lab.clinical_significance_to)}{pending_text}")
             else:
-                notification.add_field(f"{sig_lab.lab} {count_text}- classify this as", f"{clin_sig_key.pretty_value(sig_lab.clinical_significance_from)}")
+                notification.add_field(f"{sig_lab.lab}{count_text}", f"{clin_sig_key.pretty_value(sig_lab.clinical_significance_from)}")
 
         # don't want to include notes in email as the text might be too sensitive
 

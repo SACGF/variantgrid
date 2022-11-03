@@ -39,6 +39,7 @@ def menu_top(context,
     return {
         'url': url,
         'active': is_active,
+        'type': 'top',
         'title': title,
         'id': f'menu-top-{app_names[0]}'
     }
@@ -81,7 +82,7 @@ def menu_item(
         other_url_parts = other_urls.split(',')
         current_url = context.request.path
         for other_url_part in other_url_parts:
-            if current_url.startswith(other_url_part):
+            if current_url.startswith(other_url_part) or current_url_name == other_url_part:
                 is_active = True
                 break
 
@@ -105,6 +106,7 @@ def menu_item(
         'icon': icon,
         'admin_only': admin_only,
         'active': is_active,
+        'type': 'side',
         'badge_count': badge_count,
         'id': f'submenu-{url_name}',
         'external': external
@@ -114,3 +116,8 @@ def menu_item(
 @register.simple_tag()
 def absolute_url(name, *args, **kwargs) -> str:
     return get_url_from_view_path(reverse(name, args=args, kwargs=kwargs))
+
+
+@register.inclusion_tag("uicore/menus/current_record.html", takes_context=True)
+def current_record(context, current_record: Any):
+    return {"current_record": current_record}

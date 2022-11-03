@@ -10,7 +10,7 @@ from sync.models import SyncRun, SyncDestination, SyncStatus
 @receiver(signal=health_check_signal)
 def sync_health_check(sender, health_request, **kwargs):
     # Report when each enabled sync run was last successfully performed
-    responses: List[HealthCheckAge] = list()
+    responses: List[HealthCheckAge] = []
     for sync_destination in SyncDestination.objects.filter(enabled=True):
         last_successful_sync_run = SyncRun.objects.filter(
                 destination=sync_destination,

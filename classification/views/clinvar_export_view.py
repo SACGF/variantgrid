@@ -1,3 +1,4 @@
+import io
 import json
 import re
 from collections import defaultdict
@@ -5,7 +6,8 @@ from dataclasses import dataclass
 from typing import Dict, Any, Optional, Iterable, List
 
 from django.contrib import messages
-from django.db.models import QuerySet, When, Value, Case, IntegerField, Count, Q
+from django.db.models import QuerySet, When, Value, Case, IntegerField, Count, Q, TextField
+from django.db.models.functions import Cast
 from django.http import HttpResponse, StreamingHttpResponse, HttpRequest
 from django.http.response import HttpResponseBase
 from django.shortcuts import render, redirect, get_object_or_404
@@ -23,13 +25,11 @@ from classification.views.classification_dashboard_view import ClassificationDas
 from genes.hgvs import CHGVS
 from library.cache import timed_cache
 from library.django_utils import add_save_message, get_url_from_view_path
-from library.log_utils import report_event
 from library.utils import html_to_text, export_column, ExportRow, local_date_string
 from snpdb.lab_picker import LabPickerData
 from snpdb.models import ClinVarKey, Lab, Allele, GenomeBuild
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder, CellData
 from uicore.json.json_types import JsonDataType
-import io
 
 
 @timed_cache(size_limit=30, ttl=60)
@@ -102,13 +102,29 @@ class ClinVarExportColumns(DatatableConfig[ClinVarExport]):
 
     def power_search(self, qs: QuerySet[ClinVarExport], search_string: str) -> QuerySet[ClinVarExport]:
         try:
-            batch_id = int(search_string)
-            submissions = ClinVarExportSubmission.objects.filter(submission_batch_id=batch_id).values_list("clinvar_export_id", flat=True)
-            # filter rather than just return submissions to make sure user has permission to see items that belong to the batch
-            # also make sure an individual export doesn't have the batch ID
-            return qs.filter(Q(pk__in=submissions) | Q(pk=batch_id))
+            # if searching on a number could be batch ID or submission ID
+            if search_string.isnumeric():
+                batch_id = int(search_string)
+                submissions = ClinVarExportSubmission.objects.filter(submission_batch_id=batch_id).values_list("clinvar_export_id", flat=True)
+                # filter rather than just return submissions to make sure user has permission to see items that belong to the batch
+                # also make sure an individual export doesn't have the batch ID
+                return qs.filter(Q(pk__in=submissions) | Q(pk=batch_id))
+
+            # if searcing a ClinGenAlleleID
+            elif search_string.upper().startswith("CA"):
+                clingen_number_str = search_string[2:]
+                # make sure we're actually searching on a number and not "cat disease"
+                if clingen_number_str:  # if user is just typing 0s, don't filter anything yet
+                    if clingen_number := int(clingen_number_str):
+                        return qs.annotate(
+                            clingen_allele_id_str=(Cast('clinvar_allele__allele__clingen_allele_id', output_field=TextField()))
+                        ).filter(clingen_allele_id_str__startswith=str(clingen_number))
+                    else:
+                        return qs
         except ValueError:
             pass
+
+        # if searching on a c.hgvs, MONDO ID
         return super().power_search(qs, search_string)
 
     def batches(self, row: CellData) -> JsonDataType:
@@ -147,7 +163,7 @@ class ClinVarExportColumns(DatatableConfig[ClinVarExport]):
 
     def __init__(self, request: HttpRequest):
         super().__init__(request)
-        self.export_to_batches = dict()
+        self.export_to_batches = {}
 
         self.search_box_enabled = True
         self.expand_client_renderer = DatatableConfig._row_expand_ajax('clinvar_export_detail')
@@ -345,24 +361,23 @@ class ClinVarExportSummary(ExportRow):
 
     @export_column("Sync Status")
     def sync_status(self):
+        if self.clinvar_export.status == ClinVarExportStatus.UP_TO_DATE:
+            if clinvar_error := self.clinvar_export.last_submission_error:
+                return "ClinVar Error"
         return self.clinvar_export.get_status_display()
 
     @export_column("SCV")
     def scv(self):
         return self.clinvar_export.scv
 
-    @lazy
-    def latest_submission(self) -> ClinVarExportSubmission:
-        return self.clinvar_export.clinvarexportsubmission_set.order_by('-pk').first()
-
     @export_column("Latest Batch ID")
     def batch_id(self):
-        if submission := self.latest_submission:
+        if submission := self.clinvar_export.last_submission:
             return submission.submission_batch_id
 
     @export_column("Latest Batch Status")
     def batch_status(self):
-        if submission := self.latest_submission:
+        if submission := self.clinvar_export.last_submission:
             submission.submission_batch.get_status_display()
 
     @export_column("All Batch IDs")
@@ -372,9 +387,15 @@ class ClinVarExportSummary(ExportRow):
 
     @export_column("Messages")
     def messages(self):
+        all_messages: List[str] = []
+        if clinvar_error := self.clinvar_export.last_submission_error:
+            all_messages.append(f"(CLINVAR ERROR) {clinvar_error}")
+
         if json_body := self.clinvar_export.submission_full:
             if j_messages := json_body.all_messages:
-                return "\n".join([f"({message.severity.upper()}) {message.text}" for message in j_messages if message.severity != "info"])
+                all_messages += [f"({message.severity.upper()}) {message.text}" for message in j_messages if message.severity != "info"]
+
+        return "\n".join(all_messages)
 
     ## This column is a bit much
     # @export_column("JSON")

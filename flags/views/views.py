@@ -1,4 +1,5 @@
 import datetime
+from collections import defaultdict
 from typing import Iterable, Dict, Any, Union, List, Optional
 
 from django.conf import settings
@@ -282,9 +283,12 @@ class FlagHelper:
         if self._include_flag_types:
             flag_types = []
 
-            for flag_type in self.flag_types.values():
-                resolutions = list(FlagTypeResolution.objects.filter(flag_type=flag_type).values_list('resolution__id', flat=True))
+            flag_type_resolutions = defaultdict(list)
+            flag_type_qs = FlagTypeResolution.objects.filter(flag_type__in=self.flag_types.values())
+            for flag_type, resolution_id in flag_type_qs.values_list('flag_type', 'resolution_id'):
+                flag_type_resolutions[flag_type].append(resolution_id)
 
+            for flag_type in self.flag_types.values():
                 json_entry = {
                     'id': flag_type.pk,
                     'only_one': flag_type.only_one,
@@ -296,7 +300,7 @@ class FlagHelper:
                     'raise_permission': flag_type.raise_permission_enum.level,
                     'comments_enabled': flag_type.comments_enabled,
                     'importance': flag_type.importance,
-                    'resolutions': resolutions
+                    'resolutions': flag_type_resolutions[flag_type],
                 }
 
                 # Dirty hack, that links VariantGrid settings to a specific flag type
