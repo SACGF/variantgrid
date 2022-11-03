@@ -1,5 +1,17 @@
 {% load static %}
 {% load js_tags %}
+{% load ui_help %}
+
+{% if has_samples_in_other_builds %}
+    {% page_help_embedded page_id='genes/variant_sample_information_help' title='Variant Sample Information' %}
+        <p>The locus counts and sample genotypes are from VCFs in the current genome build only -
+            you will not see the same mutation in a sample from a different build.</p>
+
+        <p>You may want to visit the Allele link (box at the top of the page) then view variants in a different build</p>
+    {% end_page_help_embedded %}
+{% endif %}
+
+
 {% if vsi.has_observations %}
     <script type="text/javascript" src="{% static 'js/lib/plotly-latest.min.js' %}"></script>
     <script type="text/javascript" src="{% static 'js/plotly_helper.js' %}"></script>

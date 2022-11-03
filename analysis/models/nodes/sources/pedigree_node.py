@@ -1,4 +1,6 @@
-from typing import Optional, List
+import operator
+from functools import reduce
+from typing import Optional, List, Dict, Set
 
 from django.db import models
 from django.db.models import Q
@@ -22,14 +24,21 @@ class PedigreeNode(AbstractCohortBasedNode):
             cohort = self.pedigree.cohort
         return cohort
 
-    def _get_node_q(self) -> Optional[Q]:
-        cohort, q = self.get_cohort_and_q()
+    def _get_node_arg_q_dict(self) -> Dict[Optional[str], Dict[str, Q]]:
+        cohort, arg_q_dict = self.get_cohort_and_arg_q_dict()
         if cohort:
+            q = None
             if self.inheritance_model == PedigreeInheritance.AUTOSOMAL_RECESSIVE:
-                q &= self.get_recessive_q(cohort.cohort_genotype_collection)
+                q = self.get_recessive_q(cohort.cohort_genotype_collection)
             elif self.inheritance_model == PedigreeInheritance.AUTOSOMAL_DOMINANT:
-                q &= self.get_dominant_q(cohort.cohort_genotype_collection)
-        return q
+                q = self.get_dominant_q(cohort.cohort_genotype_collection)
+
+            if q:
+                cohort_arg_q_dict = {
+                    self.cohort_genotype_collection.cohortgenotype_alias: {str(q): q}
+                }
+                self.merge_arg_q_dicts(arg_q_dict, cohort_arg_q_dict)
+        return arg_q_dict
 
     def get_affected_unaffected_sample_zygosities_dict(self, unaffected_zygosities, affected_zygosities):
         sample_zygosities_dict = {}

@@ -1,14 +1,15 @@
+import operator
 import re
 from functools import reduce
-import operator
-from typing import List, Dict
+from typing import List, Dict, Optional, Set, Tuple
 
 from django.db.models import Q
 
 from analysis.models.enums import GroupOperation
 from analysis.models.nodes.analysis_node import NodeVCFFilter, NodeAlleleFrequencyFilter
 from patients.models_enums import Zygosity
-from snpdb.models import VCFFilter
+from snpdb.models import VCFFilter, Cohort
+from upload.models import UploadedVCF
 
 
 class CohortMixin:
@@ -90,21 +91,26 @@ class CohortMixin:
         """ Collects node editor filters. Overridden below """
         return self.get_allele_frequency_q_list()
 
-    def get_cohort_and_q(self):
+    def get_cohort_and_arg_q_dict(self) -> Tuple[Cohort, Dict[Optional[str], Dict[str, Q]]]:
+        arg_q_dict = {}
         cohort = self._get_cohort()
         if cohort:
             cgc = self.cohort_genotype_collection
-            q_and = [Q(**{f"{cgc.cohortgenotype_alias}__collection": cgc})]
+            q_and = []
             if cohort.is_sub_cohort():
                 missing = [Zygosity.UNKNOWN_ZYGOSITY, Zygosity.MISSING]
                 sample_zygosities_dict = {s: missing for s in cohort.get_samples()}
                 q_sub = cgc.get_zygosity_q(sample_zygosities_dict, exclude=True)
                 q_and.append(q_sub)
             q_and.extend(self._get_q_and_list())
-            q = reduce(operator.and_, q_and)
+            if q_and:
+                print(q_and)
+                q = reduce(operator.and_, q_and)
+                arg_q_dict[cgc.cohortgenotype_alias] = {str(q): q}
         else:
-            q = self.q_none()
-        return cohort, q
+            q_none = self.q_none()
+            arg_q_dict[None] = {str(q_none): q_none}
+        return cohort, arg_q_dict
 
     def get_allele_frequency_q_list(self):
         """ Anything that subclasses this (eg TrioNode/PedigreeNode) must also implement
@@ -134,11 +140,11 @@ class CohortMixin:
             q_and.append(GroupOperation.reduce(filters, naff.group_operation))
         return q_and
 
-    def get_vcf_locus_filters_q(self):
-        q = self.q_all()
+    def get_vcf_locus_filters_arg_q_dict(self) -> Dict[Optional[str], Dict[str, Q]]:
+        arg_q_dict = {}
         if self.has_filters:
             vcf = self._get_vcf()
-            cgc = self.cohort_genotype_collection
+            alias = self.cohort_genotype_collection.cohortgenotype_alias
 
             node_vcf_filters_qs = NodeVCFFilter.filter_for_node(self, vcf)
             filter_codes = set(node_vcf_filters_qs.values_list("vcf_filter__filter_code", flat=True).distinct())
@@ -146,17 +152,18 @@ class CohortMixin:
                 q_or = []
                 if None in filter_codes:  # Pass
                     filter_codes.remove(None)
-                    q_or.append(Q(**{f"{cgc.cohortgenotype_alias}__filters__isnull": True}))
+                    q_or.append(Q(**{f"{alias}__filters__isnull": True}))
 
                 if filter_codes:
                     joined_codes = re.escape(''.join(filter_codes))
                     joined_codes = joined_codes.replace("'", "''")
                     pattern = f"[{joined_codes}]"
-                    q_or.append(Q(**{f"{cgc.cohortgenotype_alias}__filters__regex": pattern}))
+                    q_or.append(Q(**{f"{alias}__filters__regex": pattern}))
 
                 if q_or:
                     q = reduce(operator.or_, q_or)
-        return q
+                    arg_q_dict[alias] = {str(q): q}
+        return arg_q_dict
 
     def get_filter_code(self):
         """

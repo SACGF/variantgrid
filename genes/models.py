@@ -1023,10 +1023,12 @@ class GeneList(models.Model):
     locked = models.BooleanField(default=False)
     url = models.TextField(null=True, blank=True)
 
-    def get_q(self, release: GeneAnnotationRelease):
+    def get_q(self, variant_annotation_version):
         """ For a Variant queryset """
         from annotation.models.models import VariantTranscriptAnnotation
-        return VariantTranscriptAnnotation.get_overlapping_genes_q(self.get_genes(release))
+        genes_qs = self.get_genes(variant_annotation_version.gene_annotation_release)
+        return VariantTranscriptAnnotation.get_overlapping_genes_q(variant_annotation_version,
+                                                                   genes_qs)
 
     @staticmethod
     def get_gene_ids_for_gene_lists(release: GeneAnnotationRelease, gene_lists: List['GeneList']):

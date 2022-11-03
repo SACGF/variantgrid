@@ -1,10 +1,14 @@
+import logging
+import operator
 from collections import namedtuple
-from typing import Dict, List
+from functools import reduce
+from typing import Dict, List, Tuple
 
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied, ObjectDoesNotExist
 from django.db import models
+from django.db.models import Lookup, Field
 from django.db.models.deletion import SET_NULL, CASCADE
 from django.db.models.functions import Substr
 from django.db.models.query_utils import Q
@@ -24,10 +28,22 @@ from library.log_utils import log_traceback, report_event
 from patients.models import FakeData, Patient, Specimen
 from patients.models_enums import Sex
 from snpdb.models.models import Tag, LabProject
+from snpdb.models.models_enums import ImportStatus, VariantsType, ProcessingStatus
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_genomic_interval import GenomicIntervalsCollection
 from snpdb.models.models_variant import Variant, VariantCollection, AlleleSource
-from snpdb.models.models_enums import ImportStatus, VariantsType, ProcessingStatus
+
+
+@Field.register_lookup
+class NotEqual(Lookup):
+    """ From https://docs.djangoproject.com/en/4.0/howto/custom-lookups/#a-lookup-example """
+    lookup_name = 'ne'
+
+    def as_sql(self, compiler, connection):
+        lhs, lhs_params = self.process_lhs(compiler, connection)
+        rhs, rhs_params = self.process_rhs(compiler, connection)
+        params = lhs_params + rhs_params
+        return '%s <> %s' % (lhs, rhs), params
 
 
 class Project(models.Model):
@@ -336,18 +352,20 @@ class Sample(SortByPKMixin, models.Model):
         sample_zygosity = Substr(f"{cgc.cohortgenotype_alias}__samples_zygosity", i, length=1)
         return {self.zygosity_alias: sample_zygosity}
 
-    def get_cohort_genotype_field(self, field_name):
+    def get_cohort_genotype_alias_and_field(self, field_name) -> Tuple[str, str]:
         if not field_name.startswith("samples_"):
             field_name = f"samples_{field_name}"
 
         # samples_zygosity is a string not array, and should be added to w/get_annotation_kwargs
         if field_name == "samples_zygosity":
+            alias = self.zygosity_alias
             field = self.zygosity_alias
         else:
             cgc = self.cohort_genotype_collection
             i = cgc.get_array_index_for_sample_id(self.pk)
-            field = f"{cgc.cohortgenotype_alias}__{field_name}__{i}"
-        return field
+            alias = cgc.cohortgenotype_alias
+            field = f"{alias}__{field_name}__{i}"
+        return alias, field
 
     def get_variant_qs(self, qs=None):
         """ Returns a Variant queryset inner joined to CohortGenotype with annotation aliases

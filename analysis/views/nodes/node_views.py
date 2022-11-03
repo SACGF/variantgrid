@@ -317,7 +317,7 @@ class VennNodeView(NodeView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         try:
-            a, b = self.object.get_ordered_parents()
+            a, b = self.object.ordered_parents
             a_name = a.name
             b_name = b.name
         except (NonFatalNodeError, ValueError):

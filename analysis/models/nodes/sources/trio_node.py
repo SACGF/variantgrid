@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
-from typing import Optional, List, Set, Tuple
+from typing import Optional, List, Set, Tuple, Dict
 
+from cache_memoize import cache_memoize
 from django.db import models
 from django.db.models import Count
 from django.db.models.deletion import SET_NULL
@@ -9,6 +10,7 @@ from django.db.models.query_utils import Q
 from analysis.models.enums import TrioInheritance, NodeErrorSource, AnalysisTemplateType
 from analysis.models.nodes.sources import AbstractCohortBasedNode
 from annotation.models.models import VariantTranscriptAnnotation
+from library.constants import DAY_SECS
 from patients.models_enums import Zygosity, Sex
 from snpdb.models import Trio, Sample
 
@@ -51,7 +53,7 @@ class AbstractTrioInheritance(ABC):
         return ", ".join([f"{k}: {v}" for k, v in filters.items() if v])
 
     @abstractmethod
-    def get_q(self) -> Q:
+    def get_arg_q_dict(self) -> Dict[Optional[str], Dict[str, Q]]:
         pass
 
     @abstractmethod
@@ -64,9 +66,11 @@ class SimpleTrioInheritance(AbstractTrioInheritance):
     def _get_mum_dad_proband_zygosities(self) -> Tuple[Set, Set, Set]:
         pass
 
-    def get_q(self) -> Q:
-        cohort_genotype_collection = self.node.trio.cohort.cohort_genotype_collection
-        return self._get_zyg_q(cohort_genotype_collection, self._get_mum_dad_proband_zygosities())
+    def get_arg_q_dict(self) -> Dict[Optional[str], Dict[str, Q]]:
+        cgc = self.node.trio.cohort.cohort_genotype_collection
+        alias = cgc.cohortgenotype_alias
+        q = self._get_zyg_q(cgc, self._get_mum_dad_proband_zygosities())
+        return {alias: {str(q): q}}
 
     def get_method(self) -> str:
         return self.get_zygosities_method(*self._get_mum_dad_proband_zygosities())
@@ -99,8 +103,11 @@ class XLinkedRecessive(SimpleTrioInheritance):
     def _get_mum_dad_proband_zygosities(self) -> Tuple[Set, Set, Set]:
         return {Zygosity.HET}, set(), {Zygosity.HOM_ALT}
 
-    def get_q(self) -> Q:
-        return super().get_q() & Q(locus__contig__name='X')  # will work for hg19 and GRCh38
+    def get_arg_q_dict(self) -> Dict[Optional[str], Dict[str, Q]]:
+        arg_q_dict = super().get_arg_q_dict()
+        q = Q(locus__contig__name='X')  # will work for hg19 and GRCh38
+        arg_q_dict[None] = {str(q): q}
+        return arg_q_dict
 
     def get_method(self) -> str:
         return super().get_method() + " and contig name = 'X'"
@@ -113,7 +120,8 @@ class CompHet(AbstractTrioInheritance):
     def _dad_but_not_mum(self):
         return self.NO_VARIANT, {Zygosity.HET}, {Zygosity.HET}
 
-    def get_q(self) -> Q:
+    @cache_memoize(DAY_SECS, args_rewrite=lambda s: (s.node.pk, s.node.version))
+    def _get_parent_comp_het_q_and_two_hit_genes(self):
         cohort_genotype_collection = self.node.trio.cohort.cohort_genotype_collection
 
         parent = self.node.get_single_parent()
@@ -130,13 +138,24 @@ class CompHet(AbstractTrioInheritance):
 
         # This ends up doing 3 queries (where we call set() - to work out what Q we need to return)
         common_genes = set(get_parent_genes(mum_but_not_dad)) & set(get_parent_genes(dad_but_not_mum))
-        q_in_genes = Q(varianttranscriptannotation__gene__in=common_genes)
+        variant_annotation_version = self.node.analysis.annotation_version.variant_annotation_version
+        q_in_genes = VariantTranscriptAnnotation.get_overlapping_genes_q(variant_annotation_version, common_genes)
         parent_genes_qs = parent.get_queryset(q_in_genes, extra_annotation_kwargs=annotation_kwargs)
         parent_genes_qs = parent_genes_qs.values_list("varianttranscriptannotation__gene")
         two_hits = parent_genes_qs.annotate(gene_count=Count("pk")).filter(gene_count__gte=2)
-        two_hit_genes = set(two_hits.values_list("varianttranscriptannotation__gene", flat=True))
-        comp_het_genes = VariantTranscriptAnnotation.get_overlapping_genes_q(two_hit_genes)
-        return parent.get_q() & comp_het_q & comp_het_genes
+        two_hit_genes = set(two_hits.values_list("varianttranscriptannotation__gene", flat=True).distinct())
+        return parent, comp_het_q, two_hit_genes
+
+    def get_arg_q_dict(self) -> Dict[Optional[str], Dict[str, Q]]:
+        parent, comp_het_q, two_hit_genes = self._get_parent_comp_het_q_and_two_hit_genes()
+        variant_annotation_version = self.node.analysis.annotation_version.variant_annotation_version
+        comp_het_genes = VariantTranscriptAnnotation.get_overlapping_genes_q(variant_annotation_version, two_hit_genes)
+        cgc = self.node.trio.cohort.cohort_genotype_collection
+        q_hash = str(comp_het_q)
+        return {
+            cgc.cohortgenotype_alias: {q_hash: comp_het_q},
+            None: {q_hash: comp_het_genes},
+        }
 
     def get_method(self) -> str:
         mum1, dad1, _ = self._mum_but_not_dad()
@@ -208,13 +227,13 @@ class TrioNode(AbstractCohortBasedNode):
         klass = inhertiance_classes[TrioInheritance(self.inheritance)]
         return klass(self)
 
-    def _get_node_q(self) -> Optional[Q]:
-        cohort, q = self.get_cohort_and_q()
+    def _get_node_arg_q_dict(self) -> Dict[Optional[str], Dict[str, Q]]:
+        cohort, arg_q_dict = self.get_cohort_and_arg_q_dict()
         if cohort:
             inheritance = self._inheritance_factory()
-            q &= inheritance.get_q()
-            q &= self.get_vcf_locus_filters_q()
-        return q
+            self.merge_arg_q_dicts(arg_q_dict, inheritance.get_arg_q_dict())
+            self.merge_arg_q_dicts(arg_q_dict, self.get_vcf_locus_filters_arg_q_dict())
+        return arg_q_dict
 
     def _get_method_summary(self):
         if self._get_cohort():

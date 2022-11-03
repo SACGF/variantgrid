@@ -1,11 +1,9 @@
-from typing import Optional, List
+from typing import Optional, List, Dict, Set
 
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import models
 from django.db.models import SET_NULL
 from django.db.models.query_utils import Q
-from functools import reduce
-import operator
 
 from analysis.models import GeneCoverageMixin
 from analysis.models.nodes.analysis_node import AnalysisNode, NodeAlleleFrequencyFilter
@@ -71,47 +69,45 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
             zyg = ''  # Any
         return zyg
 
-    def _get_zygosity_q(self):
-        zygosity = self._get_zygosities()
-        zygosity_q = None
-        if zygosity:
-            field = self.sample.get_cohort_genotype_field("zygosity")
-            zygosity_q = Q(**{f"{field}__in": zygosity})
-
-        return zygosity_q
-
-    def _get_node_q(self) -> Optional[Q]:
+    def _get_node_arg_q_dict(self) -> Dict[Optional[str], Dict[str, Q]]:
+        arg_q_dict = {}
         if not self.sample:
-            return self.q_none()
+            q_none = self.q_none()
+            return {None: {str(q_none): q_none}}
 
-        q_and = []
         # _get_zygosity_q handles no genotype (UNKNOWN)
-        if zygosity_q := self._get_zygosity_q():
-            q_and.append(zygosity_q)
+        if zygosity := self._get_zygosities():
+            alias, field = self.sample.get_cohort_genotype_alias_and_field("zygosity")
+            q = Q(**{f"{field}__in": zygosity})
+            arg_q_dict[alias] = {str(q): q}
 
         if self.sample.has_genotype:
             for node_field, ov_field in self.SAMPLE_FIELD_MAPPINGS:
                 min_value = getattr(self, f"min_{node_field}")
                 if min_value:
-                    ov_path = self.sample.get_cohort_genotype_field(ov_field)
-                    q_and.append(Q(**{f"{ov_path}__gte": min_value}))
+                    alias, ov_path = self.sample.get_cohort_genotype_alias_and_field(ov_field)
+                    q = Q(**{f"{ov_path}__gte": min_value})
+                    self.merge_arg_q_dicts(arg_q_dict, {alias: {str(q): q}})
 
             if self.max_pl is not None:
-                pl_path = self.sample.get_cohort_genotype_field("phred_likelihood")
-                q_and.append(Q(**{f"{pl_path}__lte": self.max_pl}))
+                alias, pl_path = self.sample.get_cohort_genotype_alias_and_field("phred_likelihood")
+                q = Q(**{f"{pl_path}__lte": self.max_pl})
+                self.merge_arg_q_dicts(arg_q_dict, {alias: {str(q): q}})
 
-            if af_q := NodeAlleleFrequencyFilter.get_sample_q(self, self.sample):
-                q_and.append(af_q)
+            if sample_arg_q_dict := NodeAlleleFrequencyFilter.get_sample_arg_q_dict(self, self.sample):
+                self.merge_arg_q_dicts(arg_q_dict, sample_arg_q_dict)
 
         if self.restrict_to_qc_gene_list:
             if self.sample_gene_list:
-                q = self.sample_gene_list.gene_list.get_q(self.analysis.gene_annotation_release)
+                q_hash = f"gene_list_{self.sample_gene_list.gene_list_id}"
+                q = self.sample_gene_list.gene_list.get_q(self.analysis.annotation_version.variant_annotation_version)
             else:
                 q = self.q_none()  # Safety - don't show anything if missing
-            q_and.append(q)
+                q_hash = str(q)
+            self.merge_arg_q_dicts(arg_q_dict, {None: {q_hash: q}})
 
-        q_and.append(self.get_vcf_locus_filters_q())
-        return reduce(operator.and_, q_and)
+        self.merge_arg_q_dicts(arg_q_dict, self.get_vcf_locus_filters_arg_q_dict())
+        return arg_q_dict
 
     def _get_method_summary(self):
         if self.sample:
@@ -160,13 +156,16 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
 
     def _has_filters_that_affect_label_counts(self):
         # This returns None if no filters to apply
-        if NodeAlleleFrequencyFilter.get_sample_q(self, self.sample):
+        if NodeAlleleFrequencyFilter.get_sample_arg_q_dict(self, self.sample):
             return True
 
         return any([getattr(self, f) for f in self.FIELDS_THAT_CHANGE_QUERYSET])
 
     def _get_cached_label_count(self, label):
         """ Input counts can be static, so use cached AnnotationStats if we can """
+        if self._has_filters_that_affect_label_counts():
+            return None  # Have to do counts
+
         CLASSES = {
             BuiltInFilters.TOTAL: (SampleStats, SampleStatsPassingFilter),
             BuiltInFilters.CLINVAR: (SampleClinVarAnnotationStats, SampleClinVarAnnotationStatsPassingFilter),
@@ -175,18 +174,17 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
         }
         annotation_version = self.analysis.annotation_version
         count = None
-        if not self._has_filters_that_affect_label_counts():
-            try:
-                filter_code = self.get_filter_code()
-                klazz = CLASSES[label][filter_code]  # Maybe exception and out of range
-                obj = klazz.load_version(self.sample, annotation_version)
-                zygosities = [self.zygosity_ref, self.zygosity_het, self.zygosity_hom, self.zygosity_unk]
-                if self.sample and not self.sample.has_genotype:
-                    zygosities = [True] * len(zygosities)  # Show everything
+        try:
+            filter_code = self.get_filter_code()
+            klazz = CLASSES[label][filter_code]  # Maybe exception and out of range
+            obj = klazz.load_version(self.sample, annotation_version)
+            zygosities = [self.zygosity_ref, self.zygosity_het, self.zygosity_hom, self.zygosity_unk]
+            if self.sample and not self.sample.has_genotype:
+                zygosities = [True] * len(zygosities)  # Show everything
 
-                count = obj.count_for_zygosity(*zygosities, label=label)
-            except (IndexError, KeyError, ObjectDoesNotExist):
-                pass  # OK, will just calculate it
+            count = obj.count_for_zygosity(*zygosities, label=label)
+        except (IndexError, KeyError, ObjectDoesNotExist):
+            pass  # OK, will just calculate it
 
         return count
 
