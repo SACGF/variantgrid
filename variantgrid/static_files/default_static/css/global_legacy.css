@@ -1130,43 +1130,6 @@ a.clinical-context {
   flex-direction: column;
 }
 
-.citation a {
-  color: #222288;
-  text-decoration: none;
-}
-.citation a:hover {
-  text-decoration: underline;
-}
-.citation .author, .citation .authors {
-  color: gray;
-}
-.citation .title {
-  color: #444444;
-  display: inline-block;
-}
-.citation .show-abstract-link {
-  margin-top: 2px;
-  display: block;
-}
-.citation .year {
-  color: gray;
-}
-.citation .abstract {
-  color: #444444;
-  margin-bottom: 0;
-}
-.citation .loading {
-  opacity: 1.0;
-}
-.citation.failed {
-  background-color: #ffcccc;
-}
-.citation + .citation {
-  margin-top: 15px;
-  padding-top: 15px;
-  border-top: 1px dashed lightgray;
-}
-
 @keyframes pulse {
   0% {
     box-shadow: 0 0 0 0 rgba(100, 100, 200, 0.4);

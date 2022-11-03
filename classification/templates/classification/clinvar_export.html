@@ -83,12 +83,17 @@
         {% ui_register_tab_embedded label="Export Preview" tab_set="clinvar_tabs" %}
             <p class="text-info">This is the representation data that will be submitted to ClinVar (validation messages wont be sent).</p>
             {% code_json clinvar_export.submission_full.serialize %}
+             <h4>Citations</h4>
+            {% for citation_id in clinvar_export.citation_ids %}
+                <div data-citation-id="{{ citation_id }}">...</div>
+            {% endfor %}
             {% with diffs=clinvar_export.differences_since_last_submission %}
                 {% if diffs %}
                     <h4>Differences Since Last Submission</h4>
                     {% code_json diffs %}
                 {% endif %}
             {% endwith %}
+
         {% end_ui_register_tab_embedded %}
 
         {% ui_register_tab label="Submission History" tab_set="clinvar_tabs" url="clinvar_export_history" param=clinvar_export.pk %}
