@@ -1,3 +1,4 @@
 user-agent: *
 Allow: /$
+Allow: /accounts/login/
 Disallow: /
