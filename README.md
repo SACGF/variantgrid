@@ -11,8 +11,8 @@ Private servers:
 
 Collaborative data sharing sites:
 
-* https://shariant.org.au - Australian Genomics variant classification sharing server
-* https://runx1db.runx1-fpd.org - Rare blood disease data sharing
+* Shariant Australia - Australian Genomics variant interpretation sharing server (https://shariant.org.au)
+* RUNX1Db - Rare blood disease data sharing (https://runx1db.runx1-fpd.org)
 
 ## Analysis / curation
 
@@ -31,7 +31,7 @@ Upload VCFs to:
 
 VariantGrid code is free to use for research and evaluation, while production commercial use requires a [licence](https://github.com/SACGF/variantgrid/blob/master/LICENCE.md), before code becomes fully free/open source in 4 years.
 
-Please contact us for discussion for support/collaboration.
+Please contact us to discuss support/collaboration.
 
 ## Other resources
 
