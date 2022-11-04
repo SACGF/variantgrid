@@ -359,7 +359,7 @@ class ClassificationFilter:
             status: Optional[DiscordanceReportStatus] = None
             if dr.resolution == DiscordanceReportResolution.CONCORDANT:
                 pass
-            if dr.is_pending_concordance:
+            elif dr.is_pending_concordance:
                 status = DiscordanceReportStatus.PENDING_CONCORDANCE
             elif dr.resolution == DiscordanceReportResolution.CONTINUED_DISCORDANCE:
                 status = DiscordanceReportStatus.CONTINUED
