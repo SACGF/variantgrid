@@ -83,11 +83,14 @@ class MergeNode(AnalysisNode):
                 variant_ids = qs.values_list("pk", flat=True)
                 or_list.append(Q(pk__in=variant_ids))
             else:
-                remaining_q_set = arg_q_dict.get(None, {}).values()
-                merged_q = reduce(operator.and_, remaining_q_set)
-                or_list.append(merged_q)
+                if remaining_q_dict := arg_q_dict.get(None):
+                    merged_q = reduce(operator.and_, remaining_q_dict.values())
+                    or_list.append(merged_q)
 
-        return reduce(operator.or_, or_list)
+        q = None
+        if or_list:
+            q = reduce(operator.or_, or_list)
+        return q
 
     @staticmethod
     def _remove_arg_q_hash(parent_arg_q_dict, extract_arg_q_hash):
