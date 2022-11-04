@@ -4,6 +4,10 @@ VariantGrid is a database and web application for storing, analysing and classif
 
 ## Use cases
 
+Public servers:
+
+* [VariantGrid.com](https://variantgrid.com) - research focused instance, free user access
+
 Private servers:
 
 * Clinical/diagnostic use by [SA Pathology](https://www.sapathology.sa.gov.au), the South Australian public pathology service. 
@@ -11,8 +15,8 @@ Private servers:
 
 Collaborative data sharing sites:
 
-* Shariant Australia - Australian Genomics variant interpretation sharing server (https://shariant.org.au)
-* RUNX1Db - Rare blood disease data sharing (https://runx1db.runx1-fpd.org)
+* [Shariant Australia](https://shariant.org.au) - Australian Genomics variant interpretation sharing server
+* [RUNX1Db](https://runx1db.runx1-fpd.org) - Rare blood disease data sharing
 
 ## Analysis / curation
 
@@ -36,7 +40,6 @@ Please contact us to discuss support/collaboration.
 ## Other resources
 
 * [User guide at read the docs](https://variantgrid.readthedocs.io/en/latest/)
-* [VariantGrid.com](https://variantgrid.com) main site, and research cloud server
 * [Technical Wiki](https://github.com/SACGF/variantgrid/wiki) wiki for installation/maintenance.
 
 ## Installation
