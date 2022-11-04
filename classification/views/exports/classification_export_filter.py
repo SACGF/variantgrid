@@ -378,9 +378,7 @@ class ClassificationFilter:
         for cc in ClinicalContext.objects.filter(status=ClinicalContextStatus.DISCORDANT):
             dr = DiscordanceReport.latest_report(cc)
 
-            status: Optional[DiscordanceReportStatus] = None
-            if dr.resolution == DiscordanceReportResolution.CONCORDANT:
-                pass
+            status: Optional[DiscordanceReportStatus]
             if dr.is_pending_concordance:
                 status = DiscordanceReportStatus.PENDING_CONCORDANCE
             elif dr.resolution == DiscordanceReportResolution.CONTINUED_DISCORDANCE:
@@ -388,9 +386,8 @@ class ClassificationFilter:
             else:
                 status = DiscordanceReportStatus.ON_GOING
 
-            if status:
-                for c in dr.actively_discordant_classification_ids():
-                    discordance_status[c] = status
+            for c in dr.actively_discordant_classification_ids():
+                discordance_status[c] = status
 
         return discordance_status
 
