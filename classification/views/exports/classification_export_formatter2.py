@@ -242,8 +242,8 @@ class ClassificationExportFormatter2(ABC):
         row_count = self.row_count
 
         body_parts = [f":simple_smile: {user.username}"]
-        if request := get_current_request():
-            body_parts.append(f"URL : `{request.path_info}`")
+        if path_info := self.classification_filter.path_info:
+            body_parts.append(f"URL : `{path_info}`")
         body_parts.append(f"Rows Downloaded : *{row_count}*")
         if self.file_count > 1:
             body_parts.append(f"File Count : *{self.file_count}*")
@@ -251,8 +251,7 @@ class ClassificationExportFormatter2(ABC):
         nb = NotificationBuilder(message="Classification Download")\
             .add_header(":arrow_down: Classification Download Completed")\
             .add_markdown("\n".join(body_parts), indented=True)
-        if request := get_current_request():
-            for key, value in request.GET.items():
-                nb.add_field(key, value)
+        for key, value in self.classification_filter.request_params.items():
+            nb.add_field(key, value)
         nb.add_field("Duration", str((end - self.started).seconds) + " seconds")
         nb.send()

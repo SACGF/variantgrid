@@ -11,6 +11,7 @@ from django.db.models import QuerySet, Q
 from django.http import HttpRequest
 from guardian.shortcuts import get_objects_for_user
 from lazy import lazy
+from threadlocals.threadlocals import get_current_request
 
 from classification.enums import ShareLevel, ClinicalContextStatus
 from classification.enums.discordance_enums import DiscordanceReportResolution
@@ -204,6 +205,27 @@ class ClassificationFilter:
     file_include_date: bool = True
     starting_query: Optional[QuerySet[ClassificationModification]] = None
     benchmarking: bool = False
+    path_info: Optional[str] = None
+    request_params: Optional[dict] = None
+
+    def __post_init__(self):
+        if self.path_info and self.request_params:
+            pass
+        elif request := get_current_request():
+            self.record_request_details(request)
+
+    def record_request_details(self, request):
+        if not self.path_info:
+            self.path_info = request.path_info
+        if self.request_params is None:
+            request_params = dict()
+            if GET := request.GET:
+                for key, value in GET.items():
+                    request_params[key] = value
+            if POST := request.POST:
+                for key, value in POST.items():
+                    request_params[key] = value
+            self.request_params = request_params
 
     @lazy
     def date_str(self) -> str:
