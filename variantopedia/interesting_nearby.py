@@ -223,9 +223,10 @@ def filter_variant_domain(qs, variant: Variant):
     return qs
 
 
-def variant_interesting_summary(user: User, variant: Variant, genome_build, clinical_significance=False) -> str:
+def variant_interesting_summary(user: User, variant: Variant, genome_build, clinical_significance=False) -> str: #
     """ Could use this for search summary? """
     qs = get_variant_queryset_for_latest_annotation_version(genome_build)
+    qs, _ = VariantZygosityCountCollection.annotate_global_germline_counts(qs)
     qs = qs.filter(pk=variant.pk)
 
     return interesting_summary(qs, user, genome_build, total=False, clinical_significance=clinical_significance)
