@@ -8,15 +8,15 @@ Public servers:
 
 * [VariantGrid.com](https://variantgrid.com) - research focused instance, free user access
 
-Private servers:
-
-* Clinical/diagnostic use by [SA Pathology](https://www.sapathology.sa.gov.au), the South Australian public pathology service. 
-* Research exomes by labs at the [Centre for Cancer Biology](https://www.centreforcancerbiology.org.au)
-
 Collaborative data sharing sites:
 
 * [Shariant Australia](https://shariant.org.au) - Australian Genomics variant interpretation sharing server
 * [RUNX1Db](https://runx1db.runx1-fpd.org) - Rare blood disease data sharing
+
+Private servers:
+
+* Clinical/diagnostic use by [SA Pathology](https://www.sapathology.sa.gov.au), the South Australian public pathology service. 
+* Research exomes by labs at the [Centre for Cancer Biology](https://www.centreforcancerbiology.org.au)
 
 ## Analysis / curation
 
