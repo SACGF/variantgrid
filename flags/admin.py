@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.admin import RelatedFieldListFilter, TabularInline
 
-from flags.models import Flag, FlagComment, FlagTypeResolution, FlagCollection
+from flags.models import Flag, FlagComment, FlagCollection
 from flags.models.models import FlagType
 from snpdb.admin_utils import ModelAdminBasics, AllValuesChoicesFieldListFilter
 
@@ -35,19 +35,6 @@ class FlagAdmin(ModelAdminBasics):
 @admin.register(FlagComment)
 class FlagCommentAdmin(ModelAdminBasics):
     list_display = ('id', 'flag', 'user', 'text', 'resolution', 'created', 'modified')
-
-
-class FlagTypeResolution(TabularInline):
-    model = FlagTypeResolution
-
-    def has_add_permission(self, request, obj):
-        return False
-
-    def has_delete_permission(self, request, obj=None):
-        return False
-
-    def has_change_permission(self, request, obj=None):
-        return False
 
 
 @admin.register(FlagType)
