@@ -40,7 +40,7 @@ class DebugTimer:
 
     def __init__(self):
         self.start = datetime.now()
-        self.times: Dict[str, DebugTime] = dict()
+        self.times: Dict[str, DebugTime] = {}
 
     def tick(self, description: str):
         now = datetime.now()

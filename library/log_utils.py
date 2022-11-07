@@ -154,7 +154,7 @@ class NotificationBuilder:
     class FieldsBlock(Block):
 
         def __init__(self):
-            self.fields: List[Union[str, Any]] = list()
+            self.fields: List[Union[str, Any]] = []
 
         def add_field(self, label: str, value: str):
             self.fields.append((label, value))
@@ -171,7 +171,7 @@ class NotificationBuilder:
             return "".join([as_field(field) for field in self.fields])
 
         def as_slack(self):
-            blocks = list()
+            blocks = []
 
             def as_field(field: Tuple[str, Any]):
                 return {
@@ -186,12 +186,12 @@ class NotificationBuilder:
                         "fields": [as_field(field) for field in fields]
                     })
 
-            field_list = list()
+            field_list = []
             for field in self.fields:
                 field_list.append(field)
                 if len(field_list) == 2:
                     add_field_list(field_list)
-                    field_list = list()
+                    field_list = []
             add_field_list(field_list)
             return blocks
 
@@ -237,7 +237,7 @@ class NotificationBuilder:
         :param message: WARNING, this is ignored for Slack Notifications (maybe turn into a header?)
         """
         self.message = message
-        self.blocks: List[NotificationBuilder.Block] = list()
+        self.blocks: List[NotificationBuilder.Block] = []
         self.sent = False
 
     def _last_block(self) -> Optional[Block]:
@@ -273,7 +273,7 @@ class NotificationBuilder:
         return None
 
     def as_slack(self) -> List:
-        slack_blocks: List = list()
+        slack_blocks: List = []
         for block in self.blocks:
             slack_bit = block.as_slack()
             if isinstance(slack_bit, dict):

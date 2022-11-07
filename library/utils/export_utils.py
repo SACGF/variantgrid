@@ -109,7 +109,7 @@ class ExportRow:
         if categories:
             def passes_filter(export_method) -> bool:
                 nonlocal categories
-                decorated_values = export_method.categories or dict()
+                decorated_values = export_method.categories or {}
                 # for every requirement of categories
                 for key, value in categories.items():
                     # get the decorated value
@@ -191,7 +191,7 @@ class ExportRow:
     def csv_header(cls, categories: Optional[Dict[str, Any]] = None, export_settings: Optional[ExportSettings] = None) -> List[str]:
         if not export_settings:
             export_settings = ExportSettings.get_for_request()
-        row = list()
+        row = []
         for method in ExportRow.get_export_methods(cls, categories=categories):
             label = method.label or method.__name__
             label = export_settings.format_heading(export_format=ExportFormat.csv, data_type=method.data_type, label=label)
@@ -206,7 +206,7 @@ class ExportRow:
     def to_csv(self, categories: Optional[Dict[str, Any]] = None, export_settings: Optional[ExportSettings] = None) -> List[str]:
         if not export_settings:
             export_settings = ExportSettings.get_for_request()
-        row = list()
+        row = []
         for method in ExportRow.get_export_methods(self.__class__, categories=categories):
             result = method(self)
             if sub_data := method.sub_data:
@@ -223,7 +223,7 @@ class ExportRow:
     def to_json(self, categories: Optional[Dict[str, Any]] = None, export_settings: Optional[ExportSettings] = None) -> JsonObjType:
         if not export_settings:
             export_settings = ExportSettings.get_for_request()
-        row = dict()
+        row = {}
         for method in ExportRow.get_export_methods(self.__class__, categories=categories):
             result = method(self)
             value: Any

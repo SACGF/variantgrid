@@ -218,7 +218,7 @@ class ClassificationFilter:
         if not self.path_info:
             self.path_info = request.path_info
         if self.request_params is None:
-            request_params = dict()
+            request_params = {}
             if GET := request.GET:
                 for key, value in GET.items():
                     request_params[key] = value

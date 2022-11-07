@@ -35,7 +35,7 @@ class DiffBuilder:
     # TODO, rather than trying to do a bunch of smarts in append() maybe all the smarts are best saved for optimize
 
     def __init__(self):
-        self.diff_segments: List[DiffTextSegment] = list()
+        self.diff_segments: List[DiffTextSegment] = []
         self.same_text = ''
         self.add_text = ''
         self.sub_text = ''
@@ -62,7 +62,7 @@ class DiffBuilder:
         #     suffix_same += subtract[-1]
         #     subtract = subtract[:-1]
         #     add = add[:-1]
-        items: List[DiffTextSegment] = list()
+        items: List[DiffTextSegment] = []
         if prefix_same:
             items.append(DiffTextSegment(operation=' ', text=prefix_same))
         if subtract:
@@ -75,7 +75,7 @@ class DiffBuilder:
 
     def optimize(self):
         self.apply()
-        optimized = list()
+        optimized = []
         check_starts_with = None
         for element in self.diff_segments:
             if element.operation == '-':

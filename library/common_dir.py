@@ -3,14 +3,16 @@ from collections import Counter
 
 _end = '_end_'
 
+
 def make_trie(*words):
-    root = dict()
+    root = {}
     for word in words:
         current_dict = root
         for letter in word:
             current_dict = current_dict.setdefault(letter, {})
         current_dict = current_dict.setdefault(_end, _end)
     return root
+
 
 def get_multi_entries(trie, prefix=''):
     counter = Counter()

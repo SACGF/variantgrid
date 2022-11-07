@@ -109,7 +109,7 @@ class HealthCheckRecentActivity(HealthCheckStat):
                 # assume verbose name plural is auto generated if it doesn't start with a capital
                 name = verbose_name
 
-        response = list()
+        response = []
         if created:
             q: Q
             if model_has_field(model, 'created'):
@@ -144,9 +144,9 @@ class HealthCheckRecentActivity(HealthCheckStat):
         Display standalone lines at the front, and then non-zero items per line, then all the zeros in one line
         """
         items = sorted(items, key=lambda hc: (hc.name, hc.sub_type))
-        zeros: List[HealthCheckRecentActivity] = list()
-        stand_alone: List[HealthCheckRecentActivity] = list()
-        values: List[HealthCheckRecentActivity] = list()
+        zeros: List[HealthCheckRecentActivity] = []
+        stand_alone: List[HealthCheckRecentActivity] = []
+        values: List[HealthCheckRecentActivity] = []
         for item in items:
             if item.stand_alone:
                 stand_alone.append(item)
@@ -155,13 +155,13 @@ class HealthCheckRecentActivity(HealthCheckStat):
             else:
                 values.append(item)
 
-        output = list()
+        output = []
         for stand_alone_hc in stand_alone:
             output.append(str(stand_alone_hc))
         for valued in values:
             output.append(str(valued))
         if zeros:
-            flattened_empty = list()
+            flattened_empty = []
             for name, hc_sub_types in itertools.groupby(zeros, key=lambda hc: hc.name):
                 flattened_empty.append(name + " " + "/".join(hc.sub_type for hc in hc_sub_types))
             all_empty = ", ".join(flattened_empty)
@@ -263,7 +263,7 @@ class HealthCheckAge(HealthCheckStat):
 
     @classmethod
     def to_lines(cls, items: List['HealthCheckAge'], health_request: HealthCheckRequest) -> List[str]:
-        lines: List[str] = list()
+        lines: List[str] = []
         items = sorted(items, key=lambda hc: (hc.warning_age, hc.age_in_days, hc.name))
         for warning_age, warning_age_grouped in itertools.groupby(items, key=lambda hc: hc.warning_age):
             for current_age, current_and_warning_grouped in itertools.groupby(warning_age_grouped, key=lambda hc: hc.age_in_days):
@@ -304,7 +304,7 @@ def populate_health_check(notification: NotificationBuilder, since: Optional[dat
         since = now - timedelta(days=1)
     health_request = HealthCheckRequest(since=since, now=now)
 
-    results = list()
+    results = []
     for caller, result in health_check_signal.send_robust(sender=None, health_request=health_request):
         if isinstance(result, Exception):
             notification.add_markdown(f"Exception generating health check by {caller}: {result}")
@@ -315,8 +315,8 @@ def populate_health_check(notification: NotificationBuilder, since: Optional[dat
     checks = sorted(checks, key=lambda hc: hc.sort_order())
     grouped_checks = [(key, list(values)) for key, values in itertools.groupby(checks, lambda check: type(check))]
     grouped_checks = sorted(grouped_checks, key=lambda gc: gc[0].sort_order())
-    recent_lines = list()
-    overall_lines = list()
+    recent_lines = []
+    overall_lines = []
     for check_type, checks_typed in grouped_checks:
         section_lines = check_type.to_lines(checks_typed, health_request=health_request)
         if check_type.is_recent_activity():

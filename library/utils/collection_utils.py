@@ -93,12 +93,12 @@ def iter_fixed_chunks(iterable: Iterable[T], chunk_size: int) -> Iterator[List[T
 
 
 def batch_iterator(iterable: Iterable[T], batch_size: int = 10) -> Iterator[List[T]]:
-    batch: List[T] = list()
+    batch: List[T] = []
     for record in iterable:
         batch.append(record)
         if len(batch) >= batch_size:
             yield batch
-            batch = list()
+            batch = []
     if batch:
         yield batch
 
@@ -127,7 +127,7 @@ def group_data(data: Iterable[Data], key_func: Callable[[Data], Tuple[Key, Value
     for element in data:
         key, value = key_func(element)
         group_dict[key].add(value)
-    flat: List[Group[Key, Value]] = list()
+    flat: List[Group[Key, Value]] = []
     for key, values in group_dict.items():
         flat.append(Group(key, values))
     return flat
@@ -144,7 +144,7 @@ def group_by_key(qs: Iterable, key: Callable) -> Iterator[Tuple[Any, List]]:
     :return:
     """
     last_value = None
-    records = list()
+    records = []
     for record in qs:
         value = key(record)
         if value is None:
@@ -153,7 +153,7 @@ def group_by_key(qs: Iterable, key: Callable) -> Iterator[Tuple[Any, List]]:
             if records:
                 yield last_value, records
             last_value = value
-            records = list()
+            records = []
         records.append(record)
     if records:
         yield last_value, records
@@ -167,7 +167,7 @@ def all_equal(iterable):
 
 def empty_dict() -> Dict:
     # If you want an empty_dict as a default function parameter
-    return dict()
+    return {}
 
 
 TransformInput = TypeVar("TransformInput")
@@ -287,8 +287,8 @@ def segment(iterable: Iterable[T], filter: Callable[[T], bool]) -> Tuple[List[T]
     :param filter A filter to run over each element of iterable, to put it into a pass or fail list
     :returns two lists, the first being elements that passed the filter, the second being ones that failed
     """
-    passes: List[T] = list()
-    fails: List[T] = list()
+    passes: List[T] = []
+    fails: List[T] = []
     for element in iterable:
         if filter(element):
             passes.append(element)
