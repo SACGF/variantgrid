@@ -1,7 +1,7 @@
 import difflib
 import re
-from html import escape
 from dataclasses import dataclass
+from html import escape
 from typing import List
 
 from django.utils.safestring import SafeString

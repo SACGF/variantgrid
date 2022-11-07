@@ -1,13 +1,12 @@
+import operator
+import re
 from collections import defaultdict
 from dataclasses import dataclass
 from itertools import islice
 from typing import Iterable, Iterator, List, TypeVar, Any, Generic, Set, Callable, Tuple, Optional, Dict, Sequence, \
     Union
-import operator
-import re
 
 from django.utils.functional import SimpleLazyObject
-
 
 DictKey = TypeVar("DictKey")
 DictVal = TypeVar("DictVal")

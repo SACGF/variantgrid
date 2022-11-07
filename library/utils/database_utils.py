@@ -2,9 +2,7 @@ from typing import Iterable, Optional, Tuple, List, Any, Dict
 
 import sqlparse
 from django.db import connection, transaction
-
-
-#970: Added transaction wrapper due to Postgres hanging query
+# 970: Added transaction wrapper due to Postgres hanging query
 from django.db.models import QuerySet
 
 

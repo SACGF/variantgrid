@@ -1,9 +1,9 @@
-from typing import Collection, Any, Optional, Callable
+import csv
+import io
+import math
 import re
 import string
-import io
-import csv
-import math
+from typing import Collection, Any, Optional, Callable
 
 
 def pretty_label(label: str) -> str:

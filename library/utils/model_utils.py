@@ -1,4 +1,5 @@
 from typing import Type
+
 from django.core.exceptions import FieldDoesNotExist
 from django.db import models
 from django.db.models import Model

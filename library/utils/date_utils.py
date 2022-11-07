@@ -1,9 +1,9 @@
+import time
+from datetime import date, datetime, timedelta
 from typing import Optional, Tuple, List
 
 from django.utils import timezone
 from django.utils.timezone import localtime
-from datetime import date, datetime, timedelta
-import time
 
 
 def time_since(start: datetime) -> timedelta:

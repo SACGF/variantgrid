@@ -1,9 +1,10 @@
+import html
+import re
+import uuid
 from typing import Optional, Set
+
 from bs4 import BeautifulSoup
 from django.utils.safestring import mark_safe, SafeString
-import html
-import uuid
-import re
 
 
 def html_id_safe(text: str) -> str:

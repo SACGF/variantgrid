@@ -1,8 +1,9 @@
+import logging
 from dataclasses import field, dataclass
+from datetime import datetime, timedelta
 from functools import reduce
 from typing import List, Dict
-from datetime import datetime, timedelta
-import logging
+
 from library.utils import time_since
 
 
