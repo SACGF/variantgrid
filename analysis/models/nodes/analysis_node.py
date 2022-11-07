@@ -800,9 +800,6 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
 
         node_counts = []
         for label, count in label_counts.items():
-            # We only need this for Django < 4 (as after that we have empty_result_set_value=0)
-            if count is None:
-                count = 0
             node_counts.append(NodeCount(node_version=self.node_version, label=label, count=count))
         if node_counts:
             NodeCount.objects.bulk_create(node_counts)
