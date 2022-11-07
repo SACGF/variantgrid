@@ -312,12 +312,10 @@ class ClinVarKey(TimeStampedModel):
         """
         :throw PermissionDenied if user is not associated to ClinVarKey
         """
-
-        def check_user_can_access(self, user: User):
-            if not user.is_superuser:
-                allowed_clinvar_keys = ClinVarKey.clinvar_keys_for_user(user)
-                if not allowed_clinvar_keys.filter(pk=self).exists():
-                    raise PermissionDenied("User does not belong to a lab that uses the submission key")
+        if not user.is_superuser:
+            allowed_clinvar_keys = ClinVarKey.clinvar_keys_for_user(user)
+            if not allowed_clinvar_keys.filter(pk=self).exists():
+                raise PermissionDenied("User does not belong to a lab that uses the submission key")
 
 
 class ClinVarKeyExcludePatternMode(TextChoices):
