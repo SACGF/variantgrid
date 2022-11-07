@@ -10,17 +10,17 @@ def _variant_wiki_column(apps, _schema_editor):
     CustomColumnsCollection = apps.get_model("snpdb", "CustomColumnsCollection")
 
     DATABASE_LEVEL = 'D'
-    vw_column, created = VariantGridColumn.objects.get_or_create(grid_column_name='variant_wiki',
-                                                                 variant_column='variantwiki__markdown',
-                                                                 annotation_level=DATABASE_LEVEL,
-                                                                 label='Variant Wiki',
-                                                                 description='Internal Variant Wiki, edit on variant page.')
+    vw_column, _ = VariantGridColumn.objects.get_or_create(grid_column_name='variant_wiki',
+                                                           variant_column='variantwiki__markdown',
+                                                           annotation_level=DATABASE_LEVEL,
+                                                           label='Variant Wiki',
+                                                           description='Internal Variant Wiki, edit on variant page.')
 
-    gw_column, created = VariantGridColumn.objects.get_or_create(grid_column_name='gene_symbol_wiki',
-                                                                 variant_column='variantannotation__transcript_version__gene_version__gene_symbol__genesymbolwiki__markdown',
-                                                                 annotation_level='D',
-                                                                 label='Gene Wiki',
-                                                                 description='Internal Gene Symbol Wiki, edit on gene symbol page.')
+    gw_column, _ = VariantGridColumn.objects.get_or_create(grid_column_name='gene_symbol_wiki',
+                                                           variant_column='variantannotation__transcript_version__gene_version__gene_symbol__genesymbolwiki__markdown',
+                                                           annotation_level='D',
+                                                           label='Gene Wiki',
+                                                           description='Internal Gene Symbol Wiki, edit on gene symbol page.')
 
     all_columns = CustomColumnsCollection.objects.get(name="All columns")
     if not all_columns.customcolumn_set.contains(vw_column):

@@ -90,7 +90,7 @@ class Keycloak:
                         auth=self.connector.auth(),
                         url=self.connector.url(f'/auth/admin/realms/{self.realm}/groups/{parent}/children'),
                         json={
-                            "name":combined.split('/')[-1]
+                            "name": combined.rsplit('/', maxsplit=1)[-1],
                         }
                     )
                     response.raise_for_status()
