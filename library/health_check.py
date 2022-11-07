@@ -313,7 +313,7 @@ def populate_health_check(notification: NotificationBuilder, since: Optional[dat
     checks: List[HealthCheckStat] = flatten_nested_lists(results)
 
     checks = sorted(checks, key=lambda hc: hc.sort_order())
-    grouped_checks = [(key, list(values)) for key, values in itertools.groupby(checks, lambda check: type(check))]
+    grouped_checks = [(key, list(values)) for key, values in itertools.groupby(checks, type)]
     grouped_checks = sorted(grouped_checks, key=lambda gc: gc[0].sort_order())
     recent_lines = []
     overall_lines = []

@@ -3,7 +3,7 @@
 from django.db import migrations
 
 
-def pending_changes_flag(apps, _schema_editor):
+def _pending_changes_flag(apps, _schema_editor):
     FlagType = apps.get_model("flags", "FlagType")
     FlagResolution = apps.get_model("flags", "FlagResolution")
     FlagTypeResolution = apps.get_model("flags", "FlagTypeResolution")
@@ -70,5 +70,5 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RunPython(pending_changes_flag)
+        migrations.RunPython(_pending_changes_flag)
     ]

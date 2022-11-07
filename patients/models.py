@@ -75,7 +75,7 @@ class ExternallyManagedModel(TimeStampedModel):
             em = self.external_pk.external_manager
         return em
 
-    def can_write(self, user):
+    def can_write(self, _user):
         cw = True
         if self.external_manager:
             cw &= self.external_manager.can_modify
@@ -142,7 +142,8 @@ class Patient(GuardianPermissionsMixin, HasPhenotypeDescriptionMixin, Externally
     @property
     def condition_description(self):
         if self.date_of_death:
-            return "dead (D.O.D. %s)" % self.date_of_death.strftime(settings.DATE_FORMAT)
+            dod = self.date_of_death.strftime(settings.DATE_FORMAT)
+            return f"dead (D.O.D. {dod})"
         return "alive"
 
     @property

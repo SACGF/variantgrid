@@ -244,7 +244,8 @@ def related_objects(obj):
 def object_relations(obj):
     """ returns (one_to_one, many_to_many) """
 
-    is_1_to_1 = lambda field: isinstance(field, OneToOneRel)
+    def is_1_to_1(field):
+        return isinstance(field, OneToOneRel)
     return discrimine(is_1_to_1, obj._meta._get_fields(forward=False))
 
 

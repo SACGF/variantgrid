@@ -80,8 +80,6 @@ def strip_json(json_values: JsonDataType) -> JsonDataType:
 
 
 class JsonPathPart(ABC):
-    pass
-
     @property
     @abstractmethod
     def short(self) -> str:

@@ -4,11 +4,10 @@ import re
 from collections import defaultdict
 from dataclasses import dataclass
 from functools import reduce
-from typing import Optional, Dict, Any
+from typing import Optional, Any
 
 from django.conf import settings
 from django.contrib import messages
-from django.contrib.auth.models import User
 from django.db import connection
 from django.db.models import Q
 from django.forms import model_to_dict
@@ -62,13 +61,6 @@ def variants(request, genome_build_name=None):
     genome_build = UserSettings.get_genome_build_or_default(request.user, genome_build_name)
     context = {"genome_build": genome_build}
     return render(request, "variantopedia/variants.html", context)
-
-
-def get_total_counts(user: User) -> Dict[str, int]:
-    return {
-        "classifications_shared": Classification.dashboard_total_shared_classifications(),
-        "classifications_unshared": Classification.dashboard_total_unshared_classifications()
-    }
 
 
 def strip_celery_from_keys(celery_state):
@@ -216,7 +208,10 @@ def server_status(request):
             disk_free["status"] = "warning"
         disk_free["messages"].append(message)
 
-    total_counts = get_total_counts(request.user)
+    total_counts = {
+        "classifications_shared": Classification.dashboard_total_shared_classifications(),
+        "classifications_unshared": Classification.dashboard_total_unshared_classifications()
+    }
 
     context = {
         "celery_workers": celery_workers,
