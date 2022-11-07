@@ -78,5 +78,8 @@ def get_node_counts_and_labels_dict(node, counts_to_get):
             q = None
         else:
             q = get_extra_filters_q(node.analysis.user, node.analysis.genome_build, count_type)
-        aggregate_kwargs[count_type] = Count("pk", filter=q)
-    return qs.aggregate(**aggregate_kwargs)
+        # empty_result_set_value=0 only works for Django >= 4, so we handle manually below
+        aggregate_kwargs[count_type] = Count("pk", filter=q, empty_result_set_value=0)
+    node_counts = qs.aggregate(**aggregate_kwargs)
+    return {k: v if v is not None else 0 for k, v in node_counts.items()}
+
