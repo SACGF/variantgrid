@@ -1,17 +1,17 @@
 import re
 from typing import List
-
 from django.contrib import admin, messages
 from django.contrib.admin.widgets import AdminTextInputWidget
 from django.db.models import QuerySet
 from unidecode import unidecode
 
+from classification.models import ClinicalContext
 from snpdb import models
 from snpdb.admin_utils import ModelAdminBasics, GuardedModelAdminBasics, admin_list_column, \
     admin_action
 from snpdb.liftover import liftover_alleles
 from snpdb.models import Allele, VariantAllele, ClinVarKey, ClinVarKeyExcludePattern, UserSettingsOverride, \
-    LabUserSettingsOverride, OrganizationUserSettingsOverride, UserPageAck, Organization, Lab
+    LabUserSettingsOverride, OrganizationUserSettingsOverride, UserPageAck, Organization, Lab, GlobalSettings
 from snpdb.models.models_genome import GenomeBuild
 
 
@@ -74,6 +74,17 @@ class DefaultBuildFilter(admin.SimpleListFilter):
         return queryset
 
 
+class SettingsOverrideAdmin(ModelAdminBasics):
+    pass
+
+    # Not sure hwo to just set timezone to a dropdown of available timezones, just need to be careful to enter an exact value
+    # def get_form(self, request, obj=None, **kwargs):
+    #
+    #     return super().get_form(request, obj, widgets={
+    #         'timezone': admin.widgets.AutocompleteSelect(choices=[(None, "")] + [(tz, tz) for tz in settings.AVAILABLE_TZS])
+    #     }, **kwargs)
+
+
 @admin.register(UserSettingsOverride)
 class UserSettingsOverrideAdmin(ModelAdminBasics):
     list_display = ('user', 'default_lab', 'default_genome_build', 'email_weekly_updates', 'email_discordance_updates')
@@ -107,6 +118,11 @@ class OrganizationUserSettingsOverrideAdmin(ModelAdminBasics):
         if f.name == 'default_genome_build':
             return False
         return super().is_readonly_field(f)
+
+
+@admin.register(GlobalSettings)
+class GlobalSettingsAdmin(SettingsOverrideAdmin):
+    pass
 
 
 @admin.register(UserPageAck)
@@ -318,7 +334,6 @@ admin.site.register(models.CustomColumn, ModelAdminBasics)
 admin.site.register(models.CustomColumnsCollection, ModelAdminBasics)
 admin.site.register(models.GenomeBuild, ModelAdminBasics)
 admin.site.register(models.GenomicIntervalsCollection, ModelAdminBasics)
-admin.site.register(models.GlobalSettings, ModelAdminBasics)
 admin.site.register(models.LabProject)
 admin.site.register(models.Manufacturer)
 admin.site.register(models.Project, ModelAdminBasics)

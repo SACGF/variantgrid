@@ -372,7 +372,9 @@ class SettingsOverrideForm(BaseModelForm):
                    "import_messages": BlankNullBooleanSelect(),
                    'default_sort_by_column': ModelSelect2(url='custom_column_autocomplete',
                                                           forward=['columns'],
-                                                          attrs={'data-placeholder': 'Column...'})}
+                                                          attrs={'data-placeholder': 'Column...'}),
+                   'timezone': forms.Select(choices=[(None, "")] + [(tz, tz) for tz in settings.AVAILABLE_TZS], attrs={})
+                   }
         labels = {
             "email_weekly_updates": "Email Regular Updates",
             "email_discordance_updates": "Email Discordance Updates",
@@ -383,7 +385,8 @@ class SettingsOverrideForm(BaseModelForm):
             "default_sort_by_column": "Default Sort by Column",
             "igv_port": "IGV Port",
             "default_genome_build": "Default Genome Build",
-            "default_lab": "Default Lab"
+            "default_lab": "Default Lab",
+            "timezone": "TimeZone (for downloads)"
         }
 
     def __init__(self, *args, **kwargs):
@@ -440,7 +443,6 @@ class UserSettingsOverrideForm(SettingsOverrideForm):
         if "columns" in self.fields:
             self.fields['columns'].queryset = models.CustomColumnsCollection.filter_for_user(user)
         self.fields['default_lab'].queryset = Lab.valid_labs_qs(user)
-
 
 class CreateCohortForm(BaseModelForm):
 

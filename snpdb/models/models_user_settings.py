@@ -2,7 +2,6 @@ import dataclasses
 from collections import OrderedDict, defaultdict
 from dataclasses import dataclass
 from typing import Optional, List, Tuple, Dict, Set
-
 from avatar.templatetags.avatar_tags import avatar_url
 from django.conf import settings
 from django.contrib.auth.models import User, Group
@@ -12,7 +11,6 @@ from django.db.models.deletion import SET_NULL, CASCADE
 from django_extensions.db.models import TimeStampedModel
 from lazy import lazy
 from model_utils.managers import InheritanceManager
-
 from library.django_utils import thread_safe_unique_together_get_or_create
 from library.django_utils.avatar import SpaceThemedAvatarProvider
 from library.utils import rgb_invert, string_deterministic_hash
@@ -20,6 +18,7 @@ from snpdb.models.models import Tag, Lab, Organization
 from snpdb.models.models_columns import CustomColumnsCollection, CustomColumn
 from snpdb.models.models_enums import BuiltInFilters
 from snpdb.models.models_genome import GenomeBuild
+from dateutil.tz import gettz
 
 
 def get_igv_data(user, genome_build: GenomeBuild = None):
@@ -131,6 +130,7 @@ class SettingsOverride(models.Model):
     import_messages = models.BooleanField(null=True, blank=True)  # Get a message once import is done
     igv_port = models.IntegerField(null=True, blank=True)
     default_genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE, null=True, blank=True)
+    timezone = models.TextField(null=True, blank=True)
 
 
 class GlobalSettings(SettingsOverride):
@@ -247,7 +247,15 @@ class UserSettings:
     default_genome_build: GenomeBuild
     default_lab: Optional[Lab]
     oauth_sub: str
+    timezone: str
     _settings_overrides: List[SettingsOverride]
+
+    @property
+    def tz(self):
+        if self.timezone:
+            return gettz(self.timezone)
+        else:
+            return gettz(settings.TIME_ZONE)
 
     def default_lab_safe(self) -> Lab:
         if lab := self.default_lab:

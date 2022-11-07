@@ -123,6 +123,32 @@ CACHES = {
 TIME_ZONE = 'Australia/Adelaide'
 DATE_FORMAT = "%-d/%-m/%y"
 
+AVAILABLE_TZS = [
+    "Australia/ACT",
+    "Australia/Adelaide",
+    "Australia/Brisbane",
+    "Australia/Broken_Hill",
+    "Australia/Canberra",
+    "Australia/Currie",
+    "Australia/Darwin",
+    "Australia/Eucla",
+    "Australia/Hobart",
+    "Australia/LHI",
+    "Australia/Lindeman",
+    "Australia/Lord_Howe",
+    "Australia/Melbourne",
+    "Australia/NSW",
+    "Australia/North",
+    "Australia/Perth",
+    "Australia/Queensland",
+    "Australia/South",
+    "Australia/Sydney",
+    "Australia/Tasmania",
+    "Australia/Victoria",
+    "Australia/West",
+    "Australia/Yancowinna"
+]
+
 # Language code for this installation. All choices can be found here:
 # http://www.i18nguy.com/unicode/language-identifiers.html
 LANGUAGE_CODE = 'en-us'
@@ -859,6 +885,7 @@ _URLS_NAME_REGISTER_OVERRIDE = {
     "condition_matchings": False,
     "condition_match_test": False,
     "discordance_reports": False,
+    "vus": False
 }
 URLS_NAME_REGISTER = defaultdict(lambda: _URLS_NAME_REGISTER_DEFAULT, _URLS_NAME_REGISTER_OVERRIDE)
 

@@ -1,0 +1,139 @@
+let CitationsManager = (function() {
+
+    function Deferred() {
+        let self = this;
+        this.promise = new Promise(function(resolve, reject) {
+            self.reject = reject
+            self.resolve = resolve
+        });
+    }
+
+    let CitationsManager = function () {
+        this.citationToDeferred = {};
+        this.citationsToLoad = {};
+    }
+
+    CitationsManager.prototype = {
+
+        citationPromise(citationId) {
+            let existing = this.citationToDeferred[citationId];
+            let deferred = null;
+            if (existing) {
+                return existing.promise;
+            } else {
+                deferred = new Deferred();
+                this.citationToDeferred[citationId] = deferred;
+            }
+            this.citationsToLoad[citationId] = true;
+            this.debounceRequestData();
+            return deferred.promise;
+        },
+
+        requestData() {
+            let loadIds = Object.keys(this.citationsToLoad);
+            this.citationsToLoad = {};
+            $.ajax({
+                headers: {
+                    'Accept' : 'application/json',
+                    'Content-Type' : 'application/json'
+                },
+                //url: this.url + request_ids.join('/'),
+                url: Urls.citations_json(loadIds.join('/')),
+                type: 'GET',
+                error: (call, status, text) => {
+                    console.log(text)
+                },
+                success: (record) => {
+                    for (let citationData of record['citations']) {
+                        // TODO, can the API return the ID that was used to request?
+                        for (let requestingId of citationData.requested_using) {
+                            let deferred = this.citationToDeferred[requestingId];
+                            if (deferred) {
+                                deferred.resolve(citationData);
+                            }
+                        }
+                    }
+                }
+            });
+        },
+
+        // debounceRequestData: debounce(this.requestData),
+
+        populate(dom) {
+            let $dom = $(dom);
+            $dom.addClass('citation');
+            $dom.addClass('loading');
+            let citationId = $dom.attr('data-citation-id');
+            this.citationPromise(citationId).then(data => {
+                $dom.removeClass('loading').empty().append(this.renderData(data));
+            });
+        },
+
+        renderData(citation) {
+            let citDom = $('<div>');
+            let sourceMap = {"PubMed": "PMID"};
+            let source = sourceMap[citation.source] || citation.source;
+            let sourceId = citation.citation_id;
+            let year = citation.year;
+
+            let authorShort = citation.authors_short;
+            let singleAuthor = null;
+            if (!authorShort && citation.authors) {
+                let authors = citation.authors.split(',');
+                if (authors.length) {
+                    authorShort = authors[0];
+                    singleAuthor = authors.length === 1;
+                }
+            } else if (authorShort && citation.authors) {
+                singleAuthor = authorShort == citation.authors;
+            }
+            let title = citation.title || 'Could not load title';
+
+            let linkRow = [];
+            if (citation.citation_link) {
+                linkRow.push($('<a>', {href: citation.citation_link, target: '_blank', class:'source external-link', text: `${source}: ${sourceId}`}));
+            }
+            if (authorShort) {
+                let text = authorShort;
+                if (singleAuthor == false) {
+                    text += ' et al';
+                }
+                linkRow.push($('<span>', {class:'author', text: text}));
+            }
+            if (year) {
+                linkRow.push($('<span>', {class:'year', text: year}));
+            }
+            if (title) {
+                linkRow.push($('<span>', {class:'title', text: title}));
+            }
+            let linkDom = $('<span>', {class: 'title-row'});
+
+            linkDom = linkRow.reduce((prev, current) => {
+                prev.append(current);
+                prev.append((document.createTextNode(' ')));
+                return prev;
+            }, linkDom);
+            linkDom.appendTo(citDom);
+
+            if (citation.abstract || !singleAuthor || citation.journal) {
+                $('<a>', {class: 'toggle-link d-block', 'data-toggle':"collapse", href:`#detail-${citation.citation_id}`, text: 'Toggle detail'}).appendTo(citDom);
+                let detailContainer = $('<div>', {class: 'collapse', id:`detail-${citation.citation_id}`}).appendTo(citDom);
+                if (citation.journal) {
+                    $('<p>', {class: 'journal', text: citation.journal}).appendTo(detailContainer);
+                }
+                if (!singleAuthor) {
+                    $('<p>', {class: 'authors', text: citation.authors}).appendTo(detailContainer);
+                }
+                $('<p>', {class: 'abstract', text: citation.abstract && citation.abstract.length ? citation.abstract : 'Could not fetch abstract'}).appendTo(detailContainer);
+            }
+            return citDom;
+
+        }
+    };
+
+    return CitationsManager;
+})();
+
+CitationsManager.prototype.debounceRequestData = debounce(CitationsManager.prototype.requestData);
+
+CitationsManager.defaultManager = new CitationsManager();

@@ -689,6 +689,16 @@ div.background-image {
 .hidden { display: none }
 .visible-hidden {visibility: hidden}
 
+.fa-animate-1 {
+  animation-iteration-count: 1 !important;
+}
+.fa-animate-2 {
+  animation-iteration-count: 2 !important;
+}
+.fa-animate-3 {
+  animation-iteration-count: 3 !important;
+}
+
 .toggle-link {
   color: #88B;
   cursor: pointer;
@@ -1136,3 +1146,49 @@ a .c-hgvs-body {
     animation: highlight-select 1s infinite alternate;
 }
  */
+
+// CITATIONS
+
+.citation {
+    a {
+        color: #222288;
+        text-decoration: none;
+        &:hover {
+            text-decoration: underline;
+        }
+    }
+    .source {
+        //font-family: monospace;
+    }
+    .author, .authors {
+        color: gray;
+    }
+    .no-details {}
+    .title {
+        color: #444444;
+        display: inline-block;
+    }
+    .show-abstract-link {
+        margin-top: 2px;
+        display: block;
+    }
+    .year {
+        color: gray;
+    }
+    .abstract {
+        color: #444444;
+        margin-bottom: 0;
+    }
+
+    .loading {
+        opacity: 1.0;
+    }
+    &.failed {
+        background-color: #ffcccc;
+    }
+    & + .citation {
+        margin-top: 15px;
+        padding-top: 15px;
+        border-top: 1px dashed lightgray;
+    }
+}

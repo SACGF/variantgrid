@@ -216,7 +216,8 @@ URLS_NAME_REGISTER.update({  # Disable selected snpdb urls
 
     # ClinVarExport
     "clinvar_key_summary": True,
-    "clinvar_match": True
+    "clinvar_match": True,
+    "vus": False
 })
 
 PREFER_ALLELE_LINKS = True

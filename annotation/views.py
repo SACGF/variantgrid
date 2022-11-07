@@ -2,7 +2,7 @@ import logging
 import subprocess
 from collections import defaultdict, Counter
 from subprocess import check_output
-from typing import List, Optional
+from typing import List, Optional, Dict
 
 from django.conf import settings
 from django.contrib import messages
@@ -542,19 +542,33 @@ def citations_json(request, citations_ids_list):
     Request JSON of citations, accepts either variant grid internal citation ids, or PubMed:123456
     """
     citation_ids = citations_ids_list.split("/")
+
     citations: List[Citation] = []
-    for citation_id in citation_ids:
-        parts = citation_id.split(':')
-        citation: Citation
-        if len(parts) == 2 and parts[0] == 'PubMed':
-            citation, _ = Citation.objects.get_or_create(citation_source=CitationSource.PUBMED,
-                                                         citation_id=parts[1])
+    citation_id_to_request: dict[int, list[str]] = defaultdict(list)
+
+    for requested_citation_id in citation_ids:
+        parts = requested_citation_id.split(':')
+
+        citation: Optional[Citation] = None
+        if len(parts) == 2:
+            if source := CitationSource.CODES.get(parts[0]):
+                citation, _ = Citation.objects.get_or_create(citation_source=source,
+                                                             citation_id=parts[1])
+            else:
+                logging.warning(f"Don't know how to look up a citation for {requested_citation_id}")
         else:
-            citation = Citation.objects.filter(pk=citation_id).first()
+            citation = Citation.objects.filter(pk=requested_citation_id).first()
 
         if citation:
             citations.append(citation)
+            citation_id_to_request[citation.id].append(requested_citation_id)
 
     cached_citations = get_citations(citations)
 
-    return JsonResponse({'citations': [vars(cc) for cc in cached_citations]})
+    json_data = []
+    for cc in cached_citations:
+        cc_json_data = vars(cc)
+        cc_json_data['requested_using'] = citation_id_to_request[cc.id]
+        json_data.append(cc_json_data)
+
+    return JsonResponse({'citations': json_data})

@@ -57,6 +57,7 @@ from snpdb.forms import SampleChoiceForm, UserSelectForm, LabSelectForm
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import Variant, UserSettings, Sample, Lab, Allele
 from snpdb.models.models_genome import GenomeBuild
+from snpdb.user_settings_manager import UserSettingsManager
 from uicore.utils.form_helpers import form_helper_horizontal
 from variantopedia.forms import SearchAndClassifyForm
 
@@ -123,7 +124,8 @@ def classifications(request):
     Classification listing page
     """
 
-    user_settings = UserSettings.get_for_user(request.user)
+    # is cached on the request
+    user_settings = UserSettingsManager.get_user_settings()
 
     initial = {'classify': True}
     search_and_classify_form = SearchAndClassifyForm(initial=initial)

@@ -116,6 +116,14 @@ class ClinVarExport(TimeStampedModel):
     def condition_resolved(self) -> ConditionResolved:
         return ConditionResolved.from_dict(self.condition)
 
+    @property
+    def citation_ids(self) -> List[str]:
+        if body := self.submission_body:
+            if clin_sig := body["clinicalSignificance"]:
+                if citation := clin_sig["citation"]:
+                    return [entry["id"] for entry in citation]
+        return []
+
     @condition_resolved.setter
     def condition_resolved(self, new_condition: ConditionResolved):
         self.condition = new_condition.to_json()

@@ -324,6 +324,7 @@ URLS_NAME_REGISTER.update({  # Disable selected snpdb urls
     "classification_upload_unmapped": True,
     "classification_view_metrics": True,
     "discordance_reports": True,
+    "vus": True
 })
 
 # mimic shariant
@@ -341,3 +342,4 @@ PREFER_ALLELE_LINKS = True
 
 VARIANT_MANUAL_CREATE_BY_NON_ADMIN = False
 GENE_RELATION_PANEL_APP_LIVE_UPDATE = True
+COMPRESS_ENABLED = False

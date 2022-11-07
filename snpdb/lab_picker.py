@@ -213,7 +213,7 @@ class LabPickerData:
     @property
     def labs_if_not_admin(self) -> Set[Lab]:
         # Used to group together as "internal" labs
-        if self.user and self.user.is_superuser:
+        if self.is_admin_mode:
             return set()
         else:
             return set(self.all_labs)
@@ -245,6 +245,7 @@ class LabPickerData:
     def has_external(self) -> bool:
         return bool(self.external_labs)
 
+    @property
     def is_admin_mode(self) -> bool:
         # see if user is an admin looking at all labs
         return self.user and self.user.is_superuser and (not self.selected_lab) and (not self.selected_org)

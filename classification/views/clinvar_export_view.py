@@ -1,4 +1,3 @@
-import io
 import json
 import re
 from collections import defaultdict
@@ -15,7 +14,6 @@ from django.urls import reverse
 from django.views import View
 from django.views.decorators.http import require_POST
 from lazy import lazy
-
 from classification.enums import SpecialEKeys
 from classification.models import ClinVarExport, ClinVarExportBatch, ClinVarExportBatchStatus, \
     EvidenceKeyMap, ClinVarExportStatus, ClinVarExportSubmission
@@ -25,11 +23,13 @@ from classification.views.classification_dashboard_view import ClassificationDas
 from genes.hgvs import CHGVS
 from library.cache import timed_cache
 from library.django_utils import add_save_message, get_url_from_view_path
-from library.utils import html_to_text, export_column, ExportRow, local_date_string
+from library.log_utils import report_event
+from library.utils import html_to_text, export_column, ExportRow, local_date_string, ExportDataType
 from snpdb.lab_picker import LabPickerData
 from snpdb.models import ClinVarKey, Lab, Allele, GenomeBuild
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder, CellData
 from uicore.json.json_types import JsonDataType
+import io
 
 
 @timed_cache(size_limit=30, ttl=60)
@@ -354,10 +354,10 @@ class ClinVarExportSummary(ExportRow):
         if classification := self.classification:
             return EvidenceKeyMap.pretty_value_for(classification, SpecialEKeys.CURATION_DATE)
 
-    @export_column("Classification Submitted to $site_name")
+    @export_column("Classification Submitted to $site_name", data_type=ExportDataType.datetime)
     def classification_imported_created(self):
         if modification := self.classification:
-            return modification.classification.created.strftime('%Y-%m-%d')
+            return modification.created
 
     @export_column("Sync Status")
     def sync_status(self):

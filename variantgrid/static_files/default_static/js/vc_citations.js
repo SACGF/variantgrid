@@ -1,3 +1,6 @@
+// Citations HAS BEEN DEPRECATED
+// Please simple use <div data-citation-id="PMID:12355"></div> etc
+
 let Citations = (function() {
 
     let Citations = function(dom) {

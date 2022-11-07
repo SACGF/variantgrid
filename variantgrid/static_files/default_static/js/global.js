@@ -298,6 +298,12 @@ function enhanceAndMonitor() {
                     $node.click();
                 }
             }
+        },
+
+        {test: '[data-citation-id]',
+            func: (node) => {
+                CitationsManager.defaultManager.populate(node);
+            }
         }
 
         /*
