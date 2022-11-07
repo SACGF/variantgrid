@@ -41,7 +41,7 @@ def name_from_filename(filename: str, remove_gz=False) -> str:
     return name
 
 
-def file_to_array(filename, comment: Optional[str]=None, max_lines: Optional[int]=None):
+def file_to_array(filename, comment: Optional[str] = None, max_lines: Optional[int] = None):
     array = []
     f_or_f = file_or_filename(filename)
     for i, line in enumerate(f_or_f):

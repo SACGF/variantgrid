@@ -18,4 +18,3 @@ def execute_cmd(cmd: list, **kwargs) -> Tuple[int, Optional[str], Optional[str]]
 
     std_out, std_err = pipes.communicate()
     return pipes.returncode, std_out.decode() if std_out else None, std_err.decode() if std_err else None
-

@@ -554,7 +554,7 @@ class VariantAllele(TimeStampedModel):
         return f"{self.allele} - {self.variant_id}({self.genome_build}/{self.allele_linking_tool})"
 
 
-class VariantCollection(RelatedModelsPartitionModel): #
+class VariantCollection(RelatedModelsPartitionModel):
     """ A set of variants - usually used as a cached result """
 
     RECORDS_BASE_TABLE_NAMES = ["snpdb_variantcollectionrecord"]

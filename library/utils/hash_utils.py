@@ -20,4 +20,3 @@ def md5sum_str(s: str) -> str:
 def sha1_str(s: str) -> str:
     s_bytes = s.encode()
     return hashlib.sha1(s_bytes).hexdigest()
-
