@@ -558,9 +558,9 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
         if not variant_allele.needs_clingen_call():
             variant_allele_data = VariantAlleleSerializer.data_with_link_data(variant_allele)
 
-    variant_tags = []
+    variant_tag_list = []
     for vt in VariantTag.get_for_build(genome_build, variant_qs=variant.equivalent_variants):
-        variant_tags.append(VariantTagSerializer(vt, context={"request": request}).data)
+        variant_tag_list.append(VariantTagSerializer(vt, context={"request": request}).data)
 
     annotation_description = {}
     if user_settings.tool_tips:
@@ -592,7 +592,7 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
         "variant": variant,
         "variant_allele": variant_allele_data,
         "variant_annotation": variant_annotation,
-        "variant_tags": json.dumps(variant_tags),
+        "variant_tags": json.dumps(variant_tag_list),
         "vts": vts,
     }
     if extra_context:

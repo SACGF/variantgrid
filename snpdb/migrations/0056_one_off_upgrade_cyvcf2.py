@@ -7,7 +7,7 @@ from django.db import migrations
 from manual.operations.manual_operations import ManualOperation
 
 
-def _test_old_version(apps):
+def _test_old_version(_apps):
     needs_upgrade = False
     try:
         required_version = (0, 30, 14)  # Ploidy fixes

@@ -45,7 +45,7 @@ class VariantWikiColumns(DatatableConfig[VariantWiki]):
         g_hgvs = HGVSMatcher(genome_build).variant_to_g_hgvs(variant)
         return {"id": variant_id, "g_hgvs": g_hgvs}
 
-    def render_genome_build(self, row: Dict[str, Any]) -> JsonDataType:
+    def render_genome_build(self, _row: Dict[str, Any]) -> JsonDataType:
         return self.get_query_param('genome_build')
 
     def get_initial_queryset(self) -> QuerySet[VariantWiki]:

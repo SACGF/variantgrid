@@ -12,7 +12,7 @@ from snpdb.genome import reference_contigs
 from snpdb.genome.reference_contigs import get_assembly_report_df
 
 
-def snpdb_initial_data(apps, _schema_editor):
+def _snpdb_initial_data(apps, _schema_editor):
     SITES = [
         {'id': 2, 'domain': 'localhost', 'name': 'localhost'},
         {'id': 3, 'domain': 'variantgrid.com', 'name': 'variantgrid.com'},
@@ -33,7 +33,7 @@ def snpdb_initial_data(apps, _schema_editor):
     bulk_insert_class_data(apps, "snpdb", [("GenomicIntervalsCategory", GENOMIC_INTERVAL_CATEGORIES)])
 
 
-def create_columns(apps, _schema_editor):
+def _create_columns(apps, _schema_editor):
     CustomColumnsCollection = apps.get_model("snpdb", "CustomColumnsCollection")
     CustomColumn = apps.get_model("snpdb", "CustomColumn")
 
@@ -1399,12 +1399,12 @@ def create_columns(apps, _schema_editor):
         CustomColumn.objects.bulk_create(records)
 
 
-def add_requires_classification_tag(apps, _schema_editor):
+def _add_requires_classification_tag(apps, _schema_editor):
     Tag = apps.get_model("snpdb", "Tag")
     Tag.objects.get_or_create(id=settings.TAG_REQUIRES_CLASSIFICATION)
 
 
-def create_bot_user(apps, _schema_editor):
+def _create_bot_user(apps, _schema_editor):
     User = apps.get_model("auth", "User")
     User.objects.get_or_create(
         username='admin_bot',
@@ -1420,7 +1420,7 @@ def create_bot_user(apps, _schema_editor):
     )
 
 
-def import_contigs(apps, _schema_editor):
+def _import_contigs(apps, _schema_editor):
     GenomeBuild = apps.get_model("snpdb", "GenomeBuild")
     GenomeBuildContig = apps.get_model("snpdb", "GenomeBuildContig")
     Contig = apps.get_model("snpdb", "Contig")
@@ -1469,7 +1469,7 @@ def import_contigs(apps, _schema_editor):
         if alias:
             kwargs["alias"] = alias
         genome_build = GenomeBuild.objects.create(**kwargs)
-        logging.info(f"Created build {genome_build}")
+        logging.info(f"Created build %s", genome_build)
         role_lookup = invert_dict(dict(SequenceRole.CHOICES))
         molecule_type_lookup = invert_dict(dict(AssemblyMoleculeType.CHOICES))
         molecule_type_lookup["na"] = None
@@ -1499,7 +1499,7 @@ def import_contigs(apps, _schema_editor):
     GenomeBuild.objects.filter(name='GRCh38').update(igv_genome='hg38')
 
 
-def genome_build_accession(apps, _schema_editor):
+def _genome_build_accession(apps, _schema_editor):
     # Move this pu into main bit
     GenomeBuild = apps.get_model("snpdb", "GenomeBuild")
 
@@ -1514,7 +1514,7 @@ def genome_build_accession(apps, _schema_editor):
         genome_build.save()
 
 
-def global_settings(apps, _schema_editor):
+def _global_settings(apps, _schema_editor):
     GenomeBuild = apps.get_model("snpdb", "GenomeBuild")
     GlobalSettings = apps.get_model("snpdb", "GlobalSettings")
     CustomColumnsCollection = apps.get_model("snpdb", "CustomColumnsCollection")
@@ -1535,7 +1535,7 @@ def global_settings(apps, _schema_editor):
                                   default_genome_build=genome_build)
 
 
-def add_global_initial_group_permissions(apps, _schema_editor):
+def _add_global_initial_group_permissions(apps, _schema_editor):
     Group = apps.get_model("auth", "Group")
     GlobalSettings = apps.get_model("snpdb", "GlobalSettings")
     SettingsInitialGroupPermission = apps.get_model("snpdb", "SettingsInitialGroupPermission")
@@ -1551,7 +1551,7 @@ def add_global_initial_group_permissions(apps, _schema_editor):
                                                       group=group, read=not public_group, write=False)
 
 
-def create_vzc_partition(pk):
+def _create_vzc_partition(pk):
     base_table_name = "snpdb_variantzygositycount"
     sql_template = """
 CREATE TABLE "%(table_name)s" (
@@ -1571,11 +1571,11 @@ CREATE TABLE "%(table_name)s" (
     run_sql(sql)
 
 
-def variant_zygosity_count_defaults(apps, _schema_editor):
+def _variant_zygosity_count_defaults(apps, _schema_editor):
     VariantZygosityCountCollection = apps.get_model("snpdb", "VariantZygosityCountCollection")
 
     vzcc = VariantZygosityCountCollection.objects.create(name="global", description="All uploaded samples")
-    create_vzc_partition(vzcc.pk)
+    _create_vzc_partition(vzcc.pk)
 
 
 class Migration(migrations.Migration):
@@ -1585,13 +1585,13 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RunPython(snpdb_initial_data),
-        migrations.RunPython(create_columns),
-        migrations.RunPython(add_requires_classification_tag),
-        migrations.RunPython(create_bot_user),
-        migrations.RunPython(import_contigs),
-        migrations.RunPython(genome_build_accession),
-        migrations.RunPython(global_settings),
-        migrations.RunPython(add_global_initial_group_permissions),
-        migrations.RunPython(variant_zygosity_count_defaults),
+        migrations.RunPython(_snpdb_initial_data),
+        migrations.RunPython(_create_columns),
+        migrations.RunPython(_add_requires_classification_tag),
+        migrations.RunPython(_create_bot_user),
+        migrations.RunPython(_import_contigs),
+        migrations.RunPython(_genome_build_accession),
+        migrations.RunPython(_global_settings),
+        migrations.RunPython(_add_global_initial_group_permissions),
+        migrations.RunPython(_variant_zygosity_count_defaults),
     ]
