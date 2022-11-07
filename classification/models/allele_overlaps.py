@@ -111,7 +111,7 @@ class ClinicalGroupingOverlap:
     @property
     def is_all_vus(self):
         for group in self.groups:
-            if not group.clinical_significance_to.startswith("VUS"):
+            if not (group.clinical_significance_to and group.clinical_significance_to.startswith("VUS")):
                 return False
         return True
 
