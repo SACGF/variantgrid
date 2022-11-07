@@ -10,8 +10,9 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.models import User, Group
 from django.contrib.postgres.fields import DecimalRangeField
+from django.core.cache import cache
 from django.db import models
-from django.db.models import Value, When, Case, IntegerField
+from django.db.models import Value, When, Case, IntegerField, Max
 from django.db.models.deletion import SET_NULL, CASCADE, PROTECT
 from django.db.models.signals import post_delete, pre_delete
 from django.dispatch.dispatcher import receiver
@@ -21,7 +22,8 @@ from django_extensions.db.models import TimeStampedModel
 from lazy import lazy
 
 from genes.models import GeneListCategory, CustomTextGeneList, GeneList, GeneCoverageCollection, \
-    Transcript, GeneSymbol, SampleGeneList, TranscriptVersion
+    Transcript, GeneSymbol, SampleGeneList, TranscriptVersion, GeneCoverageCanonicalTranscript
+from library.constants import DAY_SECS
 from library.enums.log_level import LogLevel
 from library.file_utils import name_from_filename, remove_gz_if_exists
 from library.log_utils import get_traceback, log_traceback
@@ -1329,9 +1331,41 @@ def get_samples_by_sequencing_sample(sample_sheet, vcf):
 
 
 def get_20x_gene_coverage(gene_symbol, min_coverage=100):
-    unique_gene_coverage_qs = gene_symbol.genecoveragecanonicaltranscript_set.filter(gene_coverage_collection__qcgenecoverage__qc__bam_file__unaligned_reads__sequencing_sample__sample_sheet__sequencingruncurrentsamplesheet__isnull=False)
-    unique_gene_coverage_qs = unique_gene_coverage_qs.distinct("gene_coverage_collection")
-    return unique_gene_coverage_qs.filter(percent_20x__gte=min_coverage).count()
+    gcg_qs = GeneCoverageCollection.objects.filter(
+        qcgenecoverage__qc__bam_file__unaligned_reads__sequencing_sample__sample_sheet__sequencingruncurrentsamplesheet__isnull=False)
+
+    existing_count = 0
+    existing_max_pk = 0
+    existing_num = 0
+    cache_key = f"20x_gene_coverage_{gene_symbol}_cov_{min_coverage}"
+    if cached_count_num_and_max_pk := cache.get(cache_key):
+        cached_count, cached_num_coverage_collections, cached_max_pk = cached_count_num_and_max_pk
+        # Check that num is what we expect, ie none have been deleted/changed etc
+        actual_num = gcg_qs.filter(pk__lte=cached_max_pk).count()
+        if cached_num_coverage_collections == actual_num:
+            logging.info("get_20x_gene_coverage - using cached values %d / %d / %d", *cached_count_num_and_max_pk)
+            existing_count = cached_count
+            existing_num = cached_num_coverage_collections
+            existing_max_pk = cached_max_pk
+            gcg_qs = gcg_qs.filter(pk__gt=existing_max_pk)
+        else:
+            logging.warning("get_20x_gene_coverage cache out of date (num records don't match actual)")
+
+    if new_num := gcg_qs.count():
+        logging.info("get_20x_gene_coverage - retrieving counts on %d new collections", new_num)
+        # Using gene_coverage_collection__in=gcg_qs didn't save any time (SQL must evaluate inner query last)
+        qs = GeneCoverageCanonicalTranscript.objects.filter(gene_symbol=gene_symbol,
+                                                            gene_coverage_collection__pk__gte=existing_max_pk,
+                                                            percent_20x__gte=min_coverage)
+        count = existing_count + qs.count()
+        data = gcg_qs.aggregate(max_pk=Max("pk"))
+        max_pk = data["max_pk"] or existing_max_pk
+        num = existing_num + new_num
+        logging.info("get_20x_gene_coverage setting cache values %d / %d / %d", count, num, max_pk)
+        cache.set(cache_key, (count, num, max_pk), timeout=30 * DAY_SECS)
+    else:
+        count = existing_count
+    return count
 
 
 def get_variant_caller_from_vcf_file(vcf_path):
