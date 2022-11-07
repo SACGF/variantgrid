@@ -80,6 +80,8 @@
                                 </td>
                             </tr>
                         {% endfor %}
+                    {% empty %}
+                        <tr><td colspan="3" class="table-empty"><span class="no-value">No data to show</span></td></tr>
                     {% endfor %}
                 </tbody>
             </table>
