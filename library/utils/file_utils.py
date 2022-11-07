@@ -15,7 +15,7 @@ def file_or_filename(f, mode='r'):
             mk_path_for_file(f)
 
         return open_handle_gzip(f, mode)
-    if all([hasattr(f, method) for method in ["read", "readlines"]]):
+    if all(hasattr(f, method) for method in ["read", "readlines"]):
         return f  # Already a File object
     raise ValueError(f"'{f}' ({type(f)}) not a file or string")
 

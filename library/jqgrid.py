@@ -528,7 +528,7 @@ class JqGrid:
     @staticmethod
     def add_search_options(field, colmodel):
         # See: http://www.trirand.com/jqgridwiki/doku.php?id=wiki:search_config
-        is_boolean_field = any([isinstance(field, t) for t in [fields.BooleanField, fields.NullBooleanField]])
+        is_boolean_field = any(isinstance(field, t) for t in [fields.BooleanField, fields.NullBooleanField])
         if is_boolean_field:
             colmodel['stype'] = 'select'
             colmodel['searchoptions'] = {'value': {'False': 'False', 'True': 'True'}}

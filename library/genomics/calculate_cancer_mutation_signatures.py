@@ -165,7 +165,7 @@ class MutationSignatures:
 
     def __init__(self,
                  invcf=None, reference=None,
-                 sigdatafile=None, siginfofile=None,
+                 sigdatafile=None,
                  iterations=100, processes=1, sampling=0.8,
                  precision="float", minimization="LS"):
         """ Set data by either passing invcf and reference - to read from VCF
@@ -206,9 +206,7 @@ class MutationSignatures:
             msg = "calculate_signatures() called with no variants. You need to set it either by passing invcf/reference to the constructor or calculating yourself and calling UpdateMutIndexList()?"
             raise ValueError(msg)
 
-        sampling_size = int(self.TOTAL_VARS * self.SAMPLING)
-        if sampling_size < 1:
-            sampling_size = 1
+        sampling_size = max(int(self.TOTAL_VARS * self.SAMPLING), 1)
 
         # first set is the full data
         normalised_freq = self.ObservedRawFrequency / sum(self.ObservedRawFrequency)
@@ -403,7 +401,6 @@ if __name__ == '__main__':
     ms = MutationSignatures(invcf=args.invcf,
                             reference=args.reference,
                             sigdatafile=args.sigdata,
-                            siginfofile=args.siginfo,
                             iterations=args.iterations,
                             processes=args.processes,
                             sampling=args.sampling,

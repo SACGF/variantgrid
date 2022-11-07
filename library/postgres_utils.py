@@ -25,9 +25,9 @@ def prepare_binary(f, dat):
     pgcopy = np.empty(dat.shape, pgcopy_dtype)
     pgcopy['num_fields'] = num_fields
 
-    for i in range(len(dat.dtype)):
+    for i, dt in enumerate(dat.dtype):
         field = dat.dtype.names[i]
-        pgcopy[field + '_length'] = dat.dtype[i].alignment
+        pgcopy[field + '_length'] = dt.alignment
         pgcopy[field] = dat[field]
 
     f.write(pack('!11sii', b'PGCOPY\n\377\r\n\0', 0, 0))
