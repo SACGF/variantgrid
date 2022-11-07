@@ -111,6 +111,18 @@ class JsonPathKey(JsonPathPart):
     def __str__(self):
         return f"[{json.dumps(self.key)}]"
 
+@dataclass(frozen=True)
+class JsonPathId(JsonPathPart):
+    key: str
+    # not a real path, indicates that we're treating a list as
+    # a dictionary with "id" as the key
+    @property
+    def short(self):
+        return f"id({self.key})"
+
+    def __str__(self):
+        return f"id({self.key})"
+
 
 @dataclass(frozen=True, repr=False)
 class JsonDiff:
@@ -156,25 +168,28 @@ class JsonDiffs:
         return JsonDiffs(diffs)
 
     @staticmethod
-    def _differences(obj1: JsonDataType, obj2: JsonDataType, path: List[JsonPathPart], diffs: List[JsonDiff]):
+    def _differences(obj1: JsonDataType, obj2: JsonDataType, path: List[JsonPathPart], diffs: List[JsonDiff]) -> None:
         if obj1 == obj2:
             return
 
         if type(obj1) is type(obj2):
             if isinstance(obj1, dict):
-                all_keys = obj1.keys() | obj2.keys()
-                for key in all_keys:
+                for key in obj1.keys() | obj2.keys():
                     JsonDiffs._differences(obj1.get(key), obj2.get(key), path + [JsonPathKey(key)], diffs)
-                return
-            if isinstance(obj1, list):
-                # if len(obj1) != len(obj2):
-                #    diffs.append(JsonDiff(json_path=path + [JsonPathKey("length")], a=len(obj1), b=len(obj2)))
-
-                max_length = max(len(obj1), len(obj2))
-                for index in range(0, max_length):
-                    obj1_index = obj1[index] if len(obj1) > index else None
-                    obj2_index = obj2[index] if len(obj2) > index else None
-                    JsonDiffs._differences(obj1_index, obj2_index, path + [JsonPathIndex(index)], diffs)
-                return
-
-        diffs.append(JsonDiff(json_path=path, a=obj1, b=obj2))
+            elif isinstance(obj1, list):
+                has_id = all(x.get('id') is not None for x in obj1 + obj2)
+                if has_id:
+                    obj1dict = {x.get('id'): x for x in obj1}
+                    obj2dict = {x.get('id'): x for x in obj2}
+                    for key in obj1dict.keys() | obj2dict.keys():
+                        JsonDiffs._differences(obj1dict.get(key), obj2dict.get(key), path + [JsonPathId(key)], diffs)
+                else:
+                    max_length = max(len(obj1), len(obj2))
+                    for index in range(0, max_length):
+                        obj1_index = obj1[index] if len(obj1) > index else None
+                        obj2_index = obj2[index] if len(obj2) > index else None
+                        JsonDiffs._differences(obj1_index, obj2_index, path + [JsonPathIndex(index)], diffs)
+            else:
+                diffs.append(JsonDiff(json_path=path, a=obj1, b=obj2))
+        else:
+            diffs.append(JsonDiff(json_path=path, a=obj1, b=obj2))
