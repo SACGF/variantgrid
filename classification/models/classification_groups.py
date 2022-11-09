@@ -8,7 +8,7 @@ from lazy import lazy
 from classification.enums import SpecialEKeys, CriteriaEvaluation, ShareLevel
 from classification.models import ClassificationModification, EvidenceKeyMap, CuratedDate, ConditionResolved, \
     classification_flag_types
-from classification.models.evidence_mixin import CriteriaStrength
+from classification.criteria_strengths import CriteriaStrength
 from classification.models.flag_types import ClassificationFlagTypes
 from flags.models import Flag, FlagStatus
 from genes.hgvs import CHGVS, PHGVS

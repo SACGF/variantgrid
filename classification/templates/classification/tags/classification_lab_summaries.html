@@ -1,4 +1,6 @@
 {% load classification_tags %}
+{% load ui_utils %}
+
 <div {% if not shared %}style="opacity:0.6"{% endif %}>
     {% for lab_summ in lab_classification_summaries %}
         <div class="w-100 row mt-1">
@@ -9,10 +11,13 @@
             <div class="col-5 py-2 cs-{{ lab_summ.clinical_significance_to }}" style="border-radius:5px; padding-left: 8px">
                 {% if lab_summ.changed %}
                     <del>{{ lab_summ.clinical_significance_from|ekey:'clinical_significance' }}</del> <i class="fas fa-arrow-right mx-2 text-secondary"></i>
-                    {{ lab_summ.clinical_significance_to|ekey:'clinical_significance' }}
+                    <span style="font-weight:600">{{ lab_summ.clinical_significance_to|ekey:'clinical_significance' }}</span>
                     {% if lab_summ.pending %}<div title="This is an agreed upon pending change" class="flag flag-classification_pending_changes hover-detail ml-1" style="position:relative; top: 5px; margin-top: -5px"></div>{% endif %}
                 {% else %}
-                {{ lab_summ.clinical_significance_from|ekey:'clinical_significance' }}
+                    <span style="font-weight:600">{{ lab_summ.clinical_significance_from|ekey:'clinical_significance' }}</span>
+                {% endif %}
+                {% if include_acmg %}
+                    {% if lab_summ.acmg_summary %}{{ lab_summ.acmg_summary }}{% else %}No Criteria Provided{% endif %}
                 {% endif %}
             </div>
         </div>

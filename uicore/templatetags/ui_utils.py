@@ -445,7 +445,7 @@ def number(number: int, severity: Optional[str] = None) -> str:
 def value(value: Any, no_value: Optional[str] = None) -> str:
     if isinstance(value, bool):
         return boolean(value)
-    if value in ('', 0, '-'):
+    if not value:
         return SafeString(f'<span class="no-value">{no_value or value}</span>')
     elif isinstance(value, int):
         return f'{value:,}'

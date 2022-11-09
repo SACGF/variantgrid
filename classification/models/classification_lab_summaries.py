@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Optional, List
 
 from classification.enums import SpecialEKeys
 from snpdb.models import Lab
@@ -17,6 +18,7 @@ class ClassificationLabSummary:
     group: ClassificationLabSummaryEntry
     is_internal: bool
     count: int
+
 
     @property
     def lab(self):

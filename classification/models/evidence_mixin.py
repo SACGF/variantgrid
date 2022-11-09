@@ -1,11 +1,11 @@
 import re
-from functools import total_ordering
-from typing import Dict, Any, Mapping, Optional, Union, List, TypedDict
+from typing import Dict, Any, Mapping, Optional, Union, List, TypedDict, Set
 
 from django.conf import settings
 from lazy import lazy
 
 from annotation.models import Citation, CitationSource
+from classification.criteria_strengths import CriteriaStrength, CriteriaStrengths
 from classification.enums import SpecialEKeys, CriteriaEvaluation
 from genes.hgvs import CHGVS, PHGVS
 from library.log_utils import report_message
@@ -42,62 +42,6 @@ VCStoreValue = VCBlobDict
 VCPatchValue = Union[None, VCStoreValue]
 VCStore = Dict[str, VCStoreValue]
 VCPatch = Dict[str, VCPatchValue]
-
-
-@total_ordering
-class CriteriaStrength:
-
-    def __init__(self, ekey: 'EvidenceKey', strength: Optional[str]):
-        self.ekey = ekey
-        self.strength = strength or ekey.default_crit_evaluation
-
-    @property
-    def strength_value(self) -> int:
-        try:
-            return CriteriaEvaluation.ALL_STRENGTHS.index(self.strength)
-        except:
-            return 0
-
-    def __str__(self) -> str:
-
-        # just need special handling of X
-        def strength_suffix(strength: str):
-            if strength == "X":
-                return "unspecified"
-            elif strength.endswith("X"):
-                return strength[0] + "_unspecified"
-            return strength
-
-        # Make sure criteria are in camel case so removing spaces still leaves it readable
-        pretty_label = self.ekey.pretty_label.replace(" ", "")
-        suffix = self.strength
-
-        matches_direction = False
-        if not self.ekey.namespace:
-            if self.ekey.default_crit_evaluation == self.strength:
-                return pretty_label
-            criteria_first_letter = self.ekey.key[0].upper()
-            matches_direction = criteria_first_letter == suffix[0]
-
-        if matches_direction:
-            suffix = suffix[1:]
-
-        return f"{pretty_label}_{strength_suffix(suffix)}"
-
-    def __eq__(self, other) -> bool:
-        if not isinstance(other, CriteriaStrength):
-            return False
-        return self.ekey == other.ekey and self.strength == other.strength
-
-    def __hash__(self):
-        return hash(self.ekey) + hash(self.strength)
-
-    def __lt__(self, other) -> bool:
-        if not isinstance(other, CriteriaStrength):
-            raise ValueError(f'Cannot sort CriteriaStrength and {other}')
-        if self.strength_value == other.strength_value:
-            return self.ekey.pretty_label < other.ekey.pretty_label
-        return self.strength_value < other.strength_value
 
 
 class EvidenceMixin:
@@ -172,21 +116,21 @@ class EvidenceMixin:
                 citations.append(citation)
         return citations
 
-    def criteria_strength_summary(self, ekeys: Optional['EvidenceKeyMap'] = None, only_acmg: bool = False) -> str:
-        if ekeys is None:
-            from classification.models import EvidenceKeyMap
-            ekeys = EvidenceKeyMap.instance()
+    def criteria_strengths(self, e_keys: Optional['EvidenceKeyMap'] = None) -> CriteriaStrengths:
+        from classification.models import EvidenceKeyMap
+        if not e_keys:
+            e_keys = EvidenceKeyMap.instance()
 
         criteria: List[CriteriaStrength] = []
-        for ek in ekeys.criteria():
-            if only_acmg and ek.namespace:
-                continue
-            strength = self.get(ek.key)
-            if CriteriaEvaluation.is_met(strength):  # exclude neutral, not met, not applicable
+        for ek in e_keys.criteria():
+            if strength := self.get(ek.key):
                 criteria.append(CriteriaStrength(ek, strength))
 
-        criteria.sort()
-        return ", ".join([str(c) for c in criteria])
+        return CriteriaStrengths(strengths=criteria, source=self)
+
+    def criteria_strength_summary(self, ekeys: Optional['EvidenceKeyMap'] = None, only_acmg: bool = False) -> str:
+        strengths = self.criteria_strengths(e_keys=ekeys)
+        return strengths.summary_string(acmg_only=only_acmg)
 
     @lazy
     def c_parts(self) -> CHGVS:

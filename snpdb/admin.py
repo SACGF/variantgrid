@@ -208,7 +208,8 @@ class LabAdmin(ModelAdminBasics):
         ('Position', {'fields': ('city', 'state', 'country', 'lat', 'long')}),
         ('Contact', {'fields': ('url', 'contact_name', 'contact_email', 'contact_phone')}),
         ('Notifications', {'fields': ('email', 'slack_webhook')}),
-        ('Submissions', {'fields': ('classification_config', 'upload_location', 'upload_automatic', 'upload_instructions', 'external', 'clinvar_key')})
+        ('Uploads', {'fields': ('upload_location', 'upload_automatic', 'upload_instructions')}),
+        ('Submissions', {'fields': ('classification_config', 'external', 'clinvar_key', 'consolidates_variant_classifications')})
     )
 
     def is_readonly_field(self, f) -> bool:

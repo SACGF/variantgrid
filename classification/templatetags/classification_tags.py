@@ -14,6 +14,7 @@ from classification.enums import SpecialEKeys
 from classification.enums.classification_enums import ShareLevel
 from classification.models import ConditionTextMatch, ConditionResolved, DiscordanceReportRowData, \
     ClassificationLabSummary
+from classification.models.allele_overlaps import StrengthComparison
 from classification.models.classification import ClassificationModification, Classification
 from classification.models.classification_groups import ClassificationGroup, ClassificationGroups, \
     ClassificationGroupUtils
@@ -521,5 +522,18 @@ def discordance_report_row(discordance_report_summary: DiscordanceReportRowData,
 
 
 @register.inclusion_tag("classification/tags/classification_lab_summaries.html")
-def classification_lab_summaries(lab_classification_summaries: Iterable[ClassificationLabSummary], shared: bool = True):
-    return {"lab_classification_summaries": lab_classification_summaries, "shared": shared}
+def classification_lab_summaries(lab_classification_summaries: Iterable[ClassificationLabSummary], shared: bool = True, include_acmg: bool = False):
+    return {
+        "lab_classification_summaries": lab_classification_summaries,
+        "shared": shared,
+        "include_acmg": include_acmg
+    }
+
+
+@register.inclusion_tag("classification/tags/strength_comparison.html")
+def strength_comparison(strength_compare: StrengthComparison, td: bool = False):
+    return {
+        "comparison": strength_compare,
+        "td": td,
+        "sort_score": 2 if strength_compare.is_different_values else 1 if strength_compare.is_any_met else 0
+    }

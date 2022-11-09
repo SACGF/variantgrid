@@ -370,6 +370,20 @@ class CriteriaEvaluation:
     PATHOGENIC_VERY_STRONG = 'PVS'
     PATHOGENIC_UNSPECIFIED = 'PX'
 
+    POINTS = {
+        BENIGN_STANDALONE: -8,
+        BENIGN_STRONG: -4,
+        BENIGN_MODERATE: -2,
+        BENIGN_SUPPORTING: -1,
+        NOT_MET: 0,
+        NOT_APPLICABLE: 0,
+        NEUTRAL: 0,
+        PATHOGENIC_SUPPORTING: 1,
+        PATHOGENIC_MODERATE: 2,
+        PATHOGENIC_STRONG: 4,
+        PATHOGENIC_VERY_STRONG: 8
+    }
+
     CHOICES = (
         (BENIGN_STANDALONE, 'Benign Standalone'),
         (BENIGN_STRONG, 'Benign Strong'),

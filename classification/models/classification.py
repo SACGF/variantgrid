@@ -2438,6 +2438,10 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
     def curated_date_check(self) -> 'CuratedDate':
         return CuratedDate(self)
 
+    @property
+    def lab(self) -> Lab:
+        return self.classification.lab
+
     @staticmethod
     def optimize_for_report(qs: QuerySet) -> QuerySet:
         return qs.select_related(

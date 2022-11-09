@@ -1,0 +1,3 @@
+{% if td %}<td data-order="{{ sort_score }}">{% endif %}
+{% if comparison.is_different_values %}<i class="fas fa-not-equal text-danger"></i>{% elif comparison.is_any_met %}<i class="fas fa-check-square text-success"></i>{% else %}<i class="no-value">-</i>{% endif %}
+{% if td %}</td>{% endif %}

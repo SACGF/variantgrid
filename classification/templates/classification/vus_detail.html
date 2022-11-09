@@ -4,12 +4,20 @@
 {% load ui_tabs_builder %}
 <h5>VUS Overlaps</h5>
 
-<table class="table">
+<table class="table sticky-header" id="vus_detail_table">
     <thead>
         <tr>
             <th>c.HGVS</th>
-            <th>Status</th>
             <th class="text-center" style="width:50%">Lab/Clinical Significance</th>
+            <th class="text-right">Highest Score</th>
+            <th class="text-right">Patients Seen</th>
+            <th>PM6</th>
+            <th>PS2</th>
+            <th>BP2</th>
+            <th>PM3</th>
+            <th>PP4</th>
+            <th>PS3</th>
+            <th>BS3</th>
         </tr>
     </thead>
     <tbody>
@@ -27,22 +35,26 @@
                     </div>
                 </td>
                 <td {% if not forloop.first %}style="border-top-style:dashed"{% endif %}>
-                    {% if grouping.shared %}
-                        <span class="{{ grouping.status.css_class }}">{{ grouping.status }}</span>
-                        <div>{{ grouping.status.lab_count }} Sharing Lab{% plural grouping.status.lab_count %}</div>
-                    {% else %}
-                        <b class="overlap-no_entries">Not-shared Submissions</b>
-                    {% endif %}
-                    {% if grouping.discordance_report %}
-                        <div class="mt-2"><a class="hover-link" href="{{ grouping.discordance_report.get_absolute_url }}">See Discordance Report</a>
-                        </div>
-                    {% endif %}
+                    {% classification_lab_summaries grouping.lab_clinical_significances shared=grouping.shared include_acmg=True %}
                 </td>
-                <td {% if not forloop.first %}style="border-top-style:dashed"{% endif %}>
-                    {% classification_lab_summaries grouping.lab_clinical_significances shared=grouping.shared %}
-                </td>
-            </tr>
-            {% empty %}<td colspan="3">No Records</td>
+                {% with strengths=grouping.strengths %}
+                    <td class="text-right">{% if strengths.has_non_standard %}<span class="hover-detail" title="1 or more submitting labs are not using ACMG, ACMG Points could not be calculated accurately for those labs">{{ strengths.max_points }}*{% else %}{{ strengths.max_points }}{% endif %}</td>
+                    <td class="text-right">{% if grouping.patient_counts.consolidating_labs %}<span class="hover-detail" title="1 or more submitting labs only provide 1 classification per variant">{{ grouping.patient_counts.total_minimum }}<span style="font-weight: 600">+</span></span>{% else %}{{ grouping.patient_counts.total_minimum }}{% endif %}</td>
+                    {% strength_comparison strengths.pm6 td=True %}
+                    {% strength_comparison strengths.ps2 td=True %}
+                    {% strength_comparison strengths.bp2 td=True %}
+                    {% strength_comparison strengths.pm3 td=True %}
+                    {% strength_comparison strengths.pp4 td=True %}
+                    {% strength_comparison strengths.ps3 td=True %}
+                    {% strength_comparison strengths.bs3 td=True %}
+                {% endwith %}
+                </tr>
+            {% empty %}<td colspan="11">No Records</td>
         {% endfor %}
     </tbody>
 </table>
+<script>
+    $('#vus_detail_table').DataTable({
+        paging: false
+    });
+</script>

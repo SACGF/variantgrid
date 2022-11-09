@@ -1,11 +1,14 @@
+import itertools
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import List, Optional, Dict, Set, Iterator
+from functools import reduce
+from typing import List, Optional, Dict, Set, Iterator, Sequence
 
 from django.db.models import Count, QuerySet, Subquery
 from lazy import lazy
 
+from classification.criteria_strengths import CriteriaStrengths, CriteriaStrength
 from classification.enums import SpecialEKeys
 from classification.models import ClassificationModification, ClinicalContext, ClassificationLabSummaryEntry, \
     ClassificationLabSummary, classification_flag_types, ClassificationFlagTypes, DiscordanceReport
@@ -14,7 +17,94 @@ from flags.models import Flag, FlagStatus
 from genes.hgvs import CHGVS
 from library.utils import group_by_key, segment
 from snpdb.lab_picker import LabPickerData
-from snpdb.models import Allele
+from snpdb.models import Allele, Lab
+
+
+class PatientCount:
+
+    def __init__(self):
+        self.lab_to_count: Dict[Lab, int] = defaultdict(int)
+        self.lab_seen_patient_ids: Dict[Lab, Set[str]] = defaultdict(set)
+
+    def _count_classification(self, cm: ClassificationModification):
+        lab = cm.classification.lab
+        if patient_id := cm.get(SpecialEKeys.PATIENT_ID):
+            if patient_id in self.lab_seen_patient_ids[lab]:
+                return
+            self.lab_seen_patient_ids[lab].add(patient_id)
+        self.lab_to_count[lab] += 1
+
+    @property
+    def consolidating_labs(self) -> Set[Lab]:
+        return {lab for lab in self.lab_to_count.keys() if lab.consolidates_variant_classifications}
+
+    @property
+    def total_minimum(self) -> int:
+        return reduce(lambda a, b: a + b, self.lab_to_count.values(), 0)
+
+    @staticmethod
+    def count_classifications(cms: Sequence[ClassificationModification]):
+        pc = PatientCount()
+        for cm in cms:
+            pc._count_classification(cm)
+        return pc
+
+
+@dataclass(frozen=True)
+class StrengthComparison:
+    key: str
+    strengths: List[CriteriaStrengths]
+
+    @property
+    def is_any_met(self):
+        return any(strengths[self.key].is_met for strengths in self.strengths if self.key in strengths)
+
+    @property
+    def is_different_values(self):
+        all_values = set()
+        for strength in self.strengths:
+            value = strength[self.key]
+            all_values.add(value)
+            if len(all_values) > 1:
+                return True
+        return False
+
+
+@dataclass(frozen=True)
+class StrengthCompares:
+    strengths: List[CriteriaStrengths]
+
+    @lazy
+    def strengths_that_are_set(self) -> List[CriteriaStrengths]:
+        return [strength for strength in self.strengths if strength.has_criteria]
+
+    @property
+    def has_non_standard(self) -> bool:
+        return [strength.has_non_standard_strengths for strength in self.strengths_that_are_set]
+
+    @property
+    def is_all_set(self):
+        return all(strengths.has_criteria for strengths in self.strengths)
+
+    @property
+    def is_any_set(self):
+        return any(strengths.has_criteria for strengths in self.strengths)
+
+    @property
+    def is_any_unset(self):
+        return any(not strengths.has_criteria for strengths in self.strengths)
+
+    @property
+    def max_points(self) -> int:
+        return max(strengths.acmg_point_score for strengths in self.strengths)
+
+    def __getitem__(self, item) -> StrengthComparison:
+        if hasattr(self, item):
+            return getattr(self, item)
+        return StrengthComparison(key=item, strengths=self.strengths_that_are_set)
+
+    def __iter__(self):
+        return iter(self.strengths)
 
 
 class OverlapsCalculatorState:
@@ -54,6 +144,16 @@ class OverlapState(ABC):
         pass
 
 
+@dataclass(frozen=True)
+class ClassificationLabSummaryExtra(ClassificationLabSummary):
+    cms: Optional[List[ClassificationModification]] = None
+
+    @property
+    def acmg_summary(self) -> str:
+        all_criterias = set().union(*(cm.criteria_strengths().strength_list_met for cm in self.cms))
+        return ", ".join(str(crit) for crit in sorted(all_criterias))
+
+
 class ClinicalGroupingOverlap:
     """
     Overlaps detail for a clinical grouping within an allele
@@ -62,9 +162,12 @@ class ClinicalGroupingOverlap:
     def __init__(self, state: OverlapState, clinical_context: Optional[ClinicalContext]):
         self.state = state
         self.clinical_context = clinical_context
-        self.groups: Dict[ClassificationLabSummaryEntry] = defaultdict(int)
-        self.cms = []
+        self.groups: Dict[ClassificationLabSummaryEntry, List[ClassificationModification]] = defaultdict(list)
         self.labs = set()
+
+    @lazy
+    def patient_counts(self):
+        return PatientCount.count_classifications(self.cms)
 
     @property
     def calculator_state(self):
@@ -73,6 +176,10 @@ class ClinicalGroupingOverlap:
     @property
     def c_hgvses(self):
         return self.state.c_hgvses
+
+    @property
+    def allele(self):
+        return self.clinical_context.allele if self.clinical_context else None
 
     def add_classification(self, cm: ClassificationModification):
         clinical_sig = cm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
@@ -83,9 +190,16 @@ class ClinicalGroupingOverlap:
             clinical_significance_to=pending_clin_sig or clinical_sig,  # FIXME, check flags for pending
             pending=bool(pending_clin_sig)
         )
-        self.groups[group] += 1
-        self.cms.append(cm)
+        self.groups[group].append(cm)
         self.labs.add(cm.classification.lab)
+
+    @lazy
+    def strengths(self) -> StrengthCompares:
+        return StrengthCompares([cm.criteria_strengths() for cm in self.cms])
+
+    @property
+    def cms(self):
+        return list(itertools.chain(*self.groups.values()))
 
     @lazy
     def status(self) -> 'DiscordanceStatus':
@@ -125,14 +239,16 @@ class ClinicalGroupingOverlap:
         return "zzzzz"
 
     def __lt__(self, other):
-        return self._sort_value < other._sort_value
+        if isinstance(other, ClinicalGroupingOverlap):
+            return self._sort_value < other._sort_value
 
-    def lab_clinical_significances(self) -> List[ClassificationLabSummary]:
-        return sorted([ClassificationLabSummary(
+    def lab_clinical_significances(self) -> List[ClassificationLabSummaryExtra]:
+        return sorted([ClassificationLabSummaryExtra(
             group=group,
             is_internal=group.lab in self.calculator_state.perspective.labs_if_not_admin,
-            count=count
-        ) for group, count in self.groups.items()])
+            count=len(cms),
+            cms=cms
+        ) for group, cms in self.groups.items()])
 
 
 class AlleleOverlap(OverlapState):
@@ -207,7 +323,8 @@ class AlleleOverlap(OverlapState):
         return self._sort_value
 
     def __lt__(self, other):
-        return self._sort_value < other._sort_value
+        if isinstance(other, AlleleOverlap):
+            return self._sort_value < other._sort_value
 
 
 @dataclass(frozen=True)

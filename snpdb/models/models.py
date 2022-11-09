@@ -419,6 +419,9 @@ class Lab(models.Model):
     upload_automatic = models.BooleanField(default=False, blank=True)
     upload_instructions = models.TextField(default="", blank=True)
 
+    consolidates_variant_classifications = models.BooleanField(default=False)
+    # does this lab produce one classification
+
     """
     If provided, and filename matches, file upload will be automatically set to auto_processed
     """
