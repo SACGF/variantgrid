@@ -2,10 +2,10 @@
 {% load ui_utils %}
 <div class="crit-values">
     {% for strength in strengths %}
-        {% if not strength.strength %}
-            <span style="font-size:8pt" class="crit-value crit-strength-{{ strength.acmg_point }} crit-direction-{{ strength.strength_direction }}">Not Set</span>
+        {% if strength.strength_direction == 'N' %}
+            <span style="font-size:8pt" class="crit-value crit-strength-0 crit-direction-N">-</span>
         {% else %}
-            <span class="crit-value crit-strength-{{ strength.acmg_point|abs }} crit-direction-{{ strength.strength_direction }}">{{ strength.strength_suffix }}</span>
+            <span class="crit-value crit-strength-{{ strength.acmg_point|abs }} crit-direction-{{ strength.strength_direction }}">{{ strength.strength_suffix_short }}</span>
         {% endif %}
     {% endfor %}
 </div>

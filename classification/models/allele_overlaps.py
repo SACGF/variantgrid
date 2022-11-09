@@ -15,7 +15,7 @@ from classification.models import ClassificationModification, ClinicalContext, C
 from classification.models.clinical_context_models import DiscordanceStatus, DiscordanceLevel
 from flags.models import Flag, FlagStatus
 from genes.hgvs import CHGVS
-from library.utils import group_by_key, segment
+from library.utils import group_by_key, segment, first
 from snpdb.lab_picker import LabPickerData
 from snpdb.models import Allele, Lab
 
@@ -80,8 +80,7 @@ class StrengthCompares:
     def __getitem__(self, item) -> List[CriteriaStrength]:
         if hasattr(self, item):
             return getattr(self, item)
-        items = [strength[item] for strength in self.strengths_that_are_set]
-        return sorted(set(items), reverse=True)
+        return [strength[item] for strength in self.strengths]
 
     def __iter__(self):
         return iter(self.strengths)
@@ -126,12 +125,16 @@ class OverlapState(ABC):
 
 @dataclass(frozen=True)
 class ClassificationLabSummaryExtra(ClassificationLabSummary):
-    cms: Optional[List[ClassificationModification]] = None
+    cms: Optional[List[ClassificationModification]]
 
     @property
     def acmg_summary(self) -> str:
         all_criterias = set().union(*(cm.criteria_strengths().strength_list_met for cm in self.cms))
         return ", ".join(str(crit) for crit in sorted(all_criterias))
+
+    @property
+    def latest(self) -> ClassificationModification:
+        return first(sorted(self.cms, key=lambda cms: cms.curated_date_check))
 
 
 class ClinicalGroupingOverlap:
@@ -173,9 +176,13 @@ class ClinicalGroupingOverlap:
         self.groups[group].append(cm)
         self.labs.add(cm.classification.lab)
 
-    @lazy
+    @property
     def strengths(self) -> StrengthCompares:
         return StrengthCompares([cm.criteria_strengths() for cm in self.cms])
+
+    @property
+    def strengths_for_latest_lab(self) -> StrengthCompares:
+        return StrengthCompares([group.latest.criteria_strengths() for group in self.lab_clinical_significances])
 
     @property
     def cms(self):
@@ -222,6 +229,7 @@ class ClinicalGroupingOverlap:
         if isinstance(other, ClinicalGroupingOverlap):
             return self._sort_value < other._sort_value
 
+    @lazy
     def lab_clinical_significances(self) -> List[ClassificationLabSummaryExtra]:
         return sorted([ClassificationLabSummaryExtra(
             group=group,

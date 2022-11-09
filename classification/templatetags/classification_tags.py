@@ -25,6 +25,7 @@ from classification.models.evidence_key import EvidenceKey, EvidenceKeyMap
 from classification.models.evidence_mixin import VCDbRefDict
 from genes.hgvs import CHGVS
 from genes.models import GeneSymbol
+from library.utils import first, get_single_element
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import VariantAllele, Lab
 from snpdb.models.models_genome import GenomeBuild, Contig, GenomeFasta
@@ -536,4 +537,10 @@ def criteria_strength(strength: CriteriaStrength):
 
 @register.inclusion_tag("classification/tags/criteria_strengths.html")
 def criteria_strengths(strengths: Collection[CriteriaStrength]):
-    return {"strengths": strengths}
+    # going to display NM, NS, NA all the same
+    has_different_points = set(strength.strength if strength.is_met else 'NM' for strength in strengths)
+    if len(has_different_points) == 1:
+        strengths = [next(iter(strengths))]
+    return {
+        "strengths": strengths
+    }

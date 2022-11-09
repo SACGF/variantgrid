@@ -473,6 +473,8 @@ def value_abs(value: Any) -> Any:
         return abs(value)
     elif isinstance(value, float):
         return abs(value)
+    elif value is None:
+        return 0
     return value
 
 @register.filter()

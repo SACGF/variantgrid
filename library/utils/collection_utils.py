@@ -43,17 +43,15 @@ def sorted_nicely(l: Iterable) -> Sequence:
     return sorted(l, key=alphanum_key)
 
 
-def first(obj):
+T = TypeVar("T")
+
+
+def first(obj: Iterable[T]) -> T:
     # FIXME, seems inferior to get_single_element in every way
     # (note this will return None instead of ValueError)
-    if isinstance(obj, list):
-        if len(obj) >= 1:
-            return obj[0]
-        return None
-    return obj
-
-
-T = TypeVar("T")
+    for element in obj:
+        return element
+    return None
 
 
 def get_single_element(sequence: Sequence[T]) -> T:

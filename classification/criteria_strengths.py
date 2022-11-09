@@ -52,7 +52,10 @@ class CriteriaStrength:
         return strength
 
     @property
-    def strength_suffix(self):
+    def strength_suffix_short(self):
+        if self.strength == "X":
+            return "?"
+
         suffix = self.strength
         if self.is_expected_direction and suffix:
             suffix = suffix[1:]
