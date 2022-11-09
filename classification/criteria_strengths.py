@@ -53,23 +53,22 @@ class CriteriaStrength:
 
     @property
     def strength_suffix_short(self):
-        if self.strength == "X":
-            return "?"
-
         suffix = self.strength
         if self.is_expected_direction and suffix:
             suffix = suffix[1:]
 
+        if self.strength.endswith("X"):
+            return "?"
+
         return self.strength_suffix_for(suffix)
 
-    def __str__(self) -> str:
+    def __repr__(self) -> str:
         # Make sure criteria are in camel case so removing spaces still leaves it readable
         pretty_label = self.ekey.pretty_label.replace(" ", "")
         suffix = self.strength
         if suffix:
-            matches_direction = False
             if not self.ekey.namespace:
-                if self.is_expected_direction:
+                if self.is_expected_direction and self.is_default_strength:
                     return pretty_label
 
             if self.is_expected_direction:

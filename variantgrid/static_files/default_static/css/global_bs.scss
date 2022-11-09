@@ -1203,6 +1203,9 @@ a .c-hgvs-body {
   color: #888;
 }
 .crit-direction-B {
+  &.crit-strength-0 {
+    background-color: #f8f8ff;
+  }
   &.crit-strength-1 {
     background-color: #eef;
   }
@@ -1220,6 +1223,9 @@ a .c-hgvs-body {
   }
 }
 .crit-direction-P {
+  &.crit-strength-0 {
+    background-color: #fff8f8;
+  }
   &.crit-strength-1 {
     background-color: #fee;
   }

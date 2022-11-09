@@ -36,17 +36,17 @@
                     {% classification_lab_summaries grouping.lab_clinical_significances shared=grouping.shared include_acmg=True %}
                 </td>
                 {% with strengths=grouping.strengths_for_latest_lab %}
-                    <td class="text-right text-monospace" style="font-size:10pt">{% if strengths.has_non_standard %}<span class="hover-detail" title="1 or more submitting labs are not using ACMG, ACMG Points could not be calculated accurately for those labs">{{ strengths.max_points }}*{% else %}{{ strengths.max_points }}&nbsp;{% endif %}</td>
-                    <td class="text-right text-monospace" style="font-size:10pt">{% if grouping.patient_counts.consolidating_labs %}<span class="hover-detail" title="1 or more submitting labs only provide 1 classification per variant">{{ grouping.patient_counts.total_minimum }}<span style="font-weight: 600">+</span></span>{% else %}{{ grouping.patient_counts.total_minimum }}&nbsp;{% endif %}</td>
-                    <td class="compact">{% criteria_strengths strengths.pm6 %}</td>
-                    <td class="compact">{% criteria_strengths strengths.ps2 %}</td>
-                    <td class="compact">{% criteria_strengths strengths.bp2 %}</td>
-                    <td class="compact">{% criteria_strengths strengths.pm3 %}</td>
-                    <td class="compact">{% criteria_strengths strengths.pp1 %}</td>
-                    <td class="compact">{% criteria_strengths strengths.pp4 %}</td>
-                    <td class="compact">{% criteria_strengths strengths.ps3 %}</td>
-                    <td class="compact">{% criteria_strengths strengths.bs3 %}</td>
-                    <td class="compact">{% criteria_strengths strengths.bs4 %}</td>
+                    <td class="text-right text-monospace" style="vertical-align:middle;font-size:10pt">{% if strengths.has_non_standard %}<span class="hover-detail" title="1 or more submitting labs are not using ACMG, ACMG Points could not be calculated accurately for those labs">{{ strengths.max_points }}*{% else %}{{ strengths.max_points }}&nbsp;{% endif %}</td>
+                    <td class="text-right text-monospace" style="vertical-align:middle;font-size:10pt">{% if grouping.patient_counts.consolidating_labs %}<span class="hover-detail" title="1 or more submitting labs only provide 1 classification per variant">{{ grouping.patient_counts.total_minimum }}<span style="font-weight: 600">+</span></span>{% else %}{{ grouping.patient_counts.total_minimum }}&nbsp;{% endif %}</td>
+                    <td class="compact" style="vertical-align:middle;">{% criteria_strengths strengths.pm6 %}</td>
+                    <td class="compact" style="vertical-align:middle;">{% criteria_strengths strengths.ps2 %}</td>
+                    <td class="compact" style="vertical-align:middle;">{% criteria_strengths strengths.bp2 %}</td>
+                    <td class="compact" style="vertical-align:middle;">{% criteria_strengths strengths.pm3 %}</td>
+                    <td class="compact" style="vertical-align:middle;">{% criteria_strengths strengths.pp1 %}</td>
+                    <td class="compact" style="vertical-align:middle;">{% criteria_strengths strengths.pp4 %}</td>
+                    <td class="compact" style="vertical-align:middle;">{% criteria_strengths strengths.ps3 %}</td>
+                    <td class="compact" style="vertical-align:middle;">{% criteria_strengths strengths.bs3 %}</td>
+                    <td class="compact" style="vertical-align:middle;">{% criteria_strengths strengths.bs4 %}</td>
                 {% endwith %}
                 </tr>
             {% empty %}<td colspan="11">No Records</td>

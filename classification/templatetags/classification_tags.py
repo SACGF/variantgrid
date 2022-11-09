@@ -542,5 +542,6 @@ def criteria_strengths(strengths: Collection[CriteriaStrength]):
     if len(has_different_points) == 1:
         strengths = [next(iter(strengths))]
     return {
-        "strengths": strengths
+        "strengths": strengths,
+        "single_not_met": len(strengths) == 1 and strengths[0].strength_direction == "N"
     }

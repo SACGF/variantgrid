@@ -1171,6 +1171,9 @@ a .c-hgvs-body .c-hgvs-transcript, a .c-hgvs-body .c-hgvs-nomen {
   color: #888;
 }
 
+.crit-direction-B.crit-strength-0 {
+  background-color: #f8f8ff;
+}
 .crit-direction-B.crit-strength-1 {
   background-color: #eef;
 }
@@ -1187,6 +1190,9 @@ a .c-hgvs-body .c-hgvs-transcript, a .c-hgvs-body .c-hgvs-nomen {
   background-color: #aaf;
 }
 
+.crit-direction-P.crit-strength-0 {
+  background-color: #fff8f8;
+}
 .crit-direction-P.crit-strength-1 {
   background-color: #fee;
 }
