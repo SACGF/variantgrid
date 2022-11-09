@@ -49,27 +49,6 @@ class PatientCount:
             pc._count_classification(cm)
         return pc
 
-
-@dataclass(frozen=True)
-class StrengthComparison:
-    key: str
-    strengths: List[CriteriaStrengths]
-
-    @property
-    def is_any_met(self):
-        return any(strengths[self.key].is_met for strengths in self.strengths if self.key in strengths)
-
-    @property
-    def is_different_values(self):
-        all_values = set()
-        for strength in self.strengths:
-            value = strength[self.key]
-            all_values.add(value)
-            if len(all_values) > 1:
-                return True
-        return False
-
-
 @dataclass(frozen=True)
 class StrengthCompares:
     strengths: List[CriteriaStrengths]
@@ -80,7 +59,7 @@ class StrengthCompares:
 
     @property
     def has_non_standard(self) -> bool:
-        return [strength.has_non_standard_strengths for strength in self.strengths_that_are_set]
+        return any(strength.has_non_standard_strengths for strength in self.strengths_that_are_set)
 
     @property
     def is_all_set(self):
@@ -98,10 +77,11 @@ class StrengthCompares:
     def max_points(self) -> int:
         return max(strengths.acmg_point_score for strengths in self.strengths)
 
-    def __getitem__(self, item) -> StrengthComparison:
+    def __getitem__(self, item) -> List[CriteriaStrength]:
         if hasattr(self, item):
             return getattr(self, item)
-        return StrengthComparison(key=item, strengths=self.strengths_that_are_set)
+        items = [strength[item] for strength in self.strengths_that_are_set]
+        return sorted(set(items), reverse=True)
 
     def __iter__(self):
         return iter(self.strengths)

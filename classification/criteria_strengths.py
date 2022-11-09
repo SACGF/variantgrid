@@ -1,6 +1,4 @@
 from dataclasses import dataclass
-from enum import Enum
-from functools import total_ordering
 from typing import Optional, Iterable, List, Any
 
 from classification.enums import CriteriaEvaluation
@@ -16,36 +14,65 @@ class CriteriaStrength:
         return CriteriaEvaluation.POINTS.get(self.strength)
 
     @property
+    def strength_direction(self) -> str:
+        if not self.strength:
+            return "N"
+        else:
+            return self.strength[0]
+
+    @property
     def is_met(self):
         return CriteriaEvaluation.is_met(self.strength)
 
+    def __hash__(self):
+        return hash(self.ekey) + hash(self.strength)
+
+    def __eq__(self, other):
+        return self.ekey == other.ekey and self.strength == other.strength
+
+    @property
+    def is_default_strength(self):
+        return self.strength == self.ekey.default_crit_evaluation
+
+    @property
+    def is_expected_direction(self) -> bool:
+        if self.strength:
+            return self.ekey.key[0].upper() == self.strength_direction
+        else:
+            return True
+
+    @staticmethod
+    def strength_suffix_for(strength: str):
+        if strength is None:
+            return "NM"
+        elif strength == "X":
+            return "unspecified"
+        elif strength.endswith("X"):
+            return strength[0] + "_unspecified"
+        return strength
+
+    @property
+    def strength_suffix(self):
+        suffix = self.strength
+        if self.is_expected_direction and suffix:
+            suffix = suffix[1:]
+
+        return self.strength_suffix_for(suffix)
+
     def __str__(self) -> str:
-
-        # just need special handling of X
-        def strength_suffix(strength: str):
-            if strength is None:
-                return "NM"
-            elif strength == "X":
-                return "unspecified"
-            elif strength.endswith("X"):
-                return strength[0] + "_unspecified"
-            return strength
-
         # Make sure criteria are in camel case so removing spaces still leaves it readable
         pretty_label = self.ekey.pretty_label.replace(" ", "")
         suffix = self.strength
         if suffix:
             matches_direction = False
             if not self.ekey.namespace:
-                if self.ekey.default_crit_evaluation == self.strength:
+                if self.is_expected_direction:
                     return pretty_label
-                criteria_first_letter = self.ekey.key[0].upper()
-                matches_direction = criteria_first_letter == suffix[0]
 
-            if matches_direction:
+            if self.is_expected_direction:
                 suffix = suffix[1:]
 
-        return f"{pretty_label}_{strength_suffix(suffix)}"
+        return f"{pretty_label}_{CriteriaStrength.strength_suffix_for(suffix)}"
 
     @property
     def _sort_key(self) -> int:
@@ -87,7 +114,8 @@ class CriteriaStrengths:
 
     def __getitem__(self, item) -> Optional[CriteriaStrength]:
         if isinstance(item, str):
-            return self.strength_map.get(item.lower())
+            from classification.models import EvidenceKeyMap
+            return self.strength_map.get(item.lower()) or CriteriaStrength(EvidenceKeyMap.cached_key(item), None)
 
     def __contains__(self, item) -> bool:
         if isinstance(item, str):

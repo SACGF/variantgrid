@@ -467,6 +467,14 @@ def secret(value: Any, length: int = -4) -> str:
             return str_value
 
 
+@register.filter(name="abs")
+def value_abs(value: Any) -> Any:
+    if isinstance(value, int):
+        return abs(value)
+    elif isinstance(value, float):
+        return abs(value)
+    return value
+
 @register.filter()
 def segmented_text(text: str, divider: str = ':') -> str:
     if not text:

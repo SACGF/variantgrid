@@ -1,6 +1,6 @@
 import uuid
 from html import escape
-from typing import Union, Optional, Iterable, Any
+from typing import Union, Optional, Iterable, Any, Collection
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -10,11 +10,11 @@ from django.template import Library
 from django.utils.safestring import mark_safe
 
 from annotation.manual_variant_entry import check_can_create_variants, CreateManualVariantForbidden
+from classification.criteria_strengths import CriteriaStrength
 from classification.enums import SpecialEKeys
 from classification.enums.classification_enums import ShareLevel
 from classification.models import ConditionTextMatch, ConditionResolved, DiscordanceReportRowData, \
     ClassificationLabSummary
-from classification.models.allele_overlaps import StrengthComparison
 from classification.models.classification import ClassificationModification, Classification
 from classification.models.classification_groups import ClassificationGroup, ClassificationGroups, \
     ClassificationGroupUtils
@@ -529,11 +529,11 @@ def classification_lab_summaries(lab_classification_summaries: Iterable[Classifi
         "include_acmg": include_acmg
     }
 
+@register.inclusion_tag("classification/tags/criteria_strength.html")
+def criteria_strength(strength: CriteriaStrength):
+    return {"strength": strength}
 
-@register.inclusion_tag("classification/tags/strength_comparison.html")
-def strength_comparison(strength_compare: StrengthComparison, td: bool = False):
-    return {
-        "comparison": strength_compare,
-        "td": td,
-        "sort_score": 2 if strength_compare.is_different_values else 1 if strength_compare.is_any_met else 0
-    }
+
+@register.inclusion_tag("classification/tags/criteria_strengths.html")
+def criteria_strengths(strengths: Collection[CriteriaStrength]):
+    return {"strengths": strengths}
