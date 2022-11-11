@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from typing import Optional, List, Dict, Set, Union, Tuple, Iterable
 
 from cache_memoize import cache_memoize
+from django.conf import settings
 from django.contrib.postgres.fields import ArrayField
 from django.db import models, connection
 from django.db.models import PROTECT, CASCADE, QuerySet, Q, Max, TextChoices
@@ -436,8 +437,15 @@ class OntologyTerm(TimeStampedModel):
         return self.id.split(":")[1]
 
     @property
-    def url(self):
+    def external_url(self):
         return OntologyService.URLS[self.ontology_service].replace("${1}", self.padded_index)
+
+    @property
+    def url(self):
+        if settings.ONTOLOGY_EXTERNAL_LINKS:
+            return self.external_url
+        else:
+            return self.get_absolute_url()
 
     @property
     def moved_to(self) -> Optional[str]:

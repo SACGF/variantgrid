@@ -61,7 +61,7 @@
                     {% labelled label="Aliases" %}{% for alias in term.aliases %}{{ alias }}<br/>{% endfor %}{% endlabelled %}
                 {% endif %}
                 {% labelled label="URL" %}
-                    <a href="{{ term.url }}" class="external-link hover-link" target="_blank">{{ term.url }}</a>
+                    <a href="{{ term.external_url }}" class="external-link hover-link" target="_blank">{{ term.external_url }}</a>
                 {% endlabelled %}
                 {% labelled label="Cross Ontology URL" %}
                     <a href="https://www.ebi.ac.uk/spot/oxo/terms/{{ term.id }}" class="external-link" target="_blank">https://www.ebi.ac.uk/spot/oxo/terms/{{ term.id }}</a>

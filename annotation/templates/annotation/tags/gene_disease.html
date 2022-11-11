@@ -9,7 +9,7 @@
             <ul class='list-group'>
                 {% for gdr in gene_disease_relations %}
                     <li class="list-group-item">
-                        <a href="{{ gdr.source_term.get_absolute_url }}" title="{{ gdr.source_term.definition }}">{{ gdr.source_term }}</a>
+                        <a href="{{ gdr.source_term.url }}" title="{{ gdr.source_term.definition }}">{{ gdr.source_term }}</a>
                         <ul class='list-group'>
                             {% for src in gdr.extra.sources %}
                                 <li class="list-group-item">
