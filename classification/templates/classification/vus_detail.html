@@ -25,6 +25,7 @@
             <th>c.HGVS/Lab Lab/Clinical Significance</th>
             <th class="text-right" style="width:30px">Highest Score</th>
             <th class="text-right" style="width:30px">Patients Seen</th>
+            <th style="width:5%" class="compact text-center">PS4</th>
             <th style="width:5%" class="compact text-center">PP1<br/>BS4</th>
             <th style="width:5%" class="compact text-center">PM6</th>
             <th style="width:5%" class="compact text-center">PS2</th>
@@ -51,6 +52,7 @@
                 {% with strengths=grouping.strengths_for_latest_lab %}
                     <td class="text-right text-monospace" style="vertical-align:middle;font-size:10pt" data-order="{{ strengths.max_points|stringformat:"02d" }}">{% if strengths.has_non_standard %}<span class="hover-detail" title="1 or more submitting labs are not using ACMG, ACMG Points could not be calculated accurately for those labs">{{ strengths.max_points }}*</span>{% else %}{{ strengths.max_points }}&nbsp;{% endif %}</td>
                     <td class="text-right text-monospace" style="vertical-align:middle;font-size:10pt" data-order="{{ grouping.patient_counts.total_minimum|stringformat:"02d" }}">{% if grouping.patient_counts.consolidating_labs %}<span class="hover-detail" title="1 or more submitting labs only provide 1 classification per variant">{{ grouping.patient_counts.total_minimum }}<span style="font-weight: 600">+</span></span>{% else %}{{ grouping.patient_counts.total_minimum }}&nbsp;{% endif %}</td>
+                    <td class="criteria-cell">{% criteria_strengths strengths.ps4 %}</td>
                     <td class="criteria-cell">{% criteria_strengths strengths.pp1_bs4 %}</td>
                     <td class="criteria-cell">{% criteria_strengths strengths.pm6 %}</td>
                     <td class="criteria-cell">{% criteria_strengths strengths.ps2 %}</td>
