@@ -6,9 +6,17 @@
     <div class="crit-values">
         {% for strength in strengths %}
             {% if strength.strength_direction == 'N' %}
-                <span style="font-size:8pt" class="crit-value crit-strength-0 crit-direction-N">-</span>
+                    <div style="font-size:8pt" class="crit-value crit-strength-0 crit-direction-N">
+                        <div class="flex-grow-1"></div>
+                        <div class="no-value">-</div>
+                        <div class="flex-grow-1"></div>
+                    </div>
             {% else %}
-                <span class="crit-value crit-strength-{{ strength.acmg_point|abs }} crit-direction-{{ strength.strength_direction }}">{{ strength.strength_suffix_short }}</span>
+                <div class="crit-value crit-strength-{{ strength.acmg_point|abs }} crit-direction-{{ strength.strength_direction }}">
+                    <div class="flex-grow-1"></div>
+                    <div>{{ strength.short }}</div>
+                    <div class="flex-grow-1"></div>
+                </div>
             {% endif %}
         {% endfor %}
     </div>

@@ -42,27 +42,26 @@ class CriteriaStrength:
             return True
 
     @staticmethod
-    def strength_suffix_for(strength: str):
+    def strength_suffix_for(strength: str, short: bool = False):
         if strength is None:
             return "NM"
         elif strength == "X":
-            return "unspecified"
+            if short:
+                return "?"
+            else:
+                return "unspecified"
         elif strength.endswith("X"):
-            return strength[0] + "_unspecified"
+            if short:
+                return strength[0] + "_?"
+            else:
+                return strength[0] + "_unspecified"
         return strength
 
     @property
-    def strength_suffix_short(self):
-        suffix = self.strength
-        if self.is_expected_direction and suffix:
-            suffix = suffix[1:]
+    def short(self):
+        return format(self, 'short')
 
-        if self.strength.endswith("X"):
-            return "?"
-
-        return self.strength_suffix_for(suffix)
-
-    def __repr__(self) -> str:
+    def __format__(self, format_spec):
         # Make sure criteria are in camel case so removing spaces still leaves it readable
         pretty_label = self.ekey.pretty_label.replace(" ", "")
         suffix = self.strength
@@ -74,7 +73,10 @@ class CriteriaStrength:
             if self.is_expected_direction:
                 suffix = suffix[1:]
 
-        return f"{pretty_label}_{CriteriaStrength.strength_suffix_for(suffix)}"
+        return f"{pretty_label}_{CriteriaStrength.strength_suffix_for(suffix, short=format_spec=='short')}"
+
+    def __repr__(self):
+        return format(self)
 
     @property
     def _sort_key(self) -> int:

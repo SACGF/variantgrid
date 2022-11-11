@@ -1194,9 +1194,10 @@ a .c-hgvs-body {
 }
 
 .crit-value {
+  color: rgba(0, 0, 0, 0.75);
   display: block;
-  border: 1px solid #bbb;
   text-align: center;
+  font-weight: 500;
 }
 .crit-strength-N {
   background-color: #eee;
@@ -1243,29 +1244,24 @@ a .c-hgvs-body {
   }
 }
 .crit-values {
-  height: 100px;
+  border-width: 0 1px 0 1px;
+  border-style: solid;
+  border-color: #ccc;
   display: flex;
   flex-direction: column;
 
   .crit-value {
     padding-top: 8px;
     flex-grow: 1;
+    border-bottom: 1px dashed #aaa;
+    display: flex;
+    flex-direction: column;
   }
   .crit-value.crit-direction-N {
     border-color: #ddd;
   }
-
-  .crit-value:first-of-type {
-    border-bottom-width: 0;
-    border-top-left-radius: 5px;
-    border-top-right-radius: 5px;
-  }
   .crit-value:last-of-type {
-    border-bottom-left-radius: 5px;
-    border-bottom-right-radius: 5px;
-  }
-  .crit-value:first-of-type:last-of-type {
-    border-bottom-width: 1px;
+    border-bottom-width: 0;
   }
 }
 

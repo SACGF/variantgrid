@@ -80,6 +80,19 @@ class StrengthCompares:
     def __getitem__(self, item) -> List[CriteriaStrength]:
         if hasattr(self, item):
             return getattr(self, item)
+
+        if "_" in item:
+            parts = item.split("_")
+            results = []
+            for strength in self.strengths:
+                criterias = [strength[sub_item] for sub_item in parts]
+                non_neutral = [criteria for criteria in criterias if criteria.strength_direction != "N"]
+                if non_neutral:
+                    results.append(non_neutral[0])
+                else:
+                    results.append(criterias[0])
+            return results
+
         return [strength[item] for strength in self.strengths]
 
     def __iter__(self):
@@ -129,8 +142,7 @@ class ClassificationLabSummaryExtra(ClassificationLabSummary):
 
     @property
     def acmg_summary(self) -> str:
-        all_criterias = set().union(*(cm.criteria_strengths().strength_list_met for cm in self.cms))
-        return ", ".join(str(crit) for crit in sorted(all_criterias))
+        return self.latest.criteria_strength_summary()
 
     @property
     def latest(self) -> ClassificationModification:
@@ -147,6 +159,10 @@ class ClinicalGroupingOverlap:
         self.clinical_context = clinical_context
         self.groups: Dict[ClassificationLabSummaryEntry, List[ClassificationModification]] = defaultdict(list)
         self.labs = set()
+
+    @property
+    def allele(self) -> Allele:
+        return self.clinical_context.allele
 
     @lazy
     def patient_counts(self):
