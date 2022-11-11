@@ -175,7 +175,7 @@ class JsonDiffs:
                 for key in obj1.keys() | obj2.keys():
                     JsonDiffs._differences(obj1.get(key), obj2.get(key), path + [JsonPathKey(key)], diffs)
             elif isinstance(obj1, list):
-                has_id = all(x.get('id') is not None for x in obj1 + obj2)
+                has_id = all(isinstance(x, dict) and x.get('id') is not None for x in obj1 + obj2)
                 if has_id:
                     obj1dict = {x.get('id'): x for x in obj1}
                     obj2dict = {x.get('id'): x for x in obj2}
