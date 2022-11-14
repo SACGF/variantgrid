@@ -119,34 +119,37 @@
         <table id="key-table" class="evidencekey-table sticky-header table">
             <thead>
             <tr>
-                <th class="position">Position
-                <th class="key">Key/Label
-                <th class="category">Evidence Category
-                <th class="status">Status
-                <th class="max-share-level">Max Share Level
-                <th class="values">Values
-                <th class="description">Description
+                <th class="position">Position</th>
+                <th class="key">Key/Label</th>
+                <th class="category">Evidence Category</th>
+                <th class="status">Status</th>
+                <th class="max-share-level" style="min-width:80px">Max<br/>Share Level</th>
+                <th class="values">Values</th>
+                <th class="description">Description</th>
             </tr>
             </thead>
             <tbody>
             {% for ekey in keys %}
                 {% if not ekey.hide %}
                     <tr>
-                        <td class="position">{{ forloop.counter }}
+                        <td class="position">{{ forloop.counter }}</td>
                         <td class="key"><span class="key text-secondary text-monospace">{{ ekey.key }}</span><br/>{{ ekey.pretty_label }}
-                        {% if ekey.sub_label %}<br/><span class="text-info">({{ ekey.sub_label }})</span>{% endif %}
-                        <td class="category">{{ ekey.get_evidence_category_display }}
-                        <td class="status align-center">{% if ekey.mandatory %}Mandatory{% endif %} {% if ekey.hide %}Hidden{% endif %}
-                        <td class="max-share-level">{{ ekey.max_share_level_enum.label }}
+                        {% if ekey.sub_label %}<br/><span class="text-info">({{ ekey.sub_label }})</span>{% endif %}</td>
+                        <td class="category">{{ ekey.get_evidence_category_display }}</td>
+                        <td class="status align-center">{% if ekey.mandatory %}Mandatory{% endif %} {% if ekey.hide %}Hidden{% endif %}</td>
+                        <td class="max-share-level">{{ ekey.max_share_level_enum.label }}</td>
                         <td class="values">
-                        <span class="value-type">{{ ekey.get_value_type_display }}</span>
-                        {% if ekey.allow_custom_values %}<br/><i>Allows custom values</i><br/>{% endif %}
-                        {% if ekey.virtual_options %}<br/>
-                        {% for option in ekey.virtual_options %}
-                            <span class="option-key">{{ option.key }}</span> : <span class="option-label">{{ option | option_label }}</span><br/>
-                        {% endfor %}
-                        {% endif %}
-                        <td class="description">{% if ekey.description %}{{ ekey.description | safe }}{% endif %}{% if ekey.see %}<br><a href="{{ekey.see}}">{{ ekey.see }}{% endif %}</a>
+                            <span class="value-type">{{ ekey.get_value_type_display }}</span>
+                            {% if ekey.allow_custom_values %}<br/><i>Allows custom values</i><br/>{% endif %}
+                            {% if ekey.virtual_options %}<br/>
+                            {% for option in ekey.virtual_options %}
+                                <span class="option-key">{{ option.key }}</span> : <span class="option-label">{{ option | option_label }}</span><br/>
+                            {% endfor %}
+                            {% endif %}
+                        </td>
+                        <td class="description">
+                            {% if ekey.description %}{{ ekey.description | safe }}{% endif %}{% if ekey.see %}<br><a href="{{ekey.see}}">{{ ekey.see }}{% endif %}</a>
+                        </td>
                     </tr>
                 {% endif %}
             {% endfor %}
