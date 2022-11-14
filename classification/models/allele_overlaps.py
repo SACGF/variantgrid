@@ -147,8 +147,11 @@ class ClinicalGroupingOverlap:
         self.labs.add(cm.classification.lab)
 
     @lazy
-    def max_acmg_points(self) -> int:
-        return max(lb.latest.criteria_strengths().acmg_point_score for lb in self.lab_clinical_significances)
+    def max_acmg_points(self) -> Optional[int]:
+        if valid_strengths := [lb.latest.criteria_strengths().acmg_point_score for lb in self.lab_clinical_significances if lb.latest.criteria_strengths().has_criteria]:
+            return max(valid_strengths)
+        else:
+            return None
 
     @property
     def cms(self):
