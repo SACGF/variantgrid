@@ -576,4 +576,4 @@ def admin_link(context, object: Model):
 
 @register.filter(name='format')
 def format(value, fmt):
-    return fmt.format(value)
+    return f"{{:{fmt}}}".format(value)

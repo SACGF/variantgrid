@@ -59,11 +59,11 @@
                         <td>{{ lab_summary.lab }}</td>
                         {% with strengths=lab_summary.latest.criteria_strengths %}
                             {% if strengths.has_criteria %}
-                                <td data-order="{{ grouping.max_acmg_points|add:100|format:"%03d" }}_{{ grouping.allele.pk }}_{{ strengths.acmg_point_score|add:100|format:"%03d" }}">{{ strengths.acmg_point_score }}</td>
+                                <td data-order="{{ grouping.max_acmg_points|add:100|format:"03d" }}_{{ grouping.allele.pk }}_{{ strengths.acmg_point_score|add:100|format:"03d" }}">{{ strengths.acmg_point_score }}</td>
                             {% else %}
-                                <td data-order="{{ grouping.max_acmg_points|add:100|format:"%03d" }}_{{ grouping.allele.pk }}_000"><div class="no-value">-</div></td>
+                                <td data-order="{{ grouping.max_acmg_points|add:100|format:"03d" }}_{{ grouping.allele.pk }}_000"><div class="no-value">-</div></td>
                             {% endif %}
-                            <td data-order="{{ grouping.patient_count|format:"%02d" }}_{{ grouping.allele.pk }}_{{ lab_summary.patient_count }}">{{ lab_summary.patient_count }}</td>
+                            <td data-order="{{ grouping.patient_count.count|format:"03d" }}_{{ grouping.allele.pk }}_{{ lab_summary.patient_count.count|format:"03d" }}">{{ lab_summary.patient_count }}</td>
                             {% criteria_strength_td strengths.ps4 %}
                             {% criteria_strength_td strengths.pp1_bs4 %}
                             {% criteria_strength_td strengths.pm6 %}
