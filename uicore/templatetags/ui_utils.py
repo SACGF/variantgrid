@@ -572,3 +572,8 @@ def admin_link(context, object: Model):
         except NoReverseMatch:
             pass
     return {"url": url}
+
+
+@register.filter(name='format')
+def format(value, fmt):
+    return fmt.format(value)

@@ -3,12 +3,10 @@ from abc import ABC, abstractmethod
 from collections import defaultdict
 from dataclasses import dataclass
 from functools import reduce
-from typing import List, Optional, Dict, Set, Iterator, Sequence
+from typing import List, Optional, Dict, Set, Iterator
 
 from django.db.models import Count, QuerySet, Subquery
 from lazy import lazy
-
-from classification.criteria_strengths import CriteriaStrengths, CriteriaStrength
 from classification.enums import SpecialEKeys
 from classification.models import ClassificationModification, ClinicalContext, ClassificationLabSummaryEntry, \
     ClassificationLabSummary, classification_flag_types, ClassificationFlagTypes, DiscordanceReport
@@ -20,84 +18,44 @@ from snpdb.lab_picker import LabPickerData
 from snpdb.models import Allele, Lab
 
 
+@dataclass(frozen=True)
+class _PatientIdLab:
+    lab: Lab
+    patient_id: Optional[str]
+
+
 class PatientCount:
 
-    def __init__(self):
-        self.lab_to_count: Dict[Lab, int] = defaultdict(int)
-        self.lab_seen_patient_ids: Dict[Lab, Set[str]] = defaultdict(set)
-
-    def _count_classification(self, cm: ClassificationModification):
-        lab = cm.classification.lab
-        if patient_id := cm.get(SpecialEKeys.PATIENT_ID):
-            if patient_id in self.lab_seen_patient_ids[lab]:
-                return
-            self.lab_seen_patient_ids[lab].add(patient_id)
-        self.lab_to_count[lab] += 1
+    def __init__(self, counts: Dict[_PatientIdLab, int]):
+        self.counts = counts
 
     @property
-    def consolidating_labs(self) -> Set[Lab]:
-        return {lab for lab in self.lab_to_count.keys() if lab.consolidates_variant_classifications}
+    def count(self):
+        numbers = [1 if key.patient_id else value for key, value in self.counts.items()]
+        return reduce(lambda a, b: a+b, numbers, 0)
 
     @property
-    def total_minimum(self) -> int:
-        return reduce(lambda a, b: a + b, self.lab_to_count.values(), 0)
+    def consolidates_variant_classifications(self) -> bool:
+        return any(key.lab.consolidates_variant_classifications for key in self.counts.keys())
 
     @staticmethod
-    def count_classifications(cms: Sequence[ClassificationModification]):
-        pc = PatientCount()
-        for cm in cms:
-            pc._count_classification(cm)
-        return pc
+    def count_classification(cms: ClassificationModification):
+        lab = cms.lab
+        patient_id = cms.get(SpecialEKeys.PATIENT_ID)
+        key = _PatientIdLab(lab=lab, patient_id=patient_id)
+        return PatientCount(counts={key: 1})
 
-@dataclass(frozen=True)
-class StrengthCompares:
-    strengths: List[CriteriaStrengths]
+    def __add__(self, other):
+        counts: Dict[_PatientIdLab, int] = {}
+        for key in self.counts.keys() | other.counts.keys():
+            counts[key] = self.counts.get(key, 0) + other.counts.get(key, 0)
+        return PatientCount(counts=counts)
 
-    @lazy
-    def strengths_that_are_set(self) -> List[CriteriaStrengths]:
-        return [strength for strength in self.strengths if strength.has_criteria]
+    def __repr__(self):
+        return f"{self.count}"
 
-    @property
-    def has_non_standard(self) -> bool:
-        return any(strength.has_non_standard_strengths for strength in self.strengths_that_are_set)
 
-    @property
-    def is_all_set(self):
-        return all(strengths.has_criteria for strengths in self.strengths)
-
-    @property
-    def is_any_set(self):
-        return any(strengths.has_criteria for strengths in self.strengths)
-
-    @property
-    def is_any_unset(self):
-        return any(not strengths.has_criteria for strengths in self.strengths)
-
-    @property
-    def max_points(self) -> int:
-        return max(strengths.acmg_point_score for strengths in self.strengths)
-
-    def __getitem__(self, item) -> List[CriteriaStrength]:
-        if hasattr(self, item):
-            return getattr(self, item)
-
-        if "_" in item:
-            parts = item.split("_")
-            results = []
-            for strength in self.strengths:
-                criterias = [strength[sub_item] for sub_item in parts]
-                non_neutral = [criteria for criteria in criterias if criteria.strength_direction != "N"]
-                if non_neutral:
-                    results.append(non_neutral[0])
-                else:
-                    results.append(criterias[0])
-            return results
-
-        return [strength[item] for strength in self.strengths]
-
-    def __iter__(self):
-        return iter(self.strengths)
-
+PatientCount.ZERO = PatientCount(counts={})
 
 class OverlapsCalculatorState:
     """
@@ -141,10 +99,10 @@ class ClassificationLabSummaryExtra(ClassificationLabSummary):
     cms: Optional[List[ClassificationModification]]
 
     @property
-    def acmg_summary(self) -> str:
-        return self.latest.criteria_strength_summary()
+    def patient_count(self) -> PatientCount:
+        return reduce(lambda a, b: a + b, (PatientCount.count_classification(cms) for cms in self.cms), PatientCount.ZERO)
 
-    @property
+    @lazy
     def latest(self) -> ClassificationModification:
         return first(sorted(self.cms, key=lambda cms: cms.curated_date_check))
 
@@ -162,11 +120,11 @@ class ClinicalGroupingOverlap:
 
     @property
     def allele(self) -> Allele:
-        return self.clinical_context.allele
+        return self.clinical_context.allele if self.clinical_context else None
 
     @lazy
-    def patient_counts(self):
-        return PatientCount.count_classifications(self.cms)
+    def patient_count(self) -> PatientCount:
+        return reduce(lambda a, b: a + b, (PatientCount.count_classification(cms) for cms in self.cms), PatientCount.ZERO)
 
     @property
     def calculator_state(self):
@@ -175,10 +133,6 @@ class ClinicalGroupingOverlap:
     @property
     def c_hgvses(self):
         return self.state.c_hgvses
-
-    @property
-    def allele(self):
-        return self.clinical_context.allele if self.clinical_context else None
 
     def add_classification(self, cm: ClassificationModification):
         clinical_sig = cm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
@@ -192,13 +146,9 @@ class ClinicalGroupingOverlap:
         self.groups[group].append(cm)
         self.labs.add(cm.classification.lab)
 
-    @property
-    def strengths(self) -> StrengthCompares:
-        return StrengthCompares([cm.criteria_strengths() for cm in self.cms])
-
-    @property
-    def strengths_for_latest_lab(self) -> StrengthCompares:
-        return StrengthCompares([group.latest.criteria_strengths() for group in self.lab_clinical_significances])
+    @lazy
+    def max_acmg_points(self) -> int:
+        return max(lb.latest.criteria_strengths().acmg_point_score for lb in self.lab_clinical_significances)
 
     @property
     def cms(self):

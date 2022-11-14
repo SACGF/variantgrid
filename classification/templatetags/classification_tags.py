@@ -535,13 +535,14 @@ def criteria_strength(strength: CriteriaStrength):
     return {"strength": strength}
 
 
-@register.inclusion_tag("classification/tags/criteria_strengths.html")
-def criteria_strengths(strengths: Collection[CriteriaStrength]):
+@register.inclusion_tag("classification/tags/criteria_strength_td.html")
+def criteria_strength_td(strength: Union[CriteriaStrength, Collection[CriteriaStrength]]):
     # going to display NM, NS, NA all the same
-    has_different_points = set(strength.strength if strength.is_met else 'NM' for strength in strengths)
-    if len(has_different_points) == 1:
-        strengths = [next(iter(strengths))]
+    if isinstance(strength, list):
+        if first_met := first(str for str in strength if str.is_met):
+            strength = first_met
+        else:
+            strength = first(strength)
     return {
-        "strengths": strengths,
-        "single_not_met": len(strengths) == 1 and strengths[0].strength_direction == "N"
+        "strength": strength
     }

@@ -48,3 +48,7 @@ SITE_NAME = "Shariant Test"
 VARIANT_VCF_DB_PREFIX = "stv"
 
 SITE_MESSAGE = "This is the test version of Shariant. Please avoid sharing real data in this environment."
+
+URLS_NAME_REGISTER.update({
+    "vus": True
+})

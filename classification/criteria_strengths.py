@@ -47,12 +47,12 @@ class CriteriaStrength:
             return "NM"
         elif strength == "X":
             if short:
-                return "?"
+                return "X"
             else:
                 return "unspecified"
         elif strength.endswith("X"):
             if short:
-                return strength[0] + "_?"
+                return strength[0] + "_X"
             else:
                 return strength[0] + "_unspecified"
         return strength
@@ -117,6 +117,8 @@ class CriteriaStrengths:
         return any(s.is_met for s in self.strengths)
 
     def __getitem__(self, item) -> Optional[CriteriaStrength]:
+        if hasattr(self, item):
+            return getattr(self, item)
         if isinstance(item, str):
             from classification.models import EvidenceKeyMap
             return self.strength_map.get(item.lower()) or CriteriaStrength(EvidenceKeyMap.cached_key(item), None)

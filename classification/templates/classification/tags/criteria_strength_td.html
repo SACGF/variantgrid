@@ -1,0 +1,11 @@
+{% load classification_tags %}
+{% load ui_utils %}
+{% if strength.is_met %}
+    <td class="crit-value crit-strength-{{ strength.acmg_point|abs }} crit-direction-{{ strength.strength_direction }}">
+        {{ strength.short }}
+    </td>
+{% else %}
+    <td class="crit-value crit-strength-0 crit-direction-N">
+        <div class="no-value">-</div>
+    </td>
+{% endif %}

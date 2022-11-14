@@ -54,6 +54,10 @@ label, form label {
   padding:0px 15px 3px 15px;
 }
 
+.dtrg-start td {
+  background-color: #efefef;
+}
+
 /// DATATABLES
 
 // When showing just a preview
@@ -1194,9 +1198,7 @@ a .c-hgvs-body {
 }
 
 .crit-value {
-  color: rgba(0, 0, 0, 0.75);
-  display: block;
-  text-align: center;
+  text-align: center !important;
   font-weight: 500;
 }
 .crit-strength-N {
@@ -1242,29 +1244,4 @@ a .c-hgvs-body {
   &.crit-strength-5 {
     background-color: #faa;
   }
-}
-.crit-values {
-  border-width: 0 1px 0 1px;
-  border-style: solid;
-  border-color: #ccc;
-  display: flex;
-  flex-direction: column;
-
-  .crit-value {
-    padding-top: 8px;
-    flex-grow: 1;
-    border-bottom: 1px dashed #aaa;
-    display: flex;
-    flex-direction: column;
-  }
-  .crit-value.crit-direction-N {
-    border-color: #ddd;
-  }
-  .crit-value:last-of-type {
-    border-bottom-width: 0;
-  }
-}
-
-td.compact, th.compact {
-  padding: 0.75rem 0.25rem 0.75rem 0.25rem
 }
