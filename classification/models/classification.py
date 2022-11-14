@@ -1557,7 +1557,8 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                     patch[e_key].wipe(WipeMode.SET_EMPTY)
 
         if remove_api_immutable:
-            for key, cell in use_evidence.items():
+            for key in use_evidence.keys():
+                cell = use_evidence[key]
                 if cell.immutability == SubmissionSource.API:
                     patch[key].immutability = None
 
