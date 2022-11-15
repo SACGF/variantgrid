@@ -1213,21 +1213,21 @@ a .c-hgvs-body .c-hgvs-transcript, a .c-hgvs-body .c-hgvs-nomen {
 }
 
 div.dataTables_processing {
-  border-radius: 10px;
-  transform: scale(0.7);
+  border-radius: 4px;
 }
 div.dataTables_processing div {
-  position: relative;
+  margin: 4px !important;
 }
 div.dataTables_processing div::before {
-  position: relative;
-  bottom: 6px;
-  font-size: 20px;
-  content: 'Loading';
-  color: #888;
+  content: 'Processing...';
+  color: #444;
 }
 div.dataTables_processing div * {
   display: none;
+}
+
+div.dataTables_processing > div:last-child {
+  width: auto !important;
 }
 
 /*# sourceMappingURL=global_bs.css.map */

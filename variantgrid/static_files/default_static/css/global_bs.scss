@@ -1248,20 +1248,22 @@ a .c-hgvs-body {
 
 // Datatables - fix ugly loading indicator
 div.dataTables_processing {
-  border-radius: 10px;
-  transform: scale(0.7);
+  border-radius: 4px;
   div {
-    position: relative;
+    margin: 4px !important;
     &::before {
-      position: relative;
-      bottom: 6px;
-      font-size: 20px;
-      content: 'Loading';
-      color: #888;
+      content: 'Processing...';
+      color: #444;
+    }
+    &>div:last-child {
+
     }
 
     * {
       display: none;
     }
   }
+}
+div.dataTables_processing>div:last-child {
+  width: auto !important;
 }
