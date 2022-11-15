@@ -9,6 +9,7 @@ from django.shortcuts import redirect
 from django.urls import reverse
 from lazy import lazy
 
+from library.utils import first
 from snpdb.models import Lab, Organization, GenomeBuild, UserSettings
 
 
@@ -239,6 +240,13 @@ class LabPickerData:
             for lab in self.all_labs[1:]:
                 if lab.organization != first_org:
                     return True
+        return False
+
+    @property
+    def has_multi_org_selection(self) -> bool:
+        if self.selected_labs:
+            first_org = first(self.selected_labs).organization
+            return any(lab.organization != first_org for lab in self.selected_labs)
         return False
 
     @property
