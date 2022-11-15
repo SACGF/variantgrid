@@ -314,7 +314,7 @@ class ClinVarKey(TimeStampedModel):
         """
         if not user.is_superuser:
             allowed_clinvar_keys = ClinVarKey.clinvar_keys_for_user(user)
-            if not allowed_clinvar_keys.filter(pk=self).exists():
+            if not allowed_clinvar_keys.filter(pk=self.pk).exists():
                 raise PermissionDenied("User does not belong to a lab that uses the submission key")
 
 
