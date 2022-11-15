@@ -370,13 +370,13 @@ class DiscordanceReportRowData:
     @property
     def other_labs(self) -> Set[Lab]:
         involved_labs = self.all_actively_involved_labs
-        if selected := self.perspective.selected_labs:
+        if not self.perspective.has_multi_orgs and (selected := self.perspective.selected_labs):
             involved_labs = involved_labs - selected
         return involved_labs
 
     @property
     def is_internal(self):
-        if self.perspective.is_admin_mode:
+        if self.perspective.has_multi_orgs:
             return False
         if self.all_actively_involved_labs in self.perspective.selected_labs:
             return True
