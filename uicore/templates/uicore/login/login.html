@@ -25,6 +25,7 @@
             {% csrf_token %}
             {% labelled label="Username" errors=form.errors.username %}<input name="username" class="form-control" autofocus />{% endlabelled %}
             {% labelled label="Password" errors=form.errors.password %}<input name="password" class="form-control" type="password" />{% endlabelled %}
+            {{ form.non_field_errors }}
             <input type="hidden" name="next" value="{{ next }}" />
             {% labelled %}
                 <button class="btn-login btn btn-primary w-100" type="submit">{% if maintenance_mode %}Administrator{% else %}User{% endif %} Login</button>
