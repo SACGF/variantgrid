@@ -1212,4 +1212,22 @@ a .c-hgvs-body .c-hgvs-transcript, a .c-hgvs-body .c-hgvs-nomen {
   background-color: #faa;
 }
 
+div.dataTables_processing {
+  border-radius: 10px;
+  transform: scale(0.7);
+}
+div.dataTables_processing div {
+  position: relative;
+}
+div.dataTables_processing div::before {
+  position: relative;
+  bottom: 6px;
+  font-size: 20px;
+  content: 'Loading';
+  color: #888;
+}
+div.dataTables_processing div * {
+  display: none;
+}
+
 /*# sourceMappingURL=global_bs.css.map */

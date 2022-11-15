@@ -1245,3 +1245,23 @@ a .c-hgvs-body {
     background-color: #faa;
   }
 }
+
+// Datatables - fix ugly loading indicator
+div.dataTables_processing {
+  border-radius: 10px;
+  transform: scale(0.7);
+  div {
+    position: relative;
+    &::before {
+      position: relative;
+      bottom: 6px;
+      font-size: 20px;
+      content: 'Loading';
+      color: #888;
+    }
+
+    * {
+      display: none;
+    }
+  }
+}
