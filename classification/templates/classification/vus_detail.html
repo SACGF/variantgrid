@@ -19,8 +19,8 @@
                     <a class="hover-link" href="{% url 'classification_diff' %}?allele={{ grouping.allele.pk }}">Show Diffs</a>
                 </div>
             </td>
-            <td style="font-weight:500">{{ grouping.max_acmg_points|default_if_none:'-' }}</td>
-            <td style="font-weight:500">{{ grouping.patient_count }}</td>
+            <td class="text-right" style="font-weight:500">{{ grouping.max_acmg_points|default_if_none:'-' }}</td>
+            <td class="text-right" style="font-weight:500">{{ grouping.patient_count }}</td>
             <td></td>
             <td></td>
             <td></td>
@@ -39,8 +39,8 @@
         <tr class="grouped-row">
             <th>Allele ID</th>
             <th>c.HGVS/Lab</th>
-            <th>(Max)<br/>Score</th>
-            <th>(Total)<br/>Patients</th>
+            <th class="text-right">(Max)<br/>Score</th>
+            <th class="text-right">(Total)<br/>Patients</th>
             <th class="crit-value">PS4</th>
             <th class="crit-value">PP1<br/>BS4</th>
             <th class="crit-value">PM6</th>
@@ -65,11 +65,11 @@
                         </td>
                         {% with strengths=lab_summary.latest.criteria_strengths %}
                             {% if strengths.has_criteria %}
-                                <td data-order="{{ grouping.max_acmg_points|default_if_none:0|add:100|format:"03d" }}_{{ grouping.allele.pk }}_{{ strengths.acmg_point_score|add:100|format:"03d" }}">{{ strengths.acmg_point_score }}</td>
+                                <td class="text-right" data-order="{{ grouping.max_acmg_points|default_if_none:0|add:100|format:"03d" }}_{{ grouping.allele.pk }}_{{ strengths.acmg_point_score|add:100|format:"03d" }}">{{ strengths.acmg_point_score }}</td>
                             {% else %}
-                                <td data-order="{{ grouping.max_acmg_points|default_if_none:0|add:100|format:"03d" }}_{{ grouping.allele.pk }}_000"><div class="no-value">-</div></td>
+                                <td class="text-right" data-order="{{ grouping.max_acmg_points|default_if_none:0|add:100|format:"03d" }}_{{ grouping.allele.pk }}_000"><div class="no-value">-</div></td>
                             {% endif %}
-                            <td data-order="{{ grouping.patient_count.count|format:"03d" }}_{{ grouping.allele.pk }}_{{ lab_summary.patient_count.count|format:"03d" }}">{{ lab_summary.patient_count }}</td>
+                            <td class="text-right" data-order="{{ grouping.patient_count.count|format:"03d" }}_{{ grouping.allele.pk }}_{{ lab_summary.patient_count.count|format:"03d" }}">{{ lab_summary.patient_count }}</td>
                             {% criteria_strength_td strengths.ps4 %}
                             {% criteria_strength_td strengths.pp1_bs4 %}
                             {% criteria_strength_td strengths.pm6 %}
