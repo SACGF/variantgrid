@@ -498,9 +498,8 @@ class DiscordanceReportTableData:
         return sorted(self.perspective.your_labs)
 
     def labs_quick_str(self) -> str:
-        if len(self.perspective.your_labs) == 1:
-            lab = list(self.perspective.your_labs)[0]
-            return str(lab)
+        if len(self.perspective.selected_labs) == 1:
+            return str(first(self.perspective.selected_labs))
         else:
             return "your assigned labs"
 
