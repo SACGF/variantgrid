@@ -373,7 +373,7 @@ class DiscordanceReportRowData:
 
     @property
     def is_internal(self):
-        return not self.perspective.is_admin_mode and not self.other_labs
+        return not self.other_labs
 
     @property
     def _cm_candidate(self) -> ClassificationModification:
