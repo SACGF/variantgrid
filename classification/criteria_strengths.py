@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional, Iterable, List, Any
+from typing import Optional, Iterable, List, Any, Union
 
 from classification.enums import CriteriaEvaluation
 
@@ -116,11 +116,15 @@ class CriteriaStrengths:
     def has_criteria(self):
         return any(s.is_met for s in self.strengths)
 
-    def __getitem__(self, item) -> Optional[CriteriaStrength]:
+    def __getitem__(self, item) -> Union[None, CriteriaStrength, List[CriteriaStrength]]:
         if hasattr(self, item):
             return getattr(self, item)
         if isinstance(item, str):
             from classification.models import EvidenceKeyMap
+            if '_' in item:
+                parts = item.split('_')
+                return [self.strength_map.get(part.lower()) or CriteriaStrength(EvidenceKeyMap.cached_key(part), None) for part in parts]
+
             return self.strength_map.get(item.lower()) or CriteriaStrength(EvidenceKeyMap.cached_key(item), None)
 
     def __contains__(self, item) -> bool:
