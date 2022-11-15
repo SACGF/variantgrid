@@ -129,6 +129,9 @@ let DataTableDefinition = (function() {
                 },
                 bFilter: defn.searchBoxEnabled,
                 bAutoWidth: false,
+                initComplete:  function( settings, json ) {
+                    $('th.toggle-link').removeClass('toggle-link');
+                }
             };
             if (defn.downloadCsvButtonEnabled) {
                 dtParams.buttons = [
