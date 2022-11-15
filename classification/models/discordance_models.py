@@ -369,11 +369,19 @@ class DiscordanceReportRowData:
 
     @property
     def other_labs(self) -> Set[Lab]:
-        return self.all_actively_involved_labs - self.perspective.labs_if_not_admin
+        involved_labs = self.all_actively_involved_labs
+        if selected := self.perspective.selected_labs:
+            involved_labs = involved_labs - selected
+        return involved_labs
 
     @property
     def is_internal(self):
-        return not self.other_labs
+        if self.perspective.is_admin_mode:
+            return False
+        if self.all_actively_involved_labs in self.perspective.selected_labs:
+            return True
+        return False
+
 
     @property
     def _cm_candidate(self) -> ClassificationModification:
