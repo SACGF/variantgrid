@@ -262,7 +262,7 @@ class UserSettings:
             if lab.organization.active:
                 return lab
 
-        if lab := Lab.valid_labs_qs(self.user).first() or Lab.valid_labs_qs(self.user, admin_check=True).exclude(external=True).exclude(organization__active=False).first():
+        if lab := Lab.valid_labs_qs(self.user).exclude(external=True).exclude(organization__active=False).first() or Lab.valid_labs_qs(self.user, admin_check=True).exclude(external=True).exclude(organization__active=False).first():
             return lab
 
         raise ValueError("User doesn't have access to any Labs")
@@ -305,7 +305,7 @@ class UserSettings:
         for so in settings_overrides:
             for f in override_fields:
                 val = getattr(so, f, None)
-                if val is not None:
+                if val is not None and val != '':
                     kwargs[f] = val
         return UserSettings(**kwargs)
 
