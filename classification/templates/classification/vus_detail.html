@@ -29,7 +29,7 @@
                 {% with points=grouping.extreme_acmg_points %}
                     {% if points.has_criteria %}
                         {% if points.is_acmg_standard %}
-                            {% value_with_icon %}
+                            {% value_with_icon value=points.points %}
                         {% else %}
                             {% value_with_icon value=points.points help="One or more VUS records for this allele use a non-default ACMG curation method" icon="fa-solid fa-asterisk text-warning" %}
                         {% endif %}
