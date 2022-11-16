@@ -2,7 +2,7 @@ import logging
 import subprocess
 from collections import defaultdict, Counter
 from subprocess import check_output
-from typing import List, Optional, Dict
+from typing import List, Optional
 
 from django.conf import settings
 from django.contrib import messages
@@ -84,14 +84,14 @@ def _get_build_annotation_details(build_contigs, genome_build):
     except Exception as e:
         annotation_details["reference_fasta_error"] = str(e)
 
-    av = AnnotationVersion.latest(genome_build, validate=False)
+    av = AnnotationVersion.latest(genome_build, active=False, validate=False)
     if av is None:
         # Maybe doesn't exist - attempt to create
         try:
             get_variant_annotation_version(genome_build)
         except:
             pass
-        av = AnnotationVersion.latest(genome_build, validate=False)
+        av = AnnotationVersion.latest(genome_build, active=False, validate=False)
 
     if av:
         annotation_details["latest"] = av
@@ -304,9 +304,11 @@ def annotation_versions(request):
         except AnnotationVersion.DoesNotExist:
             latest = None
         qs = AnnotationVersion.objects.filter(genome_build=genome_build).order_by("-annotation_date")
+        has_annotation = qs.exists()
+        has_active = qs.filter(variant_annotation_version__active=True).exists()
         vep_command = get_vep_command("in.vcf", "out.vcf", genome_build, genome_build.annotation_consortium)
         vep_command = " ".join(vep_command).replace(" -", "\n")
-        anno_versions[genome_build.name] = (vep_command, qs, latest)
+        anno_versions[genome_build.name] = (vep_command, qs, latest, has_annotation, has_active)
 
     context = {"annotation_versions": anno_versions}
     return render(request, "annotation/annotation_versions.html", context)

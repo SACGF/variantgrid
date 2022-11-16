@@ -1,6 +1,6 @@
 <div>
 <p>
-An AnnotationVersion is composed of 4 sub types: Variant Level, Gene level, ClinVar and Human Protein Atlas.
+An AnnotationVersion is composed of sub types: Variant Level, Gene level, ClinVar, Ontology and Human Protein Atlas.
 
 <p>
 They are updated by someone manually changing pipelines or updating annotation files on the server.
@@ -10,5 +10,9 @@ Each of these tools can be upgraded separately, changing one will create a new m
 
 <P>
 This allows you to keep track of past annotations, as well as compare results from new annotations vs old.    
+
+<P>
+VariantAnnotationVersion may be present but not active. This is so you can install a new version and run the annotation
+(which may take a few days for very large servers) while still using existing annotation as the default.
 
 </div>

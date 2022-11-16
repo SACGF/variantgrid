@@ -12,6 +12,30 @@
         {% ui_register_tabs tab_set="annotation_versions" %}
         {% for build_name, av_data in annotation_versions.items %}
             {% ui_register_tab_embedded tab_set="annotation_versions" label=build_name %}
+                {% if av_data.3 %}
+                    {% if not av_data.4 %}
+                        <div class="install-instructions not-installed">
+                            No active AnnotationVersion found.
+                            {% if user.is_superuser %}
+                                Via <a href="{% url 'admin:annotation_variantannotationversion_changelist' %}">Admin</a>
+                                select a variant annotation version, then set active=True
+                            {% else %}
+                                Your systems administrator needs to make a version active.
+                            {% endif %}
+                        </div>
+                    {% endif %}
+                {% else %}
+                    <div class="install-instructions not-installed">
+                        <p>
+                            No AnnotationVersion found. Perhaps VEP is not setup correctly on your system? Run:
+                        </p>
+                        <code>
+                            python3 manage.py vep_version --genome-build={{ build_name }}
+                        </code>
+                    </div>
+                {% endif %}
+
+
                 <table class='table'>
                     <thead>
                         <tr>
