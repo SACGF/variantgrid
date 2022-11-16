@@ -191,8 +191,11 @@ class Command(BaseCommand):
                 version = 0  # RefSeq genes have no version, store as 0
 
             if gene_id not in known_genes_ids:
-                new_genes.append(Gene(identifier=gene_id,
-                                      annotation_consortium=annotation_consortium))
+                gene = Gene(identifier=gene_id,
+                            annotation_consortium=annotation_consortium)
+                if gene_summary := gv_data.get("summary"):
+                    gene.summary = gene_summary
+                new_genes.append(gene)
                 known_genes_ids.add(gene_id)
 
             if symbol := gv_data["gene_symbol"]:
