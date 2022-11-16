@@ -480,6 +480,7 @@ VARIANT_CLASSIFICATION_FILE_ATTACHMENTS = True  # allow users to attach files to
 VARIANT_CLASSIFICATION_MAX_REFERENCE_LENGTH = 100  # Used for MVL export, general display use HGVS_MAX_REF_ALLELE_LENGTH
 
 VARIANT_CLASSIFICATION_REDCAP_EXPORT = True
+VARIANT_CLASSIFICATION_NON_ACMG_ASSERTION_METHOD = None  # when calculating ACMG points, even if we have ACMG criteria, are they a little too trnaslated to be useful
 
 ONTOLOGY_EXTERNAL_LINKS = False  # Generate external or internal links for ontology terms
 

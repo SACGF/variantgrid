@@ -116,6 +116,15 @@ class EvidenceMixin:
                 citations.append(citation)
         return citations
 
+    @property
+    def is_likely_acmg(self) -> bool:
+        if non_standard_res := settings.VARIANT_CLASSIFICATION_NON_ACMG_ASSERTION_METHOD:
+            if assertion_method := self.get(SpecialEKeys.ASSERTION_METHOD):
+                for non_standard_re in non_standard_res:
+                    if non_standard_re.match(assertion_method):
+                        return False
+        return True
+
     def criteria_strengths(self, e_keys: Optional['EvidenceKeyMap'] = None) -> CriteriaStrengths:
         from classification.models import EvidenceKeyMap
         if not e_keys:
@@ -126,7 +135,7 @@ class EvidenceMixin:
             if strength := self.get(ek.key):
                 criteria.append(CriteriaStrength(ek, strength))
 
-        return CriteriaStrengths(strengths=criteria, source=self)
+        return CriteriaStrengths(strengths=criteria, is_acmg_standard=self.is_likely_acmg)
 
     def criteria_strength_summary(self, ekeys: Optional['EvidenceKeyMap'] = None, only_acmg: bool = False) -> str:
         strengths = self.criteria_strengths(e_keys=ekeys)

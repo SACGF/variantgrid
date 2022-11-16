@@ -7,6 +7,8 @@ from typing import List, Optional, Dict, Set, Iterator
 
 from django.db.models import Count, QuerySet, Subquery
 from lazy import lazy
+
+from classification.criteria_strengths import AcmgPointScore, CriteriaStrengths
 from classification.enums import SpecialEKeys
 from classification.models import ClassificationModification, ClinicalContext, ClassificationLabSummaryEntry, \
     ClassificationLabSummary, classification_flag_types, ClassificationFlagTypes, DiscordanceReport
@@ -24,17 +26,17 @@ class _PatientIdLab:
     patient_id: Optional[str]
 
 
+@dataclass(frozen=True)
 class PatientCount:
 
-    def __init__(self, counts: Dict[_PatientIdLab, int]):
-        self.counts = counts
+    counts: Dict[_PatientIdLab, int]
 
-    @property
+    @lazy
     def count(self):
         numbers = [1 if key.patient_id else value for key, value in self.counts.items()]
         return reduce(lambda a, b: a+b, numbers, 0)
 
-    @property
+    @lazy
     def consolidates_variant_classifications(self) -> bool:
         return any(key.lab.consolidates_variant_classifications for key in self.counts.keys())
 
@@ -51,11 +53,19 @@ class PatientCount:
             counts[key] = self.counts.get(key, 0) + other.counts.get(key, 0)
         return PatientCount(counts=counts)
 
+    @property
+    def sort_string(self):
+        adjusted_score = self.count * 10
+        if self.consolidates_variant_classifications:
+            adjusted_score += 1
+        return f"{adjusted_score:03}"
+
     def __repr__(self):
         return f"{self.count}"
 
 
 PatientCount.ZERO = PatientCount(counts={})
+
 
 class OverlapsCalculatorState:
     """
@@ -103,6 +113,10 @@ class ClassificationLabSummaryExtra(ClassificationLabSummary):
         return reduce(lambda a, b: a + b, (PatientCount.count_classification(cms) for cms in self.cms), PatientCount.ZERO)
 
     @lazy
+    def strengths(self) -> CriteriaStrengths:
+        return self.latest.criteria_strengths()
+
+    @lazy
     def latest(self) -> ClassificationModification:
         return first(sorted(self.cms, key=lambda cms: cms.curated_date_check))
 
@@ -147,11 +161,8 @@ class ClinicalGroupingOverlap:
         self.labs.add(cm.classification.lab)
 
     @lazy
-    def max_acmg_points(self) -> Optional[int]:
-        if valid_strengths := [lb.latest.criteria_strengths().acmg_point_score for lb in self.lab_clinical_significances if lb.latest.criteria_strengths().has_criteria]:
-            return max(valid_strengths)
-        else:
-            return None
+    def extreme_acmg_points(self) -> AcmgPointScore:
+        return AcmgPointScore.most_extreme_point_score(lb.latest.criteria_strengths().acmg_point_score for lb in self.lab_clinical_significances)
 
     @property
     def cms(self):

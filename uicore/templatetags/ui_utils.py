@@ -577,3 +577,12 @@ def admin_link(context, object: Model):
 @register.filter(name='format')
 def format(value, fmt):
     return f"{{:{fmt}}}".format(value)
+
+
+@register.inclusion_tag(name="value_with_icon", filename="uicore/tags/value_with_icon.html")
+def value_with_icon(value: Optional[Any] = None, help: Optional[str] = None, icon: Optional[str] = None):
+    return {
+        "value": value,
+        "help": help,
+        "icon": icon
+    }

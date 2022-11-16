@@ -9,6 +9,8 @@ See https://github.com/sacgf/variantgrid/wiki/Annotation%20Setup
 from variantgrid.settings.components.celery_settings import *  # pylint: disable=wildcard-import, unused-wildcard-import
 from variantgrid.settings.components.default_settings import *  # pylint: disable=wildcard-import, unused-wildcard-import
 from variantgrid.settings.components.seqauto_settings import *  # pylint: disable=wildcard-import, unused-wildcard-import
+import re
+
 
 AVATAR_PROVIDERS = (
     'library.django_utils.avatar.SpaceThemedAvatarProvider'
@@ -40,6 +42,10 @@ DISCORDANCE_EMAIL = '"Shariant Updates" <updates@shariant.org.au>'
 ACCOUNTS_EMAIL = 'accounts@shariant.org.au'
 SEND_EMAILS = True
 VARIANT_CLASSIFICATION_NEW_GROUPING = True
+VARIANT_CLASSIFICATION_NON_ACMG_ASSERTION_METHOD = [
+    re.compile(r'.*VCGS.*', flags=re.IGNORECASE),
+    re.compile(r'.*Sherloc.*', flags=re.IGNORECASE)
+]
 
 # Keycloak
 

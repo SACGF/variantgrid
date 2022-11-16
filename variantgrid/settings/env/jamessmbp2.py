@@ -11,6 +11,8 @@ GEOS_LIBRARY_PATH="/opt/homebrew/Cellar/geos/3.10.2/lib/libgeos_c.dylib"
 from variantgrid.settings.components.celery_settings import *  # pylint: disable=wildcard-import, unused-wildcard-import
 from variantgrid.settings.components.default_settings import *  # pylint: disable=wildcard-import, unused-wildcard-import
 from variantgrid.settings.components.seqauto_settings import *  # pylint: disable=wildcard-import, unused-wildcard-import
+import re
+
 """
 EMAIL_BACKEND = 'django_amazon_ses.EmailBackend'
 aws_dict = get_aws_secrets()
@@ -330,6 +332,10 @@ URLS_NAME_REGISTER.update({  # Disable selected snpdb urls
 # mimic shariant
 VARIANT_DETAILS_SHOW_ANNOTATION = True
 VARIANT_DETAILS_SHOW_SAMPLES = False
+VARIANT_CLASSIFICATION_NON_ACMG_ASSERTION_METHOD = [
+    re.compile(r'.*VCGS.*', flags=re.IGNORECASE),
+    re.compile(r'.*Sherloc.*', flags=re.IGNORECASE)
+]
 
 
 UNSHARED_FLAG_ENABLED = True

@@ -5,6 +5,12 @@
 
 <h5>VUS Overlaps</h5>
 
+<style>
+    .dtrg-group .value-with-icon .value {
+        font-weight: 600;
+    }
+</style>
+
 <table style="display:none">
 {% for grouping in overlaps.overlaps_vus %}
     {% if grouping.allele %}
@@ -19,8 +25,28 @@
                     <a class="hover-link" href="{% url 'classification_diff' %}?allele={{ grouping.allele.pk }}">Show Diffs</a>
                 </div>
             </td>
-            <td class="text-right" style="font-weight:500">{{ grouping.max_acmg_points|default_if_none:'-' }}</td>
-            <td class="text-right" style="font-weight:500">{{ grouping.patient_count }}</td>
+            <td class="text-right" style="font-weight:500">
+                {% with points=grouping.extreme_acmg_points %}
+                    {% if points.has_criteria %}
+                        {% if points.is_acmg_standard %}
+                            {% value_with_icon %}
+                        {% else %}
+                            {% value_with_icon value=points.points help="One or more VUS records for this allele use a non-default ACMG curation method" icon="fa-solid fa-asterisk text-warning" %}
+                        {% endif %}
+                    {% else %}
+                        {% value_with_icon value=None %}
+                    {% endif %}
+                {% endwith %}
+            </td>
+            <td class="text-right" style="font-weight:500">
+                {% with patient_count=grouping.patient_count %}
+                    {% if patient_count.consolidates_variant_classifications %}
+                        {% value_with_icon value=patient_count.count help="One or more labs is unable to report number of patients, actual number of patients might be higher" icon="fa-solid fa-plus text-warning" %}
+                    {% else %}
+                        {% value_with_icon value=patient_count.count %}
+                    {% endif %}
+                {% endwith %}
+            </td>
             <td></td>
             <td></td>
             <td></td>
@@ -39,7 +65,7 @@
         <tr class="grouped-row">
             <th>Allele ID</th>
             <th>c.HGVS/Lab</th>
-            <th class="text-right">(Max)<br/>Score</th>
+            <th class="text-right">(Max Abs)<br/>Score</th>
             <th class="text-right">(Total)<br/>Patients</th>
             <th class="crit-value">PS4</th>
             <th class="crit-value">PP1<br/>BS4</th>
@@ -64,12 +90,28 @@
                             </nomin>
                         </td>
                         {% with strengths=lab_summary.latest.criteria_strengths %}
-                            {% if strengths.has_criteria %}
-                                <td class="text-right" data-order="{{ grouping.max_acmg_points|default_if_none:0|add:100|format:"03d" }}_{{ grouping.allele.pk }}_{{ strengths.acmg_point_score|add:100|format:"03d" }}">{{ strengths.acmg_point_score }}</td>
-                            {% else %}
-                                <td class="text-right" data-order="{{ grouping.max_acmg_points|default_if_none:0|add:100|format:"03d" }}_{{ grouping.allele.pk }}_000"><div class="no-value">-</div></td>
-                            {% endif %}
-                            <td class="text-right" data-order="{{ grouping.patient_count.count|format:"03d" }}_{{ grouping.allele.pk }}_{{ lab_summary.patient_count.count|format:"03d" }}">{{ lab_summary.patient_count }}</td>
+                            {% with points=strengths.acmg_point_score %}
+                                <td class="text-right" data-order="{{ grouping.extreme_acmg_points.sort_string }}_{{ grouping.allele.pk }}_{{ points.sort_string }}">
+                                    {% if points.has_criteria %}
+                                        {% if points.is_acmg_standard %}
+                                            {% value_with_icon value=points.points %}
+                                        {% else %}
+                                            {% value_with_icon value=points.points help="This record used a non-default ACMG curation method.</br>Points might not be an accurate reflection of the record." icon="fa-solid fa-asterisk text-warning" %}
+                                        {% endif %}
+                                    {% else %}
+                                        {% value_with_icon %}
+                                    {% endif %}
+                                </td>
+                            {% endwith %}
+                            <td class="text-right" data-order="{{ grouping.patient_count.sort_string }}_{{ grouping.allele.pk }}_{{ lab_summary.patient_count.sort_string }}">
+                                {% with patient_count=lab_summary.patient_count %}
+                                    {% if patient_count.consolidates_variant_classifications %}
+                                        {% value_with_icon value=patient_count.count help="This lab is unable to report number of patients, actual number of patients might be higher" icon="fa-solid fa-plus text-warning" %}
+                                    {% else %}
+                                        {% value_with_icon value=patient_count.count %}
+                                    {% endif %}
+                                {% endwith %}
+                            </td>
                             {% criteria_strength_td strengths.ps4 %}
                             {% criteria_strength_td strengths.pp1_bs4 %}
                             {% criteria_strength_td strengths.pm6 %}
@@ -89,10 +131,11 @@
     $('#vus_detail_table').DataTable({
         paging: false,
         searching: false,
+        dom: 'p',
         columns: [
             {visible: false}, // Allele ID
             {orderable: false}, // Lab
-            {orderable: true}, // Score
+            {orderable: true, orderData: [2, 3]}, // Score
             {orderable: true}, // Patients
             {orderable: false}, // PS4
             {orderable: false}, // PP1 BS4
