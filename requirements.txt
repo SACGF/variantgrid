@@ -42,6 +42,7 @@ git+https://github.com/davmlaw/django-js-reverse#egg=django-js-reverse
 git+https://github.com/SACGF/hgvs#egg=pyhgvs
 HTSeq==2.0.1
 ijson==3.1.4
+ipython==8.6.0
 kombu==5.2.3
 lazy==1.4
 Markdown==3.1.1

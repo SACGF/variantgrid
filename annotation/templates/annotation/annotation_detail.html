@@ -87,13 +87,13 @@
                     </div>
                 {% endfor %}
 
-                {% install-instructions build_name installed=True %}
+                {% install-instructions build_name installed=details.genes_and_transcripts.transcripts %}
                     <p>
                     You can install both Ensembl and RefSeq transcripts (for HGVS) but you NEED the ones used by your variant annotation pipeline which is: '<b>{{ details.annotation_consortium }}</b>'
                     </p>
 
                     <p>
-                    See <a href="https://github.com/SACGF/variantgrid/wiki/Gene-and-Transcript-version-data">Gene and Transcript version data</a> for details and how to generate this from scratch
+                    Download data from <a href="https://github.com/SACGF/cdot/wiki/Download-JSON.gz-files">cdot</a>. See <a href="https://github.com/SACGF/variantgrid/wiki/Gene-and-Transcript-version-data">Gene and Transcript version data</a> for details and how to generate this from scratch
                     </p>
 
 <code>
@@ -105,28 +105,28 @@ cd ${gene_annotation_dir}
                     <h5>Ensembl GRCh37</h5>
 
 <code>
-wget https://variantgrid.com/static/gene_annotation/pyhgvs_transcripts_ensembl_grch37.json.gz
-python3 manage.py import_gene_annotation --annotation-consortium=Ensembl --genome-build=GRCh37 --json-file ${gene_annotation_dir}/pyhgvs_transcripts_ensembl_grch37.json.gz
+wget https://cdot.cc/download/cdot-0.2.10.ensembl.grch37.json.gz
+python3 manage.py import_gene_annotation --annotation-consortium=Ensembl --genome-build=GRCh37 --json-file ${gene_annotation_dir}/cdot-0.2.10.ensembl.grch37.json.gz
 </code>
                     {% elif build_name == 'GRCh38' %}
                     <h5>Ensembl GRCh38</h5>
 <code>
-wget https://variantgrid.com/static/gene_annotation/pyhgvs_transcripts_ensembl_grch38.json.gz
-python3 manage.py import_gene_annotation --annotation-consortium=Ensembl --genome-build=GRCh38 --json-file ${gene_annotation_dir}/pyhgvs_transcripts_ensembl_grch38.json.gz
+wget https://cdot.cc/download/cdot-0.2.10.ensembl.grch38.json.gz
+python3 manage.py import_gene_annotation --annotation-consortium=Ensembl --genome-build=GRCh38 --json-file ${gene_annotation_dir}/cdot-0.2.10.ensembl.grch38.json.gz
 </code>
                     {% endif %}
 
                     {% if build_name == 'GRCh37' %}
                     <h5>RefSeq GRCh37</h5>
 <code>
-wget https://variantgrid.com/static/gene_annotation/pyhgvs_transcripts_refseq_grch37.json.gz
-python3 manage.py import_gene_annotation --annotation-consortium=RefSeq --genome-build=GRCh37 --json-file ${gene_annotation_dir}/pyhgvs_transcripts_refseq_grch37.json.gz
+wget https://cdot.cc/download/cdot-0.2.10.refseq.grch37.json.gz
+python3 manage.py import_gene_annotation --annotation-consortium=RefSeq --genome-build=GRCh37 --json-file ${gene_annotation_dir}/cdot-0.2.10.refseq.grch37.json.gz
 </code>
                     {% elif build_name == 'GRCh38' %}
                     <h5>RefSeq GRCh38</h5>
 <code>
-wget https://variantgrid.com/static/gene_annotation/pyhgvs_transcripts_refseq_grch38.json.gz
-python3 manage.py import_gene_annotation --annotation-consortium=RefSeq --genome-build=GRCh38 --json-file ${gene_annotation_dir}/pyhgvs_transcripts_refseq_grch38.json.gz
+wget https://cdot.cc/download/cdot-0.2.10.refseq.grch38.json.gz
+python3 manage.py import_gene_annotation --annotation-consortium=RefSeq --genome-build=GRCh38 --json-file ${gene_annotation_dir}/cdot-0.2.10.refseq.grch38.json.gz
 </code>
                     {% endif %}
                 {% endinstall-instructions %}

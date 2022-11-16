@@ -636,7 +636,7 @@ class OntologyVersion(TimeStampedModel):
         return ontology_import.filename in versioned[ontology_import.import_source]
 
     @staticmethod
-    def latest() -> Optional['OntologyVersion']:
+    def latest(validate=True) -> Optional['OntologyVersion']:
         oi_qs = OntologyImport.objects.all()
         kwargs = {}
         missing_fields = set()
@@ -656,8 +656,11 @@ class OntologyVersion(TimeStampedModel):
                 from annotation.models import AnnotationVersion
                 AnnotationVersion.new_sub_version(None)
         else:
-            msg = "OntologyVersion.latest() - missing fields: %s", ", ".join(missing_fields)
-            raise OntologyVersion.DoesNotExist(msg)
+            if validate:
+                msg = "OntologyVersion.latest() - missing fields: %s", ", ".join(missing_fields)
+                raise OntologyVersion.DoesNotExist(msg)
+            else:
+                ontology_version = None
         return ontology_version
 
     def get_ontology_imports(self):

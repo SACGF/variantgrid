@@ -176,7 +176,7 @@ def annotation_detail(request):
 
     ontology_relationship_counts = {}
     ontology_services = [OntologyService.MONDO, OntologyService.OMIM, OntologyService.HPO, OntologyService.HGNC]
-    if ontology_version := OntologyVersion.latest():
+    if ontology_version := OntologyVersion.latest(validate=False):
         otr_qs = ontology_version.get_ontology_term_relations()
         for first_index, first_service in enumerate(ontology_services):
             for second_service in ontology_services[first_index:]:
@@ -196,7 +196,7 @@ def annotation_detail(request):
             all_ontologies_accounted_for = False
         ontology_imports.append({"context": context, "last_import": last_import})
 
-    diagnostic = GeneListCategory.objects.get(name='Diagnostic')
+    diagnostic = GeneListCategory.get_or_create_category(category_name='Diagnostic')
     diagnostic_gene_list_count = diagnostic.genelist_set.count()
     if diagnostic_gene_list_count:
         diagnostic_gene_list = f"{diagnostic_gene_list_count} diagnostic gene lists"

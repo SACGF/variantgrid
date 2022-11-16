@@ -10,7 +10,7 @@ from library.pandas_utils import df_nan_to_none
 
 def store_lrg_ref_seq_gene_from_web(cached_web_resource: CachedWebResource):
     LRG_URL = "https://ftp.ncbi.nlm.nih.gov/refseq/H_sapiens/RefSeqGene/LRG_RefSeqGene"
-    df = pd.read_csv(LRG_URL, sep='\t', error_bad_lines=False)
+    df = pd.read_csv(LRG_URL, sep='\t', on_bad_lines='warn')
     lrg_mask = ~pd.isna(df["LRG"])
     lrg_df = df_nan_to_none(df[lrg_mask])
 
