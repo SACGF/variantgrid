@@ -15,6 +15,28 @@
     #vus_detail_table .value-with-icon i {
         font-size: 8pt;
     }
+    #vus_detail_table .dtrg-group td {
+        position: relative;
+    }
+    #vus_detail_table .dtrg-group .criteria {
+        text-align: center;
+    }
+    #vus_detail_table .dtrg-group .v-middle {
+        position: absolute;
+        top: 50%;
+        margin-top: -0.5rem;
+
+    }
+    #vus_detail_table .dtrg-group .h-middle {
+        position: absolute;
+        margin-left: -0.5rem;
+        left: 50%;
+    }
+    #vus_detail_table .dtrg-group .h-right {
+        position: absolute;
+        right: 10px;
+    }
+}
 </style>
 
 <table style="display:none">
@@ -32,35 +54,39 @@
                 </div>
             </td>
             <td class="text-right" style="font-weight:500">
-                {% with points=grouping.extreme_acmg_points %}
-                    {% if points.has_criteria %}
-                        {% if points.is_acmg_standard %}
-                            {% value_with_icon value=points.points %}
+                <div class="v-middle h-right">
+                    {% with points=grouping.extreme_acmg_points %}
+                        {% if points.has_criteria %}
+                            {% if points.is_acmg_standard %}
+                                {% value_with_icon value=points.points %}
+                            {% else %}
+                                {% value_with_icon value=points.points help="One or more VUS records for this allele use a non-default ACMG curation method" icon="fa-solid fa-asterisk text-info" %}
+                            {% endif %}
                         {% else %}
-                            {% value_with_icon value=points.points help="One or more VUS records for this allele use a non-default ACMG curation method" icon="fa-solid fa-asterisk text-info" %}
+                            {% value_with_icon value=None %}
                         {% endif %}
-                    {% else %}
-                        {% value_with_icon value=None %}
-                    {% endif %}
-                {% endwith %}
+                    {% endwith %}
+                </div>
             </td>
             <td class="text-right" style="font-weight:500">
-                {% with patient_count=grouping.patient_count %}
-                    {% if patient_count.consolidates_variant_classifications %}
-                        {% value_with_icon value=patient_count.count help="One or more labs is unable to report number of patients, actual number of patients might be higher" icon="fa-solid fa-plus text-info" %}
-                    {% else %}
-                        {% value_with_icon value=patient_count.count %}
-                    {% endif %}
-                {% endwith %}
+                <div class="v-middle h-right">
+                    {% with patient_count=grouping.patient_count %}
+                        {% if patient_count.consolidates_variant_classifications %}
+                            {% value_with_icon value=patient_count.count help="One or more labs is unable to report number of patients, actual number of patients might be higher" icon="fa-solid fa-plus text-info" %}
+                        {% else %}
+                            {% value_with_icon value=patient_count.count %}
+                        {% endif %}
+                    {% endwith %}
+                </div>
             </td>
             {% with criteria_compare=grouping.criteria_compare %}
-                <td class="text-center">{{ criteria_compare.ps4.html }}</td>
-                <td class="text-center">{{ criteria_compare.pp1_bs4.html }}</td>
-                <td class="text-center">{{ criteria_compare.pm6.html }}</td>
-                <td class="text-center">{{ criteria_compare.ps2.html }}</td>
-                <td class="text-center">{{ criteria_compare.pm3.html }}</td>
-                <td class="text-center">{{ criteria_compare.pp4.html }}</td>
-                <td class="text-center">{{ criteria_compare.ps3_bs3.html }}</td>
+                <td class="criteria"><div class="v-middle h-middle">{{ criteria_compare.ps4.html }}</div></td>
+                <td class="criteria"><div class="v-middle h-middle">{{ criteria_compare.pp1_bs4.html }}</div></td>
+                <td class="criteria"><div class="v-middle h-middle">{{ criteria_compare.pm6.html }}</div></td>
+                <td class="criteria"><div class="v-middle h-middle">{{ criteria_compare.ps2.html }}</div></td>
+                <td class="criteria"><div class="v-middle h-middle">{{ criteria_compare.pm3.html }}</div></td>
+                <td class="criteria"><div class="v-middle h-middle">{{ criteria_compare.pp4.html }}</div></td>
+                <td class="criteria"><div class="v-middle h-middle">{{ criteria_compare.ps3_bs3.html }}</div></td>
             {% endwith %}
 
         </tr>
