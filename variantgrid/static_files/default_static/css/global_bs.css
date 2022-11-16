@@ -43,6 +43,10 @@ label, form label {
   background-color: #efefef;
 }
 
+tbody tr.dtrg-group.dtrg-start:not(:first-child) td {
+  border-top: 40px solid white;
+}
+
 .table th {
   font-weight: 500;
 }
