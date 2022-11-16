@@ -6,8 +6,14 @@
 <h5>VUS Overlaps</h5>
 
 <style>
-    .dtrg-group .value-with-icon .value {
+    #vus_detail_table .dtrg-group .value-with-icon .value {
         font-weight: 600;
+    }
+    #vus_detail_table .value {
+        font-family: monospace;
+    }
+    #vus_detail_table .value-with-icon i {
+        font-size: 8pt;
     }
 </style>
 
@@ -31,7 +37,7 @@
                         {% if points.is_acmg_standard %}
                             {% value_with_icon value=points.points %}
                         {% else %}
-                            {% value_with_icon value=points.points help="One or more VUS records for this allele use a non-default ACMG curation method" icon="fa-solid fa-asterisk text-warning" %}
+                            {% value_with_icon value=points.points help="One or more VUS records for this allele use a non-default ACMG curation method" icon="fa-solid fa-asterisk text-info" %}
                         {% endif %}
                     {% else %}
                         {% value_with_icon value=None %}
@@ -41,19 +47,21 @@
             <td class="text-right" style="font-weight:500">
                 {% with patient_count=grouping.patient_count %}
                     {% if patient_count.consolidates_variant_classifications %}
-                        {% value_with_icon value=patient_count.count help="One or more labs is unable to report number of patients, actual number of patients might be higher" icon="fa-solid fa-plus text-warning" %}
+                        {% value_with_icon value=patient_count.count help="One or more labs is unable to report number of patients, actual number of patients might be higher" icon="fa-solid fa-plus text-info" %}
                     {% else %}
                         {% value_with_icon value=patient_count.count %}
                     {% endif %}
                 {% endwith %}
             </td>
-            <td></td>
-            <td></td>
-            <td></td>
-            <td></td>
-            <td></td>
-            <td></td>
-            <td></td>
+            {% with criteria_compare=grouping.criteria_compare %}
+                <td class="text-center">{{ criteria_compare.ps4.html }}</td>
+                <td class="text-center">{{ criteria_compare.pp1_bs4.html }}</td>
+                <td class="text-center">{{ criteria_compare.pm6.html }}</td>
+                <td class="text-center">{{ criteria_compare.ps2.html }}</td>
+                <td class="text-center">{{ criteria_compare.pm3.html }}</td>
+                <td class="text-center">{{ criteria_compare.pp4.html }}</td>
+                <td class="text-center">{{ criteria_compare.ps3_bs3.html }}</td>
+            {% endwith %}
 
         </tr>
     {% endif %}
@@ -96,7 +104,7 @@
                                         {% if points.is_acmg_standard %}
                                             {% value_with_icon value=points.points %}
                                         {% else %}
-                                            {% value_with_icon value=points.points help="This record used a non-default ACMG curation method.</br>Points might not be an accurate reflection of the record." icon="fa-solid fa-asterisk text-warning" %}
+                                            {% value_with_icon value=points.points help="This record used a non-default ACMG curation method.</br>Points might not be an accurate reflection of the record." icon="fa-solid fa-asterisk text-info" %}
                                         {% endif %}
                                     {% else %}
                                         {% value_with_icon %}
@@ -106,7 +114,7 @@
                             <td class="text-right" data-order="{{ grouping.patient_count.sort_string }}_{{ grouping.allele.pk }}_{{ lab_summary.patient_count.sort_string }}">
                                 {% with patient_count=lab_summary.patient_count %}
                                     {% if patient_count.consolidates_variant_classifications %}
-                                        {% value_with_icon value=patient_count.count help="This lab is unable to report number of patients, actual number of patients might be higher" icon="fa-solid fa-plus text-warning" %}
+                                        {% value_with_icon value=patient_count.count help="This lab is unable to report number of patients, actual number of patients might be higher" icon="fa-solid fa-plus text-info" %}
                                     {% else %}
                                         {% value_with_icon value=patient_count.count %}
                                     {% endif %}

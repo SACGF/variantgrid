@@ -1,9 +1,12 @@
 from dataclasses import dataclass
+from enum import Enum
 from typing import Optional, Iterable, List, Any, Union
 
+from django.utils.safestring import SafeString
 from lazy import lazy
 
 from classification.enums import CriteriaEvaluation
+from library.utils import first
 
 
 @dataclass(frozen=True)
@@ -202,3 +205,83 @@ class CriteriaStrengths:
             if bit_score := cs.acmg_point:
                 points += bit_score
         return AcmgPointScore(points=points, has_criteria=True, is_acmg_standard=self.is_acmg_standard)
+
+
+@dataclass(frozen=True)
+class CriteriaCompare:
+    has_pathogenic: bool = False
+    has_benign: bool = False
+    has_none: bool = False
+
+    @property
+    def sort_string(self):
+        if self.is_conflicing:
+            return 3
+        elif self.has_pathogenic:
+            return 2
+        elif self.has_benign:
+            return 0
+        else:
+            return 1
+
+    @property
+    def is_conflicing(self):
+        return self.has_pathogenic and self.has_benign
+
+    @property
+    def direction_key(self):
+        if self.is_conflicing:
+            return "C"
+        elif self.has_pathogenic:
+            return "P"
+        elif self.has_benign:
+            return "B"
+        return ""
+
+    @property
+    def html(self):
+        icon_name: str
+        style: str = ""
+        if self.is_conflicing:
+            icon_name = "fa-solid fa-circle-half-stroke"
+        elif self.has_pathogenic:
+            icon_name = "fa-solid fa-circle"
+            style += "color:#d88;"
+        elif self.has_benign:
+            icon_name = "fa-solid fa-circle"
+            style += "color:#88f;"
+        else:
+            return ""
+
+        if self.has_none:
+            style += "opacity:0.5;"
+        return SafeString(f'<i class="{icon_name}" style="{style}"></i>')
+
+    def __repr__(self):
+        return self.direction_key
+
+
+class CriteriaSummarizer:
+    def __init__(self, strengths: List[CriteriaStrengths]):
+        self.strengths = strengths
+
+    def __getitem__(self, item: str):
+        has_pathogenic: bool = False
+        has_benign: bool = False
+        has_none: bool = False
+        for strengths in self.strengths:
+            single_has_value: bool = False
+            if strengths.has_criteria:
+                values = strengths[item]
+                if not isinstance(values, list):
+                    values = [values]
+                if value := first(value for value in values if value.strength_direction != "N"):
+                    if value.strength_direction == "B":
+                        has_benign = True
+                        single_has_value = True
+                    elif value.strength_direction == "P":
+                        has_pathogenic = True
+                        single_has_value = True
+            if not single_has_value:
+                has_none = True
+        return CriteriaCompare(has_pathogenic=has_pathogenic, has_benign=has_benign, has_none=has_none)

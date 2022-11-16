@@ -2,13 +2,14 @@ import itertools
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from dataclasses import dataclass
+from enum import Enum
 from functools import reduce
 from typing import List, Optional, Dict, Set, Iterator
 
 from django.db.models import Count, QuerySet, Subquery
 from lazy import lazy
 
-from classification.criteria_strengths import AcmgPointScore, CriteriaStrengths
+from classification.criteria_strengths import AcmgPointScore, CriteriaStrengths, CriteriaSummarizer
 from classification.enums import SpecialEKeys
 from classification.models import ClassificationModification, ClinicalContext, ClassificationLabSummaryEntry, \
     ClassificationLabSummary, classification_flag_types, ClassificationFlagTypes, DiscordanceReport
@@ -140,6 +141,10 @@ class ClinicalGroupingOverlap:
     def patient_count(self) -> PatientCount:
         return reduce(lambda a, b: a + b, (PatientCount.count_classification(cms) for cms in self.cms), PatientCount.ZERO)
 
+    @lazy
+    def criteria_compare(self) -> CriteriaSummarizer:
+        return CriteriaSummarizer([lb.criteria_strengths() for lb in self.all_latest])
+
     @property
     def calculator_state(self):
         return self.state.calculator_state
@@ -162,7 +167,7 @@ class ClinicalGroupingOverlap:
 
     @lazy
     def extreme_acmg_points(self) -> AcmgPointScore:
-        return AcmgPointScore.most_extreme_point_score(lb.latest.criteria_strengths().acmg_point_score for lb in self.lab_clinical_significances)
+        return AcmgPointScore.most_extreme_point_score(lb.criteria_strengths().acmg_point_score for lb in self.all_latest)
 
     @property
     def cms(self):
@@ -208,6 +213,10 @@ class ClinicalGroupingOverlap:
     def __lt__(self, other):
         if isinstance(other, ClinicalGroupingOverlap):
             return self._sort_value < other._sort_value
+
+    @property
+    def all_latest(self) -> List[ClassificationModification]:
+        return [lb.latest for lb in self.lab_clinical_significances]
 
     @lazy
     def lab_clinical_significances(self) -> List[ClassificationLabSummaryExtra]:
