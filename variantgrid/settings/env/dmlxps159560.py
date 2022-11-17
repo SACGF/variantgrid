@@ -32,12 +32,15 @@ ANNOTATION_ENTREZ_EMAIL = 'davmlaw@gmail.com'
 
 ANNOTATION_VEP_PERLBREW_RUNNER_SCRIPT = os.path.join(BASE_DIR, "scripts", "perlbrew_runner.sh")
 ANNOTATION_VEP_ARGS = ["--buffer_size", "1000"]  # default = 5000
+
+ANNOTATION[BUILD_GRCH37]["columns_version"] = 2
+
 ANNOTATION[BUILD_GRCH38]["enabled"] = True
 ANNOTATION[BUILD_GRCH38]["annotation_consortium"] = "RefSeq"
+ANNOTATION[BUILD_GRCH38]["columns_version"] = 2
 
 # On laptop I get all kinds of errors using BigWig files, so just turn off
 ANNOTATION[BUILD_GRCH37]["vep_config"].update({
-    "columns_version": 2,
     'phastcons100way': None,
     'phastcons46way': None,
     'phylop100way': None,
@@ -47,7 +50,6 @@ ANNOTATION[BUILD_GRCH37]["vep_config"].update({
     "spliceai_indel": "annotation_data/GRCh37/spliceai_scores.raw.indel.head_100.hg19.vcf.gz",
 })
 ANNOTATION[BUILD_GRCH38]["vep_config"].update({
-    "columns_version": 2,
     'phastcons100way': None,
     'phastcons30way': None,
     'phylop100way': None,

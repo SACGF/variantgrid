@@ -38,8 +38,8 @@ TEST_ANNOTATION[settings.BUILD_GRCH38]["vep_config"].update({
 })
 
 ANNOTATION_COLUMNS_V1 = copy.deepcopy(TEST_ANNOTATION)
-ANNOTATION_COLUMNS_V1[settings.BUILD_GRCH37]["vep_config"]["columns_version"] = 1
-ANNOTATION_COLUMNS_V1[settings.BUILD_GRCH38]["vep_config"]["columns_version"] = 1
+ANNOTATION_COLUMNS_V1[settings.BUILD_GRCH37]["columns_version"] = 1
+ANNOTATION_COLUMNS_V1[settings.BUILD_GRCH38]["columns_version"] = 1
 
 
 @override_settings(IMPORT_PROCESSING_DIR=TEST_IMPORT_PROCESSING_DIR,
@@ -192,8 +192,8 @@ class TestAnnotationVCF(TestCase):
 
 
 ANNOTATION_COLUMNS_V2 = copy.deepcopy(TEST_ANNOTATION)
-ANNOTATION_COLUMNS_V2[settings.BUILD_GRCH37]["vep_config"]["columns_version"] = 2
-ANNOTATION_COLUMNS_V2[settings.BUILD_GRCH38]["vep_config"]["columns_version"] = 2
+ANNOTATION_COLUMNS_V2[settings.BUILD_GRCH37]["columns_version"] = 2
+ANNOTATION_COLUMNS_V2[settings.BUILD_GRCH38]["columns_version"] = 2
 
 
 @override_settings(IMPORT_PROCESSING_DIR=TEST_IMPORT_PROCESSING_DIR,

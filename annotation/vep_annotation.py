@@ -25,7 +25,7 @@ class VEPConfig:
         self.annotation_consortium = genome_build.annotation_consortium
         self.genome_build = genome_build
         self.vep_data = genome_build.settings["vep_config"]
-        self.columns_version = self.vep_data["columns_version"]
+        self.columns_version = genome_build.settings["columns_version"]
 
     def __getitem__(self, key):
         """ Throws KeyError if missing """

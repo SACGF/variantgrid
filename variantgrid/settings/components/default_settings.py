@@ -216,15 +216,15 @@ ANNOTATION = {
     BUILD_GRCH37: {
         "enabled": True,
         "annotation_consortium": "Ensembl",
+        "columns_version": 1,
+        "cytoband": os.path.join(VG_REFERENCE_DIR, "hg19", "cytoband.hg19.txt.gz"),
         "reference_fasta": os.path.join(_ANNOTATION_FASTA_BASE_DIR, "GCF_000001405.25_GRCh37.p13_genomic.fna.gz"),
         "reference_fasta_has_chr": False,
-        "cytoband": os.path.join(VG_REFERENCE_DIR, "hg19", "cytoband.hg19.txt.gz"),
 
         # VEP paths are relative to ANNOTATION_VEP_BASE_DIR - worked out at runtime
         # so you can change just that variable and have everything else work
         # The names correspond to VEPPlugin or VEPCustom entries (but lower case)
         "vep_config": {
-            "columns_version": 1,
             "cosmic": "annotation_data/GRCh37/CosmicCodingMuts_v95_20211101_grch37.normal.vcf.gz",
             "dbnsfp": "annotation_data/GRCh37/dbNSFP4.0a.grch37.stripped.gz",
             "dbscsnv": "annotation_data/GRCh37/dbscSNV1.1_GRCh37.txt.gz",
@@ -248,15 +248,15 @@ ANNOTATION = {
     BUILD_GRCH38: {
         "enabled": False,
         "annotation_consortium": "Ensembl",
+        "columns_version": 1,
+        "cytoband": os.path.join(VG_REFERENCE_DIR, "hg38", "cytoband.hg38.txt.gz"),
         "reference_fasta": os.path.join(_ANNOTATION_FASTA_BASE_DIR, "GCF_000001405.39_GRCh38.p13_genomic.fna.gz"),
         "reference_fasta_has_chr": False,
-        "cytoband": os.path.join(VG_REFERENCE_DIR, "hg38", "cytoband.hg38.txt.gz"),
 
         # VEP paths are relative to ANNOTATION_VEP_BASE_DIR - worked out at runtime
         # so you can change just that variable and have everything else work
         # The names correspond to VEPPlugin or VEPCustom entries (but lower case)
         "vep_config": {
-            "columns_version": 1,
             "cosmic": "annotation_data/GRCh38/CosmicCodingMuts_v95_20211101_grch38.normal.vcf.gz",
             "dbnsfp": "annotation_data/GRCh38/dbNSFP4.0a.grch38.stripped.gz",
             "dbscsnv": "annotation_data/GRCh38/dbscSNV1.1_GRCh38.txt.gz",
