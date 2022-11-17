@@ -107,13 +107,13 @@
                     <tr>
                         <td>{{ grouping.allele.pk }}</td>
                         {% with strengths=lab_summary.latest.criteria_strengths %}
-                            <td>
+                            <td data-search="{% for hgvs in grouping.c_hgvses %}{{ hgvs }} {% endfor %}">
                                 <nomin>
                                 {{ lab_summary.lab }}
                                 {% if lab_summary.count > 1 %} x {{ lab_summary.count }}{% endif %}
                                 {% clinical_significance_inline lab_summary.clinical_significance_to %} </nomin>
                                 {% if strengths.has_criteria %}
-                                <span class="mono text-muted">({{ strengths.summary_string }})</span>
+                                <span class="mono text-muted">({{ strengths.summary_string_short }})</span>
                                 {% else %}
                                 <span class="no-value">No Criteria Provided</span>
                                 {% endif %}
@@ -150,20 +150,21 @@
 
     $('#vus_detail_table').DataTable({
         paging: false,
-        searching: false,
-        dom: 'p',
+        searching: true,
+        dom: 'fp',
+        language: {'searchPlaceholder': 'c.HGVS/gene symbol'},
         columns: [
-            {visible: false}, // Allele ID
-            {orderable: false}, // Lab
-            {orderable: true, orderData: [2, 3]}, // Score
-            {orderable: true}, // Patients
-            {orderable: false}, // PS4
-            {orderable: false}, // PP1 BS4
-            {orderable: false}, // PM6
-            {orderable: false}, // PS2
-            {orderable: false}, // PM3
-            {orderable: false}, // PP4
-            {orderable: false}, // PS3 / BS3
+            {visible: false, searchable:false}, // Allele ID
+            {orderable: false, searchable: true}, // Lab (not actually searchable but we put data-search on it)
+            {orderable: true, searchable: false, orderData: [2, 3]}, // Score
+            {orderable: true, searchable: false}, // Patients
+            {orderable: false, searchable: false}, // PS4
+            {orderable: false, searchable: false}, // PP1 BS4
+            {orderable: false, searchable: false}, // PM6
+            {orderable: false, searchable: false}, // PS2
+            {orderable: false, searchable: false}, // PM3
+            {orderable: false, searchable: false}, // PP4
+            {orderable: false, searchable: false}, // PS3 / BS3
         ],
         rowGroup: {
             dataSrc: 0,

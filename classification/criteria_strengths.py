@@ -28,6 +28,10 @@ class CriteriaStrength:
     def is_met(self):
         return CriteriaEvaluation.is_met(self.strength)
 
+    @property
+    def is_unspecified(self) -> bool:
+        return self.strength and self.strength.endswith("X")
+
     def __hash__(self):
         return hash(self.ekey) + hash(self.strength)
 
@@ -128,9 +132,12 @@ class AcmgPointScore:
         """
         biggest_score: Optional[AcmgPointScore] = None
         lowest_score: Optional[AcmgPointScore] = None
+        unspecified: Optional[AcmgPointScore] = None
         has_non_standard = False
         for score in scores:
-            if score.has_criteria:
+            if score.has_unspecified:
+                unspecified = unspecified
+            elif score.has_criteria:
                 if not biggest_score or biggest_score < score:
                     biggest_score = score
                 if not lowest_score or score < lowest_score:
@@ -138,6 +145,8 @@ class AcmgPointScore:
                 has_non_standard = has_non_standard or not score.is_acmg_standard
 
         if not biggest_score:
+            if unspecified:
+                return unspecified
             return AcmgPointScore.NO_CRITERIA
 
         most_extreme = biggest_score if abs(biggest_score.points) >= abs(lowest_score.points) else lowest_score
@@ -167,6 +176,9 @@ class CriteriaStrengths:
             return CriteriaEvaluation.is_met(cs.strength) and (not acmg_only or not cs.ekey.namespace)
 
         return ", ".join(str(cs) for cs in sorted(self.strength_list_met))
+
+    def summary_string_short(self) -> str:
+        return ", ".join(f"{cs:short}" for cs in sorted(str for str in self.strength_list_met if not str.ekey.namespace))
 
     @property
     def has_criteria(self):
@@ -198,9 +210,8 @@ class CriteriaStrengths:
             return AcmgPointScore.NO_CRITERIA
         points = 0
         for cs in self.strength_list_met:
-            if cs.strength.endswith("X"):
+            if cs.is_unspecified:
                 has_unspecified = True
-
             if bit_score := cs.acmg_point:
                 points += bit_score
         return AcmgPointScore(points=points, has_criteria=True, is_acmg_standard=self.is_acmg_standard, has_unspecified=has_unspecified)
@@ -208,38 +219,17 @@ class CriteriaStrengths:
 
 @dataclass(frozen=True)
 class CriteriaCompare:
-    has_pathogenic: bool = False
-    has_benign: bool = False
-    has_none: bool = False
+    direction: str = "N"
+    has_value: bool = False
     has_differences: bool = False
 
-    @property
-    def sort_string(self):
-        if self.is_conflicing:
-            return 3
-        elif self.has_pathogenic:
-            return 2
-        elif self.has_benign:
-            return 0
-        else:
-            return 1
-
-    @property
-    def is_conflicing(self):
-        return self.has_pathogenic and self.has_benign
-
-    @property
-    def direction_key(self):
-        if self.is_conflicing:
-            return "C"
-        elif self.has_pathogenic:
-            return "P"
-        elif self.has_benign:
-            return "B"
-        return ""
 
     @property
     def html(self):
+        if not self.has_value:
+            return ""
+
+        hidden_text: str = ""
         icon_name: str
         style: str = ""
 
@@ -247,22 +237,22 @@ class CriteriaCompare:
         if self.has_differences:
             icon_name = "fa-solid fa-circle-half-stroke"
 
-        if self.is_conflicing:
+        if self.direction == "N":
             icon_name = "fa-solid fa-circle-exclamation"
             style += "color:#d8d;"
-        elif self.has_pathogenic:
-            style += "color:#d88;"
-        elif self.has_benign:
-            style += "color:#88f;"
+            hidden_text = "!!"
         else:
-            return ""
+            if self.direction == "P":
+                style += "color:#d88;"
+                hidden_text = "P"
+            elif self.direction == "B":
+                style += "color:#88f;"
+                hidden_text = "B"
 
-        if self.has_none:
-            style += "opacity:0.5;"
-        return SafeString(f'<i class="{icon_name}" style="{style}"></i>')
+            if self.has_differences:
+                hidden_text += "!"
 
-    def __repr__(self):
-        return self.direction_key
+        return SafeString(f'<i class="{icon_name}" style="{style}"></i><span style="opacity:0;width:0">{hidden_text}</span>')
 
 
 class CriteriaSummarizer:
@@ -270,11 +260,11 @@ class CriteriaSummarizer:
         self.strengths = strengths
 
     def __getitem__(self, item: str):
-        has_pathogenic: bool = False
-        has_benign: bool = False
-        has_none: bool = False
-        has_multiple_strengths: bool = False
-        non_unspecified_strengths = set()
+        all_strengths = set()
+        all_directions = set()
+        any_met = False
+        any_not_met = False
+
         for strengths in self.strengths:
             single_has_value: bool = False
             if strengths.has_criteria:
@@ -282,18 +272,20 @@ class CriteriaSummarizer:
                 if not isinstance(values, list):
                     values = [values]
                 if value := first(value for value in values if value.strength_direction != "N"):
-                    if value.strength_direction in {"B", "P"}:
-                        single_has_value = True
-                        if value.strength_direction == "B":
-                            has_benign = True
-                        elif value.strength_direction == "P":
-                            has_pathogenic = True
-                        if not value.strength.endswith("X"):
-                            non_unspecified_strengths.add(value)
+                    any_met = True
+                    if not value.strength.endswith("X"):
+                        all_strengths.add(value)
+                    all_directions.add(value.strength_direction)
+                else:
+                    any_not_met = True
+                    all_strengths.add(values[0])
 
-            if not single_has_value:
-                has_none = True
-        if len(non_unspecified_strengths) > 1:
-            has_multiple_strengths = True
-
-        return CriteriaCompare(has_pathogenic=has_pathogenic, has_benign=has_benign, has_none=has_none, has_differences=has_multiple_strengths)
+        met_strengths = [strength for strength in all_strengths if strength.is_met]
+        if not any_met:
+            return CriteriaCompare()
+        else:
+            return CriteriaCompare(
+                has_differences=(any_met and any_not_met) or len(all_strengths) > 1,
+                has_value=any_met,
+                direction="N" if len(all_directions) != 1 else first(all_directions)
+            )

@@ -47,6 +47,10 @@ tbody tr.dtrg-group.dtrg-start:not(:first-child) td {
   border-top: 40px solid white;
 }
 
+.dataTables_filter input[type=search] {
+  min-width: 200px;
+}
+
 .table th {
   font-weight: 500;
 }
