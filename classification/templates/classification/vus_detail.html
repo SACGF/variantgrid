@@ -106,14 +106,18 @@
                 {% for lab_summary in grouping.lab_clinical_significances %}
                     <tr>
                         <td>{{ grouping.allele.pk }}</td>
-                        <td>
-                            <nomin>
-                            {{ lab_summary.lab }}
-                            {% if lab_summary.count > 1 %} x {{ lab_summary.count }}{% endif %}
-                            {% clinical_significance_inline lab_summary.clinical_significance_to %} <span class="mono text-muted">({{ lab_summary.latest.criteria_strengths.summary_string }})</span>
-                            </nomin>
-                        </td>
                         {% with strengths=lab_summary.latest.criteria_strengths %}
+                            <td>
+                                <nomin>
+                                {{ lab_summary.lab }}
+                                {% if lab_summary.count > 1 %} x {{ lab_summary.count }}{% endif %}
+                                {% clinical_significance_inline lab_summary.clinical_significance_to %} </nomin>
+                                {% if strengths.has_criteria %}
+                                <span class="mono text-muted">({{ strengths.summary_string }})</span>
+                                {% else %}
+                                <span class="no-value">No Criteria Provided</span>
+                                {% endif %}
+                            </td>
                             {% with points=strengths.acmg_point_score %}
                                 <td class="text-right" data-order="{{ grouping.extreme_acmg_points.sort_string }}_{{ grouping.allele.pk }}_{{ points.sort_string }}">
                                     {% acmg_points points %}
