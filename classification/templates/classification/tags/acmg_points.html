@@ -1,0 +1,10 @@
+{% load ui_utils %}
+{% if points.points is None %}
+    {% value_with_icon value=None %}
+{% elif points.has_unspecified %}
+    {% value_with_icon value=points.points icon="fa-solid fa-asterisk" help="This record has a non-specified strength. Point total should be considered a rough estimate" %}
+{% elif not points.is_acmg_standard %}
+    {% value_with_icon value=points.points icon="fa-solid fa-asterisk text-info" help="This record uses a non-default ACMG curation method. Point total should be considered an estimate" %}
+{% else %}
+    {% value_with_icon value=points.points %}
+{% endif %}

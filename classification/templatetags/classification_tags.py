@@ -8,9 +8,8 @@ from django.db.models import Model
 from django.db.models.query import QuerySet
 from django.template import Library
 from django.utils.safestring import mark_safe
-
 from annotation.manual_variant_entry import check_can_create_variants, CreateManualVariantForbidden
-from classification.criteria_strengths import CriteriaStrength
+from classification.criteria_strengths import CriteriaStrength, AcmgPointScore
 from classification.enums import SpecialEKeys
 from classification.enums.classification_enums import ShareLevel
 from classification.models import ConditionTextMatch, ConditionResolved, DiscordanceReportRowData, \
@@ -25,7 +24,7 @@ from classification.models.evidence_key import EvidenceKey, EvidenceKeyMap
 from classification.models.evidence_mixin import VCDbRefDict
 from genes.hgvs import CHGVS
 from genes.models import GeneSymbol
-from library.utils import first, get_single_element
+from library.utils import first
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import VariantAllele, Lab
 from snpdb.models.models_genome import GenomeBuild, Contig, GenomeFasta
@@ -546,3 +545,8 @@ def criteria_strength_td(strength: Union[CriteriaStrength, Collection[CriteriaSt
     return {
         "strength": strength
     }
+
+
+@register.inclusion_tag("classification/tags/acmg_points.html")
+def acmg_points(points: AcmgPointScore):
+    return {"points": points}
