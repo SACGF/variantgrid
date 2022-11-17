@@ -4,7 +4,7 @@ import os
 import re
 from collections import defaultdict
 from datetime import datetime, timedelta
-from typing import List, Optional, Dict, Callable
+from typing import List, Optional, Dict, Callable, Tuple
 
 from Bio import Entrez
 from Bio.Data.IUPACData import protein_letters_1to3
@@ -32,7 +32,7 @@ from genes.models import GeneSymbol, Gene, TranscriptVersion, Transcript, GeneAn
 from genes.models_enums import AnnotationConsortium
 from library.django_utils import object_is_referenced
 from library.django_utils.django_partition import RelatedModelsPartitionModel
-from library.utils import invert_dict
+from library.utils import invert_dict, name_from_filename
 from ontology.models import OntologyVersion
 from patients.models_enums import GnomADPopulation
 from snpdb.models import GenomeBuild, Variant, VariantGridColumn, Q, VCF, DBSNP_PATTERN, VARIANT_PATTERN
@@ -528,6 +528,60 @@ class VariantAnnotationVersion(SubVersionPartition):
     @lazy
     def has_phylop_46_way_mammalian(self) -> bool:
         return self._vep_config.get("phylop46way")
+
+    @lazy
+    def _gene_annotation_release_and_gff_url(self) -> Tuple[Optional[str], Optional[str]]:
+        release = None
+        gff_url = None
+        # See issue: https://github.com/Ensembl/ensembl-vep/issues/833 - perhaps this can be done more easily now
+        if self.annotation_consortium == AnnotationConsortium.ENSEMBL:
+            if self.genome_build.name == "GRCh37":
+                # This has remained unchanged (last checked v108)
+                release = "87"
+                gff_url = "ftp://ftp.ensembl.org/pub/grch37/release-87/gff3/homo_sapiens/Homo_sapiens.GRCh37.87.gff3.gz"
+            elif self.genome_build.name == "GRCh38":
+                release = str(self.vep)
+                gff_url = f"ftp://ftp.ensembl.org/pub/release-{self.vep}/gff3/homo_sapiens/Homo_sapiens.GRCh38.{self.vep}.gff3.gz"
+        else:
+            if self.genome_build.name == "GRCh37":
+                # This is the last GRCh37 release (checked VEP v108)
+                if self.refseq == '2020-10-26 17:03:42 - GCF_000001405.25_GRCh37.p13_genomic.gff':
+                    release = "105.20201022"
+                    gff_url = f"http://ftp.ncbi.nlm.nih.gov/refseq/H_sapiens/annotation/annotation_releases/{release}/GCF_000001405.25_GRCh37.p13/GCF_000001405.25_GRCh37.p13_genomic.gff.gz"
+            elif self.genome_build.name == "GRCh38":
+                # This is good for 108 (will need to keep on top of this)
+                (release, gff_filename) = self.refseq.split(" - ")
+                if not gff_filename.endswith(".gz"):
+                    gff_filename += ".gz"
+                patch_version = 14
+                gff_url = f"https://ftp.ncbi.nlm.nih.gov/refseq/H_sapiens/annotation/annotation_releases/{release}/GCF_000001405.40_GRCh38.p{patch_version}/{gff_filename}"
+        return release, gff_url
+
+    @property
+    def gene_annotation_release_gff_url(self):
+        return self._gene_annotation_release_and_gff_url[1]
+
+    @lazy
+    def cdot_gene_release_filename(self) -> str:
+        """ returns blank if unknown """
+        name_components = []
+        release, gff_url = self._gene_annotation_release_and_gff_url
+        if gff_url:
+            name_components = [name_from_filename(gff_url)]
+            if self.genome_build.name == "GRCh37" and self.annotation_consortium == AnnotationConsortium.REFSEQ:
+                # These ones got renamed as the filename wasn't unique
+                if m := re.match("http://ftp.ncbi.nlm.nih.gov/refseq/H_sapiens/annotation/annotation_releases/(105.\d+)/GCF_000001405.25_GRCh37.p13/GCF_000001405.25_GRCh37.p13_genomic.gff.gz", gff_url):
+                    name_components.append(m.group(1))
+            name_components.append("json.gz")
+
+        return ".".join(name_components)
+
+    @property
+    def suggested_gene_annotation_release_name(self) -> str:
+        release, _ = self._gene_annotation_release_and_gff_url
+        if release:
+            return f"{self.get_annotation_consortium_display()}_{release}"
+        return "TOOD_RELEASE_NAME"
 
     def short_string(self) -> str:
         """ Short VEP description """

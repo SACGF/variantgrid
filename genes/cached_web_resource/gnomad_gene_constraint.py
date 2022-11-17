@@ -75,7 +75,7 @@ def store_gnomad_gene_constraint_from_df(cached_web_resource, df):
         gene_constraints.append(ggc)
 
     if new_gene_symbols:
-        GeneSymbol.objects.bulk_create(new_gene_symbols, batch_size=2000)
+        GeneSymbol.objects.bulk_create(new_gene_symbols, batch_size=2000, ignore_conflicts=True)
 
     GnomADGeneConstraint.objects.bulk_create(gene_constraints)
     cached_web_resource.description = f"{len(gene_constraints)} genes."

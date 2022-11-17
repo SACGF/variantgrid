@@ -140,8 +140,18 @@ python3 manage.py import_gene_annotation --annotation-consortium=RefSeq --genome
                 {% endif %}
                 {% install-instructions "Gene Annotation Release" installed=details.gene_annotation_release %}
                     You need a Gene Annotation Release that matches the exact symbol/gene/transcript versions used by VEP.
-
                     <a href="https://github.com/SACGF/variantgrid/wiki/Gene-and-Transcript-Version-Data#gene-annotation-release---install">See Wiki for details</a>
+
+                    {% with vav=details.latest.variant_annotation_version %}
+                        {% if vav.cdot_gene_release_filename %}
+                            <code>
+                                wget http://cdot.cc/download/{{ cdot_gene_release_filename }}
+                                python3 manage.py import_gene_annotation --annotation-consortium={{ vav.get_annotation_consortium_display }} --genome-build={{ build_name }} --json-file {{ vav.cdot_gene_release_filename }} --release={{ vav.suggested_gene_annotation_release_name }}
+                            </code>
+                            If it doesn't auto-link, go to <a href="{% url 'admin:annotation_variantannotationversion_change' vav.pk %}">Admin</a> then set the gene annotation release.
+                        {% endif %}
+                    {% endwith %}
+
                 {% endinstall-instructions %}
             {% endlabelled %}
             {% labelled label="Gene Annotation" %}
@@ -151,7 +161,7 @@ python3 manage.py import_gene_annotation --annotation-consortium=RefSeq --genome
                     <div class="no-value">Not Installed</div>
                {% endif %}
                 {% install-instructions "Gene Annotation" installed=details.gene_level_annotation %}
-                    <code>{{ python_command }} manage.py gene_annotation --gene-annotation-release=(Gene Annotation Release ID)</code>
+                    <code>{{ python_command }} manage.py gene_annotation --gene-annotation-release={{ details.latest.variant_annotation_version.gene_annotation_release_id|default_if_none:'(Gene Annotation Release ID)' }}</code>
                 {% endinstall-instructions %}
             {% endlabelled %}
             {% labelled label="ClinVar" %}

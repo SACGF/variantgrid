@@ -6,6 +6,7 @@ from django.core.management.base import BaseCommand
 from django.db.models import Max
 from django.db.models.functions import Upper
 
+from annotation.models import VariantAnnotationVersion
 from genes.cached_web_resource.refseq import retrieve_refseq_gene_summaries
 from genes.gene_matching import ReleaseGeneMatcher
 from genes.models import GeneSymbol, GeneAnnotationImport, Gene, GeneVersion, TranscriptVersion, Transcript, HGNC, \
@@ -141,6 +142,20 @@ class Command(BaseCommand):
         print("Matching existing gene list symbols to this release...")
         gm = ReleaseGeneMatcher(release)
         gm.match_unmatched_in_hgnc_and_gene_lists()
+
+        # Attempt to link it...
+        if not release.variantannotationversion_set.exists():
+            auto_linked = False
+            for vav in VariantAnnotationVersion.objects.filter(gene_annotation_release__isnull=True,
+                                                               genome_build=genome_build):
+                if vav.gene_annotation_release_gff_url == release.gene_annotation_import.url:
+                    print(f"Auto-linking release to {vav}")
+                    vav.gene_annotation_release = release
+                    vav.save()
+                    auto_linked = True
+                    break
+            if not auto_linked:
+                print("Release not linked - you will have to manually do so via Django Admin")
 
     @staticmethod
     def _get_gene_and_transcript_version_pk_lookups(genome_build: GenomeBuild, annotation_consortium) -> Tuple[Dict, Dict]:

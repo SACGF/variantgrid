@@ -78,7 +78,10 @@ class Command(BaseCommand):
                 raise ValueError("Only specify ontology-version when gene-annotation-release also specified")
 
             for genome_build in GenomeBuild.builds_with_annotation():
-                av = AnnotationVersion.latest(genome_build, validate=False)
+                av = AnnotationVersion.latest(genome_build, validate=False, active=False)
+                if not av:
+                    raise InvalidAnnotationVersionError(f"No AnnotationVersion for {genome_build}")
+
                 if not av.variant_annotation_version:
                     raise InvalidAnnotationVersionError(f"AnnotationVersion {av} has no VariantAnnotationVersion set")
 
