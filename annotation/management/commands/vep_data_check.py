@@ -1,5 +1,6 @@
 import os
 
+from django.conf import settings
 from django.core.management.base import BaseCommand
 
 from annotation.vep_annotation import VEPConfig
@@ -22,3 +23,11 @@ class Command(BaseCommand):
             for key, filename in check_files.items():
                 if not os.path.exists(filename):
                     print(f"{key}: {filename} MISSING")
+
+        for build_name, data in settings.VCF_IMPORT_COMMON_FILTERS.items():
+            key = "gnomad_af_filename"
+            if filename := data.get(key):
+                if not filename.startswith("/"):
+                    filename = os.path.join(settings.ANNOTATION_VEP_BASE_DIR, filename)
+                    if not os.path.exists(filename):
+                        print(f"{key}: {filename} MISSING")
