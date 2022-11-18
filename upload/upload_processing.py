@@ -36,7 +36,7 @@ def process_uploaded_file(uploaded_file, run_async=True) -> Tuple[UploadPipeline
     except UploadPipeline.DoesNotExist:
         pass
 
-    upload_pipeline = UploadPipeline(uploaded_file=uploaded_file)
+    upload_pipeline = UploadPipeline.objects.create(uploaded_file=uploaded_file)
     return process_upload_pipeline(upload_pipeline, run_async=run_async)
 
 
