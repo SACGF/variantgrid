@@ -4,6 +4,7 @@ from collections import defaultdict, Counter
 from subprocess import check_output
 from typing import List, Optional
 
+import cdot
 from django.conf import settings
 from django.contrib import messages
 from django.http.response import HttpResponse, HttpResponseRedirect, Http404, \
@@ -260,7 +261,8 @@ def annotation_detail(request):
         "num_annotation_columns": VariantGridColumn.objects.count(),
         "cached_web_resources": cached_web_resources,
         "python_command": settings.PYTHON_COMMAND,
-        "somalier": somalier
+        "somalier": somalier,
+        "cdot_version": cdot.__version__,
     }
     return render(request, "annotation/annotation_detail.html", context)
 

@@ -105,28 +105,28 @@ cd ${gene_annotation_dir}
                     <h5>Ensembl GRCh37</h5>
 
 <code>
-wget https://cdot.cc/download/cdot-0.2.10.ensembl.grch37.json.gz
-python3 manage.py import_gene_annotation --annotation-consortium=Ensembl --genome-build=GRCh37 --json-file ${gene_annotation_dir}/cdot-0.2.10.ensembl.grch37.json.gz
+wget https://cdot.cc/download/cdot-{{ cdot_version }}.ensembl.grch37.json.gz
+python3 manage.py import_gene_annotation --annotation-consortium=Ensembl --genome-build=GRCh37 --json-file ${gene_annotation_dir}/cdot-{{ cdot_version }}.ensembl.grch37.json.gz
 </code>
                     {% elif build_name == 'GRCh38' %}
                     <h5>Ensembl GRCh38</h5>
 <code>
-wget https://cdot.cc/download/cdot-0.2.10.ensembl.grch38.json.gz
-python3 manage.py import_gene_annotation --annotation-consortium=Ensembl --genome-build=GRCh38 --json-file ${gene_annotation_dir}/cdot-0.2.10.ensembl.grch38.json.gz
+wget https://cdot.cc/download/cdot-{{ cdot_version }}.ensembl.grch38.json.gz
+python3 manage.py import_gene_annotation --annotation-consortium=Ensembl --genome-build=GRCh38 --json-file ${gene_annotation_dir}/cdot-{{ cdot_version }}.ensembl.grch38.json.gz
 </code>
                     {% endif %}
 
                     {% if build_name == 'GRCh37' %}
                     <h5>RefSeq GRCh37</h5>
 <code>
-wget https://cdot.cc/download/cdot-0.2.10.refseq.grch37.json.gz
-python3 manage.py import_gene_annotation --annotation-consortium=RefSeq --genome-build=GRCh37 --json-file ${gene_annotation_dir}/cdot-0.2.10.refseq.grch37.json.gz
+wget https://cdot.cc/download/cdot-{{ cdot_version }}.refseq.grch37.json.gz
+python3 manage.py import_gene_annotation --annotation-consortium=RefSeq --genome-build=GRCh37 --json-file ${gene_annotation_dir}/cdot-{{ cdot_version }}.refseq.grch37.json.gz
 </code>
                     {% elif build_name == 'GRCh38' %}
                     <h5>RefSeq GRCh38</h5>
 <code>
-wget https://cdot.cc/download/cdot-0.2.10.refseq.grch38.json.gz
-python3 manage.py import_gene_annotation --annotation-consortium=RefSeq --genome-build=GRCh38 --json-file ${gene_annotation_dir}/cdot-0.2.10.refseq.grch38.json.gz
+wget https://cdot.cc/download/cdot-{{ cdot_version }}.refseq.grch38.json.gz
+python3 manage.py import_gene_annotation --annotation-consortium=RefSeq --genome-build=GRCh38 --json-file ${gene_annotation_dir}/cdot-{{ cdot_version }}.refseq.grch38.json.gz
 </code>
                     {% endif %}
                 {% endinstall-instructions %}
@@ -144,10 +144,10 @@ python3 manage.py import_gene_annotation --annotation-consortium=RefSeq --genome
 
                     {% with vav=details.latest.variant_annotation_version %}
                         {% if vav.cdot_gene_release_filename %}
-                            <code>
-                                wget http://cdot.cc/download/{{ cdot_gene_release_filename }}
-                                python3 manage.py import_gene_annotation --annotation-consortium={{ vav.get_annotation_consortium_display }} --genome-build={{ build_name }} --json-file {{ vav.cdot_gene_release_filename }} --release={{ vav.suggested_gene_annotation_release_name }}
-                            </code>
+<code>
+wget http://cdot.cc/download/{{ vav.cdot_gene_release_filename }}
+python3 manage.py import_gene_annotation --annotation-consortium={{ vav.get_annotation_consortium_display }} --genome-build={{ build_name }} --json-file {{ vav.cdot_gene_release_filename }} --release={{ vav.suggested_gene_annotation_release_name }}
+</code>
                             If it doesn't auto-link, go to <a href="{% url 'admin:annotation_variantannotationversion_change' vav.pk %}">Admin</a> then set the gene annotation release.
                         {% endif %}
                     {% endwith %}
@@ -204,9 +204,10 @@ python3 manage.py import_gene_annotation --annotation-consortium=RefSeq --genome
             {% endif %}
             {% install-instructions "Human Protein Atlas" installed=hpa_counts %}
                 <div>Go to <a href='https://www.proteinatlas.org/about/download'>Protein Atlas Download Page</a> and download <b>rna_tissue_consensus.tsv.zip</b> note the version (ie <b>21</b>):</div>
-                <code>
-                    wget https://v21.proteinatlas.org/download/rna_tissue_consensus.tsv.zip
-                    {{ python_command }} manage.py human_protein_atlas_import --hpa-version 21 ${VARIANTGRID_SETUP_DATA}/rna_tissue_consensus.tsv.zip</code>
+<code>
+wget https://v21.proteinatlas.org/download/rna_tissue_consensus.tsv.zip
+{{ python_command }} manage.py human_protein_atlas_import --hpa-version 21 ${VARIANTGRID_SETUP_DATA}/rna_tissue_consensus.tsv.zip
+</code>
             {% endinstall-instructions %}
         {% endlabelled %}
 
@@ -219,8 +220,10 @@ python3 manage.py import_gene_annotation --annotation-consortium=RefSeq --genome
                 <div class="no-value">Not installed</div>
             {% endif %}
             {% install-instructions "Gene Symbol Aliases" installed=gene_symbol_alias_counts %}
-<code>wget ftp://ftp.ncbi.nlm.nih.gov/gene/DATA/GENE_INFO/Mammalia/Homo_sapiens.gene_info.gz
-{{ python_command }} manage.py import_ncbi_gene_info ${VARIANTGRID_SETUP_DATA}/Homo_sapiens.gene_info.gz</code>
+<code>
+wget ftp://ftp.ncbi.nlm.nih.gov/gene/DATA/GENE_INFO/Mammalia/Homo_sapiens.gene_info.gz
+{{ python_command }} manage.py import_ncbi_gene_info ${VARIANTGRID_SETUP_DATA}/Homo_sapiens.gene_info.gz
+</code>
              {% endinstall-instructions %}
         {% endlabelled %}
 
