@@ -217,7 +217,7 @@ class ClinVarExportConverter:
         if self.classification_based_on is None:
             return ValidatedJson(None, JsonMessages.error("No classification is currently associated with this allele and condition"))
         else:
-            data["assertionCriteria"] = self.json_assertion_criteria
+            data["meta"] = ValidatedJson({"assertionCriteria": self.json_assertion_criteria}, JsonMessages.info("Meta data isn't sent to ClinVar. We use it to populate batch data."))
             data["clinicalSignificance"] = self.json_clinical_significance
             data["conditionSet"] = self.condition_set
             allele_id = self.clinvar_export_record.clinvar_allele.allele_id
@@ -229,7 +229,6 @@ class ClinVarExportConverter:
             data["localID"] = local_id
             data["localKey"] = local_key
             data["observedIn"] = self.observed_in
-            data["releaseStatus"] = "public"
             data["variantSet"] = self.variant_set
 
             messages = JSON_MESSAGES_EMPTY
@@ -303,34 +302,11 @@ class ClinVarExportConverter:
             return ValidatedJson(None, JsonMessages.error("Could not determine genome build of submission"))
 
     @property
-    def json_assertion_criteria(self) -> Union[dict, ValidatedJson]:
+    def json_assertion_criteria(self) -> str:
         assertion_criteria = self.value(SpecialEKeys.ASSERTION_METHOD)
-
-        assertion_method_lookups = self.clinvar_key.assertion_method_lookup
-        acmg_criteria = {
-            "citation": {
-                "db": "PubMed",
-                "id": "PMID:25741868"
-            },
-            "method": EvidenceKeyMap.cached_key(SpecialEKeys.ASSERTION_METHOD).pretty_value("acmg")
-        }
-
-        if assertion_criteria == "acmg":
-            return acmg_criteria
+        if assertion_name := self.clinvar_key.lookup_assertion_criteria_name(assertion_criteria):
+            return ValidatedJson(assertion_name)
         else:
-            for key, criteria in assertion_method_lookups.items():
-                raw_criteria = criteria
-                if criteria == "acmg":
-                    criteria = acmg_criteria
-
-                if not assertion_criteria:
-                    if not criteria or re.compile(key, RegexFlag.IGNORECASE).match(""):
-                        return ValidatedJson(criteria, JsonMessages.info(f"Using config for assertion method \"{key}\" : {json.dumps(raw_criteria)}"))
-                else:
-                    expr = re.compile(key, RegexFlag.IGNORECASE)
-                    if expr.match(assertion_criteria):
-                        return ValidatedJson(criteria, JsonMessages.info(f"Using config for assertion method \"{key}\" : {json.dumps(raw_criteria)}"))
-
             return ValidatedJson(None, JsonMessages.error(f"No match for assertion method of \"{assertion_criteria}\""))
 
     @property

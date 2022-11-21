@@ -31,7 +31,7 @@ from model_utils.managers import InheritanceManager
 
 from classification.enums.classification_enums import ShareLevel
 from library.enums.log_level import LogLevel
-from library.utils import import_class
+from library.utils import import_class, JsonObjType
 
 
 class Tag(models.Model):
@@ -270,7 +270,34 @@ class ClinVarKey(TimeStampedModel):
     default_affected_status = models.TextField(choices=ClinVarAssertionMethods.choices, null=True, blank=True)
     inject_acmg_description = models.BooleanField(blank=True, default=False)
     assertion_method_lookup = models.JSONField(null=False, default=dict)
+    assertion_method_resolution = models.JSONField(null=False, default=dict)
     citations_mode = models.TextField(choices=ClinVarCitationsModes.choices, default=ClinVarCitationsModes.all)
+
+    def lookup_assertion_criteria_name(self, assertion_criteria_value: Optional[str]) -> Optional[str]:
+        for key, criteria in self.assertion_method_lookup.items():
+            expr = re.compile(key, RegexFlag.IGNORECASE)
+            # if we have no value for assertion_criteria_value, see if we match ""
+            if not assertion_criteria_value and re.compile(key, RegexFlag.IGNORECASE).match(""):
+                return criteria
+
+            if expr.match(assertion_criteria_value):
+                return criteria
+
+        if assertion_criteria_value == "acmg":
+            return "acmg"
+
+        return None
+
+    def resolve_assertion_criteria_name(self, assertion_criteria_name: str) -> JsonObjType:
+        if resolution := self.assertion_method_resolution.get(assertion_criteria_name):
+            return resolution
+        elif assertion_criteria_name == "acmg":
+            return {
+                "db": "PubMed",
+                "id": "PMID:25741868"
+            }
+        else:
+            raise ValueError(f"Unknown Assertion Criteria Name '{assertion_criteria_name}'")
 
     @property
     def label(self) -> str:

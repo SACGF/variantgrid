@@ -222,6 +222,7 @@ class ClinVarExportBatch(TimeStampedModel):
     status = models.CharField(max_length=1, choices=ClinVarExportBatchStatus.choices, default=ClinVarExportBatchStatus.AWAITING_UPLOAD)
     submission_identifier = models.TextField(null=True, blank=True)
     file_url = models.TextField(null=True, blank=True)
+    assertion_method: models.TextField(null=True, blank=True)  # TODO, populate old records with ACMG
 
     def __str__(self):
         return f"ClinVar Submission Batch : {self.id} - {self.get_status_display()}"
