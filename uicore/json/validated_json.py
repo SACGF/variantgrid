@@ -210,6 +210,9 @@ class ValidatedJson:
     def __getitem__(self, item):
         return self.json_data[item]
 
+    def get(self, item):
+        return self.json_data.get(item)
+
     @lazy
     def all_messages(self) -> JsonMessages:
         """
