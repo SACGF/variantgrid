@@ -1,5 +1,6 @@
+from collections import defaultdict
 from dataclasses import dataclass
-from typing import Optional, Iterable, List, Any, Union
+from typing import Optional, Iterable, List, Union, Set, Dict
 from django.utils.safestring import SafeString
 from lazy import lazy
 from classification.enums import CriteriaEvaluation
@@ -126,7 +127,7 @@ class AcmgPointScore:
     def most_extreme_point_score(scores: Iterable['AcmgPointScore']) -> 'AcmgPointScore':
         """
         Return the ACMG Criteria with the largest absolute points (e.g. -4 is more extreme than 3)
-        If any record with criteria has non standard ACMG criteria, mark the result as non-standard
+        If any record with criteria has non-standard ACMG criteria, mark the result as non-standard
         :param scores: A list of scores to inspect for the most extreme score
         :return: The most extreme score, or NO_CRITERIA if none of the scores has_criteria
         """
@@ -178,7 +179,7 @@ class CriteriaStrengths:
         return ", ".join(str(cs) for cs in sorted(self.strength_list_met))
 
     def summary_string_short(self) -> str:
-        return ", ".join(f"{cs:short}" for cs in sorted(str for str in self.strength_list_met if not str.ekey.namespace))
+        return ", ".join(f"{cs:short}" for cs in sorted(strength for strength in self.strength_list_met if not strength.ekey.namespace))
 
     @property
     def has_criteria(self):
@@ -219,9 +220,37 @@ class CriteriaStrengths:
 
 @dataclass(frozen=True)
 class CriteriaCompare:
-    direction: str = "N"
-    has_value: bool = False
-    has_differences: bool = False
+    any_not_met: bool
+    strength_counts: Dict[CriteriaStrength, int]
+
+    @property
+    def has_value(self):
+        return bool(self.strength_counts)
+
+    @property
+    def direction(self) -> str:
+        directions: Set[str] = set()
+        for strength in self.strength_counts.keys():
+            directions.add(strength.strength_direction)
+        if len(directions) != 1:
+            # multiple or no directions, use "N"
+            return "N"
+        else:
+            return first(directions)
+
+    @property
+    def has_difference(self) -> bool:
+        return (len(self.strength_counts.keys()) + (1 if self.any_not_met else 0)) > 1
+
+    @property
+    def has_difference_unspecified(self) -> bool:
+        if not self.any_not_met:
+            if len(self.strength_counts.keys()) == 2 and any(strength.is_unspecified for strength in self.strength_counts.keys()):
+                return True
+            # two unspecified strengths are still has_difference_unspecified as they may be different strengths (whole point of unspecified)
+            if len(self.strength_counts.keys()) == 1 and first(self.strength_counts.keys()).is_unspecified and first(self.strength_counts.values()) > 1:
+                return True
+        return False
 
     @property
     def html(self):
@@ -231,13 +260,19 @@ class CriteriaCompare:
         hidden_text: str = ""
         icon_name: str
         style: str = ""
+        title: str = ""
 
         icon_name = "fa-solid fa-circle"
-        if self.has_differences:
+        if self.has_difference_unspecified:
+            icon_name = "fa-solid fa-circle-question"
+            title = "This allele has an unknown criteria for the given criteria. Unable to determine if this represents a difference or not."
+        elif self.has_difference:
             icon_name = "fa-solid fa-circle-half-stroke"
+            title = "This allele has different strengths for the given criteria."
 
         if self.direction == "N":
-            icon_name = "fa-solid fa-circle-exclamation"
+            title = "This allele has both benign and pathogenic strengths for the given criteria."
+            icon_name = "fa-solid fa-circle-half-stroke"
             style += "color:#d8d;"
             hidden_text = "!!"
         else:
@@ -248,10 +283,12 @@ class CriteriaCompare:
                 style += "color:#88f;"
                 hidden_text = "B"
 
-            if self.has_differences:
+            if self.has_difference_unspecified:
+                hidden_text += "?"
+            elif self.has_difference:
                 hidden_text += "!"
 
-        return SafeString(f'<i class="{icon_name}" style="{style}"></i><span style="opacity:0;width:0">{hidden_text}</span>')
+        return SafeString(f'<i class="{icon_name} hover-detail" style="{style}" title="{title}"></i><span style="opacity:0;width:0">{hidden_text}</span>')
 
 
 class CriteriaSummarizer:
@@ -259,33 +296,24 @@ class CriteriaSummarizer:
         self.strengths = strengths
 
     def __getitem__(self, item: str):
-        all_strengths = set()
-        all_directions = set()
-        any_met = False
+        strength_counts: Dict[CriteriaStrength, int] = defaultdict(int)
         any_not_met = False
 
         for strengths in self.strengths:
             single_has_value: bool = False
             # if we only want to compare when we have criteria
-            #if strengths.has_criteria:
             values = strengths[item]
             if not isinstance(values, list):
                 values = [values]
-            if value := first(value for value in values if value.strength_direction != "N"):
-                any_met = True
-                if not value.strength.endswith("X"):
-                    all_strengths.add(value)
-                all_directions.add(value.strength_direction)
-            else:
-                any_not_met = True
-                all_strengths.add(values[0])
+            if len(values) > 1 and (met_values := [value for value in values if value.is_met]):
+                values = met_values
+            for strength in values:
+                if not strength.is_met:
+                    any_not_met = True
+                else:
+                    strength_counts[strength] += 1
 
-        met_strengths = [strength for strength in all_strengths if strength.is_met]
-        if not any_met:
-            return CriteriaCompare()
-        else:
-            return CriteriaCompare(
-                has_differences=(any_met and any_not_met) or len(all_strengths) > 1,
-                has_value=any_met,
-                direction="N" if len(all_directions) != 1 else first(all_directions)
-            )
+        return CriteriaCompare(
+            any_not_met=any_not_met,
+            strength_counts=strength_counts
+        )
