@@ -15,6 +15,28 @@
     #vus_detail_table .value-with-icon i {
         font-size: 8pt;
     }
+    #vus_detail_table .dtrg-group td {
+        position: relative;
+    }
+    #vus_detail_table .dtrg-group .criteria {
+        text-align: center;
+    }
+    #vus_detail_table .dtrg-group .v-middle {
+        position: absolute;
+        top: 50%;
+        margin-top: -0.5rem;
+
+    }
+    #vus_detail_table .dtrg-group .h-middle {
+        position: absolute;
+        margin-left: -0.5rem;
+        left: 50%;
+    }
+    #vus_detail_table .dtrg-group .h-right {
+        position: absolute;
+        right: 10px;
+    }
+}
 </style>
 
 <table style="display:none">
@@ -32,35 +54,29 @@
                 </div>
             </td>
             <td class="text-right" style="font-weight:500">
-                {% with points=grouping.extreme_acmg_points %}
-                    {% if points.has_criteria %}
-                        {% if points.is_acmg_standard %}
-                            {% value_with_icon value=points.points %}
-                        {% else %}
-                            {% value_with_icon value=points.points help="One or more VUS records for this allele use a non-default ACMG curation method" icon="fa-solid fa-asterisk text-info" %}
-                        {% endif %}
-                    {% else %}
-                        {% value_with_icon value=None %}
-                    {% endif %}
-                {% endwith %}
+                <div class="v-middle h-right">
+                    {% acmg_points grouping.extreme_acmg_points %}
+                </div>
             </td>
             <td class="text-right" style="font-weight:500">
-                {% with patient_count=grouping.patient_count %}
-                    {% if patient_count.consolidates_variant_classifications %}
-                        {% value_with_icon value=patient_count.count help="One or more labs is unable to report number of patients, actual number of patients might be higher" icon="fa-solid fa-plus text-info" %}
-                    {% else %}
-                        {% value_with_icon value=patient_count.count %}
-                    {% endif %}
-                {% endwith %}
+                <div class="v-middle h-right">
+                    {% with patient_count=grouping.patient_count %}
+                        {% if patient_count.consolidates_variant_classifications %}
+                            {% value_with_icon value=patient_count.count help="One or more labs is unable to report number of patients, actual number of patients might be higher" icon="fa-solid fa-plus text-info" %}
+                        {% else %}
+                            {% value_with_icon value=patient_count.count %}
+                        {% endif %}
+                    {% endwith %}
+                </div>
             </td>
             {% with criteria_compare=grouping.criteria_compare %}
-                <td class="text-center">{{ criteria_compare.ps4.html }}</td>
-                <td class="text-center">{{ criteria_compare.pp1_bs4.html }}</td>
-                <td class="text-center">{{ criteria_compare.pm6.html }}</td>
-                <td class="text-center">{{ criteria_compare.ps2.html }}</td>
-                <td class="text-center">{{ criteria_compare.pm3.html }}</td>
-                <td class="text-center">{{ criteria_compare.pp4.html }}</td>
-                <td class="text-center">{{ criteria_compare.ps3_bs3.html }}</td>
+                <td class="criteria"><div class="v-middle h-middle">{{ criteria_compare.ps4.html }}</div></td>
+                <td class="criteria"><div class="v-middle h-middle">{{ criteria_compare.pp1_bs4.html }}</div></td>
+                <td class="criteria"><div class="v-middle h-middle">{{ criteria_compare.pm6.html }}</div></td>
+                <td class="criteria"><div class="v-middle h-middle">{{ criteria_compare.ps2.html }}</div></td>
+                <td class="criteria"><div class="v-middle h-middle">{{ criteria_compare.pm3.html }}</div></td>
+                <td class="criteria"><div class="v-middle h-middle">{{ criteria_compare.pp4.html }}</div></td>
+                <td class="criteria"><div class="v-middle h-middle">{{ criteria_compare.ps3_bs3.html }}</div></td>
             {% endwith %}
 
         </tr>
@@ -90,25 +106,21 @@
                 {% for lab_summary in grouping.lab_clinical_significances %}
                     <tr>
                         <td>{{ grouping.allele.pk }}</td>
-                        <td>
-                            <nomin>
-                            {{ lab_summary.lab }}
-                            {% if lab_summary.count > 1 %} x {{ lab_summary.count }}{% endif %}
-                            {% clinical_significance_inline lab_summary.clinical_significance_to %}
-                            </nomin>
-                        </td>
                         {% with strengths=lab_summary.latest.criteria_strengths %}
+                            <td data-search="{% for hgvs in grouping.c_hgvses %}{{ hgvs }} {% endfor %}">
+                                <nomin>
+                                {{ lab_summary.lab }}
+                                {% if lab_summary.count > 1 %} x {{ lab_summary.count }}{% endif %}
+                                {% clinical_significance_inline lab_summary.clinical_significance_to %} </nomin>
+                                {% if strengths.has_criteria %}
+                                <span class="mono text-muted">({{ strengths.summary_string_short }})</span>
+                                {% else %}
+                                <span class="no-value">No Criteria Provided</span>
+                                {% endif %}
+                            </td>
                             {% with points=strengths.acmg_point_score %}
                                 <td class="text-right" data-order="{{ grouping.extreme_acmg_points.sort_string }}_{{ grouping.allele.pk }}_{{ points.sort_string }}">
-                                    {% if points.has_criteria %}
-                                        {% if points.is_acmg_standard %}
-                                            {% value_with_icon value=points.points %}
-                                        {% else %}
-                                            {% value_with_icon value=points.points help="This record used a non-default ACMG curation method.</br>Points might not be an accurate reflection of the record." icon="fa-solid fa-asterisk text-info" %}
-                                        {% endif %}
-                                    {% else %}
-                                        {% value_with_icon %}
-                                    {% endif %}
+                                    {% acmg_points points %}
                                 </td>
                             {% endwith %}
                             <td class="text-right" data-order="{{ grouping.patient_count.sort_string }}_{{ grouping.allele.pk }}_{{ lab_summary.patient_count.sort_string }}">
@@ -138,20 +150,21 @@
 
     $('#vus_detail_table').DataTable({
         paging: false,
-        searching: false,
-        dom: 'p',
+        searching: true,
+        dom: 'fp',
+        language: {'searchPlaceholder': 'c.HGVS/gene symbol'},
         columns: [
-            {visible: false}, // Allele ID
-            {orderable: false}, // Lab
-            {orderable: true, orderData: [2, 3]}, // Score
-            {orderable: true}, // Patients
-            {orderable: false}, // PS4
-            {orderable: false}, // PP1 BS4
-            {orderable: false}, // PM6
-            {orderable: false}, // PS2
-            {orderable: false}, // PM3
-            {orderable: false}, // PP4
-            {orderable: false}, // PS3 / BS3
+            {visible: false, searchable:false}, // Allele ID
+            {orderable: false, searchable: true}, // Lab (not actually searchable but we put data-search on it)
+            {orderable: true, searchable: false, orderData: [2, 3]}, // Score
+            {orderable: true, searchable: false}, // Patients
+            {orderable: false, searchable: false}, // PS4
+            {orderable: false, searchable: false}, // PP1 BS4
+            {orderable: false, searchable: false}, // PM6
+            {orderable: false, searchable: false}, // PS2
+            {orderable: false, searchable: false}, // PM3
+            {orderable: false, searchable: false}, // PP4
+            {orderable: false, searchable: false}, // PS3 / BS3
         ],
         rowGroup: {
             dataSrc: 0,

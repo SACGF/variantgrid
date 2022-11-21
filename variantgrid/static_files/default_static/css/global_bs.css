@@ -43,6 +43,14 @@ label, form label {
   background-color: #efefef;
 }
 
+tbody tr.dtrg-group.dtrg-start:not(:first-child) td {
+  border-top: 40px solid white;
+}
+
+.dataTables_filter input[type=search] {
+  min-width: 200px;
+}
+
 .table th {
   font-weight: 500;
 }
@@ -1210,6 +1218,10 @@ a .c-hgvs-body .c-hgvs-transcript, a .c-hgvs-body .c-hgvs-nomen {
 }
 .crit-direction-P.crit-strength-5 {
   background-color: #faa;
+}
+
+.crit-direction-X {
+  background-color: #faf;
 }
 
 div.dataTables_processing {

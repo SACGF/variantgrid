@@ -58,6 +58,15 @@ label, form label {
   background-color: #efefef;
 }
 
+tbody tr.dtrg-group.dtrg-start:not(:first-child) td {
+    border-top: 40px solid white;
+}
+
+// most likely DataTable search
+.dataTables_filter input[type=search] {
+  min-width: 200px;
+}
+
 /// DATATABLES
 
 // When showing just a preview
@@ -1244,6 +1253,9 @@ a .c-hgvs-body {
   &.crit-strength-5 {
     background-color: #faa;
   }
+}
+.crit-direction-X {
+  background-color: #faf;
 }
 
 // Datatables - fix ugly loading indicator
