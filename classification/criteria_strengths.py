@@ -223,7 +223,6 @@ class CriteriaCompare:
     has_value: bool = False
     has_differences: bool = False
 
-
     @property
     def html(self):
         if not self.has_value:
@@ -267,18 +266,19 @@ class CriteriaSummarizer:
 
         for strengths in self.strengths:
             single_has_value: bool = False
-            if strengths.has_criteria:
-                values = strengths[item]
-                if not isinstance(values, list):
-                    values = [values]
-                if value := first(value for value in values if value.strength_direction != "N"):
-                    any_met = True
-                    if not value.strength.endswith("X"):
-                        all_strengths.add(value)
-                    all_directions.add(value.strength_direction)
-                else:
-                    any_not_met = True
-                    all_strengths.add(values[0])
+            # if we only want to compare when we have criteria
+            #if strengths.has_criteria:
+            values = strengths[item]
+            if not isinstance(values, list):
+                values = [values]
+            if value := first(value for value in values if value.strength_direction != "N"):
+                any_met = True
+                if not value.strength.endswith("X"):
+                    all_strengths.add(value)
+                all_directions.add(value.strength_direction)
+            else:
+                any_not_met = True
+                all_strengths.add(values[0])
 
         met_strengths = [strength for strength in all_strengths if strength.is_met]
         if not any_met:

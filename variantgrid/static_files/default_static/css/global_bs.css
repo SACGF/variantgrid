@@ -1220,6 +1220,10 @@ a .c-hgvs-body .c-hgvs-transcript, a .c-hgvs-body .c-hgvs-nomen {
   background-color: #faa;
 }
 
+.crit-direction-X {
+  background-color: #faf;
+}
+
 div.dataTables_processing {
   border-radius: 4px;
 }

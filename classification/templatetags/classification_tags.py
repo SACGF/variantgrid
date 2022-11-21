@@ -538,10 +538,16 @@ def criteria_strength(strength: CriteriaStrength):
 def criteria_strength_td(strength: Union[CriteriaStrength, Collection[CriteriaStrength]]):
     # going to display NM, NS, NA all the same
     if isinstance(strength, list):
-        if first_met := first(str for str in strength if str.is_met):
-            strength = first_met
+        all_met_strengths = [str for str in strength if str.is_met]
+        if len(all_met_strengths) > 1:
+            return {
+                "strengths": all_met_strengths
+            }
+        elif len(all_met_strengths) == 1:
+            strength = all_met_strengths[0]
         else:
-            strength = first(strength)
+            strength = strength[0]
+
     return {
         "strength": strength
     }
