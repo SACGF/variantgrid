@@ -157,7 +157,7 @@
             $('<td>', {class: 'toggle-cell', html:toggleButton}).appendTo(row);
 
              $('<td>', {class: 'term-cell', html:[
-                $('<a>', {class: 'external-link', target:'blank', href:onto.url, text:onto.id}),
+                $('<a>', {target:'blank', href:onto.url, text:onto.id}),
                 $('<br>'),
                 onto.title
             ]}).appendTo(row);
@@ -722,7 +722,7 @@
                     Condition matching collects classifications that share the same "condition under curation", and allows you to assign
                     standard ontology terms to them.<br/>
                     If a free text condition is provided, text will be matched to MONDO terms as a first pass
-                    (see <a class="external-link" href="https://mondo.monarchinitiative.org/" target="_blank">https://mondo.monarchinitiative.org/</a> for more information)<br/>
+                    (see <a href="https://mondo.monarchinitiative.org/" target="_blank">https://mondo.monarchinitiative.org/</a> for more information)<br/>
                     e.g. The text "sifrim-hitz-weiss syndrome" can be assigned to MONDO:0014946
                 </p>
                 <p>

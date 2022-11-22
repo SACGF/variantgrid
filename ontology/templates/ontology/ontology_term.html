@@ -61,14 +61,14 @@
                     {% labelled label="Aliases" %}{% for alias in term.aliases %}{{ alias }}<br/>{% endfor %}{% endlabelled %}
                 {% endif %}
                 {% labelled label="URL" %}
-                    <a href="{{ term.external_url }}" class="external-link hover-link" target="_blank">{{ term.external_url }}</a>
+                    <a href="{{ term.external_url }}" class="hover-link" target="_blank">{{ term.external_url }}</a>
                 {% endlabelled %}
                 {% labelled label="Cross Ontology URL" %}
-                    <a href="https://www.ebi.ac.uk/spot/oxo/terms/{{ term.id }}" class="external-link" target="_blank">https://www.ebi.ac.uk/spot/oxo/terms/{{ term.id }}</a>
+                    <a href="https://www.ebi.ac.uk/spot/oxo/terms/{{ term.id }}" target="_blank">https://www.ebi.ac.uk/spot/oxo/terms/{{ term.id }}</a>
                 {% endlabelled %}
                 {% if term.ontology_service == "MONDO" %}
                     {% labelled label="Hierarchy URL" %}
-                        <a class="external-link" target="_blank"
+                        <a target="_blank"
                            href="https://www.ebi.ac.uk/ols/ontologies/MONDO/terms?iri=http%3A%2F%2Fpurl.obolibrary.org%2Fobo%2F{{ term.url_safe_id }}">
                         https://www.ebi.ac.uk/ols/ontologies/MONDO/terms?iri=http%3A%2F%2Fpurl.obolibrary.org%2Fobo%2F{{ term.url_safe_id }}
                         </a>
