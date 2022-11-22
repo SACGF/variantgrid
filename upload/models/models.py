@@ -12,7 +12,7 @@ from django.db import models, transaction
 from django.db.models.aggregates import Max
 from django.db.models.deletion import CASCADE, SET_NULL
 from django.db.models.query import QuerySet
-from django.db.models.signals import pre_delete
+from django.db.models.signals import pre_delete, post_save
 from django.dispatch.dispatcher import receiver
 from django.utils import timezone
 from django_extensions.db.models import TimeStampedModel
@@ -690,3 +690,9 @@ class UploadSettingsFileType(models.Model):
 
     class Meta:
         unique_together = ('upload_settings', 'file_type')
+
+
+@receiver(post_save, sender=UploadSettings)
+def upload_settings_post_save_handler(sender, instance, **kwargs):
+    if kwargs.get("created"):
+        instance.create_default_visible_file_types()
