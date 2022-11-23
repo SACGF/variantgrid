@@ -556,3 +556,12 @@ def criteria_strength_td(strength: Union[CriteriaStrength, Collection[CriteriaSt
 @register.inclusion_tag("classification/tags/acmg_points.html")
 def acmg_points(points: AcmgPointScore):
     return {"points": points}
+
+
+@register.inclusion_tag("classification/tags/evidence_key_heading.html")
+def evidence_key_heading(key: str, include_help: bool = True):
+    e_key = EvidenceKeyMap.cached_key(key)
+    return {
+        "e_key": e_key,
+        "help":  e_key.description if include_help else None
+    }

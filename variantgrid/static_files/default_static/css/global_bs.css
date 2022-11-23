@@ -1242,4 +1242,16 @@ div.dataTables_processing > div:last-child {
   width: auto !important;
 }
 
+li.help-item {
+  display: flex;
+}
+li.help-item :first-child {
+  display: inline-block;
+  min-width: 150px;
+}
+li.help-item :last-child {
+  display: inline-block;
+  flex-grow: 1;
+}
+
 /*# sourceMappingURL=global_bs.css.map */

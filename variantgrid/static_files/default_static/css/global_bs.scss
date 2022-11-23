@@ -1279,3 +1279,15 @@ div.dataTables_processing {
 div.dataTables_processing>div:last-child {
   width: auto !important;
 }
+
+li.help-item {
+  display: flex;
+  :first-child {
+    display: inline-block;
+    min-width: 150px;
+  }
+  :last-child {
+    display: inline-block;
+    flex-grow: 1;
+  }
+}

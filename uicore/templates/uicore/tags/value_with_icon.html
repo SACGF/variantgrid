@@ -1,4 +1,4 @@
-<span class="hover-detail d-inline-block value-with-icon" {% if help %}title="{{ help }}"{% endif %}>
+<span class="{% if help %}hover-detail{% endif %} d-inline-block value-with-icon" {% if help %}title="{{ help }}"{% endif %}>
     <div class="d-inline-block value">{% if value is None %}<span class="no-value">-</span>{% else %}{{ value }}{% endif %}</div>
     <span class="d-inline-block" style="width:12px">
         {% if icon %}

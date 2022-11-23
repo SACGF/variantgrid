@@ -91,13 +91,13 @@
             <th>c.HGVS/Lab</th>
             <th class="text-right">(Max Abs)<br/>Score</th>
             <th class="text-right">(Total)<br/>Patients</th>
-            <th class="crit-value">PS4</th>
-            <th class="crit-value">PP1<br/>BS4</th>
-            <th class="crit-value">PM6</th>
-            <th class="crit-value">PS2</th>
-            <th class="crit-value">PM3</th>
-            <th class="crit-value">PP4</th>
-            <th class="crit-value">PS3<br/>BS3</th>
+            <th class="crit-value">{% evidence_key_heading 'ps4' %}</th>
+            <th class="crit-value">{% evidence_key_heading 'pp1' %}<br/>{% evidence_key_heading 'bs4' %}</th>
+            <th class="crit-value">{% evidence_key_heading 'pm6' %}</th>
+            <th class="crit-value">{% evidence_key_heading 'ps2' %}</th>
+            <th class="crit-value">{% evidence_key_heading 'pm3' %}</th>
+            <th class="crit-value">{% evidence_key_heading 'pp4' %}</th>
+            <th class="crit-value">{% evidence_key_heading 'ps3' %}<br/>{% evidence_key_heading 'bs3' %}</th>
         </tr>
     </thead>
     <tbody>
@@ -156,7 +156,7 @@
         columns: [
             {visible: false, searchable:false}, // Allele ID
             {orderable: false, searchable: true}, // Lab (not actually searchable but we put data-search on it)
-            {orderable: true, searchable: false, orderData: [2, 3]}, // Score
+            {orderable: true, searchable: false}, // Score
             {orderable: true, searchable: false}, // Patients
             {orderable: false, searchable: false}, // PS4
             {orderable: false, searchable: false}, // PP1 BS4
@@ -173,6 +173,7 @@
                 let alleleId = rows.data()[0][0];
                 return $(`#allele-${alleleId}-header`).clone().removeAttr('id');
             }
-        }
+        },
+        order: [[2, 'desc'], [3, 'desc']]
     });
 </script>

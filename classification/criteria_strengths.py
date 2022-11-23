@@ -263,9 +263,11 @@ class CriteriaCompare:
         title: str = ""
 
         icon_name = "fa-solid fa-circle"
+        title = "This allele has the same strength across all records for this criteria."
+
         if self.has_difference_unspecified:
             icon_name = "fa-solid fa-circle-question"
-            title = "This allele has an unknown criteria for the given criteria. Unable to determine if this represents a difference or not."
+            title = "This allele has an unspecified strength for the given criteria. Unable to determine if this represents a difference or not."
         elif self.has_difference:
             icon_name = "fa-solid fa-circle-half-stroke"
             title = "This allele has different strengths for the given criteria."

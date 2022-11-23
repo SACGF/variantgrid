@@ -7,7 +7,19 @@
 {% block content %}
 <div class="container">
     {% page_help_embedded title='VUS Resolution' %}
-        You can review which of your classifications have overlaps with other labs where all records are VUS.
+        You can review which of your classifications have overlaps with other labs where all records are VUS.<br/>
+        <br/>
+        There are columns provided for the following:<br/>
+        <ul class="list-group">
+            <li class="list-group-item help-item"><label>(Max Abs) Score</label><span>The maximum absolute ACMG point score for this allele. Some labs use curation methods that don't map properly to ACMG point system.</span></li>
+            <li class="list-group-item help-item"><label>(Total) Patients</label><span>Number of patients for the given Allele - typically measured by number of classifications. Some labs are unable to provide patient counts.</span></li>
+            <li class="list-group-item help-item"><label>ACMG Criteria</label><span>Hover over the headings to see the descriptions. The header will have one of the following icons</span></li>
+            <ul class="list-group">
+                <li class="list-group-item help-item"><i class="fa-solid fa-circle text-muted"></i><span>Indicates all classifications share the same strength for this criteria.</span></li>
+                <li class="list-group-item help-item"><i class="fa-solid fa-circle-question text-muted"></i><span>Indicates all classifications have a strength for this criteria, but one or more is "unspecified". Could indicate a difference.</span></li>
+                <li class="list-group-item help-item"><i class="fa-solid fa-circle-half-stroke text-muted"></i><span>Indicates that classifications for this criteria have different strengths.</span></li>
+            </ul>
+        </ul>
     {% end_page_help_embedded %}
     {% lab_picker data=lab_picker_data %}
     <p class="text-info">In future we hope to provide more tools to assist in resolving VUSs to Pathogenic/Benign</p>
