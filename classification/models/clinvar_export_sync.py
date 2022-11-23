@@ -14,6 +14,9 @@ from uicore.json.json_types import JsonObjType
 
 
 class _ClinVarExportConfigDic(TypedDict):
+    """
+    How the configuration should be stored in the secrets file
+    """
     mode: str
     api_key: str
     org_id: str

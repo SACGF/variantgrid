@@ -165,55 +165,6 @@ class ClinVarExport(TimeStampedModel):
         from classification.models.clinvar_export_convertor import ClinVarExportConverter
         return ClinVarExportConverter(self).convert().changes
 
-    # def differences_since_last_submission(self) -> Optional[JsonObjType]:
-    #     if self.classification_based_on:
-    #         if (previous := self.previous_submission) and (submission_body := self.submission_body):  # no point showing diffs if currently no classification
-    #             return JsonDiffs.differences(previous.submission_body, submission_body.pure_json()).to_json("previous", "current")
-    #     return None
-    #
-    # def update(self):
-    #     """
-    #     Uses the linked data to newly generate JSON
-    #     Will not update the classification used, update_classification should generally be called externally
-    #     """
-    #
-    #     # very messy dependancy handling
-    #     from classification.models.clinvar_export_convertor import ClinVarExportConverter
-    #
-    #     # TODO, maybe optimise this if nothing changes?
-    #     converted_record = ClinVarExportConverter(clinvar_export_record=self).convert()
-    #
-    #     status: ClinVarExportStatus
-    #     if converted_record.no_record:
-    #         status = ClinVarExportStatus.IN_ERROR
-    #     else:
-    #         self.submission_body_validated = converted_record.body.serialize()
-    #         self.submission_grouping_validated = converted_record.header.serialize()
-    #         lazy.invalidate('submission_body')
-    #         lazy.invalidate('submission_grouping')
-    #
-    #     if (cm := self.classification_based_on) and cm.classification.flag_collection_safe.get_open_flag_of_type(classification_flag_types.classification_not_public):
-    #         status = ClinVarExportStatus.EXCLUDE
-    #     elif converted_record.has_errors:
-    #         status = ClinVarExportStatus.IN_ERROR
-    #     else:
-    #         if converted_record.is_new:
-    #             status = ClinVarExportStatus.NEW_SUBMISSION
-    #         elif converted_record.changes:
-    #             status = ClinVarExportStatus.CHANGES_PENDING
-    #         else:
-    #             status = ClinVarExportStatus.UP_TO_DATE
-    #
-    #     self.status = status
-    #     self.save()
-    #
-    # def submission_data(self):
-    #     return ClinVarExportJson(
-    #         clinvar_export=self,
-    #         grouping=self.submission_header_validated,
-    #         body=self.submission_body
-    #     )
-
 
 class ClinVarExportBatchStatus(models.TextChoices):
     """

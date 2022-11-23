@@ -17,11 +17,30 @@ from uicore.json.validated_json import JsonMessages, JSON_MESSAGES_EMPTY, Valida
 CLINVAR_ACCEPTED_TRANSCRIPTS = {"NM_", "NR_"}
 
 
+class ClinVarCitation(TypedDict, total=False):
+    """
+    Dictionary representation of a citation in the ClinVar format
+    """
+    db: str
+    id: str
+    url: str
+
+
 @dataclass(frozen=True)
 class ClinVarExportChanges:
+    """
+    Keeps track of what changed between what was last submitted and current.
+    Consider renaming to ClinVarExportDifferences
+    """
+
     grouping_changes: Optional[JsonDiffs]
+    """ Changes in the grouping header, None if the previous record didn't have a grouping """
+
     body_changes: Optional[JsonDiffs]
+    """ Changes in the body """
+
     version_change: bool = False
+    """ Indicates if the record previously submitted under a different version """
 
     @property
     def grouping_changes_json(self):
@@ -37,16 +56,27 @@ class ClinVarExportChanges:
 
 @dataclass(frozen=True)
 class ClinVarExportData:
+    """
+    Provides functionality around a ClinVarExport to update it or put it into a batch
+    """
     clinvar_export: 'ClinVarExport'
+    """ The record this export data is for """
+
     grouping: Optional[ValidatedJson] = None
+    """ The body data we'll be using (could either be as it's cached in the record or what the most up to date grouping
+    header would look like"""
+
     body: Optional[ValidatedJson] = None
+    """ The body data we'll be using (could either be as it's cached in the record or what the most up to date body
+    would look like"""
 
     @property
     def no_record(self) -> bool:
+        """ Indicates if there's no valid classification """
         return self.clinvar_export.classification_based_on is None
 
     @lazy
-    def body_json(self):
+    def body_json(self) -> JsonObjType:
         return self.body.pure_json()
 
     @property
@@ -63,14 +93,20 @@ class ClinVarExportData:
 
     @property
     def is_new(self):
+        """ Indicates if this is the first time the record has been submitted.
+        Important, this is not the same as already having a SCV """
         return not self._previous_submission
 
     @property
     def is_valid(self):
+        """ Are we able to send this data to ClinVar - important does NOT check status """
         return bool(self.grouping) and bool(self.body) and not self.has_errors and 'assertionCriteria' in self.grouping
 
     @lazy
     def changes(self) -> Optional[ClinVarExportChanges]:
+        """
+        Differences between this data and the previously submitted
+        """
         if self.no_record:
             return None
         if previous_submission := self._previous_submission:
@@ -85,6 +121,11 @@ class ClinVarExportData:
         return None
 
     def submission_full(self) -> JsonObjType:
+        """
+        JSON data including recordStatus and scv, not normally included in body as we don't want the assigning of a SCV
+        to generate a change
+        :return:
+        """
         json_data = self.body.pure_json()
         if scv := self.clinvar_export.scv:
             json_data["recordStatus"] = "update"
@@ -94,7 +135,7 @@ class ClinVarExportData:
         return json_data
 
     @property
-    def assertion_criteria(self) -> Optional[str]:
+    def assertion_criteria(self) -> Optional[ClinVarCitation]:
         return self.grouping.pure_json().get("assertionCriteria") if self.grouping else None
 
     @property
@@ -106,6 +147,9 @@ class ClinVarExportData:
         return self.body_json.get("localKey")
 
     def apply(self):
+        """
+        Updates the underlying ClinVarExport record with this data, and updates the status
+        """
         clinvar_export = self.clinvar_export
 
         status: ClinVarExportStatus
@@ -131,6 +175,9 @@ class ClinVarExportData:
 
     @staticmethod
     def current(clinvar_export: ClinVarExport) -> 'ClinVarExportData':
+        """
+        Make ClinVarExoprtData based on current evidence (good if we just reloaded clinvar_export from the DB)
+        """
         return ClinVarExportData(
             clinvar_export=clinvar_export,
             grouping=clinvar_export.submission_grouping,
@@ -211,18 +258,6 @@ class ClinVarEvidenceKey:
     def __bool__(self):
         # think this is default behaviour for bool
         return len(self) > 0
-
-
-# Dictionary definitions, we don't have many since we deal more with ValidatedJSon where a typed dictionary doesn't fit
-
-
-class ClinVarCitation(TypedDict, total=False):
-    """
-    Dictionary representation of a citation in the ClinVar format
-    """
-    db: str
-    id: str
-    url: str
 
 
 class ClinVarExportConverter:
