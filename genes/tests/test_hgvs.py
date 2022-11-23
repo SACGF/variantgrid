@@ -32,6 +32,8 @@ class TestAnnotationVCF(TestCase):
             # Good brackets HGVS (just testing gene symbol)
             "NM_001754.5(RUNX1):c.1415T>C",
             "NM_032638:c.1126_1133DUP",  # Case
+            "NM_001754.5:557T>A",  # Missing "c."
+            "NC_000007.13:117199563G>T",  # Missing "g."
         ]
 
         for bad_hgvs in BAD_HGVS:

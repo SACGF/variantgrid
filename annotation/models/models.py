@@ -35,7 +35,8 @@ from library.django_utils.django_partition import RelatedModelsPartitionModel
 from library.utils import invert_dict, name_from_filename
 from ontology.models import OntologyVersion
 from patients.models_enums import GnomADPopulation
-from snpdb.models import GenomeBuild, Variant, VariantGridColumn, Q, VCF, DBSNP_PATTERN, VARIANT_PATTERN
+from snpdb.models import GenomeBuild, Variant, VariantGridColumn, Q, VCF, DBSNP_PATTERN, VARIANT_PATTERN, \
+    HGVS_UNCLEANED_PATTERN
 from snpdb.models.models_enums import ImportStatus
 
 
@@ -1087,10 +1088,9 @@ class ManualVariantEntry(models.Model):
 
     @staticmethod
     def get_entry_type(line: str) -> ManualVariantEntryType:
-        HGVS_MINIMAL_PATTERN = re.compile(r"[^:].+:[cgp]\..*\d+.*")
         MATCHERS = {
             DBSNP_PATTERN: ManualVariantEntryType.DBSNP,
-            HGVS_MINIMAL_PATTERN: ManualVariantEntryType.HGVS,
+            HGVS_UNCLEANED_PATTERN: ManualVariantEntryType.HGVS,
             VARIANT_PATTERN: ManualVariantEntryType.VARIANT,
         }
         for k, v in MATCHERS.items():

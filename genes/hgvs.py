@@ -457,6 +457,8 @@ class HGVSMatcher:
     # noinspection RegExpSingleCharAlternation
     HGVS_SLOPPY_PATTERN = re.compile(r"(\d):?(c|g|p)\.?(\d+)")
     HGVS_SLOPPY_REPLACE = r"\g<1>:\g<2>.\g<3>"
+    HGVS_TRANSCRIPT_NO_CDOT = re.compile(r"^(NM_|ENST)\d+.*:\d+")
+    HGVS_CONTIG_NO_GDOT = re.compile(r"^NC_\d+.*:\d+")
 
     HGVS_METHOD_PYHGVS = f"pyhgvs v{metadata.version('pyhgvs')}"
     HGVS_METHOD_CLINGEN_ALLELE_REGISTRY = "ClinGen Allele Registry"
@@ -969,6 +971,12 @@ class HGVSMatcher:
 
         cleaned_hgvs = cls.TRANSCRIPT_NO_UNDERSCORE.sub(cls.TRANSCRIPT_UNDERSCORE_REPLACE, cleaned_hgvs)
         cleaned_hgvs = cls.HGVS_SLOPPY_PATTERN.sub(cls.HGVS_SLOPPY_REPLACE, cleaned_hgvs)
+
+        # If it contains a transcript and a colon, but no "c." then add it
+        if cls.HGVS_TRANSCRIPT_NO_CDOT.match(cleaned_hgvs):
+            cleaned_hgvs = cleaned_hgvs.replace(":", ":c.")
+        elif cls.HGVS_CONTIG_NO_GDOT.match(cleaned_hgvs):
+            cleaned_hgvs = cleaned_hgvs.replace(":", ":g.")
         return cleaned_hgvs
 
     @classmethod

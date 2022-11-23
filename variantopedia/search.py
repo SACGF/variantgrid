@@ -32,7 +32,7 @@ from seqauto.models import SequencingRun, Experiment
 from snpdb.clingen_allele import get_clingen_allele
 from snpdb.models import VARIANT_PATTERN, LOCUS_PATTERN, LOCUS_NO_REF_PATTERN, DBSNP_PATTERN, Allele, Contig, \
     ClinGenAllele, GenomeBuild, Sample, Variant, Sequence, VariantCoordinate, UserSettings, Organization, Lab, VCF, \
-    DbSNP, Cohort
+    DbSNP, Cohort, HGVS_UNCLEANED_PATTERN
 from snpdb.search2 import SearchInput, SearchResponseRecordAbstract, SearchResponse
 from upload.models import ModifiedImportedVariant
 from variantgrid.perm_path import get_visible_url_names
@@ -236,6 +236,12 @@ class SearchResult:
             return True
         return False
 
+    def __str__(self):
+        s = f"SearchResult (type={self.search_type})"
+        if self.record is not None:
+            s += f": {self.record}"
+        return s
+
 
 @dataclass(frozen=True)
 class SearchError:
@@ -322,7 +328,6 @@ class Searcher:
         """
         HAS_ALPHA_PATTERN = re.compile(r"[a-zA-Z]")
         NOT_WHITESPACE = re.compile(r"\S+")
-        HGVS_UNCLEANED_PATTERN = re.compile(r"[^:]([cnmg]\.|:[cnmg]).*\d+")  # Bare bones match - should tighten...
         COSMIC_PATTERN = re.compile(r"^COS[MV](\d+)$")  # Old or new
         CLINGEN_ALLELE_PATTERN = re.compile(r"^CA")
         TRANSCRIPT_PATTERN = re.compile(r"^(ENST|NM_|NR_|XR_)\d+\.?\d*$")
@@ -346,7 +351,7 @@ class Searcher:
             (SearchTypes.COSMIC, COSMIC_PATTERN, search_cosmic),
         ]
         self.genome_agnostic_searches = [
-            (SearchTypes.GENE, GENE_SYMBOL_PATTERN, search_gene_symbol),  # special case
+            (SearchTypes.GENE_SYMBOL, GENE_SYMBOL_PATTERN, search_gene_symbol),  # special case
             (SearchTypes.GENE, GENE_PATTERN, search_gene),  # special case
             (SearchTypes.EXPERIMENT, HAS_ALPHA_PATTERN, search_experiment),
             (SearchTypes.EXTERNAL_PK, HAS_ALPHA_PATTERN, search_external_pk),
