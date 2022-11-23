@@ -4,8 +4,8 @@ See https://bitbucket.org/sacgf/variantgrid/wiki/Annotation%20Setup
 """
 from variantgrid.settings.components.default_settings import get_aws_secrets
 
-GDAL_LIBRARY_PATH="/opt/homebrew/Cellar/gdal/3.4.2_2/lib/libgdal.30.dylib"
-GEOS_LIBRARY_PATH="/opt/homebrew/Cellar/geos/3.10.2/lib/libgeos_c.dylib"
+GDAL_LIBRARY_PATH="/opt/homebrew/Cellar/gdal/3.5.3/lib/libgdal.31.dylib"
+GEOS_LIBRARY_PATH="/opt/homebrew/Cellar/geos/3.11.1/lib/libgeos_c.dylib"
 # LDFLAGS="-L/opt/homebrew/opt/llvm/lib"
 # CPPFLAGS="-I/opt/homebrew/opt/llvm/include"
 # IMPORTANT : THE BELOW IMPORTS ARE USED TO APPLY THEIR RESPECTIVE SETTINGS VALUES

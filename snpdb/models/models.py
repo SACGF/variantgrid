@@ -31,7 +31,7 @@ from model_utils.managers import InheritanceManager
 
 from classification.enums.classification_enums import ShareLevel
 from library.enums.log_level import LogLevel
-from library.utils import import_class
+from library.utils import import_class, JsonObjType
 
 
 class Tag(models.Model):
@@ -272,6 +272,32 @@ class ClinVarKey(TimeStampedModel):
     assertion_method_lookup = models.JSONField(null=False, default=dict)
     citations_mode = models.TextField(choices=ClinVarCitationsModes.choices, default=ClinVarCitationsModes.all)
 
+    def assertion_criteria_vg_to_code(self, vg_value: str) -> Optional[JsonObjType]:
+        """
+        :param raw_value: Value as stored in the evidence key
+        :return: The code we map to, None indicates we don't have a mapping
+        """
+        def map_value(raw_value: str):
+            for key, criteria in self.assertion_method_lookup.items():
+                expr = re.compile(key, RegexFlag.IGNORECASE)
+                # if we have no value for assertion_criteria_value, see if we match ""
+                if not raw_value and re.compile(key, RegexFlag.IGNORECASE).match(""):
+                    return criteria
+
+                if expr.match(raw_value):
+                    return criteria
+
+            return raw_value
+
+        mapped_value = map_value(vg_value)
+        if mapped_value == "acmg":
+            return {
+                "db": "PubMed",
+                "id": "PMID:25741868"
+            }
+        else:
+            return mapped_value
+
     @property
     def label(self) -> str:
         return self.name if self.name else self.id
@@ -285,14 +311,14 @@ class ClinVarKey(TimeStampedModel):
     def clean(self):
         #  validate assertion method lookup
         if not isinstance(self.assertion_method_lookup, dict):
-            raise ValidationError({'assertion_method_lookup': ValidationError("Must be a dictionary of regular expression keys to \"acmg\" or {citation: db, id or url} and {method: str}")})
+            raise ValidationError({'assertion_method_lookup': ValidationError("Must be a dictionary of regular expression keys to \"acmg\" or {db,id, url}")})
         for key, assertion_dict in self.assertion_method_lookup.items():
             try:
                 re.compile(key)
             except:
                 raise ValidationError({'assertion_method_lookup': ValidationError('%s is not a valid regular expression', params={'key': key})})
-            if assertion_dict != "acmg" and (not isinstance(assertion_dict, dict) or 'citation' not in assertion_dict or 'method' not in assertion_dict):
-                raise ValidationError({'assertion_method_lookup': ValidationError('%s must have value for citation (db,id or url) and method', params={'key': key})})
+            if assertion_dict != "acmg" and (not isinstance(assertion_dict, dict)):
+                raise ValidationError({'assertion_method_lookup': ValidationError('%s must be acmg or a citation to curation method', params={'key': key})})
 
     @staticmethod
     def clinvar_keys_for_user(user: User) -> QuerySet:

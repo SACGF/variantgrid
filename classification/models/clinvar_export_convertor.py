@@ -1,23 +1,141 @@
-import json
-import re
-from re import RegexFlag
-from typing import List, Any, Mapping, TypedDict, Union
-
+from dataclasses import dataclass
+from typing import List, Any, Mapping, TypedDict, Optional
 from lazy import lazy
-
 from annotation.regexes import DbRegexes, db_ref_regexes
 from classification.enums import SpecialEKeys, EvidenceKeyValueType, ShareLevel
 from classification.models import ClassificationModification, EvidenceKeyMap, EvidenceKey, \
-    MultiCondition, ClinVarExport, classification_flag_types, Classification
+    MultiCondition, ClinVarExport, classification_flag_types, Classification, ClinVarExportStatus, \
+    ClinVarExportSubmission, CLINVAR_EXPORT_CONVERSION_VERSION
 from classification.models.evidence_mixin import VCDbRefDict
 from genes.hgvs import CHGVS
-from library.utils import html_to_text
+from library.utils import html_to_text, JsonObjType, JsonDiffs
 from ontology.models import OntologyTerm, OntologyService
 from snpdb.models import ClinVarKey, ClinVarCitationsModes
 from uicore.json.validated_json import JsonMessages, JSON_MESSAGES_EMPTY, ValidatedJson
 
 # Code in this file is responsible for converting VariantGrid formatted classifications to ClinVar JSON
 CLINVAR_ACCEPTED_TRANSCRIPTS = {"NM_", "NR_"}
+
+
+@dataclass(frozen=True)
+class ClinVarExportChanges:
+    grouping_changes: Optional[JsonDiffs]
+    body_changes: Optional[JsonDiffs]
+    version_change: bool = False
+
+    @property
+    def grouping_changes_json(self):
+        return self.grouping_changes.to_json("previous", "current")
+
+    @property
+    def body_changes_json(self):
+        return self.body_changes.to_json("previous", "current")
+
+    def __bool__(self):
+        return self.version_change or bool(self.grouping_changes) or bool(self.body_changes)
+
+
+@dataclass(frozen=True)
+class ClinVarExportData:
+    clinvar_export: 'ClinVarExport'
+    grouping: Optional[ValidatedJson] = None
+    body: Optional[ValidatedJson] = None
+
+    @property
+    def no_record(self) -> bool:
+        return self.clinvar_export.classification_based_on is None
+
+    @lazy
+    def body_json(self):
+        return self.body.pure_json()
+
+    @property
+    def has_errors(self) -> bool:
+        if self.grouping and self.grouping.has_errors:
+            return True
+        if self.body and self.body.has_errors:
+            return True
+        return False
+
+    @lazy
+    def _previous_submission(self) -> ClinVarExportSubmission:
+        return self.clinvar_export.previous_submission
+
+    @property
+    def is_new(self):
+        return not self._previous_submission
+
+    @property
+    def is_valid(self):
+        return bool(self.grouping) and bool(self.body) and not self.has_errors and 'assertionCriteria' in self.grouping
+
+    @lazy
+    def changes(self) -> Optional[ClinVarExportChanges]:
+        if self.no_record:
+            return None
+        if previous_submission := self._previous_submission:
+            grouping_changes = JsonDiffs.differences(previous_submission.submission_grouping or dict(), self.grouping.pure_json())
+            body_changes = JsonDiffs.differences(previous_submission.submission_body, self.body.pure_json())
+
+            return ClinVarExportChanges(
+                grouping_changes=grouping_changes,
+                body_changes=body_changes,
+                version_change=previous_submission.submission_version != CLINVAR_EXPORT_CONVERSION_VERSION
+            )
+        return None
+
+    def submission_full(self) -> JsonObjType:
+        json_data = self.body.pure_json()
+        if scv := self.clinvar_export.scv:
+            json_data["recordStatus"] = "update"
+            json_data["clinvarAccession"] = scv
+        else:
+            json_data["recordStatus"] = "novel"
+        return json_data
+
+    @property
+    def assertion_criteria(self) -> Optional[str]:
+        return self.grouping.pure_json().get("assertionCriteria") if self.grouping else None
+
+    @property
+    def local_id(self) -> str:
+        return self.body_json.get("localID")
+
+    @property
+    def local_key(self) -> str:
+        return self.body_json.get("localKey")
+
+    def apply(self):
+        clinvar_export = self.clinvar_export
+
+        status: ClinVarExportStatus
+        if (cm := clinvar_export.classification_based_on) and cm.classification.flag_collection_safe.get_open_flag_of_type(
+            classification_flag_types.classification_not_public):
+            status = ClinVarExportStatus.EXCLUDE
+        elif self.has_errors:
+            status = ClinVarExportStatus.IN_ERROR
+        else:
+            if self.is_new:
+                status = ClinVarExportStatus.NEW_SUBMISSION
+            elif self.changes:
+                status = ClinVarExportStatus.CHANGES_PENDING
+            else:
+                status = ClinVarExportStatus.UP_TO_DATE
+
+        clinvar_export.status = status
+        clinvar_export.submission_grouping_validated = self.grouping
+        clinvar_export.submission_body_validated = self.body
+        lazy.invalidate(clinvar_export, 'submission_grouping')
+        lazy.invalidate(clinvar_export, 'submission_body')
+        clinvar_export.save()
+
+    @staticmethod
+    def current(clinvar_export: ClinVarExport) -> 'ClinVarExportData':
+        return ClinVarExportData(
+            clinvar_export=clinvar_export,
+            grouping=clinvar_export.submission_grouping,
+            body=clinvar_export.submission_body
+        )
 
 
 class ClinVarEvidenceKey:
@@ -145,7 +263,7 @@ class ClinVarExportConverter:
         xrefs: List
         if self.clinvar_key.citations_mode == ClinVarCitationsModes.interpretation_summary_only:
             if text := self.classification_based_on.get(SpecialEKeys.INTERPRETATION_SUMMARY):
-                xrefs = [ref.to_json() for ref in db_ref_regexes.search(self.classification_based_on.get(SpecialEKeys.INTERPRETATION_SUMMARY))]
+                xrefs = [ref.to_json() for ref in db_ref_regexes.search(text)]
             else:
                 xrefs = []
         else:
@@ -211,13 +329,16 @@ class ClinVarExportConverter:
             "id": id_part
         }, messages)
 
-    @lazy
-    def as_validated_json(self) -> ValidatedJson:
-        data = {}
+    def convert(self) -> ClinVarExportData:
+
         if self.classification_based_on is None:
-            return ValidatedJson(None, JsonMessages.error("No classification is currently associated with this allele and condition"))
+            return ClinVarExportData(
+                clinvar_export=self.clinvar_export_record
+            )
         else:
-            data["assertionCriteria"] = self.json_assertion_criteria
+            grouping = ValidatedJson({"assertionCriteria": self.json_assertion_criteria})
+
+            data = {}
             data["clinicalSignificance"] = self.json_clinical_significance
             data["conditionSet"] = self.condition_set
             allele_id = self.clinvar_export_record.clinvar_allele.allele_id
@@ -229,7 +350,6 @@ class ClinVarExportConverter:
             data["localID"] = local_id
             data["localKey"] = local_key
             data["observedIn"] = self.observed_in
-            data["releaseStatus"] = "public"
             data["variantSet"] = self.variant_set
 
             messages = JSON_MESSAGES_EMPTY
@@ -263,7 +383,11 @@ class ClinVarExportConverter:
                         if not c.flag_collection_safe.get_open_flag_of_type(flag_type=classification_flag_types.classification_not_public):
                             messages += JsonMessages.error(f"Another classification for this allele '{c.lab_record_id}' has an unresolved condition with text '{c.get(SpecialEKeys.CONDITION)}'")
 
-            return ValidatedJson(data, messages)
+            return ClinVarExportData(
+                clinvar_export=self.clinvar_export_record,
+                grouping=grouping,
+                body=ValidatedJson(data, messages)
+            )
 
     @property
     def variant_set(self) -> ValidatedJson:
@@ -272,9 +396,6 @@ class ClinVarExportConverter:
             if c_hgvs := self.classification_based_on.classification.get_c_hgvs(genome_build):
                 c_hgvs_obj = CHGVS(c_hgvs)
                 c_hgvs_no_gene = c_hgvs_obj.without_gene_symbol_str
-
-                variant_data = [{"hgvs": c_hgvs_no_gene}]
-                json_data = {"variant": [{"hgvs": c_hgvs_no_gene}]}
 
                 hgvs_errors = JSON_MESSAGES_EMPTY
                 for accepted_transcript in CLINVAR_ACCEPTED_TRANSCRIPTS:
@@ -296,42 +417,20 @@ class ClinVarExportConverter:
                     ]
                 }
 
-                return json_data
+                return ValidatedJson(json_data)
             else:
                 return ValidatedJson(None, JsonMessages.error(f"No normalised c.hgvs in genome build {genome_build}"))
         except BaseException:
             return ValidatedJson(None, JsonMessages.error("Could not determine genome build of submission"))
 
     @property
-    def json_assertion_criteria(self) -> Union[dict, ValidatedJson]:
+    def json_assertion_criteria(self) -> ValidatedJson:
         assertion_criteria = self.value(SpecialEKeys.ASSERTION_METHOD)
-
-        assertion_method_lookups = self.clinvar_key.assertion_method_lookup
-        acmg_criteria = {
-            "citation": {
-                "db": "PubMed",
-                "id": "PMID:25741868"
-            },
-            "method": EvidenceKeyMap.cached_key(SpecialEKeys.ASSERTION_METHOD).pretty_value("acmg")
-        }
-
-        if assertion_criteria == "acmg":
-            return acmg_criteria
-        else:
-            for key, criteria in assertion_method_lookups.items():
-                raw_criteria = criteria
-                if criteria == "acmg":
-                    criteria = acmg_criteria
-
-                if not assertion_criteria:
-                    if not criteria or re.compile(key, RegexFlag.IGNORECASE).match(""):
-                        return ValidatedJson(criteria, JsonMessages.info(f"Using config for assertion method \"{key}\" : {json.dumps(raw_criteria)}"))
-                else:
-                    expr = re.compile(key, RegexFlag.IGNORECASE)
-                    if expr.match(assertion_criteria):
-                        return ValidatedJson(criteria, JsonMessages.info(f"Using config for assertion method \"{key}\" : {json.dumps(raw_criteria)}"))
-
-            return ValidatedJson(None, JsonMessages.error(f"No match for assertion method of \"{assertion_criteria}\""))
+        if mapped_assertion_method := self.clinvar_key.assertion_criteria_vg_to_code(assertion_criteria):
+            if isinstance(mapped_assertion_method, dict):
+                return ValidatedJson(mapped_assertion_method)
+            else:
+                return ValidatedJson(mapped_assertion_method or "", JsonMessages.error(f"Could not map to assertionCriteria citation"))
 
     @property
     def json_clinical_significance(self) -> ValidatedJson:
@@ -402,3 +501,11 @@ class ClinVarExportConverter:
         data["collectionMethod"] = "clinical testing"
         # numberOfIndividuals do we do anything with this?
         return ValidatedJson([data])
+
+    @staticmethod
+    def clinvar_export_data(clinvar_export: ClinVarExport, update: bool) -> ClinVarExportData:
+        if update:
+            data = ClinVarExportConverter(clinvar_export).convert()
+            data.apply()
+        # always load fresh just to be safe
+        return ClinVarExportData.current(clinvar_export)
