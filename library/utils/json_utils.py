@@ -149,6 +149,9 @@ class JsonDiffs:
     def __init__(self, json_diffs: List[JsonDiff]):
         self.json_diffs = json_diffs
 
+    def __bool__(self):
+        return bool(self.json_diffs)
+
     def to_json(self, before_label: str = "before", after_label: str = "after") -> JsonObjType:
         diff_dict = {}
         for diff in self.json_diffs:

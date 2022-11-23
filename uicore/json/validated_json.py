@@ -208,7 +208,13 @@ class ValidatedJson:
         self.json_data[key] = value
 
     def __getitem__(self, item):
-        return self.json_data[item]
+        return self.json_data.get[item]
+
+    def __contains__(self, item):
+        return item in self.json_data
+
+    def __delitem__(self, key):
+        del self.json_data[key]
 
     def get(self, item):
         return self.json_data.get(item)

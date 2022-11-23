@@ -19,6 +19,8 @@
                     <a href="#submission-{{ history_entry.pk }}" class="toggle-link" data-toggle="collapse">Toggle Data</a>
                 {% endlabelled %}
                 <div id="submission-{{ history_entry.pk }}" class="collapse">
+                    <label>Heading</label>
+                    {% code_json history_entry.submission_grouping %}
                     <label>Content</label>
                     {% code_json history_entry.submission_full %}
                     <div class="mt-4">

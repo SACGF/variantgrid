@@ -75,3 +75,4 @@ Unidecode
 boto3
 django-storages
 django_threadlocals
+frozendict
