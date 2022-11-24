@@ -208,7 +208,7 @@ class ValidatedJson:
         self.json_data[key] = value
 
     def __getitem__(self, item):
-        return self.json_data.get[item]
+        return self.json_data[item]
 
     def __contains__(self, item):
         return item in self.json_data
@@ -237,3 +237,7 @@ class ValidatedJson:
 
     def __bool__(self):
         return bool(self.json_data) or bool(self.messages)
+
+    def __iter__(self):
+        if isinstance(self.json_data, list):
+            return iter(self.json_data)

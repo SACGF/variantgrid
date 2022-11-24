@@ -25,6 +25,7 @@ class CitationDetails:
     citation_link: str
     source: str
     abstract: str
+    is_error: bool = False
 
     def __eq__(self, other):
         return self.source == other.source and self.citation_id == other.citation_id
@@ -62,7 +63,8 @@ def _citation_error(cached_citation: Union[Citation, CachedCitation]) -> Citatio
                            citation_id=citation.citation_id,
                            citation_link=None,
                            source=citation_source,
-                           abstract=None)
+                           abstract=None,
+                           is_error=True)
 
 
 def get_year_from_date(date_published) -> str:

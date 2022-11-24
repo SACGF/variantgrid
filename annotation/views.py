@@ -561,7 +561,7 @@ def citations_json(request, citations_ids_list):
             else:
                 logging.warning(f"Don't know how to look up a citation for {requested_citation_id}")
         else:
-            citation = Citation.objects.filter(pk=requested_citation_id).first()
+            citation = Citation.objects.filter(citation_id=requested_citation_id).first()
 
         if citation:
             citations.append(citation)

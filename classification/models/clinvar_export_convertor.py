@@ -1,6 +1,10 @@
 from dataclasses import dataclass
 from typing import List, Any, Mapping, TypedDict, Optional
 from lazy import lazy
+
+from annotation.citation_utils import CitationLoader
+from annotation.citations import get_citation_from_cached_citation, get_citations, CitationDetails
+from annotation.models import Citation, CachedCitation, CitationSource
 from annotation.regexes import DbRegexes, db_ref_regexes
 from classification.enums import SpecialEKeys, EvidenceKeyValueType, ShareLevel
 from classification.models import ClassificationModification, EvidenceKeyMap, EvidenceKey, \
@@ -262,12 +266,6 @@ class ClinVarEvidenceKey:
 
 class ClinVarExportConverter:
 
-    CITATION_DB_MAPPING = {
-        DbRegexes.PUBMED.db: "PubMed",
-        DbRegexes.PMC.db: "pmc",
-        DbRegexes.NCBIBookShelf.db: "BookShelf"
-    }
-
     FLAG_TYPES_TO_MESSAGES = {
         classification_flag_types.classification_withdrawn: JsonMessages.error("Classification has since been withdrawn"),
         classification_flag_types.transcript_version_change_flag: JsonMessages.error("Classification has open transcript version flag"),
@@ -293,21 +291,39 @@ class ClinVarExportConverter:
     def classification_based_on(self) -> ClassificationModification:
         return self.clinvar_export_record.classification_based_on
 
+    CITATION_SOURCE_TO_CLINVAR = {
+        CitationSource.PUBMED: "PubMed",
+        CitationSource.PUBMED_CENTRAL: "pmc",
+        CitationSource.NCBI_BOOKSHELF: "BookShelf"
+    }
+
     @property
-    def citation_refs(self) -> List[VCDbRefDict]:
-        xrefs: List
+    def citations(self) -> List[ValidatedJson]:
+        citation_list = []
+        citation_loader = CitationLoader()
         if self.clinvar_key.citations_mode == ClinVarCitationsModes.interpretation_summary_only:
             if text := self.classification_based_on.get(SpecialEKeys.INTERPRETATION_SUMMARY):
-                xrefs = [ref.to_json() for ref in db_ref_regexes.search(text)]
-            else:
-                xrefs = []
+                citation_loader.search_ids(text)
         else:
-            xrefs = self.classification_based_on.db_refs
+            citation_loader.add_dbrefs(self.classification_based_on.db_refs)
 
-        pubmed_refs = {ref.get('id'): ref for ref in xrefs if ref.get('db') in ClinVarExportConverter.CITATION_DB_MAPPING}
-        unique_refs = list(pubmed_refs.values())
-        unique_refs.sort(key=lambda x: x.get('id'))
-        return unique_refs
+        for citation_receipt in citation_loader.load():
+            if clinvar_db := ClinVarExportConverter.CITATION_SOURCE_TO_CLINVAR.get(citation_receipt.citation.citation_source):
+                # NEED to test for NBCI
+                id_part = citation_receipt.citation.citation_id
+                if clinvar_db == "PubMed":
+                    id_part = f"PubMed:{id_part}"
+                citation_json = {
+                    "db": clinvar_db,
+                    "id": id_part
+                }
+                messages = JSON_MESSAGES_EMPTY
+                if not citation_receipt.is_valid:
+                    messages += JsonMessages.error(f"Citation \"{id_part}\" does not appear to be valid.")
+
+                citation_list.append(ValidatedJson(citation_json, messages=messages))
+
+        return citation_list
 
     def clinvar_value(self, key: str) -> ClinVarEvidenceKey:
         evidence_key = EvidenceKeyMap.cached_key(key)
@@ -320,21 +336,6 @@ class ClinVarExportConverter:
             return html_to_text(value, preserve_lines=True)
         else:
             return value
-
-    @staticmethod
-    def citation_to_json(citation: VCDbRefDict) -> ClinVarCitation:
-        db = ClinVarExportConverter.CITATION_DB_MAPPING.get(citation.get("db"))
-        id_part = citation['id'].replace(' ', '')
-        if db == "PubMed":
-            # Special support for PubMed to be PMID
-            # (at some point should fix that in the citation JSON)
-            id_part = f"PMID:{citation['idx']}"
-
-        citation: ClinVarCitation = {
-            "db": db,
-            "id": id_part
-        }
-        return citation
 
     @staticmethod
     def condition_to_json(condition: OntologyTerm) -> ValidatedJson:
@@ -483,8 +484,8 @@ class ClinVarExportConverter:
     @property
     def json_clinical_significance(self) -> ValidatedJson:
         data = {}
-        if citations := self.citation_refs:
-            data["citation"] = [ClinVarExportConverter.citation_to_json(citation) for citation in citations]
+        if citations := self.citations:
+            data["citation"] = citations
         data["clinicalSignificanceDescription"] = self.clinvar_value(SpecialEKeys.CLINICAL_SIGNIFICANCE).value(single=True)
 
         comment_parts: List[str] = []
