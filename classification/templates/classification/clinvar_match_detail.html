@@ -19,6 +19,7 @@
                     {% for match_type in clinvar_export_match.match_types %}
                         <div class="text-success">- {{ match_type }}</div>
                     {% endfor %}
+                    <div>{{ clinvar_export_match.get_status_display }}, SCV:{{ clinvar_export_match.scv }}</div>
                 </div>
             {% endfor %}
         </div>

@@ -130,7 +130,7 @@ class ClinVarLegacyRow:
 
     @staticmethod
     def from_data_str(clinvar_key: ClinVarKey, data_str: str):
-        return ClinVarLegacyRow(clinvar_key=clinvar_key, data=json.loads(data_str))
+        return ClinVarLegacyRow(clinvar_key=clinvar_key, data=json.loads(data_str) if data_str else {})
 
     @property
     def data_str(self) -> str:
