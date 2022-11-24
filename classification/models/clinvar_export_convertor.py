@@ -9,7 +9,7 @@ from classification.models import ClassificationModification, EvidenceKeyMap, Ev
 from classification.models.evidence_mixin import VCDbRefDict
 from genes.hgvs import CHGVS
 from library.utils import html_to_text, JsonObjType, JsonDiffs
-from ontology.models import OntologyTerm, OntologyService
+from ontology.models import OntologyTerm, OntologyService, OntologyTermStatus
 from snpdb.models import ClinVarKey, ClinVarCitationsModes
 from uicore.json.validated_json import JsonMessages, JSON_MESSAGES_EMPTY, ValidatedJson
 
@@ -167,8 +167,8 @@ class ClinVarExportData:
                 status = ClinVarExportStatus.UP_TO_DATE
 
         clinvar_export.status = status
-        clinvar_export.submission_grouping_validated = self.grouping
-        clinvar_export.submission_body_validated = self.body
+        clinvar_export.submission_grouping_validated = self.grouping.serialize()
+        clinvar_export.submission_body_validated = self.body.serialize()
         lazy.invalidate(clinvar_export, 'submission_grouping')
         lazy.invalidate(clinvar_export, 'submission_body')
         clinvar_export.save()
@@ -343,6 +343,17 @@ class ClinVarExportConverter:
         if condition.ontology_service not in (OntologyService.OMIM, OntologyService.ORPHANET,
                                               OntologyService.HPO, OntologyService.MONDO):
             messages += JsonMessages.error(f"Ontology \"{condition.ontology_service}\" is not supported by ClinVar")
+
+        if not condition.is_valid_for_condition:
+            if condition.status == OntologyTermStatus.STUB:
+                messages += JsonMessages.error(f"We have no record of condition \"{condition}\". If this is valid it will be automatically resolved when our system refreshes ontology terms next.")
+            elif condition.status == OntologyTermStatus.DEPRECATED:
+                messages += JsonMessages.error(
+                    f"Term \"{condition}\" has been marked as deprecated. You will need to condition match to a newer term to submit this data to ClinVar.")
+            elif condition.status == OntologyTermStatus.NON_CONDITION:
+                messages += JsonMessages.error(
+                    f"Term \"{condition}\" is not valid to use as a condition under curation. You will need to condition match to a newer term to submit this data to ClinVar."
+                )
 
         """
         # Examples
