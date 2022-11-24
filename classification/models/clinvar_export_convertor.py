@@ -312,7 +312,7 @@ class ClinVarExportConverter:
                 # NEED to test for NBCI
                 id_part = citation_receipt.citation.citation_id
                 if clinvar_db == "PubMed":
-                    id_part = f"PubMed:{id_part}"
+                    id_part = f"PMID:{id_part}"
                 citation_json = {
                     "db": clinvar_db,
                     "id": id_part
