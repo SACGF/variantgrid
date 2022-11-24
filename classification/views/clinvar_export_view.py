@@ -545,10 +545,10 @@ class ClinVarMatchView(View):
         clinvar_key: ClinVarKey = get_object_or_404(ClinVarKey, pk=clinvar_key_id)
         clinvar_key.check_user_can_access(request.user)
 
-        clinvar_legacy_rows: Iterable = []
+        clinvar_legacy_rows: List[ClinVarLegacyRow] = []
         try:
             file_obj = io_string = io.StringIO(request.FILES.get('file').read().decode("utf-8"))
-            clinvar_legacy_rows = ClinVarLegacyRow.load_file(file_obj, clinvar_key)
+            clinvar_legacy_rows = list(ClinVarLegacyRow.load_file(file_obj, clinvar_key))
         except ValueError as ve:
             messages.error(request, str(ve))
 
