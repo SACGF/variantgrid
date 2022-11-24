@@ -200,5 +200,7 @@ class VariantSampleInformation:
 
             rows.append(row)
 
-        df = pd.DataFrame.from_records(rows).sort_values("sort_order")
+        df = pd.DataFrame.from_records(rows)
+        if rows:
+            df = df.sort_values("sort_order")
         return df
