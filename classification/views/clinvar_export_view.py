@@ -391,7 +391,12 @@ class ClinVarExportSummary(ExportRow):
         if clinvar_error := self.clinvar_export.last_submission_error:
             all_messages.append(f"(CLINVAR ERROR) {clinvar_error}")
 
-        if json_body := self.clinvar_export.submission_full:
+        if json_header := self.clinvar_export.submission_grouping:
+            if j_messages := json_header.all_messages:
+                all_messages += [f"({message.severity.upper()}) {message.text}" for message in j_messages if
+                                 message.severity != "info"]
+
+        if json_body := self.clinvar_export.submission_body:
             if j_messages := json_body.all_messages:
                 all_messages += [f"({message.severity.upper()}) {message.text}" for message in j_messages if message.severity != "info"]
 
