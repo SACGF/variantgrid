@@ -546,7 +546,12 @@ class ClinVarMatchView(View):
         clinvar_key.check_user_can_access(request.user)
 
         file_obj = io_string = io.StringIO(request.FILES.get('file').read().decode("utf-8"))
-        clinvar_legacy_rows = ClinVarLegacyRow.load_file(file_obj, clinvar_key)
+
+        clinvar_legacy_rows: Iterable = []
+        try:
+            clinvar_legacy_rows = ClinVarLegacyRow.load_file(file_obj, clinvar_key)
+        except ValueError as ve:
+            messages.error(request, str(ve))
 
         return render(request, 'classification/clinvar_match.html', {
             'all_keys': ClinVarKey.clinvar_keys_for_user(request.user),
