@@ -61,7 +61,8 @@ pysam
 python_dateutil
 python_Levenshtein
 pyvcf3
-redis
+# Have trouble with Celery workers shutting down with newer versions of Redis
+redis==3.5.3
 reportlab
 requests
 requests_oauthlib
