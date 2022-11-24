@@ -1242,6 +1242,15 @@ div.dataTables_processing > div:last-child {
   width: auto !important;
 }
 
+/**
+ li.help-item, use when you want to put a list of icons/headings/etc and their help in a UL
+ e.g.
+ <ul class="list-group">
+  <li class="list-item help-item"><label>Heading X</label><span>X represents the unknown</li>
+  <li class="list-item help-item"><i class="fas fa-skull-and-cross-bones"><span>Oh no, this means pirates</li>
+ </ul>
+ Make sure there's only two direct elements within the help-item, the key and the description
+ */
 li.help-item {
   display: flex;
 }
@@ -1252,6 +1261,19 @@ li.help-item :first-child {
 li.help-item :last-child {
   display: inline-block;
   flex-grow: 1;
+}
+
+.helpful:after {
+  display: inline-block;
+  font-style: normal;
+  font-variant: normal;
+  text-rendering: auto;
+  font-family: 'Font Awesome 6 Free', 'FontAwesome';
+  font-weight: 900;
+  content: "\f05a";
+  opacity: 0.4;
+  margin-left: 4px;
+  font-size: 10pt;
 }
 
 /*# sourceMappingURL=global_bs.css.map */

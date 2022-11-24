@@ -103,6 +103,46 @@ function enhanceAndMonitor() {
             });
         }},
 
+        {test: '[data-help]', func: ($node) => {
+            let title = $node.text();
+
+            // wrap everything in an inline-block span
+            // this is because many elements will take up 100% of horizontal space
+            // so help is show far off to the right after a lot of whitespace
+
+            // TODO, have a solution for when on a device without a mouse
+            $node.wrapInner('<span></span>');
+            let $target = $node.children('span').first();
+
+            $target.css('display', 'inline-block');
+            $target.addClass('hover-detail');
+            $target.addClass('popover-hover-stay');
+            $target.addClass('helpful');
+            $target.attr('data-toggle', 'popover');
+            $target.attr('title', title);
+            $target.attr('data-content', $node.attr('data-help'))
+            $target.attr('data-html', true);
+            $target.attr('data-placement', 'left'); // top & left are preferred as most help are labels with data to the right
+            $target.on("mouseenter", function () {
+                let _this = this;
+                $(this).popover("show");
+                $(".popover").on("mouseleave", function () {
+                    $(_this).popover('hide');
+                });
+            }).on("mouseleave", function () {
+                let _this = this;
+                setTimeout(function () {
+                    if (!$(".popover:hover").length) {
+                        $(_this).popover("hide");
+                    }
+                }, 300);
+            });
+
+            // remove attributes from parent element as to not get overlapping help
+            $node.removeAttr('title');
+            $node.removeAttr('data-help');
+        }},
+
         // setup popovers
         {test: '[data-content]', func: (node) => {
                 node.addClass('hover-detail');
@@ -135,6 +175,7 @@ function enhanceAndMonitor() {
                 node.click(function(e) {$(this).tooltip('hide');});
             }
         },
+
         {test: '.nav-tabs a',
             func: (node) => {node.on('shown.bs.tab', function(e) {
                 let $this = $(this);
