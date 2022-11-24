@@ -155,13 +155,18 @@ def create_cached_citations_from_entrez(entrez_db, cvcs_to_query: List[Citation]
     ids = [str(cvc.citation_id) for cvc in cvcs_to_query]
     try:
         h = Entrez.efetch(db=entrez_db, id=ids, rettype='medline', retmode='text')
-        records = Medline.parse(h)
-        for cvc, record in zip(cvcs_to_query, records):
-            cc = cache_citation(cvc, record)
-            try:
-                citations_by_cvc_id[cvc.pk] = get_citation_from_cached_citation(cc)
-            except CitationException:
-                citations_by_cvc_id[cvc.pk] = _citation_error(cc)
+        records = list(Medline.parse(h))
+        if records:
+            for cvc, record in zip(cvcs_to_query, records):
+                cc = cache_citation(cvc, record)
+                try:
+                    citations_by_cvc_id[cvc.pk] = get_citation_from_cached_citation(cc)
+                except CitationException:
+                    citations_by_cvc_id[cvc.pk] = _citation_error(cc)
+        else:
+            for cvc in cvcs_to_query:
+                citations_by_cvc_id[cvc.pk] = _citation_error(cvc)
+
     except Exception:
         # if this fails it's probably because a single id in ids ruined it for everybody
         for cvc in cvcs_to_query:
