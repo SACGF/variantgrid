@@ -3,7 +3,7 @@ from typing import Dict
 
 from bgzip import BGZipWriter
 
-from snpdb.models import VCF, Zygosity, Sample, Variant
+from snpdb.models import VCF, Zygosity, Sample
 from snpdb.vcf_export_utils import get_vcf_header_from_contigs, get_vcf_header_lines
 
 
