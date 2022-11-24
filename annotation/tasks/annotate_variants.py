@@ -54,7 +54,7 @@ def annotate_variants(annotation_run_id):
     num_modified = AnnotationRun.objects.filter(pk=annotation_run.pk,
                                                 task_id__isnull=True).update(task_id=annotate_variants.request.id)
     if num_modified != 1:
-        msg = f"Celery could't get task_id lock on AnnotationRun: {annotation_run.pk}"
+        msg = f"Celery couldn't get task_id lock on AnnotationRun: {annotation_run.pk}"
         annotation_run.celery_task_logs[annotate_variants.request.id] = msg
         annotation_run.save()
         raise ValueError(msg)
