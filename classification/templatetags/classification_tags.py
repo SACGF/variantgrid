@@ -24,7 +24,6 @@ from classification.models.evidence_key import EvidenceKey, EvidenceKeyMap
 from classification.models.evidence_mixin import VCDbRefDict
 from genes.hgvs import CHGVS
 from genes.models import GeneSymbol
-from library.utils import first
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import VariantAllele, Lab
 from snpdb.models.models_genome import GenomeBuild, Contig, GenomeFasta

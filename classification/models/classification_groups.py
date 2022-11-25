@@ -273,11 +273,12 @@ class ClassificationGroup:
         return sorted(unique_c)
 
     @lazy
-    def variant_sort(self):
+    def variant_sort(self) -> str:
         genome_build = GenomeBuildManager.get_current_genome_build()
         for cm in self.modifications:
             if variant := cm.classification.get_variant_for_build(genome_build):
                 return variant.sort_string
+        return ""
 
 
     @property
