@@ -22,7 +22,7 @@ class Command(BaseCommand):
     def check_obsoletes(self):
         for cm in Classification.objects.filter(condition_resolution__isnull=False):
             if cm.refresh_condition_resolution_details():
-                print(f"Updated classification condition text object for - {cm.condition_resolution_obj.plain_text}")
+                print(f"Updated classification condition text object for - {cm.condition_resolution_obj.summary}")
 
         for ctm in ConditionTextMatch.objects.filter(condition_xrefs__isnull=False):
             for term in ctm.condition_xref_terms:
