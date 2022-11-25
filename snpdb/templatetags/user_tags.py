@@ -35,7 +35,7 @@ def _group_str_for_user(user: User):
     if len(all_labs) == 1:
         return str(first(all_labs))
     else:
-        all_orgs = set(lab.org for lab in all_labs)
+        all_orgs = set(lab.organization for lab in all_labs)
         return ", ".join(sorted([org.name for org in all_orgs]))
 
 
