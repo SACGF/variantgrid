@@ -3,7 +3,7 @@ from typing import Dict
 
 from django.core.management.base import BaseCommand
 
-from classification.models import ConditionText, sync_all_condition_resolutions_to_classifications
+from classification.models import ConditionText, sync_all_condition_resolutions_to_classifications, Classification
 from classification.models.condition_text_matching import ConditionTextMatch
 
 
@@ -20,6 +20,10 @@ class Command(BaseCommand):
         parser.add_argument('--orphans', action='store_true', default=False)
 
     def check_obsoletes(self):
+        for cm in Classification.objects.filter(condition_resolution__isnull=False):
+            if cm.refresh_condition_resolution_details():
+                print(f"Updated classification condition text object for - {cm.condition_resolution_obj.plain_text}")
+
         for ctm in ConditionTextMatch.objects.filter(condition_xrefs__isnull=False):
             for term in ctm.condition_xref_terms:
                 if term.is_obsolete:
