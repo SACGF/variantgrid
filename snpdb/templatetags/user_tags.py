@@ -6,6 +6,8 @@ from django import template
 from django.contrib.auth.models import User
 from lazy import lazy
 
+from library.cache import timed_cache
+from library.utils import first
 from snpdb.models import AvatarDetails, Lab
 from snpdb.models.models_user_settings import UserSettings
 
@@ -22,8 +24,23 @@ def has_group_or_admin(user, group_name):
     return user.is_superuser or has_group(user, group_name)
 
 
+@timed_cache(ttl=60)
+def _group_str_for_user(user: User):
+    """
+    UserDetails sometimes get rendered a few times, worth caching the most expensive method
+    """
+    if user.is_superuser:
+        return "admin"
+    all_labs = list(Lab.valid_labs_qs(user).select_related('organization'))
+    if len(all_labs) == 1:
+        return str(first(all_labs))
+    else:
+        all_orgs = set(lab.org for lab in all_labs)
+        return ", ".join(sorted([org.name for org in all_orgs]))
+
+
 @register.inclusion_tag("snpdb/tags/user.html", takes_context=True)
-def user(context, u: User, show_avatar=False, show_email=False, show_last_login=False, show_orgs=False, role='user', size='normal'):
+def user(context, u: User, show_avatar=False, show_email=False, show_last_login=False, show_group=False, role='user', size='normal'):
 
     @dataclass(frozen=True)
     class UserDetails:
@@ -31,7 +48,7 @@ def user(context, u: User, show_avatar=False, show_email=False, show_last_login=
         user: User
         role: str
         size: str
-        show_orgs: bool
+        show_group: bool
         show_avatar: bool
         show_email: bool
         show_last_login: bool
@@ -57,6 +74,17 @@ def user(context, u: User, show_avatar=False, show_email=False, show_last_login=
             orgs = sorted({lab.organization for lab in Lab.valid_labs_qs(self.user).select_related('organization')})
             return ", ".join([org.name for org in orgs])
 
+        @property
+        def group_str(self):
+            if self.user.is_superuser:
+                return "admin"
+            all_labs = list(Lab.valid_labs_qs(self.user).select_related('organization'))
+            if len(all_labs) == 1:
+                return str(first(all_labs))
+            else:
+                all_orgs = set(lab.org for lab in all_labs)
+                return ", ".join(sorted([org.name for org in all_orgs]))
+
         @lazy
         def user_settings(self) -> UserSettings:
             user_cache: Dict[int, UserSettings] = self.context.get("_user_cache")
@@ -78,7 +106,7 @@ def user(context, u: User, show_avatar=False, show_email=False, show_last_login=
             return self.user_settings.email_discordance_updates
 
     return {
-        "user_details": UserDetails(context=context, user=u, show_avatar=show_avatar, show_orgs=show_orgs, show_email=show_email, show_last_login=show_last_login, role=role, size=size)
+        "user_details": UserDetails(context=context, user=u, show_avatar=show_avatar, show_group=show_group, show_email=show_email, show_last_login=show_last_login, role=role, size=size)
     }
 
 

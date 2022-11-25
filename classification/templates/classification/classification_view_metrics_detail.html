@@ -14,7 +14,7 @@
         {% for view_event in views %}
             <tr>
                 <td>{% timestamp view_event.created %}</td>
-                <td>{% user view_event.user show_orgs=True size="tiny" %}</td>
+                <td>{% user view_event.user show_group=True size="tiny" %}</td>
                 <td>{{ view_event.view_name | segmented_text }}</td>
                 <td>
                 {% if not view_event.is_get %}<label>{{ view_event.method }}</label>{% endif %}

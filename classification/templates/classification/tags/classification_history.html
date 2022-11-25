@@ -42,11 +42,11 @@
             <td class="user">
                 {% ifchanged change_group.record_id change_group.source change_group.user change_group.flag %}
                     {% if change_group.flag %}
-                    <div class="submission-source flag flag-{{ change_group.flag.flag_type.id }}" title="{{ change_group.source_label }} ({{ change_group.flag.id }})"></div>
+                    <div style="flex-shrink: 0; flex-grow: 0" class="submission-source flag flag-{{ change_group.flag.flag_type.id }}" title="{{ change_group.source_label }} ({{ change_group.flag.id }})"></div>
                     {% else %}
-                    <div class="submission-source {{ change_group.source }}" title="{{ change_group.source_label }}"></div>
+                    <div style="flex-shrink: 0; flex-grow: 0" class="submission-source {{ change_group.source }}" title="{{ change_group.source_label }}"></div>
                     {% endif %}
-                    {% avatar2 change_group.user size='tiny' show_label=True %}
+                    {% user change_group.user show_group=True size="tiny" %}
                 {% endifchanged %}
             </td>
             <td>

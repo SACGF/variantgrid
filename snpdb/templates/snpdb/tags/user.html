@@ -9,8 +9,8 @@
         {% else %}
             {{ user_details.preferred_label }}
         {% endif %}
-        {% if user_details.show_orgs %}
-            <span class="text-info">{{ user_details.orgs_str }}</span>
+        {% if user_details.show_group %}
+            <span style="font-size:8pt" class="text-info">{{ user_details.group_str }}</span>
         {% endif %}
         {% if user_details.show_last_login %}
             <br/>
