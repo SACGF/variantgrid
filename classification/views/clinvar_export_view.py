@@ -567,5 +567,5 @@ def clinvar_match_detail(request, clinvar_key_id: str):
     data_str = request.GET.get('data_str')
 
     return render(request, 'classification/clinvar_match_detail.html', {
-        'matches': ClinVarLegacyRow.from_data_str(clinvar_key, data_str).find_variant_grid_allele()
+        'matches': ClinVarLegacyRow.from_data_str(clinvar_key, data_str).find_variant_grid_allele() if data_str else []
     })
