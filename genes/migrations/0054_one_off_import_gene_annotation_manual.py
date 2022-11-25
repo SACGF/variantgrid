@@ -5,6 +5,12 @@ from django.db import migrations
 from manual.operations.manual_operations import ManualOperation
 
 
+def _has_existing_gene_annotation_import(apps):
+    # Only need to do this for old deploys, not new ones
+    GeneAnnotationImport = apps.get_model("genes", "GeneAnnotationImport")
+    return GeneAnnotationImport.objects.all().exists()
+
+
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -15,5 +21,6 @@ class Migration(migrations.Migration):
         ManualOperation(ManualOperation.operation_other([
             "Download cdot data and run import_gene_annotation. " +
             "See https://github.com/SACGF/variantgrid/issues/566#issuecomment-1097543081",
-            ])),
+            ],
+            test=_has_existing_gene_annotation_import)),
     ]
