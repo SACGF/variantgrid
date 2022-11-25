@@ -25,6 +25,7 @@ class Command(BaseCommand):
             analysis.save()
             add_public_group_read_permission(analysis)
 
+            AnalysisTemplate.objects.filter(name=analysis.name).delete()  # Clear existing
             analysis_template = AnalysisTemplate.objects.create(name=analysis.name, user=user, analysis=analysis)
 
             analysis_snapshot = analysis.clone()
