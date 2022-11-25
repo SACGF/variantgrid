@@ -76,14 +76,7 @@ def user(context, u: User, show_avatar=False, show_email=False, show_last_login=
 
         @property
         def group_str(self):
-            if self.user.is_superuser:
-                return "admin"
-            all_labs = list(Lab.valid_labs_qs(self.user).select_related('organization'))
-            if len(all_labs) == 1:
-                return str(first(all_labs))
-            else:
-                all_orgs = set(lab.org for lab in all_labs)
-                return ", ".join(sorted([org.name for org in all_orgs]))
+            return _group_str_for_user(self.user)
 
         @lazy
         def user_settings(self) -> UserSettings:
