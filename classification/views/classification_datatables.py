@@ -121,7 +121,8 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
             ),
             RichColumn(
                 key=ClassificationModification.column_name_for_build(self.genome_build_prefs[0]),
-                sort_keys=['variant_sort', 'c_hgvs'],  # annotated column
+                # sort_keys=['variant_sort', 'c_hgvs'],  # annotated column
+                sort_keys=['c_hgvs'],
                 name='c_hgvs',
                 label=f'HGVS ({user_settings.default_genome_build.name})',
                 renderer=self.render_c_hgvs,
@@ -231,7 +232,8 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
                     output_field=TextField())
         initial_qs = initial_qs.annotate(c_hgvs=case)
 
-        initial_qs = Classification.annotate_with_variant_sort(initial_qs, GenomeBuild.grch38())
+        # takes too long to sort on variant
+        # initial_qs = Classification.annotate_with_variant_sort(initial_qs, GenomeBuild.grch38())
 
         # So VUS-A is actually VUS-Pathogenic, VUS-C is VUS-Benign
         # so when sorting within VUS we want to do so in reverse alphabetical order

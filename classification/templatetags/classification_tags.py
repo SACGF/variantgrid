@@ -85,7 +85,8 @@ def classification_groups(
     if isinstance(classification_modifications, QuerySet):
         classification_modifications = classification_modifications.select_related(
             'classification', 'classification__clinical_context', 'classification__lab', 'classification__lab__organization',
-            'classification__variant', 'classification__variant__locus', 'classification__variant__locus__contig'
+            # if sorting by variant directly
+            # 'classification__variant', 'classification__variant__locus', 'classification__variant__locus__contig'
         )
 
     sort_order_index = 1
