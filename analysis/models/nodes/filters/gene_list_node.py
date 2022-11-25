@@ -122,7 +122,7 @@ class GeneListNode(AncestorSampleMixin, GeneCoverageMixin, AnalysisNode):
         MAX_NODE_NAME_LENGTH = 30
 
         name = ''
-        if self.modifies_parents():
+        if self.pk and self.modifies_parents():  # needs pk as looks at related objects
             if self.accordion_panel in (self.SELECTED_GENE_LIST, self.PANEL_APP_GENE_LIST):
                 filter_types = {self.SELECTED_GENE_LIST: "gene lists", self.PANEL_APP_GENE_LIST: "PanelApp"}
                 gene_list_names = self._get_gene_list_names()
@@ -201,18 +201,18 @@ class GeneListNode(AncestorSampleMixin, GeneCoverageMixin, AnalysisNode):
 
     def _get_configuration_errors(self) -> List:
         errors = super()._get_configuration_errors()
+        if self.pk:
+            gene_lists_to_validate = []
+            if self.accordion_panel == self.PANEL_APP_GENE_LIST:
+                # May not have got local cache of PanelApp yet
+                for gln_pap in self.genelistnodepanelapppanel_set.filter(panel_app_panel_local_cache_gene_list__isnull=False):
+                    gene_lists_to_validate.append(gln_pap.gene_list)
+            else:
+                gene_lists_to_validate = self.get_gene_lists()
 
-        gene_lists_to_validate = []
-        if self.accordion_panel == self.PANEL_APP_GENE_LIST:
-            # May not have got local cache of PanelApp yet
-            for gln_pap in self.genelistnodepanelapppanel_set.filter(panel_app_panel_local_cache_gene_list__isnull=False):
-                gene_lists_to_validate.append(gln_pap.gene_list)
-        else:
-            gene_lists_to_validate = self.get_gene_lists()
-
-        for gene_list in gene_lists_to_validate:
-            if gene_list.import_status != ImportStatus.SUCCESS:
-                errors.append(f"{gene_list}: {gene_list.error_message}")
+            for gene_list in gene_lists_to_validate:
+                if gene_list.import_status != ImportStatus.SUCCESS:
+                    errors.append(f"{gene_list}: {gene_list.error_message}")
 
         return errors
 
