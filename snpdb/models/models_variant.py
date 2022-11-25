@@ -513,6 +513,12 @@ class Variant(models.Model):
         chrom = format_chrom(chrom, want_chr)
         return chrom, position, ref, alt
 
+    @property
+    def sort_string(self) -> str:
+        padded_contig = (self.locus.contig.name or '').rjust(2, '0')
+        padded_position = f'{self.locus.position or 0:09d}'
+        return f"{padded_contig}-{padded_position}"
+
 
 class VariantWiki(Wiki):
     variant = models.OneToOneField(Variant, on_delete=CASCADE)

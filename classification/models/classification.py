@@ -2215,11 +2215,17 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         return Q(id__in=list(variant_ids))  # List is much faster than inner query...
 
     @staticmethod
-    def annotate_with_variant_sort(classifications_qs, genome_build: GenomeBuild, name="variant_sort"):
+    def annotate_with_variant_sort(classifications_qs: QuerySet, genome_build: GenomeBuild, name="variant_sort"):
         """ Annotate Classification queryset you can use to order by genome build position """
 
-        variant_qs = Variant.objects.filter(variantallele__allele=OuterRef("variant__variantallele__allele"),
-                                            variantallele__genome_build=genome_build)
+        variant_qs: QuerySet
+        if classifications_qs.model == Classification:
+            variant_qs = Variant.objects.filter(variantallele__allele=OuterRef("variant__variantallele__allele"),
+                                                variantallele__genome_build=genome_build)
+        else:
+            variant_qs = Variant.objects.filter(variantallele__allele=OuterRef("classification__variant__variantallele__allele"),
+                                                variantallele__genome_build=genome_build)
+
         variant_qs = variant_qs.annotate(
             padded_contig=LPad("locus__contig__name", 2, Value("0")),
             padded_position=LPad(Cast("locus__position", output_field=TextField()), 9, Value("0")),

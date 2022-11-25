@@ -13,7 +13,7 @@
         {% endif %}
         {% if group.count > 1 %}<div class="font-weight-bold font-size-small mt-1">{{ group.count }} records</div>{% endif %}
     </td>
-    <td data-order="{{ group.c_hgvs.sort_str }}">
+    <td data-order="{{ group.variant_sort }}">
         {% for c_hgvs in group.c_hgvses %}
             <div class="mb-1" style="font-size:11px">{% c_hgvs c_hgvs %}</div>
         {% endfor %}

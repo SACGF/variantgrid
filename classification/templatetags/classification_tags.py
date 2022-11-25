@@ -83,6 +83,12 @@ def classification_groups(
     :param old_classification_modifications: For showing what a discordance report used to be
     :param default_sort: The column to sort by default
     """
+    if isinstance(classification_modifications, QuerySet):
+        classification_modifications = classification_modifications.select_related(
+            'classification', 'classification__clinical_context', 'classification__lab', 'classification__lab__organization',
+            'classification__variant', 'classification__variant__locus', 'classification__variant__locus__contig'
+        )
+
     sort_order_index = 1
     if default_sort == 'clinical_significance':
         sort_order_index = 2

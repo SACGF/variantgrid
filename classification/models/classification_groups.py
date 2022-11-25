@@ -272,6 +272,14 @@ class ClassificationGroup:
             unique_c.add(ge.c_hgvs)
         return sorted(unique_c)
 
+    @lazy
+    def variant_sort(self):
+        genome_build = GenomeBuildManager.get_current_genome_build()
+        for cm in self.modifications:
+            if variant := cm.classification.get_variant_for_build(genome_build):
+                return variant.sort_string
+
+
     @property
     def c_hgvs(self) -> CHGVS:
         return self.c_hgvses[0]
