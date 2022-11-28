@@ -26,8 +26,10 @@ class Test(URLTestCase):
         grch37 = GenomeBuild.get_name_or_alias("GRCh37")
         get_fake_annotation_version(grch37)
 
-        cls.user_owner = User.objects.get_or_create(username='testuser')[0]
-        cls.user_non_owner = User.objects.get_or_create(username='different_user')[0]
+        owner_username = f"test_user_{__file__}_owner"
+        non_owner_username = f"test_user_{__file__}_non_owner"
+        cls.user_owner = User.objects.get_or_create(username=owner_username)[0]
+        cls.user_non_owner = User.objects.get_or_create(username=non_owner_username)[0]
 
         cls.trio = create_fake_trio(cls.user_owner, grch37)
         cls.cohort = cls.trio.cohort

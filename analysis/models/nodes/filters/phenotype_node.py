@@ -174,7 +174,7 @@ class PhenotypeNode(AnalysisNode):
     def get_node_name(self):
         MAX_NAME_LENGTH = 50
         name = ''
-        if self.modifies_parents():
+        if self.pk and self.modifies_parents():
             if self.accordion_panel == self.PANEL_PATIENT and self.patient:
                 name = f"{self.patient} patient phenotypes"
             else:

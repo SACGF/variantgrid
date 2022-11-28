@@ -3,15 +3,16 @@ from django.test import TestCase, override_settings
 
 from analysis.models import Analysis, CohortNode, CohortNodeZygosityFiltersCollection, FilterNode, FilterNodeItem, \
     SampleNode, GeneListNode, IntersectionNode, PhenotypeNode, PopulationNode, TagNode, VariantTag, \
-    AlleleFrequencyNode, NodeAlleleFrequencyFilter, NodeVCFFilter, TrioNode
+    AlleleFrequencyNode, NodeAlleleFrequencyFilter, NodeVCFFilter, TrioNode, MOINode, MergeNode, PedigreeNode
 from annotation.fake_annotation import get_fake_annotation_version, create_fake_variants
 from annotation.models import VariantGeneOverlap, AnnotationRun
 from annotation.tests.test_data_fake_genes import create_fake_transcript_version
 from genes.models import GeneList, GeneListGeneSymbol
 from ontology.models import OntologyTerm
 from patients.models_enums import GnomADPopulation
+from pedigree.models import PedigreeInheritance
 from snpdb.models import GenomeBuild, ImportStatus, Variant, GenomicInterval, Tag
-from snpdb.tests.test_data import create_fake_trio
+from snpdb.tests.test_data import create_fake_trio, create_fake_pedigree
 
 
 @override_settings(ANALYSIS_NODE_CACHE_Q=False)
@@ -30,6 +31,7 @@ class TestCloneAnalysisNodes(TestCase):
                                                                 release=gene_annotation_release)
         cls.gene_symbol = cls.transcript_version.gene_version.gene_symbol
         cls.trio = create_fake_trio(user, cls.grch37)
+        cls.pedigree = create_fake_pedigree(user, cls.grch37)
 
         cls.analysis = Analysis(genome_build=cls.grch37)
         cls.analysis.set_defaults_and_save(user)
@@ -57,7 +59,8 @@ class TestCloneAnalysisNodes(TestCase):
         VariantTag.objects.create(genome_build=cls.grch37, analysis=cls.analysis,
                                   variant=variant, tag=cls.tag, user=user)
 
-    def _test_clone_node(self, node):
+    def _test_clone_node(self, node, full_test=False):
+        """ full_test = check entire query (including parents) not just node """
         clone = node.save_clone()
         node_arg_q_dict = str(node._get_node_arg_q_dict())
         clone_arg_q_dict = str(clone._get_node_arg_q_dict())
@@ -81,15 +84,21 @@ class TestCloneAnalysisNodes(TestCase):
         self._set_af_for_node(af_node)
         self._test_clone_node(af_node)
 
-    def test_clone_cohort_node(self):
+    def _get_cohort_node(self):
         cohort = self.trio.cohort
         cohort_node = CohortNode.objects.create(analysis=self.analysis, cohort=cohort,
                                                 accordion_panel=CohortNode.PER_SAMPLE_ZYGOSITY)
 
         self._set_af_for_node(cohort_node)
         self._set_vcf_filter_for_node(cohort_node, cohort.vcf)
+        return cohort_node
 
-        fc = CohortNodeZygosityFiltersCollection.get_for_node_and_cohort(cohort_node, cohort)
+    def _get_sample_node(self):
+        return SampleNode.objects.create(analysis=self.analysis, sample=self.sample)
+
+    def test_clone_cohort_node(self):
+        cohort_node = self._get_cohort_node()
+        fc = CohortNodeZygosityFiltersCollection.get_for_node_and_cohort(cohort_node, cohort_node.cohort)
         zf1 = fc.cohortnodezygosityfilter_set.order_by("pk").first()
         zf1.zygosity_hom = False
         zf1.save()
@@ -123,7 +132,25 @@ class TestCloneAnalysisNodes(TestCase):
         self.assertNotEqual(original_genomic_interval_id, clone.genomic_interval.pk,
                             "Intersection node made copy of genomic interval")
 
-    # TODO: test_clone_pedigree_node - same as sample/trio etc
+    def test_clone_merge_node(self):
+        _merge_node = MergeNode.objects.create(analysis=self.analysis)
+        # TODO: This doesn't run the test, as it calls _get_node_q which MergeNode doesn't implement
+        # self._test_clone_node(merge_node)
+
+    def test_clone_moi_node(self):
+        # TODO: Need to also test patient setup w/ontology etc
+        moi_node = MOINode.objects.create(analysis=self.analysis, sample=self.sample)
+
+        ontology_term = OntologyTerm.objects.first()
+        moi_node.moinodeontologyterm_set.create(ontology_term=ontology_term)
+        self._test_clone_node(moi_node)
+
+    def test_clone_pedigree_node(self):
+        pedigree_node = PedigreeNode.objects.create(analysis=self.analysis, pedigree=self.pedigree,
+                                                    inheritance_model=PedigreeInheritance.AUTOSOMAL_DOMINANT)
+        self._set_af_for_node(pedigree_node)
+        self._set_vcf_filter_for_node(pedigree_node, self.trio.cohort.vcf)
+        self._test_clone_node(pedigree_node)
 
     def test_clone_phenotype_node(self):
         # TODO: Need to insert genes against the ontology term so that it actually does filtering
@@ -139,7 +166,7 @@ class TestCloneAnalysisNodes(TestCase):
 
     def test_clone_sample_node(self):
         # Test allele frequency, VCF filters
-        sample_node = SampleNode.objects.create(analysis=self.analysis, sample=self.sample)
+        sample_node = self._get_sample_node()
         self._set_af_for_node(sample_node)
         self._set_vcf_filter_for_node(sample_node, self.sample.vcf)
         self._test_clone_node(sample_node)

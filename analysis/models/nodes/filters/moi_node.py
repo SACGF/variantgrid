@@ -159,8 +159,9 @@ class MOINode(AncestorSampleMixin, AnalysisNode):
                     or_filters.append(q_zygosity & q_genes)
                 else:
                     or_filters.append(q_genes)  # Any zygosity
-            q = reduce(operator.or_, or_filters)
-            arg_q_dict[self.sample.zygosity_alias] = {str(q): q}
+            if or_filters:
+                q = reduce(operator.or_, or_filters)
+                arg_q_dict[self.sample.zygosity_alias] = {str(q): q}
         else:
             gene_qs = self._get_gene_qs()
             variant_annotation_version = self.analysis.annotation_version.variant_annotation_version
@@ -198,13 +199,14 @@ class MOINode(AncestorSampleMixin, AnalysisNode):
 
     def get_node_name(self):
         name = ''
-        if ontology_term_ids := self._get_all_ontology_term_ids():
-            terms = sorted([ot.name for ot in OntologyTerm.objects.filter(pk__in=ontology_term_ids)])
-            terms_text = ", ".join(terms)
-            if self.accordion_panel == self.PANEL_PATIENT:
-                name = f"{terms_text or 'No terms'} (from patient)"
-            else:
-                name = terms_text
+        if self.pk:
+            if ontology_term_ids := self._get_all_ontology_term_ids():
+                terms = sorted([ot.name for ot in OntologyTerm.objects.filter(pk__in=ontology_term_ids)])
+                terms_text = ", ".join(terms)
+                if self.accordion_panel == self.PANEL_PATIENT:
+                    name = f"{terms_text or 'No terms'} (from patient)"
+                else:
+                    name = terms_text
         return name
 
     @staticmethod
