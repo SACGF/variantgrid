@@ -412,7 +412,7 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
                 if node_arg_q_dict := self._get_node_arg_q_dict():
                     arg_q_dict = node_arg_q_dict
                 else:
-                    arg_q_dict[None] = {}
+                    arg_q_dict = {None: {}}
             if self._cache_node_q:
                 try:
                     cache.set(cache_key, arg_q_dict)
