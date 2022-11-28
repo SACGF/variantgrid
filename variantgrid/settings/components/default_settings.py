@@ -8,6 +8,7 @@ See __init__.py in this dir for details
 
 import os
 import socket
+import re
 from collections import defaultdict
 
 from library.django_utils.django_secret_key import get_or_create_django_secret_key
@@ -532,6 +533,10 @@ ROLLBAR = {
     'root': BASE_DIR,
     'capture_username': True,
     'code_version': Git(BASE_DIR).hash,
+    'ignorable_404_urls': (
+        re.compile(r'.*\.map'),
+        re.compile(r'.*\.ico')
+    ),
 }
 
 SLACK = {
@@ -610,7 +615,11 @@ MIDDLEWARE = (
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'global_login_required.GlobalLoginRequiredMiddleware',  # Must be after other auth middleware
-    'library.django_utils.rollbar_middleware.CustomRollbarNotifierMiddleware',
+    #'library.django_utils.rollbar_middleware.CustomRollbarNotifierMiddleware',
+    'rollbar.contrib.django.middleware.RollbarNotifierMiddleware',
+    # if you want to always avoid 404, use
+    # 'rollbar.contrib.django.middleware.RollbarNotifierMiddlewareExcluding404'
+
     'htmlmin.middleware.HtmlMinifyMiddleware',
     'htmlmin.middleware.MarkRequestMiddleware',
     'threadlocals.middleware.ThreadLocalMiddleware',
