@@ -85,8 +85,8 @@
           "group_operation": "Y",
           "nodeallelefrequencyrange_set": [
             {
-              "min": 3,
-              "max": 100
+              "min": 0.03,
+              "max": 1
             }
           ]
         },
