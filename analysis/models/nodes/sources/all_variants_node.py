@@ -79,6 +79,11 @@ class AllVariantsNode(AnalysisNode, AbstractZygosityCountNode):
         return VariantZygosityCountCollection.objects.get(name=settings.VARIANT_ZYGOSITY_GLOBAL_COLLECTION)
 
     @property
+    def count_annotation_arg(self):
+        """ key in annotation_kwargs """
+        return self.db_counts.alias
+
+    @property
     def ref_count_column(self):
         return self.db_counts.ref_alias
 
