@@ -98,8 +98,8 @@ class ClinVarExportData:
     @property
     def is_new(self):
         """ Indicates if this is the first time the record has been submitted.
-        Important, this is not the same as already having a SCV """
-        return not self._previous_submission
+            Important, this is not the same as already having a SCV """
+        return not (self.clinvar_export.pk and self._previous_submission)
 
     @property
     def is_valid(self):

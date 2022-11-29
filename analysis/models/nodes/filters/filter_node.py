@@ -63,14 +63,16 @@ class FilterNode(AnalysisNode):
         return joiner.join(rules_summary)
 
     def get_node_name(self):
-        fn_items = list(self.filternodeitem_set.all())  # Evaluate once
-        num_filters = len(fn_items)
-        if num_filters == 0:
-            node_name = ''
-        elif num_filters == 1:
-            node_name = str(fn_items[0])
-        else:
-            node_name = f"{num_filters} filters"
+        node_name = ''
+        if self.pk:
+            fn_items = list(self.filternodeitem_set.all())  # Evaluate once
+            num_filters = len(fn_items)
+            if num_filters == 0:
+                node_name = ''
+            elif num_filters == 1:
+                node_name = str(fn_items[0])
+            else:
+                node_name = f"{num_filters} filters"
 
         return node_name
 

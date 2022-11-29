@@ -7,6 +7,7 @@ from library.guardian_utils import assign_permission_to_user_and_groups
 from pedigree.models import PedFile, Pedigree, PedFileFamily
 from snpdb.models import ImportStatus, Cohort
 from snpdb.models.models_genome import GenomeBuild
+from snpdb.tests.test_data import create_fake_pedigree
 
 
 class Test(URLTestCase):
@@ -16,18 +17,9 @@ class Test(URLTestCase):
 
         cls.user_owner = User.objects.get_or_create(username='testuser')[0]
         cls.user_non_owner = User.objects.get_or_create(username='different_user')[0]
-        cls.grch37 = GenomeBuild.get_name_or_alias("GRCh37")
-        cls.cohort = Cohort.objects.get_or_create(name="fake cohort",
-                                                  user=cls.user_owner,
-                                                  version=1,
-                                                  import_status=ImportStatus.SUCCESS,
-                                                  genome_build=cls.grch37)[0]
-        cls.ped_file = PedFile.objects.get_or_create(name="fakepf", user=cls.user_owner,
-                                                     import_status=ImportStatus.SUCCESS)[0]
-        assign_permission_to_user_and_groups(cls.user_owner, cls.ped_file)
-        cls.ped_file_family = PedFileFamily.objects.get_or_create(name="fake family", ped_file=cls.ped_file)[0]
-        cls.pedigree = Pedigree.objects.get_or_create(user=cls.user_owner, name="fake pedigree",
-                                                      cohort=cls.cohort, ped_file_family=cls.ped_file_family)[0]
+        grch37 = GenomeBuild.get_name_or_alias("GRCh37")
+        cls.pedigree = create_fake_pedigree(cls.user_owner, grch37)
+        cls.ped_file = cls.pedigree.ped_file_family.ped_file
 
         cls.PRIVATE_OBJECT_URL_NAMES_AND_KWARGS = [
             # ('view_pedigree', {"pedigree_id": cls.pedigree.pk}, 200),

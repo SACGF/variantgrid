@@ -30,8 +30,10 @@ class Test(URLTestCase):
         grch37 = GenomeBuild.get_name_or_alias("GRCh37")
         annotation_version = get_fake_annotation_version(grch37)  # Needed in cohort_hotspot_graph
 
-        cls.user_owner = User.objects.get_or_create(username='testuser')[0]
-        cls.user_non_owner = User.objects.get_or_create(username='different_user')[0]
+        owner_username = f"test_user_{__file__}_owner"
+        non_owner_username = f"test_user_{__file__}_non_owner"
+        cls.user_owner = User.objects.get_or_create(username=owner_username)[0]
+        cls.user_non_owner = User.objects.get_or_create(username=non_owner_username)[0]
         cls.vcf = VCF.objects.create(name="test_urls_vcf", genotype_samples=1, genome_build=grch37,
                                      import_status=ImportStatus.SUCCESS,
                                      user=cls.user_owner, date=timezone.now())
