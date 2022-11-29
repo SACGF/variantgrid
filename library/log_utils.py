@@ -41,7 +41,7 @@ def report_event(name: str, request: Request = None, extra_data: Dict = None):
 
     user: Optional[User] = None
     details = None
-    if request:
+    if request and request.user.is_authenticated():
         user = request.user
 
     if extra_data:
