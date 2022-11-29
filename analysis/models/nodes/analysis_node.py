@@ -539,7 +539,7 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
             q_list.extend(q_dict.values())
 
         if arg_q_dict:
-            raise Exception(f"arg_q_dict filters {arg_q_dict.keys()} not applied (missing annotation_kwargs)")
+            raise Exception(f"arg_q_dict filters {arg_q_dict.keys()} not applied (missing in {a_kwargs=})")
 
         if self.analysis.node_queryset_filter_contigs:
             q_list.append(Q(locus__contig__in=self.get_contigs()))

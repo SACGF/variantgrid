@@ -444,6 +444,7 @@ class UserSettingsOverrideForm(SettingsOverrideForm):
             self.fields['columns'].queryset = models.CustomColumnsCollection.filter_for_user(user)
         self.fields['default_lab'].queryset = Lab.valid_labs_qs(user)
 
+
 class CreateCohortForm(BaseModelForm):
 
     class Meta:
