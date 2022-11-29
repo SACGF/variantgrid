@@ -5,6 +5,7 @@ from django_messages.models import Message
 
 from analysis.tasks.karyomapping_tasks import create_genome_karyomapping_for_trio
 from library.guardian_utils import admin_bot
+from library.log_utils import AdminNotificationBuilder
 from snpdb.models import UserDataPrefix, SettingsInitialGroupPermission, Organization, Lab
 from snpdb.tasks.vcf_bed_file_task import create_backend_vcf_bed_intersections
 
@@ -16,8 +17,7 @@ def user_post_save_handler(sender, instance, **kwargs):
         group, _ = Group.objects.get_or_create(name=group_name)
         group.user_set.add(instance)
 
-    created = kwargs.get("created")
-    if created:
+    if kwargs.get("created"):
         add_user_to_group(settings.PUBLIC_GROUP_NAME)
         add_user_to_group(settings.LOGGED_IN_USERS_GROUP_NAME)
 
@@ -42,6 +42,12 @@ def user_post_save_handler(sender, instance, **kwargs):
                                            body=message,
                                            sender=admin_bot(),
                                            recipient=instance)
+
+        nb = AdminNotificationBuilder(message="User Created")
+        nb.add_markdown("A new user has been created")
+        nb.add_field("Username", instance.username)
+        nb.add_field("Email", instance.email)
+        nb.send()
 
 
 def group_post_save_handler(sender, instance, **kwargs):
