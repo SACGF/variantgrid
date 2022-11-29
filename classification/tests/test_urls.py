@@ -16,9 +16,12 @@ class Test(URLTestCase):
     def setUpClass(cls):
         super().setUpClass()
 
-        cls.user_admin = User.objects.create_superuser("admin_user", "foo@bar", "password")
-        cls.user_owner = User.objects.get_or_create(username='testuser')[0]
-        cls.user_non_owner = User.objects.get_or_create(username='different_user')[0]
+        admin_username = f"test_user_{__file__}_admin"
+        owner_username = f"test_user_{__file__}_owner"
+        non_owner_username = f"test_user_{__file__}_non_owner"
+        cls.user_admin = User.objects.create_superuser(admin_username, "foo@bar", "password")
+        cls.user_owner = User.objects.get_or_create(username=owner_username)[0]
+        cls.user_non_owner = User.objects.get_or_create(username=non_owner_username)[0]
 
         organization = Organization.objects.get_or_create(name="Fake Org", group_name="fake_org")[0]
         australia = Country.objects.get_or_create(name="Australia")[0]
