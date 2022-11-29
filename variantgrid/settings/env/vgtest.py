@@ -50,6 +50,8 @@ ANNOTATION_VCF_DUMP_DIR = os.path.join(ANNOTATION_REFERENCE_BASE_DIR, 'scratch')
 GENES_DEFAULT_CANONICAL_TRANSCRIPT_COLLECTION_ID = 1  # MedEx
 DEFAULT_FROM_EMAIL = 'noreply@variantgrid.com'
 SEND_EMAILS = True
+ADMIN_EMAIL_NOTIFICATION = "admin@variantgrid.com"
+CONTACT_US_ENABLED = True
 
 # Needed in production (when debug=False)
 ALLOWED_HOSTS = [WEB_HOSTNAME, WEB_IP]
