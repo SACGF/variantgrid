@@ -20,7 +20,8 @@ class Command(BaseCommand):
         parser.add_argument('--all', action='store_true', default=False, help='Attempt to rematch every single classification')
         parser.add_argument('--file', type=str, help='If provided expects a csv where the first column is a combination of genome build and imported c.hgvs it expects to import')
         parser.add_argument('--missing', action='store_true', default=False, help='Attempt to rematch only classifications not linked to a variant - one at a time')
-        parser.add_argument('--chgvs', action='store_true', default=False, help='Re-calculate c.hgvs values for all linked classifications that are missing 37 or 38 rep')
+        parser.add_argument('--extra', action='store_true', default=False, help='Populate the variant_info of a classification')
+
 
     def report_unmatched(self):
         print(f"Unmatched count = {Classification.objects.filter(variant__isnull=True).count()}")
@@ -28,24 +29,24 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         mode_all = options.get('all')
         mode_missing = options.get('missing')
+        mode_extra = options.get('extra')
         mode_file = options.get('file')
-        mode_chgvs = options.get('chgvs')
 
         if mode_all and mode_missing:
             raise ValueError("all and missing are mutually exclusive parameters")
 
-        if mode_file and (mode_all or mode_missing or mode_chgvs):
+        if mode_file and (mode_all or mode_missing or mode_extra):
             raise ValueError("file is an exclusive parameter")
 
-        if not any([mode_all, mode_missing, mode_file, mode_chgvs]):
-            raise ValueError("Need one of all, file, missing, chgvs")
+        if not any([mode_all, mode_missing, mode_file, mode_extra]):
+            raise ValueError("Need one of all, file, missing, mode_extra")
 
         row_count = 0
         batch_size = 50
         import_keys: Optional[Set[str]] = None
 
-        if mode_chgvs:
-            self.handle_chgvs(apply_all=mode_all)
+        if mode_extra:
+            self.handle_extra()
             return
         if mode_missing:
             batch_size = 1
@@ -98,16 +99,14 @@ class Command(BaseCommand):
     def sleep_for_delay(self):
         time.sleep(10)
 
-    def handle_chgvs(self, apply_all: bool = False):
-        qs = Classification.objects.filter(variant__isnull=False).filter(Q(chgvs_grch37__isnull=True) | Q(chgvs_grch38__isnull=True))
-        print(f"Number of matched records missing 37 or 38 rep : {qs.count()}")
+    def handle_extra(self):
+        for i, c in enumerate(Classification.objects.all()):
+            if i % 100 == 0:
+                print(f"Processed {i} classifications")
+            c.update_allele_info()
+            c.save(update_modified=False)
+        print(f"Finished {i} classifications")
 
-        if apply_all:
-            qs = Classification.objects.all()
-
-        for c in qs:
-            c.update_cached_c_hgvs()
-        print("Finished update c.hgvs")
 
     def handle_batch(self, batch: List[Classification]):
         ClassificationImportRun.record_classification_import("variant_rematching", len(batch))

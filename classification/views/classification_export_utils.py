@@ -416,7 +416,7 @@ class ExportFormatter(BaseExportFormatter):
 
     @lazy
     def preferred_chgvs_column(self) -> str:
-        return ClassificationModification.column_name_for_build(self.genome_build, use_full=self.use_full_chgvs)
+        return ClassificationModification.column_name_for_build(self.genome_build, suffix='c_hgvs_full')
 
     @lazy
     def ekeys(self) -> EvidenceKeyMap:

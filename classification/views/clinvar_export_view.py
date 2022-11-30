@@ -135,9 +135,9 @@ class ClinVarExportColumns(DatatableConfig[ClinVarExport]):
             genome_build = row["classification_based_on__published_evidence__genome_build__value"]
             c_hgvs_str: str
             if "h37" in genome_build:
-                c_hgvs_str = row["classification_based_on__classification__chgvs_grch37"]
+                c_hgvs_str = row["classification_based_on__classification__variant_info__grch37__c_hgvs"]
             else:
-                c_hgvs_str = row["classification_based_on__classification__chgvs_grch38"]
+                c_hgvs_str = row["classification_based_on__classification__variant_info__grch38__c_hgvs"]
 
             data: Dict[str, Any]
             c_hgvs = CHGVS(c_hgvs_str)
@@ -170,19 +170,19 @@ class ClinVarExportColumns(DatatableConfig[ClinVarExport]):
         self.rich_columns = [
             RichColumn("id", label="ID", orderable=True, default_sort=SortOrder.DESC),
             RichColumn(name="c_hgvs", label='Allele',
-                    sort_keys=["classification_based_on__classification__chgvs_grch38"],
+                    sort_keys=["classification_based_on__classification__variant_info__grch38__c_hgvs"],
                     extra_columns=[
                         "clinvar_allele__allele",
                         "classification_based_on__classification__variant",
                         "classification_based_on__published_evidence__genome_build__value",
-                        "classification_based_on__classification__chgvs_grch37",
-                        "classification_based_on__classification__chgvs_grch38",
+                        "classification_based_on__classification__variant_info__grch37__c_hgvs",
+                        "classification_based_on__classification__variant_info__grch38__c_hgvs",
                     ],
                     renderer=self.render_c_hgvs, client_renderer='TableFormat.hgvs',
                     search=[
                         # "clinvar_allele__allele__clingen_allele__id",  # need a string
-                        "classification_based_on__classification__chgvs_grch37",
-                        "classification_based_on__classification__chgvs_grch38"
+                        "classification_based_on__classification__variant_info__grch37__c_hgvs",
+                        "classification_based_on__classification__variant_info__grch38__c_hgvs"
                     ]
             ),
             RichColumn("condition",

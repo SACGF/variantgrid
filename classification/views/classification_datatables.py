@@ -92,6 +92,7 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
         super().__init__(request)
 
         user_settings = UserSettings.get_for_user(self.user)
+        genome_build_preferred = self.genome_build_prefs[0]
 
         self.rich_columns = [
             RichColumn(
@@ -120,17 +121,17 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
                 orderable=True
             ),
             RichColumn(
-                key=ClassificationModification.column_name_for_build(self.genome_build_prefs[0]),
+                key=ClassificationModification.column_name_for_build(genome_build_preferred),
                 # sort_keys=['variant_sort', 'c_hgvs'],  # annotated column
-                sort_keys=['c_hgvs'],
+                sort_keys=[ClassificationModification.column_name_for_build(genome_build_preferred, 'sort_string'), 'c_hgvs'],
                 name='c_hgvs',
                 label=f'HGVS ({user_settings.default_genome_build.name})',
                 renderer=self.render_c_hgvs,
                 client_renderer='VCTable.c_hgvs',
                 orderable=True,
                 extra_columns=[
-                    "classification__chgvs_grch37",
-                    "classification__chgvs_grch38",
+                    "classification__variant_info__grch37__c_hgvs",
+                    "classification__variant_info__grch38__c_hgvs",
                     'published_evidence__c_hgvs__value',
                     'published_evidence__p_hgvs__value',
                     'published_evidence__genome_build__value',
