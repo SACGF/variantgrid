@@ -31,7 +31,7 @@ class AbstractZygosityCountNode(Model):
         arg_q_dict = defaultdict(dict)
         for arg, column, min_count, max_count in COUNT_COLUMNS:
             q_and = []
-            if min_count:
+            if min_count is not None:
                 q_and.append(Q(**{column + "__gte": min_count}))
             if max_count:
                 q_and.append(Q(**{column + "__lte": max_count}))
