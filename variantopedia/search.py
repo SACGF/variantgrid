@@ -41,7 +41,6 @@ from variantopedia.models import SearchTypes
 DB_PREFIX_PATTERN = re.compile(fr"^(v|{settings.VARIANT_VCF_DB_PREFIX})(\d+)$")
 VARIANT_VCF_PATTERN = re.compile(r"((?:chr)?\S*)\s+(\d+)\s+\.?\s*([GATC]+)\s+([GATC]+)")
 VARIANT_GNOMAD_PATTERN = re.compile(r"(?:chr)?(\S*)-(\d+)-([GATC]+)-([GATC]+)")
-HGVS_MINIMUM_TO_SHOW_ERROR_PATTERN = re.compile(r":[cgpn]\..*\d+")
 MAX_RESULTS_PER_TYPE = 50
 
 
@@ -275,9 +274,14 @@ class SearchResults:
         self.results.append(result)
 
     def append_error(self, search_type: str, error: Any, genome_build: Optional[GenomeBuild] = None):
-        genome_builds = self.search_errors[SearchError(search_type=search_type, error=str(error))]
-        if genome_build:
-            genome_builds.add(genome_build)
+        errors = []
+        if cause := getattr(error, "__cause__", None):
+            errors.append(str(cause))
+        errors.append(str(error))
+        for error_string in errors:
+            genome_builds = self.search_errors[SearchError(search_type=search_type, error=error_string)]
+            if genome_build:
+                genome_builds.add(genome_build)
 
     def extend(self, other: 'SearchResults'):
         for search_error, genome_builds in other.search_errors.items():
@@ -631,6 +635,7 @@ def search_hgvs(search_string: str, user: User, genome_build: GenomeBuild, varia
         search_messages = []
         initial_score = 0
         hgvs_string = search_string
+        variant_tuple = None
         used_transcript_accession = None
         kind = None
         method = None
@@ -641,30 +646,31 @@ def search_hgvs(search_string: str, user: User, genome_build: GenomeBuild, varia
             variant_tuple, used_transcript_accession, kind, method = hgvs_matcher.get_variant_tuple_used_transcript_kind_and_method(hgvs_string)
         except (ValueError, NotImplementedError) as original_error:  # InvalidHGVSName is subclass of ValueError
             original_hgvs_string = hgvs_string
-            try:
-                hgvs_string = HGVSMatcher.clean_hgvs(hgvs_string)
-                if search_string != hgvs_string:
-                    search_messages.append(f"Warning: Cleaned '{search_string}' => '{hgvs_string}'")
-                variant_tuple, used_transcript_accession, kind, method = hgvs_matcher.get_variant_tuple_used_transcript_kind_and_method(hgvs_string)
-            except (ValueError, NotImplementedError):
+            cleaned_error = None
+            hgvs_string = HGVSMatcher.clean_hgvs(hgvs_string)
+            if original_hgvs_string != hgvs_string:
+                search_messages.append(f"Warning: Cleaned '{search_string}' => '{hgvs_string}'")
                 try:
-                    if gene_symbol := hgvs_matcher.get_gene_symbol_if_no_transcript(hgvs_string):
-                        if results := _search_hgvs_using_gene_symbol(gene_symbol, search_messages,
-                                                                     hgvs_string, user, genome_build, variant_qs):
-                            return results
-                except InvalidHGVSName as e:
-                    # might just not be a HGVS name at all
-                    pass
+                    variant_tuple, used_transcript_accession, kind, method = hgvs_matcher.get_variant_tuple_used_transcript_kind_and_method(hgvs_string)
+                except (ValueError, NotImplementedError) as ce:
+                    cleaned_error = ce
+                    try:
+                        if gene_symbol := hgvs_matcher.get_gene_symbol_if_no_transcript(hgvs_string):
+                            if results := _search_hgvs_using_gene_symbol(gene_symbol, search_messages,
+                                                                         hgvs_string, user, genome_build, variant_qs):
+                                return results
+                    except InvalidHGVSName as e:
+                        # might just not be a HGVS name at all
+                        pass
 
+            if variant_tuple is None:
                 if classify:
                     search_message = f"Error reading HGVS: '{original_error}'"
                     return [SearchResult(ClassifyNoVariantHGVS(genome_build, original_hgvs_string), message=search_message)]
 
-                # We want to be able to rescue dodgy HGVS but don't want to raise errors
-                # for everything as that will cause lots of false positives.
-                if HGVS_MINIMUM_TO_SHOW_ERROR_PATTERN.findall(search_string):
-                    raise original_error  # cleaning didn't work don't tell anyone
-                return None
+                if cleaned_error and str(cleaned_error) != str(original_error):
+                    raise cleaned_error from original_error
+                raise original_error
 
         try:
             # This currently fails if we switch transcripts
