@@ -171,8 +171,7 @@ class ClinvarExportPrepare:
             classification__allele__isnull=False
         ).select_related(
             'classification',
-            'classification__variant_info',
-            'classification__variant_info__allele_info__allele',
+            'classification__allele_info__allele',
             'classification__lab',
             'classification__lab__clinvar_key'
         ).order_by('classification__allele_id', 'classification__lab__clinvar_key_id')

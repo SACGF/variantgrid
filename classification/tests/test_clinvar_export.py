@@ -163,9 +163,9 @@ class TestClinVarExport(TestCase):
         c.variant = variant
         c.allele = allele
         c.update_allele_info()
-        c.variant_info.grch37.c_hgvs = "NM_000001.2(TECTA):c.1913G>A"
-        c.variant_info.grch37.c_hgvs_full = "NM_000001.2(TECTA):c.1913G>A"
-        c.variant_info.grch37.save()
+        c.allele_info.grch37.c_hgvs = "NM_000001.2(TECTA):c.1913G>A"
+        c.allele_info.grch37.c_hgvs_full = "NM_000001.2(TECTA):c.1913G>A"
+        c.allele_info.grch37.save()
         # c.chgvs_grch37 = "NM_000001.2(TECTA):c.1913G>A"
         # c.chgvs_grch37_full = "NM_000001.2(TECTA):c.1913G>A"
         c.condition_resolution = {"sort_text": "ataxia-telangiectasia with generalized skin pigmentation and early death",

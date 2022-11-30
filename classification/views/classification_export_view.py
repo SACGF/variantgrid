@@ -276,9 +276,9 @@ class ClassificationApiExportView(APIView):
             'classification__lab',
             'classification__lab__organization',
             'classification__clinical_context',
-            'classification__variant_info__grch37',
-            'classification__variant_info__grch38',
-            'classification__variant_info__allele_info__allele__clingen_allele',
+            'classification__allele_info__grch37',
+            'classification__allele_info__grch38',
+            'classification__allele_info__allele_info__allele__clingen_allele',
             'classification__flag_collection')
 
         if allele := request.query_params.get('allele'):

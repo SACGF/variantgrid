@@ -8,27 +8,8 @@ from library.log_utils import report_exc_info
 from snpdb.models import GenomeBuild, Variant, Allele
 
 
-class ImportedAlleleInfo(TimeStampedModel):
-    # We can derive variants from fields other than c.hgvs, will need to make more supported in future
-    imported_c_hgvs = TextField(null=True, blank=True)
-    imported_genome_build = ForeignKey(GenomeBuild, null=True, blank=True, on_delete=CASCADE)
-
-    # matched
-    allele = ForeignKey(Allele, null=True, blank=True, on_delete=SET_NULL)
-
-    @property
-    def imported_c_hgvs_obj(self) -> Optional[CHGVS]:
-        return CHGVS(self.imported_c_hgvs)
-
-    def __str__(self):
-        return f"Imported {self.imported_c_hgvs} {self.imported_genome_build} : resolved to {self.allele:CA}"
-
-    class Meta:
-        unique_together = ('imported_c_hgvs', 'imported_genome_build')
-
-
 class ImportedVariantInfo(TimeStampedModel):
-    allele_info = ForeignKey(ImportedAlleleInfo, on_delete=CASCADE)
+    allele_info = ForeignKey('ImportedAlleleInfo', on_delete=CASCADE, null=True, blank=True, related_name='+')
     genome_build = ForeignKey(GenomeBuild, on_delete=CASCADE)
 
     variant = ForeignKey(Variant, null=True, on_delete=SET_NULL)
@@ -36,7 +17,7 @@ class ImportedVariantInfo(TimeStampedModel):
     c_hgvs_full = TextField(null=True, blank=True)
     gene_symbol = ForeignKey(GeneSymbol, null=True, on_delete=SET_NULL)
     transcript_version = ForeignKey(TranscriptVersion, null=True, on_delete=SET_NULL)
-    sort_string = TextField(null=True, blank=True)
+    genomic_sort = TextField(null=True, blank=True)
 
     class Meta:
         unique_together = ('allele_info', 'genome_build')
@@ -44,20 +25,9 @@ class ImportedVariantInfo(TimeStampedModel):
     def __str__(self):
         return f"{self.c_hgvs}"
 
-    @staticmethod
-    def get_or_create(allele_info: ImportedAlleleInfo,
-                      genome_build: GenomeBuild,
-                      always_update: bool = False):
-
-        vcvi, created = ImportedVariantInfo.objects.get_or_create(
-            allele_info=allele_info,
-            genome_build=genome_build,
-        )
-        # allele / variant may not have been setup
-        if created or not vcvi.variant or always_update:
-            vcvi.update_and_save()
-
-        return vcvi
+    @property
+    def allele(self) -> Optional[Allele]:
+        self.allele_info.allele
 
     def _derive_variant(self) -> Optional[Variant]:
         if allele := self.allele_info.allele:
@@ -80,7 +50,7 @@ class ImportedVariantInfo(TimeStampedModel):
         c_hgvs_obj = self.allele_info.imported_c_hgvs_obj
 
         if variant:
-            self.sort_string = variant.sort_string
+            self.genomic_sort = variant.sort_string
 
             if genome_build.is_annotated:
                 imported_transcript = c_hgvs_obj.transcript
@@ -102,36 +72,60 @@ class ImportedVariantInfo(TimeStampedModel):
                         "transcript_id": imported_transcript
                     })
         self.save()
+        return self
 
 
-class ImportedAlleleCommonBuilds(TimeStampedModel):
+class ImportedAlleleInfo(TimeStampedModel):
     """
     This class exists to give quick access to 37 and 38 version, e.g.
-    qs.order_by('classification__variant_info__grch37__sort_order')
+    qs.order_by('classification__allele_info__grch37__genomic_sort')
     """
-    allele_info = OneToOneField(ImportedAlleleInfo, on_delete=CASCADE)
-    grch37 = ForeignKey(ImportedVariantInfo, on_delete=SET_NULL, null=True, blank=True, related_name='+')
-    grch38 = ForeignKey(ImportedVariantInfo, on_delete=SET_NULL, null=True, blank=True, related_name='+')
+    imported_c_hgvs = TextField(null=True, blank=True)
+    imported_genome_build = ForeignKey(GenomeBuild, null=True, blank=True, on_delete=CASCADE)
+
+    @property
+    def imported_c_hgvs_obj(self) -> CHGVS:
+        return CHGVS(self.imported_c_hgvs)
+
+    class Meta:
+        unique_together = ('imported_c_hgvs', 'imported_genome_build')
+
+    grch37 = OneToOneField(ImportedVariantInfo, on_delete=SET_NULL, null=True, blank=True, related_name='+')
+    grch38 = OneToOneField(ImportedVariantInfo, on_delete=SET_NULL, null=True, blank=True, related_name='+')
+
+    # matched
+    allele = ForeignKey(Allele, null=True, blank=True, on_delete=SET_NULL)
 
     def update_and_save(self, always_update: bool = True):
-        self.grch37 = ImportedVariantInfo.get_or_create(self.allele_info, GenomeBuild.grch37(), always_update=always_update)
-        self.grch38 = ImportedVariantInfo.get_or_create(self.allele_info, GenomeBuild.grch38(), always_update=always_update)
-        self.save()
+        inserted_genome_builds = False
+        if not self.pk:
+            self.save()  # need to save so other objects can reference self
+
+        if not self.grch37:
+            inserted_genome_builds = True
+            self.grch37, _ = ImportedVariantInfo.objects.get_or_create(allele_info=self, genome_build=GenomeBuild.grch37())
+        if not self.grch38:
+            inserted_genome_builds = True
+            self.grch38, _ = ImportedVariantInfo.objects.get_or_create(allele_info=self, genome_build=GenomeBuild.grch38())
+
+        if always_update:
+            self.save()
+            self.grch37.update_and_save()
+            self.grch38.update_and_save()
 
     @staticmethod
-    def get_or_create(imported_c_hgvs: str, imported_genome_build: GenomeBuild, matched_allele: Optional[Allele] = None) -> 'ImportedAlleleCommonBuilds':
-        common_builds: ImportedAlleleCommonBuilds
+    def get_or_create(imported_c_hgvs: str, imported_genome_build: GenomeBuild, matched_allele: Optional[Allele] = None) -> 'ImportedAlleleInfo':
 
-        allele_info, _ = ImportedAlleleInfo.objects.get_or_create(
+        allele_info, needs_saving = ImportedAlleleInfo.objects.get_or_create(
             imported_c_hgvs=imported_c_hgvs,
             imported_genome_build=imported_genome_build
         )
 
         if matched_allele and allele_info.allele != matched_allele:
             allele_info.allele = matched_allele
-            allele_info.save()
+            needs_saving = True
 
-        common_builds, _ = ImportedAlleleCommonBuilds.objects.get_or_create(allele_info=allele_info)
-        common_builds.update_and_save()
+        if needs_saving:
+            allele_info.update_and_save()
 
-        return common_builds
+        return allele_info

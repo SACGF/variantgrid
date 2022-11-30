@@ -35,7 +35,7 @@ from classification.models.classification_import_run import ClassificationImport
 from classification.models.classification_patcher import patch_fuzzy_age
 from classification.models.classification_utils import \
     ValidationMerger, ClassificationJsonParams, VariantCoordinateFromEvidence, PatchMeta, ClassificationPatchResponse
-from classification.models.classification_variant_info_models import ImportedAlleleCommonBuilds
+from classification.models.classification_variant_info_models import ImportedAlleleInfo
 from classification.models.evidence_key import EvidenceKeyValueType, \
     EvidenceKey, EvidenceKeyMap, VCDataDict, WipeMode, VCDataCell
 from classification.models.evidence_mixin import EvidenceMixin, VCPatch
@@ -417,7 +417,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
     variant = models.ForeignKey(Variant, null=True, on_delete=PROTECT)  # Null as might not match this
     allele = models.ForeignKey(Allele, null=True, on_delete=PROTECT)
 
-    # These fields were all deleted in favour of variant_info
+    # These fields were all deleted in favour of allele_info
     # chgvs_grch37 = models.TextField(blank=True, null=True)
     # chgvs_grch38 = models.TextField(blank=True, null=True)
     #
@@ -428,14 +428,14 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
     # transcript_version_grch38 = models.ForeignKey(TranscriptVersion, null=True, blank=True, on_delete=SET_NULL, related_name='classification_38')
     ## END SO MANY DERIVED FIELDS
 
-    variant_info = models.ForeignKey(ImportedAlleleCommonBuilds, null=True, blank=True, on_delete=SET_NULL)
+    allele_info = models.ForeignKey(ImportedAlleleInfo, null=True, blank=True, on_delete=SET_NULL)
     """ Keeps links to common builds (37, 38) for quick access to c.hgvs, transcript etc. Is shared between classifications with same import data """
 
     @property
     def allele_object(self) -> Allele:
         """ The new preferred way to reference the allele, so we can eventually remove allele from the classification object """
         try:
-            return self.variant_info.allele_info.allele
+            return self.allele_info.allele
         except AttributeError:
             return self.allele
 
@@ -488,28 +488,28 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
     @property
     def chgvs_grch37(self) -> Optional[str]:
         try:
-            return self.variant_info.grch37.c_hgvs
+            return self.allele_info.grch37.c_hgvs
         except AttributeError:
             return None
 
     @property
     def chgvs_grch38(self) -> Optional[str]:
         try:
-            return self.variant_info.grch38.c_hgvs
+            return self.allele_info.grch38.c_hgvs
         except AttributeError:
             return None
 
     @property
     def chgvs_grch37_full(self) -> Optional[str]:
         try:
-            return self.variant_info.grch37.c_hgvs_full
+            return self.allele_info.grch37.c_hgvs_full
         except AttributeError:
             return None
 
     @property
     def chgvs_grch38_full(self) -> Optional[str]:
         try:
-            return self.variant_info.grch38.c_hgvs_full
+            return self.allele_info.grch38.c_hgvs_full
         except AttributeError:
             return None
 
@@ -588,7 +588,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         flag_collections = Flag.objects.filter(time_range_q, resolution__status=FlagStatus.OPEN)
         flag_collections = flag_collections.order_by('collection__id').values_list('collection__id', flat=True)
         flag_q = Q(flag_collection_id__in=flag_collections.distinct())
-        missing_chgvs_q = (Q(variant_info__grch37__c_hgvs__isnull=True) | Q(variant_info__grch38__c_hgvs__isnull=True))
+        missing_chgvs_q = (Q(allele_info__grch37__c_hgvs__isnull=True) | Q(allele_info__grch38__c_hgvs__isnull=True))
         coi_qs = Classification.objects.filter(flag_q | (time_range_q & missing_chgvs_q))
         coi_qs = coi_qs.order_by('-pk').select_related('lab', 'flag_collection')
 
@@ -737,7 +737,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         self.update_allele_info()
 
         # if we had a previously opened flag match warning - don't re-open
-        if self.variant_info:
+        if self.allele_info:
             if not self.id:
                 # need to save to have a flag collection
                 self.save()
@@ -830,10 +830,10 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             try:
                 genome_build = self.get_genome_build()
             except ValueError:
-                self.variant_info: Optional[ImportedAlleleCommonBuilds] = None
+                self.allele_info: Optional[ImportedAlleleInfo] = None
                 return
 
-            self.variant_info = ImportedAlleleCommonBuilds.get_or_create(
+            self.allele_info = ImportedAlleleInfo.get_or_create(
                 imported_c_hgvs=self.imported_c_hgvs,
                 imported_genome_build=genome_build,
                 matched_allele=allele
@@ -2086,6 +2086,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
     #     return None
 
     def get_allele_info(self) -> Optional[Dict[str, Any]]:
+        # TODO rename to avoid confusion with allele_info
         if not self.allele_object:
             return None
 
@@ -2410,7 +2411,7 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
             build_str = 'grch38'
         else:
             raise ValueError(f'No cached column for genome build {genome_build.pk}')
-        return f'classification__variant_info__{build_str}__{suffix}'
+        return f'classification__allele_info__{build_str}__{suffix}'
 
 
     @property
@@ -2525,11 +2526,9 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
         if published:
             qs = qs.select_related(
                 'classification',
-                'classification__lab',
                 'classification__lab__organization',
-                'classification__variant_info',
-                'classification__variant_info__grch37',
-                'classification__variant_info__grch38',
+                'classification__allele_info__grch37',
+                'classification__allele_info__grch38',
                 'classification__user'
             )
             qs = qs.filter(is_last_published=True)

@@ -20,7 +20,7 @@ class Command(BaseCommand):
         parser.add_argument('--all', action='store_true', default=False, help='Attempt to rematch every single classification')
         parser.add_argument('--file', type=str, help='If provided expects a csv where the first column is a combination of genome build and imported c.hgvs it expects to import')
         parser.add_argument('--missing', action='store_true', default=False, help='Attempt to rematch only classifications not linked to a variant - one at a time')
-        parser.add_argument('--extra', action='store_true', default=False, help='Populate the variant_info of a classification')
+        parser.add_argument('--extra', action='store_true', default=False, help='Populate the allele_info of a classification')
 
 
     def report_unmatched(self):

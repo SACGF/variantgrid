@@ -385,8 +385,8 @@ def classification_gene_symbol_filter(gene_symbol: Union[str, GeneSymbol]) -> Op
                 # TODO match on gene symbol in the variant info
 
             t_qs = Transcript.objects.filter(transcriptversion__gene_version__gene__in=genes).distinct()
-            evidence_q_list.append(Q(classification__variant_info__grch37__transcript_version__transcript__in=t_qs))
-            evidence_q_list.append(Q(classification__variant_info__grch38__transcript_version__transcript__in=t_qs))
+            evidence_q_list.append(Q(classification__allele_info__grch37__transcript_version__transcript__in=t_qs))
+            evidence_q_list.append(Q(classification__allele_info__grch38__transcript_version__transcript__in=t_qs))
             """
             for transcript_id, annotation_consortium in t_qs.values_list("identifier", "annotation_consortium"):
                 e_key = SpecialEKeys.ANNOTATION_CONSORTIUM_KEYS[annotation_consortium]

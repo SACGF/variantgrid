@@ -12,7 +12,7 @@ from classification.classification_import import reattempt_variant_matching
 from classification.enums.classification_enums import EvidenceCategory, SpecialEKeys, SubmissionSource, ShareLevel
 from classification.models import EvidenceKey, EvidenceKeyMap, DiscordanceReport, DiscordanceReportClassification, \
     send_discordance_notification, ClinicalContext, ClassificationReportTemplate, ClassificationModification, \
-    UploadedClassificationsUnmapped, ClinicalContextRecalcTrigger, ImportedAlleleCommonBuilds
+    UploadedClassificationsUnmapped, ClinicalContextRecalcTrigger, ImportedAlleleInfo
 from classification.models.classification import Classification
 from classification.models.classification_import_run import ClassificationImportRun, ClassificationImportRunStatus
 from classification.tasks.classification_import_map_and_insert_task import ClassificationImportMapInsertTask
@@ -181,17 +181,17 @@ class ClassificationAdmin(ModelAdminBasics):
     inlines = (ClassificationModificationAdmin,)
     list_select_related = ('lab', 'user', 'allele')
 
-    @admin_list_column(short_description="c.hgvs (37)", order_field="variant_info__grch37__c_hgvs")
+    @admin_list_column(short_description="c.hgvs (37)", order_field="allele_info__grch37__c_hgvs")
     def grch37_c_hgvs(self, obj: Classification):
         try:
-            return obj.variant_info.grch37.c_hgvs
+            return obj.allele_info.grch37.c_hgvs
         except AttributeError:
             return ""
 
-    @admin_list_column(short_description="c.hgvs (38)", order_field="variant_info__grch37__c_hgvs")
+    @admin_list_column(short_description="c.hgvs (38)", order_field="allele_info__grch37__c_hgvs")
     def grch38_c_hgvs(self, obj: Classification):
         try:
-            return obj.variant_info.grch38.c_hgvs
+            return obj.allele_info.grch38.c_hgvs
         except AttributeError:
             return ""
 
@@ -594,20 +594,11 @@ class UploadedClassificationsUnmappedAdmin(ModelAdminBasics):
             task.apply_async()
 
 
-@admin.register(ImportedAlleleCommonBuilds)
+@admin.register(ImportedAlleleInfo)
 class ImportedAlleleAdmin(ModelAdminBasics):
     list_display = (
         "imported_c_hgvs",
-        "allele_info",
+        "imported_genome_build",
         "grch37",
         "grch38"
     )
-
-    @admin_list_column("Imported c.HGVS")
-    def imported_c_hgvs(self, obj: ImportedAlleleCommonBuilds):
-        return obj.allele_info.imported_c_hgvs
-
-
-    @admin_list_column("Imported Genome Build")
-    def imported_genome_build(self, obj: ImportedAlleleCommonBuilds):
-        return obj.allele_info.imported_genome_build

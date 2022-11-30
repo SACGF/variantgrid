@@ -41,7 +41,7 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
         })
         response = {
             'values': values,
-            'allele_id': row.get('classification__variant_info__allele_info__allele_id')
+            'allele_id': row.get('classification__allele_info__allele_id')
         }
 
         if settings.VARIANT_CLASSIFICATION_GRID_SHOW_PHGVS:
@@ -123,19 +123,19 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
             RichColumn(
                 key=ClassificationModification.column_name_for_build(genome_build_preferred),
                 # sort_keys=['variant_sort', 'c_hgvs'],  # annotated column
-                sort_keys=[ClassificationModification.column_name_for_build(genome_build_preferred, 'sort_string'), 'c_hgvs'],
+                sort_keys=[ClassificationModification.column_name_for_build(genome_build_preferred, 'genomic_sort'), 'c_hgvs'],
                 name='c_hgvs',
                 label=f'HGVS ({user_settings.default_genome_build.name})',
                 renderer=self.render_c_hgvs,
                 client_renderer='VCTable.c_hgvs',
                 orderable=True,
                 extra_columns=[
-                    "classification__variant_info__grch37__c_hgvs",
-                    "classification__variant_info__grch38__c_hgvs",
+                    "classification__allele_info__grch37__c_hgvs",
+                    "classification__allele_info__grch38__c_hgvs",
                     'published_evidence__c_hgvs__value',
                     'published_evidence__p_hgvs__value',
                     'published_evidence__genome_build__value',
-                    'classification__variant_info__allele_info__allele_id',
+                    'classification__allele_info__allele_id',
                 ]
             ),
             RichColumn(
