@@ -9,8 +9,8 @@ from snpdb.tests.test_data import create_fake_trio
 
 class CohortGenotypeTestCase(TestCase):
     @classmethod
-    def setUpClass(cls):
-        super().setUpClass()
+    def setUpTestData(cls):
+        super().setUpTestData()
         owner_username = f"test_user_{__file__}_owner"
         cls.user_owner = User.objects.get_or_create(username=owner_username)[0]
         cls.grch37 = GenomeBuild.get_name_or_alias("GRCh37")

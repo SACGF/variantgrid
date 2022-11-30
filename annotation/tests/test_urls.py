@@ -12,8 +12,8 @@ from snpdb.models.models_genome import GenomeBuild
 
 class Test(URLTestCase):
     @classmethod
-    def setUpClass(cls):
-        super().setUpClass()
+    def setUpTestData(cls):
+        super().setUpTestData()
 
         owner_username = f"test_user_{__file__}_owner"
         admin_username = f"test_user_{__file__}_admin"

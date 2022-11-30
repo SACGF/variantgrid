@@ -9,6 +9,7 @@ See __init__.py in this dir for details
 import os
 import socket
 import re
+import sys
 from collections import defaultdict
 
 from library.django_utils.django_secret_key import get_or_create_django_secret_key
@@ -62,6 +63,7 @@ DISCORDANCE_ENABLED = False
 # be considered in the report
 DISCORDANCE_REPORT_LEEWAY = 14
 
+UNIT_TEST = sys.argv[1:2] == ['test']
 DEBUG = True
 # If SEND_EMAILS is False, all emails that would go through EmailLog will still be record but wont be sent
 # Good for test environments where you don't want to spam test accounts

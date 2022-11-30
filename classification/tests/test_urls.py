@@ -13,8 +13,8 @@ from snpdb.models import GenomeBuild, Variant, ClinGenAllele, Allele, VariantAll
 
 class Test(URLTestCase):
     @classmethod
-    def setUpClass(cls):
-        super().setUpClass()
+    def setUpTestData(cls):
+        super().setUpTestData()
 
         admin_username = f"test_user_{__file__}_admin"
         owner_username = f"test_user_{__file__}_owner"

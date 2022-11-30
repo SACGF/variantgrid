@@ -20,8 +20,8 @@ class Test(URLTestCase):
     """
 
     @classmethod
-    def setUpClass(cls):
-        super().setUpClass()
+    def setUpTestData(cls):
+        super().setUpTestData()
 
         grch37 = GenomeBuild.get_name_or_alias("GRCh37")
         get_fake_annotation_version(grch37)
@@ -95,15 +95,6 @@ class Test(URLTestCase):
             ("genomic_intervals_grid", {}, cls.genomic_intervals_collection),
             ("custom_columns_grid", {}, cls.custom_columns_collection),
         ]
-
-    @classmethod
-    def tearDownClass(cls):
-        cls.user_owner.delete()
-        cls.user_non_owner.delete()
-        cls.vcf.delete()  # Will cascade sample/cohort/trio
-        cls.genomic_intervals_collection.delete()
-
-        super().tearDownClass()
 
     def testUrls(self):
         URL_NAMES_AND_KWARGS = [

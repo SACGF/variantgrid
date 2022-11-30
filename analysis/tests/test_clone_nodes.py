@@ -20,8 +20,8 @@ class TestCloneAnalysisNodes(TestCase):
     """ It's only worth testing AnalysisNodes with related objects, as normal fields are just copied OK """
 
     @classmethod
-    def setUpClass(cls):
-        super().setUpClass()
+    def setUpTestData(cls):
+        super().setUpTestData()
 
         user = User.objects.get_or_create(username='testuser')[0]
         cls.grch37 = GenomeBuild.get_name_or_alias("GRCh37")

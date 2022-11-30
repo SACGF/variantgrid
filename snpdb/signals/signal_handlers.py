@@ -13,6 +13,9 @@ from snpdb.tasks.vcf_bed_file_task import create_backend_vcf_bed_intersections
 def user_post_save_handler(sender, instance, **kwargs):
     """ Add new user to the public group """
 
+    print("*** user_post_save_handler ***")
+    print("*" * 42)
+
     def add_user_to_group(group_name: str):
         group, _ = Group.objects.get_or_create(name=group_name)
         group.user_set.add(instance)

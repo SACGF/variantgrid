@@ -19,8 +19,9 @@ class TestVCFProcessors(TestCase):
     TEST_DATA_DIR = os.path.join(settings.BASE_DIR, "upload", "test_data", "vcf")
 
     @classmethod
-    def setUpClass(cls):
-        super().setUpClass()
+    def setUpTestData(cls):
+        super().setUpTestData()
+
         for base in "GATC":
             Sequence.objects.get_or_create(seq=base, seq_md5_hash=md5sum_str(base), length=len(base))
 

@@ -24,8 +24,8 @@ from snpdb.tests.utils.vcf_testing_utils import slowly_create_loci_and_variants_
 class Test(URLTestCase):
 
     @classmethod
-    def setUpClass(cls):
-        super().setUpClass()
+    def setUpTestData(cls):
+        super().setUpTestData()
 
         grch37 = GenomeBuild.get_name_or_alias("GRCh37")
         annotation_version = get_fake_annotation_version(grch37)  # Needed in cohort_hotspot_graph
@@ -160,14 +160,6 @@ class Test(URLTestCase):
         cls.PRIVATE_GRID_LIST_URLS = [
             #("vcfs_grid", {}, cls.vcf),
         ]
-
-    @classmethod
-    def tearDownClass(cls):
-        cls.user_owner.delete()
-        cls.user_non_owner.delete()
-        cls.vcf.delete()  # Will cascade sample/cohort/trio
-
-        super().tearDownClass()
 
     def testUrls(self):
         URL_NAMES_AND_KWARGS = [

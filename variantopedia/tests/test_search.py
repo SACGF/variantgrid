@@ -1,6 +1,5 @@
-from unittest import TestCase
-
 from django.contrib.auth.models import User
+from django.test import TestCase
 
 from annotation.tests.test_data_fake_genes import create_fake_transcript_version
 from snpdb.models import GenomeBuild, ClinGenAllele
@@ -8,11 +7,11 @@ from variantopedia.models import SearchTypes
 from variantopedia.search import search_data
 
 
-class TestVCFProcessors(TestCase):
+class TestSearch(TestCase):
 
     @classmethod
-    def setUpClass(cls):
-        super().setUpClass()
+    def setUpTestData(cls):
+        super().setUpTestData()
         cls.user = User.objects.get_or_create(username='testuser')[0]
         create_fake_transcript_version(GenomeBuild.grch38())
 
@@ -57,7 +56,6 @@ class TestVCFProcessors(TestCase):
             search_results = search_data(self.user, variant_str, False)
             self._verify_all_of_type(search_results, SearchTypes.VARIANT)
 
-
     def test_search_dbsnp(self):
         DBSNP = [
             # "rs6025",
@@ -73,7 +71,6 @@ class TestVCFProcessors(TestCase):
         for ca_str in CLINGEN_ALLELE:
             search_results = search_data(self.user, ca_str, False)
             self._verify_all_of_type(search_results, SearchTypes.CLINGEN_ALLELE_ID)
-
 
     def test_gene_symbol(self):
         GENE_SYMBOL = [

@@ -1,6 +1,7 @@
 import logging
 
 from django.apps import AppConfig
+from django.conf import settings
 from django.db.models.signals import post_save
 
 
@@ -20,8 +21,9 @@ class SnpdbConfig(AppConfig):
 
         backend_vcf_import_success_signal.connect(backend_vcf_import_success_handler)
 
-        # Add newly created users to public group
-        post_save.connect(user_post_save_handler, sender=User)
+        if not settings.UNIT_TEST:
+            # Add newly created users to public group
+            post_save.connect(user_post_save_handler, sender=User)
 
         # Make global settings share read only with this group by default
         post_save.connect(group_post_save_handler, sender=Group)

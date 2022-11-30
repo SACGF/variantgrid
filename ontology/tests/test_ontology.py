@@ -7,8 +7,8 @@ from ontology.tests.test_data_ontology import create_ontology_test_data
 
 class Test(TestCase):
     @classmethod
-    def setUpClass(cls):
-        super().setUpClass()
+    def setUpTestData(cls):
+        super().setUpTestData()
 
     def testLoadData(self):
         create_ontology_test_data()
