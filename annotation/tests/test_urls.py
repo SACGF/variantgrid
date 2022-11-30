@@ -1,7 +1,6 @@
 import unittest
 
 from django.contrib.auth.models import User
-from django.db import IntegrityError
 
 from annotation.fake_annotation import get_fake_annotation_version, create_fake_clinvar_data, \
     create_fake_variant_annotation
@@ -16,11 +15,10 @@ class Test(URLTestCase):
     def setUpClass(cls):
         super().setUpClass()
 
-        cls.user = User.objects.get_or_create(username='testuser')[0]
-        try:
-            cls.admin_user = User.objects.create_superuser('admin_user')
-        except IntegrityError:
-            cls.admin_user = User.objects.get(username='admin_user')
+        owner_username = f"test_user_{__file__}_owner"
+        admin_username = f"test_user_{__file__}_admin"
+        cls.user = User.objects.get_or_create(username=owner_username)[0]
+        cls.admin_user = User.objects.create_superuser(admin_username)
         cls.grch37 = GenomeBuild.get_name_or_alias("GRCh37")
         cls.grch38 = GenomeBuild.get_name_or_alias("GRCh38")
 

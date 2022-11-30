@@ -11,7 +11,8 @@ class CohortGenotypeTestCase(TestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        cls.user_owner = User.objects.get_or_create(username='testuser')[0]
+        owner_username = f"test_user_{__file__}_owner"
+        cls.user_owner = User.objects.get_or_create(username=owner_username)[0]
         cls.grch37 = GenomeBuild.get_name_or_alias("GRCh37")
         cls.trio1 = create_fake_trio(cls.user_owner, cls.grch37)
         cls.trio2 = create_fake_trio(cls.user_owner, cls.grch37)
