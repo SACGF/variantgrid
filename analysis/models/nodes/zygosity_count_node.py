@@ -22,22 +22,23 @@ class AbstractZygosityCountNode(Model):
 
     def get_zygosity_count_arg_q_dict(self) -> Dict[Optional[str], Dict[str, Q]]:
         COUNT_COLUMNS = [
-            # column                         MIN                 MAX
-            (self.any_zygosity_count_column, self.minimum_count, self.maximum_count),
-            (self.ref_count_column, self.min_ref_count, self.max_ref_count),
-            (self.het_count_column, self.min_het_count, self.max_het_count),
-            (self.hom_count_column, self.min_hom_count, self.max_hom_count),
+            # arg                               column                         MIN                 MAX
+            (self.any_zygosity_count_column,    self.any_zygosity_count_column, self.minimum_count, self.maximum_count),
+            (self.count_annotation_arg,         self.ref_count_column, self.min_ref_count, self.max_ref_count),
+            (self.count_annotation_arg,         self.het_count_column, self.min_het_count, self.max_het_count),
+            (self.count_annotation_arg,         self.hom_count_column, self.min_hom_count, self.max_hom_count),
         ]
         arg_q_dict = defaultdict(dict)
-        for column, min_count, max_count in COUNT_COLUMNS:
+        for arg, column, min_count, max_count in COUNT_COLUMNS:
             q_and = []
-            if min_count:
+            if min_count is not None:
                 q_and.append(Q(**{column + "__gte": min_count}))
             if max_count:
                 q_and.append(Q(**{column + "__lte": max_count}))
             if q_and:
                 q = reduce(operator.and_, q_and)
-                arg_q_dict[column][str(q)] = q
+                arg_q_dict[arg][str(q)] = q
+
         return arg_q_dict
 
     def _get_zygosity_count_description(self) -> str:

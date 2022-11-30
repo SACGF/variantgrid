@@ -68,6 +68,11 @@ class CohortMixin:
         return column_prefix
 
     @property
+    def count_annotation_arg(self):
+        """ key in annotation_kwargs """
+        return self.cohort_genotype_collection.cohortgenotype_alias
+
+    @property
     def ref_count_column(self):
         return self.count_column_prefix + "ref_count"
 
