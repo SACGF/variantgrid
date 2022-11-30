@@ -240,11 +240,11 @@ class ClassificationAccumulationGraph:
     def classification_iterable(self):
         cm_qs_summary = ClassificationModification.objects.filter(
             published=True,
-            classification__allele__isnull=False,
+            classification__variant_info__allele_info__allele__isnull=False,
             share_level__in=self.share_levels).order_by(
             "created").values_list("classification_id", "created",
                                             "published_evidence__clinical_significance__value",
-                                            "classification__allele_id",
+                                            "classification__variant_info__allele_info__allele_id",
                                             "classification__lab__name")
         if labs := self.labs:
             cm_qs_summary = cm_qs_summary.filter(classification__lab__in=labs)

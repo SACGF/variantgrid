@@ -312,7 +312,7 @@ class ClinVarExportSummary(ExportRow):
     @export_column("ClinGenAllele")
     def clingen_allele(self):
         if modification := self.classification:
-            if allele := modification.classification.allele:
+            if allele := modification.classification.allele_object:
                 return str(allele.clingen_allele)
 
     @export_column("c.HGVS")

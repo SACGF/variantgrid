@@ -2085,7 +2085,7 @@ VCTable.c_hgvs = (data, type, row) => {
     */
 
     if (data) {
-        let variant_id = data.variant_id;
+        let allele_id = data.allele_id;
         let values = data.values;
 
         let chgvsToValues = {};
@@ -2115,11 +2115,11 @@ VCTable.c_hgvs = (data, type, row) => {
             $('<span>', {class:'genome-build hover-detail', text: displayChgvs.build || ''}).appendTo(dom);
         }
 
-        if (variant_id) {
+        if (allele_id) {
             $('<a>', {
                 class: 'hover-link variant-coordinate',
                 text: displayChgvs ? limitLength(displayChgvs.value, MAX_C_HGVS_LEN) : 'variant',
-                href: Urls.view_allele_from_variant(variant_id),
+                href: Urls.view_allele(allele_id),
             }).appendTo(dom);
         } else {
             if (displayChgvs) {

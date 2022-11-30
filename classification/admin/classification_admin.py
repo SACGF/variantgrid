@@ -596,4 +596,18 @@ class UploadedClassificationsUnmappedAdmin(ModelAdminBasics):
 
 @admin.register(ImportedAlleleCommonBuilds)
 class ImportedAlleleAdmin(ModelAdminBasics):
-    list_display = ("allele_info", "grch37", "grch38")
+    list_display = (
+        "imported_c_hgvs",
+        "allele_info",
+        "grch37",
+        "grch38"
+    )
+
+    @admin_list_column("Imported c.HGVS")
+    def imported_c_hgvs(self, obj: ImportedAlleleCommonBuilds):
+        return obj.allele_info.imported_c_hgvs
+
+
+    @admin_list_column("Imported Genome Build")
+    def imported_genome_build(self, obj: ImportedAlleleCommonBuilds):
+        return obj.allele_info.imported_genome_build

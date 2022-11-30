@@ -41,7 +41,7 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
         })
         response = {
             'values': values,
-            'variant_id': row.get('classification__variant_id')
+            'allele_id': row.get('classification__variant_info__allele_info__allele_id')
         }
 
         if settings.VARIANT_CLASSIFICATION_GRID_SHOW_PHGVS:
@@ -135,7 +135,7 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
                     'published_evidence__c_hgvs__value',
                     'published_evidence__p_hgvs__value',
                     'published_evidence__genome_build__value',
-                    'classification__variant_id',
+                    'classification__variant_info__allele_info__allele_id',
                 ]
             ),
             RichColumn(

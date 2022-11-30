@@ -169,14 +169,20 @@ class ClinvarExportPrepare:
             classification__lab__in=clinvar_labs,
             is_last_published=True,
             classification__allele__isnull=False
-        ).select_related('classification', 'classification__allele', 'classification__lab', 'classification__lab__clinvar_key').order_by('classification__allele_id', 'classification__lab__clinvar_key_id')
+        ).select_related(
+            'classification',
+            'classification__variant_info',
+            'classification__variant_info__allele_info__allele',
+            'classification__lab',
+            'classification__lab__clinvar_key'
+        ).order_by('classification__allele_id', 'classification__lab__clinvar_key_id')
 
         combined_log = []
 
         # need to keep track of which allele, clinvar_key combos we've seen
         # so we can check all other alleles to make sure they haven't lost candidates
         clinvar_key_to_processed_alleles = defaultdict(list)
-        for allele, allele_classifications in itertools.groupby(all_classifications, lambda cm: cm.classification.allele):
+        for allele, allele_classifications in itertools.groupby(all_classifications, lambda cm: cm.classification.allele_object):
             for clinvar_key, clinvar_allele_classifications in itertools.groupby(allele_classifications, lambda cm: cm.classification.lab.clinvar_key):
                 combined_log += ClinvarExportPrepare.process_allele(clinvar_key=clinvar_key, allele=allele, modifications=clinvar_allele_classifications)
                 clinvar_key_to_processed_alleles[clinvar_key].append(allele)

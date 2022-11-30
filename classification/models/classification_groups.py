@@ -195,7 +195,7 @@ class ClassificationGroup:
     @property
     def allele(self) -> Optional[Allele]:
         # method is a holdover from when allele wasn't directly accessible on a classification
-        return self.most_recent.classification.allele
+        return self.most_recent.classification.allele_object
 
     def diff_ids(self) -> str:
         return ",".join([str(cm.classification_id) for cm in self.modifications])
