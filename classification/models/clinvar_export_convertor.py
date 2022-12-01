@@ -329,7 +329,7 @@ class ClinVarExportConverter:
                 messages = JSON_MESSAGES_EMPTY
 
                 if ClinVarExportConverter.is_exclude_citation(citation_json):
-                    citation_list.append(ValidatedJson.make_void(JsonMessages.info(f"{citation_json.get('id')} is being excluded as not specific for this variant.")))
+                    citation_list.append(ValidatedJson.make_void(JsonMessages.info(f"{citation_json.get('id')} is omitted as it's not specific for this variant.")))
                 else:
                     if not citation_receipt.is_valid:
                         messages += JsonMessages.error(f"Citation \"{id_part}\" does not appear to be valid.")
