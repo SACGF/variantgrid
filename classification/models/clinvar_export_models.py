@@ -118,7 +118,7 @@ class ClinVarExport(TimeStampedModel):
 
     @property
     def citation_ids(self) -> List[str]:
-        if body := self.submission_body:
+        if body := self.submission_body.pure_json():
             if clin_sig := body.get("clinicalSignificance"):
                 if citation := clin_sig.get("citation"):
                     return [entry["id"] for entry in citation]

@@ -283,6 +283,15 @@ class ClinVarExportConverter:
         """
         self.clinvar_export_record = clinvar_export_record
 
+    @staticmethod
+    def is_exclude_citation(citation_json: ClinVarCitation) -> bool:
+        if pmid_id := citation_json.get('id'):
+            return pmid_id in {
+                "PMID:25741868",  # ACMG criteria
+                "PMID:28492532",  # Sherloc criteria
+                "PMID:30192042",  # Recommendations for interpreting the loss of function PVS1 ACMG/AMP variant criterion
+            }
+
     @property
     def clinvar_key(self) -> ClinVarKey:
         return self.clinvar_export_record.clinvar_allele.clinvar_key
@@ -318,10 +327,14 @@ class ClinVarExportConverter:
                     "id": id_part
                 }
                 messages = JSON_MESSAGES_EMPTY
-                if not citation_receipt.is_valid:
-                    messages += JsonMessages.error(f"Citation \"{id_part}\" does not appear to be valid.")
 
-                citation_list.append(ValidatedJson(citation_json, messages=messages))
+                if ClinVarExportConverter.is_exclude_citation(citation_json):
+                    citation_list.append(ValidatedJson.make_void(JsonMessages.info(f"{citation_json.get('id')} is being excluded as not specific for this variant.")))
+                else:
+                    if not citation_receipt.is_valid:
+                        messages += JsonMessages.error(f"Citation \"{id_part}\" does not appear to be valid.")
+
+                    citation_list.append(ValidatedJson(citation_json, messages=messages))
 
         return citation_list
 

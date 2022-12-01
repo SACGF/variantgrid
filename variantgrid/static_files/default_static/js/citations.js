@@ -44,13 +44,25 @@ let CitationsManager = (function() {
                     console.log(text)
                 },
                 success: (record) => {
+                    let requestedIds = {};
+                    for (let loadId of loadIds) {
+                        requestedIds[loadId] = true;
+                    }
                     for (let citationData of record['citations']) {
-                        // TODO, can the API return the ID that was used to request?
                         for (let requestingId of citationData.requested_using) {
+                            delete requestedIds[requestingId];
                             let deferred = this.citationToDeferred[requestingId];
                             if (deferred) {
                                 deferred.resolve(citationData);
                             }
+                        }
+                    }
+                    for (let remainingId of Object.keys(requestedIds)) {
+                        let deferred = this.citationToDeferred[remainingId];
+                        if (deferred) {
+                            deferred.resolve({
+                                "title": `Could not load ${remainingId}`
+                            })
                         }
                     }
                 }
