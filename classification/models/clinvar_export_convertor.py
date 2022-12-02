@@ -490,11 +490,11 @@ class ClinVarExportConverter:
         assertion_criteria = self.value(SpecialEKeys.ASSERTION_METHOD) or ""
         if mapped_assertion_method := self.clinvar_key.assertion_criteria_vg_to_code(assertion_criteria):
             if "url" in mapped_assertion_method or ("db" in mapped_assertion_method and "id" in mapped_assertion_method):
-                return ValidatedJson(mapped_assertion_method)
+                return ValidatedJson(mapped_assertion_method, JsonMessages.info(f"Mapped from \"{assertion_criteria}\"."))
             else:
                 return ValidatedJson(mapped_assertion_method, JsonMessages.error("ADMIN: Mapped to invalid assertionCriteria"))
         else:
-            return ValidatedJson(mapped_assertion_method or "", JsonMessages.error(f'Could not map \"{assertion_criteria}\" to an assertionCriteria'))
+            return ValidatedJson(mapped_assertion_method or "", JsonMessages.error(f'Could not map \"{assertion_criteria}\" to an assertionCriteria.'))
 
     @property
     def json_clinical_significance(self) -> ValidatedJson:
