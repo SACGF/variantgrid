@@ -75,7 +75,7 @@ class Citation2(TimeStampedModel):
 
         # now load from external source
 
-    def update_from_data_json(self):
+    def blank_out(self):
         self.title = ''
         self.journal = ''
         self.journal_short = ''
@@ -87,36 +87,6 @@ class Citation2(TimeStampedModel):
         self.source = ''
         self.abstract = ''
 
-        if record := self.data_json:
-            # PMID, PubMed Central record
-            if citation_id := record.get("PMID"):
-                self.title = record.get("TI")
-                self.journal = record.get("SO")
-                self.journal_short = record.get("TA", self.journal)
-                # TODO could year be an int?
-                # or could we just store published date and extract year?
-                self.year = get_year_from_date(record.get("DP"))
-                if authors_list := record.get("FAU"):
-                    first_author = authors_list[0]
-                    first_author_last = first_author.split(",")[0]
-                    self.authors_short = first_author_last
-                    self.authors = ", ".join(authors_list)
-                self.citation_id = citation_id
-                self.citation_link = f"https://www.ncbi.nlm.nih.gov/pubmed/{citation_id}"
-                self.source=self.get_ontology_source_display()
-                self.abstract=record.get("AB")
-
-                # NCBI Bookshelf
-            elif citation_id := record.get("RID"):
-                book = record.get("Book")
-                self.title = record.get("Title")
-                self.journal = f"Book Title: {book}"
-                self.journal_short = book
-                self.year = get_year_from_date(record.get("DP"))
-                self.citation_id = citation_id
-                self.citation_link = f"https://www.ncbi.nlm.nih.gov/books/{citation_id}"
-                self.source="NCBIBookShelf"
-                #authors, authors_short, abstract = None
 
 
 @dataclass(frozen=True)
@@ -226,11 +196,12 @@ class CitationFetchEntry:
 
 class CitationFetchRequest:
 
-
-
     def __init__(self, fetch_citations: List[CitationFetchEntry], max_age: Optional[timedelta] = None):
         requires_reloading_before = now() - (max_age if max_age else timedelta(years=100))
         requires_loading = [fetch for fetch in fetch_citations if fetch.should_refersh(requires_reloading_before)]
+
+        self.id_to_fetch = {fc.normalised_id: fc for fc in requires_loading}
+
         if requires_loading:
             citations_by_source = sorted([fetch.citation for fetch in fetch_citations], lambda c: c.ontology_service)
             by_source: Dict[CitationSource2, List[Citation2]] = dict()
@@ -241,11 +212,13 @@ class CitationFetchRequest:
 
 
     @staticmethod
-    def create_cached_citations_from_entrez(entrez_db: str, ids: Iterable[str]) -> Dict[str, JsonObjType]:
+    def create_cached_citations_from_entrez(entrez_db: EntrezDbType, ids: Iterable[str]) -> Dict[str, JsonObjType]:
         try:
             handle = Entrez.efetch(db=entrez_db, id=ids, rettype='medline', retmode='text')
             records = list(Medline.parse(handle))
-            if records:
+            for record in records:
+                if citation_id := record.get("PMID"):
+                    CitationIdNormalized.normalize_id(citation_id)
 
 
                 for cvc, record in zip(cvcs_to_query, records):
