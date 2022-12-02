@@ -299,8 +299,7 @@ class ClinVarKey(TimeStampedModel):
                 "db": "PubMed",
                 "id": "PMID:25741868"
             }
-        else:
-            return None
+        return mapped_value
 
     @property
     def label(self) -> str:
