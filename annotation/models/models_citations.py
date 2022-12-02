@@ -12,6 +12,7 @@ from django.utils.timezone import now
 from django_extensions.db.models import TimeStampedModel
 
 from annotation.models import CitationSource
+from library.log_utils import report_message, report_exc_info
 from library.utils import JsonObjType
 import re
 
@@ -53,27 +54,8 @@ class Citation2(TimeStampedModel):
     year = models.TextField(blank=True)
     authors = models.TextField(blank=True)
     authors_short = models.TextField(blank=True)
-    citation_id = models.TextField(blank=True)
-    citation_link = models.TextField(blank=True)
     source = models.TextField(blank=True)
     abstract = models.TextField(blank=True)
-
-    @staticmethod
-    def ensure_populated(citations: Iterable['Citation2'], max_age: Optional[timedelta] = None):
-        bookshelf: List[Citation2] = []
-        pmids: List[Citation2] = []
-
-        requires_reloading_before = now() - (max_age if max_age else timedelta(years=100))
-        require_loading = [cit for cit in citations if not cit.last_loaded or cit.last_loaded <= requires_reloading_before]
-
-        citations_by_source = sorted(require_loading, lambda c: c.ontology_service)
-        for source, citations_by_source in itertools.groupby(citations_by_source, key=lambda c: c.ontology_service):
-            if source == CitationSource2.NCBI_BOOKSHELF:
-                bookshelf += list(citations_by_source)
-            else:
-                pmids += list(citations_by_source)
-
-        # now load from external source
 
     def blank_out(self):
         self.title = ''
@@ -82,8 +64,6 @@ class Citation2(TimeStampedModel):
         self.year = ''
         self.authors = ''
         self.authors_short = ''
-        self.citation_id = ''
-        self.citation_link = ''
         self.source = ''
         self.abstract = ''
 
@@ -99,11 +79,11 @@ class CitationIdNormalized:
         if self.source == CitationSource2.PUBMED:
             return f"PMID:{self.index}"
         elif self.source == CitationSource2.PUBMED_CENTRAL:
-            raise ValueError("FIXME need to know proper layout for PubMedCentral")
+            return f"PMCID:{self.index}"
         else:
             return f"NBK{self.index}"
 
-    CITATION_SPLIT_RE = re.compile("(?P<prefix>[a-z])+(?P<semicolon>:)?(?P<number>[0-9]+)", re.IGNORECASE)
+    CITATION_SPLIT_RE = re.compile(r"(?P<prefix>[a-z])+\s*(?P<semicolon>:)?\s*(?P<number_prefix>[a-z]+)?(?P<number>[0-9]+)", re.IGNORECASE)
 
     @staticmethod
     def from_citation(citation: Citation2):
@@ -120,6 +100,8 @@ class CitationIdNormalized:
             elif prefix == "PUBMEDCENTRAL":
                 prefix = "PubMedCentral"
             source = CitationSource2(prefix)
+            if source == CitationSource2.PUBMED_CENTRAL:
+                number = f"PMC{number}"
             return CitationIdNormalized(source=source, index=number)
         raise ValueError(f"Unable to parse Citation ID {citation_id}")
 
@@ -129,6 +111,7 @@ class CitationFetchEntry:
     normalised_id: Optional[CitationIdNormalized] = None
     citation: Optional[Citation2] = None
     requested_ids: Set[str] = field(default_factory=set)
+    fetched: bool = False
 
     def as_citation(self):
         return Citation2(
@@ -200,41 +183,73 @@ class CitationFetchRequest:
         requires_reloading_before = now() - (max_age if max_age else timedelta(years=100))
         requires_loading = [fetch for fetch in fetch_citations if fetch.should_refersh(requires_reloading_before)]
 
-        self.id_to_fetch = {fc.normalised_id: fc for fc in requires_loading}
+        self.id_to_fetch: Dict[CitationIdNormalized, CitationFetchEntry] = {fc.normalised_id: fc for fc in requires_loading}
 
         if requires_loading:
-            citations_by_source = sorted([fetch.citation for fetch in fetch_citations], lambda c: c.ontology_service)
-            by_source: Dict[CitationSource2, List[Citation2]] = dict()
-            for source, citations_by_source in itertools.groupby(citations_by_source, key=lambda c: c.ontology_service):
-                by_source[source] = list(citations_by_source)
+            citations_by_source = sorted([fetch.normalised_id for fetch in fetch_citations], lambda c: c.ontology_service)
+            for source, citations_ids_by_source in itertools.groupby(citations_by_source, key=lambda c: c.ontology_service):
+                citations_ids_by_source = list(citations_ids_by_source)
+                if source == CitationSource2.PUBMED:
+                    self.populate_from_entrez(entrez_db=EntrezDbType.PUBMED, ids=citations_ids_by_source)
+                elif source == CitationSource2.PUBMED_CENTRAL:
+                    self.populate_from_entrez(entrez_db=EntrezDbType.PUBMED_CENTRAL, ids=citations_ids_by_source)
+                elif source == CitationSource2.NCBI_BOOKSHELF:
+                    self.populate_from_nbk(ids=citations_ids_by_source)
 
 
 
-
-    @staticmethod
-    def create_cached_citations_from_entrez(entrez_db: EntrezDbType, ids: Iterable[str]) -> Dict[str, JsonObjType]:
+    def populate_from_entrez(self, entrez_db: EntrezDbType, ids: Iterable[str]) -> Dict[str, JsonObjType]:
         try:
             handle = Entrez.efetch(db=entrez_db, id=ids, rettype='medline', retmode='text')
             records = list(Medline.parse(handle))
             for record in records:
-                if citation_id := record.get("PMID"):
-                    CitationIdNormalized.normalize_id(citation_id)
+                normal_id: CitationIdNormalized
+                if entrez_db == EntrezDbType.PUBMED:
+                    normal_id = CitationIdNormalized(source=CitationSource2.PUBMED, index=record.get("PMID"))
+                elif entrez_db == EntrezDbType.PUBMED_CENTRAL:
+                    normal_id = CitationIdNormalized(source=CitationSource2.PUBMED_CENTRAL, index=record.get("PMC"))
 
+                if fetch := self.id_to_fetch.get(normal_id):
+                    fetch.fetched = True
+                    citation = fetch.citation
 
-                for cvc, record in zip(cvcs_to_query, records):
-                    cc = cache_citation(cvc, record)
-                    try:
-                        citations_by_cvc_id[cvc.pk] = get_citation_from_cached_citation(cc)
-                    except CitationException:
-                        citations_by_cvc_id[cvc.pk] = _citation_error(cc)
-            else:
-                for cvc in cvcs_to_query:
-                    citations_by_cvc_id[cvc.pk] = _citation_error(cvc)
+                    citation.blank_out()
+                    citation.title = record.get("TI")
+                    citation.journal = record.get("SO")
+                    citation.journal_short = record.get("TA", self.journal)
+                    # TODO could year be an int?
+                    # or could we just store published date and extract year?
+                    citation.year = get_year_from_date(record.get("DP"))
+                    if authors_list := record.get("FAU"):
+                        first_author = authors_list[0]
+                        first_author_last = first_author.split(",")[0]
+                        citation.authors_short = first_author_last
+                        citation.authors = ", ".join(authors_list)
+                    citation.source = self.get_ontology_source_display()
+                    citation.abstract = record.get("AB")
 
         except Exception:
             # if this fails it's probably because a single id in ids ruined it for everybody
-            for cvc in cvcs_to_query:
-                citations_by_cvc_id[cvc.pk] = _citation_error(cvc)
-                report_exc_info(extra_data={f'Error when attempting to Entrez.efetch ids {ids}'})
+            report_exc_info(f'Error when attempting to Entrez.efetch ids {ids}')
 
-        return citations_by_cvc_id
+    def populate_from_nbk(self, ids: Iterable[str]):
+        # TODO populate from NBK
+        # handle = Entrez.esearch(db="books", term=bookshelf_rid, retmax=20)
+        # search_results = None
+        # try:
+        #     search_results = Entrez.read(handle)
+        #     handle = Entrez.esummary(db="books", id=','.join(search_results['IdList']))
+        #     results = Entrez.read(handle)
+        #
+        #     for r in results:
+        #         if r["RID"] == bookshelf_rid:
+        #             return r
+        # except RuntimeError as re:
+        #     report_message('Searching for bookshelf_rid caused an error', level='warning',
+        #                    extra_data={'bookshelf_rid': bookshelf_rid, 'error': str(re)})
+        #     return {"id": bookshelf_rid, "status": "Error occurred", "error": str(re),
+        #             "reporter": "This is a variantgrid message"}
+        #
+        # return {"id": bookshelf_rid, "status": "Error occurred",
+        #         "error": f"No RID matching {bookshelf_rid} returned", "reporter": "This is a variantgrid message"}
+
