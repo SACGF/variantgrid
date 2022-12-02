@@ -72,7 +72,7 @@ def get_phred_likelihood_field(vcf_formats, vcf_source, default_phred_likelihood
 
 def create_vcf_filters(vcf, header_types):
     filter_code_id = VCFFilter.ASCII_MIN
-    filters = header_types.get("FILTER", [])
+    filters = header_types.get("FILTER", {})
     for filter_id, filter_dict in filters.items():
         if filter_code_id > VCFFilter.ASCII_MAX:
             num_filters = VCFFilter.ASCII_MAX - VCFFilter.ASCII_MIN

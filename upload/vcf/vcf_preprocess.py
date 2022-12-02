@@ -89,6 +89,7 @@ def preprocess_vcf(upload_step, remove_info=False, annotate_gnomad_af=False):
     vcf_name = name_from_filename(vcf_filename, remove_gz=True)
     skipped_contigs_stats_file = get_import_processing_filename(upload_pipeline.pk, f"{vcf_name}.skipped_contigs.tsv")
     skipped_records_stats_file = get_import_processing_filename(upload_pipeline.pk, f"{vcf_name}.skipped_records.tsv")
+    skipped_filters_stats_file = get_import_processing_filename(upload_pipeline.pk, f"{vcf_name}.skipped_filters.tsv")
 
     manage_command = settings.MANAGE_COMMAND
     read_variants_cmd = manage_command + ["vcf_clean_and_filter",
@@ -97,7 +98,9 @@ def preprocess_vcf(upload_step, remove_info=False, annotate_gnomad_af=False):
                                           "--skipped-contigs-stats-file",
                                           skipped_contigs_stats_file,
                                           "--skipped-records-stats-file",
-                                          skipped_records_stats_file]
+                                          skipped_records_stats_file,
+                                          "--skipped-filters-stats-file",
+                                          skipped_filters_stats_file]
     if remove_info:
         read_variants_cmd.append("--remove-info")
     pipe_commands[VCF_CLEAN_AND_FILTER_SUB_STEP] = read_variants_cmd
@@ -190,12 +193,9 @@ def preprocess_vcf(upload_step, remove_info=False, annotate_gnomad_af=False):
                 VCFSkippedContig.objects.create(import_info=import_info,
                                                 contig=contig,
                                                 num_skipped=count)
-    if os.path.exists(skipped_records_stats_file):
-        df = pd.read_csv(skipped_records_stats_file, header=None, sep='\t', index_col=0)
-        if not df.empty:
-            for name, count in df.iloc[:, 0].iteritems():
-                message_string = f"Skipped {count} '{name}' records."
-                SimpleVCFImportInfo.objects.create(upload_step=clean_sub_step, message_string=message_string)
+
+    _store_vcf_skip_stats(skipped_records_stats_file, clean_sub_step, "records")
+    _store_vcf_skip_stats(skipped_filters_stats_file, clean_sub_step, "FILTER")
 
     # Create this here so downstream tasks can add modified imported variant messages
     import_info, _ = ModifiedImportedVariants.objects.get_or_create(upload_step=upload_step)
@@ -229,3 +229,12 @@ def preprocess_vcf(upload_step, remove_info=False, annotate_gnomad_af=False):
         # We don't know how big the last split file is, so leave items_to_process as null so no check
         UploadStepMultiFileOutput.objects.create(upload_step=upload_step,
                                                  output_filename=output_filename)
+
+
+def _store_vcf_skip_stats(filename, upload_set, description):
+    if os.path.exists(filename):
+        df = pd.read_csv(filename, header=None, sep='\t', index_col=0)
+        if not df.empty:
+            for name, count in df.iloc[:, 0].iteritems():
+                message_string = f"Skipped {count} '{name}' {description}"
+                SimpleVCFImportInfo.objects.create(upload_step=upload_set, message_string=message_string)

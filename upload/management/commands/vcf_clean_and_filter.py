@@ -4,10 +4,13 @@ Uploaded VCFs are first passed through this command to fix things that will caus
 import re
 import sys
 from collections import Counter
+from io import StringIO
 
+from vcf import Reader
 from django.conf import settings
 from django.core.management.base import BaseCommand
 
+from library.vcf_utils import cyvcf2_header_types
 from snpdb.models import GenomeBuild, GenomeFasta
 
 
@@ -19,13 +22,16 @@ class Command(BaseCommand):
         parser.add_argument('--remove-info', action='store_true', help='clear INFO field')
         parser.add_argument('--skipped-contigs-stats-file', help='File name')
         parser.add_argument('--skipped-records-stats-file', help='File name')
+        parser.add_argument('--skipped-filters-stats-file', help='File name')
 
     def handle(self, *args, **options):
+        QUICK_ACCEPT_FILTERS = {".", "PASS"}
         vcf_filename = options["vcf"]
         build_name = options["genome_build"]
         remove_info = options["remove_info"]
         skipped_contigs_stats_file = options.get("skipped_contigs_stats_file")
         skipped_records_stats_file = options.get("skipped_records_stats_file")
+        skipped_filters_stats_file = options.get("skipped_filters_stats_file")
 
         genome_build = GenomeBuild.get_name_or_alias(build_name)
         genome_fasta = GenomeFasta.get_for_genome_build(genome_build)
@@ -39,17 +45,25 @@ class Command(BaseCommand):
 
         skipped_contigs = Counter()
         skipped_records = Counter()
+        skipped_filters = Counter()
 
-        ref_standard_bases_pattern = re.compile("[GATC]")
-        alt_standard_bases_pattern = re.compile("[GATC,\.]")  # Can be multi-alts, or "." for reference
+        ref_standard_bases_pattern = re.compile(r"[GATC]")
+        alt_standard_bases_pattern = re.compile(r"[GATC,\.]")  # Can be multi-alts, or "." for reference
 
         skip_patterns = {}
         if skip_regex := getattr(settings, "VCF_IMPORT_SKIP_RECORD_REGEX", {}):
             for name, regex in skip_regex.items():
                 skip_patterns[name] = re.compile(regex)
 
+        vcf_header_lines = []
+        defined_filters = None
         for line in f:
-            if line and line[0] != '#':
+            if line[0] == '#':
+                vcf_header_lines.append(line)
+                sys.stdout.write(line)
+            else:
+                if defined_filters is None:
+                    defined_filters = self._get_defined_vcf_filters(vcf_header_lines)
                 columns = line.split("\t")
                 chrom = columns[0]
                 contig_id = chrom_to_contig_id.get(chrom)
@@ -61,6 +75,7 @@ class Command(BaseCommand):
                     if skipped_contigs_stats_file:
                         skipped_contigs[chrom] += 1
                     continue
+                columns[0] = fasta_chrom
 
                 if skip_patterns:
                     if skip_reason := self._check_skip_line(skip_patterns, line):
@@ -87,7 +102,22 @@ class Command(BaseCommand):
                         skipped_records[skip_reason] += 1
                         continue
 
-                columns[0] = fasta_chrom
+                # Remove filters not in header
+                filter_column = columns[6]
+                if filter_column not in QUICK_ACCEPT_FILTERS:
+                    cleaned_filters = []
+                    for fc in filter_column.split(";"):
+                        if fc in defined_filters:
+                            cleaned_filters.append(fc)
+                        else:
+                            skipped_filters[fc] += 1
+
+                    if cleaned_filters:
+                        filter_column = ";".join(cleaned_filters)
+                    else:
+                        filter_column = "."
+                    columns[6] = filter_column
+
                 if remove_info:
                     # Zero out INFO (makes file size smaller and causes bcftools issues)
                     columns[7] = "."
@@ -95,11 +125,18 @@ class Command(BaseCommand):
                     if len(columns) == 8:
                         columns[7] += "\n"
                 sys.stdout.write("\t".join(columns))
-            else:
-                sys.stdout.write(line)
 
         self._write_skip_counts(skipped_contigs, skipped_contigs_stats_file)
         self._write_skip_counts(skipped_records, skipped_records_stats_file)
+        self._write_skip_counts(skipped_filters, skipped_filters_stats_file)
+
+    @staticmethod
+    def _get_defined_vcf_filters(vcf_header_lines) -> set:
+        defined_filters = {"PASS"}
+        stream = StringIO("".join(vcf_header_lines))
+        reader = Reader(stream)
+        defined_filters.update(reader.filters.keys())
+        return defined_filters
 
     @staticmethod
     def _write_skip_counts(counts, filename):
