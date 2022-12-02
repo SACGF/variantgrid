@@ -93,38 +93,39 @@
                 Body
             </h4>
             {% code_json clinvar_export.submission_body %}
-            <h4 data-help="These are the citations present in the Classification. Based on your ClinVarKey configuration, this might just be a subset that we have more confidence about the relevance.">
-                Citations
-            </h4>
-            {% for citation_id in clinvar_export.citation_ids %}
-                <div data-citation-id="{{ citation_id }}">...</div>
-            {% endfor %}
+            {% if clinvar_export.citation_ids %}
+                <h4 data-help="These are the citations present in the Classification. Based on your ClinVarKey configuration, this might just be a subset that we have more confidence about the relevance.">
+                    Citations
+                </h4>
+                {% for citation_id in clinvar_export.citation_ids %}
+                    <div data-citation-id="{{ citation_id }}">...</div>
+                {% endfor %}
+            {% endif %}
             {% with diffs=clinvar_export.differences_since_last_submission %}
                 {% if diffs %}
                     {% if diffs.version_change %}
                         <h4>ClinVar API Has Changed Since Last Submission</h4>
-                        <p>{{ 'W'|severity_icon }} The ClinVar API has changed since this was last submitted.
+                        <p>{{ 'W'|severity_icon }} The ClinVar API has changed since this was last added to a ClinVar batch.
                         Changes will be a combination of changes in data and changes in ClinVar structure.</p>
                     {% endif %}
-                    <h4 data-help="Changes (if any) in the header since this record was last submitted to ClinVar">
-                        Header Changes Since Last Submission
-                    </h4>
+                    <h4 data-help="Changes (if any) in the header since this record was last added to a ClinVarSubmissionBatch">Header Changes</h4>
+                    <p class="text-info">Previous ClinVarSubmission ({{ clinvar_export.last_submission.pk }})<i class="fa-solid fa-right-left ml-2 mr-1 text-small"></i> Current</p>
                     {% if diffs.grouping_changes %}
                         {% code_json diffs.grouping_changes_json %}
                     {% else %}
                         <div class="no-value">No changes in the header since last submission</div>
                     {% endif %}
-                    <h4 data-help="Changes (if any) in the body since this record was last submitted to ClinVar">
-                        Body Changes Since Last Submission
-                    </h4>
+                    <h4 data-help="Changes (if any) in the body since this record was last added to a ClinVarSubmissionBatch">Body Changes</h4>
+                    <p class="text-info">Previous ClinVarSubmission ({{ clinvar_export.last_submission.pk }})<i class="fa-solid fa-right-left ml-2 mr-1 text-small"></i> Current</p>
                     {% if diffs.body_changes %}
                         {% code_json diffs.body_changes_json %}
                     {% else %}
                         <div class="no-value">No changes in the body since last submission</div>
                     {% endif %}
-                {% else %}
-                    <h4 >Changes Since Last Submission</h4>
-                    <div class="no-value">No changes since last submission</div>
+                {% elif diffs is not None %}
+                    <h4>Changes</h4>
+                    <p class="text-info">Current <i class="fa-solid fa-right-left ml-2 mr-1 text-small"></i> Previous ClinVarExport ({{ clinvar_export.last_submission.pk }})</p>
+                    <div class="no-value">No changes since last added to a ClinVarSubmission</div>
                 {% endif %}
             {% endwith %}
 
