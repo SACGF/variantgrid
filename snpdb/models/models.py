@@ -278,12 +278,10 @@ class ClinVarKey(TimeStampedModel):
         :return: The code we map to, None indicates we don't have a mapping
         """
         def map_value(raw_value: str):
+            if not raw_value:
+                raw_value = ""
             for key, criteria in self.assertion_method_lookup.items():
                 expr = re.compile(key, RegexFlag.IGNORECASE)
-                # if we have no value for assertion_criteria_value, see if we match ""
-                if not raw_value and re.compile(key, RegexFlag.IGNORECASE).match(""):
-                    return criteria
-
                 if expr.match(raw_value):
                     return criteria
 

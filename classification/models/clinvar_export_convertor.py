@@ -398,7 +398,13 @@ class ClinVarExportConverter:
                 clinvar_export=self.clinvar_export_record
             )
         else:
-            grouping = ValidatedJson({"assertionCriteria": self.json_assertion_criteria})
+            grouping: ValidatedJson
+            if json_assertion_criteria := self.json_assertion_criteria:
+                grouping = ValidatedJson({"assertionCriteria": self.json_assertion_criteria})
+            else:
+                assertion_criteria = self.value(SpecialEKeys.ASSERTION_METHOD)
+                message = f'No mapping for assertion criteria "{assertion_criteria}"' if assertion_criteria else "No mapping for blank assertion criteria."
+                grouping = ValidatedJson({"assertionCriteria": None}, JsonMessages.error(message))
 
             data = {}
             data["clinicalSignificance"] = self.json_clinical_significance

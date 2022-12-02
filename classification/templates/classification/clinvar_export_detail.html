@@ -3,7 +3,7 @@
 {% load classification_tags %}
 {% labelled label="Full Detail" %}<a class="hover-link" href="{% url 'clinvar_export' clinvar_export.pk %}">View ClinVar Export ({{ clinvar_export.pk }})</a>{% endlabelled %}
 {% labelled label="Last Evaluated" %}{% timestamp clinvar_export.clinvar_allele.last_evaluated time_ago=True %}{% endlabelled %}
-{% with errors=clinvar_export.submission_body.all_messages.errors %}
+{% with errors=clinvar_export.all_errors %}
     {% if errors %}
         {% labelled label="Outstanding Issues" %}
             <ul class="compact">

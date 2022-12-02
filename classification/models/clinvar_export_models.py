@@ -64,6 +64,11 @@ class ClinVarExport(TimeStampedModel):
     submission_grouping_validated = models.JSONField(null=False, blank=False, default=dict)
     submission_body_validated = models.JSONField(null=False, blank=False, default=dict)
 
+    @property
+    def all_errors(self):
+        return self.submission_grouping.all_messages.errors() + \
+               self.submission_body.all_messages.errors()
+
     @lazy
     def last_submission(self) -> Optional['ClinVarExportSubmission']:
         if last_submission := self.clinvarexportsubmission_set.order_by('-created').first():
