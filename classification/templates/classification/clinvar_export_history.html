@@ -5,7 +5,7 @@
     {% for history_entry in history %}
         <div class="card mb-4">
             <div class="card-header">
-                <div class="float-left">ClinVacr Submission ({{ history_entry.pk }})</div>
+                <div class="float-left">ClinVar Submission ({{ history_entry.pk }})</div>
                 <div class="float-right">{% timestamp history_entry.created time_ago=True %}</div>
             </div>
             <div class="card-body">

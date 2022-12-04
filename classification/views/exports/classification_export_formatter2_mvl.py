@@ -385,6 +385,8 @@ f"""{{
     def footer(self) -> List[str]:
         if self.file_format == FormatDetailsMVLFileFormat.JSON:
             return ["\n\t]\n}"]
+        else:
+            return []
 
     def row(self, allele_data: AlleleData) -> List[str]:
         c_datas = CHGVSData.split_into_c_hgvs(allele_data, use_full=True)
