@@ -3,7 +3,7 @@ import itertools
 from dataclasses import dataclass, field
 from datetime import timedelta
 from enum import Enum
-from typing import Optional, Iterable, List, Dict, Set
+from typing import Optional, Iterable, List, Dict, Set, Union
 
 from Bio import Entrez, Medline
 from django.db import models
@@ -54,7 +54,6 @@ class Citation2(TimeStampedModel):
     year = models.TextField(blank=True)
     authors = models.TextField(blank=True)
     authors_short = models.TextField(blank=True)
-    source = models.TextField(blank=True)
     abstract = models.TextField(blank=True)
 
     def blank_out(self):
@@ -64,9 +63,7 @@ class Citation2(TimeStampedModel):
         self.year = ''
         self.authors = ''
         self.authors_short = ''
-        self.source = ''
         self.abstract = ''
-
 
 
 @dataclass(frozen=True)
@@ -90,7 +87,9 @@ class CitationIdNormalized:
         return CitationIdNormalized(source=citation.source, index=citation.index)
 
     @staticmethod
-    def normalize_id(citation_id: str) -> 'CitationIdNormalized':
+    def normalize_id(citation_id: Union[str, 'CitationIdNormalized']) -> 'CitationIdNormalized':
+        if isinstance(citation_id, CitationIdNormalized):
+            return citation_id
         citation_id = citation_id.strip().upper()
         if parts := Citation2.CITATION_SPLIT_RE.match():
             prefix = parts.group('prefix')
@@ -190,17 +189,34 @@ class CitationFetchRequest:
             for source, citations_ids_by_source in itertools.groupby(citations_by_source, key=lambda c: c.ontology_service):
                 citations_ids_by_source = list(citations_ids_by_source)
                 if source == CitationSource2.PUBMED:
-                    self.populate_from_entrez(entrez_db=EntrezDbType.PUBMED, ids=citations_ids_by_source)
+                    self.load_from_entrez(entrez_db=EntrezDbType.PUBMED, ids=citations_ids_by_source)
                 elif source == CitationSource2.PUBMED_CENTRAL:
-                    self.populate_from_entrez(entrez_db=EntrezDbType.PUBMED_CENTRAL, ids=citations_ids_by_source)
+                    self.load_from_entrez(entrez_db=EntrezDbType.PUBMED_CENTRAL, ids=citations_ids_by_source)
                 elif source == CitationSource2.NCBI_BOOKSHELF:
-                    self.populate_from_nbk(ids=citations_ids_by_source)
+                    self.load_from_nbk(ids=citations_ids_by_source)
 
+        for fetch in self.id_to_fetch.values():
+            # would like to bulk update but that wouldn't update modified date
+            fetch.citation.save()
 
+    def mark_error_if_not_fetched(self, ids: Iterable[str, CitationIdNormalized], error_message: str):
+        for fetch_id in ids:
+            if fetch := self.id_to_fetch.get(fetch_id):
+                fetch.loaded = True
+                fetch.error = error_message
 
-    def populate_from_entrez(self, entrez_db: EntrezDbType, ids: Iterable[str]) -> Dict[str, JsonObjType]:
+    def _fetch_to_populate(self, id: Union[str, CitationIdNormalized]) -> Optional[Citation2]:
+        if entry := self.id_to_fetch.get(CitationIdNormalized.normalize_id(id)):
+            entry.fetched = True
+            entry.citation.blank_out()
+            entry.citation.last_loaded = now()
+            return entry.citation
+        return None
+
+    def load_from_entrez(self, entrez_db: EntrezDbType, ids: List[CitationIdNormalized]):
+        request_ids = [id.index for id in ids]
         try:
-            handle = Entrez.efetch(db=entrez_db, id=ids, rettype='medline', retmode='text')
+            handle = Entrez.efetch(db=entrez_db, id=request_ids, rettype='medline', retmode='text')
             records = list(Medline.parse(handle))
             for record in records:
                 normal_id: CitationIdNormalized
@@ -209,47 +225,55 @@ class CitationFetchRequest:
                 elif entrez_db == EntrezDbType.PUBMED_CENTRAL:
                     normal_id = CitationIdNormalized(source=CitationSource2.PUBMED_CENTRAL, index=record.get("PMC"))
 
-                if fetch := self.id_to_fetch.get(normal_id):
-                    fetch.fetched = True
-                    citation = fetch.citation
+                if citation := self._fetch_to_populate(normal_id):
+                    CitationFetchRequest.populate_from_entrez(citation, record)
 
-                    citation.blank_out()
-                    citation.title = record.get("TI")
-                    citation.journal = record.get("SO")
-                    citation.journal_short = record.get("TA", self.journal)
-                    # TODO could year be an int?
-                    # or could we just store published date and extract year?
-                    citation.year = get_year_from_date(record.get("DP"))
-                    if authors_list := record.get("FAU"):
-                        first_author = authors_list[0]
-                        first_author_last = first_author.split(",")[0]
-                        citation.authors_short = first_author_last
-                        citation.authors = ", ".join(authors_list)
-                    citation.source = self.get_ontology_source_display()
-                    citation.abstract = record.get("AB")
-
-        except Exception:
+        except Exception as ex:
             # if this fails it's probably because a single id in ids ruined it for everybody
             report_exc_info(f'Error when attempting to Entrez.efetch ids {ids}')
+            self.mark_error_if_not_fetched(ids, f'Error when attempting to Entrez.efetch ids {request_ids} : {str(ex)}')
 
-    def populate_from_nbk(self, ids: Iterable[str]):
-        # TODO populate from NBK
-        # handle = Entrez.esearch(db="books", term=bookshelf_rid, retmax=20)
-        # search_results = None
-        # try:
-        #     search_results = Entrez.read(handle)
-        #     handle = Entrez.esummary(db="books", id=','.join(search_results['IdList']))
-        #     results = Entrez.read(handle)
-        #
-        #     for r in results:
-        #         if r["RID"] == bookshelf_rid:
-        #             return r
-        # except RuntimeError as re:
-        #     report_message('Searching for bookshelf_rid caused an error', level='warning',
-        #                    extra_data={'bookshelf_rid': bookshelf_rid, 'error': str(re)})
-        #     return {"id": bookshelf_rid, "status": "Error occurred", "error": str(re),
-        #             "reporter": "This is a variantgrid message"}
-        #
-        # return {"id": bookshelf_rid, "status": "Error occurred",
-        #         "error": f"No RID matching {bookshelf_rid} returned", "reporter": "This is a variantgrid message"}
+    @staticmethod
+    def populate_from_entrez(citation: Citation2, record: JsonObjType):
+        citation.title = record.get("TI")
+        citation.journal = record.get("SO")
+        citation.journal_short = record.get("TA", citation.journal)
+        # TODO could year be an int?
+        # or could we just store published date and extract year?
+        citation.year = get_year_from_date(record.get("DP"))
+        if authors_list := record.get("FAU"):
+            first_author = authors_list[0]
+            first_author_last = first_author.split(",")[0]
+            citation.authors_short = first_author_last
+            citation.authors = ", ".join(authors_list)
+        citation.abstract = record.get("AB")
 
+    def load_from_nbk(self, ids: Iterable[CitationIdNormalized]):
+        for bookshelf_rid in ids:
+            try:
+                handle = Entrez.esearch(db="books", term=bookshelf_rid.full_id, retmax=20)
+                search_results = Entrez.read(handle)
+                handle = Entrez.esummary(db="books", id=','.join(search_results['IdList']))
+                results = Entrez.read(handle)
+
+                for record in results:
+                    if citation := self._fetch_to_populate(record["RID"]):
+                        CitationFetchRequest.populate_from_nbk(citation, record)
+
+            except RuntimeError as re:
+                report_message('Searching for bookshelf_rid caused an error', level='error',
+                               extra_data={'bookshelf_rid': bookshelf_rid, 'error': str(re)})
+                self.mark_error_if_not_fetched([bookshelf_rid],
+                                               f'Error when attempting to Entrez.efetch ids {bookshelf_rid} : {str(re)}')
+
+    @staticmethod
+    def populate_from_nbk(citation: Citation2, record: JsonObjType):
+        year = get_year_from_date(record.get("DP"))
+        book = record.get("Book")
+        journal = f"Book Title: {book}"
+        journal_short = book
+
+        citation.title = record.get("Title")
+        citation.journal = journal
+        citation.journal_short = journal_short
+        citation.year = year
