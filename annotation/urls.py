@@ -32,6 +32,8 @@ urlpatterns = [
     perm_path('annotation_version/grid/<genome_build_name>/<slug:op>/', JQGridView.as_view(grid=VariantAnnotationVersionGrid), name='variant_annotation_version_grid'),
 
     perm_path('annotation_run/datatables', DatabaseTableView.as_view(column_class=AnnotationRunColumns), name='annotation_run_datatable'),
+
+    perm_path('citation/<str:citation_id>', views.view_citation, name='view_citation')
 ]
 
 rest_urlpatterns = [

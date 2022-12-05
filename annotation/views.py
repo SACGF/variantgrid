@@ -2,7 +2,7 @@ import logging
 import subprocess
 from collections import defaultdict, Counter
 from subprocess import check_output
-from typing import List, Optional
+from typing import List, Optional, Dict
 
 import cdot
 from django.conf import settings
@@ -24,6 +24,7 @@ from annotation.models import ClinVar, AnnotationVersion, AnnotationRun, Variant
     VariantAnnotationVersionDiff
 from annotation.models.models import CachedWebResource, Citation, HumanProteinAtlasAnnotationVersion, \
     HumanProteinAtlasAnnotation, ColumnVEPField, DBNSFPGeneAnnotationVersion
+from annotation.models.models_citations import CitationFetchRequest
 from annotation.models.models_enums import AnnotationStatus, CitationSource
 from annotation.models.models_version_diff import VersionDiff
 from annotation.tasks.annotate_variants import annotation_run_retry
@@ -512,6 +513,10 @@ def pubmed_citations_tab(request, pubmed_citations):
     return _citations_tab(request, citations)
 
 
+def view_citation(request, citation_id: str):
+    return render(request, "annotation/citation.html", {"citation": CitationFetchRequest().fetch_now(citation_id).citation})
+
+
 def citations_tab(request, citations_ids_list):
     citation_ids = citations_ids_list.split("/")
     citations = [Citation.objects.get(pk=pk) for pk in citation_ids]
@@ -548,7 +553,7 @@ def citations_json(request, citations_ids_list):
     citation_ids = citations_ids_list.split("/")
 
     citations: List[Citation] = []
-    citation_id_to_request: dict[int, list[str]] = defaultdict(list)
+    citation_id_to_request: Dict[int, List[str]] = defaultdict(list)
 
     for requested_citation_id in citation_ids:
         parts = requested_citation_id.split(':')

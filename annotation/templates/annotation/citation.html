@@ -1,0 +1,29 @@
+{% extends menu_annotation_base %}
+{% load static %}
+{% load ui_utils %}
+{% load js_tags %}
+{% block title %}Citation{% endblock title %}
+{% block head %}
+{% endblock head %}
+
+{% block content %}
+    <div class="container">
+        <div class="card">
+            <div class="card-header">{{ citation.id }}</div>
+            <div class="card-body">
+                {% if citation.error %}{% labelled label="Error" %}{{ 'E'|severity_icon }} {{ citation.error }}{% endlabelled %}{% endif %}
+                {% labelled label="URL" %}<a class="hover-link" href="{{ citation.get_external_url }}">{{ citation.get_external_url }}</a>{% endlabelled %}
+                {% labelled label="Title" %}{{ citation.title }}{% endlabelled %}
+                {% labelled label="Journal" %}{{ citation.journal }}{% endlabelled %}
+                {% labelled label="Year" %}{{ citation.year }}{% endlabelled %}
+                {% labelled label="Authors" %}{{ citation.authors }}{% endlabelled %}
+                {% labelled label="Abstract" %}{{ citation.abstract }}{% endlabelled %}
+            </div>
+            <div class="card-footer">
+                <div class="float-right">
+                    Last Retrieved: {% timestamp citation.last_loaded %}
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}

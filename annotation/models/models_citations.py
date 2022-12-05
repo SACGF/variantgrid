@@ -8,10 +8,10 @@ from typing import Optional, Iterable, List, Dict, Set, Union
 from Bio import Entrez, Medline
 from django.db import models
 from django.db.models import TextField
+from django.urls import reverse
 from django.utils.timezone import now
 from django_extensions.db.models import TimeStampedModel
 
-from annotation.models import CitationSource
 from library.log_utils import report_message, report_exc_info
 from library.utils import JsonObjType
 import re
@@ -27,7 +27,7 @@ def get_year_from_date(date_published) -> str:
 class CitationSource2(models.TextChoices):
     PUBMED = 'PMID', 'PMID'
     NCBI_BOOKSHELF = 'NBK', 'NCBIBookShelf'
-    PUBMED_CENTRAL = 'PubMedCentral', 'PubMedCentral'
+    PUBMED_CENTRAL = 'PMCID', 'PubMedCentral'
 
 
 class EntrezDbType(str, Enum):
@@ -39,7 +39,9 @@ class Citation2(TimeStampedModel):
     # details about the ID of the citation
     id = TextField(primary_key=True)
 
-    citation_source = models.CharField(max_length=15, choices=CitationSource.choices)
+    old_id = models.IntegerField(null=True, blank=True)  # the ID of the old Citation
+
+    source = models.CharField(max_length=10, choices=CitationSource2.choices)
     index = models.TextField(null=True)
 
     # details about retrieving the JSON from a source
@@ -48,22 +50,37 @@ class Citation2(TimeStampedModel):
     error = models.TextField(null=True, blank=True)
 
     # details about the citation directly
-    title = models.TextField(blank=True)
-    journal = models.TextField(blank=True)
-    journal_short = models.TextField(blank=True)
-    year = models.TextField(blank=True)
-    authors = models.TextField(blank=True)
-    authors_short = models.TextField(blank=True)
-    abstract = models.TextField(blank=True)
+    title = models.TextField(null=True, blank=True)
+    journal = models.TextField(null=True, blank=True)
+    journal_short = models.TextField(null=True, blank=True)
+    year = models.TextField(null=True, blank=True)
+    authors = models.TextField(null=True, blank=True)
+    authors_short = models.TextField(null=True, blank=True)
+    abstract = models.TextField(null=True, blank=True)
+
+    def __str__(self):
+        return self.id
+
+    @property
+    def get_external_url(self):
+        if self.source == CitationSource2.PUBMED:
+            return f"https://www.ncbi.nlm.nih.gov/pubmed/{self.index}"
+        elif self.source == CitationSource2.PUBMED_CENTRAL:
+            return f"http://www.ncbi.nlm.nih.gov/pmc/?term={self.index}"
+        else:
+            return f"https://www.ncbi.nlm.nih.gov/books/{self.id}"
+
+    def get_absolute_url(self):
+        return reverse('view_citation', kwargs={"citation_id": self.id})
 
     def blank_out(self):
-        self.title = ''
-        self.journal = ''
-        self.journal_short = ''
-        self.year = ''
-        self.authors = ''
-        self.authors_short = ''
-        self.abstract = ''
+        self.title = None
+        self.journal = None
+        self.journal_short = None
+        self.year = None
+        self.authors = None
+        self.authors_short = None
+        self.abstract = None
 
 
 @dataclass(frozen=True)
@@ -80,18 +97,18 @@ class CitationIdNormalized:
         else:
             return f"NBK{self.index}"
 
-    CITATION_SPLIT_RE = re.compile(r"(?P<prefix>[a-z])+\s*(?P<semicolon>:)?\s*(?P<number_prefix>[a-z]+)?(?P<number>[0-9]+)", re.IGNORECASE)
+    CITATION_SPLIT_RE = re.compile(r"(?P<prefix>[a-z]+)\s*(?P<semicolon>:)?\s*(?P<number_prefix>[a-z]+)?(?P<number>[0-9]+)", re.IGNORECASE)
 
     @staticmethod
     def from_citation(citation: Citation2):
-        return CitationIdNormalized(source=citation.source, index=citation.index)
+        return CitationIdNormalized(source=CitationSource2(citation.source), index=citation.index)
 
     @staticmethod
     def normalize_id(citation_id: Union[str, 'CitationIdNormalized']) -> 'CitationIdNormalized':
         if isinstance(citation_id, CitationIdNormalized):
             return citation_id
         citation_id = citation_id.strip().upper()
-        if parts := Citation2.CITATION_SPLIT_RE.match():
+        if parts := CitationIdNormalized.CITATION_SPLIT_RE.match(citation_id):
             prefix = parts.group('prefix')
             number = parts.group('number')
             if prefix == "PUBMED":
@@ -104,6 +121,14 @@ class CitationIdNormalized:
             return CitationIdNormalized(source=source, index=number)
         raise ValueError(f"Unable to parse Citation ID {citation_id}")
 
+    def get_or_create(self) -> Citation2:
+        citation, _ = Citation2.objects.get_or_create(
+            id=self.full_id,
+            source=self.source,
+            index=self.index
+        )
+        return citation
+
 
 @dataclass
 class CitationFetchEntry:
@@ -112,81 +137,88 @@ class CitationFetchEntry:
     requested_ids: Set[str] = field(default_factory=set)
     fetched: bool = False
 
-    def as_citation(self):
-        return Citation2(
-            id=self.normalised_id,
-            source=self.normalised_id.source,
-            index=self.normalised_id.index
-        )
-
-    def should_refersh(self, refresh_before: datetime) -> bool:
+    def should_refresh(self, refresh_before: datetime) -> bool:
         if last_loaded := self.citation.last_loaded:
             return last_loaded < refresh_before
         else:
             return True
 
-    @property
-    def is_valid(self) -> bool:
-        return self.citation is not None
 
-    @staticmethod
-    def requested_ids_to_fetch(citation_ids: Iterable[str]) -> List['CitationFetchEntry']:
-        normal_to_fetch: Dict[CitationIdNormalized, CitationFetchEntry] = dict()
-        invalid_ids: Set[str] = set()
-
-        for citation_id in citation_ids:
-            try:
-                normalized = CitationIdNormalized(citation_id)
-                existing = normal_to_fetch.get(normalized)
-                if not existing:
-                    entry = CitationFetchEntry(
-                        normalised_id=normalized,
-                        citation=Citation2.objects.get_or_create(
-                            id=normalized.full_id,
-                            citation_source=normalized.source,
-                            index=normalized.index
-                        )
-                    )
-                    normal_to_fetch[normalized] = entry
-                entry.requested_ids.add(citation_id)
-            except:
-                invalid_ids.append(citation_id)
-
-        not_created_yet = set(normal_to_fetch.keys())
-        fetch_these = set(not_created_yet)
-
-        # assume that for any citation, it's not going to exist once, then it is going to exist 20 times
-        # so try fetching first
-        for citation in Citation2.objects.filter(id__in=[f.normalized_id.full_id for f in fetch_these]):
-            fetched_id = CitationIdNormalized.from_citation(citation)
-            not_created_yet.remove(fetched_id)
-            normal_to_fetch[fetched_id].citation = citation
-
-        if not_created_yet:
-            # there were some citations that aren't already in the database
-            # create them, then populate the fetch requests as if they were always tehre
-            Citation2.objects.bulk_create(
-                objs=[not_yet.as_citation() for not_yet in not_created_yet]
-            )
-            for citation in Citation2.objects.filter(id__in=[f.normalized_id.full_id for f in not_created_yet]):
-                fetched_id = CitationIdNormalized.from_citation(citation)
-                not_created_yet.remove(fetched_id)
-                normal_to_fetch[fetched_id].citation = citation
-
-        return normal_to_fetch.values() + [CitationFetchEntry(requested_ids=set([citation_id]))]
+CitationRequest = Union[str, CitationIdNormalized, Citation2]
 
 
 class CitationFetchRequest:
 
-    def __init__(self, fetch_citations: List[CitationFetchEntry], max_age: Optional[timedelta] = None):
-        requires_reloading_before = now() - (max_age if max_age else timedelta(years=100))
-        requires_loading = [fetch for fetch in fetch_citations if fetch.should_refersh(requires_reloading_before)]
+    def __init__(self, cache_age: Optional[timedelta] = None):
+        self.id_to_fetch: Dict[CitationIdNormalized, CitationFetchEntry] = dict()
+        self.refresh_before = now() - (cache_age or timedelta(days=365))  # reload every year
 
-        self.id_to_fetch: Dict[CitationIdNormalized, CitationFetchEntry] = {fc.normalised_id: fc for fc in requires_loading}
+    @staticmethod
+    def fetch_all_now(citation_ids: Iterable[CitationRequest]) -> List[Citation2]:
+        cfr = CitationFetchRequest()
+        for citation_id in citation_ids:
+            cfr.queue(citation_id)
+        cfr.fetch_queue()
+        return [fetch.citation for fetch in cfr._all_citation_fetches]
 
-        if requires_loading:
-            citations_by_source = sorted([fetch.normalised_id for fetch in fetch_citations], lambda c: c.ontology_service)
-            for source, citations_ids_by_source in itertools.groupby(citations_by_source, key=lambda c: c.ontology_service):
+    def queue(self, citation_id: CitationRequest) -> CitationFetchEntry:
+        citation: Optional[Citation2] = None
+        normalized: Optional[CitationIdNormalized] = None
+        if isinstance(citation_id, Citation2):
+            citation = citation_id
+            normalized = CitationIdNormalized.normalize_id(citation.id)
+        elif isinstance(citation_id, CitationIdNormalized):
+            normalized = citation_id
+        elif isinstance(citation_id, str):
+            normalized = CitationIdNormalized.normalize_id(citation_id)
+
+        existing = self.id_to_fetch.get(normalized)
+        entry: CitationFetchEntry
+        if existing:
+            entry = existing
+        else:
+            entry = CitationFetchEntry(
+                normalised_id=normalized,
+                citation=citation
+            )
+        entry.requested_ids.add(citation_id)
+
+        self.id_to_fetch[normalized] = entry
+        return entry
+
+    def fetch_now(self, citation_id: str) -> CitationFetchEntry:
+        entry = self.queue(citation_id)
+        self.fetch_queue()
+        return entry
+
+    def _load_citation_stubs(self):
+        if fetch_needing_citations := [fetch for fetch in self.id_to_fetch.values() if not fetch.citation]:
+            # assume we request citations much more than we create them
+            citations = Citation2.objects.filter(
+                id__in=[fetch.normalised_id.full_id for fetch in fetch_needing_citations]
+            )
+            citations_by_id = {citation.pk: citation for citation in citations}
+            for fetch in fetch_needing_citations:
+                if existing := citations_by_id.get(fetch.normalised_id.full_id):
+                    fetch.citation = existing
+                else:
+                    # doesn't save the citation yet, will do that when we retrieve the data
+                    fetch.citation = fetch.normalised_id.get_or_create()
+
+    @property
+    def _all_citation_fetches(self):
+        return list(self.id_to_fetch.values())
+
+    @property
+    def _all_citations_needing_loading(self):
+        return [fetch for fetch in self._all_citation_fetches if fetch.should_refresh(self.refresh_before)]
+
+    def fetch_queue(self):
+        self._load_citation_stubs()
+        if self.id_to_fetch:
+            all_ids = [fetch.normalised_id for fetch in self._all_citation_fetches]
+            citations_by_source = sorted(all_ids, key=lambda c: c.source)
+            for source, citations_ids_by_source in itertools.groupby(citations_by_source, key=lambda c: c.source):
                 citations_ids_by_source = list(citations_ids_by_source)
                 if source == CitationSource2.PUBMED:
                     self.load_from_entrez(entrez_db=EntrezDbType.PUBMED, ids=citations_ids_by_source)
@@ -195,18 +227,21 @@ class CitationFetchRequest:
                 elif source == CitationSource2.NCBI_BOOKSHELF:
                     self.load_from_nbk(ids=citations_ids_by_source)
 
+        self._mark_error_if_not_fetched(self.id_to_fetch.keys(), "No record was returned for this ID")
+
         for fetch in self.id_to_fetch.values():
             # would like to bulk update but that wouldn't update modified date
             fetch.citation.save()
 
-    def mark_error_if_not_fetched(self, ids: Iterable[str, CitationIdNormalized], error_message: str):
+    def _mark_error_if_not_fetched(self, ids: Iterable[Union[str, CitationIdNormalized]], error_message: str):
         for fetch_id in ids:
             if fetch := self.id_to_fetch.get(fetch_id):
-                fetch.loaded = True
-                fetch.error = error_message
+                if not fetch.fetched:
+                    fetch.fetched = True
+                    fetch.citation.error = error_message
 
-    def _fetch_to_populate(self, id: Union[str, CitationIdNormalized]) -> Optional[Citation2]:
-        if entry := self.id_to_fetch.get(CitationIdNormalized.normalize_id(id)):
+    def _fetch_to_populate(self, cit_id: Union[str, CitationIdNormalized]) -> Optional[Citation2]:
+        if entry := self.id_to_fetch.get(CitationIdNormalized.normalize_id(cit_id)):
             entry.fetched = True
             entry.citation.blank_out()
             entry.citation.last_loaded = now()
@@ -224,6 +259,8 @@ class CitationFetchRequest:
                     normal_id = CitationIdNormalized(source=CitationSource2.PUBMED, index=record.get("PMID"))
                 elif entrez_db == EntrezDbType.PUBMED_CENTRAL:
                     normal_id = CitationIdNormalized(source=CitationSource2.PUBMED_CENTRAL, index=record.get("PMC"))
+                else:
+                    raise ValueError(f"Unsupported EntrezDbType {entrez_db}")
 
                 if citation := self._fetch_to_populate(normal_id):
                     CitationFetchRequest.populate_from_entrez(citation, record)
@@ -231,10 +268,11 @@ class CitationFetchRequest:
         except Exception as ex:
             # if this fails it's probably because a single id in ids ruined it for everybody
             report_exc_info(f'Error when attempting to Entrez.efetch ids {ids}')
-            self.mark_error_if_not_fetched(ids, f'Error when attempting to Entrez.efetch ids {request_ids} : {str(ex)}')
+            self._mark_error_if_not_fetched(ids, f'Error when attempting to Entrez.efetch ids {request_ids} : {str(ex)}')
 
     @staticmethod
     def populate_from_entrez(citation: Citation2, record: JsonObjType):
+        citation.data_json = record
         citation.title = record.get("TI")
         citation.journal = record.get("SO")
         citation.journal_short = record.get("TA", citation.journal)
@@ -263,7 +301,7 @@ class CitationFetchRequest:
             except RuntimeError as re:
                 report_message('Searching for bookshelf_rid caused an error', level='error',
                                extra_data={'bookshelf_rid': bookshelf_rid, 'error': str(re)})
-                self.mark_error_if_not_fetched([bookshelf_rid],
+                self._mark_error_if_not_fetched([bookshelf_rid],
                                                f'Error when attempting to Entrez.efetch ids {bookshelf_rid} : {str(re)}')
 
     @staticmethod
@@ -273,6 +311,7 @@ class CitationFetchRequest:
         journal = f"Book Title: {book}"
         journal_short = book
 
+        citation.data_json = record
         citation.title = record.get("Title")
         citation.journal = journal
         citation.journal_short = journal_short

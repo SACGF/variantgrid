@@ -12,6 +12,7 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
 from django.db import models, transaction, connection
+from django.db.models import QuerySet
 from django.db.models.deletion import PROTECT, CASCADE, SET_NULL
 from django.db.models.signals import pre_delete
 from django.dispatch.dispatcher import receiver
@@ -25,6 +26,7 @@ from psqlextra.types import PostgresPartitioningMethod
 from annotation.external_search_terms import get_variant_search_terms, get_variant_pubmed_search_terms
 from annotation.models.damage_enums import Polyphen2Prediction, FATHMMPrediction, MutationTasterPrediction, \
     SIFTPrediction, PathogenicityImpact, MutationAssessorPrediction, ALoFTPrediction
+from annotation.models.models_citations import Citation2, CitationFetchRequest
 from annotation.models.models_enums import AnnotationStatus, CitationSource, \
     VariantClass, ColumnAnnotationCategory, VEPPlugin, VEPCustom, ClinVarReviewStatus, VEPSkippedReason, \
     ManualVariantEntryType, HumanProteinAtlasAbundance, EssentialGeneCRISPR, EssentialGeneCRISPR2, EssentialGeneGeneTrap
@@ -134,10 +136,15 @@ class ClinVar(models.Model):
     def get_suspect_reason_code_display(self):
         return ClinVar.SUSPECT_REASON_CODES.get(self.clinvar_suspect_reason_code)
 
-    def get_citations(self):
+    def get_citations(self) -> QuerySet[Citation2]:
         cvc_qs = ClinVarCitation.objects.filter(clinvar_variation_id=self.clinvar_variation_id,
                                                 clinvar_allele_id=self.clinvar_allele_id)
-        return Citation.objects.filter(clinvarcitation__in=cvc_qs)
+        return Citation2.objects.filter(clinvarcitation2__in=cvc_qs)
+
+    def get_citations(self) -> QuerySet[Citation2]:
+        cvc_qs = ClinVarCitation.objects.filter(clinvar_variation_id=self.clinvar_variation_id,
+                                                clinvar_allele_id=self.clinvar_allele_id)
+        return Citation.objects.filter(clinvarcitation2__in=cvc_qs)
 
     def __str__(self):
         return f"ClinVar: variant: {self.variant}, path: {self.highest_pathogenicity}"
@@ -202,6 +209,7 @@ class ClinVarCitation(models.Model):
     clinvar_variation_id = models.IntegerField()
     clinvar_allele_id = models.IntegerField()
     citation = models.ForeignKey(Citation, null=True, on_delete=CASCADE)
+    citation2 = models.ForeignKey(Citation2, null=True, on_delete=CASCADE)
 
 
 class CitationException(Exception):
@@ -1301,6 +1309,7 @@ class CachedWebResource(TimeStampedModel):
 class GeneSymbolCitation(models.Model):
     gene_symbol = models.ForeignKey(GeneSymbol, on_delete=CASCADE)
     citation = models.ForeignKey(Citation, on_delete=CASCADE)
+    citation2 = models.ForeignKey(Citation2, null=True, on_delete=CASCADE)
 
     class Meta:
         unique_together = ('gene_symbol', 'citation')
