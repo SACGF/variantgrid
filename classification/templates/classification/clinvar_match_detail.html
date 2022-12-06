@@ -1,4 +1,5 @@
 {% load ontology_tags %}
+{% load ui_utils %}
 {% for match in matches %}
     <div class="d-flex" style="align-content: start">
         <div style="width:150px">
@@ -20,6 +21,9 @@
                         <div class="text-success">- {{ match_type }}</div>
                     {% endfor %}
                     <div>{{ clinvar_export_match.clinvar_export.get_status_display }}</div>
+                    {% for error in clinvar_export_match.clinvar_export.all_errors %}
+                        <div>{{ 'E'|severity_icon }} {{ error.text }}</div>
+                    {% endfor %}
                     {% if clinvar_export_match.clinvar_export.scv %}<div>SCV:{{ clinvar_export_match.clinvar_export.scv }}</div>{% endif %}
                 </div>
             {% endfor %}
