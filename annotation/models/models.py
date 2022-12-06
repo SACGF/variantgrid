@@ -136,10 +136,10 @@ class ClinVar(models.Model):
     def get_suspect_reason_code_display(self):
         return ClinVar.SUSPECT_REASON_CODES.get(self.clinvar_suspect_reason_code)
 
-    def get_citations(self) -> QuerySet[Citation2]:
+    def get_loaded_citations(self) -> QuerySet[Citation2]:
         cvc_qs = ClinVarCitation.objects.filter(clinvar_variation_id=self.clinvar_variation_id,
                                                 clinvar_allele_id=self.clinvar_allele_id)
-        return Citation2.objects.filter(clinvarcitation2__in=cvc_qs)
+        return CitationFetchRequest.fetch_all_now(Citation2.objects.filter(clinvarcitation2__in=cvc_qs)).all_citations
 
     def get_citations(self) -> QuerySet[Citation2]:
         cvc_qs = ClinVarCitation.objects.filter(clinvar_variation_id=self.clinvar_variation_id,

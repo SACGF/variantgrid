@@ -22,8 +22,7 @@ def search_citations(sender: Any, search_input: SearchInput, **kwargs) -> Search
         normal_id = CitationIdNormalized.normalize_id(search_input.search_string)
         response.mark_valid_search()
 
-        citation = normal_id.as_citation()
-        citation.save()
+        citation = normal_id.get_or_create()
         response.add(citation)
     except RuntimeError:
         pass

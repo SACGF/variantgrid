@@ -83,31 +83,20 @@ let CitationsManager = (function() {
 
         renderData(citation) {
             let citDom = $('<div>');
-            let sourceMap = {"PubMed": "PMID"};
-            let source = sourceMap[citation.source] || citation.source;
-            let sourceId = citation.citation_id;
             let year = citation.year;
 
             let authorShort = citation.authors_short;
-            let singleAuthor = null;
-            if (!authorShort && citation.authors) {
-                let authors = citation.authors.split(',');
-                if (authors.length) {
-                    authorShort = authors[0];
-                    singleAuthor = authors.length === 1;
-                }
-            } else if (authorShort && citation.authors) {
-                singleAuthor = authorShort == citation.authors;
-            }
             let title = citation.title || 'Could not load title';
 
             let linkRow = [];
-            if (citation.citation_link) {
-                linkRow.push($('<a>', {href: citation.citation_link, target: '_blank', class:'source external-link', text: `${source}: ${sourceId}`}));
+            if (citation.external_url) {
+                linkRow.push($('<a>', {href: citation.external_url, target: '_blank', class:'source external-link', text: `${citation.id}`}));
+            } else {
+                linkRow.push($('<span>', {text: `${citation.id}`}));
             }
             if (authorShort) {
                 let text = authorShort;
-                if (singleAuthor == false) {
+                if (citation.singleAuthor == false) {
                     text += ' et al';
                 }
                 linkRow.push($('<span>', {class:'author', text: text}));
@@ -127,13 +116,13 @@ let CitationsManager = (function() {
             }, linkDom);
             linkDom.appendTo(citDom);
 
-            if (citation.abstract || !singleAuthor || citation.journal) {
-                $('<a>', {class: 'toggle-link d-block', 'data-toggle':"collapse", href:`#detail-${citation.citation_id}`, text: 'Toggle detail'}).appendTo(citDom);
-                let detailContainer = $('<div>', {class: 'collapse', id:`detail-${citation.citation_id}`}).appendTo(citDom);
+            if (citation.abstract || !citation.singleAuthor || citation.journal) {
+                $('<a>', {class: 'toggle-link d-block', 'data-toggle':"collapse", href:`#detail-${citation.id}`, text: 'Toggle detail'}).appendTo(citDom);
+                let detailContainer = $('<div>', {class: 'collapse', id:`detail-${citation.id}`}).appendTo(citDom);
                 if (citation.journal) {
                     $('<p>', {class: 'journal', text: citation.journal}).appendTo(detailContainer);
                 }
-                if (!singleAuthor) {
+                if (!citation.singleAuthor) {
                     $('<p>', {class: 'authors', text: citation.authors}).appendTo(detailContainer);
                 }
                 $('<p>', {class: 'abstract', text: citation.abstract && citation.abstract.length ? citation.abstract : 'Could not fetch abstract'}).appendTo(detailContainer);

@@ -18,10 +18,10 @@ from django.views.decorators.vary import vary_on_cookie
 from htmlmin.decorators import not_minified_response
 
 from annotation.annotation_versions import get_variant_annotation_version
-from annotation.citations import get_citations, CitationDetails
+from annotation.citations import get_citations
 from annotation.manual_variant_entry import create_manual_variants
-from annotation.models import ClinVar, AnnotationVersion, AnnotationRun, VariantAnnotationVersion, \
-    VariantAnnotationVersionDiff
+from annotation.models import AnnotationVersion, AnnotationRun, VariantAnnotationVersion, \
+    VariantAnnotationVersionDiff, Citation2
 from annotation.models.models import CachedWebResource, Citation, HumanProteinAtlasAnnotationVersion, \
     HumanProteinAtlasAnnotation, ColumnVEPField, DBNSFPGeneAnnotationVersion
 from annotation.models.models_citations import CitationFetchRequest
@@ -488,62 +488,46 @@ def create_manual_variant_entry_from_text(request, genome_build_name, variants_t
     mvec = create_manual_variants(request.user, genome_build, variants_text)
     return redirect('watch_manual_variant_entry', pk=mvec.pk)
 
+# These specific citation tabs do not appear to be referenced anymore
 
-# TODO when possible remove the citations_tab.html in favour of vc_citations.js
-def clinvar_citations_tab(request, clinvar_id):
-    clinvar = get_object_or_404(ClinVar, pk=clinvar_id)
-    clinvar_citations = clinvar.get_citations()
+# def clinvar_citations_tab(request, clinvar_id):
+#     clinvar = get_object_or_404(ClinVar, pk=clinvar_id)
+#
+#     context = {"clinvar": clinvar,
+#                "citations": clinvar.get_loaded_citations()}
+#     return render(request, "annotation/citations_tab.html", context)
+#
+#
+# @cache_page(WEEK_SECS)
+# def pubmed_citations_tab(request, pubmed_citations):
+#     """ pubmed_citations looks like "25722852&26702340" """
+#
+#     citations = []
+#     for pubmed_id in pubmed_citations.split('&'):
+#         citation, _ = Citation.objects.get_or_create(citation_source=CitationSource.PUBMED,
+#                                                      citation_id=pubmed_id)
+#         citations.append(citation)
+#     return _citations_tab(request, citations)
+#
 
-    citations = get_citations(clinvar_citations)
-
-    context = {"clinvar": clinvar,
-               "citations": citations}
-    return render(request, "annotation/citations_tab.html", context)
-
-
-@cache_page(WEEK_SECS)
-def pubmed_citations_tab(request, pubmed_citations):
-    """ pubmed_citations looks like "25722852&26702340" """
-
-    citations = []
-    for pubmed_id in pubmed_citations.split('&'):
-        citation, _ = Citation.objects.get_or_create(citation_source=CitationSource.PUBMED,
-                                                     citation_id=pubmed_id)
-        citations.append(citation)
-    return _citations_tab(request, citations)
+def citations_tab(request, citations_ids_list):
+    # FIXME, best that we don't even retrieve the citations here, and just use citation HTML auto-loading
+    citation_ids = citations_ids_list.split("/")
+    return render(request, "annotation/citations_tab.html", {"citations": CitationFetchRequest.fetch_all_now(citation_ids).all_citations})
 
 
 def view_citation(request, citation_id: str):
-    return render(request, "annotation/citation.html", {"citation": CitationFetchRequest().fetch_now(citation_id).citation})
+    """
+    A dedicated page for a single citation, handy for testing
+    :param request: The Request
+    :param citation_id: The full ID of the citation, e.g. PMID:4353345
+    :return: A stand alone page with the loaded citation details
+    """
+    return render(request, "annotation/citation.html", {"citation": CitationFetchRequest.fetch_all_now([citation_id]).first_citation})
 
 
-def citations_tab(request, citations_ids_list):
-    citation_ids = citations_ids_list.split("/")
-    citations = [Citation.objects.get(pk=pk) for pk in citation_ids]
-    return _citations_tab(request, citations)
-
-
-def _citations_tab(request, citations):
-    cached_citations = get_citations(citations)
-
-    context = {"citations": cached_citations}
-    return render(request, "annotation/citations_tab.html", context)
-
-
-def simple_citation_html(cd: CitationDetails) -> str:
-    first_author = cd.authors_short
-    single_author = cd.authors_short == cd.authors
-    if cd.authors and not first_author:
-        author_list = cd.authors.split(',')
-        if author_list:
-            first_author = author_list[0]
-        single_author = len(author_list) == 1
-    context = {
-        "first_author": first_author,
-        "single_author": single_author,
-    }
-    context = {**context, **vars(cd)}
-    return render_to_string('annotation/citation_simple.html', context).replace('\n', '').strip()
+def simple_citation_html(cd: Citation2) -> str:
+    return render_to_string('annotation/citation_simple.html', {"citation": cd}).replace('\n', '').strip()
 
 
 def citations_json(request, citations_ids_list):
@@ -551,33 +535,4 @@ def citations_json(request, citations_ids_list):
     Request JSON of citations, accepts either variant grid internal citation ids, or PubMed:123456
     """
     citation_ids = citations_ids_list.split("/")
-
-    citations: List[Citation] = []
-    citation_id_to_request: Dict[int, List[str]] = defaultdict(list)
-
-    for requested_citation_id in citation_ids:
-        parts = requested_citation_id.split(':')
-
-        citation: Optional[Citation] = None
-        if len(parts) == 2:
-            if source := CitationSource.CODES.get(parts[0]):
-                citation, _ = Citation.objects.get_or_create(citation_source=source,
-                                                             citation_id=parts[1])
-            else:
-                logging.warning(f"Don't know how to look up a citation for {requested_citation_id}")
-        elif requested_citation_id.isnumeric():
-            citation = Citation.objects.filter(pk=requested_citation_id).first()
-
-        if citation:
-            citations.append(citation)
-            citation_id_to_request[citation.id].append(requested_citation_id)
-
-    cached_citations = get_citations(citations)
-
-    json_data = []
-    for cc in cached_citations:
-        cc_json_data = vars(cc)
-        cc_json_data['requested_using'] = citation_id_to_request[cc.id]
-        json_data.append(cc_json_data)
-
-    return JsonResponse({'citations': json_data})
+    return JsonResponse({"citations": CitationFetchRequest.fetch_all_now(citation_ids).to_json()})

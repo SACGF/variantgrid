@@ -4,44 +4,6 @@ from django.db import migrations, models
 import django.db.models.deletion
 import django_extensions.db.fields
 
-
-def duplicate_citations(apps, schema_editor):
-    print("About to populate Citation2")
-    Citation = apps.get_model("annotation", "Citation")
-    Citation2 = apps.get_model("annotation", "Citation2")
-    all_citation_2s = list()
-    for citation in Citation.objects.all():
-        source = citation.citation_source
-        if source == "P":
-            all_citation_2s.append(Citation2(
-                pk=f"PMID:{citation.citation_id}",
-                old_id=citation.pk,
-                source="PMID",
-                index=citation.citation_id
-            ))
-        elif source == "C":
-            all_citation_2s.append(Citation2(
-                pk=f"PMCID:PMC{citation.citation_id}",
-                old_id=citation.pk,
-                source="PMCID",
-                index=citation.citation_id
-            ))
-        elif source == "N":
-            all_citation_2s.append(Citation2(
-                pk=f"{citation.citation_id}",
-                old_id=citation.pk,
-                source="NBK",
-                index=citation.citation_id
-            ))
-    Citation2.objects.bulk_create(objs=all_citation_2s)
-    print("Completed making Citation2 stubs")
-
-    all_gene_symbols = list()
-    GeneSymbolCitation = apps.get_model("annotation", "GeneSymbolCitation")
-
-
-
-
 class Migration(migrations.Migration):
 
     dependencies = [

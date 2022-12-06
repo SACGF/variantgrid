@@ -1,4 +1,4 @@
-<div class='clinvar-citation' id='clinvar-citation-{{ citation.citation_id }}'>
+<div class='clinvar-citation' id='clinvar-citation-{{ citation.pk }}'>
     <script>
     function showAbstract(clinvar_citation_id) {
         var cvc = $("#clinvar-citation-" + clinvar_citation_id);
@@ -16,10 +16,10 @@
         <div class='details'>
             {{ citation.journal | default_if_none:"" }}
         <span class='aux'>
-            <span class='rprtid'>{{ citation.source }}: {{ citation.citation_id }}</span>
+            <span class='rprtid'>{{ citation.pk }}</span>
         </span>
         {% if citation.abstract %}
-        <a class='show-abstract-link' href='javascript:showAbstract("{{ citation.citation_id }}")'>Show abstract.</a>
+        <a class='show-abstract-link' href='javascript:showAbstract("{{ citation.pk }}")'>Show abstract.</a>
         {% endif %}
         </div>
     </div>

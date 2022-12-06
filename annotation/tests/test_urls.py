@@ -53,8 +53,8 @@ class Test(URLTestCase):
             ("view_annotation_descriptions", {}, 200),
             ("about_new_vep_columns", {}, 200),
             ("view_annotation_version_details", {"annotation_version_id": self.annotation_version_grch37.pk}, 200),
-            ("clinvar_citations_tab", {"clinvar_id": self.clinvar_id}, 200),
-            ("pubmed_citations_tab", {"pubmed_citations": self.pubmed_citations}, 200),
+            # ("clinvar_citations_tab", {"clinvar_id": self.clinvar_id}, 200),
+            # ("pubmed_citations_tab", {"pubmed_citations": self.pubmed_citations}, 200),
             ("citations_tab", {"citations_ids_list": self.citations_ids_list}, 200),
             ("citations_json", {"citations_ids_list": self.citations_ids_list_pubmed}, 200),
             # API

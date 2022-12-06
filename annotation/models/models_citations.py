@@ -3,7 +3,7 @@ import itertools
 from dataclasses import dataclass, field
 from datetime import timedelta
 from enum import Enum
-from typing import Optional, Iterable, List, Dict, Set, Union
+from typing import Optional, Iterable, List, Dict, Set, Union, Any, Iterator
 
 from Bio import Entrez, Medline
 from django.db import models
@@ -13,7 +13,7 @@ from django.utils.timezone import now
 from django_extensions.db.models import TimeStampedModel
 
 from library.log_utils import report_message, report_exc_info
-from library.utils import JsonObjType
+from library.utils import JsonObjType, first
 import re
 
 
@@ -29,6 +29,31 @@ class CitationSource2(models.TextChoices):
     NCBI_BOOKSHELF = 'NBK', 'NCBIBookShelf'
     PUBMED_CENTRAL = 'PMCID', 'PubMedCentral'
 
+
+    # PUBMED = 'P', 'PubMed'
+    # NCBI_BOOKSHELF = 'N', 'NCBIBookShelf'
+    # PUBMED_CENTRAL = 'C', 'PubMedCentral'
+    #
+    # CODES = Constant({'PubMed': PUBMED[0],
+    #                   'PMID': PUBMED[0],
+    #                   'NCBIBookShelf': NCBI_BOOKSHELF[0],
+    #                   'PubMedCentral': PUBMED_CENTRAL[0]})
+
+    @staticmethod
+    def from_legacy_code(code: str) -> Optional['CitationSource2']:
+        return {
+            "P": CitationSource2.PUBMED,
+            "PMID": CitationSource2.PUBMED,
+            "PUBMED": CitationSource2.PUBMED,
+
+            "C": CitationSource2.PUBMED_CENTRAL,
+            "PMCID": CitationSource2.PUBMED_CENTRAL,
+            "PubMedCentral": CitationSource2.PUBMED_CENTRAL,
+
+            "N": CitationSource2.NCBI_BOOKSHELF,
+            "NBK": CitationSource2.NCBI_BOOKSHELF,
+            "NCBIBookShelf": CitationSource2.NCBI_BOOKSHELF
+        }.get(code.upper())
 
 class EntrezDbType(str, Enum):
     PUBMED = "pubmed"
@@ -57,6 +82,34 @@ class Citation2(TimeStampedModel):
     authors = models.TextField(null=True, blank=True)
     authors_short = models.TextField(null=True, blank=True)
     abstract = models.TextField(null=True, blank=True)
+
+    @property
+    def _first_and_single_author(self):
+        first_author = self.authors_short
+        single_author = self.authors_short == self.authors
+        if self.authors and not first_author:
+            author_list = self.authors.split(',')
+            if author_list:
+                first_author = author_list[0]
+            single_author = len(author_list) == 1
+        return first_author, single_author
+
+    @property
+    def first_author(self):
+        return self._first_and_single_author[0]
+
+    @property
+    def single_author(self):
+        return self._first_and_single_author[1]
+
+    @property
+    def title_safe(self):
+        if self.error:
+            return "Could not retrieve citation"
+        elif not self.title:
+            return "Have not retrieved citation"
+        else:
+            return self.title
 
     def __str__(self):
         return self.id
@@ -95,9 +148,27 @@ class CitationIdNormalized:
         elif self.source == CitationSource2.PUBMED_CENTRAL:
             return f"PMCID:{self.index}"
         else:
-            return f"NBK{self.index}"
+            fixed = self.index
+            if not fixed.startswith("NBK"):
+                fixed = f"NBK{self.index}"
+            return fixed
 
     CITATION_SPLIT_RE = re.compile(r"(?P<prefix>[a-z]+)\s*(?P<semicolon>:)?\s*(?P<number_prefix>[a-z]+)?(?P<number>[0-9]+)", re.IGNORECASE)
+
+    def __lt__(self, other):
+        if self.source < other.source:
+            return True
+        if self.source == other.source:
+            return self.index.rjust(10, '0') < other.index.rjust(10, '0')
+        return False
+
+    @staticmethod
+    def from_parts(source: CitationSource2, index: str):
+        source = CitationSource2.from_legacy_code(source)
+        if source == CitationSource2.PUBMED_CENTRAL and not index.startswith("PMC"):
+            index = f"PMC{index}"
+        return CitationIdNormalized(source, index)
+
 
     @staticmethod
     def from_citation(citation: Citation2):
@@ -124,8 +195,10 @@ class CitationIdNormalized:
     def get_or_create(self) -> Citation2:
         citation, _ = Citation2.objects.get_or_create(
             id=self.full_id,
-            source=self.source,
-            index=self.index
+            defaults={
+                "source": self.source,
+                "index": self.index
+            }
         )
         return citation
 
@@ -134,7 +207,7 @@ class CitationIdNormalized:
 class CitationFetchEntry:
     normalised_id: Optional[CitationIdNormalized] = None
     citation: Optional[Citation2] = None
-    requested_ids: Set[str] = field(default_factory=set)
+    requested_ids: Set[Any] = field(default_factory=set)
     fetched: bool = False
 
     def should_refresh(self, refresh_before: datetime) -> bool:
@@ -143,8 +216,47 @@ class CitationFetchEntry:
         else:
             return True
 
+    def to_json(self) -> JsonObjType:
+        data = {key: value for key, value in vars(self.citation).items() if isinstance(value, str)}
+        data["external_url"] = self.citation.get_external_url
+        data["first_author"] = self.citation.first_author
+        data["single_author"] = self.citation.single_author
+        data['requested_using'] = [requested_id for requested_id in self.requested_ids if isinstance(requested_id, str)]
+        return data
 
-CitationRequest = Union[str, CitationIdNormalized, Citation2]
+
+CitationRequest = Union[str, CitationIdNormalized, Citation2, int]
+
+
+class CitationFetchResponse:
+
+    def __init__(self, entries: List[CitationFetchEntry]):
+        self.all_entries = entries
+        requested_to_fetch: Dict[Any, CitationFetchEntry] = dict()
+        for fetch in entries:
+            for requested_id in fetch.requested_ids:
+                requested_to_fetch[requested_id] = fetch
+        self.requested_to_fetch = requested_to_fetch
+
+    @property
+    def all_citations(self) -> List[Citation2]:
+        return [entry.citation for entry in self.all_entries]
+
+    def for_requested(self, citation_id: CitationRequest):
+        return self.requested_to_fetch.get(citation_id).citation
+
+    def __iter__(self) -> Iterator[Citation2]:
+        return iter(self.all_entries)
+
+    def __len__(self) -> int:
+        return len(self.all_entries)
+
+    @property
+    def first_citation(self) -> Citation2:
+        return first(self.all_entries).citation
+
+    def to_json(self):
+        return [entry.to_json() for entry in self.all_entries]
 
 
 class CitationFetchRequest:
@@ -154,17 +266,20 @@ class CitationFetchRequest:
         self.refresh_before = now() - (cache_age or timedelta(days=365))  # reload every year
 
     @staticmethod
-    def fetch_all_now(citation_ids: Iterable[CitationRequest]) -> List[Citation2]:
+    def fetch_all_now(citation_ids: Iterable[CitationRequest]) -> CitationFetchResponse:
         cfr = CitationFetchRequest()
         for citation_id in citation_ids:
             cfr.queue(citation_id)
         cfr.fetch_queue()
-        return [fetch.citation for fetch in cfr._all_citation_fetches]
+        return CitationFetchResponse(cfr._all_citation_fetches)
 
     def queue(self, citation_id: CitationRequest) -> CitationFetchEntry:
         citation: Optional[Citation2] = None
         normalized: Optional[CitationIdNormalized] = None
-        if isinstance(citation_id, Citation2):
+        if isinstance(citation_id, int) or (isinstance(citation_id, str) and citation_id.isnumeric()):  # old_id
+            citation = Citation2.objects.get(old_id=int(citation_id))
+            normalized = CitationIdNormalized.normalize_id(citation.pk)
+        elif isinstance(citation_id, Citation2):
             citation = citation_id
             normalized = CitationIdNormalized.normalize_id(citation.id)
         elif isinstance(citation_id, CitationIdNormalized):
@@ -186,7 +301,7 @@ class CitationFetchRequest:
         self.id_to_fetch[normalized] = entry
         return entry
 
-    def fetch_now(self, citation_id: str) -> CitationFetchEntry:
+    def fetch_now(self, citation_id: CitationRequest) -> CitationFetchEntry:
         entry = self.queue(citation_id)
         self.fetch_queue()
         return entry
@@ -197,10 +312,20 @@ class CitationFetchRequest:
             citations = Citation2.objects.filter(
                 id__in=[fetch.normalised_id.full_id for fetch in fetch_needing_citations]
             )
-            citations_by_id = {citation.pk: citation for citation in citations}
+            citations_by_id: Dict[str, Citation2] = {citation.pk: citation for citation in citations}
             for fetch in fetch_needing_citations:
                 if existing := citations_by_id.get(fetch.normalised_id.full_id):
                     fetch.citation = existing
+                    # check if JSON has been migrated from CachedCitation
+                    # load that instead of loading from the Citation server
+                    if existing.data_json and not existing.last_loaded:
+                        if existing.source in {CitationSource2.PUBMED, CitationSource2.PUBMED_CENTRAL}:
+                            CitationFetchRequest.populate_from_entrez(existing, existing.data_json)
+                        elif existing.source == CitationSource2.NCBI_BOOKSHELF:
+                            CitationFetchRequest.populate_from_nbk(existing, existing.data_json)
+                        existing.last_loaded = now()
+                        existing.save()
+                        fetch.fetched = True
                 else:
                     # doesn't save the citation yet, will do that when we retrieve the data
                     fetch.citation = fetch.normalised_id.get_or_create()
@@ -215,8 +340,8 @@ class CitationFetchRequest:
 
     def fetch_queue(self):
         self._load_citation_stubs()
-        if self.id_to_fetch:
-            all_ids = [fetch.normalised_id for fetch in self._all_citation_fetches]
+
+        if all_ids := [fetch.normalised_id for fetch in self._all_citations_needing_loading]:
             citations_by_source = sorted(all_ids, key=lambda c: c.source)
             for source, citations_ids_by_source in itertools.groupby(citations_by_source, key=lambda c: c.source):
                 citations_ids_by_source = list(citations_ids_by_source)
@@ -227,7 +352,7 @@ class CitationFetchRequest:
                 elif source == CitationSource2.NCBI_BOOKSHELF:
                     self.load_from_nbk(ids=citations_ids_by_source)
 
-        self._mark_error_if_not_fetched(self.id_to_fetch.keys(), "No record was returned for this ID")
+        self._mark_error_if_not_fetched(all_ids, "No record was returned for this ID")
 
         for fetch in self.id_to_fetch.values():
             # would like to bulk update but that wouldn't update modified date
