@@ -36,3 +36,8 @@ class LRGRefSeqGeneCategory(models.TextChoices):
     ALIGNED_SELECTED = "S", 'aligned: Selected'
     ALIGNED_HISTORICAL = "H", "aligned: historical"
     REFERENCE_STANDARD = "R", "reference standard"
+
+
+class MANEStatus(models.TextChoices):
+    MANE_SELECT = "M", 'MANE Select'
+    MANE_PLUS_CLINICAL = "C", "MANE Plus Clinical"
