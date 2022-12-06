@@ -16,15 +16,15 @@
                     {% for term in clinvar_export_match.condition.terms %}
                         <div style="font-size:10px">{% ontology_term term %}</div>
                     {% endfor %}
-                    <div>{{ clinvar_export_match.clinical_significance }}</div>
+                    <div class="cs-{{ clinvar_export_match.clinical_significance.uppercase }}">{{ clinvar_export_match.clinical_significance }}</div>
                     {% for match_type in clinvar_export_match.match_types %}
                         <div class="text-success">- {{ match_type }}</div>
                     {% endfor %}
-                    <div>{{ clinvar_export_match.clinvar_export.get_status_display }}</div>
+                    <div class="font-weight-bold">{{ clinvar_export_match.clinvar_export.get_status_display }}</div>
                     {% for error in clinvar_export_match.clinvar_export.all_errors %}
                         <div>{{ 'E'|severity_icon }} {{ error.text }}</div>
                     {% endfor %}
-                    {% if clinvar_export_match.clinvar_export.scv %}<div>SCV:{{ clinvar_export_match.clinvar_export.scv }}</div>{% endif %}
+                    {% if clinvar_export_match.clinvar_export.scv %}<div class="text-monospace">SCV:{{ clinvar_export_match.clinvar_export.scv }}</div>{% endif %}
                 </div>
             {% endfor %}
         </div>
