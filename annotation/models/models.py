@@ -312,6 +312,9 @@ class GeneAnnotationVersion(SubVersionPartition):
     def genome_build(self):
         return self.gene_annotation_release.genome_build
 
+    def __str__(self):
+        return f"GAR: {self.gene_annotation_release}, Ont: {self.ontology_version}, DBnsFP: {self.dbnsfp_gene_version}"
+
 
 @receiver(pre_delete, sender=GeneAnnotationVersion)
 def gene_annotation_version_pre_delete_handler(sender, instance, **kwargs):  # pylint: disable=unused-argument
@@ -550,12 +553,16 @@ class VariantAnnotationVersion(SubVersionPartition):
                     release = "105.20201022"
                     gff_url = f"http://ftp.ncbi.nlm.nih.gov/refseq/H_sapiens/annotation/annotation_releases/{release}/GCF_000001405.25_GRCh37.p13/GCF_000001405.25_GRCh37.p13_genomic.gff.gz"
             elif self.genome_build.name == "GRCh38":
-                # This is good for 108 (will need to keep on top of this)
-                (release, gff_filename) = self.refseq.split(" - ")
-                if not gff_filename.endswith(".gz"):
-                    gff_filename += ".gz"
-                patch_version = 14
-                gff_url = f"https://ftp.ncbi.nlm.nih.gov/refseq/H_sapiens/annotation/annotation_releases/{release}/GCF_000001405.40_GRCh38.p{patch_version}/{gff_filename}"
+                if m := re.match("(109.20\d{6}) - GCF_000001405.39_GRCh38.p13_genomic.gff", self.refseq):
+                    release = m.group(1)
+                    gff_url = f"http://ftp.ncbi.nlm.nih.gov/refseq/H_sapiens/annotation/annotation_releases/{release}/GCF_000001405.39_GRCh38.p13/GCF_000001405.39_GRCh38.p13_genomic.gff.gz"
+                else:
+                    (release, gff_filename) = self.refseq.split(" - ")
+                    if not gff_filename.endswith(".gz"):
+                        gff_filename += ".gz"
+                    # This is good for VEP v108 (will need to keep on top of this)
+                    patch_version = 14
+                    gff_url = f"https://ftp.ncbi.nlm.nih.gov/refseq/H_sapiens/annotation/annotation_releases/{release}/GCF_000001405.40_GRCh38.p{patch_version}/{gff_filename}"
         return release, gff_url
 
     @property
@@ -566,13 +573,18 @@ class VariantAnnotationVersion(SubVersionPartition):
     def cdot_gene_release_filename(self) -> str:
         """ returns blank if unknown """
         name_components = []
-        release, gff_url = self._gene_annotation_release_and_gff_url
+        _release, gff_url = self._gene_annotation_release_and_gff_url
         if gff_url:
             name_components = [name_from_filename(gff_url)]
-            if self.genome_build.name == "GRCh37" and self.annotation_consortium == AnnotationConsortium.REFSEQ:
-                # These ones got renamed as the filename wasn't unique
-                if m := re.match("http://ftp.ncbi.nlm.nih.gov/refseq/H_sapiens/annotation/annotation_releases/(105.\d+)/GCF_000001405.25_GRCh37.p13/GCF_000001405.25_GRCh37.p13_genomic.gff.gz", gff_url):
-                    name_components.append(m.group(1))
+            # These ones got renamed as the filename wasn't unique
+            if self.annotation_consortium == AnnotationConsortium.REFSEQ:
+                if self.genome_build.name == "GRCh37":
+                    if m := re.match("http://ftp.ncbi.nlm.nih.gov/refseq/H_sapiens/annotation/annotation_releases/(105.20\d{6})/GCF_000001405.25_GRCh37.p13/(GCF_000001405.25_GRCh37.p13_genomic).gff.gz", gff_url):
+                        name_components = [m.group(2), m.group(1), "gff"]
+                elif self.genome_build.name == "GRCh38":
+                    # GCF_000001405.39_GRCh38.p13_genomic.109.20210514.gff.json.gz
+                    if m := re.match("http://ftp.ncbi.nlm.nih.gov/refseq/H_sapiens/annotation/annotation_releases/(109.20\d{6})/GCF_000001405.39_GRCh38.p13/(GCF_000001405.39_GRCh38.p13_genomic).gff.gz", gff_url):
+                        name_components = [m.group(2), m.group(1), "gff"]
             name_components.append("json.gz")
 
         return ".".join(name_components)
