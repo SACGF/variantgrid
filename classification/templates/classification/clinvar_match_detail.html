@@ -1,9 +1,9 @@
 {% load ontology_tags %}
 {% load ui_utils %}
 {% for match in matches %}
-    <div class="d-flex" style="align-content: start">
+    <div class="d-flex {% if not forloop.first %}mt-2{% endif %}" style="align-content: start">
         <div style="width:150px">
-        <div alss="mb-1"><a href="{{ match.allele.get_absolute_url }}">{{ match.allele }}</a></div>
+        <div><a href="{{ match.allele.get_absolute_url }}">{{ match.allele }}</a></div>
         <div>Lab Classifications: {{ match.classifications|length }}</div>
         {% for match_type in match.match_types %}
             <div class="text-success">- {{ match_type }}</div>
@@ -16,11 +16,11 @@
                     {% for term in clinvar_export_match.condition.terms %}
                         <div style="font-size:10px">{% ontology_term term %}</div>
                     {% endfor %}
-                    <div class="cs-{{ clinvar_export_match.clinical_significance.uppercase }}">{{ clinvar_export_match.clinical_significance }}</div>
+                    <div class="cs-{{ clinvar_export_match.clinical_significance }} p-1 pl-2" style="font-size:smaller; border-radius:4px">{{ clinvar_export_match.clinical_significance }}</div>
                     {% for match_type in clinvar_export_match.match_types %}
                         <div class="text-success">- {{ match_type }}</div>
                     {% endfor %}
-                    <div class="font-weight-bold">{{ clinvar_export_match.clinvar_export.get_status_display }}</div>
+                    <div><span class="font-weight-bold">Status</span>: {{ clinvar_export_match.clinvar_export.get_status_display }}</div>
                     {% for error in clinvar_export_match.clinvar_export.all_errors %}
                         <div>{{ 'E'|severity_icon }} {{ error.text }}</div>
                     {% endfor %}
