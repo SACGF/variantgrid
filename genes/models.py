@@ -2249,3 +2249,11 @@ class MANE(models.Model):
     ensembl_transcript_version = models.ForeignKey(TranscriptVersion, related_name="mane_ensembl",
                                                    null=True, on_delete=CASCADE)
     status = models.CharField(max_length=1, choices=MANEStatus.choices)
+
+    def get_transcript_version(self, annotation_consortium: AnnotationConsortium) -> TranscriptVersion:
+        transcript_version = None
+        if annotation_consortium == AnnotationConsortium.REFSEQ:
+            transcript_version = self.refseq_transcript_version
+        elif annotation_consortium == AnnotationConsortium.ENSEMBL:
+            transcript_version = self.ensembl_transcript_version
+        return transcript_version
