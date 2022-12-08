@@ -544,7 +544,7 @@ class GeneVersion(models.Model):
         if genome_build:
             filter_kwargs["genome_build"] = genome_build
         if annotation_consortium:
-            filter_kwargs["transcript__annotation_consortium"] = annotation_consortium
+            filter_kwargs["gene__annotation_consortium"] = annotation_consortium
         gene_version_qs = GeneVersion.objects.filter(**filter_kwargs)
         ids_by_accession = {}  # Uses version if non-zero
         for (pk, gene_id, version) in gene_version_qs.values_list("pk", "gene_id", "version"):
@@ -981,6 +981,13 @@ class TranscriptVersion(SortByPKMixin, models.Model):
         if self.pyhgvs_data:
             coords = f"{self.chrom}:{self.pyhgvs_data['start'] + 1}-{self.pyhgvs_data['end']} ({self.pyhgvs_data['strand']})"
         return coords
+
+    @lazy
+    def tags(self) -> List[str]:
+        """ 'tag' has been in cdot since 0.2.12 """
+        REMOVE_TAGS = {"basic"}  # This is on pretty much every Ensembl transcript
+        tag_list = self.data.get("tag", "").split(",")
+        return sorted(tag for tag in tag_list if tag not in REMOVE_TAGS)
 
     def get_contigs(self) -> Set[Contig]:
         raw_chrom = {self.pyhgvs_data["chrom"]}

@@ -18,6 +18,19 @@
             $("#transcripts").slideDown();
         }
     </script>
+    <style>
+    /* This is the same as global legacy css 'pill' */
+    .transcript-tag {
+        padding: 4px 8px 4px 8px;
+        background-color: #fefefe;
+        border: 1px solid #aaccaa;
+        border-radius: 8px;
+        display: inline-block;
+        margin: 4px;
+        color: #448844;
+        text-decoration: none;
+    }
+    </style>
 {% endblock head %}
 {% block content %}
     <div class="container">
@@ -114,6 +127,9 @@
                                             <td>
                                                 {% for tv in tv_set %}
                                                     <a class="d-inline-block mx-2 hover-link" href="{% url 'view_transcript_version' tv.transcript_id tv.version %}">v.{{ tv.version }}</a>
+                                                    {% for t_tag in tv.tags %}
+                                                        <span class="transcript-tag transcript-tag-{{ t_tag }}">{{ t_tag }}</span>
+                                                    {% endfor %}
                                                 {% endfor %}
                                             </td>
                                         {% endfor %}
