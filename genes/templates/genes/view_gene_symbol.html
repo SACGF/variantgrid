@@ -405,8 +405,9 @@
             {% endif %}
 
             {% if citations %}
-                {% load citation_tags %}
-                {% retrieve_cached_citations citations %}
+                {% for citation_id in citations_ids %}
+                    <div data-citation-id="{{ citation_id }}"></div>
+                {% endfor %}
             {% endif %}
         {% endif %}
     </div>

@@ -1313,7 +1313,7 @@ class CachedWebResource(TimeStampedModel):
 
 class GeneSymbolCitation(models.Model):
     gene_symbol = models.ForeignKey(GeneSymbol, on_delete=CASCADE)
-    citation = models.ForeignKey(Citation, on_delete=CASCADE)
+    citation = models.ForeignKey(Citation, null=True, on_delete=CASCADE)
     citation2 = models.ForeignKey(Citation2, null=True, on_delete=CASCADE)
 
     class Meta:

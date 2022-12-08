@@ -203,6 +203,15 @@ class CitationIdNormalized:
         )
         return citation
 
+    def for_bulk_create(self) -> Citation2:
+        return Citation2(
+            id=self.full_id,
+            source=self.source,
+            index=self.index,
+            created=now(),
+            modified=now()
+        )
+
 
 @dataclass
 class CitationFetchEntry:
