@@ -238,6 +238,7 @@ class ModelAdminBasics(admin.ModelAdmin):
             # really tried to find the proper way to decode the object_id
             # but just left doing this sub, I'm sure this will fail for other IDs with harder to escape values
             object_id = object_id.replace("_5F", "_")
+            object_id = object_id.replace("_3A", ":")
 
         action = self.get_action(action_name)
         response = action[0](self, request, self.model.objects.filter(pk=object_id))

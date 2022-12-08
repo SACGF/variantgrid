@@ -9,7 +9,7 @@
 {% block content %}
     <div class="container">
         <div class="card">
-            <div class="card-header">{{ citation.id }}</div>
+            <div class="card-header">{{ citation.id }} {% admin_link citation %}</div>
             <div class="card-body">
                 {% if citation.error %}{% labelled label="Error" %}{{ 'E'|severity_icon }} {{ citation.error }}{% endlabelled %}{% endif %}
                 {% labelled label="URL" %}<a class="hover-link" href="{{ citation.get_external_url }}">{{ citation.get_external_url }}</a>{% endlabelled %}

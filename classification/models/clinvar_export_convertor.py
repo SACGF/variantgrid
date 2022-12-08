@@ -1,16 +1,12 @@
 from dataclasses import dataclass
 from typing import List, Any, Mapping, TypedDict, Optional
 from lazy import lazy
-
-from annotation.citation_utils import CitationLoader
-from annotation.citations import get_citation_from_cached_citation, get_citations, CitationDetails
-from annotation.models import Citation, CachedCitation, CitationSource
-from annotation.regexes import DbRegexes, db_ref_regexes
+from annotation.models import CitationSource, CitationFetchRequest
+from annotation.regexes import db_citation_regexes
 from classification.enums import SpecialEKeys, EvidenceKeyValueType, ShareLevel
 from classification.models import ClassificationModification, EvidenceKeyMap, EvidenceKey, \
     MultiCondition, ClinVarExport, classification_flag_types, Classification, ClinVarExportStatus, \
     ClinVarExportSubmission, CLINVAR_EXPORT_CONVERSION_VERSION
-from classification.models.evidence_mixin import VCDbRefDict
 from genes.hgvs import CHGVS
 from library.utils import html_to_text, JsonObjType, JsonDiffs
 from ontology.models import OntologyTerm, OntologyService, OntologyTermStatus
@@ -308,31 +304,29 @@ class ClinVarExportConverter:
 
     @property
     def citations(self) -> List[ValidatedJson]:
-        citation_list = []
-        citation_loader = CitationLoader()
+        request_ids = list()
         if self.clinvar_key.citations_mode == ClinVarCitationsModes.interpretation_summary_only:
             if text := self.classification_based_on.get(SpecialEKeys.INTERPRETATION_SUMMARY):
-                citation_loader.search_ids(text)
+                request_ids = db_citation_regexes.search(text)
         else:
-            citation_loader.add_dbrefs(self.classification_based_on.db_refs)
+            # non citation refs will be ignored
+            request_ids = self.classification_based_on.db_refs
 
-        for citation_receipt in citation_loader.load():
-            if clinvar_db := ClinVarExportConverter.CITATION_SOURCE_TO_CLINVAR.get(citation_receipt.citation.citation_source):
+        citation_list = list()
+        for citation in CitationFetchRequest.fetch_all_now(request_ids).all_citations:
+            if clinvar_db := ClinVarExportConverter.CITATION_SOURCE_TO_CLINVAR.get(citation.source):
                 # NEED to test for NBCI
-                id_part = citation_receipt.citation.citation_id
-                if clinvar_db == "PubMed":
-                    id_part = f"PMID:{id_part}"
                 citation_json = {
                     "db": clinvar_db,
-                    "id": id_part
+                    "id": citation.id
                 }
                 messages = JSON_MESSAGES_EMPTY
 
                 if ClinVarExportConverter.is_exclude_citation(citation_json):
                     citation_list.append(ValidatedJson.make_void(JsonMessages.info(f"{citation_json.get('id')} is omitted as it's not specific for this variant.")))
                 else:
-                    if not citation_receipt.is_valid:
-                        messages += JsonMessages.error(f"Citation \"{id_part}\" does not appear to be valid.")
+                    if citation.error:
+                        messages += JsonMessages.error(f"Could not retrieve \"{citation.id}\", might not be valid.")
 
                     citation_list.append(ValidatedJson(citation_json, messages=messages))
 

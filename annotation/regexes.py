@@ -4,8 +4,7 @@ from operator import attrgetter
 from re import RegexFlag
 from typing import List, Union, Match, Dict, Optional
 
-from annotation.models.models import Citation
-from annotation.models.models_enums import CitationSource
+from annotation.models.models_citations import CitationSource2, CitationIdNormalized
 from library.log_utils import report_message
 from ontology.models import OntologyService, OntologyTerm
 
@@ -106,12 +105,11 @@ class DbRefRegexResult:
                 if not term.is_valid_for_condition:
                     self.summary += " (obsolete or not phenotype)"
 
-        try:
-            if source := CitationSource.CODES.get(self.db):
-                citation, _ = Citation.objects.get_or_create(citation_source=source, citation_id=idx)
-                self.internal_id = citation.pk
-        except:
-            report_message(message=f"Could not resolve external DB reference for {self.db}:{self.idx}")
+        # no longer pre-emptively load citation, save that for rendering
+        # but normalise the ID
+        if source := CitationSource2.from_legacy_code(self.db):
+            self.db = source
+            self.idx = CitationIdNormalized.from_parts(source, self.idx).index
 
     @property
     def id_fixed(self):
@@ -240,3 +238,4 @@ class DbRefRegexes:
 
 
 db_ref_regexes = DbRefRegexes(DbRefRegex._all_db_ref_regexes)
+db_citation_regexes = DbRefRegexes([DbRegexes.PUBMED, DbRegexes.PMC, DbRegexes.NCBIBookShelf])

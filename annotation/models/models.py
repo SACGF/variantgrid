@@ -26,7 +26,7 @@ from psqlextra.types import PostgresPartitioningMethod
 from annotation.external_search_terms import get_variant_search_terms, get_variant_pubmed_search_terms
 from annotation.models.damage_enums import Polyphen2Prediction, FATHMMPrediction, MutationTasterPrediction, \
     SIFTPrediction, PathogenicityImpact, MutationAssessorPrediction, ALoFTPrediction
-from annotation.models.models_citations import Citation2, CitationFetchRequest
+from annotation.models.models_citations import Citation2, CitationFetchRequest, CitationFetchResponse
 from annotation.models.models_enums import AnnotationStatus, CitationSource, \
     VariantClass, ColumnAnnotationCategory, VEPPlugin, VEPCustom, ClinVarReviewStatus, VEPSkippedReason, \
     ManualVariantEntryType, HumanProteinAtlasAbundance, EssentialGeneCRISPR, EssentialGeneCRISPR2, EssentialGeneGeneTrap
@@ -136,15 +136,20 @@ class ClinVar(models.Model):
     def get_suspect_reason_code_display(self):
         return ClinVar.SUSPECT_REASON_CODES.get(self.clinvar_suspect_reason_code)
 
-    def get_loaded_citations(self) -> QuerySet[Citation2]:
+    def get_loaded_citations(self) -> CitationFetchResponse:
         cvc_qs = ClinVarCitation.objects.filter(clinvar_variation_id=self.clinvar_variation_id,
                                                 clinvar_allele_id=self.clinvar_allele_id)
-        return CitationFetchRequest.fetch_all_now(Citation2.objects.filter(clinvarcitation2__in=cvc_qs)).all_citations
+        return CitationFetchRequest.fetch_all_now(Citation2.objects.filter(clinvarcitation__in=cvc_qs))
 
-    def get_citations(self) -> QuerySet[Citation2]:
-        cvc_qs = ClinVarCitation.objects.filter(clinvar_variation_id=self.clinvar_variation_id,
-                                                clinvar_allele_id=self.clinvar_allele_id)
-        return Citation.objects.filter(clinvarcitation2__in=cvc_qs)
+    @property
+    def citation_ids(self) -> List[str]:
+        return sorted(set(ClinVarCitation.objects.filter(clinvar_variation_id=self.clinvar_variation_id,
+                                       clinvar_allele_id=self.clinvar_allele_id).values_list('citation2_id', flat=True)))
+
+    # def get_citations(self) -> QuerySet[Citation]:
+    #     cvc_qs = ClinVarCitation.objects.filter(clinvar_variation_id=self.clinvar_variation_id,
+    #                                             clinvar_allele_id=self.clinvar_allele_id)
+    #     return Citation.objects.filter(clinvarcitation__in=cvc_qs)
 
     def __str__(self):
         return f"ClinVar: variant: {self.variant}, path: {self.highest_pathogenicity}"

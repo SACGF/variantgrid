@@ -4,12 +4,15 @@ from django.db import migrations
 import json
 
 
-def duplicate_citations(apps, schema_editor):
+def _migrate_citations(apps, schema_editor):
     print("About to populate Citation2")
     Citation = apps.get_model("annotation", "Citation")
     Citation2 = apps.get_model("annotation", "Citation2")
     CachedCitation = apps.get_model("annotation", "CachedCitation")
     all_citation_2s = list()
+
+    citation_map = dict()
+
     for citation in Citation.objects.all():
         if len(all_citation_2s) % 1000 == 0:
             print(f"Migrated {len(all_citation_2s)} citations")
@@ -23,69 +26,67 @@ def duplicate_citations(apps, schema_editor):
                     print(re)
 
         source = citation.citation_source
+        dest_source = None
+        dest_index = f"{citation.citation_id}"
+
         if source == "P":
-            all_citation_2s.append(Citation2(
-                pk=f"PMID:{citation.citation_id}",
-                old_id=citation.pk,
-                source="PMID",
-                index=citation.citation_id,
-                data_json=citation_json
-            ))
+            dest_source = "PMID"
+
         elif source == "C":
-            all_citation_2s.append(Citation2(
-                pk=f"PMCID:PMC{citation.citation_id}",
-                old_id=citation.pk,
-                source="PMCID",
-                index=citation.citation_id,
-                data_json=citation_json
-            ))
+            dest_source = "PMCID"
+            if not dest_index.startswith("PMC"):
+                dest_index = f"PMC{dest_index}"
+
         elif source == "N":
-            all_citation_2s.append(Citation2(
-                pk=f"{citation.citation_id}",
-                old_id=citation.pk,
-                source="NBK",
-                index=citation.citation_id,
-                data_json=citation_json
-            ))
+            dest_source = "BookShelf"
+            if not dest_index.startswith("NBK"):
+                dest_index = f"NBK{dest_index}"
+
+        dest_id = f"{dest_source}:{dest_index}"
+        all_citation_2s.append(Citation2(
+            pk=dest_id,
+            old_id=citation.pk,
+            source=dest_source,
+            index=dest_index,
+            data_json=citation_json
+        ))
+        citation_map[citation.pk] = dest_id
+
     Citation2.objects.bulk_create(objs=all_citation_2s, ignore_conflicts=True, batch_size=1000)
     print(f"Completed {len(all_citation_2s)} migrations")
 
 
-def migrate_gene_symbol_citations(apps, schema_editor):
     all_gene_symbol_citations = list()
     GeneSymbolCitation = apps.get_model("annotation", "GeneSymbolCitation")
-    Citation2 = apps.get_model("annotation", "Citation2")
     for gene_symbol_citation in GeneSymbolCitation.objects.all():
         if len(all_gene_symbol_citations) % 1000 == 0:
             print(f"Migrated {len(all_gene_symbol_citations)} gene_symbol_citation")
         old_id = gene_symbol_citation.citation_id
-        new_citation = Citation2.objects.get(old_id=old_id)
-        gene_symbol_citation.citation2 = new_citation
+        gene_symbol_citation.citation2_id = citation_map[old_id]
         all_gene_symbol_citations.append(gene_symbol_citation)
     GeneSymbolCitation.objects.bulk_update(objs=all_gene_symbol_citations, fields=['citation2'], batch_size=1000)
     print(f"Completed {len(all_gene_symbol_citations)} migrations")
 
 
-def migrate_clinvar_citations(apps, schema_editor):
-    print("Migrating ClinVarCitations")
-    all_clinvar_citations = list()
     ClinVarCitation = apps.get_model("annotation", "ClinVarCitation")
-    Citation2 = apps.get_model("annotation", "Citation2")
-
-    print("Preparing old_id to new_id mapping")
-    citation_map = dict()
-    for mapping in Citation2.objects.all().values_list('old_id', 'id'):
-        citation_map[mapping[0]] = mapping[1]
-
+    all_clinvar_citations = list()
     for clinvar_citation in ClinVarCitation.objects.filter(citation__isnull=False):
-        #if len(all_clinvar_citations) % 1000 == 0:
-        #    print(f"Migrated {len(all_clinvar_citations)} clinvar_citations")
         old_id = clinvar_citation.citation_id
         clinvar_citation.citation2_id = citation_map[old_id]
         all_clinvar_citations.append(clinvar_citation)
-    print(f"About to bulk update {len(all_clinvar_citations)} clinvar_citations - this may take a very long time")
+    print(f"About to bulk update {len(all_clinvar_citations)} clinvar_citations - this may take a few minutes")
     ClinVarCitation.objects.bulk_update(objs=all_clinvar_citations, fields=['citation2'], batch_size=10000)
     print(f"Completed {len(all_clinvar_citations)} migrations")
+
+
+def _unmigrate_citations(apps, schema_editor):
+    Citation2 = apps.get_model("annotation", "Citation2")
+    GeneSymbolCitation = apps.get_model("annotation", "GeneSymbolCitation")
+    ClinVarCitation = apps.get_model("annotation", "ClinVarCitation")
+
+    ClinVarCitation.objects.all().update(citation2=None)
+    GeneSymbolCitation.objects.all().update(citation2=None)
+    Citation2.objects.all().delete()
 
 
 
@@ -96,7 +97,5 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        #migrations.RunPython(duplicate_citations),
-        #migrations.RunPython(migrate_gene_symbol_citations),
-        migrations.RunPython(migrate_clinvar_citations)
+        migrations.RunPython(_migrate_citations, _unmigrate_citations)
     ]

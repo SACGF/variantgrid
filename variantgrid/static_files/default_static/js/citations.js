@@ -81,18 +81,36 @@ let CitationsManager = (function() {
             });
         },
 
+        prettyId(citation_id) {
+            return `${citation_id}`.replace(':', ': ').replace('  ', ' ');
+        },
+
         renderData(citation) {
             let citDom = $('<div>');
+
+            if (citation.error) {
+                if (citation.id) {
+                    citDom.html([
+                        $('<div>', {text: citation.id}),
+                        $('<div>', {text: citation.error, class: 'text-danger'})
+                    ])
+                } else {
+                    citDom.html($('<div>', {html: citation.error, class: 'text-danger'}));
+                }
+                return citDom;
+            }
+
             let year = citation.year;
 
             let authorShort = citation.authors_short;
             let title = citation.title || 'Could not load title';
+            let prettyId = this.prettyId(citation.id);
 
             let linkRow = [];
             if (citation.external_url) {
-                linkRow.push($('<a>', {href: citation.external_url, target: '_blank', class:'source external-link', text: `${citation.id}`}));
+                linkRow.push($('<a>', {href: citation.external_url, target: '_blank', class:'source external-link', text: prettyId}));
             } else {
-                linkRow.push($('<span>', {text: `${citation.id}`}));
+                linkRow.push($('<span>', {text: prettyId}));
             }
             if (authorShort) {
                 let text = authorShort;
@@ -116,9 +134,10 @@ let CitationsManager = (function() {
             }, linkDom);
             linkDom.appendTo(citDom);
 
+            let safeId = citation.id.replace(':','_');
             if (citation.abstract || !citation.singleAuthor || citation.journal) {
-                $('<a>', {class: 'toggle-link d-block', 'data-toggle':"collapse", href:`#detail-${citation.id}`, text: 'Toggle detail'}).appendTo(citDom);
-                let detailContainer = $('<div>', {class: 'collapse', id:`detail-${citation.id}`}).appendTo(citDom);
+                $('<a>', {class: 'toggle-link d-block', 'data-toggle':"collapse", href:`#detail-${safeId}`, text: 'Toggle detail'}).appendTo(citDom);
+                let detailContainer = $('<div>', {class: 'collapse', id:`detail-${safeId}`}).appendTo(citDom);
                 if (citation.journal) {
                     $('<p>', {class: 'journal', text: citation.journal}).appendTo(detailContainer);
                 }
@@ -128,7 +147,27 @@ let CitationsManager = (function() {
                 $('<p>', {class: 'abstract', text: citation.abstract && citation.abstract.length ? citation.abstract : 'Could not fetch abstract'}).appendTo(detailContainer);
             }
             return citDom;
+        },
 
+        citationDomFor(dbRef) {
+            let citation_id = null;
+            if (typeof(dbRef) == 'string' && dbRef.startsWith('PMID')) {
+                citation_id = dbRef;
+            } else {
+                if (dbRef.internal_id) {
+                    citation_id = dbRef.internal_id;
+                } else if (dbRef.db in ['PMID', 'PMCID', 'BookShelf']) {
+                    citation_id = dbRef.id;
+                }
+            }
+            if (citation_id) {
+                return $('<div>', {'data-citation-id': citation_id, html: [
+                    $('<span>', {text:`${this.prettyId(dbRef.id)}`}),
+                    $('<span>', {text:' Loading...', class:'text-muted'})
+                ]});
+            } else {
+                return null;
+            }
         }
     };
 

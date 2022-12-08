@@ -531,6 +531,7 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
             genes_canonical_transcripts = get_genes_canonical_transcripts(variant, annotation_version)
 
             clinvar_qs = ClinVar.objects.filter(variant=variant, version=annotation_version.clinvar_version)
+            clinvar: Optional[ClinVar] = None
             try:
                 clinvar = clinvar_qs.get()
             except ClinVar.MultipleObjectsReturned:
@@ -542,7 +543,8 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
                 pass
 
             if clinvar:
-                clinvar_citations = [{'idx': c.citation_id, 'db': c.get_citation_source_display()} for c in clinvar.get_citations()]
+                # FIXME, make it so we can load citations without fetching them
+                clinvar_citations = clinvar.citation_ids
                 num_clinvar_citations = len(clinvar_citations)
         except:  # May not have been annotated?
             log_traceback()
