@@ -25,10 +25,11 @@ class Command(BaseCommand):
                              "be specified together"
 
         parser.add_argument('--force', action="store_true", help="Force create new GeneAnnotation for same release")
+        parser.add_argument('--ontology-version', type=int, help=gar_ov_dbsnfp_help)
+        parser.add_argument('--dbnsfp-gene-version', help=gar_ov_dbsnfp_help)
+
         group = parser.add_mutually_exclusive_group(required=True)
         group.add_argument('--gene-annotation-release', type=int, help=gar_ov_dbsnfp_help)
-        group.add_argument('--ontology-version', type=int, help=gar_ov_dbsnfp_help)
-        group.add_argument('--dbnsfp-gene-version', help=gar_ov_dbsnfp_help)
         group.add_argument('--missing', action="store_true",
                            help="Automatically create for latest AnnotationVersions for each build if missing")
         group.add_argument('--add-new-to-existing', action="store_true",
@@ -67,7 +68,8 @@ class Command(BaseCommand):
             if not ov_id:
                 raise ValueError("You must specify ontology-version when gene-annotation-release is specified")
             ontology_version = OntologyVersion.objects.get(pk=ov_id)
-            dbnsfp_gene_version = DBNSFPGeneAnnotationVersion.objects.get(pk=dbnsfp_gene_version_id)
+            if dbnsfp_gene_version_id:
+                dbnsfp_gene_version = DBNSFPGeneAnnotationVersion.objects.get(pk=dbnsfp_gene_version_id)
             gene_annotation_release = GeneAnnotationRelease.objects.get(pk=gar_id)
             if not force and GeneAnnotationVersion.objects.filter(gene_annotation_release=gene_annotation_release).exists():
                 raise ValueError("Existing GeneAnnotationVersion for gene_annotation_release={} exists! Use --force?")

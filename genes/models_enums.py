@@ -36,3 +36,13 @@ class LRGRefSeqGeneCategory(models.TextChoices):
     ALIGNED_SELECTED = "S", 'aligned: Selected'
     ALIGNED_HISTORICAL = "H", "aligned: historical"
     REFERENCE_STANDARD = "R", "reference standard"
+
+
+class MANEStatus(models.TextChoices):
+    """
+    MANE Select = 1 transcript per gene
+    MANE Plus Clinical - additional transcripts for genes where MANE Select alone is not sufficient to report all
+                         Pathogenic or Likely Pathogenic clinical variants available in public resources.
+    """
+    MANE_SELECT = "M", 'MANE Select'
+    MANE_PLUS_CLINICAL = "C", "MANE Plus Clinical"

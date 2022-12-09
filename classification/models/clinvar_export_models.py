@@ -11,7 +11,7 @@ from classification.models import ClassificationModification, ConditionResolved
 from library.utils import first
 from snpdb.models import ClinVarKey, Allele
 from uicore.json.json_types import JsonObjType
-from uicore.json.validated_json import ValidatedJson
+from uicore.json.validated_json import ValidatedJson, JsonMessages
 
 CLINVAR_EXPORT_CONVERSION_VERSION = 4
 
@@ -65,7 +65,7 @@ class ClinVarExport(TimeStampedModel):
     submission_body_validated = models.JSONField(null=False, blank=False, default=dict)
 
     @property
-    def all_errors(self):
+    def all_errors(self) -> JsonMessages:
         return self.submission_grouping.all_messages.errors() + \
                self.submission_body.all_messages.errors()
 

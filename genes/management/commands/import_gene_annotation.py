@@ -157,25 +157,6 @@ class Command(BaseCommand):
             if not auto_linked:
                 print("Release not linked - you will have to manually do so via Django Admin")
 
-    @staticmethod
-    def _get_gene_and_transcript_version_pk_lookups(genome_build: GenomeBuild, annotation_consortium) -> Tuple[Dict, Dict]:
-        gene_version_qs = GeneVersion.objects.filter(genome_build=genome_build,
-                                                     gene__annotation_consortium=annotation_consortium)
-        gene_version_ids_by_accession = {}  # Uses version if non-zero
-        for (pk, gene_id, version) in gene_version_qs.values_list("pk", "gene_id", "version"):
-            if version:
-                gene_accession = f"{gene_id}.{version}"
-            else:
-                gene_accession = gene_id
-            gene_version_ids_by_accession[gene_accession] = pk
-
-        transcript_version_qs = TranscriptVersion.objects.filter(genome_build=genome_build,
-                                                                 transcript__annotation_consortium=annotation_consortium)
-        tv_values = transcript_version_qs.values_list("pk", "transcript_id", "version")
-        transcript_version_ids_by_accession = {f"{transcript_id}.{version}": pk
-                                                     for (pk, transcript_id, version) in tv_values}
-        return gene_version_ids_by_accession, transcript_version_ids_by_accession
-
     def _import_merged_data(self, genome_build: GenomeBuild, annotation_consortium, cdot_data: Dict):
         print("_import_merged_data")
 
@@ -185,7 +166,10 @@ class Command(BaseCommand):
         transcripts_qs = Transcript.objects.filter(annotation_consortium=annotation_consortium)
         known_transcript_ids = set(transcripts_qs.values_list("identifier", flat=True))
         hgnc_ids = set(HGNC.objects.all().values_list("pk", flat=True))
-        gene_version_ids_by_accession, transcript_version_ids_by_accession = self._get_gene_and_transcript_version_pk_lookups(genome_build, annotation_consortium)
+        gene_version_ids_by_accession = GeneVersion.id_by_accession(genome_build=genome_build,
+                                                                    annotation_consortium=annotation_consortium)
+        transcript_version_ids_by_accession = TranscriptVersion.id_by_accession(genome_build=genome_build,
+                                                                                annotation_consortium=annotation_consortium)
 
         new_gene_symbols = set()
         new_genes = []

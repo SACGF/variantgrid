@@ -37,7 +37,7 @@ from guardian.shortcuts import get_objects_for_user
 from lazy import lazy
 from requests import RequestException
 from genes.gene_coverage import load_gene_coverage_df
-from genes.models_enums import AnnotationConsortium, HGNCStatus, GeneSymbolAliasSource
+from genes.models_enums import AnnotationConsortium, HGNCStatus, GeneSymbolAliasSource, MANEStatus
 from library.constants import HOUR_SECS, WEEK_SECS
 from library.django_utils import SortByPKMixin
 from library.django_utils.django_partition import RelatedModelsPartitionModel
@@ -142,6 +142,13 @@ class HGNC(models.Model):
             uniprot_ids = self.uniprot_ids.split(",")
             ulist = list(UniProt.objects.filter(pk__in=uniprot_ids))
         return ulist
+
+    @staticmethod
+    def id_by_accession(hgnc_prefix=True) -> Dict:
+        pk_qs = HGNC.objects.all().values_list("pk", flat=True)
+        if hgnc_prefix:
+            return {f"HGNC:{pk}": pk for pk in pk_qs}
+        return {pk: pk for pk in pk_qs}
 
 
 class UniProt(models.Model):
@@ -530,6 +537,23 @@ class GeneVersion(models.Model):
             identifier, version = gene_accession, None
         return identifier, version
 
+    @staticmethod
+    def id_by_accession(genome_build: GenomeBuild = None, annotation_consortium=None) -> Dict[str, int]:
+        filter_kwargs = {}
+        if genome_build:
+            filter_kwargs["genome_build"] = genome_build
+        if annotation_consortium:
+            filter_kwargs["gene__annotation_consortium"] = annotation_consortium
+        gene_version_qs = GeneVersion.objects.filter(**filter_kwargs)
+        ids_by_accession = {}  # Uses version if non-zero
+        for (pk, gene_id, version) in gene_version_qs.values_list("pk", "gene_id", "version"):
+            if version:
+                gene_accession = f"{gene_id}.{version}"
+            else:
+                gene_accession = gene_id
+            ids_by_accession[gene_accession] = pk
+        return ids_by_accession
+
     def __str__(self):
         return f"{self.accession} ({self.gene_symbol}/{self.genome_build})"
 
@@ -790,13 +814,23 @@ class TranscriptVersion(SortByPKMixin, models.Model):
         if annotation_consortium:
             filter_kwargs["transcript__annotation_consortium"] = annotation_consortium
 
-        qs = TranscriptVersion.objects.all()
-        if filter_kwargs:
-            qs = qs.filter(**filter_kwargs)
+        qs = TranscriptVersion.objects.filter(**filter_kwargs)
         tv_by_id = defaultdict(dict)
         for pk, transcript_id, version in qs.values_list("pk", "transcript_id", "version"):
             tv_by_id[transcript_id][version] = pk
         return tv_by_id
+
+    @staticmethod
+    def id_by_accession(genome_build: GenomeBuild = None, annotation_consortium=None) -> Dict[str, int]:
+        filter_kwargs = {}
+        if genome_build:
+            filter_kwargs["genome_build"] = genome_build
+        if annotation_consortium:
+            filter_kwargs["transcript__annotation_consortium"] = annotation_consortium
+
+        qs = TranscriptVersion.objects.filter(**filter_kwargs)
+        tv_values = qs.values_list("pk", "transcript_id", "version")
+        return {f"{transcript_id}.{version}": pk for (pk, transcript_id, version) in tv_values}
 
     @staticmethod
     def filter_by_accession(accession, genome_build=None):
@@ -946,6 +980,13 @@ class TranscriptVersion(SortByPKMixin, models.Model):
         if self.pyhgvs_data:
             coords = f"{self.chrom}:{self.pyhgvs_data['start'] + 1}-{self.pyhgvs_data['end']} ({self.pyhgvs_data['strand']})"
         return coords
+
+    @lazy
+    def tags(self) -> List[str]:
+        """ 'tag' has been in cdot since 0.2.12 """
+        REMOVE_TAGS = {"basic"}  # This is on pretty much every Ensembl transcript
+        tag_list = self.data.get("tag", "").split(",")
+        return sorted(tag for tag in tag_list if tag not in REMOVE_TAGS)
 
     def get_contigs(self) -> Set[Contig]:
         raw_chrom = {self.pyhgvs_data["chrom"]}
@@ -2200,3 +2241,25 @@ class PfamSequenceIdentifier(models.Model):
             longest_transcript_versions = sorted(latest_transcript_versions, key=lambda tv: tv.length or -1, reverse=True)
             transcript = longest_transcript_versions[0].transcript
         return transcript
+
+
+class MANE(models.Model):
+    """ Matched Annotation from NCBI and EMBL-EBI (MANE)
+        @see https://www.ncbi.nlm.nih.gov/refseq/MANE/ """
+    ncbi_gene_version = models.ForeignKey(GeneVersion, related_name="mane_ncbi", null=True, on_delete=CASCADE)
+    ensembl_gene_version = models.ForeignKey(GeneVersion, related_name="mane_ensembl", null=True, on_delete=CASCADE)
+    hgnc = models.ForeignKey(HGNC, null=True, on_delete=CASCADE)
+    symbol = models.ForeignKey(GeneSymbol, on_delete=CASCADE)
+    refseq_transcript_version = models.ForeignKey(TranscriptVersion, related_name="mane_refseq",
+                                                  null=True, on_delete=CASCADE)
+    ensembl_transcript_version = models.ForeignKey(TranscriptVersion, related_name="mane_ensembl",
+                                                   null=True, on_delete=CASCADE)
+    status = models.CharField(max_length=1, choices=MANEStatus.choices)
+
+    def get_transcript_version(self, annotation_consortium: AnnotationConsortium) -> TranscriptVersion:
+        transcript_version = None
+        if annotation_consortium == AnnotationConsortium.REFSEQ:
+            transcript_version = self.refseq_transcript_version
+        elif annotation_consortium == AnnotationConsortium.ENSEMBL:
+            transcript_version = self.ensembl_transcript_version
+        return transcript_version
