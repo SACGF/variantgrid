@@ -5,7 +5,7 @@ from django.conf import settings
 from django.contrib.sites.models import Site
 
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
-from annotation.models import Citation2
+from annotation.models import Citation
 from annotation.models.damage_enums import FATHMMPrediction, \
     MutationTasterPrediction, Polyphen2Prediction, SIFTPrediction, \
     MutationAssessorPrediction, ALoFTPrediction
@@ -502,7 +502,7 @@ def get_literature(clinvar) -> str:
     literature_references: Optional[str] = None
     if clinvar:
         clinvar_citation_text_rows = []
-        citation:Citation2
+        citation:Citation
         for citation in clinvar.get_loaded_citations():
             citation_parts = [citation.authors_short]
             if citation.year:

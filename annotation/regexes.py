@@ -5,7 +5,6 @@ from re import RegexFlag
 from typing import List, Union, Match, Dict, Optional
 
 from annotation.models.models_citations import CitationSource2, CitationIdNormalized
-from library.log_utils import report_message
 from ontology.models import OntologyService, OntologyTerm
 
 

@@ -216,14 +216,15 @@ const Diff = (function() {
                     } else {
                         icon = $('<i class="fas fa-check-square" style="color:#6d6"></i>');
                     }
-                    let effectiveId = Citations.effectiveId(dbRef);
-                    let isDetailed = !!effectiveId;
+                    // let effectiveId = Citations.effectiveId(dbRef);
+                    // let isDetailed = !!effectiveId;
                     let th;
-                    if (dbRef.label) {
-                        th = $('<th>', {html: [icon, dbRef.label]}).appendTo(row);
-                    } else {
-                        th = $('<th>', {class: isDetailed ? `citation-row` : `simple-citation`, html: [icon, Citations.renderDbRef(dbRef)]}).appendTo(row);
-                    }
+                    // if (dbRef.label) {
+                    //     th = $('<th>', {html: [icon, dbRef.label]}).appendTo(row);
+                    // } else {
+                    // th = $('<th>', {class: isDetailed ? `citation-row` : `simple-citation`, html: [icon, CitationsManager.citationDomFor(dbRef, true)]}).appendTo(row);
+                    th = $('<th>', {class: `citation-row`, html: [icon, CitationsManager.defaultManager.citationDomFor(dbRef, true)]}).appendTo(row);
+                    //}
                     let hasCount = 0;
                     let hasnotCount = 0;
                     includedVersions.filter(v => this.isIncluded(v)).forEach((v, index) => {
@@ -263,7 +264,7 @@ const Diff = (function() {
                 });
             };
             renderDbRefCompare = renderDbRefCompare.bind(this);
-            new Citations().refresh();
+            //new Citations().refresh();
 
             //var percent = Math.floor(100 / Math.max(1, this.versions.length));
             includedVersions.forEach((v, index) => {
@@ -343,6 +344,10 @@ const Diff = (function() {
                     includedVersions.forEach((v, index) => {
                         let db_refs = (v[key] || {}).db_refs;
                         if (db_refs) {
+                            for (let db_ref of db_refs) {
+                                CitationsManager.normalizeInPlace(db_ref);
+                            }
+
                             for (let db_ref of db_refs) {
                                 let ref_details = all_db_refs[db_ref.id];
 

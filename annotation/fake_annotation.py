@@ -7,9 +7,9 @@ from django.conf import settings
 from django.db.models.fields import IntegerField, TextField
 from django.utils import timezone
 
-from annotation.models import ClinVarReviewStatus, CitationSource, GeneAnnotationRelease, Citation2
+from annotation.models import ClinVarReviewStatus, GeneAnnotationRelease
 from annotation.models.models import VariantAnnotationVersion, ClinVarVersion, \
-    HumanProteinAtlasAnnotationVersion, AnnotationVersion, ClinVar, Citation, ClinVarCitation, \
+    HumanProteinAtlasAnnotationVersion, AnnotationVersion, ClinVar, ClinVarCitation, \
     ClinVarCitationsCollection, VariantAnnotation, AnnotationRun, AnnotationRangeLock, GeneAnnotationVersion
 from annotation.models.models_citations import CitationIdNormalized, CitationSource2
 from genes.models import GeneAnnotationImport
@@ -112,7 +112,7 @@ def create_fake_clinvar_data(clinvar_version: ClinVarVersion):
     ClinVarCitation.objects.get_or_create(clinvar_citations_collection=cvcc,
                                           clinvar_variation_id=clinvar_variation_id,
                                           clinvar_allele_id=clinvar_allele_id,
-                                          citation2=citation)
+                                          citation=citation)
 
 
 def create_fake_variant_annotation(variant, variant_annotation_version: VariantAnnotationVersion):

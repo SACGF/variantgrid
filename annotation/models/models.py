@@ -1,4 +1,3 @@
-import json
 import logging
 import os
 import re
@@ -12,7 +11,6 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
 from django.db import models, transaction, connection
-from django.db.models import QuerySet
 from django.db.models.deletion import PROTECT, CASCADE, SET_NULL
 from django.db.models.signals import pre_delete
 from django.dispatch.dispatcher import receiver
@@ -26,8 +24,8 @@ from psqlextra.types import PostgresPartitioningMethod
 from annotation.external_search_terms import get_variant_search_terms, get_variant_pubmed_search_terms
 from annotation.models.damage_enums import Polyphen2Prediction, FATHMMPrediction, MutationTasterPrediction, \
     SIFTPrediction, PathogenicityImpact, MutationAssessorPrediction, ALoFTPrediction
-from annotation.models.models_citations import Citation2, CitationFetchRequest, CitationFetchResponse
-from annotation.models.models_enums import AnnotationStatus, CitationSource, \
+from annotation.models.models_citations import Citation, CitationFetchRequest, CitationFetchResponse
+from annotation.models.models_enums import AnnotationStatus, \
     VariantClass, ColumnAnnotationCategory, VEPPlugin, VEPCustom, ClinVarReviewStatus, VEPSkippedReason, \
     ManualVariantEntryType, HumanProteinAtlasAbundance, EssentialGeneCRISPR, EssentialGeneCRISPR2, EssentialGeneGeneTrap
 from genes.models import GeneSymbol, Gene, TranscriptVersion, Transcript, GeneAnnotationRelease
@@ -139,12 +137,12 @@ class ClinVar(models.Model):
     def get_loaded_citations(self) -> CitationFetchResponse:
         cvc_qs = ClinVarCitation.objects.filter(clinvar_variation_id=self.clinvar_variation_id,
                                                 clinvar_allele_id=self.clinvar_allele_id)
-        return CitationFetchRequest.fetch_all_now(Citation2.objects.filter(clinvarcitation__in=cvc_qs))
+        return CitationFetchRequest.fetch_all_now(Citation.objects.filter(clinvarcitation__in=cvc_qs))
 
     @property
     def citation_ids(self) -> List[str]:
         return sorted(set(ClinVarCitation.objects.filter(clinvar_variation_id=self.clinvar_variation_id,
-                                       clinvar_allele_id=self.clinvar_allele_id).values_list('citation2_id', flat=True)))
+                                       clinvar_allele_id=self.clinvar_allele_id).values_list('citation_id', flat=True)))
 
     # def get_citations(self) -> QuerySet[Citation]:
     #     cvc_qs = ClinVarCitation.objects.filter(clinvar_variation_id=self.clinvar_variation_id,
@@ -159,85 +157,11 @@ class ClinVarCitationsCollection(models.Model):
     cached_web_resource = models.ForeignKey('CachedWebResource', null=True, on_delete=CASCADE)
 
 
-class Citation(models.Model):
-    citation_source = models.CharField(max_length=1, choices=CitationSource.choices)
-    citation_id = models.TextField()
-
-    class Meta:
-        unique_together = ("citation_source", "citation_id")
-
-    def unique_code(self):
-        return f"{self.citation_source}_{self.citation_id}"
-
-    def __str__(self):
-        citation_source = self.get_citation_source_display()
-        return f"{self.citation_id} ({citation_source})"
-
-    def ref_id(self):
-        citation_source = self.get_citation_source_display()
-        return f"{citation_source}:{self.citation_id}"
-
-    @property
-    def sort_key(self):
-        return self.citation_source, self.citation_id.rjust(10, '0')
-
-    def __lt__(self, other):
-        return self.sort_key < other.sort_key
-
-    @staticmethod
-    def citations_from_text(text):
-        """ returns a list of (unsaved) Citation objects from text """
-        # TODO replace with code from dbregexes
-
-        citation_source_codes = dict({k.lower(): v for k, v in CitationSource.CODES.items()})
-        regex_pattern = r"(%s):\s*(\d+)" % '|'.join(citation_source_codes)
-        pattern = re.compile(regex_pattern, flags=re.IGNORECASE)  # @UndefinedVariable
-
-        citations_list = []
-        if text:
-            # Find all PUBMED
-            for m in pattern.finditer(text):
-                citation_source_string = m.group(1)
-                citation_id = m.group(2)
-
-                citation_source = citation_source_codes.get(citation_source_string.lower())
-                if citation_source:
-                    citation, _ = Citation.objects.get_or_create(citation_source=citation_source,
-                                                                 citation_id=citation_id)
-                    citations_list.append(citation)
-
-        return citations_list
-
-
 class ClinVarCitation(models.Model):
     clinvar_citations_collection = models.ForeignKey(ClinVarCitationsCollection, on_delete=CASCADE)
     clinvar_variation_id = models.IntegerField()
     clinvar_allele_id = models.IntegerField()
-    citation = models.ForeignKey(Citation, null=True, on_delete=CASCADE)
-    citation2 = models.ForeignKey(Citation2, null=True, on_delete=CASCADE)
-
-
-class CitationException(Exception):
-    pass
-
-
-class CachedCitation(TimeStampedModel):
-    citation = models.OneToOneField(Citation, null=True, on_delete=CASCADE)
-    json_string = models.TextField()
-    has_error = models.BooleanField(blank=True, null=False, default=False)
-
-    def get_record_or_fail(self):
-        if self.has_error:
-            raise CitationException(self.json_string)
-        return self.get_record()
-
-    def get_record(self):
-        """ You can cache this by setting _record """
-        record = getattr(self, "_record", None)
-        if not record:
-            record = json.loads(self.json_string)
-            self._record = record
-        return record
+    citation = models.ForeignKey(Citation, on_delete=CASCADE)
 
 
 class DBNSFPGeneAnnotationVersion(TimeStampedModel):
@@ -1314,7 +1238,6 @@ class CachedWebResource(TimeStampedModel):
 class GeneSymbolCitation(models.Model):
     gene_symbol = models.ForeignKey(GeneSymbol, on_delete=CASCADE)
     citation = models.ForeignKey(Citation, null=True, on_delete=CASCADE)
-    citation2 = models.ForeignKey(Citation2, null=True, on_delete=CASCADE)
 
     class Meta:
         unique_together = ('gene_symbol', 'citation')

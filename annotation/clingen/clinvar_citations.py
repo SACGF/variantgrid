@@ -5,7 +5,7 @@ from typing import Dict, Set
 
 import pandas as pd
 
-from annotation.models import Citation2
+from annotation.models import Citation
 from annotation.models.models import ClinVarCitation, ClinVarCitationsCollection
 from annotation.models.models_citations import CitationIdNormalized
 
@@ -36,11 +36,11 @@ def store_clinvar_citations_from_web(cached_web_resource):
         cvc = ClinVarCitation(clinvar_citations_collection=clinvar_citations_collection,
                               clinvar_variation_id=row[VARIATION_ID],
                               clinvar_allele_id=row[ALLELE_ID],
-                              citation2_id=citation_id.full_id)
+                              citation_id=citation_id.full_id)
         rows.append(cvc)
 
     logging.info(f"About to ensure existence of {len(citation_ids)} citations")
-    Citation2.objects.bulk_create(objs=[citation_id.for_bulk_create() for citation_id in citation_ids], batch_size=2000, ignore_conflicts=True)
+    Citation.objects.bulk_create(objs=[citation_id.for_bulk_create() for citation_id in citation_ids], batch_size=2000, ignore_conflicts=True)
 
     num_citations = len(rows)
     logging.info("Read %d records, inserting into DB", num_citations)

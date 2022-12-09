@@ -1,7 +1,7 @@
 from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import List, Dict, Iterable, Set, Tuple, Any
-from annotation.models import CitationSource, Citation2, CitationFetchRequest
+from annotation.models import Citation, CitationFetchRequest
 from annotation.models.models_citations import CitationIdNormalized, CitationSource2
 from classification.enums import SpecialEKeys
 from classification.models import ClassificationModification
@@ -28,7 +28,7 @@ class CitationCounter:
     def citation_ids(self) -> List[str]:
         return [citation_id.full_id for citation_id in sorted(set(self.all_citations.keys()))]
 
-    def ordered_references(self) -> Iterable[Tuple[Citation2, List[Any]]]:
+    def ordered_references(self) -> Iterable[Tuple[Citation, List[Any]]]:
         citation_response = CitationFetchRequest.fetch_all_now(list(self.all_citations.keys()))
         for key in sorted(set(self.all_citations.keys())):
             labs = self.all_citations.get(key)

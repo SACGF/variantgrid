@@ -23,8 +23,8 @@ from lazy import lazy
 
 from analysis.models import VariantTag
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
-from annotation.models import Citation2
-from annotation.models.models import AnnotationVersion, Citation, VariantAnnotation, VariantAnnotationVersion, \
+from annotation.models import Citation
+from annotation.models.models import AnnotationVersion, VariantAnnotation, VariantAnnotationVersion, \
     DBNSFPGeneAnnotationVersion, DBNSFPGeneAnnotation
 from annotation.models.molecular_consequence_enums import MolecularConsequenceColors
 from classification.enums import ShareLevel
@@ -174,7 +174,7 @@ class GeneSymbolViewInfo:
 
     @lazy
     def citations_ids(self) -> List[str]:
-        return sorted(set(Citation2.objects.filter(genesymbolcitation2__gene_symbol=self.gene_symbol).values_list('id', flat=True)))
+        return sorted(set(Citation.objects.filter(genesymbolcitation__gene_symbol=self.gene_symbol).values_list('id', flat=True)))
 
     @lazy
     def dbnsfp_gene_annotation(self) -> Optional[DBNSFPGeneAnnotation]:

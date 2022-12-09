@@ -149,7 +149,7 @@ let CitationsManager = (function() {
             return citDom;
         },
 
-        citationDomFor(dbRef) {
+        citationDomFor(dbRef, renderNonCitations) {
             let citation_id = null;
             if (typeof(dbRef) == 'string' && dbRef.startsWith('PMID')) {
                 citation_id = dbRef;
@@ -165,8 +165,12 @@ let CitationsManager = (function() {
                     $('<span>', {text:`${this.prettyId(dbRef.id)}`}),
                     $('<span>', {text:' Loading...', class:'text-muted'})
                 ]});
-            } else {
-                return null;
+            } else if (renderNonCitations) {
+                let citationDom = $('<div>', {class: 'citation'});
+                if (dbRef.id && dbRef.url) {
+                    $('<a>', {class: 'no-details', text: dbRef.id, href: dbRef.url, target: '_blank'}).appendTo(citationDom);
+                }
+                return citationDom;
             }
         }
     };
@@ -174,6 +178,31 @@ let CitationsManager = (function() {
     return CitationsManager;
 })();
 
-CitationsManager.prototype.debounceRequestData = debounce(CitationsManager.prototype.requestData);
+CitationsManager.dbMigration = {
+    "PUBMED": "PMID",
+    "PMC": "PMCID",
+    "NCBIBOOKSHELF": "Bookshelf ID"
+}
 
+CitationsManager.normalizeInPlace = function(dbRef) {
+    if (dbRef.internal_id) {
+        // only need to normalize old records, e.g. the ones with internal ID
+        let migratedSource = CitationsManager.dbMigration[dbRef.db.toUpperCase()];
+        if (migratedSource) {
+            let idx = `${dbRef.idx}`;
+            if (migratedSource == "PMID") {
+                // no special action
+            } else if (migratedSource == "PMCID") {
+                idx = `PMC${idx}`;
+            } else if (migratedSource == "Bookshelf ID") {
+                idx = `NBK${idx}`;
+            }
+            dbRef.db = migratedSource;
+            dbRef.idx = idx;
+            dbRef.id = `${migratedSource}:${idx}`;
+        }
+    }
+}
+
+CitationsManager.prototype.debounceRequestData = debounce(CitationsManager.prototype.requestData);
 CitationsManager.defaultManager = new CitationsManager();

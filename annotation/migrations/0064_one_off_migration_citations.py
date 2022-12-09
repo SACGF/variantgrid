@@ -55,14 +55,13 @@ def _migrate_citations(apps, schema_editor):
     Citation2.objects.bulk_create(objs=all_citation_2s, ignore_conflicts=True, batch_size=1000)
     print(f"Completed {len(all_citation_2s)} migrations")
 
-
     all_gene_symbol_citations = list()
     GeneSymbolCitation = apps.get_model("annotation", "GeneSymbolCitation")
     for gene_symbol_citation in GeneSymbolCitation.objects.all():
         if len(all_gene_symbol_citations) % 1000 == 0:
             print(f"Migrated {len(all_gene_symbol_citations)} gene_symbol_citation")
         old_id = gene_symbol_citation.citation_id
-        gene_symbol_citation.citation2_id = citation_map[old_id]
+        gene_symbol_citation.citation_id = citation_map[old_id]
         all_gene_symbol_citations.append(gene_symbol_citation)
     GeneSymbolCitation.objects.bulk_update(objs=all_gene_symbol_citations, fields=['citation2'], batch_size=1000)
     print(f"Completed {len(all_gene_symbol_citations)} migrations")
@@ -72,7 +71,7 @@ def _migrate_citations(apps, schema_editor):
     all_clinvar_citations = list()
     for clinvar_citation in ClinVarCitation.objects.filter(citation__isnull=False):
         old_id = clinvar_citation.citation_id
-        clinvar_citation.citation2_id = citation_map[old_id]
+        clinvar_citation.citation_id = citation_map[old_id]
         all_clinvar_citations.append(clinvar_citation)
     print(f"About to bulk update {len(all_clinvar_citations)} clinvar_citations - this may take a few minutes")
     ClinVarCitation.objects.bulk_update(objs=all_clinvar_citations, fields=['citation2'], batch_size=10000)
@@ -87,7 +86,6 @@ def _unmigrate_citations(apps, schema_editor):
     ClinVarCitation.objects.all().update(citation2=None)
     GeneSymbolCitation.objects.all().update(citation2=None)
     Citation2.objects.all().delete()
-
 
 
 class Migration(migrations.Migration):

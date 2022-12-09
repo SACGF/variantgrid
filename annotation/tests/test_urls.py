@@ -4,7 +4,8 @@ from django.contrib.auth.models import User
 
 from annotation.fake_annotation import get_fake_annotation_version, create_fake_clinvar_data, \
     create_fake_variant_annotation
-from annotation.models import HumanProteinAtlasTissueSample, ClinVar, Citation, CitationSource
+from annotation.models import HumanProteinAtlasTissueSample, ClinVar, Citation
+from annotation.models.models_citations import CitationSource2
 from library.django_utils.unittest_utils import URLTestCase
 from snpdb.models import Variant
 from snpdb.models.models_genome import GenomeBuild
@@ -32,13 +33,13 @@ class Test(URLTestCase):
         q = Variant.get_contigs_q(cls.grch37) & Variant.get_no_reference_q()
         variant = Variant.objects.filter(q).first()
         create_fake_variant_annotation(variant, cls.annotation_version_grch37.variant_annotation_version)
-        citation = Citation.objects.filter(citation_source=CitationSource.PUBMED).first()
-        pubmed_citation = f"PubMed:{citation.citation_id}"
+        citation = Citation.objects.filter(source=CitationSource2.PUBMED).first()
+        pubmed_citation = citation.id
 
         cls.clinvar_id = clinvar.pk
         cls.variant_string = str(variant)
-        cls.pubmed_citations = "&".join((str(c) for c in Citation.objects.all().values_list("citation_id", flat=True)[:2]))
-        cls.citations_ids_list = "/".join((str(c) for c in Citation.objects.all().values_list("pk", flat=True)[:2]))
+        cls.pubmed_citations = "&".join((str(c) for c in Citation.objects.all().values_list("id", flat=True)[:2]))
+        cls.citations_ids_list = "/".join((str(c) for c in Citation.objects.all().values_list("id", flat=True)[:2]))
         cls.citations_ids_list_pubmed = pubmed_citation
 
     def testUrls(self):
@@ -53,9 +54,6 @@ class Test(URLTestCase):
             ("view_annotation_descriptions", {}, 200),
             ("about_new_vep_columns", {}, 200),
             ("view_annotation_version_details", {"annotation_version_id": self.annotation_version_grch37.pk}, 200),
-            # ("clinvar_citations_tab", {"clinvar_id": self.clinvar_id}, 200),
-            # ("pubmed_citations_tab", {"pubmed_citations": self.pubmed_citations}, 200),
-            ("citations_tab", {"citations_ids_list": self.citations_ids_list}, 200),
             ("citations_json", {"citations_ids_list": self.citations_ids_list_pubmed}, 200),
             # API
             ("api_variant_annotation", {"genome_build_name": self.grch37.name, "variant_string": self.variant_string}, 200),

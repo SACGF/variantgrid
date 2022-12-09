@@ -1,9 +1,0 @@
-{% load citation_tags %}
-
-{% if citations %}
-    <table>
-    {% for citation in citations %}
-        <tr><td>{% clinvar_citation_abstract citation %}
-    {% endfor %}
-    </table>
-{% endif %} 

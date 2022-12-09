@@ -20,11 +20,11 @@ from htmlmin.decorators import not_minified_response
 from annotation.annotation_versions import get_variant_annotation_version
 from annotation.manual_variant_entry import create_manual_variants
 from annotation.models import AnnotationVersion, AnnotationRun, VariantAnnotationVersion, \
-    VariantAnnotationVersionDiff, Citation2
-from annotation.models.models import CachedWebResource, Citation, HumanProteinAtlasAnnotationVersion, \
+    VariantAnnotationVersionDiff, Citation
+from annotation.models.models import CachedWebResource, HumanProteinAtlasAnnotationVersion, \
     HumanProteinAtlasAnnotation, ColumnVEPField, DBNSFPGeneAnnotationVersion
 from annotation.models.models_citations import CitationFetchRequest
-from annotation.models.models_enums import AnnotationStatus, CitationSource
+from annotation.models.models_enums import AnnotationStatus
 from annotation.models.models_version_diff import VersionDiff
 from annotation.tasks.annotate_variants import annotation_run_retry
 from annotation.vep_annotation import get_vep_command
@@ -487,33 +487,6 @@ def create_manual_variant_entry_from_text(request, genome_build_name, variants_t
     mvec = create_manual_variants(request.user, genome_build, variants_text)
     return redirect('watch_manual_variant_entry', pk=mvec.pk)
 
-# These specific citation tabs do not appear to be referenced anymore
-
-# def clinvar_citations_tab(request, clinvar_id):
-#     clinvar = get_object_or_404(ClinVar, pk=clinvar_id)
-#
-#     context = {"clinvar": clinvar,
-#                "citations": clinvar.get_loaded_citations()}
-#     return render(request, "annotation/citations_tab.html", context)
-#
-#
-# @cache_page(WEEK_SECS)
-# def pubmed_citations_tab(request, pubmed_citations):
-#     """ pubmed_citations looks like "25722852&26702340" """
-#
-#     citations = []
-#     for pubmed_id in pubmed_citations.split('&'):
-#         citation, _ = Citation.objects.get_or_create(citation_source=CitationSource.PUBMED,
-#                                                      citation_id=pubmed_id)
-#         citations.append(citation)
-#     return _citations_tab(request, citations)
-#
-
-def citations_tab(request, citations_ids_list):
-    # FIXME, best that we don't even retrieve the citations here, and just use citation HTML auto-loading
-    citation_ids = citations_ids_list.split("/")
-    return render(request, "annotation/citations_tab.html", {"citations": CitationFetchRequest.fetch_all_now(citation_ids).all_citations})
-
 
 def view_citation(request, citation_id: str):
     """
@@ -525,7 +498,7 @@ def view_citation(request, citation_id: str):
     return render(request, "annotation/citation.html", {"citation": CitationFetchRequest.fetch_all_now([citation_id]).first_citation})
 
 
-def simple_citation_html(cd: Citation2) -> str:
+def simple_citation_html(cd: Citation) -> str:
     return render_to_string('annotation/citation_simple.html', {"citation": cd}).replace('\n', '').strip()
 
 

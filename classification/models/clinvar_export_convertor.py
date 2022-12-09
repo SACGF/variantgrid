@@ -1,7 +1,8 @@
 from dataclasses import dataclass
 from typing import List, Any, Mapping, TypedDict, Optional
 from lazy import lazy
-from annotation.models import CitationSource, CitationFetchRequest
+from annotation.models import CitationFetchRequest
+from annotation.models.models_citations import CitationSource2
 from annotation.regexes import db_citation_regexes
 from classification.enums import SpecialEKeys, EvidenceKeyValueType, ShareLevel
 from classification.models import ClassificationModification, EvidenceKeyMap, EvidenceKey, \
@@ -94,7 +95,7 @@ class ClinVarExportData:
     @property
     def is_new(self):
         """ Indicates if this is the first time the record has been submitted.
-            Important, this is not the same as already having a SCV """
+            Important, this is not the same as already having an SCV """
         return not (self.clinvar_export.pk and self._previous_submission)
 
     @property
@@ -122,7 +123,7 @@ class ClinVarExportData:
 
     def submission_full(self) -> JsonObjType:
         """
-        JSON data including recordStatus and scv, not normally included in body as we don't want the assigning of a SCV
+        JSON data including recordStatus and scv, not normally included in body as we don't want the assigning of an SCV
         to generate a change
         :return:
         """
@@ -297,9 +298,9 @@ class ClinVarExportConverter:
         return self.clinvar_export_record.classification_based_on
 
     CITATION_SOURCE_TO_CLINVAR = {
-        CitationSource.PUBMED: "PubMed",
-        CitationSource.PUBMED_CENTRAL: "pmc",
-        CitationSource.NCBI_BOOKSHELF: "BookShelf"
+        CitationSource2.PUBMED: "PubMed",
+        CitationSource2.PUBMED_CENTRAL: "pmc",
+        CitationSource2.NCBI_BOOKSHELF: "Bookshelf"  # FIXME, don't know if this is what NCBI wants, waiting on email
     }
 
     @property

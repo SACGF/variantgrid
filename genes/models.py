@@ -36,7 +36,6 @@ from django_extensions.db.models import TimeStampedModel
 from guardian.shortcuts import get_objects_for_user
 from lazy import lazy
 from requests import RequestException
-
 from genes.gene_coverage import load_gene_coverage_df
 from genes.models_enums import AnnotationConsortium, HGNCStatus, GeneSymbolAliasSource
 from library.constants import HOUR_SECS, WEEK_SECS
@@ -1399,13 +1398,13 @@ class GeneSymbolWiki(Wiki):
 
         existing_citations = {}
         for gc in self.gene_symbol.genesymbolcitation_set.all():
-            existing_citations[gc.citation.unique_code()] = gc
+            existing_citations[gc.citation.pk] = gc
 
         gene_citation_ids_to_keep = []
-        for citation in Citation.citations_from_text(self.markdown):
-            gene_citation = existing_citations.get(citation.unique_code())
+        from annotation.models import CitationFetchRequest
+        for citation in CitationFetchRequest.fetch_all_now(self.markdown).all_citations:
+            gene_citation = existing_citations.get(citation.pk)
             if not gene_citation:
-                citation.save()
                 gene_citation = self.gene_symbol.genesymbolcitation_set.create(citation=citation)
             gene_citation_ids_to_keep.append(gene_citation.pk)
 
