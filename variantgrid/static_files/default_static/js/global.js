@@ -62,6 +62,10 @@ function enhanceAndMonitor() {
         }
     };
 
+    const ignoreSelectors = [
+        '.wiki-tag'
+    ];
+
     // setup a list of processors
     // they have a test (a selector for a node to meet)
     // then an action to perform over that node if the test is met
@@ -413,8 +417,17 @@ function enhanceAndMonitor() {
     // would be best only to do this if added element has data-toggle, but still too much code that doens't provide that
     const observer = new MutationObserver((mutationsList, observer) => {
         mutationsList.forEach((mutation) => {
+            let mutatedNode = $(mutation.target);
+            // leave 3rd party wigets alone
+            for (selector of ignoreSelectors) {
+                if (mutatedNode.parents(selector).length) {
+                    return;
+                }
+            }
+
             for (let node of mutation.addedNodes) {
                 node = $(node);
+
                 if (!node.attr('data-p')) {
                     checkNode($(node), true);
                     // add an attribute at the top level to stop items being processed multiple times
