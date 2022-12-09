@@ -34,6 +34,7 @@ from genes.models_enums import AnnotationConsortium, GeneSymbolAliasSource
 from library.constants import WEEK_SECS
 from library.django_utils import require_superuser, get_field_counts
 from library.log_utils import log_traceback
+from library.utils import first
 from ontology.models import OntologyTerm, OntologyService, OntologyImport, OntologyVersion
 from snpdb.models import VariantGridColumn, SomalierConfig, GenomeBuild, VCF, UserSettings, ColumnAnnotationLevel
 from variantgrid.celery import app
@@ -490,12 +491,24 @@ def create_manual_variant_entry_from_text(request, genome_build_name, variants_t
 
 def view_citation(request, citation_id: str):
     """
+    A dedicated page for a single citation, handy for testing.
+    :param request: The Request
+    :param citation_id: The full ID of the citation, e.g. PMID:4353345
+    :return: A stand alone page with the loaded citation details
+    """
+    # important, we don't actually retrieve the citation here
+    return render(request, "annotation/citation.html", {"citation": first(CitationFetchRequest.get_unfetched_citations([citation_id]))})
+
+
+def view_citation_detail(request, citation_id: str):
+    """
     A dedicated page for a single citation, handy for testing
     :param request: The Request
     :param citation_id: The full ID of the citation, e.g. PMID:4353345
     :return: A stand alone page with the loaded citation details
     """
-    return render(request, "annotation/citation.html", {"citation": CitationFetchRequest.fetch_all_now([citation_id]).first_citation})
+    return render(request, "annotation/citation_detail.html", {"citation": CitationFetchRequest.fetch_all_now([citation_id]).first_citation})
+
 
 
 def simple_citation_html(cd: Citation) -> str:

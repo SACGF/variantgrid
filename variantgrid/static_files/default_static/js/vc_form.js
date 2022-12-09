@@ -512,6 +512,7 @@ const VCForm = (function() {
                let blob = this.data[k];
                if (blob && blob['db_refs']) {
                    for (let ref of blob['db_refs']) {
+                       console.log(ref);
                        let dom = CitationsManager.defaultManager.citationDomFor(ref);
                        if (dom) {
                            elements.push(dom);

@@ -1,6 +1,6 @@
 from django.test.testcases import TestCase
 
-from annotation.regexes import db_ref_regexes, DbRegexes
+from annotation.regexes import db_ref_regexes, DbRegexes, db_citation_regexes
 
 
 class RegexTests(TestCase):
@@ -9,14 +9,14 @@ class RegexTests(TestCase):
         text = 'Hello PMID: #3432 There'
         results = db_ref_regexes.search(text)
         self.assertEqual(len(results), 1)
-        self.assertEqual(str(results[0]), 'PubMed:3432')
+        self.assertEqual(str(results[0]), 'PMID:3432')
 
     def test_comma_sep(self):
         text = 'Hello PMID 1111, 2222, this is something else 3333'
         results = db_ref_regexes.search(text)
         self.assertEqual(len(results), 2)
-        self.assertEqual(str(results[0]), 'PubMed:1111')
-        self.assertEqual(str(results[1]), 'PubMed:2222')
+        self.assertEqual(str(results[0]), 'PMID:1111')
+        self.assertEqual(str(results[1]), 'PMID:2222')
 
     def test_default(self):
         text = '12345'
@@ -64,7 +64,13 @@ class RegexTests(TestCase):
         text = 'NCBIBookShelf: NBK1426'
         results = db_ref_regexes.search(text)
         self.assertEqual(len(results), 1)
-        self.assertEqual(str(results[0]), 'NCBIBookShelf:NBK1426')
+        self.assertEqual(str(results[0]), 'Bookshelf ID:NBK1426')
+
+    def test_pmc(self):
+        text = 'PMCID:PMC123456'
+        results = db_citation_regexes.search(text)
+        self.assertEqual(len(results), 1)
+        self.assertEqual(str(results[0]), 'PMCID:PMC123456')
 
     def test_dividers(self):
         text = 'OMIM# 123456 PMID#23456 HPO:123456'
@@ -72,7 +78,7 @@ class RegexTests(TestCase):
         self.assertEqual(len(results), 3)
         self.assertEqual(str(results[0]), 'HP:0123456')
         self.assertEqual(str(results[1]), 'OMIM:123456')
-        self.assertEqual(str(results[2]), 'PubMed:23456')
+        self.assertEqual(str(results[2]), 'PMID:23456')
 
     def test_urls(self):
         text = "Here is a link (http://foo.com) and another one http://bar. That was the end of a sentance, lastly https://abc.com"

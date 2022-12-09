@@ -178,7 +178,6 @@ class CitationIdNormalized:
             index = f"NBK{index}"
         return CitationIdNormalized(use_source, index)
 
-
     @staticmethod
     def from_citation(citation: Citation):
         return CitationIdNormalized.from_parts(source=citation.source, index=citation.index)
@@ -294,11 +293,20 @@ class CitationFetchRequest:
     def fetch_all_now(citation_ids: Iterable[CitationRequest], cache_age: Optional[timedelta] = None) -> CitationFetchResponse:
         cfr = CitationFetchRequest(cache_age=cache_age)
         for citation_id in citation_ids:
-            cfr.queue(citation_id)
-        cfr.fetch_queue()
+            cfr._queue(citation_id)
+        cfr._fetch_queue()
         return CitationFetchResponse(cfr._all_citation_fetches + cfr.error_fetches)
 
-    def queue(self, citation_id: CitationRequest) -> CitationFetchEntry:
+    @staticmethod
+    def get_unfetched_citations(citation_ids: Iterable[CitationRequest]) -> List[Citation]:
+        cfr = CitationFetchRequest()
+        for citation_id in citation_ids:
+            cfr._queue(citation_id)
+        cfr._load_citation_stubs()
+        return [cfe.citation for cfe in cfr._all_citation_fetches if cfe.citation]
+
+
+    def _queue(self, citation_id: CitationRequest) -> CitationFetchEntry:
         citation: Optional[Citation] = None
         normalized: Optional[CitationIdNormalized] = None
         # handle a WHOLE slew of inputs
@@ -309,7 +317,7 @@ class CitationFetchRequest:
             if isinstance(citation_id, int) or (isinstance(citation_id, str) and citation_id.isnumeric()):
                 citation = Citation.objects.filter(old_id=int(citation_id)).first()
                 if not citation:
-                    # something's gone wrong, an old_Id was provided but we have no copy of it
+                    # something's gone wrong, an old_Id was provided, but we have no copy of it
                     invalid_id_fetch = CitationFetchEntry()
                     invalid_id_fetch.record_request_id(citation_id)
                     invalid_id_fetch.error = "Internal Error: could not load citation"
@@ -362,9 +370,9 @@ class CitationFetchRequest:
         self.id_to_fetch[normalized] = entry
         return entry
 
-    def fetch_now(self, citation_id: CitationRequest) -> CitationFetchEntry:
-        entry = self.queue(citation_id)
-        self.fetch_queue()
+    def _fetch_now(self, citation_id: CitationRequest) -> CitationFetchEntry:
+        entry = self._queue(citation_id)
+        self._fetch_queue()
         return entry
 
     def _load_citation_stubs(self):
@@ -381,9 +389,9 @@ class CitationFetchRequest:
                     # load that instead of loading from the Citation server
                     if existing.data_json and not existing.last_loaded:
                         if existing.source in {CitationSource2.PUBMED, CitationSource2.PUBMED_CENTRAL}:
-                            CitationFetchRequest.populate_from_entrez(existing, existing.data_json)
+                            CitationFetchRequest._populate_from_entrez(existing, existing.data_json)
                         elif existing.source == CitationSource2.NCBI_BOOKSHELF:
-                            CitationFetchRequest.populate_from_nbk(existing, existing.data_json)
+                            CitationFetchRequest._populate_from_nbk(existing, existing.data_json)
                         existing.last_loaded = now()
                         existing.save()
                         fetch.fetched = True
@@ -399,7 +407,7 @@ class CitationFetchRequest:
     def _all_citations_needing_loading(self):
         return [fetch for fetch in self._all_citation_fetches if fetch.should_refresh(self.refresh_before)]
 
-    def fetch_queue(self):
+    def _fetch_queue(self):
         self._load_citation_stubs()
 
         if all_ids := [fetch.normalised_id for fetch in self._all_citations_needing_loading]:
@@ -407,11 +415,11 @@ class CitationFetchRequest:
             for source, citations_ids_by_source in itertools.groupby(citations_by_source, key=lambda c: c.source):
                 citations_ids_by_source = list(citations_ids_by_source)
                 if source == CitationSource2.PUBMED:
-                    self.load_from_entrez(entrez_db=EntrezDbType.PUBMED, ids=citations_ids_by_source)
+                    self._load_from_entrez(entrez_db=EntrezDbType.PUBMED, ids=citations_ids_by_source)
                 elif source == CitationSource2.PUBMED_CENTRAL:
-                    self.load_from_entrez(entrez_db=EntrezDbType.PUBMED_CENTRAL, ids=citations_ids_by_source)
+                    self._load_from_entrez(entrez_db=EntrezDbType.PUBMED_CENTRAL, ids=citations_ids_by_source)
                 elif source == CitationSource2.NCBI_BOOKSHELF:
-                    self.load_from_nbk(ids=citations_ids_by_source)
+                    self._load_from_nbk(ids=citations_ids_by_source)
 
         self._mark_error_if_not_fetched(all_ids, "No record was returned for this ID")
 
@@ -437,8 +445,8 @@ class CitationFetchRequest:
             return entry.citation
         return None
 
-    def load_from_entrez(self, entrez_db: EntrezDbType, ids: List[CitationIdNormalized]):
-        request_ids = [id.index for id in ids]
+    def _load_from_entrez(self, entrez_db: EntrezDbType, ids: List[CitationIdNormalized]):
+        request_ids = [citation_id.index for citation_id in ids]
         try:
             handle = Entrez.efetch(db=entrez_db, id=request_ids, rettype='medline', retmode='text')
             records = list(Medline.parse(handle))
@@ -452,7 +460,7 @@ class CitationFetchRequest:
                     raise ValueError(f"Unsupported EntrezDbType {entrez_db}")
 
                 if citation := self._fetch_to_populate(normal_id):
-                    CitationFetchRequest.populate_from_entrez(citation, record)
+                    CitationFetchRequest._populate_from_entrez(citation, record)
 
         except Exception as ex:
             # if this fails it's probably because a single id in ids ruined it for everybody
@@ -460,13 +468,13 @@ class CitationFetchRequest:
             self._mark_error_if_not_fetched(ids, f'Error when attempting to Entrez.efetch ids {request_ids} : {str(ex)}')
 
     @staticmethod
-    def populate_from_entrez(citation: Citation, record: JsonObjType):
+    def _populate_from_entrez(citation: Citation, record: JsonObjType):
         citation.data_json = record
         citation.title = record.get("TI")
         citation.journal = record.get("SO")
         citation.journal_short = record.get("TA", citation.journal)
-        # TODO could year be an int?
-        # or could we just store published date and extract year?
+
+        # TODO could we just store published date and extract year?
         citation.year = get_year_from_date(record.get("DP"))
         if authors_list := record.get("FAU"):
             first_author = authors_list[0]
@@ -475,28 +483,28 @@ class CitationFetchRequest:
             citation.authors = ", ".join(authors_list)
         citation.abstract = record.get("AB")
 
-    def load_from_nbk(self, ids: Iterable[CitationIdNormalized]):
+    def _load_from_nbk(self, ids: Iterable[CitationIdNormalized]):
         for bookshelf_rid in ids:
             try:
                 handle = Entrez.esearch(db="books", term=bookshelf_rid.index, retmax=50)
                 search_results = Entrez.read(handle)
                 print(f"For searching {bookshelf_rid.full_id}")
                 if id_list := search_results['IdList']:
-                    handle = Entrez.esummary(db="books", id=','.join(search_results['IdList']))
+                    handle = Entrez.esummary(db="books", id=','.join(id_list))
                     results = Entrez.read(handle)
 
                     for record in results:
                         rid = record["RID"]
                         if CitationFetchRequest.TOP_LEVEL_NBK_RE.fullmatch(rid):
                             if citation := self._fetch_to_populate(CitationIdNormalized.from_parts(source=CitationSource2.NCBI_BOOKSHELF, index=rid)):
-                                CitationFetchRequest.populate_from_nbk(citation, record)
+                                CitationFetchRequest._populate_from_nbk(citation, record)
 
-            except RuntimeError as re:
+            except RuntimeError as run_error:
                 report_exc_info(extra_data={'bookshelf_rid': bookshelf_rid})
-                self._mark_error_if_not_fetched([bookshelf_rid], f'Error when attempting to Entrez.efetch ids {bookshelf_rid} : {str(re)}')
+                self._mark_error_if_not_fetched([bookshelf_rid], f'Error when attempting to Entrez.efetch ids {bookshelf_rid} : {str(run_error)}')
 
     @staticmethod
-    def populate_from_nbk(citation: Citation, record: JsonObjType):
+    def _populate_from_nbk(citation: Citation, record: JsonObjType):
         publish_date = record.get("DP") or record.get("PubDate")
         year = get_year_from_date(publish_date)
         book = record.get("Book")

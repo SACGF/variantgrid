@@ -1443,7 +1443,7 @@ class GeneSymbolWiki(Wiki):
 
         gene_citation_ids_to_keep = []
         from annotation.models import CitationFetchRequest
-        for citation in CitationFetchRequest.fetch_all_now(self.markdown).all_citations:
+        for citation in CitationFetchRequest.get_unfetched_citations(self.markdown):
             gene_citation = existing_citations.get(citation.pk)
             if not gene_citation:
                 gene_citation = self.gene_symbol.genesymbolcitation_set.create(citation=citation)

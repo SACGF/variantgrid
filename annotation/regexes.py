@@ -2,7 +2,7 @@ import re
 from enum import Enum
 from operator import attrgetter
 from re import RegexFlag
-from typing import List, Union, Match, Dict, Optional
+from typing import List, Union, Match, Dict, Optional, Set
 
 from annotation.models.models_citations import CitationSource2, CitationIdNormalized
 from ontology.models import OntologyService, OntologyTerm
@@ -72,13 +72,13 @@ class DbRegexes:
     HGNC = DbRefRegex(db="HGNC", prefixes="HGNC", link=OntologyService.URLS[OntologyService.HGNC], expected_length=OntologyService.EXPECTED_LENGTHS[OntologyService.HGNC])
     MEDGEN = DbRefRegex(db="MedGen", prefixes="MedGen", link="https://www.ncbi.nlm.nih.gov/medgen/?term=${1}", match_type=MatchType.ALPHA_NUMERIC)
     MONDO = DbRefRegex(db="MONDO", prefixes="MONDO", link=OntologyService.URLS[OntologyService.MONDO], expected_length=OntologyService.EXPECTED_LENGTHS[OntologyService.MONDO])
-    NCBIBookShelf = DbRefRegex(db="NCBIBookShelf", prefixes=["NCBIBookShelf"], link="https://www.ncbi.nlm.nih.gov/books/${1}", match_type=MatchType.ALPHA_NUMERIC)
+    NCBIBookShelf = DbRefRegex(db="Bookshelf ID", prefixes=["NCBIBookShelf", "Bookshelf ID", "Bookshelf"], link="https://www.ncbi.nlm.nih.gov/books/${1}", match_type=MatchType.ALPHA_NUMERIC)
     NIHMS = DbRefRegex(db="NIHMS", prefixes="NIHMS", link="https://www.ncbi.nlm.nih.gov/pubmed/?term=NIHMS${1}")
     # smallest OMIM starts with a 1, so there's no 0 padding there, expect min length
     OMIM = DbRefRegex(db="OMIM", prefixes=["OMIM", "MIM"], link=OntologyService.URLS[OntologyService.OMIM], min_length=OntologyService.EXPECTED_LENGTHS[OntologyService.OMIM], expected_length=OntologyService.EXPECTED_LENGTHS[OntologyService.OMIM])
     ORPHA = DbRefRegex(db="Orphanet", prefixes=["ORPHANET", "ORPHA"], link=OntologyService.URLS[OntologyService.ORPHANET], expected_length=OntologyService.EXPECTED_LENGTHS[OntologyService.ORPHANET])
-    PMC = DbRefRegex(db="PMC", prefixes="PMCID", link="https://www.ncbi.nlm.nih.gov/pubmed/?term=PMC${1}")
-    PUBMED = DbRefRegex(db="PubMed", prefixes=["PubMed", "PMID", "PubMedCentral"], link="https://www.ncbi.nlm.nih.gov/pubmed/?term=${1}")
+    PUBMED = DbRefRegex(db="PMID", prefixes=["PubMed", "PMID"], link="https://www.ncbi.nlm.nih.gov/pubmed/?term=${1}")
+    PUBMED_CENTRAL = DbRefRegex(db="PMCID", prefixes=["PMCID", "PubMedCentral", "PMC"], link="https://www.ncbi.nlm.nih.gov/pubmed/?term=PMC${1}", match_type=MatchType.ALPHA_NUMERIC)
     SNP = DbRefRegex(db="SNP", prefixes="rs", link="https://www.ncbi.nlm.nih.gov/snp/${1}", match_type=MatchType.SIMPLE_NUMBERS)
     SNOMEDCT = DbRefRegex(db="SNOMED-CT", prefixes=["SNOMED-CT", "SNOMEDCT"], link="https://snomedbrowser.com/Codes/Details/${1}")
     UNIPROTKB = DbRefRegex(db="UniProtKB", prefixes="UniProtKB", link="https://www.uniprot.org/uniprot/${1}", match_type=MatchType.ALPHA_NUMERIC)
@@ -88,6 +88,8 @@ class DbRegexes:
 
 
 class DbRefRegexResult:
+
+    ID_NUM = re.compile(".*?([0-9]+)")
 
     def __init__(self, cregx: DbRefRegex, idx: str, match: Match):
         self.cregx = cregx
@@ -106,28 +108,35 @@ class DbRefRegexResult:
 
         # no longer pre-emptively load citation, save that for rendering
         # but normalise the ID
-        if source := CitationSource2.from_legacy_code(self.db):
-            self.db = source
-            self.idx = CitationIdNormalized.from_parts(source, self.idx).index
+        if self.db in {"PMID", "PMCID", "Bookshelf ID"}:
+            self.idx = CitationIdNormalized.from_parts(self.db, self.idx).index
 
     @property
     def id_fixed(self):
         return f"{self.db}:{self.cregx.fix_id(self.idx)}"
 
     @property
+    def _idx_num(self):
+        if match := DbRefRegexResult.ID_NUM.match(self.idx):
+            return int(match.group(1))
+        return 0
+
+    def __hash__(self):
+        return hash(self.id_fixed)
+
+    def __eq__(self, other):
+        return self.id_fixed == other.id_fixed
+
+    @property
     def url(self):
         return self.cregx.link.replace('${1}', self.idx)
 
     @property
-    def idx_num(self):
-        """
-        Attempt to convert the id to a number, only use for sorting.
-        Some ids have a version suffix, so using float for the sake of decimals
-        """
-        try:
-            return float(self.idx)
-        except:
-            return 0
+    def _sort_key(self):
+        return self.db, self._idx_num, self.idx
+
+    def __lt__(self, other):
+        return self._sort_key < other._sort_key
 
     @property
     def db(self):
@@ -185,6 +194,7 @@ class DbRefRegexes:
         @param sort If true sorts the results by database and id, otherwise leaves them in order of discovery
         """
         results: List[DbRefRegexResult] = []
+        already_added: Set[DbRefRegexResult] = set()
 
         def append_result_if_length(db_regex: DbRefRegex, match: Optional[Match]) -> bool:
             """
@@ -194,8 +204,12 @@ class DbRefRegexes:
             :return: True if the ID looked valid and was recorded, False otherwise
             """
             nonlocal results
+            nonlocal already_added
             if match and len(match.group(1)) >= db_regex.min_length:
-                results.append(DbRefRegexResult(cregx=db_regex, idx=match.group(1), match=match))
+                result = DbRefRegexResult(cregx=db_regex, idx=match.group(1), match=match)
+                if not result in already_added:
+                    results.append(result)
+                    already_added.add(result)
                 return True
             return False
 
@@ -232,9 +246,9 @@ class DbRefRegexes:
             append_result_if_length(default_regex, match)
 
         if sort:
-            results.sort(key=attrgetter('db', 'idx_num', 'idx'))
+            results = sorted(results)
         return results
 
 
 db_ref_regexes = DbRefRegexes(DbRefRegex._all_db_ref_regexes)
-db_citation_regexes = DbRefRegexes([DbRegexes.PUBMED, DbRegexes.PMC, DbRegexes.NCBIBookShelf])
+db_citation_regexes = DbRefRegexes([DbRegexes.PUBMED, DbRegexes.PUBMED_CENTRAL, DbRegexes.NCBIBookShelf])

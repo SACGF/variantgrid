@@ -38,7 +38,7 @@ class ClassificationRef:
     def __str__(self):
         parts = []
         if self.rid:
-            parts.append(self.rid)
+            parts.append(str(self.rid))
         else:
             if self.lab:
                 parts.append(self.lab.group_name)

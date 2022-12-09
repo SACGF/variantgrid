@@ -73,9 +73,16 @@ let CitationsManager = (function() {
 
         populate(dom) {
             let $dom = $(dom);
+            let citationId = $dom.attr('data-citation-id');
+            let prettyId = this.prettyId(citationId);
+            $dom.text()
             $dom.addClass('citation');
             $dom.addClass('loading');
-            let citationId = $dom.attr('data-citation-id');
+            $dom.html([
+                $('<span>', {text:`${prettyId}`}),
+                $('<span>', {text:' Loading...', class:'text-muted'})
+            ]);
+
             this.citationPromise(citationId).then(data => {
                 $dom.removeClass('loading').empty().append(this.renderData(data));
             });
@@ -135,15 +142,9 @@ let CitationsManager = (function() {
             linkDom.appendTo(citDom);
 
             let safeId = citation.id.replace(':','_');
-            if (citation.abstract || !citation.singleAuthor || citation.journal) {
-                $('<a>', {class: 'toggle-link d-block', 'data-toggle':"collapse", href:`#detail-${safeId}`, text: 'Toggle detail'}).appendTo(citDom);
-                let detailContainer = $('<div>', {class: 'collapse', id:`detail-${safeId}`}).appendTo(citDom);
-                if (citation.journal) {
-                    $('<p>', {class: 'journal', text: citation.journal}).appendTo(detailContainer);
-                }
-                if (!citation.singleAuthor) {
-                    $('<p>', {class: 'authors', text: citation.authors}).appendTo(detailContainer);
-                }
+            if (!citation.error) {
+                $('<a>', {'class':'d-block', 'data-toggle':'ajax-modal', 'data-href':Urls.view_citation_detail(citation.id), 'data-title': prettyId, 'text':'Show Detail'}).appendTo(citDom)
+            } else {
                 $('<p>', {class: 'abstract', text: citation.abstract && citation.abstract.length ? citation.abstract : 'Could not fetch abstract'}).appendTo(detailContainer);
             }
             return citDom;
@@ -156,8 +157,8 @@ let CitationsManager = (function() {
             } else {
                 if (dbRef.internal_id) {
                     citation_id = dbRef.internal_id;
-                } else if (dbRef.db in ['PMID', 'PMCID', 'BookShelf']) {
-                    citation_id = dbRef.id;
+                } else if (['PMID', 'PMCID', 'Bookshelf'].indexOf(dbRef.db) !== -1) {
+                    citation_id = dbRef.id.replace('\s{2,}', '');
                 }
             }
             if (citation_id) {
@@ -171,6 +172,8 @@ let CitationsManager = (function() {
                     $('<a>', {class: 'no-details', text: dbRef.id, href: dbRef.url, target: '_blank'}).appendTo(citationDom);
                 }
                 return citationDom;
+            } else {
+                return null;
             }
         }
     };
