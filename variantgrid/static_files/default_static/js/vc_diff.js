@@ -57,7 +57,11 @@ const Diff = (function() {
         this.excluded = {};
     };
 
-    Diff.LITERATURE_DBS = {'PubMed': true, 'NCBIBookShelf': true};
+    Diff.LITERATURE_DBS = {
+        'Bookshelf ID': true,
+        'PMCID': true,
+        'PMID': true
+    };
 
     Diff.hash = function(val) {
         val = Diff.emptyToNull(val);
@@ -344,9 +348,7 @@ const Diff = (function() {
                     includedVersions.forEach((v, index) => {
                         let db_refs = (v[key] || {}).db_refs;
                         if (db_refs) {
-                            for (let db_ref of db_refs) {
-                                CitationsManager.normalizeInPlace(db_ref);
-                            }
+                            CitationsManager.normalizeInPlace(db_refs);
 
                             for (let db_ref of db_refs) {
                                 let ref_details = all_db_refs[db_ref.id];
@@ -536,7 +538,7 @@ const Diff = (function() {
                             });
                             let dbRefs = includedVersions.map(v => {
                                 if (v[key] && v[key].db_refs) {
-                                    return v[key].db_refs;
+                                    return CitationsManager.normalizeInPlace(v[key].db_refs);
                                 }
                                 return null;
                             });

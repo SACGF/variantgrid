@@ -72,6 +72,24 @@ class RegexTests(TestCase):
         self.assertEqual(len(results), 1)
         self.assertEqual(str(results[0]), 'PMCID:PMC123456')
 
+    def test_pmid_and_pmc(self):
+        text = """
+        Richards (2015) Genet Med, Standards and guidelines for the interpretation of sequence variants: a joint consensus recommendation of the American College of Medical Genetics and Genomics and the Association for Molecular Pathology.
+        PubMed: 25741868
+        Richards (2015) Genet Med, Standards and Guidelines for the Interpretation of Sequence Variants: A Joint Consensus Recommendation of the American College of Medical Genetics and Genomics and the Association for Molecular Pathology.
+        PubMedCentral: 25741868
+        and let's not forget books
+        Bookshelf: NBK1003
+        """
+        results = db_ref_regexes.search(text)
+        self.assertEqual(len(results), 3)
+
+        self.assertEqual(str(results[0]), 'Bookshelf ID:NBK1003')
+        self.assertEqual(str(results[1]), 'PMCID:PMC25741868')
+        self.assertEqual(str(results[2]), 'PMID:25741868')
+
+
+
     def test_dividers(self):
         text = 'OMIM# 123456 PMID#23456 HPO:123456'
         results = db_ref_regexes.search(text)

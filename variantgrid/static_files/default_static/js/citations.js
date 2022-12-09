@@ -157,8 +157,8 @@ let CitationsManager = (function() {
             } else {
                 if (dbRef.internal_id) {
                     citation_id = dbRef.internal_id;
-                } else if (['PMID', 'PMCID', 'Bookshelf'].indexOf(dbRef.db) !== -1) {
-                    citation_id = dbRef.id.replace('\s{2,}', '');
+                } else if (['PMID', 'PMCID', 'Bookshelf ID'].indexOf(dbRef.db) !== -1) {
+                    citation_id = dbRef.id.replace('\s*', '');
                 }
             }
             if (citation_id) {
@@ -188,23 +188,33 @@ CitationsManager.dbMigration = {
 }
 
 CitationsManager.normalizeInPlace = function(dbRef) {
-    if (dbRef.internal_id) {
+    let dbArray = null;
+    if (Array.isArray(dbRef)) {
+        dbArray = dbRef;
+    } else {
+        dbArray = [dbRef];
+    }
+
+    for (let dbRef of dbArray) {
         // only need to normalize old records, e.g. the ones with internal ID
-        let migratedSource = CitationsManager.dbMigration[dbRef.db.toUpperCase()];
-        if (migratedSource) {
-            let idx = `${dbRef.idx}`;
-            if (migratedSource == "PMID") {
-                // no special action
-            } else if (migratedSource == "PMCID") {
-                idx = `PMC${idx}`;
-            } else if (migratedSource == "Bookshelf ID") {
-                idx = `NBK${idx}`;
+        if (dbRef.db && dbRef.idx) {
+            let migratedSource = CitationsManager.dbMigration[dbRef.db.toUpperCase()];
+            if (migratedSource) {
+                let idx = `${dbRef.idx}`;
+                if (migratedSource == "PMID") {
+                    // no special action
+                } else if (migratedSource == "PMCID") {
+                    idx = `PMC${idx}`;
+                } else if (migratedSource == "Bookshelf ID") {
+                    idx = `NBK${idx}`;
+                }
+                dbRef.db = migratedSource;
+                dbRef.idx = idx;
             }
-            dbRef.db = migratedSource;
-            dbRef.idx = idx;
-            dbRef.id = `${migratedSource}:${idx}`;
+            dbRef.id = `${dbRef.db}:${dbRef.idx}`;
         }
     }
+    return dbRef;
 }
 
 CitationsManager.prototype.debounceRequestData = debounce(CitationsManager.prototype.requestData);
