@@ -510,8 +510,6 @@ class GeneVersion(models.Model):
             for f in FIELDS:
                 data[f].add(tv.pyhgvs_data[f])
 
-        print(f"{data}")
-
         # Sometimes chrom is a contig so we'll end up with chrom as "3,NC_000003.11" - check only 1 and convert to name
         chrom_list = data["chrom"]
         contigs = {self.genome_build.chrom_contig_mappings[chrom] for chrom in chrom_list}
@@ -986,8 +984,10 @@ class TranscriptVersion(SortByPKMixin, models.Model):
     def tags(self) -> List[str]:
         """ 'tag' has been in cdot since 0.2.12 """
         REMOVE_TAGS = {"basic"}  # This is on pretty much every Ensembl transcript
-        tag_list = self.data.get("tag", "").split(",")
-        return sorted(tag for tag in tag_list if tag not in REMOVE_TAGS)
+        tag_list = []
+        if tag_list_str := self.data.get("tag"):
+            tag_list = sorted(tag for tag in tag_list_str.split(",") if tag not in REMOVE_TAGS)
+        return tag_list
 
     def get_contigs(self) -> Set[Contig]:
         raw_chrom = {self.pyhgvs_data["chrom"]}

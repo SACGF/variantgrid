@@ -1,6 +1,6 @@
 import json
 import logging
-from typing import Dict, Tuple
+from typing import Dict
 
 from django.core.management.base import BaseCommand
 from django.db.models import Max
@@ -263,13 +263,16 @@ class Command(BaseCommand):
             gene_version_id = gene_version_ids_by_accession[gene_accession]
             import_source = self._get_import_source_by_url(genome_build, annotation_consortium, build_data["url"])
             contig = genome_build.chrom_contig_mappings[build_data["contig"]]
+            if biotype := tv_data.get("biotype"):
+                # Biotype stored as a list of strings
+                biotype = ", ".join(sorted(biotype))
             transcript_version = TranscriptVersion(transcript_id=transcript_id,
                                                    version=version,
                                                    gene_version_id=gene_version_id,
                                                    genome_build=genome_build,
                                                    contig=contig,
                                                    import_source=import_source,
-                                                   biotype=tv_data.get("biotype"),
+                                                   biotype=biotype,
                                                    data=tv_data)
             if pk := transcript_version_ids_by_accession.get(transcript_accession):
                 transcript_version.pk = pk
