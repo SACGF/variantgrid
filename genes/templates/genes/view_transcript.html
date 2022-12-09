@@ -31,6 +31,7 @@
                     <th>Version</th>
                     <th class="text-left">Genome Build</th>
                     <th class="text-right">Length</th>
+                    <th class="text-left">Tags</th>
                     <th class="text-left">Alignment Gap</th>
                     <th>OK for Local HGVS Resolution</th>
                     <th class="collapse method">Method</th>
@@ -44,10 +45,17 @@
                     {% with tv=tvd.tv %}
                         {% if tv %}
                             <td class="num">{{ tv.length }}</td>
+                            <td>
+                                <span class="pills">
+                                    {% for t_tag in tv.tags %}
+                                    <span class="pill transcript-tag-{{ t_tag }}">{{ t_tag }}</span>
+                                    {% endfor %}
+                                </span>
+                            </td>
                             <td>{% if tv.alignment_gap %}{{ tv.cdna_match_diff }}{% else %}<span class="no-value">-</span>{% endif %}</td>
                             <td class="text-center">{{ tv.hgvs_ok | boolean }}</td>
                         {% else %}
-                            <td colspan="3"><div class="no-value text-center">No local copy of transcript version</div></td>
+                            <td colspan="4"><div class="no-value text-center">No local copy of transcript version</div></td>
                         {% endif %}
                     {% endwith %}
                      <td style="width:50%" class="collapse method">
