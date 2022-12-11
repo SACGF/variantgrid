@@ -71,6 +71,12 @@ class RegexTests(TestCase):
         self.assertEqual(len(results), 1)
         self.assertEqual(str(results[0]), 'Bookshelf ID:NBK1426')
 
+        text = 'patients with X linked Alport syndrome (https://www.ncbi.nlm.nih.gov/books/NBK1207/ PMID: 20301386).'
+        results = db_ref_regexes.search(text)
+        self.assertEqual(len(results), 2)
+        self.assertEqual(str(results[0]), 'Bookshelf ID:NBK1207')
+        self.assertEqual(str(results[1]), 'PMID:20301386')
+
     def test_pmc(self):
         text = 'PMCID:PMC123456'
         results = db_citation_regexes.search(text)

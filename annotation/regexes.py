@@ -72,7 +72,7 @@ class DbRegexes:
     HGNC = DbRefRegex(db="HGNC", prefixes="HGNC", link=OntologyService.URLS[OntologyService.HGNC], expected_length=OntologyService.EXPECTED_LENGTHS[OntologyService.HGNC])
     MEDGEN = DbRefRegex(db="MedGen", prefixes="MedGen", link="https://www.ncbi.nlm.nih.gov/medgen/?term=${1}", match_type=MatchType.ALPHA_NUMERIC)
     MONDO = DbRefRegex(db="MONDO", prefixes="MONDO", link=OntologyService.URLS[OntologyService.MONDO], expected_length=OntologyService.EXPECTED_LENGTHS[OntologyService.MONDO])
-    NCBIBookShelf = DbRefRegex(db="Bookshelf ID", prefixes=["NCBIBookShelf", "Bookshelf ID", "Bookshelf"], link="https://www.ncbi.nlm.nih.gov/books/${1}", match_type=MatchType.ALPHA_NUMERIC)
+    NCBIBookShelf = DbRefRegex(db="Bookshelf ID", prefixes=["NCBIBookShelf", "Bookshelf ID", "Bookshelf", "https://www.ncbi.nlm.nih.gov/books/NBK"], link="https://www.ncbi.nlm.nih.gov/books/${1}", match_type=MatchType.ALPHA_NUMERIC)
     NIHMS = DbRefRegex(db="NIHMS", prefixes="NIHMS", link="https://www.ncbi.nlm.nih.gov/pubmed/?term=NIHMS${1}")
     # smallest OMIM starts with a 1, so there's no 0 padding there, expect min length
     OMIM = DbRefRegex(db="OMIM", prefixes=["OMIM", "MIM"], link=OntologyService.URLS[OntologyService.OMIM], min_length=OntologyService.EXPECTED_LENGTHS[OntologyService.OMIM], expected_length=OntologyService.EXPECTED_LENGTHS[OntologyService.OMIM])
