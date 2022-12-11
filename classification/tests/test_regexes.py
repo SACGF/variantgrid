@@ -66,6 +66,11 @@ class RegexTests(TestCase):
         self.assertEqual(len(results), 1)
         self.assertEqual(str(results[0]), 'Bookshelf ID:NBK1426')
 
+        text = 'Bookshelf ID: NBK1426'
+        results = db_ref_regexes.search(text)
+        self.assertEqual(len(results), 1)
+        self.assertEqual(str(results[0]), 'Bookshelf ID:NBK1426')
+
     def test_pmc(self):
         text = 'PMCID:PMC123456'
         results = db_citation_regexes.search(text)
