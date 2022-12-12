@@ -13,6 +13,7 @@ class SearchResponseOntology(SearchResponseRecordAbstract[OntologyTerm]):
     def search_type(cls) -> str:
         return "Ontology"
 
+
 @receiver(search_signal, sender=SearchInput)
 def search_ontology(sender: Any, search_input: SearchInput, **kwargs) -> SearchResponse:
     response: SearchResponse[OntologyTerm] = SearchResponse(SearchResponseOntology)

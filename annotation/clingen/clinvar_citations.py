@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 
 import logging
+from typing import Dict, Set
 
 import pandas as pd
 
-from annotation.models.models import ClinVarCitation, ClinVarCitationsCollection, Citation
-from annotation.models.models_enums import CitationSource
-from library.utils import invert_dict
+from annotation.models import Citation
+from annotation.models.models import ClinVarCitation, ClinVarCitationsCollection
+from annotation.models.models_citations import CitationIdNormalized
 
 ALLELE_ID = '#AlleleID'
 VARIATION_ID = 'VariationID'
@@ -23,53 +24,23 @@ def store_clinvar_citations_from_web(cached_web_resource):
             raise ValueError(msg)
 
     clinvar_citations_collection = ClinVarCitationsCollection.objects.create(cached_web_resource=cached_web_resource)
-    existing_citations = {}
-    citation = None
-    for citation in Citation.objects.all().order_by("pk"):
-        existing_citations[citation.unique_code()] = citation
 
-    if citation:
-        max_previously_existing_citation_id = citation.pk  # as qs above is in PK order
-    else:
-        max_previously_existing_citation_id = 0
-
-    citation_sources = invert_dict(dict(CitationSource.choices))
-    new_citations_by_key = {}
+    rows = list()
+    citation_ids: Set[CitationIdNormalized] = set()
     for _, row in df.iterrows():
-        #print("row: %s" % row)
-        cs = row[CITATION_SOURCE]
-        citation_source = citation_sources[cs]
+        citation_source = row[CITATION_SOURCE]
 
-        citation = Citation(citation_source=citation_source,
-                            citation_id=row[CITATION_ID])
-
-        key = citation.unique_code()
-        if key not in existing_citations:
-            new_citations_by_key[key] = citation
-
-    # Insert the new citations
-    logging.info("Inserting %d citations", len(new_citations_by_key))
-    Citation.objects.bulk_create(new_citations_by_key.values(), batch_size=2000, ignore_conflicts=True)
-
-    # Update hash
-    for citation in Citation.objects.filter(pk__gt=max_previously_existing_citation_id):
-        existing_citations[citation.unique_code()] = citation
-
-    # Insert ClinVar citations
-    rows = []
-    for _, row in df.iterrows():
-        cs = row[CITATION_SOURCE]
-        citation_source = citation_sources[cs]
-
-        wanted_citation = Citation(citation_source=citation_source,
-                                   citation_id=row[CITATION_ID])
-        citation = existing_citations[wanted_citation.unique_code()]  # Will die if not there
+        citation_id = CitationIdNormalized.from_parts(source=citation_source, index=row[CITATION_ID])
+        citation_ids.add(citation_id)
 
         cvc = ClinVarCitation(clinvar_citations_collection=clinvar_citations_collection,
                               clinvar_variation_id=row[VARIATION_ID],
                               clinvar_allele_id=row[ALLELE_ID],
-                              citation=citation)
+                              citation_id=citation_id.full_id)
         rows.append(cvc)
+
+    logging.info(f"About to ensure existence of {len(citation_ids)} citations")
+    Citation.objects.bulk_create(objs=[citation_id.for_bulk_create() for citation_id in citation_ids], batch_size=2000, ignore_conflicts=True)
 
     num_citations = len(rows)
     logging.info("Read %d records, inserting into DB", num_citations)

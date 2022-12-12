@@ -55,17 +55,6 @@ class HPOSynonymScope(models.TextChoices):
     RELATED = 'R', 'Related'
 
 
-class CitationSource(models.TextChoices):
-    PUBMED = 'P', 'PubMed'
-    NCBI_BOOKSHELF = 'N', 'NCBIBookShelf'
-    PUBMED_CENTRAL = 'C', 'PubMedCentral'
-
-    CODES = Constant({'PubMed': PUBMED[0],
-                      'PMID': PUBMED[0],
-                      'NCBIBookShelf': NCBI_BOOKSHELF[0],
-                      'PubMedCentral': PUBMED_CENTRAL[0]})
-
-
 class ClinGenClassification(models.TextChoices):
     DEFINITIVE = 'D', 'Definitive'
     STRONG = 'S', 'Strong'

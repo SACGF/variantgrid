@@ -507,14 +507,24 @@ const VCForm = (function() {
         },
         
         updateCitations() {
-            let refs = [];
+            let seenIds = {};
+            let elements = [];
             Object.keys(this.data).forEach(k => {
                let blob = this.data[k];
                if (blob && blob['db_refs']) {
-                   refs = refs.concat(blob['db_refs']);
+                   for (let ref of blob['db_refs']) {
+                       let id = (ref.id || '').replace('\s*', '');
+                       if (!seenIds[id]) {
+                           let dom = CitationsManager.defaultManager.citationDomFor(ref);
+                           if (dom) {
+                               elements.push(dom);
+                           }
+                           seenIds[id] = true;
+                       }
+                   }
                } 
             });
-            this.citations.update(refs);
+            this.citations.empty().html(elements);
         },
 
         iconForSeverity(severity) {

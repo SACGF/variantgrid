@@ -23,7 +23,8 @@
                 {
                     userAdmin: {{ user.is_superuser | jsonify }},
                     genomeBuild: "{{ genome_build.pk }}",
-                    citations: new Citations($('#citations')),
+                    // citations: new Citations($('#citations')),
+                    citations: $('#citations'),
                     filterBox: $('#vcform-filter-box'),
                     clearFilterButton: $('#vcform-clear-filter'),
                     summary: $('#vcform-summary .card-body'),

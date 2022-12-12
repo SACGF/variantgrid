@@ -2,6 +2,7 @@ from annotation.tasks.cached_web_resource_tasks import CachedWebResourceTask
 from genes.cached_web_resource.gnomad_gene_constraint import store_gnomad_gene_constraint_from_web
 from genes.cached_web_resource.hgnc import store_hgnc_from_web
 from genes.cached_web_resource.lrg_ref_seq_gene import store_lrg_ref_seq_gene_from_web
+from genes.cached_web_resource.mane import store_mane_from_web
 from genes.cached_web_resource.pfam import store_pfam_from_web
 from genes.cached_web_resource.refseq import store_refseq_gene_summary_from_web, store_refseq_gene_info_from_web
 from genes.cached_web_resource.uniprot import store_uniprot_from_web
@@ -23,6 +24,11 @@ class HGNCWebResourceTask(CachedWebResourceTask):
 class LRGRefSeqGeneWebResourceTask(CachedWebResourceTask):
     def _load_cached_web_resource(self, cached_web_resource):
         store_lrg_ref_seq_gene_from_web(cached_web_resource)
+
+
+class MANEWebResourceTask(CachedWebResourceTask):
+    def _load_cached_web_resource(self, cached_web_resource):
+        store_mane_from_web(cached_web_resource)
 
 
 class PanelAppAustraliaPanelsWebResourceTask(CachedWebResourceTask):
@@ -60,6 +66,7 @@ class UniProtWebResourceTask(CachedWebResourceTask):
 GnomADGeneConstraintWebResourceTask = app.register_task(GnomADGeneConstraintWebResourceTask())
 HGNCWebResourceTask = app.register_task(HGNCWebResourceTask())
 LRGRefSeqGeneWebResourceTask = app.register_task(LRGRefSeqGeneWebResourceTask())
+MANEWebResourceTask = app.register_task(MANEWebResourceTask())
 PanelAppEnglandPanelsWebResourceTask = app.register_task(PanelAppEnglandPanelsWebResourceTask())
 PanelAppAustraliaPanelsWebResourceTask = app.register_task(PanelAppAustraliaPanelsWebResourceTask())
 PfamWebResourceTask = app.register_task(PfamWebResourceTask())

@@ -5,15 +5,6 @@
 {% load ui_utils %}
 {% load ui_help %}
 {% load settings_tags %}
-<script>
-    $(document).ready(function() {
-        Flags.instance.init({userId: '{{user.id}}'});
-        let clinvar_citations = $('#clinvar-citation-div')
-        {% for citation in clinvar_citations %}
-            Citations.renderDbRef({{ citation | jsonify }}).appendTo(clinvar_citations);
-        {% endfor %}
-    });
-</script>
 {% load user_tag_color_tags %}
 {% render_tag_styles_and_formatter %}
 <script type="text/javascript">
@@ -247,35 +238,37 @@ function geneFunc(geneId, geneSymbol, data) {
     $("#hgnc_symbol", geneInfoTable).html(linkHtml);
 }
 
-function showPubMedCitationsOverflow() {
-    // Move into other div so that borders between citations look nice
-    let pmCitations = $("#pubmed-citations");
-    $("#pubmed-citations-overflow").children().appendTo(pmCitations);
-    $("#show-pubmed-citations-overflow").hide();
-}
 
 function handlePubMedLinks(pubmed) {
     const NUM_INITIAL_PUBMED_ARTICLES = 4;
+
     let pmCitations = $("#pubmed-citations");
-    let showPubMedCitationsOverflow = $("#show-pubmed-citations-overflow");
-    let pmCitationsOverflow = $("#pubmed-citations-overflow");
     pmCitations.empty();
-    showPubMedCitationsOverflow.empty().hide();
-    pmCitationsOverflow.empty().hide();
+
     if (pubmed) {
+        pmCitations.show();
         let allPubmedIds = pubmed.split('&');
-        let pubmedIds = allPubmedIds.slice(0, NUM_INITIAL_PUBMED_ARTICLES);
-        let pubmedIdsOverflow = allPubmedIds.slice(NUM_INITIAL_PUBMED_ARTICLES);
-        for (let pubId of pubmedIds) {
-            Citations.renderDbRef({db:'PubMed', idx:pubId}).appendTo(pmCitations);
+        let allCitationDivs = [];
+        for (const pubMedId of allPubmedIds) {
+            allCitationDivs.push(CitationsManager.defaultManager.citationDomFor(`PMID:${pubMedId}`));
         }
-        if (pubmedIdsOverflow.length) {
-            showPubMedCitationsOverflow.text("Show all " + allPubmedIds.length + " articles.").show();
-            for (let pubId of pubmedIdsOverflow) {
-                Citations.renderDbRef({db:'PubMed', idx:pubId}).appendTo(pmCitationsOverflow);
-            }
+
+        let citationDivs = allCitationDivs.slice(0, NUM_INITIAL_PUBMED_ARTICLES);
+        let citationDivsOverflow = allCitationDivs.slice(NUM_INITIAL_PUBMED_ARTICLES);
+
+        pmCitations.html(citationDivs);
+        if (citationDivsOverflow.length) {
+            $('<div>', {
+                class:'text-center mt-2 mb-4',
+                html:$('<a>', {
+                    class: 'toggle-link text-center',
+                    text: `Toggle remaining ${allPubmedIds.length - NUM_INITIAL_PUBMED_ARTICLES} of ${allPubmedIds.length} articles`,
+                    'data-toggle': 'collapse',
+                    'href': '#pubmed-citation-overflow'
+                })
+            }).appendTo(pmCitations);
+            $('<div>', {id:'pubmed-citation-overflow', class:'collapse', html: citationDivsOverflow}).appendTo(pmCitations);
         }
-        new Citations().refresh();
     } else {
         $('<div>', {class:'mb-2 text-center', text: 'No Pubmed citations available'}).appendTo(pmCitations);
     }
@@ -639,7 +632,11 @@ function applyVariantValues() {
                     {% else %}No Citations.
                     {% endif %}
                 {% endlabelled %}
-                <div id="clinvar-citation-div" class="collapse"></div>
+                <div id="clinvar-citation-div" class="collapse">
+                    {% for citation_id in clinvar_citations %}
+                    <div data-citation-id="{{ citation_id }}"></div>
+                    {% endfor %}
+                </div>
             {% else %}
                 No ClinVar entry (version: {{ annotation_version.clinvar_version.annotation_date.date  }})
                 <a href="https://www.ncbi.nlm.nih.gov/clinvar/?term={{ g_hgvs }}">Search ClinVar</a>
@@ -900,15 +897,11 @@ function applyVariantValues() {
                     <div class="card-header">Literature</div>
                     <div class="card-body">
 
-                        <div id='pubmed-citations' class="citations">
+                        <div id='pubmed-citations' class="citations mb-4">
                             <div id='pubmed-loading'>
                                 <img src="{% static 'images/spinner.gif' %}" /> Loading citations...
                             </div>
                         </div>
-                        <div>
-                            <a id="show-pubmed-citations-overflow" href="javascript:showPubMedCitationsOverflow();"></a>
-                        </div>
-                        <div id='pubmed-citations-overflow' class="hidden"></div>
 
                         {% if variant_annotation.mastermind_mmid3 %}
                             <div class="mt-2"></div>

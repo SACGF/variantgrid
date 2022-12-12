@@ -1,0 +1,25 @@
+{% extends menu_annotation_base %}
+{% load static %}
+{% load ui_utils %}
+{% load js_tags %}
+{% block title %}Citation{% endblock title %}
+{% block head %}
+{% endblock head %}
+
+{% block content %}
+    <div class="container">
+        <div class="card">
+            <div class="card-header">{{ citation.id }} {% admin_link citation %}</div>
+            <div class="card-body">
+                <div data-toggle="ajax" href="{% url 'view_citation_detail' citation.id %}"></div>
+            </div>
+            <!--
+            <div class="card-footer">
+                <div class="float-right">
+                    Last Retrieved: {% timestamp citation.last_loaded %}
+                </div>
+            </div>
+            -->
+        </div>
+    </div>
+{% endblock %}

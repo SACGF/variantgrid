@@ -1,16 +1,13 @@
 from dataclasses import dataclass
 from typing import List, Any, Mapping, TypedDict, Optional
 from lazy import lazy
-
-from annotation.citation_utils import CitationLoader
-from annotation.citations import get_citation_from_cached_citation, get_citations, CitationDetails
-from annotation.models import Citation, CachedCitation, CitationSource
-from annotation.regexes import DbRegexes, db_ref_regexes
+from annotation.models import CitationFetchRequest
+from annotation.models.models_citations import CitationSource
+from annotation.regexes import db_citation_regexes
 from classification.enums import SpecialEKeys, EvidenceKeyValueType, ShareLevel
 from classification.models import ClassificationModification, EvidenceKeyMap, EvidenceKey, \
     MultiCondition, ClinVarExport, classification_flag_types, Classification, ClinVarExportStatus, \
     ClinVarExportSubmission, CLINVAR_EXPORT_CONVERSION_VERSION
-from classification.models.evidence_mixin import VCDbRefDict
 from genes.hgvs import CHGVS
 from library.utils import html_to_text, JsonObjType, JsonDiffs
 from ontology.models import OntologyTerm, OntologyService, OntologyTermStatus
@@ -98,7 +95,7 @@ class ClinVarExportData:
     @property
     def is_new(self):
         """ Indicates if this is the first time the record has been submitted.
-            Important, this is not the same as already having a SCV """
+            Important, this is not the same as already having an SCV """
         return not (self.clinvar_export.pk and self._previous_submission)
 
     @property
@@ -126,7 +123,7 @@ class ClinVarExportData:
 
     def submission_full(self) -> JsonObjType:
         """
-        JSON data including recordStatus and scv, not normally included in body as we don't want the assigning of a SCV
+        JSON data including recordStatus and scv, not normally included in body as we don't want the assigning of an SCV
         to generate a change
         :return:
         """
@@ -283,6 +280,15 @@ class ClinVarExportConverter:
         """
         self.clinvar_export_record = clinvar_export_record
 
+    @staticmethod
+    def is_exclude_citation(citation_json: ClinVarCitation) -> bool:
+        if pmid_id := citation_json.get('id'):
+            return pmid_id in {
+                "PMID:25741868",  # ACMG criteria
+                "PMID:28492532",  # Sherloc criteria
+                "PMID:30192042",  # Recommendations for interpreting the loss of function PVS1 ACMG/AMP variant criterion
+            }
+
     @property
     def clinvar_key(self) -> ClinVarKey:
         return self.clinvar_export_record.clinvar_allele.clinvar_key
@@ -294,34 +300,36 @@ class ClinVarExportConverter:
     CITATION_SOURCE_TO_CLINVAR = {
         CitationSource.PUBMED: "PubMed",
         CitationSource.PUBMED_CENTRAL: "pmc",
-        CitationSource.NCBI_BOOKSHELF: "BookShelf"
+        CitationSource.NCBI_BOOKSHELF: "Bookshelf"  # FIXME, don't know if this is what NCBI wants, waiting on email
     }
 
     @property
     def citations(self) -> List[ValidatedJson]:
-        citation_list = []
-        citation_loader = CitationLoader()
+        request_ids = list()
         if self.clinvar_key.citations_mode == ClinVarCitationsModes.interpretation_summary_only:
             if text := self.classification_based_on.get(SpecialEKeys.INTERPRETATION_SUMMARY):
-                citation_loader.search_ids(text)
+                request_ids = db_citation_regexes.search(text)
         else:
-            citation_loader.add_dbrefs(self.classification_based_on.db_refs)
+            # non citation refs will be ignored
+            request_ids = self.classification_based_on.db_refs
 
-        for citation_receipt in citation_loader.load():
-            if clinvar_db := ClinVarExportConverter.CITATION_SOURCE_TO_CLINVAR.get(citation_receipt.citation.citation_source):
+        citation_list = list()
+        for citation in CitationFetchRequest.fetch_all_now(request_ids).all_citations:
+            if clinvar_db := ClinVarExportConverter.CITATION_SOURCE_TO_CLINVAR.get(citation.source):
                 # NEED to test for NBCI
-                id_part = citation_receipt.citation.citation_id
-                if clinvar_db == "PubMed":
-                    id_part = f"PMID:{id_part}"
                 citation_json = {
                     "db": clinvar_db,
-                    "id": id_part
+                    "id": citation.id
                 }
                 messages = JSON_MESSAGES_EMPTY
-                if not citation_receipt.is_valid:
-                    messages += JsonMessages.error(f"Citation \"{id_part}\" does not appear to be valid.")
 
-                citation_list.append(ValidatedJson(citation_json, messages=messages))
+                if ClinVarExportConverter.is_exclude_citation(citation_json):
+                    citation_list.append(ValidatedJson.make_void(JsonMessages.info(f"{citation_json.get('id')} is omitted as it's not specific for this variant.")))
+                else:
+                    if citation.error:
+                        messages += JsonMessages.error(f"Could not retrieve \"{citation.id}\", might not be valid.")
+
+                    citation_list.append(ValidatedJson(citation_json, messages=messages))
 
         return citation_list
 
@@ -474,12 +482,14 @@ class ClinVarExportConverter:
 
     @property
     def json_assertion_criteria(self) -> ValidatedJson:
-        assertion_criteria = self.value(SpecialEKeys.ASSERTION_METHOD)
+        assertion_criteria = self.value(SpecialEKeys.ASSERTION_METHOD) or ""
         if mapped_assertion_method := self.clinvar_key.assertion_criteria_vg_to_code(assertion_criteria):
-            if isinstance(mapped_assertion_method, dict):
-                return ValidatedJson(mapped_assertion_method)
+            if "url" in mapped_assertion_method or ("db" in mapped_assertion_method and "id" in mapped_assertion_method):
+                return ValidatedJson(mapped_assertion_method, JsonMessages.info(f"Mapped from \"{assertion_criteria}\"."))
             else:
-                return ValidatedJson(mapped_assertion_method or "", JsonMessages.error(f"Could not map to assertionCriteria citation"))
+                return ValidatedJson(mapped_assertion_method, JsonMessages.error("ADMIN: Mapped to invalid assertionCriteria"))
+        else:
+            return ValidatedJson(mapped_assertion_method or "", JsonMessages.error(f'Could not map \"{assertion_criteria}\" to an assertionCriteria.'))
 
     @property
     def json_clinical_significance(self) -> ValidatedJson:

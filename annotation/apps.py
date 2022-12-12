@@ -24,6 +24,7 @@ class AnnotationConfig(AppConfig):
         from annotation.signals.signals import clinvar_citations_post_save_handler
 
         # imported to activate receivers
+        from annotation.citation_search import search_citations
         from annotation.signals import clinvar_annotation_health_check  # pylint: disable=unused-import
         # pylint: enable=import-outside-toplevel
 

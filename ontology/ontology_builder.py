@@ -73,7 +73,7 @@ class CachedObj(Generic[T]):
             print(f"{model} Modifying {len(modified):,}")
         batch_size = 2000
         if created:
-            model.objects.bulk_create(created, batch_size=batch_size)
+            model.objects.bulk_create(created, batch_size=batch_size, ignore_conflicts=True)
         if modified:
             model.objects.bulk_update(modified, fields, batch_size=batch_size)
 

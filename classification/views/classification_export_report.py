@@ -3,7 +3,6 @@ from typing import Optional
 from django.http import HttpResponse
 from django.template import engines
 
-from annotation.citations import get_citations
 from classification.models import ClassificationJsonParams, ClassificationReportTemplate
 from classification.models.classification import ClassificationModification, \
     Classification
@@ -74,7 +73,7 @@ class ExportFormatterReport(ExportFormatter):
             context[key] = report_blob
 
         context['condition_resolved'] = record.classification.condition_resolution
-        context['citations'] = [vars(citation) for citation in get_citations(record.citations)]
+        context['citations'] = record.loaded_citations().to_json()
         context['evidence_weights'] = Classification.summarize_evidence_weights(evidence)
         context['acmg_criteria'] = record.criteria_strength_summary(e_keys)
         context['editable'] = record.classification.can_write(self.user)

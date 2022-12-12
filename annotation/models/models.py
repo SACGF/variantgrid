@@ -1,4 +1,3 @@
-import json
 import logging
 import os
 import re
@@ -25,7 +24,8 @@ from psqlextra.types import PostgresPartitioningMethod
 from annotation.external_search_terms import get_variant_search_terms, get_variant_pubmed_search_terms
 from annotation.models.damage_enums import Polyphen2Prediction, FATHMMPrediction, MutationTasterPrediction, \
     SIFTPrediction, PathogenicityImpact, MutationAssessorPrediction, ALoFTPrediction
-from annotation.models.models_enums import AnnotationStatus, CitationSource, \
+from annotation.models.models_citations import Citation, CitationFetchRequest, CitationFetchResponse
+from annotation.models.models_enums import AnnotationStatus, \
     VariantClass, ColumnAnnotationCategory, VEPPlugin, VEPCustom, ClinVarReviewStatus, VEPSkippedReason, \
     ManualVariantEntryType, HumanProteinAtlasAbundance, EssentialGeneCRISPR, EssentialGeneCRISPR2, EssentialGeneGeneTrap
 from genes.models import GeneSymbol, Gene, TranscriptVersion, Transcript, GeneAnnotationRelease
@@ -134,10 +134,20 @@ class ClinVar(models.Model):
     def get_suspect_reason_code_display(self):
         return ClinVar.SUSPECT_REASON_CODES.get(self.clinvar_suspect_reason_code)
 
-    def get_citations(self):
+    def get_loaded_citations(self) -> CitationFetchResponse:
         cvc_qs = ClinVarCitation.objects.filter(clinvar_variation_id=self.clinvar_variation_id,
                                                 clinvar_allele_id=self.clinvar_allele_id)
-        return Citation.objects.filter(clinvarcitation__in=cvc_qs)
+        return CitationFetchRequest.fetch_all_now(Citation.objects.filter(clinvarcitation__in=cvc_qs))
+
+    @property
+    def citation_ids(self) -> List[str]:
+        return sorted(set(ClinVarCitation.objects.filter(clinvar_variation_id=self.clinvar_variation_id,
+                                       clinvar_allele_id=self.clinvar_allele_id).values_list('citation_id', flat=True)))
+
+    # def get_citations(self) -> QuerySet[Citation]:
+    #     cvc_qs = ClinVarCitation.objects.filter(clinvar_variation_id=self.clinvar_variation_id,
+    #                                             clinvar_allele_id=self.clinvar_allele_id)
+    #     return Citation.objects.filter(clinvarcitation__in=cvc_qs)
 
     def __str__(self):
         return f"ClinVar: variant: {self.variant}, path: {self.highest_pathogenicity}"
@@ -147,84 +157,11 @@ class ClinVarCitationsCollection(models.Model):
     cached_web_resource = models.ForeignKey('CachedWebResource', null=True, on_delete=CASCADE)
 
 
-class Citation(models.Model):
-    citation_source = models.CharField(max_length=1, choices=CitationSource.choices)
-    citation_id = models.TextField()
-
-    class Meta:
-        unique_together = ("citation_source", "citation_id")
-
-    def unique_code(self):
-        return f"{self.citation_source}_{self.citation_id}"
-
-    def __str__(self):
-        citation_source = self.get_citation_source_display()
-        return f"{self.citation_id} ({citation_source})"
-
-    def ref_id(self):
-        citation_source = self.get_citation_source_display()
-        return f"{citation_source}:{self.citation_id}"
-
-    @property
-    def sort_key(self):
-        return self.citation_source, self.citation_id.rjust(10, '0')
-
-    def __lt__(self, other):
-        return self.sort_key < other.sort_key
-
-    @staticmethod
-    def citations_from_text(text):
-        """ returns a list of (unsaved) Citation objects from text """
-        # TODO replace with code from dbregexes
-
-        citation_source_codes = dict({k.lower(): v for k, v in CitationSource.CODES.items()})
-        regex_pattern = r"(%s):\s*(\d+)" % '|'.join(citation_source_codes)
-        pattern = re.compile(regex_pattern, flags=re.IGNORECASE)  # @UndefinedVariable
-
-        citations_list = []
-        if text:
-            # Find all PUBMED
-            for m in pattern.finditer(text):
-                citation_source_string = m.group(1)
-                citation_id = m.group(2)
-
-                citation_source = citation_source_codes.get(citation_source_string.lower())
-                if citation_source:
-                    citation, _ = Citation.objects.get_or_create(citation_source=citation_source,
-                                                                 citation_id=citation_id)
-                    citations_list.append(citation)
-
-        return citations_list
-
-
 class ClinVarCitation(models.Model):
     clinvar_citations_collection = models.ForeignKey(ClinVarCitationsCollection, on_delete=CASCADE)
     clinvar_variation_id = models.IntegerField()
     clinvar_allele_id = models.IntegerField()
-    citation = models.ForeignKey(Citation, null=True, on_delete=CASCADE)
-
-
-class CitationException(Exception):
-    pass
-
-
-class CachedCitation(TimeStampedModel):
-    citation = models.OneToOneField(Citation, null=True, on_delete=CASCADE)
-    json_string = models.TextField()
-    has_error = models.BooleanField(blank=True, null=False, default=False)
-
-    def get_record_or_fail(self):
-        if self.has_error:
-            raise CitationException(self.json_string)
-        return self.get_record()
-
-    def get_record(self):
-        """ You can cache this by setting _record """
-        record = getattr(self, "_record", None)
-        if not record:
-            record = json.loads(self.json_string)
-            self._record = record
-        return record
+    citation = models.ForeignKey(Citation, on_delete=CASCADE)
 
 
 class DBNSFPGeneAnnotationVersion(TimeStampedModel):
@@ -311,6 +248,9 @@ class GeneAnnotationVersion(SubVersionPartition):
     @property
     def genome_build(self):
         return self.gene_annotation_release.genome_build
+
+    def __str__(self):
+        return f"GAR: {self.gene_annotation_release}, Ont: {self.ontology_version}, DBnsFP: {self.dbnsfp_gene_version}"
 
 
 @receiver(pre_delete, sender=GeneAnnotationVersion)
@@ -550,12 +490,16 @@ class VariantAnnotationVersion(SubVersionPartition):
                     release = "105.20201022"
                     gff_url = f"http://ftp.ncbi.nlm.nih.gov/refseq/H_sapiens/annotation/annotation_releases/{release}/GCF_000001405.25_GRCh37.p13/GCF_000001405.25_GRCh37.p13_genomic.gff.gz"
             elif self.genome_build.name == "GRCh38":
-                # This is good for 108 (will need to keep on top of this)
-                (release, gff_filename) = self.refseq.split(" - ")
-                if not gff_filename.endswith(".gz"):
-                    gff_filename += ".gz"
-                patch_version = 14
-                gff_url = f"https://ftp.ncbi.nlm.nih.gov/refseq/H_sapiens/annotation/annotation_releases/{release}/GCF_000001405.40_GRCh38.p{patch_version}/{gff_filename}"
+                if m := re.match("(109.20\d{6}) - GCF_000001405.39_GRCh38.p13_genomic.gff", self.refseq):
+                    release = m.group(1)
+                    gff_url = f"http://ftp.ncbi.nlm.nih.gov/refseq/H_sapiens/annotation/annotation_releases/{release}/GCF_000001405.39_GRCh38.p13/GCF_000001405.39_GRCh38.p13_genomic.gff.gz"
+                else:
+                    (release, gff_filename) = self.refseq.split(" - ")
+                    if not gff_filename.endswith(".gz"):
+                        gff_filename += ".gz"
+                    # This is good for VEP v108 (will need to keep on top of this)
+                    patch_version = 14
+                    gff_url = f"https://ftp.ncbi.nlm.nih.gov/refseq/H_sapiens/annotation/annotation_releases/{release}/GCF_000001405.40_GRCh38.p{patch_version}/{gff_filename}"
         return release, gff_url
 
     @property
@@ -566,13 +510,18 @@ class VariantAnnotationVersion(SubVersionPartition):
     def cdot_gene_release_filename(self) -> str:
         """ returns blank if unknown """
         name_components = []
-        release, gff_url = self._gene_annotation_release_and_gff_url
+        _release, gff_url = self._gene_annotation_release_and_gff_url
         if gff_url:
             name_components = [name_from_filename(gff_url)]
-            if self.genome_build.name == "GRCh37" and self.annotation_consortium == AnnotationConsortium.REFSEQ:
-                # These ones got renamed as the filename wasn't unique
-                if m := re.match("http://ftp.ncbi.nlm.nih.gov/refseq/H_sapiens/annotation/annotation_releases/(105.\d+)/GCF_000001405.25_GRCh37.p13/GCF_000001405.25_GRCh37.p13_genomic.gff.gz", gff_url):
-                    name_components.append(m.group(1))
+            # These ones got renamed as the filename wasn't unique
+            if self.annotation_consortium == AnnotationConsortium.REFSEQ:
+                if self.genome_build.name == "GRCh37":
+                    if m := re.match("http://ftp.ncbi.nlm.nih.gov/refseq/H_sapiens/annotation/annotation_releases/(105.20\d{6})/GCF_000001405.25_GRCh37.p13/(GCF_000001405.25_GRCh37.p13_genomic).gff.gz", gff_url):
+                        name_components = [m.group(2), m.group(1), "gff"]
+                elif self.genome_build.name == "GRCh38":
+                    # GCF_000001405.39_GRCh38.p13_genomic.109.20210514.gff.json.gz
+                    if m := re.match("http://ftp.ncbi.nlm.nih.gov/refseq/H_sapiens/annotation/annotation_releases/(109.20\d{6})/GCF_000001405.39_GRCh38.p13/(GCF_000001405.39_GRCh38.p13_genomic).gff.gz", gff_url):
+                        name_components = [m.group(2), m.group(1), "gff"]
             name_components.append("json.gz")
 
         return ".".join(name_components)
@@ -1300,7 +1249,7 @@ class CachedWebResource(TimeStampedModel):
 
 class GeneSymbolCitation(models.Model):
     gene_symbol = models.ForeignKey(GeneSymbol, on_delete=CASCADE)
-    citation = models.ForeignKey(Citation, on_delete=CASCADE)
+    citation = models.ForeignKey(Citation, null=True, on_delete=CASCADE)
 
     class Meta:
         unique_together = ('gene_symbol', 'citation')

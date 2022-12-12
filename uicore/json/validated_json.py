@@ -1,7 +1,7 @@
 import copy
 import json
 from dataclasses import dataclass, field
-from typing import List, Iterator, Union, Optional
+from typing import List, Iterator, Union, Optional, Any
 
 from lazy import lazy
 
@@ -103,6 +103,10 @@ class ValidatedJson:
     void: bool = False
 
     @staticmethod
+    def is_void(obj: Any) -> bool:
+        return isinstance(obj, ValidatedJson) and obj.void
+
+    @staticmethod
     def make_void(messages: Optional[JsonMessages] = JSON_MESSAGES_EMPTY):
         return ValidatedJson(
             json_data=None,
@@ -131,7 +135,7 @@ class ValidatedJson:
                     pure_dict[key] = ValidatedJson.recursive_to_json(value)
             return pure_dict
         elif isinstance(data, list):
-            return [ValidatedJson.recursive_to_json(item) for item in data]
+            return [ValidatedJson.recursive_to_json(item) for item in data if not ValidatedJson.is_void(item)]
         else:
             return data
 

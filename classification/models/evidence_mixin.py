@@ -1,12 +1,13 @@
 import re
-from typing import Dict, Any, Mapping, Optional, Union, List, TypedDict, Set
+from typing import Dict, Any, Mapping, Optional, Union, List, TypedDict
 
 from django.conf import settings
 from lazy import lazy
 
-from annotation.models import Citation, CitationSource
+from annotation.models import CitationFetchRequest
+from annotation.models.models_citations import CitationFetchResponse
 from classification.criteria_strengths import CriteriaStrength, CriteriaStrengths
-from classification.enums import SpecialEKeys, CriteriaEvaluation
+from classification.enums import SpecialEKeys
 from genes.hgvs import CHGVS, PHGVS
 from library.log_utils import report_message
 from library.utils import empty_to_none
@@ -101,20 +102,8 @@ class EvidenceMixin:
                 all_db_refs.extend(db_refs)
         return all_db_refs
 
-    @property
-    def citations(self) -> List[Citation]:
-        """
-        Returns the entire list of citations through the evidence
-        :return: A list of Citations
-        """
-        # NOTE using CitationCounter is much more efficient
-        citations = []
-        for db_ref in self.db_refs:
-            source = CitationSource.CODES.get(db_ref.get('db'))
-            if source:
-                citation, _ = Citation.objects.get_or_create(citation_source=source, citation_id=db_ref.get('idx'))
-                citations.append(citation)
-        return citations
+    def loaded_citations(self) -> CitationFetchResponse:
+        return CitationFetchRequest.fetch_all_now(self.db_refs)
 
     @property
     def is_likely_acmg(self) -> bool:

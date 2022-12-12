@@ -7,10 +7,11 @@ from django.conf import settings
 from django.db.models.fields import IntegerField, TextField
 from django.utils import timezone
 
-from annotation.models import ClinVarReviewStatus, CitationSource, GeneAnnotationRelease
+from annotation.models import ClinVarReviewStatus, GeneAnnotationRelease
 from annotation.models.models import VariantAnnotationVersion, ClinVarVersion, \
-    HumanProteinAtlasAnnotationVersion, AnnotationVersion, ClinVar, Citation, ClinVarCitation, \
+    HumanProteinAtlasAnnotationVersion, AnnotationVersion, ClinVar, ClinVarCitation, \
     ClinVarCitationsCollection, VariantAnnotation, AnnotationRun, AnnotationRangeLock, GeneAnnotationVersion
+from annotation.models.models_citations import CitationIdNormalized, CitationSource
 from genes.models import GeneAnnotationImport
 from genes.models_enums import AnnotationConsortium
 from ontology.tests.test_data_ontology import create_ontology_test_data, create_test_ontology_version
@@ -105,7 +106,7 @@ def create_fake_clinvar_data(clinvar_version: ClinVarVersion):
         "highest_pathogenicity": 5
     }
     ClinVar.objects.get_or_create(version=clinvar_version, variant=variant, defaults=defaults)
-    citation, _ = Citation.objects.get_or_create(citation_source=CitationSource.PUBMED, citation_id=20613862)
+    citation = CitationIdNormalized(source=CitationSource.PUBMED, index=20613862).for_bulk_create().save()
     cvcc, _ = ClinVarCitationsCollection.objects.get_or_create(pk=1)
 
     ClinVarCitation.objects.get_or_create(clinvar_citations_collection=cvcc,

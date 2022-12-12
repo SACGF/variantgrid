@@ -15,8 +15,8 @@ from snpdb.tests.utils.mock_clingen_api import MockClinGenAlleleRegistryAPI
 
 class Test(URLTestCase):
     @classmethod
-    def setUpClass(cls):
-        super().setUpClass()
+    def setUpTestData(cls):
+        super().setUpTestData()
         cls.user = User.objects.get_or_create(username='testuser')[0]
         cls.grch37 = GenomeBuild.get_name_or_alias("GRCh37")
         cls.annotation_version = get_fake_annotation_version(cls.grch37)
@@ -49,10 +49,6 @@ class Test(URLTestCase):
         # Fake that we have a sample w/variant so it shows up on all variants grid
         vzcc = VariantZygosityCountCollection.objects.get_or_create(name=settings.VARIANT_ZYGOSITY_GLOBAL_COLLECTION)[0]
         VariantZygosityCount.objects.get_or_create(variant=cls.variant, collection=vzcc, het_count=1)
-
-    @classmethod
-    def tearDownClass(cls):
-        super().tearDownClass()
 
     def testUrls(self):
         # Don't test 'server_status' as it polls Celery worker queues etc

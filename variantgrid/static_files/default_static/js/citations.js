@@ -44,13 +44,25 @@ let CitationsManager = (function() {
                     console.log(text)
                 },
                 success: (record) => {
+                    let requestedIds = {};
+                    for (let loadId of loadIds) {
+                        requestedIds[loadId] = true;
+                    }
                     for (let citationData of record['citations']) {
-                        // TODO, can the API return the ID that was used to request?
                         for (let requestingId of citationData.requested_using) {
+                            delete requestedIds[requestingId];
                             let deferred = this.citationToDeferred[requestingId];
                             if (deferred) {
                                 deferred.resolve(citationData);
                             }
+                        }
+                    }
+                    for (let remainingId of Object.keys(requestedIds)) {
+                        let deferred = this.citationToDeferred[remainingId];
+                        if (deferred) {
+                            deferred.resolve({
+                                "title": `Could not load ${remainingId}`
+                            })
                         }
                     }
                 }
@@ -61,41 +73,55 @@ let CitationsManager = (function() {
 
         populate(dom) {
             let $dom = $(dom);
+            let citationId = $dom.attr('data-citation-id');
+            let prettyId = this.prettyId(citationId);
+            $dom.text()
             $dom.addClass('citation');
             $dom.addClass('loading');
-            let citationId = $dom.attr('data-citation-id');
+            $dom.html([
+                $('<span>', {text:`${prettyId}`}),
+                $('<span>', {text:' Loading...', class:'text-muted'})
+            ]);
+
             this.citationPromise(citationId).then(data => {
                 $dom.removeClass('loading').empty().append(this.renderData(data));
             });
         },
 
+        prettyId(citation_id) {
+            return `${citation_id}`.replace(':', ': ').replace('  ', ' ');
+        },
+
         renderData(citation) {
             let citDom = $('<div>');
-            let sourceMap = {"PubMed": "PMID"};
-            let source = sourceMap[citation.source] || citation.source;
-            let sourceId = citation.citation_id;
+
+            if (citation.error) {
+                if (citation.id) {
+                    citDom.html([
+                        $('<div>', {text: citation.id}),
+                        $('<div>', {text: citation.error, class: 'text-danger'})
+                    ])
+                } else {
+                    citDom.html($('<div>', {html: citation.error, class: 'text-danger'}));
+                }
+                return citDom;
+            }
+
             let year = citation.year;
 
             let authorShort = citation.authors_short;
-            let singleAuthor = null;
-            if (!authorShort && citation.authors) {
-                let authors = citation.authors.split(',');
-                if (authors.length) {
-                    authorShort = authors[0];
-                    singleAuthor = authors.length === 1;
-                }
-            } else if (authorShort && citation.authors) {
-                singleAuthor = authorShort == citation.authors;
-            }
             let title = citation.title || 'Could not load title';
+            let prettyId = this.prettyId(citation.id);
 
             let linkRow = [];
-            if (citation.citation_link) {
-                linkRow.push($('<a>', {href: citation.citation_link, target: '_blank', class:'source external-link', text: `${source}: ${sourceId}`}));
+            if (citation.external_url) {
+                linkRow.push($('<a>', {href: citation.external_url, target: '_blank', class:'source external-link', text: prettyId}));
+            } else {
+                linkRow.push($('<span>', {text: prettyId}));
             }
             if (authorShort) {
                 let text = authorShort;
-                if (singleAuthor == false) {
+                if (citation.singleAuthor == false) {
                     text += ' et al';
                 }
                 linkRow.push($('<span>', {class:'author', text: text}));
@@ -115,25 +141,81 @@ let CitationsManager = (function() {
             }, linkDom);
             linkDom.appendTo(citDom);
 
-            if (citation.abstract || !singleAuthor || citation.journal) {
-                $('<a>', {class: 'toggle-link d-block', 'data-toggle':"collapse", href:`#detail-${citation.citation_id}`, text: 'Toggle detail'}).appendTo(citDom);
-                let detailContainer = $('<div>', {class: 'collapse', id:`detail-${citation.citation_id}`}).appendTo(citDom);
-                if (citation.journal) {
-                    $('<p>', {class: 'journal', text: citation.journal}).appendTo(detailContainer);
-                }
-                if (!singleAuthor) {
-                    $('<p>', {class: 'authors', text: citation.authors}).appendTo(detailContainer);
-                }
+            let safeId = citation.id.replace(':','_');
+            if (!citation.error) {
+                $('<a>', {'class':'d-block', 'data-toggle':'ajax-modal', 'data-href':Urls.view_citation_detail(citation.id), 'data-title': prettyId, 'text':'Show Detail'}).appendTo(citDom)
+            } else {
                 $('<p>', {class: 'abstract', text: citation.abstract && citation.abstract.length ? citation.abstract : 'Could not fetch abstract'}).appendTo(detailContainer);
             }
             return citDom;
+        },
 
+        citationDomFor(dbRef, renderNonCitations) {
+            let citation_id = null;
+            if (typeof(dbRef) == 'string' && dbRef.startsWith('PMID')) {
+                citation_id = dbRef;
+            } else {
+                if (dbRef.internal_id) {
+                    citation_id = dbRef.internal_id;
+                } else if (['PMID', 'PMCID', 'Bookshelf ID'].indexOf(dbRef.db) !== -1) {
+                    citation_id = dbRef.id.replace('\s*', '');
+                }
+            }
+            if (citation_id) {
+                return $('<div>', {'data-citation-id': citation_id, html: [
+                    $('<span>', {text:`${this.prettyId(dbRef.id)}`}),
+                    $('<span>', {text:' Loading...', class:'text-muted'})
+                ]});
+            } else if (renderNonCitations) {
+                let citationDom = $('<div>', {class: 'citation'});
+                if (dbRef.id && dbRef.url) {
+                    $('<a>', {class: 'no-details', text: dbRef.id, href: dbRef.url, target: '_blank'}).appendTo(citationDom);
+                }
+                return citationDom;
+            } else {
+                return null;
+            }
         }
     };
 
     return CitationsManager;
 })();
 
-CitationsManager.prototype.debounceRequestData = debounce(CitationsManager.prototype.requestData);
+CitationsManager.dbMigration = {
+    "PUBMED": "PMID",
+    "PMC": "PMCID",
+    "NCBIBOOKSHELF": "Bookshelf ID"
+}
 
+CitationsManager.normalizeInPlace = function(dbRef) {
+    let dbArray = null;
+    if (Array.isArray(dbRef)) {
+        dbArray = dbRef;
+    } else {
+        dbArray = [dbRef];
+    }
+
+    for (let dbRef of dbArray) {
+        // only need to normalize old records, e.g. the ones with internal ID
+        if (dbRef.db && dbRef.idx) {
+            let migratedSource = CitationsManager.dbMigration[dbRef.db.toUpperCase()];
+            if (migratedSource) {
+                let idx = `${dbRef.idx}`;
+                if (migratedSource == "PMID") {
+                    // no special action
+                } else if (migratedSource == "PMCID") {
+                    idx = `PMC${idx}`;
+                } else if (migratedSource == "Bookshelf ID") {
+                    idx = `NBK${idx}`;
+                }
+                dbRef.db = migratedSource;
+                dbRef.idx = idx;
+            }
+            dbRef.id = `${dbRef.db}:${dbRef.idx}`;
+        }
+    }
+    return dbRef;
+}
+
+CitationsManager.prototype.debounceRequestData = debounce(CitationsManager.prototype.requestData);
 CitationsManager.defaultManager = new CitationsManager();

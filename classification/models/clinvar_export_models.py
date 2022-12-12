@@ -11,7 +11,7 @@ from classification.models import ClassificationModification, ConditionResolved
 from library.utils import first
 from snpdb.models import ClinVarKey, Allele
 from uicore.json.json_types import JsonObjType
-from uicore.json.validated_json import ValidatedJson
+from uicore.json.validated_json import ValidatedJson, JsonMessages
 
 CLINVAR_EXPORT_CONVERSION_VERSION = 4
 
@@ -63,6 +63,11 @@ class ClinVarExport(TimeStampedModel):
 
     submission_grouping_validated = models.JSONField(null=False, blank=False, default=dict)
     submission_body_validated = models.JSONField(null=False, blank=False, default=dict)
+
+    @property
+    def all_errors(self) -> JsonMessages:
+        return self.submission_grouping.all_messages.errors() + \
+               self.submission_body.all_messages.errors()
 
     @lazy
     def last_submission(self) -> Optional['ClinVarExportSubmission']:
@@ -118,7 +123,7 @@ class ClinVarExport(TimeStampedModel):
 
     @property
     def citation_ids(self) -> List[str]:
-        if body := self.submission_body:
+        if body := self.submission_body.pure_json():
             if clin_sig := body.get("clinicalSignificance"):
                 if citation := clin_sig.get("citation"):
                     return [entry["id"] for entry in citation]

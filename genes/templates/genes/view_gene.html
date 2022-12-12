@@ -114,6 +114,11 @@
                                             <td>
                                                 {% for tv in tv_set %}
                                                     <a class="d-inline-block mx-2 hover-link" href="{% url 'view_transcript_version' tv.transcript_id tv.version %}">v.{{ tv.version }}</a>
+                                                    <span class="pills">
+                                                    {% for t_tag in tv.tags %}
+                                                        <span class="pill transcript-tag-{{ t_tag }}">{{ t_tag }}</span>
+                                                    {% endfor %}
+                                                    </span>
                                                 {% endfor %}
                                             </td>
                                         {% endfor %}

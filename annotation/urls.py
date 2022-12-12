@@ -22,16 +22,16 @@ urlpatterns = [
     perm_path('view_annotation_descriptions/<genome_build_name>', views.view_annotation_descriptions, name='view_annotation_descriptions_genome_build'),
     perm_path('about_new_vep_columns', views.about_new_vep_columns, name='about_new_vep_columns'),
     perm_path('view_annotation_version_details/<int:annotation_version_id>', views.view_annotation_version_details, name='view_annotation_version_details'),
-    perm_path('clinvar_citations_tab/<int:clinvar_id>', views.clinvar_citations_tab, name='clinvar_citations_tab'),
-    perm_path('pubmed_citations_tab/<pubmed_citations>', views.pubmed_citations_tab, name='pubmed_citations_tab'),
-    perm_path('citations_tab/<path:citations_ids_list>', views.citations_tab, name='citations_tab'),
-    perm_path('citations_json/<path:citations_ids_list>', views.citations_json, name='citations_json'),
     perm_path('load_cached_web_resource/<pk>', views.load_cached_web_resource, name='load_cached_web_resource'),
 
     perm_path('annotation_version/datatable/<path:genome_build_name>/', DatabaseTableView.as_view(column_class=VariantAnnotationVersionColumns), name='variant_annotation_version_datatable'),
     perm_path('annotation_version/grid/<genome_build_name>/<slug:op>/', JQGridView.as_view(grid=VariantAnnotationVersionGrid), name='variant_annotation_version_grid'),
 
     perm_path('annotation_run/datatables', DatabaseTableView.as_view(column_class=AnnotationRunColumns), name='annotation_run_datatable'),
+
+    perm_path('citations_json/<path:citations_ids_list>', views.citations_json, name='citations_json'),
+    perm_path('citation/<str:citation_id>', views.view_citation, name='view_citation'),
+    perm_path('citation/<str:citation_id>/detail', views.view_citation_detail, name='view_citation_detail')
 ]
 
 rest_urlpatterns = [

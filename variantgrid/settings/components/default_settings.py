@@ -9,6 +9,7 @@ See __init__.py in this dir for details
 import os
 import socket
 import re
+import sys
 from collections import defaultdict
 
 from library.django_utils.django_secret_key import get_or_create_django_secret_key
@@ -62,6 +63,7 @@ DISCORDANCE_ENABLED = False
 # be considered in the report
 DISCORDANCE_REPORT_LEEWAY = 14
 
+UNIT_TEST = sys.argv[1:2] == ['test']
 DEBUG = True
 # If SEND_EMAILS is False, all emails that would go through EmailLog will still be record but wont be sent
 # Good for test environments where you don't want to spam test accounts
@@ -301,6 +303,7 @@ CACHED_WEB_RESOURCE_GENCC = "GenCC Gene Disease Relationships"
 CACHED_WEB_RESOURCE_GNOMAD_GENE_CONSTRAINT = "GnomADGeneConstraint"
 CACHED_WEB_RESOURCE_HGNC = "HGNC"
 CACHED_WEB_RESOURCE_LRG_REF_SEQ_GENE = "LRGRefSeqGene"
+CACHED_WEB_RESOURCE_MANE = "MANE"
 CACHED_WEB_RESOURCE_PANEL_APP_AUSTRALIA_PANELS = "PanelApp Australia Panels"
 CACHED_WEB_RESOURCE_PANEL_APP_ENGLAND_PANELS = "Genomics England PanelApp Panels"
 CACHED_WEB_RESOURCE_PFAM = "Pfam"
@@ -312,6 +315,7 @@ ANNOTATION_CACHED_WEB_RESOURCES = [
     CACHED_WEB_RESOURCE_GNOMAD_GENE_CONSTRAINT,
     CACHED_WEB_RESOURCE_HGNC,
     CACHED_WEB_RESOURCE_LRG_REF_SEQ_GENE,
+    CACHED_WEB_RESOURCE_MANE,
     CACHED_WEB_RESOURCE_PANEL_APP_AUSTRALIA_PANELS,
     CACHED_WEB_RESOURCE_PANEL_APP_ENGLAND_PANELS,
     CACHED_WEB_RESOURCE_PFAM,

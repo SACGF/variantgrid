@@ -404,9 +404,10 @@
                 </p>
             {% endif %}
 
-            {% if citations %}
-                {% load citation_tags %}
-                {% retrieve_cached_citations citations %}
+            {% if citations_ids %}
+                {% for citation_id in citations_ids %}
+                    <div data-citation-id="{{ citation_id }}"></div>
+                {% endfor %}
             {% endif %}
         {% endif %}
     </div>
@@ -446,7 +447,7 @@
     </div>
     <div class="container">
         {% if show_annotation %}
-                <h3>Variants ({{ genome_build }})</h3>
+                <h4>Variants ({{ genome_build }})</h4>
 
             {% if has_samples_in_other_builds %}
                 Note: The variants below are from {{ genome_build }} VCFs only. To see data from other builds, switch
@@ -507,7 +508,7 @@
         {% endif %}
 
         {% if gene_in_gene_lists %}
-            <h3>Gene Lists containing {{ gene_symbol }}</h3>
+            <h4>Gene Lists containing {{ gene_symbol }}</h4>
             {% jqgrid 'gene_lists_for_gene_symbol_grid' category.name search=False delete=False gene_symbol=gene_symbol.pk %}
         {% endif %}
 

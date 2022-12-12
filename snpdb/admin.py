@@ -175,13 +175,15 @@ class ClinVarKeyAdmin(ModelAdminBasics):
             self.message_user(request, message=report_row, level=messages.INFO)
 
     def get_form(self, request, obj=None, **kwargs):
-
-        return super().get_form(request, obj, widgets={
+        form = super().get_form(request, obj, widgets={
             'id': admin.widgets.AdminTextInputWidget(),
             'api_key': admin.widgets.AdminTextInputWidget(),
             'org_id': admin.widgets.AdminTextInputWidget(),
             'name': admin.widgets.AdminTextInputWidget()
         }, **kwargs)
+        form.base_fields["assertion_method_lookup"].help_text = \
+            'Preferred format is<br/>{"lookups":[<br/>&nbsp;{"match": "(regex1)", "citation": "acmg"},<br/>&nbsp;{"match": "(regex2)", "citation": {"db": "PubMed", "id": "PMID:123456"}}<br/>]}'
+        return form
 
 
 def make_code_friendly(text: str) -> str:

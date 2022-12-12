@@ -145,7 +145,7 @@ python3 manage.py import_gene_annotation --annotation-consortium=RefSeq --genome
                     {% with vav=details.latest.variant_annotation_version %}
                         {% if vav.cdot_gene_release_filename %}
 <code>
-wget http://cdot.cc/download/{{ vav.cdot_gene_release_filename }}
+wget http://cdot.cc/download/{{ vav.get_annotation_consortium_display }}/{{ build_name }}/{{ vav.cdot_gene_release_filename }}
 python3 manage.py import_gene_annotation --annotation-consortium={{ vav.get_annotation_consortium_display }} --genome-build={{ build_name }} --json-file {{ vav.cdot_gene_release_filename }} --release={{ vav.suggested_gene_annotation_release_name }}
 </code>
                             If it doesn't auto-link, go to <a href="{% url 'admin:annotation_variantannotationversion_change' vav.pk %}">Admin</a> then set the gene annotation release.

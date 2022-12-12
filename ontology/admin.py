@@ -10,8 +10,8 @@ class OntologyTermAdmin(ModelAdminBasics):
     list_display = ('id', 'ontology_service', 'index', 'name', 'status')
     list_filter = ('ontology_service', 'status')
 
-    def is_readonly_field(self, f) -> bool:
-        return True
+    # def is_readonly_field(self, f) -> bool:
+    #     return True
 
     def has_add_permission(self, request):
         return False

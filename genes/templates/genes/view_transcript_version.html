@@ -60,10 +60,11 @@
                 <th>Genome Build</th>
                 <th>Gene</th>
                 <th>BioType</th>
-                <th>Alignment Gap</th>
-                <th>OK for local HGVS resolution</th>
                 <th>Coordinates</th>
                 <th>Length</th>
+                <th>Tags</th>
+                <th>Alignment Gap</th>
+                <th>OK for local HGVS resolution</th>
                 <th>JSON</th>
                 {% if user.is_staff %}
                     <th>Import Filename</th>
@@ -76,6 +77,20 @@
                 <td>{{ genome_build_id }}</td>
                 <td><a class="hover-link" href="{% url 'view_gene' transcript_version.gene.pk %}">{{ transcript_version.gene }}</a></td>
                 <td>{{ transcript_version.biotype }}</td>
+                {% if transcript_version.has_valid_data %}
+                    <td>{{ transcript_version.coordinates }}</td>
+                    <td>{{ transcript_version.length }}</td>
+                {% else %}
+                    <td> N/A</td>
+                    <td> N/A</td>
+                {% endif %}
+                <td>
+                    <span class="pills">
+                        {% for t_tag in transcript_version.tags %}
+                        <span class="pill transcript-tag-{{ t_tag }}">{{ t_tag }}</span>
+                        {% endfor %}
+                    </span>
+                </td>
                 <td>
                     {% if transcript_version.alignment_gap %}
                         {{ transcript_version.cdna_match_diff }}
@@ -84,13 +99,6 @@
                     {% endif %}
                 </td>
                 <td class="text-center">{{ transcript_version.hgvs_ok | boolean }}</td>
-                {% if transcript_version.has_valid_data %}
-                    <td>{{ transcript_version.coordinates }}</td>
-                    <td>{{ transcript_version.length }}</td>
-                {% else %}
-                    <td> N/A</td>
-                    <td> N/A</td>
-                {% endif %}
                 <td>
                     {% modal id="transcript-"|append:transcript_version.pk|append:"-json" label="JSON" %}
                         {% code_json transcript_version.data css_class="modal-body" %}

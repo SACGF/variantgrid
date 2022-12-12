@@ -7,7 +7,7 @@ from genes.models import GeneListCategory
 from genes.tasks.cached_web_resource_tasks import PanelAppEnglandPanelsWebResourceTask, \
     PanelAppAustraliaPanelsWebResourceTask, GnomADGeneConstraintWebResourceTask, PfamWebResourceTask, \
     UniProtWebResourceTask, RefSeqGeneSummaryWebResourceTask, HGNCWebResourceTask, LRGRefSeqGeneWebResourceTask, \
-    RefSeqGeneInfoWebResourceTask
+    RefSeqGeneInfoWebResourceTask, MANEWebResourceTask
 
 # For some reason this doesn't work as a variable, has to be stored here...
 gnomad_gene_constraint_post_save_handler = CachedWebResource.named_handler_factory(settings.CACHED_WEB_RESOURCE_GNOMAD_GENE_CONSTRAINT,
@@ -17,6 +17,9 @@ hgnc_post_save_handler = CachedWebResource.named_handler_factory(settings.CACHED
 
 lrg_ref_seq_gene_post_save_handler = CachedWebResource.named_handler_factory(settings.CACHED_WEB_RESOURCE_LRG_REF_SEQ_GENE,
                                                                              LRGRefSeqGeneWebResourceTask)
+
+mane_post_save_handler = CachedWebResource.named_handler_factory(settings.CACHED_WEB_RESOURCE_MANE,
+                                                                 MANEWebResourceTask)
 
 panel_app_england_panels_post_save_handler = CachedWebResource.named_handler_factory(settings.CACHED_WEB_RESOURCE_PANEL_APP_ENGLAND_PANELS,
                                                                                      PanelAppEnglandPanelsWebResourceTask)

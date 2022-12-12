@@ -25,6 +25,9 @@ def store_pfam_from_web(cached_web_resource):
       The columns are: Pfam accession, clan accession, clan ID, Pfam
       ID, Pfam description. """
 
+    if not Transcript.objects.exists():
+        raise ValueError("No transcripts - you need to import them first.")
+
     # Clear existing records + recreate
     Pfam.objects.all().delete()
     PfamSequence.objects.all().delete()
@@ -75,8 +78,8 @@ def store_pfam_sequences_and_domains() -> int:
     # Insert sequences
     unique_sequences = mapping_df[ensembl_transcript_mask | refseq_transcript_mask]["seq_id"].unique()
     insert_sequences(unique_sequences)
-    insert_ensembl_mappings(mapping_df[ensembl_transcript_mask])
-    insert_refseq_mappings(mapping_df[refseq_transcript_mask])
+    insert_mappings(mapping_df[ensembl_transcript_mask], AnnotationConsortium.ENSEMBL)
+    insert_mappings(mapping_df[refseq_transcript_mask], AnnotationConsortium.REFSEQ)
 
     logging.debug("Retrieving Pfam protein domains via FTP")
     ftp = ftplib.FTP("ftp.ebi.ac.uk")
@@ -99,68 +102,31 @@ def insert_sequences(unique_sequences):
         PfamSequence.objects.bulk_create(pfam_sequences, batch_size=BULK_INSERT_SIZE, ignore_conflicts=True)
 
 
-def insert_ensembl_mappings(ensembl_mapping_df):
-    # PFam maps Sequence <-> Ensembl Transcript ID without version
-    transcripts_qs = Transcript.objects.filter(annotation_consortium=AnnotationConsortium.ENSEMBL)
-    ensembl_transcript_ids = set(transcripts_qs.values_list("identifier", flat=True))
+def insert_mappings(mapping_df, annotation_consortium):
+    ac_label = AnnotationConsortium(annotation_consortium).label
+    known_transcripts = Transcript.known_transcript_ids(annotation_consortium=annotation_consortium)
 
-    num_missing_ensembl_transcripts = 0
-    ensembl_mappings = []
-    for _, row in ensembl_mapping_df.iterrows():
-        transcript_id = row["identifier"]
-        if transcript_id in ensembl_transcript_ids:
-            seq_id = row["seq_id"]
-            if m := PFAM_SEQUENCE_PATTERN.match(seq_id):
-                seq_id = m.group(1)  # Strip off end bit
-            psi = PfamSequenceIdentifier(pfam_sequence_id=seq_id, transcript_id=transcript_id)
-            ensembl_mappings.append(psi)
-        else:
-            num_missing_ensembl_transcripts += 1
-
-    if ensembl_mappings:
-        print(f"Inserting {len(ensembl_mappings)} ENSEMBL transcripts")
-        PfamSequenceIdentifier.objects.bulk_create(ensembl_mappings, batch_size=BULK_INSERT_SIZE)
-    if num_missing_ensembl_transcripts:
-        print(f"Missing {num_missing_ensembl_transcripts} ENSEMBL transcripts")
-
-
-def insert_refseq_mappings(refseq_mapping_df):
-    refseq_transcript_ids = set()
-    refseq_transcript_version_id_by_accession = {}
-    tv_qs = TranscriptVersion.objects.filter(transcript__annotation_consortium=AnnotationConsortium.REFSEQ)
-    for pk, transcript_id, version in tv_qs.values_list("pk", "transcript_id", "version"):
-        refseq_transcript_ids.add(transcript_id)
-        accession = TranscriptVersion.get_accession(transcript_id, version)
-        refseq_transcript_version_id_by_accession[accession] = pk
-
-    num_missing_refseq_transcripts = 0
-    num_missing_refseq_transcript_versions = 0
-
-    refseq_mappings = []
-    for _, row in refseq_mapping_df.iterrows():
+    num_missing_transcripts = 0
+    mappings = []
+    for _, row in mapping_df.iterrows():
         accession = row["identifier"]
-        transcript_id, _ = TranscriptVersion.get_transcript_id_and_version(accession)
-        if transcript_id not in refseq_transcript_ids:
-            num_missing_refseq_transcripts += 1
+        transcript_id, version = TranscriptVersion.get_transcript_id_and_version(accession)
+        if transcript_id not in known_transcripts:
+            num_missing_transcripts += 1
             continue
         seq_id = row["seq_id"]
         if m := PFAM_SEQUENCE_PATTERN.match(seq_id):
             seq_id = m.group(1)  # Strip off end bit
         kwargs = {"pfam_sequence_id": seq_id,
-                  "transcript_id": transcript_id}
-        if transcript_version_id := refseq_transcript_version_id_by_accession.get(accession):
-            kwargs["transcript_version_id"] = transcript_version_id
-        else:
-            num_missing_refseq_transcript_versions += 1
-        refseq_mappings.append(PfamSequenceIdentifier(**kwargs))
+                  "transcript_id": transcript_id,
+                  "version": version}
+        mappings.append(PfamSequenceIdentifier(**kwargs))
 
-    if refseq_mappings:
-        print(f"Inserting {len(refseq_mappings)} RefSeq transcripts")
-        PfamSequenceIdentifier.objects.bulk_create(refseq_mappings, batch_size=BULK_INSERT_SIZE)
-    if num_missing_refseq_transcripts:
-        print(f"Missing {num_missing_refseq_transcripts} RefSeq transcripts")
-    if num_missing_refseq_transcript_versions:
-        print(f"Missing {num_missing_refseq_transcript_versions} RefSeq transcript versions")
+    if mappings:
+        print(f"Inserting {len(mappings)} {ac_label} transcripts")
+        PfamSequenceIdentifier.objects.bulk_create(mappings, batch_size=BULK_INSERT_SIZE)
+    if num_missing_transcripts:
+        print(f"Missing {num_missing_transcripts} {ac_label} transcripts")
 
 
 def insert_domains(pfam_tsv) -> int:

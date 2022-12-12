@@ -1,9 +1,8 @@
 from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import List, Dict, Iterable, Set, Tuple, Any
-
-from annotation.citations import CitationDetails, get_citations
-from annotation.models import CitationSource, Citation
+from annotation.models import Citation, CitationFetchRequest
+from annotation.models.models_citations import CitationIdNormalized, CitationSource
 from classification.enums import SpecialEKeys
 from classification.models import ClassificationModification
 from classification.views.classification_export_utils import TranscriptGroup, VariantWithChgvs
@@ -12,77 +11,28 @@ from genes.hgvs import CHGVS
 from library.log_utils import report_message
 
 
-@dataclass(frozen=True, eq=True)
-class CitationStub:
-    source: str
-    idx: str
-
-    def __str__(self):
-        prefix: str
-        if self.source == CitationSource.PUBMED.value:
-            prefix = CitationSource.PUBMED.label  # would be better off as PMID
-        elif self.source == CitationSource.PUBMED_CENTRAL.value:
-            prefix = CitationSource.PUBMED_CENTRAL.label
-        elif self.source == CitationSource.NCBI_BOOKSHELF.value:
-            prefix = CitationSource.NCBI_BOOKSHELF.label
-        else:
-            # shouldn't happen, but just in case
-            prefix = self.source
-        return f"{prefix}:{self.idx}"
-
-    def __lt__(self, other):
-        if self.source < other.source:
-            return True
-        if self.source == other.source:
-            return self.idx.rjust(10, '0') < other.idx.rjust(10, '0')
-        return False
-
-
 class CitationCounter:
 
     def __init__(self):
-        self.all_citations: Dict[CitationStub, Set[str]] = defaultdict(set)
+        self.all_citations: Dict[CitationIdNormalized, Set[str]] = defaultdict(set)
 
     def reference_citations(self, cm: ClassificationModification):
         for db_ref in cm.db_refs:
-            db = db_ref.get('db')
-            if source := CitationSource.CODES.get(db):
-                idx = db_ref.get('idx')
-                stub = CitationStub(source=source, idx=idx)
-                self.all_citations[stub].add(cm.classification.lab.name)
+            if citation_source := CitationSource.from_legacy_code(db_ref.get('db')):
+                citation_id = CitationIdNormalized.from_parts(
+                    source=citation_source,
+                    index=db_ref.get('idx')
+                )
+                self.all_citations[citation_id].add(cm.classification.lab.name)
 
     def citation_ids(self) -> List[str]:
-        return [str(stub) for stub in sorted(set(self.all_citations.keys()))]
+        return [citation_id.full_id for citation_id in sorted(set(self.all_citations.keys()))]
 
-    def citations(self) -> List[Citation]:
-        citations: List[Citation] = []
-
-        by_source: Dict[str, List[str]] = defaultdict(list)
-        for stub in list(self.all_citations.keys()):
-            by_source[stub.source].append(stub.idx)
-
-        # bulk select and select cachedcitation since we're going to be asking for that soon
-        for source, keys in by_source.items():
-            found = set()
-            for cit in Citation.objects.select_related('cachedcitation').filter(citation_source=source,
-                                                                                citation_id__in=keys):
-                found.add(cit.citation_id)
-                citations.append(cit)
-
-            for check in keys:
-                if check not in found:
-                    citations.append(Citation.objects.create(citation_source=source, citation_id=check))
-        return citations
-
-    def ordered_references(self) -> Iterable[Tuple[CitationDetails, List[Any]]]:
-        citations = self.citations()
-        details = get_citations(citations)
-
-        for citation_detail in details:
-            stub = CitationStub(CitationSource.CODES.get(citation_detail.source), citation_detail.citation_id)
-            references = list(self.all_citations[stub])
-            references.sort()
-            yield citation_detail, references
+    def ordered_references(self) -> Iterable[Tuple[Citation, List[Any]]]:
+        citation_response = CitationFetchRequest.fetch_all_now(list(self.all_citations.keys()))
+        for key in sorted(set(self.all_citations.keys())):
+            labs = self.all_citations.get(key)
+            yield citation_response.for_requested(key), sorted(labs)
 
 
 @dataclass

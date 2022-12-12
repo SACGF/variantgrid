@@ -13,8 +13,8 @@ from snpdb.models import GenomeBuild
 
 class Test(URLTestCase):
     @classmethod
-    def setUpClass(cls):
-        super().setUpClass()
+    def setUpTestData(cls):
+        super().setUpTestData()
 
         cls.user = User.objects.get_or_create(username='testuser')[0]
         ontology_import = OntologyImport.objects.get_or_create(import_source="fake", processed_date=timezone.now())[0]

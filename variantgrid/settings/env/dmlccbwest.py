@@ -87,6 +87,7 @@ _RUNX1_MODE = False
 
 
 VIEW_GENE_SHOW_CLASSIFICATIONS_HOTSPOT_GRAPH = True
+VIEW_GENE_SHOW_HOTSPOT_GRAPH = True
 
 if _SHARIANT_MODE:
     SHARIANT_STATIC_FILES_DIR = os.path.join(VARIANTGRID_APP_DIR, "static_files", "shariant_static")
@@ -106,7 +107,6 @@ if _SHARIANT_MODE:
     VARIANT_DETAILS_SHOW_SAMPLES = False
     VARIANT_SHOW_CANONICAL_HGVS = False
     VIEW_GENE_SHOW_WIKI = False
-    VIEW_GENE_SHOW_CLASSIFICATIONS_HOTSPOT_GRAPH = True
 
     URLS_APP_REGISTER.update({"analysis": False,
                               "expression": False,

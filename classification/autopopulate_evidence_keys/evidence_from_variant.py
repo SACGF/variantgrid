@@ -5,7 +5,7 @@ from django.conf import settings
 from django.contrib.sites.models import Site
 
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
-from annotation.citations import get_citations
+from annotation.models import Citation
 from annotation.models.damage_enums import FATHMMPrediction, \
     MutationTasterPrediction, Polyphen2Prediction, SIFTPrediction, \
     MutationAssessorPrediction, ALoFTPrediction
@@ -498,12 +498,12 @@ def get_evidence_fields_from_variant_query(
     return data
 
 
-def get_literature(clinvar):
-    literature_references = None
+def get_literature(clinvar) -> str:
+    literature_references: Optional[str] = None
     if clinvar:
-        clinvar_citations = clinvar.get_citations()
         clinvar_citation_text_rows = []
-        for citation in get_citations(clinvar_citations):
+        citation:Citation
+        for citation in clinvar.get_loaded_citations():
             citation_parts = [citation.authors_short]
             if citation.year:
                 citation_parts.append(f"({citation.year})")
@@ -513,7 +513,7 @@ def get_literature(clinvar):
             citation_parts = [x for x in citation_parts if x is not None]
             cite_text = " ".join(citation_parts)
             clinvar_citation_text_rows.append(cite_text)
-            clinvar_citation_text_rows.append(f"{citation.source}: {citation.citation_id}")
+            clinvar_citation_text_rows.append(f"{citation.id_pretty}")
             clinvar_citation_text_rows.append('')
 
         if clinvar_citation_text_rows:
