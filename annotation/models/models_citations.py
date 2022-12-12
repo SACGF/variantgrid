@@ -29,27 +29,32 @@ def get_year_from_date(date_published: str) -> str:
     return year
 
 
-class CitationSource2(models.TextChoices):
+class CitationSource(models.TextChoices):
     PUBMED = 'PMID', 'PubMed'
     NCBI_BOOKSHELF = 'Bookshelf ID', 'NCBI Bookshelf'
     PUBMED_CENTRAL = 'PMCID', 'PubMedCentral'
 
     @staticmethod
-    def from_legacy_code(code: str) -> Optional['CitationSource2']:
+    def from_legacy_code(code: str) -> Optional['CitationSource']:
+        """
+        Turns any kind of possible citation prefix into a CitationSource
+        :param code:
+        :return:
+        """
         return {
-            "P": CitationSource2.PUBMED,
-            "PMID": CitationSource2.PUBMED,
-            "PUBMED": CitationSource2.PUBMED,
+            "P": CitationSource.PUBMED,
+            "PMID": CitationSource.PUBMED,
+            "PUBMED": CitationSource.PUBMED,
 
-            "C": CitationSource2.PUBMED_CENTRAL,
-            "PMCID": CitationSource2.PUBMED_CENTRAL,
-            "PubMedCentral": CitationSource2.PUBMED_CENTRAL,
+            "C": CitationSource.PUBMED_CENTRAL,
+            "PMCID": CitationSource.PUBMED_CENTRAL,
+            "PubMedCentral": CitationSource.PUBMED_CENTRAL,
 
-            "N": CitationSource2.NCBI_BOOKSHELF,
-            "NBK": CitationSource2.NCBI_BOOKSHELF,
-            "NCBIBOOKSHELF": CitationSource2.NCBI_BOOKSHELF,
-            "BOOKSHELF": CitationSource2.NCBI_BOOKSHELF,
-            "BOOKSHELF ID": CitationSource2.NCBI_BOOKSHELF
+            "N": CitationSource.NCBI_BOOKSHELF,
+            "NBK": CitationSource.NCBI_BOOKSHELF,
+            "NCBIBOOKSHELF": CitationSource.NCBI_BOOKSHELF,
+            "BOOKSHELF": CitationSource.NCBI_BOOKSHELF,
+            "BOOKSHELF ID": CitationSource.NCBI_BOOKSHELF
         }.get(code.upper())
 
 
@@ -64,7 +69,7 @@ class Citation(TimeStampedModel):
 
     old_id = models.IntegerField(null=True, blank=True)  # the ID of the old Citation
 
-    source = models.CharField(max_length=16, choices=CitationSource2.choices)
+    source = models.CharField(max_length=16, choices=CitationSource.choices)
     index = models.TextField(null=True)
 
     # details about retrieving the JSON from a source
@@ -118,9 +123,9 @@ class Citation(TimeStampedModel):
 
     @property
     def get_external_url(self):
-        if self.source == CitationSource2.PUBMED:
+        if self.source == CitationSource.PUBMED:
             return f"https://www.ncbi.nlm.nih.gov/pubmed/{self.index}"
-        elif self.source == CitationSource2.PUBMED_CENTRAL:
+        elif self.source == CitationSource.PUBMED_CENTRAL:
             return f"https://www.ncbi.nlm.nih.gov/pmc/?term={self.index}"
         else:
             return f"https://www.ncbi.nlm.nih.gov/books/{self.index}"
@@ -140,16 +145,16 @@ class Citation(TimeStampedModel):
 
 @dataclass(frozen=True)
 class CitationIdNormalized:
-    source: CitationSource2
+    source: CitationSource
     index: str
 
     @property
     def full_id(self):
-        if self.source == CitationSource2.PUBMED:
+        if self.source == CitationSource.PUBMED:
             return f"PMID:{self.index}"
-        elif self.source == CitationSource2.PUBMED_CENTRAL:
+        elif self.source == CitationSource.PUBMED_CENTRAL:
             return f"PMCID:{self.index}"
-        elif self.source == CitationSource2.NCBI_BOOKSHELF:
+        elif self.source == CitationSource.NCBI_BOOKSHELF:
             return f"Bookshelf ID:{self.index}"
         else:
             raise ValueError(f"Unexpected citation source {self.source}")
@@ -165,9 +170,9 @@ class CitationIdNormalized:
         return False
 
     @staticmethod
-    def from_parts(source: Union[str, CitationSource2], index: Union[str, int]):
+    def from_parts(source: Union[str, CitationSource], index: Union[str, int]):
         index = str(index)
-        use_source = CitationSource2.from_legacy_code(source)
+        use_source = CitationSource.from_legacy_code(source)
         if not use_source:
             print(f"Unexpected source {source}")
             raise ValueError(f"Unexpected source for Citation ID {source}")
@@ -177,9 +182,9 @@ class CitationIdNormalized:
         else:
             raise ValueError(f"Cannot convert {index} to a number")
 
-        if use_source == CitationSource2.PUBMED_CENTRAL:
+        if use_source == CitationSource.PUBMED_CENTRAL:
             index = f"PMC{index}"
-        elif use_source == CitationSource2.NCBI_BOOKSHELF:
+        elif use_source == CitationSource.NCBI_BOOKSHELF:
             index = f"NBK{index}"
         return CitationIdNormalized(use_source, index)
 
@@ -393,9 +398,9 @@ class CitationFetchRequest:
                     # check if JSON has been migrated from CachedCitation
                     # load that instead of loading from the Citation server
                     if existing.data_json and not existing.last_loaded:
-                        if existing.source in {CitationSource2.PUBMED, CitationSource2.PUBMED_CENTRAL}:
+                        if existing.source in {CitationSource.PUBMED, CitationSource.PUBMED_CENTRAL}:
                             CitationFetchRequest._populate_from_entrez(existing, existing.data_json)
-                        elif existing.source == CitationSource2.NCBI_BOOKSHELF:
+                        elif existing.source == CitationSource.NCBI_BOOKSHELF:
                             CitationFetchRequest._populate_from_nbk(existing, existing.data_json)
                         existing.last_loaded = now()
                         existing.save()
@@ -419,11 +424,11 @@ class CitationFetchRequest:
             citations_by_source = sorted(all_ids, key=lambda c: c.source)
             for source, citations_ids_by_source in itertools.groupby(citations_by_source, key=lambda c: c.source):
                 citations_ids_by_source = list(citations_ids_by_source)
-                if source == CitationSource2.PUBMED:
+                if source == CitationSource.PUBMED:
                     self._load_from_entrez(entrez_db=EntrezDbType.PUBMED, ids=citations_ids_by_source)
-                elif source == CitationSource2.PUBMED_CENTRAL:
+                elif source == CitationSource.PUBMED_CENTRAL:
                     self._load_from_entrez(entrez_db=EntrezDbType.PUBMED_CENTRAL, ids=citations_ids_by_source)
-                elif source == CitationSource2.NCBI_BOOKSHELF:
+                elif source == CitationSource.NCBI_BOOKSHELF:
                     self._load_from_nbk(ids=citations_ids_by_source)
 
         self._mark_error_if_not_fetched(all_ids, "No record was returned for this ID")
@@ -458,9 +463,9 @@ class CitationFetchRequest:
             for record in records:
                 normal_id: CitationIdNormalized
                 if entrez_db == EntrezDbType.PUBMED:
-                    normal_id = CitationIdNormalized(source=CitationSource2.PUBMED, index=record.get("PMID"))
+                    normal_id = CitationIdNormalized(source=CitationSource.PUBMED, index=record.get("PMID"))
                 elif entrez_db == EntrezDbType.PUBMED_CENTRAL:
-                    normal_id = CitationIdNormalized(source=CitationSource2.PUBMED_CENTRAL, index=record.get("PMC"))
+                    normal_id = CitationIdNormalized(source=CitationSource.PUBMED_CENTRAL, index=record.get("PMC"))
                 else:
                     raise ValueError(f"Unsupported EntrezDbType {entrez_db}")
 
@@ -501,7 +506,7 @@ class CitationFetchRequest:
                     for record in results:
                         rid = record["RID"]
                         if CitationFetchRequest.TOP_LEVEL_NBK_RE.fullmatch(rid):
-                            if citation := self._fetch_to_populate(CitationIdNormalized.from_parts(source=CitationSource2.NCBI_BOOKSHELF, index=rid)):
+                            if citation := self._fetch_to_populate(CitationIdNormalized.from_parts(source=CitationSource.NCBI_BOOKSHELF, index=rid)):
                                 CitationFetchRequest._populate_from_nbk(citation, record)
 
             except RuntimeError as run_error:

@@ -4,7 +4,7 @@ from operator import attrgetter
 from re import RegexFlag
 from typing import List, Union, Match, Dict, Optional, Set
 
-from annotation.models.models_citations import CitationSource2, CitationIdNormalized
+from annotation.models.models_citations import CitationSource, CitationIdNormalized
 from ontology.models import OntologyService, OntologyTerm
 
 

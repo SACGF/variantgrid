@@ -2,7 +2,7 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import List, Dict, Iterable, Set, Tuple, Any
 from annotation.models import Citation, CitationFetchRequest
-from annotation.models.models_citations import CitationIdNormalized, CitationSource2
+from annotation.models.models_citations import CitationIdNormalized, CitationSource
 from classification.enums import SpecialEKeys
 from classification.models import ClassificationModification
 from classification.views.classification_export_utils import TranscriptGroup, VariantWithChgvs
@@ -18,7 +18,7 @@ class CitationCounter:
 
     def reference_citations(self, cm: ClassificationModification):
         for db_ref in cm.db_refs:
-            if citation_source := CitationSource2.from_legacy_code(db_ref.get('db')):
+            if citation_source := CitationSource.from_legacy_code(db_ref.get('db')):
                 citation_id = CitationIdNormalized.from_parts(
                     source=citation_source,
                     index=db_ref.get('idx')

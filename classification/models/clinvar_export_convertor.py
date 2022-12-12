@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import List, Any, Mapping, TypedDict, Optional
 from lazy import lazy
 from annotation.models import CitationFetchRequest
-from annotation.models.models_citations import CitationSource2
+from annotation.models.models_citations import CitationSource
 from annotation.regexes import db_citation_regexes
 from classification.enums import SpecialEKeys, EvidenceKeyValueType, ShareLevel
 from classification.models import ClassificationModification, EvidenceKeyMap, EvidenceKey, \
@@ -298,9 +298,9 @@ class ClinVarExportConverter:
         return self.clinvar_export_record.classification_based_on
 
     CITATION_SOURCE_TO_CLINVAR = {
-        CitationSource2.PUBMED: "PubMed",
-        CitationSource2.PUBMED_CENTRAL: "pmc",
-        CitationSource2.NCBI_BOOKSHELF: "Bookshelf"  # FIXME, don't know if this is what NCBI wants, waiting on email
+        CitationSource.PUBMED: "PubMed",
+        CitationSource.PUBMED_CENTRAL: "pmc",
+        CitationSource.NCBI_BOOKSHELF: "Bookshelf"  # FIXME, don't know if this is what NCBI wants, waiting on email
     }
 
     @property

@@ -5,7 +5,7 @@ from django.contrib.auth.models import User
 from annotation.fake_annotation import get_fake_annotation_version, create_fake_clinvar_data, \
     create_fake_variant_annotation
 from annotation.models import HumanProteinAtlasTissueSample, ClinVar, Citation
-from annotation.models.models_citations import CitationSource2
+from annotation.models.models_citations import CitationSource
 from library.django_utils.unittest_utils import URLTestCase
 from snpdb.models import Variant
 from snpdb.models.models_genome import GenomeBuild
@@ -33,7 +33,7 @@ class Test(URLTestCase):
         q = Variant.get_contigs_q(cls.grch37) & Variant.get_no_reference_q()
         variant = Variant.objects.filter(q).first()
         create_fake_variant_annotation(variant, cls.annotation_version_grch37.variant_annotation_version)
-        citation = Citation.objects.filter(source=CitationSource2.PUBMED).first()
+        citation = Citation.objects.filter(source=CitationSource.PUBMED).first()
         pubmed_citation = citation.id
 
         cls.clinvar_id = clinvar.pk

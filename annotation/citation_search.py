@@ -2,12 +2,12 @@ from typing import Any, Optional
 
 from django.dispatch import receiver
 
-from annotation.models.models_citations import CitationSource2, CitationIdNormalized, Citation, CitationFetchRequest, \
+from annotation.models.models_citations import CitationSource, CitationIdNormalized, Citation, CitationFetchRequest, \
     CitationFetchEntry
 from snpdb.search2 import SearchResponseRecordAbstract, SearchInput, search_signal, SearchResponse
 
 
-class SearchResponseCitation(SearchResponseRecordAbstract[CitationSource2]):
+class SearchResponseCitation(SearchResponseRecordAbstract[CitationSource]):
 
     @classmethod
     def search_type(cls) -> str:
