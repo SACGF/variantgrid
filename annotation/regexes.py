@@ -11,8 +11,9 @@ from ontology.models import OntologyService, OntologyTerm
 class MatchType(Enum):
     NUMERIC = 1
     ALPHA_NUMERIC = 2
-    SIMPLE_NUMBERS = 3
-    ENTIRE_UNTIL_SPACE = 4
+    OPT_ALPHA_MAN_NUMERIC = 3  # alpha numeric where there MUST be a numeric at the end
+    SIMPLE_NUMBERS = 4
+    ENTIRE_UNTIL_SPACE = 5
 
 
 class DbRefRegex:
@@ -72,12 +73,12 @@ class DbRegexes:
     HGNC = DbRefRegex(db="HGNC", prefixes="HGNC", link=OntologyService.URLS[OntologyService.HGNC], expected_length=OntologyService.EXPECTED_LENGTHS[OntologyService.HGNC])
     MEDGEN = DbRefRegex(db="MedGen", prefixes="MedGen", link="https://www.ncbi.nlm.nih.gov/medgen/?term=${1}", match_type=MatchType.ALPHA_NUMERIC)
     MONDO = DbRefRegex(db="MONDO", prefixes="MONDO", link=OntologyService.URLS[OntologyService.MONDO], expected_length=OntologyService.EXPECTED_LENGTHS[OntologyService.MONDO])
-    NCBIBookShelf = DbRefRegex(db="Bookshelf ID", prefixes=["NCBIBookShelf", "Bookshelf ID", "Bookshelf", "https://www.ncbi.nlm.nih.gov/books/NBK"], link="https://www.ncbi.nlm.nih.gov/books/${1}", match_type=MatchType.ALPHA_NUMERIC)
+    NCBIBookShelf = DbRefRegex(db="Bookshelf ID", prefixes=["NCBIBookShelf", "Bookshelf ID", "Bookshelf", "https://www.ncbi.nlm.nih.gov/books/NBK"], link="https://www.ncbi.nlm.nih.gov/books/${1}", match_type=MatchType.OPT_ALPHA_MAN_NUMERIC)
     NIHMS = DbRefRegex(db="NIHMS", prefixes="NIHMS", link="https://www.ncbi.nlm.nih.gov/pubmed/?term=NIHMS${1}")
     # smallest OMIM starts with a 1, so there's no 0 padding there, expect min length
     OMIM = DbRefRegex(db="OMIM", prefixes=["OMIM", "MIM"], link=OntologyService.URLS[OntologyService.OMIM], min_length=OntologyService.EXPECTED_LENGTHS[OntologyService.OMIM], expected_length=OntologyService.EXPECTED_LENGTHS[OntologyService.OMIM])
     ORPHA = DbRefRegex(db="Orphanet", prefixes=["ORPHANET", "ORPHA"], link=OntologyService.URLS[OntologyService.ORPHANET], expected_length=OntologyService.EXPECTED_LENGTHS[OntologyService.ORPHANET])
-    PUBMED_CENTRAL = DbRefRegex(db="PMCID", prefixes=["PMCID", "PubMedCentral", "PMC"], link="https://www.ncbi.nlm.nih.gov/pubmed/?term=PMC${1}", match_type=MatchType.ALPHA_NUMERIC)
+    PUBMED_CENTRAL = DbRefRegex(db="PMCID", prefixes=["PMCID", "PubMedCentral", "PMC"], link="https://www.ncbi.nlm.nih.gov/pubmed/?term=PMC${1}", match_type=MatchType.OPT_ALPHA_MAN_NUMERIC)
     PUBMED = DbRefRegex(db="PMID", prefixes=["PubMed", "PMID"], link="https://www.ncbi.nlm.nih.gov/pubmed/?term=${1}")
     SNP = DbRefRegex(db="SNP", prefixes="rs", link="https://www.ncbi.nlm.nih.gov/snp/${1}", match_type=MatchType.SIMPLE_NUMBERS)
     SNOMEDCT = DbRefRegex(db="SNOMED-CT", prefixes=["SNOMED-CT", "SNOMEDCT"], link="https://snomedbrowser.com/Codes/Details/${1}")
@@ -196,7 +197,7 @@ class DbRefRegexes:
         results: List[DbRefRegexResult] = []
         already_added: Set[DbRefRegexResult] = set()
 
-        def append_result_if_length(db_regex: DbRefRegex, match: Optional[Match]) -> bool:
+        def append_result_if_length(db_regex: DbRefRegex, match: Optional[Match], must_end_in_number: bool = False) -> bool:
             """
 
             :param db_regex: The Database Regex we were searching for
@@ -205,13 +206,20 @@ class DbRefRegexes:
             """
             nonlocal results
             nonlocal already_added
-            if match and len(match.group(1)) >= db_regex.min_length:
-                result = DbRefRegexResult(cregx=db_regex, idx=match.group(1), match=match)
-                if not result in already_added:
-                    results.append(result)
-                    already_added.add(result)
-                return True
-            return False
+
+            if not match:
+                return False
+            id_group = match.group(1)
+            if len(id_group) < db_regex.min_length:
+                return False
+            if must_end_in_number and not id_group[-1].isnumeric():
+                return False
+
+            result = DbRefRegexResult(cregx=db_regex, idx=id_group, match=match)
+            if not result in already_added:
+                results.append(result)
+                already_added.add(result)
+            return True
 
         for match in re.finditer(self.prefix_regex, text):
             prefix = match.group(1).lower()
@@ -223,6 +231,9 @@ class DbRefRegexes:
             elif db_regex.match_type == MatchType.ALPHA_NUMERIC:
                 match = _word_regex.match(text, find_from)
                 append_result_if_length(db_regex, match)
+            elif db_regex.match_type == MatchType.OPT_ALPHA_MAN_NUMERIC:
+                match = _word_regex.match(text, find_from)
+                append_result_if_length(db_regex, match, must_end_in_number=True)
             elif db_regex.match_type == MatchType.ENTIRE_UNTIL_SPACE:
                 match = _entire_until_space.match(text, find_from)
                 append_result_if_length(db_regex, match)

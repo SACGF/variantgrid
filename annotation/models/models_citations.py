@@ -170,7 +170,10 @@ class CitationIdNormalized:
             print(f"Unexpected source {source}")
             raise ValueError(f"Unexpected source for Citation ID {source}")
 
-        index = CitationIdNormalized.NUMER_STRIP_RE.match(index).group('number')
+        if match := CitationIdNormalized.NUMER_STRIP_RE.match(index):
+            index = match.group('number')
+        else:
+            raise ValueError(f"Cannot convert {index} to a number")
 
         if use_source == CitationSource2.PUBMED_CENTRAL:
             index = f"PMC{index}"
