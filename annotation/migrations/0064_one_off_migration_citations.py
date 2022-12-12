@@ -61,17 +61,17 @@ def _migrate_citations(apps, schema_editor):
         if len(all_gene_symbol_citations) % 1000 == 0:
             print(f"Migrated {len(all_gene_symbol_citations)} gene_symbol_citation")
         old_id = gene_symbol_citation.citation_id
-        gene_symbol_citation.citation_id = citation_map[old_id]
+        gene_symbol_citation.citation2_id = citation_map[old_id]
         all_gene_symbol_citations.append(gene_symbol_citation)
+    print(f"About to bulk update {len(all_gene_symbol_citations)} gene_symbol_citations - this may take a few minutes")
     GeneSymbolCitation.objects.bulk_update(objs=all_gene_symbol_citations, fields=['citation2'], batch_size=1000)
     print(f"Completed {len(all_gene_symbol_citations)} migrations")
 
-
-    ClinVarCitation = apps.get_model("annotation", "ClinVarCitation")
     all_clinvar_citations = list()
+    ClinVarCitation = apps.get_model("annotation", "ClinVarCitation")
     for clinvar_citation in ClinVarCitation.objects.filter(citation__isnull=False):
         old_id = clinvar_citation.citation_id
-        clinvar_citation.citation_id = citation_map[old_id]
+        clinvar_citation.citation2_id = citation_map[old_id]
         all_clinvar_citations.append(clinvar_citation)
     print(f"About to bulk update {len(all_clinvar_citations)} clinvar_citations - this may take a few minutes")
     ClinVarCitation.objects.bulk_update(objs=all_clinvar_citations, fields=['citation2'], batch_size=10000)
