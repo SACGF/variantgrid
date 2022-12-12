@@ -1093,9 +1093,10 @@ class TranscriptVersion(SortByPKMixin, models.Model):
         PD_ARGS = ("protein_domain__name", "protein_domain__description", "start", "end")
         values_qs = self.proteindomaintranscriptversion_set.all().order_by("start").values_list(*PD_ARGS)
         if not values_qs.exists():
-            pfam = self.pfamsequenceidentifier_set.first()
+            pfam_qs = self.transcript.pfamsequenceidentifier_set.all()
+            pfam = pfam_qs.filter(version=self.version).first()  # Try our version
             if not pfam:
-                pfam = self.transcript.pfamsequenceidentifier_set.first()
+                pfam = pfam_qs.order_by("version").last()
 
             if pfam:
                 PFAM_ARGS = ("pfam__pfam_id", "pfam__description", "start", "end")
@@ -2209,7 +2210,9 @@ class PfamSequenceIdentifier(models.Model):
     """ From HUMAN_9606_idmapping - Used to map Transcripts to PFam sequences """
     pfam_sequence = models.ForeignKey(PfamSequence, on_delete=CASCADE)
     transcript = models.ForeignKey(Transcript, on_delete=CASCADE)
-    transcript_version = models.ForeignKey(TranscriptVersion, null=True, on_delete=SET_NULL)
+    # PFam provides transcript versions, but is build independent, while our transcript versions have builds
+    # So we'll just store the version number
+    version = models.IntegerField(null=True)
 
     @classmethod
     def get_transcript_for_gene(cls, gene: Gene, variant_annotation_version):
@@ -2227,8 +2230,7 @@ class PfamSequenceIdentifier(models.Model):
         pfam_qs = PfamSequenceIdentifier.objects.all()
         for gene in genes:
             if canonical_transcript := gene.get_vep_canonical_transcript(variant_annotation_version):
-                canonical_pfam_q = Q(transcript=canonical_transcript) | Q(transcript_version__transcript=canonical_transcript)
-                if pfam_qs.filter(canonical_pfam_q).exists():
+                if pfam_qs.filter(transcript=canonical_transcript).exists():
                     return canonical_transcript
 
         q_has_pfam = Q(pfamsequenceidentifier__isnull=False) | Q(transcript__pfamsequenceidentifier__isnull=False)

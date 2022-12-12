@@ -104,28 +104,22 @@ def insert_sequences(unique_sequences):
 
 def insert_mappings(mapping_df, annotation_consortium):
     ac_label = AnnotationConsortium(annotation_consortium).label
-    transcript_versions_by_id = TranscriptVersion.transcript_versions_by_id(annotation_consortium=annotation_consortium)
+    known_transcripts = Transcript.known_transcript_ids(annotation_consortium=annotation_consortium)
 
     num_missing_transcripts = 0
-    num_missing_transcript_versions = 0
-
     mappings = []
     for _, row in mapping_df.iterrows():
         accession = row["identifier"]
         transcript_id, version = TranscriptVersion.get_transcript_id_and_version(accession)
-        versions_dict = transcript_versions_by_id.get(transcript_id)
-        if versions_dict is None:
+        if transcript_id not in known_transcripts:
             num_missing_transcripts += 1
             continue
         seq_id = row["seq_id"]
         if m := PFAM_SEQUENCE_PATTERN.match(seq_id):
             seq_id = m.group(1)  # Strip off end bit
         kwargs = {"pfam_sequence_id": seq_id,
-                  "transcript_id": transcript_id}
-        if transcript_version_id := versions_dict.get(version):
-            kwargs["transcript_version_id"] = transcript_version_id
-        else:
-            num_missing_transcript_versions += 1
+                  "transcript_id": transcript_id,
+                  "version": version}
         mappings.append(PfamSequenceIdentifier(**kwargs))
 
     if mappings:
@@ -133,8 +127,6 @@ def insert_mappings(mapping_df, annotation_consortium):
         PfamSequenceIdentifier.objects.bulk_create(mappings, batch_size=BULK_INSERT_SIZE)
     if num_missing_transcripts:
         print(f"Missing {num_missing_transcripts} {ac_label} transcripts")
-    if num_missing_transcript_versions:
-        print(f"Missing {num_missing_transcript_versions} {ac_label} transcript versions")
 
 
 def insert_domains(pfam_tsv) -> int:
