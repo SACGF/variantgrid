@@ -21,7 +21,9 @@ DATE_PUBLISHED_RE = re.compile("^([0-9]+).*?$")
 
 
 def get_year_from_date(date_published: str) -> str:
-    year = None
+    if not date_published:
+        return ""
+    year = ""
     if year_match := DATE_PUBLISHED_RE.fullmatch(date_published):
         year = year_match.group(1)
     return year
