@@ -4,7 +4,7 @@ import typing
 from dataclasses import dataclass, field
 from datetime import timedelta
 from enum import Enum
-from typing import Optional, Iterable, List, Dict, Set, Union, Any, Iterator
+from typing import Optional, Iterable, List, Dict, Set, Union, Any, Iterator, Tuple
 
 from Bio import Entrez, Medline
 from django.db import models
@@ -15,6 +15,17 @@ from django_extensions.db.models import TimeStampedModel
 from library.log_utils import report_exc_info
 from library.utils import JsonObjType, first
 import re
+
+
+"""
+Has the model for Citation as well as the methods for populating them.
+Short version
+
+CitationFetchRequest.fetch_all_now(["PMID:1231232", "PMID:2342323"]).citations
+# returns an array of populated citations
+
+Going via CitationFetchRequest should generally be the only way you interact with Citations
+"""
 
 
 DATE_PUBLISHED_RE = re.compile("^([0-9]+).*?$")
@@ -38,8 +49,8 @@ class CitationSource(models.TextChoices):
     def from_legacy_code(code: str) -> Optional['CitationSource']:
         """
         Turns any kind of possible citation prefix into a CitationSource
-        :param code:
-        :return:
+        :param code: String representing PubMed, PubMedCentral or NCBI's Bookshelf
+        :return: A CitationSource if valid, None otherwise
         """
         return {
             "P": CitationSource.PUBMED,
@@ -61,21 +72,48 @@ class CitationSource(models.TextChoices):
 class EntrezDbType(str, Enum):
     PUBMED = "pubmed"
     PUBMED_CENTRAL = "pmc"
+    BOOKSHELF = "books"
 
 
 class Citation(TimeStampedModel):
-    # details about the ID of the citation
     id = TextField(primary_key=True)
+    """
+    3rd party's unique ID for the citation, e.g. PMID:234434, BookShelf ID:NBK52333
+    """
 
-    old_id = models.IntegerField(null=True, blank=True)  # the ID of the old Citation
+    old_id = models.IntegerField(null=True, blank=True)
+    """
+    Integer ID when Citaiton used that as its primary key.
+    Only needed for Classifications that haven't been re-validated, or historic ClassificationModifications
+    """
 
     source = models.CharField(max_length=16, choices=CitationSource.choices)
-    index = models.TextField(null=True)
+    """
+    Which kind of citation, e.g. PubMed, PubMedCentral
+    """
 
-    # details about retrieving the JSON from a source
+    index = models.TextField(null=True)
+    """
+    The non prefix : part of the citation, often contains redundant of its own e.g.
+    PMCID:PMC42343 index will be "PMC42343"
+    """
+
     data_json = models.JSONField(null=True, blank=True)
+    """
+    The data retrieved from Entrez or similar
+    """
+
     last_loaded = models.DateTimeField(null=True, blank=True)
+    """
+    When this citation data was last requested from Entrez (if it has been).
+    Note if this migration was copied over from the old model, this will be null.
+    If last_loaded is null, title, journal, journal_short etc should all be blank.
+    """
+
     error = models.TextField(null=True, blank=True)
+    """
+    Error (if any) when last attempted to retrieve this record
+    """
 
     # details about the citation directly
     title = models.TextField(null=True, blank=True)
@@ -91,7 +129,7 @@ class Citation(TimeStampedModel):
         return self.id.replace(":", ": ")
 
     @property
-    def _first_and_single_author(self):
+    def _first_and_single_author(self) -> Tuple[str, str]:
         first_author = self.authors_short
         single_author = self.authors_short == self.authors
         if self.authors and not first_author:
@@ -134,6 +172,10 @@ class Citation(TimeStampedModel):
         return reverse('view_citation', kwargs={"citation_id": self.id})
 
     def blank_out(self):
+        """
+        Removes all the derived data in a Citation
+        Generally call before populating data
+        """
         self.title = None
         self.journal = None
         self.journal_short = None
@@ -145,11 +187,22 @@ class Citation(TimeStampedModel):
 
 @dataclass(frozen=True)
 class CitationIdNormalized:
+    """
+    A class that represents a validated Citation.
+    A CitationID should always be valid in format, though it may reference IDs that don't exist.
+    Use a static factory method such as CitationIdNormalized.from_parts and CitationIdNormalized.normalize_id etc
+    so validation is performed.
+    """
+
     source: CitationSource
     index: str
 
     @property
-    def full_id(self):
+    def full_id(self) -> str:
+        """
+        Produce the ID as it would be saved in our database and referred to by 3rd parties
+        :return: A string identifying the citation
+        """
         if self.source == CitationSource.PUBMED:
             return f"PMID:{self.index}"
         elif self.source == CitationSource.PUBMED_CENTRAL:
@@ -160,7 +213,14 @@ class CitationIdNormalized:
             raise ValueError(f"Unexpected citation source {self.source}")
 
     CITATION_SPLIT_RE = re.compile(r"(?P<prefix>[a-z ]+)\s*(?P<semicolon>:)?\s*(?P<number_prefix>[a-z]+)?(?P<number>[0-9]+)", re.IGNORECASE)
+    """
+    Used to split citation strings into parts, e.g. PMCID: PMC32432232 prefix=PMCID, semicolon=: number_prefix=PMC, number=32432232
+    """
+
     NUMER_STRIP_RE = re.compile(r"(?P<number_prefix>[a-z]+)?(?P<number>[0-9]+)", re.IGNORECASE)
+    """
+    Extract the pure number from index, e.g. PMC32432232 gives you PMC and 32432232
+    """
 
     def __lt__(self, other):
         if self.source < other.source:
@@ -205,6 +265,10 @@ class CitationIdNormalized:
         raise ValueError(f"Unable to parse Citation ID {citation_id}")
 
     def get_or_create(self) -> Citation:
+        """
+        Gets or creates a Citation for this CitationID
+        :return: A Citation
+        """
         citation, _ = Citation.objects.get_or_create(
             id=self.full_id,
             defaults={
@@ -215,6 +279,11 @@ class CitationIdNormalized:
         return citation
 
     def for_bulk_create(self) -> Citation:
+        """
+        If using Citation.objects.bulk_create(...., ignore_conflicts=True) use this method
+        for objects, populates created, modified which bulk_create wont do
+        :return: A Citation for use in bulk_create
+        """
         return Citation(
             id=self.full_id,
             source=self.source,
@@ -226,19 +295,55 @@ class CitationIdNormalized:
 
 @dataclass
 class CitationFetchEntry:
-    normalised_id: Optional[CitationIdNormalized] = None
-    citation: Optional[Citation] = None
-    requested_ids: Set[Any] = field(default_factory=set)
-    fetched: bool = False
-    error: Optional[str] = None
+    """
+    Represents the request for a populated Citation.
+    Citations end up in 3 states:
+    A valid ID, where we don't have a Citation record in the database
+    A valid ID, where we do have a Citation record in the database, but it hasn't been populated from Entrez
+    A valid ID, where we do have a Citation record in the database and it has been loaded
+    An invalid ID
+    """
 
-    def record_request_id(self, obj: Any) -> bool:
+    normalised_id: Optional[CitationIdNormalized] = None
+    """
+    The requested ID (derived or provided directly)
+    """
+
+    citation: Optional[Citation] = None
+    """
+    The corresponding Citation record
+    """
+
+    requested_ids: Set[Any] = field(default_factory=set)
+    """
+    Used to link what was requested to what we respond with.
+    e.g. if an API requested an array of ID strings including "PubMed:   2343223", and the resulting normalised_id, citation don't match
+    we can use requested_ids to work out that the resulting "PMID:2343223" matches the requested "PubMed:   2343223"
+    """
+
+    fetched: bool = False
+    """
+    Used internally within CitationFetchRequest to keep track of what records have been processed 
+    """
+
+    error: Optional[str] = None
+    """
+    Error if any with the fetch entry
+    """
+
+    def record_request_id(self, obj: Any):
+        """
+        Attempts to record the object used to make the request, must be Hashable to be recorded
+        """
         if isinstance(obj, typing.Hashable):
             self.requested_ids.add(obj)
-            return True
-        return False
 
     def should_refresh(self, refresh_before: datetime) -> bool:
+        """
+        Does this record need to be reloaded from Entrez
+        :param refresh_before: If the citation was loaded before this date - or never loaded, reload it
+        :return: A boolean indicating if a refresh is required
+        """
         if last_loaded := self.citation.last_loaded:
             return last_loaded < refresh_before
         else:
@@ -257,9 +362,21 @@ class CitationFetchEntry:
 
 
 CitationRequest = Union[str, CitationIdNormalized, Citation, int, 'VCDbRefDict', 'DbRefRegexResult']
+"""
+All the ways a citation can be requested
+str : A string (that we will attempt to normalise) e.g. "PMID: 23423423"
+CitationIdNormalized: ID is already in a known format
+Citation: Citation model, might still need to be populted from Entrez
+int: Refers to the old_id in Citation
+VCDbRefDict: Expects a dict with a key of 'id' (which then acts the same way as str)
+DbRefRegexResult: Expects an attribute 'id_fixed' (which then acts the same way as str)
+"""
 
 
 class CitationFetchResponse:
+    """
+    Wraps the citations returned from a CitationFetchRequest
+    """
 
     def __init__(self, entries: List[CitationFetchEntry]):
         self.all_entries = entries
@@ -273,7 +390,10 @@ class CitationFetchResponse:
     def all_citations(self) -> List[Citation]:
         return [entry.citation for entry in self.all_entries]
 
-    def for_requested(self, citation_id: CitationRequest):
+    def for_requested(self, citation_id: CitationRequest) -> Citation:
+        """
+        Return (a hopefully populated) Citation for the ID that was used to request it
+        """
         return self.requested_to_fetch.get(citation_id).citation
 
     def __iter__(self) -> Iterator[CitationRequest]:
@@ -291,16 +411,35 @@ class CitationFetchResponse:
 
 
 class CitationFetchRequest:
+    """
+    Use to request a batch of populated Citations. Attempts to do so with the minimum number of database and network calls.
+    """
 
     TOP_LEVEL_NBK_RE = re.compile("^NBK[0-9]+$")
+    """
+    Used to identify which response from requesting NBK represents the book (and not just a chapter)
+    """
 
     def __init__(self, cache_age: Optional[timedelta] = None):
         self.id_to_fetch: Dict[CitationIdNormalized, CitationFetchEntry] = dict()
+        """
+        Keeps a dict of all normalized IDs to FetchEntries but only for records
+        """
+
         self.error_fetches: List[CitationFetchEntry] = list()
-        self.refresh_before = now() - (cache_age if cache_age is not None else timedelta(days=365))  # reload every year
+        """
+        FetchEntries that are too invalid to request from Entrez
+        """
+
+        self.refresh_before = now() - (cache_age if cache_age is not None else timedelta(days=730))  # reload every 2 years
 
     @staticmethod
     def fetch_all_now(citation_ids: Iterable[CitationRequest], cache_age: Optional[timedelta] = None) -> CitationFetchResponse:
+        """
+        Return Citations that we attempt to populate
+        :param citation_ids: A series of requests, be they strings, or formatted dicts (note that dicts for non citations will be ignored)
+        :param cache_age: Reload any citations older than the given date, is 2 years by default (just in case there's a correction)
+        """
         cfr = CitationFetchRequest(cache_age=cache_age)
         for citation_id in citation_ids:
             cfr._queue(citation_id)
@@ -309,6 +448,9 @@ class CitationFetchRequest:
 
     @staticmethod
     def get_unfetched_citations(citation_ids: Iterable[CitationRequest]) -> List[Citation]:
+        """
+        Return Citation objects, but don't attempt to populate from Entrez (records might already be populated)
+        """
         cfr = CitationFetchRequest()
         for citation_id in citation_ids:
             cfr._queue(citation_id)
@@ -386,6 +528,10 @@ class CitationFetchRequest:
         return entry
 
     def _load_citation_stubs(self):
+        """
+        Provides Citation objects to the FetchEntries but doesn't populate them (some might even be new Citations
+        not yet saved to the database).
+        """
         if fetch_needing_citations := [fetch for fetch in self.id_to_fetch.values() if not fetch.citation]:
             # assume we request citations much more than we create them
             citations = Citation.objects.filter(
@@ -395,8 +541,8 @@ class CitationFetchRequest:
             for fetch in fetch_needing_citations:
                 if existing := citations_by_id.get(fetch.normalised_id.full_id):
                     fetch.citation = existing
-                    # check if JSON has been migrated from CachedCitation
-                    # load that instead of loading from the Citation server
+                    # Special case of having JSON populated but not the appropriate fields
+                    # This will be the case if teh citation was migrated
                     if existing.data_json and not existing.last_loaded:
                         if existing.source in {CitationSource.PUBMED, CitationSource.PUBMED_CENTRAL}:
                             CitationFetchRequest._populate_from_entrez(existing, existing.data_json)
@@ -420,8 +566,8 @@ class CitationFetchRequest:
     def _fetch_queue(self):
         self._load_citation_stubs()
 
-        if all_ids := [fetch.normalised_id for fetch in self._all_citations_needing_loading]:
-            citations_by_source = sorted(all_ids, key=lambda c: c.source)
+        if ids_require_fetching := [fetch.normalised_id for fetch in self._all_citations_needing_loading]:
+            citations_by_source = sorted(ids_require_fetching, key=lambda c: c.source)
             for source, citations_ids_by_source in itertools.groupby(citations_by_source, key=lambda c: c.source):
                 citations_ids_by_source = list(citations_ids_by_source)
                 if source == CitationSource.PUBMED:
@@ -431,11 +577,14 @@ class CitationFetchRequest:
                 elif source == CitationSource.NCBI_BOOKSHELF:
                     self._load_from_nbk(ids=citations_ids_by_source)
 
-        self._mark_error_if_not_fetched(all_ids, "No record was returned for this ID")
+        # Often the error is we asked NCBI Bookshelf for a list of IDs, but it only returned data for some of the IDs
+        # so if nothing has returned data for a Citation, mark it as in error
+        self._mark_error_if_not_fetched(ids_require_fetching, "No record was returned for this ID")
 
         for fetch in self.id_to_fetch.values():
-            # would like to bulk update but that wouldn't update modified date
-            fetch.citation.save()
+            if fetch.fetched:
+                # TODO, could look into making this a bulk update
+                fetch.citation.save()
 
     def _mark_error_if_not_fetched(self, ids: Iterable[CitationRequest], error_message: str):
         for fetch_id in ids:
@@ -443,6 +592,7 @@ class CitationFetchRequest:
                 if fetch := self.id_to_fetch.get(CitationIdNormalized.normalize_id(fetch_id)):
                     if not fetch.fetched:
                         fetch.fetched = True
+                        fetch.citation.last_loaded = now()
                         fetch.citation.error = error_message
             except ValueError:
                 pass
@@ -456,6 +606,11 @@ class CitationFetchRequest:
         return None
 
     def _load_from_entrez(self, entrez_db: EntrezDbType, ids: List[CitationIdNormalized]):
+        """
+        Requests citation data from Entrez, populates via fetch _fetch_to_populate
+        :param entrez_db: Must be EntrezDb.PMID or EntrezDb.PubMed
+        :param ids: A list of IDs, all sources should match the equivilant EntrezDbType
+        """
         request_ids = [citation_id.index for citation_id in ids]
         try:
             handle = Entrez.efetch(db=entrez_db, id=request_ids, rettype='medline', retmode='text')
@@ -494,18 +649,22 @@ class CitationFetchRequest:
         citation.abstract = record.get("AB")
 
     def _load_from_nbk(self, ids: Iterable[CitationIdNormalized]):
+        """
+        Requests citation data from Entrez, populates via fetch _fetch_to_populate
+        :param ids: A list of IDs, all sources should be BookShelfID
+        """
         for bookshelf_rid in ids:
             try:
-                handle = Entrez.esearch(db="books", term=bookshelf_rid.index, retmax=50)
+                handle = Entrez.esearch(db=EntrezDbType.BOOKSHELF, term=bookshelf_rid.index, retmax=50)
                 search_results = Entrez.read(handle)
-                print(f"For searching {bookshelf_rid.full_id}")
                 if id_list := search_results['IdList']:
-                    handle = Entrez.esummary(db="books", id=','.join(id_list))
+                    handle = Entrez.esummary(db=EntrezDbType.BOOKSHELF, id=','.join(id_list))
                     results = Entrez.read(handle)
 
                     for record in results:
                         rid = record["RID"]
                         if CitationFetchRequest.TOP_LEVEL_NBK_RE.fullmatch(rid):
+                            # result from esummary includes the book and chapters, with no real visible rhyme or reason
                             if citation := self._fetch_to_populate(CitationIdNormalized.from_parts(source=CitationSource.NCBI_BOOKSHELF, index=rid)):
                                 CitationFetchRequest._populate_from_nbk(citation, record)
 
