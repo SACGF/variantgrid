@@ -59,11 +59,11 @@ def nan_to_none(val):
 
 
 def df_nan_to_none(df: pd.DataFrame) -> pd.DataFrame:
-    return df.where((pd.notnull(df)), None)
-
-
-def df_replace_nan(df: pd.DataFrame, nan_replace='') -> pd.DataFrame:
-    return df.where((pd.notnull(df)), nan_replace)
+    """
+    old code: df.where((pd.notnull(df)), None) no longer works in Pandas 1.3.0 (comment July 2021)
+    see https://github.com/pandas-dev/pandas/issues/17494#issuecomment-328890572
+    """
+    return df.replace(np.nan, None)
 
 
 def read_csv_skip_header(fle, header='#', **kwargs) -> pd.DataFrame:
