@@ -325,10 +325,10 @@ class GeneSymbolViewInfo:
         return PanelAppServer.objects.order_by("pk")
 
     def show_classifications_hotspot_graph(self) -> bool:
-        return settings.VIEW_GENE_SHOW_CLASSIFICATIONS_HOTSPOT_GRAPH and self.has_variants.has_classified_variants
+        return settings.VIEW_GENE_HOTSPOT_GRAPH_CLASSIFICATIONS and self.has_variants.has_classified_variants
 
     def show_hotspot_graph(self) -> bool:
-        return settings.VIEW_GENE_SHOW_HOTSPOT_GRAPH and self.has_variants.has_observed_variants
+        return settings.VIEW_GENE_HOTSPOT_GRAPH and self.has_variants.has_observed_variants
 
 
 def export_classifications_gene_symbol(request, gene_symbol: str, genome_build_name: str):
@@ -383,7 +383,7 @@ def view_gene_symbol(request, gene_symbol: str, genome_build_name: Optional[str]
             "show_hotspot_graph"
         ]
     )
-    context["show_wiki"] = settings.VIEW_GENE_SHOW_WIKI
+    context["show_wiki"] = settings.VIEW_GENE_WIKI
     context["show_annotation"] = settings.VARIANT_DETAILS_SHOW_ANNOTATION
     context["datatable_config"] = ClassificationColumns(request)
 
@@ -799,6 +799,10 @@ class HotspotGraphView(TemplateView):
         genome_build_name = self.kwargs["genome_build_name"]
         return GenomeBuild.get_name_or_alias(genome_build_name)
 
+    def _prefer_canonical_with_diff_version(self) -> bool:
+        """ Choose canonical transcripts (w/different version) over exact version non-canonical transcripts """
+        return settings.VIEW_GENE_HOTSPOT_GRAPH_PREFER_CANONICAL_WITH_DIFF_VERSION
+
     @lazy
     def _transcript_version(self) -> Tuple[Optional[TranscriptVersion], Optional[str]]:
         """
@@ -842,12 +846,20 @@ class HotspotGraphView(TemplateView):
 
                 # First, we look for canonical in our gene annotation release
                 canonical, non_canonical = segment(tv_list, filter=lambda tv: tv.canonical_score)
-                SEARCH_ORDER = [
-                    ("canonical", canonical, True),
-                    ("non-canonical", non_canonical, True),
-                    ("canonical", canonical, False),
-                    ("non-canonical", non_canonical, False),
-                ]
+                if self._prefer_canonical_with_diff_version:
+                    SEARCH_ORDER = [
+                        ("canonical", canonical, True),
+                        ("canonical", canonical, False),
+                        ("non-canonical", non_canonical, True),
+                        ("non-canonical", non_canonical, False),
+                    ]
+                else:
+                    SEARCH_ORDER = [
+                        ("canonical", canonical, True),
+                        ("non-canonical", non_canonical, True),
+                        ("canonical", canonical, False),
+                        ("non-canonical", non_canonical, False),
+                    ]
 
                 for description, tv_list, version_match in SEARCH_ORDER:
                     for tv in tv_list:
@@ -927,6 +939,9 @@ class ClassificationsHotspotGraphView(HotspotGraphView):
                               "varianttranscriptannotation__consequence",
                               "variantannotation__gnomad_af",
                               count_column)
+
+    def _prefer_canonical_with_diff_version(self) -> bool:
+        return settings.VIEW_GENE_HOTSPOT_GRAPH_CLASSIFICATIONS_PREFER_CANONICAL_WITH_DIFF_VERSION
 
 
 class CohortHotspotGraphView(HotspotGraphView):
