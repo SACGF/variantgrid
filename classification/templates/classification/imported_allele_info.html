@@ -1,0 +1,21 @@
+{% extends "uicore/page/base.html" %}
+{% load classification_tags %}
+{% load ui_menu_bars %}
+{% load ui_help %}
+{% load ui_utils %}
+{% load ui_tabs_builder %}
+{% block title %}Allele Import Info{% endblock %}
+{% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
+{% block head %}
+{% endblock %}
+{% block content %}
+    <div class="container-table">
+        <h4>Allele Import Info</h4>
+        <table id="imported-allele-info-datatables"
+               data-datatable-url="{% url 'imported_allele_info_datatables' %}"
+               {% comment %}data-datatable-data='classificationFilter'{% endcomment %}
+               class="sticky-header"
+        ></table>
+
+    </div>
+{% endblock %}

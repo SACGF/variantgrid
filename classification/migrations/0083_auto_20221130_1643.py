@@ -6,7 +6,7 @@ from manual.operations.manual_operations import ManualOperation
 
 def _check_has_classifications(apps):
     Classification = apps.get_model("classification", "Classification")
-    return Classification.objects.filter(variant_info__isnull=True).exists()
+    return Classification.objects.filter(allele_info__isnull=True).exists()
 
 
 class Migration(migrations.Migration):

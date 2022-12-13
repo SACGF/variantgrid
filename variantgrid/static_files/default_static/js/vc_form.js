@@ -2122,7 +2122,7 @@ VCTable.c_hgvs = (data, type, row) => {
             // let buildTooltip = `Cannot display normalised c.hgvs in preferred build.\nDisplaying ${labelFn(displayChgvs)} instead`;
             // tooltipLines.splice(0,0,buildTooltip);
 
-            $('<span>', {class:'genome-build hover-detail', text: displayChgvs.build || ''}).appendTo(dom);
+            $('<span>', {class:'genome-build', text: displayChgvs.build || ''}).appendTo(dom);
         }
 
         if (allele_id) {

@@ -15,6 +15,7 @@ from classification.models import EvidenceKey, EvidenceKeyMap, DiscordanceReport
     UploadedClassificationsUnmapped, ClinicalContextRecalcTrigger, ImportedAlleleInfo
 from classification.models.classification import Classification
 from classification.models.classification_import_run import ClassificationImportRun, ClassificationImportRunStatus
+from classification.models.classification_variant_info_models import ImportedVariantInfo
 from classification.tasks.classification_import_map_and_insert_task import ClassificationImportMapInsertTask
 from library.guardian_utils import admin_bot
 from snpdb.admin_utils import ModelAdminBasics, admin_action, admin_list_column, AllValuesChoicesFieldListFilter, \
@@ -594,6 +595,22 @@ class UploadedClassificationsUnmappedAdmin(ModelAdminBasics):
             task.apply_async()
 
 
+@admin.register(ImportedVariantInfo)
+class VariantAlleleAdmin(ModelAdminBasics):
+    list_display = (
+        'allele_info',
+        'genome_build',
+        'variant',
+        'c_hgvs',
+        'gene_symbol',
+        'transcript_version',
+        'genomic_sort'
+    )
+
+    def has_add_permission(self, request):
+        return False
+
+
 @admin.register(ImportedAlleleInfo)
 class ImportedAlleleAdmin(ModelAdminBasics):
     list_display = (
@@ -602,3 +619,6 @@ class ImportedAlleleAdmin(ModelAdminBasics):
         "grch37",
         "grch38"
     )
+
+    def has_add_permission(self, request):
+        return False
