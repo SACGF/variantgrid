@@ -622,6 +622,14 @@ class TranscriptVersion(SortByPKMixin, models.Model):
     biotype = models.TextField(null=True)  # Ensembl has gene + transcript biotypes
     data = models.JSONField(null=False, blank=True, default=empty_dict)  # for pyHGVS
 
+    # These are in data.tags
+    CANONICAL_SCORES = {
+        "MANE Select": 2,
+        "MANE_Select": 2,
+        "RefSeq Select": 1,
+        # Some way to find canonical in Ensembl GRCh37?
+    }
+
     class Meta:
         unique_together = ("transcript", "version", "genome_build")
 
@@ -989,19 +997,18 @@ class TranscriptVersion(SortByPKMixin, models.Model):
         return tag_list
 
     @lazy
+    def canonical_tag(self) -> str:
+        """ We only want to return the most important one """
+        tags = set(self.tags)
+        for ct, score in self.CANONICAL_SCORES.items():
+            if ct in tags:
+                return ct
+        return ""
+
+    @property
     def canonical_score(self) -> int:
         """ This is so you can sort multiple transcripts and find 'most canonical' """
-        CANONICAL_SCORES = {
-            "MANE Select": 2,
-            "MANE_Select": 2,
-            "RefSeq Select": 1,
-            # Some way to find canonical in Ensembl GRCh37?
-        }
-        tags = set(self.tags)
-        for ct, score in CANONICAL_SCORES.items():
-            if ct in tags:
-                return score
-        return 0
+        return self.CANONICAL_SCORES.get(self.canonical_tag, 0)
 
     @property
     def is_canonical(self) -> bool:
@@ -1107,12 +1114,13 @@ class TranscriptVersion(SortByPKMixin, models.Model):
                 return transcript
         return None
 
-    def get_domains(self) -> Tuple[List[Tuple], str]:
+    @lazy
+    def protein_domains_and_accession(self) -> Tuple[List[Tuple], str]:
         """ Gets custom ProteinDomain if available, falling back on Pfam """
         PD_ARGS = ("protein_domain__name", "protein_domain__description", "start", "end")
         protein_domains = list(self.proteindomaintranscriptversion_set.all().order_by("start").values_list(*PD_ARGS))
         if protein_domains:
-            used_transcript_version = str(self)
+            used_transcript_version = self.accession
         else:
             pfam_qs = self.transcript.pfamsequenceidentifier_set.all()
             pfam = pfam_qs.filter(version=self.version).first()  # Try our version
@@ -1121,7 +1129,7 @@ class TranscriptVersion(SortByPKMixin, models.Model):
 
             if pfam:
                 PFAM_ARGS = ("pfam__pfam_id", "pfam__description", "start", "end")
-                protein_domains = pfam.pfam_sequence.pfamdomains_set.order_by("start").values_list(*PFAM_ARGS)
+                protein_domains = list(pfam.pfam_sequence.pfamdomains_set.order_by("start").values_list(*PFAM_ARGS))
                 used_transcript_version = pfam.accession
             else:
                 used_transcript_version = None
@@ -2200,7 +2208,7 @@ class GnomADGeneConstraint(models.Model):
 
 
 class ProteinDomain(models.Model):
-    """ For custom domains, can be used to override PFam - used in TranscriptVersion.get_domains() """
+    """ For custom domains, can be used to override PFam - used in TranscriptVersion.protein_domains_and_accession """
     name = models.TextField(unique=True)
     description = models.TextField()
 

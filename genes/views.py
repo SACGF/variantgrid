@@ -1,4 +1,5 @@
 import logging
+import time
 import uuid
 from collections import defaultdict
 from dataclasses import dataclass
@@ -804,7 +805,7 @@ class HotspotGraphView(TemplateView):
         return settings.VIEW_GENE_HOTSPOT_GRAPH_PREFER_CANONICAL_WITH_DIFF_VERSION
 
     @lazy
-    def _transcript_version(self) -> Tuple[Optional[TranscriptVersion], Optional[str]]:
+    def _pick_transcripts(self) -> Tuple[Optional[TranscriptVersion], str, List[Tuple[str, bool, str, str]]]:
         """
             The transcript diagram is built via transcript_version.get_domains()
             which uses PfamSequenceIdentifier (linked to transcript and has a version number)
@@ -814,9 +815,15 @@ class HotspotGraphView(TemplateView):
 
             Sometimes we have to choose between using canonical but bumping a version vs using non-canonical
         """
+
+        start = time.time()
         transcript_id = self.kwargs.get("transcript_id")
         gene_id = self.kwargs.get("gene_id")
         gene_symbol_id = self.kwargs.get("gene_symbol")
+
+        transcript_version: Optional[TranscriptVersion] = None
+        method = ""
+        transcript_options = []
 
         # Using gene annotation release will restrict it to the desired annotation consortium and versions
         vav = VariantAnnotationVersion.latest(self.genome_build)
@@ -839,11 +846,6 @@ class HotspotGraphView(TemplateView):
             # Sort by canonical then choose higher version if any ties
             tv_list = list(sorted(tv_qs, key=lambda tv: (tv.canonical_score, tv.version), reverse=True))
             if tv_list:
-                pfsi_tv = defaultdict(set)
-                pfsi_qs = PfamSequenceIdentifier.objects.filter(transcript__in=[tv.transcript for tv in tv_list])
-                for transcript_id, version in pfsi_qs.values_list("transcript", "version"):
-                    pfsi_tv[transcript_id].add(version)
-
                 # First, we look for canonical in our gene annotation release
                 canonical, non_canonical = segment(tv_list, filter=lambda tv: tv.canonical_score)
                 if self._prefer_canonical_with_diff_version:
@@ -861,24 +863,36 @@ class HotspotGraphView(TemplateView):
                         ("non-canonical", non_canonical, False),
                     ]
 
-                for description, tv_list, version_match in SEARCH_ORDER:
+                for _description, tv_list, require_version_match in SEARCH_ORDER:
                     for tv in tv_list:
-                        if version_set := pfsi_tv.get(tv.transcript_id):
-                            if version_match:
-                                found = tv.version in version_set
-                                version_info = ""
-                            else:
-                                found = True
-                                version_info = f", version changed from: {tv.version}"
-                            if found:
-                                method = f"Looked up: {lookup} ({description}{version_info})"
-                                return tv, method
-        return None, None
+                        domains, domain_transcript_accession = tv.protein_domains_and_accession
+                        if not domains:
+                            continue
+                        version_match = tv.accession == domain_transcript_accession
+                        found = version_match or not require_version_match
+                        details = ""
+                        if not version_match:
+                            details = f"domain: {domain_transcript_accession}"
+
+                        if found:
+                            tv_method = f"Looked up: {lookup}"
+                            if transcript_version is None:  # First is best one
+                                transcript_version = tv
+                                method = tv_method
+
+                        # We loop through this twice so take last (so transcript_version has been set)
+                        if not require_version_match:
+                            active = tv == transcript_version
+                            transcript_options.append((tv.accession, active, tv.canonical_tag, details))
+
+        end = time.time()
+        #print(f"hotspot transcript took {end-start} secs")
+        return transcript_version, method, transcript_options
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        if tv_and_method := self._transcript_version:
-            transcript_version, method = tv_and_method
+        transcript_version, method, transcript_options = self._pick_transcripts
+        if transcript_version:
             variant_data = []
             for hgvs_p, protein_position, consequence, gnomad_af, count in self._get_values(transcript_version):
                 consequence = MolecularConsequenceColors.CONSEQUENCE_LOOKUPS.get(consequence,
@@ -891,7 +905,7 @@ class HotspotGraphView(TemplateView):
                 pp = VariantAnnotation.protein_position_to_int(protein_position)
                 variant_data.append((protein_aa1, pp, consequence, gnomad_af, count))
 
-            domains, domain_transcript_accession = transcript_version.get_domains()
+            domains, domain_transcript_accession = transcript_version.protein_domains_and_accession
             transcript_description = str(transcript_version.accession)
             if transcript_description != domain_transcript_accession:
                 transcript_description += f" (domain={domain_transcript_accession})"
@@ -905,6 +919,7 @@ class HotspotGraphView(TemplateView):
                 "uuid": uuid.uuid4(),
                 "title": self._get_title(transcript_description),
                 "lookup_method": method,
+                "transcript_options": transcript_options,
                 "y_title": self._get_y_label(),
                 "has_graph_filter_toolbar": self.has_graph_filter_toolbar
             })

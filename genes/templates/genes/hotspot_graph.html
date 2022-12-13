@@ -18,6 +18,11 @@
           margin-left: -10px;
           text-align: center;
         }
+
+        .active-row {
+            background-color: #f6f6ff !important;
+            font-weight: bold;
+        }
     </style>
     <div class="slider-container">
     {% if has_graph_filter_toolbar %}
@@ -28,6 +33,25 @@
         <div class="clear"></div>
         <div id="hotspot-transcripts-{{ uuid }}" class="collapse">
             {{ lookup_method }}
+            <table>
+            {% for accession, active, canonical_tag, details in transcript_options %}
+                <tr class="{% if active %}active-row{% endif %}">
+                    <td>
+                        <a href="">{{ accession }}</a>
+                    </td>
+                    <td>
+                        {{ details }}
+                    </td>
+                    <td>
+                        {% if canonical_tag %}
+                            <span class="pills">
+                                <span class="pill">{{ canonical_tag }}</span>
+                            </span>
+                        {% endif %}
+                    </td>
+                </tr>
+            {% endfor %}
+            </table>
         </div>
     </div>
     <script>
