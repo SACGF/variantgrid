@@ -5,12 +5,7 @@
     Define a JS function "hotspot_graph_click_func(text, transcript_accession, protein_position)" to get callbacks from plotly clicks
     {% endcomment %}
     <div class="hotspot-graph" id="hotspot-graph-{{ uuid }}"></div>
-    {% if has_graph_filter_toolbar %}
     <style>
-        .slider-container {
-            height: 30px;
-        }
-
         .gnomad-af-slider {
             margin-left: 15px;
             width: 400px;
@@ -25,11 +20,16 @@
         }
     </style>
     <div class="slider-container">
+    {% if has_graph_filter_toolbar %}
         <label class="left" for="hotspot-graph-af-slider-{{ uuid }}">Graph gnomAD max %: </label>
         <div class="left gnomad-af-slider" id="hotspot-graph-af-slider-{{ uuid }}"></div>
-        <div class="clear"></div>
-    </div>
     {% endif %}
+        <a class="toggle-link" data-toggle="collapse" href="#hotspot-transcripts-{{ uuid }}">HotSpot graph transcripts...</a>
+        <div class="clear"></div>
+        <div id="hotspot-transcripts-{{ uuid }}" class="collapse">
+            {{ lookup_method }}
+        </div>
+    </div>
     <script>
     _ = function() {
         const GNOMAD_PERCENT = [0.1, 1, 5, 100];

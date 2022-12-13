@@ -47,7 +47,7 @@ from genes.models_enums import AnnotationConsortium
 from genes.serializers import SampleGeneListSerializer
 from library.constants import MINUTE_SECS
 from library.django_utils import get_field_counts, add_save_message
-from library.utils import defaultdict_to_dict, LazyAttribute
+from library.utils import defaultdict_to_dict, LazyAttribute, segment
 from ontology.models import OntologySnake, OntologyService, OntologyTerm
 from seqauto.models import EnrichmentKit
 from snpdb.models import CohortGenotypeCollection, Cohort, VariantZygosityCountCollection, Sample, VariantGridColumn
@@ -770,8 +770,8 @@ class HotspotGraphView(TemplateView):
     template_name = "genes/hotspot_graph.html"
     has_graph_filter_toolbar = True
 
-    def _get_title(self, transcript_version) -> str:
-        return f"Het/Hom variants for {transcript_version}"
+    def _get_title(self, transcript_description) -> str:
+        return f"Het/Hom variants for {transcript_description}"
 
     def _get_y_label(self) -> str:
         return "# samples"
@@ -823,11 +823,65 @@ class HotspotGraphView(TemplateView):
             raise ValueError("At least one of 'gene_symbol', 'gene_id' or 'transcript_id' must be in url kwargs")
         return transcript
 
+    @lazy
+    def _transcript_version(self) -> Tuple[Optional[TranscriptVersion], Optional[str]]:
+        transcript_id = self.kwargs.get("transcript_id")
+        gene_id = self.kwargs.get("gene_id")
+        gene_symbol_id = self.kwargs.get("gene_symbol")
+
+        # Using gene annotation release will restrict it to the desired annotation consortium and versions
+        vav = VariantAnnotationVersion.latest(self.genome_build)
+        if gar := vav.gene_annotation_release:
+            if transcript_id:
+                lookup = f"Transcript: {transcript_id}"
+                transcript = Transcript.objects.get(pk=transcript_id)
+                tv_qs = gar.releasetranscriptversion_set.filter(transcript=transcript)
+            elif gene_id or gene_symbol_id:
+                if gene_id:
+                    lookup = f"Gene: {gene_id}"
+                    gene = get_object_or_404(Gene, identifier=gene_id)
+                    tv_qs = gar.transcript_versions_for_gene(gene)
+                else:
+                    lookup = f"GeneSymbol: {gene_symbol_id}"
+                    tv_qs = gar.transcript_versions_for_symbol(gene_symbol_id)
+            else:
+                raise ValueError("At least one of 'gene_symbol', 'gene_id' or 'transcript_id' must be in url kwargs")
+
+            # Sort by canonical then choose higher version if any ties
+            tv_list = list(sorted(tv_qs, key=lambda tv: (tv.canonical_score, tv.version), reverse=True))
+            if tv_list:
+                pfsi_tv = defaultdict(set)
+                pfsi_qs = PfamSequenceIdentifier.objects.filter(transcript__in=[tv.transcript for tv in tv_list])
+                for transcript_id, version in pfsi_qs.values_list("transcript", "version"):
+                    pfsi_tv[transcript_id].add(version)
+
+                # First, we look for canonical in our gene annotation release
+                canonical, non_canonical = segment(tv_list, filter=lambda tv: tv.canonical_score)
+                SEARCH_ORDER = [
+                    ("canonical", canonical, True),
+                    ("canonical", canonical, False),
+                    ("non-canonical", non_canonical, True),
+                    ("non-canonical", non_canonical, False),
+                ]
+
+                for description, tv_list, version_match in SEARCH_ORDER:
+                    for tv in tv_list:
+                        if version_set := pfsi_tv.get(tv.transcript_id):
+                            if version_match:
+                                found = tv.version in version_set
+                                version_info = ""
+                            else:
+                                found = True
+                                version_info = f", version changed from: {tv.version}"
+                            if found:
+                                method = f"Looked up: {lookup} ({description}{version_info})"
+                                return tv, method
+        return None, None
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        if self.transcript:
-            transcript_version = self.transcript.latest_version(self.genome_build)
-
+        if tv_and_method := self._transcript_version:
+            transcript_version, method = tv_and_method
             variant_data = []
             for hgvs_p, protein_position, consequence, gnomad_af, count in self._get_values(transcript_version):
                 consequence = MolecularConsequenceColors.CONSEQUENCE_LOOKUPS.get(consequence,
@@ -840,24 +894,31 @@ class HotspotGraphView(TemplateView):
                 pp = VariantAnnotation.protein_position_to_int(protein_position)
                 variant_data.append((protein_aa1, pp, consequence, gnomad_af, count))
 
-            domains = transcript_version.get_domains()
+            domains, domain_transcript_accession = transcript_version.get_domains()
+            transcript_description = str(transcript_version)
+            if transcript_description != domain_transcript_accession:
+                transcript_description += f" (domain={domain_transcript_accession})"
+
             molecular_consequence_colors = dict(MolecularConsequenceColors.HOTSPOT_COLORS)
-            context.update({"transcript_version": transcript_version,
-                            "molecular_consequence_colors": molecular_consequence_colors,
-                            "domains": list(domains),
-                            "variant_data": variant_data,
-                            "uuid": uuid.uuid4(),
-                            "title": self._get_title(transcript_version),
-                            "y_title": self._get_y_label(),
-                            "has_graph_filter_toolbar": self.has_graph_filter_toolbar})
+            context.update({
+                "transcript_version": transcript_version,
+                "molecular_consequence_colors": molecular_consequence_colors,
+                "domains": list(domains),
+                "variant_data": variant_data,
+                "uuid": uuid.uuid4(),
+                "title": self._get_title(transcript_description),
+                "lookup_method": method,
+                "y_title": self._get_y_label(),
+                "has_graph_filter_toolbar": self.has_graph_filter_toolbar
+            })
         return context
 
 
 class ClassificationsHotspotGraphView(HotspotGraphView):
     has_graph_filter_toolbar = False
 
-    def _get_title(self, transcript_version) -> str:
-        return f"Classifications for {transcript_version}"
+    def _get_title(self, transcript_description) -> str:
+        return f"Classifications for {transcript_description}"
 
     def _get_y_label(self) -> str:
         return "# classifications"
@@ -894,8 +955,8 @@ class CohortHotspotGraphView(HotspotGraphView):
         cohort_id = self.kwargs["cohort_id"]
         return Cohort.get_for_user(self.request.user, cohort_id)
 
-    def _get_title(self, transcript_version) -> str:
-        return f"{self.cohort} - {transcript_version}"
+    def _get_title(self, transcript_description) -> str:
+        return f"{self.cohort} - {transcript_description}"
 
     def _get_values(self, transcript_version):
         """ :returns hgvs_p, pp, consequence, count, gnomad_af """
@@ -924,8 +985,8 @@ class PublicRUNX1HotspotGraphView(ClassificationsHotspotGraphView):
     def transcript(self) -> Optional[Transcript]:
         return Transcript.objects.get(pk="ENST00000300305")
 
-    def _get_title(self, transcript_version) -> str:
-        title = super()._get_title(transcript_version)
+    def _get_title(self, transcript_description) -> str:
+        title = super()._get_title(transcript_description)
         return title + " (Germline)"
 
     def _get_classifications(self):
