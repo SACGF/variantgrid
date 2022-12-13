@@ -832,7 +832,7 @@ class HotspotGraphView(TemplateView):
             if transcript_id:
                 lookup = f"Transcript: {transcript_id}"
                 transcript = Transcript.objects.get(pk=transcript_id)
-                tv_qs = gar.releasetranscriptversion_set.filter(transcript_version__transcript=transcript)
+                tv_qs = gar.transcript_versions_for_transcript(transcript)
             elif gene_id or gene_symbol_id:
                 if gene_id:
                     lookup = f"Gene: {gene_id}"
