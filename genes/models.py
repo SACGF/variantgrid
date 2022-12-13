@@ -1115,11 +1115,11 @@ class TranscriptVersion(SortByPKMixin, models.Model):
         return None
 
     @lazy
-    def protein_domains_and_accession(self) -> Tuple[List[Tuple], str]:
+    def protein_domains_and_accession(self) -> Tuple[QuerySet, str]:
         """ Gets custom ProteinDomain if available, falling back on Pfam """
         PD_ARGS = ("protein_domain__name", "protein_domain__description", "start", "end")
-        protein_domains = list(self.proteindomaintranscriptversion_set.all().order_by("start").values_list(*PD_ARGS))
-        if protein_domains:
+        protein_domains = self.proteindomaintranscriptversion_set.all().order_by("start").values_list(*PD_ARGS)
+        if protein_domains.exists():
             used_transcript_version = self.accession
         else:
             pfam_qs = self.transcript.pfamsequenceidentifier_set.all()
@@ -1129,7 +1129,7 @@ class TranscriptVersion(SortByPKMixin, models.Model):
 
             if pfam:
                 PFAM_ARGS = ("pfam__pfam_id", "pfam__description", "start", "end")
-                protein_domains = list(pfam.pfam_sequence.pfamdomains_set.order_by("start").values_list(*PFAM_ARGS))
+                protein_domains = pfam.pfam_sequence.pfamdomains_set.order_by("start").values_list(*PFAM_ARGS)
                 used_transcript_version = pfam.accession
             else:
                 used_transcript_version = None

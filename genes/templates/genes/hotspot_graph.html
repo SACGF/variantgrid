@@ -37,7 +37,7 @@
             {% for accession, active, canonical_tag, details in transcript_options %}
                 <tr class="{% if active %}active-row{% endif %}">
                     <td>
-                        <a href="">{{ accession }}</a>
+                        <a class="hotspot-load-transcript-link" accession="{{ accession }}">{{ accession }}</a>
                     </td>
                     <td>
                         {{ details }}
@@ -55,12 +55,16 @@
         </div>
     </div>
     <script>
-    _ = function() {
+    (function() {
         const GNOMAD_PERCENT = [0.1, 1, 5, 100];
         let molecularConsequenceColors = {{ molecular_consequence_colors | jsonify }};
         let numCodons = {{ transcript_version.num_codons }};
         let domains = {{ domains | jsonify }};
         let variantData = {{ variant_data | jsonify }};
+        let transcriptUrls = {{ transcript_urls | jsonify }};
+        let hotSpotId = "hotspot-graph-{{ uuid }}";
+        let hotSpotDiv = $("#" + hotSpotId);
+        let hotspot_graph_click_func = hotSpotDiv.attr("hotspot_graph_click_func");
 
         function drawTranscriptModel(selector, gnomADMaxPercent) {
             const DEFAULT_COLORS = [
@@ -269,13 +273,23 @@
 
             let myPlot = document.getElementById(selector);
             myPlot.on('plotly_click', function (data) {
-                let hotspot_graph_click_func = $(myPlot).attr("hotspot_graph_click_func");
                 if (typeof (hotspot_graph_click_func) != 'undefined') {
                     let barClicked = data.points[0];
                     let i = barClicked.data.x.indexOf(String(barClicked.x));
                     let text = "Hotspot click " + barClicked.data.text[i];
                     eval(hotspot_graph_click_func + "('{{ transcript_version.pk }}', text, barClicked.x);");
                 }
+            });
+        }
+
+        function clickTranscript() {
+            const accession = $(this).attr("accession");
+            const url = transcriptUrls[accession];
+            const container = hotSpotDiv.parent();
+            container.empty();
+            container.load(url, function() {
+                // put click handler back
+                $(".hotspot-graph", this).attr("hotspot_graph_click_func", hotspot_graph_click_func);
             });
         }
 
@@ -287,7 +301,7 @@
                     let value = $(sliderDiv).slider("value");
                     gnomADMaxPercent = GNOMAD_PERCENT[value];
                 }
-                drawTranscriptModel("hotspot-graph-{{ uuid }}", gnomADMaxPercent);
+                drawTranscriptModel(hotSpotId, gnomADMaxPercent);
             }
 
             let gnomadMax = GNOMAD_PERCENT.length - 1;
@@ -296,17 +310,19 @@
                 change: drawMyTranscriptModel
             }).each(function() {
                 // From: https://stackoverflow.com/a/16877678/295724
-                var opt = $(this).data().uiSlider.options;
-                var vals = opt.max - opt.min;
-                for (var i = 0; i <= vals; i++) {
-                    var label = GNOMAD_PERCENT[i] + "%";
-                    var el = $('<label>' + label + '</label>').css('left', (i/vals*100) + '%');
+                const opt = $(this).data().uiSlider.options;
+                const vals = opt.max - opt.min;
+                for (let i = 0; i <= vals; i++) {
+                    const label = GNOMAD_PERCENT[i] + "%";
+                    const el = $('<label>' + label + '</label>').css('left', (i/vals*100) + '%');
                     sliderDiv.append(el);
                 }
             });
 
             drawMyTranscriptModel();
+
+            $("a.hotspot-load-transcript-link", "#hotspot-transcripts-{{ uuid }}").on('click', clickTranscript);
         });
-    }();
+    })();
     </script>
 {% endif %}
