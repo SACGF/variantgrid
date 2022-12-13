@@ -800,31 +800,16 @@ class HotspotGraphView(TemplateView):
         return GenomeBuild.get_name_or_alias(genome_build_name)
 
     @lazy
-    def transcript(self) -> Optional[Transcript]:
-        transcript_id = self.kwargs.get("transcript_id")
-        gene_id = self.kwargs.get("gene_id")
-        gene_symbol_id = self.kwargs.get("gene_symbol")
-        transcript = None
-
-        if transcript_id:
-            transcript = Transcript.objects.get(pk=transcript_id)
-        elif gene_id or gene_symbol_id:
-            vav = VariantAnnotationVersion.latest(self.genome_build)
-            if gene_id:
-                gene = get_object_or_404(Gene, identifier=gene_id)
-                transcript = PfamSequenceIdentifier.get_transcript_for_gene(gene, vav)
-            elif gene_symbol_id:
-                gene_symbol = get_object_or_404(GeneSymbol, pk=gene_symbol_id)
-                transcript = PfamSequenceIdentifier.get_transcript_for_gene_symbol(gene_symbol, vav)
-
-            if transcript is None:
-                logging.warning("No PfamSequenceIdentifier for %s", gene_id or gene_symbol_id)
-        else:
-            raise ValueError("At least one of 'gene_symbol', 'gene_id' or 'transcript_id' must be in url kwargs")
-        return transcript
-
-    @lazy
     def _transcript_version(self) -> Tuple[Optional[TranscriptVersion], Optional[str]]:
+        """
+            The transcript diagram is built via transcript_version.get_domains()
+            which uses PfamSequenceIdentifier (linked to transcript and has a version number)
+
+            The protein position of variants come from VariantAnnotation, which means we need to match the transcripts
+            used between gene annotation release and PfamSequenceIdentifier
+
+            Sometimes we have to choose between using canonical but bumping a version vs using non-canonical
+        """
         transcript_id = self.kwargs.get("transcript_id")
         gene_id = self.kwargs.get("gene_id")
         gene_symbol_id = self.kwargs.get("gene_symbol")
@@ -859,8 +844,8 @@ class HotspotGraphView(TemplateView):
                 canonical, non_canonical = segment(tv_list, filter=lambda tv: tv.canonical_score)
                 SEARCH_ORDER = [
                     ("canonical", canonical, True),
-                    ("canonical", canonical, False),
                     ("non-canonical", non_canonical, True),
+                    ("canonical", canonical, False),
                     ("non-canonical", non_canonical, False),
                 ]
 
@@ -895,7 +880,7 @@ class HotspotGraphView(TemplateView):
                 variant_data.append((protein_aa1, pp, consequence, gnomad_af, count))
 
             domains, domain_transcript_accession = transcript_version.get_domains()
-            transcript_description = str(transcript_version)
+            transcript_description = str(transcript_version.accession)
             if transcript_description != domain_transcript_accession:
                 transcript_description += f" (domain={domain_transcript_accession})"
 
