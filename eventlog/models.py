@@ -10,14 +10,13 @@ from django.utils import timezone
 from model_utils.models import TimeStampedModel
 
 from library.enums.log_level import LogLevel
-from library.utils import empty_dict
 
 
 class ViewEvent(TimeStampedModel):
     # ViewEvent isn't an accurate name since it's also used for POST
     user = models.ForeignKey(User, null=True, on_delete=SET_NULL)
     view_name = models.TextField()
-    args = models.JSONField(null=False, blank=True, default=empty_dict)
+    args = models.JSONField(null=False, blank=True, default=dict)
     path = models.TextField()
     method = models.TextField()
     referer = models.TextField(null=True, blank=True)

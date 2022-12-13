@@ -9,7 +9,6 @@ from django.db import migrations, models
 import classification.models.evidence_mixin
 import library.django_utils.django_file_system_storage
 import library.django_utils.guardian_permissions_mixin
-import library.utils
 
 
 class Migration(migrations.Migration):
@@ -72,7 +71,7 @@ class Migration(migrations.Migration):
                 ('chgvs_grch38_full', models.TextField(blank=True, null=True)),
                 ('share_level', models.CharField(choices=[('user', 'CURRENT_USER'), ('lab', 'LAB'), ('institution', 'INSTITUTION'), ('logged_in_users', 'ALL_USERS'), ('public', 'PUBLIC')], default='lab', max_length=16)),
                 ('lab_record_id', models.TextField(blank=True, null=True)),
-                ('evidence', models.JSONField(blank=True, default=library.utils.empty_dict)),
+                ('evidence', models.JSONField(blank=True, default=dict)),
                 ('withdrawn', models.BooleanField(default=False)),
                 ('clinical_significance', models.CharField(blank=True, choices=[('0', 'Other'), ('1', 'Benign'), ('2', 'Likely Benign'), ('3', 'VUS'), ('4', 'Likely Pathogenic'), ('5', 'Pathogenic')], max_length=1, null=True)),
                 ('annotation_version', models.ForeignKey(null=True, on_delete=django.db.models.deletion.SET_NULL, to='annotation.annotationversion')),
@@ -101,7 +100,7 @@ class Migration(migrations.Migration):
                 ('created', datetimeutc.fields.DateTimeUTCField(auto_now_add=True, db_index=True)),
                 ('modified', datetimeutc.fields.DateTimeUTCField(auto_now=True)),
                 ('source', models.TextField()),
-                ('delta', models.JSONField(blank=True, default=library.utils.empty_dict)),
+                ('delta', models.JSONField(blank=True, default=dict)),
                 ('published', models.BooleanField(default=False)),
                 ('published_evidence', models.JSONField(blank=True, default=None, null=True)),
                 ('share_level', models.CharField(blank=True, choices=[('user', 'CURRENT_USER'), ('lab', 'LAB'), ('institution', 'INSTITUTION'), ('logged_in_users', 'ALL_USERS'), ('public', 'PUBLIC')], max_length=16, null=True)),

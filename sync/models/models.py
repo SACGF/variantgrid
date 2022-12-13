@@ -5,7 +5,6 @@ from django.db import models
 from django.db.models.deletion import CASCADE
 from django_extensions.db.models import TimeStampedModel
 
-from library.utils import empty_dict
 from sync.models.enums import SyncStatus
 
 
@@ -19,7 +18,7 @@ class SyncDestination(models.Model):
     """
 
     name = models.TextField(null=False, unique=True)
-    config = models.JSONField(null=False, blank=True, default=empty_dict)
+    config = models.JSONField(null=False, blank=True, default=dict)
     enabled = models.BooleanField(null=False, blank=True, default=True)
 
     def run(self, full_sync: bool = False, max_rows: Optional[int] = None):

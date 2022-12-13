@@ -44,7 +44,7 @@ from library.django_utils.django_partition import RelatedModelsPartitionModel
 from library.file_utils import mk_path
 from library.guardian_utils import assign_permission_to_user_and_groups, DjangoPermission
 from library.log_utils import log_traceback
-from library.utils import empty_dict, get_single_element, iter_fixed_chunks
+from library.utils import get_single_element, iter_fixed_chunks
 from snpdb.models import Wiki, Company, Sample, DataState
 from snpdb.models.models_enums import ImportStatus
 from snpdb.models.models_genome import GenomeBuild, Contig
@@ -620,7 +620,7 @@ class TranscriptVersion(SortByPKMixin, models.Model):
     contig = models.ForeignKey(Contig, on_delete=CASCADE)  # Optimisation to restrict Variant queries
     import_source = models.ForeignKey(GeneAnnotationImport, on_delete=CASCADE)
     biotype = models.TextField(null=True)  # Ensembl has gene + transcript biotypes
-    data = models.JSONField(null=False, blank=True, default=empty_dict)  # for pyHGVS
+    data = models.JSONField(null=False, blank=True, default=dict)  # for cdot data
 
     # These are in data.tags
     CANONICAL_SCORES = {

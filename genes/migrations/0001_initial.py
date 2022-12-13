@@ -172,7 +172,7 @@ class Migration(migrations.Migration):
                 ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('version', models.IntegerField()),
                 ('biotype', models.TextField(null=True)),
-                ('data', models.JSONField(blank=True, default=library.utils.empty_dict)),
+                ('data', models.JSONField(blank=True, default=dict)),
                 ('gene_version', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='genes.geneversion')),
                 ('genome_build', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='snpdb.genomebuild')),
                 ('import_source', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='genes.geneannotationimport')),

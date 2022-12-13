@@ -10,7 +10,7 @@ class ViewEventAdmin(ModelAdminBasics):
     """
     user = models.ForeignKey(User, null=True, on_delete=SET_NULL)
     view_name = models.TextField()
-    args = models.JSONField(null=False, blank=True, default=empty_dict)
+    args = models.JSONField(null=False, blank=True, default=dict)
     path = models.TextField()
     method = models.TextField()
 
