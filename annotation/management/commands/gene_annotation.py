@@ -191,29 +191,13 @@ class Command(BaseCommand):
 
         print(f"Completed: {timezone.now()}")
 
-    @staticmethod
-    def _bad_gene_annotation():
-        bad_gene_annotation = []
-        for gav in GeneAnnotationVersion.objects.all():
-            if gav.dbnsfp_gene_version and not gav.geneannotation_set.filter(dbnsfp_gene__isnull=False).exists():
-                # print(f"{gav} - dbNSFP set but not linked correctly!")
-                bad_gene_annotation.append(gav)
-                continue
-
-            try:
-                if ga := gav.geneannotation_set.first():
-                    _ = ga.gene
-            except Gene.DoesNotExist:
-                bad_gene_annotation.append(gav)
-        return bad_gene_annotation
-
     def _fix_bad_gene_annotation(self, gene_symbols):
         """ dbNSFP wasn't linked from new - due to not including headers
             gene was inserted as str(gene) which caused it to be "ENSG (Ensembl)"
         """
 
         fixed = []
-        for gav in self._bad_gene_annotation():
+        for gav in bad_gene_annotation():
             print(f"{gav} - needs fixing. Deleting old...")
             gav.geneannotation_set.all().delete()
             print(f"{gav} - regenerating...")
@@ -350,3 +334,20 @@ class Command(BaseCommand):
         self.stdout.write(f"Inserting file '{csv_filename}' into partition {partition_table}\n")
         sql_copy_csv(csv_filename, partition_table, self.GENE_ANNOTATION_HEADER, delimiter=delimiter)
         self.stdout.write("Done!\n")
+
+
+def bad_gene_annotation():
+    """ This is used as a test in annotation/migrations/0068_one_off_manual_fix_bad_gene_annotation """
+    bad_gene_annotation = []
+    for gav in GeneAnnotationVersion.objects.all():
+        if gav.dbnsfp_gene_version and not gav.geneannotation_set.filter(dbnsfp_gene__isnull=False).exists():
+            # print(f"{gav} - dbNSFP set but not linked correctly!")
+            bad_gene_annotation.append(gav)
+            continue
+
+        try:
+            if ga := gav.geneannotation_set.first():
+                _ = ga.gene
+        except Gene.DoesNotExist:
+            bad_gene_annotation.append(gav)
+    return bad_gene_annotation
