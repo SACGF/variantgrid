@@ -36,8 +36,8 @@ class Command(BaseCommand):
                            help="Add new columns gene/disease and MONDO terms to existing gene annotation")
         group.add_argument('--add-dbnsfp-gene', action="store_true",
                            help="Add new dbNSFP to existing gene annotation")
-        group.add_argument('--fix-bad-genes', action="store_true",
-                           help="Fix for bad gene symbols")
+        group.add_argument('--fix-bad-gene-annotation', action="store_true",
+                           help="Fix for bad gene IDs, dbNSFP not linked")
 
     def handle(self, *args, **options):
         if not settings.ANNOTATION_GENE_ANNOTATION_VERSION_ENABLED:
@@ -66,8 +66,8 @@ class Command(BaseCommand):
 
         gene_symbols = set(GnomADGeneConstraint.objects.all().values_list("gene_symbol_id", flat=True))
 
-        if options["fix_bad_genes"]:
-            self._fix_bad_genes(gene_symbols)
+        if options["fix_bad_gene_annotation"]:
+            self._fix_bad_gene_annotation(gene_symbols)
             return
 
         if gar_id:
@@ -207,8 +207,10 @@ class Command(BaseCommand):
                 bad_gene_annotation.append(gav)
         return bad_gene_annotation
 
-    def _fix_bad_genes(self, gene_symbols):
-        """ """
+    def _fix_bad_gene_annotation(self, gene_symbols):
+        """ dbNSFP wasn't linked from new - due to not including headers
+            gene was inserted as str(gene) which caused it to be "ENSG (Ensembl)"
+        """
 
         fixed = []
         for gav in self._bad_gene_annotation():
