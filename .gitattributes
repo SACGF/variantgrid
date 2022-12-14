@@ -1,5 +1,7 @@
 # NCBI Perl script
 scripts/remap_api.pl
+# VEP plugin
+annotation/annotation_data/generate_annotation/Grantham.pm
 
 # Javascript libraries
 variantgrid/static_files/**/js/lib/** linguist-vendored
