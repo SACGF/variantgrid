@@ -1,0 +1,5 @@
+# NCBI Perl script
+scripts/remap_api.pl
+
+# Javascript libraries
+variantgrid/static_files/**/js/lib/** linguist-vendored
