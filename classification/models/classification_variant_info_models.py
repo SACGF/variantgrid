@@ -77,11 +77,21 @@ class ImportedVariantInfo(TimeStampedModel):
 
 class ImportedAlleleInfo(TimeStampedModel):
     """
-    This class exists to give quick access to 37 and 38 version, e.g.
-    qs.order_by('classification__allele_info__grch37__genomic_sort')
+    This class exists to give quick access to GRCh 37 and 38 details to a classification
+    As well as only having to resolve unique imported data once
     """
+
     imported_c_hgvs = TextField(null=True, blank=True)
+    """
+    The c.hgvs exactly as it was imported without any normalization
+    Note - when we start doing imports on g.hgvs or genomic coordinate we will need to add more columns
+    """
+
     imported_genome_build = ForeignKey(GenomeBuild, null=True, blank=True, on_delete=CASCADE)
+    """
+    The genome build used to import
+    Should this be the raw 
+    """
 
     @property
     def imported_c_hgvs_obj(self) -> CHGVS:

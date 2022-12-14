@@ -334,14 +334,14 @@
                                 <a href="https://www.uniprot.org/uniprot/{{ uniprot }}" target="_blank">{{ uniprot }}</a>
                             {% endlabelled %}
                             {% labelled label="Function" help=annotation_description.function_from_uniprotkb %}{{ uniprot.function }}{% endlabelled %}
-                            <div id="more-uniprot" class="collapse">
+                            <a class="toggle-link" data-toggle="collapse" href="#more-uniprot-{{ uniprot.pk }}">More UniProt...</a>
+                            <div id="more-uniprot-{{ uniprot.pk }}" class="collapse">
                                 {% labelled label="Pathway" help=annotation_description.pathway_from_uniprotkb %}{{ uniprot.pathway }}{% endlabelled %}
                                 {% labelled label="Pathway Interaction DB" help=annotation_description.interactions_consensus_pathdb %}{{ uniprot.pathway_interaction_db }}{% endlabelled %}
                                 {% labelled label="Reactome" help=annotation_description.uniprot_reactome %}{{ uniprot.reactome }}{% endlabelled %}
                                 {% labelled label="Tissue Specificity" help=annotation_description.tissue_specificity %}{{ uniprot.tissue_specificity }}{% endlabelled %}
                             </div>
                         {% endfor %}
-                        <a class="toggle-link" data-toggle="collapse" href="#more-uniprot">More UniProt...</a>
                     </div>
                 </div>
             {% endif %}

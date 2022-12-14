@@ -1,6 +1,7 @@
 import operator
+from dataclasses import dataclass
 from functools import reduce
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Tuple
 
 from django.conf import settings
 from django.db.models import Q, Subquery, When, Case, TextField, Value, IntegerField, QuerySet
@@ -13,6 +14,7 @@ from classification.enums import SpecialEKeys, EvidenceCategory, ShareLevel
 from classification.models import ClassificationModification, classification_flag_types, Classification, EvidenceKeyMap
 from classification.models.classification_utils import classification_gene_symbol_filter
 from flags.models import FlagCollection, FlagStatus
+from genes.hgvs import CHGVS
 from genes.models import TranscriptVersion
 from ontology.models import OntologyTerm
 from snpdb.models import UserSettings, GenomeBuild, Variant, Lab
@@ -28,28 +30,35 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
 
     def render_c_hgvs(self, row: Dict[str, Any]) -> JsonDataType:
         values = []
-        for index, genome_build in enumerate(self.genome_build_prefs):
-            values.append({
-                'type': 'normal-pref' if index == 0 else 'normal',
-                'build': genome_build.pk,
-                'value': row.get(ClassificationModification.column_name_for_build(genome_build))
-            })
-        values.append({
-            'type': 'imported',
-            'build': row.get('published_evidence__genome_build__value'),
-            'value': row.get('published_evidence__c_hgvs__value'),
-        })
-        response = {
-            'values': values,
-            'allele_id': row.get('classification__allele_info__allele_id')
-        }
 
+        def get_preferred_chgvs() -> CHGVS:
+            nonlocal row
+            for index, genome_build in enumerate(self.genome_build_prefs):
+                if c_hgvs_string := row.get(ClassificationModification.column_name_for_build(genome_build)):
+                    c_hgvs = CHGVS(c_hgvs_string)
+                    c_hgvs.genome_build = genome_build
+                    c_hgvs.is_desired_build = index == 0
+                    return c_hgvs
+
+            c_hgvs = CHGVS(row.get('published_evidence__c_hgvs__value'))
+            c_hgvs.is_normalised = False
+            try:
+                c_hgvs.genome_build = GenomeBuild.get_name_or_alias(row.get('published_evidence__genome_build__value'))
+            except GenomeBuild.DoesNotExist:
+                pass
+            return c_hgvs
+
+        use_c_hgvs = get_preferred_chgvs()
+        response = use_c_hgvs.to_json()
         if settings.VARIANT_CLASSIFICATION_GRID_SHOW_PHGVS:
             if p_hgvs := row.get('published_evidence__p_hgvs__value'):
                 p_dot = p_hgvs.find('p.')
                 if p_dot != -1:
                     p_hgvs = p_hgvs[p_dot::]
             response['p_hgvs'] = p_hgvs
+
+        if allele_id := row.get('classification__allele_info__allele_id'):
+            response['allele_id'] = allele_id;
 
         return response
 
@@ -127,7 +136,7 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
                 name='c_hgvs',
                 label=f'HGVS ({user_settings.default_genome_build.name})',
                 renderer=self.render_c_hgvs,
-                client_renderer='VCTable.c_hgvs',
+                client_renderer='VCTable.hgvs',
                 orderable=True,
                 extra_columns=[
                     "classification__allele_info__grch37__c_hgvs",

@@ -2081,74 +2081,70 @@ let VCTable = (function() {
     return VCTable;
 })();
 
-VCTable.c_hgvs = (data, type, row) => {
-    const MAX_C_HGVS_LEN = 100;
-
-    /*
-    let labelFn = (chgvsValue) => {
-        if (chgvsValue.type === 'imported') {
-            return `<i>Imported (${chgvsValue.build})</i>`;
-        } else {
-            return `<i>Normalised (${chgvsValue.build})</i>`;
+VCTable.hgvs = (data, type, row) => {
+    let parts = data;
+    if (typeof(parts) == 'string') {
+        parts = parts.trim();
+        if (!parts.length) {
+            return $('<span>', {text:'-', class:'no-value'}).prop('outerHTML');
         }
-    };
-    */
-
-    if (data) {
-        let allele_id = data.allele_id;
-        let values = data.values;
-
-        let chgvsToValues = {};
-        let displayChgvs = null;
-        for (let chgvsValue of values) {
-            let chgvsText = chgvsValue.value || 'null';
-            let existing = chgvsToValues[chgvsText] || [];
-            existing.push(chgvsValue);
-            chgvsToValues[chgvsText] = existing;
-            if (!displayChgvs && chgvsValue.value) {
-                displayChgvs = chgvsValue;
-            }
-        }
-
-        /*
-        let tooltipLines = [];
-        for (let [text, chgvsValues] of Object.entries(chgvsToValues)) {
-            text = text == 'null' ? 'Cannot display' : text;
-            tooltipLines.push(chgvsValues.map((val) => labelFn(val)).join(' and \n') + ' -\n' + text);
-        }
-        */
-        let dom = $('<div>');
-        if (displayChgvs && displayChgvs.type !== 'normal-pref') {
-            // let buildTooltip = `Cannot display normalised c.hgvs in preferred build.\nDisplaying ${labelFn(displayChgvs)} instead`;
-            // tooltipLines.splice(0,0,buildTooltip);
-
-            $('<span>', {class:'genome-build', text: displayChgvs.build || ''}).appendTo(dom);
-        }
-
-        if (allele_id) {
-            $('<a>', {
-                class: 'hover-link variant-coordinate',
-                text: displayChgvs ? limitLength(displayChgvs.value, MAX_C_HGVS_LEN) : 'variant',
-                href: Urls.view_allele(allele_id),
-            }).appendTo(dom);
-        } else {
-            if (displayChgvs) {
-                $('<span>', {text: limitLength(displayChgvs.value, MAX_C_HGVS_LEN), class: 'variant-coordinate'}).appendTo(dom);
-            } else {
-                $('<span>', {class: 'no-value', text: '-'}).appendTo(dom);
-            }
-        }
-        // let tooltip = tooltipLines.join('<br/><br/>');
-        // dom.attr('title', 'hgvs');
-        // dom.attr('data-content', tooltip);
-        let p_hgvs = data.p_hgvs;
-        if (p_hgvs) {
-            $('<span>', {class: 'd-block mt-1 text-secondary', text: limitLength(p_hgvs)}).appendTo(dom);
-        }
-
-        return dom.prop('outerHTML');
+        return $('<span>', {text:limitLength(parts, 100)}).prop('outerHTML');
     }
-};
+    let genomeBuild = parts.genome_build;
+    let transcript = parts.transcript;
+    let geneSymbol = parts.gene_symbol;
+    let cNomen = parts.c_nomen || parts.variant; // older code called cNomen 'variant'
+    let variantId = parts.variant_id;
+    let alleleId = parts.allele_id;
+    let pHgvs = parts.p_hgvs;
+    let url = null;
+    if (variantId) {
+        url = Urls.view_allele_from_variant(variantId)
+    } else if (alleleId) {
+        url = Urls.view_allele(alleleId)
+    }
+    // also turn into a link
+
+    let dom = $('<div>');
+    if (genomeBuild && (parts.desired === false || parts.normalized === false)) {
+        let genomeBuildWrapper = $('<div>');
+        if (parts.normalized === false) {
+            $('<span>', {html: '<i class="fa-solid fa-triangle-exclamation text-warning"></i> not resolved ', style:'color:#888'}).appendTo(genomeBuildWrapper);
+        } else {
+            $('<span>', {html: '<i class="fa-solid fa-triangle-exclamation text-warning"></i> not lifted-over ', style:'color:#888'}).appendTo(genomeBuildWrapper);
+        }
+
+        dom.append(genomeBuildWrapper);
+        dom.append($('<span>', {text: genomeBuild, style:'font-weight:500; color:#888'}));
+        dom.append(' ');
+        // <span style="white-space: nowrap"><span>{{ c_hgvs.transcript }}</span>{% if c_hgvs.gene_symbol %}(<span class="text-secondary" style="letter-spacing: 0.5px">{{ c_hgvs.gene_symbol }}</span>){% endif %}:</span><span style="display:inline-block;word-break: break-all">{{ c_hgvs.raw_c }}</span>
+    }
+
+    let cDom = $('<span>', {class:'c-hgvs-body'});
+    if (transcript && cNomen) {
+        cDom.append($('<span>', {text: transcript, class:'c-hgvs-transcript'}));
+        if (geneSymbol) {
+            cDom.append($('<span>', {class: 'c-hgvs-gene-symbol-b', html:[
+                $('<span>', {text: "(", class: 'mx-1'}),
+                $('<span>', {class: 'c-hgvs-gene-symbol', text: geneSymbol}),
+                $('<span>', {text: "):", class: 'ml-1', style: 'letter-spacing: 2px'})
+            ]}));
+        }
+        // used to be display:inline-block; but that doesn't underline
+        cDom.append($('<span>', {class:'c-hgvs-nomen', text: limitLength(cNomen, 100)}));
+    } else {
+        cDom.append(limitLength(data.full, 100));
+    }
+    if (url) {
+        cDom = $('<a>', {href: url, html: cDom});
+    }
+    dom.append(cDom);
+    if (pHgvs) {
+        $('<span>', {class: 'd-block mt-1 text-secondary', text: limitLength(pHgvs)}).appendTo(dom);
+    }
+    return dom.prop('outerHTML');
+}
+
 VCTable.condition = (data, type, row) => {
     if (data.resolved_terms) {
         return VCForm.format_condition(data).prop('outerHTML');
@@ -2156,6 +2152,7 @@ VCTable.condition = (data, type, row) => {
         return data.display_text;
     }
 };
+
 VCTable.clinical_significance = (data, type, row) => {
     let csKey = EKeys.cachedKeys.key(SpecialEKeys.CLINICAL_SIGNIFICANCE);
     let label = csKey.prettyValue(data);
@@ -2165,9 +2162,11 @@ VCTable.clinical_significance = (data, type, row) => {
         return $('<span>', {class: 'no-value', text: 'Unclassified'}).prop('outerHTML');
     }
 };
+
 VCTable.clinical_significance_td = ( cell, cellData, rowData, rowIndex, colIndex ) => {
     $(cell).addClass(`text-center cs cs-${(cellData || '').toLowerCase()}`);
 };
+
 VCTable.evidence_key = (key_name, data, type, row) => {
     let csKey = EKeys.cachedKeys.key(key_name);
     let span;
@@ -2179,6 +2178,7 @@ VCTable.evidence_key = (key_name, data, type, row) => {
     }
     return span.prop('outerHTML');
 };
+
 VCTable.identifier = (data, type, row) => {
     let id = data.id;
     let org_name = data.org_name;

@@ -64,7 +64,7 @@
 {% block content %}
     <div class="container-table">
         <h4>HGVS Issues</h4>
-        <p><a href="{% url 'view_imported_allele_info' %}">See all imported data to matched alleles</a></p>
+        <p><a class='hover-link' href="{% url 'view_imported_allele_info' %}">See all imported data to matched alleles</a></p>
         <p class="text-info">Note that only Alleles with 1 or more classifications attached will be considered.</p>
 
         {% labelled label="All HGVS Issues" %}

@@ -1131,9 +1131,25 @@ table .fa-hand-point-right {
 
 a .c-hgvs-body {
   .c-hgvs-transcript, .c-hgvs-nomen {
-    color: #4444bb;
+    color: #444488;
   }
 }
+a .c-hgvs-body:hover {
+  .c-hgvs-transcript, .c-hgvs-nomen, .c-hgvs-gene-symbol-b {
+    text-decoration: underline !important;
+  }
+}
+.c-hgvs-body {
+  .c-hgvs-transcript, .c-hgvs-nomen, .c-hgvs-gene-symbol-b {
+    display: inline-block;
+    white-space: nowrap;
+    word-break: normal;
+  }
+  .c-hgvs-gene-symbol {
+    color:#6c757d; letter-spacing: 0.5px;
+  }
+}
+
 
 .current-record-menu-item {
   display: none;

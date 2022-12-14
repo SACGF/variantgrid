@@ -1,3 +1,5 @@
+from typing import Optional
+
 from django.contrib.auth.decorators import user_passes_test
 from django.db.models import QuerySet, Q, Count
 from django.http import HttpRequest
@@ -13,21 +15,28 @@ from snpdb.views.datatable_view import DatatableConfig, RichColumn, CellData
 class ImportedAlleleInfoColumns(DatatableConfig[ImportedAlleleInfo]):
 
     def render_c_hgvs(self, data: CellData):
-        build_number = '37'
-        if '38' in data.key:
-            build_number = '38'
-        if c_hgvs_str := data.get(f'grch{build_number}__c_hgvs'):
-            c_hgvs = CHGVS(c_hgvs_str)
-            variant_id = data.get(f'grch{build_number}__variant')
+        c_hgvs_str: Optional[str] = None
+        c_hgvs: Optional[CHGVS] = None
+        variant_id = None
 
-            return {
-                "transcript": c_hgvs.transcript,
-                "geneSymbol": c_hgvs.gene_symbol,
-                "variant": c_hgvs.variant,
-                "variantId": variant_id
-            }
+        if '37' in data.key:
+            c_hgvs_str = data.get('grch37__c_hgvs')
+            variant_id = data.get('grch37__variant')
+        elif '38' in data.key:
+            c_hgvs_str = data.get('grch38__c_hgvs')
+            variant_id = data.get('grch38__variant')
         else:
-            return {}
+            c_hgvs_str = data.get(data.key)
+
+        if c_hgvs_str:
+            if c_hgvs := CHGVS(c_hgvs_str):
+                json_data = c_hgvs.to_json()
+                json_data['variant_id'] = variant_id
+                return json_data
+            else:
+                return {
+                    "full": c_hgvs_str
+                }
 
 
     def __init__(self, request: HttpRequest):
@@ -36,34 +45,36 @@ class ImportedAlleleInfoColumns(DatatableConfig[ImportedAlleleInfo]):
 
         self.rich_columns = [
             RichColumn(
-                key='imported_c_hgvs',
-                label='Imported c.HGVS',
+                key='imported_genome_build',
+                label='Imported<br/>Genome Build',
                 orderable=True
             ),
             RichColumn(
-                key='imported_genome_build',
-                label='Imported Gene Symbol',
-                orderable=True
+                key='imported_c_hgvs',
+                label='Imported<br/>c.HGVS',
+                orderable=True,
+                renderer=self.render_c_hgvs,
+                client_renderer='VCTable.hgvs'
             ),
             RichColumn(
                 key='grch37__c_hgvs',
-                label='Resolved GRCh37 c.HGVS',
+                label='Resolved GRCh37<br/>c.HGVS',
                 orderable=True,
                 extra_columns=['grch37__variant'],
                 renderer=self.render_c_hgvs,
-                client_renderer='TableFormat.hgvs'
+                client_renderer='VCTable.hgvs'
             ),
             RichColumn(
                 key='grch38__c_hgvs',
-                label='Resolved GRCh38 c.HGVS',
+                label='Resolved GRCh38<br/>c.HGVS',
                 orderable=True,
                 extra_columns=['grch38__variant'],
                 renderer=self.render_c_hgvs,
-                client_renderer='TableFormat.hgvs'
+                client_renderer='VCTable.hgvs'
             ),
             RichColumn(
                 key='classification_count',
-                label="Classification Count",
+                label="Classification<br/>Count",
                 orderable=True
             )
         ]

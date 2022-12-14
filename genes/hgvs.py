@@ -212,6 +212,17 @@ class CHGVS:
         else:
             self.raw_c = full_c_hgvs
 
+    def to_json(self):
+        return {
+            "transcript": self.transcript,
+            "gene_symbol": self.gene,
+            "c_nomen": self.raw_c,
+            "full": self.full_c_hgvs,
+            "genome_build": self.genome_build.pk if self.genome_build else None,
+            "desired": self.is_desired_build,
+            "normalized": self.is_normalised
+        }
+
     @staticmethod
     def _clean_transcript(transcript: str) -> str:
         t_upper = transcript.upper()
