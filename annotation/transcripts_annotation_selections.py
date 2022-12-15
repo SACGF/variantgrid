@@ -109,6 +109,7 @@ class VariantTranscriptSelections:
             data["transcript_id"] = transcript_id
 
             if obj.transcript_version:
+                data["tags"] = obj.transcript_version.tags
                 data["protein_length"] = obj.transcript_version.protein_length
                 ggc, ggc_method, ggc_url = GnomADGeneConstraint.get_for_transcript_version_with_method_and_url(obj.transcript_version)
                 if ggc:

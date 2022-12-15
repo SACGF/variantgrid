@@ -56,6 +56,9 @@ fieldset.form-fields {
             <td><span class="pills">
                 {% if transcript_data.representative %}<span class="pill important" data-toggle="tooltip" title="representative transcript (picked by VEP, changes per variant)">rep.</span>{% endif %}
                 {% if transcript_data.canonical %}<span class="pill" data-toggle="tooltip" title="canonical transcript for gene (from {{ vts.get_annotation_consortium_display }})">can.</span>{% endif %}
+                {% for t_tag in transcript_data.tags %}
+                <span class="pill transcript-tag-{{ t_tag }}">{{ t_tag }}</span>
+                {% endfor %}
             </span>
         </tr>
     {% endfor %}
