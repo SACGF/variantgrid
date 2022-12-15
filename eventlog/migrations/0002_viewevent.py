@@ -5,8 +5,6 @@ import model_utils.fields
 from django.conf import settings
 from django.db import migrations, models
 
-import library.utils
-
 
 class Migration(migrations.Migration):
 
@@ -23,7 +21,7 @@ class Migration(migrations.Migration):
                 ('created', model_utils.fields.AutoCreatedField(default=django.utils.timezone.now, editable=False, verbose_name='created')),
                 ('modified', model_utils.fields.AutoLastModifiedField(default=django.utils.timezone.now, editable=False, verbose_name='modified')),
                 ('view_name', models.TextField()),
-                ('args', models.JSONField(blank=True, default=library.utils.empty_dict)),
+                ('args', models.JSONField(blank=True, default=dict)),
                 ('path', models.TextField()),
                 ('method', models.TextField()),
                 ('user', models.ForeignKey(null=True, on_delete=django.db.models.deletion.SET_NULL, to=settings.AUTH_USER_MODEL)),

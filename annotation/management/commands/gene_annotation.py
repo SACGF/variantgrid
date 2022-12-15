@@ -8,7 +8,7 @@ from django.utils import timezone
 from annotation.models import GeneAnnotationVersion, OntologyTerm, GenomeBuild, AnnotationVersion, \
     InvalidAnnotationVersionError, GeneAnnotation, DBNSFPGeneAnnotationVersion
 from genes.gene_matching import ReleaseGeneMatcher
-from genes.models import GeneAnnotationRelease, GnomADGeneConstraint, ReleaseGeneSymbolGene
+from genes.models import GeneAnnotationRelease, GnomADGeneConstraint, ReleaseGeneSymbolGene, Gene
 from library.django_utils.django_file_utils import get_import_processing_filename
 from ontology.models import OntologyService, GeneDiseaseClassification, OntologyTermRelation, \
     OntologyVersion
@@ -16,7 +16,7 @@ from upload.vcf.sql_copy_files import write_sql_copy_csv, sql_copy_csv
 
 
 class Command(BaseCommand):
-    GENE_ANNOTATION_HEADER = ["version_id", "gene_id", "hpo_terms", "omim_terms", "mondo_terms",
+    GENE_ANNOTATION_HEADER = ["version_id", "gene_id", "dbnsfp_gene_id", "hpo_terms", "omim_terms", "mondo_terms",
                               "gene_disease_moderate_or_above", "gene_disease_supportive_or_below", "gnomad_oe_lof"]
     TERM_JOIN_STRING = " | "
 
@@ -36,6 +36,8 @@ class Command(BaseCommand):
                            help="Add new columns gene/disease and MONDO terms to existing gene annotation")
         group.add_argument('--add-dbnsfp-gene', action="store_true",
                            help="Add new dbNSFP to existing gene annotation")
+        group.add_argument('--fix-bad-gene-annotation', action="store_true",
+                           help="Fix for bad gene IDs, dbNSFP not linked")
 
     def handle(self, *args, **options):
         if not settings.ANNOTATION_GENE_ANNOTATION_VERSION_ENABLED:
@@ -64,6 +66,10 @@ class Command(BaseCommand):
 
         gene_symbols = set(GnomADGeneConstraint.objects.all().values_list("gene_symbol_id", flat=True))
 
+        if options["fix_bad_gene_annotation"]:
+            self._fix_bad_gene_annotation(gene_symbols)
+            return
+
         if gar_id:
             if not ov_id:
                 raise ValueError("You must specify ontology-version when gene-annotation-release is specified")
@@ -73,8 +79,9 @@ class Command(BaseCommand):
             gene_annotation_release = GeneAnnotationRelease.objects.get(pk=gar_id)
             if not force and GeneAnnotationVersion.objects.filter(gene_annotation_release=gene_annotation_release).exists():
                 raise ValueError("Existing GeneAnnotationVersion for gene_annotation_release={} exists! Use --force?")
-            self._create_gene_annotation_version(gene_annotation_release, ontology_version,
-                                                 dbnsfp_gene_version, gene_symbols)
+            gav = self._create_gene_annotation_version(gene_annotation_release, ontology_version,
+                                                       dbnsfp_gene_version)
+            self._populate_gene_annotation_version(gav, gene_symbols)
         elif missing:
             if ov_id is not None:
                 raise ValueError("Only specify ontology-version when gene-annotation-release also specified")
@@ -101,7 +108,8 @@ class Command(BaseCommand):
                 if not gar:
                     raise InvalidAnnotationVersionError(f"VariantAnnotationVersion {av.variant_annotation_version} needs to be assigned an GeneAnnotationRelease")
 
-                self._create_gene_annotation_version(gar, av.ontology_version, dbnsfp_gene_version, gene_symbols)
+                gav = self._create_gene_annotation_version(gar, av.ontology_version, dbnsfp_gene_version)
+                self._populate_gene_annotation_version(gav, gene_symbols)
 
     @staticmethod
     def _validate_has_required_data():
@@ -183,6 +191,23 @@ class Command(BaseCommand):
 
         print(f"Completed: {timezone.now()}")
 
+    def _fix_bad_gene_annotation(self, gene_symbols):
+        """ dbNSFP wasn't linked from new - due to not including headers
+            gene was inserted as str(gene) which caused it to be "ENSG (Ensembl)"
+        """
+
+        fixed = []
+        for gav in bad_gene_annotation():
+            print(f"{gav} - needs fixing. Deleting old...")
+            gav.geneannotation_set.all().delete()
+            print(f"{gav} - regenerating...")
+            self._populate_gene_annotation_version(gav, gene_symbols)
+            fixed.append(gav)
+
+        print("Fixed gene annotation versions:")
+        for gav in fixed:
+            print(f"{gav.pk}: {gav}")
+
     @staticmethod
     def _get_gene_disease(ontology_version, gene_symbol, delimiter: str):
         moderate_or_above = GeneDiseaseClassification.get_above_min(GeneDiseaseClassification.MODERATE)
@@ -208,18 +233,20 @@ class Command(BaseCommand):
         return gene_disease_supportive_or_below, gene_disease_moderate_or_above
 
     def _create_gene_annotation_version(self, gene_annotation_release, ontology_version,
-                                        dbnsfp_gene_version, gene_symbols):
+                                        dbnsfp_gene_version) -> GeneAnnotationVersion:
         gnomad_gene_constraint = GnomADGeneConstraint.objects.first()  # Only ever 1
 
         # Only 1 of each of Gnomad (CachedWebResource - deleted upon reload)
         # When you create GeneAnnotationVersion (sub version) it automatically creates/bumps a new annotation version
-        gav = GeneAnnotationVersion.objects.create(gene_annotation_release=gene_annotation_release,
-                                                   ontology_version=ontology_version,
-                                                   dbnsfp_gene_version=dbnsfp_gene_version,
-                                                   gnomad_import_date=gnomad_gene_constraint.cached_web_resource.created)
+        return GeneAnnotationVersion.objects.create(gene_annotation_release=gene_annotation_release,
+                                                    ontology_version=ontology_version,
+                                                    dbnsfp_gene_version=dbnsfp_gene_version,
+                                                    gnomad_import_date=gnomad_gene_constraint.cached_web_resource.created)
+
+    def _populate_gene_annotation_version(self, gav: GeneAnnotationVersion, gene_symbols):
 
         # 1st we need to make sure all symbols are matched in a GeneAnnotationRelease (HGNC already done)
-        gene_matcher = ReleaseGeneMatcher(gene_annotation_release)
+        gene_matcher = ReleaseGeneMatcher(gav.gene_annotation_release)
         gene_matcher.match_unmatched_symbols(gene_symbols)
 
         missing_genes = Counter()
@@ -229,10 +256,10 @@ class Command(BaseCommand):
             service_terms = {}
             gene_symbol = hgnc_ot.name
             for ontology_service in [OntologyService.OMIM, OntologyService.HPO, OntologyService.MONDO]:
-                snake = ontology_version.terms_for_gene_symbol(gene_symbol, ontology_service, max_depth=0)
+                snake = gav.ontology_version.terms_for_gene_symbol(gene_symbol, ontology_service, max_depth=0)
                 service_terms[ontology_service] = self.TERM_JOIN_STRING.join((str(lt) for lt in snake.leafs()))
 
-            gene_disease_supportive_or_below, gene_disease_moderate_or_above = self._get_gene_disease(ontology_version,
+            gene_disease_supportive_or_below, gene_disease_moderate_or_above = self._get_gene_disease(gav.ontology_version,
                                                                                                       gene_symbol,
                                                                                                       Command.TERM_JOIN_STRING)
             if not (any(service_terms.values()) or
@@ -240,38 +267,42 @@ class Command(BaseCommand):
                 continue  # Skip who cares
 
             uc_symbol = gene_symbol.upper()
-            genes_qs = gene_annotation_release.genes_for_symbol(uc_symbol)
+            genes_qs = gav.gene_annotation_release.genes_for_symbol(uc_symbol)
             if genes_qs.exists():
-                for gene in genes_qs:
+                for gene_id in genes_qs.values_list("identifier", flat=True):
                     for ontology_service, terms in service_terms.items():
                         column = f"{str(ontology_service).lower()}_terms"
-                        annotation_by_gene[gene][column] = terms
+                        annotation_by_gene[gene_id][column] = terms
 
-                    annotation_by_gene[gene]["gene_disease_supportive_or_below"] = gene_disease_supportive_or_below
-                    annotation_by_gene[gene]["gene_disease_moderate_or_above"] = gene_disease_moderate_or_above
+                    annotation_by_gene[gene_id]["gene_disease_supportive_or_below"] = gene_disease_supportive_or_below
+                    annotation_by_gene[gene_id]["gene_disease_moderate_or_above"] = gene_disease_moderate_or_above
             else:
-                print(f"Warning: {gene_annotation_release} has no match for '{uc_symbol}' ({service_terms})")
+                print(f"Warning: {gav.gene_annotation_release} has no match for '{uc_symbol}' ({service_terms})")
                 missing_genes["ontology"] += 1
 
-        rgsg_qs = ReleaseGeneSymbolGene.objects.filter(release_gene_symbol__release=gene_annotation_release)
+        rgsg_qs = ReleaseGeneSymbolGene.objects.filter(release_gene_symbol__release=gav.gene_annotation_release)
         symbol_to_gene_ids = defaultdict(set)
         for gene_symbol, gene_id in rgsg_qs.values_list("release_gene_symbol__gene_symbol", "gene_id"):
             symbol_to_gene_ids[gene_symbol].add(gene_id)
 
         # Go through and match all the
-        dbnsfp_qs = dbnsfp_gene_version.dbnsfpgeneannotation_set.all()
+        dbnsfp_qs = gav.dbnsfp_gene_version.dbnsfpgeneannotation_set.all()
+        if not dbnsfp_qs.exists():
+            raise ValueError(f"{gav.dbnsfp_gene_version} has no entries!")
         for dbnsfp_gene_id, gene_symbol_id in dbnsfp_qs.values_list("pk", "gene_symbol_id"):
-            for gene_id in symbol_to_gene_ids.get(gene_symbol_id, []):
-                annotation_by_gene[gene_id]["dbnsfp_gene_id"] = dbnsfp_gene_id
+            if gene_ids_for_symbol := symbol_to_gene_ids.get(gene_symbol_id):
+                for gene_id in gene_ids_for_symbol:
+                    annotation_by_gene[gene_id]["dbnsfp_gene_id"] = dbnsfp_gene_id
             else:
-                print(f"Warning: {gene_annotation_release} has no match for '{gene_symbol_id}' - dbNSFP Gene Annotation")
+                print(f"Warning: {gav.gene_annotation_release} has no match for '{gene_symbol_id}' - dbNSFP Gene Annotation")
                 missing_genes["dbnsfp_gene_annotation"] += 1
 
         for gene_symbol_id, oe_lof in GnomADGeneConstraint.objects.all().values_list("gene_symbol_id", "oe_lof"):
-            for gene_id in symbol_to_gene_ids.get(gene_symbol_id, []):
-                annotation_by_gene[gene_id]["gnomad_oe_lof"] = oe_lof
+            if gene_ids_for_symbol := symbol_to_gene_ids.get(gene_symbol_id):
+                for gene_id in gene_ids_for_symbol:
+                    annotation_by_gene[gene_id]["gnomad_oe_lof"] = oe_lof
             else:
-                print(f"Warning: {gene_annotation_release} has no match for '{gene_symbol_id}' - GnomADGeneConstraint")
+                print(f"Warning: {gav.gene_annotation_release} has no match for '{gene_symbol_id}' - GnomADGeneConstraint")
                 missing_genes["gnomad_gene_constraints"] += 1
 
         gene_annotation_records = []
@@ -303,3 +334,20 @@ class Command(BaseCommand):
         self.stdout.write(f"Inserting file '{csv_filename}' into partition {partition_table}\n")
         sql_copy_csv(csv_filename, partition_table, self.GENE_ANNOTATION_HEADER, delimiter=delimiter)
         self.stdout.write("Done!\n")
+
+
+def bad_gene_annotation():
+    """ This is used as a test in annotation/migrations/0068_one_off_manual_fix_bad_gene_annotation """
+    bad_gene_annotation = []
+    for gav in GeneAnnotationVersion.objects.all():
+        if gav.dbnsfp_gene_version and not gav.geneannotation_set.filter(dbnsfp_gene__isnull=False).exists():
+            # print(f"{gav} - dbNSFP set but not linked correctly!")
+            bad_gene_annotation.append(gav)
+            continue
+
+        try:
+            if ga := gav.geneannotation_set.first():
+                _ = ga.gene
+        except Gene.DoesNotExist:
+            bad_gene_annotation.append(gav)
+    return bad_gene_annotation

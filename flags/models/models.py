@@ -18,7 +18,7 @@ from lazy import lazy
 from flags.models.enums import FlagStatus
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
 from library.guardian_utils import admin_bot
-from library.utils import empty_dict, ModelUtilsMixin, ChoicesEnum
+from library.utils import ModelUtilsMixin, ChoicesEnum
 
 flag_collection_extra_info_signal = django.dispatch.Signal()  # args: "flag_infos", "user"
 
@@ -92,7 +92,7 @@ class FlagType(TimeStampedModel, ModelUtilsMixin):
 
     # can put days open until warning back in when we actually use it
     # days_open_until_warning = models.IntegerField(null=True, blank=True)
-    attributes = models.JSONField(null=False, blank=True, default=empty_dict)
+    attributes = models.JSONField(null=False, blank=True, default=dict)
     comments_enabled = models.BooleanField(default=True)
     # determines on what screens the flag will be shown, more about if it causes clutter than importance
     importance = models.IntegerField(default=0)

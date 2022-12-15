@@ -4,8 +4,6 @@ import django.db.models.deletion
 import django_extensions.db.fields
 from django.db import migrations, models
 
-import library.utils
-
 
 class Migration(migrations.Migration):
 
@@ -21,7 +19,7 @@ class Migration(migrations.Migration):
             fields=[
                 ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('name', models.TextField(unique=True)),
-                ('config', models.JSONField(blank=True, default=library.utils.empty_dict)),
+                ('config', models.JSONField(blank=True, default=dict)),
             ],
         ),
         migrations.CreateModel(

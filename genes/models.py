@@ -44,7 +44,7 @@ from library.django_utils.django_partition import RelatedModelsPartitionModel
 from library.file_utils import mk_path
 from library.guardian_utils import assign_permission_to_user_and_groups, DjangoPermission
 from library.log_utils import log_traceback
-from library.utils import empty_dict, get_single_element, iter_fixed_chunks
+from library.utils import get_single_element, iter_fixed_chunks
 from snpdb.models import Wiki, Company, Sample, DataState
 from snpdb.models.models_enums import ImportStatus
 from snpdb.models.models_genome import GenomeBuild, Contig
@@ -620,7 +620,15 @@ class TranscriptVersion(SortByPKMixin, models.Model):
     contig = models.ForeignKey(Contig, on_delete=CASCADE)  # Optimisation to restrict Variant queries
     import_source = models.ForeignKey(GeneAnnotationImport, on_delete=CASCADE)
     biotype = models.TextField(null=True)  # Ensembl has gene + transcript biotypes
-    data = models.JSONField(null=False, blank=True, default=empty_dict)  # for pyHGVS
+    data = models.JSONField(null=False, blank=True, default=dict)  # for cdot data
+
+    # These are in data.tags
+    CANONICAL_SCORES = {
+        "MANE Select": 2,
+        "MANE_Select": 2,
+        "RefSeq Select": 1,
+        # Some way to find canonical in Ensembl GRCh37?
+    }
 
     class Meta:
         unique_together = ("transcript", "version", "genome_build")
@@ -988,6 +996,24 @@ class TranscriptVersion(SortByPKMixin, models.Model):
             tag_list = sorted(tag for tag in tag_list_str.split(",") if tag not in REMOVE_TAGS)
         return tag_list
 
+    @lazy
+    def canonical_tag(self) -> str:
+        """ We only want to return the most important one """
+        tags = set(self.tags)
+        for ct, score in self.CANONICAL_SCORES.items():
+            if ct in tags:
+                return ct
+        return ""
+
+    @property
+    def canonical_score(self) -> int:
+        """ This is so you can sort multiple transcripts and find 'most canonical' """
+        return self.CANONICAL_SCORES.get(self.canonical_tag, 0)
+
+    @property
+    def is_canonical(self) -> bool:
+        return bool(self.canonical_score)
+
     def get_contigs(self) -> Set[Contig]:
         raw_chrom = {self.pyhgvs_data["chrom"]}
         if other_chroms := self.pyhgvs_data.get("other_chroms"):
@@ -1088,11 +1114,14 @@ class TranscriptVersion(SortByPKMixin, models.Model):
                 return transcript
         return None
 
-    def get_domains(self) -> List[Tuple]:
-        """ Gets ProteinDomain if available, falling back on Pfam """
+    @lazy
+    def protein_domains_and_accession(self) -> Tuple[QuerySet, str]:
+        """ Gets custom ProteinDomain if available, falling back on Pfam """
         PD_ARGS = ("protein_domain__name", "protein_domain__description", "start", "end")
-        values_qs = self.proteindomaintranscriptversion_set.all().order_by("start").values_list(*PD_ARGS)
-        if not values_qs.exists():
+        protein_domains = self.proteindomaintranscriptversion_set.all().order_by("start").values_list(*PD_ARGS)
+        if protein_domains.exists():
+            used_transcript_version = self.accession
+        else:
             pfam_qs = self.transcript.pfamsequenceidentifier_set.all()
             pfam = pfam_qs.filter(version=self.version).first()  # Try our version
             if not pfam:
@@ -1100,8 +1129,11 @@ class TranscriptVersion(SortByPKMixin, models.Model):
 
             if pfam:
                 PFAM_ARGS = ("pfam__pfam_id", "pfam__description", "start", "end")
-                values_qs = pfam.pfam_sequence.pfamdomains_set.order_by("start").values_list(*PFAM_ARGS)
-        return values_qs
+                protein_domains = pfam.pfam_sequence.pfamdomains_set.order_by("start").values_list(*PFAM_ARGS)
+                used_transcript_version = pfam.accession
+            else:
+                used_transcript_version = None
+        return protein_domains, used_transcript_version
 
     def get_absolute_url(self):
         kwargs = {"transcript_id": self.transcript_id, "version": self.version}
@@ -1383,6 +1415,18 @@ class GeneAnnotationRelease(models.Model):
 
     def genes_for_symbol(self, gene_symbol) -> QuerySet:
         return self.genes_for_symbols([gene_symbol])
+
+    def transcript_versions_for_transcript(self, transcript) -> QuerySet:
+        return TranscriptVersion.objects.filter(releasetranscriptversion__release=self,
+                                                transcript=transcript)
+
+    def transcript_versions_for_gene(self, gene) -> QuerySet:
+        return TranscriptVersion.objects.filter(releasetranscriptversion__release=self,
+                                                gene_version__gene=gene)
+
+    def transcript_versions_for_symbol(self, gene_symbol) -> QuerySet:
+        return TranscriptVersion.objects.filter(releasetranscriptversion__release=self,
+                                                gene_version__gene__in=self.genes_for_symbol(gene_symbol))
 
     def __str__(self):
         return f"{self.genome_build_id}/{self.get_annotation_consortium_display()} - v{self.version}"
@@ -2168,7 +2212,7 @@ class GnomADGeneConstraint(models.Model):
 
 
 class ProteinDomain(models.Model):
-    """ For custom domains, can be used to override PFam - used in TranscriptVersion.get_domains() """
+    """ For custom domains, can be used to override PFam - used in TranscriptVersion.protein_domains_and_accession """
     name = models.TextField(unique=True)
     description = models.TextField()
 
@@ -2214,35 +2258,15 @@ class PfamSequenceIdentifier(models.Model):
     # So we'll just store the version number
     version = models.IntegerField(null=True)
 
-    @classmethod
-    def get_transcript_for_gene(cls, gene: Gene, variant_annotation_version):
-        return cls._get_transcript_for_genes([gene], variant_annotation_version)
+    @property
+    def accession(self) -> str:
+        acc = f"{self.transcript_id}"
+        if self.version:
+            acc += f".{self.version}"
+        return acc
 
-    @classmethod
-    def get_transcript_for_gene_symbol(cls, gene_symbol: GeneSymbol, variant_annotation_version):
-        genes_qs = gene_symbol.get_genes().filter(annotation_consortium=variant_annotation_version.annotation_consortium)
-        return cls._get_transcript_for_genes(list(genes_qs), variant_annotation_version)
-
-    @classmethod
-    def _get_transcript_for_genes(cls, genes: List[Gene], variant_annotation_version):
-        """ Get best transcript (canonical transcript if available), then longest)
-            This can be quite slow ie 1-2 seconds """
-        pfam_qs = PfamSequenceIdentifier.objects.all()
-        for gene in genes:
-            if canonical_transcript := gene.get_vep_canonical_transcript(variant_annotation_version):
-                if pfam_qs.filter(transcript=canonical_transcript).exists():
-                    return canonical_transcript
-
-        q_has_pfam = Q(pfamsequenceidentifier__isnull=False) | Q(transcript__pfamsequenceidentifier__isnull=False)
-        genome_build = variant_annotation_version.genome_build
-        tv_qs = TranscriptVersion.objects.filter(q_has_pfam, genome_build=genome_build, gene_version__gene__in=genes)
-        latest_transcript_versions = list(tv_qs.order_by("transcript_id", "-version").distinct("transcript_id"))
-
-        transcript = None
-        if latest_transcript_versions:
-            longest_transcript_versions = sorted(latest_transcript_versions, key=lambda tv: tv.length or -1, reverse=True)
-            transcript = longest_transcript_versions[0].transcript
-        return transcript
+    def __str__(self):
+        return f"{self.pfam_sequence}: {self.transcript}.{self.version}"
 
 
 class MANE(models.Model):

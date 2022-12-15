@@ -105,13 +105,13 @@ cd ${gene_annotation_dir}
                     <h5>Ensembl GRCh37</h5>
 
 <code>
-wget https://cdot.cc/download/cdot-{{ cdot_version }}.ensembl.grch37.json.gz
+wget https://cdot.cc/download/{{ cdot_version }}/cdot-{{ cdot_version }}.ensembl.grch37.json.gz
 python3 manage.py import_gene_annotation --annotation-consortium=Ensembl --genome-build=GRCh37 --json-file ${gene_annotation_dir}/cdot-{{ cdot_version }}.ensembl.grch37.json.gz
 </code>
                     {% elif build_name == 'GRCh38' %}
                     <h5>Ensembl GRCh38</h5>
 <code>
-wget https://cdot.cc/download/cdot-{{ cdot_version }}.ensembl.grch38.json.gz
+wget https://cdot.cc/download/{{ cdot_version }}/cdot-{{ cdot_version }}.ensembl.grch38.json.gz
 python3 manage.py import_gene_annotation --annotation-consortium=Ensembl --genome-build=GRCh38 --json-file ${gene_annotation_dir}/cdot-{{ cdot_version }}.ensembl.grch38.json.gz
 </code>
                     {% endif %}
@@ -119,13 +119,13 @@ python3 manage.py import_gene_annotation --annotation-consortium=Ensembl --genom
                     {% if build_name == 'GRCh37' %}
                     <h5>RefSeq GRCh37</h5>
 <code>
-wget https://cdot.cc/download/cdot-{{ cdot_version }}.refseq.grch37.json.gz
+wget https://cdot.cc/download/{{ cdot_version }}/cdot-{{ cdot_version }}.refseq.grch37.json.gz
 python3 manage.py import_gene_annotation --annotation-consortium=RefSeq --genome-build=GRCh37 --json-file ${gene_annotation_dir}/cdot-{{ cdot_version }}.refseq.grch37.json.gz
 </code>
                     {% elif build_name == 'GRCh38' %}
                     <h5>RefSeq GRCh38</h5>
 <code>
-wget https://cdot.cc/download/cdot-{{ cdot_version }}.refseq.grch38.json.gz
+wget https://cdot.cc/download/{{ cdot_version }}/cdot-{{ cdot_version }}.refseq.grch38.json.gz
 python3 manage.py import_gene_annotation --annotation-consortium=RefSeq --genome-build=GRCh38 --json-file ${gene_annotation_dir}/cdot-{{ cdot_version }}.refseq.grch38.json.gz
 </code>
                     {% endif %}

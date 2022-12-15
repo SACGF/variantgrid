@@ -48,7 +48,7 @@ from genes.models import Gene, TranscriptVersion, Transcript
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
 from library.guardian_utils import clear_permissions
 from library.log_utils import report_exc_info, report_event
-from library.utils import empty_dict, empty_to_none, nest_dict, cautious_attempt_html_to_text, DebugTimer
+from library.utils import empty_to_none, nest_dict, cautious_attempt_html_to_text, DebugTimer
 from ontology.models import OntologyTerm, OntologySnake, OntologyTermRelation
 from snpdb.clingen_allele import populate_clingen_alleles_for_variants
 from snpdb.genome_build_manager import GenomeBuildManager
@@ -464,7 +464,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
     lab_record_id = models.TextField(blank=True, null=True)
     """ Should be unique together with lab """
 
-    evidence = models.JSONField(null=False, blank=True, default=empty_dict)
+    evidence = models.JSONField(null=False, blank=True, default=dict)
     """ The latest evidence (should always match the content of the latest ClassificationModification.evidence) """
 
     withdrawn = models.BooleanField(default=False)
@@ -2379,7 +2379,7 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
     def source_enum(self) -> SubmissionSource:
         return SubmissionSource(self.source) if self.source else SubmissionSource.FORM
 
-    delta = models.JSONField(null=False, blank=True, default=empty_dict)
+    delta = models.JSONField(null=False, blank=True, default=dict)
     published = models.BooleanField(null=False, default=False)
     published_evidence = models.JSONField(null=True, blank=True, default=None)
     # changing the share level does not change the actual logic of sharing

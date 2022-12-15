@@ -6,7 +6,6 @@ from django.conf import settings
 from django.db import migrations, models
 
 import library.django_utils.guardian_permissions_mixin
-import library.utils
 
 
 class Migration(migrations.Migration):
@@ -68,7 +67,7 @@ class Migration(migrations.Migration):
                 ('raise_permission', models.TextField(choices=[('0', 'NO_PERM'), ('U', 'USERS'), ('O', 'OWNER'), ('A', 'ADMIN')], default='A', max_length=1)),
                 ('permission', models.TextField(choices=[('0', 'NO_PERM'), ('U', 'USERS'), ('O', 'OWNER'), ('A', 'ADMIN')], max_length=1)),
                 ('only_one', models.BooleanField(default=False)),
-                ('attributes', models.JSONField(blank=True, default=library.utils.empty_dict)),
+                ('attributes', models.JSONField(blank=True, default=dict)),
                 ('comments_enabled', models.BooleanField(default=True)),
                 ('importance', models.IntegerField(default=0)),
                 ('context', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='flags.flagtypecontext')),

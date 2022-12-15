@@ -163,11 +163,6 @@ def all_equal(iterable):
     return all(start == x for x in it)
 
 
-def empty_dict() -> Dict:
-    # If you want an empty_dict as a default function parameter
-    return {}
-
-
 TransformInput = TypeVar("TransformInput")
 
 
