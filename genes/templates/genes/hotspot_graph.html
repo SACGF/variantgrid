@@ -64,7 +64,6 @@
         let transcriptUrls = {{ transcript_urls | jsonify }};
         let hotSpotId = "hotspot-graph-{{ uuid }}";
         let hotSpotDiv = $("#" + hotSpotId);
-        let hotspot_graph_click_func = hotSpotDiv.attr("hotspot_graph_click_func");
 
         function drawTranscriptModel(selector, gnomADMaxPercent) {
             const DEFAULT_COLORS = [
@@ -273,6 +272,7 @@
 
             let myPlot = document.getElementById(selector);
             myPlot.on('plotly_click', function (data) {
+                const hotspot_graph_click_func = hotSpotDiv.attr("hotspot_graph_click_func");
                 if (typeof (hotspot_graph_click_func) != 'undefined') {
                     let barClicked = data.points[0];
                     let i = barClicked.data.x.indexOf(String(barClicked.x));
@@ -286,6 +286,7 @@
             const accession = $(this).attr("accession");
             const url = transcriptUrls[accession];
             const container = hotSpotDiv.parent();
+            const hotspot_graph_click_func = hotSpotDiv.attr("hotspot_graph_click_func");
             container.empty();
             container.load(url, function() {
                 // put click handler back
