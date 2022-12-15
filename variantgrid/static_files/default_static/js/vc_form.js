@@ -2100,6 +2100,12 @@ VCTable.hgvs = (data, type, row) => {
     let alleleId = parts.allele_id;
     let pHgvs = parts.p_hgvs;
     let url = null;
+    let error = parts.error;
+
+    if (error) {
+        return $(`<span><i class="fa-solid fa-circle-exclamation text-danger"></i> ${error}</span>`).prop('outerHTML');
+    }
+
     if (variantId) {
         url = Urls.view_allele_from_variant(variantId)
     } else if (alleleId) {

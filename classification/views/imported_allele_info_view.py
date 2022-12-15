@@ -17,14 +17,17 @@ class ImportedAlleleInfoColumns(DatatableConfig[ImportedAlleleInfo]):
     def render_c_hgvs(self, data: CellData):
         c_hgvs_str: Optional[str] = None
         c_hgvs: Optional[CHGVS] = None
-        variant_id = None
+        variant_id: Optional[int] = None
+        error: Optional[str] = None
 
         if '37' in data.key:
             c_hgvs_str = data.get('grch37__c_hgvs')
             variant_id = data.get('grch37__variant')
+            error = data.get('grch37__error')
         elif '38' in data.key:
             c_hgvs_str = data.get('grch38__c_hgvs')
             variant_id = data.get('grch38__variant')
+            error = data.get('grch38__error')
         else:
             c_hgvs_str = data.get(data.key)
 
@@ -37,6 +40,8 @@ class ImportedAlleleInfoColumns(DatatableConfig[ImportedAlleleInfo]):
                 return {
                     "full": c_hgvs_str
                 }
+        else:
+            return {"error": error}
 
 
     def __init__(self, request: HttpRequest):
@@ -60,7 +65,7 @@ class ImportedAlleleInfoColumns(DatatableConfig[ImportedAlleleInfo]):
                 key='grch37__c_hgvs',
                 label='Resolved GRCh37<br/>c.HGVS',
                 orderable=True,
-                extra_columns=['grch37__variant'],
+                extra_columns=['grch37__variant', 'grch37__error'],
                 renderer=self.render_c_hgvs,
                 client_renderer='VCTable.hgvs'
             ),
@@ -68,7 +73,7 @@ class ImportedAlleleInfoColumns(DatatableConfig[ImportedAlleleInfo]):
                 key='grch38__c_hgvs',
                 label='Resolved GRCh38<br/>c.HGVS',
                 orderable=True,
-                extra_columns=['grch38__variant'],
+                extra_columns=['grch38__variant', 'grch38__error'],
                 renderer=self.render_c_hgvs,
                 client_renderer='VCTable.hgvs'
             ),
