@@ -15,7 +15,7 @@ from library.genomics.fasta_wrapper import FastaFileWrapper
 from library.utils import invert_dict
 from snpdb.genome.fasta_index import load_genome_fasta_index
 from snpdb.models.models_enums import SequenceRole, AssemblyMoleculeType
-
+import re
 
 class GenomeBuild(models.Model, SortMetaOrderingMixin):
     """ There is only 1 patch version of a genome build on the system
@@ -74,7 +74,7 @@ class GenomeBuild(models.Model, SortMetaOrderingMixin):
     @staticmethod
     def detect_from_filename(filename) -> Optional['GenomeBuild']:
         """ Attempt to detect from filename
-            eg "foo_grch37.bed" (returns GRCh37) - must only contain name/alias from 1 build) """
+            eg "foo_grch37.bed" (returns GRCh37) - must only contain name/alias from 1 build """
 
         lc_filename = filename.lower()
         possible_builds = set()
@@ -237,6 +237,50 @@ class GenomeBuild(models.Model, SortMetaOrderingMixin):
 
     def __str__(self):
         return self.name
+
+
+class GenomeBuildPatchVersion(models.Model):
+    name = models.TextField(primary_key=True)
+    genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)
+    patch_version = models.IntegerField(blank=True, null=True)
+
+    GENOME_BUILD_VERSION_RE = re.compile(r"(?P<genome_build>[A-Za-z0-9]+)(?:[.]p(?P<patch_version>[0-9]+))?", re.IGNORECASE)
+
+    class Meta:
+        unique_together = ('genome_build', 'patch_version')
+
+    def __str__(self):
+        return self.name
+
+    @staticmethod
+    def get_or_create(name: str) -> 'GenomeBuildPatchVersion':
+        if match := GenomeBuildPatchVersion.GENOME_BUILD_VERSION_RE.match(name):
+            genome_build = GenomeBuild.get_name_or_alias(match.group('genome_build'))
+            patch_version: Optional[int] = None
+            normalized_name: str
+            if patch_version_str := match.group('patch_version'):
+                patch_version = int(patch_version_str)
+                normalized_name = f"{genome_build.name}.p{patch_version}"
+            else:
+                normalized_name = genome_build.name
+
+            gbpv, _ = GenomeBuildPatchVersion.objects.get_or_create(
+                name=normalized_name,
+                genome_build=genome_build,
+                patch_version=patch_version
+            )
+            return gbpv
+        else:
+            raise ValueError(f"Invalid Genome Build Patch Version \"{name}\"")
+
+    @staticmethod
+    def get_unspecified_patch_version_for(genome_build: GenomeBuild) -> 'GenomeBuildPatchVersion':
+        gbpv, _ = GenomeBuildPatchVersion.objects.get_or_create(
+            name=genome_build.name,
+            genome_build=genome_build,
+            patch_version=None
+        )
+        return gbpv
 
 
 class Contig(models.Model):

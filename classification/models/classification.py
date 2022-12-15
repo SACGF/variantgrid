@@ -828,14 +828,14 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
     def update_allele_info(self):
         if allele := self.allele:
             try:
-                genome_build = self.get_genome_build()
+                genome_build_patch_version = self.get_genome_build_patch_version()
             except ValueError:
                 self.allele_info: Optional[ImportedAlleleInfo] = None
                 return
 
             self.allele_info = ImportedAlleleInfo.get_or_create(
                 imported_c_hgvs=self.imported_c_hgvs,
-                imported_genome_build=genome_build,
+                imported_genome_build_patch_version=genome_build_patch_version,
                 matched_allele=allele
             )
 

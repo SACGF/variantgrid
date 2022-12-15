@@ -596,7 +596,7 @@ class UploadedClassificationsUnmappedAdmin(ModelAdminBasics):
 
 
 @admin.register(ImportedVariantInfo)
-class VariantAlleleAdmin(ModelAdminBasics):
+class ImportedVariantInfoAdmin(ModelAdminBasics):
     list_display = (
         'allele_info',
         'genome_build',
@@ -604,7 +604,8 @@ class VariantAlleleAdmin(ModelAdminBasics):
         'c_hgvs',
         'gene_symbol',
         'transcript_version',
-        'genomic_sort'
+        'genomic_sort',
+        'error'
     )
 
     def has_add_permission(self, request):
@@ -612,13 +613,14 @@ class VariantAlleleAdmin(ModelAdminBasics):
 
 
 @admin.register(ImportedAlleleInfo)
-class ImportedAlleleAdmin(ModelAdminBasics):
+class ImportedAlleleInfoAdmin(ModelAdminBasics):
     list_display = (
         "imported_c_hgvs",
-        "imported_genome_build",
+        "imported_genome_build_patch_version",
         "grch37",
         "grch38"
     )
+    list_filter = ('imported_genome_build_patch_version', )
 
     def has_add_permission(self, request):
         return False

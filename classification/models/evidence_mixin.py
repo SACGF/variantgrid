@@ -11,7 +11,7 @@ from classification.enums import SpecialEKeys
 from genes.hgvs import CHGVS, PHGVS
 from library.log_utils import report_message
 from library.utils import empty_to_none
-from snpdb.models import GenomeBuild
+from snpdb.models import GenomeBuild, GenomeBuildPatchVersion
 
 
 class VCDbRefDict(TypedDict, total=False):
@@ -92,6 +92,15 @@ class EvidenceMixin:
             return GenomeBuild.get_name_or_alias(build_name)
         except GenomeBuild.DoesNotExist:
             raise ValueError(f"Unsupported GenomeBuild {build_name}")
+
+    def get_genome_build_patch_version(self) -> GenomeBuildPatchVersion:
+        if build_name := self.get(SpecialEKeys.GENOME_BUILD):
+            try:
+                return GenomeBuildPatchVersion.get_or_create(build_name)
+            except ValueError:
+                return GenomeBuildPatchVersion.get_unspecified_patch_version_for(self.get_genome_build())
+        else:
+            raise ValueError("Classification does not have a value for genome build")
 
     @lazy
     def db_refs(self) -> List[Dict]:

@@ -45,7 +45,7 @@ class ImportedAlleleInfoColumns(DatatableConfig[ImportedAlleleInfo]):
 
         self.rich_columns = [
             RichColumn(
-                key='imported_genome_build',
+                key='imported_genome_build_patch_version',
                 label='Imported<br/>Genome Build',
                 orderable=True
             ),
