@@ -2089,6 +2089,8 @@ VCTable.hgvs = (data, type, row) => {
             return $('<span>', {text:'-', class:'no-value'}).prop('outerHTML');
         }
         return $('<span>', {text:limitLength(parts, 100)}).prop('outerHTML');
+    } else if (!parts) {
+        return $('<span>', {text:'-', class:'no-value'}).prop('outerHTML');
     }
     let genomeBuild = parts.genome_build;
     let transcript = parts.transcript;
