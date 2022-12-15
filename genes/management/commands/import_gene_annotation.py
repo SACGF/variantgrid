@@ -56,9 +56,9 @@ class Command(BaseCommand):
             print(f"JSON uses cdot version {cdot_version}")
 
         if release_version := options["release"]:
-            self._create_release(genome_build, annotation_consortium, release_version, cdot_data)
+            self._create_release(genome_build, annotation_consortium, release_version, cdot_data, cdot_version)
         else:
-            self._import_merged_data(genome_build, annotation_consortium, cdot_data)
+            self._import_merged_data(genome_build, annotation_consortium, cdot_data, cdot_version)
 
         if options["clear_obsolete"]:
             print("Clearing old Transcript Versions")
@@ -76,7 +76,7 @@ class Command(BaseCommand):
             self.import_source_by_url[url] = import_source
         return import_source
 
-    def _create_release(self, genome_build: GenomeBuild, annotation_consortium, release_version, cdot_data):
+    def _create_release(self, genome_build: GenomeBuild, annotation_consortium, release_version, cdot_data, cdot_version):
         """ A GeneAnnotationRelease doesn't change/store transcript data, but does keep track of eg what
             symbols are used and how things are linked together """
 
@@ -117,7 +117,7 @@ class Command(BaseCommand):
                 "genes": {k: v for k, v in cdot_data["genes"].items() if k in missing_gene_versions},
                 "transcripts": {},  # Don't insert any of these
             }
-            self._import_merged_data(genome_build, annotation_consortium, fake_cdot_data)
+            self._import_merged_data(genome_build, annotation_consortium, fake_cdot_data, cdot_version)
             new_gene_versions = GeneVersion.objects.filter(genome_build=genome_build,
                                                            gene__annotation_consortium=annotation_consortium,
                                                            pk__gt=max_gene_version)
@@ -157,7 +157,7 @@ class Command(BaseCommand):
             if not auto_linked:
                 print("Release not linked - you will have to manually do so via Django Admin")
 
-    def _import_merged_data(self, genome_build: GenomeBuild, annotation_consortium, cdot_data: Dict):
+    def _import_merged_data(self, genome_build: GenomeBuild, annotation_consortium, cdot_data: Dict, cdot_version):
         print("_import_merged_data")
 
         known_uc_gene_symbols = set(GeneSymbol.objects.annotate(uc_symbol=Upper("symbol")).values_list("uc_symbol", flat=True))
@@ -258,6 +258,7 @@ class Command(BaseCommand):
             if transcript_id not in known_transcript_ids:
                 new_transcript_ids.add(transcript_id)
 
+            tv_data["cdot"] = cdot_version
             build_data = tv_data["genome_builds"][genome_build.name]  # Should always be there as single build file
             gene_accession = fix_accession(tv_data.pop("gene_version"))
             gene_version_id = gene_version_ids_by_accession[gene_accession]
