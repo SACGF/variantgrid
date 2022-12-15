@@ -1763,7 +1763,9 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
 
     @property
     def last_published_version(self) -> 'ClassificationModification':
-        return ClassificationModification.objects.filter(classification=self, is_last_published=True).first()
+        return ClassificationModification.objects.filter(classification=self, is_last_published=True)\
+            .select_related('classification', 'classification__lab', 'classification__lab__organization')\
+            .first()
 
     @property
     def last_published_sync_records(self):
