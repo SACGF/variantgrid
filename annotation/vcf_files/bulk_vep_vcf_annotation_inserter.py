@@ -11,7 +11,7 @@ from annotation.models.damage_enums import SIFTPrediction, FATHMMPrediction, \
     MutationAssessorPrediction, MutationTasterPrediction, Polyphen2Prediction, \
     PathogenicityImpact, ALoFTPrediction
 from annotation.models.models import ColumnVEPField, VariantAnnotation, \
-    VariantTranscriptAnnotation, VariantAnnotationVersion
+    VariantTranscriptAnnotation, VariantAnnotationVersion, VariantGeneOverlap
 from annotation.models.models_enums import VariantClass
 from annotation.vep_annotation import VEPConfig
 from genes.models import TranscriptVersion, GeneVersion
@@ -155,6 +155,7 @@ class BulkVEPVCFAnnotationInserter:
             "aloft_pred": get_choice_formatter_func(ALoFTPrediction.choices, empty_values=["."]),
             "aloft_high_confidence": format_aloft_high_confidence,
             "aloft_ensembl_transcript": format_empty_as_none,
+            "canonical": format_canonical,
             "cosmic_count": format_pick_highest_int,
             "cosmic_id": extract_cosmic,
             "cosmic_legacy_id": remove_empty_multiples,
@@ -497,27 +498,34 @@ class BulkVEPVCFAnnotationInserter:
 
     def bulk_insert(self):
         ANNOTATION_TYPE = {
-            VariantAnnotationVersion.REPRESENTATIVE_TRANSCRIPT_ANNOTATION: self.variant_annotation_list,
-            VariantAnnotationVersion.TRANSCRIPT_ANNOTATION: self.variant_transcript_annotation_list,
-            VariantAnnotationVersion.VARIANT_GENE_OVERLAP: self.variant_gene_overlap_list,
+            VariantAnnotationVersion.REPRESENTATIVE_TRANSCRIPT_ANNOTATION: (VariantAnnotation ,self.variant_annotation_list),
+            VariantAnnotationVersion.TRANSCRIPT_ANNOTATION: (VariantTranscriptAnnotation, self.variant_transcript_annotation_list),
+            VariantAnnotationVersion.VARIANT_GENE_OVERLAP: (VariantGeneOverlap, self.variant_gene_overlap_list),
         }
 
-        for base_table_name, annotations_list in ANNOTATION_TYPE.items():
-            logging.info("bulk_insert")
-            extension = EXTENSIONS[DELIMITER]
-            base_filename = f"{self.PREFIX}_{base_table_name}_{self.batch_id}.{extension}"
-            data_filename = get_import_processing_filename(self.annotation_run.pk, base_filename, prefix=self.PREFIX)
-            header = self.get_sql_csv_header(base_table_name)
-            row_data = self._annotations_list_to_row_data(header, annotations_list)
-            write_sql_copy_csv(row_data, data_filename, delimiter=DELIMITER)
+        for base_table_name, (klass, annotations_list) in ANNOTATION_TYPE.items():
+            # In unit testing, cursor.copy_from causes:
+            # psycopg2.errors.NotNullViolation: null value in column "id" of relation ... violates not-null constraint
+            if settings.UNIT_TEST:
+                # Goes into main table not partition
+                records = [klass(**kwargs) for kwargs in annotations_list]
+                klass.objects.bulk_create(records, batch_size=2000)
+            else:
+                logging.info("bulk_insert")
+                extension = EXTENSIONS[DELIMITER]
+                base_filename = f"{self.PREFIX}_{base_table_name}_{self.batch_id}.{extension}"
+                data_filename = get_import_processing_filename(self.annotation_run.pk, base_filename, prefix=self.PREFIX)
+                header = self.get_sql_csv_header(base_table_name)
+                row_data = self._annotations_list_to_row_data(header, annotations_list)
+                write_sql_copy_csv(row_data, data_filename, delimiter=DELIMITER)
 
-            if self.insert_variants:
-                vav = self.annotation_run.variant_annotation_version
-                partition_table = vav.get_partition_table(base_table_name=base_table_name)
+                if self.insert_variants:
+                    vav = self.annotation_run.variant_annotation_version
+                    partition_table = vav.get_partition_table(base_table_name=base_table_name)
 
-                logging.info("Inserting file '%s' into partition %s", data_filename, partition_table)
-                sql_copy_csv(data_filename, partition_table, header, delimiter=DELIMITER)
-                logging.info("Done!")
+                    logging.info("Inserting file '%s' into partition %s", data_filename, partition_table)
+                    sql_copy_csv(data_filename, partition_table, header, delimiter=DELIMITER)
+                    logging.info("Done!")
 
             annotations_list.clear()
 
@@ -660,3 +668,7 @@ def format_aloft_high_confidence(value) -> bool:
     elif value == "Low":
         high_confidence = False
     return high_confidence
+
+
+def format_canonical(value) -> bool:
+    return value == "YES"
