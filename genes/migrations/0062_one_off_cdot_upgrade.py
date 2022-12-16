@@ -12,7 +12,8 @@ def _test_old_cdot(apps):
         return False  # No transcripts, mew install
 
     if cdot_transcript := TranscriptVersion.objects.filter(data__cdot__isnull=False).first():
-        cdot_version = tuple(int(i) for i in cdot_transcript.data["cdot"].split("."))
+        it = (int(i) for i in cdot_transcript.data["cdot"].split("."))
+        cdot_version = tuple(it)
         return cdot_version < (0, 2, 12)  # This is release with MANE/RefSeq etc tags
     return False
 
@@ -24,7 +25,8 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        ManualOperation.operation_other(args=["Update cdot - import_gene_annotation with cdot transcript data >= 0.1.12"
-                                              " see annotation page (Gene/Transcript information) "],
+        ManualOperation.operation_other(args=["Update cdot - import_gene_annotation with cdot transcript DATA >= 0.2.12"
+                                              "from https://github.com/SACGF/cdot/wiki/Download-JSON.gz-files"
+                                              "Any cdot 0.2.X code is ok"],
                                         test=_test_old_cdot),
     ]
