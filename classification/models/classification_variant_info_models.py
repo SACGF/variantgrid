@@ -48,7 +48,7 @@ class ResolvedVariantInfo(TimeStampedModel):
         unique_together = ('allele_info', 'genome_build')
 
     def __str__(self):
-        return f"{self.c_hgvs}"
+        return f"{self.c_hgvs}" if self.c_hgvs else "Could not resolve c.HGVS"
 
     @property
     def allele(self) -> Optional[Allele]:

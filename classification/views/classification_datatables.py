@@ -29,27 +29,23 @@ ALLELE_KNOWN_VALUES = ALLELE_GERMLINE_VALUES + ALLELE_SOMATIC_VALUES
 class ClassificationColumns(DatatableConfig[ClassificationModification]):
 
     def render_c_hgvs(self, row: Dict[str, Any]) -> JsonDataType:
-        values = []
-
-        def get_preferred_chgvs() -> CHGVS:
+        def get_preferred_chgvs_json() -> CHGVS:
             nonlocal row
             for index, genome_build in enumerate(self.genome_build_prefs):
                 if c_hgvs_string := row.get(ClassificationModification.column_name_for_build(genome_build)):
                     c_hgvs = CHGVS(c_hgvs_string)
                     c_hgvs.genome_build = genome_build
                     c_hgvs.is_desired_build = index == 0
-                    return c_hgvs
+                    return c_hgvs.to_json()
 
             c_hgvs = CHGVS(row.get('published_evidence__c_hgvs__value'))
             c_hgvs.is_normalised = False
-            try:
-                c_hgvs.genome_build = GenomeBuild.get_name_or_alias(row.get('published_evidence__genome_build__value'))
-            except GenomeBuild.DoesNotExist:
-                pass
-            return c_hgvs
+            json_data = c_hgvs.to_json()
+            # use this rather than genome build object so we can get a patch version
+            json_data['genome_build'] = row.get('published_evidence__genome_build__value')
+            return json_data
 
-        use_c_hgvs = get_preferred_chgvs()
-        response = use_c_hgvs.to_json()
+        response = get_preferred_chgvs_json()
         if settings.VARIANT_CLASSIFICATION_GRID_SHOW_PHGVS:
             if p_hgvs := row.get('published_evidence__p_hgvs__value'):
                 p_dot = p_hgvs.find('p.')

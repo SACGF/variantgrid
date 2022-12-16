@@ -2117,7 +2117,7 @@ VCTable.hgvs = (data, type, row) => {
     if (genomeBuild && (parts.desired === false || parts.normalized === false)) {
         let genomeBuildWrapper = $('<div>');
         if (parts.normalized === false) {
-            $('<span>', {html: '<i class="fa-solid fa-triangle-exclamation text-warning"></i> not resolved ', style:'color:#888'}).appendTo(genomeBuildWrapper);
+            $('<span>', {html: '<i class="fa-solid fa-triangle-exclamation text-warning"></i> not resolved, showing imported ', style:'color:#888'}).appendTo(genomeBuildWrapper);
         } else {
             $('<span>', {html: '<i class="fa-solid fa-triangle-exclamation text-warning"></i> not lifted-over ', style:'color:#888'}).appendTo(genomeBuildWrapper);
         }

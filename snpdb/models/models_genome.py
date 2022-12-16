@@ -240,10 +240,19 @@ class GenomeBuild(models.Model, SortMetaOrderingMixin):
 
 
 class GenomeBuildPatchVersion(models.Model):
+    """
+    Stores a GenomeBuild along with a patch version.
+    At the time of this comment, we don't do anything with different patch versions, but use this class to future proof
+    """
+
     name = models.TextField(primary_key=True)
+    """ The patch version as it's primarily described e.g. GRCh37.p13 """
+
     genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)
-    # FIXME add more comments about patch_version Null vs patch version 0
+    """ The patchless genome build """
+
     patch_version = models.IntegerField(blank=True, null=True)
+    """ The version of the patch, or None if the version is unknown, note this is different to an explicit patch_version of 0 """
 
     GENOME_BUILD_VERSION_RE = re.compile(r"(?P<genome_build>[A-Za-z0-9]+)(?:[.]p(?P<patch_version>[0-9]+))?", re.IGNORECASE)
 
@@ -276,6 +285,9 @@ class GenomeBuildPatchVersion(models.Model):
 
     @staticmethod
     def get_unspecified_patch_version_for(genome_build: GenomeBuild) -> 'GenomeBuildPatchVersion':
+        """
+        Returns a GenomePatchVersion object where the patch is not known (represented by None)
+        """
         gbpv, _ = GenomeBuildPatchVersion.objects.get_or_create(
             name=genome_build.name,
             genome_build=genome_build,

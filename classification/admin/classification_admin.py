@@ -596,7 +596,7 @@ class UploadedClassificationsUnmappedAdmin(ModelAdminBasics):
 
 
 @admin.register(ResolvedVariantInfo)
-class ImportedVariantInfoAdmin(ModelAdminBasics):
+class ResolvedVariantInfoAdmin(ModelAdminBasics):
     list_display = (
         'allele_info',
         'genome_build',

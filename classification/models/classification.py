@@ -631,12 +631,12 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
 
         tests = Q()
         if GenomeBuild.grch37().is_annotated:
-            tests |= Q(chgvs_grch37__isnull=True)
+            tests |= Q(allele_info__grch37__isnull=True)
         if GenomeBuild.grch38().is_annotated:
-            tests |= Q(chgvs_grch38__isnull=True)
+            tests |= Q(allele_info__grch38__isnull=True)
 
         requires_relinking = Classification.objects.filter(
-            (tests | Q(clinical_context__isnull=True)) & Q(variant__isnull=False)
+            (tests | Q(clinical_context__isnull=True)) & Q(allele_info__isnull=False)
         )
         if vc_import:
             requires_relinking = requires_relinking.filter(classification_import=vc_import)

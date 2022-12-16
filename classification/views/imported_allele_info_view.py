@@ -40,6 +40,8 @@ class ImportedAlleleInfoColumns(DatatableConfig[ImportedAlleleInfo]):
                 return {
                     "full": c_hgvs_str
                 }
+        elif not variant_id:
+            return {"error": "Not resolved to a variant"}
         else:
             return {"error": error}
 
