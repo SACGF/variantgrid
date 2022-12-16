@@ -27,7 +27,6 @@ class VariantTranscriptSelections:
 
     def __init__(self, variant: Variant,
                  genome_build: GenomeBuild, annotation_version=None,
-                 initial_transcript_id=None, initial_transcript_column=REFSEQ_TRANSCRIPT,
                  add_other_annotation_consortium_transcripts=False):
         """ annotation_version defaults to latest version """
 
@@ -42,7 +41,7 @@ class VariantTranscriptSelections:
         self.warning_messages = []
         self.error_messages = []
         self.initial_transcript_id = self.NO_TRANSCRIPT
-        self._populate(variant, annotation_version, initial_transcript_id, initial_transcript_column)
+        self._populate(variant, annotation_version)
         self.other_annotation_consortium_transcripts_warning = None  # set in _add_other_annotation_consortium_transcripts
         if add_other_annotation_consortium_transcripts:
             self._add_other_annotation_consortium_transcripts(variant)
@@ -51,6 +50,7 @@ class VariantTranscriptSelections:
         else:
             sort_order = [self.ENSEMBL_TRANSCRIPT]
         self.transcript_data.sort(key=operator.itemgetter(*sort_order), reverse=True)
+        self._set_initial_and_selected()
 
     def get_annotation_consortium_display(self):
         return AnnotationConsortium(self.annotation_consortium).label
@@ -74,63 +74,7 @@ class VariantTranscriptSelections:
             ac_key = self.ENSEMBL_TRANSCRIPT
         return ac_key
 
-    def _populate(self, variant, annotation_version, initial_transcript_id, initial_transcript_column):
-
-        def get_transcript_data(obj: VariantTranscriptAnnotation, representative_transcript):
-            data = model_to_dict(obj)
-            # Use nice values if available
-            for f in data:
-                try:
-                    data[f] = getattr(obj, f"get_{f}_display")()
-                except AttributeError:
-                    pass
-
-            # Split/clean aggregate fields
-            VEP_JOINED_FIELDS = ["domains"]
-            for field in VEP_JOINED_FIELDS:
-                field_value = data[field]
-                if field_value:
-                    data[field] = field_value.replace("&", ", ")
-
-            # These always need to be set for sorting
-            data[self.REFSEQ_TRANSCRIPT] = self.NO_TRANSCRIPT
-            data[self.ENSEMBL_TRANSCRIPT] = self.NO_TRANSCRIPT
-            if obj.transcript:
-                ac_key = self._ac_key(obj.transcript.annotation_consortium)
-                data[ac_key] = obj.transcript_accession
-
-            data[self.GENE_SYMBOL] = obj.symbol
-            data["gene_id"] = obj.gene_id
-
-            transcript_id = self.NO_TRANSCRIPT
-            for col in settings.VARIANT_ANNOTATION_TRANSCRIPT_PREFERENCES:
-                if transcript_id := data.get(col):
-                    break
-            data["transcript_id"] = transcript_id
-
-            if obj.transcript_version:
-                data["tags"] = obj.transcript_version.tags
-                data["protein_length"] = obj.transcript_version.protein_length
-                ggc, ggc_method, ggc_url = GnomADGeneConstraint.get_for_transcript_version_with_method_and_url(obj.transcript_version)
-                if ggc:
-                    data[self.GNOMAD_GENE_CONSTRAINT_OE_LOF_SUMMARY] = ggc.oe_lof_summary
-                    data[self.GNOMAD_GENE_CONSTRAINT_METHOD] = ggc_method
-                    data[self.GNOMAD_GENE_CONSTRAINT_URL] = ggc_url
-
-            is_representative = bool(representative_transcript and representative_transcript == obj.transcript)
-            data[self.REPRESENTATIVE] = is_representative
-
-            # Initial set to what is passed in, otherwise use representative
-            if initial_transcript_id:
-                transcript_id = data[initial_transcript_column]
-                selected = initial_transcript_id == transcript_id
-            else:
-                selected = is_representative
-            data["selected"] = selected
-            if selected:
-                self.initial_transcript_id = data["transcript_id"]
-            return data
-
+    def _populate(self, variant, annotation_version):
         vav = annotation_version.variant_annotation_version
         try:
             self.variant_annotation = variant.variantannotation_set.get(version=vav)
@@ -144,7 +88,7 @@ class VariantTranscriptSelections:
             transcripts_list = list(variant.varianttranscriptannotation_set.filter(version=vav))
 
             for vsta in transcripts_list:
-                t_data = get_transcript_data(vsta, representative_transcript)
+                t_data = self._get_transcript_data(vsta, representative_transcript)
                 self.transcript_data.append(t_data)
 
                 if vsta.gene_id and vsta.gene_id not in self.gene_annotations:
@@ -170,6 +114,75 @@ class VariantTranscriptSelections:
                 self.error_messages.append(msg)
         except InvalidAnnotationVersionError as e:
             self.error_messages.append(str(e))
+
+    def _get_transcript_data(self, obj: VariantTranscriptAnnotation, representative_transcript):
+        data = model_to_dict(obj)
+        # Use nice values if available
+        for f in data:
+            try:
+                data[f] = getattr(obj, f"get_{f}_display")()
+            except AttributeError:
+                pass
+
+        # Split/clean aggregate fields
+        VEP_JOINED_FIELDS = ["domains"]
+        for field in VEP_JOINED_FIELDS:
+            field_value = data[field]
+            if field_value:
+                data[field] = field_value.replace("&", ", ")
+
+        # These always need to be set for sorting
+        data[self.REFSEQ_TRANSCRIPT] = self.NO_TRANSCRIPT
+        data[self.ENSEMBL_TRANSCRIPT] = self.NO_TRANSCRIPT
+        if obj.transcript:
+            ac_key = self._ac_key(obj.transcript.annotation_consortium)
+            data[ac_key] = obj.transcript_accession
+
+        data[self.GENE_SYMBOL] = obj.symbol
+        data["gene_id"] = obj.gene_id
+
+        transcript_id = self.NO_TRANSCRIPT
+        for col in settings.VARIANT_ANNOTATION_TRANSCRIPT_PREFERENCES:
+            if transcript_id := data.get(col):
+                break
+        data["transcript_id"] = transcript_id
+
+        transcript_canonical_score = 0
+        if obj.transcript_version:
+            data["tags"] = obj.transcript_version.tags
+            data["protein_length"] = obj.transcript_version.protein_length
+            transcript_canonical_score = obj.transcript_version.canonical_score
+            ggc, ggc_method, ggc_url = GnomADGeneConstraint.get_for_transcript_version_with_method_and_url(obj.transcript_version)
+            if ggc:
+                data[self.GNOMAD_GENE_CONSTRAINT_OE_LOF_SUMMARY] = ggc.oe_lof_summary
+                data[self.GNOMAD_GENE_CONSTRAINT_METHOD] = ggc_method
+                data[self.GNOMAD_GENE_CONSTRAINT_URL] = ggc_url
+
+        data["selected"] = False  # Will be set in _set_initial_and_selected
+        data["canonical_score"] = transcript_canonical_score
+        is_representative = bool(representative_transcript and representative_transcript == obj.transcript)
+        data[self.REPRESENTATIVE] = is_representative
+        return data
+
+    def _set_initial_and_selected(self):
+        # Initial set to what is passed in, otherwise use representative
+
+        if self.transcript_data:
+            td_canonical = sorted(self.transcript_data, key=operator.itemgetter("canonical_score"), reverse=True)
+            td_canonical = next(iter(td_canonical))
+            selected_transcript_data = None
+            if settings.VARIANT_TRANSCRIPT_USE_TRANSCRIPT_CANONICAL and td_canonical["canonical_score"]:
+                selected_transcript_data = td_canonical
+            else:
+                # Use representative (VEP pick) that is used as VariantAnnotation
+                for data in self.transcript_data:
+                    if data[self.REPRESENTATIVE]:
+                        selected_transcript_data = data
+                        break
+
+            if selected_transcript_data:
+                selected_transcript_data["selected"] = True
+                self.initial_transcript_id = selected_transcript_data["transcript_id"]
 
     def _add_other_annotation_consortium_transcripts(self, variant):
         """ VariantAnnotation is populated from VEP as either RefSeq or Ensembl

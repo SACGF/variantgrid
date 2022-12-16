@@ -330,6 +330,8 @@ VARIANT_ANNOTATION_TRANSCRIPT_PREFERENCES = ['lrg_identifier', 'refseq_transcrip
 VARIANT_ANNOTATION_DELETE_TEMP_FILES_ON_SUCCESS = True  # not DEBUG
 # If true, then if we don't have a specific transcript version, we'll match it to the closest one we can
 VARIANT_TRANSCRIPT_VERSION_BEST_ATTEMPT = True
+# Use highest TranscriptVersion canonical, set False to use representative transcript (ie VEP pick = variant annotation)
+VARIANT_TRANSCRIPT_USE_TRANSCRIPT_CANONICAL = True
 
 VARIANT_ZYGOSITY_GLOBAL_COLLECTION = "global"
 
