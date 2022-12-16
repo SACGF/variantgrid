@@ -32,6 +32,10 @@
         <a class="toggle-link" data-toggle="collapse" href="#hotspot-transcripts-{{ uuid }}">HotSpot graph transcripts...</a>
         <div class="clear"></div>
         <div id="hotspot-transcripts-{{ uuid }}" class="collapse">
+            <div>Note: The protein position (x coordinate) is determined by VEP using their transcript versions.
+                The protein domains come from <a href="https://www.ebi.ac.uk/interpro/">PFam (now InterPro)</a>
+                If the versions don't match, the different version will be included.
+            </div>
             {{ lookup_method }}
             <table>
             {% for accession, active, canonical_tag, details in transcript_options %}
