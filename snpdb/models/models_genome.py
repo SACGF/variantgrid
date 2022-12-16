@@ -242,6 +242,7 @@ class GenomeBuild(models.Model, SortMetaOrderingMixin):
 class GenomeBuildPatchVersion(models.Model):
     name = models.TextField(primary_key=True)
     genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)
+    # FIXME add more comments about patch_version Null vs patch version 0
     patch_version = models.IntegerField(blank=True, null=True)
 
     GENOME_BUILD_VERSION_RE = re.compile(r"(?P<genome_build>[A-Za-z0-9]+)(?:[.]p(?P<patch_version>[0-9]+))?", re.IGNORECASE)

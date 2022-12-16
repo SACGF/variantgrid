@@ -415,6 +415,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
 
     # TODO - remove variant and allele in favour of having that accessed via  variant_info
     variant = models.ForeignKey(Variant, null=True, on_delete=PROTECT)  # Null as might not match this
+    """ Deprecated -  """
     allele = models.ForeignKey(Allele, null=True, on_delete=PROTECT)
 
     # These fields were all deleted in favour of allele_info
@@ -833,11 +834,11 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 self.allele_info: Optional[ImportedAlleleInfo] = None
                 return
 
-            self.allele_info = ImportedAlleleInfo.get_or_create(
+            allele_info, _ = ImportedAlleleInfo.objects.get_or_create(
                 imported_c_hgvs=self.imported_c_hgvs,
-                imported_genome_build_patch_version=genome_build_patch_version,
-                matched_allele=allele
+                imported_genome_build_patch_version=genome_build_patch_version
             )
+            self.allele_info = allele_info.update_and_save(matched_allele=allele)
 
     @transaction.atomic()
     def set_variant(self, variant: Variant = None, message: str = None, failed: bool = False):

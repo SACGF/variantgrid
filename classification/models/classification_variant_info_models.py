@@ -1,25 +1,48 @@
-from typing import Optional
+from typing import Optional, List
 from django.conf import settings
 from django.db.models import TextField, ForeignKey, CASCADE, SET_NULL, OneToOneField
 from model_utils.models import TimeStampedModel
 from genes.hgvs import HGVSMatcher, CHGVS
 from genes.models import TranscriptVersion, GeneSymbol
+from library.cache import timed_cache
 from library.log_utils import report_exc_info
 from snpdb.models import GenomeBuild, Variant, Allele, GenomeBuildPatchVersion
 
 
-class ImportedVariantInfo(TimeStampedModel):
-    allele_info = ForeignKey('ImportedAlleleInfo', on_delete=CASCADE, null=True, blank=True, related_name='+')
-    genome_build = ForeignKey(GenomeBuild, on_delete=CASCADE)
+class ResolvedVariantInfo(TimeStampedModel):
+    """
+    Stores information about a genome_build_patch_version/allele combo, generally stuff we have to have access quickly for sorting classifications
+    """
 
-    variant = ForeignKey(Variant, null=True, on_delete=SET_NULL)
+    allele_info = ForeignKey('ImportedAlleleInfo', on_delete=CASCADE, null=True, blank=True, related_name='+')
+    """
+    There is some redundancy between allele_info to variant_info and vice versa, this parent relationship is the 'proper' one
+    The one via grch37, grch38 is un-normalized for purpose of efficiency
+    """
+
+    genome_build = ForeignKey(GenomeBuild, on_delete=CASCADE)
+    """ The genome build (combined with allele) make up this unique """
+
+    variant = ForeignKey(Variant, null=False, on_delete=CASCADE)
+    """ The variant the allele/genome_build matched up to """
+
     c_hgvs = TextField(null=True, blank=True)
+    """ c.HGVS as you'd normally represent it """
+
     c_hgvs_full = TextField(null=True, blank=True)
+    """ c.HGVS with all bases explicit in the case of dels & dups """
+
     gene_symbol = ForeignKey(GeneSymbol, null=True, on_delete=SET_NULL)
+    """ The GeneSymbol of the c.HGVS """
+
     transcript_version = ForeignKey(TranscriptVersion, null=True, on_delete=SET_NULL)
+    """ The TranscriptVersion of the c.HGVS """
+
     genomic_sort = TextField(null=True, blank=True)
+    """ Cached string that should have alphabetic sort order that matched genomic sort order """
 
     error = TextField(null=True, blank=True)
+    """ If there was an error generating the c.HGVS, put it here """
 
     class Meta:
         unique_together = ('allele_info', 'genome_build')
@@ -31,52 +54,60 @@ class ImportedVariantInfo(TimeStampedModel):
     def allele(self) -> Optional[Allele]:
         return self.allele_info.allele
 
-    def _derive_variant(self) -> Optional[Variant]:
-        if allele := self.allele_info.allele:
-            try:
-                return allele.variant_for_build(self.genome_build)
-            except ValueError:
-                return None
+    def update_and_save(self, variant: Variant) -> 'ResolvedVariantInfo':
+        """
+        Update all the derived fields
+        :param variant: Can't be None, variant we should use, provide the existing one if still need to update derived fields for existing record
+        """
 
-    def update_and_save(self):
         self.c_hgvs = None
         self.c_hgvs_full = None
         self.gene_symbol = None
         self.transcript_version = None
         self.sort_string = None
 
-        self.variant = self._derive_variant()
+        self.variant = variant
 
         genome_build = self.genome_build
-        variant = self.variant
         c_hgvs_obj = self.allele_info.imported_c_hgvs_obj
 
-        if variant:
-            self.genomic_sort = variant.sort_string
+        self.genomic_sort = variant.sort_string
 
-            if genome_build.is_annotated:
-                imported_transcript = c_hgvs_obj.transcript
+        imported_transcript = c_hgvs_obj.transcript
 
-                hgvs_matcher = HGVSMatcher(genome_build=genome_build)
-                try:
-                    c_hgvs_name = hgvs_matcher.variant_to_c_hgvs_extra(variant, imported_transcript)
-                    c_hgvs = c_hgvs_name.format()
-                    c_hgvs_obj = CHGVS(c_hgvs)
-                    self.c_hgvs = c_hgvs
-                    self.c_hgvs_full = c_hgvs_name.format(max_ref_length=settings.VARIANT_CLASSIFICATION_MAX_REFERENCE_LENGTH)
-                    self.transcript_version = c_hgvs_obj.transcript_version_model(genome_build=genome_build)
-                    self.gene_symbol = GeneSymbol.objects.filter(symbol=c_hgvs_obj.gene_symbol).first()
-                except Exception as exeception:
-                    self.error = str(exeception)
-                    # can't map between builds
-                    report_exc_info(extra_data={
-                        "genome_build": genome_build.name,
-                        "variant": str(variant),
-                        "transcript_id": imported_transcript
-                    })
+        hgvs_matcher = HGVSMatcher(genome_build=genome_build)
+        try:
+            c_hgvs_name = hgvs_matcher.variant_to_c_hgvs_extra(variant, imported_transcript)
+            c_hgvs = c_hgvs_name.format()
+            c_hgvs_obj = CHGVS(c_hgvs)
+            self.c_hgvs = c_hgvs
+            self.c_hgvs_full = c_hgvs_name.format(max_ref_length=settings.VARIANT_CLASSIFICATION_MAX_REFERENCE_LENGTH)
+            self.transcript_version = c_hgvs_obj.transcript_version_model(genome_build=genome_build)
+            self.gene_symbol = GeneSymbol.objects.filter(symbol=c_hgvs_obj.gene_symbol).first()
+        except Exception as exeception:
+            self.error = str(exeception)
+            # can't map between builds
+            report_exc_info(extra_data={
+                "genome_build": genome_build.name,
+                "variant": str(variant),
+                "transcript_id": imported_transcript
+            })
         self.save()
         return self
 
+    @staticmethod
+    def get_or_create(allele_info: 'ImportedAlleleInfo', genome_build: GenomeBuild, variant: Variant) -> 'ResolvedVariantInfo':
+        variant_info, created = ResolvedVariantInfo.objects.get_or_create(
+            allele_info=allele_info,
+            genome_build=genome_build,
+            defaults={
+                "variant": variant
+            }
+        )
+        if created or variant_info.variant != variant:
+            variant_info.update_and_save(variant)
+
+        return variant_info
 
 class ImportedAlleleInfo(TimeStampedModel):
     """
@@ -96,52 +127,74 @@ class ImportedAlleleInfo(TimeStampedModel):
     Should this be the raw 
     """
 
-    @property
-    def imported_c_hgvs_obj(self) -> CHGVS:
-        return CHGVS(self.imported_c_hgvs)
+    allele = ForeignKey(Allele, null=True, blank=True, on_delete=SET_NULL)
+    """ set this once it's matched, but record can exist prior to variant matching """
 
-    def __str__(self):
-        return f"{self.imported_genome_build_patch_version} {self.imported_c_hgvs}"
+    grch37 = OneToOneField(ResolvedVariantInfo, on_delete=SET_NULL, null=True, blank=True, related_name='+')
+    """ cached reference to 37, so can quickly refer to classification__allele_info__grch37__c_hgvs for example """
+
+    grch38 = OneToOneField(ResolvedVariantInfo, on_delete=SET_NULL, null=True, blank=True, related_name='+')
+    """ cached reference to 38, so can quickly refer to classification__allele_info__grch38__c_hgvs for example """
 
     class Meta:
         unique_together = ('imported_c_hgvs', 'imported_genome_build_patch_version')
 
-    grch37 = OneToOneField(ImportedVariantInfo, on_delete=SET_NULL, null=True, blank=True, related_name='+')
-    grch38 = OneToOneField(ImportedVariantInfo, on_delete=SET_NULL, null=True, blank=True, related_name='+')
 
-    # matched
-    allele = ForeignKey(Allele, null=True, blank=True, on_delete=SET_NULL)
+    @property
+    def imported_c_hgvs_obj(self) -> CHGVS:
+        return CHGVS(self.imported_c_hgvs)
 
-    def update_and_save(self, always_update: bool = True):
-        inserted_genome_builds = False
-        if not self.pk:
-            self.save()  # need to save so other objects can reference self
-
-        if not self.grch37:
-            inserted_genome_builds = True
-            self.grch37, _ = ImportedVariantInfo.objects.get_or_create(allele_info=self, genome_build=GenomeBuild.grch37())
-        if not self.grch38:
-            inserted_genome_builds = True
-            self.grch38, _ = ImportedVariantInfo.objects.get_or_create(allele_info=self, genome_build=GenomeBuild.grch38())
-
-        if always_update or inserted_genome_builds:
-            self.save()
-            self.grch37.update_and_save()
-            self.grch38.update_and_save()
+    def __str__(self) -> str:
+        return f"{self.imported_genome_build_patch_version} {self.imported_c_hgvs}"
 
     @staticmethod
-    def get_or_create(imported_c_hgvs: str, imported_genome_build_patch_version: GenomeBuildPatchVersion, matched_allele: Optional[Allele] = None) -> 'ImportedAlleleInfo':
+    def __genome_build_to_attr(genome_build: GenomeBuild) -> str:
+        """ for looping through the cached variant infos """
+        if genome_build == GenomeBuild.grch37():
+            return 'grch37'
+        elif genome_build == GenomeBuild.grch38():
+            return 'grch38'
+        else:
+            raise ValueError(f"No cached genome for {genome_build}")
 
-        allele_info, needs_saving = ImportedAlleleInfo.objects.get_or_create(
-            imported_c_hgvs=imported_c_hgvs,
-            imported_genome_build_patch_version=imported_genome_build_patch_version
-        )
+    @staticmethod
+    @timed_cache()
+    def _genome_builds() -> List[GenomeBuild]:
+        """ genome builds that the variantgrid instance is supporting """
+        return [build for build in GenomeBuild.builds_with_annotation() if build in [GenomeBuild.grch37(), GenomeBuild.grch38()]]
 
-        if matched_allele and allele_info.allele != matched_allele:
-            allele_info.allele = matched_allele
-            needs_saving = True
+    def __getitem__(self, item: GenomeBuild) -> Optional[ResolvedVariantInfo]:
+        return getattr(self, ImportedAlleleInfo.__genome_build_to_attr(item))
 
-        if needs_saving:
-            allele_info.update_and_save()
+    def __setitem__(self, key: GenomeBuild, value: Optional[ResolvedVariantInfo]):
+        setattr(self, ImportedAlleleInfo.__genome_build_to_attr(key), value)
 
-        return allele_info
+    def update_and_save(self, matched_allele: Allele, force_update: bool = False):
+        """
+        Call after providing an allele to update the attached variant infos
+        :param matched_allele: Forces an update on the ImportedAlleleInfos
+        :param force_update: Use if the allele has changed what variants it's matched to (not required if it
+        """
+        if self.allele != matched_allele:
+            self.allele = matched_allele
+
+        if not self.pk:
+            self.save()
+
+        for build in ImportedAlleleInfo._genome_builds():
+            variant = self.allele.variant_for_build_optional(build)
+            if not self.allele or not variant:
+                # we don't have an allele OR we don't have the corresponding variant, delete the VariantInfo
+                if existing := self[build]:
+                    existing.delete()
+                    self[build] = None  # TODO is this required or does delete just handle it?
+
+            else:
+                if existing := self[build]:
+                    if existing.variant != variant or force_update:
+                        existing.update_and_save(variant=variant)
+                else:
+                    self[build] = ResolvedVariantInfo.get_or_create(self, build, variant)
+
+        self.save()
+        return self

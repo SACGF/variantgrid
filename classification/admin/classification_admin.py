@@ -15,7 +15,7 @@ from classification.models import EvidenceKey, EvidenceKeyMap, DiscordanceReport
     UploadedClassificationsUnmapped, ClinicalContextRecalcTrigger, ImportedAlleleInfo
 from classification.models.classification import Classification
 from classification.models.classification_import_run import ClassificationImportRun, ClassificationImportRunStatus
-from classification.models.classification_variant_info_models import ImportedVariantInfo
+from classification.models.classification_variant_info_models import ResolvedVariantInfo
 from classification.tasks.classification_import_map_and_insert_task import ClassificationImportMapInsertTask
 from library.guardian_utils import admin_bot
 from snpdb.admin_utils import ModelAdminBasics, admin_action, admin_list_column, AllValuesChoicesFieldListFilter, \
@@ -595,7 +595,7 @@ class UploadedClassificationsUnmappedAdmin(ModelAdminBasics):
             task.apply_async()
 
 
-@admin.register(ImportedVariantInfo)
+@admin.register(ResolvedVariantInfo)
 class ImportedVariantInfoAdmin(ModelAdminBasics):
     list_display = (
         'allele_info',
