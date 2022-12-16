@@ -52,3 +52,5 @@ SITE_MESSAGE = "This is the test version of Shariant. Please avoid sharing real 
 URLS_NAME_REGISTER.update({
     "vus": True
 })
+
+VIEW_GENE_HOTSPOT_GRAPH_CLASSIFICATIONS = True
