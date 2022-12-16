@@ -12,8 +12,7 @@ def _test_old_cdot(apps):
         return False  # No transcripts, mew install
 
     if cdot_transcript := TranscriptVersion.objects.filter(data__cdot__isnull=False).first():
-        it = (int(i) for i in cdot_transcript.data["cdot"].split("."))
-        cdot_version = tuple(it)
+        cdot_version = tuple(int(i) for i in cdot_transcript.data["cdot"].split("."))
         return cdot_version < (0, 2, 12)  # This is release with MANE/RefSeq etc tags
     return False
 
