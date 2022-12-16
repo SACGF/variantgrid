@@ -635,9 +635,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         if GenomeBuild.grch38().is_annotated:
             tests |= Q(allele_info__grch38__isnull=True)
 
-        requires_relinking = Classification.objects.filter(
-            (tests | Q(clinical_context__isnull=True)) & Q(allele_info__isnull=False)
-        )
+        requires_relinking = Classification.objects.filter(tests)
         if vc_import:
             requires_relinking = requires_relinking.filter(classification_import=vc_import)
 
@@ -827,6 +825,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         self.allele = allele
 
     def update_allele_info(self):
+        # TODO, handle when allele hasn't been provided yet but we can just use a previous match
         if allele := self.allele:
             try:
                 genome_build_patch_version = self.get_genome_build_patch_version()
