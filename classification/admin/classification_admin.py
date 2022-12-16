@@ -12,7 +12,7 @@ from classification.classification_import import reattempt_variant_matching
 from classification.enums.classification_enums import EvidenceCategory, SpecialEKeys, SubmissionSource, ShareLevel
 from classification.models import EvidenceKey, EvidenceKeyMap, DiscordanceReport, DiscordanceReportClassification, \
     send_discordance_notification, ClinicalContext, ClassificationReportTemplate, ClassificationModification, \
-    UploadedClassificationsUnmapped, ClinicalContextRecalcTrigger, ImportedAlleleInfo
+    UploadedClassificationsUnmapped, ClinicalContextRecalcTrigger, ImportedAlleleInfo, ClassificationImport
 from classification.models.classification import Classification
 from classification.models.classification_import_run import ClassificationImportRun, ClassificationImportRunStatus
 from classification.models.classification_variant_info_models import ResolvedVariantInfo
@@ -371,6 +371,33 @@ class ClassificationAdmin(ModelAdminBasics):
             'lab_record_id': admin.widgets.AdminTextInputWidget()
         }, **kwargs)
 
+
+class ClassificationImportInline(admin.TabularInline):
+    model = Classification
+    fields = ['id', 'allele_info']
+
+    def has_add_permission(self, request, obj):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+@admin.register(ClassificationImport)
+class ClassificationImportAdmin(ModelAdminBasics):
+    inlines = (ClassificationImportInline,)
+    list_display = ('created', 'user', 'genome_build', 'outstanding_classifications')
+
+    @admin_list_column("Outstanding Classifications")
+    def outstanding_classifications(self, obj: ClassificationImport):
+        return Classification.objects.filter(classification_import=obj).count()
+
+    @admin_action("Relink Variants")
+    def relink_variants(self, request, queryset):
+        for obj in queryset:
+            Classification.relink_variants(obj)
 
 @admin.register(ClinicalContext)
 class ClinicalContextAdmin(ModelAdminBasics):

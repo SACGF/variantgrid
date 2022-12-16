@@ -629,7 +629,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             :return: A tuple of records now correctly set and those still outstanding
         """
 
-        tests = Q()
+        tests = Q(allele_info__isnull=True)
         if GenomeBuild.grch37().is_annotated:
             tests |= Q(allele_info__grch37__isnull=True)
         if GenomeBuild.grch38().is_annotated:
