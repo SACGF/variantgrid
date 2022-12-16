@@ -620,7 +620,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         return RawSQL('cast(evidence->>%s as jsonb)->>%s', (key_id, 'value'))
 
     @staticmethod
-    def relink_variants(vc_import: Optional[ClassificationImport] = None):
+    def relink_variants(vc_import: Optional[ClassificationImport] = None) -> int:
         """
             Call after import/liftover as variants may not have been processed enough at the time of "set_variant"
             Updates all records that have a variant but not cached c.hgvs values or no clinical context.
@@ -639,12 +639,15 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         if vc_import:
             requires_relinking = requires_relinking.filter(classification_import=vc_import)
 
+        relink_count = requires_relinking.count()
+
         vc: Classification
         for vc in requires_relinking:
             vc.set_variant(vc.variant)
             vc.save()
 
         logging.info("Bulk Update of variant relinking complete")
+        return relink_count
 
     @property
     def variant_coordinate(self):

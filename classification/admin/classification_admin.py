@@ -388,7 +388,7 @@ class ClassificationImportInline(admin.TabularInline):
 @admin.register(ClassificationImport)
 class ClassificationImportAdmin(ModelAdminBasics):
     inlines = (ClassificationImportInline,)
-    list_display = ('created', 'user', 'genome_build', 'outstanding_classifications')
+    list_display = ('pk', 'created', 'user', 'genome_build', 'outstanding_classifications')
 
     @admin_list_column("Outstanding Classifications")
     def outstanding_classifications(self, obj: ClassificationImport):
@@ -397,7 +397,8 @@ class ClassificationImportAdmin(ModelAdminBasics):
     @admin_action("Relink Variants")
     def relink_variants(self, request, queryset):
         for obj in queryset:
-            Classification.relink_variants(obj)
+            updated_vc_count = Classification.relink_variants(obj)
+            self.message_user(request, f'Classification Import ({obj.pk}) relinked {updated_vc_count} variants')
 
 @admin.register(ClinicalContext)
 class ClinicalContextAdmin(ModelAdminBasics):
