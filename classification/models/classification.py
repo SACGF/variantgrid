@@ -828,8 +828,8 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         self.allele = allele
 
     def update_allele_info(self):
-        # TODO, handle when allele hasn't been provided yet but we can just use a previous match
-        if allele := self.allele:
+        allele_info: Optional[ImportedAlleleInfo] = self.allele_info
+        if not self.allele_info:
             try:
                 genome_build_patch_version = self.get_genome_build_patch_version()
             except ValueError:
@@ -840,7 +840,10 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 imported_c_hgvs=self.imported_c_hgvs,
                 imported_genome_build_patch_version=genome_build_patch_version
             )
-            self.allele_info = allele_info.update_and_save(matched_allele=allele)
+            self.allele_info = allele_info
+
+        if allele := self.allele:
+            allele_info.update_and_save(matched_allele=allele)
 
     @transaction.atomic()
     def set_variant(self, variant: Variant = None, message: str = None, failed: bool = False):
@@ -857,6 +860,11 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         self.variant = variant
         self.update_allele()
         self.update_allele_info()
+        if variant and (allele_info := self.allele_info):
+            try:
+                allele_info.update_variant(self.get_genome_build(), variant)
+            except ValueError:
+                pass
 
         # don't want to be considered as part of the import anymore
         # as we've failed matching somewhere along the line

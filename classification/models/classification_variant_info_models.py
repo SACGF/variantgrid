@@ -181,20 +181,23 @@ class ImportedAlleleInfo(TimeStampedModel):
         if not self.pk:
             self.save()
 
-        for build in ImportedAlleleInfo._genome_builds():
-            variant = self.allele.variant_for_build_optional(build)
-            if not self.allele or not variant:
-                # we don't have an allele OR we don't have the corresponding variant, delete the VariantInfo
-                if existing := self[build]:
-                    existing.delete()
-                    self[build] = None  # TODO is this required or does delete just handle it?
-
-            else:
-                if existing := self[build]:
-                    if existing.variant != variant or force_update:
-                        existing.update_and_save(variant=variant)
-                else:
-                    self[build] = ResolvedVariantInfo.get_or_create(self, build, variant)
+        for genome_build in ImportedAlleleInfo._genome_builds():
+            variant = self.allele.variant_for_build_optional(genome_build)
+            self.update_variant(genome_build, variant, force_update)
 
         self.save()
         return self
+
+    def update_variant(self, genome_build: GenomeBuild, variant: Variant, force_update: bool = False):
+        if not self.allele or not variant:
+            # we don't have an allele OR we don't have the corresponding variant, delete the VariantInfo
+            if existing := self[genome_build]:
+                existing.delete()
+                self[genome_build] = None  # TODO is this required or does delete just handle it?
+
+        else:
+            if existing := self[genome_build]:
+                if existing.variant != variant or force_update:
+                    existing.update_and_save(variant=variant)
+            else:
+                self[genome_build] = ResolvedVariantInfo.get_or_create(self, genome_build, variant)
