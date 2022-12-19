@@ -1,0 +1,40 @@
+{% extends "uicore/page/base.html" %}
+{% load classification_tags %}
+{% load ui_menu_bars %}
+{% load ui_help %}
+{% load ui_utils %}
+{% load ui_tabs_builder %}
+{% block title %}Allele Import Info{% endblock %}
+{% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
+{% block head %}
+{% endblock %}
+{% block content %}
+    <style>
+        .dt-imported_c_hgvs, .dt-grch37__c_hgvs, .dt-grch38__c_hgvs {
+            width: 25%;
+        }
+    </style>
+    <script>
+        function datatableFilter(data) {
+            data['37_not_38'] = $("#37_not_38").is(':checked');
+        }
+        function applyFilters() {
+            $('#imported-allele-info-datatables').DataTable().ajax.reload();
+        }
+    </script>
+    <div class="container-table">
+        <h4>Allele Import Info</h4>
+        <table id="imported-allele-info-datatables"
+               data-datatable-url="{% url 'imported_allele_info_datatables' %}"
+               data-datatable-data='datatableFilter'
+               class="sticky-header"
+        ></table>
+        <div data-toolbar="#imported-allele-info-datatables">
+            <div class="float-right mr-4" style="position:relative;top:6px">
+                <input type="checkbox" class="form-check-input" id="37_not_38" onclick="applyFilters()"/>
+                <label for="37_not_38">Filter 37 != 38</label>
+            </div>
+        </div>
+
+    </div>
+{% endblock %}

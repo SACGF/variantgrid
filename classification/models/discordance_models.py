@@ -149,6 +149,10 @@ class DiscordanceReport(TimeStampedModel):
                     classification_original=vcm
                 ).save()
 
+        lazy.invalidate(self, 'discordance_report_classifications')
+        lazy.invalidate(self, 'involved_labs')
+        lazy.invalidate(self, 'all_actively_involved_labs')
+
         # contents of existing_vms are now presumably records that changed clinical groupings
 
         if not self.clinical_context.discordance_status.is_discordant:
@@ -171,9 +175,7 @@ class DiscordanceReport(TimeStampedModel):
     @lazy
     def discordance_report_classifications(self) -> List['DiscordanceReportClassification']:
         return list(self.discordancereportclassification_set.select_related(
-            'classification_original',
-            'classification_original__classification',
-            'classification_final',
+            'classification_original__classification__clinical_context',
             'classification_final__classification'
         ).all())
 
@@ -242,7 +244,8 @@ class DiscordanceReport(TimeStampedModel):
 
     @staticmethod
     def latest_report(clinical_context: ClinicalContext) -> 'DiscordanceReport':
-        return DiscordanceReport.objects.filter(clinical_context=clinical_context).order_by('-created').first()
+        return DiscordanceReport.objects.filter(clinical_context=clinical_context)\
+            .order_by('-created').first()
 
     @property
     def is_latest(self):
@@ -318,7 +321,7 @@ class DiscordanceReport(TimeStampedModel):
         if not self.is_important:
             return set()
         classifications = set()
-        for dr in DiscordanceReportClassification.objects.filter(report=self):
+        for dr in self.discordance_report_classifications:
             if dr.clinical_context_effective == self.clinical_context and not dr.withdrawn_effective:
                 classifications.add(dr.classification_original.classification.id)
         return classifications

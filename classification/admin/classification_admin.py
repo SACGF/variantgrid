@@ -12,9 +12,10 @@ from classification.classification_import import reattempt_variant_matching
 from classification.enums.classification_enums import EvidenceCategory, SpecialEKeys, SubmissionSource, ShareLevel
 from classification.models import EvidenceKey, EvidenceKeyMap, DiscordanceReport, DiscordanceReportClassification, \
     send_discordance_notification, ClinicalContext, ClassificationReportTemplate, ClassificationModification, \
-    UploadedClassificationsUnmapped, ClinicalContextRecalcTrigger
+    UploadedClassificationsUnmapped, ClinicalContextRecalcTrigger, ImportedAlleleInfo, ClassificationImport
 from classification.models.classification import Classification
 from classification.models.classification_import_run import ClassificationImportRun, ClassificationImportRunStatus
+from classification.models.classification_variant_info_models import ResolvedVariantInfo
 from classification.tasks.classification_import_map_and_insert_task import ClassificationImportMapInsertTask
 from library.guardian_utils import admin_bot
 from snpdb.admin_utils import ModelAdminBasics, admin_action, admin_list_column, AllValuesChoicesFieldListFilter, \
@@ -158,10 +159,10 @@ class ClassificationAdmin(ModelAdminBasics):
         'share_level',
         'clinical_significance',
         'allele_fallback',
+        'grch37_c_hgvs',
+        'grch38_c_hgvs',
         'imported_genome_build',
         'imported_c_hgvs',
-        'chgvs_grch37',
-        'chgvs_grch38',
         'withdrawn',
         'user',
         'created_detailed',
@@ -180,6 +181,20 @@ class ClassificationAdmin(ModelAdminBasics):
     list_per_page = 100
     inlines = (ClassificationModificationAdmin,)
     list_select_related = ('lab', 'user', 'allele')
+
+    @admin_list_column(short_description="c.hgvs (37)", order_field="allele_info__grch37__c_hgvs")
+    def grch37_c_hgvs(self, obj: Classification):
+        try:
+            return obj.allele_info.grch37.c_hgvs
+        except AttributeError:
+            return ""
+
+    @admin_list_column(short_description="c.hgvs (38)", order_field="allele_info__grch37__c_hgvs")
+    def grch38_c_hgvs(self, obj: Classification):
+        try:
+            return obj.allele_info.grch38.c_hgvs
+        except AttributeError:
+            return ""
 
     @admin_list_column(short_description="Created", order_field="created")
     def created_detailed(self, obj: Classification):
@@ -281,6 +296,12 @@ class ClassificationAdmin(ModelAdminBasics):
             vc.update_cached_c_hgvs()
             vc.save()
 
+    @admin_action("Matching: Update Variant Cache Info")
+    def update_variant_cache_info(self, request, queryset: QuerySet[Classification]):
+        for vc in queryset:
+            vc.update_allele_info()
+            vc.save()
+
     def publish_share_level(self, request, queryset: QuerySet[Classification], share_level: ShareLevel):
         already_published = 0
         in_error = 0
@@ -347,13 +368,37 @@ class ClassificationAdmin(ModelAdminBasics):
 
     def get_form(self, request, obj=None, **kwargs):
         return super().get_form(request, obj, widgets={
-            'lab_record_id': admin.widgets.AdminTextInputWidget(),
-            'chgvs_grch37': admin.widgets.AdminTextInputWidget(),
-            'chgvs_grch37_full': admin.widgets.AdminTextInputWidget(),
-            'chgvs_grch38': admin.widgets.AdminTextInputWidget(),
-            'chgvs_grch38_full': admin.widgets.AdminTextInputWidget()
+            'lab_record_id': admin.widgets.AdminTextInputWidget()
         }, **kwargs)
 
+
+class ClassificationImportInline(admin.TabularInline):
+    model = Classification
+    fields = ['id', 'allele_info']
+
+    def has_add_permission(self, request, obj):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+@admin.register(ClassificationImport)
+class ClassificationImportAdmin(ModelAdminBasics):
+    inlines = (ClassificationImportInline,)
+    list_display = ('pk', 'created', 'user', 'genome_build', 'outstanding_classifications')
+
+    @admin_list_column("Outstanding Classifications")
+    def outstanding_classifications(self, obj: ClassificationImport):
+        return Classification.objects.filter(classification_import=obj).count()
+
+    @admin_action("Relink Variants")
+    def relink_variants(self, request, queryset):
+        for obj in queryset:
+            updated_vc_count = Classification.relink_variants(obj)
+            self.message_user(request, f'Classification Import ({obj.pk}) relinked {updated_vc_count} variants')
 
 @admin.register(ClinicalContext)
 class ClinicalContextAdmin(ModelAdminBasics):
@@ -576,3 +621,34 @@ class UploadedClassificationsUnmappedAdmin(ModelAdminBasics):
         for ufl in queryset:
             task = ClassificationImportMapInsertTask.si(ufl.pk)
             task.apply_async()
+
+
+@admin.register(ResolvedVariantInfo)
+class ResolvedVariantInfoAdmin(ModelAdminBasics):
+    list_display = (
+        'allele_info',
+        'genome_build',
+        'variant',
+        'c_hgvs',
+        'gene_symbol',
+        'transcript_version',
+        'genomic_sort',
+        'error'
+    )
+
+    def has_add_permission(self, request):
+        return False
+
+
+@admin.register(ImportedAlleleInfo)
+class ImportedAlleleInfoAdmin(ModelAdminBasics):
+    list_display = (
+        "imported_c_hgvs",
+        "imported_genome_build_patch_version",
+        "grch37",
+        "grch38"
+    )
+    list_filter = ('imported_genome_build_patch_version', )
+
+    def has_add_permission(self, request):
+        return False

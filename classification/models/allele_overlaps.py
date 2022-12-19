@@ -332,12 +332,16 @@ class OverlapsCalculator:
         cm_qs: QuerySet[ClassificationModification]
         cm_qs = ClassificationModification.latest_for_user(user=perspective.user, published=True).filter(
             classification__allele_id__in=Subquery(allele_qs.values("pk"))) \
-            .select_related('classification', 'classification__allele', 'classification__clinical_context',
-                            'classification__lab', 'classification__lab__organization') \
-            .order_by('classification__allele')
+            .select_related('classification',
+                            'classification__allele_info__grch37',
+                            'classification__allele_info__grch38',
+                            'classification__clinical_context',
+                            'classification__lab',
+                            'classification__lab__organization') \
+            .order_by('classification__allele_info__allele')
 
         all_overlaps = []
-        for allele, cms in group_by_key(cm_qs, lambda x: x.classification.allele):
+        for allele, cms in group_by_key(cm_qs, lambda x: x.classification.allele_object):
             if len(cms) >= 2 and any((cm.classification.lab_id in lab_ids for cm in cms)):
                 overlap = AlleleOverlap(calculator_state=self.calculator_state, allele=allele)
                 all_overlaps.append(overlap)

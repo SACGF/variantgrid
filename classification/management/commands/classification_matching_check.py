@@ -30,6 +30,7 @@ class Command(BaseCommand):
         variant_diff_count = Counter()
         transcript_diff_count = Counter()
         diff_rows = []
+        c: Classification
         for c in Classification.objects.all().iterator(chunk_size=100):
             try:
                 if v := c.variant:

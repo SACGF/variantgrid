@@ -35,6 +35,7 @@ from classification.models.classification_import_run import ClassificationImport
 from classification.models.classification_patcher import patch_fuzzy_age
 from classification.models.classification_utils import \
     ValidationMerger, ClassificationJsonParams, VariantCoordinateFromEvidence, PatchMeta, ClassificationPatchResponse
+from classification.models.classification_variant_info_models import ImportedAlleleInfo
 from classification.models.evidence_key import EvidenceKeyValueType, \
     EvidenceKey, EvidenceKeyMap, VCDataDict, WipeMode, VCDataCell
 from classification.models.evidence_mixin import EvidenceMixin, VCPatch
@@ -408,24 +409,75 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
     The data is free form basked on EvidenceKey (rather than one column per possible field)
 
     Based on ACMG criteria and evidence - @see https://www.nature.com/articles/gim201530
-
-    :cvar variant: The variant this classification is linked to, a classification needs to be linked to a variant
-    to be useful.
-    :cvar chgvs_grch37: A cache of the chgvs lifted over to 37
-    :cvar chgvs_grch38: A cache of the chgvs lifted over to 38
-    :cvar sample: The sample (if any) this classification is linked to
-    :cvar classification_import: provide a value here to later match this record to a variant
-    :cvar user: The owner of the classification, is somewhat redundant to the evidence_key classified_by
-    :cvar share_level: Who should be able to see this classification (check GuardianPermissions not this directly)
-    :cvar annotation_version: If created from a variant and auto-populated, with which version of annotations
-    :cvar clinical_context: After being matched to a variant, this will be set to the default clinical_context for the allele
-    but it can be changed to be another clinical_context (for the same allele)
-    :cvar lab_record_id: Should be unique together with lab
-    :cvar evidence: The latest evidence (should always match the content of the latest ClassificationModification.evidence)
-    :cvar withdrawn: Soft delete, if withdrawn classification should not appear in most places
     """
 
     SUPPORTED_TRANSCRIPTS = settings.VARIANT_CLASSIFICATION_SUPPORTED_TRANSCRIPTS
+
+    # TODO - remove variant and allele in favour of having that accessed via  variant_info
+    variant = models.ForeignKey(Variant, null=True, on_delete=PROTECT)  # Null as might not match this
+    """ Deprecated -  """
+    allele = models.ForeignKey(Allele, null=True, on_delete=PROTECT)
+
+    # These fields were all deleted in favour of allele_info
+    # chgvs_grch37 = models.TextField(blank=True, null=True)
+    # chgvs_grch38 = models.TextField(blank=True, null=True)
+    #
+    # chgvs_grch37_full = models.TextField(blank=True, null=True)
+    # chgvs_grch38_full = models.TextField(blank=True, null=True)
+    #
+    # transcript_version_grch37 = models.ForeignKey(TranscriptVersion, null=True, blank=True, on_delete=SET_NULL, related_name='classification_37')
+    # transcript_version_grch38 = models.ForeignKey(TranscriptVersion, null=True, blank=True, on_delete=SET_NULL, related_name='classification_38')
+    ## END SO MANY DERIVED FIELDS
+
+    allele_info = models.ForeignKey(ImportedAlleleInfo, null=True, blank=True, on_delete=SET_NULL)
+    """ Keeps links to common builds (37, 38) for quick access to c.hgvs, transcript etc. Is shared between classifications with same import data """
+
+    @property
+    def allele_object(self) -> Allele:
+        """ The new preferred way to reference the allele, so we can eventually remove allele from the classification object """
+        try:
+            return self.allele_info.allele
+        except AttributeError:
+            return self.allele
+
+    sample = models.ForeignKey(Sample, null=True, blank=True, on_delete=SET_NULL)
+    """ The sample (if any) this classification is linked to """
+
+    classification_import = models.ForeignKey(ClassificationImport, null=True, on_delete=CASCADE)
+    """ provide a value here to later match this record to a variant """
+
+    user = models.ForeignKey(User, on_delete=PROTECT)
+    """ The owner of the classification, is somewhat redundant to the evidence_key classified_by, not heavily used """
+
+    lab = models.ForeignKey(Lab, on_delete=CASCADE)
+    """ The lab the classification belongs to, determines what permissions the classification is given """
+
+    share_level = models.CharField(max_length=16, choices=ShareLevel.choices(), null=False, default=ShareLevel.LAB.key)
+    """ The current share level of the classification, combined with lab determines the permissions """
+
+    annotation_version = models.ForeignKey(AnnotationVersion, null=True, blank=True, on_delete=SET_NULL)
+    """ If created from a variant and auto-populated, with which version of annotations. If null was created via import """
+
+    clinical_context = models.ForeignKey('ClinicalContext', null=True, blank=True, on_delete=SET_NULL)
+    """ After being matched to a variant, this will be set to the default clinical_context for the allele
+    but it can be changed to be another clinical_context (for the same allele) """
+
+    lab_record_id = models.TextField(blank=True, null=True)
+    """ Should be unique together with lab """
+
+    evidence = models.JSONField(null=False, blank=True, default=dict)
+    """ The latest evidence (should always match the content of the latest ClassificationModification.evidence) """
+
+    withdrawn = models.BooleanField(default=False)
+    """ Soft delete, if withdrawn classification should not appear in most places """
+
+    clinical_significance = models.CharField(max_length=1, choices=ClinicalSignificance.CHOICES, null=True, blank=True)
+    """ Used as an optimisation for queries """
+
+    condition_resolution = models.JSONField(null=True, blank=True)  # of type ConditionProcessedDict
+
+    last_source_id = models.TextField(blank=True, null=True)
+    last_import_run = models.ForeignKey(ClassificationImportRun, null=True, blank=True, on_delete=SET_NULL)
 
     @staticmethod
     def is_supported_transcript(transcript_or_hgvs: str):
@@ -434,36 +486,33 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 return True
         return False
 
-    # Variant is created/linked from initial GenomeBuild - discordance is against Allele
-    variant = models.ForeignKey(Variant, null=True, on_delete=PROTECT)  # Null as might not match this
-    # try to migrate more code to use allele
-    allele = models.ForeignKey(Allele, null=True, on_delete=PROTECT)
-    chgvs_grch37 = models.TextField(blank=True, null=True)
-    chgvs_grch38 = models.TextField(blank=True, null=True)
+    @property
+    def chgvs_grch37(self) -> Optional[str]:
+        try:
+            return self.allele_info.grch37.c_hgvs
+        except AttributeError:
+            return None
 
-    chgvs_grch37_full = models.TextField(blank=True, null=True)
-    chgvs_grch38_full = models.TextField(blank=True, null=True)
+    @property
+    def chgvs_grch38(self) -> Optional[str]:
+        try:
+            return self.allele_info.grch38.c_hgvs
+        except AttributeError:
+            return None
 
-    transcript_version_grch37 = models.ForeignKey(TranscriptVersion, null=True, blank=True, on_delete=SET_NULL, related_name='classification_37')
-    transcript_version_grch38 = models.ForeignKey(TranscriptVersion, null=True, blank=True, on_delete=SET_NULL, related_name='classification_38')
+    @property
+    def chgvs_grch37_full(self) -> Optional[str]:
+        try:
+            return self.allele_info.grch37.c_hgvs_full
+        except AttributeError:
+            return None
 
-    sample = models.ForeignKey(Sample, null=True, blank=True, on_delete=SET_NULL)  # Won't always have this
-    classification_import = models.ForeignKey(ClassificationImport, null=True, on_delete=CASCADE)
-    user = models.ForeignKey(User, on_delete=PROTECT)
-    lab = models.ForeignKey(Lab, on_delete=CASCADE)
-    share_level = models.CharField(max_length=16, choices=ShareLevel.choices(), null=False, default=ShareLevel.LAB.key)
-    annotation_version = models.ForeignKey(AnnotationVersion, null=True, blank=True,
-                                           on_delete=SET_NULL)  # Null means OUTSIDE of VariantGrid
-    clinical_context = models.ForeignKey('ClinicalContext', null=True, blank=True, on_delete=SET_NULL)
-    lab_record_id = models.TextField(blank=True, null=True)
-    evidence = models.JSONField(null=False, blank=True, default=dict)
-    withdrawn = models.BooleanField(default=False)
-
-    clinical_significance = models.CharField(max_length=1, choices=ClinicalSignificance.CHOICES, null=True, blank=True)
-    condition_resolution = models.JSONField(null=True, blank=True)  # of type ConditionProcessedDict
-
-    last_source_id = models.TextField(blank=True, null=True)
-    last_import_run = models.ForeignKey(ClassificationImportRun, null=True, blank=True, on_delete=SET_NULL)
+    @property
+    def chgvs_grch38_full(self) -> Optional[str]:
+        try:
+            return self.allele_info.grch38.c_hgvs_full
+        except AttributeError:
+            return None
 
     @property
     def metrics_logging_key(self) -> Tuple[str, Any]:
@@ -540,7 +589,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         flag_collections = Flag.objects.filter(time_range_q, resolution__status=FlagStatus.OPEN)
         flag_collections = flag_collections.order_by('collection__id').values_list('collection__id', flat=True)
         flag_q = Q(flag_collection_id__in=flag_collections.distinct())
-        missing_chgvs_q = (Q(chgvs_grch37__isnull=True) | Q(chgvs_grch38__isnull=True))
+        missing_chgvs_q = (Q(allele_info__grch37__c_hgvs__isnull=True) | Q(allele_info__grch38__c_hgvs__isnull=True))
         coi_qs = Classification.objects.filter(flag_q | (time_range_q & missing_chgvs_q))
         coi_qs = coi_qs.order_by('-pk').select_related('lab', 'flag_collection')
 
@@ -571,7 +620,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         return RawSQL('cast(evidence->>%s as jsonb)->>%s', (key_id, 'value'))
 
     @staticmethod
-    def relink_variants(vc_import: Optional[ClassificationImport] = None):
+    def relink_variants(vc_import: Optional[ClassificationImport] = None) -> int:
         """
             Call after import/liftover as variants may not have been processed enough at the time of "set_variant"
             Updates all records that have a variant but not cached c.hgvs values or no clinical context.
@@ -580,17 +629,17 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             :return: A tuple of records now correctly set and those still outstanding
         """
 
-        tests = Q()
+        tests = Q(allele_info__isnull=True)
         if GenomeBuild.grch37().is_annotated:
-            tests |= Q(chgvs_grch37__isnull=True)
+            tests |= Q(allele_info__grch37__isnull=True)
         if GenomeBuild.grch38().is_annotated:
-            tests |= Q(chgvs_grch38__isnull=True)
+            tests |= Q(allele_info__grch38__isnull=True)
 
-        requires_relinking = Classification.objects.filter(
-            (tests | Q(clinical_context__isnull=True)) & Q(variant__isnull=False)
-        )
+        requires_relinking = Classification.objects.filter(tests)
         if vc_import:
             requires_relinking = requires_relinking.filter(classification_import=vc_import)
+
+        relink_count = requires_relinking.count()
 
         vc: Classification
         for vc in requires_relinking:
@@ -598,6 +647,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             vc.save()
 
         logging.info("Bulk Update of variant relinking complete")
+        return relink_count
 
     @property
     def variant_coordinate(self):
@@ -681,68 +731,15 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         classification_withdraw_signal.send(Classification, classification=self)
         return True
 
-    def update_transcripts(self) -> int:
-        """
-        Updates the cached transcripts, save() still need to be called
-        :return: the number of transcripts successfully set (even if they didn't change)
-        """
-
-        def resolve_transcript(c_hgvs: str, genome_build: GenomeBuild):
-            if c_hgvs:
-                return CHGVS(c_hgvs).transcript_version_model(genome_build=genome_build)
-            else:
-                if transcript := self.transcript:
-                    transcript_parts = transcript.split('.')
-                    if len(transcript_parts) == 2:
-                        identifier = transcript_parts[0]
-                        try:
-                            version = int(transcript_parts[1])
-                            if transcript_obj := Transcript.objects.filter(identifier=identifier).first():
-                                return TranscriptVersion.objects.filter(genome_build=genome_build, transcript=transcript_obj, version=version).first()
-                        except ValueError:
-                            pass
-            return None
-
-        self.transcript_version_grch37 = resolve_transcript(self.chgvs_grch37, GenomeBuild.grch37())
-        self.transcript_version_grch38 = resolve_transcript(self.chgvs_grch38, GenomeBuild.grch38())
-
-        transcript_counts = 0
-        if self.transcript_version_grch37:
-            transcript_counts += 1
-        if self.transcript_version_grch38:
-            transcript_counts += 1
-        return transcript_counts
-
     def update_cached_c_hgvs(self) -> int:
         """
         :return: Returns length of the c.hgvs if successfully updated caches
         """
-        max_length = 0
-        variant = self.variant
-        if variant:
-            if GenomeBuild.grch37().is_annotated:
-                c_hgvs_name = self._generate_c_hgvs_extra(genome_build=GenomeBuild.grch37())
-                max_length = max(c_hgvs_name.ref_lengths(), max_length)
-                self.chgvs_grch37 = c_hgvs_name.format()
-                self.chgvs_grch37_full = c_hgvs_name.format(
-                    max_ref_length=settings.VARIANT_CLASSIFICATION_MAX_REFERENCE_LENGTH)
-            if GenomeBuild.grch38().is_annotated:
-                c_hgvs_name = self._generate_c_hgvs_extra(genome_build=GenomeBuild.grch38())
-                max_length = max(c_hgvs_name.ref_lengths(), max_length)
-                self.chgvs_grch38 = c_hgvs_name.format()
-                self.chgvs_grch38_full = c_hgvs_name.format(
-                    max_ref_length=settings.VARIANT_CLASSIFICATION_MAX_REFERENCE_LENGTH)
-        else:
-            self.chgvs_grch37 = None
-            self.chgvs_grch37_full = None
-            self.chgvs_grch38 = None
-            self.chgvs_grch38_full = None
-
-        self.update_transcripts()
         self.update_allele()
+        self.update_allele_info()
 
         # if we had a previously opened flag match warning - don't re-open
-        if variant:
+        if self.allele_info:
             if not self.id:
                 # need to save to have a flag collection
                 self.save()
@@ -822,8 +819,6 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             # validation will be called again anyway)
             allele.validate(liftover_complete=False)
 
-        return max_length
-
     def update_allele(self):
         # Updates the allele based off the variant
         # Warning, does not call save()
@@ -831,6 +826,24 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         if variant := self.variant:
             allele = variant.allele
         self.allele = allele
+
+    def update_allele_info(self):
+        allele_info: Optional[ImportedAlleleInfo] = self.allele_info
+        if not self.allele_info:
+            try:
+                genome_build_patch_version = self.get_genome_build_patch_version()
+            except ValueError:
+                self.allele_info: Optional[ImportedAlleleInfo] = None
+                return
+
+            allele_info, _ = ImportedAlleleInfo.objects.get_or_create(
+                imported_c_hgvs=self.imported_c_hgvs,
+                imported_genome_build_patch_version=genome_build_patch_version
+            )
+            self.allele_info = allele_info
+
+        if allele := self.allele:
+            allele_info.update_and_save(matched_allele=allele)
 
     @transaction.atomic()
     def set_variant(self, variant: Variant = None, message: str = None, failed: bool = False):
@@ -846,6 +859,12 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         old_allele = self.allele
         self.variant = variant
         self.update_allele()
+        self.update_allele_info()
+        if variant and (allele_info := self.allele_info):
+            try:
+                allele_info.update_variant(self.get_genome_build(), variant)
+            except ValueError:
+                pass
 
         # don't want to be considered as part of the import anymore
         # as we've failed matching somewhere along the line
@@ -1755,7 +1774,9 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
 
     @property
     def last_published_version(self) -> 'ClassificationModification':
-        return ClassificationModification.objects.filter(classification=self, is_last_published=True).first()
+        return ClassificationModification.objects.filter(classification=self, is_last_published=True)\
+            .select_related('classification', 'classification__lab', 'classification__lab__organization')\
+            .first()
 
     @property
     def last_published_sync_records(self):
@@ -1954,7 +1975,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         # Summary
         data = content['data']
 
-        if self.allele:
+        if self.allele_object:
             content["allele"] = self.get_allele_info()
 
         if self.sample:
@@ -2061,29 +2082,30 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             visible_evidence[k] = value
         return visible_evidence
 
-    def get_variant_info(self, genome_build: GenomeBuild) -> Optional[Dict[str, str]]:
-        variant = self.get_variant_for_build(genome_build)
-        if variant:
-            try:
-                g_hgvs = HGVSMatcher(genome_build=genome_build).variant_to_g_hgvs(variant)
-                c_hgvs = self.get_c_hgvs(genome_build)
-                return {
-                    SpecialEKeys.GENOME_BUILD: genome_build.name,
-                    SpecialEKeys.VARIANT_COORDINATE: str(variant),
-                    SpecialEKeys.G_HGVS: g_hgvs,
-                    SpecialEKeys.C_HGVS: c_hgvs,
-                }
-            except:
-                pass
-        return None
+    # def get_variant_info(self, genome_build: GenomeBuild) -> Optional[Dict[str, str]]:
+    #     variant = self.get_variant_for_build(genome_build)
+    #     if variant:
+    #         try:
+    #             g_hgvs = HGVSMatcher(genome_build=genome_build).variant_to_g_hgvs(variant)
+    #             c_hgvs = self.get_c_hgvs(genome_build)
+    #             return {
+    #                 SpecialEKeys.GENOME_BUILD: genome_build.name,
+    #                 SpecialEKeys.VARIANT_COORDINATE: str(variant),
+    #                 SpecialEKeys.G_HGVS: g_hgvs,
+    #                 SpecialEKeys.C_HGVS: c_hgvs,
+    #             }
+    #         except:
+    #             pass
+    #     return None
 
     def get_allele_info(self) -> Optional[Dict[str, Any]]:
-        if not self.allele:
+        # TODO rename to avoid confusion with allele_info
+        if not self.allele_object:
             return None
 
         allele_info = {}
         try:
-            allele: Allele = self.allele
+            allele = self.allele_object
             allele_info["id"] = allele.pk
             if allele.clingen_allele:
                 allele_info[SpecialEKeys.CLINGEN_ALLELE_ID] = str(allele.clingen_allele)
@@ -2392,12 +2414,18 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
         )
 
     @staticmethod
-    def column_name_for_build(genome_build: GenomeBuild, use_full: bool = False):
+    def column_name_for_build(genome_build: GenomeBuild, suffix: str = 'c_hgvs'):
+
+        build_str: str
         if genome_build.is_equivalent(GenomeBuild.grch37()):
-            return 'classification__chgvs_grch37' if not use_full else 'classification__chgvs_grch37_full'
-        if genome_build.is_equivalent(GenomeBuild.grch38()):
-            return 'classification__chgvs_grch38' if not use_full else 'classification__chgvs_grch38_full'
-        raise ValueError(f'No cached column for genome build {genome_build.pk}')
+            build_str = 'grch37'
+
+        elif genome_build.is_equivalent(GenomeBuild.grch38()):
+            build_str = 'grch38'
+        else:
+            raise ValueError(f'No cached column for genome build {genome_build.pk}')
+        return f'classification__allele_info__{build_str}__{suffix}'
+
 
     @property
     def share_level_enum(self) -> ShareLevel:
@@ -2448,17 +2476,6 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
     @property
     def lab(self) -> Lab:
         return self.classification.lab
-
-    @staticmethod
-    def optimize_for_report(qs: QuerySet) -> QuerySet:
-        return qs.select_related(
-            'classification',
-            'classification__lab',
-            'classification__lab__organization',
-            'classification__user',
-            'classification__variant',
-            'classification__variant__locus',
-            'classification__clinical_context')
 
     def as_json(self,
                 params: ClassificationJsonParams) -> dict:
@@ -2520,8 +2537,13 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
             qs = qs.filter(share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS)
 
         if published:
-            qs = qs.select_related('classification', 'classification__lab', 'classification__variant',
-                                   'classification__user')
+            qs = qs.select_related(
+                'classification',
+                'classification__lab__organization',
+                'classification__allele_info__grch37',
+                'classification__allele_info__grch38',
+                'classification__user'
+            )
             qs = qs.filter(is_last_published=True)
         else:
             if classification:  # if we're only looking at one classification, grab the latest the user can see

@@ -43,7 +43,7 @@ def get_classification_counts_allele(qs: QuerySet[ClassificationModification], f
     counts: Dict[Any, int] = {}
 
     # django doesn't support query set annotations and distinct() at the same time, so have to do this as multiple requests
-    qs = qs.order_by('classification__allele_id', '-created').distinct('classification__allele_id')
+    qs = qs.order_by('classification__allele_info__allele_id', '-created').distinct('classification__allele_info__allele_id')
     for possible_value in possible_values:
         count: int
         if possible_value is None:
@@ -97,7 +97,7 @@ def get_grouped_classification_counts(user: User,
         raise ValueError("Can't supply both 'evidence_key' and 'field_labels'")
 
     vc_qs = get_visible_classifications_qs(user).order_by('-modified')
-    values_qs = vc_qs.values_list("clinical_significance", field, "classification__allele")
+    values_qs = vc_qs.values_list("clinical_significance", field, "classification__allele_info__allele")
 
     counts = Counter()
     classification_counts = defaultdict(Counter)

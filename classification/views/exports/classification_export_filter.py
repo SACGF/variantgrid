@@ -316,9 +316,9 @@ class ClassificationFilter:
         :return: The name of the c.hgvs column to use in a Classification QS
         """
         if self.genome_build == GenomeBuild.grch37():
-            return 'classification__chgvs_grch37'
+            return 'classification__allele_info__grch37__c_hgvs'
         else:
-            return 'classification__chgvs_grch38'
+            return 'classification__allele_info__grch38__c_hgvs'
 
     @lazy
     def _bad_allele_transcripts(self) -> Dict[int, Set[str]]:
@@ -475,7 +475,13 @@ class ClassificationFilter:
                 cms = cms.exclude(classification__lab__in=exclude_labs)
 
         cms = cms.order_by('-classification__allele_id', '-classification__id')
-        cms = cms.select_related('classification', 'classification__lab', 'classification__lab__organization', 'classification__clinical_context')
+        cms = cms.select_related(
+            'classification',
+            'classification__allele_info__grch37',
+            'classification__allele_info__grch38',
+            'classification__lab',
+            'classification__lab__organization',
+            'classification__clinical_context')
 
         if allele_id := self.allele:
             cms = cms.filter(classification__allele_id=allele_id)

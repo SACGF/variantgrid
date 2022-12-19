@@ -98,6 +98,10 @@ class Allele(FlagsMixin, models.Model):
             return va.variant
         raise ValueError(f'Could not find any variants in allele {self.id}')
 
+    def variant_for_build_optional(self, genome_build: GenomeBuild) -> Optional['Variant']:
+        if va := self.variant_alleles().filter(genome_build=genome_build).first():
+            return va.variant
+
     def get_liftover_tuple(self, genome_build: GenomeBuild) -> Tuple[AlleleConversionTool,
                                                                      Union[int, 'VariantCoordinate']]:
         """ Used by to write VCF coordinates during liftover. Can be slow (API call)
