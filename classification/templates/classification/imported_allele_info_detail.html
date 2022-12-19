@@ -1,0 +1,6 @@
+{% load ui_utils %}
+<div>
+    {% for diff_text in c_hgvses %}
+        {% labelled label=diff_text.identifier value_css="text-monospace" %}{{ diff_text.html }}{% endlabelled %}
+    {% endfor %}
+</div>

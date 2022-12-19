@@ -1,13 +1,16 @@
 import difflib
+import itertools
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from html import escape
-from typing import List
+from typing import List, Optional, Any, Pattern
 
 from django.utils.safestring import SafeString
 
+from library.utils import first
 
-@dataclass(frozen=True)
+
+@dataclass
 class DiffTextSegment:
     operation: str
     text: str
@@ -24,6 +27,10 @@ class DiffTextSegment:
             return 'subtract'
         elif self.operation == '+':
             return 'add'
+        elif self.operation == 'd': # only used by multi-diff
+            return 'different'
+        elif self.operation == '?': # only used by multi-diff
+            return 'unknown'
         else:
             return self.operation
 
@@ -145,3 +152,91 @@ def diff_text(a: str, b: str) -> DiffBuilder:
         diff_builder.append(diff_chars)
     diff_builder.optimize()
     return diff_builder
+
+
+@dataclass(frozen=True)
+class MultiDiffInput:
+    identifier: Any
+    text: str
+
+@dataclass(frozen=True)
+class MultiDiffOutput:
+    input: MultiDiffInput
+    parts: Optional[List[str]]
+    matched: Optional[bool]
+    diffs: List[DiffTextSegment] = field(default_factory=list)
+
+    @property
+    def identifier(self):
+        return self.input.identifier
+
+    def __str__(self):
+        return " ".join(str(diff) for diff in self.diffs)
+
+    def html(self):
+        if len(self.diffs) == 1 and not self.diffs[0].text:
+            return ""
+
+        return SafeString("<span class='diff-text'>" + "".join(
+            f"<span class='diff-text-{diff.operation_name}'>{escape(diff.text)}</span>" for diff in self.diffs
+        ) + "</span>")
+
+    def append(self, op: str, segment: str) -> 'MultiDiffOutput':
+        if not self.diffs or self.diffs[-1].operation != op:
+            self.diffs.append(DiffTextSegment(op, segment))
+        else:
+            self.diffs[-1].text += segment
+        return self
+
+    @staticmethod
+    def from_input(input: MultiDiffInput, pattern: Pattern):
+        text = input.text or ''
+        parts: List[str]
+        if match := pattern.match(text):
+            parts = match.groups()
+            return MultiDiffOutput(
+                input=input,
+                parts=parts,
+                matched=True
+            )
+        else:
+            return MultiDiffOutput(
+                input=input,
+                parts=None,
+                matched=False,
+            ).append('u', text)
+
+class MultiDiff:
+
+    @staticmethod
+    def diff_index(parts: List[str]) -> Optional[int]:
+        for index, by_the_letter in enumerate(itertools.zip_longest(*parts, fillvalue='$')):
+            if any(x != first(by_the_letter) for x in by_the_letter):
+                return index
+        return None
+
+    def __init__(self, re_parts: Pattern):
+        self.re_parts = re_parts
+
+    def diffs(self, compare: List[MultiDiffInput]) -> List[MultiDiffOutput]:
+        length = len(compare)
+        if length == 0:
+            return []
+        elif length == 1:
+            first_compare = compare[0]
+            return [MultiDiffOutput(input=first_compare, matched=None, parts=[]).append(' ', first_compare.text)]
+        else:
+            outputs = [MultiDiffOutput.from_input(input, self.re_parts) for input in compare]
+            comparing = [output for output in outputs if output.matched]
+            for index in range(0, self.re_parts.groups):
+                compare_parts = [compare.parts[index] or '' for compare in comparing]
+                diff_index = MultiDiff.diff_index(compare_parts)
+                for diff_output, part in zip(comparing, compare_parts):
+                    if diff_index is None:
+                        diff_output.append(' ', part)
+                        continue
+                    if diff_index > 0:
+                        diff_output.append(' ', part[:diff_index])
+                    diff_output.append('d', part[diff_index:])
+
+            return outputs
