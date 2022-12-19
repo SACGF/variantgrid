@@ -281,17 +281,21 @@ class ClinVarKey(TimeStampedModel):
             if not raw_value:
                 raw_value = ""
 
-            if lookups := self.assertion_method_lookup.get("lookups"):
-                for lookup in lookups:
-                    if match_text := lookup.get("match"):
-                        if re.compile(match_text, RegexFlag.IGNORECASE).match(raw_value):
-                            return lookup.get("citation")
-                    else:
-                        raise ValueError("Assertion Method Lookup, lacking a 'match' field")
+            if assertion_method_lookup := self.assertion_method_lookup:
+                if lookups := self.assertion_method_lookup.get("lookups"):
+                    for lookup in lookups:
+                        if match_text := lookup.get("match"):
+                            if re.compile(match_text, RegexFlag.IGNORECASE).match(raw_value):
+                                return lookup.get("citation")
+                        else:
+                            raise ValueError("Assertion Method Lookup, lacking a 'match' field")
+                else:
+                    raise ValueError("Assertion Method Lookup, needs a key 'lookups', with dict entries of 'match' and 'citation'")
+            elif raw_value == "acmg":
+                # if no method lookups have been setup, only accept "acmg"
+                return raw_value
             else:
-                raise ValueError("Assertion Method Lookup, needs a key 'lookups', with dict entries of 'match' and 'citation'")
-
-            return None
+                raise None
 
         mapped_value = map_value(vg_value)
         if mapped_value == "acmg":

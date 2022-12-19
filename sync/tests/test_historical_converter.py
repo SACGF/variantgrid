@@ -126,7 +126,11 @@ class Test(unittest.TestCase):
             historical_converter = HistoricalEKeyConverter()
             non_legacy_vcm = FakeVCM(user=User("fake_user"))
             to_shariant_data = historical_converter.to_shariant(non_legacy_vcm, latest_data)
-            self.assertDictEqual(to_shariant_data, latest_data, f"{description} to_shariant conversion (latest keys)")
+
+            latest_data_only_values = {key: {'value': value.get('value')} for key, value in latest_data.items() if isinstance(value, dict)}
+            only_values = {key: {'value': value.get('value')} for key, value in to_shariant_data.items() if isinstance(value, dict)}
+
+            self.assertDictEqual(only_values, latest_data_only_values, f"{description} to_shariant conversion (latest keys)")
 
 
 if __name__ == "__main__":
