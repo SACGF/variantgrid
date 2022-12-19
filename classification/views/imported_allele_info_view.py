@@ -1,7 +1,7 @@
 from typing import Optional
 
 from django.contrib.auth.decorators import user_passes_test
-from django.db.models import QuerySet, Q, Count
+from django.db.models import QuerySet, Q, Count, F
 from django.http import HttpRequest
 from django.shortcuts import render
 from requests import Response
@@ -91,6 +91,12 @@ class ImportedAlleleInfoColumns(DatatableConfig[ImportedAlleleInfo]):
         return ImportedAlleleInfo.objects.all().annotate(
             classification_count=Count('classification')
         )
+
+    def filter_queryset(self, qs: QuerySet[ImportedAlleleInfo]) -> QuerySet[ImportedAlleleInfo]:
+        if filter_mode := self.get_query_param('37_not_38'):
+            if filter_mode == 'true':
+                qs = qs.filter(grch37__c_hgvs__ne=F('grch38__c_hgvs'))
+        return qs
 
     def power_search(self, qs: QuerySet[ImportedAlleleInfo], search_string: str) -> QuerySet[ImportedAlleleInfo]:
         # TODO, make RichColumn's searchable on/off so we can just fall back onto that

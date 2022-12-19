@@ -14,13 +14,27 @@
             width: 25%;
         }
     </style>
+    <script>
+        function datatableFilter(data) {
+            data['37_not_38'] = $("#37_not_38").is(':checked');
+        }
+        function applyFilters() {
+            $('#imported-allele-info-datatables').DataTable().ajax.reload();
+        }
+    </script>
     <div class="container-table">
         <h4>Allele Import Info</h4>
         <table id="imported-allele-info-datatables"
                data-datatable-url="{% url 'imported_allele_info_datatables' %}"
-               {% comment %}data-datatable-data='classificationFilter'{% endcomment %}
+               data-datatable-data='datatableFilter'
                class="sticky-header"
         ></table>
+        <div data-toolbar="#imported-allele-info-datatables">
+            <div class="float-right mr-4" style="position:relative;top:6px">
+                <input type="checkbox" class="form-check-input" id="37_not_38" onclick="applyFilters()"/>
+                <label for="37_not_38">Filter 37 != 38</label>
+            </div>
+        </div>
 
     </div>
 {% endblock %}
