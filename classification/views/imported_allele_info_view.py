@@ -55,7 +55,7 @@ class ImportedAlleleInfoColumns(DatatableConfig[ImportedAlleleInfo]):
     def __init__(self, request: HttpRequest):
         super().__init__(request)
         self.search_box_enabled = True
-        self.expand_client_renderer = DatatableConfig._row_expand_ajax('view_imported_allele_info_detail', expected_height=200)
+        self.expand_client_renderer = DatatableConfig._row_expand_ajax('view_imported_allele_info_detail', expected_height=108)
 
         self.rich_columns = [
             RichColumn(
