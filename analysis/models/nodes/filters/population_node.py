@@ -64,7 +64,7 @@ class PopulationNode(AnalysisNode):
     def _get_annotation_kwargs_for_node(self, **kwargs) -> Dict:
         annotation_kwargs = super()._get_annotation_kwargs_for_node(**kwargs)
         if self.use_internal_counts:
-            vzcc = VariantZygosityCountCollection.objects.get(name=settings.VARIANT_ZYGOSITY_GLOBAL_COLLECTION)
+            vzcc = VariantZygosityCountCollection.get_global_germline_counts()
             annotation_kwargs.update(vzcc.get_annotation_kwargs(**kwargs))
         return annotation_kwargs
 
@@ -126,7 +126,7 @@ class PopulationNode(AnalysisNode):
             # number of joins. However, if we have keep_internally_classified_pathogenic - we need to apply them with
             # an OR - so need to put into the standard node_arg_q_dict[None] later
 
-            vzcc = VariantZygosityCountCollection.objects.get(name=settings.VARIANT_ZYGOSITY_GLOBAL_COLLECTION)
+            vzcc = VariantZygosityCountCollection.get_global_germline_counts()
             # Max germline can be applied either by percent or from max_samples and zygosity = ANY_GERMLINE
             max_germline_list = []
             if self.max_samples is not None:

@@ -22,7 +22,7 @@ class AllVariantsNode(AnalysisNode, AbstractZygosityCountNode):
     def _get_annotation_kwargs_for_node(self, **kwargs) -> Dict:
         annotation_kwargs = super()._get_annotation_kwargs_for_node(**kwargs)
         if self.get_zygosity_count_arg_q_dict():
-            vzcc = VariantZygosityCountCollection.objects.get(name=settings.VARIANT_ZYGOSITY_GLOBAL_COLLECTION)
+            vzcc = VariantZygosityCountCollection.get_global_germline_counts()
             annotation_kwargs.update(vzcc.get_annotation_kwargs(**kwargs))
         return annotation_kwargs
 
@@ -74,7 +74,7 @@ class AllVariantsNode(AnalysisNode, AbstractZygosityCountNode):
 
     @lazy
     def db_counts(self):
-        return VariantZygosityCountCollection.objects.get(name=settings.VARIANT_ZYGOSITY_GLOBAL_COLLECTION)
+        return VariantZygosityCountCollection.get_global_germline_counts()
 
     @property
     def count_annotation_arg(self):

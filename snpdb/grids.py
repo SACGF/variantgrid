@@ -1,8 +1,9 @@
 import operator
 from functools import reduce
+from typing import Optional, List, Tuple
 
 from django.conf import settings
-from django.db.models import F
+from django.db.models import F, QuerySet
 from django.db.models.aggregates import Count
 from django.db.models.query_utils import Q
 from guardian.shortcuts import get_objects_for_user
@@ -11,10 +12,12 @@ from library.database_utils import get_queryset_column_names, \
     get_queryset_select_from_where_parts
 from library.jqgrid_sql import JqGridSQL
 from library.jqgrid_user_row_config import JqGridUserRowConfig
+from library.unit_percent import get_allele_frequency_formatter
 from library.utils import calculate_age
 from snpdb.grid_columns.custom_columns import get_variantgrid_extra_alias_and_select_columns
 from snpdb.models import VCF, Cohort, Sample, ImportStatus, \
-    GenomicIntervalsCollection, CustomColumnsCollection, Variant, Trio, UserGridConfig, GenomeBuild
+    GenomicIntervalsCollection, CustomColumnsCollection, Variant, Trio, UserGridConfig, GenomeBuild, ClinGenAllele, \
+    VariantZygosityCountCollection
 from snpdb.tasks.soft_delete_tasks import soft_delete_vcfs, remove_soft_deleted_vcfs_task
 
 
@@ -320,12 +323,148 @@ class CustomColumnsCollectionListGrid(JqGridUserRowConfig):
         return colmodels
 
 
+def server_side_format_clingen_allele(row, field):
+    if ca_id := row[field]:
+        ca_id = ClinGenAllele.format_clingen_allele(ca_id)
+    return ca_id
+
+
+def server_side_format_exon_and_intron(row, field):
+    """ MS Excel will turn '8/11' into a date :( """
+    if val := row[field]:
+        val = val.replace("/", " of ")
+    return val
+
+
 class AbstractVariantGrid(JqGridSQL):
     model = Variant
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._count = None
+        self.queryset_is_sorted = False
+        self.sort_by_contig_and_position = False
+
+    def _get_standard_overrides(self, af_show_in_percent):
+        overrides = {
+            # Note:     client side formatters should only be used for adding links etc, never conversion of data, such as
+            #           unit to percent, as the CSV downloads (w/o JS formatters) won't match the grid.
+            'id': {'editable': False, 'width': 90, 'fixed': True, 'formatter': 'detailsLink', 'sorttype': 'int'},
+            'tags_global': {
+                'model_field': False, 'queryset_field': False,
+                'name': 'tags_global', 'index': 'tags_global',
+                'classes': 'no-word-wrap', 'formatter': 'tagsGlobalFormatter', 'sortable': False
+            },
+            'clinvar__clinvar_variation_id': {'width': 60, 'formatter': 'clinvarLink'},
+            'variantallele__allele__clingen_allele__id': {
+                'width': 90,
+                "server_side_formatter": server_side_format_clingen_allele,
+                'formatter': 'formatClinGenAlleleId'
+            },
+            'variantannotation__cosmic_id': {'width': 90, 'formatter': 'cosmicLink'},
+            'variantannotation__cosmic_legacy_id': {'width': 90, 'formatter': 'cosmicLink'},
+            'variantannotation__transcript_version__gene_version__gene_symbol__symbol': {'formatter': 'geneSymbolLink'},
+            'variantannotation__overlapping_symbols': {'formatter': 'geneSymbolNewWindowLink'},
+            'variantannotation__transcript_version__gene_version__hgnc__omim_ids': {'width': 60,
+                                                                                    'formatter': 'omimLink'},
+            'variantannotation__gnomad_filtered': {"formatter": "gnomadFilteredFormatter"},
+            'variantannotation__exon': {"server_side_formatter": server_side_format_exon_and_intron},
+            'variantannotation__intron': {"server_side_formatter": server_side_format_exon_and_intron},
+            # There is more server side formatting (Unit -> Percent) added in _get_fields_and_overrides
+        }
+
+        if af_show_in_percent:
+            # gnomAD etc are all stored as AF in DB - want to show as percentage on grid
+            # But need to be able to turn it off to export VCF as AF
+            server_side_format_unit_af = get_allele_frequency_formatter(source_in_percent=False,
+                                                                        dest_in_percent=af_show_in_percent)
+            af_override = {
+                # Unit -> Percent
+                'variantannotation__af_1kg': {'server_side_formatter': server_side_format_unit_af},
+                'variantannotation__af_uk10k': {'server_side_formatter': server_side_format_unit_af},
+                'variantannotation__gnomad2_liftover_af': {'server_side_formatter': server_side_format_unit_af},
+                'variantannotation__gnomad_af': {'server_side_formatter': server_side_format_unit_af},
+                'variantannotation__gnomad_afr_af': {'server_side_formatter': server_side_format_unit_af},
+                'variantannotation__gnomad_amr_af': {'server_side_formatter': server_side_format_unit_af},
+                'variantannotation__gnomad_asj_af': {'server_side_formatter': server_side_format_unit_af},
+                'variantannotation__gnomad_eas_af': {'server_side_formatter': server_side_format_unit_af},
+                'variantannotation__gnomad_fin_af': {'server_side_formatter': server_side_format_unit_af},
+                'variantannotation__gnomad_nfe_af': {'server_side_formatter': server_side_format_unit_af},
+                'variantannotation__gnomad_oth_af': {'server_side_formatter': server_side_format_unit_af},
+                'variantannotation__gnomad_popmax_af': {'server_side_formatter': server_side_format_unit_af},
+                'variantannotation__gnomad_sas_af': {'server_side_formatter': server_side_format_unit_af},
+                'variantannotation__topmed_af': {'server_side_formatter': server_side_format_unit_af},
+            }
+            overrides.update(af_override)
+        return overrides
+
+    def _get_base_queryset(self) -> QuerySet:
+        raise NotImplementedError()
+
+    def _get_queryset(self, request):
+        qs = self._get_base_queryset()
+        # Annotate so we can use global_variant_zygosity in grid columns
+        qs, _ = VariantZygosityCountCollection.annotate_global_germline_counts(qs)
+        qs = self.filter_items(request, qs)  # JQGrid filtering from request
+        if q := self._get_q():
+            qs = qs.filter(q)
+
+        if self.sort_by_contig_and_position:
+            # These 2 are custom_columns.ID_FORMATTER_REQUIRED_FIELDS so won't add extra cols
+            qs = qs.order_by("locus__contig__name", "locus__position")
+            self.queryset_is_sorted = True
+        return qs
+
+    def get_values_queryset(self, request, field_names: List = None):
+        if field_names is None:
+            field_names = self.get_queryset_field_names()
+
+        queryset = self._get_queryset(request)
+        return queryset.values(*field_names)
+
+    def get_sql_params_and_columns(self, request):
+        values_queryset = self.get_values_queryset(request)
+        is_sorted = self.queryset_is_sorted
+        order_by = None
+        if not is_sorted:
+            # If sort column is normal, go through normal sort_items path.
+            # If special, modify SQL below
+            sidx = request.GET.get('sidx', 'id')
+            if self.column_in_queryset_fields(sidx):
+                values_queryset = self.sort_items(request, values_queryset)
+                is_sorted = True
+
+            override = self.get_override(sidx)
+            order_by = override.get("order_by")
+
+        sql, column_names = self._get_sql_and_columns(values_queryset, order_by)
+        return sql, [], column_names, is_sorted
+
+    def _get_variantgrid_extra_alias_and_select_columns(self):
+        return get_variantgrid_extra_alias_and_select_columns(self.user)
+
+    def _get_sql_and_columns(self, values_queryset, order_by: str):
+        new_columns, select_part, from_part, where_part = self._get_new_columns_select_from_where_parts(values_queryset)
+
+        extra_column_selects = []
+        for alias, select in self._get_variantgrid_extra_alias_and_select_columns():
+            extra_column_selects.append(f'({select}) as "{alias}"')
+            new_columns.append(alias)
+
+        if order_by:  # SELECT DISTINCT, ORDER BY expressions must appear in select list
+            extra_column_selects.append(order_by)
+        select_part += ",\n" + ",\n".join(extra_column_selects)
+
+        sql = '\n'.join([select_part, from_part, where_part])
+        column_names = get_queryset_column_names(values_queryset, new_columns)
+        return sql, column_names
+
+    def _get_new_columns_select_from_where_parts(self, values_queryset) -> Tuple[List[str], str, str, str]:
+        select_part, from_part, where_part = get_queryset_select_from_where_parts(values_queryset)
+        return [], select_part, from_part, where_part
+
+    def _get_q(self) -> Optional[Q]:
+        return None
 
     def column_in_queryset_fields(self, field):
         colmodel = self.get_override(field)
@@ -339,32 +478,8 @@ class AbstractVariantGrid(JqGridSQL):
 
         return field_names
 
-    def get_sql_params_and_columns(self, request):
-        queryset = self.get_filtered_queryset(request)
-
-        sidx = request.GET.get('sidx', 'id')
-        if self.column_in_queryset_fields(sidx):
-            queryset = self.sort_items(request, queryset)
-
-        select_part, from_part, where_part = get_queryset_select_from_where_parts(queryset)
-
-        extra_columns = []
-        extra_select = []
-        for alias, select in get_variantgrid_extra_alias_and_select_columns(self.user):
-            extra_columns.append(alias)
-            extra_select.append(f'({select}) as "{alias}"')
-        select_part += ",\n" + ",\n".join(extra_select)
-
-        sql = '\n'.join([select_part, from_part, where_part])
-        #logging.info(sql)
-
-        column_names = get_queryset_column_names(queryset, extra_columns)
-
-        params = []
-        return sql, params, column_names, True
-
     def get_count(self, request):
         if self._count is None:
-            queryset = self.get_filtered_queryset(request)
+            queryset = self._get_queryset(request)
             self._count = queryset.count()
         return self._count

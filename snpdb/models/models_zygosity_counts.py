@@ -57,14 +57,17 @@ class VariantZygosityCountCollection(RelatedModelsPartitionModel):
                 self.all_zygosity_counts_alias: F(self.ref_alias) + F(self.het_alias) + F(self.hom_alias)}
 
     @staticmethod
-    def annotate_global_germline_counts(qs: QuerySet) -> Tuple[QuerySet, 'VariantZygosityCountCollection']:
+    def get_global_germline_counts() -> 'VariantZygosityCountCollection':
         try:
-            vzcc = VariantZygosityCountCollection.objects.get(name=settings.VARIANT_ZYGOSITY_GLOBAL_COLLECTION)
+            return VariantZygosityCountCollection.objects.get(name=settings.VARIANT_ZYGOSITY_GLOBAL_COLLECTION)
         except VariantZygosityCountCollection.DoesNotExist:
             logging.error("Could not find collection for settings.VARIANT_ZYGOSITY_GLOBAL_COLLECTION = %s",
                           settings.VARIANT_ZYGOSITY_GLOBAL_COLLECTION)
             raise
 
+    @staticmethod
+    def annotate_global_germline_counts(qs: QuerySet) -> Tuple[QuerySet, 'VariantZygosityCountCollection']:
+        vzcc = VariantZygosityCountCollection.get_global_germline_counts()
         return vzcc.annotate_all_germline_counts(qs), vzcc
 
     def annotate_all_germline_counts(self, qs: QuerySet) -> QuerySet:

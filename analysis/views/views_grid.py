@@ -113,7 +113,7 @@ def format_items_iterator(analysis, sample_ids, items):
         yield item
 
 
-def replace_transcripts_iterator(grid, ctc: CanonicalTranscriptCollection, items):
+def _replace_transcripts_iterator(request, grid, ctc: CanonicalTranscriptCollection, items):
     """ This uses a large amount of RAM - reading a whole  """
 
     variant_transcript_annotation_variant_id_field = "variant_id"
@@ -132,7 +132,7 @@ def replace_transcripts_iterator(grid, ctc: CanonicalTranscriptCollection, items
                 transcript_replace_fields[suffix] = f
 
     # We only need things from VariantTranscriptAnnotation - so join there directly
-    variants_qs = grid.get_values_queryset(field_names=["id"])
+    variants_qs = grid.get_values_queryset(request, field_names=["id"])
     version = grid.node.analysis.annotation_version.variant_annotation_version
     ct_qs = ctc.canonicaltranscript_set
     transcript_versions = ct_qs.values_list("transcript_version", flat=True)
@@ -202,7 +202,7 @@ def node_grid_export(request, analysis_id):
         # Whether to use it or not is set server-side. Just use client to see what they wanted
         if ctc := node.analysis.canonical_transcript_collection:
             basename += f"_{ctc}"
-            items = replace_transcripts_iterator(grid, ctc, items)
+            items = _replace_transcripts_iterator(request, grid, ctc, items)
         else:
             logging.warning("Grid request had 'use_canonical_transcripts' but analysis did not.")
 

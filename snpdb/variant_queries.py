@@ -45,10 +45,14 @@ def get_has_variant_tags(genome_build) -> Q:
              variantallele__allele__in=tags_qs.values_list("variant__variantallele__allele", flat=True))
 
 
-def variant_qs_filter_has_internal_data(variant_qs: QuerySet, genome_build: GenomeBuild) -> QuerySet:
+def variant_qs_filter_has_internal_data(variant_qs: QuerySet, annotation_version: AnnotationVersion,
+                                        show_clinvar=False) -> QuerySet:
     qs, vzcc = VariantZygosityCountCollection.annotate_global_germline_counts(variant_qs)
     interesting = [Q(**{f"{vzcc.germline_counts_alias}__gt": 0}),
-                   get_has_classifications_q(genome_build),
-                   get_has_variant_tags(genome_build)]
+                   get_has_classifications_q(annotation_version.genome_build),
+                   get_has_variant_tags(annotation_version.genome_build)]
+    # annotation_version.clinvar_version.get
+    if show_clinvar:
+        interesting.append(Q(clinvar__version=annotation_version.clinvar_version))
     q = reduce(operator.or_, interesting)
     return qs.filter(q)

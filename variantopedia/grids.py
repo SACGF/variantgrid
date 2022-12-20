@@ -1,7 +1,8 @@
 import operator
 from functools import reduce
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
+from django.conf import settings
 from django.db.models import TextField, Value, QuerySet, Q
 from django.http import HttpRequest
 from django.shortcuts import get_object_or_404
@@ -60,70 +61,71 @@ class VariantWikiColumns(DatatableConfig[VariantWiki]):
 
 class AllVariantsGrid(AbstractVariantGrid):
     caption = 'All Variants'
-    fields = ["id", "locus__contig__name", 'locus__position', 'locus__ref', 'alt']
-    colmodel_overrides = {
-        'id': {'editable': False, 'width': 90, 'fixed': True, 'formatter': 'detailsLink'},
-        'tags_global': {'classes': 'no-word-wrap', 'formatter': 'tagsGlobalFormatter', 'sortable': False},
-    }
 
     def __init__(self, user, genome_build_name, **kwargs):
         user_settings = UserSettings.get_for_user(user)
         genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
-        annotation_version = AnnotationVersion.latest(genome_build)
+        self.annotation_version = AnnotationVersion.latest(genome_build)
         fields, override, _ = get_custom_column_fields_override_and_sample_position(user_settings.columns,
-                                                                                    annotation_version)
+                                                                                    self.annotation_version)
+        fields.remove("tags")
         self.fields = fields
         super().__init__(user)
+        af_show_in_percent = settings.VARIANT_ALLELE_FREQUENCY_CLIENT_SIDE_PERCENT
+        override.update(self._get_standard_overrides(af_show_in_percent))
         self.update_overrides(override)
 
-        extra_filters = kwargs.pop("extra_filters", {})
-        queryset = get_variant_queryset_for_annotation_version(annotation_version)
-        queryset, vzcc = VariantZygosityCountCollection.annotate_global_germline_counts(queryset)
-
-        filter_list = [
-            Variant.get_contigs_q(genome_build),
-        ]
-        if extra_filters:
-            if min_count := int(extra_filters.get("min_count", 0)):
-                filter_list.append(Q(**{f"{vzcc.germline_counts_alias}__gte": min_count}))
-        else:
-            # benchmarking - I found it much faster to do both of these queries (seems redundant)
-            hom_nonzero = Q(**{f"{vzcc.hom_alias}__gt": 0})
-            het_nonzero = Q(**{f"{vzcc.het_alias}__gt": 0})
-            filter_list.append(hom_nonzero | het_nonzero)
-            filter_list.append(Q(**{f"{vzcc.germline_counts_alias}__gt": 0}))
-
-        q = reduce(operator.and_, filter_list)
-        queryset = queryset.filter(q)
-        self.queryset = queryset.values(*self.get_queryset_field_names())
-        self.extra_config.update({'sortname': vzcc.germline_counts_alias,
+        self.vzcc = VariantZygosityCountCollection.get_global_germline_counts()
+        self.extra_filters = kwargs.pop("extra_filters", {})
+        self.extra_config.update({'sortname': self.vzcc.germline_counts_alias,
                                   'sortorder': "desc",
                                   'shrinkToFit': False})
+
+    def _get_base_queryset(self) -> QuerySet:
+        return get_variant_queryset_for_annotation_version(self.annotation_version)
+
+    def _get_q(self) -> Optional[Q]:
+        filter_list = [
+            Variant.get_contigs_q(self.annotation_version.genome_build),
+        ]
+        if self.extra_filters:
+            if min_count := int(self.extra_filters.get("min_count", 0)):
+                filter_list.append(Q(**{f"{self.vzcc.germline_counts_alias}__gte": min_count}))
+        else:
+            # benchmarking - I found it much faster to do both of these queries (seems redundant)
+            hom_nonzero = Q(**{f"{self.vzcc.hom_alias}__gt": 0})
+            het_nonzero = Q(**{f"{self.vzcc.het_alias}__gt": 0})
+            filter_list.append(hom_nonzero | het_nonzero)
+            filter_list.append(Q(**{f"{self.vzcc.germline_counts_alias}__gt": 0}))
+
+        return reduce(operator.and_, filter_list)
 
 
 class NearbyVariantsGrid(AbstractVariantGrid):
     caption = 'Nearby Variants'
-    fields = ["id", "locus__contig__name", 'locus__position', 'locus__ref', 'alt']
-    colmodel_overrides = {'id': {'editable': False, 'width': 90, 'fixed': True, 'formatter': 'detailsLink'}}
 
     def __init__(self, user, variant_id, region_type, **kwargs):
-        super().__init__(user)
-
-        variant = get_object_or_404(Variant, pk=variant_id)
+        self.variant = get_object_or_404(Variant, pk=variant_id)
+        self.region_type = region_type
 
         user_settings = UserSettings.get_for_user(user)
-        annotation_version = AnnotationVersion.latest(user_settings.default_genome_build)
+        self.annotation_version = AnnotationVersion.latest(user_settings.default_genome_build)
         fields, override, _ = get_custom_column_fields_override_and_sample_position(user_settings.columns,
-                                                                                    annotation_version)
+                                                                                    self.annotation_version)
+        fields.remove("tags")
         self.fields = fields
+        super().__init__(user)
+        af_show_in_percent = settings.VARIANT_ALLELE_FREQUENCY_CLIENT_SIDE_PERCENT
+        override.update(self._get_standard_overrides(af_show_in_percent))
         self.update_overrides(override)
 
-        region_filters = get_nearby_qs(variant, annotation_version)
-        queryset = region_filters[region_type]
-        self.queryset = queryset.values(*self.get_queryset_field_names())
         self.extra_config.update({'sortname': "locus__position",
                                   'sortorder': "desc",
                                   'shrinkToFit': False})
+
+    def _get_base_queryset(self) -> QuerySet:
+        region_filters = get_nearby_qs(self.variant, self.annotation_version)
+        return region_filters[self.region_type]
 
 
 class VariantTagsGrid(JqGridUserRowConfig):
@@ -194,44 +196,41 @@ class VariantTagsGrid(JqGridUserRowConfig):
 
 class TaggedVariantGrid(AbstractVariantGrid):
     """ Shows Variants that have been tagged (Variant-centric) """
-    model = Variant
     caption = 'Variant with tags'
-    fields = ["id", "locus__contig__name", 'locus__position', 'locus__ref', 'alt']
-    colmodel_overrides = {
-        'id': {'editable': False, 'width': 90, 'fixed': True, 'formatter': 'detailsLink'},
-        'tags_global': {'classes': 'no-word-wrap', 'formatter': 'tagsGlobalFormatter', 'sortable': False},
-        "variantannotation__transcript_version__gene_version__gene_symbol__symbol": {'label': 'Gene',
-                                                                                     'formatter': 'geneSymbolNewWindowLink'},
-    }
 
     def __init__(self, user, genome_build_name, extra_filters=None):
-        super().__init__(user)
-
         genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
-        user_grid_config = UserGridConfig.get(user, self.caption)
-        tags_qs = VariantTag.filter_for_user(user)
-        if not user_grid_config.show_group_data:
-            tags_qs = tags_qs.filter(user=user)
-
         tag_ids = []
         if extra_filters:
             if tag_id := extra_filters.get("tag"):
                 tag_ids.append(tag_id)
+        self.tag_ids = tag_ids
 
-        qs = get_variant_queryset_for_latest_annotation_version(genome_build)
-        qs = qs.filter(Variant.get_contigs_q(genome_build))
-        qs, _ = VariantZygosityCountCollection.annotate_global_germline_counts(qs)
-        tags_q = VariantTag.variants_for_build_q(genome_build, tags_qs, tag_ids)
-        qs = qs.filter(tags_q)
         user_settings = UserSettings.get_for_user(user)
-        annotation_version = AnnotationVersion.latest(genome_build)
+        self.annotation_version = AnnotationVersion.latest(genome_build)
         fields, override, _ = get_custom_column_fields_override_and_sample_position(user_settings.columns,
-                                                                                    annotation_version)
+                                                                                    self.annotation_version)
+        af_show_in_percent = settings.VARIANT_ALLELE_FREQUENCY_CLIENT_SIDE_PERCENT
+        override.update(self._get_standard_overrides(af_show_in_percent))
         fields.remove("tags")
         self.fields = fields
+        super().__init__(user)
         self.update_overrides(override)
-
-        self.queryset = qs.values(*self.get_queryset_field_names())
         self.extra_config.update({'sortname': "locus__position",
                                   'sortorder': "asc",
                                   'shrinkToFit': False})
+
+    def _get_base_queryset(self) -> QuerySet:
+        genome_build = self.annotation_version.genome_build
+        qs = get_variant_queryset_for_latest_annotation_version(genome_build)
+        qs = qs.filter(Variant.get_contigs_q(genome_build))
+        return qs
+
+    def _get_q(self) -> Optional[Q]:
+        genome_build = self.annotation_version.genome_build
+        user_grid_config = UserGridConfig.get(self.user, self.caption)
+        tags_qs = VariantTag.filter_for_user(self.user)
+        if not user_grid_config.show_group_data:
+            tags_qs = tags_qs.filter(user=self.user)
+        return VariantTag.variants_for_build_q(genome_build, tags_qs, self.tag_ids)
+

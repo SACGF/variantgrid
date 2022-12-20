@@ -277,23 +277,18 @@ class JqGrid:
             else:
                 order_by = order_by.asc(nulls_first=True)
 
-            # always fall back to a second sort column
-            # to ensure reliable results, by default have that
-            # column be descending id (so newest are first)
-
-            second_sidx = 'pk'
-            second_order_by = '-pk'
-
+            order_by_list = [order_by]
             if 'sortname' in self.extra_config:
                 second_sidx = self.extra_config.get('sortname')
-                second_sort_order = ('-' if self.extra_config.get('sortorder') == 'desc' else '')
-                second_order_by = f"{second_sort_order}{second_sidx}"
+                if sidx != second_sidx:
+                    second_sort_order = ('-' if self.extra_config.get('sortorder') == 'desc' else '')
+                    order_by_list.append(f"{second_sort_order}{second_sidx}")
 
+            # always ultimately sort by PK to ensure reliable results
+            order_by_list.append("-pk")
             try:
-                if sidx == second_sidx:
-                    items = items.order_by(order_by)
-                else:
-                    items = items.order_by(order_by, second_order_by)
+                # print(f"ORDER BY: {order_by_list}")
+                items = items.order_by(*order_by_list)
             except FieldError as fe:
                 print(fe)
         return items

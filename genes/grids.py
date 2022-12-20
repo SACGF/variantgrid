@@ -1,6 +1,6 @@
 import operator
 from functools import reduce
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 from django.conf import settings
 from django.contrib.postgres.aggregates.general import StringAgg
@@ -114,46 +114,50 @@ class GeneListGenesGrid(JqGridUserRowConfig):
 class GeneSymbolVariantsGrid(AbstractVariantGrid):
     """ Uses custom columns subtracting away the gene annotations (as they're displayed above) """
     caption = 'Gene Variants'
-    fields = ["id", "locus__contig__name", 'locus__position', 'locus__ref', 'alt']
-    colmodel_overrides = {
-        'id': {'editable': False, 'width': 90, 'fixed': True, 'formatter': 'detailsLink'},
-        'tags_global': {'classes': 'no-word-wrap', 'formatter': 'tagsGlobalFormatter', 'sortable': False},
-    }
 
     def __init__(self, user, gene_symbol, genome_build_name, **kwargs):
         extra_filters = kwargs.pop("extra_filters", None)
-        super().__init__(user)
-
+        self.gene_symbol = get_object_or_404(GeneSymbol, pk=gene_symbol)
         user_settings = UserSettings.get_for_user(user)
         genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
-        annotation_version = AnnotationVersion.latest(genome_build)
+        self.annotation_version = AnnotationVersion.latest(genome_build)
         fields, override, _ = get_custom_column_fields_override_and_sample_position(user_settings.columns,
-                                                                                    annotation_version)
+                                                                                    self.annotation_version)
+        af_show_in_percent = settings.VARIANT_ALLELE_FREQUENCY_CLIENT_SIDE_PERCENT
+        override.update(self._get_standard_overrides(af_show_in_percent))
         self.fields = self._get_non_gene_fields(fields)
+        super().__init__(user)
         self.update_overrides(override)
+        self.extra_filters = extra_filters
+        self.extra_config.update({'sortname': "locus__position",
+                                  'sortorder': "asc",
+                                  'shrinkToFit': False})
 
-        gene_symbol = get_object_or_404(GeneSymbol, pk=gene_symbol)
-        genes_qs = get_variant_queryset_for_gene_symbol(gene_symbol, annotation_version)
-        queryset = variant_qs_filter_has_internal_data(genes_qs, genome_build)
-        if extra_filters:
+    def _get_base_queryset(self) -> QuerySet:
+        genes_qs = get_variant_queryset_for_gene_symbol(self.gene_symbol, self.annotation_version)
+        return variant_qs_filter_has_internal_data(genes_qs, self.annotation_version, show_clinvar=False)
+
+    def _get_q(self) -> Optional[Q]:
+        q_list = []
+        if self.extra_filters:
             # Hotspot filters
-            if protein_position := extra_filters.get("protein_position"):
-                transcript_version = TranscriptVersion.objects.get(pk=extra_filters["protein_position_transcript_version_id"])
-                queryset = queryset.filter(varianttranscriptannotation__transcript_version=transcript_version,
-                                           varianttranscriptannotation__protein_position__icontains=protein_position)
-            tag_id = extra_filters.get("tag")
+            if protein_position := self.extra_filters.get("protein_position"):
+                transcript_version = TranscriptVersion.objects.get(pk=self.extra_filters["protein_position_transcript_version_id"])
+                q_list.append(Q(varianttranscriptannotation__transcript_version=transcript_version,
+                                varianttranscriptannotation__protein_position__icontains=protein_position))
+            tag_id = self.extra_filters.get("tag")
             if tag_id is not None:  # "" for all tags
                 tags_qs = VariantTag.objects.all()
                 if tag_id:
                     tag = get_object_or_404(Tag, pk=tag_id)
                     tags_qs = tags_qs.filter(tag=tag)
                 alleles_qs = tags_qs.values_list("variant__variantallele__allele")
-                queryset = queryset.filter(variantallele__allele__in=alleles_qs)
+                q_list.append(Q(variantallele__allele__in=alleles_qs))
 
-        self.queryset = queryset.distinct().values(*self.get_queryset_field_names())
-        self.extra_config.update({'sortname': "locus__position",
-                                  'sortorder': "asc",
-                                  'shrinkToFit': False})
+        q = None
+        if q_list:
+            q = reduce(operator.and_, q_list)
+        return q
 
     @staticmethod
     def _get_non_gene_fields(fields):
@@ -188,6 +192,7 @@ def _get_gene_fields():
 
 
 class GenesGrid(JqGridUserRowConfig):
+    """ Shows genes / symbols in a gene annotation release """
     model = ReleaseGeneVersion
     caption = "Gene Release"
     colmodel_overrides = {

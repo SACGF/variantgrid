@@ -3,8 +3,11 @@
 {% load ui_utils %}
 {% load ui_menu_bars %}
 {% load genome_build_tags %}
+{% load user_tag_color_tags %}
 {% block title %}Variants{% endblock %}
 {% block head %}
+    {{ block.super }}
+    {% render_tag_styles_and_formatter %}
     <script type="text/javascript" src="{% static 'js/grid.js' %}"></script>
     <script>
         gridExtraFilters = {};
@@ -60,7 +63,6 @@
         });
     </script>
     <style>
-        {% load user_tag_color_tags %}
         {% render_node_count_colors_css %}
     </style>
 {% endblock head %}
@@ -83,5 +85,5 @@
 
             </div>
         {% load jqgrid_tags %}
-        {% jqgrid 'all_variants_grid' 'all-variants' genome_build_name=genome_build.name search=True delete=False download_grid_json_as_csv=True %}
+        {% jqgrid 'all_variants_grid' 'all-variants' template_name='jqgrid/variant_details_link_grid.html' genome_build_name=genome_build.name search=True delete=False download_grid_json_as_csv=True %}
 {% endblock submenu_page_content %}

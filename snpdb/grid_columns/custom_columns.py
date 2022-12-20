@@ -14,7 +14,7 @@ def get_custom_column_fields_override_and_sample_position(custom_columns_collect
     q_columns_this_version = Q(column__columnvepfield__isnull=True) | Q(column__columnvepfield__in=cvf_qs)
     columns_queryset = CustomColumn.objects.filter(q_columns_this_version,
                                                    custom_columns_collection=custom_columns_collection)
-    columns_queryset = columns_queryset.select_related("column").order_by("sort_order")
+    columns_queryset = columns_queryset.select_related("column").order_by("sort_order").distinct()
     fields = []
     sample_columns_position = None
     override = {}

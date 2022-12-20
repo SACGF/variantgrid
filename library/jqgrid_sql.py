@@ -40,9 +40,6 @@ class JqGridSQL(JqGridUserRowConfig):
     def is_empty(self, request):
         return self.get_count(request) == 0
 
-    def get_filtered_queryset(self, request):
-        return self.filter_items(request, self.queryset)
-
     @abc.abstractmethod
     def get_sql_params_and_columns(self, request):
         raise NotImplementedError()
