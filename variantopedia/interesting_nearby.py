@@ -78,7 +78,7 @@ def get_nearby_summaries(user, variant, annotation_version, distance=None, clini
 
 def interesting_summary(qs, user, genome_build, total=True, clinvar=True, classifications=True, clinical_significance=False):
     counts = interesting_counts(qs, user, genome_build, clinical_significance=clinical_significance)
-    print(counts)
+    # print(counts)
     summary = ""
     if num_variants := counts['total']:
         classification_types = {}
