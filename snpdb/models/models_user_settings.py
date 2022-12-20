@@ -1,5 +1,5 @@
 import dataclasses
-from collections import OrderedDict, defaultdict
+from collections import defaultdict
 from dataclasses import dataclass
 from typing import Optional, List, Tuple, Dict, Set
 
@@ -10,13 +10,15 @@ from django.contrib.auth.models import User, Group
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models.deletion import SET_NULL, CASCADE
+from django.urls import reverse
 from django_extensions.db.models import TimeStampedModel
 from lazy import lazy
 from model_utils.managers import InheritanceManager
 
 from library.django_utils import thread_safe_unique_together_get_or_create
 from library.django_utils.avatar import SpaceThemedAvatarProvider
-from library.utils import rgb_invert, string_deterministic_hash
+from library.django_utils.guardian_permissions_mixin import GuardianPermissionsAutoInitialSaveMixin
+from library.utils import string_deterministic_hash, rgb_invert
 from snpdb.models.models import Tag, Lab, Organization
 from snpdb.models.models_columns import CustomColumnsCollection, CustomColumn
 from snpdb.models.models_enums import BuiltInFilters
@@ -47,37 +49,51 @@ class UserDataPrefix(models.Model):
         return replace_dict
 
 
-class UserTagColors(models.Model):
-    user = models.ForeignKey(User, null=True, on_delete=CASCADE)  # Null is "default"
+class TagColorsCollection(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
+    user = models.ForeignKey(User, null=True, blank=True, on_delete=CASCADE)
+    name = models.TextField()
+    version_id = models.IntegerField(null=False, default=0)
+
+    def get_user_colors_by_tag(self) -> Dict[str, Dict]:
+        user_colors_by_tag = {}
+        for tag_id, rgb in self.tagcolor_set.all().values_list('tag', 'rgb'):
+            user_colors_by_tag[tag_id] = {
+                "background-color": rgb,
+                "color": rgb_invert(rgb)
+            }
+        return user_colors_by_tag
+
+
+    def clone_for_user(self, user):
+        name = f"{user}'s copy of {self.name}"
+        clone_tcc = TagColorsCollection(name=name, user=user)
+        clone_tcc.save()
+
+        for cc in self.tagcolor_set.all():
+            cc.pk = None
+            cc.collection = clone_tcc
+            cc.save()
+
+        return clone_tcc
+
+    def get_absolute_url(self):
+        return reverse('view_tag_colors_collection', kwargs={'tag_colors_collection_id': self.pk})
+
+    def __str__(self):
+        who = self.user or 'global'
+        return f"({who}): {self.name}"
+
+
+class TagColor(TimeStampedModel):
+    collection = models.ForeignKey(TagColorsCollection, null=True, on_delete=CASCADE)
     tag = models.ForeignKey(Tag, on_delete=CASCADE)
     rgb = models.CharField(max_length=7)  # '#rrggbb'
 
-    @staticmethod
-    def get_all_tags_and_user_colors(user):
-        """ Returns Hash of { tag_name : color }
-            with color being None if not set for user """
-        user_colors_by_tag = {}
-        for tag_id, rgb in UserTagColors.objects.filter(user=user).values_list('tag', 'rgb'):
-            user_colors_by_tag[tag_id] = {"background-color": rgb,
-                                          "color": rgb_invert(rgb)}
+    class Meta:
+        unique_together = ('collection', 'tag')
 
-        user_tag_colors = OrderedDict()
-        for tag in Tag.objects.all():
-            user_tag_colors[tag] = user_colors_by_tag.get(tag.id)
-        return user_tag_colors
-
-    @staticmethod
-    def get_tag_styles_and_colors(user):
-        user_tag_styles = []
-        user_tag_colors = {}
-
-        for tag, style in UserTagColors.get_all_tags_and_user_colors(user).items():
-            user_tag_styles.append((tag.id, style))
-            rgb = None
-            if style:
-                rgb = style.get("background-color")
-            user_tag_colors[tag.id] = rgb
-        return user_tag_styles, user_tag_colors
+    def __str__(self):
+        return f"{self.collection}/{self.tag}: {self.rgb}"
 
 
 class UserPageAck(TimeStampedModel):
@@ -126,12 +142,13 @@ class SettingsOverride(models.Model):
     email_discordance_updates = models.BooleanField(null=True, blank=True)
     columns = models.ForeignKey(CustomColumnsCollection, on_delete=SET_NULL, null=True, blank=True)
     default_sort_by_column = models.ForeignKey(CustomColumn, on_delete=SET_NULL, null=True, blank=True)
+    tag_colors = models.ForeignKey(TagColorsCollection, on_delete=SET_NULL, null=True, blank=True)
     variant_link_in_analysis_opens_new_tab = models.BooleanField(null=True)
     tool_tips = models.BooleanField(null=True, blank=True)
     node_debug_tab = models.BooleanField(null=True, blank=True)
     import_messages = models.BooleanField(null=True, blank=True)  # Get a message once import is done
     igv_port = models.IntegerField(null=True, blank=True)
-    default_genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE, null=True, blank=True)
+    default_genome_build = models.ForeignKey(GenomeBuild, on_delete=SET_NULL, null=True, blank=True)
     timezone = models.TextField(null=True, blank=True)
 
 
@@ -241,6 +258,7 @@ class UserSettings:
     email_discordance_updates: bool
     columns: CustomColumnsCollection
     default_sort_by_column: CustomColumn
+    tag_colors: TagColorsCollection
     variant_link_in_analysis_opens_new_tab: bool
     tool_tips: bool
     node_debug_tab: bool

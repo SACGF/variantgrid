@@ -1,0 +1,135 @@
+{% extends menu_settings_base %}
+{% load static %}
+
+{% block title %}VariantGrid Tag Colors Collection{% endblock %}
+
+{% block head %}
+{{ block.super }}
+<link href="{% static 'css/colorPicker.css' %}" rel="stylesheet"></link>
+<script type="text/javascript" src="{% static 'js/lib/jquery.xcolor.min.js' %}"></script>
+<script type="text/javascript" src="{% static 'js/lib/jquery.colorPicker.min.js' %}"></script>
+<style>
+</style>
+<script>
+	function cloneTagColorsCollection() {
+		$(this).prop("disabled", true);
+
+		const cccId = {{ tag_colors_collection.pk }};
+		$.ajax({
+			type: "POST",
+			url: Urls.clone_tag_colors_collection(cccId),
+			success: function (data) {
+				window.location = Urls.view_tag_colors_collection(data["pk"]);
+			},
+		});
+	}
+
+	$(document).ready(function() {
+		$("#clone-button").click(cloneTagColorsCollection);
+
+        const picker = $('.tag-colorpicker').colorPicker();
+
+	{% if has_write_permission %}
+        picker.change(function() {
+            const SET_TAG_COLORS_URL = "{% url 'set_tag_color' tag_colors_collection.pk %}";
+            const tagId = this.attributes['tag_id'].value;
+            const rgb = this.value;
+
+            const changeTagColor = function () {
+                const t = $(".user-tag-colored", ".tagged-" + tagId);
+                let manualStyle = "background-color: " + rgb + " !important;";
+                manualStyle += "color: " + invertColor(rgb) + " !important;";
+                t.attr("style", manualStyle);
+            };
+
+            const data = 'tag=' + tagId + '&rgb=' + rgb;
+            $.ajax({
+                type: "POST",
+                data: data,
+                success: changeTagColor,
+                url: SET_TAG_COLORS_URL,
+            });
+        });
+
+		$("#tag-colors-collection-tabs").tabs({cache: true});
+
+        $("button#change-name-button").click(function() {
+            let nameInput = $("#tag-colors-collection-name");
+            let name = nameInput.val();
+            let msgBox = $("#save-name-message");
+            msgBox.empty();
+            nameInput.prop("disabled", true);
+            $.ajax({
+                type: "POST",
+		        data: "name=" + encodeURIComponent(name),
+		        url: "{{ request.path }}",
+                success: function() {
+		            nameInput.prop("disabled", false);
+		            msgBox.append(`<li class='alert-info'>Name saved successfully</li>`);
+                    msgBox.fadeIn().delay(2000).fadeOut(1000);
+                },
+                error: function() {
+		            msgBox.append(`<li class='error'>Could not save name</li>`);
+                }
+            });
+        });
+{% endif %}
+	});
+</script>
+{% endblock %}
+
+{% block submenu_page_content %}
+<h3>Tag Colors Collection</h3>
+
+{% if has_write_permission %}
+    <div id="tag-colors-collection-tabs">
+        <ul>
+            <li><a href="#name">Name</a></li>
+	        <li><a href="{% url 'group_permissions' 'snpdb.models.TagColorsCollection' tag_colors_collection.pk %}">Sharing / Permissions</a></li>
+		</ul>
+        <div id="name">
+			<form id="tag-colors-collection-form" method="post">
+				{% csrf_token %}
+				<label for="tag-colors-collection-name">Name:</label>
+				<input id="tag-colors-collection-name" size="50" value="{{ tag_colors_collection.name }}" />
+				<button id='change-name-button' type="button" class="btn btn-primary">Change Name</button>
+				<button id='clone-button' title="Create a new copy of these tag colors" type="button" class="btn btn-primary">Clone these tag colors...</button>
+				<ul id="save-name-message" class="messages">
+				</ul>
+			</form>
+		</div>
+	</div>
+
+{% else %}
+	<label for="tag-colors-collection-name">Name:</label>
+	<input id="tag-colors-collection-name" size="50" readonly="readonly" value="{{ tag_colors_collection.name }}" />
+
+	<button id='clone-button' title="Create a new copy of these columns that you can edit" type="button" class="btn btn-primary">Clone these columns</button>
+{% endif %}
+
+    <h3>Tag Colors</h3>
+    <p>
+    Click the colored box on the right to change background color
+    </p>
+
+    <div class="row">
+        <div class="col-md-6 offset-md-3">
+            <table class="table">
+                <thead>
+                   <tr>
+                       <th>Tag</th>
+                       <th>Color</th>
+                   </tr>
+               </thead>
+            {% for tag_id, rgb in user_tag_colors.items %}
+                <tr>
+                    <td><span class='grid-tag tagged-{{ tag_id }}'><span class='user-tag-colored'> {{ tag_id }}</span></span></td>
+                    <td><input class="tag-colorpicker" tag_id='{{ tag_id }}' name='tag-{{ tag_id }}-colorpicker' type="text" value="{{ rgb }}"/></td>
+                </tr>
+            {% endfor %}
+            </table>
+        </div>
+    </div>
+
+
+{% endblock %}

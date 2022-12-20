@@ -413,6 +413,20 @@ TableFormat.text = (data, type, row) => {
     }
 };
 
+TableFormat.linkUrl = (data, type, row) => {
+    let text = data.text;
+
+    let textDom;
+    if (!text) {
+        textDom = $('<span>', {class: 'no-value', text:'<blank>'});
+    } else {
+        textDom = $('<span>', {text: text});
+    }
+    let aDom = $('<a>', {href:data.url, html: textDom, class: 'hover-link'});
+
+    return aDom.prop('outerHTML');
+};
+
 TableFormat.preview = (columns, data, type, row) => {
     let dom = $('<div>');
     let hasValue = false;

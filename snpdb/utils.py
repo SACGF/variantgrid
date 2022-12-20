@@ -7,7 +7,7 @@ from django.contrib.auth.models import Group, User
 from email_manager.models import EmailLog
 from library.log_utils import NotificationBuilder, send_notification
 from library.utils import empty_to_none
-from snpdb.models import Lab, UserSettings
+from snpdb.models import Lab, UserSettings, Tag, TagColorsCollection
 
 
 class LabNotificationBuilder(NotificationBuilder):
@@ -71,3 +71,34 @@ class LabNotificationBuilder(NotificationBuilder):
     @property
     def webhook_url(self) -> Optional[str]:
         return self.lab.slack_webhook
+
+
+def get_all_tags_and_user_colors(user, tag_colors_collection=None):
+    """ Returns Hash of { tag_name : color }
+        with color being None if not set for user """
+
+    if tag_colors_collection is None:
+        user_settings = UserSettings.get_for_user(user)
+        tag_colors_collection = user_settings.tag_colors
+
+    user_colors_by_tag = {}
+    if tag_colors_collection:
+        user_colors_by_tag = tag_colors_collection.get_user_colors_by_tag()
+
+    user_tag_colors = {}
+    for tag in Tag.objects.all().order_by("pk"):
+        user_tag_colors[tag] = user_colors_by_tag.get(tag.id)
+    return user_tag_colors
+
+
+def get_tag_styles_and_colors(user, tag_colors_collection: TagColorsCollection = None):
+    user_tag_styles = []
+    user_tag_colors = {}
+
+    for tag, style in get_all_tags_and_user_colors(user, tag_colors_collection=tag_colors_collection).items():
+        user_tag_styles.append((tag.id, style))
+        rgb = None
+        if style:
+            rgb = style.get("background-color")
+        user_tag_colors[tag.id] = rgb
+    return user_tag_styles, user_tag_colors

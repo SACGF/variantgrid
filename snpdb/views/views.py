@@ -64,17 +64,17 @@ from snpdb.graphs.chromosome_intervals_graph import ChromosomeIntervalsGraph
 from snpdb.graphs.homozygosity_percent_graph import HomozygosityPercentGraph
 from snpdb.import_status import set_vcf_and_samples_import_status
 from snpdb.models import CachedGeneratedFile, VariantGridColumn, UserSettings, \
-    VCF, UserTagColors, CustomColumnsCollection, CustomColumn, Cohort, \
+    VCF, CustomColumnsCollection, CustomColumn, Cohort, \
     CohortSample, GenomicIntervalsCollection, Sample, UserDataPrefix, UserGridConfig, \
     get_igv_data, SampleLocusCount, UserContact, Tag, Wiki, Organization, GenomeBuild, \
     Trio, AbstractNodeCountSettings, CohortGenotypeCollection, UserSettingsOverride, NodeCountSettingsCollection, Lab, \
     LabUserSettingsOverride, OrganizationUserSettingsOverride, LabHead, SomalierRelatePairs, \
     VariantZygosityCountCollection, VariantZygosityCountForVCF, ClinVarKey, AvatarDetails, State, SampleStats, \
-    SampleStatsPassingFilter
+    SampleStatsPassingFilter, TagColor, TagColorsCollection
 from snpdb.models.models_enums import ProcessingStatus, ImportStatus, BuiltInFilters
 from snpdb.sample_file_path import get_example_replacements
 from snpdb.tasks.soft_delete_tasks import soft_delete_vcfs
-from snpdb.utils import LabNotificationBuilder
+from snpdb.utils import LabNotificationBuilder, get_tag_styles_and_colors
 from upload.models import UploadedVCF
 from upload.uploaded_file_type import retry_upload_pipeline
 
@@ -946,21 +946,42 @@ def tag_settings(request):
             name = "Tag"
         add_save_message(request, valid, name, created=True)
 
-    user_tag_styles, user_tag_colors = UserTagColors.get_tag_styles_and_colors(request.user)
-    context_dict = {'form': form,
-                    'user_tag_styles': user_tag_styles,
-                    'user_tag_colors': user_tag_colors}
+    user_tag_styles, user_tag_colors = get_tag_styles_and_colors(request.user)
+    context_dict = {
+        'form': form,
+        'user_tag_styles': user_tag_styles,
+        'user_tag_colors': user_tag_colors,
+    }
     return render(request, 'snpdb/settings/tag_settings.html', context_dict)
 
 
+def view_tag_colors_collection(request, tag_colors_collection_id):
+    tag_colors_collection = TagColorsCollection.get_for_user(request.user, pk=tag_colors_collection_id)
+    has_write_permission = tag_colors_collection.can_write(request.user)
+    if not has_write_permission:
+        msg = "You do not have permission to edit these columns. " \
+              "If you wish to customise them, click 'clone' and modify the copy"
+        messages.add_message(request, messages.WARNING, msg)
+
+    user_tag_styles, user_tag_colors = get_tag_styles_and_colors(request.user, tag_colors_collection)
+    context = {
+        "tag_colors_collection": tag_colors_collection,
+        "has_write_permission": has_write_permission,
+        'user_tag_styles': user_tag_styles,
+        'user_tag_colors': user_tag_colors,
+    }
+    return render(request, 'snpdb/settings/view_tag_colors_collection.html', context)
+
+
 @require_POST
-def set_user_tag_color(request):
+def set_tag_color(request, tag_colors_collection_id):
+    tcc = TagColorsCollection.get_for_user(request.user, pk=tag_colors_collection_id)
     tag = request.POST['tag']
     rgb = request.POST['rgb']
-    (utc, _) = UserTagColors.objects.get_or_create(user=request.user, tag_id=tag)
-    utc.rgb = rgb
-    utc.save()
-    logging.info("saved %s", utc)
+    tc = tcc.tagcolor_set.get_or_create(tag_id=tag)[0]
+    tc.rgb = rgb
+    tc.save()
+    logging.info("set_tag_color: saved %s", tc)
     return HttpResponse()
 
 

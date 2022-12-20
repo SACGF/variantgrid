@@ -17,8 +17,9 @@ from library.utils import calculate_age
 from snpdb.grid_columns.custom_columns import get_variantgrid_extra_alias_and_select_columns
 from snpdb.models import VCF, Cohort, Sample, ImportStatus, \
     GenomicIntervalsCollection, CustomColumnsCollection, Variant, Trio, UserGridConfig, GenomeBuild, ClinGenAllele, \
-    VariantZygosityCountCollection
+    VariantZygosityCountCollection, TagColorsCollection
 from snpdb.tasks.soft_delete_tasks import soft_delete_vcfs, remove_soft_deleted_vcfs_task
+from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
 
 
 class VCFListGrid(JqGridUserRowConfig):
@@ -483,3 +484,24 @@ class AbstractVariantGrid(JqGridSQL):
             queryset = self._get_queryset(request)
             self._count = queryset.count()
         return self._count
+
+
+class TagColorsCollectionColumns(DatatableConfig[TagColorsCollection]):
+
+    def __init__(self, request):
+        super().__init__(request)
+        self.user = request.user
+
+        self.rich_columns = [
+            RichColumn(key="id", visible=False),
+            RichColumn(key="name", label="Name", orderable=True,
+                       renderer=self.view_primary_key,
+                       client_renderer='TableFormat.linkUrl'),
+            RichColumn(key="user__username", label="User", orderable=True),
+            RichColumn(key="created", client_renderer='TableFormat.timestamp', orderable=True),
+            RichColumn(key="modified", client_renderer='TableFormat.timestamp', orderable=True,
+                       default_sort=SortOrder.DESC),
+        ]
+
+    def get_initial_queryset(self) -> QuerySet[TagColorsCollection]:
+        return TagColorsCollection.filter_for_user(self.user)

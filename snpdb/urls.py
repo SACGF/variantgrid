@@ -6,9 +6,10 @@ from rest_framework.urlpatterns import format_suffix_patterns
 
 from library.django_utils.jqgrid_view import JQGridView
 from snpdb.grids import CohortListGrid, CohortSampleListGrid, SamplesListGrid, GenomicIntervalsListGrid, \
-    CustomColumnsCollectionListGrid, TriosListGrid, VCFListGrid
+    CustomColumnsCollectionListGrid, TriosListGrid, VCFListGrid, TagColorsCollectionColumns
 from snpdb.views import views, views_json, views_rest, \
     views_autocomplete
+from snpdb.views.datatable_view import DatabaseTableView
 from variantgrid.perm_path import perm_path
 
 urlpatterns = [
@@ -59,7 +60,13 @@ urlpatterns = [
     perm_path('settings/set_user_row_config', views.set_user_row_config, name='set_user_row_config'),
     perm_path('settings/set_user_data_grid_config', views.set_user_data_grid_config, name='set_user_data_grid_config'),
     perm_path('settings/tags', views.tag_settings, name='tag_settings'),
-    perm_path('settings/set_user_tag_color', views.set_user_tag_color, name='set_user_tag_color'),
+    perm_path('settings/tags/collection/datatable', DatabaseTableView.as_view(column_class=TagColorsCollectionColumns),
+              name='tag_color_collections_datatable'),
+    perm_path('settings/tags/collection/view/<int:tag_colors_collection_id>', views.view_tag_colors_collection,
+              name='view_tag_colors_collection'),
+    perm_path('settings/tags/collection/clone/<int:tag_colors_collection_id>', views_json.clone_tag_colors_collection,
+              name='clone_tag_colors_collection'),
+    perm_path('settings/tags/collection/set_tag_color/<int:tag_colors_collection_id>', views.set_tag_color, name='set_tag_color'),
     perm_path('settings/igv_integration', views.igv_integration, name='igv_integration'),
     perm_path('settings/password/password_change', PasswordChangeView.as_view(
         template_name='snpdb/settings/password_change.html',

@@ -9,14 +9,15 @@ from analysis.models import AnalysisTemplateType
 from analysis.models.nodes.node_utils import update_analysis
 from library.django_utils import set_form_read_only
 from snpdb.models.models_enums import BuiltInFilters
-from snpdb.models.models_user_settings import UserTagColors, UserSettings
+from snpdb.models.models_user_settings import UserSettings
+from snpdb.utils import get_all_tags_and_user_colors
 
 
 class NodeView(UpdateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         extra_filters = self.kwargs.get("extra_filters")
-        user_tag_colors = UserTagColors.get_all_tags_and_user_colors(self.request.user)
+        user_tag_colors = get_all_tags_and_user_colors(self.request.user)
         context.update({"node": self.object,
                         "node_id": self.object.pk,
                         "version_id": self.object.version,

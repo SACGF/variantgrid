@@ -299,6 +299,19 @@ class DatatableConfig(Generic[DC]):
         """
         pass
 
+    def view_primary_key(self, row: Dict[str, Any]) -> JsonDataType:
+        """ Relies on being 'id' and object defining get_absolute_url  """
+        pk = row.get("id")
+        if not pk:
+            raise ValueError("Need to include 'id' in columns")
+        text = row.value
+        qs = self.get_initial_queryset()
+        obj = qs.model(pk=pk)
+        return {
+            "text": text,
+            "url": obj.get_absolute_url(),
+        }
+
 
 class DatabaseTableView(Generic[DC], JSONResponseView):
     """

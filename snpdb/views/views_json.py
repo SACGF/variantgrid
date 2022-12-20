@@ -8,7 +8,8 @@ from django.shortcuts import get_object_or_404
 from django.views.decorators.http import require_POST
 
 from library.django_utils import require_superuser
-from snpdb.models import CachedGeneratedFile, Cohort, Sample, VCF, VCFAlleleSource, CustomColumnsCollection
+from snpdb.models import CachedGeneratedFile, Cohort, Sample, VCF, VCFAlleleSource, CustomColumnsCollection, \
+    TagColorsCollection
 from snpdb.tasks.clingen_tasks import populate_clingen_alleles_from_allele_source
 from snpdb.tasks.cohort_genotype_tasks import create_cohort_genotype_and_launch_task
 from snpdb.tasks.vcf_zygosity_count_tasks import update_variant_zygosity_count_for_vcf_task
@@ -99,3 +100,10 @@ def clone_custom_columns(request, custom_columns_collection_id):
     ccc = CustomColumnsCollection.get_for_user(request.user, custom_columns_collection_id)
     cloned_ccc = ccc.clone_for_user(request.user)
     return JsonResponse({"pk": cloned_ccc.pk})
+
+
+@require_POST
+def clone_tag_colors_collection(request, tag_colors_collection_id):
+    tcc = TagColorsCollection.get_for_user(request.user, tag_colors_collection_id)
+    cloned_tcc = tcc.clone_for_user(request.user)
+    return JsonResponse({"pk": cloned_tcc.pk})

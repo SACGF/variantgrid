@@ -8,7 +8,8 @@ from analysis.models.nodes.node_counts import get_node_count_colors
 from annotation.models import AnnotationVersion
 from library import tag_utils
 from library.django_utils import get_field_counts
-from snpdb.models import UserTagColors, GenomeBuild
+from snpdb.models import GenomeBuild
+from snpdb.utils import get_tag_styles_and_colors
 from snpdb.variant_queries import get_variant_queryset_for_gene_symbol
 
 register = template.Library()
@@ -90,10 +91,10 @@ def render_variant_tags_dict(_parser, token):
 
 
 @register.inclusion_tag("analysis/tags/render_tag_styles_and_formatter.html", takes_context=True)
-def render_tag_styles_and_formatter(context):
+def render_tag_styles_and_formatter(context, tag_colors_collection=None):
     """ Also relies on global.js being included """
     user = context["user"]
-    user_tag_styles, _ = UserTagColors.get_tag_styles_and_colors(user)
+    user_tag_styles, _ = get_tag_styles_and_colors(user, tag_colors_collection=tag_colors_collection)
 
     return {"user_tag_styles": user_tag_styles,
             "url_name_visible": context["url_name_visible"]}
