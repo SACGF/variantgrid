@@ -3,6 +3,7 @@ from typing import Dict, List, Tuple, Optional
 
 import pandas as pd
 from django.conf import settings
+from django.contrib.postgres.aggregates import StringAgg
 from django.core.exceptions import PermissionDenied
 from django.db.models import Max, F, Q, QuerySet
 from django.urls.base import reverse
@@ -241,7 +242,7 @@ class AnalysesGrid(JqGridUserRowConfig):
     model = Analysis
     caption = 'Analyses'
     fields = ["id", "name", "created", "modified", "genome_build__name", "analysis_type", "description",
-              "user__username", "analysislock__locked"]
+              "user__username", "tags", "analysislock__locked"]
     colmodel_overrides = {
         'id': {'formatter': 'analysisLink',
                'formatter_kwargs': {"icon_css_class": "analysis-icon",
@@ -250,6 +251,7 @@ class AnalysesGrid(JqGridUserRowConfig):
         "genome_build__name": {"label": "Genome Build"},
         "analysis_type": {"label": "Type"},
         "user__username": {'label': 'Created by'},
+        "tags": {"label": "Tags", "model_field": False, "formatter": "tagsFormatter"},  # This formatter counts multiple tags
         "analysislock__locked": {"hidden": True},
     }
 
@@ -271,6 +273,7 @@ class AnalysesGrid(JqGridUserRowConfig):
         qs = qs.filter(visible=True, template_type__isnull=True)  # Hide templates
         q_last_lock = Q(analysislock=F("last_lock")) | Q(analysislock__isnull=True)
         qs = qs.annotate(last_lock=Max("analysislock__pk")).filter(q_last_lock)
+        qs = qs.annotate(tags=StringAgg("varianttag__tag", delimiter='|'))
         self.queryset = qs.values(*fields)
         self.extra_config.update({'sortname': 'modified',
                                   'sortorder': 'desc'})

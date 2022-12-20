@@ -4,10 +4,14 @@
 {% load ui_utils %}
 {% load crispy_forms_field %}
 {% load crispy_forms_tags %}
+{% load user_tag_color_tags %}
 
 {% block submenu %}{% menu_bar_analysis %}{% endblock %}
 {% block title %}VariantGrid: Analyses{% endblock title %}
 {% block head %}
+    {{ block.super }}
+    {% render_tag_styles_and_formatter %}
+    <script type="text/javascript" src="{% static 'js/grid.js' %}"></script>
     <style>
         .settings-button {
             display: block;
@@ -60,6 +64,10 @@
                     let analysisLink = linkFormatter(analysisId, options, rowObject, iconCssClassList);
                     let settingsLink = "<a class='settings-button' href='javascript:analysisSettings(" + analysisId + ")' title='Open Settings'></a>";
                     return "<span>" + analysisLink + settingsLink + "</span>";
+                },
+                "tagsFormatter": function(cellValue, options, rowObject) {
+                    cellValue = rowObject.tags; // I don't know why cellValue is undefined
+                    return tagsGlobalFormatter(cellValue, options, rowObject);
                 }
             });
 
