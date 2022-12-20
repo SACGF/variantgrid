@@ -1,10 +1,11 @@
 import operator
 import re
-from collections import defaultdict
+from collections import defaultdict, Counter
 from functools import reduce
 from typing import Dict
 
 from django.conf import settings
+from django.contrib.postgres.aggregates import StringAgg
 from django.db.models import Count, Sum, Q
 
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
@@ -77,7 +78,7 @@ def get_nearby_summaries(user, variant, annotation_version, distance=None, clini
 
 def interesting_summary(qs, user, genome_build, total=True, clinvar=True, classifications=True, clinical_significance=False):
     counts = interesting_counts(qs, user, genome_build, clinical_significance=clinical_significance)
-    # print(counts)
+    print(counts)
     summary = ""
     if num_variants := counts['total']:
         classification_types = {}
@@ -101,6 +102,11 @@ def interesting_summary(qs, user, genome_build, total=True, clinvar=True, classi
                 else:
                     classification_summary = classification_count
                 summaries.append(f"{label}: {classification_summary}")
+
+        if tags := counts.get("tags"):
+            tag_counts = Counter(tags.split("|"))
+            tag_summary = ", ".join(f"{k}x{v}" for k,v in tag_counts.most_common())
+            summaries.append(f"Tags: {tag_summary}")
 
         zygosity_counts = []
         for zygosity in ["REF", "HET", "HOM_ALT"]:
@@ -130,6 +136,7 @@ def interesting_counts(qs, user, genome_build, clinical_significance=False):
         "REF": Sum("global_variant_zygosity__ref_count"),
         "HET": Sum("global_variant_zygosity__het_count"),
         "HOM_ALT": Sum("global_variant_zygosity__hom_count"),
+        "tags": StringAgg("varianttag__tag", delimiter='|'),
     }
 
     clinical_significance_list = [c[0] for c in ClinicalSignificance.SHORT_CHOICES]
