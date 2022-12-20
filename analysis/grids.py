@@ -42,7 +42,7 @@ class VariantGrid(AbstractVariantGrid):
             af_show_in_percent = settings.VARIANT_ALLELE_FREQUENCY_CLIENT_SIDE_PERCENT
 
         self.fields, override = self._get_fields_and_overrides(node, af_show_in_percent)
-        super().__init__(user, af_show_in_percent=af_show_in_percent)  # Need to call init after setting fields
+        super().__init__(user)  # Need to call init after setting fields
 
         self.url = SimpleLazyObject(lambda: reverse("node_grid_handler", kwargs={"analysis_id": node.analysis_id}))
         self.sort_by_contig_and_position = sort_by_contig_and_position
