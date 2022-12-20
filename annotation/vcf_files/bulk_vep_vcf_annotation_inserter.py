@@ -498,7 +498,7 @@ class BulkVEPVCFAnnotationInserter:
 
     def bulk_insert(self):
         ANNOTATION_TYPE = {
-            VariantAnnotationVersion.REPRESENTATIVE_TRANSCRIPT_ANNOTATION: (VariantAnnotation ,self.variant_annotation_list),
+            VariantAnnotationVersion.REPRESENTATIVE_TRANSCRIPT_ANNOTATION: (VariantAnnotation, self.variant_annotation_list),
             VariantAnnotationVersion.TRANSCRIPT_ANNOTATION: (VariantTranscriptAnnotation, self.variant_transcript_annotation_list),
             VariantAnnotationVersion.VARIANT_GENE_OVERLAP: (VariantGeneOverlap, self.variant_gene_overlap_list),
         }

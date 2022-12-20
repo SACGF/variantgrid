@@ -18,7 +18,6 @@ def _one_off_fix_pandas_nan_to_none(apps, _schema_editor):
     g_qs.filter(oe_lof_upper=np.NaN).update(oe_lof_upper=None)
 
 
-
 class Migration(migrations.Migration):
 
     dependencies = [

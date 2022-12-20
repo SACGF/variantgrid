@@ -22,7 +22,6 @@ class Command(BaseCommand):
         parser.add_argument('--missing', action='store_true', default=False, help='Attempt to rematch only classifications not linked to a variant - one at a time')
         parser.add_argument('--extra', action='store_true', default=False, help='Populate the allele_info of a classification')
 
-
     def report_unmatched(self):
         print(f"Unmatched count = {Classification.objects.filter(variant__isnull=True).count()}")
 
@@ -106,7 +105,6 @@ class Command(BaseCommand):
             c.update_allele_info()
             c.save(update_modified=False)
         print(f"Finished {i} classifications")
-
 
     def handle_batch(self, batch: List[Classification]):
         ClassificationImportRun.record_classification_import("variant_rematching", len(batch))

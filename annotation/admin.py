@@ -25,7 +25,6 @@ class HasErrorFilter(admin.SimpleListFilter):
         return queryset
 
 
-
 @admin.register(Citation)
 class CitationAdmin(ModelAdminBasics):
     list_display = ('id', 'last_loaded', 'error', 'old_id')

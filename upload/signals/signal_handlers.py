@@ -1,5 +1,5 @@
 from annotation.annotation_versions import get_lowest_unannotated_variant_id
-from upload.models import UploadedVCFPendingAnnotation, UploadSettings
+from upload.models import UploadedVCFPendingAnnotation
 
 
 def annotation_run_complete_signal_handler(variant_annotation_version, **kwargs):

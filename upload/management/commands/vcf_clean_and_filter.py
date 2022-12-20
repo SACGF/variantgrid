@@ -6,11 +6,10 @@ import sys
 from collections import Counter
 from io import StringIO
 
-from vcf import Reader
 from django.conf import settings
 from django.core.management.base import BaseCommand
+from vcf import Reader
 
-from library.vcf_utils import cyvcf2_header_types
 from snpdb.models import GenomeBuild, GenomeFasta
 
 

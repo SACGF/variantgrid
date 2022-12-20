@@ -355,7 +355,7 @@ class ClinVarExportConverter:
 
         if condition.ontology_service in (OntologyService.OMIM, OntologyService.HPO, OntologyService.MONDO) and not condition.is_valid_for_condition:
             # we don't keep Orphanet records, so just hope for the best with them
-            
+
             if condition.status == OntologyTermStatus.STUB:
                 messages += JsonMessages.error(f"We have no record of condition \"{condition}\". If this is valid it will be automatically resolved when our system refreshes ontology terms next.")
             elif condition.status == OntologyTermStatus.DEPRECATED:

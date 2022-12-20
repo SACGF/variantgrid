@@ -19,7 +19,6 @@ class ClassificationLabSummary:
     is_internal: bool
     count: int
 
-
     @property
     def lab(self):
         return self.group.lab

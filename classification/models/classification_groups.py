@@ -281,7 +281,6 @@ class ClassificationGroup:
         #         return variant.sort_string
         # return ""
 
-
     @property
     def c_hgvs(self) -> CHGVS:
         return self.c_hgvses[0]

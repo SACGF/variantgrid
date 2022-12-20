@@ -2,7 +2,9 @@ import dataclasses
 from collections import OrderedDict, defaultdict
 from dataclasses import dataclass
 from typing import Optional, List, Tuple, Dict, Set
+
 from avatar.templatetags.avatar_tags import avatar_url
+from dateutil.tz import gettz
 from django.conf import settings
 from django.contrib.auth.models import User, Group
 from django.core.exceptions import ValidationError
@@ -11,6 +13,7 @@ from django.db.models.deletion import SET_NULL, CASCADE
 from django_extensions.db.models import TimeStampedModel
 from lazy import lazy
 from model_utils.managers import InheritanceManager
+
 from library.django_utils import thread_safe_unique_together_get_or_create
 from library.django_utils.avatar import SpaceThemedAvatarProvider
 from library.utils import rgb_invert, string_deterministic_hash
@@ -18,7 +21,6 @@ from snpdb.models.models import Tag, Lab, Organization
 from snpdb.models.models_columns import CustomColumnsCollection, CustomColumn
 from snpdb.models.models_enums import BuiltInFilters
 from snpdb.models.models_genome import GenomeBuild
-from dateutil.tz import gettz
 
 
 def get_igv_data(user, genome_build: GenomeBuild = None):

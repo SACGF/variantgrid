@@ -6,6 +6,7 @@ from pedigree.models import Pedigree, PedFileFamily, PedFile
 from snpdb.models import CohortGenotypeCollection, Trio, CohortSample, ImportStatus, Sample, VCF, GenomeBuild, Cohort, \
     VCFFilter
 
+
 def create_fake_cohort(user: User, genome_build: GenomeBuild) -> Cohort:
     vcf = VCF.objects.create(name="test_urls_vcf", genotype_samples=1, genome_build=genome_build,
                              import_status=ImportStatus.SUCCESS,

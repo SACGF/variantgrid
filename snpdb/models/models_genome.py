@@ -1,5 +1,6 @@
 import itertools
 import os
+import re
 from typing import Dict, Optional, List
 
 from django.conf import settings
@@ -15,7 +16,7 @@ from library.genomics.fasta_wrapper import FastaFileWrapper
 from library.utils import invert_dict
 from snpdb.genome.fasta_index import load_genome_fasta_index
 from snpdb.models.models_enums import SequenceRole, AssemblyMoleculeType
-import re
+
 
 class GenomeBuild(models.Model, SortMetaOrderingMixin):
     """ There is only 1 patch version of a genome build on the system

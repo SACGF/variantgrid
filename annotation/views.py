@@ -510,7 +510,6 @@ def view_citation_detail(request, citation_id: str):
     return render(request, "annotation/citation_detail.html", {"citation": CitationFetchRequest.fetch_all_now([citation_id]).first_citation})
 
 
-
 def simple_citation_html(cd: Citation) -> str:
     return render_to_string('annotation/citation_simple.html', {"citation": cd}).replace('\n', '').strip()
 

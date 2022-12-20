@@ -36,10 +36,6 @@ class Command(BaseCommand):
             print(f"Checking size of Variant query against {annotation_version=}.....")
             print(f"Query was {qs.count()} records...")
 
-
-
-
-
     @staticmethod
     def _get_float_paths(annotation_version) -> Tuple[AnalysisNode, List[float]]:
         user = admin_bot()

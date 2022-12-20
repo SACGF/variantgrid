@@ -2426,7 +2426,6 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
             raise ValueError(f'No cached column for genome build {genome_build.pk}')
         return f'classification__allele_info__{build_str}__{suffix}'
 
-
     @property
     def share_level_enum(self) -> ShareLevel:
         if self.share_level:

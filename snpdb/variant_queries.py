@@ -10,7 +10,6 @@ from annotation.annotation_version_querysets import get_variant_queryset_for_ann
 from annotation.models import AnnotationVersion
 from genes.models import GeneSymbol, Gene
 from snpdb.models import VariantZygosityCountCollection
-from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_variant import VariantAllele
 
 

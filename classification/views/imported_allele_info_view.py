@@ -51,7 +51,6 @@ class ImportedAlleleInfoColumns(DatatableConfig[ImportedAlleleInfo]):
         else:
             return {"error": error}
 
-
     def __init__(self, request: HttpRequest):
         super().__init__(request)
         self.search_box_enabled = True

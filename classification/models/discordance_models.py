@@ -385,7 +385,6 @@ class DiscordanceReportRowData:
             return True
         return False
 
-
     @property
     def _cm_candidate(self) -> ClassificationModification:
         return first(self._cm_candidates)

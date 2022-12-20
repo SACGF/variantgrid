@@ -457,7 +457,6 @@ class CitationFetchRequest:
         cfr._load_citation_stubs()
         return [cfe.citation for cfe in cfr._all_citation_fetches if cfe.citation]
 
-
     def _queue(self, citation_id: CitationRequest) -> CitationFetchEntry:
         citation: Optional[Citation] = None
         normalized: Optional[CitationIdNormalized] = None

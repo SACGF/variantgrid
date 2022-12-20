@@ -99,8 +99,6 @@ class RegexTests(TestCase):
         self.assertEqual(str(results[1]), 'PMCID:PMC25741868')
         self.assertEqual(str(results[2]), 'PMID:25741868')
 
-
-
     def test_dividers(self):
         text = 'OMIM# 123456 PMID#23456 HPO:123456'
         results = db_ref_regexes.search(text)

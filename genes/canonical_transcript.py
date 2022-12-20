@@ -46,8 +46,6 @@ class VEPCanonicalTranscriptManager(CanonicalTranscriptManager):
         gene.get_vep_canonical_transcript(variant_annotation_version=vav)
 
 
-
-
 def canonical_transcript_manager_factory(genome_build: GenomeBuild, annotation_consortium: AnnotationConsortium):
     if genome_build.name == "GRCh37":
         # MANE

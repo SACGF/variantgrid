@@ -27,9 +27,9 @@ class DiffTextSegment:
             return 'subtract'
         elif self.operation == '+':
             return 'add'
-        elif self.operation == 'd': # only used by multi-diff
+        elif self.operation == 'd':  # only used by multi-diff
             return 'different'
-        elif self.operation == '?': # only used by multi-diff
+        elif self.operation == '?':  # only used by multi-diff
             return 'unknown'
         else:
             return self.operation

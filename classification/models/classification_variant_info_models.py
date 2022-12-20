@@ -139,7 +139,6 @@ class ImportedAlleleInfo(TimeStampedModel):
     class Meta:
         unique_together = ('imported_c_hgvs', 'imported_genome_build_patch_version')
 
-
     @property
     def imported_c_hgvs_obj(self) -> CHGVS:
         return CHGVS(self.imported_c_hgvs)

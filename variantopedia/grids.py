@@ -233,4 +233,3 @@ class TaggedVariantGrid(AbstractVariantGrid):
         if not user_grid_config.show_group_data:
             tags_qs = tags_qs.filter(user=self.user)
         return VariantTag.variants_for_build_q(genome_build, tags_qs, self.tag_ids)
-
