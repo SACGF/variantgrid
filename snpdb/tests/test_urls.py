@@ -93,7 +93,6 @@ class Test(URLTestCase):
             ("cohort_grid", {}, cls.cohort2),
             ("trio_grid", {}, cls.trio),
             ("genomic_intervals_grid", {}, cls.genomic_intervals_collection),
-            ("custom_columns_grid", {}, cls.custom_columns_collection),
         ]
 
     def testUrls(self):
