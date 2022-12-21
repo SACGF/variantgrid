@@ -54,6 +54,10 @@ class TagColorsCollection(GuardianPermissionsAutoInitialSaveMixin, TimeStampedMo
     name = models.TextField()
     version_id = models.IntegerField(null=False, default=0)
 
+    def increment_version(self):
+        self.version_id += 1
+        self.save()
+
     def get_user_colors_by_tag(self) -> Dict[str, Dict]:
         user_colors_by_tag = {}
         for tag_id, rgb in self.tagcolor_set.all().values_list('tag', 'rgb'):
@@ -62,7 +66,6 @@ class TagColorsCollection(GuardianPermissionsAutoInitialSaveMixin, TimeStampedMo
                 "color": rgb_invert(rgb)
             }
         return user_colors_by_tag
-
 
     def clone_for_user(self, user):
         name = f"{user}'s copy of {self.name}"
@@ -91,6 +94,14 @@ class TagColor(TimeStampedModel):
 
     class Meta:
         unique_together = ('collection', 'tag')
+
+    def save(self, **kwargs):
+        self.collection.increment_version()
+        super().save(**kwargs)
+
+    def delete(self, **kwargs):
+        self.collection.increment_version()
+        super().delete(**kwargs)
 
     def __str__(self):
         return f"{self.collection}/{self.tag}: {self.rgb}"

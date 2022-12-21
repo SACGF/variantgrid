@@ -15,7 +15,7 @@
 {% block head %}
     <script>
         function changeAvatar() {
-            var editAvatar = $("#edit-avatar");
+            const editAvatar = $("#edit-avatar");
             function changeAvatarLoaded() {
                 $("#avatar-preview").hide();
                 $("input[type=submit]", editAvatar).button()

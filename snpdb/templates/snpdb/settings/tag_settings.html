@@ -49,12 +49,23 @@
         </div>
         <div>
             <h3>Existing Tags</h3>
+
+            <p>
+                Tags colored below using tag colors
+                {% if user_settings_tag_colors %}
+                    <a href="{{ user_settings_tag_colors.get_absolute_url }}">{{ user_settings_tag_colors }}</a>
+                {% endif %}
+                set in your <a href="{% url 'view_user_settings' %}">User Settings</a>
+            </p>
+
             {% for tag_id in user_tag_colors %}
                 <span class='grid-tag tagged-{{ tag_id }}'><span class='user-tag-colored'> {{ tag_id }}</span></span>
             {% endfor %}
         </div>
 
-        <h3>Tag colors</h3>
+        <h3>Tag color schemes</h3>
+
+        <p>Change colors schemes below</p>
 
         <table id="tag-color-collections-datatable" data-datatable-url="{% url 'tag_color_collections_datatable' %}" class="sticky-header responsive"></table>
 

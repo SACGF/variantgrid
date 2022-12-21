@@ -70,7 +70,7 @@ from snpdb.models import CachedGeneratedFile, VariantGridColumn, UserSettings, \
     Trio, AbstractNodeCountSettings, CohortGenotypeCollection, UserSettingsOverride, NodeCountSettingsCollection, Lab, \
     LabUserSettingsOverride, OrganizationUserSettingsOverride, LabHead, SomalierRelatePairs, \
     VariantZygosityCountCollection, VariantZygosityCountForVCF, ClinVarKey, AvatarDetails, State, SampleStats, \
-    SampleStatsPassingFilter, TagColor, TagColorsCollection
+    SampleStatsPassingFilter, TagColorsCollection
 from snpdb.models.models_enums import ProcessingStatus, ImportStatus, BuiltInFilters
 from snpdb.sample_file_path import get_example_replacements
 from snpdb.tasks.soft_delete_tasks import soft_delete_vcfs
@@ -946,9 +946,12 @@ def tag_settings(request):
             name = "Tag"
         add_save_message(request, valid, name, created=True)
 
-    user_tag_styles, user_tag_colors = get_tag_styles_and_colors(request.user)
+    user_settings = UserSettings.get_for_user(request.user)
+    user_settings_tag_colors = user_settings.tag_colors
+    user_tag_styles, user_tag_colors = get_tag_styles_and_colors(request.user, user_settings_tag_colors)
     context_dict = {
         'form': form,
+        "user_settings_tag_colors": user_settings_tag_colors,
         'user_tag_styles': user_tag_styles,
         'user_tag_colors': user_tag_colors,
     }
