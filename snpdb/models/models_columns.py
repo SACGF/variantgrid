@@ -5,6 +5,7 @@ from django.contrib.auth.models import User
 from django.db import models
 from django.db.models import Q
 from django.db.models.deletion import CASCADE
+from django.urls import reverse
 from guardian.shortcuts import get_objects_for_group
 from lazy import lazy
 from model_utils.models import TimeStampedModel
@@ -119,6 +120,9 @@ class CustomColumnsCollection(GuardianPermissionsAutoInitialSaveMixin, TimeStamp
     @classmethod
     def filter_public(cls):
         return get_objects_for_group(public_group(), cls.get_read_perm(), klass=cls)
+
+    def get_absolute_url(self):
+        return reverse('view_custom_columns', kwargs={"custom_columns_collection_id": self.pk})
 
     def __str__(self):
         who = self.user or 'global'

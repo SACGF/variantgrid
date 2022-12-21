@@ -6,7 +6,7 @@ from rest_framework.urlpatterns import format_suffix_patterns
 
 from library.django_utils.jqgrid_view import JQGridView
 from snpdb.grids import CohortListGrid, CohortSampleListGrid, SamplesListGrid, GenomicIntervalsListGrid, \
-    CustomColumnsCollectionListGrid, TriosListGrid, VCFListGrid, TagColorsCollectionColumns
+    CustomColumnsCollectionColumns, TriosListGrid, VCFListGrid, TagColorsCollectionColumns
 from snpdb.views import views, views_json, views_rest, \
     views_autocomplete
 from snpdb.views.datatable_view import DatabaseTableView
@@ -101,7 +101,9 @@ urlpatterns = [
     perm_path('cohort_sample/grid/<int:cohort_id>/<slug:op>/', JQGridView.as_view(grid=CohortSampleListGrid), name='cohort_sample_grid'),
     perm_path('sample/grid/<slug:op>/', JQGridView.as_view(grid=SamplesListGrid, delete_row=True), name='samples_grid'),
     perm_path('genomic_intervals/grid/<slug:op>/', JQGridView.as_view(grid=GenomicIntervalsListGrid, delete_row=True), name='genomic_intervals_grid'),
-    perm_path('settings/custom_columns/grid/<slug:op>/', JQGridView.as_view(grid=CustomColumnsCollectionListGrid, delete_row=True), name='custom_columns_grid'),
+    perm_path('settings/custom_columns/collection/datatable',
+              DatabaseTableView.as_view(column_class=CustomColumnsCollectionColumns),
+              name='custom_columns_collections_datatable'),
     perm_path('trio/grid/<slug:op>/', JQGridView.as_view(grid=TriosListGrid, delete_row=True), name='trio_grid'),
     perm_path('vcfs/grid/<slug:op>/', JQGridView.as_view(grid=VCFListGrid, delete_row=True), name='vcfs_grid'),
 

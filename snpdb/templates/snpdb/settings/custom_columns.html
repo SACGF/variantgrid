@@ -51,8 +51,6 @@
         Click to edit your columns or clone a global set.
         </p>
 
-        {% load jqgrid_tags %}
-        {% user_data_grid_filter 'columns' 'Custom Columns' %}
-        {% jqgrid 'custom_columns_grid' 'columns' search=False delete=True gbox_id='columns-grid-filter-container' init_func='grid_init_func' %}
+        <table id="custom-columns-collection-datatable" data-datatable-url="{% url 'custom_columns_collections_datatable' %}" class="sticky-header responsive"></table>
     </div>
 {% endblock %}

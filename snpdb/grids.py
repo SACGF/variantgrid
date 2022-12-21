@@ -292,36 +292,25 @@ class GenomicIntervalsListGrid(JqGridUserRowConfig):
         self.queryset = queryset.order_by("-pk").values(*self.get_field_names())
 
 
-class CustomColumnsCollectionListGrid(JqGridUserRowConfig):
-    model = CustomColumnsCollection
-    caption = 'Custom Columns'
-    fields = ["id", "name", "user__username", "modified"]
-    colmodel_overrides = {
-        'id': {"hidden": True},
-        "name": {'formatter': 'linkFormatter',
-                 'formatter_kwargs': {"url_name": "view_custom_columns",
-                                      "url_object_column": "id"}},
-        'user__username': {'label': 'User'},
-    }
+class CustomColumnsCollectionColumns(DatatableConfig[CustomColumnsCollection]):
 
-    def __init__(self, user):
-        super().__init__(user)
+    def __init__(self, request):
+        super().__init__(request)
+        self.user = request.user
 
-        user_grid_config = UserGridConfig.get(user, self.caption)
-        if user_grid_config.show_group_data:
-            queryset = self.model.filter_for_user(user)
-        else:
-            queryset = self.model.objects.filter(Q(user__isnull=True) | Q(user=user))
+        self.rich_columns = [
+            RichColumn(key="id", visible=False),
+            RichColumn(key="name", label="Name", orderable=True,
+                       renderer=self.view_primary_key,
+                       client_renderer='TableFormat.linkUrl'),
+            RichColumn(key="user__username", label="User", orderable=True),
+            RichColumn(key="created", client_renderer='TableFormat.timestamp', orderable=True),
+            RichColumn(key="modified", client_renderer='TableFormat.timestamp', orderable=True,
+                       default_sort=SortOrder.DESC),
+        ]
 
-        queryset = queryset.annotate(num_columns=Count("customcolumn"))
-        field_names = self.get_field_names() + ["num_columns"]
-        self.queryset = queryset.values(*field_names)
-
-    def get_colmodels(self, *args, **kwargs):
-        colmodels = super().get_colmodels(*args, **kwargs)
-        extra = {'index': 'num_columns', 'name': 'num_columns', 'label': 'Number of columns', 'sorttype': 'int'}
-        colmodels.append(extra)
-        return colmodels
+    def get_initial_queryset(self) -> QuerySet[TagColorsCollection]:
+        return CustomColumnsCollection.filter_for_user(self.user)
 
 
 def server_side_format_clingen_allele(row, field):
