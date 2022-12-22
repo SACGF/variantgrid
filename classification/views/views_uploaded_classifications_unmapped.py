@@ -147,7 +147,7 @@ class UploadedClassificationsUnmappedView(View):
 
         context = {"lab_picker": lab_picker}
         selected_lab = lab_picker.selected_lab
-        if upload_location := selected_lab.upload_location:
+        if selected_lab.upload_location:
             if server_address := resolve_uploaded_url_to_handle(selected_lab.upload_location):
                 existing: Set[FileMeta] = set()
                 for unmapped in UploadedClassificationsUnmapped.objects.filter(lab=selected_lab):
@@ -164,13 +164,13 @@ class UploadedClassificationsUnmappedView(View):
 
         return render(request, 'classification/classification_upload_file_unmapped.html', context)
 
-    def post(self, requests, **kwargs):
+    def post(self, request, **kwargs):
         # lazily have s3boto3 requirements
 
         django.utils.encoding.force_text1 = django.utils.encoding.force_str
         django.utils.encoding.smart_text = django.utils.encoding.smart_str
 
-        lab_picker = LabPickerData.from_request(request=requests, selection=kwargs.get('lab_id'))
+        lab_picker = LabPickerData.from_request(request=request, selection=kwargs.get('lab_id'))
         lab = lab_picker.selected_lab
         if not lab:
             raise ValueError("Single Lab Required")
@@ -179,23 +179,23 @@ class UploadedClassificationsUnmappedView(View):
             if server_address := resolve_uploaded_url_to_handle(lab.upload_location):
                 sub_file: FileHandle
 
-                if existing_file := requests.POST.get('import-existing'):
+                if existing_file := request.POST.get('import-existing'):
                     sub_file = server_address.sub_file(existing_file)
                     if not sub_file.exists:
                         raise ValueError(f"File {existing_file} does not appear to exist")
 
                 else:
-                    file_obj = requests.FILES.get('file')
+                    file_obj = request.FILES.get('file')
                     if not file_obj:
                         raise ValueError("No File Provided")
                     sub_file = server_address.save(file_obj)
 
                 status = UploadedClassificationsUnmappedStatus.Pending if lab.upload_automatic else UploadedClassificationsUnmappedStatus.Manual
-                user: User = requests.user
+                user: User = request.user
                 uploaded_file = UploadedClassificationsUnmapped.objects.create(
                     url=sub_file.clean_url,
                     filename=sub_file.filename,
-                    user=requests.user,
+                    user=request.user,
                     lab=lab,
                     status=status,
                     effective_modified=sub_file.modified,
@@ -222,7 +222,7 @@ class UploadedClassificationsUnmappedView(View):
                     # Soon going to replace this with automated import
 
                     notifier.add_markdown("This file will need to be handled manually!")
-                    messages.add_message(requests, messages.INFO,
+                    messages.add_message(request, messages.INFO,
                                          f"File {sub_file.filename} uploaded for {lab.name}. This file will be uploaded after manual review.")
 
                     notifier.send()
@@ -231,7 +231,7 @@ class UploadedClassificationsUnmappedView(View):
 
         except ValueError as ve:
             report_exc_info()
-            messages.add_message(requests, messages.ERROR, str(ve))
+            messages.add_message(request, messages.ERROR, str(ve))
 
         if lab:
             return HttpResponseRedirect(reverse("classification_upload_unmapped_lab", kwargs={"lab_id": lab.pk}))

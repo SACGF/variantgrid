@@ -19,6 +19,7 @@ from threadlocals.threadlocals import get_current_request, get_current_user
 
 from email_manager.models import EmailLog
 from eventlog.models import Event
+from library.constants import MINUTE_SECS
 from library.enums.log_level import LogLevel
 
 
@@ -344,7 +345,6 @@ def send_notification(
     :param blocks: See https://api.slack.com/messaging/webhooks#advanced_message_formatting
     :param slack_webhook_url: Provide the slack URL, if not provided will get from settings (if enabled)
     """
-    sent = False
     emoji = ':dna:'
     if slack := settings.SLACK:
         if slack_webhook_url is None:
@@ -363,17 +363,15 @@ def send_notification(
         }
         if blocks:
             data["blocks"] = blocks
-        data_str = json.dumps(data)
 
-        r = requests.request(
+        r = requests.post(
             headers={"Content-Type": "application/json"},
-            method="POST",
             url=slack_webhook_url,
-            json=data
+            json=data,
+            timeout=MINUTE_SECS,
         )
         try:
             r.raise_for_status()
-            sent = True
         except:
             report_exc_info()
     else:

@@ -9,6 +9,7 @@ from requests import Response
 
 from classification.models import ClinVarExportBatch, ClinVarExportRequest, ClinVarExportRequestType, \
     ClinVarExportBatchStatus, ClinVarExportSubmission, ClinVarExportSubmissionStatus
+from library.constants import MINUTE_SECS
 from library.log_utils import report_message
 from uicore.json.json_types import JsonObjType
 
@@ -119,17 +120,17 @@ class ClinVarExportSync:
         }
 
         if json_data:
-            response = requests.request(
+            response = requests.post(
                 url=url,
-                method="POST",
                 headers=headers,
-                json=json_data
+                json=json_data,
+                timeout=MINUTE_SECS,
             )
         else:
-            response = requests.request(
+            response = requests.get(
                 url=url,
-                method="GET",
-                headers=headers
+                headers=headers,
+                timeout=MINUTE_SECS,
             )
 
         response_json: Optional[JsonObjType] = None
