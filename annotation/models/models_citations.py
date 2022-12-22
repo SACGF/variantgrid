@@ -323,7 +323,7 @@ class CitationFetchEntry:
 
     fetched: bool = False
     """
-    Used internally within CitationFetchRequest to keep track of what records have been processed 
+    Used internally within CitationFetchRequest to keep track of what records have been processed
     """
 
     error: Optional[str] = None

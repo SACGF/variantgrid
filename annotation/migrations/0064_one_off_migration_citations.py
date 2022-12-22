@@ -5,7 +5,7 @@ import json
 from django.db import migrations
 
 
-def _migrate_citations(apps, schema_editor):
+def _migrate_citations(apps, _schema_editor):
     print("About to populate Citation2")
     Citation = apps.get_model("annotation", "Citation")
     Citation2 = apps.get_model("annotation", "Citation2")

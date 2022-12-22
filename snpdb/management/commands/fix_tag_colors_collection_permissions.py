@@ -12,4 +12,3 @@ class Command(BaseCommand):
                 assign_permission_to_user_and_groups(collection.user, collection)
             else:
                 add_public_group_read_permission(collection)
-

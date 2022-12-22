@@ -77,7 +77,7 @@ class ColumnVCFInfo(models.Model):
 
 
 class CustomColumnsCollection(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
-    MANDATORY_COLUMNS = ["variant"] #
+    MANDATORY_COLUMNS = ["variant"]
     name = models.TextField()
     user = models.ForeignKey(User, null=True, on_delete=CASCADE)  # null = Public
     version_id = models.IntegerField(null=False, default=0)

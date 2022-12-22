@@ -1001,7 +1001,7 @@ class TranscriptVersion(SortByPKMixin, models.Model):
     def canonical_tag(self) -> str:
         """ We only want to return the most important one """
         tags = set(self.tags)
-        for ct, score in self.CANONICAL_SCORES.items():
+        for ct in self.CANONICAL_SCORES:
             if ct in tags:
                 return ct
         return ""
