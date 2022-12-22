@@ -65,8 +65,8 @@ def group_enrichment_kits_df(df, by_column, max_groups=None):
 
         get_labels_from_start_to_end = LABELS_FOR_COLUMNS.get(by_column)
         if not get_labels_from_start_to_end:
-            msg = "by_column must be one of %s" % ', '.join(LABELS_FOR_COLUMNS)
-            raise ValueError(msg)
+            label_options = ', '.join(LABELS_FOR_COLUMNS)
+            raise ValueError(f"by_column must be one of {label_options}")
         labels = get_labels_from_start_to_end(start, end, year_month_start)
 
         for enrichment_kit_name, enrichment_kit_df in df.groupby("enrichment_kit__name"):

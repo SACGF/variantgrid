@@ -123,7 +123,7 @@ def external_pk_autocomplete_form_factory(external_type):
     class ExternalPKNameForm(forms.Form):
         external_pk = forms.ModelChoiceField(queryset=ExternalPK.objects.all(),
                                              widget=ModelSelect2(url='external_pk_autocomplete',
-                                                                 attrs={'data-placeholder': "%s..." % external_type},
+                                                                 attrs={'data-placeholder': f"{external_type}..."},
                                                                  forward=(forward.Const(external_type, 'external_type'),)))
 
     return ExternalPKNameForm()
