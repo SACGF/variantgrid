@@ -1,5 +1,6 @@
 import datetime
 import itertools
+import re
 import typing
 from dataclasses import dataclass, field
 from datetime import timedelta
@@ -12,10 +13,9 @@ from django.db.models import TextField
 from django.urls import reverse
 from django.utils.timezone import now
 from django_extensions.db.models import TimeStampedModel
+
 from library.log_utils import report_exc_info
 from library.utils import JsonObjType, first
-import re
-
 
 """
 Has the model for Citation as well as the methods for populating them.

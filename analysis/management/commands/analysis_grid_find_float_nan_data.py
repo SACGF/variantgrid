@@ -6,12 +6,11 @@ import numpy as np
 from django.core.management.base import BaseCommand
 from django.db.models import Q
 
+from analysis.grids import VariantGrid
 from analysis.models import AnalysisNode
 from annotation.models import AnnotationVersion
-from snpdb.models import CustomColumnsCollection, GenomeBuild
-from analysis.grids import VariantGrid
-
 from library.guardian_utils import admin_bot
+from snpdb.models import CustomColumnsCollection, GenomeBuild
 
 
 class Command(BaseCommand):

@@ -3,7 +3,6 @@ from functools import reduce
 from typing import Optional, Dict, List
 
 from cache_memoize import cache_memoize
-from django.conf import settings
 from django.db import models
 from django.db.models.deletion import CASCADE
 from django.db.models.query_utils import Q

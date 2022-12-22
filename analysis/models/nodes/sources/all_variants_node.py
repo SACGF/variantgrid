@@ -1,6 +1,5 @@
 from typing import Optional, List, Dict
 
-from django.conf import settings
 from django.db import models
 from django.db.models import Q, CASCADE, SET_NULL
 from lazy import lazy

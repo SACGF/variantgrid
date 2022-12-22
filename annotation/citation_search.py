@@ -1,9 +1,8 @@
-from typing import Any, Optional
+from typing import Any
 
 from django.dispatch import receiver
 
-from annotation.models.models_citations import CitationSource, CitationIdNormalized, Citation, CitationFetchRequest, \
-    CitationFetchEntry
+from annotation.models.models_citations import CitationSource, CitationIdNormalized, Citation
 from snpdb.search2 import SearchResponseRecordAbstract, SearchInput, search_signal, SearchResponse
 
 

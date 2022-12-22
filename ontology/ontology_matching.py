@@ -9,8 +9,7 @@ from lazy import lazy
 from annotation.regexes import db_ref_regexes
 from library.log_utils import report_message
 from library.utils import empty_to_none
-from ontology.models import OntologyTerm, OntologyService, OntologySnake, OntologyImportSource, \
-    GeneDiseaseClassification
+from ontology.models import OntologyTerm, OntologyService, OntologySnake, GeneDiseaseClassification
 
 
 class OntologySnakeJson(TypedDict):

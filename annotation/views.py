@@ -2,7 +2,7 @@ import logging
 import subprocess
 from collections import defaultdict, Counter
 from subprocess import check_output
-from typing import List, Optional, Dict
+from typing import Optional
 
 import cdot
 from django.conf import settings

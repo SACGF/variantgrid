@@ -7,8 +7,8 @@ See __init__.py in this dir for details
 """
 
 import os
-import socket
 import re
+import socket
 import sys
 from collections import defaultdict
 
