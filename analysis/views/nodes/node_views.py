@@ -35,7 +35,7 @@ from analysis.views.views_json import get_sample_patient_gene_disease_data
 from classification.models.classification import Classification
 from classification.views.classification_datatables import ClassificationColumns
 from library.django_utils import highest_pk
-from library.jqgrid import JqGrid
+from library.jqgrid.jqgrid import JqGrid
 from snpdb.models.models_variant import Variant
 
 

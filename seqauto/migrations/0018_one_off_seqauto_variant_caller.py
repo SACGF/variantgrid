@@ -3,7 +3,7 @@ import itertools
 
 from django.db import migrations
 
-from library.vcf_utils import get_variant_caller_and_version_from_vcf
+from library.genomics.vcf_utils import get_variant_caller_and_version_from_vcf
 
 
 def _get_variant_caller_from_vcf_file(VariantCaller, vcf_path):

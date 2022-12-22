@@ -6,7 +6,7 @@ from django.db.models import Q
 from django.db.models.deletion import CASCADE
 
 from analysis.models.nodes.analysis_node import AnalysisNode
-from library import jqgrid
+from library.jqgrid.jqgrid import JqGrid, format_operation
 from snpdb.models import VariantGridColumn, Variant
 
 
@@ -21,7 +21,7 @@ class FilterNode(AnalysisNode):
         return self.filternodeitem_set.count()
 
     def _get_node_q(self) -> Optional[Q]:
-        class FakeFilterGrid(jqgrid.JqGrid):
+        class FakeFilterGrid(JqGrid):
             model = Variant
             fields = ["id"]
 
@@ -56,7 +56,7 @@ class FilterNode(AnalysisNode):
     def _get_method_summary(self):
         rules_summary = []
         for rule in self.get_rules():
-            rule["op"] = jqgrid.format_operation(rule["op"])
+            rule["op"] = format_operation(rule["op"])
             rules_summary.append("%(field)s %(op)s %(data)s" % rule)
 
         joiner = f" {self.group_operation} "
@@ -119,7 +119,7 @@ class FilterNodeItem(models.Model):
         return VariantGridColumn.objects.get(variant_column=self.field)
 
     def __str__(self):
-        op = jqgrid.format_operation(self.operation)
+        op = format_operation(self.operation)
         description = f"{self.column.grid_column_name} {op}"
         if self.data:
             description += " " + self.data

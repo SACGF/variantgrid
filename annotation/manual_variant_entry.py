@@ -8,7 +8,7 @@ from annotation.models.models import ManualVariantEntryCollection, ManualVariant
 from annotation.tasks.process_manual_variants_task import ManualVariantsPostInsertTask, get_manual_variant_tuples
 from library.django_utils.django_file_utils import get_import_processing_dir
 from library.utils import full_class_name
-from library.vcf_utils import write_vcf_from_tuples
+from library.genomics.vcf_utils import write_vcf_from_tuples
 from snpdb.models.models_enums import ImportSource
 from snpdb.models.models_genome import GenomeBuild
 from upload.models import UploadPipeline, UploadedFile, UploadStep, UploadedManualVariantEntryCollection

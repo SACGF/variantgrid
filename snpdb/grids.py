@@ -10,8 +10,8 @@ from guardian.shortcuts import get_objects_for_user
 
 from library.utils.database_utils import get_queryset_column_names, \
     get_queryset_select_from_where_parts
-from library.jqgrid_sql import JqGridSQL
-from library.jqgrid_user_row_config import JqGridUserRowConfig
+from library.jqgrid.jqgrid_sql import JqGridSQL
+from library.jqgrid.jqgrid_user_row_config import JqGridUserRowConfig
 from library.unit_percent import get_allele_frequency_formatter
 from library.utils import calculate_age
 from snpdb.grid_columns.custom_columns import get_variantgrid_extra_alias_and_select_columns

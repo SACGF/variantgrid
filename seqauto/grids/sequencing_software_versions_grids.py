@@ -1,5 +1,5 @@
 from library.django_utils import get_model_fields
-from library.jqgrid_user_row_config import JqGridUserRowConfig
+from library.jqgrid.jqgrid_user_row_config import JqGridUserRowConfig
 from seqauto.models import Library, Sequencer, Aligner, Assay, VariantCaller, VariantCallingPipeline
 
 

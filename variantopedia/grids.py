@@ -12,7 +12,7 @@ from annotation.annotation_version_querysets import get_variant_queryset_for_lat
     get_variant_queryset_for_annotation_version
 from annotation.models import AnnotationVersion
 from genes.hgvs import HGVSMatcher
-from library.jqgrid_user_row_config import JqGridUserRowConfig
+from library.jqgrid.jqgrid_user_row_config import JqGridUserRowConfig
 from snpdb.grid_columns.custom_columns import get_custom_column_fields_override_and_sample_position
 from snpdb.grids import AbstractVariantGrid
 from snpdb.models import Variant, VariantZygosityCountCollection, GenomeBuild, Tag, VariantWiki

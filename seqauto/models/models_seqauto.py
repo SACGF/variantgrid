@@ -28,7 +28,7 @@ from library.enums.log_level import LogLevel
 from library.utils.file_utils import name_from_filename, remove_gz_if_exists
 from library.log_utils import get_traceback, log_traceback
 from library.utils import sorted_nicely
-from library.vcf_utils import get_variant_caller_and_version_from_vcf
+from library.genomics.vcf_utils import get_variant_caller_and_version_from_vcf
 from patients.models import FakeData, Patient
 from seqauto.illumina import illuminate_report
 from seqauto.illumina.illumina_sequencers import SEQUENCING_RUN_REGEX

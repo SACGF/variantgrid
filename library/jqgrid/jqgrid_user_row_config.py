@@ -1,5 +1,5 @@
 from library.guardian_utils import check_can_write
-from library.jqgrid import JqGrid
+from library.jqgrid.jqgrid import JqGrid
 from library.utils import nice_class_name
 from snpdb.models import UserGridConfig
 

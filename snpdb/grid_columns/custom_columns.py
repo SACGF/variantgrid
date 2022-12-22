@@ -2,7 +2,7 @@ from django.contrib.auth.models import User
 from django.db.models import Q
 
 from annotation.models import AnnotationVersion, ColumnVEPField
-from library.jqgrid_sql import get_overrides
+from library.jqgrid.jqgrid_sql import get_overrides
 from snpdb.models import CustomColumn, CustomColumnsCollection
 from snpdb.models.models_enums import ColumnAnnotationLevel
 

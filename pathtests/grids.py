@@ -1,4 +1,4 @@
-from library.jqgrid_user_row_config import JqGridUserRowConfig
+from library.jqgrid.jqgrid_user_row_config import JqGridUserRowConfig
 from pathtests.models import PathologyTestOrder, Case, PathologyTest
 
 

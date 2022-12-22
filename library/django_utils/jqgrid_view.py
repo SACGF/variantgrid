@@ -6,7 +6,7 @@ from django.http.response import JsonResponse, HttpResponse
 from django.urls.base import resolve, reverse
 from django.views.generic.base import View
 
-from library.jqgrid_export import grid_export_request
+from library.jqgrid.jqgrid_export import grid_export_request
 from library.utils import nice_class_name
 
 

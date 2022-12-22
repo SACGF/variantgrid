@@ -1,7 +1,7 @@
 from django.shortcuts import get_object_or_404
 
 from annotation.annotation_version_querysets import get_queryset_for_latest_annotation_version
-from library.jqgrid_user_row_config import JqGridUserRowConfig
+from library.jqgrid.jqgrid_user_row_config import JqGridUserRowConfig
 from snpdb.models.models_variant import Variant
 from upload.models import UploadStep, ModifiedImportedVariant, UploadPipeline
 

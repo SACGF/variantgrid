@@ -2,7 +2,7 @@ from cyvcf2 import Reader
 from django.core.management.base import BaseCommand
 
 from annotation.vcf_files.bulk_vep_vcf_annotation_inserter import BulkVEPVCFAnnotationInserter
-from library.vcf_utils import cyvcf2_header_types
+from library.genomics.vcf_utils import cyvcf2_header_types
 
 
 class Command(BaseCommand):

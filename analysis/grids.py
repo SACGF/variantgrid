@@ -15,8 +15,8 @@ from analysis.models.nodes.analysis_node import get_extra_filters_q, NodeColumnS
 from analysis.views.analysis_permissions import get_node_subclass_or_404
 from annotation.models import HumanProteinAtlasAnnotation
 from genes.models import HGNC
-from library.jqgrid_sql import get_overrides
-from library.jqgrid_user_row_config import JqGridUserRowConfig
+from library.jqgrid.jqgrid_sql import get_overrides
+from library.jqgrid.jqgrid_user_row_config import JqGridUserRowConfig
 from library.pandas_jqgrid import DataFrameJqGrid
 from library.unit_percent import get_allele_frequency_formatter
 from library.utils import md5sum_str

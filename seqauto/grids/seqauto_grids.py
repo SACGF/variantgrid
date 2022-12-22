@@ -4,7 +4,7 @@ from django.urls.base import reverse
 
 from genes.models import GeneCoverageCanonicalTranscript
 from library.django_utils.jqgrid_view import JQGridViewOp
-from library.jqgrid_user_row_config import JqGridUserRowConfig
+from library.jqgrid.jqgrid_user_row_config import JqGridUserRowConfig
 from library.pandas_jqgrid import DataFrameJqGrid
 from library.pandas_utils import nan_to_none
 from seqauto.models import SeqAutoRun, SequencingSample, GoldCoverageSummary, \

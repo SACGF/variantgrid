@@ -6,7 +6,7 @@ from django.shortcuts import get_object_or_404
 
 from annotation.models.models_phenotype_match import PATIENT_ONTOLOGY_TERM_PATH
 from library.django_utils import get_model_fields
-from library.jqgrid_user_row_config import JqGridUserRowConfig
+from library.jqgrid.jqgrid_user_row_config import JqGridUserRowConfig
 from ontology.grids import AbstractOntologyGenesGrid
 from ontology.models import OntologyTerm, OntologyService
 from patients.models import PatientRecords, Patient, PatientRecord

@@ -14,7 +14,7 @@ from annotation.vep_annotation import vep_check_version_match
 def import_vcf_annotations(annotation_run: AnnotationRun, insert_variants=True, vep_version_check=True,
                            delete_temp_files=settings.VARIANT_ANNOTATION_DELETE_TEMP_FILES_ON_SUCCESS):
     import cyvcf2
-    from library.vcf_utils import cyvcf2_header_types
+    from library.genomics.vcf_utils import cyvcf2_header_types
 
     annotation_run.upload_start = timezone.now()
     annotation_run.upload_attempts += 1

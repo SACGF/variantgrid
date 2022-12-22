@@ -4,7 +4,7 @@ from django.db.models.aggregates import Count
 from django.db.models.functions import Cast
 from django.db.models.query_utils import Q
 
-from library.jqgrid_user_row_config import JqGridUserRowConfig
+from library.jqgrid.jqgrid_user_row_config import JqGridUserRowConfig
 from seqauto.models import SequencingRun, BamFile, UnalignedReads, VCFFile, QC, Experiment, EnrichmentKit
 from snpdb.models import UserGridConfig, DataState
 

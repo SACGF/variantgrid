@@ -1,4 +1,4 @@
-from library.jqgrid_user_row_config import JqGridUserRowConfig
+from library.jqgrid.jqgrid_user_row_config import JqGridUserRowConfig
 from pedigree.models import PedFile, Pedigree
 from snpdb.models import UserGridConfig
 

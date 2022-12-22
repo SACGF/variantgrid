@@ -13,7 +13,7 @@ from analysis.models.models_karyomapping import KaryomappingAnalysis, KaryotypeB
     KaryomappingGene
 from library.constants import DAY_SECS
 from library.django_utils import add_save_message
-from library.jqgrid_export import StashFile
+from library.jqgrid.jqgrid_export import StashFile
 from patients.models_enums import Zygosity
 from snpdb.models import Trio
 from snpdb.models.models_variant import Variant

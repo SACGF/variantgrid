@@ -1,7 +1,7 @@
 from guardian.shortcuts import get_objects_for_user
 
 from expression.models import CuffDiffFile
-from library.jqgrid_user_row_config import JqGridUserRowConfig
+from library.jqgrid.jqgrid_user_row_config import JqGridUserRowConfig
 
 
 class ExpressionFilesGrid(JqGridUserRowConfig):

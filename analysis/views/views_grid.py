@@ -22,7 +22,7 @@ from annotation.models import VariantTranscriptAnnotation
 from genes.models import CanonicalTranscriptCollection
 from library.constants import WEEK_SECS
 from library.django_utils import get_model_fields
-from library.jqgrid_export import grid_export_csv, StashFile
+from library.jqgrid.jqgrid_export import grid_export_csv, StashFile
 from snpdb.models import Sample, ColumnVCFInfo, VCFInfoTypes, Zygosity
 from snpdb.models.models_variant import Variant
 from snpdb.vcf_export_utils import get_vcf_header_from_contigs

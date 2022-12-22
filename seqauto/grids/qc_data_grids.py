@@ -1,7 +1,7 @@
 from django.urls.base import reverse
 
 from library.django_utils.jqgrid_view import JQGridViewOp
-from library.jqgrid_user_row_config import JqGridUserRowConfig
+from library.jqgrid.jqgrid_user_row_config import JqGridUserRowConfig
 from seqauto.models import IlluminaFlowcellQC, FastQC, Flagstats, QCExecSummary
 
 
