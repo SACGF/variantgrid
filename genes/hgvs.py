@@ -890,7 +890,7 @@ class HGVSMatcher:
                     raise ValueError(f"Could not convert {variant} to HGVS - tried: {attempts}")
             else:
                 # No methods tried, mustn't have had any transcripts
-                raise TranscriptVersion.raise_bad_or_missing_transcript(transcript_accession)
+                TranscriptVersion.raise_bad_or_missing_transcript(transcript_accession)
         else:
             # No transcript = Genomic HGVS
             hgvs_name = pyhgvs.variant_to_hgvs_name(chrom, offset, ref, alt, self.genome_build.genome_fasta.fasta,

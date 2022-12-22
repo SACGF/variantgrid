@@ -295,7 +295,7 @@ class ClinVarKey(TimeStampedModel):
                 # if no method lookups have been setup, only accept "acmg"
                 return raw_value
             else:
-                raise None
+                raise ValueError(f"Unable to map {raw_value=}")
 
         mapped_value = map_value(vg_value)
         if mapped_value == "acmg":
