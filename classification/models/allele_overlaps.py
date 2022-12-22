@@ -2,7 +2,6 @@ import itertools
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from dataclasses import dataclass
-from enum import Enum
 from functools import reduce
 from typing import List, Optional, Dict, Set, Iterator
 

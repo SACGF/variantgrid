@@ -1481,8 +1481,6 @@ class GeneSymbolWiki(Wiki):
         self.update_citations()
 
     def update_citations(self):
-        from annotation.models import Citation
-
         existing_citations = {}
         for gc in self.gene_symbol.genesymbolcitation_set.all():
             existing_citations[gc.citation.pk] = gc

@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from typing import Optional, List
 
 from classification.enums import SpecialEKeys
 from snpdb.models import Lab

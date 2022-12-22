@@ -341,7 +341,7 @@ class ClinVarExportBatches:
         self.skipped_records: int = 0
 
     def add_record(self, record: ClinVarExport, force_update: bool = False):
-        from classification.models.clinvar_export_convertor import ClinVarExportData, ClinVarExportConverter
+        from classification.models.clinvar_export_convertor import ClinVarExportConverter
         data = ClinVarExportConverter.clinvar_export_data(record, update=force_update)
         if data.clinvar_export.status not in {ClinVarExportStatus.CHANGES_PENDING, ClinVarExportStatus.NEW_SUBMISSION}:
             self.skipped_records += 1

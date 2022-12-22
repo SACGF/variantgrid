@@ -44,7 +44,7 @@ from flags.models import Flag, FlagPermissionLevel, FlagStatus
 from flags.models.models import FlagsMixin, FlagCollection, FlagTypeContext, \
     flag_collection_extra_info_signal, FlagInfos
 from genes.hgvs import HGVSMatcher, CHGVS, chgvs_diff_description, CHGVSDiff, HGVSNameExtra
-from genes.models import Gene, TranscriptVersion, Transcript
+from genes.models import Gene
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
 from library.guardian_utils import clear_permissions
 from library.log_utils import report_exc_info, report_event
