@@ -18,7 +18,7 @@ class OntologyTermAdmin(ModelAdminBasics):
 
 
 @admin.register(OntologyImport)
-class OntologyImport(ModelAdminBasics):
+class OntologyImportAdmin(ModelAdminBasics):
     search_fields = ('filename',)
     list_display = ('import_source', 'filename', 'processed_date')
     list_filter = ('import_source',)

@@ -283,7 +283,7 @@ class LabelledValueTag(template.Node):
 
 
 @register.tag(name='modal')
-def render_labelled(parser, token):
+def render_modal(parser, token):
     tag_name, args, kwargs = parse_tag(token, parser)
     nodelist = parser.parse(('endmodal',))
     parser.delete_first_token()
