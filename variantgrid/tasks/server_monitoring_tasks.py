@@ -7,7 +7,7 @@ import celery
 import requests
 from django.conf import settings
 
-from library.file_utils import get_disk_usage
+from library.utils.file_utils import get_disk_usage
 from library.log_utils import report_message
 
 

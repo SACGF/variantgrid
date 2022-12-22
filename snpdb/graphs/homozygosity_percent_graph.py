@@ -5,7 +5,7 @@ from django.db import connection
 from lazy import lazy
 from matplotlib import cm
 
-from library.database_utils import get_queryset_select_from_where_parts
+from library.utils.database_utils import get_queryset_select_from_where_parts
 from library.genomics import get_genomic_size_description
 from library.graphs.chromosomes_graph import plot_chromosomes
 from library.utils import sha1_str

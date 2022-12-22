@@ -11,7 +11,7 @@ from annotation.models.models import ManualVariantEntryCollection, ClinVarVersio
 from classification.models import ClassificationImport
 from expression.models import CuffDiffFile
 from genes.models import GeneList, GeneCoverageCollection
-from library.file_utils import name_from_filename
+from library.utils.file_utils import name_from_filename
 from patients.models import PatientRecords
 from pedigree.models import PedFile
 from snpdb.models import GenomicIntervalsCollection, AnnotationLevel, ImportStatus, Sample, ImportedWikiCollection

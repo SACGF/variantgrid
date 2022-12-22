@@ -42,7 +42,7 @@ from genes.models_enums import AnnotationConsortium, HGNCStatus, GeneSymbolAlias
 from library.constants import HOUR_SECS, WEEK_SECS
 from library.django_utils import SortByPKMixin
 from library.django_utils.django_partition import RelatedModelsPartitionModel
-from library.file_utils import mk_path
+from library.utils.file_utils import mk_path
 from library.guardian_utils import assign_permission_to_user_and_groups, DjangoPermission
 from library.log_utils import log_traceback
 from library.utils import get_single_element, iter_fixed_chunks

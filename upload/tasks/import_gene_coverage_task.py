@@ -6,7 +6,7 @@ import pandas as pd
 from genes.canonical_transcripts.canonical_transcript_manager import CanonicalTranscriptManager
 from genes.gene_matching import GeneSymbolMatcher
 from genes.models import GeneCoverageCollection, AnnotationConsortium, TranscriptVersion
-from library.file_utils import name_from_filename
+from library.utils.file_utils import name_from_filename
 from library.log_utils import log_traceback
 from snpdb.models import Sample, GenomeBuild, DataState
 from upload.models import UploadedGeneCoverage

@@ -7,7 +7,7 @@ from django.db.models import Max
 from django.utils import timezone
 
 from eventlog.models import create_event
-from library.database_utils import run_sql
+from library.utils.database_utils import run_sql
 from library.enums.log_level import LogLevel
 from library.log_utils import get_traceback
 from snpdb.models import VCF, VariantZygosityCountForVCF, VariantZygosityCountForSample, Sample, Variant, \

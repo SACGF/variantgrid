@@ -1,7 +1,7 @@
 import os
 import re
 
-from library.file_utils import name_from_filename
+from library.utils.file_utils import name_from_filename
 
 
 def meta_data_file(filename, meta_data_file_format):

@@ -7,7 +7,7 @@ from concurrent.futures.thread import ThreadPoolExecutor
 from django.conf import settings
 from django.core.cache import cache
 
-from library.file_utils import name_from_filename, mk_path
+from library.utils.file_utils import name_from_filename, mk_path
 from snpdb import variant_collection
 from snpdb.models import Variant
 from snpdb.variant_pk_lookup import VariantPKLookup

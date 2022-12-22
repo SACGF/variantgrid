@@ -14,7 +14,7 @@ from genes.canonical_transcripts.canonical_transcript_manager import CanonicalTr
 from genes.gene_matching import GeneSymbolMatcher
 from genes.models import TranscriptVersion
 from library.enums.log_level import LogLevel
-from library.file_utils import name_from_filename, file_md5sum, file_to_array
+from library.utils.file_utils import name_from_filename, file_md5sum, file_to_array
 from library.log_utils import get_traceback, log_traceback
 from seqauto.illumina.run_parameters import get_run_parameters
 from seqauto.illumina.samplesheet import convert_sheet_to_df, samplesheet_is_valid

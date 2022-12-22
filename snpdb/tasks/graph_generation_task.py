@@ -4,10 +4,9 @@ import traceback
 import celery
 
 from eventlog.models import create_event
-from library import file_utils
 from library.enums.log_level import LogLevel
 from library.log_utils import get_traceback
-from library.utils import import_class
+from library.utils import file_utils, import_class
 
 
 @celery.shared_task(ignore_result=False)

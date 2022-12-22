@@ -6,7 +6,7 @@ and I don't want cross-dependencies between those apps
 """
 from collections import defaultdict
 
-from library.database_utils import get_queryset_select_from_where_parts
+from library.utils.database_utils import get_queryset_select_from_where_parts
 from library.utils import single_quote
 from snpdb.models import CohortGenotype, VCF
 

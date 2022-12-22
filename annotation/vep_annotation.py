@@ -10,7 +10,7 @@ from annotation.fake_annotation import get_fake_vep_version
 from annotation.models.models import ColumnVEPField
 from annotation.models.models_enums import VEPPlugin, VEPCustom
 from genes.models_enums import AnnotationConsortium
-from library.file_utils import get_extension_without_gzip, mk_path_for_file, open_handle_gzip
+from library.utils.file_utils import get_extension_without_gzip, mk_path_for_file, open_handle_gzip
 from library.utils import get_single_element, execute_cmd
 from snpdb.models.models_genome import GenomeBuild
 

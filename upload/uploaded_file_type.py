@@ -2,7 +2,7 @@ import logging
 from collections import defaultdict
 from operator import itemgetter
 
-from library.file_utils import get_extension_without_gzip
+from library.utils.file_utils import get_extension_without_gzip
 from upload.import_task_factories.import_task_factory import get_import_task_factories
 from upload.models import UploadedFileTypes
 from upload.tasks.vcf.genotype_vcf_tasks import reload_vcf_task

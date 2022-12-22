@@ -3,7 +3,7 @@
 import pandas as pd
 from django.db import migrations
 
-from library.file_utils import mk_path
+from library.utils.file_utils import mk_path
 from manual.operations.manual_operations import ManualOperation
 
 

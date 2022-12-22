@@ -5,7 +5,7 @@ from collections import defaultdict
 
 from django.conf import settings
 
-from library.file_utils import add_permissions_to_file, mk_path_for_file
+from library.utils.file_utils import add_permissions_to_file, mk_path_for_file
 from seqauto.job_scripts import get_job_data, create_bash_script
 from seqauto.models import VCFFile, SampleSheet, BamFile, \
     SequencingFileType, QC, SampleSheetCombinedVCFFile, IlluminaFlowcellQC, \

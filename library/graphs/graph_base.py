@@ -3,7 +3,7 @@ import abc
 from matplotlib.backends.backend_agg import FigureCanvasAgg
 from matplotlib.figure import Figure
 
-from library import file_utils
+from library.utils import file_utils
 from library.graphs.graph_utils import legend_patches_and_labels
 
 

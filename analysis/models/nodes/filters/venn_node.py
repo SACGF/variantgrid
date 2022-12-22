@@ -13,7 +13,7 @@ from lazy import lazy
 
 from analysis.models.enums import SetOperations
 from analysis.models.nodes.analysis_node import AnalysisNode, NodeStatus, NodeVersion
-from library.database_utils import queryset_to_sql
+from library.utils.database_utils import queryset_to_sql
 from snpdb.models import VariantCollection, ProcessingStatus
 from snpdb.variant_collection import write_variant_set_operation
 

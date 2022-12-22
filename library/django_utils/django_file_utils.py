@@ -2,7 +2,7 @@ import os
 
 from django.conf import settings
 
-from library.file_utils import mk_path
+from library.utils.file_utils import mk_path
 
 
 def get_import_processing_dir(pk, prefix='pipeline'):

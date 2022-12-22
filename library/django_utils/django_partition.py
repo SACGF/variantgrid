@@ -5,7 +5,7 @@ from django.db import models
 from django.db.utils import ProgrammingError
 from django.utils.text import slugify
 
-from library.database_utils import run_sql
+from library.utils.database_utils import run_sql
 from library.log_utils import log_traceback
 from library.utils import single_quote, double_quote
 

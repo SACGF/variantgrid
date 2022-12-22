@@ -10,7 +10,7 @@ from django.utils.timesince import timesince
 from model_utils.managers import InheritanceManager
 
 from annotation.models.models import VariantAnnotationVersion
-from library.database_utils import dictfetchall
+from library.utils.database_utils import dictfetchall
 from snpdb.models import VariantGridColumn
 
 

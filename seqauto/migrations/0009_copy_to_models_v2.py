@@ -6,7 +6,7 @@ from django.db import migrations
 from django.db.models import Q
 from django.utils import timezone
 
-from library.file_utils import mk_path
+from library.utils.file_utils import mk_path
 
 
 def _one_off_copy_to_models_v2(apps, _schema_editor):

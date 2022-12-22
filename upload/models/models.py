@@ -23,7 +23,7 @@ from eventlog.models import create_event
 from library.django_utils.django_file_system_storage import PrivateUploadStorage
 from library.django_utils.django_file_utils import get_import_processing_dir
 from library.enums.log_level import LogLevel
-from library.file_utils import file_md5sum, mk_path
+from library.utils.file_utils import file_md5sum, mk_path
 from library.log_utils import get_traceback, report_message
 from seqauto.models import VCFFile, SampleSheetCombinedVCFFile, get_samples_by_sequencing_sample, VariantCaller
 from snpdb.import_status import set_vcf_and_samples_import_status

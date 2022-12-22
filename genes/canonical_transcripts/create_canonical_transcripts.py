@@ -4,8 +4,8 @@ import pandas as pd
 
 from genes.gene_matching import GeneSymbolMatcher
 from genes.models import CanonicalTranscriptCollection, CanonicalTranscript, TranscriptVersion
-from library.database_utils import sql_delete_qs
-from library.file_utils import file_md5sum
+from library.utils.database_utils import sql_delete_qs
+from library.utils.file_utils import file_md5sum
 from snpdb.models import GenomeBuild
 
 DELETE_IN_PARTS = False

@@ -6,7 +6,7 @@ from django.core.management import BaseCommand
 from genes.models import TranscriptVersionSequenceInfo, TranscriptVersionSequenceInfoFastaFileImport, TranscriptVersion, \
     Transcript
 from genes.models_enums import AnnotationConsortium
-from library.file_utils import file_md5sum, open_handle_gzip
+from library.utils.file_utils import file_md5sum, open_handle_gzip
 from library.utils import invert_dict
 
 

@@ -5,7 +5,7 @@ from django.conf import settings
 from django.db import migrations
 from django.utils import timezone
 
-from library.database_utils import run_sql
+from library.utils.database_utils import run_sql
 from library.django_utils import bulk_insert_class_data
 from library.utils import single_quote, invert_dict
 from snpdb.genome import reference_contigs

@@ -5,7 +5,7 @@ import os
 
 from django.core.management.base import BaseCommand
 
-from library.file_utils import file_to_array
+from library.utils.file_utils import file_to_array
 from seqauto.models import EnrichmentKit, SequencingRun, GoldReference, ImportStatus
 from seqauto.tasks.gold_summary_tasks import calculate_gold_summary
 

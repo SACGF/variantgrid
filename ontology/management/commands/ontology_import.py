@@ -13,7 +13,7 @@ from model_utils.models import now
 
 from annotation.models.models_enums import HPOSynonymScope
 from genes.models import HGNC
-from library.file_utils import file_md5sum
+from library.utils.file_utils import file_md5sum
 from ontology.gencc import load_gencc
 from ontology.models import OntologyService, OntologyRelation, OntologyTerm, OntologyImportSource, OntologyImport, \
     OntologyTermRelation, OntologyVersion, OntologyTermStatus

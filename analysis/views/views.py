@@ -49,7 +49,7 @@ from annotation.models.models import MutationalSignatureInfo
 from classification.views.views import create_classification_object, CreateClassificationForVariantView
 from library import pandas_utils
 from library.constants import WEEK_SECS, HOUR_SECS
-from library.database_utils import run_sql
+from library.utils.database_utils import run_sql
 from library.django_utils import add_save_message, get_field_counts, set_form_read_only
 from library.guardian_utils import is_superuser
 from library.utils import full_class_name, defaultdict_to_dict

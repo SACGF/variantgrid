@@ -2,7 +2,7 @@ import logging
 
 import pandas as pd
 
-from library.file_utils import file_md5sum
+from library.utils.file_utils import file_md5sum
 
 
 def load_genome_fasta_index(genome_fasta: 'GenomeFasta', genome_build: 'GenomeBuild'):

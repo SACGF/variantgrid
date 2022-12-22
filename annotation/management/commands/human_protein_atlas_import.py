@@ -12,7 +12,7 @@ from annotation.models import HumanProteinAtlasAnnotationVersion, HumanProteinAt
 from genes.models import GeneSymbol, Gene
 from genes.models_enums import AnnotationConsortium
 from library.django_utils.django_file_utils import get_import_processing_filename
-from library.file_utils import file_md5sum
+from library.utils.file_utils import file_md5sum
 from upload.vcf.sql_copy_files import write_sql_copy_csv, sql_copy_csv
 
 

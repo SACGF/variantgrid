@@ -14,7 +14,7 @@ from annotation.vcf_files.import_vcf_annotations import import_vcf_annotations
 from annotation.vep_annotation import get_vep_command
 from eventlog.models import create_event
 from library.enums.log_level import LogLevel
-from library.file_utils import name_from_filename, mk_path_for_file
+from library.utils.file_utils import name_from_filename, mk_path_for_file
 from library.log_utils import get_traceback, report_message, log_traceback
 from library.utils import execute_cmd
 from snpdb.variants_to_vcf import write_contig_sorted_values_to_vcf_file, VARIANT_GRID_INFO_DICT

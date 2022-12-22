@@ -8,7 +8,7 @@ from django.db.models.aggregates import Count
 from django.db.models.query_utils import Q
 from guardian.shortcuts import get_objects_for_user
 
-from library.database_utils import get_queryset_column_names, \
+from library.utils.database_utils import get_queryset_column_names, \
     get_queryset_select_from_where_parts
 from library.jqgrid_sql import JqGridSQL
 from library.jqgrid_user_row_config import JqGridUserRowConfig

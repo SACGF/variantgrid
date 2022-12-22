@@ -10,7 +10,7 @@ from django.conf import settings
 from django.utils import timezone
 
 from library.django_utils.django_file_utils import get_import_processing_filename
-from library.file_utils import name_from_filename
+from library.utils.file_utils import name_from_filename
 from upload.models import ModifiedImportedVariants, ToolVersion, UploadStep, \
     UploadStepTaskType, VCFSkippedContigs, VCFSkippedContig, UploadStepMultiFileOutput, VCFPipelineStage, \
     SimpleVCFImportInfo

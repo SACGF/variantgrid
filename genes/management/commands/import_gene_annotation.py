@@ -12,7 +12,7 @@ from genes.gene_matching import ReleaseGeneMatcher
 from genes.models import GeneSymbol, GeneAnnotationImport, Gene, GeneVersion, TranscriptVersion, Transcript, HGNC, \
     GeneAnnotationRelease, ReleaseGeneVersion, ReleaseTranscriptVersion
 from genes.models_enums import AnnotationConsortium
-from library.file_utils import open_handle_gzip
+from library.utils.file_utils import open_handle_gzip
 from library.utils import invert_dict
 from snpdb.models.models_genome import GenomeBuild
 

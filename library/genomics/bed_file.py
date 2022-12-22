@@ -1,6 +1,7 @@
 from shlex import shlex
 
-from library import file_utils, genomics
+from library import genomics
+from library.utils import file_utils
 
 BED_DETAILS = 'bedDetail'
 BED_FILE = 'bedFile'
