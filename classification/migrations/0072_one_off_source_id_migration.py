@@ -38,7 +38,7 @@ def migrate_source_id(apps, _schema_editor):
 
     EvidenceKey.objects.filter(key='source_id').delete()
     log.append("Removing EvidenceKey source_id")
-    with open('source_id_migration.log', 'w') as log_file:
+    with open('source_id_migration.log', 'w', encoding="utf-8") as log_file:
         log_file.writelines([line + '\n' for line in log])
     print("Check source_id_migration.log for details on migration. Delete (or archive) the file to tidy up.")
 

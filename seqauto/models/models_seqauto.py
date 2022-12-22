@@ -979,7 +979,7 @@ class QCGeneList(SeqAutoRecord):
 
     def load_from_file(self, seqauto_run, **kwargs):
         from genes.custom_text_gene_list import create_custom_text_gene_list
-        with open(self.path) as f:
+        with open(self.path, encoding="utf-8") as f:
             custom_gene_list_text = f.read()
             custom_text_gene_list = CustomTextGeneList(name=f"QC GeneList for {self.sequencing_sample.sample_name}",
                                                        text=custom_gene_list_text)

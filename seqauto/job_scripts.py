@@ -57,7 +57,7 @@ def create_bash_script(name, filename, out_file, command, cores, mem, job_script
                "job_script_pk": job_script_pk}
     script_contents = render_to_string(BASH_TEMPLATE, context)
 
-    with open(filename, 'w') as f:
+    with open(filename, 'w', encoding="utf-8") as f:
         f.write(script_contents)
 
 

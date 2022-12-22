@@ -93,7 +93,7 @@ def link_records(cuff_diff_file):
         msg = f"Unknown annotation level '{cuff_diff_file.annotation_level}'"
         raise ValueError(msg)
 
-    with open(os.path.join(EXPRESSION_SCRIPTS_DIR, script_name)) as f:
+    with open(os.path.join(EXPRESSION_SCRIPTS_DIR, script_name), encoding="utf-8") as f:
         raw_sql = f.read()
     sql = raw_sql % {"cuff_diff_file_id": cuff_diff_file.pk}
 

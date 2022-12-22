@@ -42,7 +42,7 @@ class GenomicIntervalsCollection(GuardianPermissionsAutoInitialSaveMixin, models
         """ returns iterator of GenomicInterval (collection) or HTSeq.GenomicInterval (bed file)
             both classes share chrom/start/end fields """
         if self.processed_file is not None:
-            with open(self.processed_file) as f:
+            with open(self.processed_file, encoding="utf-8") as f:
                 for feature in BedFileReader(f):
                     yield feature.iv
         else:

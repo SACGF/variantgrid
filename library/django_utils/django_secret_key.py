@@ -28,7 +28,7 @@ def get_or_create_django_secret_key(key_dir):
         with open(key_filename, "wb") as f:
             f.write(secret_key)
     else:
-        with open(key_filename) as f:
+        with open(key_filename, encoding="utf-8") as f:
             secret_key = f.read().strip()
 
     return secret_key

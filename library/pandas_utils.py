@@ -66,10 +66,10 @@ def df_nan_to_none(df: pd.DataFrame) -> pd.DataFrame:
     return df.replace(np.nan, None)
 
 
-def read_csv_skip_header(fle, header='#', **kwargs) -> pd.DataFrame:
-    if os.stat(fle).st_size == 0:
+def read_csv_skip_header(filename, header='#', **kwargs) -> pd.DataFrame:
+    if os.stat(filename).st_size == 0:
         raise ValueError("File is empty")
-    with open(fle) as f:
+    with open(filename, encoding="utf-8") as f:
         pos = 0
         cur_line = f.readline()
         while cur_line.startswith(header):

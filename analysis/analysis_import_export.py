@@ -42,7 +42,7 @@ def analysis_import(user: User, genome_build: GenomeBuild, filename,
     if annotation_version is None:
         annotation_version = AnnotationVersion.latest(genome_build)
 
-    with open(filename) as f:
+    with open(filename, encoding="utf-8") as f:
         analysis_json = json.loads(f.read())
 
     node_serializers = {}

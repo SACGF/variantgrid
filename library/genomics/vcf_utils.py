@@ -60,7 +60,7 @@ def write_vcf_from_tuples(vcf_filename, variant_tuples, tuples_have_id_field=Fal
     columns = "\t".join(["CHROM", "POS", "ID", "REF", "ALT", "QUAL", "FILTER", "INFO"])
     header = "\n".join(["##fileformat=VCFv4.1", "##source=VariantGrid", "#" + columns])
     empty_columns = "\t." * 3  # QUAL/FILTER/INFO always empty
-    with open(vcf_filename, "wt") as f:
+    with open(vcf_filename, "wt", encoding="utf-8") as f:
         f.write(header + "\n")
         for vcf_record in vcf_tuples:
             (chrom, position, id_col, ref, alt) = vcf_record

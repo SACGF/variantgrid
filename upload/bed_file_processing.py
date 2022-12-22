@@ -24,7 +24,7 @@ def process_bed_file(bed_file, processed_file, has_chr):
     pipe_in = codecs.getreader('utf-8')(bed_pipe.stdout)
 
     num_records = 0
-    with open(processed_file, "w") as out_f:
+    with open(processed_file, "w", encoding="utf-8") as out_f:
         for feature in BedFileReader(pipe_in):
             num_records += 1
             chrom = genomics.format_chrom(feature.iv.chrom, has_chr)

@@ -42,7 +42,7 @@ def _fix_seqauto_qc_gene_list(apps, _schema_editor):
     for qcgl in QCGeneList.objects.filter(data_state=DATASTATE_COMPLETE):
         path = pathlib.Path(qcgl.path)
         if path.exists():
-            with open(qcgl.path) as f:
+            with open(qcgl.path, encoding="utf-8") as f:
                 try:
                     custom_gene_list_text = f.read()
                     md5_hash = md5sum_str(custom_gene_list_text)

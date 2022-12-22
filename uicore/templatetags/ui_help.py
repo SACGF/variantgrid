@@ -37,7 +37,7 @@ def page_help(page_id: str = None, title=None, show_title=True, header_tag="h3")
     page_help_filename = finders.find(page_help_path)
     file_exists = False
     if page_help_filename and os.path.exists(page_help_filename):
-        with open(page_help_filename) as ph:
+        with open(page_help_filename, encoding="utf-8") as ph:
             file_exists = True
             page_help_html = ph.read()
     if not file_exists:

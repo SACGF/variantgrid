@@ -234,7 +234,7 @@ class MutationSignatures:
     # ---------------------------------------------------------------------------
     # parse the signature data
     def ParseSignatureData(self, sig_data_file):
-        with open(sig_data_file, "r") as fin:
+        with open(sig_data_file, "r", encoding="utf-8") as fin:
             # how many columns are there? how many signatures?
             header = fin.readline()
             for idx, col_name in enumerate(header.strip().split("\t")[3:]):

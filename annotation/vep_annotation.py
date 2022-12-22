@@ -175,7 +175,7 @@ def get_vep_version(genome_build: GenomeBuild, annotation_consortium):
                        "#CHROM    POS    ID    REF    ALT    QUAL    FILTER    INFO\n" \
                        "1    123456    .    G    T    .    .        \n"
 
-        with open(vcf_filename, "w") as f:
+        with open(vcf_filename, "w", encoding="utf-8") as f:
             f.write(FAKE_VCF_STR)
 
     output_basename = f"fake.vep_annotated_{genome_build.name}.vcf.gz"
