@@ -8,6 +8,7 @@ import requests
 from annotation.models import CachedWebResource
 from genes.models import TranscriptVersion, GeneSymbol, GeneVersion, MANE, HGNC
 from genes.models_enums import MANEStatus
+from library.constants import MINUTE_SECS
 from snpdb.models import GenomeBuild
 
 
@@ -15,7 +16,7 @@ def store_mane_from_web(cached_web_resource: CachedWebResource):
     MANE_VERSION = "v1.0"
     MANE_URL = f"https://ftp.ncbi.nlm.nih.gov/refseq/MANE/MANE_human/current/MANE.GRCh38.{MANE_VERSION}.summary.txt.gz"
     logging.info("Retrieving %s", MANE_URL)
-    r = requests.get(MANE_URL, stream=True)
+    r = requests.get(MANE_URL, stream=True, timeout=MINUTE_SECS)
     f = gzip.GzipFile(fileobj=r.raw)
 
     MANE.objects.all().delete()

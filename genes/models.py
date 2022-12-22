@@ -39,7 +39,7 @@ from requests import RequestException
 
 from genes.gene_coverage import load_gene_coverage_df
 from genes.models_enums import AnnotationConsortium, HGNCStatus, GeneSymbolAliasSource, MANEStatus
-from library.constants import HOUR_SECS, WEEK_SECS
+from library.constants import HOUR_SECS, WEEK_SECS, MINUTE_SECS
 from library.django_utils import SortByPKMixin
 from library.django_utils.django_partition import RelatedModelsPartitionModel
 from library.utils.file_utils import mk_path
@@ -1253,7 +1253,7 @@ class TranscriptVersionSequenceInfo(TimeStampedModel):
         base_url = ENSEMBL_REST_BASE_URLS[genome_build.name]
         transcript_id, version = TranscriptVersion.get_transcript_id_and_version(transcript_accession)
         url = f"{base_url}/sequence/id/{transcript_id}?type=cdna"
-        r = requests.get(url, headers={"Content-Type": "application/json"})
+        r = requests.get(url, headers={"Content-Type": "application/json"}, timeout=MINUTE_SECS)
         data = r.json()
 
         if r.ok:

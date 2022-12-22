@@ -24,6 +24,7 @@ from typing import Dict, List, Tuple, Optional
 import requests
 from django.conf import settings
 
+from library.constants import MINUTE_SECS
 from library.django_utils import thread_safe_unique_together_get_or_create
 from library.utils import iter_fixed_chunks, get_single_element
 from snpdb.models import Allele, ClinGenAllele, GenomeBuild, Variant, VariantAllele, Contig, GenomeFasta
@@ -95,7 +96,7 @@ class ClinGenAlleleRegistryAPI:
         gb_time = str(int(time.time()))
         token = hashlib.sha1((url + identity + gb_time).encode('utf-8')).hexdigest()
         request = url + '&gbLogin=' + self.login + '&gbTime=' + gb_time + '&gbToken=' + token
-        response = requests.put(request, data=data)
+        response = requests.put(request, data=data, timeout=MINUTE_SECS)
         self._check_response(response)
         return response.json()
 
@@ -118,7 +119,7 @@ class ClinGenAlleleRegistryAPI:
 
     @classmethod
     def get(cls, url):
-        response = requests.get(url)
+        response = requests.get(url, timeout=MINUTE_SECS)
         cls._check_response(response)
         return response.json()
 

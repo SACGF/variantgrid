@@ -7,6 +7,7 @@ from django.urls import reverse
 from lazy import lazy
 
 from annotation.regexes import db_ref_regexes
+from library.constants import MINUTE_SECS
 from library.log_utils import report_message
 from library.utils import empty_to_none
 from ontology.models import OntologyTerm, OntologyService, OntologySnake, GeneDiseaseClassification
@@ -337,7 +338,7 @@ class OntologyMatching:
                         "rows": row_count,
                         "minimal_tokenizer": "false",
                         "category": "disease"
-                    }).json().get("docs")
+                    }, timeout=MINUTE_SECS).json().get("docs")
 
                     for index, result in enumerate(results):
                         o_id = result.get('id')

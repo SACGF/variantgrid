@@ -17,6 +17,7 @@ import requests
 from genes.models import GnomADGeneConstraint, \
     Transcript, GeneVersion, GeneSymbol
 from genes.models_enums import AnnotationConsortium
+from library.constants import MINUTE_SECS
 from library.pandas_utils import df_nan_to_none
 
 
@@ -25,7 +26,7 @@ def store_gnomad_gene_constraint_from_web(cached_web_resource):
 
     GNOMAD_GENE_CONSTRAINT_URL = "https://storage.googleapis.com/gcp-public-data--gnomad/release/2.1.1/constraint/gnomad.v2.1.1.lof_metrics.by_gene.txt.bgz"
 
-    r = requests.get(GNOMAD_GENE_CONSTRAINT_URL, stream=True)
+    r = requests.get(GNOMAD_GENE_CONSTRAINT_URL, stream=True, timeout=MINUTE_SECS)
     f = gzip.GzipFile(fileobj=r.raw)
     df = pd.read_csv(f, sep='\t')
     store_gnomad_gene_constraint_from_df(cached_web_resource, df)

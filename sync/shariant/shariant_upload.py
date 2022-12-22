@@ -8,6 +8,7 @@ from classification.enums.classification_enums import ShareLevel
 from classification.models import EvidenceKeyMap
 from classification.models.classification import ClassificationModification
 from classification.models.classification_utils import ClassificationJsonParams
+from library.constants import MINUTE_SECS
 from library.guardian_utils import admin_bot
 from library.oauth import OAuthConnector
 from sync.models.enums import SyncStatus
@@ -158,7 +159,8 @@ class ClassificationUploader:
                     response = requests.post(
                         self.shariant.url('classification/api/classifications/v2/record/'),
                         auth=auth,
-                        json=json_to_send
+                        json=json_to_send,
+                        timeout=MINUTE_SECS,
                     )
                     response.raise_for_status()
                     # results are sent back in an array in the same order they were sent up

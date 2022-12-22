@@ -24,6 +24,7 @@ from classification.models import Classification, ClassificationModification, cl
 from flags.models import flag_comment_action, Flag, FlagComment, FlagResolution
 from genes.models import GeneSymbol, GeneSymbolAlias
 from library.cache import timed_cache
+from library.constants import MINUTE_SECS
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
 from library.guardian_utils import admin_bot
 from library.log_utils import report_exc_info, report_message
@@ -874,7 +875,7 @@ def search_suggestion(text: str) -> ConditionMatchingSuggestion:
                 "rows": 10,
                 "minimal_tokenizer": "false",
                 "category": "disease"
-            }).json().get("docs")
+            }, timeout=MINUTE_SECS).json().get("docs")
 
         matches: List[ConditionMatchingSuggestion] = []
         for result in results:

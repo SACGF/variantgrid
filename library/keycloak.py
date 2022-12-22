@@ -6,6 +6,7 @@ import requests
 from django.conf import settings
 from django.contrib.auth.models import User
 
+from library.constants import MINUTE_SECS
 from library.oauth import OAuthConnector
 from snpdb.models.models import Lab
 from snpdb.models.models_user_settings import UserSettings
@@ -47,7 +48,8 @@ class Keycloak:
         response = requests.put(
             auth=self.connector.auth(),
             url=self.connector.url(f'/auth/admin/realms/{self.realm}/users/{user_id}/execute-actions-email'),
-            json=['UPDATE_PASSWORD']
+            json=['UPDATE_PASSWORD'],
+            timeout=MINUTE_SECS,
         )
 
         response.raise_for_status()
@@ -57,6 +59,7 @@ class Keycloak:
         response = requests.get(
             auth=self.connector.auth(),
             url=self.connector.url(f'/auth/admin/realms/{self.realm}/groups'),
+            timeout=MINUTE_SECS,
         )
         group_array = json.loads(response.text)
         group_dict = {}
@@ -91,7 +94,8 @@ class Keycloak:
                         url=self.connector.url(f'/auth/admin/realms/{self.realm}/groups/{parent}/children'),
                         json={
                             "name": combined.rsplit('/', maxsplit=1)[-1],
-                        }
+                        },
+                        timeout=MINUTE_SECS,
                     )
                     response.raise_for_status()
                     new_group_json = json.loads(response.text)
@@ -105,7 +109,8 @@ class Keycloak:
         params_str = urllib.parse.urlencode(params)
         response = requests.get(
             auth=self.connector.auth(),
-            url=self.connector.url(f'/auth/admin/realms/{self.realm}/users?{params_str}')
+            url=self.connector.url(f'/auth/admin/realms/{self.realm}/users?{params_str}'),
+            timeout=MINUTE_SECS,
         )
         response.raise_for_status()
 
@@ -140,7 +145,8 @@ class Keycloak:
         response = requests.post(
             auth=self.connector.auth(),
             url=self.connector.url(f'/auth/admin/realms/{self.realm}/users'),
-            json=user_rep
+            json=user_rep,
+            timeout=MINUTE_SECS,
         )
         response.raise_for_status()
 
@@ -152,7 +158,8 @@ class Keycloak:
         for group_id in group_ids:
             response = requests.put(
                 auth=self.connector.auth(),
-                url=self.connector.url(f'/auth/admin/realms/{self.realm}/users/{user_id}/groups/{group_id}')
+                url=self.connector.url(f'/auth/admin/realms/{self.realm}/users/{user_id}/groups/{group_id}'),
+                timeout=MINUTE_SECS,
             )
             response.raise_for_status()
             print(response.text)
@@ -164,7 +171,8 @@ class Keycloak:
         response = requests.put(
             auth=self.connector.auth(),
             url=self.connector.url(f'/auth/admin/realms/{self.realm}/users/{user_id}/execute-actions-email'),
-            json=['UPDATE_PASSWORD']
+            json=['UPDATE_PASSWORD'],
+            timeout=MINUTE_SECS,
         )
 
         response.raise_for_status()

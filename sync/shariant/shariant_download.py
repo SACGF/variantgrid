@@ -8,6 +8,7 @@ from dateutil import tz
 
 from classification.models.evidence_key import EvidenceKeyMap
 from classification.views.classification_view import BulkClassificationInserter
+from library.constants import MINUTE_SECS
 from library.guardian_utils import admin_bot
 from library.oauth import OAuthConnector
 from library.utils import make_json_safe_in_place, batch_iterator
@@ -108,7 +109,8 @@ def sync_shariant_download(sync_destination: SyncDestination, full_sync: bool = 
         response = requests.get(shariant.url('classification/api/classifications/export'),
                                 auth=shariant.auth(),
                                 params=params,
-                                stream=False)
+                                stream=False,
+                                timeout=MINUTE_SECS)
 
         last_modified = response.headers.get('Last-Modified')
         evidence_keys = EvidenceKeyMap.instance()

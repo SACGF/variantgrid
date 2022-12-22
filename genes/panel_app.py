@@ -9,6 +9,7 @@ from genes.gene_matching import GeneSymbolMatcher
 from genes.models import PanelAppPanelRelevantDisorders, PanelAppPanel, PanelAppServer, \
     PanelAppPanelLocalCacheGeneList, GeneList, GeneListCategory, create_fake_gene_list
 from genes.serializers import GeneListGeneSymbolSerializer
+from library.constants import MINUTE_SECS
 from library.guardian_utils import admin_bot, add_public_group_read_permission
 
 PANEL_APP_PREFIX = "panel-app"
@@ -19,7 +20,7 @@ PANEL_APP_SEARCH_BY_GENES_BASE_PATH = "/api/v1/genes/"
 
 def get_panel_app_results_by_gene_symbol_json(server: PanelAppServer, gene_symbol) -> Optional[Dict]:
     url = server.url + PANEL_APP_SEARCH_BY_GENES_BASE_PATH + str(gene_symbol)
-    r = requests.get(url)
+    r = requests.get(url, timeout=MINUTE_SECS)
     results = None
     if r.ok:
         data = r.json()
@@ -30,7 +31,7 @@ def get_panel_app_results_by_gene_symbol_json(server: PanelAppServer, gene_symbo
 
 def _get_panel_app_panel_url_and_json(panel_app_panel):
     url = panel_app_panel.server.url + PANEL_APP_GET_PANEL_API_BASE_PATH + str(panel_app_panel.panel_id)
-    r = requests.get(url)
+    r = requests.get(url, timeout=MINUTE_SECS)
     json_data: Dict = r.json()
     # Panel App isn't very REST-ful - returns 200 for missing data but we'll return 404
     if detail := json_data.get("detail"):
@@ -108,7 +109,7 @@ def store_panel_app_panels_from_web(server: PanelAppServer, cached_web_resource:
     url = server.url + PANEL_APP_LIST_PANELS_PATH
     while url:
         logging.debug("Calling %s", url)
-        r = requests.get(url)
+        r = requests.get(url, timeout=MINUTE_SECS)
         data = r.json()
         url = data["next"]
 

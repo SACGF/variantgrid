@@ -7,6 +7,7 @@ from django.conf import settings
 from pandas import DataFrame, read_csv
 
 from annotation.models import CachedWebResource
+from library.constants import MINUTE_SECS
 from library.pandas_utils import df_nan_to_none
 from library.utils import md5sum_str
 from ontology.models import OntologyRelation, GeneDiseaseClassification
@@ -15,7 +16,7 @@ from ontology.ontology_builder import OntologyBuilder
 
 def store_gencc_from_web(cached_web_resource: CachedWebResource):
     GENCC_CSV_URL = "https://search.thegencc.org/download/action/submissions-export-csv"
-    r = requests.get(GENCC_CSV_URL)
+    r = requests.get(GENCC_CSV_URL, timeout=MINUTE_SECS)
     file_hash = md5sum_str(r.text)
     fileobj = StringIO(r.text)
     num_gene_disease_relationships = load_gencc(fileobj, file_hash, force=True, url=GENCC_CSV_URL)

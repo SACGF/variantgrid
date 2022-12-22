@@ -11,6 +11,7 @@ from annotation.models import CachedWebResource
 from genes.gene_matching import ReleaseGeneMatcher
 from genes.models import HGNCImport, GeneAnnotationRelease, GeneSymbol, HGNC, GeneSymbolAlias, UniProt
 from genes.models_enums import HGNCStatus, GeneSymbolAliasSource
+from library.constants import MINUTE_SECS
 from library.django_utils import get_model_fields, get_field_counts
 from library.utils import invert_dict
 
@@ -26,7 +27,7 @@ def store_hgnc_from_web(cached_web_resource: CachedWebResource):
     for hgnc_status in [HGNCStatus.APPROVED, HGNCStatus.ENTRY_WITHDRAWN]:
         url = HGNC_BASE_URL + hgnc_status.label
         logging.info("Fetching HGNC of status: %s", hgnc_status.label)
-        r = requests.get(url, headers=headers)
+        r = requests.get(url, headers=headers, timeout=MINUTE_SECS)
         data = r.json()
         records = data["response"]["docs"]
         save_hgnc_records(existing_hgnc_ids, records)

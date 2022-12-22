@@ -8,6 +8,7 @@ from Bio import Entrez
 from annotation.models import CachedWebResource
 from genes.models import Gene, GeneSymbol, GeneSymbolAlias
 from genes.models_enums import AnnotationConsortium, GeneSymbolAliasSource
+from library.constants import MINUTE_SECS
 from library.django_utils import chunked_queryset
 
 
@@ -22,7 +23,7 @@ def store_refseq_gene_summary_from_web(cached_web_resource: CachedWebResource):
 
 def store_refseq_gene_info_from_web(cached_web_resource: CachedWebResource):
     GENE_INFO_URL = "https://ftp.ncbi.nlm.nih.gov/refseq/H_sapiens/Homo_sapiens.gene_info.gz"
-    r = requests.get(GENE_INFO_URL, stream=True)
+    r = requests.get(GENE_INFO_URL, stream=True, timeout=MINUTE_SECS)
     f = gzip.GzipFile(fileobj=r.raw)
     gene_info_df = pd.read_csv(f, sep='\t')
 

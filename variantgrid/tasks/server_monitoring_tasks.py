@@ -7,6 +7,7 @@ import celery
 import requests
 from django.conf import settings
 
+from library.constants import MINUTE_SECS
 from library.utils.file_utils import get_disk_usage
 from library.log_utils import report_message
 
@@ -87,7 +88,7 @@ def warn_low_disk_space():
 @celery.shared_task
 def heartbeat():
     if settings.HEARTBEAT_URL:
-        _ = requests.get(settings.HEARTBEAT_URL)
+        _ = requests.get(settings.HEARTBEAT_URL, timeout=MINUTE_SECS)
         # we're not overly concerned with the response
 
 
