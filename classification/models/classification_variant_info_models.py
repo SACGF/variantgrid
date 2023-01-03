@@ -1,6 +1,6 @@
 from typing import Optional, List
 from django.conf import settings
-from django.db.models import TextField, ForeignKey, CASCADE, SET_NULL, OneToOneField
+from django.db.models import TextField, ForeignKey, CASCADE, SET_NULL, OneToOneField, TextChoices
 from model_utils.models import TimeStampedModel
 from genes.hgvs import HGVSMatcher, CHGVS
 from genes.models import TranscriptVersion, GeneSymbol
@@ -109,6 +109,12 @@ class ResolvedVariantInfo(TimeStampedModel):
 
         return variant_info
 
+
+class ImportedAlleleFieldType(TextChoices):
+    C_HGVS = "c_hgvs"
+    G_HGVS = "g_hgvs"
+
+
 class ImportedAlleleInfo(TimeStampedModel):
     """
     This class exists to give quick access to GRCh 37 and 38 details to a classification
@@ -118,8 +124,10 @@ class ImportedAlleleInfo(TimeStampedModel):
     imported_c_hgvs = TextField(null=True, blank=True)
     """
     The c.hgvs exactly as it was imported without any normalization
-    Note - when we start doing imports on g.hgvs or genomic coordinate we will need to add more columns
+    Note - only provide this OR g_hgvs, not both
     """
+
+    imported_g_hgvs = TextField(null=True, blank=True)
 
     imported_genome_build_patch_version = ForeignKey(GenomeBuildPatchVersion, null=True, blank=True, on_delete=CASCADE)
     """
@@ -137,7 +145,7 @@ class ImportedAlleleInfo(TimeStampedModel):
     """ cached reference to 38, so can quickly refer to classification__allele_info__grch38__c_hgvs for example """
 
     class Meta:
-        unique_together = ('imported_c_hgvs', 'imported_genome_build_patch_version')
+        unique_together = ('imported_c_hgvs', 'imported_g_hgvs', 'imported_genome_build_patch_version')
 
     @property
     def imported_c_hgvs_obj(self) -> CHGVS:

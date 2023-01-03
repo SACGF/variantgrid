@@ -664,6 +664,10 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
     def imported_c_hgvs(self):
         return self.get(SpecialEKeys.C_HGVS)
 
+    @property
+    def imported_g_hgvs(self):
+        return self.get(SpecialEKeys.G_HGVS)
+
     def flag_type_context(self):
         return FlagTypeContext.objects.get(pk='classification')
 
@@ -836,10 +840,13 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 self.allele_info: Optional[ImportedAlleleInfo] = None
                 return
 
-            allele_info, _ = ImportedAlleleInfo.objects.get_or_create(
-                imported_c_hgvs=self.imported_c_hgvs,
-                imported_genome_build_patch_version=genome_build_patch_version
-            )
+            fields = {"imported_genome_build_patch_version": genome_build_patch_version}
+            if c_hgvs := self.imported_c_hgvs:
+                fields["imported_c_hgvs"] = c_hgvs
+            elif g_hgvs := self.imported_g_hgvs:
+                fields["imported_g_hgvs"] = g_hgvs
+
+            allele_info, _ = ImportedAlleleInfo.objects.get_or_create(**fields)
             self.allele_info = allele_info
 
         if allele := self.allele:
