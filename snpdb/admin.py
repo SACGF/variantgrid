@@ -329,6 +329,11 @@ class StateAdmin(ModelAdminBasics):
         return super().is_readonly_field(f)
 
 
+@admin.register(models.GenomicIntervalsCollection)
+class GenomicIntervalsCollectionAdmin(ModelAdminBasics):
+    search_fields = ('name', )
+
+
 admin.site.register(models.CachedGeneratedFile, ModelAdminBasics)
 admin.site.register(models.Cohort, ModelAdminBasics)
 admin.site.register(models.CohortGenotypeCollection, ModelAdminBasics)
@@ -336,7 +341,6 @@ admin.site.register(models.CohortSample, ModelAdminBasics)
 admin.site.register(models.CustomColumn, ModelAdminBasics)
 admin.site.register(models.CustomColumnsCollection, ModelAdminBasics)
 admin.site.register(models.GenomeBuild, ModelAdminBasics)
-admin.site.register(models.GenomicIntervalsCollection, ModelAdminBasics)
 admin.site.register(models.LabProject)
 admin.site.register(models.Manufacturer)
 admin.site.register(models.Project, ModelAdminBasics)
