@@ -233,6 +233,7 @@ class VariantTranscriptSelections:
                     "transcript_id": transcript_version.accession,  # for transcript data keys
                     self.REPRESENTATIVE: False,
                     "consequence": "?",
+                    "canonical_score": -1,
                 }
                 try:
                     # Transcript data may not be well formed
