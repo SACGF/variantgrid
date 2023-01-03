@@ -640,15 +640,36 @@ class ResolvedVariantInfoAdmin(ModelAdminBasics):
         return False
 
 
+class MatchingOnFilter(admin.SimpleListFilter):
+    title = "Matching On"
+    parameter_name = "field"
+
+    def lookups(self, request, model_admin):
+        return [("c_hgvs", "c.HGVS"), ("g_hgvs", "g.HGVS")]
+
+    def queryset(self, request, queryset: QuerySet[ImportedAlleleInfo]):
+        if self.value() == "c_hgvs":
+            queryset = queryset.filter(c_hgvs__isnull=False)
+        elif self.value() == "g_hgvs":
+            queryset = queryset.filter(g_hgvs__isnull=False)
+
+        return queryset
+
+
 @admin.register(ImportedAlleleInfo)
 class ImportedAlleleInfoAdmin(ModelAdminBasics):
     list_display = (
-        "imported_c_hgvs",
+        "imported_hgvs",
         "imported_genome_build_patch_version",
         "grch37",
         "grch38"
     )
     list_filter = ('imported_genome_build_patch_version', )
+    search_fields = ('imported_c_hgvs', 'imported_g_hgvs')
+
+    @admin_list_column("Imported HGVS", "imported_c_hgvs")
+    def imported_hgvs(self, obj: ImportedAlleleInfo):
+        return obj.imported_c_hgvs or obj.imported_g_hgvs
 
     def has_add_permission(self, request):
         return False
