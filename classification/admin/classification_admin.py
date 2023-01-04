@@ -649,9 +649,9 @@ class MatchingOnFilter(admin.SimpleListFilter):
 
     def queryset(self, request, queryset: QuerySet[ImportedAlleleInfo]):
         if self.value() == "c_hgvs":
-            queryset = queryset.filter(c_hgvs__isnull=False)
+            queryset = queryset.filter(imported_c_hgvs__isnull=False)
         elif self.value() == "g_hgvs":
-            queryset = queryset.filter(g_hgvs__isnull=False)
+            queryset = queryset.filter(imported_g_hgvs__isnull=False)
 
         return queryset
 
@@ -664,7 +664,7 @@ class ImportedAlleleInfoAdmin(ModelAdminBasics):
         "grch37",
         "grch38"
     )
-    list_filter = ('imported_genome_build_patch_version', )
+    list_filter = ('imported_genome_build_patch_version', MatchingOnFilter)
     search_fields = ('imported_c_hgvs', 'imported_g_hgvs')
 
     @admin_list_column("Imported HGVS", "imported_c_hgvs")

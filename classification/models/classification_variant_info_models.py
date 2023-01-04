@@ -67,13 +67,10 @@ class ResolvedVariantInfo(TimeStampedModel):
         self.sort_string = None
 
         self.variant = variant
-
         genome_build = self.genome_build
-        c_hgvs_obj = self.allele_info.imported_c_hgvs_obj
-
         self.genomic_sort = variant.sort_string
 
-        imported_transcript = c_hgvs_obj.transcript
+        imported_transcript = self.allele_info.get_transcript
 
         hgvs_matcher = HGVSMatcher(genome_build=genome_build)
         try:
@@ -110,11 +107,6 @@ class ResolvedVariantInfo(TimeStampedModel):
         return variant_info
 
 
-class ImportedAlleleFieldType(TextChoices):
-    C_HGVS = "c_hgvs"
-    G_HGVS = "g_hgvs"
-
-
 class ImportedAlleleInfo(TimeStampedModel):
     """
     This class exists to give quick access to GRCh 37 and 38 details to a classification
@@ -128,6 +120,11 @@ class ImportedAlleleInfo(TimeStampedModel):
     """
 
     imported_g_hgvs = TextField(null=True, blank=True)
+
+    imported_transcript = TextField(null=True, blank=True)
+    """
+    Only needed if we're using g.hgvs
+    """
 
     imported_genome_build_patch_version = ForeignKey(GenomeBuildPatchVersion, null=True, blank=True, on_delete=CASCADE)
     """
@@ -145,14 +142,21 @@ class ImportedAlleleInfo(TimeStampedModel):
     """ cached reference to 38, so can quickly refer to classification__allele_info__grch38__c_hgvs for example """
 
     class Meta:
-        unique_together = ('imported_c_hgvs', 'imported_g_hgvs', 'imported_genome_build_patch_version')
+        unique_together = ('imported_c_hgvs', 'imported_g_hgvs', 'imported_transcript', 'imported_genome_build_patch_version')
 
     @property
     def imported_c_hgvs_obj(self) -> CHGVS:
         return CHGVS(self.imported_c_hgvs)
 
+    @property
+    def get_transcript(self) -> str:
+        if self.imported_transcript:
+            return self.imported_transcript
+        elif self.imported_c_hgvs:
+            return CHGVS(self.imported_c_hgvs).transcript
+
     def __str__(self) -> str:
-        return f"{self.imported_genome_build_patch_version} {self.imported_c_hgvs}"
+        return f"{self.imported_genome_build_patch_version} {self.imported_c_hgvs or self.imported_g_hgvs}"
 
     @staticmethod
     def __genome_build_to_attr(genome_build: GenomeBuild) -> str:

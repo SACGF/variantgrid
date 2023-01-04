@@ -845,6 +845,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 fields["imported_c_hgvs"] = c_hgvs
             elif g_hgvs := self.imported_g_hgvs:
                 fields["imported_g_hgvs"] = g_hgvs
+                fields["imported_transcript"] = self.transcript
 
             allele_info, _ = ImportedAlleleInfo.objects.get_or_create(**fields)
             self.allele_info = allele_info
