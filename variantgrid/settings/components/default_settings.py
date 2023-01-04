@@ -489,6 +489,11 @@ VARIANT_CLASSIFICATION_MAX_REFERENCE_LENGTH = 100  # Used for MVL export, genera
 VARIANT_CLASSIFICATION_REDCAP_EXPORT = True
 VARIANT_CLASSIFICATION_NON_ACMG_ASSERTION_METHOD = None  # when calculating ACMG points, even if we have ACMG criteria, are they a little too trnaslated to be useful
 
+VARIANT_CLASSIFICATION_ALLOW_DELETE = True
+"""
+Is a hard-delete offered to classification owners (if false admins will have to delete from admin screen)
+"""
+
 ONTOLOGY_EXTERNAL_LINKS = False  # Generate external or internal links for ontology terms
 
 PATHOLOGY_TESTS_ENABLED = False

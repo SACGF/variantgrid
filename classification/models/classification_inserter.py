@@ -118,6 +118,11 @@ class BulkClassificationInserter:
                 share_level = None
 
             delete_value = data.pop('delete', None)
+            # delete can be
+            # True : delete (or withdraw if shared)
+            # False : unwithdraw
+            # "withdraw": (withdraw regardless of share level)
+            requested_withdraw = delete_value == "withdraw"
             requested_delete = delete_value is True
             requested_undelete = delete_value is False
 
@@ -148,7 +153,7 @@ class BulkClassificationInserter:
                         operation_data = op_data or {}
 
             # if we're deleting, don't do anything else
-            if requested_delete:
+            if requested_delete or requested_withdraw:
                 operation = None
                 operation_data = None
                 share_level = None
@@ -263,7 +268,7 @@ class BulkClassificationInserter:
                 patch_response.append_warning(code="unexpected_parameters", message=f"Unexpected parameters {data}")
 
             if save:
-                if requested_delete:
+                if requested_delete or requested_withdraw:
                     # deleting or withdrawing
                     record.check_can_write(user)
 
@@ -277,7 +282,8 @@ class BulkClassificationInserter:
 
                     patch_response.classification_json = record.as_json(params)
 
-                    if record.share_level_enum >= ShareLevel.ALL_USERS:
+                    if record.share_level_enum >= ShareLevel.ALL_USERS or requested_withdraw:
+                        # withdraw if shared or if only asking for withdraw
                         patch_response.status = ClassificationPatchStatus.WITHDRAWN if not record.withdrawn else ClassificationPatchStatus.NO_CHANGE
                         record.set_withdrawn(user=user, withdraw=True)
                         patch_response.withdrawn = True

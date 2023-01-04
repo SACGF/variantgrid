@@ -339,7 +339,8 @@ def view_classification(request: HttpRequest, classification_id: str):
         'existing_files': existing_files,
         'other_classifications_summary': other_classifications_summary,
         'report_enabled': ClassificationReportTemplate.objects.filter(name=ReportNames.DEFAULT_REPORT).exclude(template__iexact='').exists(),
-        'attachments_enabled': settings.VARIANT_CLASSIFICATION_FILE_ATTACHMENTS
+        'attachments_enabled': settings.VARIANT_CLASSIFICATION_FILE_ATTACHMENTS,
+        'delete_enabled': settings.VARIANT_CLASSIFICATION_ALLOW_DELETE
     }
     return render(request, 'classification/classification.html', context)
 

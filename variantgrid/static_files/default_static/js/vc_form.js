@@ -191,13 +191,13 @@ const VCForm = (function() {
                     window.alert(`Unwithdraw aborted`);
                 }
             } else {
-                let is_withdraw = this.record.publish_level === 'logged_in_users' || this.record.publish_level === 'public';
+                let is_withdraw = this.record.publish_level === 'logged_in_users' || this.record.publish_level === 'public' || !this.deleteEnabled;
                 let mode = is_withdraw ? "withdraw" : "delete";
                 let confirmed = false;
                 confirmed = window.prompt(`Are you sure you wish to ${mode} this record? Please type "${mode}" to confirm.`);
                 
                 if (confirmed && confirmed.toLowerCase() === mode) {
-                    this.deleteRequest = true;
+                    this.deleteRequest = is_withdraw ? "withdraw" : true;
                     this.dataUpdated();
                 } else {
                     window.alert(`${mode} aborted`);
@@ -373,7 +373,8 @@ const VCForm = (function() {
                 butt.removeClass('btn-danger');
                 butt.addClass('btn-secondary');
             } else if (this.record.publish_level === 'logged_in_users' ||
-                this.record.publish_level === 'public') {
+                this.record.publish_level === 'public' ||
+                !this.deleteEnabled) {
                 //butt.attr('title', 'Cannot delete classification after it has been shared with logged in users or 3rd parties');
                 //butt = disableButton(butt);
                 butt.attr('title', 'Withdraw Classification');
@@ -660,7 +661,7 @@ const VCForm = (function() {
                 envelope['publish'] = this.publish_level;
             }
             if (this.deleteRequest) {
-                envelope['delete'] = true;
+                envelope['delete'] = this.deleteRequest;
             } else if (this.undeleteRequest) {
                 envelope['delete'] = false;
             }
@@ -1102,6 +1103,7 @@ const VCForm = (function() {
             
             this.otherClassificationsSummary = params.otherClassificationsSummary;
             this.reportEnabled = params.reportEnabled;
+            this.deleteEnabled = params.deleteEnabled;
 
             this.initData(record);
             // Create the sections

@@ -41,7 +41,9 @@ DISCORDANCE_ENABLED = True
 DISCORDANCE_EMAIL = '"Shariant Updates" <updates@shariant.org.au>'
 ACCOUNTS_EMAIL = 'accounts@shariant.org.au'
 SEND_EMAILS = True
+
 VARIANT_CLASSIFICATION_NEW_GROUPING = True
+VARIANT_CLASSIFICATION_ALLOW_DELETE = False
 VARIANT_CLASSIFICATION_NON_ACMG_ASSERTION_METHOD = [
     re.compile(r'.*VCGS.*', flags=re.IGNORECASE),
     re.compile(r'.*Sherloc.*', flags=re.IGNORECASE)
