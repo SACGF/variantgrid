@@ -83,6 +83,12 @@
                     <h3>PanelApp Panels</h3>
                     <div>
                         <div class="fieldWrapper">
+                            {{ form.min_panel_app_confidence.errors }}
+                            <label for="{{ form.min_panel_app_confidence.id_for_label }}">Min PanelApp Confidence:</label>
+                            {{ form.min_panel_app_confidence }}
+                        </div>
+
+                        <div class="fieldWrapper">
                             {{ form.panel_app_panel_aus.errors }}
                             <label for="{{ form.panel_app_panel_aus.id_for_label }}">PanelApp Australia:</label>
                             {{ form.panel_app_panel_aus }}

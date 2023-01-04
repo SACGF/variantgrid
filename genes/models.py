@@ -38,12 +38,12 @@ from lazy import lazy
 from requests import RequestException
 
 from genes.gene_coverage import load_gene_coverage_df
-from genes.models_enums import AnnotationConsortium, HGNCStatus, GeneSymbolAliasSource, MANEStatus
+from genes.models_enums import AnnotationConsortium, HGNCStatus, GeneSymbolAliasSource, MANEStatus, PanelAppConfidence
 from library.constants import HOUR_SECS, WEEK_SECS, MINUTE_SECS
 from library.django_utils import SortByPKMixin
 from library.django_utils.django_partition import RelatedModelsPartitionModel
 from library.utils.file_utils import mk_path
-from library.guardian_utils import assign_permission_to_user_and_groups, DjangoPermission
+from library.guardian_utils import assign_permission_to_user_and_groups, DjangoPermission, admin_bot
 from library.log_utils import log_traceback
 from library.utils import get_single_element, iter_fixed_chunks
 from snpdb.models import Wiki, Company, Sample, DataState
@@ -1742,7 +1742,6 @@ def create_fake_gene_list(*args, **kwargs):
 
 
 class GeneListGeneSymbol(models.Model):
-    """ Replacement for GeneListGene - will keep both in place during switchover """
     gene_list = models.ForeignKey(GeneList, on_delete=CASCADE)
     original_name = models.TextField(null=True, blank=True)
     gene_symbol = models.ForeignKey(GeneSymbol, null=True, on_delete=CASCADE)
@@ -1873,6 +1872,10 @@ class PanelAppPanel(TimeStampedModel):
         unique_together = ('server', 'panel_id')
 
     @property
+    def url(self) -> str:
+        return f"{self.server.url}/api/v1/panels/{self.panel_id}"
+
+    @property
     def cache_valid(self) -> bool:
         # Attempt to use cache if recent and present, otherwise fall through and do a query
         max_age = timedelta(days=settings.PANEL_APP_CACHE_DAYS)
@@ -1890,16 +1893,58 @@ class PanelAppPanelRelevantDisorders(models.Model):
         unique_together = ('panel_app_panel', 'name')
 
 
-class PanelAppPanelLocalCacheGeneList(TimeStampedModel):
+class PanelAppPanelLocalCache(TimeStampedModel):
     panel_app_panel = models.ForeignKey(PanelAppPanel, on_delete=CASCADE)
     version = models.TextField()
-    gene_list = models.ForeignKey(GeneList, on_delete=CASCADE)
 
     class Meta:
         unique_together = ("panel_app_panel", "version")
 
+    def get_gene_list(self, panel_app_confidence) -> GeneList:
+        from genes.gene_matching import GeneSymbolMatcher
+
+        min_level = int(panel_app_confidence)
+        name = f"{self.panel_app_panel.name} v.{self.version}.min_{min_level}"
+
+        # We'll try to re-use gene lists - but it's possible due to race conditions we may occasionally make
+        # a duplicate, but this should work fine and won't affect much
+        category = GeneListCategory.get_or_create_category(GeneListCategory.PANEL_APP_CACHE, hidden=True)
+        gene_list_kwargs = {
+            "category": category,
+            "name": name,
+            "user": admin_bot(),
+            "import_status": ImportStatus.SUCCESS,
+            "url": self.panel_app_panel.url,
+        }
+        if gene_list := GeneList.objects.filter(**gene_list_kwargs).order_by("pk").first():
+            print(f"Reused existing gene list: {gene_list.pk}")
+        else:
+            gene_list = GeneList.objects.create(**gene_list_kwargs)
+            print(f"Created gene list: {gene_list.pk}")
+            gene_names_list = []
+            for pap_lc_gs in self.panelapppanellocalcachegenesymbol_set.all():
+                confidence_level = int(pap_lc_gs.data["confidence_level"])
+                if confidence_level >= min_level:
+                    gene_symbol = pap_lc_gs.data["gene_data"]["gene_symbol"]
+                    gene_names_list.append(gene_symbol)
+
+            print(f"Creating symbols: {gene_names_list}")
+            gene_matcher = GeneSymbolMatcher()
+            gene_matcher.create_gene_list_gene_symbols(gene_list, gene_names_list)
+            gene_list.import_status = ImportStatus.SUCCESS
+            gene_list.save()
+
+        print(f"Returning gene list: {gene_list.pk}")
+        return gene_list
+
     def __str__(self):
-        return f"PanelApp GeneList cache for {self.panel_app_panel} v{self.version} (mod: {self.modified})"
+        return f"PanelApp cache for {self.panel_app_panel} v{self.version} (mod: {self.modified})"
+
+
+class PanelAppPanelLocalCacheGeneSymbol(models.Model):
+    panel_app_local_cache = models.ForeignKey(PanelAppPanelLocalCache, on_delete=CASCADE)
+    gene_symbol = models.ForeignKey(GeneSymbol, on_delete=CASCADE)
+    data = models.JSONField(null=False, blank=True, default=dict)  # API response
 
 
 class CachedThirdPartyGeneList(models.Model):
