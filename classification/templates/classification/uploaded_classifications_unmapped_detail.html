@@ -16,28 +16,7 @@
     {% if record.validation_list %}
         {% if in_progress %}<p class="text-info">Full validation details are available when the import has completed.</p>
         {% else %}
-            <a class="toggle-link" data-toggle="collapse" href="#validation-details">Toggle Full Validation Details</a>
-            <div id="validation-details" class="collapse">
-                {% if record.validation_includes_json %}
-                <p class="text-info mt-2">Note that for Alissa files source number refers to the ID of the MVL entry.</p>
-                {% endif %}
-                <table class="table">
-                    <tr>
-                        <th>Source</th>
-                        <th>Category</th>
-                        <th>Message</th>
-                    </tr>
-                    <tbody>
-                        {% for validation_row in record.validation_list_objs %}
-                            <tr>
-                                <td>{{ validation_row.filename_line_number }}</td>
-                                <td>{{ validation_row.severity | severity_icon}} {{ validation_row.category }}</td>
-                                <td>{{ validation_row.message }}</td>
-                            </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
+            <a class="toggle-link" data-toggle="ajax-collapse" href="{% url 'classification_upload_unmapped_status_validation_detail' record.pk %}" title="Full Validation Detail"></a>
         {% endif %}
     {% endif %}
     {% if import_runs %}

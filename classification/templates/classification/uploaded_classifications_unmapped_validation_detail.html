@@ -1,0 +1,24 @@
+{% load ui_utils %}
+{% if record.validation_includes_json %}
+<p class="text-info mt-2">Note that for Alissa files source number refers to the ID of the MVL entry.</p>
+{% endif %}
+{% if record.validation_list_obj %}
+    <table class="table">
+        <tr>
+            <th>Source</th>
+            <th>Category</th>
+            <th>Message</th>
+        </tr>
+        <tbody>
+            {% for validation_row in record.validation_list_objs %}
+                <tr>
+                    <td>{{ validation_row.filename_line_number }}</td>
+                    <td>{{ validation_row.severity | severity_icon}} {{ validation_row.category }}</td>
+                    <td>{{ validation_row.message }}</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% else %}
+    <p class="no-value">{{'s' | severity_icon}} There are no validation messages</p>
+{% endif %}

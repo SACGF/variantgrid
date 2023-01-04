@@ -31,7 +31,8 @@ from classification.views.imported_allele_info_view import view_imported_allele_
 from classification.views.views import classification_import_tool, AutopopulateView
 from classification.views.views_uploaded_classifications_unmapped import UploadedClassificationsUnmappedView, \
     UploadedClassificationsUnmappedColumns, download_classification_unmapped_file, \
-    view_uploaded_classification_unmapped, view_uploaded_classification_unmapped_detail
+    view_uploaded_classification_unmapped, view_uploaded_classification_unmapped_detail, \
+    view_uploaded_classification_unmapped_validation_detail
 from snpdb.views.datatable_view import DatabaseTableView
 from variantgrid.perm_path import perm_path
 
@@ -54,6 +55,7 @@ urlpatterns = [
     # TODO move file lab into another subfolder as it gets a bit confused with upload page
     perm_path('classification/import_upload/file/<int:uploaded_classification_unmapped_id>', view_uploaded_classification_unmapped, name="classification_upload_unmapped_status"),
     perm_path('classification/import_upload/file/<int:uploaded_classification_unmapped_id>/detail', view_uploaded_classification_unmapped_detail, name="classification_upload_unmapped_status_detail"),
+    perm_path('classification/import_upload/file/<int:uploaded_classification_unmapped_id>/validation_detail', view_uploaded_classification_unmapped_validation_detail, name="classification_upload_unmapped_status_validation_detail"),
     perm_path('classification/import_upload/datatable', DatabaseTableView.as_view(column_class=UploadedClassificationsUnmappedColumns), name='classification_upload_unmapped_datatable'),
     perm_path('classification/import_upload/download/<int:uploaded_classification_unmapped_id>', download_classification_unmapped_file, name='classification_upload_unmapped_download'),
     perm_path('classification/import_upload/<str:lab_id>', UploadedClassificationsUnmappedView.as_view(), name="classification_upload_unmapped_lab"),

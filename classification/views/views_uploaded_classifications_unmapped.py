@@ -75,7 +75,7 @@ def view_uploaded_classification_unmapped(request: HttpRequest, uploaded_classif
 def view_uploaded_classification_unmapped_detail(request: HttpRequest, uploaded_classification_unmapped_id: int):
     user = request.user
     record = UploadedClassificationsUnmapped.objects.filter(pk=uploaded_classification_unmapped_id).filter(
-        lab__in=Lab.valid_labs_qs(user, admin_check=True)).first()
+        lab__in=Lab.valid_labs_qs(user, admin_check=True)).defer('validation_list').first()
     if not record:
         raise PermissionDenied("You do not have access to this file")
     in_progress = record.status not in {
@@ -97,6 +97,15 @@ def view_uploaded_classification_unmapped_detail(request: HttpRequest, uploaded_
         # data is still being processed, we should continue to reload this page
         http_response['Auto-refresh'] = str(5000)  # auto-refresh in 5 seconds
     return http_response
+
+
+def view_uploaded_classification_unmapped_validation_detail(request: HttpRequest, uploaded_classification_unmapped_id: int):
+    user = request.user
+    record = UploadedClassificationsUnmapped.objects.filter(pk=uploaded_classification_unmapped_id).filter(
+        lab__in=Lab.valid_labs_qs(user, admin_check=True))
+    if not record:
+        raise PermissionDenied("You do not have access to this file")
+    return render(request, 'classification/uploaded_classifications_unmapped_validation_detail.html', {"record": record})
 
 
 @dataclass
