@@ -151,7 +151,6 @@ class DiscordanceReport(TimeStampedModel):
 
         lazy.invalidate(self, 'discordance_report_classifications')
         lazy.invalidate(self, 'involved_labs')
-        lazy.invalidate(self, 'all_actively_involved_labs')
 
         # contents of existing_vms are now presumably records that changed clinical groupings
 
