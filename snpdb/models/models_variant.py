@@ -1,6 +1,7 @@
 import collections
 import logging
 import re
+from dataclasses import dataclass
 from typing import Optional, Pattern, Tuple, Iterable, Set, Union, Dict, Any
 
 import django.dispatch
@@ -249,8 +250,23 @@ class AlleleMergeLog(TimeStampedModel):
     message = models.TextField(null=True)
 
 
-VariantCoordinate = collections.namedtuple('VariantCoordinate', 'chrom pos ref alt')
+@dataclass(frozen=True)
+class VariantCoordinate:
+    chrom: str
+    pos: int
+    ref: str
+    alt: str
 
+    def __iter__(self):
+        return iter([self.chrom, self.pos, self.ref, self.alt])
+
+    def __str__(self):
+        return f"{self.chrom}:{self.pos} {self.ref}>{self.alt}"
+
+    @staticmethod
+    def from_clean_str(clean_str: str):
+        if full_match := VARIANT_PATTERN.fullmatch(clean_str):
+            return VariantCoordinate(chrom=full_match.group(1), pos=int(full_match.group(2)), ref=full_match.group(3), alt=full_match.group(4))
 
 class Sequence(models.Model):
     """

@@ -462,6 +462,18 @@ class FakeTranscriptVersion:
         return f"{self.transcript_id}.{self.version}"
 
 
+@dataclass(frozen=True)
+class VariantCoordinateAndDetails:
+    variant_coordinate: VariantCoordinate
+    transcript_accession: str
+    kind: str
+    method: str
+
+    def __iter__(self):
+        # just exists so we can deconstruct for backwards compatibility when this was just done in a tuple
+        return iter([self.variant_coordinate, self.used_transcript_accession, self.kind, self.method])
+
+
 class HGVSMatcher:
     TRANSCRIPT_NO_UNDERSCORE = re.compile(r"(NM|NC)(\d+)")
     TRANSCRIPT_UNDERSCORE_REPLACE = r"\g<1>_\g<2>"
@@ -684,8 +696,7 @@ class HGVSMatcher:
         sort_key = self._get_sort_key_transcript_version_and_methods(version, prefer_pyhgvs=prefer_pyhgvs, closest=closest)
         return sorted(tv_and_method, key=sort_key)
 
-    def get_variant_tuple_used_transcript_kind_and_method(self, hgvs_string: str) -> \
-            Tuple[VariantCoordinate, str, str, str]:
+    def get_variant_tuple_used_transcript_kind_and_method(self, hgvs_string: str) -> VariantCoordinateAndDetails:
         """ Returns variant_tuple and method for HGVS resolution = """
 
         used_transcript_accession = None
@@ -759,7 +770,12 @@ class HGVSMatcher:
 
         if Variant.is_ref_alt_reference(ref, alt):
             alt = Variant.REFERENCE_ALT
-        return VariantCoordinate(chrom, position, ref, alt), used_transcript_accession, kind, method
+        return VariantCoordinateAndDetails(
+            variant_coordinate=VariantCoordinate(chrom, position, ref, alt),
+            transcript_accession=used_transcript_accession,
+            kind=kind,
+            method=method
+        )
 
     def _get_hgvs_and_pyhgvs_transcript(self, hgvs_string: str):
         hgvs_name = HGVSName(hgvs_string)
