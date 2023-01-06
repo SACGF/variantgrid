@@ -10,6 +10,7 @@ from classification.models.classification import ClassificationImport, Classific
 from classification.models.classification_import_run import ClassificationImportRun
 from classification.tasks.classification_import_process_variants_task import ClassificationImportProcessVariantsTask
 from library.django_utils.django_file_utils import get_import_processing_dir
+from library.log_utils import report_exc_info
 from library.utils import full_class_name
 from library.genomics.vcf_utils import write_vcf_from_tuples
 from snpdb.models import Variant, ImportSource
@@ -163,12 +164,12 @@ def reattempt_variant_matching(user: User, queryset: QuerySet[Classification]) -
                     imports_by_genome[genome_build.pk] = ClassificationImport.objects.create(user=user,
                                                                                              genome_build=genome_build)
                 vc_import = imports_by_genome[genome_build.pk]
-                vc.set_variant(variant=None, message='Admin has re-triggered variant matching')
-                vc.classification_import = vc_import
+                vc.set_variant_prepare_for_rematch(vc_import)
                 vc.save()
                 valid_this_loop += 1
 
             except BaseException:
+                report_exc_info()  # temporary until we're sure we're not responsible for all of this
                 invalid_record_count += 1
 
             if valid_this_loop >= max_size:

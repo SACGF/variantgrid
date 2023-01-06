@@ -884,9 +884,10 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         self._apply_allele_info_to_classification()
         return allele_info.status in {ImportedAlleleInfoStatus.MATCHED_ALL_BUILDS, ImportedAlleleInfoStatus.FAILED}
 
-    def set_variant_prepare_for_rematch(self):
+    def set_variant_prepare_for_rematch(self, classification_import: ClassificationImport):
         self.variant = None
         self.allele = None
+        self.classification_import = classification_import
 
     def set_variant_failed_matching(self, message: Optional[str] = None):
         if allele_info := self.ensure_allele_info():
