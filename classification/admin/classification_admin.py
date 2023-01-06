@@ -671,13 +671,14 @@ class ImportedAlleleInfoAdmin(ModelAdminBasics):
     @admin_action("Re-Match - via linked classifications")
     def re_match(self, request, queryset: QuerySet[ImportedAlleleInfo]):
         classifications = Classification.objects.filter(allele_info__in=queryset)
+        self.message_user(request, f'Found : {classifications.count()} linked classifications')
         valid_record_count, invalid_record_count = reattempt_variant_matching(request.user, queryset)
         if invalid_record_count:
             self.message_user(request, f'Records with missing or invalid builds/coordinates : {invalid_record_count}')
         self.message_user(request, f'Classification Records re-matching : {valid_record_count}')
 
-    @admin_action("Update VariantClassification")
-    def re_match(self, request, queryset: QuerySet[ImportedAlleleInfo]):
+    @admin_action("Update Variant Coordinate")
+    def update_variant_coordinate(self, request, queryset: QuerySet[ImportedAlleleInfo]):
         for allele_info in queryset:
             allele_info.update_variant_coordinate()
             allele_info.update_status()
