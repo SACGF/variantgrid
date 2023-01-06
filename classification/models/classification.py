@@ -852,12 +852,16 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             self.allele_info = allele_info
         return self.allele_info
 
-    def update_allele_info_from_classification(self, force_update: bool = False):
+    def update_allele_info_from_classification(self, force_update: bool = False) -> bool:
         """
         Semi-deprecated, only useful if setting variant or allele on the classification manually in tests (to avoid all the flag stuff)
         or when migrating to the use of allele_info in the first place
         Update the allele_info with the data already set on the classification
         """
+        if self.allele_info:
+            if not force_update and self.allele_info.status == ImportedAlleleInfoStatus.MATCHED_ALL_BUILDS:
+                return False
+
         if allele_info := self.ensure_allele_info():
             allele_info.update_variant_coordinate()  # only need this for systems that were migrated when half of the AlleleInfo was done
             allele_info.update_status()
@@ -866,6 +870,9 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 return
             if matched_variant := self.variant:
                 allele_info.update_and_save(matched_variant, force_update=force_update)
+            return True
+        else:
+            return False
 
     def attempt_set_variant_info_from_pre_existing_imported_allele_info(self) -> bool:
         """
