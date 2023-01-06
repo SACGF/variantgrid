@@ -676,6 +676,13 @@ class ImportedAlleleInfoAdmin(ModelAdminBasics):
             self.message_user(request, f'Records with missing or invalid builds/coordinates : {invalid_record_count}')
         self.message_user(request, f'Classification Records re-matching : {valid_record_count}')
 
+    @admin_action("Update VariantClassification")
+    def re_match(self, request, queryset: QuerySet[ImportedAlleleInfo]):
+        for allele_info in queryset:
+            allele_info.update_variant_coordinate()
+            allele_info.update_status()
+            allele_info.save()
+
     def has_add_permission(self, request):
         return False
 
