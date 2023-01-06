@@ -288,7 +288,7 @@ class ClassificationAdmin(ModelAdminBasics):
         valid_record_count, invalid_record_count = reattempt_variant_matching(request.user, queryset)
         if invalid_record_count:
             self.message_user(request, f'Records with missing or invalid builds/coordinates : {invalid_record_count}')
-        self.message_user(request, f'Records revalidating : {valid_record_count}')
+        self.message_user(request, f'Records re-matching : {valid_record_count}')
 
     @admin_action("Matching: Re-Calculate c.hgvs, transcripts")
     def recalculate_cached_chgvs(self, request, queryset: QuerySet[Classification]):
@@ -667,6 +667,14 @@ class ImportedAlleleInfoAdmin(ModelAdminBasics):
     @admin_list_column("Imported HGVS", "imported_c_hgvs")
     def imported_hgvs(self, obj: ImportedAlleleInfo):
         return obj.imported_c_hgvs or obj.imported_g_hgvs
+
+    @admin_action("Re-Match - via linked classifications")
+    def re_match(self, request, queryset: QuerySet[ImportedAlleleInfo]):
+        classifications = Classification.objects.filter(allele_info__in=queryset)
+        valid_record_count, invalid_record_count = reattempt_variant_matching(request.user, queryset)
+        if invalid_record_count:
+            self.message_user(request, f'Records with missing or invalid builds/coordinates : {invalid_record_count}')
+        self.message_user(request, f'Classification Records re-matching : {valid_record_count}')
 
     def has_add_permission(self, request):
         return False

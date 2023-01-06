@@ -3,7 +3,7 @@
     {% for diff_text in c_hgvses %}
         {% labelled label=diff_text.identifier value_css="text-monospace" %}{{ diff_text.html }}{% endlabelled %}
     {% endfor %}
-    {% labelled label="Normalised Variant Coordinate" value_css="text-monospace" %}{{ allele_info.variant_coordinate }}{% endlabelled %}
+    {% labelled label="Normalised Variant Coordinate (in imported Genome Build)" value_css="text-monospace" %}{{ allele_info.variant_coordinate }}{% endlabelled %}
     {% if allele_info.message %}
         {% labelled label="Note" %}{{ allele_info.message }}{% endlabelled %}
     {% endif %}
