@@ -833,8 +833,8 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         if not self.allele_info:
             try:
                 genome_build_patch_version = self.get_genome_build_patch_version()
-            except ValueError:
-                # no allele info if can't derive a genome build
+            except Exception:
+                # no allele info if we can't derive a genome build
                 self.allele_info: Optional[ImportedAlleleInfo] = None
                 return
 
