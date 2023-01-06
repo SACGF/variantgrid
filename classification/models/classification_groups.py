@@ -1,9 +1,9 @@
 from dataclasses import dataclass
+from functools import cached_property
 from itertools import groupby
 from typing import Optional, List, Iterable, TypeVar, Generic, Set, Dict
 
 from django.contrib.auth.models import User
-from lazy import lazy
 
 from classification.enums import SpecialEKeys, CriteriaEvaluation, ShareLevel
 from classification.models import ClassificationModification, EvidenceKeyMap, CuratedDate, ConditionResolved, \
@@ -54,7 +54,7 @@ class ClassificationGroupEntry:
     def clin_sig(self):
         return self.modification.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
 
-    @lazy
+    @cached_property
     def c_hgvs(self):
         return ClassificationGroup.c_hgvs_for(self.modification, self.genome_build)
 
@@ -65,7 +65,7 @@ class ClassificationGroupEntry:
                 return "A" + (resolved.terms[0].name or resolved.terms[0].id).lower()
         return "Z" + (self.modification.get(SpecialEKeys.CONDITION) or "").lower()
 
-    @lazy
+    @cached_property
     def grouping_key(self):
         clin_sig_sorter = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE).classification_sorter_value
         return (
@@ -99,7 +99,7 @@ class ClassificationGroupUtils:
         self._old_modifications = old_modifications
         self.calculate_pending = calculate_pending
 
-    @lazy
+    @cached_property
     def _pending_changes_flag_map(self) -> Dict[int, str]:
         mod_id_to_clin_sig: Dict[int, str] = {}
 
@@ -116,7 +116,7 @@ class ClassificationGroupUtils:
 
         return mod_id_to_clin_sig
 
-    @lazy
+    @cached_property
     def _classification_to_old_clin_sig(self) -> Dict[int, str]:
         old_ids: Dict[int, str] = {}
         if self._old_modifications:
@@ -183,7 +183,7 @@ class ClassificationGroup:
         self.sort_order = 0  # override this once we've sorted all classifications together
         # for the sake of a JavaScript sort
 
-    @lazy
+    @cached_property
     def clinical_significance_score(self):
         sorter = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE).classification_sorter_value
         return sorter(self.clinical_significance_pending if self.clinical_significance_pending else self.clinical_significance)
@@ -265,14 +265,14 @@ class ClassificationGroup:
                 pass
         return c_parts
 
-    @lazy
+    @cached_property
     def c_hgvses(self) -> List[CHGVS]:
         unique_c = set()
         for ge in self.group_entries:
             unique_c.add(ge.c_hgvs)
         return sorted(unique_c)
 
-    @lazy
+    @cached_property
     def variant_sort(self) -> str:
         return self.c_hgvs.sort_str
         # genome_build = GenomeBuildManager.get_current_genome_build()
@@ -285,7 +285,7 @@ class ClassificationGroup:
     def c_hgvs(self) -> CHGVS:
         return self.c_hgvses[0]
 
-    @lazy
+    @cached_property
     def flag_types(self) -> List[List[str]]:
         FLAG_TYPES = [
             classification_flag_types.matching_variant_flag,
@@ -312,7 +312,7 @@ class ClassificationGroup:
     def count(self) -> int:
         return len(self.modifications)
 
-    @lazy
+    @cached_property
     def acmg_criteria(self) -> MultiValues[CriteriaStrength]:
 
         def criteria_converter(cm: ClassificationModification) -> Set[CriteriaStrength]:
@@ -336,15 +336,15 @@ class ClassificationGroup:
         all_values.sort()
         return all_values
 
-    @lazy
+    @cached_property
     def zygosities(self) -> List[str]:
         return self._evidence_key_set(SpecialEKeys.ZYGOSITY)
 
-    @lazy
+    @cached_property
     def allele_origins(self) -> List[str]:
         return self._evidence_key_set(SpecialEKeys.ALLELE_ORIGIN)
 
-    @lazy
+    @cached_property
     def most_recent_curated(self) -> CuratedDate:
         return self.most_recent.curated_date_check
 

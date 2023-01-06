@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from enum import Enum
+from functools import cached_property
 from typing import List, Optional, Iterable, Set, Dict
 
 import django.dispatch
@@ -11,7 +12,6 @@ from django.db.models.query import QuerySet
 from django.dispatch.dispatcher import receiver
 from django.utils.timezone import now
 from django_extensions.db.models import TimeStampedModel
-from lazy import lazy
 
 from classification.enums import ShareLevel, SpecialEKeys
 from classification.enums.clinical_context_enums import ClinicalContextStatus
@@ -24,6 +24,7 @@ from flags.models.models import FlagsMixin, FlagCollection, FlagTypeContext, \
     flag_collection_extra_info_signal, FlagInfos
 from library.django_utils import get_url_from_view_path
 from library.log_utils import NotificationBuilder
+from library.utils import invalidate_cached_property
 from snpdb.models import Variant, Lab
 from snpdb.models.models_variant import Allele
 
@@ -293,13 +294,13 @@ class ClinicalContext(FlagsMixin, TimeStampedModel):
     def calculate_discordance_status(self) -> DiscordanceStatus:
         return DiscordanceStatus.calculate(self.classification_modifications, self.latest_report)
 
-    @lazy
+    @cached_property
     def discordance_status(self) -> DiscordanceStatus:
         # TODO this is awkwardly named as it calculates (at least the first time)
         # Need to distinguish between this and database cached is_discordant
         return DiscordanceStatus.calculate(self.classification_modifications, self.latest_report)
 
-    @lazy
+    @cached_property
     def relevant_classification_count(self) -> int:
         return len([vcm for vcm in self.classification_modifications if DiscordanceStatus.cs_buckets().get(vcm.get(SpecialEKeys.CLINICAL_SIGNIFICANCE))])
 
@@ -307,7 +308,7 @@ class ClinicalContext(FlagsMixin, TimeStampedModel):
         # WARNING: THIS IS APPLIES TO CACHED STATUS ONLY
         return self.status == ClinicalContextStatus.DISCORDANT
 
-    @lazy
+    @cached_property
     def latest_report(self) -> Optional['DiscordanceReport']:
         from classification.models import DiscordanceReport
         return DiscordanceReport.latest_report(self)
@@ -322,7 +323,7 @@ class ClinicalContext(FlagsMixin, TimeStampedModel):
         typically will be "Lab X submitted a new variant"
         :param cause_code: A finite list of codes as to what triggered the discordance
         """
-        lazy.invalidate(self, 'discordance_status')
+        invalidate_cached_property(self, 'discordance_status')
 
         old_status: ClinicalContextStatus = self.status
         new_status: ClinicalContextStatus = self.calculate_status()

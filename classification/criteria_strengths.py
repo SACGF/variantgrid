@@ -1,8 +1,8 @@
 from collections import defaultdict
 from dataclasses import dataclass
+from functools import cached_property
 from typing import Optional, Iterable, List, Union, Set, Dict
 from django.utils.safestring import SafeString
-from lazy import lazy
 from classification.enums import CriteriaEvaluation
 from library.utils import first
 
@@ -204,7 +204,7 @@ class CriteriaStrengths:
     def has_non_standard_strengths(self):
         return any(CriteriaEvaluation.POINTS.get(s.strength) is None for s in self.strengths if s.is_met)
 
-    @lazy
+    @cached_property
     def acmg_point_score(self) -> AcmgPointScore:
         has_unspecified = False
         if not self.has_criteria:

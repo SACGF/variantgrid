@@ -1,8 +1,8 @@
 from collections import defaultdict
+from functools import cached_property
 
 import numpy as np
 from django.db import connection
-from lazy import lazy
 from matplotlib import cm
 
 from library.utils.database_utils import get_queryset_select_from_where_parts
@@ -24,7 +24,7 @@ class HomozygosityPercentGraph(CacheableGraph):
         self.sample_id = sample_id
         self.cmap = cmap
 
-    @lazy
+    @cached_property
     def sample(self):
         return Sample.objects.get(pk=self.sample_id)
 

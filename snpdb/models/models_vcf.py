@@ -1,7 +1,7 @@
 import logging
 import operator
 from collections import namedtuple
-from functools import reduce
+from functools import cached_property, reduce
 from typing import Dict, List, Tuple
 
 from django.conf import settings
@@ -18,7 +18,6 @@ from django.shortcuts import get_object_or_404
 from django.urls.base import reverse
 from django_extensions.db.models import TimeStampedModel
 from guardian.shortcuts import get_objects_for_user
-from lazy import lazy
 
 from library.django_utils import SortByPKMixin
 from library.guardian_utils import DjangoPermission
@@ -87,7 +86,7 @@ class VCF(models.Model):
         verbose_name = 'VCF'
         verbose_name_plural = 'VCFs'
 
-    @lazy
+    @cached_property
     def has_filters(self):
         return self.vcffilter_set.exists()
 
@@ -165,7 +164,7 @@ class VCF(models.Model):
     def has_genotype(self):
         return self.genotype_samples > 0
 
-    @lazy
+    @cached_property
     def samples_by_vcf_name(self) -> Dict[str, 'Sample']:
         return {s.vcf_sample_name: s for s in self.sample_set.all()}
 
@@ -330,7 +329,7 @@ class Sample(SortByPKMixin, models.Model):
         for o in related_objects:
             o.all().delete()
 
-    @lazy
+    @cached_property
     def cohort_genotype_collection(self):
         return self.vcf.cohort.cohort_genotype_collection
 
@@ -413,7 +412,7 @@ class Sample(SortByPKMixin, models.Model):
         sample.check_can_view(user)
         return sample
 
-    @lazy
+    @cached_property
     def sequencing_run(self):
         try:
             return self.samplefromsequencingsample.sequencing_run

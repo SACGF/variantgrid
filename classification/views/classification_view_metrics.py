@@ -2,7 +2,7 @@ import operator
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import timedelta, datetime
-from functools import reduce
+from functools import cached_property, reduce
 from typing import Any, List, Callable, TypeVar, Generic, Optional
 
 from django.contrib.auth.models import User
@@ -12,7 +12,6 @@ from django.http import HttpRequest
 from django.http.response import HttpResponseBase
 from django.shortcuts import render
 from django.utils.timezone import now
-from lazy import lazy
 
 from classification.models import Classification, DiscordanceReport
 from eventlog.models import ViewEvent
@@ -28,7 +27,7 @@ class Counted(Generic[T]):
     count: int
     resolver: Optional[Callable[[Any], T]]
 
-    @lazy
+    @cached_property
     def resolve(self):
         if resolver := self.resolver:
             return resolver(self.pk)
@@ -67,7 +66,7 @@ class ViewEventCounts:
         exclude_admin = request.GET.get('exclude_admin') == "true" or not request.GET.get('exclude_admin')
         return ViewEventCounts(time_ago=time_ago, exclude_admin=exclude_admin)
 
-    @lazy
+    @cached_property
     def as_of(self) -> datetime:
         return now() - self.time_ago
 
@@ -106,23 +105,23 @@ class ViewEventCounts:
                 return "blank"
         return resolver
 
-    @lazy
+    @cached_property
     def classification_views(self) -> List[Counted[Classification]]:
         return self.count_field("classification_id", ViewEventCounts.resolver_for_model(Classification))
 
-    @lazy
+    @cached_property
     def discordance_report_views(self) -> List[Counted[Classification]]:
         return self.count_field("discordance_report_id", ViewEventCounts.resolver_for_model(DiscordanceReport))
 
-    @lazy
+    @cached_property
     def allele_views(self) -> List[Counted[Allele]]:
         return self.count_field("allele_id", ViewEventCounts.resolver_for_model(Allele))
 
-    @lazy
+    @cached_property
     def gene_symbol_views(self) -> List[Counted[GeneSymbol]]:
         return self.count_field("gene_symbol", ViewEventCounts.resolver_for_model(GeneSymbol))
 
-    @lazy
+    @cached_property
     def page_views(self) -> List[Counted[str]]:
         id_to_count = defaultdict(int)
         for values in ViewEvent.objects\
@@ -134,7 +133,7 @@ class ViewEventCounts:
 
         return sorted((Counted(pk, count, None) for pk, count in id_to_count.items()), reverse=True)
 
-    @lazy
+    @cached_property
     def active_users(self) -> List[Counted[str]]:
         id_to_count = defaultdict(int)
         for values in ViewEvent.objects \

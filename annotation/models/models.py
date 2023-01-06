@@ -3,6 +3,7 @@ import os
 import re
 from collections import defaultdict
 from datetime import datetime, timedelta
+from functools import cached_property
 from typing import List, Optional, Dict, Callable, Tuple
 
 from Bio import Entrez
@@ -17,7 +18,6 @@ from django.dispatch.dispatcher import receiver
 from django.utils import timezone
 from django.utils.timezone import localtime
 from django_extensions.db.models import TimeStampedModel
-from lazy import lazy
 from psqlextra.models import PostgresPartitionedModel
 from psqlextra.types import PostgresPartitioningMethod
 
@@ -353,7 +353,7 @@ class ColumnVEPField(models.Model):
             vif = self.get_vep_custom_display() + "_" + vif
         return vif
 
-    @lazy
+    @cached_property
     def columns_version_description(self) -> str:
         limits = []
         if self.min_vep_columns_version:
@@ -439,7 +439,7 @@ class VariantAnnotationVersion(SubVersionPartition):
             return {c: lambda d: float(d) >= pathogenic_rankscore for c in pathogenic_prediction_columns}
         raise ValueError(f"Don't know fields for {self.columns_version=}")
 
-    @lazy
+    @cached_property
     def damage_predictions_description(self) -> str:
         pathogenic_prediction = list(self.get_pathogenic_prediction_funcs())
         columns = ", ".join(pathogenic_prediction)
@@ -450,27 +450,27 @@ class VariantAnnotationVersion(SubVersionPartition):
             description = f"Count of {columns} that exceed {settings.ANNOTATION_MIN_PATHOGENIC_RANKSCORE}"
         return description
 
-    @lazy
+    @cached_property
     def _vep_config(self) -> Dict:
         return self.genome_build.settings["vep_config"]
 
-    @lazy
+    @cached_property
     def has_phastcons_30_way_mammalian(self) -> bool:
         return self._vep_config.get("phastcons30way")
 
-    @lazy
+    @cached_property
     def has_phylop_30_way_mammalian(self) -> bool:
         return self._vep_config.get("phylop30way")
 
-    @lazy
+    @cached_property
     def has_phastcons_46_way_mammalian(self) -> bool:
         return self._vep_config.get("phastcons46way")
 
-    @lazy
+    @cached_property
     def has_phylop_46_way_mammalian(self) -> bool:
         return self._vep_config.get("phylop46way")
 
-    @lazy
+    @cached_property
     def _gene_annotation_release_and_gff_url(self) -> Tuple[Optional[str], Optional[str]]:
         release = None
         gff_url = None
@@ -506,7 +506,7 @@ class VariantAnnotationVersion(SubVersionPartition):
     def gene_annotation_release_gff_url(self):
         return self._gene_annotation_release_and_gff_url[1]
 
-    @lazy
+    @cached_property
     def cdot_gene_release_filename(self) -> str:
         """ returns blank if unknown """
         name_components = []
@@ -875,7 +875,7 @@ class VariantAnnotation(AbstractVariantAnnotation):
         ~Q(alt__seq__in=['.', '*', "<DEL>"]),  # Exclude non-standard variants
     ]
 
-    @lazy
+    @cached_property
     def has_extended_gnomad_fields(self):
         """ I grabbed a few new fields but haven't patched back to GRCh37 yet
             TODO: remove this and if statements in variant_details.html once issue #231 is completed """
@@ -922,7 +922,7 @@ class VariantAnnotation(AbstractVariantAnnotation):
     def get_gnomad_population_field(population):
         return VariantAnnotation.GNOMAD_FIELDS.get(population)
 
-    @lazy
+    @cached_property
     def transcript_annotation(self) -> List['VariantTranscriptAnnotation']:
         return self.variant.varianttranscriptannotation_set.filter(version=self.version)
 
@@ -979,13 +979,13 @@ class ManualVariantEntryCollection(models.Model):
     import_status = models.CharField(max_length=1, choices=ImportStatus.choices, default=ImportStatus.CREATED)
     celery_task = models.CharField(max_length=36, null=True)
 
-    @lazy
+    @cached_property
     def first_entry(self) -> Optional['ManualVariantEntry']:
         """ Often a user will enter a single variant into search and then wait for it to be created/annotated
             We have the "first" one to deal with this """
         return self.manualvariantentry_set.all().order_by("pk").first()
 
-    @lazy
+    @cached_property
     def first_variant(self) -> Optional['Variant']:
         variant = None
         if mve := self.first_entry:
@@ -1113,7 +1113,7 @@ class AnnotationVersion(models.Model):
             sql = annotation_version.sql_partition_transformer(sql)
         return sql
 
-    @lazy
+    @cached_property
     def is_valid(self) -> bool:
         try:
             self.validate()

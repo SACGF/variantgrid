@@ -2,6 +2,7 @@ import logging
 import re
 from collections import defaultdict
 from dataclasses import dataclass
+from functools import cached_property
 from itertools import zip_longest
 from typing import Set, Iterable, Union, Optional, Match, List, Any, Dict
 
@@ -11,7 +12,6 @@ from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 from django.db.models import QuerySet
 from django.db.models.query_utils import Q
 from django.urls.base import reverse
-from lazy import lazy
 from pyhgvs import HGVSName, InvalidHGVSName
 
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
@@ -203,7 +203,7 @@ class SearchResult:
     def is_preferred(self):
         return self.is_preferred_build and self.is_preferred_annotation and not self.is_debug_data and not self.messages
 
-    @lazy
+    @cached_property
     def preference_score(self):
         if self.is_debug_data:
             return 0

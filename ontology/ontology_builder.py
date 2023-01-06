@@ -1,11 +1,11 @@
 from dataclasses import dataclass
 from datetime import timedelta, datetime
 from enum import Enum
+from functools import cached_property
 from typing import Optional, Dict, List, TypeVar, Generic, Iterable, Type, Tuple
 
 from django.db.models import Model
 from django.utils import timezone
-from lazy import lazy
 from model_utils.models import now
 
 from ontology.models import OntologyTermRelation, OntologyTerm, OntologyImport, OntologyTermStatus
@@ -287,7 +287,7 @@ class OntologyBuilder:
         self._ontology_import.completed = True
         self._ontology_import.save()
 
-    @lazy
+    @cached_property
     def _ontology_import(self) -> OntologyImport:
         return OntologyImport.objects.create(
             import_source=self.import_source,

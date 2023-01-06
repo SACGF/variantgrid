@@ -1,3 +1,4 @@
+from functools import cached_property
 from typing import Optional, List, Union
 from urllib.parse import urlencode
 
@@ -8,7 +9,6 @@ from django.http import HttpResponse
 from django.http.request import HttpRequest
 from django.shortcuts import render
 from django.urls import reverse
-from lazy import lazy
 from termsandconditions.decorators import terms_required
 
 from classification.enums import ShareLevel
@@ -40,7 +40,7 @@ class ClassificationDashboard:
     def labs(self):
         return self.lab_picker.selected_labs
 
-    @lazy
+    @cached_property
     def lab_ids_str(self) -> str:
         return ",".join([str(lab.pk) for lab in self.lab_picker.selected_labs])
 
@@ -55,11 +55,11 @@ class ClassificationDashboard:
         }
         return base + "?" + urlencode(params)
 
-    @lazy
+    @cached_property
     def shared_classifications(self) -> QuerySet[Classification]:
         return Classification.objects.filter(allele__isnull=False, lab__in=self.lab_picker.selected_labs, withdrawn=False, share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS)
 
-    @lazy
+    @cached_property
     def unique_classified_alleles_count(self) -> int:
         return self.shared_classifications.order_by('allele').distinct('allele').count()
 
@@ -67,17 +67,17 @@ class ClassificationDashboard:
     def clinvar_keys(self) -> List[ClinVarKey]:
         return sorted(set(lab.clinvar_key for lab in self.lab_picker.selected_labs if lab.clinvar_key))
 
-    @lazy
+    @cached_property
     def uploads_to_clinvar_qs(self) -> QuerySet[ClinVarExport]:
         if clinvar_keys := self.clinvar_keys:
             return ClinVarExport.objects.filter(clinvar_allele__clinvar_key__in=clinvar_keys).exclude(scv__exact='').order_by('-modified')
         return ClinVarExport.objects.none()
 
-    @lazy
+    @cached_property
     def perspective(self) -> LabPickerData:
         return self.lab_picker
 
-    @lazy
+    @cached_property
     def discordance_summaries(self) -> DiscordanceReportTableData:
         # Has changed from just finding the active discordances to discordances withdrawn from and
         # resolved discordances - so they can be listed in history
@@ -92,7 +92,7 @@ class ClassificationDashboard:
 
         return DiscordanceReportTableData(perspective=self.perspective, discordance_reports=dr_qs)
 
-    @lazy
+    @cached_property
     def classifications_wout_standard_text(self) -> int:
         return ConditionText.objects.filter(lab__in=self.labs).aggregate(total_outstanding=Sum('classifications_count_outstanding'))['total_outstanding'] or 0
 
@@ -100,12 +100,12 @@ class ClassificationDashboard:
     def classifications_with_standard_text(self) -> int:
         return Classification.objects.filter(withdrawn=False, condition_resolution__isnull=False, lab__in=self.labs).count()
 
-    @lazy
+    @cached_property
     def classifications_wout_standard_gene(self) -> List[int]:
         linked_classifications = ConditionTextMatch.objects.filter(condition_text__lab__in=self.labs, classification__isnull=False)
         return Classification.objects.filter(withdrawn=False, lab__in=self.labs).exclude(pk__in=Subquery(linked_classifications.values('classification_id'))).order_by('lab', 'created').select_related('lab')
 
-    @lazy
+    @cached_property
     def accumulation_graph_data(self):
         return get_accumulation_graph_data(AccumulationReportMode.Classification, labs=self.labs).get('lab')
 
@@ -115,7 +115,7 @@ class ClassificationDashboard:
             max_y = max(max_y, max(lab_values.get('y')))
         return max_y
 
-    @lazy
+    @cached_property
     def counts(self):
         vcqs_user = Classification.filter_for_user(self.user).filter(lab__in=self.labs)
         vcqs = vcqs_user.filter(withdrawn=False)

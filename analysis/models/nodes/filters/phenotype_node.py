@@ -1,14 +1,13 @@
 import hashlib
 import logging
 import operator
-from functools import reduce
+from functools import cached_property, reduce
 from typing import Optional, Set, Tuple, List
 
 from cache_memoize import cache_memoize
 from django.db import models
 from django.db.models.deletion import SET_NULL, CASCADE
 from django.db.models.query_utils import Q
-from lazy import lazy
 
 from analysis.models.nodes.analysis_node import AnalysisNode
 from annotation.models import VariantTranscriptAnnotation, OntologyTerm
@@ -149,7 +148,7 @@ class PhenotypeNode(AnalysisNode):
 
         return method_summary
 
-    @lazy
+    @cached_property
     def _short_and_long_descriptions(self) -> Tuple[List[str], List[str]]:
         long_descriptions = []
         short_descriptions = []

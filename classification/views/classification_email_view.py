@@ -1,6 +1,7 @@
 import collections
 import datetime
 import unicodedata
+from functools import cached_property
 from typing import List, Optional
 
 import celery
@@ -11,7 +12,6 @@ from django.http.request import HttpRequest
 from django.http.response import HttpResponse
 from django.template.loader import render_to_string
 from django.utils.timesince import timesince
-from lazy import lazy
 
 from classification.enums.discordance_enums import DiscordanceReportResolution
 from classification.models import Classification, classification_flag_types, \
@@ -31,7 +31,7 @@ class EmailLabSummaryData:
         self.lab = lab
         self.user = user
 
-    @lazy
+    @cached_property
     def last_imported_new_ago(self) -> Optional[str]:
         latest = Classification.objects.order_by('-created').filter(lab=self.lab).values_list('created',
                                                                                               flat=True).first()
@@ -41,12 +41,12 @@ class EmailLabSummaryData:
         else:
             return None
 
-    @lazy
+    @cached_property
     def genome_build(self) -> GenomeBuild:
         # TODO if user setting isn't set, grab it from lab instead
         return UserSettings.get_genome_build_or_default(self.user)
 
-    @lazy
+    @cached_property
     def discordance_report_summaries(self) -> DiscordanceReportTableData:
         discordant_vcs = FlagCollection.filter_for_open_flags(
             Classification.objects.filter(lab=self.lab),
@@ -64,13 +64,13 @@ class EmailLabSummaryData:
             discordance_reports=dr_qs
         )
 
-    @lazy
+    @cached_property
     def flagged_variants(self) -> QuerySet[Flag]:
         return FlagCollection.filter_for_open_flags(
             Classification.objects.filter(lab=self.lab).exclude(withdrawn=True)
         ).order_by('-created')
 
-    @lazy
+    @cached_property
     def pending_changes(self) -> QuerySet[Flag]:
         return FlagCollection.filter_for_open_flags(
             Classification.objects.filter(lab=self.lab).exclude(withdrawn=True),
@@ -85,7 +85,7 @@ class EmailLabSummaryData:
     def pending_changes_count(self) -> int:
         return self.pending_changes.count()
 
-    @lazy
+    @cached_property
     def imported_30_days_count(self):
         since = datetime.datetime.now() - datetime.timedelta(days=30)
         vcgs = Classification.objects.filter(lab=self.lab).filter(created__gte=since)

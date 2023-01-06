@@ -1,6 +1,7 @@
 import collections
 import logging
 import re
+from functools import cached_property
 from typing import Optional, Pattern, Tuple, Iterable, Set, Union, Dict, Any
 
 import django.dispatch
@@ -16,7 +17,6 @@ from django.db.models.query_utils import Q, FilteredRelation
 from django.dispatch import receiver
 from django.urls.base import reverse
 from django_extensions.db.models import TimeStampedModel
-from lazy import lazy
 from model_utils.managers import InheritanceManager
 
 from flags.models import FlagCollection, flag_collection_extra_info_signal, FlagInfos
@@ -57,7 +57,7 @@ class Allele(FlagsMixin, models.Model):
     def metrics_logging_key(self):
         return "allele_id", self.pk
 
-    @lazy
+    @cached_property
     def clingen_error(self):
         error = None
         if va := self.variantallele_set.filter(error__isnull=False).first():
@@ -67,21 +67,21 @@ class Allele(FlagsMixin, models.Model):
     def variant_alleles(self):
         return self.variantallele_set.select_related('variant__locus', 'variant__locus__contig', 'variant__locus__ref', 'variant__alt').order_by("genome_build__name")
 
-    @lazy
+    @cached_property
     def grch37(self) -> Optional['Variant']:
         try:
             return self.variant_for_build(genome_build=GenomeBuild.grch37(), best_attempt=False)
         except ValueError:
             return None
 
-    @lazy
+    @cached_property
     def grch38(self) -> Optional['Variant']:
         try:
             return self.variant_for_build(genome_build=GenomeBuild.grch38(), best_attempt=False)
         except ValueError:
             return None
 
-    @lazy
+    @cached_property
     def variants(self):
         return Variant.objects.filter(pk__in=self.variant_alleles().values_list('variant', flat=True))
 
@@ -388,13 +388,13 @@ class Variant(models.Model):
         return Variant.objects.get(locus__contig__genomebuildcontig__genome_build=genome_build,
                                    **dict(zip(params, variant_tuple)))
 
-    @lazy
+    @cached_property
     def genome_builds(self) -> Set['GenomeBuild']:
         gbc_qs = GenomeBuildContig.objects.filter(genome_build__in=GenomeBuild.builds_with_annotation(),
                                                   contig__locus__variant=self)
         return {gbc.genome_build for gbc in gbc_qs}
 
-    @lazy
+    @cached_property
     def coordinate(self) -> VariantCoordinate:
         locus = self.locus
         contig = locus.contig
@@ -408,7 +408,7 @@ class Variant(models.Model):
     def is_reference(self) -> bool:
         return self.alt.seq == self.REFERENCE_ALT
 
-    @lazy
+    @cached_property
     def vcf_alt(self) -> str:
         """ Return the base as a string (not as our special REFERENCE_ALT) """
         if self.is_reference:
@@ -447,7 +447,7 @@ class Variant(models.Model):
     def is_abbreviated(self):
         return str(self) != self.full_string
 
-    @lazy
+    @cached_property
     def full_string(self):
         """ No abbreviation """
         return self.format_tuple(*self.as_tuple())
@@ -459,7 +459,7 @@ class Variant(models.Model):
         # will show allele if there is one, otherwise go to variant page
         return reverse('view_allele_from_variant', kwargs={"variant_id": self.pk})
 
-    @lazy
+    @cached_property
     def allele(self) -> Optional[Allele]:
         va = VariantAllele.objects.filter(variant=self).first()
         if va:

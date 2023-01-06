@@ -3,6 +3,7 @@ import os
 import re
 import shutil
 from collections import namedtuple
+from functools import cached_property
 from typing import Dict, List, Optional, Set
 
 from django.conf import settings
@@ -16,7 +17,6 @@ from django.db.models.signals import pre_delete, post_save
 from django.dispatch.dispatcher import receiver
 from django.utils import timezone
 from django_extensions.db.models import TimeStampedModel
-from lazy import lazy
 from model_utils.managers import InheritanceManager
 
 from eventlog.models import create_event
@@ -656,7 +656,7 @@ class UploadSettings(models.Model):
 
     INTERNAL_TYPES = {UploadedFileTypes.LIFTOVER, UploadedFileTypes.VCF_INSERT_VARIANTS_ONLY}
 
-    @lazy
+    @cached_property
     def file_types(self) -> Set:
         return set(self.uploadsettingsfiletype_set.values_list("file_type", flat=True))
 

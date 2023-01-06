@@ -1,11 +1,11 @@
 import logging
 import re
+from functools import cached_property
 from typing import Dict, Optional, Tuple
 
 from django.conf import settings
 from django.db import models
 from django_extensions.db.models import TimeStampedModel
-from lazy import lazy
 from pyhgvs import HGVSName
 
 from snpdb.models.models_enums import SequenceRole
@@ -62,7 +62,7 @@ class ClinGenAllele(TimeStampedModel):
     def looks_like_id(code):
         return ClinGenAllele.get_id_from_code(code) >= 0
 
-    @lazy
+    @cached_property
     def transcript_alleles_by_transcript_accession(self) -> Dict[str, Dict]:
         ta_by_tv = {}
         if transcript_alleles := self.api_response.get("transcriptAlleles"):
@@ -72,7 +72,7 @@ class ClinGenAllele(TimeStampedModel):
                     ta_by_tv[transcript_accession] = ta
         return ta_by_tv
 
-    @lazy
+    @cached_property
     def transcript_alleles_by_transcript(self) -> Dict[str, Dict]:
         """ Version stripped off """
         ta_by_t = {}

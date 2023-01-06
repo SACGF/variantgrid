@@ -1,10 +1,10 @@
 import copy
 import json
 from dataclasses import dataclass, field
+from functools import cached_property
 from typing import List, Iterator, Union, Optional, Any
 
-from lazy import lazy
-
+from library.utils import invalidate_cached_property
 from uicore.json.json_types import JsonDataType
 
 
@@ -208,7 +208,7 @@ class ValidatedJson:
         return messages
 
     def __setitem__(self, key, value):
-        lazy.invalidate(self, 'all_messages')
+        invalidate_cached_property(self, 'all_messages')
         self.json_data[key] = value
 
     def __getitem__(self, item):
@@ -223,7 +223,7 @@ class ValidatedJson:
     def get(self, item):
         return self.json_data.get(item)
 
-    @lazy
+    @cached_property
     def all_messages(self) -> JsonMessages:
         """
         Returns messages associated to this ValidatedJson or any of its data

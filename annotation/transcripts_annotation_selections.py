@@ -1,9 +1,9 @@
+from functools import cached_property
 import operator
 
 from django.conf import settings
 from django.forms.models import model_to_dict
 from django.utils.timesince import timesince
-from lazy import lazy
 
 from annotation.models import VEPSkippedReason, AnnotationStatus
 from annotation.models.models import VariantAnnotation, AnnotationVersion, \
@@ -55,7 +55,7 @@ class VariantTranscriptSelections:
     def get_annotation_consortium_display(self):
         return AnnotationConsortium(self.annotation_consortium).label
 
-    @lazy
+    @cached_property
     def variant_transcript_annotations_dict(self):
         return {d["transcript_id"]: d for d in self.transcript_data}
 

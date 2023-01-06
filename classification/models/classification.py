@@ -6,6 +6,7 @@ from collections import Counter, namedtuple
 from dataclasses import dataclass, field
 from datetime import datetime, timezone, timedelta
 from enum import Enum
+from functools import cached_property
 from typing import Any, Dict, List, Union, Optional, Iterable, Callable, Mapping, TypedDict, Tuple, Set
 
 import django.dispatch
@@ -25,7 +26,6 @@ from django.dispatch.dispatcher import receiver
 from django.urls.base import reverse
 from django_extensions.db.models import TimeStampedModel
 from guardian.shortcuts import assign_perm, get_objects_for_user
-from lazy import lazy
 
 from annotation.models.models import AnnotationVersion, VariantAnnotationVersion, VariantAnnotation
 from annotation.regexes import db_ref_regexes, DbRegexes
@@ -48,7 +48,8 @@ from genes.models import Gene
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
 from library.guardian_utils import clear_permissions
 from library.log_utils import report_exc_info, report_event
-from library.utils import empty_to_none, nest_dict, cautious_attempt_html_to_text, DebugTimer
+from library.utils import empty_to_none, nest_dict, cautious_attempt_html_to_text, DebugTimer, \
+    invalidate_cached_property
 from ontology.models import OntologyTerm, OntologySnake, OntologyTermRelation
 from snpdb.clingen_allele import populate_clingen_alleles_for_variants
 from snpdb.genome_build_manager import GenomeBuildManager
@@ -260,7 +261,7 @@ class ConditionResolved:
         """
         return self.terms[0] if len(self.terms) == 1 else None
 
-    @lazy
+    @cached_property
     def mondo_term(self) -> Optional[OntologyTerm]:
         if term := self.single_term:
             return OntologyTermRelation.as_mondo(term)
@@ -354,7 +355,7 @@ class ConditionResolved:
             }
         return jsoned
 
-    @lazy
+    @cached_property
     def join_text(self) -> Optional[str]:
         if join := self.join:
             try:
@@ -537,7 +538,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
     def condition_resolution_dict(self) -> Optional[ConditionResolvedDict]:
         return self.condition_resolution
 
-    @lazy
+    @cached_property
     def condition_resolution_obj(self) -> Optional[ConditionResolved]:
         if cr_dict := self.condition_resolution_dict:
             return ConditionResolved.from_dict(cr_dict)
@@ -553,7 +554,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             cond_json = cond_obj.to_json()
             if self.condition_resolution != cond_json:
                 self.condition_resolution = cond_json
-                lazy.invalidate(self, 'condition_resolution_obj')
+                invalidate_cached_property(self, 'condition_resolution_obj')
                 self.save()
                 return True
         return False
@@ -1165,7 +1166,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             return results
         return None
 
-    @lazy
+    @cached_property
     def evidence_keys(self) -> EvidenceKeyMap:
         return EvidenceKeyMap.instance(lab=self.lab)
 
@@ -2476,7 +2477,7 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
     def curated_date(self) -> datetime:
         return CuratedDate(self).date
 
-    @lazy
+    @cached_property
     def curated_date_check(self) -> 'CuratedDate':
         return CuratedDate(self)
 
@@ -2643,7 +2644,7 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
             if group := self.share_level_enum.group(lab=self.classification.lab):
                 assign_perm(self.get_read_perm(), group, self)
 
-    @lazy
+    @cached_property
     def previous(self) -> Optional['ClassificationModification']:
         return ClassificationModification.objects.filter(classification=self.classification,
                                                          created__lt=self.created).order_by('-created').first()
@@ -2777,7 +2778,7 @@ class ClassificationConsensus:
     def is_valid(self) -> bool:
         return self.vcm is not None
 
-    @lazy
+    @cached_property
     def consensus_patch(self) -> VCPatch:
         keys = EvidenceKeyMap.instance()
         if not self.vcm:
@@ -2819,7 +2820,7 @@ class CuratedDate:
     def __init__(self, modification: ClassificationModification):
         self._modification = modification
 
-    @lazy
+    @cached_property
     def timezone(self):
         return gettz(settings.TIME_ZONE)
 
@@ -2831,27 +2832,27 @@ class CuratedDate:
                 pass
         return None
 
-    @lazy
+    @cached_property
     def curated_date(self) -> Optional[datetime]:
         return self.convert_date(SpecialEKeys.CURATION_DATE)
 
-    @lazy
+    @cached_property
     def sample_date(self) -> Optional[datetime]:
         return self.convert_date(SpecialEKeys.SAMPLE_DATE)
 
-    @lazy
+    @cached_property
     def curated_verified_date(self) -> Optional[datetime]:
         return self.convert_date(SpecialEKeys.CURATION_VERIFIED_DATE)
 
-    @lazy
+    @cached_property
     def created_date(self) -> datetime:
         return self._modification.classification.created.astimezone(self.timezone)
 
-    @lazy
+    @cached_property
     def epoch(self):
         return datetime.utcfromtimestamp(0).astimezone(self.timezone)
 
-    @lazy
+    @cached_property
     def relevant_date(self) -> ClassificationDateType:
         """
         Return the most relevant date (for reporting) along with a name for the date if it isn't the Sample Date

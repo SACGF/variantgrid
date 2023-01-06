@@ -2,11 +2,10 @@ import itertools
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from dataclasses import dataclass
-from functools import reduce
+from functools import cached_property, reduce
 from typing import List, Optional, Dict, Set, Iterator
 
 from django.db.models import Count, QuerySet, Subquery
-from lazy import lazy
 
 from classification.criteria_strengths import AcmgPointScore, CriteriaStrengths, CriteriaSummarizer
 from classification.enums import SpecialEKeys
@@ -31,12 +30,12 @@ class PatientCount:
 
     counts: Dict[_PatientIdLab, int]
 
-    @lazy
+    @cached_property
     def count(self):
         numbers = [1 if key.patient_id else value for key, value in self.counts.items()]
         return reduce(lambda a, b: a+b, numbers, 0)
 
-    @lazy
+    @cached_property
     def consolidates_variant_classifications(self) -> bool:
         return any(key.lab.consolidates_variant_classifications for key in self.counts.keys())
 
@@ -75,7 +74,7 @@ class OverlapsCalculatorState:
     def __init__(self, perspective: LabPickerData):
         self.perspective = perspective
 
-    @lazy
+    @cached_property
     def _collection_to_flag(self):
         # The number of open clinical significance change flags should be limited, so fetch them all to check later
         all_open_pending_changes = Flag.objects.filter(flag_type=classification_flag_types.classification_pending_changes, resolution__status=FlagStatus.OPEN)
@@ -112,11 +111,11 @@ class ClassificationLabSummaryExtra(ClassificationLabSummary):
     def patient_count(self) -> PatientCount:
         return reduce(lambda a, b: a + b, (PatientCount.count_classification(cms) for cms in self.cms), PatientCount.ZERO)
 
-    @lazy
+    @cached_property
     def strengths(self) -> CriteriaStrengths:
         return self.latest.criteria_strengths()
 
-    @lazy
+    @cached_property
     def latest(self) -> ClassificationModification:
         return first(sorted(self.cms, key=lambda cms: cms.curated_date_check))
 
@@ -136,11 +135,11 @@ class ClinicalGroupingOverlap:
     def allele(self) -> Allele:
         return self.clinical_context.allele if self.clinical_context else None
 
-    @lazy
+    @cached_property
     def patient_count(self) -> PatientCount:
         return reduce(lambda a, b: a + b, (PatientCount.count_classification(cms) for cms in self.cms), PatientCount.ZERO)
 
-    @lazy
+    @cached_property
     def criteria_compare(self) -> CriteriaSummarizer:
         return CriteriaSummarizer([lb.criteria_strengths() for lb in self.all_latest])
 
@@ -164,7 +163,7 @@ class ClinicalGroupingOverlap:
         self.groups[group].append(cm)
         self.labs.add(cm.classification.lab)
 
-    @lazy
+    @cached_property
     def extreme_acmg_points(self) -> AcmgPointScore:
         return AcmgPointScore.most_extreme_point_score(lb.criteria_strengths().acmg_point_score for lb in self.all_latest)
 
@@ -172,14 +171,14 @@ class ClinicalGroupingOverlap:
     def cms(self):
         return list(itertools.chain(*self.groups.values()))
 
-    @lazy
+    @cached_property
     def status(self) -> 'DiscordanceStatus':
         dr: Optional[DiscordanceReport] = None
         if cc := self.clinical_context:
             dr = DiscordanceReport.latest_report(cc)
         return DiscordanceStatus.calculate(self.cms, dr)
 
-    @lazy
+    @cached_property
     def discordance_report(self) -> Optional[DiscordanceReport]:
         if self.status.is_discordant:
             if cc := self.clinical_context:
@@ -217,7 +216,7 @@ class ClinicalGroupingOverlap:
     def all_latest(self) -> List[ClassificationModification]:
         return [lb.latest for lb in self.lab_clinical_significances]
 
-    @lazy
+    @cached_property
     def lab_clinical_significances(self) -> List[ClassificationLabSummaryExtra]:
         return sorted([ClassificationLabSummaryExtra(
             group=group,
@@ -319,7 +318,7 @@ class OverlapsCalculator:
         """
         self.calculator_state = OverlapsCalculatorState(perspective=perspective)
 
-    @lazy
+    @cached_property
     def overlaps(self) -> List[AlleleOverlap]:
         perspective = self.calculator_state.perspective
         lab_ids = perspective.lab_ids
@@ -369,7 +368,7 @@ class OverlapsCalculator:
             OverlapSet(segmented[1], label="Single-Lab"),
         ]
 
-    @lazy
+    @cached_property
     def multi_lab_counts(self) -> Dict[DiscordanceLevel, int]:
         counts = defaultdict(int)
         for cc in self.clinical_groupings_overlaps:
@@ -377,7 +376,7 @@ class OverlapsCalculator:
                 counts[cc.status.level] += 1
         return counts
 
-    @lazy
+    @cached_property
     def same_lab_counts(self) -> Dict[DiscordanceLevel, int]:
         counts = defaultdict(int)
         for cc in self.clinical_groupings_overlaps:

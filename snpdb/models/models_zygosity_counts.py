@@ -1,4 +1,5 @@
 import logging
+from functools import cached_property
 from typing import Tuple
 
 from django.conf import settings
@@ -6,7 +7,6 @@ from django.db import models
 from django.db.models import F, FilteredRelation, Q, QuerySet
 from django.db.models.deletion import CASCADE
 from django_extensions.db.models import TimeStampedModel
-from lazy import lazy
 
 from library.django_utils.django_partition import RelatedModelsPartitionModel
 from snpdb.models import Variant
@@ -24,29 +24,29 @@ class VariantZygosityCountCollection(RelatedModelsPartitionModel):
     name = models.TextField(unique=True)
     description = models.TextField()
 
-    @lazy
+    @cached_property
     def alias(self) -> str:
         if self.name == settings.VARIANT_ZYGOSITY_GLOBAL_COLLECTION:
             return self.GLOBAL_ALIAS
         return f"zygosity_count_{self.pk}"
 
-    @lazy
+    @cached_property
     def ref_alias(self) -> str:
         return f"{self.alias}__ref_count"
 
-    @lazy
+    @cached_property
     def het_alias(self) -> str:
         return f"{self.alias}__het_count"
 
-    @lazy
+    @cached_property
     def hom_alias(self) -> str:
         return f"{self.alias}__hom_count"
 
-    @lazy
+    @cached_property
     def germline_counts_alias(self) -> str:
         return f"germline_counts_{self.pk}"
 
-    @lazy
+    @cached_property
     def all_zygosity_counts_alias(self) -> str:
         return f"all_zygosity_counts_{self.pk}"
 

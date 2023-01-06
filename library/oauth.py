@@ -34,7 +34,7 @@ class OAuthConnector:
         self._auth = None
 
     def auth(self):
-        # TODO, this should be @lazy (rather than a manual implementation of @lazy)
+        # TODO, this should be @cached_property (rather than a manual implementation of @cached_property)
         if not self._auth:
             if self.oauth_url:
                 oauth = OAuth2Session(client=LegacyApplicationClient(client_id=self.client_id))

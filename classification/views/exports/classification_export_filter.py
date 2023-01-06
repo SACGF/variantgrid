@@ -2,7 +2,7 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from functools import reduce
+from functools import cached_property, reduce
 from operator import __or__
 from typing import List, Type, Union, Set, Optional, Dict, Iterator, Any, Callable
 
@@ -10,7 +10,6 @@ from django.contrib.auth.models import User
 from django.db.models import QuerySet, Q
 from django.http import HttpRequest
 from guardian.shortcuts import get_objects_for_user
-from lazy import lazy
 from threadlocals.threadlocals import get_current_request
 
 from classification.enums import ShareLevel, ClinicalContextStatus
@@ -105,7 +104,7 @@ class AlleleData:
         # return Allele.objects.filter(pk=self.allele_id).select_related('clingen_allele').first()
         return self.cached_allele
 
-    @lazy
+    @cached_property
     def variant(self) -> Optional[Variant]:
         return self.cached_variant
         # if allele := self.allele:
@@ -227,7 +226,7 @@ class ClassificationFilter:
                     request_params[key] = value
             self.request_params = request_params
 
-    @lazy
+    @cached_property
     def date_str(self) -> str:
         return local_date_string()
 
@@ -309,7 +308,7 @@ class ClassificationFilter:
             rows_per_file=rows_per_file
         )
 
-    @lazy
+    @cached_property
     def c_hgvs_col(self):
         """
         The classification column that represents the genome build that the user requested
@@ -320,7 +319,7 @@ class ClassificationFilter:
         else:
             return 'classification__allele_info__grch38__c_hgvs'
 
-    @lazy
+    @cached_property
     def _bad_allele_transcripts(self) -> Dict[int, Set[str]]:
         """
         :return: A dictionary of Allele ID to a set of Transcripts for that allele which has bad flags
@@ -345,7 +344,7 @@ class ClassificationFilter:
 
         return allele_to_bad_transcripts
 
-    @lazy
+    @cached_property
     def _transcript_version_classification_ids(self) -> Set[int]:
         """
         Returns a set of classification IDs that have flags that make us want to exclude due to errors
@@ -358,7 +357,7 @@ class ClassificationFilter:
                 resolution__status=FlagStatus.OPEN
             ))
 
-    @lazy
+    @cached_property
     def _variant_matching_classification_ids(self) -> Set[int]:
         return flag_ids_to(
             Classification,
@@ -367,7 +366,7 @@ class ClassificationFilter:
                 resolution__status=FlagStatus.OPEN
             ))
 
-    @lazy
+    @cached_property
     def _discordant_classification_ids(self) -> Dict[int, DiscordanceReportStatus]:
         """
         Returns a set of classification IDs where the classification id discordant
@@ -394,7 +393,7 @@ class ClassificationFilter:
     def is_discordant(self, cm: ClassificationModification) -> DiscordanceReportStatus:
         return self._discordant_classification_ids.get(cm.classification_id)
 
-    @lazy
+    @cached_property
     def _since_flagged_classification_ids(self) -> Set[int]:
         """
         TODO rename to indicate this is a flag check only
@@ -411,7 +410,7 @@ class ClassificationFilter:
             created__gte=self.since
         ))
 
-    @lazy
+    @cached_property
     def _since_flagged_allele_ids(self) -> Set[int]:
         """
         :return: A set of allele IDs that have relevant flags that have changed since the since date

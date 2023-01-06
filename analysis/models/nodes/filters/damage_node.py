@@ -1,11 +1,10 @@
 import itertools
 import operator
-from functools import reduce
+from functools import cached_property, reduce
 from typing import Optional
 
 from django.db import models
 from django.db.models.query_utils import Q
-from lazy import lazy
 
 from analysis.models.nodes.analysis_node import AnalysisNode
 from annotation.models.damage_enums import PathogenicityImpact, ALoFTPrediction
@@ -117,7 +116,7 @@ class DamageNode(AnalysisNode):
     def damage_predictions_description(self) -> str:
         return self.analysis.annotation_version.variant_annotation_version.damage_predictions_description
 
-    @lazy
+    @cached_property
     def columns_version(self):
         return self.analysis.annotation_version.variant_annotation_version.columns_version
 

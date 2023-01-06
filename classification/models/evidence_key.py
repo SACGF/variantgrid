@@ -1,12 +1,12 @@
 import math
 import re
 from enum import Enum
+from functools import cached_property
 from typing import Any, List, Optional, Dict, Iterable, Mapping, Union, Set, TypedDict, cast
 
 from django.db import models
 from django.db.models.deletion import SET_NULL
 from django_extensions.db.models import TimeStampedModel
-from lazy import lazy
 
 from classification.enums import CriteriaEvaluation, SubmissionSource, SpecialEKeys
 from classification.enums.classification_enums import EvidenceCategory, \
@@ -172,7 +172,7 @@ class EvidenceKey(TimeStampedModel):
 
         return None
 
-    @lazy
+    @cached_property
     def _option_indexes(self) -> Optional[Dict[str, int]]:
         index_map: Optional[Dict[str, int]] = None
         if options := self.virtual_options:
@@ -230,7 +230,7 @@ class EvidenceKey(TimeStampedModel):
         dummy.is_dummy = True
         return dummy
 
-    @lazy
+    @cached_property
     def namespace(self) -> Optional[str]:
         try:
             return self.key[0:self.key.index(':')]

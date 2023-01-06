@@ -1,3 +1,4 @@
+from functools import cached_property
 from typing import Dict, Optional, List
 
 from django.db import models
@@ -6,7 +7,6 @@ from django.db.models.deletion import SET_NULL, CASCADE
 from django.db.models.expressions import Value, F
 from django.db.models.functions import Concat, Substr, Length, Replace
 from django.urls.base import reverse
-from lazy import lazy
 
 from analysis.models import GroupOperation, AnalysisNode
 from analysis.models.nodes.cohort_mixin import CohortMixin
@@ -130,7 +130,7 @@ class CohortNode(AbstractCohortBasedNode, AbstractZygosityCountNode):
             arg_q_dict = self._get_per_sample_zygosity_arg_q_dict(cgc)
         return arg_q_dict
 
-    @lazy
+    @cached_property
     def simple_zygosity_columns(self) -> Dict:
         return {
             SimpleZygosity.REF: self.ref_count_column,

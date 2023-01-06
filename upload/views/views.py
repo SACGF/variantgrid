@@ -3,7 +3,7 @@ import logging
 import operator
 import os
 from datetime import date, timedelta
-from functools import reduce
+from functools import cached_property, reduce
 
 from django.conf import settings
 from django.contrib import messages
@@ -18,7 +18,6 @@ from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_POST
 from django_downloadview import PathDownloadView
 from jfu.http import upload_receive, UploadResponse, JFUResponse
-from lazy import lazy
 
 from annotation.views import get_build_contigs
 from eventlog.models import create_event
@@ -332,7 +331,7 @@ def accept_vcf_import_info_tag(request, vcf_import_info_id):
 
 
 class DownloadUploadedFile(PathDownloadView):
-    @lazy
+    @cached_property
     def uploaded_file(self):
         uploaded_file_id = self.kwargs["pk"]
         uploaded_file = get_object_or_404(UploadedFile, pk=uploaded_file_id)

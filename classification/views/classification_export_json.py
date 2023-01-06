@@ -1,7 +1,6 @@
 import json
+from functools import cached_property
 from typing import Optional
-
-from lazy import lazy
 
 from classification.models import ClassificationJsonParams
 from classification.models.classification import ClassificationModification
@@ -28,7 +27,7 @@ class ExportFormatterJSON(ExportFormatter):
     def footer(self) -> str:
         return '\n]}'
 
-    @lazy
+    @cached_property
     def json_params(self) -> ClassificationJsonParams:
         return ClassificationJsonParams(current_user=self.user,
                                         include_data=True,

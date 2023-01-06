@@ -1,4 +1,5 @@
 import logging
+from functools import cached_property
 from typing import Optional, List, Set
 
 from django.db import models
@@ -6,7 +7,6 @@ from django.db.models import Q
 from django.db.models.deletion import SET_NULL, CASCADE
 from django.db.models.signals import post_delete
 from django.dispatch.dispatcher import receiver
-from lazy import lazy
 
 from analysis.models.nodes.analysis_node import AnalysisNode
 from analysis.models.nodes.cohort_mixin import AncestorSampleMixin
@@ -243,7 +243,7 @@ class GeneListNodePanelAppPanel(models.Model):
     panel_app_panel = models.ForeignKey(PanelAppPanel, on_delete=CASCADE)
     panel_app_panel_local_cache = models.ForeignKey(PanelAppPanelLocalCache, null=True, on_delete=CASCADE)
 
-    @lazy
+    @cached_property
     def gene_list(self):
         """ Lazily create - This may take a while for new panels (should only do this in node.load())
         Will also be called if a node is cloned w/o a parent so it is invalid (in which case it should use cache) """

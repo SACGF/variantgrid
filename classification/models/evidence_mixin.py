@@ -1,8 +1,8 @@
 import re
+from functools import cached_property
 from typing import Dict, Any, Mapping, Optional, Union, List, TypedDict
 
 from django.conf import settings
-from lazy import lazy
 
 from annotation.models import CitationFetchRequest
 from annotation.models.models_citations import CitationFetchResponse
@@ -102,7 +102,7 @@ class EvidenceMixin:
         else:
             raise ValueError("Classification does not have a value for genome build")
 
-    @lazy
+    @cached_property
     def db_refs(self) -> List[Dict]:
         all_db_refs = []
         for blob in self._evidence.values():
@@ -139,11 +139,11 @@ class EvidenceMixin:
         strengths = self.criteria_strengths(e_keys=ekeys)
         return strengths.summary_string(acmg_only=only_acmg)
 
-    @lazy
+    @cached_property
     def c_parts(self) -> CHGVS:
         return CHGVS(self.get(SpecialEKeys.C_HGVS) or "")
 
-    @lazy
+    @cached_property
     def p_parts(self) -> PHGVS:
         return PHGVS.parse(self.get(SpecialEKeys.P_HGVS), override_is_confirmed_to=False)
 

@@ -2,13 +2,13 @@ from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
+from functools import cached_property
 from typing import List, Union, Iterable, Optional, Dict, Tuple, Set, Any, Mapping
 
 from django.contrib.auth.models import User
 from django.db.models import Q, Count
 from django.db.models.query import QuerySet
 from django.http.response import StreamingHttpResponse
-from lazy import lazy
 from threadlocals.threadlocals import get_current_request
 
 from classification.enums import SpecialEKeys
@@ -224,7 +224,7 @@ class VariantWithChgvs:
         self.vcm = vcm
         self.chgvs = chgvs
 
-    @lazy
+    @cached_property
     def transcript_version(self) -> int:
         if self.chgvs.transcript_parts:
             return self.chgvs.transcript_parts or 0
@@ -414,11 +414,11 @@ class ExportFormatter(BaseExportFormatter):
         """ override to return True if you want dels, ins etc to list all nucleotides after """
         return False
 
-    @lazy
+    @cached_property
     def preferred_chgvs_column(self) -> str:
         return ClassificationModification.column_name_for_build(self.genome_build, suffix='c_hgvs_full')
 
-    @lazy
+    @cached_property
     def ekeys(self) -> EvidenceKeyMap:
         return EvidenceKeyMap.instance()
 
@@ -446,7 +446,7 @@ class ExportFormatter(BaseExportFormatter):
             message = self.error_message_ids[vcm.id]
             yield vcm, message
 
-    @lazy
+    @cached_property
     def allele_37_not_38_transcripts(self) -> Dict[int, Set[str]]:
         qs = Flag.objects.filter(
             flag_type=allele_flag_types.allele_37_not_38,
@@ -506,7 +506,7 @@ class ExportFormatter(BaseExportFormatter):
         else:
             return True
 
-    @lazy
+    @cached_property
     def classification_warning_flags(self):
         return set(Flag.objects.filter(
             flag_type__in=[classification_flag_types.matching_variant_warning_flag,
@@ -650,7 +650,7 @@ class ExportFormatter(BaseExportFormatter):
     def filename(self) -> str:
         return 'classifications.txt'
 
-    @lazy
+    @cached_property
     def discordant_collections(self):
         return set(
             Flag.objects.filter(

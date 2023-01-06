@@ -319,11 +319,11 @@ class LazyAttribute:
     """
     LazyAttributes allow you to easily make a context map for a view where properties
     will only be evaluated when accessed.
-    Importantly this works for attributes marked with @lazy which are ironically eagerly
+    Importantly this works for attributes marked with @cached_property which are ironically eagerly
     evaluated by SimpleLazyObject
 
     class SomeClass:
-        @lazy
+        @cached_property
         def lazy_prop():
             return "foo"
 

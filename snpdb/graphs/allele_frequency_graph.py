@@ -1,8 +1,8 @@
+from functools import cached_property
 from typing import Optional
 
 import numpy as np
 from django.db.models import Q
-from lazy import lazy
 
 from library.utils import sha1_str
 from snpdb.graphs.graphcache import CacheableGraph
@@ -20,7 +20,7 @@ class AlleleFrequencyHistogramGraph(CacheableGraph):
         description = f"{self.sample_id}.{self.min_read_depth}"
         return sha1_str(description)
 
-    @lazy
+    @cached_property
     def sample(self) -> Sample:
         return Sample.objects.get(pk=self.sample_id)
 

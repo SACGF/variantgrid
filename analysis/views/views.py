@@ -2,6 +2,7 @@ import importlib
 import inspect
 import json
 import logging
+from functools import cached_property
 from collections import Counter, defaultdict
 
 import numpy as np
@@ -23,7 +24,6 @@ from django.views.decorators.cache import cache_page, never_cache
 from django.views.decorators.http import require_POST
 from django.views.decorators.vary import vary_on_cookie
 from htmlmin.decorators import not_minified_response
-from lazy import lazy
 
 from analysis import forms
 from analysis.analysis_templates import populate_analysis_from_template_run
@@ -877,7 +877,7 @@ class CreateClassificationForVariantTagView(CreateClassificationForVariantView):
             form = super()._get_sample_form()
         return form
 
-    @lazy
+    @cached_property
     def variant_tag(self):
         variant_tag_id = self.kwargs["variant_tag_id"]
         variant_tag = VariantTag.get_for_user(self.request.user, pk=variant_tag_id)

@@ -1,11 +1,11 @@
 import re
 from datetime import datetime, timezone
+from functools import cached_property
 from typing import Optional
 
 from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
 from django.http.response import Http404
-from lazy import lazy
 
 from classification.enums import SubmissionSource
 from classification.models import ClassificationJsonParams
@@ -46,7 +46,7 @@ class ClassificationRef:
                 parts.append(self.lab_record_id)
         return "/".join(parts)
 
-    @lazy
+    @cached_property
     def record(self) -> Classification:
         """
         if init_from_obj we'll have a cached record
@@ -60,7 +60,7 @@ class ClassificationRef:
         if self.lab_record_id:
             return Classification.objects.filter(lab=self.lab, lab_record_id=self.lab_record_id).first()
 
-    @lazy
+    @cached_property
     def modification(self) -> ClassificationModification:
         _record = self.record
         if self.version_datetime:
@@ -102,7 +102,7 @@ class ClassificationRef:
                 if not mod.can_view(self.user):
                     raise PermissionDenied()
 
-    @lazy
+    @cached_property
     def version_datetime(self) -> Optional[datetime]:
         if self.version:
             return datetime.utcfromtimestamp(self.version).replace(tzinfo=timezone.utc)

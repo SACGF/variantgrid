@@ -1,10 +1,10 @@
 import re
 from dataclasses import dataclass
+from functools import cached_property
 from typing import Dict, Optional, List, Any, Set, Iterable, TypedDict
 
 import requests
 from django.urls import reverse
-from lazy import lazy
 
 from annotation.regexes import db_ref_regexes
 from library.constants import MINUTE_SECS
@@ -47,7 +47,7 @@ class OntologyMatch:
     def text_search(self):
         return self.search_engine_score is not None
 
-    @lazy
+    @cached_property
     def _score(self):
         score = 0
         if self.selected:

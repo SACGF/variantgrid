@@ -1,12 +1,11 @@
 import operator
 from collections import defaultdict, Counter
-from functools import reduce
+from functools import cached_property, reduce
 from typing import Optional
 
 from django.db.models import Q
 
 from analysis.models.nodes.analysis_node import AnalysisNode
-from snpdb.models import lazy
 from variantgrid import settings
 
 
@@ -20,7 +19,7 @@ class MergeNode(AnalysisNode):
     def modifies_parents(self):
         return self._num_unique_parents_in_queryset > 1
 
-    @lazy
+    @cached_property
     def _num_unique_parents_in_queryset(self):
         parent_q_dicts = set()
         for p in self.get_non_empty_parents(require_parents_ready=False):

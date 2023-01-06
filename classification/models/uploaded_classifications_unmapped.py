@@ -1,8 +1,8 @@
+from functools import cached_property
 from typing import Union, Optional, Dict, List, Tuple, Any, Iterable
 
 from django.contrib.auth.models import User
 from django.db import models
-from lazy import lazy
 from model_utils.models import TimeStampedModel
 
 from classification.models.uploaded_file_types import FileHandle, resolve_uploaded_url_to_handle
@@ -93,7 +93,7 @@ class UploadedClassificationsUnmapped(TimeStampedModel):
                 pass
         return False
 
-    @lazy
+    @cached_property
     def file_data(self) -> FileHandle:
         return resolve_uploaded_url_to_handle(self.url)
 

@@ -15,9 +15,9 @@ import re
 from collections import defaultdict
 from dataclasses import dataclass
 from enum import Enum
+from functools import cached_property
 from typing import Dict, List, Optional, Set, Iterator
 
-from lazy import lazy
 from pyhgvs import InvalidHGVSName
 
 from annotation.models import ClinVar
@@ -73,14 +73,14 @@ class ClinVarLegacyMatch:
             return EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE).pretty_value(based_on.get(SpecialEKeys.CLINICAL_SIGNIFICANCE))
         return ''
 
-    @lazy
+    @cached_property
     def condition(self) -> Optional[ConditionResolved]:
         if cm := self.clinvar_export.classification_based_on:
             if cons := cm.classification.condition_resolution_obj:
                 return cons
         return self.clinvar_export.condition_resolved
 
-    @lazy
+    @cached_property
     def notes(self) -> List[str]:
         if errors := self.clinvar_export.all_errors:
             return [error.text for error in errors]
@@ -130,7 +130,7 @@ class ClinVarLegacyRow:
     clinvar_key: ClinVarKey
     data: Dict[str, str]
 
-    @lazy
+    @cached_property
     def clinvar_export(self) -> Optional[ClinVarExport]:
         return ClinVarExport.objects.filter(scv=self.scv_no_version).first()
 
@@ -238,7 +238,7 @@ class ClinVarLegacyRow:
     def clinical_significance_code(self) -> str:
         return CLINICAL_SIGNIFICANCE_MAP.get(self.clinical_significance)
 
-    @lazy
+    @cached_property
     def ontology_terms(self) -> List[OntologyTerm]:
         terms: List[OntologyTerm] = []
         if condition_identifier := self.condition_identifier.strip():

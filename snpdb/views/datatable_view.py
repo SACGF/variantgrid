@@ -5,7 +5,7 @@ import logging
 import operator
 from dataclasses import dataclass
 from datetime import datetime
-from functools import reduce
+from functools import cached_property, reduce
 from typing import List, Dict, Optional, Any, Callable, Union, TypeVar, Generic, Type
 
 from django.contrib.auth.models import User
@@ -13,7 +13,6 @@ from django.db import models
 from django.db.models import QuerySet, Q
 from django.http import HttpRequest, QueryDict
 from kombu.utils import json
-from lazy import lazy
 
 from library.log_utils import report_exc_info
 from library.utils import pretty_label
@@ -190,7 +189,7 @@ class DatatableConfig(Generic[DC]):
         self.request: HttpRequest = request
         self.user: User = request.user
 
-    @lazy
+    @cached_property
     def default_sort_order_column(self) -> RichColumn:
         rcs = [rc for rc in self.enabled_columns if rc.default_sort and rc.visible]
         return rcs[0] if rcs else self.enabled_columns[0]
@@ -198,7 +197,7 @@ class DatatableConfig(Generic[DC]):
     def column_index(self, rc: RichColumn) -> int:
         return self.enabled_columns.index(rc)
 
-    @lazy
+    @cached_property
     def enabled_columns(self) -> List[RichColumn]:
         return [rc for rc in self.rich_columns if rc.enabled]
 
@@ -236,7 +235,7 @@ class DatatableConfig(Generic[DC]):
         expected_height_str = f"{expected_height if expected_height else 100}px"
         return f"TableFormat.expandAjax.bind(null, '{expand_view}', '{id_field}', '{expected_height_str}')"
 
-    @lazy
+    @cached_property
     def _querydict(self):
         if self.request.method == 'POST':
             return self.request.POST

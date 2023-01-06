@@ -128,3 +128,9 @@ class WrappablePartial(functools.partial):
     @property
     def __doc__(self):
         return self.func.__doc__
+
+
+def invalidate_cached_property(obj, property_name: str):
+    """ Invalidates without throwing exception if not defined """
+    if property_name in obj.__dict__:
+        delattr(obj, property_name)

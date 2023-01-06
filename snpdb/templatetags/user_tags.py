@@ -1,10 +1,10 @@
 import datetime
 from dataclasses import dataclass
+from functools import cached_property
 from typing import Dict, Union, Any
 
 from django import template
 from django.contrib.auth.models import User
-from lazy import lazy
 
 from library.cache import timed_cache
 from library.utils import first
@@ -53,7 +53,7 @@ def user(context, u: User, show_avatar=False, show_email=False, show_last_login=
         show_email: bool
         show_last_login: bool
 
-        @lazy
+        @cached_property
         def avatar(self):
             return AvatarDetails.avatar_for(self.user)
 
@@ -78,7 +78,7 @@ def user(context, u: User, show_avatar=False, show_email=False, show_last_login=
         def group_str(self):
             return _group_str_for_user(self.user)
 
-        @lazy
+        @cached_property
         def user_settings(self) -> UserSettings:
             user_cache: Dict[int, UserSettings] = self.context.get("_user_cache")
             if not user_cache:
