@@ -35,7 +35,7 @@ from classification.models.classification_import_run import ClassificationImport
 from classification.models.classification_patcher import patch_fuzzy_age
 from classification.models.classification_utils import \
     ValidationMerger, ClassificationJsonParams, VariantCoordinateFromEvidence, PatchMeta, ClassificationPatchResponse
-from classification.models.classification_variant_info_models import ImportedAlleleInfo
+from classification.models.classification_variant_info_models import ImportedAlleleInfo, ImportedAlleleInfoStatus
 from classification.models.evidence_key import EvidenceKeyValueType, \
     EvidenceKey, EvidenceKeyMap, VCDataDict, WipeMode, VCDataCell
 from classification.models.evidence_mixin import EvidenceMixin, VCPatch
@@ -411,8 +411,6 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
     Based on ACMG criteria and evidence - @see https://www.nature.com/articles/gim201530
     """
 
-    SUPPORTED_TRANSCRIPTS = settings.VARIANT_CLASSIFICATION_SUPPORTED_TRANSCRIPTS
-
     # TODO - remove variant and allele in favour of having that accessed via  variant_info
     variant = models.ForeignKey(Variant, null=True, on_delete=PROTECT)  # Null as might not match this
     """ Deprecated -  """
@@ -481,10 +479,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
 
     @staticmethod
     def is_supported_transcript(transcript_or_hgvs: str):
-        for transcript_type in Classification.SUPPORTED_TRANSCRIPTS:
-            if transcript_or_hgvs.startswith(transcript_type):
-                return True
-        return False
+        return ImportedAlleleInfo.is_supported_transcript(transcript_or_hgvs)
 
     @property
     def chgvs_grch37(self) -> Optional[str]:
@@ -735,13 +730,16 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         classification_withdraw_signal.send(Classification, classification=self)
         return True
 
-    def update_cached_c_hgvs(self) -> int:
+    def update_cached_c_hgvs(self):
         """
         :return: Returns length of the c.hgvs if successfully updated caches
         """
         self.update_allele()
-        self.update_allele_info()
+        # self.update_allele_info_from_classification()
+        self.allele_info.force_refresh_and_save()
+        self._perform_c_hgvs_validation()
 
+    def _perform_c_hgvs_validation(self):
         # if we had a previously opened flag match warning - don't re-open
         if self.allele_info:
             if not self.id:
@@ -831,12 +829,12 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             allele = variant.allele
         self.allele = allele
 
-    def update_allele_info(self):
-        allele_info: Optional[ImportedAlleleInfo] = self.allele_info
+    def ensure_allele_info(self) -> ImportedAlleleInfo:
         if not self.allele_info:
             try:
                 genome_build_patch_version = self.get_genome_build_patch_version()
             except ValueError:
+                # no allele info if can't derive a genome build
                 self.allele_info: Optional[ImportedAlleleInfo] = None
                 return
 
@@ -847,32 +845,79 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 fields["imported_g_hgvs"] = g_hgvs
                 fields["imported_transcript"] = self.transcript
 
-            allele_info, _ = ImportedAlleleInfo.objects.get_or_create(**fields)
+            allele_info = ImportedAlleleInfo.get_or_create(**fields)
             self.allele_info = allele_info
+        return self.allele_info
 
-        if allele := self.allele:
-            allele_info.update_and_save(matched_allele=allele)
+    def update_allele_info_from_classification(self, force_update: bool = False):
+        """
+        Semi-deprecated, only useful if setting variant or allele on the classification manually in tests (to avoid all the flag stuff)
+        or when migrating to the use of allele_info in the first place
+        Update the allele_info with the data already set on the classification
+        """
+        if allele_info := self.ensure_allele_info():
+            allele_info.update_variant_coordinate()  # only need this for systems that were migrated when half of the AlleleInfo was done
+            allele_info.save()
+            if not force_update and self.allele_info.status == ImportedAlleleInfoStatus.MATCHED_ALL_BUILDS:
+                return
+            if matched_variant := self.variant:
+                allele_info.update_and_save(matched_variant, force_update=force_update)
+
+    def attempt_set_variant_info_from_pre_existing_imported_allele_info(self) -> bool:
+        """
+        Link to ImportedAlleleInfo (if haven't already), then update classification with any existing ImportedAlleleInfo
+        :return: True if there's nothing more to do, False if this may still require matching
+        """
+        allele_info = self.ensure_allele_info()
+        self._apply_allele_info_to_classification()
+        return allele_info.status in {ImportedAlleleInfoStatus.MATCHED_ALL_BUILDS, ImportedAlleleInfoStatus.FAILED}
+
+    def set_variant_prepare_for_rematch(self):
+        self.variant = None
+        self.allele = None
+
+    def set_variant_failed_matching(self, message: Optional[str] = None):
+        if allele_info := self.ensure_allele_info():
+            allele_info.set_matching_failed(message=message)
+            self._apply_allele_info_to_classification()
 
     @transaction.atomic()
-    def set_variant(self, variant: Variant = None, message: str = None, failed: bool = False):
+    def set_variant(self, variant: Variant = None, message: str = None):
         """
-        Update the variant matching lifecycle step
-        @param variant If we now match to a variant, pass it in and the variant set signal will be fired
+        Updates the data in the AlleleInfo (force_update=True) with the provided variant
+        @param variant The variant that we matched on, can't be None (see set_variant_failed_matching)
         @param message Any message to include about a matching failure or success
         @param failed If we're unable to match and wont be able to match again in future
 
         Calling set_variant will automatically call .save()
         If there is no variant and failed = True, any classification_import will be unset
+        can alternatively set variant to None to re-trigger matching
         """
-        old_allele = self.allele
-        self.variant = variant
-        self.update_allele()
-        self.update_allele_info()
-        if variant and (allele_info := self.allele_info):
-            try:
-                allele_info.update_variant(self.get_genome_build(), variant)
-            except ValueError:
-                pass
+        if not variant:
+            raise ValueError("set_variant requires a non-None variant, use set_variant_prepare_for_rematch or set_variant_failed_matching")
+
+        if allele_info := self.ensure_allele_info():
+            allele_info.update_and_save(matched_variant=variant, message=message, force_update=True)
+            # update the allele info, then update the classification based on the allele info
+            self._apply_allele_info_to_classification()
+        else:
+            raise ValueError("Can't derive GenomeBuild, can't make AlleleInfo, therfore can't set_variant")
+
+    def _apply_allele_info_to_classification(self):
+        if not self.allele_info:
+            raise ValueError("Can't _apply_allele_info when no allele_info has been set")
+
+        allele_or_variant_changed = False
+        variant: Optional[Variant] = None
+        if vi := self.allele_info.variant_info_for_imported_genome_build:
+            if viv := vi.variant:
+                allele_or_variant_changed = self.variant != viv
+                self.variant = viv
+        allele_or_variant_changed = allele_or_variant_changed or self.allele_info
+        self.allele = self.allele_info.allele
+
+        failed = self.allele_info.status == ImportedAlleleInfoStatus.FAILED
+        message = self.allele_info.message
 
         # don't want to be considered as part of the import anymore
         # as we've failed matching somewhere along the line
@@ -905,7 +950,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                                                          comment='Variant Matched')
                 classification_variant_set_signal.send(sender=Classification, classification=self, variant=variant)
 
-                if self.allele and self.allele != old_allele:
+                if allele_or_variant_changed:
                     self.allele_classification_changed()
             else:
                 # matching ongoing
@@ -917,7 +962,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 flag_collection.close_open_flags_of_type(classification_flag_types.transcript_version_change_flag,
                                                          comment='Variant Re-Matching')
 
-            self.update_cached_c_hgvs()
+            self._perform_c_hgvs_validation()
 
         except:
             report_exc_info()
@@ -1454,7 +1499,10 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 flag_type=classification_flag_types.unshared_flag
             )
 
-        self.set_variant(self.variant, failed=not self.variant)
+        if self.variant:
+            self.set_variant(self.variant)
+        else:
+            self.set_variant_failed_matching()
         self.fix_permissions()
         self.save()
 

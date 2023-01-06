@@ -4,6 +4,9 @@ from sync.models import SyncDestination
 
 
 class Command(BaseCommand):
+    """
+    Performs a sync to other VariantGrid instances
+    """
 
     def add_arguments(self, parser):
         parser.add_argument('--destination', required=True)

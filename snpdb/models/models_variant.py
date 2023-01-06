@@ -24,7 +24,7 @@ from flags.models import FlagCollection, flag_collection_extra_info_signal, Flag
 from flags.models.models import FlagsMixin, FlagTypeContext
 from library.django_utils.django_partition import RelatedModelsPartitionModel
 from library.genomics import format_chrom
-from library.utils import md5sum_str
+from library.utils import md5sum_str, FormerTuple
 from snpdb.models import Wiki
 from snpdb.models.flag_types import allele_flag_types
 from snpdb.models.models_clingen_allele import ClinGenAllele
@@ -251,14 +251,15 @@ class AlleleMergeLog(TimeStampedModel):
 
 
 @dataclass(frozen=True)
-class VariantCoordinate:
+class VariantCoordinate(FormerTuple):
     chrom: str
     pos: int
     ref: str
     alt: str
 
-    def __iter__(self):
-        return iter([self.chrom, self.pos, self.ref, self.alt])
+    @property
+    def as_tuple(self) -> Tuple:
+        return (self.chrom, self.pos, self.ref, self.alt)
 
     def __str__(self):
         return f"{self.chrom}:{self.pos} {self.ref}>{self.alt}"
@@ -267,6 +268,7 @@ class VariantCoordinate:
     def from_clean_str(clean_str: str):
         if full_match := VARIANT_PATTERN.fullmatch(clean_str):
             return VariantCoordinate(chrom=full_match.group(1), pos=int(full_match.group(2)), ref=full_match.group(3), alt=full_match.group(4))
+
 
 class Sequence(models.Model):
     """

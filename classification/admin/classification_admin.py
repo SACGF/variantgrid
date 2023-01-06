@@ -296,12 +296,6 @@ class ClassificationAdmin(ModelAdminBasics):
             vc.update_cached_c_hgvs()
             vc.save()
 
-    @admin_action("Matching: Update Variant Cache Info")
-    def update_variant_cache_info(self, request, queryset: QuerySet[Classification]):
-        for vc in queryset:
-            vc.update_allele_info()
-            vc.save()
-
     def publish_share_level(self, request, queryset: QuerySet[Classification], share_level: ShareLevel):
         already_published = 0
         in_error = 0
@@ -661,15 +655,21 @@ class ImportedAlleleInfoAdmin(ModelAdminBasics):
     list_display = (
         "imported_hgvs",
         "imported_genome_build_patch_version",
+        "status",
         "grch37",
-        "grch38"
+        "grch38",
+        "variant_coordinate"
     )
-    list_filter = ('imported_genome_build_patch_version', MatchingOnFilter)
+    list_filter = ('imported_genome_build_patch_version', 'status', MatchingOnFilter)
     search_fields = ('imported_c_hgvs', 'imported_g_hgvs')
+
 
     @admin_list_column("Imported HGVS", "imported_c_hgvs")
     def imported_hgvs(self, obj: ImportedAlleleInfo):
         return obj.imported_c_hgvs or obj.imported_g_hgvs
 
     def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
         return False

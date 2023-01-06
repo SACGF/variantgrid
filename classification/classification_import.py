@@ -59,9 +59,9 @@ def process_classification_import(classification_import: ClassificationImport, i
                     variant_tuples_by_hash[variant_hash] = variant_tuple
                     classifications_by_hash[variant_hash].append(classification)
             else:
-                classification.set_variant(variant=None, message='Could not derive variant coordinates', failed=True)
+                classification.set_variant_failed_matching(message='Could not derive variant coordinates')
         except ValueError as ve:
-            classification.set_variant(variant=None, message=str(ve), failed=True)
+            classification.set_variant_failed_matching(message=str(ve))
 
     variant_pk_lookup.batch_check()
     unknown_variant_coordinates = variant_pk_lookup.unknown_variant_coordinates
@@ -74,8 +74,7 @@ def process_classification_import(classification_import: ClassificationImport, i
                 variant_tuple = variant_tuples_by_hash[variant_hash]
                 if not _is_safe_for_vcf(variant_tuple):
                     ref_length = len(variant_tuple.ref) if variant_tuple.ref else 0
-                    classification.set_variant(None, message=f'Could not process via VCF, ref length = {ref_length}',
-                                               failed=True)
+                    classification.set_variant_failed_matching(message=f'Could not process via VCF, ref length = {ref_length}')
                 else:
                     unknown_variant_coordinates.append(variant_tuple)
 

@@ -34,18 +34,11 @@ class BulkClassificationInserter:
         self.start = now()
         self.debug_timer = DebugTimer()
 
-    def import_for(self, genome_build: GenomeBuild, transcript: str) -> Optional[ClassificationImport]:
+    def import_for(self, genome_build: GenomeBuild, transcript: str) -> ClassificationImport:
         """
         Returns the ClassificationImport record that a classification should attach to, to have its variant processed
         """
-        if transcript:
-            if not Classification.is_supported_transcript(transcript):
-                report_message(message="Unsupported transcript type imported - will not attempt variant match",
-                               extra_data={
-                                   "target": transcript
-                               })
-                return None
-
+        # Transcript type check is now done in AlleleInfo
         if existing := self._import_for_genome_build.get(genome_build):
             return existing
         new_import = ClassificationImport.objects.create(genome_build=genome_build, user=self.user)
@@ -200,18 +193,26 @@ class BulkClassificationInserter:
                     if save:
                         self.new_record_count += 1
 
-                        genome_build = record.get_genome_build()
-                        classification_import = self.import_for(genome_build=genome_build, transcript=record.transcript)
-                        record.classification_import = classification_import
+                        # FIXME here's where we can see if we've already matched a varaint
 
+                        genome_build = record.get_genome_build()
+
+                        if record.attempt_set_variant_info_from_pre_existing_imported_allele_info():
+                            # this combo of import data has already been resolved (or failed), either way, nothing more to do
+                            pass
+                        else:
+                            record.classification_import = self.import_for(genome_build=genome_build, transcript=record.transcript)
+
+                        # classification_import = self.import_for(genome_build=genome_build, transcript=record.transcript)
+                        # record.classification_import = classification_import
                         # mark the fact that we're searching for a variant
-                        if not record.variant:
-                            if not classification_import:
-                                record.set_variant(
-                                    message=f"Transcript {record.transcript} is not of a currently supported type",
-                                    failed=True)
-                            else:
-                                record.set_variant()
+                        # if not record.variant:
+                        #     if not classification_import:
+                        #         record.set_variant_failed_matching(
+                        #             message=f"Transcript {record.transcript} is not of a currently supported type",
+                        #             failed=True)
+                        #     else:
+                        #         # record.set_variant()
 
                         record.save()
 

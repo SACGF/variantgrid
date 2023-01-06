@@ -162,7 +162,7 @@ class TestClinVarExport(TestCase):
 
         c.variant = variant
         c.allele = allele
-        c.update_allele_info()
+        c.update_allele_info_from_classification()
         c.allele_info.grch37.c_hgvs = "NM_000001.2(TECTA):c.1913G>A"
         c.allele_info.grch37.c_hgvs_full = "NM_000001.2(TECTA):c.1913G>A"
         c.allele_info.grch37.save()

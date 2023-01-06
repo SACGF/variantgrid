@@ -25,7 +25,7 @@ from genes.models import TranscriptVersion, TranscriptParts, Transcript, GeneSym
     NoTranscript
 from library.constants import WEEK_SECS
 from library.log_utils import report_exc_info
-from library.utils import clean_string
+from library.utils import clean_string, FormerTuple
 from snpdb.clingen_allele import get_clingen_allele_from_hgvs, get_clingen_allele_for_variant, \
     ClinGenAlleleServerException, ClinGenAlleleAPIException
 from snpdb.models import Variant, ClinGenAllele
@@ -463,15 +463,15 @@ class FakeTranscriptVersion:
 
 
 @dataclass(frozen=True)
-class VariantCoordinateAndDetails:
+class VariantCoordinateAndDetails(FormerTuple):
     variant_coordinate: VariantCoordinate
     transcript_accession: str
     kind: str
     method: str
 
-    def __iter__(self):
-        # just exists so we can deconstruct for backwards compatibility when this was just done in a tuple
-        return iter([self.variant_coordinate, self.used_transcript_accession, self.kind, self.method])
+    @property
+    def as_tuple(self) -> Tuple:
+        return (self.variant_coordinate, self.transcript_accession, self.kind, self.method)
 
 
 class HGVSMatcher:

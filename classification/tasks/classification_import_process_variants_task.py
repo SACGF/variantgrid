@@ -55,7 +55,7 @@ class ClassificationImportProcessVariantsTask(ImportVCFStepTask):
             else:
                 # note this shouldn't happen at this step - to get here get_variant_coordinates_from_evidence
                 # has to have previously returned a proper value
-                classification.set_variant(None, message="Could not derive variant coordinates", failed=True)
+                classification.set_variant_failed_matching(message="Could not derive variant coordinates")
 
         # Look up variant tuples - if not exists was normalised during import - lookup ModifiedImportedVariant
         variant_pk_lookup.batch_check()
@@ -79,10 +79,13 @@ class ClassificationImportProcessVariantsTask(ImportVCFStepTask):
                     variant = Variant.objects.get(pk=variant_pk)
 
                 # go via the set method so signals can be called
-                classification.set_variant(variant, message=validation_message, failed=not variant)
+                if variant:
+                    classification.set_variant(variant, validation_message)
+                else:
+                    classification.set_variant_failed_matching(validation_message)
             except Exception as e:
                 report_exc_info()
-                classification.set_variant(None, message=f'Unexpected error during matching {str(e)}', failed=True)
+                classification.set_variant_failed_matching(f'Unexpected error during matching {str(e)}')
 
 
 def liftover_classification_import(classification_import: ClassificationImport,

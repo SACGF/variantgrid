@@ -1,12 +1,15 @@
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from django.conf import settings
-from django.db.models import TextField, ForeignKey, CASCADE, SET_NULL, OneToOneField, TextChoices
+from django.db.models import TextField, ForeignKey, CASCADE, SET_NULL, OneToOneField, TextChoices, \
+    CharField
 from model_utils.models import TimeStampedModel
+from pyhgvs import InvalidHGVSName
+
 from genes.hgvs import HGVSMatcher, CHGVS
 from genes.models import TranscriptVersion, GeneSymbol
 from library.cache import timed_cache
 from library.log_utils import report_exc_info
-from snpdb.models import GenomeBuild, Variant, Allele, GenomeBuildPatchVersion
+from snpdb.models import GenomeBuild, Variant, Allele, GenomeBuildPatchVersion, VariantCoordinate
 
 
 class ResolvedVariantInfo(TimeStampedModel):
@@ -107,6 +110,13 @@ class ResolvedVariantInfo(TimeStampedModel):
         return variant_info
 
 
+class ImportedAlleleInfoStatus(TextChoices):
+    PROCESSING = "P", "Processing"
+    MATCHED_IMPORTED_BUILD = "I", "Matched Imported Variant"
+    MATCHED_ALL_BUILDS = "M", "Matched All Builds"
+    FAILED = "F", "Failed"
+
+
 class ImportedAlleleInfo(TimeStampedModel):
     """
     This class exists to give quick access to GRCh 37 and 38 details to a classification
@@ -132,6 +142,15 @@ class ImportedAlleleInfo(TimeStampedModel):
     Should this be the raw 
     """
 
+    variant_coordinate = TextField(null=True, blank=True)
+
+    @property
+    def variant_coordinate_obj(self) -> Optional[VariantCoordinate]:
+        if variant_coordinate_str := self.variant_coordinate:
+            return VariantCoordinate.from_clean_str(variant_coordinate_str)
+        else:
+            return None
+
     allele = ForeignKey(Allele, null=True, blank=True, on_delete=SET_NULL)
     """ set this once it's matched, but record can exist prior to variant matching """
 
@@ -140,6 +159,12 @@ class ImportedAlleleInfo(TimeStampedModel):
 
     grch38 = OneToOneField(ResolvedVariantInfo, on_delete=SET_NULL, null=True, blank=True, related_name='+')
     """ cached reference to 38, so can quickly refer to classification__allele_info__grch38__c_hgvs for example """
+
+    message = TextField(null=True, blank=True)
+    """ used to describe information about the matching process (or failure) """
+
+    status = CharField(max_length=1, choices=ImportedAlleleInfoStatus.choices, default=ImportedAlleleInfoStatus.PROCESSING)
+    """ If true, indicates that this is not matchable, see the message for details """
 
     class Meta:
         unique_together = ('imported_c_hgvs', 'imported_g_hgvs', 'imported_transcript', 'imported_genome_build_patch_version')
@@ -180,26 +205,115 @@ class ImportedAlleleInfo(TimeStampedModel):
     def __setitem__(self, key: GenomeBuild, value: Optional[ResolvedVariantInfo]):
         setattr(self, ImportedAlleleInfo.__genome_build_to_attr(key), value)
 
-    def update_and_save(self, matched_allele: Allele, force_update: bool = False):
+    @staticmethod
+    def is_supported_transcript(transcript_or_hgvs: str):
+        for transcript_type in settings.VARIANT_CLASSIFICATION_SUPPORTED_TRANSCRIPTS:
+            if transcript_or_hgvs.startswith(transcript_type):
+                return True
+        return False
+
+    def update_variant_coordinate(self):
+        # TODO, support variant_coordinate being provided
+        if transcript := self.get_transcript:
+            if not ImportedAlleleInfo.is_supported_transcript(transcript):
+                self.message = "Unsupported transcript - will not attempt variant match"
+                self.status = ImportedAlleleInfoStatus.FAILED
+                # TODO - should we still attempt deriving the variant?
+                return
+
+        use_hgvs = self.imported_c_hgvs or self.imported_g_hgvs
+        try:
+            hgvs_matcher = HGVSMatcher(self.imported_genome_build_patch_version.genome_build)
+            vc_extra = hgvs_matcher.get_variant_tuple_used_transcript_kind_and_method(use_hgvs)
+            self.message = f"HGVS matched by '{vc_extra.method}'"
+            self.variant_coordinate = str(vc_extra.variant_coordinate)
+        except Exception as e:
+            # we rely on ValueError a lot, so best to just review errors in variant matching
+            # if not isinstance(e, (InvalidHGVSName, NotImplementedError)):
+            #     # extra not expected errors, report them in case they're coding mistakes rather than bad input
+            #     report_exc_info({"hgvs": use_hgvs, "genome_build": str(self.imported_genome_build_patch_version)})
+            self.message = str(e)
+            self.status = ImportedAlleleInfoStatus.FAILED
+
+    def update_status(self):
+        if self.grch37 and self.grch38:
+            self.status = ImportedAlleleInfoStatus.MATCHED_ALL_BUILDS
+        elif self.variant_info_for_imported_genome_build:
+            self.status = ImportedAlleleInfoStatus.MATCHED_IMPORTED_BUILD
+        else:
+            self.status = ImportedAlleleInfoStatus.FAILED
+
+    @staticmethod
+    def get_or_create(**kwargs: Dict[str, Any]) -> 'ImportedAlleleInfo':
+        allele_info, created = ImportedAlleleInfo.objects.get_or_create(**kwargs)
+        if created:
+            allele_info.update_variant_coordinate()
+            allele_info.save()
+        return allele_info
+
+    @property
+    def variant_info_for_imported_genome_build(self) -> Optional[ResolvedVariantInfo]:
+        return self[self.imported_genome_build_patch_version.genome_build]
+
+    def set_matching_failed(self, message: Optional[str] = None):
+        if message:
+            self.message = message
+        self.status = ImportedAlleleInfoStatus.FAILED
+        self.save()
+
+    def force_refresh_and_save(self):
         """
-        Call after providing an allele to update the attached variant infos
-        :param matched_allele: Forces an update on the ImportedAlleleInfos
-        :param force_update: Use if the allele has changed what variants it's matched to (not required if it
+        Updates linked variants (c.hgvs, etc)
         """
+        if va := self.variant_info_for_imported_genome_build:
+            if vav := va.variant:
+                self.update_and_save(matched_variant=vav, force_update=True)
+
+    def update_and_save(self, matched_variant: Variant, message: Optional[str] = None, force_update: bool = False):
+        """
+        Call to update this object, and attached ResolvedVariantInfos (will check if matched_variant has an attached allele).
+        If the variant is not yet attached to an allele (or the attached allele doesn't have a variant for each build yet
+        call again when it does).
+        :param matched_variant: The variant (for the imported genome build) that we matched on.
+        :param message: Details about the matching (if blank previous message will remain)
+        :param force_update: Forces recalc of c.hgvs etc. on variants, we will still test to see if variants for certain
+        builds are newly provided, change etc.
+        """
+
+        if not matched_variant:
+            raise ValueError("ImportedAlleleInfo.update_and_save requires a matched_variant, instead call reset_with_status")
+
+        matched_allele = matched_variant.allele
         if self.allele != matched_allele:
             self.allele = matched_allele
+
+        if message:
+            self.message = message
 
         if not self.pk:
             self.save()
 
-        for genome_build in ImportedAlleleInfo._genome_builds():
-            variant = self.allele.variant_for_build_optional(genome_build)
-            self.update_variant(genome_build, variant, force_update)
+        applied_all = False
+        if matched_allele:
+            missing_variant = False
+            for genome_build in ImportedAlleleInfo._genome_builds():
+                variant = self.allele.variant_for_build_optional(genome_build)
+                self._update_variant(genome_build, variant, force_update)
+                if not variant:
+                    missing_variant = True
+            applied_all = not missing_variant
+        elif matched_variant:
+            self._update_variant(self.imported_genome_build_patch_version.genome_build, matched_variant, force_update)
+
+        if applied_all:
+            self.status = ImportedAlleleInfoStatus.MATCHED_ALL_BUILDS
+        else:
+            self.status = ImportedAlleleInfoStatus.MATCHED_IMPORTED_BUILD
 
         self.save()
         return self
 
-    def update_variant(self, genome_build: GenomeBuild, variant: Variant, force_update: bool = False):
+    def _update_variant(self, genome_build: GenomeBuild, variant: Variant, force_update: bool = False):
         if not self.allele or not variant:
             # we don't have an allele OR we don't have the corresponding variant, delete the VariantInfo
             if existing := self[genome_build]:

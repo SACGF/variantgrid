@@ -1,8 +1,4 @@
-import itertools
-from dataclasses import dataclass, field
-from enum import Enum
-from itertools import zip_longest
-from typing import Optional, List, Pattern, Any
+from typing import Optional
 
 from django.contrib.auth.decorators import user_passes_test
 from django.db.models import QuerySet, Q, Count, F
@@ -10,15 +6,18 @@ from django.http import HttpRequest
 from django.shortcuts import render, get_object_or_404
 from requests import Response
 
-from classification.models import ImportedAlleleInfo
+from classification.models import ImportedAlleleInfo, ImportedAlleleInfoStatus
 from genes.hgvs import CHGVS
 from library.guardian_utils import is_superuser
-from library.utils import first, MultiDiff, MultiDiffInput
+from library.utils import MultiDiff, MultiDiffInput
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, CellData
 import re
 
 
 class ImportedAlleleInfoColumns(DatatableConfig[ImportedAlleleInfo]):
+
+    def render_status(self, data: CellData):
+        return ImportedAlleleInfoStatus(data.value).label
 
     def render_c_hgvs(self, data: CellData):
         c_hgvs_str: Optional[str] = None
@@ -84,6 +83,12 @@ class ImportedAlleleInfoColumns(DatatableConfig[ImportedAlleleInfo]):
                 extra_columns=['grch38__variant', 'grch38__error'],
                 renderer=self.render_c_hgvs,
                 client_renderer='VCTable.hgvs'
+            ),
+            RichColumn(
+                key='status',
+                label="Status",
+                renderer=self.render_status,
+                orderable=True
             ),
             RichColumn(
                 key='classification_count',

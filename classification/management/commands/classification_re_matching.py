@@ -14,6 +14,9 @@ class Command(BaseCommand):
         parser.add_argument('--file', type=str, required=True)
 
     def handle(self, *args, **options):
+        """
+        Take a file of internal classification IDs, and rematch them
+        """
         filename = options["file"]
         qs: QuerySet[Classification] = Classification.objects.none()
 

@@ -1,5 +1,7 @@
+import abc
 import operator
 import re
+from abc import ABC
 from collections import defaultdict
 from dataclasses import dataclass
 from itertools import islice
@@ -84,7 +86,7 @@ def nest_dict(flat_dict: Dict[DictKey, DictVal]) -> Dict[DictKey, DictVal]:
     return nested
 
 
-def iter_fixed_chunks(iterable: Iterable[T], chunk_size: int) -> Iterator[List[T]]:
+def iter_fixed_chunks(iterable: Iterable[T], chunk_size: int) -> Iterator[Tuple[T]]:
     """ https://stackoverflow.com/a/22045226 """
     it = iter(iterable)
     return iter(lambda: tuple(islice(it, chunk_size)), ())
@@ -362,3 +364,34 @@ class LazyAttribute:
             lazy_att = LazyAttribute(obj, attribute)
             context[attribute] = SimpleLazyObject(lazy_att.eval)
         return context
+
+
+class FormerTuple(ABC):
+    """
+    Base class for converting tuples (or named tuples) to data classes while maintaing decomposition
+    e.g.
+    @dataclass(frozen=True)
+    class VariantCoordinate(FormerTuple):
+        chrom: str
+        pos: int
+        alt: str
+        ref: str
+
+        @property
+        def as_tuple():
+            return (self.chrom, self.pos, self.alt, self.ref)
+
+    # existing code (still works)
+    chrom, pos, alt, ref = some_variant_coordinate
+    """
+
+    @property
+    @abc.abstractmethod
+    def as_tuple(self) -> Tuple:
+        pass
+
+    def __iter__(self):
+        return iter(self.as_tuple)
+
+    def __getitem__(self, item):
+        return self.as_tuple[item]

@@ -102,7 +102,7 @@ class Command(BaseCommand):
         for i, c in enumerate(Classification.objects.all()):
             if i % 100 == 0:
                 print(f"Processed {i} classifications")
-            c.update_allele_info()
+            c.update_allele_info_from_classification()
             c.save(update_modified=False)
         print(f"Finished {i} classifications")
 
