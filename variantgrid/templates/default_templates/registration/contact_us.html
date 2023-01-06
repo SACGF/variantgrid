@@ -21,6 +21,7 @@
                         <hr class="my-4"/>
                         <form id='contact_us' method="POST" action="{% url 'contact_us' %}" role="contact">
                             {% csrf_token %}
+                            {{ form.captcha }}
                             {% labelled label="Your Name" errors=form.errors.name %}<input name="name" class="form-control" autofocus value="{{ form.name.value|default_if_none:'' }}"/>{% endlabelled %}
                             {% labelled label="Your Email" errors=form.errors.email %}<input name="email" type="email" class="form-control" value="{{ form.email.value|default_if_none:'' }}"/>{% endlabelled %}
                             {% labelled label="Message" errors=form.errors.message %}<textarea name="message" class="form-control" style="min-height:20vh">{{ form.message.value|default_if_none:'' }}</textarea>{% endlabelled %}
