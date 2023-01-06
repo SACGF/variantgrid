@@ -245,11 +245,17 @@ class ImportedAlleleInfo(TimeStampedModel):
 
     @staticmethod
     def get_or_create(**kwargs: Dict[str, Any]) -> 'ImportedAlleleInfo':
-        allele_info, created = ImportedAlleleInfo.objects.get_or_create(**kwargs)
-        if created:
-            allele_info.update_variant_coordinate()
-            allele_info.save()
-        return allele_info
+        try:
+            allele_info, created = ImportedAlleleInfo.objects.get_or_create(**kwargs)
+            if created:
+                allele_info.update_variant_coordinate()
+                allele_info.save()
+            return allele_info
+        except ImportedAlleleInfo.MultipleObjectsReturned as me:
+            # don't think this happens anymore, but just give us some better reporting if it does
+            report_exc_info(extra_data={"kwargs": kwargs})
+            raise
+
 
     @property
     def variant_info_for_imported_genome_build(self) -> Optional[ResolvedVariantInfo]:
