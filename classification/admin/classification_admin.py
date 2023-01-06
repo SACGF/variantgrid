@@ -670,9 +670,9 @@ class ImportedAlleleInfoAdmin(ModelAdminBasics):
 
     @admin_action("Re-Match - via linked classifications")
     def re_match(self, request, queryset: QuerySet[ImportedAlleleInfo]):
-        classifications = Classification.objects.filter(allele_info__in=queryset)
-        self.message_user(request, f'Found : {classifications.count()} linked classifications')
-        valid_record_count, invalid_record_count = reattempt_variant_matching(request.user, queryset)
+        classifications_qs = Classification.objects.filter(allele_info__in=queryset)
+        self.message_user(request, f'Found : {classifications_qs.count()} linked classifications')
+        valid_record_count, invalid_record_count = reattempt_variant_matching(request.user, classifications_qs)
         if invalid_record_count:
             self.message_user(request, f'Records with missing or invalid builds/coordinates : {invalid_record_count}')
         self.message_user(request, f'Classification Records re-matching : {valid_record_count}')
