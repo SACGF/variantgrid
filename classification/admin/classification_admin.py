@@ -296,6 +296,12 @@ class ClassificationAdmin(ModelAdminBasics):
             vc.update_cached_c_hgvs()
             vc.save()
 
+    @admin_action("Matching: Re-apply AlleleInfo to Classification/Flags")
+    def re_apply_allele_info(self, request, queryset: QuerySet[Classification]):
+        for classification in queryset:
+            classification.attempt_set_variant_info_from_pre_existing_imported_allele_info()
+            classification.save()
+
     def publish_share_level(self, request, queryset: QuerySet[Classification], share_level: ShareLevel):
         already_published = 0
         in_error = 0
