@@ -105,9 +105,11 @@ class ImportedAlleleInfoColumns(DatatableConfig[ImportedAlleleInfo]):
         )
 
     def filter_queryset(self, qs: QuerySet[ImportedAlleleInfo]) -> QuerySet[ImportedAlleleInfo]:
-        if filter_mode := self.get_query_param('37_not_38'):
-            if filter_mode == 'true':
-                qs = qs.filter(grch37__c_hgvs__ne=F('grch38__c_hgvs'))
+        if (filter_mode := self.get_query_param('37_not_38')) and filter_mode == 'true':
+            qs = qs.filter(grch37__c_hgvs__ne=F('grch38__c_hgvs'))
+        if (error_mode := self.get_query_param('errors_mode')) and error_mode == 'true':
+            qs = qs.filter(Q(status=ImportedAlleleInfoStatus.FAILED) | Q(grch37__isnull=True) | Q(grch38__isnull=True))
+
         return qs
 
     def power_search(self, qs: QuerySet[ImportedAlleleInfo], search_string: str) -> QuerySet[ImportedAlleleInfo]:

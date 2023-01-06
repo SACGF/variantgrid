@@ -17,6 +17,7 @@
     <script>
         function datatableFilter(data) {
             data['37_not_38'] = $("#37_not_38").is(':checked');
+            data['errors_mode'] = $("#errors_mode").is(':checked');
         }
         function applyFilters() {
             $('#imported-allele-info-datatables').DataTable().ajax.reload();
@@ -31,8 +32,14 @@
         ></table>
         <div data-toolbar="#imported-allele-info-datatables">
             <div class="float-right mr-4" style="position:relative;top:6px">
-                <input type="checkbox" class="form-check-input" id="37_not_38" onclick="applyFilters()"/>
-                <label for="37_not_38">Filter 37 != 38</label>
+                <div class="form-check-inline">
+                    <input type="checkbox" class="form-check-input" id="errors_mode" onclick="applyFilters()"/>
+                    <label for="errors_mode">Only Errors</label>
+                </div>
+                <div class="form-check-inline">
+                    <input type="checkbox" class="form-check-input" id="37_not_38" onclick="applyFilters()"/>
+                    <label for="37_not_38">Filter 37 != 38</label>
+                </div>
             </div>
         </div>
 
