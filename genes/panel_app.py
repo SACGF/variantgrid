@@ -51,9 +51,8 @@ def get_panel_app_panel_as_gene_list_json(panel_app_panel_id):
     panel_app_gene_evidence = {}
     gene_names_list = []
     for gene_record in genes:
-        gene_data = gene_record["gene_data"]
-        gene_symbol = gene_data["gene_symbol"]
-        panel_app_gene_evidence[gene_symbol] = gene_data
+        gene_symbol = gene_record["gene_data"]["gene_symbol"]
+        panel_app_gene_evidence[gene_symbol] = gene_record
         gene_names_list.append(gene_symbol)
 
     gene_matcher = GeneSymbolMatcher()
