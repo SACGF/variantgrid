@@ -1,9 +1,9 @@
 from enum import Enum
+from functools import cached_property
 from typing import Set, Optional, List, Tuple, Callable
 
 from django.http import HttpRequest
 from django.urls import reverse
-from lazy import lazy
 
 from annotation.models import ClinVar, ClinVarVersion
 from classification.enums import SpecialEKeys
@@ -89,7 +89,7 @@ class ClinVarCompareRow(ExportRow):
                 if gene_symbol := c_hgvs.gene_symbol:
                     return gene_symbol
 
-    @lazy
+    @cached_property
     def server_clinical_significance_set(self) -> Set[str]:
         cs_set: Set[str] = set()
         for cm in self.allele_group.cms_regardless_of_issues:
@@ -97,7 +97,7 @@ class ClinVarCompareRow(ExportRow):
                 cs_set.add(classified)
         return cs_set
 
-    @lazy
+    @cached_property
     def clinvar_clinical_significance_set(self) -> Tuple[Set[str], Set[str]]:
         clinvar: ClinVar
         cs_set: Set[str] = set()
@@ -200,7 +200,7 @@ class ClinVarCompareRow(ExportRow):
         if issues := self.allele_group.issues:
             return "\n".join(sorted(set(issue.message for issue in issues)))
 
-    @lazy
+    @cached_property
     def clinvar(self) -> Optional[ClinVar]:
         return self.allele_group["clinvar"]
 
@@ -227,7 +227,7 @@ class ClassificationExportFormatter2ClinVarCompare(ClassificationExportFormatter
                     ad["clinvar"] = clinvar
         return handle_batch
 
-    @lazy
+    @cached_property
     def clinvar_version(self) -> ClinVarVersion:
         return ClinVarVersion.objects.filter(genome_build=self.classification_filter.genome_build).order_by('-created').first()
 

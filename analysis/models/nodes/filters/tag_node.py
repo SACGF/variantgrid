@@ -1,11 +1,10 @@
 import operator
-from functools import reduce
+from functools import cached_property, reduce
 from typing import List
 
 from django.db import models
 from django.db.models.deletion import SET_NULL, CASCADE
 from django.db.models.query_utils import Q
-from lazy import lazy
 
 from analysis.models.enums import TagNodeMode
 from analysis.models.models_variant_tag import VariantTag
@@ -22,7 +21,7 @@ class TagNode(AnalysisNode):
     def modifies_parents(self):
         return True
 
-    @lazy
+    @cached_property
     def tag_ids(self) -> List[str]:
         # This is called when Node is being initialised to set the name
         if self.pk is None:

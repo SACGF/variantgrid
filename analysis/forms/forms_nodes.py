@@ -346,7 +346,7 @@ class GeneListNodeForm(BaseNodeForm):
 
     class Meta:
         model = GeneListNode
-        fields = ("pathology_test_version", "sample", "exclude", "accordion_panel")
+        fields = ("pathology_test_version", "sample", "min_panel_app_confidence", "exclude", "accordion_panel")
         widgets = {
             "pathology_test_version": ModelSelect2(url='pathology_test_version_autocomplete',
                                                    attrs={'data-placeholder': 'Pathology Test...'},

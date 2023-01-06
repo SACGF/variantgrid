@@ -1,4 +1,5 @@
 import inspect
+from functools import cached_property
 from typing import Optional, List, Iterator
 
 from dateutil.tz import gettz
@@ -11,7 +12,6 @@ from django.urls import path
 from django.utils.encoding import smart_str
 from django_json_widget.widgets import JSONEditorWidget
 from guardian.admin import GuardedModelAdminMixin
-from lazy import lazy
 
 from library.utils import delimited_row, WrappablePartial
 
@@ -251,7 +251,7 @@ class ModelAdminBasics(admin.ModelAdmin):
         resulting_urls = [path('<path:object_id>/single_action/', self.single_page_action)] + self.model_urls + super().get_urls()
         return resulting_urls
 
-    @lazy
+    @cached_property
     def tz(self):
         return gettz(settings.TIME_ZONE)
 

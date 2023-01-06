@@ -2,9 +2,8 @@ import json
 from abc import abstractmethod, ABC
 from dataclasses import dataclass
 from decimal import Decimal
+from functools import cached_property
 from typing import Union, Dict, Any, List, Mapping
-
-from lazy import lazy
 
 
 # Inclusion of this code snippet will cause "to_json()" to be called on classes by the JSONEncoder, allowing them to become serializable
@@ -131,7 +130,7 @@ class JsonDiff:
     def __repr__(self) -> str:
         return f"root{self.json_path_str} {self.a} -> {self.b}"
 
-    @lazy
+    @cached_property
     def json_path_str(self):
         return "".join(str(p) for p in self.json_path)
 

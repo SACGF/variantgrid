@@ -1,13 +1,13 @@
 import itertools
 import os
 import re
+from functools import cached_property
 from typing import Dict, Optional, List
 
 from django.conf import settings
 from django.db import models
 from django.db.models.deletion import CASCADE
 from django.db.models.query_utils import Q
-from lazy import lazy
 
 from genes.models_enums import AnnotationConsortium
 from library.cache import timed_cache
@@ -52,7 +52,7 @@ class GenomeBuild(models.Model, SortMetaOrderingMixin):
         """ Use this for hacks - makes it easy to find / fix later """
         return cls.objects.get(pk='GRCh37')
 
-    @lazy
+    @cached_property
     def is_annotated(self):
         return GenomeBuild.builds_with_annotation().filter(pk=self.pk).exists()
 
@@ -113,7 +113,7 @@ class GenomeBuild(models.Model, SortMetaOrderingMixin):
         values_qs = GenomeBuild.builds_with_annotation().values_list("name", "alias")
         return ", ".join(itertools.chain.from_iterable(values_qs))
 
-    @lazy
+    @cached_property
     def contigs(self):
         qs = Contig.objects.filter(genomebuildcontig__genome_build=self)
         return qs.order_by("genomebuildcontig__order")
@@ -142,7 +142,7 @@ class GenomeBuild(models.Model, SortMetaOrderingMixin):
             build_annotation_descriptions = ", ".join([f"{k}: {v}" for k, v in build_consortia.items()])
         return build_annotation_descriptions
 
-    @lazy
+    @cached_property
     def chrom_contig_mappings(self) -> Dict[str, 'Contig']:
         chrom_contig_mappings = {}
         for contig in self.contigs:
@@ -184,7 +184,7 @@ class GenomeBuild(models.Model, SortMetaOrderingMixin):
     def reference_fasta(self):
         return self.get_settings_file("reference_fasta")
 
-    @lazy
+    @cached_property
     def genome_fasta(self):
         from snpdb.models import GenomeFasta
         return GenomeFasta.get_for_genome_build(self)
@@ -373,7 +373,7 @@ class GenomeFasta(models.Model):
             raise self.ContigNotInFastaError(f"'{chrom}' (contig_id: {contig_id}) not in {self} ({self.filename})")
         return sequence_name
 
-    @lazy
+    @cached_property
     def _contig_lookups(self):
         chrom_contig_id = self.genome_build.get_chrom_contig_id_mappings()
         contig_id_to_name = self.get_contig_id_to_name_mappings()

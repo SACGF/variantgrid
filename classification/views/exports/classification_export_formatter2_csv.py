@@ -1,9 +1,9 @@
 from dataclasses import dataclass
+from functools import cached_property
 from io import StringIO
 from typing import List, Optional, Dict, Set
 
 from django.http import HttpRequest
-from lazy import lazy
 
 from classification.models import Classification, ClassificationModification, EvidenceKeyMap
 from classification.models.classification_groups import ClassificationGroupUtils
@@ -184,7 +184,7 @@ class ClassificationExportFormatter2CSV(ClassificationExportFormatter2):
             format_details=FormatDetailsCSV.from_request(request)
         )
 
-    @lazy
+    @cached_property
     def used_keys(self) -> UsedKeyTracker:
         used_keys = UsedKeyTracker(
             self.classification_filter.user,
@@ -230,7 +230,7 @@ class ClassificationExportFormatter2CSV(ClassificationExportFormatter2):
         else:
             return []
 
-    @lazy
+    @cached_property
     def _categories(self) -> Optional[Dict]:
         categories = {}
         if self.format_details.exclude_transient:

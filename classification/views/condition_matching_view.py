@@ -1,10 +1,10 @@
+from functools import cached_property
 from typing import Optional, List, Union
 
 from django.contrib.auth.models import User
 from django.db.models import QuerySet
 from django.shortcuts import render, get_object_or_404
 from guardian.shortcuts import get_objects_for_user
-from lazy import lazy
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -34,7 +34,7 @@ class ConditionTextColumns(DatatableConfig):
                 RichColumn(key="lab__name", label='Lab', orderable=True, sort_keys=['lab__name', 'normalized_text'])
             )
 
-    @lazy
+    @cached_property
     def lab_picker(self) -> LabPickerData:
         return LabPickerData.for_user(user=self.user, selection=self.get_query_param("lab_id"))
 

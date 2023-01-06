@@ -2,10 +2,10 @@ import logging
 import operator
 import shutil
 from collections import defaultdict
+from functools import cached_property
 from typing import Tuple, Optional
 
 from django.conf import settings
-from lazy import lazy
 
 from annotation.models.damage_enums import SIFTPrediction, FATHMMPrediction, \
     MutationAssessorPrediction, MutationTasterPrediction, Polyphen2Prediction, \
@@ -553,7 +553,7 @@ class BulkVEPVCFAnnotationInserter:
         vav = self.annotation_run.variant_annotation_version
         return vav.genome_build
 
-    @lazy
+    @cached_property
     def gene_identifiers(self):
         """ A set of gene identifiers to check whether in DB or not """
         vav = self.annotation_run.variant_annotation_version
@@ -561,7 +561,7 @@ class BulkVEPVCFAnnotationInserter:
                                            genome_build=vav.genome_build)
         return set(gv_qs.distinct().values_list("gene", flat=True))
 
-    @lazy
+    @cached_property
     def transcript_versions_by_id(self):
         vav = self.annotation_run.variant_annotation_version
         return TranscriptVersion.transcript_versions_by_id(vav.genome_build, vav.annotation_consortium)

@@ -1,7 +1,7 @@
 import datetime
 import logging
 from collections import defaultdict
-from functools import total_ordering, reduce
+from functools import cached_property, total_ordering, reduce
 from operator import __and__
 from typing import Tuple, List, Optional, Union, Dict, Iterable, Any, TypeVar
 
@@ -13,7 +13,6 @@ from django.db.models.deletion import CASCADE, PROTECT
 from django.db.models.expressions import Subquery
 from django.db.models.query import QuerySet
 from django_extensions.db.models import TimeStampedModel
-from lazy import lazy
 
 from flags.models.enums import FlagStatus
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
@@ -199,7 +198,7 @@ class FlagInfos:
             self._flagc_dict[fc.pk] = fc
         self.sub_flag_types = []
 
-    @lazy
+    @cached_property
     def ids(self):
         return [fc.pk for fc in self.flag_collections]
 

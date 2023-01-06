@@ -9,6 +9,7 @@ import logging
 import re
 import sys
 from dataclasses import dataclass
+from functools import cached_property
 from importlib import metadata
 from typing import List, Optional, Tuple
 
@@ -17,7 +18,6 @@ from Bio.Data.IUPACData import protein_letters_1to3_extended
 from django.conf import settings
 from django.core.cache import cache
 from django.db.models import Max, Min
-from lazy import lazy
 from pyhgvs import HGVSName
 from pyhgvs.utils import make_transcript
 
@@ -123,7 +123,7 @@ class PHGVS:
             is_confirmed=is_confirmed
         )
 
-    @lazy
+    @cached_property
     def full_p_hgvs(self) -> str:
         if self.transcript:
             return f"{self.transcript}:{self.p_dot}"
@@ -132,7 +132,7 @@ class PHGVS:
     def __str__(self):
         return self.full_p_hgvs
 
-    @lazy
+    @cached_property
     def p_dot(self) -> str:
         if self.intron:
             return "p.?"
@@ -268,7 +268,7 @@ class CHGVS:
                 return CHGVS(full_c_hgvs)
         return self
 
-    @lazy
+    @cached_property
     def without_transcript_version(self) -> 'CHGVS':
         if self.transcript_parts:
             transcript = self.transcript_parts.identifier
@@ -298,7 +298,7 @@ class CHGVS:
     def __str__(self):
         return self.full_c_hgvs
 
-    @lazy
+    @cached_property
     def sort_str(self) -> str:
         """
         Returns a string that can be used for sorting, works on numerical part of c., followed by the extra, followed by the transcript
@@ -323,7 +323,7 @@ class CHGVS:
 
         return sort_str + self.full_c_hgvs or ""
 
-    @lazy
+    @cached_property
     def transcript_parts(self) -> TranscriptParts:
         if self.transcript:
             t_regex = re.compile('^([_A-Z0-9]+)(?:[.]([0-9]+))?$', re.RegexFlag.IGNORECASE)

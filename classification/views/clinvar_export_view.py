@@ -2,6 +2,7 @@ import json
 import re
 from collections import defaultdict
 from dataclasses import dataclass
+from functools import cached_property
 from typing import Dict, Any, Optional, Iterable, List
 
 from django.contrib import messages
@@ -13,7 +14,6 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
 from django.views import View
 from django.views.decorators.http import require_POST
-from lazy import lazy
 from classification.enums import SpecialEKeys
 from classification.models import ClinVarExport, ClinVarExportBatch, ClinVarExportBatchStatus, \
     EvidenceKeyMap, ClinVarExportStatus, ClinVarExportSubmission
@@ -271,7 +271,7 @@ class ClinVarExportSummary(ExportRow):
     def classification(self):
         return self.clinvar_export.classification_based_on
 
-    @lazy
+    @cached_property
     def genome_build_row(self) -> GenomeBuild:
         if classification := self.classification:
             try:

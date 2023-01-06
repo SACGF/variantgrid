@@ -5,10 +5,10 @@ from django.db.models import QuerySet, TextChoices
 from django.urls import reverse
 from django.utils.timezone import now
 from frozendict import frozendict
-from lazy import lazy
+from functools import cached_property
 from model_utils.models import TimeStampedModel
 from classification.models import ClassificationModification, ConditionResolved
-from library.utils import first
+from library.utils import first, invalidate_cached_property
 from snpdb.models import ClinVarKey, Allele
 from uicore.json.json_types import JsonObjType
 from uicore.json.validated_json import ValidatedJson, JsonMessages
@@ -69,7 +69,7 @@ class ClinVarExport(TimeStampedModel):
         return self.submission_grouping.all_messages.errors() + \
                self.submission_body.all_messages.errors()
 
-    @lazy
+    @cached_property
     def last_submission(self) -> Optional['ClinVarExportSubmission']:
         if last_submission := self.clinvarexportsubmission_set.order_by('-created').first():
             return last_submission
@@ -113,7 +113,7 @@ class ClinVarExport(TimeStampedModel):
     def __repr__(self):
         return str(self)
 
-    @lazy
+    @cached_property
     def _condition_resolved(self) -> ConditionResolved:
         return ConditionResolved.from_dict(self.condition)
 
@@ -132,11 +132,11 @@ class ClinVarExport(TimeStampedModel):
     @condition_resolved.setter
     def condition_resolved(self, new_condition: ConditionResolved):
         self.condition = new_condition.to_json()
-        lazy.invalidate(self, '_condition_resolved')
+        invalidate_cached_property(self, '_condition_resolved')
 
     def update_classification(self, new_classification_based_on: Optional[ClassificationModification]):
         if self.classification_based_on != new_classification_based_on:
-            lazy.invalidate(self, 'submission_body')
+            invalidate_cached_property(self, 'submission_body')
             self.classification_based_on = new_classification_based_on
             self.update()
 
@@ -149,11 +149,11 @@ class ClinVarExport(TimeStampedModel):
         cc.update_classification(candidate)
         return cc
 
-    @lazy
+    @cached_property
     def submission_grouping(self) -> ValidatedJson:
         return ValidatedJson.deserialize(self.submission_grouping_validated)
 
-    @lazy
+    @cached_property
     def submission_body(self) -> ValidatedJson:
         return ValidatedJson.deserialize(self.submission_body_validated)
 

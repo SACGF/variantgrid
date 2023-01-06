@@ -46,3 +46,23 @@ class MANEStatus(models.TextChoices):
     """
     MANE_SELECT = "M", 'MANE Select'
     MANE_PLUS_CLINICAL = "C", "MANE Plus Clinical"
+
+
+class PanelAppConfidence(models.TextChoices):
+    """
+    https://panelapp.genomicsengland.co.uk/media/files/PanelApp_User_Guide.pdf
+    * Red = lowest level of confidence; 1 of the 4 sources or from other sources
+    * Amber = intermediate; a gene from 2 sources.
+    * Green = highest level of confidence; a gene from 3 or 4 sources.
+    """
+    LOW = "1", 'Low'
+    INTERMEDIATE = "2", "Intermediate"
+    HIGH = "3", "High"
+
+    def get_css_class(self):
+        CSS_CLASSES = {
+            self.HIGH: "HighEvidence",
+            self.INTERMEDIATE: "ModerateEvidence",
+            self.LOW: "LowEvidence",
+        }
+        return CSS_CLASSES[self.value]

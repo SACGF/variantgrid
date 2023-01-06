@@ -1,4 +1,5 @@
 import logging
+from functools import cached_property
 from typing import Optional, List, Set
 
 from django.db import models
@@ -13,8 +14,9 @@ from analysis.models.nodes.gene_coverage_mixin import GeneCoverageMixin
 from annotation.models import VariantTranscriptAnnotation
 from genes.custom_text_gene_list import create_custom_text_gene_list
 from genes.models import GeneList, CustomTextGeneList, SampleGeneList, \
-    ActiveSampleGeneList, PanelAppPanelLocalCacheGeneList, PanelAppPanel
-from genes.panel_app import get_local_cache_gene_list
+    ActiveSampleGeneList, PanelAppPanel, PanelAppPanelLocalCache
+from genes.models_enums import PanelAppConfidence
+from genes.panel_app import get_panel_app_local_cache
 from pathtests.models import PathologyTestVersion
 from snpdb.models import Sample, Contig
 from snpdb.models.models_enums import ImportStatus
@@ -32,6 +34,8 @@ class GeneListNode(AncestorSampleMixin, GeneCoverageMixin, AnalysisNode):
     has_gene_coverage = models.BooleanField(null=True)
     custom_text_gene_list = models.OneToOneField(CustomTextGeneList, null=True, on_delete=models.SET_NULL)
     pathology_test_version = models.ForeignKey(PathologyTestVersion, null=True, blank=True, on_delete=SET_NULL)
+    min_panel_app_confidence = models.CharField(max_length=1, choices=PanelAppConfidence.choices,
+                                                default=PanelAppConfidence.LOW)
     exclude = models.BooleanField(default=False)
     accordion_panel = models.IntegerField(default=0)
 
@@ -103,13 +107,13 @@ class GeneListNode(AncestorSampleMixin, GeneCoverageMixin, AnalysisNode):
         return list(sorted(gene_names_set))
 
     def _get_gene_list_names(self) -> List[str]:
-        # Panel App Panel may not have been saved here, so we don't know what version it is
-        # Just set it to be name w/o version - will change once node has loaded properly
         gene_list_names = []
         if self.accordion_panel == self.PANEL_APP_GENE_LIST:
+            # Panel App Panel may not have been saved here, so we don't know what version it is
+            # Just set it to be name w/o version - will change once node has loaded properly
             for gln_pap in self.genelistnodepanelapppanel_set.all():
-                if gln_pap.panel_app_panel_local_cache_gene_list:
-                    gene_list_name = gln_pap.panel_app_panel_local_cache_gene_list.gene_list.name
+                if gln_pap.panel_app_panel_local_cache:
+                    gene_list_name = gln_pap.gene_list.name
                 else:
                     gene_list_name = str(gln_pap.panel_app_panel)
                 gene_list_names.append(gene_list_name)
@@ -191,7 +195,7 @@ class GeneListNode(AncestorSampleMixin, GeneCoverageMixin, AnalysisNode):
         self.sample_gene_list = sample_gene_list
 
     def _load(self):
-        for gln_pap in self.genelistnodepanelapppanel_set.filter(panel_app_panel_local_cache_gene_list__isnull=True):
+        for gln_pap in self.genelistnodepanelapppanel_set.filter(panel_app_panel_local_cache__isnull=True):
             _ = gln_pap.gene_list  # Lazy loading
 
         if self.use_custom_gene_list:
@@ -205,7 +209,7 @@ class GeneListNode(AncestorSampleMixin, GeneCoverageMixin, AnalysisNode):
             gene_lists_to_validate = []
             if self.accordion_panel == self.PANEL_APP_GENE_LIST:
                 # May not have got local cache of PanelApp yet
-                for gln_pap in self.genelistnodepanelapppanel_set.filter(panel_app_panel_local_cache_gene_list__isnull=False):
+                for gln_pap in self.genelistnodepanelapppanel_set.filter(panel_app_panel_local_cache__isnull=False):
                     gene_lists_to_validate.append(gln_pap.gene_list)
             else:
                 gene_lists_to_validate = self.get_gene_lists()
@@ -237,14 +241,16 @@ class GeneListNodePanelAppPanel(models.Model):
     # We call the API and retrieve a local cache of the gene list async during node loading
     gene_list_node = models.ForeignKey(GeneListNode, on_delete=CASCADE)
     panel_app_panel = models.ForeignKey(PanelAppPanel, on_delete=CASCADE)
-    panel_app_panel_local_cache_gene_list = models.ForeignKey(PanelAppPanelLocalCacheGeneList, null=True, on_delete=CASCADE)
+    panel_app_panel_local_cache = models.ForeignKey(PanelAppPanelLocalCache, null=True, on_delete=CASCADE)
 
-    @property
+    @cached_property
     def gene_list(self):
         """ Lazily create - This may take a while for new panels (should only do this in node.load())
         Will also be called if a node is cloned w/o a parent so it is invalid (in which case it should use cache) """
 
-        if self.panel_app_panel_local_cache_gene_list is None:
-            self.panel_app_panel_local_cache_gene_list = get_local_cache_gene_list(self.panel_app_panel)
+        print("GeneListNodePanelAppPanel.gene_list")
+
+        if self.panel_app_panel_local_cache is None:
+            self.panel_app_panel_local_cache = get_panel_app_local_cache(self.panel_app_panel)
             self.save()
-        return self.panel_app_panel_local_cache_gene_list.gene_list
+        return self.panel_app_panel_local_cache.get_gene_list(self.gene_list_node.min_panel_app_confidence)

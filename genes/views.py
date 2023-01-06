@@ -1,6 +1,7 @@
 import uuid
 from collections import defaultdict
 from dataclasses import dataclass
+from functools import cached_property
 from itertools import combinations
 from typing import Tuple, List, Optional, Dict, Set, Iterable, Union, Any
 
@@ -18,7 +19,6 @@ from django.views.decorators.cache import cache_page
 from django.views.decorators.http import require_POST
 from django.views.generic import TemplateView
 from global_login_required import login_not_required
-from lazy import lazy
 
 from analysis.models import VariantTag
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
@@ -162,26 +162,26 @@ class GeneSymbolViewInfo:
         self.user = user
         self.user_settings = UserSettings.get_for_user(user)
 
-    @lazy
+    @cached_property
     def omim_and_hpo_for_gene(self) -> List[Tuple[OntologyTerm, List[OntologyTerm]]]:
         return _get_omim_and_hpo_for_gene_symbol(self.gene_symbol)
 
-    @lazy
+    @cached_property
     def hgnc(self) -> Optional[HGNC]:
         return self.gene_symbol.hgnc_set.order_by("status").first()
 
-    @lazy
+    @cached_property
     def citations_ids(self) -> List[str]:
         return sorted(set(Citation.objects.filter(genesymbolcitation__gene_symbol=self.gene_symbol).values_list('id', flat=True)))
 
-    @lazy
+    @cached_property
     def dbnsfp_gene_annotation(self) -> Optional[DBNSFPGeneAnnotation]:
         dga = None
         if dbnsfp_gene_version := DBNSFPGeneAnnotationVersion.latest():
             dga = self.gene_symbol.dbnsfpgeneannotation_set.filter(version=dbnsfp_gene_version).first()
         return dga
 
-    @lazy
+    @cached_property
     def gene_summary(self) -> Optional[str]:
         refseq_gene: Gene
         if refseq_gene := Gene.objects.filter(annotation_consortium=AnnotationConsortium.REFSEQ,
@@ -189,7 +189,7 @@ class GeneSymbolViewInfo:
             return refseq_gene.summary
         return None
 
-    @lazy
+    @cached_property
     def gene_version(self) -> Optional[GeneVersion]:
         gene_versions = self.gene_symbol.geneversion_set.all()
         if gene_versions.exists():
@@ -202,7 +202,7 @@ class GeneSymbolViewInfo:
             return gene_version
         return None
 
-    @lazy
+    @cached_property
     def genome_build(self) -> GenomeBuild:
         if gene_version := self.gene_version:
             return gene_version.genome_build
@@ -220,7 +220,7 @@ class GeneSymbolViewInfo:
             warnings.append("There are no genes linked against this symbol!")
         return warnings
 
-    @lazy
+    @cached_property
     def has_variants(self) -> HasVariants:
 
         has_tagged_variants = False
@@ -250,7 +250,7 @@ class GeneSymbolViewInfo:
     def has_classified_variants(self):
         return self.has_variants.has_classified_variants
 
-    @lazy
+    @cached_property
     def consortium_genes_and_aliases(self) -> Dict[str, Set[str]]:
         consortium_genes_and_aliases = defaultdict(lambda: defaultdict(set))
         gene: Gene
@@ -259,14 +259,14 @@ class GeneSymbolViewInfo:
             aliases.update(gene.get_symbols().exclude(symbol=self.gene_symbol))
         return defaultdict_to_dict(consortium_genes_and_aliases)
 
-    @lazy
+    @cached_property
     def gene_external_urls(self) -> Dict[str, str]:
         gene_external_urls: Dict[str, str] = {}
         for gene in self.gene_symbol.genes:
             gene_external_urls[gene.identifier] = gene.get_external_url()
         return gene_external_urls
 
-    @lazy
+    @cached_property
     def annotation_description(self):
         descriptions = {}
         if self.user_settings.tool_tips:
@@ -283,7 +283,7 @@ class GeneSymbolViewInfo:
             """
         return descriptions
 
-    @lazy
+    @cached_property
     def has_gene_coverage(self) -> bool:
         if not settings.VIEW_GENE_SYMBOL_SHOW_GENE_COVERAGE:
             return False
@@ -297,17 +297,17 @@ class GeneSymbolViewInfo:
     def has_samples_in_other_builds(self) -> bool:
         return Sample.objects.exclude(vcf__genome_build=self.genome_build).exists()
 
-    @lazy
+    @cached_property
     def gene_in_gene_lists(self) -> bool:
         gene_lists_qs = GeneList.filter_for_user(self.user)
         gene_in_gene_lists = GeneList.visible_gene_lists_containing_gene_symbol(gene_lists_qs, self.gene_symbol).exists()
         return gene_in_gene_lists
 
-    @lazy
+    @cached_property
     def gene_infos(self):
         return GeneInfo.get_for_gene_symbol(self.gene_symbol)
 
-    @lazy
+    @cached_property
     def classifications(self) -> QuerySet[ClassificationModification]:
         # Note this is loaded in Ajax
         classifications_qs = ClassificationModification.objects.none()
@@ -792,7 +792,7 @@ class HotspotGraphView(TemplateView):
                               "variantannotation__gnomad_af",
                               vzcc.germline_counts_alias)
 
-    @lazy
+    @cached_property
     def genome_build(self):
         genome_build_name = self.kwargs["genome_build_name"]
         return GenomeBuild.get_name_or_alias(genome_build_name)
@@ -804,7 +804,7 @@ class HotspotGraphView(TemplateView):
     def _transcript_url(self) -> str:
         return "gene_symbol_transcript_version_hotspot_graph"
 
-    @lazy
+    @cached_property
     def _pick_transcripts(self) -> Tuple[Optional[TranscriptVersion], str, List[Tuple[str, bool, str, str]], Dict]:
         """
             The transcript diagram is built via transcript_version.get_domains()
@@ -971,11 +971,11 @@ class ClassificationsHotspotGraphView(HotspotGraphView):
 
 class CohortHotspotGraphView(HotspotGraphView):
 
-    @lazy
+    @cached_property
     def genome_build(self):
         return self.cohort.genome_build
 
-    @lazy
+    @cached_property
     def cohort(self):
         cohort_id = self.kwargs["cohort_id"]
         return Cohort.get_for_user(self.request.user, cohort_id)
@@ -1002,11 +1002,11 @@ class PublicRUNX1HotspotGraphView(ClassificationsHotspotGraphView):
     """ RUNX1 would like a hotspot graph on the front page - but we don't want to expose
         every hotspot graph obviously, so make a special case one """
 
-    @lazy
+    @cached_property
     def genome_build(self):
         return GenomeBuild.get_name_or_alias("GRCh37")  # Hardcoded for server
 
-    @lazy
+    @cached_property
     def transcript(self) -> Optional[Transcript]:
         return Transcript.objects.get(pk="ENST00000300305")
 

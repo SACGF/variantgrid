@@ -1,4 +1,5 @@
 from collections import defaultdict
+from functools import cached_property
 from typing import Tuple, Dict, List
 
 from django.apps import apps
@@ -12,7 +13,6 @@ from django.dispatch import receiver
 from django.urls.base import reverse
 from django.utils import timezone
 from django_extensions.db.models import TimeStampedModel
-from lazy import lazy
 
 from analysis.models.enums import AnalysisType, AnalysisTemplateType
 from annotation.models import AnnotationVersion, InvalidAnnotationVersionError
@@ -59,7 +59,7 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
             name = f"{name} ({self.description})"
         return name
 
-    @lazy
+    @cached_property
     def template(self):
         """ Works for both a template and a snapshot """
         try:
@@ -70,7 +70,7 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
             except AnalysisTemplateVersion.DoesNotExist:
                 return None
 
-    @lazy
+    @cached_property
     def last_lock(self):
         return self.analysislock_set.order_by("pk").last()
 
@@ -101,7 +101,7 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
     def get_absolute_url(self):
         return reverse('analysis', kwargs={"analysis_id": self.pk})
 
-    @lazy
+    @cached_property
     def gene_annotation_release(self):
         return self.annotation_version.variant_annotation_version.gene_annotation_release
 

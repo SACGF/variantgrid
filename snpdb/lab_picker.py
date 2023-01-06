@@ -1,5 +1,6 @@
 import itertools
 from dataclasses import dataclass
+from functools import cached_property
 from typing import Optional, Union, List, Set, Iterator, Iterable
 
 from django.contrib.auth.models import User
@@ -7,7 +8,6 @@ from django.db.models import QuerySet
 from django.http import HttpRequest, HttpResponseRedirect
 from django.shortcuts import redirect
 from django.urls import reverse
-from lazy import lazy
 
 from library.utils import first
 from snpdb.models import Lab, Organization, GenomeBuild, UserSettings
@@ -202,7 +202,7 @@ class LabPickerData:
             user=user
         )
 
-    @lazy
+    @cached_property
     def genome_build(self) -> GenomeBuild:
         return UserSettings.get_for(lab=self.selected_lab, organization=self.selected_org).default_genome_build or GenomeBuild.grch38()
 

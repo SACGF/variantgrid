@@ -1,7 +1,7 @@
 import hashlib
+from functools import cached_property
 
 from django.shortcuts import get_object_or_404
-from lazy import lazy
 from matplotlib.lines import Line2D
 from matplotlib.patches import Rectangle
 
@@ -29,7 +29,7 @@ class SequencingRunQCGraph(CacheableGraph):
         self.bp_color = SequencingRunQCGraph.BOXPLOT_COLORS.get(self.qc_compare_type, SequencingRunQCGraph.DEFAULT_BOXPLOT_COLOR)
         self.type_name = QCCompareType(qc_compare_type).label
 
-    @lazy
+    @cached_property
     def sequencing_run(self):
         return get_object_or_404(SequencingRun, pk=self.sequencing_run_id)
 

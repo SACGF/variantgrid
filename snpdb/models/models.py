@@ -10,7 +10,7 @@ import logging
 import re
 from dataclasses import dataclass
 from datetime import datetime
-from functools import total_ordering
+from functools import cached_property, total_ordering
 from re import RegexFlag
 from typing import List, TypedDict, Optional
 
@@ -26,7 +26,6 @@ from django.urls import reverse
 from django.utils import timezone
 from django.utils.timezone import now
 from django_extensions.db.models import TimeStampedModel
-from lazy import lazy
 from model_utils.managers import InheritanceManager
 
 from classification.enums.classification_enums import ShareLevel
@@ -204,11 +203,11 @@ class Organization(models.Model):
     def shortest_name(self) -> str:
         return self.short_name or self.name
 
-    @lazy
+    @cached_property
     def classifying_labs(self) -> List['Lab']:
         return [lab for lab in self.lab_set.all().order_by('name') if lab.total_classifications > 0]
 
-    @lazy
+    @cached_property
     def sharing_labs(self) -> List['Lab']:
         return [lab for lab in self.lab_set.all().order_by('name') if lab.total_shared_classifications > 0]
 
@@ -231,7 +230,7 @@ class LabUser:
         self.user = user
         self.role = role
 
-    @lazy
+    @cached_property
     def preferred_label(self) -> str:
         from snpdb.models import AvatarDetails
         return AvatarDetails.avatar_for(self.user).preferred_label
@@ -352,7 +351,7 @@ class ClinVarKeyExcludePattern(TimeStampedModel):
     case_insensitive = models.BooleanField(default=True, blank=True)
     mode = models.TextField(choices=ClinVarKeyExcludePatternMode.choices, default=ClinVarKeyExcludePatternMode.EXCLUDE_IF_MATCH)
 
-    @lazy
+    @cached_property
     def regex(self):
         flags = 0
         if self.case_insensitive:
@@ -483,11 +482,11 @@ class Lab(models.Model):
                 group, _ = Group.objects.get_or_create(name=inst_group_name)
                 return group
 
-    @lazy
+    @cached_property
     def active_users(self) -> QuerySet[User]:
         return self.group.user_set.filter(is_active=True)
 
-    @lazy
+    @cached_property
     def lab_users(self) -> List[User]:
         users = list(self.group.user_set.filter(is_active=True))
         heads = set(self.labhead_set.values_list('user_id', flat=True))
@@ -500,11 +499,11 @@ class Lab(models.Model):
         lab_users.sort()
         return lab_users
 
-    @lazy
+    @cached_property
     def shared_classifications(self) -> QuerySet['Classification']:
         return self.classification_set.filter(share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS).exclude(withdrawn=True)
 
-    @lazy
+    @cached_property
     def classifications(self) -> QuerySet['Classification']:
         """ Shared or all classifications based on settings.VARIANT_CLASSIFICATION_STATS_USE_SHARED """
         if settings.VARIANT_CLASSIFICATION_STATS_USE_SHARED:
@@ -513,25 +512,25 @@ class Lab(models.Model):
             qs = self.classification_set.all()
         return qs
 
-    @lazy
+    @cached_property
     def total_classifications(self) -> int:
         """ Total 'classifications' as per above method """
         return self.classifications.count()
 
-    @lazy
+    @cached_property
     def total_shared_classifications(self) -> int:
         return self.shared_classifications.count()
 
-    @lazy
+    @cached_property
     def total_unshared_classifications(self) -> int:
         all_classifications = self.classification_set.exclude(withdrawn=True).count()
         return all_classifications - self.total_shared_classifications
 
-    @lazy
+    @cached_property
     def classifications_by_created(self) -> QuerySet['Classification']:
         return self.classifications.order_by("created")
 
-    @lazy
+    @cached_property
     def classifications_by_modified(self) -> QuerySet['Classification']:
         return self.classifications.order_by("-modified")
 
@@ -539,7 +538,7 @@ class Lab(models.Model):
     def first_classification_ever_shared_date(self) -> Optional[datetime]:
         return self.classification_set.filter(share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS).values_list('created', flat=True).order_by('created').first()
 
-    @lazy
+    @cached_property
     def classifications_per_day(self) -> float:
         try:
             latest = now()
@@ -551,7 +550,7 @@ class Lab(models.Model):
             cpd = 0
         return cpd
 
-    @lazy
+    @cached_property
     def classifications_per_week(self) -> float:
         return self.classifications_per_day * 7
 

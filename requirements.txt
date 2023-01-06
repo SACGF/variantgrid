@@ -45,7 +45,6 @@ HTSeq==2.0.1
 ijson==3.1.4
 ipython==8.6.0
 kombu==5.2.3
-lazy==1.4
 Markdown==3.1.1
 matplotlib==3.5.1
 mozilla_django_oidc==2.0.0

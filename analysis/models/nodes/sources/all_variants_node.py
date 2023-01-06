@@ -1,8 +1,8 @@
+from functools import cached_property
 from typing import Optional, List, Dict
 
 from django.db import models
 from django.db.models import Q, CASCADE, SET_NULL
-from lazy import lazy
 
 from analysis.models.nodes.analysis_node import AnalysisNode
 from analysis.models.nodes.zygosity_count_node import AbstractZygosityCountNode
@@ -71,7 +71,7 @@ class AllVariantsNode(AnalysisNode, AbstractZygosityCountNode):
             errors.append("Not Saved")
         return errors
 
-    @lazy
+    @cached_property
     def db_counts(self):
         return VariantZygosityCountCollection.get_global_germline_counts()
 

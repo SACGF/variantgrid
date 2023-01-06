@@ -1,12 +1,11 @@
 import operator
-from functools import reduce
+from functools import cached_property, reduce
 from typing import Optional, Dict, List
 
 from cache_memoize import cache_memoize
 from django.db import models
 from django.db.models.deletion import CASCADE
 from django.db.models.query_utils import Q
-from lazy import lazy
 
 from analysis.models.enums import GroupOperation
 from analysis.models.nodes.analysis_node import AnalysisNode
@@ -38,7 +37,7 @@ class PopulationNode(AnalysisNode):
 
     POPULATION_DATABASE_FIELDS = ["gnomad_af", "gnomad_popmax_af", "af_1kg", "af_uk10k", "topmed_af"]
 
-    @lazy
+    @cached_property
     def num_samples_for_build(self) -> int:
         return Sample.objects.filter(vcf__genome_build=self.analysis.genome_build).count()
 

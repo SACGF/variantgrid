@@ -1,7 +1,7 @@
 import json
 import operator
 from dataclasses import dataclass
-from functools import reduce
+from functools import cached_property, reduce
 from operator import attrgetter
 from typing import List, Optional, Dict, Iterable, Set
 
@@ -14,7 +14,6 @@ from django.db.models import CASCADE, QuerySet, SET_NULL, Q
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from guardian.shortcuts import assign_perm
-from lazy import lazy
 from model_utils.models import TimeStampedModel
 
 from annotation.regexes import db_ref_regexes
@@ -156,7 +155,7 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
         # just used for templates
         return not self.classification_id and self.mode_of_inheritance is None and self.gene_symbol_id is not None
 
-    @lazy
+    @cached_property
     def children(self) -> QuerySet['ConditionTextMatch']:
         order_by: str
         if self.is_root:
@@ -218,7 +217,7 @@ class ConditionTextMatch(TimeStampedModel, GuardianPermissionsMixin):
 
         return True
 
-    @lazy
+    @cached_property
     def condition_xref_terms(self) -> List[OntologyTerm]:
         terms = []
         for term_str in self.condition_xrefs:

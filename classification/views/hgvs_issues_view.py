@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from datetime import datetime
+from functools import cached_property
 from typing import Dict, Any, Optional, Tuple, List
 
 from django.contrib.auth.decorators import user_passes_test
@@ -8,7 +9,6 @@ from django.http import StreamingHttpResponse
 from django.http.request import HttpRequest
 from django.shortcuts import render
 from django.urls import reverse
-from lazy import lazy
 from requests.models import Response
 
 from classification.enums import SpecialEKeys
@@ -131,7 +131,7 @@ class AlleleColumns(DatatableConfig):
 class FlagReport(ExportRow):
     flag: Flag
 
-    @lazy
+    @cached_property
     def data(self) -> Tuple[str, datetime]:
         """
         Returns the username of who closed the flag (if the flag is closed)
@@ -181,7 +181,7 @@ class ProblemHgvs(ExportRow):
         if last_flag := qs.first():
             return FlagReport(last_flag)
 
-    @lazy
+    @cached_property
     def allele(self):
         if variant := self.classification.variant:
             return variant.allele
@@ -317,7 +317,7 @@ class ClassificationResolution(ExportRow):
             else:
                 return ""
 
-    @lazy
+    @cached_property
     def allele(self) -> Optional[Allele]:
         if variant_id := self._variant_id:
             v = Variant.objects.get(pk=variant_id)
@@ -326,7 +326,7 @@ class ClassificationResolution(ExportRow):
 
     @export_column("Variant")
     def variant(self):
-        allele: Allele  # @lazy screws up type hints :(
+        allele: Allele  # @cached_property screws up type hints :(
         if allele := self.allele:
             parts: List[str] = []
             clingen_id = ""

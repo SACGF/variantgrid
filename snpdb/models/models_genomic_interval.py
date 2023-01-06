@@ -1,11 +1,11 @@
 import logging
 import os
+from functools import cached_property
 
 from django.contrib.auth.models import User
 from django.db import models
 from django.db.models import CASCADE
 from django.urls.base import reverse
-from lazy import lazy
 
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsAutoInitialSaveMixin
 from library.genomics.bed_file import BedFileReader
@@ -32,7 +32,7 @@ class GenomicIntervalsCollection(GuardianPermissionsAutoInitialSaveMixin, models
     user = models.ForeignKey(User, on_delete=CASCADE)
     import_status = models.CharField(max_length=1, choices=ImportStatus.choices, default=ImportStatus.CREATED)
 
-    @lazy
+    @cached_property
     def num_intervals(self):
         if self.processed_file:
             return self.processed_records

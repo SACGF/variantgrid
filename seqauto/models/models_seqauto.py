@@ -4,6 +4,7 @@ import pathlib
 import re
 import shutil
 from datetime import datetime
+from functools import cached_property
 from typing import List, Optional
 
 from django.conf import settings
@@ -19,7 +20,6 @@ from django.dispatch.dispatcher import receiver
 from django.urls.base import reverse
 from django.utils.timezone import make_aware
 from django_extensions.db.models import TimeStampedModel
-from lazy import lazy
 
 from genes.models import GeneListCategory, CustomTextGeneList, GeneList, GeneCoverageCollection, \
     Transcript, GeneSymbol, SampleGeneList, TranscriptVersion, GeneCoverageCanonicalTranscript
@@ -442,7 +442,7 @@ class SequencingSample(models.Model):
         """ Return SequencingSamples that have not been replaced by newer SampleSheet """
         return SequencingSample.objects.filter(sample_sheet__sequencingruncurrentsamplesheet__isnull=False)
 
-    @lazy
+    @cached_property
     def patient(self) -> Optional[Patient]:
         patients_set = set()
         for sfss in self.samplefromsequencingsample_set.all():
@@ -859,7 +859,7 @@ class SampleSheetCombinedVCFFile(SeqAutoRecord):
             up = None
         return up
 
-    @lazy
+    @cached_property
     def vcf(self) -> Optional[VCF]:
         try:
             VCF.objects.get(uploadedvcf__uploaded_file__path=self.path)

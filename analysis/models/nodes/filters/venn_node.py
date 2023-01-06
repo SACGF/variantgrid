@@ -1,6 +1,7 @@
 import logging
 import sys
 import traceback
+from functools import cached_property
 from typing import Optional, Tuple, Dict
 
 import celery
@@ -9,7 +10,6 @@ from django.db.models.deletion import SET_NULL, CASCADE
 from django.db.models.query_utils import Q
 from django.db.models.signals import post_delete
 from django.dispatch import receiver
-from lazy import lazy
 
 from analysis.models.enums import SetOperations
 from analysis.models.nodes.analysis_node import AnalysisNode, NodeStatus, NodeVersion
@@ -94,7 +94,7 @@ class VennNode(AnalysisNode):
     def get_rendering_args(self):
         return {"venn_flag": self.get_venn_flag()}
 
-    @lazy
+    @cached_property
     def ordered_parents(self) -> Tuple[AnalysisNode, AnalysisNode]:
         """ Return left_parent, right_parent """
         parents = self.get_parent_subclasses()

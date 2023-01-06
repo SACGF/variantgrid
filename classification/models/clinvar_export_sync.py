@@ -1,10 +1,10 @@
 from enum import Enum, auto
+from functools import cached_property
 from typing import TypedDict, Optional, Tuple
 
 import requests
 from django.conf import settings
 from django.db import transaction
-from lazy import lazy
 from requests import Response
 
 from classification.models import ClinVarExportBatch, ClinVarExportRequest, ClinVarExportRequestType, \
@@ -75,7 +75,7 @@ class ClinVarExportSync:
     In charge of
     """
 
-    @lazy
+    @cached_property
     def _config(self) -> _ClinVarExportConfigDic:
         return settings.CLINVAR_EXPORT or {"mode": None, "api_key": None}
 

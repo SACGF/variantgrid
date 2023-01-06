@@ -1,12 +1,11 @@
 import logging
-from collections import Counter
-from collections import defaultdict
+from functools import cached_property
+from collections import Counter, defaultdict
 
 import pandas as pd
 from django.conf import settings
 from django.contrib.postgres.aggregates.general import StringAgg
 from django.db.models import Q, TextField
-from lazy import lazy
 
 from annotation.models.models_phenotype_match import PATIENT_TPM_PATH, PATIENT_ONTOLOGY_TERM_PATH
 from library.unit_percent import format_af
@@ -69,7 +68,7 @@ class VariantSampleInformation:
         patients_qs = Patient.objects.filter(pk__in=self.patient_ids)
         return patients_qs.filter(**{PATIENT_TPM_PATH + "__isnull": False}).exists()
 
-    @lazy
+    @cached_property
     def has_unknown_zygosity(self):
         return 'Unknown' in self.locus_counts_df.columns
 

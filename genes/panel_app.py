@@ -6,15 +6,14 @@ from rest_framework.exceptions import NotFound
 
 from annotation.models import CachedWebResource, ImportStatus
 from genes.gene_matching import GeneSymbolMatcher
-from genes.models import PanelAppPanelRelevantDisorders, PanelAppPanel, PanelAppServer, \
-    PanelAppPanelLocalCacheGeneList, GeneList, GeneListCategory, create_fake_gene_list
+from genes.models import PanelAppPanelRelevantDisorders, PanelAppPanel, PanelAppServer, PanelAppPanelLocalCache, \
+    PanelAppPanelLocalCacheGeneSymbol, GeneSymbol, GeneList, GeneListCategory, create_fake_gene_list
 from genes.serializers import GeneListGeneSymbolSerializer
 from library.constants import MINUTE_SECS
 from library.guardian_utils import admin_bot, add_public_group_read_permission
 
 PANEL_APP_PREFIX = "panel-app"
 PANEL_APP_LIST_PANELS_PATH = "/api/v1/panels/"
-PANEL_APP_GET_PANEL_API_BASE_PATH = "/api/v1/panels/"
 PANEL_APP_SEARCH_BY_GENES_BASE_PATH = "/api/v1/genes/"
 
 
@@ -29,21 +28,20 @@ def get_panel_app_results_by_gene_symbol_json(server: PanelAppServer, gene_symbo
     return results
 
 
-def _get_panel_app_panel_url_and_json(panel_app_panel):
-    url = panel_app_panel.server.url + PANEL_APP_GET_PANEL_API_BASE_PATH + str(panel_app_panel.panel_id)
-    r = requests.get(url, timeout=MINUTE_SECS)
+def _get_panel_app_panel_api_json(panel_app_panel):
+    r = requests.get(panel_app_panel.url, timeout=MINUTE_SECS)
     json_data: Dict = r.json()
     # Panel App isn't very REST-ful - returns 200 for missing data but we'll return 404
     if detail := json_data.get("detail"):
         if detail == "Not found.":
             raise NotFound(detail=f"PanelApp couldn't find {panel_app_panel.panel_id} ({url})")
 
-    return url, json_data
+    return json_data
 
 
 def get_panel_app_panel_as_gene_list_json(panel_app_panel_id):
     panel_app_panel = PanelAppPanel.objects.get(pk=panel_app_panel_id)
-    url, json_data = _get_panel_app_panel_url_and_json(panel_app_panel)
+    json_data = _get_panel_app_panel_api_json(panel_app_panel)
 
     genes = json_data["genes"]
     name = json_data["name"]
@@ -52,9 +50,8 @@ def get_panel_app_panel_as_gene_list_json(panel_app_panel_id):
     panel_app_gene_evidence = {}
     gene_names_list = []
     for gene_record in genes:
-        gene_data = gene_record["gene_data"]
-        gene_symbol = gene_data["gene_symbol"]
-        panel_app_gene_evidence[gene_symbol] = gene_data
+        gene_symbol = gene_record["gene_data"]["gene_symbol"]
+        panel_app_gene_evidence[gene_symbol] = gene_record
         gene_names_list.append(gene_symbol)
 
     gene_matcher = GeneSymbolMatcher()
@@ -76,7 +73,7 @@ def get_panel_app_panel_as_gene_list_json(panel_app_panel_id):
         "import_status": "S",
         "genelistgenesymbol_set": genelistgenesymbol_set,
         "can_write": False,
-        "absolute_url": url,
+        "absolute_url": panel_app_panel.url,
         "gene_evidence": gene_evidence,
     }
     return data
@@ -121,21 +118,22 @@ def store_panel_app_panels_from_web(server: PanelAppServer, cached_web_resource:
     cached_web_resource.save()
 
 
-def get_local_cache_gene_list(panel_app_panel: PanelAppPanel) -> PanelAppPanelLocalCacheGeneList:
+def get_panel_app_local_cache(panel_app_panel: PanelAppPanel) -> PanelAppPanelLocalCache:
     """ Gets or creates local cache of a panel app panel so it can be used as a GeneList """
+
+    print(f"=== get_panel_app_local_cache({panel_app_panel}) ====")
 
     # Attempt to use cache if recent and present, otherwise fall through and do a query
     try:
-        existing = PanelAppPanelLocalCacheGeneList.objects.get(panel_app_panel=panel_app_panel,
-                                                               version=panel_app_panel.current_version)
+        existing = PanelAppPanelLocalCache.objects.get(panel_app_panel=panel_app_panel,
+                                                       version=panel_app_panel.current_version)
         if panel_app_panel.cache_valid:
             return existing
-    except PanelAppPanelLocalCacheGeneList.DoesNotExist:
+    except PanelAppPanelLocalCache.DoesNotExist:
         existing = None
 
-    url, json_data = _get_panel_app_panel_url_and_json(panel_app_panel)
+    json_data = _get_panel_app_panel_api_json(panel_app_panel)
     genes = json_data["genes"]
-    name = json_data["name"]
     version = json_data["version"]
 
     # Update panel_app_panel to latest (even if just bumping modified date)
@@ -144,23 +142,25 @@ def get_local_cache_gene_list(panel_app_panel: PanelAppPanel) -> PanelAppPanelLo
     if existing and existing.version == version:
         return existing  # cache still valid
 
-    category = GeneListCategory.get_or_create_category(GeneListCategory.PANEL_APP_CACHE, hidden=True)
-    gene_matcher = GeneSymbolMatcher()
-    gene_list = GeneList.objects.create(category=category,
-                                        name=f"{name} v.{version}",
-                                        user=admin_bot(),
-                                        url=url)
-    gene_names_list = []
-    for gene_record in genes:
-        gene_symbol = gene_record["gene_data"]["gene_symbol"]
-        gene_names_list.append(gene_symbol)
+    print(f"PANEL APP - {panel_app_panel}")
+    pap_lc = PanelAppPanelLocalCache.objects.create(panel_app_panel=panel_app_panel,
+                                                    version=version)
+    existing_uc_symbols = GeneSymbol.get_upper_case_lookup()
+    new_symbols = []
+    pap_lc_genes = []
+    for api_record in genes:
+        gene_symbol = api_record["gene_data"]["gene_symbol"]
+        if gene_symbol.upper() not in existing_uc_symbols:
+            new_symbols.append(gene_symbol)
+        record = PanelAppPanelLocalCacheGeneSymbol(panel_app_local_cache=pap_lc,
+                                                   gene_symbol_id=gene_symbol,
+                                                   data=api_record)
+        pap_lc_genes.append(record)
 
-    gene_matcher.create_gene_list_gene_symbols(gene_list, gene_names_list)
-    gene_list.import_status = ImportStatus.SUCCESS
-    gene_list.save()
-
-    add_public_group_read_permission(gene_list)
-    pap_gene_list = PanelAppPanelLocalCacheGeneList.objects.create(panel_app_panel=panel_app_panel,
-                                                                   version=version,
-                                                                   gene_list=gene_list)
-    return pap_gene_list
+    if new_symbols:
+        print(f"Creating {len(new_symbols)} new gene symbols")
+        GeneSymbol.objects.bulk_create(new_symbols, ignore_conflicts=True, batch_size=2000)
+    if pap_lc_genes:
+        print(f"Creating {len(pap_lc_genes)} PanelAppPanelLocalCacheGeneSymbol records")
+        PanelAppPanelLocalCacheGeneSymbol.objects.bulk_create(pap_lc_genes, batch_size=2000)
+    return pap_lc

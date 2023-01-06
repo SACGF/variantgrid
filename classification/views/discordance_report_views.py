@@ -1,5 +1,6 @@
 from collections import defaultdict
 from dataclasses import dataclass
+from functools import cached_property
 from typing import List, Dict, Optional, Tuple
 
 from django.contrib.auth.models import User
@@ -9,7 +10,6 @@ from django.http import HttpRequest
 from django.http.response import HttpResponse, HttpResponseBase
 from django.shortcuts import render, redirect
 from django.urls import reverse
-from lazy import lazy
 
 from classification.enums import SpecialEKeys
 from classification.enums.discordance_enums import ContinuedDiscordanceReason, DiscordanceReportResolution
@@ -154,13 +154,13 @@ class DiscordanceReportTemplateData:
         # sometimes you have to hate how powerless django templates are
         return not self.is_open
 
-    @lazy
+    @cached_property
     def latest_for_allele_if_not_this(self) -> Optional[DiscordanceReport]:
         if first := self.report_history.first():
             if first != self.report:
                 return first
 
-    @lazy
+    @cached_property
     def _effectives_and_not_considered(self) -> Tuple[List[ClassificationModification], List[DiscordanceNoLongerConsiders]]:
         effectives: List[ClassificationModification] = []
         withdrawns: List[ClassificationModification] = []

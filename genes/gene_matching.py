@@ -1,10 +1,10 @@
 import re
 from collections import defaultdict
+from functools import cached_property
 from typing import Iterable, Dict, List
 
 from django.db.models import F, Q, Subquery, OuterRef
 from django.db.models.functions import Upper
-from lazy import lazy
 
 from genes.models import GeneSymbol, GeneSymbolAlias, GeneListGeneSymbol, GeneAnnotationRelease, GeneVersion, \
     ReleaseGeneSymbol, ReleaseGeneSymbolGene, HGNC
@@ -14,15 +14,15 @@ from library.utils import clean_string
 
 
 class GeneSymbolMatcher:
-    @lazy
+    @cached_property
     def _gene_symbol_lookup(self):
         return GeneSymbol.get_upper_case_lookup()
 
-    @lazy
+    @cached_property
     def _alias_dict(self):
         return GeneSymbolAlias.get_upper_case_lookup()
 
-    @lazy
+    @cached_property
     def _release_gene_matchers(self):
         return [ReleaseGeneMatcher(release) for release in GeneAnnotationRelease.objects.all()]
 
@@ -70,13 +70,13 @@ class HGNCMatcher:
     def instance():
         return HGNCMatcher()
 
-    @lazy
+    @cached_property
     def _aliases(self) -> Dict:
         alias_qs = GeneSymbolAlias.objects.filter(source=GeneSymbolAliasSource.HGNC)
         alias_qs = alias_qs.annotate(uc_alias=Upper("alias"), uc_symbol=Upper("gene_symbol_id"))
         return dict(alias_qs.values_list("uc_alias", "uc_symbol"))
 
-    @lazy
+    @cached_property
     def _hgnc_by_uc_gene_symbol(self) -> Dict:
         hgnc_qs = HGNC.objects.filter(status=HGNCStatus.APPROVED)
         return {str(hgnc.gene_symbol_id).upper(): hgnc for hgnc in hgnc_qs}
@@ -96,7 +96,7 @@ class ReleaseGeneMatcher:
     def __init__(self, release: GeneAnnotationRelease):
         self.release = release
 
-    @lazy
+    @cached_property
     def genes(self) -> Dict[str, list]:
         gv_qs = GeneVersion.objects.filter(releasegeneversion__release=self.release).annotate(symbol_upper=Upper("gene_symbol"))
         genes_dict = defaultdict(list)
@@ -104,7 +104,7 @@ class ReleaseGeneMatcher:
             genes_dict[symbol_upper].append(gene_id)
         return genes_dict
 
-    @lazy
+    @cached_property
     def aliases_dict(self) -> Dict[str, Dict]:
         """ Get symbols from other GeneVersions that match genes from our release """
         qs = GeneVersion.objects.filter(gene__in=self.release.get_genes())

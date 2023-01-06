@@ -8,6 +8,7 @@ import operator
 import re
 from collections import defaultdict
 from dataclasses import dataclass
+from functools import cached_property
 from typing import Optional, List, Dict, Set, Union, Tuple, Iterable
 
 from cache_memoize import cache_memoize
@@ -16,7 +17,6 @@ from django.contrib.postgres.fields import ArrayField
 from django.db import models, connection
 from django.db.models import PROTECT, CASCADE, QuerySet, Q, Max, TextChoices
 from django.urls import reverse
-from lazy import lazy
 from model_utils.models import TimeStampedModel, now
 from psqlextra.models import PostgresPartitionedModel
 from psqlextra.types import PostgresPartitioningMethod
@@ -334,7 +334,7 @@ class OntologyTerm(TimeStampedModel):
         else:
             return None
 
-    @lazy
+    @cached_property
     def is_leaf(self) -> bool:
         # Warning, just meant to be called on MONDO terms
         if not self.is_stub and self.ontology_service == OntologyService.MONDO:
@@ -800,7 +800,7 @@ class OntologySnake:
             text += f" {'<' if not forwards else ''}-{step.relation.relation}-{'>' if forwards else ''} {step.dest_term}"
         return text
 
-    @lazy
+    @cached_property
     def _sort_key(self):
         if steps := self.show_steps():
             last_step = steps[0]
@@ -815,7 +815,7 @@ class OntologySnake:
     def leaf_relationship(self) -> OntologyTermRelation:
         return self.paths[-1]
 
-    @lazy
+    @cached_property
     def start_source(self) -> OntologyImportSource:
         return self.show_steps()[0].relation.from_import.import_source
 

@@ -1,6 +1,6 @@
 import operator
 from dataclasses import dataclass
-from functools import reduce
+from functools import cached_property, reduce
 from typing import Dict, Any, List, Optional, Tuple
 
 from django.conf import settings
@@ -8,7 +8,6 @@ from django.db.models import Q, Subquery, When, Case, TextField, Value, IntegerF
 from django.db.models.fields.json import KeyTextTransform, KeyTransform
 from django.db.models.functions import Lower, Cast
 from django.http import HttpRequest
-from lazy import lazy
 
 from classification.enums import SpecialEKeys, EvidenceCategory, ShareLevel
 from classification.models import ClassificationModification, classification_flag_types, Classification, EvidenceKeyMap
@@ -87,7 +86,7 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
             "search": id_filter
         }
 
-    @lazy
+    @cached_property
     def genome_build_prefs(self) -> List[GenomeBuild]:
         user_settings = UserSettings.get_for_user(self.user)
         return GenomeBuild.builds_with_annotation_priority(user_settings.default_genome_build)
@@ -276,7 +275,7 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
 
         return initial_qs
 
-    @lazy
+    @cached_property
     def id_columns(self) -> List[str]:
         keys = EvidenceKeyMap.instance()
         return [e_key.key for e_key in keys.all_keys if '_id' in e_key.key and

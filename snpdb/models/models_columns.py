@@ -1,3 +1,4 @@
+from functools import cached_property
 from typing import Optional
 
 from django.conf import settings
@@ -7,7 +8,6 @@ from django.db.models import Q
 from django.db.models.deletion import CASCADE
 from django.urls import reverse
 from guardian.shortcuts import get_objects_for_group
-from lazy import lazy
 from model_utils.models import TimeStampedModel
 
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsAutoInitialSaveMixin
@@ -35,7 +35,7 @@ class VariantGridColumn(models.Model):
             css_classes.append("%s-column" % annotation_level_class.lower())
         return " ".join(css_classes)
 
-    @lazy
+    @cached_property
     def columns_version_description(self) -> str:
         q = Q(min_vep_columns_version__isnull=False) | Q(max_vep_columns_version__isnull=False)
         if cvf := self.columnvepfield_set.filter(q).first():

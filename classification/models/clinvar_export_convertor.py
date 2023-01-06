@@ -1,6 +1,6 @@
 from dataclasses import dataclass
+from functools import cached_property
 from typing import List, Any, Mapping, TypedDict, Optional
-from lazy import lazy
 from annotation.models import CitationFetchRequest
 from annotation.models.models_citations import CitationSource
 from annotation.regexes import db_citation_regexes
@@ -9,7 +9,7 @@ from classification.models import ClassificationModification, EvidenceKeyMap, Ev
     MultiCondition, ClinVarExport, classification_flag_types, Classification, ClinVarExportStatus, \
     ClinVarExportSubmission, CLINVAR_EXPORT_CONVERSION_VERSION
 from genes.hgvs import CHGVS
-from library.utils import html_to_text, JsonObjType, JsonDiffs
+from library.utils import html_to_text, JsonObjType, JsonDiffs, invalidate_cached_property
 from ontology.models import OntologyTerm, OntologyService, OntologyTermStatus
 from snpdb.models import ClinVarKey, ClinVarCitationsModes
 from uicore.json.validated_json import JsonMessages, JSON_MESSAGES_EMPTY, ValidatedJson
@@ -76,7 +76,7 @@ class ClinVarExportData:
         """ Indicates if there's no valid classification """
         return self.clinvar_export.classification_based_on is None
 
-    @lazy
+    @cached_property
     def body_json(self) -> JsonObjType:
         return self.body.pure_json()
 
@@ -88,7 +88,7 @@ class ClinVarExportData:
             return True
         return False
 
-    @lazy
+    @cached_property
     def _previous_submission(self) -> ClinVarExportSubmission:
         return self.clinvar_export.previous_submission
 
@@ -103,7 +103,7 @@ class ClinVarExportData:
         """ Are we able to send this data to ClinVar - important does NOT check status """
         return bool(self.grouping) and bool(self.body) and not self.has_errors and 'assertionCriteria' in self.grouping
 
-    @lazy
+    @cached_property
     def changes(self) -> Optional[ClinVarExportChanges]:
         """
         Differences between this data and the previously submitted
@@ -170,8 +170,8 @@ class ClinVarExportData:
         clinvar_export.status = status
         clinvar_export.submission_grouping_validated = self.grouping.serialize()
         clinvar_export.submission_body_validated = self.body.serialize()
-        lazy.invalidate(clinvar_export, 'submission_grouping')
-        lazy.invalidate(clinvar_export, 'submission_body')
+        invalidate_cached_property(clinvar_export, 'submission_grouping')
+        invalidate_cached_property(clinvar_export, 'submission_body')
         clinvar_export.save()
 
     @staticmethod

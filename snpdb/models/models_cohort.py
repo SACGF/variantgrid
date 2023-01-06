@@ -1,4 +1,5 @@
 import logging
+from functools import cached_property
 from typing import List, Dict
 
 import celery
@@ -17,7 +18,6 @@ from django.shortcuts import get_object_or_404
 from django.urls.base import reverse
 from django_extensions.db.models import TimeStampedModel
 from guardian.shortcuts import get_objects_for_user
-from lazy import lazy
 
 from library.django_utils import SortByPKMixin
 from library.django_utils.django_partition import RelatedModelsPartitionModel
@@ -146,7 +146,7 @@ class Cohort(GuardianPermissionsAutoInitialSaveMixin, SortByPKMixin, TimeStamped
             cohort = self
         return cohort
 
-    @lazy
+    @cached_property
     def cohort_genotype_collection(self):
         cohort = self.get_base_cohort()
         return CohortGenotypeCollection.objects.get(cohort=cohort, cohort_version=cohort.version)
@@ -411,7 +411,7 @@ class CohortGenotypeCollection(RelatedModelsPartitionModel):
         regex_string = ''.join(zygosity_sample_matches)
         return regex_string
 
-    @lazy
+    @cached_property
     def get_packed_index_by_sample_id(self):
         return dict(self.cohort.cohortsample_set.values_list("sample_id", "cohort_genotype_packed_field_index"))
 

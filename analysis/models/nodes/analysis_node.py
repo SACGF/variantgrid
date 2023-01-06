@@ -2,7 +2,7 @@
 import logging
 import operator
 from collections import defaultdict
-from functools import reduce
+from functools import cached_property, reduce
 from random import random
 from time import time
 from typing import Tuple, Sequence, List, Dict, Optional, Set
@@ -20,7 +20,6 @@ from django.dispatch import receiver
 from django.utils import timezone
 from django_dag.models import node_factory, edge_factory
 from django_extensions.db.models import TimeStampedModel
-from lazy import lazy
 from model_utils.managers import InheritanceManager
 
 from analysis.exceptions import NonFatalNodeError, NodeParentErrorsException, NodeConfigurationException, \
@@ -465,11 +464,11 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
         sql = queryset_to_sql(qs.values_list('pk', 'variant_collection_id'))
         write_sql_to_variant_collection(variant_collection, sql)
 
-    @lazy
+    @cached_property
     def node_version(self):
         return NodeVersion.get(self)
 
-    @lazy
+    @cached_property
     def node_cache(self) -> Optional['NodeCache']:
         if parent := self.get_unmodified_single_parent_node():
             return parent.node_cache

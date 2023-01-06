@@ -1,11 +1,11 @@
 from collections import defaultdict
 from dataclasses import dataclass
+from functools import cached_property
 from typing import Dict, List, Optional
 
 from django.contrib.auth.models import User
 from django.db.models import QuerySet
 from django.dispatch import receiver
-from lazy import lazy
 
 from classification.models import ClassificationModification, EvidenceMixin, classification_flag_types, \
     classification_post_publish_signal, Classification
@@ -70,17 +70,17 @@ class ExcludeRecord:
     def has_ignore_matches(self) -> bool:
         return bool(self.matches_ignores)
 
-    @lazy
+    @cached_property
     def existing_flag(self) -> Flag:
         return self.record.classification.flag_collection_safe.get_flag_of_type(classification_flag_types.classification_not_public, open_only=False)
 
-    @lazy
+    @cached_property
     def is_currently_ignored(self) -> bool:
         if flag := self.existing_flag:
             return flag.resolution.status == FlagStatus.OPEN
         return False
 
-    @lazy
+    @cached_property
     def existing_flag_manual(self) -> bool:
         """
         Is there an exclude from ClinVar flag, where the last action was taken by a user

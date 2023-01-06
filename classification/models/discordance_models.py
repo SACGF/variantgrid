@@ -3,6 +3,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import Enum
+from functools import cached_property
 from typing import Set, Optional, List, Dict, Tuple, Any, Iterable
 
 import django.dispatch
@@ -14,7 +15,6 @@ from django.db.models.deletion import PROTECT, CASCADE
 from django.urls.base import reverse
 from django.utils.timezone import now
 from django_extensions.db.models import TimeStampedModel
-from lazy import lazy
 from more_itertools import first
 
 from classification.enums.classification_enums import SpecialEKeys, ClinicalSignificance
@@ -26,6 +26,7 @@ from classification.models.flag_types import classification_flag_types, Classifi
 from flags.models.enums import FlagStatus
 from flags.models.models import FlagComment
 from genes.hgvs import CHGVS
+from library.utils import invalidate_cached_property
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.lab_picker import LabPickerData
 from snpdb.models import Lab, GenomeBuild
@@ -149,8 +150,8 @@ class DiscordanceReport(TimeStampedModel):
                     classification_original=vcm
                 ).save()
 
-        lazy.invalidate(self, 'discordance_report_classifications')
-        lazy.invalidate(self, 'involved_labs')
+        invalidate_cached_property(self, 'discordance_report_classifications')
+        invalidate_cached_property(self, 'involved_labs')
 
         # contents of existing_vms are now presumably records that changed clinical groupings
 
@@ -171,14 +172,14 @@ class DiscordanceReport(TimeStampedModel):
     def all_actively_involved_labs(self) -> Set[Lab]:
         return {lab for lab, status in self.involved_labs.items() if status == DiscordanceReport.LabInvolvement.ACTIVE}
 
-    @lazy
+    @cached_property
     def discordance_report_classifications(self) -> List['DiscordanceReportClassification']:
         return list(self.discordancereportclassification_set.select_related(
             'classification_original__classification__clinical_context',
             'classification_final__classification'
         ).all())
 
-    @lazy
+    @cached_property
     def involved_labs(self) -> Dict[Lab, LabInvolvement]:
         lab_status: Dict[Lab, DiscordanceReport.LabInvolvement] = {}
         for drc in self.discordance_report_classifications:
@@ -353,7 +354,7 @@ class DiscordanceReportRowData:
         self.discordance_report = discordance_report
         self.perspective = perspective
 
-    @lazy
+    @cached_property
     def all_actively_involved_labs(self):
         return self.discordance_report.all_actively_involved_labs
 
@@ -425,7 +426,7 @@ class DiscordanceReportRowData:
     def is_pending_concordance(self):
         return self.discordance_report.is_pending_concordance
 
-    @lazy
+    @cached_property
     def lab_significances(self) -> List[ClassificationLabSummary]:
         group_counts: Dict[ClassificationLabSummaryEntry, int] = defaultdict(int)
         for drc in DiscordanceReportClassification.objects.filter(report=self.discordance_report).select_related(
@@ -504,7 +505,7 @@ class DiscordanceReportTableData:
         else:
             return "your assigned labs"
 
-    @lazy
+    @cached_property
     def summaries(self) -> List[DiscordanceReportRowData]:
         summaries: List[DiscordanceReportRowData] = []
         for dr in self._discordance_reports.filter(resolution__isnull=True):
@@ -514,7 +515,7 @@ class DiscordanceReportTableData:
                     summaries.append(summary)
         return summaries
 
-    @lazy
+    @cached_property
     def counts(self) -> List[DiscordanceReportSummaryCount]:
         internal_count = 0
         by_lab: Dict[Lab, int] = defaultdict(int)
@@ -530,7 +531,7 @@ class DiscordanceReportTableData:
             counts.insert(0, DiscordanceReportSummaryCount(lab=None, count=internal_count))
         return counts
 
-    @lazy
+    @cached_property
     def inactive_summaries(self) -> List[DiscordanceReportRowData]:
         inactives: List[DiscordanceReportRowData] = []
         for dr in self._discordance_reports:
@@ -635,7 +636,7 @@ class DiscordanceReportClassification(TimeStampedModel):
     clinical_context_final = models.ForeignKey(ClinicalContext, on_delete=PROTECT, null=True, blank=True)
     withdrawn_final = models.BooleanField(default=False)
 
-    @lazy
+    @cached_property
     def classification_effective(self) -> ClassificationModification:
         """
         The final state of the classification (or the current if the report is still open)
@@ -647,7 +648,7 @@ class DiscordanceReportClassification(TimeStampedModel):
             is_last_published=True
         ).select_related('classification', 'classification__lab').get()
 
-    @lazy
+    @cached_property
     def clinical_context_effective(self) -> ClinicalContext:
         """
         The final state clinical context of the classification (or the current if the report is still open)
@@ -656,7 +657,7 @@ class DiscordanceReportClassification(TimeStampedModel):
             return self.clinical_context_final
         return self.classification_original.classification.clinical_context
 
-    @lazy
+    @cached_property
     def withdrawn_effective(self) -> bool:
         """
         The final "withdrawn" of the classification (or the current if the report is still open)
@@ -671,7 +672,7 @@ class DiscordanceReportClassification(TimeStampedModel):
         self.classification_final = self.classification_effective
         self.save()
 
-    @lazy
+    @cached_property
     def action_log(self) -> DiscordanceActionsLog:
         actions = DiscordanceActionsLog()
 

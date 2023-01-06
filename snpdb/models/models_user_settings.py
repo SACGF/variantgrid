@@ -1,6 +1,7 @@
 import dataclasses
 from collections import defaultdict
 from dataclasses import dataclass
+from functools import cached_property
 from typing import Optional, List, Tuple, Dict, Set
 
 from avatar.templatetags.avatar_tags import avatar_url
@@ -12,7 +13,6 @@ from django.db import models
 from django.db.models.deletion import SET_NULL, CASCADE
 from django.urls import reverse
 from django_extensions.db.models import TimeStampedModel
-from lazy import lazy
 from model_utils.managers import InheritanceManager
 
 from library.django_utils import thread_safe_unique_together_get_or_create
@@ -232,7 +232,7 @@ class AvatarDetails:
     def avatar_for(user: User):
         return AvatarDetails(user=user)
 
-    @lazy
+    @cached_property
     def preferred_label(self) -> str:
         user = self.user
         preferred_label = user.username
@@ -240,11 +240,11 @@ class AvatarDetails:
             preferred_label = ' '.join([name for name in [user.first_name, user.last_name] if name])
         return preferred_label
 
-    @lazy
+    @cached_property
     def is_editable(self):
         return 'avatar.providers.PrimaryAvatarProvider' in settings.AVATAR_PROVIDERS
 
-    @lazy
+    @cached_property
     def url(self) -> str:
         if self.is_editable:
             return avatar_url(self.user)
@@ -252,7 +252,7 @@ class AvatarDetails:
             # have to hardcode reference to SpaceThemedAvatarProvider as otherwise if a custom avatar was setup, avatar_url will still keep a reference to the old image
             return SpaceThemedAvatarProvider.get_avatar_url(self.user, 40)
 
-    @lazy
+    @cached_property
     def background_color(self) -> str:
         if self.user.username == 'admin_bot':
             return '#ffffff'
@@ -344,7 +344,7 @@ class UserSettings:
     def get_for_user(user: User) -> 'UserSettings':
         return UserSettings.get_for(user=user)
 
-    @lazy
+    @cached_property
     def initial_perm_read_and_write_groups(self) -> Tuple[Set[Group], Set[Group]]:
         groups = self.user.groups.all()
         settings_overrides = self._settings_overrides

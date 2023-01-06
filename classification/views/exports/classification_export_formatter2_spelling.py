@@ -1,11 +1,11 @@
 import re
 from collections import defaultdict
+from functools import cached_property
 from itertools import chain
 from typing import Set, List, Dict
 
 import nltk
 from django.http import HttpRequest
-from lazy import lazy
 
 from classification.enums import SpecialEKeys
 from classification.models import ClassificationModification
@@ -47,7 +47,7 @@ class ClassificationSpellingRow(ExportRow):
             words = [word]
         return [word for word in words if len(word) >= 4]
 
-    @lazy
+    @cached_property
     def suspect_words_set(self) -> Set[str]:
         if interpretation_summary := self.cm.get(SpecialEKeys.INTERPRETATION_SUMMARY):
             words = nltk.word_tokenize(interpretation_summary)

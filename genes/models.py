@@ -7,7 +7,7 @@ import types
 from collections import namedtuple, defaultdict, Counter
 from dataclasses import dataclass
 from datetime import timedelta
-from functools import total_ordering
+from functools import cached_property, total_ordering
 from io import StringIO
 from typing import Tuple, Optional, Dict, List, Set, Union, Iterable, Any
 from urllib.error import URLError, HTTPError
@@ -34,16 +34,15 @@ from django.utils import timezone
 from django.utils.timezone import localtime
 from django_extensions.db.models import TimeStampedModel
 from guardian.shortcuts import get_objects_for_user
-from lazy import lazy
 from requests import RequestException
 
 from genes.gene_coverage import load_gene_coverage_df
-from genes.models_enums import AnnotationConsortium, HGNCStatus, GeneSymbolAliasSource, MANEStatus
+from genes.models_enums import AnnotationConsortium, HGNCStatus, GeneSymbolAliasSource, MANEStatus, PanelAppConfidence
 from library.constants import HOUR_SECS, WEEK_SECS, MINUTE_SECS
 from library.django_utils import SortByPKMixin
 from library.django_utils.django_partition import RelatedModelsPartitionModel
 from library.utils.file_utils import mk_path
-from library.guardian_utils import assign_permission_to_user_and_groups, DjangoPermission
+from library.guardian_utils import assign_permission_to_user_and_groups, DjangoPermission, admin_bot
 from library.log_utils import log_traceback
 from library.utils import get_single_element, iter_fixed_chunks
 from snpdb.models import Wiki, Company, Sample, DataState
@@ -116,27 +115,27 @@ class HGNC(models.Model):
     def url(self):
         return f"https://www.genenames.org/data/gene-symbol-report/#!/hgnc_id/HGNC:{self.pk}"
 
-    @lazy
+    @cached_property
     def ccds_list(self):
         return (self.ccds_ids or '').split(",")
 
-    @lazy
+    @cached_property
     def gene_group_id_list(self):
         return (self.gene_group_ids or '').split(",")
 
-    @lazy
+    @cached_property
     def mgd_list(self):
         return (self.mgd_ids or '').split(",")
 
-    @lazy
+    @cached_property
     def rgd_list(self):
         return (self.rgd_ids or '').split(",")
 
-    @lazy
+    @cached_property
     def ucsc_list(self):
         return (self.ucsc_ids or '').split(",")
 
-    @lazy
+    @cached_property
     def uniprot_list(self) -> List['UniProt']:
         ulist = []
         if self.uniprot_ids:
@@ -188,7 +187,7 @@ class GeneSymbol(models.Model):
         # To match HPO/OMIM so it can be used interchangeably during phenotype matching
         return Gene.objects.filter(~Q(identifier__startswith="unknown_"), geneversion__gene_symbol=self).distinct()
 
-    @lazy
+    @cached_property
     def genes(self) -> List['Gene']:
         # returns cached set of genes associated with this symbol
         # use over get_genes when possible
@@ -197,7 +196,7 @@ class GeneSymbol(models.Model):
     def get_absolute_url(self):
         return reverse("view_gene_symbol", kwargs={"gene_symbol": self.symbol})
 
-    @lazy
+    @cached_property
     def alias_meta(self) -> 'GeneSymbolAliasesMeta':
         return GeneSymbolAliasesMeta(self)
 
@@ -321,7 +320,7 @@ class GeneSymbolAliasesMeta:
                 )
             )
 
-    @lazy
+    @cached_property
     def genes(self) -> Set['Gene']:
         """
         Returns a set of genes associated with all safe aliases to/from the primary Gene Symbol.
@@ -335,7 +334,7 @@ class GeneSymbolAliasesMeta:
                 gene_set = gene_set.union(alias_summary.other_obj.genes)
         return gene_set
 
-    @lazy
+    @cached_property
     def alias_symbol_strs(self) -> List[str]:
         gene_symbol_strs: Set[str] = {self.gene_symbol.symbol}
         for alias_summary in self.alias_list:
@@ -343,11 +342,11 @@ class GeneSymbolAliasesMeta:
                 gene_symbol_strs.add(alias_summary.other_symbol)
         return list(sorted(gene_symbol_strs))
 
-    @lazy
+    @cached_property
     def aliases_out(self) -> List[GeneSymbolAliasSummary]:
         return list(sorted([alias for alias in self.alias_list if not alias.my_symbol_is_main]))
 
-    @lazy
+    @cached_property
     def aliases_in(self) -> List[GeneSymbolAliasSummary]:
         return list(sorted([alias for alias in self.alias_list if alias.my_symbol_is_main]))
 
@@ -462,7 +461,7 @@ class GeneVersion(models.Model):
     class Meta:
         unique_together = ("gene", "version", "genome_build")
 
-    @lazy
+    @cached_property
     def accession(self):
         # RefSeq has no versions, so is always 0
         # Ensembl had some old ones with no version provided, they are 0 as well
@@ -492,7 +491,7 @@ class GeneVersion(models.Model):
     def strand(self):
         return self._transcript_extents["strand"]
 
-    @lazy
+    @cached_property
     def coordinate(self) -> str:
         """ 1-based for humans """
         try:
@@ -500,7 +499,7 @@ class GeneVersion(models.Model):
         except:
             return ""
 
-    @lazy
+    @cached_property
     def _transcript_extents(self):
         """ Stores chroms/min_start/max_end/strands - which are aggregate of all linked TranscriptVersions """
 
@@ -634,7 +633,7 @@ class TranscriptVersion(SortByPKMixin, models.Model):
     class Meta:
         unique_together = ("transcript", "version", "genome_build")
 
-    @lazy
+    @cached_property
     def _transcript_regions(self) -> Tuple[List, List, List]:
         """ Returns 5'UTR, CDS, 3'UTR """
         cds_start = self.pyhgvs_data["cds_start"]
@@ -661,15 +660,15 @@ class TranscriptVersion(SortByPKMixin, models.Model):
         else:
             return right_utr, cds, left_utr
 
-    @lazy
+    @cached_property
     def fivep_utr(self):
         return self._transcript_regions[0]
 
-    @lazy
+    @cached_property
     def cds(self):
         return self._transcript_regions[1]
 
-    @lazy
+    @cached_property
     def threep_utr(self):
         return self._transcript_regions[2]
 
@@ -715,7 +714,7 @@ class TranscriptVersion(SortByPKMixin, models.Model):
             acc = transcript_id
         return acc
 
-    @lazy
+    @cached_property
     def accession(self):
         return TranscriptVersion.get_accession(self.transcript_id, self.version)
 
@@ -723,7 +722,7 @@ class TranscriptVersion(SortByPKMixin, models.Model):
     def gene(self):
         return self.gene_version.gene
 
-    @lazy
+    @cached_property
     def gene_symbol(self):
         """ Returns HGNC symbol if available (to keep consistency between builds) or GeneVersion symbol (from GFF)
             GeneVersion symbol from GFF can diverge eg Entrez GeneID: 6901 - TAZ(37) and TAFAZZIN(38) """
@@ -733,7 +732,7 @@ class TranscriptVersion(SortByPKMixin, models.Model):
             gene_symbol = self.gene_version.gene_symbol
         return gene_symbol
 
-    @lazy
+    @cached_property
     def hgvs_ok(self) -> bool:
         """ """
         if self.has_valid_data:
@@ -788,7 +787,7 @@ class TranscriptVersion(SortByPKMixin, models.Model):
         # We can't know exactly how long a polyA tail is (only that subtracting it from length is all A's)
         return self.sequence_info.length == self.length or self.sequence_poly_a_tail
 
-    @lazy
+    @cached_property
     def alignment_gap(self) -> bool:
         if self.transcript.annotation_consortium == AnnotationConsortium.REFSEQ:
             # Sometimes RefSeq transcripts have gaps when aligning to the genome
@@ -932,7 +931,7 @@ class TranscriptVersion(SortByPKMixin, models.Model):
     def _sum_intervals(intervals: List[Tuple]):
         return sum(b - a for a, b in intervals)
 
-    @lazy
+    @cached_property
     def pyhgvs_data(self):
         transcript_json = self.data.copy()
         # Legacy data stored gene_name in JSON, but that could lead to diverging values vs TranscriptVersion relations
@@ -942,7 +941,7 @@ class TranscriptVersion(SortByPKMixin, models.Model):
         tf = PyHGVSTranscriptFactory(transcripts={self.accession: transcript_json})
         return tf.get_pyhgvs_data(self.accession, self.genome_build.name, sacgf_pyhgvs_fork=True)
 
-    @lazy
+    @cached_property
     def length(self) -> Optional[int]:
         if cdna_match := self.pyhgvs_data.get('cdna_match'):
             # cdna_match = (genomic start, genomic end, cDNA start, cDNA end, gap) (genomic=0 based, transcript=1)
@@ -955,15 +954,15 @@ class TranscriptVersion(SortByPKMixin, models.Model):
             return self._sum_intervals(exons)
         return None
 
-    @lazy
+    @cached_property
     def fivep_utr_length(self) -> int:
         return self._sum_intervals(self.fivep_utr)
 
-    @lazy
+    @cached_property
     def coding_length(self) -> int:
         return self._sum_intervals(self.cds)
 
-    @lazy
+    @cached_property
     def threep_utr_length(self) -> int:
         return self._sum_intervals(self.threep_utr)
 
@@ -988,7 +987,7 @@ class TranscriptVersion(SortByPKMixin, models.Model):
             coords = f"{self.chrom}:{self.pyhgvs_data['start'] + 1}-{self.pyhgvs_data['end']} ({self.pyhgvs_data['strand']})"
         return coords
 
-    @lazy
+    @cached_property
     def tags(self) -> List[str]:
         """ 'tag' has been in cdot since 0.2.12 """
         REMOVE_TAGS = {"basic"}  # This is on pretty much every Ensembl transcript
@@ -997,7 +996,7 @@ class TranscriptVersion(SortByPKMixin, models.Model):
             tag_list = sorted(tag for tag in tag_list_str.split(",") if tag not in REMOVE_TAGS)
         return tag_list
 
-    @lazy
+    @cached_property
     def canonical_tag(self) -> str:
         """ We only want to return the most important one """
         tags = set(self.tags)
@@ -1115,7 +1114,7 @@ class TranscriptVersion(SortByPKMixin, models.Model):
                 return transcript
         return None
 
-    @lazy
+    @cached_property
     def protein_domains_and_accession(self) -> Tuple[QuerySet, str]:
         """ Gets custom ProteinDomain if available, falling back on Pfam """
         PD_ARGS = ("protein_domain__name", "protein_domain__description", "start", "end")
@@ -1191,7 +1190,7 @@ class TranscriptVersionSequenceInfo(TimeStampedModel):
     def __str__(self):
         return f"{self.accession} ({self.length}bp)"
 
-    @lazy
+    @cached_property
     def accession(self):
         return TranscriptVersion.get_accession(self.transcript_id, self.version)
 
@@ -1742,7 +1741,6 @@ def create_fake_gene_list(*args, **kwargs):
 
 
 class GeneListGeneSymbol(models.Model):
-    """ Replacement for GeneListGene - will keep both in place during switchover """
     gene_list = models.ForeignKey(GeneList, on_delete=CASCADE)
     original_name = models.TextField(null=True, blank=True)
     gene_symbol = models.ForeignKey(GeneSymbol, null=True, on_delete=CASCADE)
@@ -1873,6 +1871,10 @@ class PanelAppPanel(TimeStampedModel):
         unique_together = ('server', 'panel_id')
 
     @property
+    def url(self) -> str:
+        return f"{self.server.url}/api/v1/panels/{self.panel_id}"
+
+    @property
     def cache_valid(self) -> bool:
         # Attempt to use cache if recent and present, otherwise fall through and do a query
         max_age = timedelta(days=settings.PANEL_APP_CACHE_DAYS)
@@ -1890,16 +1892,58 @@ class PanelAppPanelRelevantDisorders(models.Model):
         unique_together = ('panel_app_panel', 'name')
 
 
-class PanelAppPanelLocalCacheGeneList(TimeStampedModel):
+class PanelAppPanelLocalCache(TimeStampedModel):
     panel_app_panel = models.ForeignKey(PanelAppPanel, on_delete=CASCADE)
     version = models.TextField()
-    gene_list = models.ForeignKey(GeneList, on_delete=CASCADE)
 
     class Meta:
         unique_together = ("panel_app_panel", "version")
 
+    def get_gene_list(self, panel_app_confidence) -> GeneList:
+        from genes.gene_matching import GeneSymbolMatcher
+
+        min_level = int(panel_app_confidence)
+        name = f"{self.panel_app_panel.name} v.{self.version}.min_{min_level}"
+
+        # We'll try to re-use gene lists - but it's possible due to race conditions we may occasionally make
+        # a duplicate, but this should work fine and won't affect much
+        category = GeneListCategory.get_or_create_category(GeneListCategory.PANEL_APP_CACHE, hidden=True)
+        gene_list_kwargs = {
+            "category": category,
+            "name": name,
+            "user": admin_bot(),
+            "import_status": ImportStatus.SUCCESS,
+            "url": self.panel_app_panel.url,
+        }
+        if gene_list := GeneList.objects.filter(**gene_list_kwargs).order_by("pk").first():
+            print(f"Reused existing gene list: {gene_list.pk}")
+        else:
+            gene_list = GeneList.objects.create(**gene_list_kwargs)
+            print(f"Created gene list: {gene_list.pk}")
+            gene_names_list = []
+            for pap_lc_gs in self.panelapppanellocalcachegenesymbol_set.all():
+                confidence_level = int(pap_lc_gs.data["confidence_level"])
+                if confidence_level >= min_level:
+                    gene_symbol = pap_lc_gs.data["gene_data"]["gene_symbol"]
+                    gene_names_list.append(gene_symbol)
+
+            print(f"Creating symbols: {gene_names_list}")
+            gene_matcher = GeneSymbolMatcher()
+            gene_matcher.create_gene_list_gene_symbols(gene_list, gene_names_list)
+            gene_list.import_status = ImportStatus.SUCCESS
+            gene_list.save()
+
+        print(f"Returning gene list: {gene_list.pk}")
+        return gene_list
+
     def __str__(self):
-        return f"PanelApp GeneList cache for {self.panel_app_panel} v{self.version} (mod: {self.modified})"
+        return f"PanelApp cache for {self.panel_app_panel} v{self.version} (mod: {self.modified})"
+
+
+class PanelAppPanelLocalCacheGeneSymbol(models.Model):
+    panel_app_local_cache = models.ForeignKey(PanelAppPanelLocalCache, on_delete=CASCADE)
+    gene_symbol = models.ForeignKey(GeneSymbol, on_delete=CASCADE)
+    data = models.JSONField(null=False, blank=True, default=dict)  # API response
 
 
 class CachedThirdPartyGeneList(models.Model):

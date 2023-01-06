@@ -1,12 +1,12 @@
 import json
 from dataclasses import dataclass
 from enum import Enum
+from functools import cached_property
 from typing import List, Any
 
 from django.http import HttpRequest
 from django.template.loader import render_to_string
 from django.urls import reverse
-from lazy import lazy
 
 from annotation.views import simple_citation_html
 from classification.enums import SpecialEKeys
@@ -193,7 +193,7 @@ class MVLEntry(ExportRow):
     def _cm(self) -> ClassificationModification:
         return self.data.cms[0]
 
-    @lazy
+    @cached_property
     def classifications_values(self) -> MVLClinicalSignificance:
         return MVLClinicalSignificance.from_data(self.mvl_data)
 
@@ -223,7 +223,7 @@ class MVLEntry(ExportRow):
             return 'VOUS'
         return self.classifications_values.alissa
 
-    @lazy
+    @cached_property
     def variant_anchor_tag(self):
         # if we want to produce the same URLs as before for comparison, at the cost of a lot of speed
         if self.formatter.compatability_mode:
@@ -237,7 +237,7 @@ class MVLEntry(ExportRow):
             url = get_url_from_view_path(url) + f'?refer=mvl&seen={self.data.source.date_str}'
             return f'<a href="{url}" target="_blank">Click here for up-to-date classifications on this variant.</a>'
 
-    @lazy
+    @cached_property
     def groups(self) -> ClassificationGroups:
         return ClassificationGroups(
             classification_modifications=self.data.cms,
