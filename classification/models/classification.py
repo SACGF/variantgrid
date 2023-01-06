@@ -860,6 +860,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         """
         if allele_info := self.ensure_allele_info():
             allele_info.update_variant_coordinate()  # only need this for systems that were migrated when half of the AlleleInfo was done
+            allele_info.update_status()
             allele_info.save()
             if not force_update and self.allele_info.status == ImportedAlleleInfoStatus.MATCHED_ALL_BUILDS:
                 return
