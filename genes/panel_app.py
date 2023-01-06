@@ -121,8 +121,6 @@ def store_panel_app_panels_from_web(server: PanelAppServer, cached_web_resource:
 def get_panel_app_local_cache(panel_app_panel: PanelAppPanel) -> PanelAppPanelLocalCache:
     """ Gets or creates local cache of a panel app panel so it can be used as a GeneList """
 
-    print(f"=== get_panel_app_local_cache({panel_app_panel}) ====")
-
     # Attempt to use cache if recent and present, otherwise fall through and do a query
     try:
         existing = PanelAppPanelLocalCache.objects.get(panel_app_panel=panel_app_panel,
@@ -142,7 +140,6 @@ def get_panel_app_local_cache(panel_app_panel: PanelAppPanel) -> PanelAppPanelLo
     if existing and existing.version == version:
         return existing  # cache still valid
 
-    print(f"PANEL APP - {panel_app_panel}")
     pap_lc = PanelAppPanelLocalCache.objects.create(panel_app_panel=panel_app_panel,
                                                     version=version)
     existing_uc_symbols = GeneSymbol.get_upper_case_lookup()
@@ -158,9 +155,7 @@ def get_panel_app_local_cache(panel_app_panel: PanelAppPanel) -> PanelAppPanelLo
         pap_lc_genes.append(record)
 
     if new_symbols:
-        print(f"Creating {len(new_symbols)} new gene symbols")
         GeneSymbol.objects.bulk_create(new_symbols, ignore_conflicts=True, batch_size=2000)
     if pap_lc_genes:
-        print(f"Creating {len(pap_lc_genes)} PanelAppPanelLocalCacheGeneSymbol records")
         PanelAppPanelLocalCacheGeneSymbol.objects.bulk_create(pap_lc_genes, batch_size=2000)
     return pap_lc
