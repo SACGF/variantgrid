@@ -925,9 +925,11 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         if vi := self.allele_info.variant_info_for_imported_genome_build:
             if viv := vi.variant:
                 allele_or_variant_changed = self.variant != viv
-                self.variant = viv
+                variant = viv
         allele_or_variant_changed = allele_or_variant_changed or self.allele_info
+
         self.allele = self.allele_info.allele
+        self.variant = variant
 
         failed = self.allele_info.status == ImportedAlleleInfoStatus.FAILED
         message = self.allele_info.message
