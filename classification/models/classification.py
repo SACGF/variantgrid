@@ -1075,9 +1075,11 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                                 lab=lab,
                                 lab_record_id=lab_record_id,
                                 **kwargs)
+
+        # -- this has to be done after calls to create now
         # so we can fire any logic that needs to happen upon linking to a variant
-        if record.variant:
-            record.set_variant(record.variant)
+        # if record.variant:
+        #    record.set_variant(record.variant)
 
         if populate_with_defaults:
             for e_key in record.evidence_keys.all_keys:

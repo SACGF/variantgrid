@@ -34,6 +34,11 @@ def create_classification_for_sample_and_variant_objects(
     # TODO - if you have > 1 labs then redirect to pick page.
     lab = user_settings.get_lab()
     vc_import = ClassificationImport.objects.create(user=user, genome_build=genome_build)
+
+    data = {
+
+    }
+
     kwargs = {"user": user,
               "lab": lab,
               "variant": variant,
@@ -46,8 +51,7 @@ def create_classification_for_sample_and_variant_objects(
                                         refseq_transcript_accession=refseq_transcript_accession,
                                         ensembl_transcript_accession=ensembl_transcript_accession,
                                         annotation_version=annotation_version)
-    #classification.set_variant(variant)  # have to re-do this because we didn't have the transcript the 1st time around
-    classification.ensure_allele_info()
+    classification.set_variant(variant)  # have to re-do this later because we didn't have the transcript the 1st time around
 
     liftover_classification_import(vc_import, ImportSource.WEB)
     return classification
