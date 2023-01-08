@@ -310,19 +310,19 @@ class ClassificationTestCaseModifications(TestCase):
         db_refs = literature.get(VCBlobKeys.DB_REFS.value)
         self.assertEqual(len(db_refs), 2)
         puby_1 = db_refs[0]
-        puby_1.pop('internal_id')
+        # puby_1.pop('internal_id')
         self.assertEqual(puby_1, {
-            'db': 'PubMed',
-            'id': 'PubMed: 123456',
+            'db': 'PMID',
+            'id': 'PMID: 123456',
             'idx': '123456',
             'url': 'https://www.ncbi.nlm.nih.gov/pubmed/?term=123456'
         })
 
         puby_2 = db_refs[1]
-        puby_2.pop('internal_id')
+        # puby_2.pop('internal_id')
         self.assertEqual(puby_2, {
-            'db': 'PubMed',
-            'id': 'PubMed: 555444',
+            'db': 'PMID',
+            'id': 'PMID: 555444',
             'idx': '555444',
             'url': 'https://www.ncbi.nlm.nih.gov/pubmed/?term=555444'
         })
