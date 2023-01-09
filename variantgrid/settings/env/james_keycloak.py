@@ -2,7 +2,7 @@
 See https://bitbucket.org/sacgf/variantgrid/wiki/Annotation%20Setup
 (test)
 """
-GDAL_LIBRARY_PATH="/opt/homebrew/Cellar/gdal/3.5.3/lib/libgdal.31.dylib"
+GDAL_LIBRARY_PATH="/opt/homebrew/Cellar/gdal/3.6.2/lib/libgdal.32.dylib"
 GEOS_LIBRARY_PATH="/opt/homebrew/Cellar/geos/3.11.1/lib/libgeos_c.dylib"
 # IMPORTANT : THE BELOW IMPORTS ARE USED TO APPLY THEIR RESPECTIVE SETTINGS VALUES
 from variantgrid.settings.components.celery_settings import *  # pylint: disable=wildcard-import, unused-wildcard-import
