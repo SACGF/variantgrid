@@ -3,6 +3,12 @@
     {% for diff_text in c_hgvses %}
         {% labelled label=diff_text.identifier value_css="text-monospace" %}{{ diff_text.html }}{% endlabelled %}
     {% endfor %}
+    {% if normalized_diff %}
+        {% labelled label="Normalising Diffs" %}{{ 'W' | severity_icon }}{{ normalized_diff|separator:', ' }}{% endlabelled %}
+    {% endif %}
+    {% if liftover_diff %}
+        {% labelled label="Liftover Diffs" %}{{ 'W' | severity_icon }}{{ liftover_diff|separator:', ' }}{% endlabelled %}
+    {% endif %}
     {% labelled label="Normalised Variant Coordinate (in imported Genome Build)" value_css="text-monospace" %}{{ allele_info.variant_coordinate }}{% endlabelled %}
     {% if allele_info.message %}
         {% labelled label="Note" %}{{ allele_info.message }}{% endlabelled %}

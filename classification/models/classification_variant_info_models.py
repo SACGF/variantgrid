@@ -32,6 +32,11 @@ class ResolvedVariantInfo(TimeStampedModel):
     c_hgvs = TextField(null=True, blank=True)
     """ c.HGVS as you'd normally represent it """
 
+    @property
+    def c_hgvs_obj(self) -> Optional[CHGVS]:
+        if self.c_hgvs:
+            return CHGVS(self.c_hgvs)
+
     c_hgvs_full = TextField(null=True, blank=True)
     """ c.HGVS with all bases explicit in the case of dels & dups """
 
@@ -170,8 +175,9 @@ class ImportedAlleleInfo(TimeStampedModel):
         unique_together = ('imported_c_hgvs', 'imported_g_hgvs', 'imported_transcript', 'imported_genome_build_patch_version')
 
     @property
-    def imported_c_hgvs_obj(self) -> CHGVS:
-        return CHGVS(self.imported_c_hgvs)
+    def imported_c_hgvs_obj(self) -> Optional[CHGVS]:
+        if self.imported_c_hgvs:
+            return CHGVS(self.imported_c_hgvs)
 
     @property
     def get_transcript(self) -> str:

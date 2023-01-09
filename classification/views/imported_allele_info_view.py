@@ -7,7 +7,7 @@ from django.shortcuts import render, get_object_or_404
 from requests import Response
 
 from classification.models import ImportedAlleleInfo, ImportedAlleleInfoStatus
-from genes.hgvs import CHGVS
+from genes.hgvs import CHGVS, CHGVSDiff, chgvs_diff_description
 from library.guardian_utils import is_superuser
 from library.utils import MultiDiff, MultiDiffInput
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, CellData
@@ -145,7 +145,19 @@ def view_imported_allele_info_detail(request: HttpRequest, pk: int):
     ]
     diff_output = multi_diff.diffs(parts)
 
+    normalized_diff: Optional[CHGVSDiff] = None
+    liftover_diff: Optional[CHGVSDiff] = None
+    if imported_c_hgvs := allele_info.imported_c_hgvs_obj:
+        if normalized := allele_info.variant_info_for_imported_genome_build:
+            if c_hgvs := normalized.c_hgvs_obj:
+                normalized_diff = imported_c_hgvs.diff(c_hgvs)
+    if (c37 := allele_info.grch37) and (c38 := allele_info.grch38):
+        if (c37c := c37.c_hgvs_obj) and (c38c := c38.c_hgvs_obj):
+            liftover_diff = c37c.diff(c38c)
+
     return render(request, "classification/imported_allele_info_detail.html", {
         "allele_info": get_object_or_404(ImportedAlleleInfo, pk=pk),
-        "c_hgvses": diff_output
+        "c_hgvses": diff_output,
+        "normalized_diff": chgvs_diff_description(normalized_diff) if normalized_diff else None,
+        "liftover_diff": chgvs_diff_description(liftover_diff) if liftover_diff else None
     })

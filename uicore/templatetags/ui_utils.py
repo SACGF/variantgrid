@@ -2,7 +2,7 @@ import json
 import re
 import uuid
 from html import escape
-from typing import Optional, Any
+from typing import Optional, Any, Iterable
 
 from django import template
 from django.contrib.auth.models import User
@@ -10,6 +10,7 @@ from django.db.models import Model
 from django.forms.utils import ErrorList
 from django.template.base import FilterExpression, kwarg_re
 from django.urls import reverse, NoReverseMatch
+from django.utils import html
 from django.utils.safestring import SafeString
 
 from library.utils import diff_text
@@ -588,3 +589,8 @@ def value_with_icon(value: Optional[Any] = None, help: Optional[str] = None, ico
         "help": help,
         "icon": icon
     }
+
+
+@register.filter(name='separator')
+def separator(items: Iterable[Any] = None, separator: str = ','):
+    return SafeString(separator.join(html.escape(str(x)) for x in items))
