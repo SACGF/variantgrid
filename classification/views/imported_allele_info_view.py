@@ -10,6 +10,7 @@ from classification.models import ImportedAlleleInfo, ImportedAlleleInfoStatus
 from genes.hgvs import CHGVS, CHGVSDiff, chgvs_diff_description
 from library.guardian_utils import is_superuser
 from library.utils import MultiDiff, MultiDiffInput
+from snpdb.models import GenomeBuild
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, CellData
 import re
 
@@ -138,11 +139,18 @@ def view_imported_allele_info_detail(request: HttpRequest, pk: int):
         '(?P<c_nomen_change>.*)'
     )
     multi_diff = MultiDiff(HGVS_REGEX)
-    parts = [
-        MultiDiffInput(f"Imported ({allele_info.imported_genome_build_patch_version})", allele_info.imported_c_hgvs),
-        MultiDiffInput("GRCh37", allele_info.grch37.c_hgvs if allele_info.grch37 else None),
-        MultiDiffInput("GRCh38", allele_info.grch38.c_hgvs if allele_info.grch38 else None)
-    ]
+    parts = [MultiDiffInput(f"Imported ({allele_info.imported_genome_build_patch_version})", allele_info.imported_c_hgvs)]
+    if allele_info.imported_genome_build_patch_version.genome_build == GenomeBuild.grch37():
+        parts += [
+            MultiDiffInput("Normalised (GRCh37)", allele_info.grch37.c_hgvs if allele_info.grch37 else None),
+            MultiDiffInput("Liftover (GRCh38)", allele_info.grch38.c_hgvs if allele_info.grch38 else None)
+        ]
+    else:
+        parts += [
+            MultiDiffInput("Normalised (GRCh38)", allele_info.grch38.c_hgvs if allele_info.grch38 else None),
+            MultiDiffInput("Liftover (GRCh37)", allele_info.grch37.c_hgvs if allele_info.grch37 else None)
+        ]
+
     diff_output = multi_diff.diffs(parts)
 
     normalized_diff: Optional[CHGVSDiff] = None
@@ -159,5 +167,6 @@ def view_imported_allele_info_detail(request: HttpRequest, pk: int):
         "allele_info": get_object_or_404(ImportedAlleleInfo, pk=pk),
         "c_hgvses": diff_output,
         "normalized_diff": chgvs_diff_description(normalized_diff) if normalized_diff else None,
-        "liftover_diff": chgvs_diff_description(liftover_diff) if liftover_diff else None
+        "liftover_diff": chgvs_diff_description(liftover_diff) if liftover_diff else None,
+        "variant_coordinate_label": f"Normalised Variant Coordinate ({allele_info.imported_genome_build_patch_version})"
     })

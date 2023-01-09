@@ -1,15 +1,21 @@
 {% load ui_utils %}
 <div>
+    {% comment %}
     {% for diff_text in c_hgvses %}
         {% labelled label=diff_text.identifier value_css="text-monospace" %}{{ diff_text.html }}{% endlabelled %}
     {% endfor %}
+    {% endcomment %}
+    {% labelled label=c_hgvses.0.identifier value_css="text-monospace" %}{{ c_hgvses.0.html }}{% endlabelled %}
     {% if normalized_diff %}
-        {% labelled label="Normalising Diffs" %}{{ 'W' | severity_icon }}{{ normalized_diff|separator:', ' }}{% endlabelled %}
+        {% labelled label="Normalised Diffs" value_css="text-muted" %}<i class="fa-solid fa-arrows-up-down"></i> {{ normalized_diff|separator:', ' }}{% endlabelled %}
     {% endif %}
+    {% labelled label=c_hgvses.1.identifier value_css="text-monospace" %}{{ c_hgvses.1.html }}{% endlabelled %}
     {% if liftover_diff %}
-        {% labelled label="Liftover Diffs" %}{{ 'W' | severity_icon }}{{ liftover_diff|separator:', ' }}{% endlabelled %}
+        {% labelled label="Liftover Diffs" value_css="text-muted" %}<i class="fa-solid fa-arrows-up-down"></i> {{ liftover_diff|separator:', ' }}{% endlabelled %}
     {% endif %}
-    {% labelled label="Normalised Variant Coordinate (in imported Genome Build)" value_css="text-monospace" %}{{ allele_info.variant_coordinate }}{% endlabelled %}
+    {% labelled label=c_hgvses.2.identifier value_css="text-monospace" %}{{ c_hgvses.2.html }}{% endlabelled %}
+    <hr style="border-top:1px dashed lightgrey"/>
+    {% labelled label=variant_coordinate_label value_css="text-monospace" %}{{ allele_info.variant_coordinate }}{% endlabelled %}
     {% if allele_info.message %}
         {% labelled label="Note" %}{{ allele_info.message }}{% endlabelled %}
     {% endif %}

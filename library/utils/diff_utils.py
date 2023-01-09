@@ -206,6 +206,7 @@ class MultiDiffOutput:
                 matched=False,
             ).append('u', text)
 
+
 class MultiDiff:
 
     @staticmethod
