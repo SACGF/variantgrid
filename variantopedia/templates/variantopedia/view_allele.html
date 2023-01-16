@@ -104,6 +104,20 @@
                             {% labelled hint="tiny" label='Description' %}{{ allele.clingen_error.description }}{% endlabelled %}
                             </div>
                         {% endif %}
+                        {% if imported_alleles %}
+                            <div class="mt-3">
+                                <label>Resolved From</label>
+                                <div style="font-size:10pt">
+                                {% for imported_allele in imported_alleles %}
+                                    <div class="mt-2">
+                                        <a data-toggle="ajax-modal" href="{% url 'view_imported_allele_info_detail' imported_allele.pk %}">
+                                        {{ imported_allele.imported_genome_build_patch_version }}<br/>{% c_hgvs imported_allele.imported_c_hgvs %}
+                                        </a>
+                                    </div>
+                                {% endfor %}
+                                </div>
+                            </div>
+                        {% endif %}
                     </div>
                 </div>
             </div>

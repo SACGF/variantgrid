@@ -20,6 +20,7 @@ from analysis.serializers import VariantTagSerializer
 from annotation.models import AnnotationRun, AnnotationVersion, ClassificationModification, Classification, ClinVar, \
     VariantAnnotationVersion, VariantAnnotation
 from annotation.transcripts_annotation_selections import VariantTranscriptSelections
+from classification.models import ImportedAlleleInfo
 from classification.models.classification_import_run import ClassificationImportRun
 from classification.views.exports import ClassificationExportFormatter2CSV
 from classification.views.exports.classification_export_filter import ClassificationFilter
@@ -443,7 +444,9 @@ def view_allele(request, allele_id: int):
                "allele_merge_log_qs": allele_merge_log_qs,
                "clingen_url": settings.CLINGEN_ALLELE_REGISTRY_DOMAIN,
                "classifications": latest_classifications,
-               "annotated_builds": GenomeBuild.builds_with_annotation()}
+               "annotated_builds": GenomeBuild.builds_with_annotation(),
+               "imported_alleles": ImportedAlleleInfo.objects.filter(allele=allele)
+               }
     return render(request, "variantopedia/view_allele.html", context)
 
 
