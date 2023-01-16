@@ -1137,14 +1137,9 @@ a .c-hgvs-body {
     color: #444488;
   }
 }
-a .c-hgvs-body:hover {
-  .c-hgvs-transcript, .c-hgvs-nomen, .c-hgvs-gene-symbol-b {
-    text-decoration: underline !important;
-  }
-}
+
 .c-hgvs-body {
   .c-hgvs-transcript, .c-hgvs-nomen, .c-hgvs-gene-symbol-b {
-    display: inline-block;
     white-space: nowrap;
     word-break: normal;
   }
