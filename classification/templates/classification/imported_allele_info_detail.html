@@ -1,4 +1,5 @@
 {% load ui_utils %}
+{% load js_tags %}
 <div>
     {% comment %}
     {% for diff_text in c_hgvses %}
@@ -14,6 +15,8 @@
         {% labelled label="Liftover Diffs" value_css="text-muted" %}<i class="fa-solid fa-arrows-up-down"></i> {{ liftover_diff|separator:', ' }}{% endlabelled %}
     {% endif %}
     {% labelled label=c_hgvses.2.identifier value_css="text-monospace" %}{{ c_hgvses.2.html }}{% endlabelled %}
+    {% labelled label="Validation Tags" %}{% if validation_tags %}{% for validation_tag in validation_tags %}<div>{{validation_tag}}</div>{% endfor %}{% else %}No Validation Issues{% endif %}{% endlabelled %}
+    {% labelled label="Include" %}{{ allele_info.latest_validation.include | boolean }}{% endlabelled %}
     <hr style="border-top:1px dashed lightgrey"/>
     {% labelled label=variant_coordinate_label value_css="text-monospace" %}{{ allele_info.variant_coordinate }}{% endlabelled %}
     {% if allele_info.message %}

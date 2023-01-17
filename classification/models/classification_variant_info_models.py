@@ -1,11 +1,15 @@
-from typing import Optional, List, Dict, Any
+from datetime import timedelta
+from typing import Optional, List, Dict, Any, TypedDict
 from django.conf import settings
+from django.contrib.auth.models import User
+from django.db import transaction
 from django.db.models import TextField, ForeignKey, CASCADE, SET_NULL, OneToOneField, TextChoices, \
-    CharField
+    CharField, JSONField, BooleanField
+from django.utils.timezone import now
 from model_utils.models import TimeStampedModel
 from pyhgvs import InvalidHGVSName
 
-from genes.hgvs import HGVSMatcher, CHGVS
+from genes.hgvs import HGVSMatcher, CHGVS, CHGVSDiff
 from genes.models import TranscriptVersion, GeneSymbol
 from library.cache import timed_cache
 from library.log_utils import report_exc_info
@@ -121,6 +125,43 @@ class ImportedAlleleInfoStatus(TextChoices):
     MATCHED_ALL_BUILDS = "M", "Matched All Builds"
     FAILED = "F", "Failed"
 
+class ImportedAlleleInfoValidationTags(TypedDict, total=False):
+    normal_transcript_id_change: bool
+    normal_transcript_version_change: bool
+    normal_gene_symbol_change: bool
+    normal_c_nomen_change: bool
+    liftover_transcript_id_change: bool
+    liftover_transcript_version_change: bool
+    liftover_gene_symbol_change: bool
+    liftover_c_nomen_change: bool
+    missing_37: bool
+    missing_38: bool
+
+
+class ImportedAlleleInfoValidation(TimeStampedModel):
+    imported_allele_info = ForeignKey('ImportedAlleleInfo', on_delete=CASCADE)
+    validation_tags = JSONField(null=True, blank=True)  # of type ImportedAlleleInfoValidation
+    c_hgvs_37 = TextField(null=True, blank=True)
+    c_hgvs_38 = TextField(null=True, blank=True)
+    include = BooleanField(null=False)  # don't provide a default - make sure it's calculated
+    confirmed = BooleanField(default=False, blank=True)
+    """ Has a user manually set the include boolean to override the default calculation """
+    confirmed_by = ForeignKey(User, null=True, blank=True, on_delete=SET_NULL)
+
+
+_DIFF_TO_VALIDATION_KEY = {
+    CHGVSDiff.DIFF_TRANSCRIPT_ID: 'transcript_id_change',
+    CHGVSDiff.DIFF_TRANSCRIPT_VER: 'transcript_version_change',
+    CHGVSDiff.DIFF_GENE: 'gene_symbol_change',
+    CHGVSDiff.DIFF_RAW_CGVS: 'c_nomen_change'
+}
+
+_ALLOWABLE_VALIDATION = {
+    'normal_transcript_version_change',
+    'liftover_transcript_version_change',
+    'missing_37'
+}
+
 
 class ImportedAlleleInfo(TimeStampedModel):
     """
@@ -171,8 +212,74 @@ class ImportedAlleleInfo(TimeStampedModel):
     status = CharField(max_length=1, choices=ImportedAlleleInfoStatus.choices, default=ImportedAlleleInfoStatus.PROCESSING)
     """ If true, indicates that this is not matchable, see the message for details """
 
+    latest_validation = ForeignKey(ImportedAlleleInfoValidation, null=True, on_delete=SET_NULL)
+
     class Meta:
         unique_together = ('imported_c_hgvs', 'imported_g_hgvs', 'imported_transcript', 'imported_genome_build_patch_version')
+
+    def _calculate_validation(self) -> ImportedAlleleInfoValidation:
+        validation_dict: ImportedAlleleInfoValidationTags = {}
+        imported_c_hgvs = self.imported_c_hgvs_obj
+        normalised_c_hgvs: Optional[CHGVS] = None
+        if normalised := self.variant_info_for_imported_genome_build:
+            normalised_c_hgvs = normalised.c_hgvs_obj
+        liftedover_c_hgvs: Optional[CHGVS] = None
+        if liftedover := self.variant_info_for_lifted_over_genome_build:
+            liftedover_c_hgvs = liftedover.c_hgvs_obj
+
+        def apply_diff(c_hgvs_diff: CHGVSDiff, prefix: str):
+            nonlocal validation_dict
+            for key, value in _DIFF_TO_VALIDATION_KEY.items():
+                if c_hgvs_diff & key:
+                    validation_dict[f'{prefix}_{value}'] = True
+
+        if imported_c_hgvs and normalised_c_hgvs:
+            apply_diff(imported_c_hgvs.diff(normalised_c_hgvs), 'normal')
+
+        if normalised_c_hgvs and liftedover_c_hgvs:
+            apply_diff(normalised_c_hgvs.diff(liftedover_c_hgvs), 'liftover')
+
+        if not self.grch37 or not self.grch37.c_hgvs_obj:
+            validation_dict['missing_37'] = True
+        if not self.grch38 or not self.grch38.c_hgvs_obj:
+            validation_dict['missing_38'] = True
+        return validation_dict
+
+    @staticmethod
+    def _should_include(validation_tags: ImportedAlleleInfoValidation):
+        return not any(True for key, value in validation_tags.items() if value and key not in _ALLOWABLE_VALIDATION)
+
+    def apply_validation(self, force_update: bool = False):
+        """
+        Make sure to call .save() after this to be safe
+        """
+        c_hgvs_37 = self.grch37.c_hgvs if self.grch37 else None
+        c_hgvs_38 = self.grch38.c_hgvs if self.grch38 else None
+
+        update_existing_validation = False
+        if check_latest := self.latest_validation:
+            if check_latest.c_hgvs_37 == c_hgvs_37 and check_latest.c_hgvs_38 == c_hgvs_38:
+                # validation is already up to date, maybe add a force option to check that the validation dict is the same?
+                if force_update:
+                    update_existing_validation = True
+                else:
+                    return
+            # there's only 1 validation, and it's less than 1 minute old
+            if check_latest.created >= now() + timedelta(minutes=1) and \
+                    ImportedAlleleInfoValidation.objects.filter(imported_allele_info=self).count() == 1:
+                update_existing_validation = True
+
+        latest_validation = self.latest_validation if update_existing_validation else ImportedAlleleInfoValidation()
+
+        validation_tags = self._calculate_validation()
+        latest_validation.imported_allele_info = self
+        latest_validation.validation_tags = validation_tags
+        latest_validation.c_hgvs_37 = c_hgvs_37
+        latest_validation.c_hgvs_38 = c_hgvs_38
+        if not latest_validation.confirmed:
+            latest_validation.include = ImportedAlleleInfo._should_include(validation_tags)
+        latest_validation.save()
+        self.latest_validation = latest_validation
 
     @property
     def imported_c_hgvs_obj(self) -> Optional[CHGVS]:
@@ -267,6 +374,14 @@ class ImportedAlleleInfo(TimeStampedModel):
     def variant_info_for_imported_genome_build(self) -> Optional[ResolvedVariantInfo]:
         return self[self.imported_genome_build_patch_version.genome_build]
 
+    @property
+    def variant_info_for_lifted_over_genome_build(self) -> Optional[ResolvedVariantInfo]:
+        actual_genome_build = self.imported_genome_build_patch_version.genome_build
+        if actual_genome_build == GenomeBuild.grch38():
+            return self[GenomeBuild.grch37()]
+        else:
+            return self[GenomeBuild.grch38()]
+
     def set_matching_failed(self, message: Optional[str] = None):
         if message:
             self.message = message
@@ -338,3 +453,4 @@ class ImportedAlleleInfo(TimeStampedModel):
                     existing.update_and_save(variant=variant)
             else:
                 self[genome_build] = ResolvedVariantInfo.get_or_create(self, genome_build, variant)
+

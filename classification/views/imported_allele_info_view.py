@@ -86,10 +86,10 @@ class ImportedAlleleInfoColumns(DatatableConfig[ImportedAlleleInfo]):
                 client_renderer='VCTable.hgvs'
             ),
             RichColumn(
-                key='status',
-                label="Status",
-                renderer=self.render_status,
-                orderable=True
+                key='latest_validation__include',
+                label="Include",
+                orderable=True,
+                client_renderer='TableFormat.boolean.bind(null, "false_is_error")'
             ),
             RichColumn(
                 key='classification_count',
@@ -168,5 +168,6 @@ def view_imported_allele_info_detail(request: HttpRequest, pk: int):
         "c_hgvses": diff_output,
         "normalized_diff": chgvs_diff_description(normalized_diff) if normalized_diff else None,
         "liftover_diff": chgvs_diff_description(liftover_diff) if liftover_diff else None,
-        "variant_coordinate_label": f"Normalised Variant Coordinate ({allele_info.imported_genome_build_patch_version})"
+        "variant_coordinate_label": f"Normalised Variant Coordinate ({allele_info.imported_genome_build_patch_version})",
+        "validation_tags": [tag for tag, value in allele_info.latest_validation.validation_tags.items() if value] if allele_info.latest_validation else []
     })

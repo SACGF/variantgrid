@@ -8,10 +8,11 @@ from django.db.models import Q
 
 from classification.classification_import import process_classification_import
 from classification.enums import SpecialEKeys
-from classification.models import Classification, ClassificationImport
+from classification.models import Classification, ClassificationImport, ImportedAlleleInfo, classification_flag_types
 from classification.models.classification_import_run import ClassificationImportRun
+from flags.models import Flag
 from library.guardian_utils import admin_bot
-from snpdb.models import ImportSource
+from snpdb.models import ImportSource, allele_flag_types
 
 
 class Command(BaseCommand):
@@ -21,6 +22,7 @@ class Command(BaseCommand):
         parser.add_argument('--file', type=str, help='If provided expects a csv where the first column is a combination of genome build and imported c.hgvs it expects to import')
         parser.add_argument('--missing', action='store_true', default=False, help='Attempt to rematch only classifications not linked to a variant - one at a time')
         parser.add_argument('--extra', action='store_true', default=False, help='Populate the allele_info of a classification')
+        parser.add_argument('--validation', action='store_true', default=False, help='Perform validation on the pre-existing normalising/liftovers')
 
     def report_unmatched(self):
         print(f"Unmatched count = {Classification.objects.filter(variant__isnull=True).count()}")
@@ -29,16 +31,17 @@ class Command(BaseCommand):
         mode_all = options.get('all')
         mode_missing = options.get('missing')
         mode_extra = options.get('extra')
+        mode_validation = options.get('validation')
         mode_file = options.get('file')
 
         if mode_all and mode_missing:
             raise ValueError("all and missing are mutually exclusive parameters")
 
-        if mode_file and (mode_all or mode_missing or mode_extra):
+        if mode_file and (mode_all or mode_missing or mode_extra, mode_validation):
             raise ValueError("file is an exclusive parameter")
 
-        if not any([mode_all, mode_missing, mode_file, mode_extra]):
-            raise ValueError("Need one of all, file, missing, mode_extra")
+        if not any([mode_all, mode_missing, mode_file, mode_extra, mode_validation]):
+            raise ValueError("Need one of all, file, missing, mode_extra, mode_validation")
 
         row_count = 0
         batch_size = 50
@@ -46,6 +49,9 @@ class Command(BaseCommand):
 
         if mode_extra:
             self.handle_extra()
+            return
+        if mode_validation:
+            self.handle_validation()
             return
         if mode_missing:
             batch_size = 1
@@ -102,9 +108,34 @@ class Command(BaseCommand):
         for i, c in enumerate(Classification.objects.all()):
             if i % 100 == 0:
                 print(f"Processed {i} classifications")
-            if c.update_allele_info_from_classification():
+            # use force_update so we can be sure that the validation objects have been made
+            if c.update_allele_info_from_classification(force_update=True):
                 c.save(update_modified=False)
         print(f"Finished {i} classifications")
+
+    def handle_validation(self):
+        approved_vm_flags = Flag.objects.filter(flag_type=classification_flag_types.matching_variant_warning_flag, resolution__id='vm_confirmed').exclude(user=admin_bot())
+        approved_37_not_38_flags = Flag.objects.filter(flag_type=allele_flag_types.allele_37_not_38, resolution__id='closed').exclude(user=admin_bot())
+
+        # TODO, also need to make sure there aren't any outstanding flags after these ones were closed
+        classification_to_flag = {flag.collection_id: flag for flag in approved_vm_flags}
+        allele_to_flag = {flag.collection_id: flag for flag in approved_37_not_38_flags}
+
+        for i, allele_info in enumerate(ImportedAlleleInfo.objects.all()):
+            if i % 100 == 0:
+                print(f"Processed {i} allele infos")
+            allele_info.apply_validation(force_update=True)
+            allele_info.save()
+
+            if allele := allele_info.allele:
+                if allele_flag_pk := allele.flag_collection_id:
+                    if approved_flag := allele_to_flag.get(allele_flag_pk):
+                        print(f"Found 37 != 38 approved flag for allele {allele}")
+                classifications = Classification.objects.filter(allele_info=allele_info)
+                for classification in classifications:
+                    if approved_flag := classification_to_flag.get(classification.flag_collection_id):
+                        print(f"Found variant matching approved flag for allele {allele}")
+
 
     def handle_batch(self, batch: List[Classification]):
         ClassificationImportRun.record_classification_import("variant_rematching", len(batch))

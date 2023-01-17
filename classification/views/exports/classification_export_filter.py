@@ -1,4 +1,3 @@
-from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
@@ -16,7 +15,8 @@ from classification.enums import ShareLevel, ClinicalContextStatus
 from classification.enums.discordance_enums import DiscordanceReportResolution
 from classification.models import ClassificationModification, Classification, classification_flag_types, \
     DiscordanceReport, ClinicalContext
-from flags.models import FlagsMixin, Flag, FlagComment, FlagStatus
+from classification.models.classification_variant_info_models import ImportedAlleleInfoValidation
+from flags.models import FlagsMixin, Flag, FlagComment
 from library.utils import batch_iterator, local_date_string
 from snpdb.models import GenomeBuild, Lab, Organization, allele_flag_types, Allele, Variant, VariantAllele
 
@@ -25,9 +25,8 @@ from snpdb.models import GenomeBuild, Lab, Organization, allele_flag_types, Alle
 class ClassificationIssue:
     classification: ClassificationModification
     withdrawn = False
-    transcript_version = False
-    matching_warning = False
-    c_37_not_38 = False
+    validation_tags: Optional[ImportedAlleleInfoValidation] = None
+    validation_include = False
     not_matched = False
 
     @property
@@ -35,12 +34,15 @@ class ClassificationIssue:
         messages: List[str] = []
         if self.withdrawn:
             messages.append("Classification has been withdrawn")
-        if self.transcript_version or self.matching_warning:
-            messages.append("Requires confirmation of variant match")
-        if self.c_37_not_38:
-            messages.append("transcript across genome builds requires confirmation")
+        # if self.transcript_version or self.matching_warning:
+        #     messages.append("Requires confirmation of variant match")
+        # if self.c_37_not_38:
+        #     messages.append("transcript across genome builds requires confirmation")
+        if not self.validation_include:
+            messages.append("Excluded due to outstanding variant matching/liftover warning")
         if self.not_matched:
             messages.append("Could not liftover/normalise")
+
         if messages:
             return ", ".join(messages)
         else:
@@ -51,7 +53,7 @@ class ClassificationIssue:
 
     @property
     def has_issue(self):
-        return self.withdrawn or self.transcript_version or self.matching_warning or self.c_37_not_38 or self.not_matched
+        return self.withdrawn or self.not_matched or not self.validation_include
 
 
 @dataclass
@@ -137,7 +139,7 @@ class AlleleData:
 
 def flag_ids_to(model: Type[FlagsMixin], qs: Union[QuerySet[Flag], QuerySet[FlagComment]]) -> Set[int]:
     """
-    Convert a qs of Flags or FlagComments to ids of Classification/Allele/etc
+    Convert a qs of Flags or FlagComments to ids of Classification/Allele/etc.
     :param model: The Model to get the IDs of e.g. Classification, Allele, assumes the flag qs was for Flags that
     correspond to the model.
     :param qs: A QuerySet of relevant flags e.g. flags_ids_to(model: Classification, qs: ...open transcript mismatch flag...)
@@ -186,7 +188,7 @@ class ClassificationFilter:
         since: Try to optimise data so we only include alleles that have been modified since this date
         min_share_level: Minimum share level of classifications to include
         transcript_strategy: Which classification transcripts should be considered
-        row_limit: Max number of rows per file (data from the 1 allele will still be grouped together if formatted produces multiple lines)
+        rows_per_file: Max number of rows per file (data from the 1 allele will still be grouped together if formatted produces multiple lines)
         starting_query: If this is provided then instead of using all of the above filters, just this
         TODO rename row_limit to indicate that it's the max per file, not
     """
@@ -319,52 +321,52 @@ class ClassificationFilter:
         else:
             return 'classification__allele_info__grch38__c_hgvs'
 
-    @cached_property
-    def _bad_allele_transcripts(self) -> Dict[int, Set[str]]:
-        """
-        :return: A dictionary of Allele ID to a set of Transcripts for that allele which has bad flags
-        """
-
-        qs = Flag.objects.filter(
-            flag_type=allele_flag_types.allele_37_not_38,
-            resolution__status=FlagStatus.OPEN
-        ).values_list('collection_id', 'data')
-
-        allele_to_bad_transcripts: Dict[int, Set[str]] = defaultdict(set)
-        collection_id_to_transcript = defaultdict(set)
-        for collection_id, data in qs:
-            if data:
-                collection_id_to_transcript[collection_id].add(data.get('transcript'))
-
-        allele_qs = Allele.objects.filter(flag_collection__in=collection_id_to_transcript.keys())\
-            .values_list('pk', 'flag_collection_id')
-        for pk, collection_id in allele_qs:
-            if transcripts := collection_id_to_transcript.get(collection_id):
-                allele_to_bad_transcripts[pk].update(transcripts)
-
-        return allele_to_bad_transcripts
-
-    @cached_property
-    def _transcript_version_classification_ids(self) -> Set[int]:
-        """
-        Returns a set of classification IDs that have flags that make us want to exclude due to errors
-        :return: A set of classification IDs
-        """
-        return flag_ids_to(
-            Classification,
-            Flag.objects.filter(
-                flag_type=classification_flag_types.transcript_version_change_flag,
-                resolution__status=FlagStatus.OPEN
-            ))
-
-    @cached_property
-    def _variant_matching_classification_ids(self) -> Set[int]:
-        return flag_ids_to(
-            Classification,
-            Flag.objects.filter(
-                flag_type=classification_flag_types.matching_variant_warning_flag,
-                resolution__status=FlagStatus.OPEN
-            ))
+    # @cached_property
+    # def _bad_allele_transcripts(self) -> Dict[int, Set[str]]:
+    #     """
+    #     :return: A dictionary of Allele ID to a set of Transcripts for that allele which has bad flags
+    #     """
+    #
+    #     qs = Flag.objects.filter(
+    #         flag_type=allele_flag_types.allele_37_not_38,
+    #         resolution__status=FlagStatus.OPEN
+    #     ).values_list('collection_id', 'data')
+    #
+    #     allele_to_bad_transcripts: Dict[int, Set[str]] = defaultdict(set)
+    #     collection_id_to_transcript = defaultdict(set)
+    #     for collection_id, data in qs:
+    #         if data:
+    #             collection_id_to_transcript[collection_id].add(data.get('transcript'))
+    #
+    #     allele_qs = Allele.objects.filter(flag_collection__in=collection_id_to_transcript.keys())\
+    #         .values_list('pk', 'flag_collection_id')
+    #     for pk, collection_id in allele_qs:
+    #         if transcripts := collection_id_to_transcript.get(collection_id):
+    #             allele_to_bad_transcripts[pk].update(transcripts)
+    #
+    #     return allele_to_bad_transcripts
+    #
+    # @cached_property
+    # def _transcript_version_classification_ids(self) -> Set[int]:
+    #     """
+    #     Returns a set of classification IDs that have flags that make us want to exclude due to errors
+    #     :return: A set of classification IDs
+    #     """
+    #     return flag_ids_to(
+    #         Classification,
+    #         Flag.objects.filter(
+    #             flag_type=classification_flag_types.transcript_version_change_flag,
+    #             resolution__status=FlagStatus.OPEN
+    #         ))
+    #
+    # @cached_property
+    # def _variant_matching_classification_ids(self) -> Set[int]:
+    #     return flag_ids_to(
+    #         Classification,
+    #         Flag.objects.filter(
+    #             flag_type=classification_flag_types.matching_variant_warning_flag,
+    #             resolution__status=FlagStatus.OPEN
+    #         ))
 
     @cached_property
     def _discordant_classification_ids(self) -> Dict[int, DiscordanceReportStatus]:
@@ -403,8 +405,8 @@ class ClassificationFilter:
         return flag_ids_to(Classification, FlagComment.objects.filter(
             flag__flag_type__in={
                 classification_flag_types.classification_withdrawn,
-                classification_flag_types.transcript_version_change_flag,
-                classification_flag_types.matching_variant_warning_flag,
+                # classification_flag_types.transcript_version_change_flag,
+                # classification_flag_types.matching_variant_warning_flag,
                 classification_flag_types.classification_pending_changes
             },
             created__gte=self.since
@@ -435,6 +437,8 @@ class ClassificationFilter:
             if cm.modified >= self.since or cm.classification.modified > self.since:
                 return True
             if cm.classification_id in self._since_flagged_classification_ids:
+                return True
+            if cm.classification.allele_info.latest_validation.modified > self.since:
                 return True
         return False
 
@@ -476,6 +480,7 @@ class ClassificationFilter:
         cms = cms.order_by('-classification__allele_id', '-classification__id')
         cms = cms.select_related(
             'classification',
+            'classification__allele_info__latest_validation',
             'classification__allele_info__grch37',
             'classification__allele_info__grch38',
             'classification__lab',
@@ -509,16 +514,12 @@ class ClassificationFilter:
     def _record_issues(self, allele_id: int, cm: ClassificationModification) -> ClassificationIssue:
         ci = ClassificationIssue(classification=cm)
         ci.withdrawn = cm.classification.withdrawn
-        ci.transcript_version = cm.classification_id in self._transcript_version_classification_ids
-        ci.matching_warning = cm.classification_id in self._variant_matching_classification_ids
-        if not allele_id:
+        # ci.transcript_version = cm.classification_id in self._transcript_version_classification_ids
+        # ci.matching_warning = cm.classification_id in self._variant_matching_classification_ids
+        if not allele_id or not ci.classification.classification.get_c_hgvs(self.genome_build):
             ci.not_matched = True
-        else:
-            if allele_bad_transcripts := self._bad_allele_transcripts.get(allele_id):
-                ci.c_37_not_38 = cm.transcript in allele_bad_transcripts
-
-        if not ci.classification.classification.get_c_hgvs(self.genome_build):
-            ci.not_matched = True
+        if (allele_info := cm.classification.allele_info) and (latest_validation := allele_info.latest_validation):
+            ci.validation_include = latest_validation.include
 
         return ci
 

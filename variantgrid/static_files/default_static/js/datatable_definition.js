@@ -451,6 +451,8 @@ TableFormat.boolean = function(style, data, type, columns) {
         if (data) {
             return '<i class="fas fa-exclamation-circle"></i>';
         }
+    } else if (style === 'false_is_error') {
+        return data ? '<i class="fas fa-check-circle text-success"></i>' : '<i class="fas fa-times-circle text-danger"></i>';
     } else {
         return data ? '<i class="fas fa-check-circle text-success"></i>' : '<i class="far fa-circle"></i>';
     }
