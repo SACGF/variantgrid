@@ -300,7 +300,7 @@ class FlagHelper:
                     'raise_permission': flag_type.raise_permission_enum.level,
                     'comments_enabled': flag_type.comments_enabled,
                     'importance': flag_type.importance,
-                    'resolutions': flag_type_resolutions[flag_type],
+                    'resolutions': flag_type_resolutions[flag_type.id],
                 }
 
                 # Dirty hack, that links VariantGrid settings to a specific flag type
