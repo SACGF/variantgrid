@@ -147,6 +147,7 @@ class ImportedAlleleInfoValidation(TimeStampedModel):
     confirmed = BooleanField(default=False, blank=True)
     """ Has a user manually set the include boolean to override the default calculation """
     confirmed_by = ForeignKey(User, null=True, blank=True, on_delete=SET_NULL)
+    confirmed_by_note = TextField(null=True, blank=True)
 
 
 _DIFF_TO_VALIDATION_KEY = {

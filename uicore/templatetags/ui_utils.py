@@ -457,6 +457,14 @@ def value(value: Any, no_value: Optional[str] = None) -> str:
 
 
 @register.filter()
+def multi_line_text(value: str):
+    if isinstance(value, str):
+        lines = value.split("\n")
+        return SafeString("<br/>".join(escape(line) for line in lines))
+    return ""
+
+
+@register.filter()
 def secret(value: Any, length: int = -4) -> str:
     if value is None:
         return ""

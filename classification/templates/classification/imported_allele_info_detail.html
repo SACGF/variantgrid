@@ -15,8 +15,13 @@
         {% labelled label="Liftover Diffs" value_css="text-muted" %}<i class="fa-solid fa-arrows-up-down"></i> {{ liftover_diff|separator:', ' }}{% endlabelled %}
     {% endif %}
     {% labelled label=c_hgvses.2.identifier value_css="text-monospace" %}{{ c_hgvses.2.html }}{% endlabelled %}
+    <hr>
     {% labelled label="Validation Tags" %}{% if validation_tags %}{% for validation_tag in validation_tags %}<div>{{validation_tag}}</div>{% endfor %}{% else %}No Validation Issues{% endif %}{% endlabelled %}
     {% labelled label="Include" %}{{ allele_info.latest_validation.include | boolean }}{% endlabelled %}
+    {% if allele_info.latest_validation.confirmed %}
+        {% labelled label="Confirmed By" %}{{ allele_info.latest_validation.confirmed_by }}{% endlabelled %}
+        {% labelled label="Confirmed Note" %}{{ allele_info.latest_validation.confirmed_by_note | multi_line_text }}{% endlabelled %}
+    {% endif %}
     <hr style="border-top:1px dashed lightgrey"/>
     {% labelled label=variant_coordinate_label value_css="text-monospace" %}{{ allele_info.variant_coordinate }}{% endlabelled %}
     {% if allele_info.message %}

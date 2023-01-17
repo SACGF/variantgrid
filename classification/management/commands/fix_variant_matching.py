@@ -10,8 +10,9 @@ from classification.classification_import import process_classification_import
 from classification.enums import SpecialEKeys
 from classification.models import Classification, ClassificationImport, ImportedAlleleInfo, classification_flag_types
 from classification.models.classification_import_run import ClassificationImportRun
-from flags.models import Flag
+from flags.models import Flag, FlagComment, FlagType
 from library.guardian_utils import admin_bot
+from library.utils import first
 from snpdb.models import ImportSource, allele_flag_types
 
 
@@ -114,12 +115,25 @@ class Command(BaseCommand):
         print(f"Finished {i} classifications")
 
     def handle_validation(self):
-        approved_vm_flags = Flag.objects.filter(flag_type=classification_flag_types.matching_variant_warning_flag, resolution__id='vm_confirmed').exclude(user=admin_bot())
-        approved_37_not_38_flags = Flag.objects.filter(flag_type=allele_flag_types.allele_37_not_38, resolution__id='closed').exclude(user=admin_bot())
+        def get_flag_comments(flag_type: FlagType, resolution_id: str) -> Dict[int, FlagComment]:
+            flag_dict: Dict[int, FlagComment] = {}
+            manual_closed_flag_comments = FlagComment.objects.filter(
+                flag__flag_type=flag_type,
+                resolution__id=resolution_id).exclude(user=admin_bot()) \
+                .select_related('flag', 'flag__collection')
+            for flag_comment in manual_closed_flag_comments:
+                flag_collection = flag_comment.flag.collection
+                # have to make sure we don't have an open flag of the type, only closed
+                if not flag_collection.get_open_flag_of_type(
+                        flag_type=classification_flag_types.matching_variant_warning_flag):
+                    flag_dict[flag_collection.pk] = flag_comment
+            return flag_dict
 
-        # TODO, also need to make sure there aren't any outstanding flags after these ones were closed
-        classification_to_flag = {flag.collection_id: flag for flag in approved_vm_flags}
-        allele_to_flag = {flag.collection_id: flag for flag in approved_37_not_38_flags}
+        manually_closed_variant_warning = get_flag_comments(flag_type=classification_flag_types.matching_variant_warning_flag, resolution_id='vm_confirmed')
+        manually_closed_37_not_38 = get_flag_comments(flag_type=allele_flag_types.allele_37_not_38, resolution_id='closed')
+
+        print(f"variant matching count = {len(manually_closed_variant_warning)}")
+        print(f"37 not 38 flag count = {len(manually_closed_37_not_38)}")
 
         for i, allele_info in enumerate(ImportedAlleleInfo.objects.all()):
             if i % 100 == 0:
@@ -128,13 +142,44 @@ class Command(BaseCommand):
             allele_info.save()
 
             if allele := allele_info.allele:
-                if allele_flag_pk := allele.flag_collection_id:
-                    if approved_flag := allele_to_flag.get(allele_flag_pk):
-                        print(f"Found 37 != 38 approved flag for allele {allele}")
-                classifications = Classification.objects.filter(allele_info=allele_info)
-                for classification in classifications:
-                    if approved_flag := classification_to_flag.get(classification.flag_collection_id):
-                        print(f"Found variant matching approved flag for allele {allele}")
+                latest_validation = allele_info.latest_validation
+                if not latest_validation.include:
+
+                    has_normal_issues = False
+                    has_liftover_issues = False
+                    for tag in latest_validation.validation_tags:
+                        if 'version' in tag:
+                            # we don't care about transcript version
+                            continue
+                        if 'normal' in tag:
+                            has_normal_issues = True
+                        if 'liftover' in tag:
+                            has_liftover_issues = True
+
+                    comments = set()
+                    users = set()
+                    if allele_flag_pk := allele.flag_collection_id:
+                        if approved_flag := manually_closed_37_not_38.get(allele_flag_pk):
+                            has_liftover_issues = False
+                            if text := approved_flag.text:
+                                comments.add(text)
+                            users.add(approved_flag.user)
+
+                    classifications = Classification.objects.filter(allele_info=allele_info)
+                    for classification in classifications:
+                        if approved_flag := manually_closed_variant_warning.get(classification.flag_collection_id):
+                            has_normal_issues = False
+                            if text := approved_flag.text:
+                                comments.add(text)
+                            users.add(approved_flag.user)
+
+                    if not has_normal_issues and not has_liftover_issues:
+                        latest_validation.include = True
+                        latest_validation.confirmed = True
+                        latest_validation.confirmed_by = first(users)
+                        latest_validation.confirmed_by_note = "\n".join(comments) if comments else ""
+                        latest_validation.save()
+                        print(f"confirmed something to true on allele {allele}")
 
 
     def handle_batch(self, batch: List[Classification]):
