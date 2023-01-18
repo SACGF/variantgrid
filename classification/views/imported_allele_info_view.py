@@ -106,8 +106,18 @@ class ImportedAlleleInfoColumns(DatatableConfig[ImportedAlleleInfo]):
         )
 
     def filter_queryset(self, qs: QuerySet[ImportedAlleleInfo]) -> QuerySet[ImportedAlleleInfo]:
-        if (filter_mode := self.get_query_param('37_not_38')) and filter_mode == 'true':
-            qs = qs.filter(grch37__c_hgvs__ne=F('grch38__c_hgvs'))
+
+        if (transcript_version_change := self.get_query_param('transcript_version_change')) and transcript_version_change == 'true':
+            qs = qs.filter(latest_validation__validation_tags__normalize__transcript_version_change__isnull=False) | \
+                 qs.filter(latest_validation__validation_tags__liftover__transcript_version_change__isnull=False)
+        if (gene_symbol_change := self.get_query_param('gene_symbol_change')) and gene_symbol_change == 'true':
+            qs = qs.filter(latest_validation__validation_tags__normalize__gene_symbol_change__isnull=False) | \
+                 qs.filter(latest_validation__validation_tags__liftover__gene_symbol_change__isnull=False)
+        if (c_nomen_change := self.get_query_param('c_nomen_change')) and c_nomen_change == 'true':
+            qs = qs.filter(latest_validation__validation_tags__normalize__c_nomen_change__isnull=False) | \
+                 qs.filter(latest_validation__validation_tags__liftover__c_nomen_change__isnull=False)
+        if (filter_mode := self.get_query_param('exclude')) and filter_mode == 'true':
+            qs = qs.filter(latest_validation__include=False)
         if (error_mode := self.get_query_param('errors_mode')) and error_mode == 'true':
             qs = qs.filter(Q(status=ImportedAlleleInfoStatus.FAILED) | Q(grch37__isnull=True) | Q(grch38__isnull=True))
 
@@ -169,5 +179,5 @@ def view_imported_allele_info_detail(request: HttpRequest, pk: int):
         "normalized_diff": chgvs_diff_description(normalized_diff) if normalized_diff else None,
         "liftover_diff": chgvs_diff_description(liftover_diff) if liftover_diff else None,
         "variant_coordinate_label": f"Normalised Variant Coordinate ({allele_info.imported_genome_build_patch_version})",
-        "validation_tags": [tag for tag, value in allele_info.latest_validation.validation_tags.items() if value] if allele_info.latest_validation else []
+        "validation_tags": allele_info.latest_validation.validation_tags_list if allele_info.latest_validation else None
     })

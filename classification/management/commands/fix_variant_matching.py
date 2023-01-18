@@ -147,14 +147,20 @@ class Command(BaseCommand):
 
                     has_normal_issues = False
                     has_liftover_issues = False
-                    for tag in latest_validation.validation_tags:
-                        if 'version' in tag:
-                            # we don't care about transcript version
-                            continue
-                        if 'normal' in tag:
-                            has_normal_issues = True
-                        if 'liftover' in tag:
-                            has_liftover_issues = True
+                    has_build_issues = False
+
+                    if normalize_issues := latest_validation.validation_tags_typed.get("normalize"):
+                        has_normal_issues = [True for severity in normalize_issues.values() if severity == "E"]
+                    if liftover_issues := latest_validation.validation_tags_typed.get("liftover"):
+                        has_liftover_issues = [True for severity in liftover_issues.values() if severity == "E"]
+                    if build_issues := latest_validation.validation_tags_typed.get("builds"):
+                        has_build_issues = [True for severity in build_issues.values() if severity == "E"]
+
+                    if not has_normal_issues and not has_liftover_issues and not has_build_issues:
+                        print("Why was this excluded in the first place if no E?")
+                        print("Dev should investigate")
+                        print(latest_validation.validation_tags_typed)
+                        return
 
                     comments = set()
                     users = set()
@@ -173,7 +179,7 @@ class Command(BaseCommand):
                                 comments.add(text)
                             users.add(approved_flag.user)
 
-                    if not has_normal_issues and not has_liftover_issues:
+                    if not has_normal_issues and not has_liftover_issues and not has_build_issues:
                         latest_validation.include = True
                         latest_validation.confirmed = True
                         latest_validation.confirmed_by = first(users)

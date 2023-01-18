@@ -1,5 +1,6 @@
+from dataclasses import dataclass
 from datetime import timedelta
-from typing import Optional, List, Dict, Any, TypedDict
+from typing import Optional, List, Dict, Any, TypedDict, Literal
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.db import transaction
@@ -13,6 +14,7 @@ from genes.hgvs import HGVSMatcher, CHGVS, CHGVSDiff
 from genes.models import TranscriptVersion, GeneSymbol
 from library.cache import timed_cache
 from library.log_utils import report_exc_info
+from library.utils import pretty_label
 from snpdb.models import GenomeBuild, Variant, Allele, GenomeBuildPatchVersion, VariantCoordinate
 
 
@@ -125,17 +127,56 @@ class ImportedAlleleInfoStatus(TextChoices):
     MATCHED_ALL_BUILDS = "M", "Matched All Builds"
     FAILED = "F", "Failed"
 
+
+ALLELE_INFO_VALIDATION_SEVERITY = Literal["W", "E"]
+
+
+_VALIDATION_TO_SEVERITY: [str, ALLELE_INFO_VALIDATION_SEVERITY] = {
+    'transcript_id_change': "E",
+    'transcript_version_change': "W",
+    'gene_symbol_change': "E",
+    'c_nomen_change': "E",
+    'missing_37': "W",
+    'missing_38': "E"
+}
+
+class ImportedAlleleValidationTagsDiff(TypedDict, total=False):
+    transcript_id_change: ALLELE_INFO_VALIDATION_SEVERITY
+    transcript_version_change: ALLELE_INFO_VALIDATION_SEVERITY
+    gene_symbol_change: ALLELE_INFO_VALIDATION_SEVERITY
+    c_nomen_change: ALLELE_INFO_VALIDATION_SEVERITY
+
+
+class ImportedAlleleValidationTagsBuilds(TypedDict, total=False):
+    missing_37: ALLELE_INFO_VALIDATION_SEVERITY
+    missing_38: ALLELE_INFO_VALIDATION_SEVERITY
+
+
 class ImportedAlleleInfoValidationTags(TypedDict, total=False):
-    normal_transcript_id_change: bool
-    normal_transcript_version_change: bool
-    normal_gene_symbol_change: bool
-    normal_c_nomen_change: bool
-    liftover_transcript_id_change: bool
-    liftover_transcript_version_change: bool
-    liftover_gene_symbol_change: bool
-    liftover_c_nomen_change: bool
-    missing_37: bool
-    missing_38: bool
+    normalize: ImportedAlleleValidationTagsDiff
+    liftover: ImportedAlleleValidationTagsDiff
+    builds: ImportedAlleleValidationTagsBuilds
+
+
+@dataclass(frozen=True)
+class ImportedAlleleInfoValidationTagEntry:
+    category: str
+    field: str
+    severity: str
+
+    @property
+    def category_pretty(self) -> str:
+        category = self.category
+        # translate to en_AU
+        if category == "normalize":
+            category = "normalise"
+        return pretty_label(self.category)
+
+    def field_pretty(self) -> str:
+        return pretty_label(self.field).replace("C Nomen", "c.nomen")
+
+    def __lt__(self, other):
+        return (self.category, self.field) < (other.category, other.field)
 
 
 class ImportedAlleleInfoValidation(TimeStampedModel):
@@ -149,18 +190,24 @@ class ImportedAlleleInfoValidation(TimeStampedModel):
     confirmed_by = ForeignKey(User, null=True, blank=True, on_delete=SET_NULL)
     confirmed_by_note = TextField(null=True, blank=True)
 
+    @property
+    def validation_tags_typed(self) -> ImportedAlleleInfoValidationTags:
+        return self.validation_tags or {}
+
+    @property
+    def validation_tags_list(self) -> List[ImportedAlleleInfoValidationTagEntry]:
+        items: List[ImportedAlleleInfoValidationTagEntry] = []
+        for category, sub_issues_dict in self.validation_tags_typed.items():
+            for field, severity in sub_issues_dict.items():
+                items.append(ImportedAlleleInfoValidationTagEntry(category=category, field=field, severity=severity))
+        return sorted(items)
+
 
 _DIFF_TO_VALIDATION_KEY = {
     CHGVSDiff.DIFF_TRANSCRIPT_ID: 'transcript_id_change',
     CHGVSDiff.DIFF_TRANSCRIPT_VER: 'transcript_version_change',
     CHGVSDiff.DIFF_GENE: 'gene_symbol_change',
     CHGVSDiff.DIFF_RAW_CGVS: 'c_nomen_change'
-}
-
-_ALLOWABLE_VALIDATION = {
-    'normal_transcript_version_change',
-    'liftover_transcript_version_change',
-    'missing_37'
 }
 
 
@@ -221,34 +268,47 @@ class ImportedAlleleInfo(TimeStampedModel):
     def _calculate_validation(self) -> ImportedAlleleInfoValidation:
         validation_dict: ImportedAlleleInfoValidationTags = {}
         imported_c_hgvs = self.imported_c_hgvs_obj
-        normalised_c_hgvs: Optional[CHGVS] = None
+        normalized_c_hgvs: Optional[CHGVS] = None
         if normalised := self.variant_info_for_imported_genome_build:
-            normalised_c_hgvs = normalised.c_hgvs_obj
-        liftedover_c_hgvs: Optional[CHGVS] = None
-        if liftedover := self.variant_info_for_lifted_over_genome_build:
-            liftedover_c_hgvs = liftedover.c_hgvs_obj
+            normalized_c_hgvs = normalised.c_hgvs_obj
+        lifted_c_hgvs: Optional[CHGVS] = None
+        if lifted := self.variant_info_for_lifted_over_genome_build:
+            lifted_c_hgvs = lifted.c_hgvs_obj
 
-        def apply_diff(c_hgvs_diff: CHGVSDiff, prefix: str):
-            nonlocal validation_dict
-            for key, value in _DIFF_TO_VALIDATION_KEY.items():
-                if c_hgvs_diff & key:
-                    validation_dict[f'{prefix}_{value}'] = True
+        def calculate_diff_dict(c_hgvs_diff: CHGVSDiff) -> ImportedAlleleValidationTagsDiff:
+            diff_dict: ImportedAlleleValidationTagsDiff = {}
+            for diff_flag, field_name in _DIFF_TO_VALIDATION_KEY.items():
+                if c_hgvs_diff & diff_flag:
+                    diff_dict[field_name] = _VALIDATION_TO_SEVERITY.get(field_name, "E")
+            return diff_dict
 
-        if imported_c_hgvs and normalised_c_hgvs:
-            apply_diff(imported_c_hgvs.diff(normalised_c_hgvs), 'normal')
+        if imported_c_hgvs and normalized_c_hgvs:
+            if normal_diff_dict := calculate_diff_dict(imported_c_hgvs.diff(normalized_c_hgvs)):
+                validation_dict["normalize"] = normal_diff_dict
 
-        if normalised_c_hgvs and liftedover_c_hgvs:
-            apply_diff(normalised_c_hgvs.diff(liftedover_c_hgvs), 'liftover')
+        if normalized_c_hgvs and lifted_c_hgvs:
+            if lifted_diff_dict := calculate_diff_dict(normalized_c_hgvs.diff(lifted_c_hgvs)):
+                validation_dict["liftover"] = lifted_diff_dict
 
+        builds: ImportedAlleleValidationTagsBuilds = {}
         if not self.grch37 or not self.grch37.c_hgvs_obj:
-            validation_dict['missing_37'] = True
+            builds["missing_37"] = _VALIDATION_TO_SEVERITY.get("missing_37", "E")
         if not self.grch38 or not self.grch38.c_hgvs_obj:
-            validation_dict['missing_38'] = True
+            builds["missing_38"] = _VALIDATION_TO_SEVERITY.get("missing_38", "E")
+
+        if builds:
+            validation_dict["builds"] = builds
+
         return validation_dict
 
     @staticmethod
-    def _should_include(validation_tags: ImportedAlleleInfoValidation):
-        return not any(True for key, value in validation_tags.items() if value and key not in _ALLOWABLE_VALIDATION)
+    def _should_include(validation_tags: ImportedAlleleInfoValidationTags):
+        if validation_tags:
+            for sub_dict in validation_tags.values():
+                for key, value in sub_dict.items():
+                    if value == "E":
+                        return False
+        return True
 
     def apply_validation(self, force_update: bool = False):
         """

@@ -16,8 +16,10 @@
     </style>
     <script>
         function datatableFilter(data) {
-            data['37_not_38'] = $("#37_not_38").is(':checked');
-            data['errors_mode'] = $("#errors_mode").is(':checked');
+            $('#imported-allele-info-datatables-filter .form-check-input').each((index, element) => {
+                let $element = $(element);
+                data[$element.attr('id')] = $element.is(':checked');
+            });
         }
         function applyFilters() {
             $('#imported-allele-info-datatables').DataTable().ajax.reload();
@@ -31,14 +33,26 @@
                class="sticky-header"
         ></table>
         <div data-toolbar="#imported-allele-info-datatables">
-            <div class="float-right mr-4" style="position:relative;top:6px">
+            <div id="imported-allele-info-datatables-filter" class="float-right mr-4" style="position:relative;top:6px">
                 <div class="form-check-inline">
-                    <input type="checkbox" class="form-check-input" id="errors_mode" onclick="applyFilters()"/>
-                    <label for="errors_mode">Only Errors</label>
+                    <input type="checkbox" class="form-check-input" id="transcript_version_change" onclick="applyFilters()"/>
+                    <label for="transcript_version_change">Transcript Ver Change</label>
                 </div>
                 <div class="form-check-inline">
-                    <input type="checkbox" class="form-check-input" id="37_not_38" onclick="applyFilters()"/>
-                    <label for="37_not_38">Filter 37 != 38</label>
+                    <input type="checkbox" class="form-check-input" id="gene_symbol_change" onclick="applyFilters()"/>
+                    <label for="gene_symbol_change">Gene Symbol Change</label>
+                </div>
+                <div class="form-check-inline">
+                    <input type="checkbox" class="form-check-input" id="c_nomen_change" onclick="applyFilters()"/>
+                    <label for="c_nomen_change">c.nomen Change</label>
+                </div>
+                <div class="form-check-inline">
+                    <input type="checkbox" class="form-check-input" id="exclude" onclick="applyFilters()"/>
+                    <label for="exclude">Excluded</label>
+                </div>
+                <div class="form-check-inline">
+                    <input type="checkbox" class="form-check-input" id="errors_mode" onclick="applyFilters()"/>
+                    <label for="errors_mode">Failed</label>
                 </div>
             </div>
         </div>
