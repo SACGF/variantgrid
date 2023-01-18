@@ -31,15 +31,15 @@ class HasLoaded(admin.SimpleListFilter):
 
     def lookups(self, request, model_admin):
         return [
-            ("un-loaded", "Un-Loaded"),
+            ("not-loaded", "Not-Loaded"),
             ("loaded", "Loaded")
         ]
 
     def queryset(self, request, queryset: QuerySet[Citation]):
-        if self.value() == "un-loaded":
-            queryset = queryset.filter(last_loaded__isnull=False)
-        if self.value() == "loaded":
+        if self.value() == "not-loaded":
             queryset = queryset.filter(last_loaded__isnull=True)
+        if self.value() == "loaded":
+            queryset = queryset.filter(last_loaded__isnull=False)
         return queryset
 
 
