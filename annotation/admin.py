@@ -25,12 +25,34 @@ class HasErrorFilter(admin.SimpleListFilter):
         return queryset
 
 
+class HasLoaded(admin.SimpleListFilter):
+    title = "Has Loaded"
+    parameter_name = "loaded"
+
+    def lookups(self, request, model_admin):
+        return [
+            ("un-loaded", "Un-Loaded"),
+            ("loaded", "Loaded")
+        ]
+
+    def queryset(self, request, queryset: QuerySet[Citation]):
+        if self.value() == "un-loaded":
+            queryset = queryset.filter(last_loaded__isnull=False)
+        if self.value() == "loaded":
+            queryset = queryset.filter(last_loaded__isnull=True)
+        return queryset
+
+
 @admin.register(Citation)
 class CitationAdmin(ModelAdminBasics):
-    list_display = ('id', 'last_loaded', 'error', 'old_id')
-    list_filter = ('source', HasErrorFilter)
+    list_display = ('id', 'title', 'error', 'last_loaded', 'old_id')
+    list_filter = ('source', HasErrorFilter, HasLoaded)
     search_fields = ('id', 'source')
 
     @admin_action("Force Refresh")
     def force_refresh(self, request, queryset: QuerySet[Citation]):
         CitationFetchRequest.fetch_all_now(queryset, cache_age=timedelta(seconds=0))
+
+    @admin_action("Load (if Unloaded)")
+    def force_refresh(self, request, queryset: QuerySet[Citation]):
+        CitationFetchRequest.fetch_all_now(queryset)
