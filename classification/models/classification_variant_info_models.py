@@ -190,6 +190,9 @@ class ImportedAlleleInfoValidation(TimeStampedModel):
     confirmed_by = ForeignKey(User, null=True, blank=True, on_delete=SET_NULL)
     confirmed_by_note = TextField(null=True, blank=True)
 
+    def __str__(self):
+        return "Validation (Include)" if self.include else "Validation (Exclude)"
+
     @property
     def validation_tags_typed(self) -> ImportedAlleleInfoValidationTags:
         return self.validation_tags or {}
@@ -201,6 +204,21 @@ class ImportedAlleleInfoValidation(TimeStampedModel):
             for field, severity in sub_issues_dict.items():
                 items.append(ImportedAlleleInfoValidationTagEntry(category=category, field=field, severity=severity))
         return sorted(items)
+
+    @staticmethod
+    def should_include(validation_tags: ImportedAlleleInfoValidationTags):
+        if validation_tags:
+            for sub_dict in validation_tags.values():
+                for key, value in sub_dict.items():
+                    if value == "E":
+                        return False
+        return True
+
+    def remove_override(self):
+        self.include = ImportedAlleleInfoValidation.should_include(self.validation_tags)
+        self.confirmed = False
+        self.confirmed_by = None
+
 
 
 _DIFF_TO_VALIDATION_KEY = {
@@ -301,15 +319,6 @@ class ImportedAlleleInfo(TimeStampedModel):
 
         return validation_dict
 
-    @staticmethod
-    def _should_include(validation_tags: ImportedAlleleInfoValidationTags):
-        if validation_tags:
-            for sub_dict in validation_tags.values():
-                for key, value in sub_dict.items():
-                    if value == "E":
-                        return False
-        return True
-
     def apply_validation(self, force_update: bool = False):
         """
         Make sure to call .save() after this to be safe
@@ -338,7 +347,7 @@ class ImportedAlleleInfo(TimeStampedModel):
         latest_validation.c_hgvs_37 = c_hgvs_37
         latest_validation.c_hgvs_38 = c_hgvs_38
         if not latest_validation.confirmed:
-            latest_validation.include = ImportedAlleleInfo._should_include(validation_tags)
+            latest_validation.include = ImportedAlleleInfoValidation.should_include(validation_tags)
         latest_validation.save()
         self.latest_validation = latest_validation
 

@@ -60,7 +60,7 @@
             <th><span class="text-secondary">Latest</span><br/>ACMG</th>
             <th><span class="text-secondary">Latest</span><br/>Curated</th>
             <th>Sort Column (hidden)</th>
-            <th><span class="text-secondary">Latest</span> c.HGVS</th>
+            {% comment %}<th><span class="text-secondary">Latest</span> c.HGVS</th>{% endcomment %}
             <th>Allele</th>
             <th>Gene Symbol</th>
             <th>Records</th>
@@ -106,7 +106,7 @@
             {}, // ACMG
             {}, // last record
             {visible: false}, // sorting column
-            {className: 'none'}, // imported c.hgvs
+            // {className: 'none'}, // imported c.hgvs
             {className: 'none'}, // allele
             {className: 'none'}, // gene link
             {className: 'none'}, // record sub-table

@@ -15,7 +15,7 @@ from classification.models import EvidenceKey, EvidenceKeyMap, DiscordanceReport
     UploadedClassificationsUnmapped, ClinicalContextRecalcTrigger, ImportedAlleleInfo, ClassificationImport
 from classification.models.classification import Classification
 from classification.models.classification_import_run import ClassificationImportRun, ClassificationImportRunStatus
-from classification.models.classification_variant_info_models import ResolvedVariantInfo
+from classification.models.classification_variant_info_models import ResolvedVariantInfo, ImportedAlleleInfoValidation
 from classification.tasks.classification_import_map_and_insert_task import ClassificationImportMapInsertTask
 from library.guardian_utils import admin_bot
 from snpdb.admin_utils import ModelAdminBasics, admin_action, admin_list_column, AllValuesChoicesFieldListFilter, \
@@ -695,3 +695,26 @@ class ImportedAlleleInfoAdmin(ModelAdminBasics):
 
     def has_change_permission(self, request, obj=None):
         return False
+
+
+@admin.register(ImportedAlleleInfoValidation)
+class ImportedAlleleInfoValidationAdmin(ModelAdminBasics):
+
+    def is_readonly_field(self, f) -> bool:
+        if f.name == 'confirmed_by_note':
+            return False
+        return True
+
+    @admin_action("Confirm Include")
+    def override_approve(self, request, queryset: QuerySet[ImportedAlleleInfoValidation]):
+        for iaiv in queryset:
+            iaiv.include = True
+            iaiv.confirmed = True
+            iaiv.confirmed_by = request.user
+            iaiv.save()
+
+    @admin_action("Remove Confirmation")
+    def remove_confirmation(self, request, queryset: QuerySet[ImportedAlleleInfoValidation]):
+        for iaiv in queryset:
+            iaiv.remove_override()
+            iaiv.save()

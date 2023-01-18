@@ -36,6 +36,9 @@ class GenomeBuild(models.Model, SortMetaOrderingMixin):
     class Meta:
         ordering = ["name"]
 
+    def is_version(self, version: int) -> bool:
+        return str(version) in self.name
+
     @classmethod
     @timed_cache(ttl=60)
     def grch37(cls) -> 'GenomeBuild':

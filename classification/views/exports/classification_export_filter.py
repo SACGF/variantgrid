@@ -14,7 +14,7 @@ from threadlocals.threadlocals import get_current_request
 from classification.enums import ShareLevel, ClinicalContextStatus
 from classification.enums.discordance_enums import DiscordanceReportResolution
 from classification.models import ClassificationModification, Classification, classification_flag_types, \
-    DiscordanceReport, ClinicalContext
+    DiscordanceReport, ClinicalContext, ImportedAlleleInfo
 from classification.models.classification_variant_info_models import ImportedAlleleInfoValidation
 from flags.models import FlagsMixin, Flag, FlagComment
 from library.utils import batch_iterator, local_date_string
@@ -73,6 +73,18 @@ class AlleleData:
     cached_variant: Optional[Variant] = None
     cached_data: Dict[str, Any] = None
 
+    @staticmethod
+    def from_allele_info(source: 'ClassificationFilter', allele_info: ImportedAlleleInfo):
+        variant: Optional[Variant] = None
+        if variant_info := allele_info[source.genome_build]:
+            variant = variant_info.variant
+        return AlleleData(
+            source=source,
+            allele_id=allele_info.allele_id,
+            cached_allele=allele_info.allele,
+            cached_variant=variant
+        )
+
     def __setitem__(self, key, value):
         if not self.cached_data:
             self.cached_data = {}
@@ -87,19 +99,20 @@ class AlleleData:
             return item in cached_data
         return False
 
-    @staticmethod
-    def pre_process(batch: List['AlleleData']):
-        if batch:
-            genome_build = batch[0].genome_build
-            allele_ids = [ad.allele_id for ad in batch]
-            alleles = Allele.objects.filter(pk__in=allele_ids).select_related('clingen_allele')
-            allele_dict = {allele.pk: allele for allele in alleles}
-            variant_alleles = VariantAllele.objects.filter(allele_id__in=allele_ids, genome_build=genome_build).select_related('variant', 'variant__locus', 'variant__locus__contig', 'variant__locus__ref', 'variant__alt')
-            variant_dict = {variant_allele.allele_id: variant_allele.variant for variant_allele in variant_alleles}
-
-            for ad in batch:
-                ad.cached_allele = allele_dict.get(ad.allele_id)
-                ad.cached_variant = variant_dict.get(ad.allele_id)
+    # @staticmethod
+    # def pre_process(batch: List['AlleleData']):
+    #     if batch:
+    #         genome_build = batch[0].genome_build
+    #         allele_ids = [ad.allele_id for ad in batch]
+    #         alleles = Allele.objects.filter(pk__in=allele_ids).select_related('clingen_allele')
+    #         allele_dict = {allele.pk: allele for allele in alleles}
+    #         # FIXME select related all this variant stuff outside?
+    #         variant_alleles = VariantAllele.objects.filter(allele_id__in=allele_ids, genome_build=genome_build).select_related('variant', 'variant__locus', 'variant__locus__contig', 'variant__locus__ref', 'variant__alt')
+    #         variant_dict = {variant_allele.allele_id: variant_allele.variant for variant_allele in variant_alleles}
+    #
+    #         for ad in batch:
+    #             ad.cached_allele = allele_dict.get(ad.allele_id)
+    #             ad.cached_variant = variant_dict.get(ad.allele_id)
 
     @property
     def allele(self) -> Allele:
@@ -477,18 +490,29 @@ class ClassificationFilter:
             if exclude_labs := [lab for lab in self.exclude_sources if isinstance(lab, Lab)]:
                 cms = cms.exclude(classification__lab__in=exclude_labs)
 
-        cms = cms.order_by('-classification__allele_id', '-classification__id')
+        cms = cms.order_by('-classification__allele_info__allele_id', '-classification__allele_info', '-classification__id')
+
+        genome_build_str = '37'
+        if self.genome_build.is_version(38):
+            genome_build_str = '38'
+
         cms = cms.select_related(
             'classification',
             'classification__allele_info__latest_validation',
-            'classification__allele_info__grch37',
-            'classification__allele_info__grch38',
+            'classification__allele_info__allele',
+            'classification__allele_info__allele__clingen_allele',
+            f'classification__allele_info__grch{genome_build_str}__variant',
+            f'classification__allele_info__grch{genome_build_str}__variant__locus',
+            f'classification__allele_info__grch{genome_build_str}__variant__locus__contig',
+            f'classification__allele_info__grch{genome_build_str}__variant__locus__ref',
+            f'classification__allele_info__grch{genome_build_str}__variant__alt',
             'classification__lab',
             'classification__lab__organization',
-            'classification__clinical_context')
+            'classification__clinical_context'
+        )
 
         if allele_id := self.allele:
-            cms = cms.filter(classification__allele_id=allele_id)
+            cms = cms.filter(classification__allele_info__allele_id=allele_id)
 
         # Always safe to exclude these (unless we want them in a CSV) even with since changes
         # couldn't show these ones if we wanted to
@@ -535,7 +559,8 @@ class ClassificationFilter:
             if not allele_data or allele_id != allele_data.allele_id:
                 if allele_data:
                     yield allele_data
-                allele_data = AlleleData(source=self, allele_id=allele_id)
+                # allele_data = AlleleData(source=self, allele_id=allele_id)
+                allele_data = AlleleData.from_allele_info(source=self, allele_info=cm.classification.allele_info)
             allele_data.all_cms.append(self._record_issues(allele_id=allele_id, cm=cm))
 
         if allele_data:
@@ -552,7 +577,7 @@ class ClassificationFilter:
 
     def allele_data_filtered_pre_processed(self, batch_processor: Optional[Callable[[List[AlleleData]], None]] = None) -> Iterator[AlleleData]:
         for batch in batch_iterator(self._allele_data_filtered(), batch_size=100):
-            AlleleData.pre_process(batch)
+            # AlleleData.pre_process(batch)
             if batch_processor:
                 batch_processor(batch)
             for data in batch:

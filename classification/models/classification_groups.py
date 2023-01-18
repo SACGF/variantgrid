@@ -285,20 +285,24 @@ class ClassificationGroup:
     def c_hgvs(self) -> CHGVS:
         return self.c_hgvses[0]
 
+    # @cached_property
+    # def flag_types(self) -> List[List[str]]:
+    #     FLAG_TYPES = [
+    #         classification_flag_types.matching_variant_flag,
+    #         classification_flag_types.matching_variant_warning_flag,
+    #         classification_flag_types.transcript_version_change_flag
+    #     ]
+    #     types: Set[str] = set()
+    #     flags_qs = self.most_recent.classification.flag_collection_safe.flags(only_open=True)
+    #     for type_n_res in flags_qs.filter(flag_type__in=FLAG_TYPES).values_list('flag_type', 'resolution'):
+    #         types.add(type_n_res[0] + '.' + type_n_res[1])
+    #     type_list = list(types)
+    #     type_list.sort()
+    #     return [part.split(".") for part in type_list]
+
     @cached_property
-    def flag_types(self) -> List[List[str]]:
-        FLAG_TYPES = [
-            classification_flag_types.matching_variant_flag,
-            classification_flag_types.matching_variant_warning_flag,
-            classification_flag_types.transcript_version_change_flag
-        ]
-        types: Set[str] = set()
-        flags_qs = self.most_recent.classification.flag_collection_safe.flags(only_open=True)
-        for type_n_res in flags_qs.filter(flag_type__in=FLAG_TYPES).values_list('flag_type', 'resolution'):
-            types.add(type_n_res[0] + '.' + type_n_res[1])
-        type_list = list(types)
-        type_list.sort()
-        return [part.split(".") for part in type_list]
+    def variant_matching_issues(self) -> bool:
+        return not self.most_recent.classification.allele_info.latest_validation.include
 
     def p_hgvses(self) -> List[PHGVS]:
         unique_p = set()
