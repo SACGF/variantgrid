@@ -554,14 +554,15 @@ class ClassificationFilter:
         """
         allele_data: Optional[AlleleData] = None
         for cm in self.cms_qs():
-            allele_id = cm.classification.allele_id
-            # FIXME: make an AlleleData for no Allele
-            if not allele_data or allele_id != allele_data.allele_id:
-                if allele_data:
-                    yield allele_data
-                # allele_data = AlleleData(source=self, allele_id=allele_id)
-                allele_data = AlleleData.from_allele_info(source=self, allele_info=cm.classification.allele_info)
-            allele_data.all_cms.append(self._record_issues(allele_id=allele_id, cm=cm))
+            if allele_info := cm.classification.allele_info:
+                allele_id = cm.classification.allele_id
+                # FIXME: make an AlleleData for no Allele
+                if not allele_data or allele_id != allele_data.allele_id:
+                    if allele_data:
+                        yield allele_data
+
+                    allele_data = AlleleData.from_allele_info(source=self, allele_info=cm.classification.allele_info)
+                allele_data.all_cms.append(self._record_issues(allele_id=allele_id, cm=cm))
 
         if allele_data:
             yield allele_data
