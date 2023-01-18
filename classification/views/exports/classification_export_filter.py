@@ -553,7 +553,7 @@ class ClassificationFilter:
         Is not filtered at this point
         """
         allele_data: Optional[AlleleData] = None
-        for cm in self.cms_qs():
+        for cm in self.cms_qs().iterator(chunk_size=1000):
             if allele_info := cm.classification.allele_info:
                 allele_id = cm.classification.allele_id
                 # FIXME: make an AlleleData for no Allele
