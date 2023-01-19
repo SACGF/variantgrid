@@ -2098,6 +2098,7 @@ VCTable.hgvs = (data, type, row) => {
     let transcript = parts.transcript;
     let geneSymbol = parts.gene_symbol;
     let cNomen = parts.c_nomen || parts.variant; // older code called cNomen 'variant'
+    let allele = parts.allele;
     let variantId = parts.variant_id;
     let alleleId = parts.allele_id;
     let pHgvs = parts.p_hgvs;
@@ -2115,18 +2116,31 @@ VCTable.hgvs = (data, type, row) => {
     }
     // also turn into a link
 
-    let dom = $('<div>');
-    if (genomeBuild && (parts.desired === false || parts.normalized === false)) {
+    let outterDom = $('<div>');
+    let dom = $('<div>').appendTo(outterDom);
+
+    if (allele) {
+        outterDom.prepend($('<dom>', {class: 'font-weight-bold', text: allele}));
+    }
+
+    if (genomeBuild && (parts.desired === false || parts.normalized === false || parts.always_show_genome_build)) {
         let genomeBuildWrapper = $('<div>');
+        let addNewLine = false;
         if (parts.normalized === false) {
             $('<span>', {html: '<i class="fa-solid fa-triangle-exclamation text-warning"></i> not resolved, showing imported ', style:'color:#888'}).appendTo(genomeBuildWrapper);
-        } else {
+        } else if (parts.desired === false) {
             $('<span>', {html: '<i class="fa-solid fa-triangle-exclamation text-warning"></i> not lifted-over ', style:'color:#888'}).appendTo(genomeBuildWrapper);
+        } else {
+            addNewLine = true;
         }
 
         dom.append(genomeBuildWrapper);
         dom.append($('<span>', {text: genomeBuild, style:'font-weight:500; color:#888'}));
-        dom.append(' ');
+        if (addNewLine) {
+            dom.append("<br/>");
+        } else {
+            dom.append(' ');
+        }
         // <span style="white-space: nowrap"><span>{{ c_hgvs.transcript }}</span>{% if c_hgvs.gene_symbol %}(<span class="text-secondary" style="letter-spacing: 0.5px">{{ c_hgvs.gene_symbol }}</span>){% endif %}:</span><span style="display:inline-block;word-break: break-all">{{ c_hgvs.raw_c }}</span>
     }
 
@@ -2152,7 +2166,7 @@ VCTable.hgvs = (data, type, row) => {
     if (pHgvs) {
         $('<span>', {class: 'd-block mt-1 text-secondary', text: limitLength(pHgvs)}).appendTo(dom);
     }
-    return dom.prop('outerHTML');
+    return outterDom.prop('outerHTML');
 }
 
 VCTable.condition = (data, type, row) => {

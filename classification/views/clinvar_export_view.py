@@ -131,7 +131,7 @@ class ClinVarExportColumns(DatatableConfig[ClinVarExport]):
         return self.export_to_batches.get(row.get("id"))
 
     def render_c_hgvs(self, row: CellData) -> JsonDataType:
-        if row["classification_based_on__classification__variant"]:
+        if row["classification_based_on__classification__allele_info__allele"]:
             genome_build = row["classification_based_on__published_evidence__genome_build__value"]
             c_hgvs_str: str
             if "h37" in genome_build:
@@ -143,10 +143,11 @@ class ClinVarExportColumns(DatatableConfig[ClinVarExport]):
             c_hgvs = CHGVS(c_hgvs_str)
             if c_hgvs.raw_c != c_hgvs.full_c_hgvs:
                 data = {
-                    "genomeBuild": genome_build,
+                    "genome_build": genome_build,
                     "transcript": c_hgvs.transcript,
-                    "geneSymbol": c_hgvs.gene_symbol,
+                    "gene_symbol": c_hgvs.gene_symbol,
                     "variant": c_hgvs.raw_c,
+                    "always_show_genome_build": True
                     # below row makes this link to the variant, but probably not desired action
                     # "variantId": row["classification_based_on__classification__variant"]
                 }
@@ -173,12 +174,12 @@ class ClinVarExportColumns(DatatableConfig[ClinVarExport]):
                     sort_keys=["classification_based_on__classification__allele_info__grch38__c_hgvs"],
                     extra_columns=[
                         "clinvar_allele__allele",
-                        "classification_based_on__classification__variant",
+                        "classification_based_on__classification__allele_info__allele",
                         "classification_based_on__published_evidence__genome_build__value",
                         "classification_based_on__classification__allele_info__grch37__c_hgvs",
                         "classification_based_on__classification__allele_info__grch38__c_hgvs",
                     ],
-                    renderer=self.render_c_hgvs, client_renderer='TableFormat.hgvs',
+                    renderer=self.render_c_hgvs, client_renderer='VCTable.hgvs',
                     search=[
                         # "clinvar_allele__allele__clingen_allele__id",  # need a string
                         "classification_based_on__classification__allele_info__grch37__c_hgvs",

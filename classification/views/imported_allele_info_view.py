@@ -106,7 +106,6 @@ class ImportedAlleleInfoColumns(DatatableConfig[ImportedAlleleInfo]):
         )
 
     def filter_queryset(self, qs: QuerySet[ImportedAlleleInfo]) -> QuerySet[ImportedAlleleInfo]:
-
         if (transcript_version_change := self.get_query_param('transcript_version_change')) and transcript_version_change == 'true':
             qs = qs.filter(latest_validation__validation_tags__normalize__transcript_version_change__isnull=False) | \
                  qs.filter(latest_validation__validation_tags__liftover__transcript_version_change__isnull=False)
@@ -116,7 +115,10 @@ class ImportedAlleleInfoColumns(DatatableConfig[ImportedAlleleInfo]):
         if (c_nomen_change := self.get_query_param('c_nomen_change')) and c_nomen_change == 'true':
             qs = qs.filter(latest_validation__validation_tags__normalize__c_nomen_change__isnull=False) | \
                  qs.filter(latest_validation__validation_tags__liftover__c_nomen_change__isnull=False)
-        if (filter_mode := self.get_query_param('exclude')) and filter_mode == 'true':
+
+        if (confirmed := self.get_query_param('confirmed')) and confirmed == 'true':
+            qs = qs.filter(latest_validation__confirmed=True)
+        if (exclude := self.get_query_param('exclude')) and exclude == 'true':
             qs = qs.filter(latest_validation__include=False)
         if (error_mode := self.get_query_param('errors_mode')) and error_mode == 'true':
             qs = qs.filter(Q(status=ImportedAlleleInfoStatus.FAILED) | Q(grch37__isnull=True) | Q(grch38__isnull=True))

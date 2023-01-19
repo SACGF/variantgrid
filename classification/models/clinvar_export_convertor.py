@@ -265,8 +265,9 @@ class ClinVarExportConverter:
 
     FLAG_TYPES_TO_MESSAGES = {
         classification_flag_types.classification_withdrawn: JsonMessages.error("Classification has since been withdrawn"),
-        classification_flag_types.transcript_version_change_flag: JsonMessages.error("Classification has open transcript version flag"),
-        classification_flag_types.matching_variant_warning_flag: JsonMessages.error("Classification has open variant warning flag"),
+        # these flags are now handled by AlleleInfo
+        # classification_flag_types.transcript_version_change_flag: JsonMessages.error("Classification has open transcript version flag"),
+        # classification_flag_types.matching_variant_warning_flag: JsonMessages.error("Classification has open variant warning flag"),
         classification_flag_types.discordant: JsonMessages.error("Classification is in discordance"),
         classification_flag_types.internal_review: JsonMessages.error("Classification is in internal review"),
         classification_flag_types.classification_outstanding_edits: JsonMessages.error("Classification has un-submitted changes"),
@@ -424,9 +425,13 @@ class ClinVarExportConverter:
                 elif message := ClinVarExportConverter.FLAG_TYPES_TO_MESSAGES.get(flag.flag_type):
                     messages += message
 
+            if not self.classification_based_on.classification.allele_info.latest_validation.include:
+                messages += JsonMessages.error("There are outstanding variant matching warnings for this record")
+
             # see if other shared classifications for the clinvar_key variant combo don't have a resolved condition
             # but only if they don't have an open don't share flag
             allele = self.clinvar_export_record.clinvar_allele.allele
+
             if other_classifications_for_key := Classification.objects.filter(
                     withdrawn=False,
                     variant__in=allele.variants,
