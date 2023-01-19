@@ -46,6 +46,10 @@
                     <input type="checkbox" class="form-check-input" id="c_nomen_change" onclick="applyFilters()"/>
                     <label for="c_nomen_change" title="Only show records where imported/normal/liftover differ by c.nomen">c.nomen Change</label>
                 </div>
+                <div class="form-check-inline">
+                    <input type="checkbox" class="form-check-input" id="missing_build" onclick="applyFilters()"/>
+                    <label for="missing_build" title="Only show records where either a 37 or a 38 build is missing (but not both)">Missing 1 Build</label>
+                </div>
                 <div class="form-check-inline">|</div>
                 <div class="form-check-inline">
                     <input type="checkbox" class="form-check-input" id="confirmed" onclick="applyFilters()"/>

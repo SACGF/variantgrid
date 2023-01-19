@@ -17,7 +17,7 @@
     {% endif %}
     {% labelled label=c_hgvses.2.identifier value_css="text-monospace" %}{{ c_hgvses.2.html }}{% endlabelled %}
     {% labelled label=variant_coordinate_label value_css="text-monospace" %}{{ allele_info.variant_coordinate }}{% endlabelled %}
-    
+
     <hr>
     {% labelled label="Validation Tags" %}
         {% if validation_tags %}
@@ -43,12 +43,24 @@
 
     <hr style="border-top:1px dashed lightgrey"/>
     <div id="classifications-allele-{{ allele_info.pk }}">
-        {% for classification in allele_info.classification_set.all %}
-            {% labelled label="" %}
-                {% classification_quick classification %}
-                <div class="flags d-inline-block" style="margin-left:12px" data-flags="{{ classification.flag_collection_id }}">...</div>
+        {% if not on_allele_page %}
+            {% labelled label="Allele" %}
+                {% if allele_info.allele %}
+                    <a class="hover-link" href="{{ allele_info.allele.get_absolute_url }}">{{ allele_info.allele }}</a>
+                    <div class="flags d-inline-block" style="margin-left:12px" data-flags="{{ allele_info.allele.flag_collection_id }}">...</div>
+                {% else %}<span class="no-value">-</span>{% endif %}
             {% endlabelled %}
-        {% endfor %}
+        {% endif %}
+        {% labelled label="Classifications" %}
+            {% for classification in allele_info.classification_set.all %}
+                <div>
+                {% classification_quick classification %}
+                    {% if not on_allele_page %}
+                        <div class="flags d-inline-block" style="margin-left:12px" data-flags="{{ classification.flag_collection_id }}">...</div>
+                    {% endif %}
+                </div>
+            {% endfor %}
+        {% endlabelled %}
     </div>
 </div>
 <script>

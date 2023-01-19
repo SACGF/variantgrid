@@ -120,6 +120,14 @@ class ImportedAlleleInfoColumns(DatatableConfig[ImportedAlleleInfo]):
         if (c_nomen_change := self.get_query_param('c_nomen_change')) and c_nomen_change == 'true':
             qs = qs.filter(latest_validation__validation_tags__normalize__c_nomen_change__isnull=False) | \
                  qs.filter(latest_validation__validation_tags__liftover__c_nomen_change__isnull=False)
+        if (missing_build := self.get_query_param('missing_build')) and missing_build == 'true':
+            # show records where only 1 build is missing
+            qs = qs.filter(
+                (Q(latest_validation__validation_tags__builds__missing_37__isnull=False) & \
+                 Q(latest_validation__validation_tags__builds__missing_38__isnull=True)) |
+                (Q(latest_validation__validation_tags__builds__missing_37__isnull=True) & \
+                 Q(latest_validation__validation_tags__builds__missing_38__isnull=False))
+            )
 
         if (confirmed := self.get_query_param('confirmed')) and confirmed == 'true':
             qs = qs.filter(latest_validation__confirmed=True)
@@ -186,5 +194,6 @@ def view_imported_allele_info_detail(request: HttpRequest, pk: int):
         "normalized_diff": chgvs_diff_description(normalized_diff) if normalized_diff else None,
         "liftover_diff": chgvs_diff_description(liftover_diff) if liftover_diff else None,
         "variant_coordinate_label": f"Normalised Variant Coordinate ({allele_info.imported_genome_build_patch_version})",
-        "validation_tags": allele_info.latest_validation.validation_tags_list if allele_info.latest_validation else None
+        "validation_tags": allele_info.latest_validation.validation_tags_list if allele_info.latest_validation else None,
+        "on_allele_page": request.GET.get("on_allele_page") == "true"
     })
