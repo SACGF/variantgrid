@@ -300,6 +300,14 @@ class ClassificationGroup:
     #     type_list.sort()
     #     return [part.split(".") for part in type_list]
 
+    @property
+    def has_matching_error(self) -> bool:
+        # TODO have it tell you how many
+        for mod in self.modifications:
+            if not mod.classification.allele_info.latest_validation.include:
+                return True
+        return False
+
     @cached_property
     def variant_matching_issues(self) -> bool:
         return not self.most_recent.classification.allele_info.latest_validation.include

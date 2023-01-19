@@ -112,7 +112,7 @@
                                     <div class="mt-2">
                                         <a data-toggle="ajax-modal" href="{% url 'view_imported_allele_info_detail' imported_allele.pk %}">
                                         {{ imported_allele.imported_genome_build_patch_version }}<br/>{% c_hgvs imported_allele.imported_c_hgvs %}
-                                        {% if not imported_allele.latest_validation.include %}<i class="mx-2 text-danger fa-brands fa-searchengin" title="Variant Matching Error"></i>{% endif %}
+                                        {% if not imported_allele.latest_validation.include %}<i style="font-size:12pt" class="mx-2 text-danger fa-brands fa-searchengin" title="Variant Matching Error"></i>{% endif %}
                                         </a>
                                     </div>
                                 {% endfor %}

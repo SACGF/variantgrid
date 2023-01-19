@@ -36,28 +36,28 @@
             <div id="imported-allele-info-datatables-filter" class="float-right mr-4" style="position:relative;top:6px">
                 <div class="form-check-inline">
                     <input type="checkbox" class="form-check-input" id="transcript_version_change" onclick="applyFilters()"/>
-                    <label for="transcript_version_change">Transcript Ver Change</label>
+                    <label for="transcript_version_change" title="Only show records where imported/normal/liftover differ by transcript version">Transcript Ver Change</label>
                 </div>
                 <div class="form-check-inline">
                     <input type="checkbox" class="form-check-input" id="gene_symbol_change" onclick="applyFilters()"/>
-                    <label for="gene_symbol_change">Gene Symbol Change</label>
+                    <label for="gene_symbol_change" title="Only show records where imported/normal/liftover differ by gene symbol">Gene Symbol Change</label>
                 </div>
                 <div class="form-check-inline">
                     <input type="checkbox" class="form-check-input" id="c_nomen_change" onclick="applyFilters()"/>
-                    <label for="c_nomen_change">c.nomen Change</label>
+                    <label for="c_nomen_change" title="Only show records where imported/normal/liftover differ by c.nomen">c.nomen Change</label>
                 </div>
                 <div class="form-check-inline">|</div>
                 <div class="form-check-inline">
                     <input type="checkbox" class="form-check-input" id="confirmed" onclick="applyFilters()"/>
-                    <label for="exclude">Confirmed</label>
+                    <label for="confirmed" title="Only show records which an admin has confirmed">Confirmed</label>
                 </div>
                 <div class="form-check-inline">
                     <input type="checkbox" class="form-check-input" id="exclude" onclick="applyFilters()"/>
-                    <label for="exclude">Excluded</label>
+                    <label for="exclude" title="Only show records that will be excluded from export">Excluded</label>
                 </div>
                 <div class="form-check-inline">
                     <input type="checkbox" class="form-check-input" id="errors_mode" onclick="applyFilters()"/>
-                    <label for="errors_mode">Failed</label>
+                    <label for="errors_mode" title="Only show records that failed to resolve to an allele">Failed</label>
                 </div>
             </div>
         </div>

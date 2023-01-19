@@ -11,7 +11,7 @@ from genes.hgvs import CHGVS, CHGVSDiff, chgvs_diff_description
 from library.guardian_utils import is_superuser
 from library.utils import MultiDiff, MultiDiffInput
 from snpdb.models import GenomeBuild
-from snpdb.views.datatable_view import DatatableConfig, RichColumn, CellData
+from snpdb.views.datatable_view import DatatableConfig, RichColumn, CellData, SortOrder
 import re
 
 
@@ -57,6 +57,11 @@ class ImportedAlleleInfoColumns(DatatableConfig[ImportedAlleleInfo]):
         self.expand_client_renderer = DatatableConfig._row_expand_ajax('view_imported_allele_info_detail', expected_height=108)
 
         self.rich_columns = [
+            RichColumn(
+                key='pk',
+                orderable=True,
+                default_sort=SortOrder.DESC
+            ),
             RichColumn(
                 key='imported_genome_build_patch_version',
                 label='Imported<br/>Genome Build',
