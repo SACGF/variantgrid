@@ -1,11 +1,14 @@
+from typing import Optional, Dict, Any
+
 from django.conf import settings
 
+from classification.models import ImportedAlleleInfo
 from classification.models.classification import ClassificationImport, \
     ClassificationImportAlleleSource, Classification
 from library.log_utils import report_exc_info
 from snpdb.clingen_allele import populate_clingen_alleles_for_variants
 from snpdb.liftover import create_liftover_pipelines
-from snpdb.models import GenomeBuild, ImportSource, Variant
+from snpdb.models import GenomeBuild, ImportSource, Variant, VariantCoordinate
 from snpdb.variant_pk_lookup import VariantPKLookup
 from upload.models import ModifiedImportedVariant, UploadStep
 from upload.tasks.vcf.import_vcf_step_task import ImportVCFStepTask
@@ -32,7 +35,7 @@ class ClassificationImportProcessVariantsTask(ImportVCFStepTask):
         liftover_classification_import(vc_import, ImportSource.API)
         # bulk_update_cached_c_hgvs call below won't get liftovers as they're in a separate task.
         # It will be called again in Liftover.complete()
-        Classification.relink_variants(vc_import)
+        ImportedAlleleInfo.relink_variants(vc_import)
 
         return 0  # Unknown how many we have to do so was set to 0
 
@@ -41,29 +44,40 @@ class ClassificationImportProcessVariantsTask(ImportVCFStepTask):
                                classification_import: ClassificationImport,
                                upload_step: UploadStep):
         variant_pk_lookup = VariantPKLookup.factory(genome_build)
-        variant_tuples_by_hash = {}
-        classifications_by_hash = {}
+        variant_tuples_by_hash: Dict[Any, VariantCoordinate] = {}
+        allele_info_by_hash: Dict[Any, ImportedAlleleInfo] = {}
 
-        # Create a list of variant tuples for classifications that have no variant set
-        no_variant_qs = classification_import.classification_set.filter(variant__isnull=True)
-        for classification in no_variant_qs:
-            variant_tuple = classification.get_variant_coordinates_from_evidence()
-            if variant_tuple:
-                variant_hash = variant_pk_lookup.add(*variant_tuple)
-                variant_tuples_by_hash[variant_hash] = variant_tuple
-                classifications_by_hash[variant_hash] = classification
+        no_variant_qs = classification_import.importedalleleinfo_set.filter(matched_variant__isnull=True)
+        for allele_info in no_variant_qs:
+            if variant_coordinate := allele_info.variant_coordinate_obj:
+                variant_hash = variant_pk_lookup.add(*variant_coordinate)
+                variant_tuples_by_hash[variant_hash] = variant_coordinate
+                allele_info_by_hash[variant_hash] = allele_info
             else:
-                # note this shouldn't happen at this step - to get here get_variant_coordinates_from_evidence
-                # has to have previously returned a proper value
-                classification.set_variant_failed_matching(message="Could not derive variant coordinates")
+                pass
+                # if there's no variant_coordinate, record already knows it's in error
+
+        # # Create a list of variant tuples for classifications that have no variant set
+        # no_variant_qs = classification_import.classification_set.filter(variant__isnull=True)
+        # for classification in no_variant_qs:
+        #     variant_tuple = classification.get_variant_coordinates_from_evidence()
+        #     if variant_tuple:
+        #         variant_hash = variant_pk_lookup.add(*variant_tuple)
+        #         variant_tuples_by_hash[variant_hash] = variant_tuple
+        #         classifications_by_hash[variant_hash] = classification
+        #     else:
+        #         # note this shouldn't happen at this step - to get here get_variant_coordinates_from_evidence
+        #         # has to have previously returned a proper value
+        #         classification.set_variant_failed_matching(message="Could not derive variant coordinates")
 
         # Look up variant tuples - if not exists was normalised during import - lookup ModifiedImportedVariant
         variant_pk_lookup.batch_check()
         for variant_hash, variant_pk in variant_pk_lookup.variant_pk_by_hash.items():
-            classification = classifications_by_hash[variant_hash]
+            #classification = classifications_by_hash[variant_hash]
+            allele_info = allele_info_by_hash[variant_hash]
             variant_tuple = variant_tuples_by_hash[variant_hash]
             try:
-                validation_message = None
+                validation_message: Optional[str] = None
                 if variant_pk is None:
                     # Not inserted - was normalised during import
                     try:
@@ -72,7 +86,7 @@ class ClassificationImportProcessVariantsTask(ImportVCFStepTask):
                         validation_message = f"{miv.old_variant} was normalized to {miv.variant}"
                     except ModifiedImportedVariant.DoesNotExist:
                         variant_str = " ".join(map(str, variant_tuple))
-                        validation_message = f"Variant '{variant_str}' for classification {classification.pk} not inserted!"
+                        validation_message = f"Variant '{variant_str}' for Allele Info {allele_info.pk} not inserted!"
 
                 variant = None
                 if variant_pk:
@@ -80,12 +94,15 @@ class ClassificationImportProcessVariantsTask(ImportVCFStepTask):
 
                 # go via the set method so signals can be called
                 if variant:
-                    classification.set_variant(variant, validation_message)
+                    allele_info.update_and_save(matched_variant=variant, message=validation_message, force_update=True)
+                    # classification.set_variant(variant, validation_message)
                 else:
-                    classification.set_variant_failed_matching(validation_message)
+                    allele_info.set_matching_failed(validation_message)
+                    # classification.set_variant_failed_matching(validation_message)
             except Exception as e:
                 report_exc_info()
-                classification.set_variant_failed_matching(f'Unexpected error during matching {str(e)}')
+                allele_info.set_matching_failed(validation_message)
+                # classification.set_variant_failed_matching(f'Unexpected error during matching {str(e)}')
 
 
 def liftover_classification_import(classification_import: ClassificationImport,

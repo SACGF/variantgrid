@@ -13,6 +13,7 @@ import django.dispatch
 from datetimeutc.fields import DateTimeUTCField
 from dateutil.tz import gettz
 from django.conf import settings
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
 from django.db import models, transaction
@@ -35,7 +36,8 @@ from classification.models.classification_import_run import ClassificationImport
 from classification.models.classification_patcher import patch_fuzzy_age
 from classification.models.classification_utils import \
     ValidationMerger, ClassificationJsonParams, VariantCoordinateFromEvidence, PatchMeta, ClassificationPatchResponse
-from classification.models.classification_variant_info_models import ImportedAlleleInfo, ImportedAlleleInfoStatus
+from classification.models.classification_variant_info_models import ImportedAlleleInfo, ImportedAlleleInfoStatus, \
+    ResolvedVariantInfo
 from classification.models.evidence_key import EvidenceKeyValueType, \
     EvidenceKey, EvidenceKeyMap, VCDataDict, WipeMode, VCDataCell
 from classification.models.evidence_mixin import EvidenceMixin, VCPatch
@@ -102,8 +104,10 @@ class ClassificationImport(models.Model):
     genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)
 
     def get_variants_qs(self):
-        q_classification_variants = Q(classification__classification_import=self)
-        return Variant.objects.filter(q_classification_variants).distinct()
+
+        allele_infos = ImportedAlleleInfo.objects.filter(classification_import=self)
+        variant_infos = ResolvedVariantInfo.objects.filter(allele_info__in=allele_infos, genome_build=self.genome_build).filter(variant__null=False)
+        return Variant.objects.filter(pk__in=variant_infos).distinct()
 
 
 class ClassificationImportAlleleSource(AlleleSource):
@@ -124,7 +128,8 @@ class ClassificationImportAlleleSource(AlleleSource):
                                                 variantallele__allele__in=allele_qs)
         populate_clingen_alleles_for_variants(genome_build, build_variants)
 
-        Classification.relink_variants(self.classification_import)
+        #Classification.relink_variants(self.classification_import)
+        ImportedAlleleInfo.relink_variants(self.classification_import)
         variants_classification_changed_signal.send(sender=Classification,
                                                     variants=build_variants, genome_build=genome_build)
 
@@ -152,7 +157,8 @@ class AllClassificationsAlleleSource(TimeStampedModel, AlleleSource):
         return Variant.objects.filter(contigs_q, classification__isnull=False)
 
     def liftover_complete(self, genome_build: GenomeBuild):
-        Classification.relink_variants()
+        #Classification.relink_variants()
+        ImportedAlleleInfo.relink_variants(self.classification_import)
         allele: Allele
         for allele in self.get_allele_qs():
             allele.validate()
@@ -442,8 +448,11 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
     sample = models.ForeignKey(Sample, null=True, blank=True, on_delete=SET_NULL)
     """ The sample (if any) this classification is linked to """
 
-    classification_import = models.ForeignKey(ClassificationImport, null=True, on_delete=CASCADE)
-    """ provide a value here to later match this record to a variant """
+    # classification_import = models.ForeignKey(ClassificationImport, null=True, on_delete=CASCADE)
+    """
+    provide a value here to later match this record to a variant
+    classification_import has been removed and moved to allele_info
+    """
 
     user = models.ForeignKey(User, on_delete=PROTECT)
     """ The owner of the classification, is somewhat redundant to the evidence_key classified_by, not heavily used """
@@ -614,36 +623,36 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
     @classmethod
     def order_by_evidence(cls, key_id: str):
         return RawSQL('cast(evidence->>%s as jsonb)->>%s', (key_id, 'value'))
-
-    @staticmethod
-    def relink_variants(vc_import: Optional[ClassificationImport] = None) -> int:
-        """
-            Call after import/liftover as variants may not have been processed enough at the time of "set_variant"
-            Updates all records that have a variant but not cached c.hgvs values or no clinical context.
-
-            :param vc_import: if provided only classifications associated to this import will have their values set
-            :return: A tuple of records now correctly set and those still outstanding
-        """
-
-        tests = Q(allele_info__isnull=True)
-        if GenomeBuild.grch37().is_annotated:
-            tests |= Q(allele_info__grch37__isnull=True)
-        if GenomeBuild.grch38().is_annotated:
-            tests |= Q(allele_info__grch38__isnull=True)
-
-        requires_relinking = Classification.objects.filter(tests)
-        if vc_import:
-            requires_relinking = requires_relinking.filter(classification_import=vc_import)
-
-        relink_count = requires_relinking.count()
-
-        vc: Classification
-        for vc in requires_relinking:
-            vc.set_variant(vc.variant)
-            vc.save()
-
-        logging.info("Bulk Update of variant relinking complete")
-        return relink_count
+    #
+    # @staticmethod
+    # def relink_variants(vc_import: Optional[ClassificationImport] = None) -> int:
+    #     """
+    #         Call after import/liftover as variants may not have been processed enough at the time of "set_variant"
+    #         Updates all records that have a variant but not cached c.hgvs values or no clinical context.
+    #
+    #         :param vc_import: if provided only classifications associated to this import will have their values set
+    #         :return: A tuple of records now correctly set and those still outstanding
+    #     """
+    #
+    #     tests = Q(allele_info__isnull=True)
+    #     if GenomeBuild.grch37().is_annotated:
+    #         tests |= Q(allele_info__grch37__isnull=True)
+    #     if GenomeBuild.grch38().is_annotated:
+    #         tests |= Q(allele_info__grch38__isnull=True)
+    #
+    #     requires_relinking = Classification.objects.filter(tests)
+    #     if vc_import:
+    #         requires_relinking = requires_relinking.filter(classification_import=vc_import)
+    #
+    #     relink_count = requires_relinking.count()
+    #
+    #     vc: Classification
+    #     for vc in requires_relinking:
+    #         vc.set_variant(vc.variant)
+    #         vc.save()
+    #
+    #     logging.info("Bulk Update of variant relinking complete")
+    #     return relink_count
 
     @property
     def variant_coordinate(self):
@@ -737,7 +746,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         """
         self.update_allele()
         # self.update_allele_info_from_classification()
-        self.allele_info.force_refresh_and_save()
+        self.allele_info.refresh_and_save(force_update=True)
         self._perform_c_hgvs_validation()
 
     def _perform_c_hgvs_validation(self):

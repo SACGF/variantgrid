@@ -372,8 +372,8 @@ class ClassificationAdmin(ModelAdminBasics):
         }, **kwargs)
 
 
-class ClassificationImportInline(admin.TabularInline):
-    model = Classification
+class ImportedAlleleInfoInline(admin.TabularInline):
+    model = ImportedAlleleInfo
     fields = ['id', 'allele_info']
 
     def has_add_permission(self, request, obj):
@@ -385,20 +385,22 @@ class ClassificationImportInline(admin.TabularInline):
     def has_delete_permission(self, request, obj=None):
         return False
 
+
 @admin.register(ClassificationImport)
 class ClassificationImportAdmin(ModelAdminBasics):
-    inlines = (ClassificationImportInline,)
+    inlines = (ImportedAlleleInfoInline,)
     list_display = ('pk', 'created', 'user', 'genome_build', 'outstanding_classifications')
 
-    @admin_list_column("Outstanding Classifications")
+    @admin_list_column("Outstanding Allele Infos")
     def outstanding_classifications(self, obj: ClassificationImport):
-        return Classification.objects.filter(classification_import=obj).count()
+        return ImportedAlleleInfo.objects.filter(classification_import=obj).count()
 
     @admin_action("Relink Variants")
     def relink_variants(self, request, queryset):
         for obj in queryset:
-            updated_vc_count = Classification.relink_variants(obj)
-            self.message_user(request, f'Classification Import ({obj.pk}) relinked {updated_vc_count} variants')
+            updated_ai_count = ImportedAlleleInfo.relink_variants(obj)
+            self.message_user(request, f'Classification Import ({obj.pk}) relinked {updated_ai_count} variants')
+
 
 @admin.register(ClinicalContext)
 class ClinicalContextAdmin(ModelAdminBasics):

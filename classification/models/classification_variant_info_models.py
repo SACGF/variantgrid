@@ -1,15 +1,13 @@
+import logging
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import Optional, List, Dict, Any, TypedDict, Literal
 from django.conf import settings
 from django.contrib.auth.models import User
-from django.db import transaction
 from django.db.models import TextField, ForeignKey, CASCADE, SET_NULL, OneToOneField, TextChoices, \
     CharField, JSONField, BooleanField
 from django.utils.timezone import now
 from model_utils.models import TimeStampedModel
-from pyhgvs import InvalidHGVSName
-
 from genes.hgvs import HGVSMatcher, CHGVS, CHGVSDiff
 from genes.models import TranscriptVersion, GeneSymbol
 from library.cache import timed_cache
@@ -263,6 +261,9 @@ class ImportedAlleleInfo(TimeStampedModel):
         else:
             return None
 
+    matched_variant = ForeignKey(Variant, null=True, blank=True, on_delete=SET_NULL)
+    """ not used for any logic other than storing the variant that was matched (so we can later find allele, and variants of other builds) """
+
     allele = ForeignKey(Allele, null=True, blank=True, on_delete=SET_NULL)
     """ set this once it's matched, but record can exist prior to variant matching """
 
@@ -279,6 +280,9 @@ class ImportedAlleleInfo(TimeStampedModel):
     """ If true, indicates that this is not matchable, see the message for details """
 
     latest_validation = ForeignKey(ImportedAlleleInfoValidation, null=True, on_delete=SET_NULL)
+
+    classification_import = ForeignKey('classification.ClassificationImport', null=True, on_delete=CASCADE)
+    """ Use this to resolved the variant and liftover """
 
     class Meta:
         unique_together = ('imported_c_hgvs', 'imported_g_hgvs', 'imported_transcript', 'imported_genome_build_patch_version')
@@ -458,13 +462,12 @@ class ImportedAlleleInfo(TimeStampedModel):
         self.status = ImportedAlleleInfoStatus.FAILED
         self.save()
 
-    def force_refresh_and_save(self):
+    def refresh_and_save(self, force_update=False):
         """
         Updates linked variants (c.hgvs, etc)
         """
-        if va := self.variant_info_for_imported_genome_build:
-            if vav := va.variant:
-                self.update_and_save(matched_variant=vav, force_update=True)
+        if va := self.matched_variant:
+            self.update_and_save(matched_variant=va, force_update=force_update)
 
     def update_and_save(self, matched_variant: Variant, message: Optional[str] = None, force_update: bool = False):
         """
@@ -479,6 +482,8 @@ class ImportedAlleleInfo(TimeStampedModel):
 
         if not matched_variant:
             raise ValueError("ImportedAlleleInfo.update_and_save requires a matched_variant, instead call reset_with_status")
+
+        self.matched_variant = matched_variant
 
         matched_allele = matched_variant.allele
         if self.allele != matched_allele:
@@ -524,3 +529,44 @@ class ImportedAlleleInfo(TimeStampedModel):
             else:
                 self[genome_build] = ResolvedVariantInfo.get_or_create(self, genome_build, variant)
 
+    @staticmethod
+    def relink_variants(vc_import: Optional['ClassificationImport'] = None) -> int:
+        """
+            Call after import/liftover as variants may not have been processed enough at the time of "set_variant"
+            Updates all records that have a variant but not cached c.hgvs values or no clinical context.
+
+            :param vc_import: if provided only classifications associated to this import will have their values set
+            :return: A tuple of records now correctly set and those still outstanding
+        """
+
+        relink_qs = ImportedAlleleInfo.objects.all()
+        if vc_import:
+            relink_qs = relink_qs.filter(classification_import=vc_import)
+
+        for allele_info in relink_qs:
+            allele_info.refresh_and_save()
+            # TODO, do this via signla instead
+            for classification in allele_info.classification_set.all():
+                classification._apply_allele_info_to_classification()
+
+        logging.info("Bulk Update of variant relinking complete")
+
+        # tests = Q(allele_info__isnull=True)
+        # if GenomeBuild.grch37().is_annotated:
+        #     tests |= Q(allele_info__grch37__isnull=True)
+        # if GenomeBuild.grch38().is_annotated:
+        #     tests |= Q(allele_info__grch38__isnull=True)
+        #
+        # requires_relinking = Classification.objects.filter(tests)
+        # if vc_import:
+        #     requires_relinking = requires_relinking.filter(classification_import=vc_import)
+        #
+        # relink_count = requires_relinking.count()
+        #
+        # vc: Classification
+        # for vc in requires_relinking:
+        #     vc.set_variant(vc.variant)
+        #     vc.save()
+        #
+        # logging.info("Bulk Update of variant relinking complete")
+        # return relink_count
