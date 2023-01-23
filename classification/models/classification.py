@@ -102,11 +102,8 @@ class ClassificationImport(models.Model):
     user = models.ForeignKey(User, on_delete=CASCADE)
     genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)
 
-    def get_variants_qs(self):
-
-        allele_infos = ImportedAlleleInfo.objects.filter(classification_import=self)
-        variant_infos = ResolvedVariantInfo.objects.filter(allele_info__in=allele_infos, genome_build=self.genome_build).filter(variant__null=False)
-        return Variant.objects.filter(pk__in=variant_infos).distinct()
+    def get_variants_qs(self) -> QuerySet[Variant]:
+        return Variant.objects.filter(pk__in=ImportedAlleleInfo.objects.filter(classification_import=self).values_list('matched_variant', flat=True))
 
 
 class ClassificationImportAlleleSource(AlleleSource):

@@ -395,8 +395,13 @@ class ClassificationImportAdmin(ModelAdminBasics):
     def outstanding_classifications(self, obj: ClassificationImport):
         return ImportedAlleleInfo.objects.filter(classification_import=obj).count()
 
+    @admin_action("Count Variants")
+    def count_variants(self, request, queryset: QuerySet[ClassificationImport]):
+        for obj in queryset:
+            self.message_user(request, f'Classification Import ({obj.pk}) has {obj.get_variants_qs().count()} variants')
+
     @admin_action("Relink Variants")
-    def relink_variants(self, request, queryset):
+    def relink_variants(self, request, queryset: QuerySet[ClassificationImport]):
         for obj in queryset:
             updated_ai_count = ImportedAlleleInfo.relink_variants(obj)
             self.message_user(request, f'Classification Import ({obj.pk}) relinked {updated_ai_count} variants')
