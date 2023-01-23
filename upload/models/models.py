@@ -24,7 +24,7 @@ from library.django_utils.django_file_system_storage import PrivateUploadStorage
 from library.django_utils.django_file_utils import get_import_processing_dir
 from library.enums.log_level import LogLevel
 from library.utils.file_utils import file_md5sum, mk_path
-from library.log_utils import get_traceback, report_message
+from library.log_utils import get_traceback, report_message, report_exc_info
 from seqauto.models import VCFFile, SampleSheetCombinedVCFFile, get_samples_by_sequencing_sample, VariantCaller
 from snpdb.import_status import set_vcf_and_samples_import_status
 from snpdb.models import VCF, Variant, SoftwareVersion, GenomeBuild
@@ -157,6 +157,8 @@ class UploadPipeline(models.Model):
             self.remove_processing_files()
 
     def error(self, error_message):
+        # FIXME remove this, cause of error might not be the most recent exception
+        report_exc_info()
         logging.error("upload_pipeline.error(%s, %s)", self, error_message)
 
         self.status = ProcessingStatus.ERROR
@@ -214,7 +216,7 @@ class UploadPipeline(models.Model):
         return vcf_import_info
 
     @property
-    def genome_build(self):
+    def genome_build(self) -> GenomeBuild:
         """ returns GenomeBuild based on uploaded file type
             throws ValueError if can't retrieve it """
 
@@ -427,7 +429,7 @@ class UploadedVCF(models.Model):
 @receiver(pre_delete, sender=UploadedVCF)
 def pre_delete_uploaded_vcf(sender, instance, *args, **kwargs):
     if vcf := instance.vcf:
-        #logging.debug("Deleting associated vcf for uploaded VCF")
+        # logging.debug("Deleting associated vcf for uploaded VCF")
         if vcf.import_status not in ImportStatus.DELETION_STATES:
             soft_delete_vcfs(vcf.user, vcf.pk)
 
