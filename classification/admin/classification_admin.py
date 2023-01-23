@@ -374,7 +374,7 @@ class ClassificationAdmin(ModelAdminBasics):
 
 class ImportedAlleleInfoInline(admin.TabularInline):
     model = ImportedAlleleInfo
-    fields = ['id', 'allele_info']
+    fields = ['id', 'imported_c_hgvs', 'imported_genome_build_patch_version', 'status']
 
     def has_add_permission(self, request, obj):
         return False
@@ -676,14 +676,16 @@ class ImportedAlleleInfoAdmin(ModelAdminBasics):
     def imported_hgvs(self, obj: ImportedAlleleInfo):
         return obj.imported_c_hgvs or obj.imported_g_hgvs
 
-    @admin_action("Re-Match - via linked classifications")
+    @admin_action("Re-Match")
     def re_match(self, request, queryset: QuerySet[ImportedAlleleInfo]):
-        classifications_qs = Classification.objects.filter(allele_info__in=queryset)
-        self.message_user(request, f'Found : {classifications_qs.count()} linked classifications')
-        valid_record_count, invalid_record_count = reattempt_variant_matching(request.user, classifications_qs)
-        if invalid_record_count:
-            self.message_user(request, f'Records with missing or invalid builds/coordinates : {invalid_record_count}')
-        self.message_user(request, f'Classification Records re-matching : {valid_record_count}')
+        reattempt_variant_matching(request.user, queryset)
+
+        # classifications_qs = Classification.objects.filter(allele_info__in=queryset)
+        # self.message_user(request, f'Found : {classifications_qs.count()} linked classifications')
+        #valid_record_count, invalid_record_count = reattempt_variant_matching(request.user, classifications_qs)
+        #if invalid_record_count:
+        #    self.message_user(request, f'Records with missing or invalid builds/coordinates : {invalid_record_count}')
+        #self.message_user(request, f'Classification Records re-matching : {valid_record_count}')
 
     @admin_action("Update Variant Coordinate")
     def update_variant_coordinate(self, request, queryset: QuerySet[ImportedAlleleInfo]):

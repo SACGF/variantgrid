@@ -462,6 +462,14 @@ class ImportedAlleleInfo(TimeStampedModel):
         self.status = ImportedAlleleInfoStatus.FAILED
         self.save()
 
+    def set_variant_prepare_for_rematch(self, classification_import: 'ClassificationImport'):
+        self.classification_import = classification_import
+        self.matched_variant = None
+        # TODO base preprare_for_rematch on status rather than if there variant is there
+        # so we can have less destructive rematches
+        self.allele = None
+        self.status = ImportedAlleleInfoStatus.PROCESSING
+
     def refresh_and_save(self, force_update=False):
         """
         Updates linked variants (c.hgvs, etc)
