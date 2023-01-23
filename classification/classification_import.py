@@ -129,7 +129,7 @@ def _add_post_data_insertion_upload_steps(upload_pipeline: UploadPipeline):
 def reattempt_variant_matching(user: User, queryset: QuerySet[ImportedAlleleInfo]) -> Tuple[int, int]:
     """ @:returns (valid_record_count, invalid_record_count) """
 
-    qs: QuerySet[ImportedAlleleInfo] = queryset.order_by('imported_genome_build_')
+    qs: QuerySet[ImportedAlleleInfo] = queryset.order_by('imported_genome_build_patch_version')
     invalid_record_count = 0
     valid_record_count = 0
     valid_this_loop = 0
