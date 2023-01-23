@@ -4,7 +4,7 @@ from django.conf import settings
 
 from classification.models import ImportedAlleleInfo
 from classification.models.classification import ClassificationImport, \
-    ClassificationImportAlleleSource, Classification
+    ClassificationImportAlleleSource
 from library.log_utils import report_exc_info
 from snpdb.clingen_allele import populate_clingen_alleles_for_variants
 from snpdb.liftover import create_liftover_pipelines
@@ -101,12 +101,13 @@ class ClassificationImportProcessVariantsTask(ImportVCFStepTask):
                     # classification.set_variant_failed_matching(validation_message)
             except Exception as e:
                 report_exc_info()
-                allele_info.set_matching_failed(validation_message)
+                allele_info.set_matching_failed(str(e))
                 # classification.set_variant_failed_matching(f'Unexpected error during matching {str(e)}')
 
 
-def liftover_classification_import(classification_import: ClassificationImport,
-                                           import_source: ImportSource):
+def liftover_classification_import(
+        classification_import: ClassificationImport,
+        import_source: ImportSource):
     if settings.LIFTOVER_CLASSIFICATIONS:
         allele_source = ClassificationImportAlleleSource.objects.create(classification_import=classification_import)
         genome_build = classification_import.genome_build

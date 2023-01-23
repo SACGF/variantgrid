@@ -4,7 +4,7 @@ from django.contrib.auth.models import User
 from snpdb.admin_utils import ModelAdminBasics
 from snpdb.models import ProcessingStatus
 from . import models
-from .models import UploadStep
+from .models import UploadStep, UploadPipeline, UploadedFile, UploadedVCF
 
 
 class UploadStepStatusFilter(admin.SimpleListFilter):
@@ -21,6 +21,7 @@ class UploadStepStatusFilter(admin.SimpleListFilter):
         return queryset
 
 
+@admin.register(UploadStep)
 class UploadStepAdmin(ModelAdminBasics):
     list_display = ('id', 'name', 'upload_pipeline', 'status', 'start_date', 'end_date', 'error_message')
     list_filter = (UploadStepStatusFilter,)
@@ -37,7 +38,16 @@ class UploadStepAdmin(ModelAdminBasics):
     actions = [mark_timed_out]
 
 
-admin.site.register(models.UploadedFile)
-admin.site.register(models.UploadPipeline)
-admin.site.register(models.UploadedVCF)
-admin.site.register(models.UploadStep, UploadStepAdmin)
+@admin.register(UploadedFile)
+class UploadFileAdmin(ModelAdminBasics):
+    pass
+
+
+@admin.register(UploadPipeline)
+class UploadPipelineAdmin(ModelAdminBasics):
+    pass
+
+
+@admin.register(UploadedVCF)
+class UploadedVCFAdmin(ModelAdminBasics):
+    pass

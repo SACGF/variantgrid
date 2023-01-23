@@ -155,7 +155,6 @@ def reattempt_variant_matching(user: User, queryset: QuerySet[ImportedAlleleInfo
 
     ClassificationImportRun.record_classification_import("admin-variant-rematch")
     try:
-
         for allele_info in qs:
             try:
                 # classification.revalidate(user=user)

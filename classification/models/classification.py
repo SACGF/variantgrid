@@ -13,7 +13,6 @@ import django.dispatch
 from datetimeutc.fields import DateTimeUTCField
 from dateutil.tz import gettz
 from django.conf import settings
-from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
 from django.db import models, transaction
@@ -114,10 +113,10 @@ class ClassificationImportAlleleSource(AlleleSource):
     """ A model to indicate that variants need to be linked to an allele and lifted over to other builds """
     classification_import = models.ForeignKey(ClassificationImport, null=True, on_delete=CASCADE)
 
-    def get_genome_build(self):
+    def get_genome_build(self) -> GenomeBuild:
         return self.classification_import.genome_build
 
-    def get_allele_qs(self):
+    def get_allele_qs(self) -> QuerySet[Allele]:
         variants_qs = self.classification_import.get_variants_qs()
         return Allele.objects.filter(variantallele__variant__in=variants_qs)
 
@@ -147,10 +146,10 @@ class AllClassificationsAlleleSource(TimeStampedModel, AlleleSource):
     genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)
     git_hash = models.TextField()
 
-    def get_genome_build(self):
+    def get_genome_build(self) -> GenomeBuild:
         return self.genome_build
 
-    def get_variants_qs(self):
+    def get_variants_qs(self) -> QuerySet[Variant]:
         # Note: This deliberately only gets classifications where the submitting variant was against this genome build
         # ie we don't use Classification.get_variant_q_from_classification_qs() to get liftovers
         contigs_q = Variant.get_contigs_q(self.genome_build)
@@ -839,14 +838,13 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             allele = variant.allele
         self.allele = allele
 
-    def ensure_allele_info(self) -> ImportedAlleleInfo:
+    def ensure_allele_info(self) -> Optional[ImportedAlleleInfo]:
         if not self.allele_info:
             try:
                 genome_build_patch_version = self.get_genome_build_patch_version()
             except Exception:
                 # no allele info if we can't derive a genome build
-                self.allele_info: Optional[ImportedAlleleInfo] = None
-                return
+                return None
 
             fields = {"imported_genome_build_patch_version": genome_build_patch_version}
             if c_hgvs := self.imported_c_hgvs:
@@ -855,7 +853,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 fields["imported_g_hgvs"] = g_hgvs
                 fields["imported_transcript"] = self.transcript
             else:
-                # no data to get
+                # need either c.hgvs, g.hgvs (in future, re-support variant_coordinate)
                 return None
 
             allele_info = ImportedAlleleInfo.get_or_create(**fields)

@@ -1,7 +1,5 @@
 import logging
 import os
-
-import cyvcf2
 from django.conf import settings
 from django.core.exceptions import PermissionDenied
 
@@ -192,6 +190,7 @@ def import_clinvar_vcf(upload_step):
 
     clinvar_version = ClinVarVersion.objects.get(md5_hash=upload_step.uploaded_file.md5_hash)
 
+    import cyvcf2
     vcf_reader = cyvcf2.VCF(upload_step.input_filename)
     bulk_inserter = BulkClinVarInserter(clinvar_version, upload_step)
 
