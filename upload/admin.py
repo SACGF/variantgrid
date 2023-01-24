@@ -38,16 +38,32 @@ class UploadStepAdmin(ModelAdminBasics):
     actions = [mark_timed_out]
 
 
+class UploadStepInline(admin.TabularInline):
+    model = UploadStep
+    fields = ['id', 'name', 'status']
+    show_change_link = True
+
+    def has_add_permission(self, request, obj):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
 @admin.register(UploadedFile)
 class UploadFileAdmin(ModelAdminBasics):
-    pass
+    list_display = ('name', 'file_type', 'path', 'uploaded_file')
 
 
 @admin.register(UploadPipeline)
 class UploadPipelineAdmin(ModelAdminBasics):
-    pass
+    list_display = ('uploaded_file', 'status')
+    inlines = (UploadStepInline, )
 
 
 @admin.register(UploadedVCF)
 class UploadedVCFAdmin(ModelAdminBasics):
-    pass
+    list_display = ('id', 'uploaded_file', 'upload_pipeline', 'vcf')
