@@ -48,12 +48,6 @@ class AlleleAdmin(ModelAdminBasics):
             return ", ".join(str(genome_build) for genome_build in genome_builds)
         return "-"
 
-    @admin_action("Validate")
-    def validate(self, request, queryset):
-        allele: Allele
-        for allele in queryset:
-            allele.validate()
-
     @admin_action("Liftover")
     def liftover(self, request, queryset):
         liftover_alleles(allele_qs=queryset, user=request.user)

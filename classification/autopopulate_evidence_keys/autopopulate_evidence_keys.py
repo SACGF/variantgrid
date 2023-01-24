@@ -51,6 +51,9 @@ def create_classification_for_sample_and_variant_objects(
                                         refseq_transcript_accession=refseq_transcript_accession,
                                         ensembl_transcript_accession=ensembl_transcript_accession,
                                         annotation_version=annotation_version)
+    if allele_info := classification.ensure_allele_info():
+        allele_info.set_variant_and_save(matched_variant=variant)
+
     classification.set_variant(variant)  # have to re-do this later because we didn't have the transcript the 1st time around
 
     liftover_classification_import(vc_import, ImportSource.WEB)

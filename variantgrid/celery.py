@@ -62,11 +62,12 @@ app.conf.beat_schedule['notify-server-status'] = {
     'schedule': crontab(hour=19, minute=0),
 }
 
-if settings.ALLELE_VALIDATION:
-    app.conf.beat_schedule['allele-validation'] = {
-        'task': 'snpdb.tasks.validation_task.validate_alleles',
-        'schedule': crontab(hour=19, minute=30),
-    }
+# No longer do scheduled allele validation
+# if settings.ALLELE_VALIDATION:
+#     app.conf.beat_schedule['allele-validation'] = {
+#         'task': 'snpdb.tasks.validation_task.validate_alleles',
+#         'schedule': crontab(hour=19, minute=30),
+#     }
 
 
 # send update emails once a day (if there has been activity)

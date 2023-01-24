@@ -70,7 +70,7 @@ def process_classification_import(classification_import: ClassificationImport, i
     for variant_hash, variant_pk in variant_pk_lookup.variant_pk_by_hash.items():
         for allele_info in allele_info_by_hash[variant_hash]:
             if variant_pk:
-                allele_info.update_and_save(matched_variant=Variant.objects.get(pk=variant_pk))
+                allele_info.set_variant_and_save(matched_variant=Variant.objects.get(pk=variant_pk))
             else:
                 variant_tuple = variant_tuples_by_hash[variant_hash]
                 if not _is_safe_for_vcf(variant_tuple):

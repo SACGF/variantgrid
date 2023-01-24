@@ -37,8 +37,6 @@ VARIANT_PATTERN = re.compile(r"^(MT|(?:chr)?(?:[XYM]|\d+)):(\d+)[,\s]*([GATC]+)>
 # matches anything hgvs-like before any fixes
 HGVS_UNCLEANED_PATTERN = re.compile(r"(^(N[MC]_|ENST)\d+.*:|[cnmg]\.|[^:]:[cnmg]).*\d+")
 
-allele_validate_signal = django.dispatch.Signal()  # args: "allele"
-
 
 class Allele(FlagsMixin, models.Model):
     """ Genome build independent - ie GRCh37 and GRCh38 variants for same change point to same allele
@@ -210,25 +208,10 @@ class Allele(FlagsMixin, models.Model):
 
     def validate(self, liftover_complete=True):
         """
+        DEPRECATED, done by ImportedAlleleInfo now
         :param liftover_complete: If False does not check for missing representations
         """
-        if liftover_complete:
-            v37 = self.variant_alleles().filter(genome_build=GenomeBuild.grch37()).first()
-            v38 = self.variant_alleles().filter(genome_build=GenomeBuild.grch38()).first()
-
-            if v37:
-                self.close_open_flags_of_type(allele_flag_types.missing_37)
-            else:
-                self.flag_collection_safe.get_or_create_open_flag_of_type(flag_type=allele_flag_types.missing_37,
-                                                                          only_if_new=True)
-
-            if v38:
-                self.close_open_flags_of_type(allele_flag_types.missing_38)
-            else:
-                self.flag_collection_safe.get_or_create_open_flag_of_type(flag_type=allele_flag_types.missing_38,
-                                                                          only_if_new=True)
-
-        allele_validate_signal.send(sender=Allele, allele=self)
+        pass
 
 
 @receiver(flag_collection_extra_info_signal, sender=FlagCollection)

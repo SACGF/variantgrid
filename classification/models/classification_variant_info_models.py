@@ -2,6 +2,7 @@ import logging
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import Optional, List, Dict, Any, TypedDict, Literal
+import django
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.db.models import TextField, ForeignKey, CASCADE, SET_NULL, OneToOneField, TextChoices, \
@@ -15,6 +16,8 @@ from library.log_utils import report_exc_info
 from library.utils import pretty_label
 from snpdb.models import GenomeBuild, Variant, Allele, GenomeBuildPatchVersion, VariantCoordinate
 
+
+allele_info_changed_signal = django.dispatch.Signal()  # args: "allele_info"
 
 class ResolvedVariantInfo(TimeStampedModel):
     """
@@ -114,7 +117,7 @@ class ResolvedVariantInfo(TimeStampedModel):
             }
         )
         if created or variant_info.variant != variant:
-            variant_info.update_and_save(variant)
+            variant_info.set_variant_and_save(variant)
 
         return variant_info
 
@@ -137,6 +140,7 @@ _VALIDATION_TO_SEVERITY: [str, ALLELE_INFO_VALIDATION_SEVERITY] = {
     'missing_37': "W",
     'missing_38': "E"
 }
+
 
 class ImportedAlleleValidationTagsDiff(TypedDict, total=False):
     transcript_id_change: ALLELE_INFO_VALIDATION_SEVERITY
@@ -475,9 +479,9 @@ class ImportedAlleleInfo(TimeStampedModel):
         Updates linked variants (c.hgvs, etc)
         """
         if va := self.matched_variant:
-            self.update_and_save(matched_variant=va, force_update=force_update)
+            self.set_variant_and_save(matched_variant=va, force_update=force_update)
 
-    def update_and_save(self, matched_variant: Variant, message: Optional[str] = None, force_update: bool = False):
+    def set_variant_and_save(self, matched_variant: Variant, message: Optional[str] = None, force_update: bool = False):
         """
         Call to update this object, and attached ResolvedVariantInfos (will check if matched_variant has an attached allele).
         If the variant is not yet attached to an allele (or the attached allele doesn't have a variant for each build yet
@@ -491,8 +495,11 @@ class ImportedAlleleInfo(TimeStampedModel):
         if not matched_variant:
             raise ValueError("ImportedAlleleInfo.update_and_save requires a matched_variant, instead call reset_with_status")
 
-        self.matched_variant = matched_variant
+        if not force_update and self.matched_variant == matched_variant and self.status == ImportedAlleleInfoStatus.MATCHED_ALL_BUILDS:
+            # nothing to do
+            return
 
+        self.matched_variant = matched_variant
         matched_allele = matched_variant.allele
         if self.allele != matched_allele:
             self.allele = matched_allele
@@ -505,6 +512,7 @@ class ImportedAlleleInfo(TimeStampedModel):
 
         applied_all = False
         if matched_allele:
+            # we have an allele, attempt to update config of relevant genome builds
             missing_variant = False
             for genome_build in ImportedAlleleInfo._genome_builds():
                 variant = self.allele.variant_for_build_optional(genome_build)
@@ -513,6 +521,7 @@ class ImportedAlleleInfo(TimeStampedModel):
                     missing_variant = True
             applied_all = not missing_variant
         elif matched_variant:
+            # no allele, but we do have the variant for the current genome build
             self._update_variant(self.imported_genome_build_patch_version.genome_build, matched_variant, force_update)
 
         if applied_all:
@@ -521,7 +530,10 @@ class ImportedAlleleInfo(TimeStampedModel):
             self.status = ImportedAlleleInfoStatus.MATCHED_IMPORTED_BUILD
 
         self.save()
+        allele_info_changed_signal.send(sender=ImportedAlleleInfo, imported_allele_info=self)
+
         return self
+
 
     def _update_variant(self, genome_build: GenomeBuild, variant: Variant, force_update: bool = False):
         if not self.allele or not variant:

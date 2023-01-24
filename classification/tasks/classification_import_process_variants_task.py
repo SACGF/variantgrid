@@ -94,7 +94,7 @@ class ClassificationImportProcessVariantsTask(ImportVCFStepTask):
 
                 # go via the set method so signals can be called
                 if variant:
-                    allele_info.update_and_save(matched_variant=variant, message=validation_message, force_update=True)
+                    allele_info.set_variant_and_save(matched_variant=variant, message=validation_message, force_update=True)
                     # classification.set_variant(variant, validation_message)
                 else:
                     allele_info.set_matching_failed(validation_message)

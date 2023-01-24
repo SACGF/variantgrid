@@ -46,7 +46,8 @@ MANAGE_COMMAND = [PYTHON_COMMAND, os.path.join(BASE_DIR, "manage.py")]
 DATA_UPLOAD_MAX_NUMBER_FIELDS = 5000
 
 # Nightly task to fix missing GRCh37/38 representations
-ALLELE_VALIDATION = False
+# No longer do allele validation, all incorporated into ImportedAlleleInfo
+# ALLELE_VALIDATION = False
 
 # if None, discordance emails wont be sent
 DISCORDANCE_EMAIL = None

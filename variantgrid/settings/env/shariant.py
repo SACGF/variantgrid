@@ -35,7 +35,6 @@ HEARTBEAT_URL = 'https://heartbeat.uptimerobot.com/m788641874-4c58c98a716180f366
 # import all the base settings #
 SITE_ID = 5  # shariant.org.au
 
-ALLELE_VALIDATION = True
 INBOX_ENABLED = False
 DISCORDANCE_ENABLED = True
 DISCORDANCE_EMAIL = '"Shariant Updates" <updates@shariant.org.au>'

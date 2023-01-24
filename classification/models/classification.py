@@ -1,5 +1,4 @@
 import copy
-import logging
 import re
 import uuid
 from collections import Counter, namedtuple
@@ -35,8 +34,7 @@ from classification.models.classification_import_run import ClassificationImport
 from classification.models.classification_patcher import patch_fuzzy_age
 from classification.models.classification_utils import \
     ValidationMerger, ClassificationJsonParams, VariantCoordinateFromEvidence, PatchMeta, ClassificationPatchResponse
-from classification.models.classification_variant_info_models import ImportedAlleleInfo, ImportedAlleleInfoStatus, \
-    ResolvedVariantInfo
+from classification.models.classification_variant_info_models import ImportedAlleleInfo, ImportedAlleleInfoStatus
 from classification.models.evidence_key import EvidenceKeyValueType, \
     EvidenceKey, EvidenceKeyMap, VCDataDict, WipeMode, VCDataCell
 from classification.models.evidence_mixin import EvidenceMixin, VCPatch
@@ -44,7 +42,7 @@ from classification.models.flag_types import classification_flag_types
 from flags.models import Flag, FlagPermissionLevel, FlagStatus
 from flags.models.models import FlagsMixin, FlagCollection, FlagTypeContext, \
     flag_collection_extra_info_signal, FlagInfos
-from genes.hgvs import HGVSMatcher, CHGVS, chgvs_diff_description, CHGVSDiff, HGVSNameExtra
+from genes.hgvs import HGVSMatcher, CHGVS, HGVSNameExtra
 from genes.models import Gene
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
 from library.guardian_utils import clear_permissions
@@ -129,9 +127,6 @@ class ClassificationImportAlleleSource(AlleleSource):
         variants_classification_changed_signal.send(sender=Classification,
                                                     variants=build_variants, genome_build=genome_build)
 
-        allele: Allele
-        for allele in allele_qs:
-            allele.validate()
         report_event('Completed import liftover',
                      extra_data={'liftover_id': self.pk, 'allele_count': allele_qs.count()})
 
@@ -154,10 +149,7 @@ class AllClassificationsAlleleSource(TimeStampedModel, AlleleSource):
 
     def liftover_complete(self, genome_build: GenomeBuild):
         #Classification.relink_variants()
-        ImportedAlleleInfo.relink_variants(self.classification_import)
-        allele: Allele
-        for allele in self.get_allele_qs():
-            allele.validate()
+        ImportedAlleleInfo.relink_variants()
 
 
 @receiver(flag_collection_extra_info_signal, sender=FlagCollection)
@@ -743,89 +735,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         self.update_allele()
         # self.update_allele_info_from_classification()
         self.allele_info.refresh_and_save(force_update=True)
-        self._perform_c_hgvs_validation()
 
-    def _perform_c_hgvs_validation(self):
-        # if we had a previously opened flag match warning - don't re-open
-        if self.allele_info:
-            if not self.id:
-                # need to save to have a flag collection
-                self.save()
-
-            # record the fact that we did match
-            flag_collection = self.flag_collection_safe
-
-            self.save()  # we should be done changing values at this point
-            # though we may modify flags (which are external objects)
-
-            if not self.lab.external:
-                # don't re-raise flags on external classifications,
-                # they would have already been raised in the external system and resolved there
-
-                # see if the match looks suspect
-                c_hgvs = self.get(SpecialEKeys.C_HGVS)
-                resolved_chgvs: Optional[CHGVS] = None
-                transcript_comment: Optional[str] = None
-                matching_warning_comment: Optional[str] = None
-                compare_to: Optional[str] = None
-                diff: Optional[CHGVSDiff] = None
-                if self.get(SpecialEKeys.GENOME_BUILD):
-                    genome_build = self.get_genome_build()
-                    if genome_build == GenomeBuild.grch37():
-                        compare_to = self.chgvs_grch37
-                    elif genome_build == GenomeBuild.grch38():
-                        compare_to = self.chgvs_grch38
-
-                    if c_hgvs and compare_to:
-                        original_chgvs = CHGVS(c_hgvs)
-                        resolved_chgvs = CHGVS(compare_to)
-
-                        diff = original_chgvs.diff(resolved_chgvs)
-
-                        if diff:
-                            # DIFF_RAW_CGVS_EXPANDED is minor and expected process
-                            diff = diff & ~CHGVSDiff.DIFF_RAW_CGVS_EXPANDED
-
-                            if diff == CHGVSDiff.DIFF_TRANSCRIPT_VER:
-                                transcript_comment = \
-                                    (f'For c.hgvs {c_hgvs} the transcripts are:\n\n'
-                                     f'{original_chgvs.transcript} (imported)\n{resolved_chgvs.transcript} (resolved)')
-                            elif diff:
-                                important_diffs = chgvs_diff_description(diff)
-                                diff_desc = ' - ' + '\n - '.join(important_diffs)
-                                matching_warning_comment = (
-                                    f'Imported c.hgvs and matched c.hgvs differ in the following ways:\n\n{diff_desc}\n\n'
-                                    f'{original_chgvs.full_c_hgvs} (imported)\n{resolved_chgvs.full_c_hgvs} (resolved)')
-
-                if transcript_comment:
-                    flag_collection.get_or_create_open_flag_of_type(
-                        flag_type=classification_flag_types.transcript_version_change_flag,
-                        comment=transcript_comment,
-                        only_if_new=True,
-                        reopen_if_bot_closed=True,
-                        data={'resolved': resolved_chgvs.transcript},
-                        close_other_data=True
-                    )
-                else:
-                    flag_collection.close_open_flags_of_type(classification_flag_types.transcript_version_change_flag)
-
-                if matching_warning_comment:
-                    flag_collection.get_or_create_open_flag_of_type(
-                        flag_type=classification_flag_types.matching_variant_warning_flag,
-                        comment=matching_warning_comment,
-                        only_if_new=True,
-                        reopen_if_bot_closed=True,
-                        data={'resolved': resolved_chgvs.full_c_hgvs},
-                        close_other_data=True
-                    )
-                else:
-                    flag_collection.close_open_flags_of_type(classification_flag_types.matching_variant_warning_flag)
-
-        if allele := self.allele:
-            # now that everything's saved - see if 37 rep != 38 rep
-            # but note that the liftover might not be complete (if there is a liftover happening
-            # validation will be called again anyway)
-            allele.validate(liftover_complete=False)
 
     def update_allele(self):
         # Updates the allele based off the variant
@@ -859,9 +769,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
 
     def update_allele_info_from_classification(self, force_update: bool = False) -> bool:
         """
-        Semi-deprecated, only useful if setting variant or allele on the classification manually in tests (to avoid all the flag stuff)
-        or when migrating to the use of allele_info in the first place
-        Update the allele_info with the data already set on the classification
+        Only to be called during migration from classification taking care of the matching to allele_info having the data
         """
         if self.allele_info:
             if not force_update and self.allele_info.status == ImportedAlleleInfoStatus.MATCHED_ALL_BUILDS:
@@ -875,7 +783,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             if not force_update and self.allele_info.status == ImportedAlleleInfoStatus.MATCHED_ALL_BUILDS:
                 return
             if matched_variant := self.variant:
-                allele_info.update_and_save(matched_variant, force_update=force_update)
+                allele_info.set_variant_and_save(matched_variant, force_update=force_update)
             return True
         else:
             return False
@@ -902,6 +810,8 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
     @transaction.atomic()
     def set_variant(self, variant: Variant = None, message: str = None):
         """
+        DEPRECATED - go via the AlleleInfo instead
+
         Updates the data in the AlleleInfo (force_update=True) with the provided variant
         @param variant The variant that we matched on, can't be None (see set_variant_failed_matching)
         @param message Any message to include about a matching failure or success
@@ -915,7 +825,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             raise ValueError("set_variant requires a non-None variant, use set_variant_prepare_for_rematch or set_variant_failed_matching")
 
         if allele_info := self.ensure_allele_info():
-            allele_info.update_and_save(matched_variant=variant, message=message, force_update=True)
+            allele_info.set_variant_and_save(matched_variant=variant, message=message, force_update=True)
             # update the allele info, then update the classification based on the allele info
             self._apply_allele_info_to_classification()
         else:
@@ -933,62 +843,11 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 variant = viv
         allele_or_variant_changed = allele_or_variant_changed or self.allele_info
 
-        self.allele = self.allele_info.allele
-        self.variant = variant
-
-        failed = self.allele_info.status == ImportedAlleleInfoStatus.FAILED
-        message = self.allele_info.message
-
-        # don't want to be considered as part of the import anymore
-        # as we've failed matching somewhere along the line
-        if variant is None and failed:
-            self.classification_import = None
-
-        # see if the clinical context is still relevant (if we have one)
-        if not variant or ((cc := self.clinical_context) and (variant.allele != cc.allele)):
-            self.clinical_context = None
-
-        if not self.id:
-            # need to save to have a flag collection
+        if allele_or_variant_changed:
+            self.allele = self.allele_info.allele
+            self.variant = variant
             self.save()
 
-        flag_collection = self.flag_collection_safe
-        try:
-            if failed:
-                # failed matching
-                if not message:
-                    c_hgvs = self.get(SpecialEKeys.C_HGVS)
-                    build_name = self.get(SpecialEKeys.GENOME_BUILD)
-                    message = f'Could not resolve {build_name} {c_hgvs}'
-
-                flag_collection.ensure_resolution(classification_flag_types.matching_variant_flag,
-                                                  resolution='matching_failed',
-                                                  comment=message)
-            elif variant:
-                # matching success
-                flag_collection.close_open_flags_of_type(classification_flag_types.matching_variant_flag,
-                                                         comment='Variant Matched')
-                classification_variant_set_signal.send(sender=Classification, classification=self, variant=variant)
-
-                if allele_or_variant_changed:
-                    self.allele_classification_changed()
-            else:
-                # matching ongoing
-                flag_collection.ensure_resolution(classification_flag_types.matching_variant_flag,
-                                                  resolution='open',
-                                                  comment=message)
-                flag_collection.close_open_flags_of_type(classification_flag_types.matching_variant_warning_flag,
-                                                         comment='Variant Re-Matching')
-                flag_collection.close_open_flags_of_type(classification_flag_types.transcript_version_change_flag,
-                                                         comment='Variant Re-Matching')
-
-            self._perform_c_hgvs_validation()
-
-        except:
-            report_exc_info()
-            flag_collection.ensure_resolution(classification_flag_types.matching_variant_flag,
-                                              resolution='matching_failed',
-                                              comment='Could not set variant for unexpected reason')
 
     def allele_classification_changed(self):
         """ Notifies all variants linked to allele that the classification has changed """
