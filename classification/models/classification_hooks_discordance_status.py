@@ -1,4 +1,6 @@
-from typing import Set, Optional
+from collections import defaultdict
+from dataclasses import dataclass
+from typing import Set, Optional, List
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -7,12 +9,14 @@ from django.db.models.signals import post_delete
 from django.dispatch.dispatcher import receiver
 
 from classification.enums import SpecialEKeys, ShareLevel
+from classification.models import ImportedAlleleInfo
 from classification.models.classification import Classification, \
     classification_current_state_signal, \
     classification_post_publish_signal, \
-    classification_variant_set_signal, ClassificationModification, \
+    ClassificationModification, \
     classification_withdraw_signal
 from classification.models.classification_utils import ValidationMerger
+from classification.models.classification_variant_info_models import allele_info_changed_signal
 from classification.models.clinical_context_models import ClinicalContext, \
     clinical_context_signal, ClinicalContextRecalcTrigger
 from classification.models.discordance_models import DiscordanceReport
@@ -23,32 +27,74 @@ from library.utils import DebugTimer
 INTERNAL_REVIEW_RELEVANT_DAYS = 365
 
 
-@receiver(classification_variant_set_signal, sender=Classification)
-def variant_set(sender, **kwargs):  # pylint: disable=unused-argument
-    record: Classification = kwargs['classification']
-    variant = kwargs['variant']
+@receiver(allele_info_changed_signal, sender=ImportedAlleleInfo)
+def update_clinical_contexts_when_allele_changes(sender, allele_info: ImportedAlleleInfo, **kwargs):
+    """
+    Triggers clinical contexts to be recalculated when an AlleleInfo changes which allele it's linked to
+    """
 
-    old_clinical_context: Optional[ClinicalContext] = None
-    new_clinical_context: Optional[ClinicalContext] = None
+    @dataclass(frozen=True)
+    class ClassificationMatched:
+        classification: Classification
+        matched: bool
 
-    if not variant and record.clinical_context:
-        old_clinical_context = record.clinical_context
-        record.clinical_context = None
-        record.save()
+    modified_clinical_contexts: dict[ClinicalContext, List[ClassificationMatched]] = defaultdict(list)
+    for classification in allele_info.classification_set.all():
 
-    elif variant and ((not record.clinical_context) or
-                      (record.clinical_context and record.clinical_context.allele != variant.allele)):
-        if dg := ClinicalContext.default_group_for(variant):
-            old_clinical_context = record.clinical_context
-            new_clinical_context = dg
-            record.clinical_context = dg
-            record.save()
+        contexts_changed = False
+        old_clinical_context: Optional[ClinicalContext] = classification.clinical_context
+        new_clinical_context: Optional[ClinicalContext] = None
 
-    # make sure you do your calculations after
-    if old_clinical_context:
-        old_clinical_context.recalc_and_save(cause=f'Classification {record.friendly_label} unmatched', cause_code=ClinicalContextRecalcTrigger.VARIANT_SET)
-    if new_clinical_context:
-        new_clinical_context.recalc_and_save(cause=f'Classification {record.friendly_label} submitted', cause_code=ClinicalContextRecalcTrigger.VARIANT_SET)
+        allele = allele_info.allele
+        if not allele and classification.clinical_context:
+            contexts_changed = True
+            new_clinical_context = None  # clinical context is being changed to None
+        elif allele and ((not classification.clinical_context) or (classification.clinical_context.allele != allele)):
+            contexts_changed = True
+            new_clinical_context = ClinicalContext.default_group_for_allele(allele)
+
+        if contexts_changed:
+            classification.clinical_context = new_clinical_context
+            classification.save()
+            if classification.share_level_enum.is_discordant_level:
+                if old_clinical_context:
+                    modified_clinical_contexts[old_clinical_context].append(ClassificationMatched(classification=classification, matched=False))
+                if new_clinical_context:
+                    modified_clinical_contexts[new_clinical_context].append(ClassificationMatched(classification=classification, matched=True))
+
+    for clinical_context, classifications_matched in modified_clinical_contexts.items():
+        notes = ", ".join(cm.classification.friendly_label + " " + ("matched" if cm.matched else "unmatched") for cm in classifications_matched)
+        notes = "Classification" + ("s" if len(classifications_matched) > 1 else "") + " " + notes
+        clinical_context.recalc_and_save(cause=notes, cause_code=ClinicalContextRecalcTrigger.VARIANT_SET)
+
+
+# now done by the above
+# @receiver(classification_variant_set_signal, sender=Classification)
+# def variant_set(sender, **kwargs):  # pylint: disable=unused-argument
+#     record: Classification = kwargs['classification']
+#     variant = kwargs['variant']
+#
+#     old_clinical_context: Optional[ClinicalContext] = None
+#     new_clinical_context: Optional[ClinicalContext] = None
+#
+#     if not variant and record.clinical_context:
+#         old_clinical_context = record.clinical_context
+#         record.clinical_context = None
+#         record.save()
+#
+#     elif variant and ((not record.clinical_context) or
+#                       (record.clinical_context and record.clinical_context.allele != variant.allele)):
+#         if dg := ClinicalContext.default_group_for(variant):
+#             old_clinical_context = record.clinical_context
+#             new_clinical_context = dg
+#             record.clinical_context = dg
+#             record.save()
+#
+#     # make sure you do your calculations after
+#     if old_clinical_context:
+#         old_clinical_context.recalc_and_save(cause=f'Classification {record.friendly_label} unmatched', cause_code=ClinicalContextRecalcTrigger.VARIANT_SET)
+#     if new_clinical_context:
+#         new_clinical_context.recalc_and_save(cause=f'Classification {record.friendly_label} submitted', cause_code=ClinicalContextRecalcTrigger.VARIANT_SET)
 
 
 @receiver(post_delete, sender=Classification)
@@ -127,8 +173,8 @@ def published(sender,
             comment=comment
         )
 
-    if classification.variant and not classification.clinical_context:
-        classification.clinical_context = ClinicalContext.default_group_for(classification.variant)
+    if classification.allele and not classification.clinical_context:
+        classification.clinical_context = ClinicalContext.default_group_for_allele(classification.allele)
         classification.save(update_fields=['clinical_context'])
 
     if classification.clinical_context:

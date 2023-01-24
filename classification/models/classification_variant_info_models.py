@@ -1,6 +1,7 @@
 import logging
 from dataclasses import dataclass
 from datetime import timedelta
+from enum import Enum
 from typing import Optional, List, Dict, Any, TypedDict, Literal
 import django
 from django.conf import settings
@@ -17,7 +18,8 @@ from library.utils import pretty_label
 from snpdb.models import GenomeBuild, Variant, Allele, GenomeBuildPatchVersion, VariantCoordinate
 
 
-allele_info_changed_signal = django.dispatch.Signal()  # args: "allele_info"
+allele_info_changed_signal = django.dispatch.Signal()  # args: "allele_info": ImportedAlleleInfoChangedEvent
+
 
 class ResolvedVariantInfo(TimeStampedModel):
     """
@@ -530,7 +532,7 @@ class ImportedAlleleInfo(TimeStampedModel):
             self.status = ImportedAlleleInfoStatus.MATCHED_IMPORTED_BUILD
 
         self.save()
-        allele_info_changed_signal.send(sender=ImportedAlleleInfo, imported_allele_info=self)
+        allele_info_changed_signal.send(sender=ImportedAlleleInfo, allele_info=self)
 
         return self
 

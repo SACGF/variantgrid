@@ -22,6 +22,7 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        ManualOperation(task_id=ManualOperation.task_id_manage(["fix_matching_flags", "--apply"]),
-                        test=_check_has_flags_of_interest)
+        # These flags are no longer used, instead they are handled by ImportedAlleleInfo
+        # ManualOperation(task_id=ManualOperation.task_id_manage(["fix_matching_flags", "--apply"]),
+        #                 test=_check_has_flags_of_interest)
     ]

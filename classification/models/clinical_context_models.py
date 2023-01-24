@@ -25,7 +25,7 @@ from flags.models.models import FlagsMixin, FlagCollection, FlagTypeContext, \
 from library.django_utils import get_url_from_view_path
 from library.log_utils import NotificationBuilder
 from library.utils import invalidate_cached_property
-from snpdb.models import Variant, Lab
+from snpdb.models import Lab
 from snpdb.models.models_variant import Allele
 
 clinical_context_signal = django.dispatch.Signal()  # args: "clinical_context", "status", "is_significance_change", "cause"
@@ -319,7 +319,7 @@ class ClinicalContext(FlagsMixin, TimeStampedModel):
                         cause_code: ClinicalContextRecalcTrigger = ClinicalContextRecalcTrigger.OTHER):
         """
         Updates this ClinicalContext with the new status and applies flags where appropriate.
-        :param cause: A human readable string to be showed to the users as to what started or stopped a discordance (if relevant)
+        :param cause: A human-readable string to be showed to the users as to what started or stopped a discordance (if relevant)
         typically will be "Lab X submitted a new variant"
         :param cause_code: A finite list of codes as to what triggered the discordance
         """
@@ -393,18 +393,23 @@ class ClinicalContext(FlagsMixin, TimeStampedModel):
     def is_default(self) -> bool:
         return self.name == ClinicalContext.default_name
 
-    @staticmethod
-    def default_group_for(variant: Variant) -> Optional['ClinicalContext']:
-        if variant.allele:
-            dg, _ = ClinicalContext.objects.get_or_create(allele=variant.allele, name=ClinicalContext.default_name)
-            return dg
-        print("Warning, classification variant doesn't have allele")
-        return None
+    # @staticmethod
+    # def default_group_for(variant: Variant) -> Optional['ClinicalContext']:
+    #     if variant.allele:
+    #         dg, _ = ClinicalContext.objects.get_or_create(allele=variant.allele, name=ClinicalContext.default_name)
+    #         return dg
+    #     print("Warning, classification variant doesn't have allele")
+    #     return None
 
     @staticmethod
-    def for_variant(variant: Variant) -> QuerySet:
-        ClinicalContext.default_group_for(variant)  # ensure we always have the default group
-        return ClinicalContext.objects.filter(allele=variant.allele).order_by('created')
+    def default_group_for_allele(allele: Allele) -> 'ClinicalContext':
+        dg, _ = ClinicalContext.objects.get_or_create(allele=allele, name=ClinicalContext.default_name)
+        return dg
+
+    # @staticmethod
+    # def for_variant(variant: Variant) -> QuerySet:
+    #     ClinicalContext.default_group_for(variant)  # ensure we always have the default group
+    #     return ClinicalContext.objects.filter(allele=variant.allele).order_by('created')
 
     @property
     def classifications_qs(self) -> QuerySet[Classification]:

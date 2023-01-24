@@ -1136,17 +1136,20 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 value = value[0]
 
         if value is not None:
-            # special keys just
-            if e_key.key == 'existing_variant_id':
-                try:
-                    self.set_variant(Variant.objects.get(pk=int(value)))
-                    # self.requires_auto_population = True
-                    return None  # clear out the value
-                except:
-                    cell.add_validation(code=ValidationCode.MATCHING_ERROR, severity='error',
-                                        message="Couldn't resolve Variant " + str(value) + ")")
+            # remove support for existing_variant_id
+            # variant matching is best done through allele_info stuff now
 
-            elif e_key.key == 'existing_sample_id':
+            # special keys just
+            # if e_key.key == 'existing_variant_id':
+            #     try:
+            #         self.set_variant(Variant.objects.get(pk=int(value)))
+            #         # self.requires_auto_population = True
+            #         return None  # clear out the value
+            #     except:
+            #         cell.add_validation(code=ValidationCode.MATCHING_ERROR, severity='error',
+            #                             message="Couldn't resolve Variant " + str(value) + ")")
+            #
+            if e_key.key == 'existing_sample_id':
                 try:
                     self.sample = Sample.objects.get(pk=int(value))
                     # self.requires_auto_population = True
