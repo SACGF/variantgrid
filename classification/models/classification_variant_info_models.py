@@ -71,7 +71,7 @@ class ResolvedVariantInfo(TimeStampedModel):
     def allele(self) -> Optional[Allele]:
         return self.allele_info.allele
 
-    def update_and_save(self, variant: Variant) -> 'ResolvedVariantInfo':
+    def set_variant_and_save(self, variant: Variant) -> 'ResolvedVariantInfo':
         """
         Update all the derived fields
         :param variant: Can't be None, variant we should use, provide the existing one if still need to update derived fields for existing record
@@ -547,7 +547,7 @@ class ImportedAlleleInfo(TimeStampedModel):
         else:
             if existing := self[genome_build]:
                 if existing.variant != variant or force_update:
-                    existing.update_and_save(variant=variant)
+                    existing.set_variant_and_save(variant=variant)
             else:
                 self[genome_build] = ResolvedVariantInfo.get_or_create(self, genome_build, variant)
 
