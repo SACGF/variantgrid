@@ -216,7 +216,7 @@ def server_status(request):
 
     context = {
         "celery_workers": celery_workers,
-        "queries": long_running_sql(),
+        "queries": long_running_sql(0),
         "can_access_reference": can_access_reference,
         "disk_free": disk_free,
         "highest_variant_annotated": highest_variant_annotated,
@@ -252,8 +252,7 @@ class RunningQuery:
     state: str
 
 
-def long_running_sql():
-    seconds = 30
+def long_running_sql(min_age_in_seconds: int = 30):
     with connection.cursor() as cursor:
         db_name = connection.settings_dict['NAME']
         cursor.execute(
@@ -268,7 +267,7 @@ def long_running_sql():
             AND datname = %s
             ORDER BY now() - pg_stat_activity.query_start desc;
             """,
-            [f"{seconds} seconds", db_name]
+            [f"{min_age_in_seconds} seconds", db_name]
         )
 
         def to_obj(row) -> RunningQuery:
