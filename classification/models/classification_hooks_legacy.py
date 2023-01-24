@@ -3,7 +3,6 @@ from typing import Dict, Any, Optional, Set
 
 import django
 from django.dispatch import receiver
-
 from classification.enums import SpecialEKeys
 from classification.models import Classification, ImportedAlleleInfoStatus, classification_flag_types, \
     classification_variant_set_signal, variants_classification_changed_signal, ImportedAlleleInfo
@@ -12,6 +11,13 @@ from genes.hgvs import HGVSMatcher, CHGVS, CHGVSDiff, chgvs_diff_description
 from library.guardian_utils import admin_bot
 from library.log_utils import report_exc_info
 from snpdb.models import Allele, GenomeBuild, allele_flag_types
+
+"""
+IMPORTANT!!
+
+NONE OF THIS CODE SHOULD BE HOOKED UP TO ANYTHING OR RUN ANYMORE.
+Will delete this soon one everything has been migrated
+"""
 
 allele_validate_signal = django.dispatch.Signal()  # args: "allele"
 # we no longer validate alleles
@@ -72,7 +78,7 @@ class TranscriptDifference:
         )
 
 
-@receiver(allele_validate_signal, sender=Allele)
+# @receiver(allele_validate_signal, sender=Allele)
 def compare_chgvs(sender, allele: Allele, **kwargs):  # pylint: disable=unused-argument
     # FIXME remove this code, no longer required compared to AlleleInfo
     transcript_differences: Set[TranscriptDifference] = set()

@@ -567,9 +567,9 @@ class ImportedAlleleInfo(TimeStampedModel):
 
         for allele_info in relink_qs:
             allele_info.refresh_and_save()
-            # TODO, do this via signla instead
+            # TODO, do this via signal instead
             for classification in allele_info.classification_set.all():
-                classification._apply_allele_info_to_classification()
+                classification.apply_allele_info_to_classification()
 
         logging.info("Bulk Update of variant relinking complete")
 

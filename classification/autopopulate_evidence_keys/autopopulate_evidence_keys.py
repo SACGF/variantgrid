@@ -15,7 +15,8 @@ from classification.autopopulate_evidence_keys.evidence_from_sample_and_patient 
 from classification.autopopulate_evidence_keys.evidence_from_variant import get_evidence_fields_for_variant, \
     AutopopulateData
 from classification.enums import SubmissionSource, SpecialEKeys
-from classification.models import EvidenceKey, Classification, ClassificationImport
+from classification.models import EvidenceKey, Classification, ClassificationImport, ImportedAlleleInfo, \
+    ImportedAlleleInfoStatus
 from classification.tasks.classification_import_process_variants_task import liftover_classification_import
 from library.git import Git
 from snpdb.models import GenomeBuild, ImportSource, Sample, UserSettings, Variant
@@ -33,7 +34,7 @@ def create_classification_for_sample_and_variant_objects(
     user_settings = UserSettings.get_for_user(user)
     # TODO - if you have > 1 labs then redirect to pick page.
     lab = user_settings.get_lab()
-    vc_import = ClassificationImport.objects.create(user=user, genome_build=genome_build)
+
 
     data = {
 
@@ -43,7 +44,6 @@ def create_classification_for_sample_and_variant_objects(
               "lab": lab,
               "variant": variant,
               "sample": sample,
-              "classification_import": vc_import,
               "populate_with_defaults": True}
 
     classification = Classification.create(**kwargs)
@@ -51,12 +51,19 @@ def create_classification_for_sample_and_variant_objects(
                                         refseq_transcript_accession=refseq_transcript_accession,
                                         ensembl_transcript_accession=ensembl_transcript_accession,
                                         annotation_version=annotation_version)
-    if allele_info := classification.ensure_allele_info():
+
+    allele_info, allele_info_created = classification.ensure_allele_info_with_created()
+    if allele_info and allele_info_created:
+        vc_import = ClassificationImport.objects.create(user=user, genome_build=genome_build)
         allele_info.set_variant_and_save(matched_variant=variant)
+        allele_info.classification_import = vc_import
+        allele_info.save()
+        liftover_classification_import(vc_import, ImportSource.WEB)
 
-    classification.set_variant(variant)  # have to re-do this later because we didn't have the transcript the 1st time around
+    # if the allele_info has already linked to an allele
+    # call this to make sure the allele gets set
+    classification.apply_allele_info_to_classification()
 
-    liftover_classification_import(vc_import, ImportSource.WEB)
     return classification
 
 

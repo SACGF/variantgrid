@@ -304,7 +304,7 @@ class ClassificationGroup:
     def has_matching_error(self) -> bool:
         # TODO have it tell you how many
         for mod in self.modifications:
-            if not mod.classification.allele_info.latest_validation.include:
+            if not mod.classification.allele_info or not mod.classification.allele_info.latest_validation.include:
                 return True
         return False
 

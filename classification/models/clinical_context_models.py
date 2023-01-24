@@ -393,23 +393,10 @@ class ClinicalContext(FlagsMixin, TimeStampedModel):
     def is_default(self) -> bool:
         return self.name == ClinicalContext.default_name
 
-    # @staticmethod
-    # def default_group_for(variant: Variant) -> Optional['ClinicalContext']:
-    #     if variant.allele:
-    #         dg, _ = ClinicalContext.objects.get_or_create(allele=variant.allele, name=ClinicalContext.default_name)
-    #         return dg
-    #     print("Warning, classification variant doesn't have allele")
-    #     return None
-
     @staticmethod
     def default_group_for_allele(allele: Allele) -> 'ClinicalContext':
         dg, _ = ClinicalContext.objects.get_or_create(allele=allele, name=ClinicalContext.default_name)
         return dg
-
-    # @staticmethod
-    # def for_variant(variant: Variant) -> QuerySet:
-    #     ClinicalContext.default_group_for(variant)  # ensure we always have the default group
-    #     return ClinicalContext.objects.filter(allele=variant.allele).order_by('created')
 
     @property
     def classifications_qs(self) -> QuerySet[Classification]:

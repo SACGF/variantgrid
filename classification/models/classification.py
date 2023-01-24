@@ -122,10 +122,10 @@ class ClassificationImportAlleleSource(AlleleSource):
                                                 variantallele__allele__in=allele_qs)
         populate_clingen_alleles_for_variants(genome_build, build_variants)
 
-        #Classification.relink_variants(self.classification_import)
         ImportedAlleleInfo.relink_variants(self.classification_import)
-        variants_classification_changed_signal.send(sender=Classification,
-                                                    variants=build_variants, genome_build=genome_build)
+        # the event below should be fired by relink_variants
+        # variants_classification_changed_signal.send(sender=Classification,
+        #                                             variants=build_variants, genome_build=genome_build)
 
         report_event('Completed import liftover',
                      extra_data={'liftover_id': self.pk, 'allele_count': allele_qs.count()})
@@ -746,12 +746,16 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         self.allele = allele
 
     def ensure_allele_info(self) -> Optional[ImportedAlleleInfo]:
+        return self.ensure_allele_info_with_created()[0]
+
+    def ensure_allele_info_with_created(self) -> Tuple[Optional[ImportedAlleleInfo], bool]:
+        created = False
         if not self.allele_info:
             try:
                 genome_build_patch_version = self.get_genome_build_patch_version()
             except Exception:
                 # no allele info if we can't derive a genome build
-                return None
+                return None, False
 
             fields = {"imported_genome_build_patch_version": genome_build_patch_version}
             if c_hgvs := self.imported_c_hgvs:
@@ -761,11 +765,12 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 fields["imported_transcript"] = self.transcript
             else:
                 # need either c.hgvs, g.hgvs (in future, re-support variant_coordinate)
-                return None
+                return None, False
 
             allele_info = ImportedAlleleInfo.get_or_create(**fields)
             self.allele_info = allele_info
-        return self.allele_info
+            created = True
+        return self.allele_info, created
 
     def update_allele_info_from_classification(self, force_update: bool = False) -> bool:
         """
@@ -794,7 +799,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         :return: True if there's nothing more to do, False if this may still require matching
         """
         allele_info = self.ensure_allele_info()
-        self._apply_allele_info_to_classification()
+        self.apply_allele_info_to_classification()
         return allele_info.status in {ImportedAlleleInfoStatus.MATCHED_ALL_BUILDS, ImportedAlleleInfoStatus.FAILED}
 
     def set_variant_prepare_for_rematch(self, classification_import: ClassificationImport):
@@ -805,7 +810,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
     def set_variant_failed_matching(self, message: Optional[str] = None):
         if allele_info := self.ensure_allele_info():
             allele_info.set_matching_failed(message=message)
-            self._apply_allele_info_to_classification()
+            self.apply_allele_info_to_classification()
 
     @transaction.atomic()
     def set_variant(self, variant: Variant = None, message: str = None):
@@ -827,13 +832,13 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         if allele_info := self.ensure_allele_info():
             allele_info.set_variant_and_save(matched_variant=variant, message=message, force_update=True)
             # update the allele info, then update the classification based on the allele info
-            self._apply_allele_info_to_classification()
+            self.apply_allele_info_to_classification()
         else:
             raise ValueError("Can't derive GenomeBuild, can't make AlleleInfo, therfore can't set_variant")
 
-    def _apply_allele_info_to_classification(self):
+    def apply_allele_info_to_classification(self):
         if not self.allele_info:
-            raise ValueError("Can't _apply_allele_info when no allele_info has been set")
+            raise ValueError("Can't apply_allele_info when no allele_info has been set")
 
         allele_or_variant_changed = False
         variant: Optional[Variant] = None
@@ -847,15 +852,6 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             self.allele = self.allele_info.allele
             self.variant = variant
             self.save()
-
-
-    def allele_classification_changed(self):
-        """ Notifies all variants linked to allele that the classification has changed """
-        if self.allele:
-            for variant_allele in self.allele.variant_alleles():
-                variants_classification_changed_signal.send(sender=Classification,
-                                                            variants=[variant_allele.variant],
-                                                            genome_build=variant_allele.genome_build)
 
     @property
     def share_level_enum(self) -> ShareLevel:
@@ -2561,9 +2557,6 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
             newly_published=self,
             user=user,
             debug_timer=debug_timer)
-
-        if previously_published and previously_published.clinical_significance != vc.clinical_significance:
-            vc.allele_classification_changed()
 
         vc.refresh_from_db()
         return True
