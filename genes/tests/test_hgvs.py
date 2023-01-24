@@ -11,7 +11,7 @@ from genes.hgvs import HGVSMatcher, FakeTranscriptVersion, HGVSNameExtra
 from snpdb.models import GenomeBuild
 
 
-class TestAnnotationVCF(TestCase):
+class TestHGVS(TestCase):
 
     def test_clean_hgvs(self):
         BAD_HGVS = [
@@ -43,7 +43,7 @@ class TestAnnotationVCF(TestCase):
             except:
                 pass  # Expected
 
-            fixed_hgvs = HGVSMatcher.clean_hgvs(bad_hgvs)
+            fixed_hgvs = HGVSMatcher.clean_hgvs(bad_hgvs)[0]
             HGVSName(fixed_hgvs)
 
     def test_format_hgvs_remove_long_ref(self):
