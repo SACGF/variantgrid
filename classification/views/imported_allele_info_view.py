@@ -46,8 +46,16 @@ class ImportedAlleleInfoColumns(DatatableConfig[ImportedAlleleInfo]):
                 return {
                     "full": c_hgvs_str
                 }
-        elif not variant_id:
-            return {"error": "Not resolved to a variant"}
+        elif data.key == 'imported_c_hgvs':
+            if g_hgvs := data.get('imported_g_hgvs'):
+                return {"full": f'(g.HGVS) {g_hgvs}'}
+            else:
+                return {"full": None}
+        elif not error:
+            if not data.get('variant_coordinate'):
+                return {"error": "Could not derive variant coordinates"}
+            else:
+                return {"error": "Not resolved to a variant"}
         else:
             return {"error": error}
 
@@ -72,7 +80,8 @@ class ImportedAlleleInfoColumns(DatatableConfig[ImportedAlleleInfo]):
                 label='Imported<br/>c.HGVS',
                 orderable=True,
                 renderer=self.render_c_hgvs,
-                client_renderer='VCTable.hgvs'
+                client_renderer='VCTable.hgvs',
+                extra_columns=['imported_g_hgvs', 'variant_coordinate']
             ),
             RichColumn(
                 key='grch37__c_hgvs',
