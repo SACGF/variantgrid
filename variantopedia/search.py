@@ -630,62 +630,61 @@ def _search_hgvs_using_gene_symbol(gene_symbol, search_messages,
 def search_hgvs(search_string: str, user: User, genome_build: GenomeBuild, variant_qs: QuerySet, **kwargs) -> VARIANT_SEARCH_RESULTS:
     hgvs_matcher = HGVSMatcher(genome_build)
     classify = kwargs.get("classify")
+    # can add on search_message to objects to (stop auto-jump and show message)
+    initial_score = 0
+    hgvs_string = search_string
+    original_hgvs_string = hgvs_string
+    variant_tuple = None
+    used_transcript_accession = None
+    kind = None
+    hgvs_string, search_messages = HGVSMatcher.clean_hgvs(hgvs_string)
+
     try:
-        # can add on search_message to objects to (stop auto-jump and show message)
-        initial_score = 0
-        hgvs_string = search_string
-        original_hgvs_string = hgvs_string
-        variant_tuple = None
-        used_transcript_accession = None
-        kind = None
-        hgvs_string, search_messages = HGVSMatcher.clean_hgvs(hgvs_string)
-
-        try:
-            variant_tuple, used_transcript_accession, kind, method = hgvs_matcher.get_variant_tuple_used_transcript_kind_and_method(hgvs_string)
-        except (ValueError, NotImplementedError) as hgvs_error:
-            try:
-                if gene_symbol := hgvs_matcher.get_gene_symbol_if_no_transcript(hgvs_string):
-                    if results := _search_hgvs_using_gene_symbol(gene_symbol, search_messages,
-                                                                 hgvs_string, user, genome_build, variant_qs):
-                        return results
-            except InvalidHGVSName:
-                # might just not be a HGVS name at all
-                pass
-
-            if variant_tuple is None:
-                if classify:
-                    search_message = f"Error reading HGVS: '{hgvs_error}'"
-                    return [SearchResult(ClassifyNoVariantHGVS(genome_build, original_hgvs_string), message=search_message)]
-
-        if used_transcript_accession and used_transcript_accession not in hgvs_string:
-            search_messages.append(f"Warning: Used transcript version '{used_transcript_accession}'")
-
-        # TODO: alter initial_score based on warning messages of alt not matching?
-        # also - _lrg_get_variant_tuple should add matches_reference to search warnings list
-
-        try:
-            results = get_results_from_variant_tuples(variant_qs, variant_tuple)
-            variant = results.get()
-            if classify:
-                transcript_id = hgvs_matcher.get_transcript_id(hgvs_string,
-                                                               transcript_version=False)
-                return [SearchResult(ClassifyVariant(variant, transcript_id),
-                                     message=search_messages, initial_score=initial_score)]
-            return [SearchResult(variant, message=search_messages, initial_score=initial_score,
-                                 is_single_build=kind == 'g')]
-        except Variant.DoesNotExist:
-            variant_string = Variant.format_tuple(*variant_tuple)
-            variant_string_abbreviated = Variant.format_tuple(*variant_tuple, abbreviate=True)
-            search_messages.append(f"'{search_string}' resolved to {variant_string_abbreviated}")
-            results = [SearchResult(CreateManualVariant(genome_build, variant_string),
-                                    message=search_messages, initial_score=initial_score)]
-            results.extend(search_for_alt_alts(variant_qs, variant_tuple, search_messages))
-            return results
-
+        variant_tuple, used_transcript_accession, kind, method = hgvs_matcher.get_variant_tuple_used_transcript_kind_and_method(hgvs_string)
     except MissingTranscript:
-        pass
+        return []
     except Contig.ContigNotInBuildError:
-        pass  # g.HGVS from another genome build - can't fix just ignore
+        # g.HGVS from another genome build - can't fix just ignore
+        return []
+    except (ValueError, NotImplementedError) as hgvs_error:
+        try:
+            if gene_symbol := hgvs_matcher.get_gene_symbol_if_no_transcript(hgvs_string):
+                if results := _search_hgvs_using_gene_symbol(gene_symbol, search_messages,
+                                                             hgvs_string, user, genome_build, variant_qs):
+                    return results
+        except InvalidHGVSName:
+            # might just not be a HGVS name at all
+            pass
+
+        if variant_tuple is None:
+            if classify:
+                search_message = f"Error reading HGVS: '{hgvs_error}'"
+                return [SearchResult(ClassifyNoVariantHGVS(genome_build, original_hgvs_string), message=search_message)]
+
+    if used_transcript_accession and used_transcript_accession not in hgvs_string:
+        search_messages.append(f"Warning: Used transcript version '{used_transcript_accession}'")
+
+    # TODO: alter initial_score based on warning messages of alt not matching?
+    # also - _lrg_get_variant_tuple should add matches_reference to search warnings list
+
+    try:
+        results = get_results_from_variant_tuples(variant_qs, variant_tuple)
+        variant = results.get()
+        if classify:
+            transcript_id = hgvs_matcher.get_transcript_id(hgvs_string,
+                                                           transcript_version=False)
+            return [SearchResult(ClassifyVariant(variant, transcript_id),
+                                 message=search_messages, initial_score=initial_score)]
+        return [SearchResult(variant, message=search_messages, initial_score=initial_score,
+                             is_single_build=kind == 'g')]
+    except Variant.DoesNotExist:
+        variant_string = Variant.format_tuple(*variant_tuple)
+        variant_string_abbreviated = Variant.format_tuple(*variant_tuple, abbreviate=True)
+        search_messages.append(f"'{search_string}' resolved to {variant_string_abbreviated}")
+        results = [SearchResult(CreateManualVariant(genome_build, variant_string),
+                                message=search_messages, initial_score=initial_score)]
+        results.extend(search_for_alt_alts(variant_qs, variant_tuple, search_messages))
+        return results
 
 
 def search_for_alt_alts(variant_qs: QuerySet, variant_tuple: VariantCoordinate, messages: List[str]) -> VARIANT_SEARCH_RESULTS:
