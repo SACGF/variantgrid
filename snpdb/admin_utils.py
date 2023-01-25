@@ -110,7 +110,11 @@ def admin_model_action(url_slug: str, short_description: Optional[str] = None, i
     return decorator
 
 
-def admin_list_column(short_description: Optional[str] = None, order_field: Optional[str] = None):
+def admin_list_column(
+        short_description: Optional[str] = None,
+        order_field: Optional[str] = None,
+        is_boolean: bool = False
+        ):
     """
     Decorator, mark a function as acting like an admin list column if class extends ModelAdminBasics
     Note that the column still needs to be added to "list_display" because its' hard to order the data otherwise
@@ -126,6 +130,8 @@ def admin_list_column(short_description: Optional[str] = None, order_field: Opti
             wrapper.short_description = short_description
         if order_field:
             wrapper.admin_order_field = order_field
+        if is_boolean:
+            wrapper.boolean = True
         wrapper.__name__ = method.__name__
         wrapper.is_list_column = True
         return wrapper

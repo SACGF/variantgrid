@@ -663,23 +663,49 @@ class MatchingOnFilter(admin.SimpleListFilter):
         return queryset
 
 
+class ImportedAlleleInfoValidationInline(admin.TabularInline):
+    model = ImportedAlleleInfoValidation
+    fields = ['c_hgvs_37', 'c_hgvs_38', 'confirmed', 'include', 'validation_tags']
+    show_change_link = True
+
+    def is_readonly_field(self, f):
+        return True
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
 @admin.register(ImportedAlleleInfo)
 class ImportedAlleleInfoAdmin(ModelAdminBasics):
     list_display = (
         "imported_hgvs",
         "imported_genome_build_patch_version",
         "status",
+        "validation_include",
         "grch37",
         "grch38",
         "variant_coordinate"
     )
     list_filter = ('imported_genome_build_patch_version', 'status', MatchingOnFilter)
     search_fields = ('imported_c_hgvs', 'imported_g_hgvs')
+    inlines = (ImportedAlleleInfoValidationInline,)
 
 
     @admin_list_column("Imported HGVS", "imported_c_hgvs")
     def imported_hgvs(self, obj: ImportedAlleleInfo):
         return obj.imported_c_hgvs or obj.imported_g_hgvs
+
+    @admin_list_column("Include in Exports", "latest_validation__include", is_boolean=True)
+    def validation_include(self, obj: ImportedAlleleInfo):
+        if latest_validation := obj.latest_validation:
+            return latest_validation.include
+        return False
 
     @admin_action("Re-Match")
     def re_match(self, request, queryset: QuerySet[ImportedAlleleInfo]):
@@ -696,7 +722,14 @@ class ImportedAlleleInfoAdmin(ModelAdminBasics):
     def update_variant_coordinate(self, request, queryset: QuerySet[ImportedAlleleInfo]):
         for allele_info in queryset:
             allele_info.update_variant_coordinate()
+            allele_info.apply_validation(force_update=True)
             allele_info.update_status()
+            allele_info.save()
+
+    @admin_action("Validate")
+    def validate(self, request, queryset: QuerySet[ImportedAlleleInfo]):
+        for allele_info in queryset:
+            allele_info.apply_validation(force_update=True)
             allele_info.save()
 
     def has_add_permission(self, request):

@@ -777,6 +777,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
 
     def update_allele_info_from_classification(self, force_update: bool = False) -> bool:
         """
+        DEPRECATED
         Only to be called during migration from classification taking care of the matching to allele_info having the data
         """
         if self.allele_info:

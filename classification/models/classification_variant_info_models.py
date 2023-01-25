@@ -442,6 +442,7 @@ class ImportedAlleleInfo(TimeStampedModel):
             allele_info, created = ImportedAlleleInfo.objects.get_or_create(**kwargs)
             if created:
                 allele_info.update_variant_coordinate()
+                allele_info.apply_validation()
                 allele_info.save()
             return allele_info
         except ImportedAlleleInfo.MultipleObjectsReturned as me:
@@ -531,6 +532,7 @@ class ImportedAlleleInfo(TimeStampedModel):
         else:
             self.status = ImportedAlleleInfoStatus.MATCHED_IMPORTED_BUILD
 
+        self.apply_validation()
         self.save()
         allele_info_changed_signal.send(sender=ImportedAlleleInfo, allele_info=self)
 
