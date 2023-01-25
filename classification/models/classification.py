@@ -483,6 +483,13 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         return ImportedAlleleInfo.is_supported_transcript(transcript_or_hgvs)
 
     @property
+    def include_based_on_allele_info(self) -> bool:
+        if allele_info := self.allele_info:
+            if validation := allele_info.latest_validation:
+                return validation.include
+        return False
+
+    @property
     def chgvs_grch37(self) -> Optional[str]:
         try:
             return self.allele_info.grch37.c_hgvs

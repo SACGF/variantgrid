@@ -276,21 +276,14 @@ class ClassificationGroup:
     def variant_sort(self) -> str:
         return self.c_hgvs.sort_str
 
-
     @property
     def c_hgvs(self) -> CHGVS:
         return self.c_hgvses[0]
 
-
     @property
     def has_matching_error(self) -> bool:
-        # TODO have it tell you how many
-        for mod in self.modifications:
-            if allele_info := mod.classification.allele_info:
-                if latest_validation := allele_info.latest_validation:
-                    if not latest_validation.include:
-                        return False
-        return True
+        # TODO have it tell you how many modifications didn't pass include test
+        return any(not mod.classification.include_based_on_allele_info for mod in self.modifications)
 
     @cached_property
     def variant_matching_issues(self) -> bool:
