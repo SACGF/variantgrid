@@ -52,8 +52,9 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
                     p_hgvs = p_hgvs[p_dot::]
             response['p_hgvs'] = p_hgvs
 
-        if allele_id := row.get('classification__allele_info__allele_id'):
-            response['allele_id'] = allele_id;
+        response['allele_id'] = row.get('classification__allele_info__allele_id')
+        response['allele_info_id'] = row.get('classification__allele_info__id')
+        response['validation_include'] = row.get('classification__allele_info__latest_validation__include')
 
         return response
 
@@ -139,7 +140,9 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
                     'published_evidence__c_hgvs__value',
                     'published_evidence__p_hgvs__value',
                     'published_evidence__genome_build__value',
+                    'classification__allele_info__id',
                     'classification__allele_info__allele_id',
+                    'classification__allele_info__latest_validation__include'
                 ]
             ),
             RichColumn(

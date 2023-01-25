@@ -2101,6 +2101,8 @@ VCTable.hgvs = (data, type, row) => {
     let allele = parts.allele;
     let variantId = parts.variant_id;
     let alleleId = parts.allele_id;
+    let validationInclude = parts.validation_include;
+    let alleleInfoId = parts.allele_info_id;
     let pHgvs = parts.p_hgvs;
     let url = null;
     let error = parts.error;
@@ -2163,6 +2165,16 @@ VCTable.hgvs = (data, type, row) => {
         cDom = $('<a>', {href: url, html: cDom});
     }
     dom.append(cDom);
+    if (validationInclude === false) {
+        $("<i>",
+            {
+                style: 'font-size:12pt',
+                class: 'text-danger fa-brands fa-searchengin ml-2',
+                title: 'This row will not appear in downloads due to outstanding variant matching issues'
+            }
+        ).appendTo(dom);
+    }
+
     if (pHgvs) {
         $('<span>', {class: 'd-block mt-1 text-secondary', text: limitLength(pHgvs)}).appendTo(dom);
     }
