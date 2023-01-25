@@ -18,6 +18,10 @@ from snpdb.models.models_genome import GenomeBuild
 
 
 class Command(BaseCommand):
+    """
+        This makes use of files produced by a spin-off project: cdot
+        @see https://github.com/SACGF/cdot
+    """
     BATCH_SIZE = 2000
 
     def __init__(self, *args, **kwargs):
@@ -95,7 +99,10 @@ class Command(BaseCommand):
             release.releasegeneversion_set.all().delete()
             release.releasetranscriptversion_set.all().delete()
 
-        gene_version_ids_by_accession, transcript_version_ids_by_accession = self._get_gene_and_transcript_version_pk_lookups(genome_build, annotation_consortium)
+        gene_version_ids_by_accession = GeneVersion.id_by_accession(genome_build=genome_build,
+                                                                    annotation_consortium=annotation_consortium)
+        transcript_version_ids_by_accession = TranscriptVersion.id_by_accession(genome_build=genome_build,
+                                                                                annotation_consortium=annotation_consortium)
 
         release_transcript_version_list = []
         gene_versions_used_by_transcripts = set()
