@@ -1,10 +1,11 @@
 from django.contrib import admin
 from django.contrib.auth.models import User
 
-from snpdb.admin_utils import ModelAdminBasics
+from snpdb.admin_utils import ModelAdminBasics, admin_list_column
 from snpdb.models import ProcessingStatus
+from snpdb.user_settings_manager import UserSettingsManager
 from . import models
-from .models import UploadStep, UploadPipeline, UploadedFile, UploadedVCF
+from .models import UploadStep, UploadPipeline, UploadedFile, UploadedVCF, UploadedClassificationImport
 
 
 class UploadStepStatusFilter(admin.SimpleListFilter):
@@ -60,10 +61,42 @@ class UploadFileAdmin(ModelAdminBasics):
 
 @admin.register(UploadPipeline)
 class UploadPipelineAdmin(ModelAdminBasics):
-    list_display = ('uploaded_file', 'status')
+    list_display = ('id', 'uploaded_file_name', 'uploaded_file_date', 'status')
     inlines = (UploadStepInline, )
+
+    @admin_list_column('File Name', order_field='uploaded_file__name')
+    def uploaded_file_name(self, obj: UploadPipeline):
+        if uploaded_file := obj.uploaded_file:
+            return uploaded_file.name
+
+    @admin_list_column('File Date', order_field='uploaded_file__created')
+    def uploaded_file_date(self, obj: UploadPipeline):
+        if uploaded_file := obj.uploaded_file:
+            timezoned = uploaded_file.created.astimezone(UserSettingsManager.get_user_timezone())
+            return f"{timezoned.strftime('%Y-%m-%d %H:%M:%S %z')}"
 
 
 @admin.register(UploadedVCF)
 class UploadedVCFAdmin(ModelAdminBasics):
     list_display = ('id', 'uploaded_file', 'upload_pipeline', 'vcf')
+
+
+@admin.register(UploadedClassificationImport)
+class UploadedClassificationImportAdmin(ModelAdminBasics):
+    list_display = ('id', 'uploaded_file_name', 'uploaded_file_date', 'classification_import', 'classification_import_allele_info_count')
+
+    @admin_list_column('File Name', order_field='uploaded_file__name')
+    def uploaded_file_name(self, obj: UploadedClassificationImport):
+        if uploaded_file := obj.uploaded_file:
+            return uploaded_file.name
+
+    @admin_list_column('File Date', order_field='uploaded_file__created')
+    def uploaded_file_date(self, obj: UploadedClassificationImport):
+        if uploaded_file := obj.uploaded_file:
+            timezoned = uploaded_file.created.astimezone(UserSettingsManager.get_user_timezone())
+            return f"{timezoned.strftime('%Y-%m-%d %H:%M:%S %z')}"
+
+    @admin_list_column('Outstanding Allele Info Count')
+    def classification_import_allele_info_count(self, obj: UploadedClassificationImport):
+        if classification_import := obj.classification_import:
+            return classification_import.importedalleleinfo_set.count()

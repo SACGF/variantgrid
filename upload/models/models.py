@@ -30,6 +30,7 @@ from snpdb.import_status import set_vcf_and_samples_import_status
 from snpdb.models import VCF, Variant, SoftwareVersion, GenomeBuild
 from snpdb.models.models_enums import ImportSource, ProcessingStatus, ImportStatus
 from snpdb.tasks.soft_delete_tasks import soft_delete_vcfs
+from snpdb.user_settings_manager import UserSettingsManager
 from upload.models.models_enums import UploadedFileTypes, VCFPipelineStage, \
     UploadStepTaskType, TimeFilterMethod, VCFImportInfoSeverity, UploadStepOrigin
 from variantgrid.celery import app
@@ -80,7 +81,7 @@ class UploadedFile(TimeStampedModel):
         self.save()
 
     def __str__(self):
-        description = f"{self.name} ({self.created})"
+        description = f"{self.name} ({self.created.astimezone(UserSettingsManager.get_user_timezone())})"
         return description
 
 

@@ -103,6 +103,9 @@ class ClassificationImport(models.Model):
     def get_variants_qs(self) -> QuerySet[Variant]:
         return Variant.objects.filter(pk__in=ImportedAlleleInfo.objects.filter(classification_import=self).values_list('matched_variant', flat=True))
 
+    def __str__(self):
+        return f"ClassificationImport ({self.genome_build})"
+
 
 class ClassificationImportAlleleSource(AlleleSource):
     """ A model to indicate that variants need to be linked to an allele and lifted over to other builds """
