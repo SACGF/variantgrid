@@ -1,8 +1,9 @@
 {% load user_tags %}
 {% load ui_menus %}
 
+
 {% menu_item 'activity' admin_only=True %}
-{% menu_item 'hgvs_issues' title="HGVS Issues" admin_only=True %}
+{% menu_item 'view_imported_allele_info' title="HGVS Issues" admin_only=True %}
 {% menu_item 'clinvar_match' title="ClinVar Match" admin_only=True %}
 {% menu_item 'classification_import_tool' title="Import Test" admin_only=True %}
 {% menu_item 'condition_match_test' title="Condition Test" admin_only=True other_urls="condition_obsoletes" %}
