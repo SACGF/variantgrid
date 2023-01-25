@@ -19,11 +19,16 @@ from snpdb.models import GenomeBuild, Variant, Allele, GenomeBuildPatchVersion, 
 
 
 allele_info_changed_signal = django.dispatch.Signal()  # args: "allele_info": ImportedAlleleInfoChangedEvent
+"""
+A signal to fire when an AlleleInfo changes what it resolves to.
+post_save seemed like it might be a little too easy to trigger.
+"""
 
 
 class ResolvedVariantInfo(TimeStampedModel):
     """
-    Stores information about a genome_build_patch_version/allele combo, generally stuff we have to have access quickly for sorting classifications
+    Stores information about a genome_build_patch_version/allele combo, generally stuff we have to have access quickly for sorting classifications.
+    Is attached to AlleleInfo (which is the object mostly in charge)
     """
 
     allele_info = ForeignKey('ImportedAlleleInfo', on_delete=CASCADE, null=True, blank=True, related_name='+')
@@ -100,7 +105,6 @@ class ResolvedVariantInfo(TimeStampedModel):
             self.gene_symbol = GeneSymbol.objects.filter(symbol=c_hgvs_obj.gene_symbol).first()
         except Exception as exeception:
             self.error = str(exeception)
-            # can't map between builds
             report_exc_info(extra_data={
                 "genome_build": genome_build.name,
                 "variant": str(variant),
@@ -126,15 +130,29 @@ class ResolvedVariantInfo(TimeStampedModel):
 
 class ImportedAlleleInfoStatus(TextChoices):
     PROCESSING = "P", "Processing"
+    """ The initial status for an ImportedAlleleInfo """
+
     MATCHED_IMPORTED_BUILD = "I", "Matched Imported Variant"
+    """ We have a variant for the imported build, but not yet lifted it over """
+
     MATCHED_ALL_BUILDS = "M", "Matched All Builds"
+    """ There's a 37 and 38 variant linked """
+
     FAILED = "F", "Failed"
 
 
 ALLELE_INFO_VALIDATION_SEVERITY = Literal["W", "E"]
+"""
+Used in validation tag JSON to indicate if the error type is fatal or not.
+If an error is W or E is based on configuration. If that configuration changes
+the linked AlleleInfos will need to be revalidated.
+
+TODO: Should I use an str, Enum instead of Literal for the sake of PyCharm introspection
+"""
 
 
 _VALIDATION_TO_SEVERITY: [str, ALLELE_INFO_VALIDATION_SEVERITY] = {
+    'transcript_type_not_supported': "E",
     'transcript_id_change': "E",
     'transcript_version_change': "W",
     'gene_symbol_change': "E",
@@ -156,17 +174,26 @@ class ImportedAlleleValidationTagsBuilds(TypedDict, total=False):
     missing_38: ALLELE_INFO_VALIDATION_SEVERITY
 
 
+class ImportedAlleleValidationTagsGeneral(TypedDict, total=False):
+    transcript_type_not_supported: ALLELE_INFO_VALIDATION_SEVERITY
+
+
 class ImportedAlleleInfoValidationTags(TypedDict, total=False):
     normalize: ImportedAlleleValidationTagsDiff
     liftover: ImportedAlleleValidationTagsDiff
     builds: ImportedAlleleValidationTagsBuilds
+    general: ImportedAlleleValidationTagsGeneral
 
 
 @dataclass(frozen=True)
 class ImportedAlleleInfoValidationTagEntry:
+    """
+    For converting JSON of validation tags into a list of different entries
+    """
+
     category: str
     field: str
-    severity: str
+    severity: ALLELE_INFO_VALIDATION_SEVERITY
 
     @property
     def category_pretty(self) -> str:
@@ -327,6 +354,9 @@ class ImportedAlleleInfo(TimeStampedModel):
         if builds:
             validation_dict["builds"] = builds
 
+        if not ImportedAlleleInfo.is_supported_transcript(self.get_transcript):
+            validation_dict["general"] = {"transcript_type_not_supported":_VALIDATION_TO_SEVERITY.get("transcript_type_not_supported", "E")}
+
         return validation_dict
 
     def apply_validation(self, force_update: bool = False):
@@ -373,6 +403,15 @@ class ImportedAlleleInfo(TimeStampedModel):
         elif self.imported_c_hgvs:
             return CHGVS(self.imported_c_hgvs).transcript
 
+    @staticmethod
+    def is_supported_transcript(transcript_or_hgvs: str):
+        if not transcript_or_hgvs:
+            return False
+        for transcript_type in settings.VARIANT_CLASSIFICATION_SUPPORTED_TRANSCRIPTS:
+            if transcript_or_hgvs.startswith(transcript_type):
+                return True
+        return False
+
     def __str__(self) -> str:
         return f"{self.imported_genome_build_patch_version} {self.imported_c_hgvs or self.imported_g_hgvs}"
 
@@ -398,21 +437,10 @@ class ImportedAlleleInfo(TimeStampedModel):
     def __setitem__(self, key: GenomeBuild, value: Optional[ResolvedVariantInfo]):
         setattr(self, ImportedAlleleInfo.__genome_build_to_attr(key), value)
 
-    @staticmethod
-    def is_supported_transcript(transcript_or_hgvs: str):
-        for transcript_type in settings.VARIANT_CLASSIFICATION_SUPPORTED_TRANSCRIPTS:
-            if transcript_or_hgvs.startswith(transcript_type):
-                return True
-        return False
-
     def update_variant_coordinate(self):
         # TODO, support variant_coordinate being provided
-        if transcript := self.get_transcript:
-            if not ImportedAlleleInfo.is_supported_transcript(transcript):
-                self.message = "Unsupported transcript - will not attempt variant match"
-                self.status = ImportedAlleleInfoStatus.FAILED
-                # TODO - should we still attempt deriving the variant?
-                return
+        # Code used to check to see if transcript was supported here
+        # but it's better to do that in the validation step
 
         use_hgvs = self.imported_c_hgvs or self.imported_g_hgvs
         try:

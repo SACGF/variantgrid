@@ -111,6 +111,8 @@ class ImportedAlleleInfoColumns(DatatableConfig[ImportedAlleleInfo]):
         )
 
     def filter_queryset(self, qs: QuerySet[ImportedAlleleInfo]) -> QuerySet[ImportedAlleleInfo]:
+        if (transcript_type_not_supported := self.get_query_param('transcript_type_not_supported')) and transcript_type_not_supported == 'true':
+            qs = qs.filter(latest_validation__validation_tags__general__transcript_type_not_supported__isnull=False)
         if (transcript_version_change := self.get_query_param('transcript_version_change')) and transcript_version_change == 'true':
             qs = qs.filter(latest_validation__validation_tags__normalize__transcript_version_change__isnull=False) | \
                  qs.filter(latest_validation__validation_tags__liftover__transcript_version_change__isnull=False)
