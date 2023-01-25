@@ -19,6 +19,7 @@ from django.conf import settings
 from django.core.cache import cache
 from django.db.models import Max, Min
 from pyhgvs import HGVSName
+from pyhgvs.models.hgvs_name import get_refseq_type
 from pyhgvs.utils import make_transcript
 
 from genes.models import TranscriptVersion, TranscriptParts, Transcript, GeneSymbol, LRGRefSeqGene, BadTranscript, \
@@ -993,18 +994,10 @@ class HGVSMatcher:
             search_messages.append(f"Warning: Cleaned '{hgvs_string}' => '{cleaned_hgvs}'")
 
         try:
-            hgvs_name = HGVSName(cleaned_hgvs)
-            if fixed_hgvs := cls.fix_swapped_gene_transcript(hgvs_name):
-                search_messages.append(f"Warning: swapped gene/transcript, ie '{cleaned_hgvs}' => '{fixed_hgvs}'")
+            fixed_hgvs, fixed_messages = cls.fix_gene_transcript(cleaned_hgvs)
+            if fixed_hgvs != cleaned_hgvs:
+                search_messages.extend(fixed_messages)
                 cleaned_hgvs = fixed_hgvs
-
-            hgvs_name = HGVSName(cleaned_hgvs)
-            if transcript := hgvs_name.transcript:
-                uc_transcript = transcript.upper()
-                if uc_transcript != transcript:
-                    search_messages.append(f"Warning: uppper cased transcript from '{transcript}' => '{uc_transcript}'")
-                    hgvs_name.transcript = uc_transcript
-                    cleaned_hgvs = hgvs_name.format()
 
         except ValueError:
             pass
@@ -1012,30 +1005,43 @@ class HGVSMatcher:
         return cleaned_hgvs, search_messages
 
     @classmethod
-    def fix_swapped_gene_transcript(cls, hgvs_name: HGVSName) -> Optional[str]:
-        """ Fix common case of 'GATA2(NM_032638.5):c.1082G>C' - returns nothing if swap wasn't ok """
+    def fix_gene_transcript(cls, hgvs_string: str) -> Tuple[str, List[str]]:
+        """ Fix common case of 'GATA2(NM_032638.5):c.1082G>C' and lower case transcript IDs """
 
-        transcript = hgvs_name.transcript
-        gene = hgvs_name.gene
-        if transcript and gene and transcript != gene:
-            transcript_id, _ = TranscriptVersion.get_transcript_id_and_version(transcript.upper())
-            if Transcript.objects.filter(pk=transcript_id).exists():
-                return  # Normal transcript
-
-            # GATA2(NM_032638.5):c.1082G>C => transcript=GATA2, gene=NM_032638.5
-            # GATA2:c.1082G>C => transcript='', gene=GATA2
-
-            transcript_id, _ = TranscriptVersion.get_transcript_id_and_version(gene.upper())
-            if Transcript.objects.filter(pk=transcript_id).exists():  # gene is transcript
+        # lower case transcripts w/o genes will be assigned as gene by pyHGVS
+        fixed_messages = []
+        hgvs_name = HGVSName(hgvs_string)
+        transcript_ok = HGVSMatcher._looks_like_transcript(hgvs_name.transcript)
+        if not transcript_ok and hgvs_name.gene:
+            # fix gene/transcript swap and lower case separately to get separate warnings.
+            if HGVSMatcher._looks_like_transcript(hgvs_name.gene.upper()):  # Need to upper here
                 old_transcript = hgvs_name.transcript
                 hgvs_name.transcript = hgvs_name.gene
-                if old_transcript and GeneSymbol.objects.filter(pk=old_transcript).exists():
-                    hgvs_name.gene = old_transcript  # Old transcript was a gene symbol
-                return hgvs_name.format()
+                hgvs_name.gene = old_transcript
+                if hgvs_name.gene:
+                    fixed_messages.append(f"Warning: swapped gene/transcript")
+                transcript_ok = HGVSMatcher._looks_like_transcript(hgvs_name.transcript)
 
-        # if GeneSymbol.objects.filter(pk=hgvs.gene).exists():
-        #    pass  # TODO: Need to work out canonical for gene
-        return None  # No fix
+        if not transcript_ok:
+            if hgvs_name.transcript:
+                uc_transcript = hgvs_name.transcript.upper()
+                if HGVSMatcher._looks_like_transcript(uc_transcript):
+                    hgvs_name.transcript = uc_transcript
+                    fixed_messages.append(f"Warning: Upper cased transcript")
+
+        return hgvs_name.format(), fixed_messages
+
+    @staticmethod
+    def _looks_like_transcript(prefix: str) -> bool:
+        """ copied from pyhgvs.models.hgvs_name.HGVSName.parse_prefix """
+        if prefix.startswith('ENST') or prefix.startswith('LRG_'):
+            return True
+
+        refseq_type = get_refseq_type(prefix)
+        if refseq_type in ('mRNA', 'RNA'):
+            return True
+
+        return False
 
     @classmethod
     def get_gene_symbol_if_no_transcript(cls, hgvs_name) -> Optional[GeneSymbol]:

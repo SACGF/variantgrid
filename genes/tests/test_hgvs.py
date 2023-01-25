@@ -46,6 +46,21 @@ class TestHGVS(TestCase):
             fixed_hgvs = HGVSMatcher.clean_hgvs(bad_hgvs)[0]
             HGVSName(fixed_hgvs)
 
+    def test_fix_gene_transcript(self):
+        swap_warning = "Warning: swapped gene/transcript"
+        uc_warning = "Warning: Upper cased transcript"
+
+        TEST_CASES = [
+            ("nm_000059.4:c.316+5G>A", [uc_warning]),
+            ("nm_000059.4(BRCA1):c.316+5G>A", [uc_warning]),
+            ("BRCA1(NM_000059.4):c.316+5G>A", [swap_warning]),
+            ("BRCA1(nm_000059.4):c.316+5G>A",  [swap_warning, uc_warning]),
+        ]
+        for hgvs_string, expected_warnings in TEST_CASES:
+            fixed_hgvs, fix_messages = HGVSMatcher.fix_gene_transcript(hgvs_string)
+            for ew in expected_warnings:
+                self.assertIn(ew, fix_messages, f"Warning for {hgvs_string}")
+
     def test_format_hgvs_remove_long_ref(self):
         LONG_AND_TRIMMED_HGVS = {  # 10bp
             "NM_000726.4(CACNB4):c.162_173delCTACACAAGCAGinsGA": "NM_000726.4(CACNB4):c.162_173delinsGA",
