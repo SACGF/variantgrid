@@ -288,8 +288,9 @@ class ClassificationGroup:
         for mod in self.modifications:
             if allele_info := mod.classification.allele_info:
                 if latest_validation := allele_info.latest_validation:
-                    return latest_validation.include
-        return False
+                    if not latest_validation.include:
+                        return False
+        return True
 
     @cached_property
     def variant_matching_issues(self) -> bool:
