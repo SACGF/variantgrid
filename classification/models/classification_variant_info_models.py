@@ -585,6 +585,7 @@ class ImportedAlleleInfo(TimeStampedModel):
             self.status = ImportedAlleleInfoStatus.MATCHED_IMPORTED_BUILD
 
         self.apply_validation()
+        self.update_status()
         self.save()
         allele_info_changed_signal.send(sender=ImportedAlleleInfo, allele_info=self)
 

@@ -718,13 +718,10 @@ class ImportedAlleleInfoAdmin(ModelAdminBasics):
         #    self.message_user(request, f'Records with missing or invalid builds/coordinates : {invalid_record_count}')
         #self.message_user(request, f'Classification Records re-matching : {valid_record_count}')
 
-    @admin_action("Update Variant Coordinate")
+    @admin_action("Recalc c.hgvs")
     def update_variant_coordinate(self, request, queryset: QuerySet[ImportedAlleleInfo]):
         for allele_info in queryset:
-            allele_info.update_variant_coordinate()
-            allele_info.apply_validation(force_update=True)
-            allele_info.update_status()
-            allele_info.save()
+            allele_info.refresh_and_save(force_update=True)
 
     @admin_action("Validate")
     def validate(self, request, queryset: QuerySet[ImportedAlleleInfo]):

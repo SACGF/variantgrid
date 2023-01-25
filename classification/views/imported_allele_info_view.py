@@ -1,3 +1,5 @@
+import operator
+from functools import reduce
 from typing import Optional
 
 from django.contrib.auth.decorators import user_passes_test
@@ -54,6 +56,8 @@ class ImportedAlleleInfoColumns(DatatableConfig[ImportedAlleleInfo]):
         elif not error:
             if not data.get('variant_coordinate'):
                 return {"error": "Could not derive variant coordinates"}
+            elif variant_id:
+                return {"error": "Resolved to variant, but no c.hgvs generated"}
             else:
                 return {"error": "Not resolved to a variant"}
         else:
@@ -151,11 +155,17 @@ class ImportedAlleleInfoColumns(DatatableConfig[ImportedAlleleInfo]):
 
     def power_search(self, qs: QuerySet[ImportedAlleleInfo], search_string: str) -> QuerySet[ImportedAlleleInfo]:
         # TODO, make RichColumn's searchable on/off so we can just fall back onto that
-        return qs.filter(
-            Q(imported_c_hgvs__icontains=search_string) | \
-            Q(grch37__c_hgvs=search_string) | \
+        ors = [
+            Q(imported_c_hgvs__icontains=search_string),
+            Q(grch37__c_hgvs=search_string),
             Q(grch38__c_hgvs=search_string)
-        )
+        ]
+        try:
+            id_int = int(search_string)
+            ors.append(Q(pk=id_int))
+        except ValueError:
+            pass
+        return qs.filter(reduce(operator.or_, ors))
 
 @user_passes_test(is_superuser)
 def view_imported_allele_info(request: HttpRequest) -> Response:
