@@ -1,9 +1,7 @@
-import logging
 from dataclasses import dataclass
 from datetime import timedelta
-from enum import Enum
 from typing import Optional, List, Dict, Any, TypedDict, Literal
-import django
+import django.dispatch
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.db.models import TextField, ForeignKey, CASCADE, SET_NULL, OneToOneField, TextChoices, \
@@ -16,6 +14,26 @@ from library.cache import timed_cache
 from library.log_utils import report_exc_info
 from library.utils import pretty_label
 from snpdb.models import GenomeBuild, Variant, Allele, GenomeBuildPatchVersion, VariantCoordinate
+
+"""
+Now we have
+Classifications
+- have a genome_build, c.hgvs when first created
+- attempt to avoid referring to classification.allele now, instead classification.allele_info.allele
+
+ImportedAlleleInfo
+- shared between classifications that have the same genome_build, c.hgvs
+- links to matched allele, and 37/38 variants
+
+ResolvedVariantInfo
+- is linked to ImportedAlleleInfo for a specific genome build
+- keeps cached information handy to access (c.hgvs, sort order, transcript version, gene_symbol)
+
+ImportedAlleleInfoValidation
+- keeps track of validation of imported c.hgvs vs resolved 37/38 c.hgvs and if record should be included in export
+- an importedAlleleInfo will link to the latest validation, but will also have a validation history in case
+the resolved 37/38 c.hgvs happens to have changed
+"""
 
 
 allele_info_changed_signal = django.dispatch.Signal()  # args: "allele_info": ImportedAlleleInfoChangedEvent
@@ -179,6 +197,9 @@ class ImportedAlleleValidationTagsGeneral(TypedDict, total=False):
 
 
 class ImportedAlleleInfoValidationTags(TypedDict, total=False):
+    """
+    Dictionary of outstanding validation issues linked to severity
+    """
     normalize: ImportedAlleleValidationTagsDiff
     liftover: ImportedAlleleValidationTagsDiff
     builds: ImportedAlleleValidationTagsBuilds
@@ -201,7 +222,7 @@ class ImportedAlleleInfoValidationTagEntry:
         # translate to en_AU
         if category == "normalize":
             category = "normalise"
-        return pretty_label(self.category)
+        return pretty_label(category)
 
     def field_pretty(self) -> str:
         return pretty_label(self.field).replace("C Nomen", "c.nomen")
@@ -217,7 +238,11 @@ class ImportedAlleleInfoValidation(TimeStampedModel):
     c_hgvs_38 = TextField(null=True, blank=True)
     include = BooleanField(null=False)  # don't provide a default - make sure it's calculated
     confirmed = BooleanField(default=False, blank=True)
-    """ Has a user manually set the include boolean to override the default calculation """
+    """
+    If confirmed=True, it indicates that a user has manually set (or agreed to) the value of 'include' and 'include'
+    will not automatically update.
+    The most common usage is to set include=True, confirmed=True if we work out that the 
+    """
     confirmed_by = ForeignKey(User, null=True, blank=True, on_delete=SET_NULL)
     confirmed_by_note = TextField(null=True, blank=True)
 
@@ -249,7 +274,6 @@ class ImportedAlleleInfoValidation(TimeStampedModel):
         self.include = ImportedAlleleInfoValidation.should_include(self.validation_tags)
         self.confirmed = False
         self.confirmed_by = None
-
 
 
 _DIFF_TO_VALIDATION_KEY = {
@@ -320,7 +344,7 @@ class ImportedAlleleInfo(TimeStampedModel):
     class Meta:
         unique_together = ('imported_c_hgvs', 'imported_g_hgvs', 'imported_transcript', 'imported_genome_build_patch_version')
 
-    def _calculate_validation(self) -> ImportedAlleleInfoValidation:
+    def _calculate_validation(self) -> ImportedAlleleInfoValidationTags:
         validation_dict: ImportedAlleleInfoValidationTags = {}
         imported_c_hgvs = self.imported_c_hgvs_obj
         normalized_c_hgvs: Optional[CHGVS] = None
@@ -355,13 +379,13 @@ class ImportedAlleleInfo(TimeStampedModel):
             validation_dict["builds"] = builds
 
         if not ImportedAlleleInfo.is_supported_transcript(self.get_transcript):
-            validation_dict["general"] = {"transcript_type_not_supported":_VALIDATION_TO_SEVERITY.get("transcript_type_not_supported", "E")}
+            validation_dict["general"] = {"transcript_type_not_supported": _VALIDATION_TO_SEVERITY.get("transcript_type_not_supported", "E")}
 
         return validation_dict
 
     def apply_validation(self, force_update: bool = False):
         """
-        Make sure to call .save() after this to be safe
+        Make sure to call .save() after this method
         """
         c_hgvs_37 = self.grch37.c_hgvs if self.grch37 else None
         c_hgvs_38 = self.grch38.c_hgvs if self.grch38 else None
@@ -369,7 +393,7 @@ class ImportedAlleleInfo(TimeStampedModel):
         update_existing_validation = False
         if check_latest := self.latest_validation:
             if check_latest.c_hgvs_37 == c_hgvs_37 and check_latest.c_hgvs_38 == c_hgvs_38:
-                # validation is already up to date, maybe add a force option to check that the validation dict is the same?
+                # validation is already up-to-date, maybe add a force option to check that the validation dict is the same?
                 if force_update:
                     update_existing_validation = True
                 else:
@@ -473,7 +497,7 @@ class ImportedAlleleInfo(TimeStampedModel):
                 allele_info.apply_validation()
                 allele_info.save()
             return allele_info
-        except ImportedAlleleInfo.MultipleObjectsReturned as me:
+        except ImportedAlleleInfo.MultipleObjectsReturned:
             # don't think this happens anymore, but just give us some better reporting if it does
             report_exc_info(extra_data={"kwargs": kwargs})
             raise
@@ -498,12 +522,12 @@ class ImportedAlleleInfo(TimeStampedModel):
         self.save()
 
     def set_variant_prepare_for_rematch(self, classification_import: 'ClassificationImport'):
+        self.status = ImportedAlleleInfoStatus.PROCESSING
+        self.update_variant_coordinate()
         self.classification_import = classification_import
         self.matched_variant = None
-        # TODO base preprare_for_rematch on status rather than if there variant is there
-        # so we can have less destructive rematches
         self.allele = None
-        self.status = ImportedAlleleInfoStatus.PROCESSING
+
 
     def refresh_and_save(self, force_update=False):
         """
@@ -566,7 +590,6 @@ class ImportedAlleleInfo(TimeStampedModel):
 
         return self
 
-
     def _update_variant(self, genome_build: GenomeBuild, variant: Variant, force_update: bool = False):
         if not self.allele or not variant:
             # we don't have an allele OR we don't have the corresponding variant, delete the VariantInfo
@@ -582,7 +605,7 @@ class ImportedAlleleInfo(TimeStampedModel):
                 self[genome_build] = ResolvedVariantInfo.get_or_create(self, genome_build, variant)
 
     @staticmethod
-    def relink_variants(vc_import: Optional['ClassificationImport'] = None) -> int:
+    def relink_variants(vc_import: Optional['ClassificationImport'] = None):
         """
             Call after import/liftover as variants may not have been processed enough at the time of "set_variant"
             Updates all records that have a variant but not cached c.hgvs values or no clinical context.
@@ -597,28 +620,4 @@ class ImportedAlleleInfo(TimeStampedModel):
 
         for allele_info in relink_qs:
             allele_info.refresh_and_save()
-            # TODO, do this via signal instead
-            for classification in allele_info.classification_set.all():
-                classification.apply_allele_info_to_classification()
-
-        logging.info("Bulk Update of variant relinking complete")
-
-        # tests = Q(allele_info__isnull=True)
-        # if GenomeBuild.grch37().is_annotated:
-        #     tests |= Q(allele_info__grch37__isnull=True)
-        # if GenomeBuild.grch38().is_annotated:
-        #     tests |= Q(allele_info__grch38__isnull=True)
-        #
-        # requires_relinking = Classification.objects.filter(tests)
-        # if vc_import:
-        #     requires_relinking = requires_relinking.filter(classification_import=vc_import)
-        #
-        # relink_count = requires_relinking.count()
-        #
-        # vc: Classification
-        # for vc in requires_relinking:
-        #     vc.set_variant(vc.variant)
-        #     vc.save()
-        #
-        # logging.info("Bulk Update of variant relinking complete")
-        # return relink_count
+            # note that refresh_and_save will update linked classifications

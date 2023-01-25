@@ -32,7 +32,7 @@
             {% endfor %}
         {% else %}No Validation Issues{% endif %}
     {% endlabelled %}
-    {% labelled label="Include" %}{{ allele_info.latest_validation.include | boolean }} {% admin_link allele_info.latest_validation %}{% endlabelled %}
+    {% labelled label="Include" %}{{ allele_info.latest_validation.include | boolean }} {% admin_link allele_info %}{% endlabelled %}
     {% if allele_info.latest_validation.confirmed %}
         {% labelled label="Confirmed By" %}{{ allele_info.latest_validation.confirmed_by }}{% endlabelled %}
         {% labelled label="Confirmed Note" %}{{ allele_info.latest_validation.confirmed_by_note | multi_line_text }}{% endlabelled %}

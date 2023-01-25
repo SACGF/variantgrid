@@ -95,7 +95,10 @@ class CreateNoClassificationForbidden(PermissionDenied):
 
 
 class ClassificationImport(models.Model):
-    """ A model to link together variant classifications that will need variant matching """
+    """
+    A model to link together allele infos that will need variant matching.
+    (Previously linked directly to Classifications, thus the name)
+    """
     created = models.DateTimeField(auto_now_add=True)
     user = models.ForeignKey(User, on_delete=CASCADE)
     genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)
@@ -126,9 +129,6 @@ class ClassificationImportAlleleSource(AlleleSource):
         populate_clingen_alleles_for_variants(genome_build, build_variants)
 
         ImportedAlleleInfo.relink_variants(self.classification_import)
-        # the event below should be fired by relink_variants
-        # variants_classification_changed_signal.send(sender=Classification,
-        #                                             variants=build_variants, genome_build=genome_build)
 
         report_event('Completed import liftover',
                      extra_data={'liftover_id': self.pk, 'allele_count': allele_qs.count()})
