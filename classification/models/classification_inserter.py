@@ -201,8 +201,9 @@ class BulkClassificationInserter:
                             # this combo of import data has already been resolved (or failed), either way, nothing more to do
                             pass
                         elif allele_info := record.allele_info:
-                            allele_info.set_variant_prepare_for_rematch(classification_import=self.import_for(genome_build=genome_build))
-                            allele_info.save()
+                            if allele_info.classification_import is None:
+                                allele_info.set_variant_prepare_for_rematch(classification_import=self.import_for(genome_build=genome_build))
+                                allele_info.save()
 
                         # classification_import = self.import_for(genome_build=genome_build, transcript=record.transcript)
                         # record.classification_import = classification_import
