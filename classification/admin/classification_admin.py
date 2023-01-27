@@ -285,7 +285,15 @@ class ClassificationAdmin(ModelAdminBasics):
 
     @admin_action("Matching: Re-Match Variant")
     def reattempt_variant_matching(self, request, queryset: QuerySet[Classification]):
-        valid_record_count, invalid_record_count = reattempt_variant_matching(request.user, queryset)
+        for classification in queryset:
+            _, created = classification.ensure_allele_info_with_created()
+            if created:
+                classification.save()
+
+        allele_info_ids = queryset.values_list('allele_info', flat=True)
+        allele_info_qs = ImportedAlleleInfo.objects.filter(id__in=allele_info_ids)
+
+        valid_record_count, invalid_record_count = reattempt_variant_matching(request.user, allele_info_qs)
         if invalid_record_count:
             self.message_user(request, f'Records with missing or invalid builds/coordinates : {invalid_record_count}')
         self.message_user(request, f'Records re-matching : {valid_record_count}')
