@@ -6,13 +6,13 @@ from django.db import transaction
 from django.utils.timezone import now
 
 from classification.enums import ShareLevel, ForceUpdate, SubmissionSource, SpecialEKeys
-from classification.models import ClassificationImport, Classification, ClassificationProcessError, ClassificationRef, \
+from classification.models import ClassificationImport, ClassificationProcessError, ClassificationRef, \
     EvidenceMixin, classification_flag_types, ClassificationJsonParams, ClassificationModification, \
     ClassificationPatchResponse, ClassificationImportRun
 from classification.models.classification_utils import ClassificationPatchStatus
 from classification.tasks.classification_import_task import process_classification_import_task
 from eventlog.models import create_event
-from library.log_utils import report_message, report_exc_info
+from library.log_utils import report_exc_info
 from library.utils import DebugTimer
 from snpdb.models import GenomeBuild, ImportSource
 
@@ -202,19 +202,7 @@ class BulkClassificationInserter:
                             pass
                         elif allele_info := record.allele_info:
                             if allele_info.classification_import is None:
-                                allele_info.set_variant_prepare_for_rematch(classification_import=self.import_for(genome_build=genome_build))
-                                allele_info.save()
-
-                        # classification_import = self.import_for(genome_build=genome_build, transcript=record.transcript)
-                        # record.classification_import = classification_import
-                        # mark the fact that we're searching for a variant
-                        # if not record.variant:
-                        #     if not classification_import:
-                        #         record.set_variant_failed_matching(
-                        #             message=f"Transcript {record.transcript} is not of a currently supported type",
-                        #             failed=True)
-                        #     else:
-                        #         # record.set_variant()
+                                allele_info.set_variant_prepare_for_rematch_and_save(classification_import=self.import_for(genome_build=genome_build))
 
                         record.save()
 

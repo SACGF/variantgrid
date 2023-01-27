@@ -6,7 +6,7 @@ from typing import List, Dict, Tuple, Any
 from django.contrib.auth.models import User
 from django.db.models import QuerySet
 
-from classification.models import ImportedAlleleInfo
+from classification.models import ImportedAlleleInfo, ImportedAlleleInfoStatus
 from classification.models.classification import ClassificationImport
 from classification.models.classification_import_run import ClassificationImportRun
 from classification.tasks.classification_import_process_variants_task import ClassificationImportProcessVariantsTask
@@ -43,14 +43,16 @@ def process_classification_import(classification_import: ClassificationImport, i
         pipeline to normalise and/or insert it.
 
         @see https://github.com/SACGF/variantgrid/wiki/Variant-Classification-Import-and-Liftover
-
         Batch variant classification submissions are broken up into 1 ClassificationImport per GenomeBuild """
 
     variant_pk_lookup = VariantPKLookup.factory(classification_import.genome_build)
     variant_tuples_by_hash: Dict[Any, VariantCoordinate] = {}
     allele_info_by_hash: Dict[Any, List[ImportedAlleleInfo]] = defaultdict(list)
 
-    no_variant_qs = classification_import.importedalleleinfo_set.filter(matched_variant__isnull=True)
+    # WARNING: previously only matched if the allele_info had no matched_variant
+    # (not sure we even have to filter on status of processing, as it shouldn't be part of a classificationImport
+    # if it doesn't want to be rematched)
+    no_variant_qs = classification_import.importedalleleinfo_set.filter(status=ImportedAlleleInfoStatus.PROCESSING)
     allele_info: ImportedAlleleInfo
     for allele_info in no_variant_qs:
         try:
@@ -163,7 +165,7 @@ def reattempt_variant_matching(user: User, queryset: QuerySet[ImportedAlleleInfo
                     imports_by_genome[genome_build.pk] = ClassificationImport.objects.create(user=user,
                                                                                              genome_build=genome_build)
                 vc_import = imports_by_genome[genome_build.pk]
-                allele_info.set_variant_prepare_for_rematch(vc_import)
+                allele_info.set_variant_prepare_for_rematch_and_save(vc_import)
                 allele_info.save()
                 valid_this_loop += 1
 

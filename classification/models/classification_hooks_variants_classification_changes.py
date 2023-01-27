@@ -34,8 +34,11 @@ def published(sender,
 
 
 @receiver(allele_info_changed_signal, sender=ImportedAlleleInfo)
-def allele_info_changed(sender, allele_info: ImportedAlleleInfo, **kwargs):
-    # update classifications
+def allele_info_changed_update_classifications(sender, allele_info: ImportedAlleleInfo, **kwargs):
+    """
+    An AlleleInfo has had its matching to a variant changed, apply the change to classifications linked
+    to the allele info, as well as calling variants_classification_changed_signal
+    """
     for classification in allele_info.classification_set.all():
         classification.apply_allele_info_to_classification()
         classification.save()

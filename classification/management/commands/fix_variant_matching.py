@@ -19,16 +19,17 @@ from snpdb.models import ImportSource, allele_flag_types
 class Command(BaseCommand):
 
     def add_arguments(self, parser):
-        parser.add_argument('--all', action='store_true', default=False, help='Attempt to rematch every single classification')
-        parser.add_argument('--file', type=str, help='If provided expects a csv where the first column is a combination of genome build and imported c.hgvs it expects to import')
-        parser.add_argument('--missing', action='store_true', default=False, help='Attempt to rematch only classifications not linked to a variant - one at a time')
+        # parser.add_argument('--all', action='store_true', default=False, help='Attempt to rematch every single classification')
+        # parser.add_argument('--file', type=str, help='If provided expects a csv where the first column is a combination of genome build and imported c.hgvs it expects to import')
+        # parser.add_argument('--missing', action='store_true', default=False, help='Attempt to rematch only classifications not linked to a variant - one at a time')
         parser.add_argument('--extra', action='store_true', default=False, help='Populate the allele_info of a classification')
-        parser.add_argument('--validation', action='store_true', default=False, help='Perform validation on the pre-existing normalising/liftovers')
+        # parser.add_argument('--validation', action='store_true', default=False, help='Perform validation on the pre-existing normalising/liftovers')
 
     def report_unmatched(self):
         print(f"Unmatched count = {Classification.objects.filter(variant__isnull=True).count()}")
 
     def handle(self, *args, **options):
+        print("Warning note that 'fix_variant_matching --extra' is the only valid parameter")
         mode_all = options.get('all')
         mode_missing = options.get('missing')
         mode_extra = options.get('extra')
@@ -54,53 +55,54 @@ class Command(BaseCommand):
         if mode_validation:
             self.handle_validation()
             return
-        if mode_missing:
-            batch_size = 1
-        elif mode_file:
-            header_row = True
-            import_keys = set()
-            with open(mode_file, 'r') as file_handle:
-                for row in csv.reader(file_handle):
-                    if header_row:
-                        if not row[0] == "Import Key":
-                            raise ValueError("Expected first column of file to be - 'Import Key'")
-                        header_row = False
-                    else:
-                        import_keys.add(row[0].strip())
-            print(f"Only running over import keys in file - {len(import_keys)}")
 
-        self.report_unmatched()
-
-        qs = Classification.objects.all().order_by('evidence__genome_build__value')
-        if mode_missing:
-            qs = qs.filter(variant__isnull=True)
-
-        user = admin_bot()
-
-        # setup a temporary import so discordance notifications are not sent out
-        try:
-            batch: List[Classification] = []
-            for c in qs:
-                if import_keys is not None:
-                    import_key = f"{c.get(SpecialEKeys.GENOME_BUILD) or ''}#{c.get(SpecialEKeys.C_HGVS) or ''}"
-                    if import_key not in import_keys:
-                        continue
-
-                c.revalidate(user=user)
-                batch.append(c)
-                row_count += 1
-
-                if len(batch) >= batch_size:
-                    self.handle_batch(batch)
-                    batch = []
-                    print(f"Handled {row_count}")
-
-            self.handle_batch(batch)
-            print(f"Handled {row_count}")
-            self.report_unmatched()
-            sleep(10)  # give time for variant matching to complete
-        finally:
-            ClassificationImportRun.record_classification_import("variant_rematching", 0, is_complete=True)
+        # if mode_missing:
+        #     batch_size = 1
+        # elif mode_file:
+        #     header_row = True
+        #     import_keys = set()
+        #     with open(mode_file, 'r') as file_handle:
+        #         for row in csv.reader(file_handle):
+        #             if header_row:
+        #                 if not row[0] == "Import Key":
+        #                     raise ValueError("Expected first column of file to be - 'Import Key'")
+        #                 header_row = False
+        #             else:
+        #                 import_keys.add(row[0].strip())
+        #     print(f"Only running over import keys in file - {len(import_keys)}")
+        #
+        # self.report_unmatched()
+        #
+        # qs = Classification.objects.all().order_by('evidence__genome_build__value')
+        # if mode_missing:
+        #     qs = qs.filter(variant__isnull=True)
+        #
+        # user = admin_bot()
+        #
+        # # setup a temporary import so discordance notifications are not sent out
+        # try:
+        #     batch: List[Classification] = []
+        #     for c in qs:
+        #         if import_keys is not None:
+        #             import_key = f"{c.get(SpecialEKeys.GENOME_BUILD) or ''}#{c.get(SpecialEKeys.C_HGVS) or ''}"
+        #             if import_key not in import_keys:
+        #                 continue
+        #
+        #         c.revalidate(user=user)
+        #         batch.append(c)
+        #         row_count += 1
+        #
+        #         if len(batch) >= batch_size:
+        #             self.handle_batch(batch)
+        #             batch = []
+        #             print(f"Handled {row_count}")
+        #
+        #     self.handle_batch(batch)
+        #     print(f"Handled {row_count}")
+        #     self.report_unmatched()
+        #     sleep(10)  # give time for variant matching to complete
+        # finally:
+        #     ClassificationImportRun.record_classification_import("variant_rematching", 0, is_complete=True)
 
     def sleep_for_delay(self):
         time.sleep(10)
@@ -114,99 +116,99 @@ class Command(BaseCommand):
                 c.save(update_modified=False)
         print(f"Finished {i} classifications")
 
-    def handle_validation(self):
-        def get_flag_comments(flag_type: FlagType, resolution_id: str) -> Dict[int, FlagComment]:
-            flag_dict: Dict[int, FlagComment] = {}
-            manual_closed_flag_comments = FlagComment.objects.filter(
-                flag__flag_type=flag_type,
-                resolution__id=resolution_id).exclude(user=admin_bot()) \
-                .select_related('flag', 'flag__collection')
-            for flag_comment in manual_closed_flag_comments:
-                flag_collection = flag_comment.flag.collection
-                # have to make sure we don't have an open flag of the type, only closed
-                if not flag_collection.get_open_flag_of_type(
-                        flag_type=classification_flag_types.matching_variant_warning_flag):
-                    flag_dict[flag_collection.pk] = flag_comment
-            return flag_dict
+    # def handle_validation(self):
+    #     def get_flag_comments(flag_type: FlagType, resolution_id: str) -> Dict[int, FlagComment]:
+    #         flag_dict: Dict[int, FlagComment] = {}
+    #         manual_closed_flag_comments = FlagComment.objects.filter(
+    #             flag__flag_type=flag_type,
+    #             resolution__id=resolution_id).exclude(user=admin_bot()) \
+    #             .select_related('flag', 'flag__collection')
+    #         for flag_comment in manual_closed_flag_comments:
+    #             flag_collection = flag_comment.flag.collection
+    #             # have to make sure we don't have an open flag of the type, only closed
+    #             if not flag_collection.get_open_flag_of_type(
+    #                     flag_type=classification_flag_types.matching_variant_warning_flag):
+    #                 flag_dict[flag_collection.pk] = flag_comment
+    #         return flag_dict
+    #
+    #     manually_closed_variant_warning = get_flag_comments(flag_type=classification_flag_types.matching_variant_warning_flag, resolution_id='vm_confirmed')
+    #     manually_closed_37_not_38 = get_flag_comments(flag_type=allele_flag_types.allele_37_not_38, resolution_id='closed')
+    #
+    #     print(f"variant matching count = {len(manually_closed_variant_warning)}")
+    #     print(f"37 not 38 flag count = {len(manually_closed_37_not_38)}")
+    #
+    #     for i, allele_info in enumerate(ImportedAlleleInfo.objects.all()):
+    #         if i % 100 == 0:
+    #             print(f"Processed {i} allele infos")
+    #         allele_info.apply_validation(force_update=True)
+    #         allele_info.save()
+    #
+    #         if allele := allele_info.allele:
+    #             latest_validation = allele_info.latest_validation
+    #             if not latest_validation.include:
+    #
+    #                 has_normal_issues = False
+    #                 has_liftover_issues = False
+    #                 has_build_issues = False
+    #
+    #                 if normalize_issues := latest_validation.validation_tags_typed.get("normalize"):
+    #                     has_normal_issues = [True for severity in normalize_issues.values() if severity == "E"]
+    #                 if liftover_issues := latest_validation.validation_tags_typed.get("liftover"):
+    #                     has_liftover_issues = [True for severity in liftover_issues.values() if severity == "E"]
+    #                 if build_issues := latest_validation.validation_tags_typed.get("builds"):
+    #                     has_build_issues = [True for severity in build_issues.values() if severity == "E"]
+    #
+    #                 if not has_normal_issues and not has_liftover_issues and not has_build_issues:
+    #                     print("Why was this excluded in the first place if no E?")
+    #                     print("Dev should investigate")
+    #                     print(latest_validation.validation_tags_typed)
+    #                     return
+    #
+    #                 comments = set()
+    #                 users = set()
+    #                 if allele_flag_pk := allele.flag_collection_id:
+    #                     if approved_flag := manually_closed_37_not_38.get(allele_flag_pk):
+    #                         has_liftover_issues = False
+    #                         if text := approved_flag.text:
+    #                             comments.add(text)
+    #                         users.add(approved_flag.user)
+    #
+    #                 classifications = Classification.objects.filter(allele_info=allele_info)
+    #                 for classification in classifications:
+    #                     if approved_flag := manually_closed_variant_warning.get(classification.flag_collection_id):
+    #                         has_normal_issues = False
+    #                         if text := approved_flag.text:
+    #                             comments.add(text)
+    #                         users.add(approved_flag.user)
+    #
+    #                 if not has_normal_issues and not has_liftover_issues and not has_build_issues:
+    #                     latest_validation.include = True
+    #                     latest_validation.confirmed = True
+    #                     latest_validation.confirmed_by = first(users)
+    #                     latest_validation.confirmed_by_note = "\n".join(comments) if comments else ""
+    #                     latest_validation.save()
+    #                     print(f"confirmed something to true on allele {allele}")
 
-        manually_closed_variant_warning = get_flag_comments(flag_type=classification_flag_types.matching_variant_warning_flag, resolution_id='vm_confirmed')
-        manually_closed_37_not_38 = get_flag_comments(flag_type=allele_flag_types.allele_37_not_38, resolution_id='closed')
 
-        print(f"variant matching count = {len(manually_closed_variant_warning)}")
-        print(f"37 not 38 flag count = {len(manually_closed_37_not_38)}")
-
-        for i, allele_info in enumerate(ImportedAlleleInfo.objects.all()):
-            if i % 100 == 0:
-                print(f"Processed {i} allele infos")
-            allele_info.apply_validation(force_update=True)
-            allele_info.save()
-
-            if allele := allele_info.allele:
-                latest_validation = allele_info.latest_validation
-                if not latest_validation.include:
-
-                    has_normal_issues = False
-                    has_liftover_issues = False
-                    has_build_issues = False
-
-                    if normalize_issues := latest_validation.validation_tags_typed.get("normalize"):
-                        has_normal_issues = [True for severity in normalize_issues.values() if severity == "E"]
-                    if liftover_issues := latest_validation.validation_tags_typed.get("liftover"):
-                        has_liftover_issues = [True for severity in liftover_issues.values() if severity == "E"]
-                    if build_issues := latest_validation.validation_tags_typed.get("builds"):
-                        has_build_issues = [True for severity in build_issues.values() if severity == "E"]
-
-                    if not has_normal_issues and not has_liftover_issues and not has_build_issues:
-                        print("Why was this excluded in the first place if no E?")
-                        print("Dev should investigate")
-                        print(latest_validation.validation_tags_typed)
-                        return
-
-                    comments = set()
-                    users = set()
-                    if allele_flag_pk := allele.flag_collection_id:
-                        if approved_flag := manually_closed_37_not_38.get(allele_flag_pk):
-                            has_liftover_issues = False
-                            if text := approved_flag.text:
-                                comments.add(text)
-                            users.add(approved_flag.user)
-
-                    classifications = Classification.objects.filter(allele_info=allele_info)
-                    for classification in classifications:
-                        if approved_flag := manually_closed_variant_warning.get(classification.flag_collection_id):
-                            has_normal_issues = False
-                            if text := approved_flag.text:
-                                comments.add(text)
-                            users.add(approved_flag.user)
-
-                    if not has_normal_issues and not has_liftover_issues and not has_build_issues:
-                        latest_validation.include = True
-                        latest_validation.confirmed = True
-                        latest_validation.confirmed_by = first(users)
-                        latest_validation.confirmed_by_note = "\n".join(comments) if comments else ""
-                        latest_validation.save()
-                        print(f"confirmed something to true on allele {allele}")
-
-
-    def handle_batch(self, batch: List[Classification]):
-        ClassificationImportRun.record_classification_import("variant_rematching", len(batch))
-        user = admin_bot()
-        if batch:
-            imports_by_genome: Dict[int, ClassificationImport] = {}
-            for vc in batch:
-                try:
-                    genome_build = vc.get_genome_build()
-                    if genome_build.pk not in imports_by_genome:
-                        imports_by_genome[genome_build.pk] = ClassificationImport.objects.create(user=user,
-                                                                                                 genome_build=genome_build)
-                    vc_import = imports_by_genome[genome_build.pk]
-                    vc.set_variant(variant=None, message='Admin has re-triggered variant matching')
-                    vc.classification_import = vc_import
-                    vc.save()
-                except ValueError as ve:
-                    print(f"Couldn't revalidate {vc.id} due to bad genome build {ve}")
-
-            for vc_import in imports_by_genome.values():
-                process_classification_import(vc_import, ImportSource.API)
-
-            self.sleep_for_delay()
+    # def handle_batch(self, batch: List[Classification]):
+    #     ClassificationImportRun.record_classification_import("variant_rematching", len(batch))
+    #     user = admin_bot()
+    #     if batch:
+    #         imports_by_genome: Dict[int, ClassificationImport] = {}
+    #         for vc in batch:
+    #             try:
+    #                 genome_build = vc.get_genome_build()
+    #                 if genome_build.pk not in imports_by_genome:
+    #                     imports_by_genome[genome_build.pk] = ClassificationImport.objects.create(user=user,
+    #                                                                                              genome_build=genome_build)
+    #                 vc_import = imports_by_genome[genome_build.pk]
+    #                 vc.set_variant(variant=None, message='Admin has re-triggered variant matching')
+    #                 vc.classification_import = vc_import
+    #                 vc.save()
+    #             except ValueError as ve:
+    #                 print(f"Couldn't revalidate {vc.id} due to bad genome build {ve}")
+    #
+    #         for vc_import in imports_by_genome.values():
+    #             process_classification_import(vc_import, ImportSource.API)
+    #
+    #         self.sleep_for_delay()

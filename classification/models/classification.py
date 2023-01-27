@@ -151,7 +151,6 @@ class AllClassificationsAlleleSource(TimeStampedModel, AlleleSource):
         return Variant.objects.filter(contigs_q, classification__isnull=False)
 
     def liftover_complete(self, genome_build: GenomeBuild):
-        #Classification.relink_variants()
         ImportedAlleleInfo.relink_variants()
 
 
@@ -813,39 +812,33 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         self.apply_allele_info_to_classification()
         return allele_info.status in {ImportedAlleleInfoStatus.MATCHED_ALL_BUILDS, ImportedAlleleInfoStatus.FAILED}
 
-    def set_variant_prepare_for_rematch(self, classification_import: ClassificationImport):
-        self.variant = None
-        self.allele = None
-        self.classification_import = classification_import
-
-    def set_variant_failed_matching(self, message: Optional[str] = None):
-        if allele_info := self.ensure_allele_info():
-            allele_info.set_matching_failed(message=message)
-            self.apply_allele_info_to_classification()
-
-    @transaction.atomic()
-    def set_variant(self, variant: Variant = None, message: str = None):
-        """
-        DEPRECATED - go via the AlleleInfo instead
-
-        Updates the data in the AlleleInfo (force_update=True) with the provided variant
-        @param variant The variant that we matched on, can't be None (see set_variant_failed_matching)
-        @param message Any message to include about a matching failure or success
-        @param failed If we're unable to match and wont be able to match again in future
-
-        Calling set_variant will automatically call .save()
-        If there is no variant and failed = True, any classification_import will be unset
-        can alternatively set variant to None to re-trigger matching
-        """
-        if not variant:
-            raise ValueError("set_variant requires a non-None variant, use set_variant_prepare_for_rematch or set_variant_failed_matching")
-
-        if allele_info := self.ensure_allele_info():
-            allele_info.set_variant_and_save(matched_variant=variant, message=message, force_update=True)
-            # update the allele info, then update the classification based on the allele info
-            self.apply_allele_info_to_classification()
-        else:
-            raise ValueError("Can't derive GenomeBuild, can't make AlleleInfo, therfore can't set_variant")
+    # def set_variant_failed_matching(self, message: Optional[str] = None):
+    #     if allele_info := self.ensure_allele_info():
+    #         allele_info.set_matching_failed(message=message)
+    #
+    # @transaction.atomic()
+    # def set_variant(self, variant: Variant = None, message: str = None):
+    #     """
+    #     DEPRECATED - go via the AlleleInfo instead
+    #
+    #     Updates the data in the AlleleInfo (force_update=True) with the provided variant
+    #     @param variant The variant that we matched on, can't be None (see set_variant_failed_matching)
+    #     @param message Any message to include about a matching failure or success
+    #     @param failed If we're unable to match and wont be able to match again in future
+    #
+    #     Calling set_variant will automatically call .save()
+    #     If there is no variant and failed = True, any classification_import will be unset
+    #     can alternatively set variant to None to re-trigger matching
+    #     """
+    #     if not variant:
+    #         raise ValueError("set_variant requires a non-None variant, use set_variant_prepare_for_rematch or set_variant_failed_matching")
+    #
+    #     if allele_info := self.ensure_allele_info():
+    #         allele_info.set_variant_and_save(matched_variant=variant, message=message, force_update=True)
+    #         # below is done automatically via a signal
+    #         # self.apply_allele_info_to_classification()
+    #     else:
+    #         raise ValueError("Can't derive GenomeBuild, can't make AlleleInfo, therfore can't set_variant")
 
     def apply_allele_info_to_classification(self):
         if not self.allele_info:
@@ -1390,10 +1383,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 flag_type=classification_flag_types.unshared_flag
             )
 
-        if self.variant:
-            self.set_variant(self.variant)
-        else:
-            self.set_variant_failed_matching()
+        self.apply_allele_info_to_classification()
         self.fix_permissions()
         self.save()
 

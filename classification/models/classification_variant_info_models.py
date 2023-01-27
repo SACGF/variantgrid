@@ -99,6 +99,8 @@ class ResolvedVariantInfo(TimeStampedModel):
         Update all the derived fields
         :param variant: Can't be None, variant we should use, provide the existing one if still need to update derived fields for existing record
         """
+        if not variant:
+            raise ValueError("set_variant_and_save requires a non-None variant")
 
         self.c_hgvs = None
         self.c_hgvs_full = None
@@ -521,12 +523,24 @@ class ImportedAlleleInfo(TimeStampedModel):
         self.status = ImportedAlleleInfoStatus.FAILED
         self.save()
 
-    def set_variant_prepare_for_rematch(self, classification_import: 'ClassificationImport'):
+    def set_variant_prepare_for_rematch_and_save(self, classification_import: 'ClassificationImport', clear_existing: bool = False):
+        # TODO, instead of cleainng everything out, can we just provide classification_import?
         self.status = ImportedAlleleInfoStatus.PROCESSING
         self.update_variant_coordinate()
         self.classification_import = classification_import
-        self.matched_variant = None
-        self.allele = None
+        self.save()
+        if clear_existing:
+            self.matched_variant = None
+            self.allele = None
+
+            # should we actually do allele info changed signal? or save it for after we've matched
+            for genome_build in [GenomeBuild.grch37(), GenomeBuild.grch38()]:
+                self._update_variant(genome_build=genome_build, variant=None)
+            self.apply_validation()
+            self.save()
+
+            # should we actually do allele info changed signal? or save it for after we've matched
+            allele_info_changed_signal.send(sender=ImportedAlleleInfo, allele_info=self)
 
 
     def refresh_and_save(self, force_update=False):
@@ -534,6 +548,7 @@ class ImportedAlleleInfo(TimeStampedModel):
         Updates linked variants (c.hgvs, etc)
         """
         if va := self.matched_variant:
+            # chances are that variant is linked to an allele now
             self.set_variant_and_save(matched_variant=va, force_update=force_update)
 
     def set_variant_and_save(self, matched_variant: Variant, message: Optional[str] = None, force_update: bool = False):
@@ -551,7 +566,7 @@ class ImportedAlleleInfo(TimeStampedModel):
             raise ValueError("ImportedAlleleInfo.update_and_save requires a matched_variant, instead call reset_with_status")
 
         if not force_update and self.matched_variant == matched_variant and self.status == ImportedAlleleInfoStatus.MATCHED_ALL_BUILDS:
-            # nothing to do
+            # nothing to do, and no force update
             return
 
         self.matched_variant = matched_variant
@@ -591,9 +606,15 @@ class ImportedAlleleInfo(TimeStampedModel):
 
         return self
 
-    def _update_variant(self, genome_build: GenomeBuild, variant: Variant, force_update: bool = False):
-        if not self.allele or not variant:
-            # we don't have an allele OR we don't have the corresponding variant, delete the VariantInfo
+    def _update_variant(self, genome_build: GenomeBuild, variant: Optional[Variant], force_update: bool = False):
+        """
+        Updates the ResolvedVariantInfo for a given genome build
+        :param genome_build: The genome buildd we're updating, should be 37 or 38
+        :param variant: The variant to set, if None will remove the ResolvedVariantInfo entirely
+        :param force_update: Should we re-perform all the caluclations even if the variant was already set to this same variant
+        """
+        if not variant:
+            # we don't have the corresponding variant, delete the VariantInfo
             if existing := self[genome_build]:
                 existing.delete()
                 self[genome_build] = None  # TODO is this required or does delete just handle it?
