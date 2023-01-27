@@ -1,3 +1,5 @@
+from captcha.fields import ReCaptchaField
+from captcha.widgets import ReCaptchaV3
 from django import forms
 from django.conf import settings
 from django.contrib import messages
@@ -194,6 +196,7 @@ def keycloak_admin(request):
 
 
 class ContactUsForm(forms.Form):
+    captcha = ReCaptchaField(widget=ReCaptchaV3)
     name = forms.CharField(max_length=200)
     email = forms.EmailField(max_length=200)
     message = forms.CharField(widget=forms.Textarea)

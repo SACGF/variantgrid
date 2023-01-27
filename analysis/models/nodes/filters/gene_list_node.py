@@ -248,8 +248,6 @@ class GeneListNodePanelAppPanel(models.Model):
         """ Lazily create - This may take a while for new panels (should only do this in node.load())
         Will also be called if a node is cloned w/o a parent so it is invalid (in which case it should use cache) """
 
-        print("GeneListNodePanelAppPanel.gene_list")
-
         if self.panel_app_panel_local_cache is None:
             self.panel_app_panel_local_cache = get_panel_app_local_cache(self.panel_app_panel)
             self.save()

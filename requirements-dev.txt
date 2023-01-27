@@ -29,8 +29,8 @@ django_model_utils
 django-postgres-extra
 django_recaptcha
 django-registration-redux
-django-rest-framework
 django_termsandconditions
+djangorestframework
 easy_thumbnails
 fontawesomefree==6.2.0
 git+https://github.com/davmlaw/django-json-widget#egg=django_json_widget

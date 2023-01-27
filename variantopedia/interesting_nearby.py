@@ -2,7 +2,7 @@ import operator
 import re
 from collections import defaultdict, Counter
 from functools import reduce
-from typing import Dict
+from typing import Dict, Tuple
 
 from django.conf import settings
 from django.contrib.postgres.aggregates import StringAgg
@@ -73,13 +73,24 @@ def get_nearby_summaries(user, variant, annotation_version, distance=None, clini
         "genome_build": annotation_version.genome_build,
         "clinical_significance": clinical_significance
     }
-    return {f"{region}_summary": interesting_summary(qs, **kwargs) for region, qs in nearby_qs.items()}
+
+    nearby_summaries = {}
+    for region, qs in nearby_qs.items():
+        summary, tag_counts = interesting_summary(qs, **kwargs)
+        nearby_summaries[f"{region}_summary"] = summary
+        nearby_summaries[f"{region}_tag_counts"] = tag_counts
+
+    return nearby_summaries
 
 
-def interesting_summary(qs, user, genome_build, total=True, clinvar=True, classifications=True, clinical_significance=False):
+def interesting_summary(qs, user, genome_build, total=True, clinvar=True, classifications=True,
+                        clinical_significance=False) -> Tuple[str, Dict[str, int]]:
+    """ returns a strin summary, and dict of tag counts (so you can format w/colors) """
     counts = interesting_counts(qs, user, genome_build, clinical_significance=clinical_significance)
-    # print(counts)
+    print(counts)
     summary = ""
+    tag_counts = {}
+
     if num_variants := counts['total']:
         classification_types = {}
         if classifications:
@@ -104,9 +115,8 @@ def interesting_summary(qs, user, genome_build, total=True, clinvar=True, classi
                 summaries.append(f"{label}: {classification_summary}")
 
         if tags := counts.get("tags"):
-            tag_counts = Counter(tags.split("|"))
-            tag_summary = ", ".join(f"{k}x{v}" for k,v in tag_counts.most_common())
-            summaries.append(f"Tags: {tag_summary}")
+            counter = Counter(tags.split("|"))
+            tag_counts = dict(counter.most_common())  # Sort highest -> lowest
 
         zygosity_counts = []
         for zygosity in ["REF", "HET", "HOM_ALT"]:
@@ -125,7 +135,7 @@ def interesting_summary(qs, user, genome_build, total=True, clinvar=True, classi
             summary = ""
         if optional_summary:
             summary += optional_summary
-    return summary
+    return summary, tag_counts
 
 
 def interesting_counts(qs, user, genome_build, clinical_significance=False):
@@ -136,7 +146,7 @@ def interesting_counts(qs, user, genome_build, clinical_significance=False):
         "REF": Sum("global_variant_zygosity__ref_count"),
         "HET": Sum("global_variant_zygosity__het_count"),
         "HOM_ALT": Sum("global_variant_zygosity__hom_count"),
-        "tags": StringAgg("varianttag__tag", delimiter='|'),
+        "tags": StringAgg("variantallele__allele__varianttag__tag", delimiter='|'),
     }
 
     clinical_significance_list = [c[0] for c in ClinicalSignificance.SHORT_CHOICES]

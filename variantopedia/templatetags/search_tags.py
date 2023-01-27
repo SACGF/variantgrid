@@ -13,17 +13,17 @@ from variantopedia.interesting_nearby import interesting_summary
 register = Library()
 
 
-@register.simple_tag(takes_context=True)
+@register.inclusion_tag("variantopedia/tags/search_summary.html", takes_context=True)
 def search_summary(context, search_result):
     user = context["user"]
-    summary = ""
     record = search_result.record
     if isinstance(record, Variant):
-        summary = _variant_interesting_summary(user, record, search_result.genome_build)
+        summary, tag_counts = _variant_interesting_summary(user, record, search_result.genome_build)
+        context["summary"] = summary
+        context["tag_counts_dict"] = tag_counts
     elif isinstance(record, OntologyTerm):
-        summary = _get_ontology_summary(user, record)
-
-    return summary
+        context["summary"] = _get_ontology_summary(user, record)
+    return context
 
 
 def _get_ontology_summary(user: User, ontology_term) -> str:
@@ -49,7 +49,7 @@ def _get_ontology_summary(user: User, ontology_term) -> str:
     return ", ".join(ontology_summary_list)
 
 
-def _variant_interesting_summary(user: User, variant: Variant, genome_build, clinical_significance=False) -> str:
+def _variant_interesting_summary(user: User, variant: Variant, genome_build, clinical_significance=False):
     qs = get_variant_queryset_for_latest_annotation_version(genome_build)
     qs, _ = VariantZygosityCountCollection.annotate_global_germline_counts(qs)
     qs = qs.filter(pk=variant.pk)

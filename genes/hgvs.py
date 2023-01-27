@@ -19,6 +19,7 @@ from django.conf import settings
 from django.core.cache import cache
 from django.db.models import Max, Min
 from pyhgvs import HGVSName
+from pyhgvs.models.hgvs_name import get_refseq_type
 from pyhgvs.utils import make_transcript
 
 from genes.models import TranscriptVersion, TranscriptParts, Transcript, GeneSymbol, LRGRefSeqGene, BadTranscript, \
@@ -520,11 +521,12 @@ class HGVSMatcher:
             if not within_transcript:
                 raise pyhgvs.InvalidHGVSName(f"'{hgvs_name.format()}' {description} {cdna_coord} resolves outside of transcript")
 
-    def _pyhgvs_get_variant_tuple(self, hgvs_string: str, transcript_version):
+    def _pyhgvs_get_variant_tuple_and_reference_match(self, hgvs_string: str, transcript_version) -> Tuple[Tuple, bool]:
         pyhgvs_transcript = None
+        hgvs_name = HGVSName(hgvs_string)
+
         # Check transcript bounds
         if transcript_version:
-            hgvs_name = HGVSName(hgvs_string)
             pyhgvs_transcript = self._create_pyhgvs_transcript(transcript_version)
             self._validate_in_transcript_range(pyhgvs_transcript, hgvs_name)
 
@@ -535,7 +537,10 @@ class HGVSMatcher:
         chrom, position, ref, alt = variant_tuple
         contig = self.genome_build.chrom_contig_mappings[chrom]
         chrom = contig.name
-        return chrom, position, ref, alt
+
+        fasta = self.genome_build.genome_fasta.fasta
+        matches_reference = pyhgvs.matches_ref_allele(hgvs_name, fasta, pyhgvs_transcript)
+        return (chrom, position, ref, alt), matches_reference
 
     def _clingen_get_variant_tuple(self, hgvs_string: str):
         # ClinGen Allele Registry doesn't like gene names - so strip (unless LRG_)
@@ -586,7 +591,9 @@ class HGVSMatcher:
         if new_hgvs_name:
             new_hgvs_string = new_hgvs_name.format()
             method = f"{self.HGVS_METHOD_PYHGVS} as '{new_hgvs_string}' (from LRG_RefSeqGene)"
-            return self._pyhgvs_get_variant_tuple(new_hgvs_string, transcript_version), method
+            variant_tuple, _matches_reference = self._pyhgvs_get_variant_tuple_and_reference_match(new_hgvs_string,
+                                                                                                   transcript_version)
+            return variant_tuple, method
 
         try:
             return self._clingen_get_variant_tuple(hgvs_string), self.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY
@@ -720,7 +727,7 @@ class HGVSMatcher:
                 hgvs_name.transcript = tv.accession
                 hgvs_string_for_version = hgvs_name.format()
                 if method == self.HGVS_METHOD_PYHGVS:
-                    variant_tuple = self._pyhgvs_get_variant_tuple(hgvs_string_for_version, tv)
+                    variant_tuple, matches_reference = self._pyhgvs_get_variant_tuple_and_reference_match(hgvs_string_for_version, tv)
                 elif method == self.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY:
                     if self._clingen_allele_registry_ok(tv.accession):
                         error_message = f"Could not convert '{hgvs_string}' using ClinGenAllele Registry: %s"
@@ -752,7 +759,7 @@ class HGVSMatcher:
                     raise ValueError(f"'{transcript_accession}': No transcripts found")
         else:
             method = self.HGVS_METHOD_PYHGVS
-            variant_tuple = self._pyhgvs_get_variant_tuple(hgvs_string, None)
+            variant_tuple, matches_reference = self._pyhgvs_get_variant_tuple_and_reference_match(hgvs_string, None)
 
         (chrom, position, ref, alt) = variant_tuple
 
@@ -787,13 +794,6 @@ class HGVSMatcher:
         if hgvs_name.transcript:
             transcript = self._get_pyhgvs_transcript(hgvs_name.transcript)
         return hgvs_name, transcript
-
-    def matches_reference(self, hgvs_name) -> bool:
-        """ Reference was provided, and matches our genome """
-        hgvs, transcript = self._get_hgvs_and_pyhgvs_transcript(hgvs_name)
-        if hgvs.ref_allele:
-            return pyhgvs.matches_ref_allele(hgvs, self.genome_build.genome_fasta.fasta, transcript)
-        return False
 
     def get_transcript_id(self, hgvs_name, transcript_version=False) -> str:
         _hgvs, transcript = self._get_hgvs_and_pyhgvs_transcript(hgvs_name)
@@ -979,8 +979,9 @@ class HGVSMatcher:
         return None
 
     @classmethod
-    def clean_hgvs(cls, hgvs_name):
-        cleaned_hgvs = clean_string(hgvs_name)  # remove non-printable characters
+    def clean_hgvs(cls, hgvs_string) -> Tuple[str, List[str]]:
+        search_messages = []
+        cleaned_hgvs = clean_string(hgvs_string)  # remove non-printable characters
         cleaned_hgvs = cleaned_hgvs.replace(" ", "")  # No whitespace in HGVS
         cleaned_hgvs = cleaned_hgvs.replace("::", ":")  # Fix double colon
         # Lowercase mutation types, eg NM_032638:c.1126_1133DUP - won't matter if also changes gene name as that's
@@ -1004,31 +1005,59 @@ class HGVSMatcher:
             cleaned_hgvs = cleaned_hgvs.replace(":", ":c.")
         elif cls.HGVS_CONTIG_NO_GDOT.match(cleaned_hgvs):
             cleaned_hgvs = cleaned_hgvs.replace(":", ":g.")
-        return cleaned_hgvs
+
+        if hgvs_string != cleaned_hgvs:
+            search_messages.append(f"Warning: Cleaned '{hgvs_string}' => '{cleaned_hgvs}'")
+
+        try:
+            fixed_hgvs, fixed_messages = cls.fix_gene_transcript(cleaned_hgvs)
+            if fixed_hgvs != cleaned_hgvs:
+                search_messages.extend(fixed_messages)
+                cleaned_hgvs = fixed_hgvs
+
+        except ValueError:
+            pass
+
+        return cleaned_hgvs, search_messages
 
     @classmethod
-    def fix_swapped_gene_transcript(cls, hgvs_name) -> Optional[str]:
-        """ Fix common case of 'GATA2(NM_032638.5):c.1082G>C' - returns nothing if swap wasn't ok """
-        hgvs = HGVSName(hgvs_name)
-        if hgvs.transcript:
-            transcript_id, _ = TranscriptVersion.get_transcript_id_and_version(hgvs.transcript)
-            if Transcript.objects.filter(pk=transcript_id).exists():
-                return  # Normal transcript
+    def fix_gene_transcript(cls, hgvs_string: str) -> Tuple[str, List[str]]:
+        """ Fix common case of 'GATA2(NM_032638.5):c.1082G>C' and lower case transcript IDs """
 
-        # GATA2(NM_032638.5):c.1082G>C => transcript=GATA2, gene=NM_032638.5
-        # GATA2:c.1082G>C => transcript='', gene=GATA2
+        # lower case transcripts w/o genes will be assigned as gene by pyHGVS
+        fixed_messages = []
+        hgvs_name = HGVSName(hgvs_string)
+        transcript_ok = HGVSMatcher._looks_like_transcript(hgvs_name.transcript)
+        if not transcript_ok and hgvs_name.gene:
+            # fix gene/transcript swap and lower case separately to get separate warnings.
+            if HGVSMatcher._looks_like_transcript(hgvs_name.gene.upper()):  # Need to upper here
+                old_transcript = hgvs_name.transcript
+                hgvs_name.transcript = hgvs_name.gene
+                hgvs_name.gene = old_transcript
+                if hgvs_name.gene:
+                    fixed_messages.append(f"Warning: swapped gene/transcript")
+                transcript_ok = HGVSMatcher._looks_like_transcript(hgvs_name.transcript)
 
-        transcript_id, _ = TranscriptVersion.get_transcript_id_and_version(hgvs.gene)
-        if Transcript.objects.filter(pk=transcript_id).exists():  # gene is transcript
-            old_transcript = hgvs.transcript
-            hgvs.transcript = hgvs.gene
-            if old_transcript and GeneSymbol.objects.filter(pk=old_transcript).exists():
-                hgvs.gene = old_transcript  # Old transcript was a gene symbol
-            return hgvs.format()
+        if not transcript_ok:
+            if hgvs_name.transcript:
+                uc_transcript = hgvs_name.transcript.upper()
+                if HGVSMatcher._looks_like_transcript(uc_transcript):
+                    hgvs_name.transcript = uc_transcript
+                    fixed_messages.append(f"Warning: Upper cased transcript")
 
-        # if GeneSymbol.objects.filter(pk=hgvs.gene).exists():
-        #    pass  # TODO: Need to work out canonical for gene
-        return None  # No fix
+        return hgvs_name.format(), fixed_messages
+
+    @staticmethod
+    def _looks_like_transcript(prefix: str) -> bool:
+        """ copied from pyhgvs.models.hgvs_name.HGVSName.parse_prefix """
+        if prefix.startswith('ENST') or prefix.startswith('LRG_'):
+            return True
+
+        refseq_type = get_refseq_type(prefix)
+        if refseq_type in ('mRNA', 'RNA'):
+            return True
+
+        return False
 
     @classmethod
     def get_gene_symbol_if_no_transcript(cls, hgvs_name) -> Optional[GeneSymbol]:
