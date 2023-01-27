@@ -3,10 +3,12 @@
 {% load ui_utils %}
 {% load ui_menu_bars %}
 {% load search_tags %}
+{% load user_tag_color_tags %}
 {% block submenu %}{% menu_bar_data %}{% endblock %}
 
 {% block title %}Search{% endblock %}
 {% block head %}
+    {% render_tag_styles_and_formatter %}
     <style>
         .example {
             font-family: monospace;

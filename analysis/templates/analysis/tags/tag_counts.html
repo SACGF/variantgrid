@@ -1,0 +1,8 @@
+{% for tag_id, count in tag_counts.items %}
+    <span class="grid-tag tagged-{{ tag_id }}" tag_id="{{ tag_id }}" title="" data-original-title="Tagged as {{ tag_id }}">
+        <span class="user-tag-colored">{{ tag_id }}</span>
+        {% if count is not None %}
+            : {{ count }}
+        {% endif %}
+    </span>
+{% endfor %}

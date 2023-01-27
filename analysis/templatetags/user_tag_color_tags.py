@@ -117,3 +117,8 @@ def tag_counts_filter(context, genome_build: GenomeBuild,
         "click_func": click_func,
         "show_all_func": show_all_func,
     }
+
+
+@register.inclusion_tag("analysis/tags/tag_counts.html")
+def tag_counts(tag_counts_dict):
+    return {"tag_counts": tag_counts_dict}
