@@ -178,7 +178,7 @@ class ClassificationAdmin(ModelAdminBasics):
         ('user', RelatedFieldListFilter),
     )
     search_fields = ('id', 'lab_record_id')
-    list_per_page = 100
+    list_per_page = 50
     inlines = (ClassificationModificationAdmin,)
     list_select_related = ('lab', 'user', 'allele')
 
