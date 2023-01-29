@@ -85,6 +85,11 @@
         </td>
         {% endcomment %}
         <td>
+            {% for allele_info in group.allele_infos %}
+                {% imported_allele_info allele_info on_allele_page=True %}
+            {% endfor %}
+        </td>
+        <td>
             {% if group.allele %}<a class="hover-link" href="{% url 'view_allele' group.allele.id %}">{{ group.allele }}</a>{% else %}<span class="no-value">-</span>{% endif %}
         </td>
         <td>
@@ -103,9 +108,12 @@
             {% if group.excluded_record_count %}
                 <div class="mt-2 text-secondary">Note: multiple records for the same patient were submitted. Only showing the most recent record per patient.</div>
             {% endif %}
+            {% comment %}Do we really need the ability to compare classifications within a sub group? Can't we just rely on the overall diff for that?{% endcomment %}
+            {% comment %}
             {% if group.count > 1 %}
                 <div class="mt-3"><a class="hover-link" href="{% url 'classification_diff' %}?cids={{ group.diff_ids }}">Compare {{ group.count }} Records</a></div>
             {% endif %}&nbsp;
+            {% endcomment %}
         </td>
     {% endif %}
 </tr>

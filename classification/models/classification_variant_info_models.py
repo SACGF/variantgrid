@@ -429,6 +429,15 @@ class ImportedAlleleInfo(TimeStampedModel):
         elif self.imported_c_hgvs:
             return CHGVS(self.imported_c_hgvs).transcript
 
+    @property
+    def gene_symbols(self) -> List[GeneSymbol]:
+        gene_symbol_set = {build.gene_symbol for build in self.resolved_builds if build.gene_symbol}
+        if c_hgvs_obj := self.imported_c_hgvs_obj:
+            if imported_gene_symbol_str := c_hgvs_obj.gene_symbol:
+                if symbol := GeneSymbol.cast(imported_gene_symbol_str):
+                    gene_symbol_set.add(symbol)
+        return list(sorted(gene_symbol_set))
+
     @staticmethod
     def is_supported_transcript(transcript_or_hgvs: str):
         if not transcript_or_hgvs:
@@ -462,6 +471,10 @@ class ImportedAlleleInfo(TimeStampedModel):
 
     def __setitem__(self, key: GenomeBuild, value: Optional[ResolvedVariantInfo]):
         setattr(self, ImportedAlleleInfo.__genome_build_to_attr(key), value)
+
+    @property
+    def resolved_builds(self) -> List[ResolvedVariantInfo]:
+        return list(ResolvedVariantInfo.objects.filter(allele_info=self))
 
     def update_variant_coordinate(self):
         # TODO, support variant_coordinate being provided

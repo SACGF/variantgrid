@@ -13,7 +13,7 @@ from classification.criteria_strengths import CriteriaStrength, AcmgPointScore
 from classification.enums import SpecialEKeys
 from classification.enums.classification_enums import ShareLevel
 from classification.models import ConditionTextMatch, ConditionResolved, DiscordanceReportRowData, \
-    ClassificationLabSummary
+    ClassificationLabSummary, ImportedAlleleInfo
 from classification.models.classification import ClassificationModification, Classification
 from classification.models.classification_groups import ClassificationGroup, ClassificationGroups, \
     ClassificationGroupUtils
@@ -573,4 +573,12 @@ def evidence_key_heading(key: str, include_help: bool = True):
     return {
         "e_key": e_key,
         "help":  e_key.description if include_help else None
+    }
+
+
+@register.inclusion_tag("classification/tags/imported_allele_info.html")
+def imported_allele_info(imported_allele_info: ImportedAlleleInfo, on_allele_page: bool = False):
+    return {
+        "imported_allele_info": imported_allele_info,
+        "on_allele_page":  on_allele_page
     }

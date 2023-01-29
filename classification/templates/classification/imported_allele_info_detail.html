@@ -54,6 +54,11 @@
                 {% else %}<span class="no-value">-</span>{% endif %}
             {% endlabelled %}
         {% endif %}
+        {% labelled label="Gene Symbol(s)" %}
+            {% for gene_symbol in allele_info.gene_symbols %}
+                <div><a class="hover-link" href="{% url 'view_gene_symbol' gene_symbol.pk %}">{{ gene_symbol }}</a></div>
+            {% endfor %}
+        {% endlabelled %}
         {% labelled label="Classifications" %}
             {% for classification in allele_info.classification_set.all %}
                 <div>

@@ -7,7 +7,7 @@ from django.contrib.auth.models import User
 
 from classification.enums import SpecialEKeys, CriteriaEvaluation, ShareLevel
 from classification.models import ClassificationModification, EvidenceKeyMap, CuratedDate, ConditionResolved, \
-    classification_flag_types
+    classification_flag_types, ImportedAlleleInfo
 from classification.criteria_strengths import CriteriaStrength
 from classification.models.flag_types import ClassificationFlagTypes
 from flags.models import Flag, FlagStatus
@@ -196,6 +196,10 @@ class ClassificationGroup:
     def allele(self) -> Optional[Allele]:
         # method is a holdover from when allele wasn't directly accessible on a classification
         return self.most_recent.classification.allele_object
+
+    @property
+    def allele_infos(self) -> List[ImportedAlleleInfo]:
+        return list(sorted({mod.classification.allele_info for mod in self.modifications if mod.classification.allele_info}))
 
     def diff_ids(self) -> str:
         return ",".join([str(cm.classification_id) for cm in self.modifications])

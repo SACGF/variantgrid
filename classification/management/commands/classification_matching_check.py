@@ -25,6 +25,7 @@ class Command(BaseCommand):
         return data["modified__max"]
 
     def handle(self, *args, **options):
+        # FIXME base this off AlleleInfo instead of Classification
         start_last_modified = self._get_last_modified()
 
         variant_diff_count = Counter()
