@@ -151,6 +151,7 @@ class Command(BaseCommand):
                     has_normal_issues = False
                     has_liftover_issues = False
                     has_general_issues = False
+                    has_builds_issues = False
 
                     if normalize_issues := latest_validation.validation_tags_typed.get("normalize"):
                         has_normal_issues = [True for severity in normalize_issues.values() if severity == "E"]
@@ -158,8 +159,10 @@ class Command(BaseCommand):
                         has_liftover_issues = [True for severity in liftover_issues.values() if severity == "E"]
                     if general_issues := latest_validation.validation_tags_typed.get("general"):
                         has_general_issues = [True for severity in general_issues.values() if severity == "E"]
+                    if build_issues := latest_validation.validation_tags_typed.get("builds"):
+                        has_builds_issues = [True for severity in build_issues.values() if severity == "E"]
 
-                    if not has_normal_issues and not has_liftover_issues and not has_general_issues:
+                    if not has_normal_issues and not has_liftover_issues and not has_general_issues and not has_builds_issues:
                         print("Why was this excluded in the first place if no E?")
                         print("Dev should investigate")
                         print(latest_validation.validation_tags_typed)
@@ -182,7 +185,7 @@ class Command(BaseCommand):
                                 comments.add(text)
                             users.add(approved_flag.user)
 
-                    if not has_normal_issues and not has_liftover_issues and not has_general_issues:
+                    if not has_normal_issues and not has_liftover_issues and not has_general_issues and not has_builds_issues:
                         latest_validation.include = True
                         latest_validation.confirmed = True
                         latest_validation.confirmed_by = first(users)
