@@ -15,7 +15,6 @@ def variant_transcript_select(transcript_select_jquery, vts,
         "gene_func": gene_func,
         "vts": vts,
         "variant_transcript_annotations": vts.variant_transcript_annotations_dict,
-        "gene_annotations": vts.gene_annotations,
         "show_all_transcript_details": show_all_transcript_details,
         "empty_transcript_option": empty_transcript_option
     }

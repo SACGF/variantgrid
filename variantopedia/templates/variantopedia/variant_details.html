@@ -203,7 +203,7 @@ function transcriptFunc(transcriptId, data) {
 }
 
 
-function geneFunc(geneId, geneSymbol, data) {
+function geneFunc(geneId, geneSymbol) {
     {% if show_gene_coverage %}
     if (geneSymbol) {
         const currentCoverageGeneId = $("#gene-coverage-data").attr("gene_symbol");
@@ -214,28 +214,6 @@ function geneFunc(geneId, geneSymbol, data) {
         }
     }
     {% endif %}
-
-    const gic = $("#gene-info-container");
-    if (data) {
-        $(".no-gene-info", gic).hide();
-        $(".has-gene-info", gic).show();
-    } else {
-        $(".no-gene-info", gic).show();
-        $(".has-gene-info", gic).hide();
-        return;
-    }
-
-    const geneInfoTable = $('#gene-info');
-    $.each(data, function(name, value) {
-        if (value === null) {
-            value = $('<span>', {class: 'no-value', text:'-'});
-        }
-        $("#" + name, geneInfoTable).html(value);
-    });
-
-    const gene_url = Urls.view_gene_symbol(geneSymbol);
-    const linkHtml = "<a id='gene-link' target='_blank' href='" + gene_url + "'>" + geneSymbol + "</a>";
-    $("#hgnc_symbol", geneInfoTable).html(linkHtml);
 }
 
 

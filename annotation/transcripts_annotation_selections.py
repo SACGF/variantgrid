@@ -199,8 +199,7 @@ class VariantTranscriptSelections:
 
         gene_symbols = set()
         for ga in self.gene_annotations.values():
-            gene_symbol = ga.get("hgnc_symbol")
-            if gene_symbol:
+            if gene_symbol := ga.get("hgnc_symbol"):
                 gene_symbols.add(gene_symbol)
 
         existing_other_transcripts = set()
