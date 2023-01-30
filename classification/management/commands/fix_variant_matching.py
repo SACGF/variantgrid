@@ -127,7 +127,7 @@ class Command(BaseCommand):
                 flag_collection = flag_comment.flag.collection
                 # have to make sure we don't have an open flag of the type, only closed
                 if not flag_collection.get_open_flag_of_type(
-                        flag_type=classification_flag_types.matching_variant_warning_flag):
+                        flag_type=flag_type):
                     flag_dict[flag_collection.pk] = flag_comment
             return flag_dict
 
@@ -150,16 +150,16 @@ class Command(BaseCommand):
 
                     has_normal_issues = False
                     has_liftover_issues = False
-                    has_build_issues = False
+                    has_general_issues = False
 
                     if normalize_issues := latest_validation.validation_tags_typed.get("normalize"):
                         has_normal_issues = [True for severity in normalize_issues.values() if severity == "E"]
                     if liftover_issues := latest_validation.validation_tags_typed.get("liftover"):
                         has_liftover_issues = [True for severity in liftover_issues.values() if severity == "E"]
-                    if build_issues := latest_validation.validation_tags_typed.get("builds"):
-                        has_build_issues = [True for severity in build_issues.values() if severity == "E"]
+                    if general_issues := latest_validation.validation_tags_typed.get("general"):
+                        has_general_issues = [True for severity in general_issues.values() if severity == "E"]
 
-                    if not has_normal_issues and not has_liftover_issues and not has_build_issues:
+                    if not has_normal_issues and not has_liftover_issues and not has_general_issues:
                         print("Why was this excluded in the first place if no E?")
                         print("Dev should investigate")
                         print(latest_validation.validation_tags_typed)
@@ -182,7 +182,7 @@ class Command(BaseCommand):
                                 comments.add(text)
                             users.add(approved_flag.user)
 
-                    if not has_normal_issues and not has_liftover_issues and not has_build_issues:
+                    if not has_normal_issues and not has_liftover_issues and not has_general_issues:
                         latest_validation.include = True
                         latest_validation.confirmed = True
                         latest_validation.confirmed_by = first(users)

@@ -738,6 +738,13 @@ class ImportedAlleleInfoAdmin(ModelAdminBasics):
             allele_info.apply_validation(force_update=True)
             allele_info.save()
 
+    @admin_action("Reset Confirmation")
+    def reset_confirmation(self, request, queryset: QuerySet[ImportedAlleleInfo]):
+        for allele_info in queryset:
+            if latest := allele_info.latest_validation:
+                latest.remove_override()
+                latest.save()
+
     def has_add_permission(self, request):
         return False
 
@@ -761,7 +768,7 @@ class ImportedAlleleInfoValidationAdmin(ModelAdminBasics):
             iaiv.confirmed_by = request.user
             iaiv.save()
 
-    @admin_action("Remove Confirmation")
+    @admin_action("Reset Confirmation")
     def remove_confirmation(self, request, queryset: QuerySet[ImportedAlleleInfoValidation]):
         for iaiv in queryset:
             iaiv.remove_override()
