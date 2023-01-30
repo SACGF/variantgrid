@@ -1,4 +1,5 @@
 import operator
+from dataclasses import dataclass
 from functools import reduce
 from typing import Optional
 
@@ -8,11 +9,13 @@ from django.http import HttpRequest
 from django.shortcuts import render, get_object_or_404
 from requests import Response
 
-from classification.models import ImportedAlleleInfo, ImportedAlleleInfoStatus
+from classification.models import ImportedAlleleInfo, ImportedAlleleInfoStatus, Classification
 from genes.hgvs import CHGVS, CHGVSDiff, chgvs_diff_description
+from library.django_utils import get_url_from_view_path
 from library.guardian_utils import is_superuser
-from library.utils import MultiDiff, MultiDiffInput
-from snpdb.models import GenomeBuild
+from library.utils import MultiDiff, MultiDiffInput, ExportRow, export_column
+from snpdb.admin_utils import get_admin_url
+from snpdb.models import GenomeBuild, Lab
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, CellData, SortOrder
 import re
 
@@ -218,3 +221,58 @@ def view_imported_allele_info_detail(request: HttpRequest, pk: int):
         "validation_tags": allele_info.latest_validation.validation_tags_list if allele_info.latest_validation else None,
         "on_allele_page": request.GET.get("on_allele_page") == "true"
     })
+
+
+class ImportedAlleleInfoDownload(ExportRow):
+
+    def __init__(self, allele_info: ImportedAlleleInfo):
+        self.allele_info = allele_info
+
+    @export_column(label="ID")
+    def id(self):
+        return self.allele_info.id
+
+    @export_column("URL")
+    def url(self):
+        return get_url_from_view_path(get_admin_url(self.allele_info))
+
+    @export_column(label="Imported Genome Build")
+    def imported_genome_build(self):
+        return str(self.allele_info.imported_genome_build_patch_version)
+
+    @export_column(label="c.HGVS (Imported)")
+    def c_hgvs_imported(self):
+        return self.allele_info.imported_c_hgvs
+
+    @export_column(label="c.HGVS (37)")
+    def c_hgvs_37(self):
+        if c37 := self.allele_info[GenomeBuild.grch37()]:
+            return c37.c_hgvs
+
+    @export_column(label="c.HGVS (38)")
+    def c_hgvs_38(self):
+        if c38 := self.allele_info[GenomeBuild.grch37()]:
+            return c38.c_hgvs
+
+    @export_column(label="Differences")
+    def differences(self):
+        return "\n".join(str(tag) for tag in self.allele_info.latest_validation.validation_tags_list)
+
+    @export_column(label="Included")
+    def included(self):
+        return self.allele_info.latest_validation.include
+
+    @export_column(label="Confirmed")
+    def confirmed(self):
+        return self.allele_info.latest_validation.confirmed
+
+    @export_column(label="Involved Labs")
+    def involved_labs(self):
+        return ", ".join([str(lab) for lab in sorted(Lab.objects.filter(pk__in=Classification.objects.filter(allele_info=self.allele_info).values_list('lab', flat=True)).select_related('organization'))])
+
+
+def download_allele_info(request: HttpRequest):
+    return ImportedAlleleInfoDownload.streaming_csv(
+        ImportedAlleleInfo.objects.order_by('id').iterator(chunk_size=2000),
+        filename="imported_allele_infos"
+    )

@@ -229,12 +229,26 @@ class ImportedAlleleInfoValidationTagEntry:
             category = "normalise"
         return pretty_label(category)
 
+    @property
     def field_pretty(self) -> str:
         return pretty_label(self.field).replace("C Nomen", "c.nomen")
+
+    @property
+    def severity_pretty(self) -> str:
+        if self.severity == "E":
+            return "Error"
+        # FIXME, change "W" to "I"
+        elif self.severity == "W":
+            return "Info"
+        else:
+            return self.severity
+
 
     def __lt__(self, other):
         return (self.category, self.field) < (other.category, other.field)
 
+    def __str__(self):
+        return f"{self.category_pretty} {self.field_pretty} : {self.severity}"
 
 class ImportedAlleleInfoValidation(TimeStampedModel):
     imported_allele_info = ForeignKey('ImportedAlleleInfo', on_delete=CASCADE)

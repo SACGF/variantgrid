@@ -100,7 +100,6 @@ table.dataTable tr.odd:hover .toggle-link:before, table.dataTable tr.even:hover 
 }
 table.dataTable .dt-detail {
   font-size: 12px;
-  white-space: pre-wrap;
   color: #444444;
   font-family: monospace;
 }

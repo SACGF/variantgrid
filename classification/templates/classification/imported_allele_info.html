@@ -27,6 +27,7 @@
     </script>
     <div class="container-table">
         <h4>Allele Import Info</h4>
+        <a class="download-link" href="{% url 'imported_allele_info_download' %}">Download All</a><br/>
         <a class="hover-link" href="{% url 'hgvs_issues' %}">View Legacy HGVS Issues page here</a>
         <table id="imported-allele-info-datatables"
                data-datatable-url="{% url 'imported_allele_info_datatables' %}"

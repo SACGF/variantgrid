@@ -14,6 +14,7 @@ from django.utils import html
 from django.utils.safestring import SafeString
 
 from library.utils import diff_text
+from snpdb.admin_utils import get_admin_url
 from variantgrid.perm_path import get_visible_url_names
 
 register = template.Library()
@@ -575,13 +576,7 @@ def admin_link(context, object: Model):
         return {}
     url: Optional[str] = None
     if isinstance(object, Model):
-        try:
-            model = object._meta.model
-            meta = model._meta
-            path = f"admin:{meta.app_label}_{meta.model_name}_change"
-            url = reverse(path, kwargs={"object_id": object.pk})
-        except NoReverseMatch:
-            pass
+        url = get_admin_url(object)
     return {"url": url}
 
 

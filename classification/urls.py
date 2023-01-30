@@ -27,7 +27,7 @@ from classification.views.evidence_keys_view import EvidenceKeysView
 from classification.views.hgvs_issues_view import view_hgvs_issues, download_hgvs_issues, AlleleColumns, \
     download_liftover_report
 from classification.views.imported_allele_info_view import view_imported_allele_info, ImportedAlleleInfoColumns, \
-    view_imported_allele_info_detail
+    view_imported_allele_info_detail, download_allele_info
 from classification.views.views import classification_import_tool, AutopopulateView
 from classification.views.views_uploaded_classifications_unmapped import UploadedClassificationsUnmappedView, \
     UploadedClassificationsUnmappedColumns, download_classification_unmapped_file, \
@@ -151,6 +151,7 @@ urlpatterns = [
     perm_path('hgvs_issues_download', download_hgvs_issues, name='hgvs_issues_download'),
     perm_path('imported_allele_info', view_imported_allele_info, name='view_imported_allele_info'),
     perm_path('imported_allele_info/<int:pk>', view_imported_allele_info_detail, name='view_imported_allele_info_detail'),
+    perm_path('imported_allele_info/download', download_allele_info, name='imported_allele_info_download'),
     perm_path('liftover_report', download_liftover_report, name='liftover_report'),
 
     perm_path('classification_graphs', views.classification_graphs, name='classification_graphs'),

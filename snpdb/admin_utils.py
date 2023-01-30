@@ -6,9 +6,9 @@ from dateutil.tz import gettz
 from django.conf import settings
 from django.contrib import admin, messages
 from django.db import models
-from django.db.models import AutoField, ForeignKey, DateTimeField
+from django.db.models import AutoField, ForeignKey, DateTimeField, Model
 from django.http import HttpResponse, StreamingHttpResponse, HttpResponseRedirect
-from django.urls import path
+from django.urls import path, NoReverseMatch, reverse
 from django.utils.encoding import smart_str
 from django_json_widget.widgets import JSONEditorWidget
 from guardian.admin import GuardedModelAdminMixin
@@ -303,3 +303,13 @@ class ModelAdminBasics(admin.ModelAdmin):
 
 class GuardedModelAdminBasics(GuardedModelAdminMixin, ModelAdminBasics):
     pass
+
+
+def get_admin_url(obj: Model):
+    try:
+        model = obj._meta.model
+        meta = model._meta
+        path = f"admin:{meta.app_label}_{meta.model_name}_change"
+        return reverse(path, kwargs={"object_id": obj.pk})
+    except NoReverseMatch:
+        return None

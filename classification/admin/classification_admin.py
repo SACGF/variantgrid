@@ -671,6 +671,7 @@ class MatchingOnFilter(admin.SimpleListFilter):
         return queryset
 
 
+
 class ImportedAlleleInfoValidationInline(admin.TabularInline):
     model = ImportedAlleleInfoValidation
     fields = ['c_hgvs_37', 'c_hgvs_38', 'confirmed', 'include', 'validation_tags']
@@ -700,7 +701,7 @@ class ImportedAlleleInfoAdmin(ModelAdminBasics):
         "grch38",
         "variant_coordinate"
     )
-    list_filter = ('imported_genome_build_patch_version', 'status', MatchingOnFilter)
+    list_filter = ('imported_genome_build_patch_version', 'status', 'latest_validation__confirmed', MatchingOnFilter)
     search_fields = ('imported_c_hgvs', 'imported_g_hgvs')
     inlines = (ImportedAlleleInfoValidationInline,)
 
