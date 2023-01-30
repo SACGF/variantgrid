@@ -90,6 +90,9 @@ class ResolvedVariantInfo(TimeStampedModel):
     def __str__(self):
         return f"{self.c_hgvs}" if self.c_hgvs else "Could not resolve c.HGVS"
 
+    def __lt__(self, other):
+        return (self.genomic_sort or '') < (other.genomic_sort or '')
+
     @property
     def allele(self) -> Optional[Allele]:
         return self.allele_info.allele
