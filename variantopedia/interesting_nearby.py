@@ -87,7 +87,6 @@ def interesting_summary(qs, user, genome_build, total=True, clinvar=True, classi
                         clinical_significance=False) -> Tuple[str, Dict[str, int]]:
     """ returns a strin summary, and dict of tag counts (so you can format w/colors) """
     counts = interesting_counts(qs, user, genome_build, clinical_significance=clinical_significance)
-    print(counts)
     summary = ""
     tag_counts = {}
 
