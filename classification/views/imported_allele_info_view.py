@@ -15,17 +15,15 @@ from library.django_utils import get_url_from_view_path
 from library.guardian_utils import is_superuser
 from library.utils import MultiDiff, MultiDiffInput, ExportRow, export_column
 from snpdb.admin_utils import get_admin_url
-from snpdb.models import GenomeBuild, Lab
+from snpdb.models import GenomeBuild, Lab, Allele
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, CellData, SortOrder
 import re
 
 
 class ImportedAlleleInfoColumns(DatatableConfig[ImportedAlleleInfo]):
 
-    def render_status(self, data: CellData):
-        return ImportedAlleleInfoStatus(data.value).label
-
-    def render_c_hgvs(self, data: CellData):
+    @staticmethod
+    def render_c_hgvs(data: CellData):
         c_hgvs_str: Optional[str] = None
         c_hgvs: Optional[CHGVS] = None
         variant_id: Optional[int] = None
@@ -45,7 +43,7 @@ class ImportedAlleleInfoColumns(DatatableConfig[ImportedAlleleInfo]):
         if c_hgvs_str:
             if c_hgvs := CHGVS(c_hgvs_str):
                 json_data = c_hgvs.to_json()
-                json_data['variant_id'] = variant_id
+                # json_data['variant_id'] = variant_id
                 return json_data
             else:
                 return {
@@ -65,6 +63,15 @@ class ImportedAlleleInfoColumns(DatatableConfig[ImportedAlleleInfo]):
                 return {"error": "Not resolved to a variant"}
         else:
             return {"error": error}
+
+    @staticmethod
+    def render_allele(data: CellData):
+        if value := data.value:
+            allele = Allele.objects.get(pk=value)
+            return {
+                "text": f'{allele:CA}',
+                "url": allele.get_absolute_url()
+            }
 
     def __init__(self, request: HttpRequest):
         super().__init__(request)
@@ -86,7 +93,7 @@ class ImportedAlleleInfoColumns(DatatableConfig[ImportedAlleleInfo]):
                 key='imported_c_hgvs',
                 label='Imported<br/>c.HGVS',
                 orderable=True,
-                renderer=self.render_c_hgvs,
+                renderer=ImportedAlleleInfoColumns.render_c_hgvs,
                 client_renderer='VCTable.hgvs',
                 extra_columns=['imported_g_hgvs', 'variant_coordinate']
             ),
@@ -95,7 +102,7 @@ class ImportedAlleleInfoColumns(DatatableConfig[ImportedAlleleInfo]):
                 label='Resolved GRCh37<br/>c.HGVS',
                 orderable=True,
                 extra_columns=['grch37__variant', 'grch37__error'],
-                renderer=self.render_c_hgvs,
+                renderer=ImportedAlleleInfoColumns.render_c_hgvs,
                 client_renderer='VCTable.hgvs'
             ),
             RichColumn(
@@ -103,8 +110,15 @@ class ImportedAlleleInfoColumns(DatatableConfig[ImportedAlleleInfo]):
                 label='Resolved GRCh38<br/>c.HGVS',
                 orderable=True,
                 extra_columns=['grch38__variant', 'grch38__error'],
-                renderer=self.render_c_hgvs,
+                renderer=ImportedAlleleInfoColumns.render_c_hgvs,
                 client_renderer='VCTable.hgvs'
+            ),
+            RichColumn(
+                key='allele',
+                label='Allele',
+                orderable=True,
+                renderer=ImportedAlleleInfoColumns.render_allele,
+                client_renderer='TableFormat.linkUrl'
             ),
             RichColumn(
                 key='latest_validation__include',
