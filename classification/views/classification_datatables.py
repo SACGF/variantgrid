@@ -120,6 +120,7 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
                 ]
             ),
             RichColumn(
+                enabled=False,
                 key='published_evidence__gene_symbol__value',
                 name='gene_symbol',
                 label='Gene Symbol',
