@@ -67,7 +67,9 @@ class ResolvedVariantInfo(TimeStampedModel):
     @property
     def c_hgvs_obj(self) -> Optional[CHGVS]:
         if self.c_hgvs:
-            return CHGVS(self.c_hgvs)
+            c_hgvs = CHGVS(self.c_hgvs)
+            c_hgvs.genome_build = self.genome_build
+            return c_hgvs
 
     c_hgvs_full = TextField(null=True, blank=True)
     """ c.HGVS with all bases explicit in the case of dels & dups """

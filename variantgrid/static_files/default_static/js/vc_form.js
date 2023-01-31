@@ -783,11 +783,29 @@ const VCForm = (function() {
 
             appendLabelHeadingForKey(SpecialEKeys.GENOME_BUILD, true, 'Build');
 
+            if (this.record.allele && this.record.allele.resolved) {
+                let resolved = this.record.allele.resolved;
+                let hgvsDom = VCTable.format_hgvs(resolved);
+                appendLabelHeading("Variant", hgvsDom);
+                if (resolved.allele_info_id) {
+                    appendLabelHeading('', $('<a>', {'data-toggle':'ajax-modal', href: Urls.view_imported_allele_info_detail(resolved.allele_info_id), text:'Resolution Details'}));
+                }
+            }
+            /*
             let variantText = this.value(SpecialEKeys.C_HGVS) || this.value(SpecialEKeys.G_HGVS) || this.value(SpecialEKeys.VARIANT_COORDINATE) || 'unknown';
+            let variantIcon = 'fas fa-question-circle';
 
             let variantTooltip = [];
             let alleleData = this.record.allele;
             if (alleleData) {
+                if (alleleData.status && alleleData.status !== "M") {
+                    if (alleleData.status === "F") {
+                        variantIcon = 'text-danger fa-magnifying-glass-chart';
+                    } else {
+                        variantIcon = 'text-warning fa-magnifying-glass-chart';
+                    }
+                }
+
                 let clingen = alleleData.clingen_allele_id || "<span class='no-value'>-</span>";
                 if (clingen) {
                     variantTooltip.push(`<strong>ClinGen Canonical Allele ID</strong><br/>${clingen}`);
@@ -816,6 +834,7 @@ const VCForm = (function() {
                 variantElement = $('<span>', {text: variantText});
             }
             appendLabelHeading('Variant', variantElement);
+            */
 
             if (this.record.resolved_condition) {
                 appendLabelHeading('Condition', VCForm.format_condition(this.record.resolved_condition));
@@ -850,19 +869,12 @@ const VCForm = (function() {
             $('<div>', {id:'vc-quick-submit'}).appendTo(jSyncStatus);
         },
 
-        alleleVariantData() {
-            if (this.record.allele && this.record.allele.genome_builds[this.genomeBuild]) {
-                return this.record.allele.genome_builds[this.genomeBuild];
-            }
-            return {};
-        },
-
         variantCoordinate() {
             let vc_value = this.value(SpecialEKeys.VARIANT_COORDINATE);
             if (vc_value) {
                 return vc_value;
             }
-            return this.alleleVariantData().variant_coordinate;
+            return this.record.allele.variant_coordinate;
         },
 
         cHGVS() {
@@ -870,7 +882,9 @@ const VCForm = (function() {
             if (vc_value) {
                 return vc_value;
             }
-            return this.alleleVariantData().c_hgvs;
+            if (this.allele.resolved) {
+                return this.allele.resolved.full;
+            }
         },
 
         populateForm(restrictToKeysSet) {
@@ -2083,8 +2097,7 @@ let VCTable = (function() {
     return VCTable;
 })();
 
-VCTable.hgvs = (data, type, row) => {
-    let parts = data;
+VCTable.format_hgvs = (parts) => {
     if (typeof(parts) == 'string') {
         parts = parts.trim();
         if (!parts.length) {
@@ -2160,7 +2173,7 @@ VCTable.hgvs = (data, type, row) => {
         // used to be display:inline-block; but that doesn't underline
         cDom.append($('<span>', {class:'c-hgvs-nomen', text: limitLength(cNomen, 100)}));
     } else {
-        cDom.append(limitLength(data.full, 100));
+        cDom.append(limitLength(parts.full, 100));
     }
     if (url) {
         cDom = $('<a>', {href: url, html: cDom});
@@ -2195,7 +2208,11 @@ VCTable.hgvs = (data, type, row) => {
     if (pHgvs) {
         $('<span>', {class: 'd-block mt-1 text-secondary', text: limitLength(pHgvs)}).appendTo(dom);
     }
-    return outterDom.prop('outerHTML');
+    return outterDom;
+}
+
+VCTable.hgvs = (data, type, row) => {
+    return VCTable.format_hgvs(data).prop('outerHTML');
 }
 
 VCTable.condition = (data, type, row) => {

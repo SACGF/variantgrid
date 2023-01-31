@@ -93,6 +93,12 @@ class EvidenceMixin:
         except GenomeBuild.DoesNotExist:
             raise ValueError(f"Unsupported GenomeBuild {build_name}")
 
+    def get_genome_build_opt(self) -> Optional[GenomeBuild]:
+        try:
+            return self.get_genome_build()
+        except ValueError:
+            return None
+
     def get_genome_build_patch_version(self) -> GenomeBuildPatchVersion:
         if build_name := self.get(SpecialEKeys.GENOME_BUILD):
             try:

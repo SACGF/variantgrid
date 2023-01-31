@@ -1912,8 +1912,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         # Summary
         data = content['data']
 
-        if self.allele_object:
-            content["allele"] = self.get_allele_info()
+        content["allele"] = self.get_allele_info_dict()
 
         if self.sample:
             content["sample_id"] = self.sample.pk
@@ -2019,74 +2018,80 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             visible_evidence[k] = value
         return visible_evidence
 
-    # def get_variant_info(self, genome_build: GenomeBuild) -> Optional[Dict[str, str]]:
-    #     variant = self.get_variant_for_build(genome_build)
-    #     if variant:
-    #         try:
-    #             g_hgvs = HGVSMatcher(genome_build=genome_build).variant_to_g_hgvs(variant)
-    #             c_hgvs = self.get_c_hgvs(genome_build)
-    #             return {
-    #                 SpecialEKeys.GENOME_BUILD: genome_build.name,
-    #                 SpecialEKeys.VARIANT_COORDINATE: str(variant),
-    #                 SpecialEKeys.G_HGVS: g_hgvs,
-    #                 SpecialEKeys.C_HGVS: c_hgvs,
-    #             }
-    #         except:
-    #             pass
-    #     return None
+    # def get_variant_info_dict(self):
+    #     allele = self.allele_object
+    #     genome_builds = {}
+    #     valid_builds = GenomeBuild.builds_with_annotation_cached()
+    #     for variant_allele in allele.variantallele_set.filter(genome_build__in=valid_builds) \
+    #             .select_related(
+    #         'variant',
+    #         'variant__locus',
+    #         'variant__locus__ref',
+    #         'variant__locus__contig',
+    #         'variant__alt',
+    #         'genome_build'
+    #     ):
+    #         variant = variant_allele.variant
+    #         hgvs_matcher = HGVSMatcher(genome_build=variant_allele.genome_build)
+    #         # getting the g_hgvs is a relatively expensive operation
+    #         # investigate removing it as nothing uses it (as far as I know)
+    #         g_hgvs = hgvs_matcher.variant_to_g_hgvs(variant)
+    #         c_hgvs = self.get_c_hgvs(variant_allele.genome_build)
+    #         build_info = {
+    #             SpecialEKeys.VARIANT_COORDINATE: str(variant),
+    #             SpecialEKeys.G_HGVS: g_hgvs,
+    #             SpecialEKeys.C_HGVS: c_hgvs,
+    #             # "origin" : variant_allele.get_origin_display(),
+    #             "variant_id": variant.pk,
+    #         }
+    #         # origin / conversion tool etc a little bit too detailed for end users downloading this
+    #         """
+    #         if variant_allele.allele_linking_tool:
+    #             build_info["conversion_tool"] = variant_allele.get_allele_linking_tool_display()
+    #
+    #         if variant_allele.error:
+    #             build_info["error"] = variant_allele.error
+    #         """
+    #         genome_builds[variant_allele.genome_build.name] = build_info
 
-    def get_allele_info(self) -> Optional[Dict[str, Any]]:
-        # TODO rename to avoid confusion with allele_info
-        if not self.allele_object:
-            return None
-
-        allele_info = {}
-        try:
-            allele = self.allele_object
-            allele_info["id"] = allele.pk
-            if allele.clingen_allele:
-                allele_info[SpecialEKeys.CLINGEN_ALLELE_ID] = str(allele.clingen_allele)
-
-            genome_builds = {}
-            valid_builds = GenomeBuild.builds_with_annotation_cached()
-            for variant_allele in allele.variantallele_set.filter(genome_build__in=valid_builds)\
-                    .select_related(
-                        'variant',
-                        'variant__locus',
-                        'variant__locus__ref',
-                        'variant__locus__contig',
-                        'variant__alt',
-                        'genome_build'
-                    ):
-                variant = variant_allele.variant
-                hgvs_matcher = HGVSMatcher(genome_build=variant_allele.genome_build)
-                g_hgvs = hgvs_matcher.variant_to_g_hgvs(variant)
-                c_hgvs = self.get_c_hgvs(variant_allele.genome_build)
-                build_info = {
-                    SpecialEKeys.VARIANT_COORDINATE: str(variant),
-                    SpecialEKeys.G_HGVS: g_hgvs,
-                    SpecialEKeys.C_HGVS: c_hgvs,
-                    # "origin" : variant_allele.get_origin_display(),
-                    "variant_id": variant.pk,
-                }
-                # origin / conversion tool etc a little bit too detailed for end users downloading this
-                """
-                if variant_allele.allele_linking_tool:
-                    build_info["conversion_tool"] = variant_allele.get_allele_linking_tool_display()
-
-                if variant_allele.error:
-                    build_info["error"] = variant_allele.error
-                """
-                genome_builds[variant_allele.genome_build.name] = build_info
-
-            if genome_builds:
-                allele_info["genome_builds"] = genome_builds
-        except Allele.DoesNotExist:
-            allele_info = {
-                "error": f"allele does not exist for variant_id {self.variant.pk}"
+    def get_allele_info_dict(self) -> Optional[Dict[str, Any]]:
+        allele_info_dict = {}
+        if allele_info := self.allele_info:
+            resolved_dict = {
+                "allele_id": allele_info.allele_id,
+                "allele_info_id": allele_info.id,
+                "allele_info_status": allele_info.status,
+                "status": allele_info.status,
+                "include": allele_info.latest_validation.include if allele_info.latest_validation else None,
+                "variant_coordinate": allele_info.variant_coordinate
             }
 
-        return allele_info
+            if (genome_build := self.get_genome_build_opt()) and \
+                    (preferred_build := allele_info[self.get_genome_build()]) and \
+                    (c_hgvs := preferred_build.c_hgvs_obj):
+                resolved_dict |= c_hgvs.to_json()
+            elif c_hgvs_raw := self.get(SpecialEKeys.C_HGVS):
+                resolved_dict |= CHGVS(c_hgvs_raw).to_json()
+
+            resolved_dict["allele_id"] = allele_info.allele_id
+            resolved_dict["status"] = allele_info.status
+            if latest_validation := allele_info.latest_validation:
+                resolved_dict["include"] = latest_validation.include
+
+            allele_info_dict["resolved"] = resolved_dict
+
+            genome_builds = {}
+            for variant_info in allele_info.resolved_builds:
+                genome_builds[variant_info.genome_build.name] = {
+                    'variant_id': variant_info.variant_id,
+                    SpecialEKeys.C_HGVS: variant_info.c_hgvs
+                }
+
+            if genome_builds:
+                allele_info_dict["genome_builds"] = genome_builds
+
+        return allele_info_dict
+
 
     def _get_variant_coordinates_from_evidence(self) -> VariantCoordinateFromEvidence:
         vcfe = VariantCoordinateFromEvidence(self)
