@@ -22,11 +22,14 @@
     {% labelled label=variant_coordinate_label value_css="text-monospace" %}{{ allele_info.variant_coordinate }}{% endlabelled %}
 
     <hr>
+    {% if allele_info.status != "M" %}
+        {% labelled label="Matching Status" %}{{ allele_info.get_status_display }}{% endlabelled %}
+    {% endif %}
     {% labelled label="Resolution Differences" %}
         {% if validation_tags %}
             {% for tag in validation_tags %}
                 <div><nomin>
-                    {% if tag.severity == 'E' %}<i class="text-danger fa-brands fa-searchengin" title="Variant Matching Error"></i>
+                    {% if tag.severity == 'E' %}<i class="text-danger fa-brands fa-searchengin" title="Variant Matching Requires Confirmation"></i>
                     {% elif tag.severity == 'W' %}<i class="text-info fa-brands fa-searchengin" title="Variant Matching Info"></i>
                     {% else %}{{ tag.severity }}
                     {% endif %}
@@ -35,7 +38,6 @@
             {% endfor %}
         {% else %}<span class="no-value">None</span>{% endif %}
     {% endlabelled %}
-    {% labelled label="Matching Status" %}{{ allele_info.get_status_display }}{% endlabelled %}
     {% labelled label="Include" %}{{ allele_info.latest_validation.include | boolean }} {% admin_link allele_info.latest_validation %}{% endlabelled %}
     {% if allele_info.latest_validation.confirmed %}
         {% labelled label="Confirmed By" %}{{ allele_info.latest_validation.confirmed_by }}{% endlabelled %}

@@ -55,6 +55,7 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
         response['allele_id'] = row.get('classification__allele_info__allele_id')
         response['allele_info_id'] = row.get('classification__allele_info__id')
         response['validation_include'] = row.get('classification__allele_info__latest_validation__include')
+        response['allele_info_status'] = row.get('classification__allele_info__status')
 
         return response
 
@@ -142,7 +143,8 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
                     'published_evidence__genome_build__value',
                     'classification__allele_info__id',
                     'classification__allele_info__allele_id',
-                    'classification__allele_info__latest_validation__include'
+                    'classification__allele_info__latest_validation__include',
+                    'classification__allele_info__status'
                 ]
             ),
             RichColumn(

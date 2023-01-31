@@ -2,7 +2,8 @@
 {% if imported_allele_info %}
     <a data-toggle="ajax-modal" href="{% url 'view_imported_allele_info_detail' imported_allele_info.pk %}?on_allele_page={{ on_allele_page|default_if_none:'false' }}">
     {{ imported_allele_info.imported_genome_build_patch_version }}<br/>{% c_hgvs imported_allele_info.imported_c_hgvs %}
-    {% if not imported_allele_info.latest_validation.include %}<i style="font-size:12pt" class="mx-2 text-danger fa-brands fa-searchengin" title="Variant Matching Error"></i>{% endif %}
+    {% if imported_allele_info.status == 'F' %}<i style="font-size:10pt" class="mx-2 text-danger fa-magnifying-glass-chart" title="Variant Matching Failure"></i>{% endif %}
+    {% if not imported_allele_info.latest_validation.include %}<i style="font-size:12pt" class="mx-2 text-danger fa-brands fa-searchengin" title="Variant Matching Requires Confirmation"></i>{% endif %}
     </a>
 {% else %}
     <span class="no-value">-</span>

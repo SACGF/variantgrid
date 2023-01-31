@@ -2103,6 +2103,7 @@ VCTable.hgvs = (data, type, row) => {
     let alleleId = parts.allele_id;
     let validationInclude = parts.validation_include;
     let alleleInfoId = parts.allele_info_id;
+    let alleleInfoStatus = parts.allele_info_status;
     let pHgvs = parts.p_hgvs;
     let url = null;
     let error = parts.error;
@@ -2165,11 +2166,27 @@ VCTable.hgvs = (data, type, row) => {
         cDom = $('<a>', {href: url, html: cDom});
     }
     dom.append(cDom);
-    if (validationInclude === false) {
+    if (alleleInfoStatus && alleleInfoStatus !== 'M') {
+        let infoText = 'Matching';
+        let infoColor = 'text-success';
+        switch (alleleInfoStatus) {
+            case 'P': infoText = 'This record is currently undergoing variant matching'; break;
+            case 'C': infoText = 'This record is currently being lifted over to other genome builds'; break;
+            case 'F': infoText = 'We could not link this record to a variant'; infoColor = 'text-danger'; break;
+        }
+        $("<i>",
+            {
+                style: 'font-size:10pt',
+                class: `${infoColor} fa-solid fa-magnifying-glass-chart ml-1`,
+                title: infoText
+            }
+        ).appendTo(dom);
+    }
+    if (validationInclude === false && alleleInfoStatus !== 'F') {
         $("<i>",
             {
                 style: 'font-size:12pt',
-                class: 'text-danger fa-brands fa-searchengin ml-2',
+                class: 'text-danger fa-brands fa-searchengin ml-1',
                 title: 'This row will not appear in downloads due to outstanding variant matching issues'
             }
         ).appendTo(dom);
