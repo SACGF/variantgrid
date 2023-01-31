@@ -159,7 +159,7 @@ class ImportedAlleleInfoStatus(TextChoices):
     """ We have a variant for the imported build, but not yet lifted it over """
 
     MATCHED_ALL_BUILDS = "M", "Matched All Builds"
-    """ There's a 37 and 38 variant linked """
+    """ There's a 37 and 38 variant linked (or at least there was an attempted liftover) """
 
     FAILED = "F", "Failed"
 
