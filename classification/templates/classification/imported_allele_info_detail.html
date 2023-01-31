@@ -35,6 +35,7 @@
             {% endfor %}
         {% else %}<span class="no-value">None</span>{% endif %}
     {% endlabelled %}
+    {% labelled label="Matching Status" %}{{ allele_info.get_status_display }}{% endlabelled %}
     {% labelled label="Include" %}{{ allele_info.latest_validation.include | boolean }} {% admin_link allele_info.latest_validation %}{% endlabelled %}
     {% if allele_info.latest_validation.confirmed %}
         {% labelled label="Confirmed By" %}{{ allele_info.latest_validation.confirmed_by }}{% endlabelled %}
