@@ -213,7 +213,7 @@ table.diff tbody tr.textarea td {
   cursor: help;
 }
 .override:after {
-  content: "*";
+  content: '*';
   color: #888;
 }
 
@@ -244,8 +244,8 @@ table.diff tbody tr.textarea td {
   min-width: 100px;
 }
 .classification-table td.dt-id, .classification-table td.id {
-  width: 200px;
-  min-width: 150px;
+  width: 240px;
+  min-width: 190px;
   word-break: break-word;
 }
 .classification-table td.dt-id img, .classification-table td.id img {
