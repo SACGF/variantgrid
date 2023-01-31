@@ -301,7 +301,7 @@ class MutationSignatures:
 # ==============================================================================
 
 
-def mutIdxList_to_freq_array(mutIdxList, dtype=np.int, normalised=False):
+def mutIdxList_to_freq_array(mutIdxList, dtype=int, normalised=False):
     outputarray = np.asarray([0] * TOTAL_MUTATION_TYPES, dtype=dtype)
     idx_freq = defaultdict(int)
 
