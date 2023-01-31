@@ -1,19 +1,12 @@
-import csv
 import time
-from time import sleep
-from typing import List, Dict, Optional, Set
+from typing import Dict
 
 from django.core.management import BaseCommand
-from django.db.models import Q
-
-from classification.classification_import import process_classification_import
-from classification.enums import SpecialEKeys
-from classification.models import Classification, ClassificationImport, ImportedAlleleInfo, classification_flag_types
-from classification.models.classification_import_run import ClassificationImportRun
-from flags.models import Flag, FlagComment, FlagType
+from classification.models import Classification, ImportedAlleleInfo, classification_flag_types
+from flags.models import FlagComment, FlagType
 from library.guardian_utils import admin_bot
 from library.utils import first
-from snpdb.models import ImportSource, allele_flag_types
+from snpdb.models import allele_flag_types
 
 
 class Command(BaseCommand):
@@ -45,10 +38,6 @@ class Command(BaseCommand):
         # if not any([mode_all, mode_missing, mode_file, mode_extra, mode_validation]):
         #     raise ValueError("Need one of all, file, missing, mode_extra, mode_validation")
 
-        row_count = 0
-        batch_size = 50
-        import_keys: Optional[Set[str]] = None
-
         if mode_extra:
             self.handle_extra()
             return
@@ -56,6 +45,9 @@ class Command(BaseCommand):
             self.handle_validation()
             return
 
+        # row_count = 0
+        # batch_size = 50
+        # import_keys: Optional[Set[str]] = None
         # if mode_missing:
         #     batch_size = 1
         # elif mode_file:
@@ -108,6 +100,7 @@ class Command(BaseCommand):
         time.sleep(10)
 
     def handle_extra(self):
+        i = 0
         for i, c in enumerate(Classification.objects.all()):
             if i % 100 == 0:
                 print(f"Processed {i} classifications")
@@ -213,7 +206,6 @@ class Command(BaseCommand):
                             latest_validation.confirmed_by = first(users)
                             latest_validation.confirmed_by_note = "\n".join(comments) if comments else ""
                             latest_validation.save()
-
 
     # def handle_batch(self, batch: List[Classification]):
     #     ClassificationImportRun.record_classification_import("variant_rematching", len(batch))
