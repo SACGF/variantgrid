@@ -414,6 +414,9 @@ TableFormat.text = (data, type, row) => {
 };
 
 TableFormat.linkUrl = (data, type, row) => {
+    if (!data) {
+        return '<span class="no-value">-</span>';
+    }
     let text = data.text;
 
     let textDom;
