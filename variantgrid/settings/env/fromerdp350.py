@@ -32,13 +32,23 @@ ANNOTATION_ENTREZ_EMAIL = 'davmlaw@gmail.com'
 
 ANNOTATION[BUILD_GRCH37].update({
     "annotation_consortium": "RefSeq",
+    "columns_version": 2,
     "reference_fasta": os.path.join(_ANNOTATION_FASTA_BASE_DIR, "GCF_000001405.25_GRCh37.p13_genomic.fna.gz")
 })
 ANNOTATION[BUILD_GRCH38].update({
     "annotation_consortium": "RefSeq",
+    "columns_version": 2,
     "enabled": True,
     "reference_fasta": os.path.join(_ANNOTATION_FASTA_BASE_DIR, "GCF_000001405.39_GRCh38.p13_genomic.fna.gz")
 })
+
+ANNOTATION[BUILD_GRCH37]["vep_config"].update({
+    "dbnsfp": "annotation_data/GRCh37/dbNSFP4.3a.grch37.stripped.gz",
+})
+ANNOTATION[BUILD_GRCH38]["vep_config"].update({
+    "dbnsfp": "annotation_data/GRCh38/dbNSFP4.3a.grch38.stripped.gz",
+})
+
 
 COMPANY = "SA_Pathology"  # Used for gene lists
 
