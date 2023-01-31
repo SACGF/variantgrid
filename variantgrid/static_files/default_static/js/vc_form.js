@@ -2248,7 +2248,7 @@ VCTable.identifier = (data, type, row) => {
         html: [
             icon,
             $('<span>', {text: `${org_name} / ${lab_name}`}),
-            ' / ',
+            '<br/>',
             limitLengthSpan(lab_record_id, 50)
         ]
     });
