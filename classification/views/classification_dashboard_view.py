@@ -147,10 +147,13 @@ class ClassificationDashboard:
                 classification_flag_types.classification_not_public
             ])
 
+        variant_matching_issues = vcqs.exclude(allele_info__latest_validation__include=True)
+
         return {
             "internal_review": internal_review.count(),
             "pending_changes": pending_changes.count(),
             "significance_change": significance_change.count(),
+            "variant_matching_issues": variant_matching_issues.count(),
             "discordant": discordant.count(),
             "variant_matching": variant_matching.count(),
             "suggestions": suggestions.count(),

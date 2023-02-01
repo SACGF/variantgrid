@@ -866,7 +866,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         self.share_level = value.value
 
     @classmethod
-    def filter_for_user(cls, user, queryset=None, **kwargs):
+    def filter_for_user(cls, user: User, queryset: Optional[QuerySet] = None, **kwargs) -> QuerySet:
         """ Classification only has write permission, View is based on a version in a point at time
             see ClassificationModification's read permission """
         klass = queryset if queryset is not None else cls

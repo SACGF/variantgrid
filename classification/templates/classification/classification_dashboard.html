@@ -167,6 +167,11 @@
     {% labelled hint="tiny" label="Classifications in Internal Review" %}{{ dlab.counts.internal_review | number:'W' }}{% endlabelled %}
     {% labelled hint="tiny" label="Classifications with Outstanding Clinical Significance Changes" %}{{ dlab.counts.significance_change | number:'W' }}{% endlabelled %}
     {% labelled hint="tiny" label="Classifications Excluded from ClinVar" %}{{ dlab.counts.clinvar_exclude | number }}{% endlabelled %}
+    <hr/>
+    {% labelled hint="tiny" label="Classifications waiting on Variant Matching Review" %}
+        {{ dlab.counts.variant_matching_issues | number:'W' }}
+        <p class="text-info">Classifications waiting on Variant Matching Review require an admin user to action</p>
+    {% endlabelled %}
 
     <p><a href="#flagged-classifications" class="toggle-link" data-toggle="collapse">Show details</a></p>
 
@@ -185,9 +190,11 @@
                 <table id="classifications-comment" data-datatable-url="{% url 'classification_datatables' %}" class="sticky-header classification-table" data-datatable-data="classificationSigChanges"></table>
             {% end_ui_register_tab_embedded %}
 
+            {% comment %}
             {% ui_register_tab_embedded tab_set="classification_issues" label="Variant Matching Issues" badge=dlab.counts.variant_matching %}
                 <table id="classifications-matching" data-datatable-url="{% url 'classification_datatables' %}" class="sticky-header classification-table" data-datatable-data="classificationMatchingVariant"></table>
             {% end_ui_register_tab_embedded %}
+            {% endcomment %}
 
             {% ui_register_tab_embedded tab_set="classification_issues" label="Unshared" badge=dlab.counts.unshared %}
                 <table id="classifications-unshared" data-datatable-url="{% url 'classification_datatables' %}" class="sticky-header classification-table" data-datatable-data="classificationUnshared"></table>
