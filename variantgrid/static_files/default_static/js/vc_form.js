@@ -2195,7 +2195,7 @@ VCTable.format_hgvs = (parts) => {
             }
         ).appendTo(dom);
     }
-    if (validationInclude === false && alleleInfoStatus !== 'F') {
+    if (validationInclude === false && alleleInfoStatus !== 'M') {
         $("<i>",
             {
                 style: 'font-size:12pt',
