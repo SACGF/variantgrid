@@ -2184,7 +2184,7 @@ VCTable.format_hgvs = (parts) => {
         let infoColor = 'text-success';
         switch (alleleInfoStatus) {
             case 'P': infoText = 'This record is currently undergoing variant matching'; break;
-            case 'C': infoText = 'This record is currently being lifted over to other genome builds'; break;
+            case 'I': infoText = 'This record is currently being lifted over to other genome builds'; infoColor = 'text-warning'; break;
             case 'F': infoText = 'We could not link this record to a variant'; infoColor = 'text-danger'; break;
         }
         $("<i>",
