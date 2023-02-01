@@ -35,7 +35,7 @@
                class="sticky-header"
         ></table>
         <div data-toolbar="#imported-allele-info-datatables">
-            <div id="imported-allele-info-datatables-filter" class="float-right mr-4" style="position:relative;top:6px">
+            <div id="imported-allele-info-datatables-filter" style="position:relative;top:6px">
                 <div class="form-check-inline">
                     <input type="checkbox" class="form-check-input" id="transcript_type_not_supported" onclick="applyFilters()"/>
                     <label for="transcript_type_not_supported" title="Only show records where the imported transcript type is not supported">Transcript Type Not Supported</label>
@@ -56,7 +56,7 @@
                     <input type="checkbox" class="form-check-input" id="missing_build" onclick="applyFilters()"/>
                     <label for="missing_build" title="Only show records where either a 37 or a 38 build is missing (but not both)">Missing 1 Build</label>
                 </div>
-                <div class="form-check-inline">|</div>
+                <br/>
                 <div class="form-check-inline">
                     <input type="checkbox" class="form-check-input" id="confirmed" onclick="applyFilters()"/>
                     <label for="confirmed" title="Only show records which an admin has confirmed">Confirmed</label>
@@ -64,6 +64,11 @@
                 <div class="form-check-inline">
                     <input type="checkbox" class="form-check-input" id="exclude" onclick="applyFilters()"/>
                     <label for="exclude" title="Only show records that will be excluded from export">Excluded</label>
+                </div>
+                <br/>
+                <div class="form-check-inline">
+                    <input type="checkbox" class="form-check-input" id="in_progress" onclick="applyFilters()"/>
+                    <label for="in_progress" title="Only show records that claim they're still being resolved">In Progress</label>
                 </div>
                 <div class="form-check-inline">
                     <input type="checkbox" class="form-check-input" id="errors_mode" onclick="applyFilters()"/>
