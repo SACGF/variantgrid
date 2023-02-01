@@ -2180,17 +2180,18 @@ VCTable.format_hgvs = (parts) => {
     }
     dom.append(cDom);
     if (alleleInfoStatus && alleleInfoStatus !== 'M') {
+        let icon = 'fa-magnifying-glass-chart';
         let infoText = 'Matching';
         let infoColor = 'text-success';
         switch (alleleInfoStatus) {
             case 'P': infoText = 'This record is currently undergoing variant matching'; break;
-            case 'I': infoText = 'This record is currently being lifted over to other genome builds'; infoColor = 'text-warning'; break;
+            case 'I': infoText = 'This record is currently being lifted over to other genome builds'; icon = 'fa-magnifying-glass-arrow-right'; break;
             case 'F': infoText = 'We could not link this record to a variant'; infoColor = 'text-danger'; break;
         }
         $("<i>",
             {
                 style: 'font-size:10pt',
-                class: `${infoColor} fa-solid fa-magnifying-glass-chart ml-1`,
+                class: `${infoColor} fa-solid ${icon} ml-1`,
                 title: infoText
             }
         ).appendTo(dom);
