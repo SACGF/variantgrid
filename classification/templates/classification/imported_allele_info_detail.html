@@ -40,8 +40,10 @@
     {% endlabelled %}
     {% labelled label="Can Include in Exports" %}{{ allele_info.latest_validation.include | boolean }} {% admin_link allele_info.latest_validation %}{% endlabelled %}
     {% if allele_info.latest_validation.confirmed %}
-        {% labelled label="Confirmed By" %}{{ allele_info.latest_validation.confirmed_by }}{% endlabelled %}
+        {% labelled label="Manually Confirmed" %}{{ True | boolean }} by {{ allele_info.latest_validation.confirmed_by }}{% endlabelled %}
         {% labelled label="Confirmed Note" %}{{ allele_info.latest_validation.confirmed_by_note | multi_line_text }}{% endlabelled %}
+    {% else %}
+        {% labelled label="Manually Confirmed" %}{{ False | boolean }}{% endlabelled %}
     {% endif %}
     {% if allele_info.message %}
         {% labelled label="Note" %}{{ allele_info.message }}{% endlabelled %}
@@ -62,16 +64,21 @@
                 <div><a class="hover-link" href="{% url 'view_gene_symbol' gene_symbol.pk %}">{{ gene_symbol }}</a></div>
             {% endfor %}
         {% endlabelled %}
-        {% labelled label="Classifications" %}
-            {% for classification in allele_info.classification_set.all %}
-                <div>
-                {% classification_quick classification %}
-                    {% if not on_allele_page %}
-                        <div class="flags d-inline-block" style="margin-left:12px" data-flags="{{ classification.flag_collection_id }}">...</div>
-                    {% endif %}
-                </div>
+        {% labelled label="Transcripts" %}
+            {% for transcript in allele_info.transcripts %}
+                <div><a class="hover-link" href="{{ transcript.get_absolute_url }}">{{ transcript }}</a></div>
             {% endfor %}
         {% endlabelled %}
+        {% if not on_allele_page %}
+            {% labelled label="Classifications" %}
+                {% for classification in allele_info.classification_set.all %}
+                    <div>
+                    {% classification_quick classification %}
+                        <div class="flags d-inline-block" style="margin-left:12px" data-flags="{{ classification.flag_collection_id }}">...</div>
+                    </div>
+                {% endfor %}
+            {% endlabelled %}
+        {% endif %}
     </div>
 </div>
 <script>

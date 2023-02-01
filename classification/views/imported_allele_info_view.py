@@ -14,6 +14,7 @@ from genes.hgvs import CHGVS, CHGVSDiff, chgvs_diff_description
 from library.django_utils import get_url_from_view_path
 from library.guardian_utils import is_superuser
 from library.utils import MultiDiff, MultiDiffInput, ExportRow, export_column
+from library.utils.django_utils import render_ajax_view
 from snpdb.admin_utils import get_admin_url
 from snpdb.models import GenomeBuild, Lab, Allele
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, CellData, SortOrder
@@ -166,7 +167,7 @@ class ImportedAlleleInfoColumns(DatatableConfig[ImportedAlleleInfo]):
         if (exclude := self.get_query_param('exclude')) and exclude == 'true':
             qs = qs.filter(latest_validation__include=False)
         if (error_mode := self.get_query_param('errors_mode')) and error_mode == 'true':
-            qs = qs.filter(Q(status=ImportedAlleleInfoStatus.FAILED) | Q(grch37__isnull=True) | Q(grch38__isnull=True))
+            qs = qs.filter(Q(status=ImportedAlleleInfoStatus.FAILED))  # | Q(grch37__isnull=True) | Q(grch38__isnull=True))
         if (in_progress := self.get_query_param('in_progress')) and in_progress == 'true':
             qs = qs.filter(Q(status__in=(ImportedAlleleInfoStatus.PROCESSING, ImportedAlleleInfoStatus.MATCHED_IMPORTED_BUILD)))
 
@@ -228,7 +229,7 @@ def view_imported_allele_info_detail(request: HttpRequest, pk: int):
         if (c37c := c37.c_hgvs_obj) and (c38c := c38.c_hgvs_obj):
             liftover_diff = c37c.diff(c38c)
 
-    return render(request, "classification/imported_allele_info_detail.html", {
+    return render_ajax_view(request, "classification/imported_allele_info_detail.html", {
         "allele_info": get_object_or_404(ImportedAlleleInfo, pk=pk),
         "c_hgvses": diff_output,
         "normalized_diff": chgvs_diff_description(normalized_diff) if normalized_diff else None,

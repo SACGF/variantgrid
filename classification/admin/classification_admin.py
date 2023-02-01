@@ -696,7 +696,7 @@ class ImportedAlleleInfoAdmin(ModelAdminBasics):
         "id",
         "imported_hgvs",
         "imported_genome_build_patch_version",
-        "status",g
+        "status",
         "validation_include",
         "grch37",
         "grch38",

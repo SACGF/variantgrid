@@ -9,7 +9,7 @@ from django.db.models import TextField, ForeignKey, CASCADE, SET_NULL, OneToOneF
 from django.utils.timezone import now
 from model_utils.models import TimeStampedModel
 from genes.hgvs import HGVSMatcher, CHGVS, CHGVSDiff
-from genes.models import TranscriptVersion, GeneSymbol
+from genes.models import TranscriptVersion, GeneSymbol, Transcript
 from library.cache import timed_cache
 from library.log_utils import report_exc_info
 from library.utils import pretty_label
@@ -182,7 +182,7 @@ _VALIDATION_TO_SEVERITY: [str, ALLELE_INFO_VALIDATION_SEVERITY] = {
     'transcript_version_change': "W",
     'gene_symbol_change': "E",
     'c_nomen_change': "E",
-    'missing_37': "W",
+    'missing_37': "E",
     'missing_38': "E"
 }
 
@@ -466,6 +466,14 @@ class ImportedAlleleInfo(TimeStampedModel):
                 if symbol := GeneSymbol.cast(imported_gene_symbol_str):
                     gene_symbol_set.add(symbol)
         return list(sorted(gene_symbol_set))
+
+    @property
+    def transcript_versions(self) -> List[TranscriptVersion]:
+        return list(sorted({build.transcript_version for build in self.resolved_builds if build.transcript_version}))
+
+    @property
+    def transcripts(self) -> List[Transcript]:
+        return list(sorted({build.transcript_version.transcript for build in self.resolved_builds if build.transcript_version}))
 
     @staticmethod
     def is_supported_transcript(transcript_or_hgvs: str):
