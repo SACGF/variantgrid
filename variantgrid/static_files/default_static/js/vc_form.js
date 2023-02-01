@@ -2101,11 +2101,11 @@ VCTable.format_hgvs = (parts) => {
     if (typeof(parts) == 'string') {
         parts = parts.trim();
         if (!parts.length) {
-            return $('<span>', {text:'-', class:'no-value'}).prop('outerHTML');
+            return $('<span>', {text:'-', class:'no-value'});
         }
-        return $('<span>', {text:limitLength(parts, 100)}).prop('outerHTML');
+        return $('<span>', {text:limitLength(parts, 100)});
     } else if (!parts) {
-        return $('<span>', {text:'-', class:'no-value'}).prop('outerHTML');
+        return $('<span>', {text:'-', class:'no-value'});
     }
     let genomeBuild = parts.genome_build;
     let transcript = parts.transcript;
@@ -2122,7 +2122,7 @@ VCTable.format_hgvs = (parts) => {
     let error = parts.error;
 
     if (error) {
-        return $(`<span><i class="fa-solid fa-circle-exclamation text-danger"></i> ${error}</span>`).prop('outerHTML');
+        return $(`<span><i class="fa-solid fa-circle-exclamation text-danger"></i> ${error}</span>`);
     }
 
     if (variantId) {
