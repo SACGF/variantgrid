@@ -693,13 +693,15 @@ class ImportedAlleleInfoValidationInline(admin.TabularInline):
 @admin.register(ImportedAlleleInfo)
 class ImportedAlleleInfoAdmin(ModelAdminBasics):
     list_display = (
+        "id",
         "imported_hgvs",
         "imported_genome_build_patch_version",
-        "status",
+        "status",g
         "validation_include",
         "grch37",
         "grch38",
-        "variant_coordinate"
+        "variant_coordinate",
+        "created"
     )
     list_filter = ('imported_genome_build_patch_version', 'status', 'latest_validation__confirmed', MatchingOnFilter)
     search_fields = ('imported_c_hgvs', 'imported_g_hgvs')
