@@ -770,7 +770,15 @@ class ImportedAlleleInfoValidationAdmin(ModelAdminBasics):
             iaiv.confirmed_by = request.user
             iaiv.save()
 
-    @admin_action("Reset Confirmation")
+    @admin_action("Confirm Exclude")
+    def override_reject(self, request, queryset: QuerySet[ImportedAlleleInfoValidation]):
+        for iaiv in queryset:
+            iaiv.include = False
+            iaiv.confirmed = True
+            iaiv.confirmed_by = request.user
+            iaiv.save()
+
+    @admin_action("Confirm Reset")
     def remove_confirmation(self, request, queryset: QuerySet[ImportedAlleleInfoValidation]):
         for iaiv in queryset:
             iaiv.remove_override()
