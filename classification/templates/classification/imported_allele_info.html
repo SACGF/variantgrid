@@ -33,7 +33,7 @@
             }
             for (let tag of data.tags) {
                 let color = tag.severity == "E" ? "text-danger" : "text-warning"
-                $('<div>', {text: tag.label, class: color}).appendTo(dom);
+                $('<div>', {text: tag.label, style: 'font-weight: bold', class: 'mt-1 ' + color}).appendTo(dom);
             }
             return dom.prop('outerHTML');
         }

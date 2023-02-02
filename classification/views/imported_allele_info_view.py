@@ -135,7 +135,6 @@ class ImportedAlleleInfoColumns(DatatableConfig[ImportedAlleleInfo]):
                 orderable=True,
                 extra_columns=['latest_validation__validation_tags'],
                 renderer=ImportedAlleleInfoColumns.render_validation,
-                # client_renderer='TableFormat.boolean.bind(null, "false_is_error")'
                 client_renderer='render_validation'
             ),
             RichColumn(

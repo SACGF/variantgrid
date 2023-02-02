@@ -246,9 +246,14 @@ class ImportedAlleleInfoValidationTagEntry:
             return self.severity
 
     def as_json(self):
+        label: str
+        if self.category == "general":
+            label = self.field_pretty
+        else:
+            label = f"{self.category_pretty} {self.field_pretty}"
         return {
             "severity": self.severity,
-            "label": f"{self.category_pretty} {self.field_pretty}"
+            "label": label
         }
 
     def __lt__(self, other):
