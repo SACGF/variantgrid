@@ -29,4 +29,9 @@
         </div>
     </div>
 </div>
+{% if gene_disease_summary %}
+    <div class="hidden gene-symbol-summary">
+        {{ gene_disease_summary }}
+    </div>
+{% endif %}
 {% endif %}

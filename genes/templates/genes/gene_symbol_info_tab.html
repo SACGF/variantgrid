@@ -1,0 +1,37 @@
+{% load ui_utils %}
+{% load gene_disease_tags %}
+{% load panel_app_tags %}
+
+<div id="gene-symbol-info-tab">
+
+    {% labelled label="Symbol" help=annotation_description.gene_symbol %}
+        <a href="{% url 'view_gene_symbol' hgnc.gene_symbol %}">{{ hgnc.gene_symbol }}</a>
+    {% endlabelled %}
+    {% labelled label="Approved Name" help=annotation_description.hgnc_name %}{{ hgnc.approved_name }}{% endlabelled %}
+    {% labelled label="Summary" help=annotation_description.refseq_gene_summary %}{{ gene_summary }}{% endlabelled %}
+
+    <a id='show-full-gene-info-link' class="toggle-link" data-toggle="collapse" href=".full-gene-info">Show all</a>
+    <div class="full-gene-info collapse">
+        {% gene_disease gene_symbol %}
+
+        {% for server in panel_app_servers %}
+            {% panel_app_gene_evidence server gene_symbol 'addGeneInfoSummary' %}
+        {% endfor %}
+    </div>
+
+</div>
+<script>
+    summaryList = []; // will reset each page reload
+
+    function addGeneInfoSummary(summaryText) {
+        summaryList.push(summaryText);
+        $("#show-full-gene-info-link").html(summaryList.join("<br>"));
+    }
+
+    $(document).ready(function() {
+        let geneInfoTab = $("#gene-symbol-info-tab");
+        $(".gene-symbol-summary", geneInfoTab).each(function() {
+            addGeneInfoSummary($(this).text());
+        });
+    });
+</script>

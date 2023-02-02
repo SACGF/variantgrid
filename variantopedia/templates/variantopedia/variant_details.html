@@ -204,14 +204,27 @@ function transcriptFunc(transcriptId, data) {
 
 
 function geneFunc(geneId, geneSymbol) {
+    let geneInfoDiv = $("#gene-info");
+    let geneInfoDetails = $("#gene-info-details");
+    if (geneSymbol) {
+        geneInfoDetails.load(Urls.gene_symbol_info_tab(geneSymbol, "{{ tool_tips }}"));
+        $("#gene-info-gene-symbol-header").html("Gene: " + geneSymbol);
+        geneInfoDiv.show();
+    } else {
+        geneInfoDiv.hide();
+    }
+
     {% if show_gene_coverage %}
+    let geneCoverage = $("#gene_coverage");
     if (geneSymbol) {
         const currentCoverageGeneId = $("#gene-coverage-data").attr("gene_symbol");
         console.log("currentCoverageGeneId:");
         console.log(currentCoverageGeneId);
         if (currentCoverageGeneId != geneSymbol) {
-            $("#gene_coverage").load(Urls.gene_coverage(geneSymbol));
+            geneCoverage.load(Urls.gene_coverage(geneSymbol));
         }
+    } else {
+        geneCoverage.html("No gene symbol")
     }
     {% endif %}
 }
@@ -644,6 +657,14 @@ function applyVariantValues() {
             <div class='select-transcript-container'></div>
             {% load variant_transcript_select_tags %}
             {% variant_transcript_select transcript_select_jquery='#select-transcript-container' vts=vts transcript_func='transcriptFunc' gene_func='geneFunc' show_all_transcript_details=True %}
+    </div>
+
+    <div id="gene-info" class="container">
+        <div class="card mt-4">
+            <div id='gene-info-gene-symbol-header' class="card-header"></div>
+            <div id="gene-info-details" class="card-body">
+            </div>
+        </div>
     </div>
 
     <div id="transcript-info" class="container">

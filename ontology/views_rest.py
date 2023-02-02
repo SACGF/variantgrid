@@ -60,6 +60,6 @@ class GeneDiseaseRelationshipView(APIView):
         data = []
         ontology_version = OntologyVersion.latest()
         for otr in ontology_version.gene_disease_relations(self.kwargs['gene_symbol'],
-                                                        min_classification=GeneDiseaseClassification.DISPUTED):
+                                                           min_classification=GeneDiseaseClassification.DISPUTED):
             data.append(OntologyTermRelationSerializer(otr).data)
         return Response(data)
