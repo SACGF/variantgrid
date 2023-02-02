@@ -15,14 +15,16 @@
     </td>
     <td data-order="{{ group.variant_sort }}">
         {% for c_hgvs in group.c_hgvses %}
-            <div class="mb-1" style="font-size:11px">{% c_hgvs c_hgvs %}</div>
+            <div class="mb-1" style="font-size:11px">{% c_hgvs c_hgvs %}
+            {% if group.has_matching_error %}
+                <i class="ml-1 fas fa-exclamation-triangle text-warning" title="Some or all of the classifications in this row will not appear in downloads due to outstanding variant matching issues"></i>
+            {% endif %}
+            </div>
         {% endfor %}
         {% for p_hgvs in group.p_hgvses %}
             <div class="mt-1 text-secondary text-monospace"  style="font-size:11px">{{ p_hgvs.p_dot }}</div>
         {% endfor %}
-        {% if group.has_matching_error %}
-        <i style="font-size:12pt" class="text-danger fa-brands fa-searchengin" title="Some or all of the classifications in this row will not appear in downloads due to outstanding variant matching issues"></i>
-        {% endif %}
+
         {% comment %}
             {% if group.flag_types %}
                 <div class="flags mt-1" title="This row may not appear in downloads due to outstanding variant matching issues" data-toggle="tooltip">
@@ -98,10 +100,8 @@
         <td>
             {% for record in group.modifications %}
                 <div class="mt-2 d-flex" style="align-items:center;position:relative;top:5px">
-                    <a class="hover-link" href="{% url 'view_classification' record.classification_id %}">{{ record.classification.lab_record_id }}</a>
-                    {% if not record.classification.allele_info.latest_validation.include %}
-                        <i style="font-size:12pt" class="mx-2 text-danger fa-brands fa-searchengin" title="This row will not appear in downloads due to outstanding variant matching issues"></i>
-                    {% endif %}
+                    <a class="hover-link" style="font-weight:bold" href="{% url 'view_classification' record.classification_id %}">{{ record.classification.lab_record_id }}</a>
+                    {{ record.classification.allele_info.issue_icon|default_if_none:'' }}
                     <div class="flags d-inline-block" style="margin-left:12px" data-flags="{{ record.classification.flag_collection_id }}">...</div>
                 </div>
             {% endfor %}
