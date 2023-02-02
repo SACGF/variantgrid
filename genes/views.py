@@ -17,6 +17,7 @@ from django.utils.datastructures import OrderedSet
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 from django.views.decorators.http import require_POST
+from django.views.decorators.vary import vary_on_cookie
 from django.views.generic import TemplateView
 from global_login_required import login_not_required
 
@@ -43,7 +44,7 @@ from genes.models import GeneInfo, CanonicalTranscriptCollection, GeneListCatego
     PanelAppServer, SampleGeneList, HGNC, GeneVersion, TranscriptVersionSequenceInfo, NoTranscript
 from genes.models_enums import AnnotationConsortium
 from genes.serializers import SampleGeneListSerializer
-from library.constants import MINUTE_SECS
+from library.constants import MINUTE_SECS, DAY_SECS, WEEK_SECS
 from library.django_utils import get_field_counts, add_save_message
 from library.utils import defaultdict_to_dict, LazyAttribute, segment
 from ontology.models import OntologySnake, OntologyService, OntologyTerm
@@ -156,11 +157,16 @@ class HasVariants:
 
 class GeneSymbolViewInfo:
 
-    def __init__(self, gene_symbol: GeneSymbol, desired_genome_build: GenomeBuild, user):
+    def __init__(self, gene_symbol: GeneSymbol, desired_genome_build: Optional[GenomeBuild], user,
+                 tool_tips=None):
         self.gene_symbol = gene_symbol
         self.desired_genome_build = desired_genome_build
-        self.user = user
-        self.user_settings = UserSettings.get_for_user(user)
+        self.tool_tips = tool_tips
+        if user is not None:
+            self.user = user
+            if self.tool_tips is None:
+                user_settings = UserSettings.get_for_user(user)
+                self.tool_tips = user_settings.tool_tips
 
     @cached_property
     def omim_and_hpo_for_gene(self) -> List[Tuple[OntologyTerm, List[OntologyTerm]]]:
@@ -269,7 +275,7 @@ class GeneSymbolViewInfo:
     @cached_property
     def annotation_description(self):
         descriptions = {}
-        if self.user_settings.tool_tips:
+        if self.tool_tips:
             descriptions = VariantGridColumn.get_column_descriptions()
             descriptions["gnomad_gene_constraint"] = """
             constraint score shown in gnomAD is the ratio of the observed / expected (oe) number of loss-of-function
@@ -548,6 +554,31 @@ def view_transcript_accession(request, transcript_accession):
     if version:
         return view_transcript_version(request, transcript_id, version)
     return view_transcript(request, transcript_id)
+
+
+@cache_page(WEEK_SECS)
+def gene_symbol_info_tab(request, gene_symbol, tool_tips):
+    """ Condensed info about gene symbol, loaded into variants page """
+
+    # We pass tool tips and don't use user/build so that it can be globally cached
+    tool_tips = tool_tips == "True"
+    view_info = GeneSymbolViewInfo(
+        gene_symbol=get_object_or_404(GeneSymbol, pk=gene_symbol),
+        desired_genome_build=None,
+        user=None,
+        tool_tips=tool_tips)
+
+    context = LazyAttribute.lazy_context(
+        view_info,
+        [
+            "annotation_description",
+            "gene_summary",
+            "gene_symbol",
+            "hgnc",
+            "panel_app_servers",
+        ]
+    )
+    return render(request, 'genes/gene_symbol_info_tab.html', context=context)
 
 
 def gene_lists_tab(request):

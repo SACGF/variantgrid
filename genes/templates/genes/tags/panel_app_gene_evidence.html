@@ -13,7 +13,11 @@
 <script>
 $(document).ready(function() {
     let panelAppId = "#panel-app-{{ server.pk }}-gene-evidence";
-    $(panelAppId).append(getPanelAppGeneEvidenceDiv({{ server.pk }}, "{{ gene_symbol }}"));
+    let _summaryFunc = null;
+    {% if summary_func %}
+        _summaryFunc = {{ summary_func | safe }};
+    {% endif %}
+    $(panelAppId).append(getPanelAppGeneEvidenceDiv("{{ server.name }}", {{ server.pk }}, "{{ gene_symbol }}", _summaryFunc));
 });
 </script>
 <div class='gene-disease card mt-4'>

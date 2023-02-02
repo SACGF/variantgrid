@@ -73,7 +73,6 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
     errors = models.TextField(null=True)
     shadow_color = models.TextField(null=True)
     load_seconds = models.FloatField(null=True)
-    parents_should_cache = models.BooleanField(default=False)  # Node suggests parents use a cache
     # This is set to node/version you cloned - cleared upon modification
     cloned_from = models.ForeignKey('NodeVersion', null=True, on_delete=SET_NULL)
     status = models.CharField(max_length=1, choices=NodeStatus.choices, default=NodeStatus.DIRTY)
@@ -454,9 +453,7 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
 
     @property
     def use_cache(self):
-        """ At the moment we only cache when a child requests it """
-        return settings.ANALYSIS_NODE_CACHE_DB and \
-               AnalysisEdge.objects.filter(parent=self, child__parents_should_cache=True).exists()
+        return False
 
     def write_cache(self, variant_collection: VariantCollection):
         qs = self.get_queryset(disable_cache=True)

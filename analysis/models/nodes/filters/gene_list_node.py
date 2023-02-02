@@ -128,13 +128,21 @@ class GeneListNode(AncestorSampleMixin, GeneCoverageMixin, AnalysisNode):
         name = ''
         if self.pk and self.modifies_parents():  # needs pk as looks at related objects
             if self.accordion_panel in (self.SELECTED_GENE_LIST, self.PANEL_APP_GENE_LIST):
-                filter_types = {self.SELECTED_GENE_LIST: "gene lists", self.PANEL_APP_GENE_LIST: "PanelApp"}
+                filter_types = {self.SELECTED_GENE_LIST: "gene lists", self.PANEL_APP_GENE_LIST: "PanelApp panels"}
                 gene_list_names = self._get_gene_list_names()
                 gene_list_names_str = "\n".join(gene_list_names)
                 if len(gene_list_names_str) <= MAX_NODE_NAME_LENGTH:
                     name = gene_list_names_str
                 else:
                     name = f"{len(gene_list_names)} x {filter_types[self.accordion_panel]}"
+
+                if self.accordion_panel == self.PANEL_APP_GENE_LIST:
+                    if self.min_panel_app_confidence != PanelAppConfidence.LOW:
+                        if self.min_panel_app_confidence == PanelAppConfidence.HIGH:
+                            conf = "High"
+                        else:
+                            conf = "Int."
+                        name += f"\n ({conf} conf)"
 
             elif self.accordion_panel == self.PATHOLOGY_TEST_GENE_LIST:
                 if self.pathology_test_version:
@@ -150,7 +158,7 @@ class GeneListNode(AncestorSampleMixin, GeneCoverageMixin, AnalysisNode):
 
                 name = prefix + ": " + ', '.join(self._get_sorted_gene_names())
 
-            if len(name) >= MAX_NODE_NAME_LENGTH:
+            if len(name) > MAX_NODE_NAME_LENGTH:
                 name = name[:MAX_NODE_NAME_LENGTH] + "..."
             if self.exclude:
                 name = "Exclude: " + name

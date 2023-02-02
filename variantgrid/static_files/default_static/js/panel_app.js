@@ -35,16 +35,23 @@ function getEvidenceHover(geneSymbol, evidence, confidence) {
     return container;
 }
 
+function getConfidenceCSS(confidence) {
+    let cssClass = null;
+    if (confidence) {
+        const CONFIDENCE_CLASS = ["LowEvidence", "ModerateEvidence", "HighEvidence"];
+        cssClass = CONFIDENCE_CLASS[parseInt(confidence) - 1];
+    }
+    return cssClass;
+}
+
 
 function addGeneEvidence(geneSymbol, evidence, geneContainer) {
     let evidenceDiv = $("<div />").addClass("evidence hover-detail");
     let confidence = evidence["confidence_level"];
     let evidenceHover = getEvidenceHover(geneSymbol, evidence, confidence);
     evidenceDiv.attr("data-content", evidenceHover.html());
-    if (confidence) {
-        const CONFIDENCE_CLASS = ["LowEvidence", "ModerateEvidence", "HighEvidence"]
-        let cssClass = CONFIDENCE_CLASS[parseInt(confidence)-1];
-        // evidenceDiv.text(confidence[0]); // for colorblind??
+    let cssClass = getConfidenceCSS(confidence);
+    if (cssClass) {
         evidenceDiv.addClass(cssClass);
     }
     geneContainer.append(evidenceDiv);
@@ -53,7 +60,10 @@ function addGeneEvidence(geneSymbol, evidence, geneContainer) {
 
 function getDivFromPanelAppGeneEvidenceAPIResult(geneSymbol, panelAppEvidenceResultsList) {
     let newDiv = $("<div />");
+    let summaryText = null;
+
     if (panelAppEvidenceResultsList.length) {
+        let confidenceCount = {};
         for (let i=0 ; i<panelAppEvidenceResultsList.length ; ++i) {
             let evidence = panelAppEvidenceResultsList[i];
             addGeneEvidence(geneSymbol, evidence, newDiv);
@@ -61,27 +71,50 @@ function getDivFromPanelAppGeneEvidenceAPIResult(geneSymbol, panelAppEvidenceRes
             let panel = evidence["panel"];
             if (panel) {
                 let diseaseName = panel["name"];
-                //let confidence = evidence["LevelOfConfidence"];
+                let confidenceLabel = getConfidenceCSS(evidence["confidence_level"]);
+                let existingCount = confidenceCount[confidenceLabel] || 0;
+                confidenceCount[confidenceLabel] = existingCount + 1;
                 let diseaseSpan = $("<span />").addClass("disease-name").text(diseaseName + ". ");
                 newDiv.append(diseaseSpan);
             }
         }
+
+        if (confidenceCount) {
+            let summaryDiv = $("<div />").addClass("hidden gene-symbol-summary");
+            // go high to low
+            let evidenceList = [];
+            for (let evidence of ["HighEvidence", "ModerateEvidence", "LowEvidence"]) {
+                let count = confidenceCount[evidence];
+                if (count) {
+                    evidenceList.push(evidence + ": " + confidenceCount[evidence]);
+                }
+            }
+            summaryText = evidenceList.join(", ");
+            newDiv.append(summaryDiv);
+        }
     } else {
         newDiv.append("No evidence.");
     }
-    return newDiv;
+    return {
+        div: newDiv,
+        summary: summaryText,
+    };
 }
 
 
-function getPanelAppGeneEvidenceDiv(server_id, geneSymbol) {
+function getPanelAppGeneEvidenceDiv(serverName, server_id, geneSymbol, summaryFunc) {
     // Returns a Div which is loading, then is filled in when API retrieved ok
     let panelAppDiv = $("<div />").addClass("loading icon16");
     $.ajax({
         type: "GET",
         url: Urls.api_panel_app_gene_evidence(server_id, geneSymbol),
         success: function(panelAppEvidenceResultsList) {
-            let newDiv = getDivFromPanelAppGeneEvidenceAPIResult(geneSymbol, panelAppEvidenceResultsList);
-            panelAppDiv.replaceWith(newDiv);
+            const {div, summary} = getDivFromPanelAppGeneEvidenceAPIResult(geneSymbol, panelAppEvidenceResultsList);
+            panelAppDiv.replaceWith(div);
+            if (summaryFunc) {
+                let summaryText = serverName + " - " + summary;
+                summaryFunc(summaryText);
+            }
         },
         error: function(qXHR, textStatus, errorThrown) {
             let errorText = "Failed...";

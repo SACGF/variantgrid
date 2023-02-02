@@ -593,6 +593,7 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
         "show_gene_coverage": settings.VARIANT_DETAILS_SHOW_GENE_COVERAGE,
         "show_samples": settings.VARIANT_DETAILS_SHOW_SAMPLES,
         "tag_form": TagForm(),
+        "tool_tips": user_settings.tool_tips,
         "variant": variant,
         "variant_allele": variant_allele_data,
         "variant_annotation": variant_annotation,

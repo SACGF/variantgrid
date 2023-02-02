@@ -203,39 +203,30 @@ function transcriptFunc(transcriptId, data) {
 }
 
 
-function geneFunc(geneId, geneSymbol, data) {
+function geneFunc(geneId, geneSymbol) {
+    let geneInfoDiv = $("#gene-info");
+    let geneInfoDetails = $("#gene-info-details");
+    if (geneSymbol) {
+        geneInfoDetails.load(Urls.gene_symbol_info_tab(geneSymbol, "{{ tool_tips }}"));
+        $("#gene-info-gene-symbol-header").html("Gene: " + geneSymbol);
+        geneInfoDiv.show();
+    } else {
+        geneInfoDiv.hide();
+    }
+
     {% if show_gene_coverage %}
+    let geneCoverage = $("#gene_coverage");
     if (geneSymbol) {
         const currentCoverageGeneId = $("#gene-coverage-data").attr("gene_symbol");
         console.log("currentCoverageGeneId:");
         console.log(currentCoverageGeneId);
         if (currentCoverageGeneId != geneSymbol) {
-            $("#gene_coverage").load(Urls.gene_coverage(geneSymbol));
+            geneCoverage.load(Urls.gene_coverage(geneSymbol));
         }
+    } else {
+        geneCoverage.html("No gene symbol")
     }
     {% endif %}
-
-    const gic = $("#gene-info-container");
-    if (data) {
-        $(".no-gene-info", gic).hide();
-        $(".has-gene-info", gic).show();
-    } else {
-        $(".no-gene-info", gic).show();
-        $(".has-gene-info", gic).hide();
-        return;
-    }
-
-    const geneInfoTable = $('#gene-info');
-    $.each(data, function(name, value) {
-        if (value === null) {
-            value = $('<span>', {class: 'no-value', text:'-'});
-        }
-        $("#" + name, geneInfoTable).html(value);
-    });
-
-    const gene_url = Urls.view_gene_symbol(geneSymbol);
-    const linkHtml = "<a id='gene-link' target='_blank' href='" + gene_url + "'>" + geneSymbol + "</a>";
-    $("#hgnc_symbol", geneInfoTable).html(linkHtml);
 }
 
 
@@ -666,6 +657,14 @@ function applyVariantValues() {
             <div class='select-transcript-container'></div>
             {% load variant_transcript_select_tags %}
             {% variant_transcript_select transcript_select_jquery='#select-transcript-container' vts=vts transcript_func='transcriptFunc' gene_func='geneFunc' show_all_transcript_details=True %}
+    </div>
+
+    <div id="gene-info" class="container">
+        <div class="card mt-4">
+            <div id='gene-info-gene-symbol-header' class="card-header"></div>
+            <div id="gene-info-details" class="card-body">
+            </div>
+        </div>
     </div>
 
     <div id="transcript-info" class="container">

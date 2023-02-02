@@ -72,6 +72,17 @@
             {% else %}
                 {% for gene_list in gene_lists %}
                     <h3>{{ gene_list }}</h3>
+
+                        {% if gene_list.url or not gene_list.category.hidden %}
+                            <a href="{{ gene_list.get_absolute_url  }}" target="_blank">
+                                {% if gene_list.url %}
+                                    {{ gene_list.url }}
+                                {% else %}
+                                    view gene list
+                                {% endif %}
+                            </a>
+                        {% endif %}
+
                     {% jqgrid 'gene_list_genes_grid' gene_list.pk search=False download_grid_json_as_csv=True gene_list_id=gene_list.pk %}
                 {% endfor %}
 

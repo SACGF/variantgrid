@@ -18,6 +18,7 @@ urlpatterns = [
     perm_path('view_transcript/<transcript_id>', views.view_transcript, name='view_transcript'),
     perm_path('view_transcript_version/<transcript_id>/<int:version>', views.view_transcript_version, name='view_transcript_version'),
     perm_path('view_transcript_accession/<transcript_accession>', views.view_transcript_accession, name='view_transcript_accession'),
+    perm_path('gene_symbol_info_tab/<gene_symbol>/tool_tips/<tool_tips>', views.gene_symbol_info_tab, name='gene_symbol_info_tab'),
     perm_path('gene_lists_tab', views.gene_lists_tab, name='gene_lists_tab'),
     perm_path('gene_lists', views.gene_lists, name='gene_lists'),
     perm_path('gene_lists/create_custom', views.create_custom_gene_list, name='create_custom_gene_list'),

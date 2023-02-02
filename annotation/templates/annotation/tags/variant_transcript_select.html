@@ -78,9 +78,6 @@ fieldset.form-fields {
 <script>
 $(document).ready(function() {
     let variant_transcript_annotations = {{ variant_transcript_annotations | jsonify }};
-    let gene_annotations = {{ gene_annotations | jsonify }};
-    const transcript_parent_select = $("{{ transcript_parent_select }}");
-    const gene_parent_select = $("{{ gene_parent_select }}");
 
     function setTranscriptInfo(transcriptId) {
         var data = variant_transcript_annotations[transcriptId];
@@ -97,19 +94,20 @@ $(document).ready(function() {
     }
     
     function setGeneInfo(geneId, geneSymbol) {
-        const data = gene_annotations[geneId];
         {% if gene_func %}
             let func = {{ gene_func | safe }};
-            func(geneId, geneSymbol, data);
+            func(geneId, geneSymbol);
         {% endif %}
     }
 
     const container = $("{{ transcript_select_jquery }}");
     const radioContainer = '#variant-transcript-select-tag-container';
     const transcriptRadio = $('input[type=radio]', radioContainer);
-    transcriptRadio.click(function() {
-        const transcriptId = $('[type="radio"]:checked', radioContainer).val();
-        setTranscriptInfo(transcriptId);
+    transcriptRadio.change(function() {
+        if ($(this).is(":checked")) {
+            const transcriptId = $(this).val();
+            setTranscriptInfo(transcriptId);
+        }
     });
     transcriptRadio.appendTo(container);
 
