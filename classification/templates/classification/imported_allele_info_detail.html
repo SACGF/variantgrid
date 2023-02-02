@@ -29,9 +29,10 @@
         {% if validation_tags %}
             {% for tag in validation_tags %}
                 <div><nomin>
-                    {% if tag.severity == 'E' %}<i class="text-danger fa-brands fa-searchengin" title="Variant Matching Requires Confirmation"></i>
-                    {% elif tag.severity == 'W' %}<i class="text-info fa-brands fa-searchengin" title="Variant Matching Info"></i>
-                    {% else %}{{ tag.severity }}
+                    {% if tag.severity == 'E' %}
+                    {{ 'W' | severity_icon:'Requires Confirmation' }}
+                    {% else %}
+                    {{ 'I' | severity_icon:'Variant Matching Info' }}
                     {% endif %}
                     <label>{{ tag.category_pretty }}</label> {{ tag.field_pretty }}
                 </nomin></div>

@@ -2114,9 +2114,11 @@ VCTable.format_hgvs = (parts) => {
     let allele = parts.allele;
     let variantId = parts.variant_id;
     let alleleId = parts.allele_id;
-    let validationInclude = parts.validation_include;
     let alleleInfoId = parts.allele_info_id;
-    let alleleInfoStatus = parts.allele_info_status;
+    // let validationInclude = parts.validation_include;
+    // let alleleInfoStatus = parts.allele_info_status;
+    let icon = parts.icon;
+    let tooltip = parts.tooltip;
     let pHgvs = parts.p_hgvs;
     let url = null;
     let error = parts.error;
@@ -2143,9 +2145,9 @@ VCTable.format_hgvs = (parts) => {
         let genomeBuildWrapper = $('<div>');
         let addNewLine = false;
         if (parts.normalized === false) {
-            $('<span>', {html: '<i class="fa-solid fa-triangle-exclamation text-warning"></i> not resolved, showing imported ', style:'color:#888'}).appendTo(genomeBuildWrapper);
+            $('<span>', {html: 'not resolved, showing imported ', style:'color:#888'}).appendTo(genomeBuildWrapper);
         } else if (parts.desired === false) {
-            $('<span>', {html: '<i class="fa-solid fa-triangle-exclamation text-warning"></i> not lifted-over ', style:'color:#888'}).appendTo(genomeBuildWrapper);
+            $('<span>', {html: 'not lifted-over ', style:'color:#888'}).appendTo(genomeBuildWrapper);
         } else {
             addNewLine = true;
         }
@@ -2179,31 +2181,13 @@ VCTable.format_hgvs = (parts) => {
         cDom = $('<a>', {href: url, html: cDom});
     }
     dom.append(cDom);
-    if (alleleInfoStatus && alleleInfoStatus !== 'M') {
-        let icon = 'fa-magnifying-glass-chart';
-        let infoText = 'Matching';
-        let infoColor = 'text-success';
-        switch (alleleInfoStatus) {
-            case 'P': infoText = 'This record is currently undergoing variant matching'; break;
-            case 'I': infoText = 'This record is currently being lifted over to other genome builds'; icon = 'fa-magnifying-glass-arrow-right'; break;
-            case 'F': infoText = 'We could not link this record to a variant'; infoColor = 'text-danger'; break;
+    if (icon) {
+        let iconData = {"class": icon};
+        if (tooltip) {
+            iconData.title = tooltip;
         }
-        $("<i>",
-            {
-                style: 'font-size:10pt',
-                class: `${infoColor} fa-solid ${icon} ml-1`,
-                title: infoText
-            }
-        ).appendTo(dom);
-    }
-    if (validationInclude === false && alleleInfoStatus === 'M') {
-        $("<i>",
-            {
-                style: 'font-size:12pt',
-                class: 'text-danger fa-brands fa-searchengin ml-1',
-                title: 'This row will not appear in downloads due to outstanding variant matching issues'
-            }
-        ).appendTo(dom);
+        let iconDom = $('<i>', iconData);
+        iconDom.appendTo(dom);
     }
 
     if (pHgvs) {

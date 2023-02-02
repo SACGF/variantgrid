@@ -362,25 +362,28 @@ class ModalTag(template.Node):
 
 
 @register.filter()
-def severity_icon(severity: str) -> str:
+def severity_icon(severity: str, title: Optional[str] = None) -> str:
     if not severity:
         severity = 'I'
+    title_html = ""
+    if title:
+        title_html = f' title="{title}"'
     severity = severity.upper()
     if severity.startswith('C'):  # critical
-        return SafeString('<i class="fas fa-bomb text-danger"></i>')
+        return SafeString(f'<i class="fas fa-bomb text-danger"{title_html}></i>')
     if severity.startswith('E'):  # error
-        return SafeString('<i class="fas fa-exclamation-circle text-danger"></i>')
+        return SafeString(f'<i class="fas fa-exclamation-circle text-danger"{title_html}></i>')
     if severity.startswith('W'):  # warning
-        return SafeString('<i class="fas fa-exclamation-triangle text-warning"></i>')
+        return SafeString(f'<i class="fas fa-exclamation-triangle text-warning"{title_html}></i>')
     if severity.startswith('I'):  # info
-        return SafeString('<i class="fas fa-info-circle text-info"></i>')
+        return SafeString(f'<i class="fas fa-info-circle text-info"{title_html}></i>')
     if severity.startswith('D'):  # debug
-        return SafeString('<i class="fas fa-key text-info"></i>')
+        return SafeString(f'<i class="fas fa-key text-info"{title_html}></i>')
     if severity.startswith('S'):  # success
-        return SafeString('<i class="fas fa-check-circle text-success"></i>')
+        return SafeString(f'<i class="fas fa-check-circle text-success"{title_html}></i>')
     # debug
 
-    return SafeString('<i class="fas fa-question-circle text-secondary"></i>')
+    return SafeString(f'<i class="fas fa-question-circle text-secondary"{title_html}></i>')
 
 
 @register.filter()

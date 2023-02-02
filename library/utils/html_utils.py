@@ -1,7 +1,9 @@
 import html
 import re
 import uuid
-from typing import Optional, Set
+from dataclasses import dataclass
+from html import escape
+from typing import Optional, Set, Dict
 
 from bs4 import BeautifulSoup
 from django.utils.safestring import mark_safe, SafeString
@@ -75,3 +77,29 @@ def html_to_text(html: str, preserve_lines: bool = False) -> Optional[str]:
             return replace_with_newlines(lines)
 
         return get_plain_text(bs).strip()
+
+
+class IconWithTooltip:
+
+    ERROR_ICON = 'fas fa-exclamation-circle text-danger'
+    WARNING_ICON = 'fas fa-exclamation-triangle text-warning'
+    HOURGLASS_START = 'fa-solid fa-hourglass-start'
+    HOURGLASS_MID = 'fa-regular fa-hourglass-half'
+    HOURGLASS_END = 'fa-solid fa-hourglass-end'
+
+    def __init__(self, icon: str, tooltip: Optional[str] = None):
+        self.icon = icon
+        self.tooltip = tooltip
+
+    def __str__(self):
+        title = ""
+        if tooltip := self.tooltip:
+            title = f'title="{escape(tooltip)}"'
+        return SafeString(f'<i class="{escape(self.icon)}" {title}></i>')
+
+    def as_json(self) -> Dict:
+        return {
+            "icon": self.icon,
+            "tooltip": self.tooltip
+        }
+

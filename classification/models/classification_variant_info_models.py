@@ -12,7 +12,7 @@ from genes.hgvs import HGVSMatcher, CHGVS, CHGVSDiff
 from genes.models import TranscriptVersion, GeneSymbol, Transcript
 from library.cache import timed_cache
 from library.log_utils import report_exc_info
-from library.utils import pretty_label
+from library.utils import pretty_label, IconWithTooltip
 from snpdb.models import GenomeBuild, Variant, Allele, GenomeBuildPatchVersion, VariantCoordinate
 
 """
@@ -474,6 +474,29 @@ class ImportedAlleleInfo(TimeStampedModel):
     @property
     def transcripts(self) -> List[Transcript]:
         return list(sorted({build.transcript_version.transcript for build in self.resolved_builds if build.transcript_version}))
+
+    @staticmethod
+    def icon_for(status: str, include: bool) -> Optional[IconWithTooltip]:
+        icon = None
+        tooltip = None
+        if status == ImportedAlleleInfoStatus.FAILED:
+            icon = IconWithTooltip.ERROR_ICON
+            tooltip = "Variant matching failed"
+        elif status == ImportedAlleleInfoStatus.PROCESSING:
+            icon = IconWithTooltip.HOURGLASS_START
+            tooltip = "Variant matching in-progress"
+        elif status == ImportedAlleleInfoStatus.MATCHED_IMPORTED_BUILD:
+            icon = IconWithTooltip.HOURGLASS_MID
+            tooltip = "Variant liftover in-progress"
+        elif not include:
+            icon = IconWithTooltip.WARNING_ICON
+            tooltip = "Variant matching requires confirmation from an administrator"
+
+        if icon:
+            return IconWithTooltip("ml-1 " + icon, tooltip)
+    @property
+    def issue_icon(self) -> Optional[IconWithTooltip]:
+        return ImportedAlleleInfo.icon_for(self.status, self.latest_validation.include if self.latest_validation else False)
 
     @staticmethod
     def is_supported_transcript(transcript_or_hgvs: str):

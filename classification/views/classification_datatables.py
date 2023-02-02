@@ -10,7 +10,8 @@ from django.db.models.functions import Lower, Cast
 from django.http import HttpRequest
 
 from classification.enums import SpecialEKeys, EvidenceCategory, ShareLevel
-from classification.models import ClassificationModification, classification_flag_types, Classification, EvidenceKeyMap
+from classification.models import ClassificationModification, classification_flag_types, Classification, EvidenceKeyMap, \
+    ImportedAlleleInfo
 from classification.models.classification_utils import classification_gene_symbol_filter
 from flags.models import FlagCollection, FlagStatus
 from genes.hgvs import CHGVS
@@ -54,8 +55,11 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
 
         response['allele_id'] = row.get('classification__allele_info__allele_id')
         response['allele_info_id'] = row.get('classification__allele_info__id')
-        response['validation_include'] = row.get('classification__allele_info__latest_validation__include')
-        response['allele_info_status'] = row.get('classification__allele_info__status')
+        if warning_icon := ImportedAlleleInfo.icon_for(
+            status=row.get('classification__allele_info__status'),
+            include=row.get('classification__allele_info__latest_validation__include')
+        ):
+            response.update(warning_icon.as_json())
 
         return response
 
