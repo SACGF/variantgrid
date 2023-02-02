@@ -142,8 +142,9 @@ function globalSetup() {
     setupListGroupCheckboxes();
 
     $(".date-picker").datepicker({changeYear: true, yearRange: "-120:+0"});
+    // If radio row is clicked, then change the radio (if not already selected)
     $('.radio-row').click(event => {
-        $(event.currentTarget).find('[type="radio"]').prop('checked', 'checked').change();
+        $(event.currentTarget).find(':radio:not(:checked)').prop('checked', 'checked').change();
     });
 }
 
