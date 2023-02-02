@@ -46,7 +46,7 @@
                         <div>
                         Genes with no coverage: {{ no_coverage_gene_names }}
                         </div>
-                        {% jqgrid 'uncovered_genes_grid' 'UncoveredGenes' False None 'jqgrid/jqgrid.html' None False gene_coverage_collection_id=cov.pk gene_list_id_list=gene_list_id_list %}
+                        {% jqgrid 'uncovered_genes_grid' 'UncoveredGenes' False None 'jqgrid/jqgrid.html' None False gene_coverage_collection_id=cov.pk gene_list_id_list=gene_list_id_list min_depth=sample.get_minimum_coverage %}
                     {% endfor %}
 
                     <p>Minimum depth required is {{ min_coverage }}</p>
