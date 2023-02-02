@@ -141,10 +141,7 @@ def classification_groups(
             raise ValueError(f"Context Object {context_object} does not have metrics_logging_key property")
 
     if link_discordance_reports:
-        all_clinical_groupings = set()
-        for cm in ordered_classifications:
-            all_clinical_groupings.add(cm.classification.clinical_context)
-        clinical_grouping_list = list(all_clinical_groupings)
+        clinical_grouping_list = list(set([cm.classification.clinical_context for cm in ordered_classifications if cm.classification.clinical_context]))
         clinical_grouping_list.sort(key=lambda cg:(not cg.is_default if cg else False, cg.name if cg else 'No Allele'))
         tag_context["clinical_contexts"] = clinical_grouping_list
 

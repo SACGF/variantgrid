@@ -5,25 +5,27 @@
 
 {% for ccg in clinical_contexts %}
     {% with discordance_status=ccg.calculate_discordance_status %}
-        <label class="mr-2">Overlap Status {% if not ccg.is_default %}{{ ccg.name }}{% endif %}:</label>
-        <div class="d-inline-block">
-            <span class="mr-2 {{ discordance_status.css_class }}">
-                {% comment %}Status: {% endcomment %}
-                {% if discordance_status.pending_concordance %}Pending Concordance
-                {% else %}
-                    {{ discordance_status }}
+        <div>
+            <label class="mr-2">Overlap Status {% if not ccg.is_default %}{{ ccg.name }}{% endif %}:</label>
+            <div class="d-inline-block">
+                <span class="mr-2 {{ discordance_status.css_class }}">
+                    {% comment %}Status: {% endcomment %}
+                    {% if discordance_status.pending_concordance %}Pending Concordance
+                    {% else %}
+                        {{ discordance_status }}
+                    {% endif %}
+                </span>
+                {% if discordance_status.level != 'single_submission' %}
+                    {% if discordance_status.lab_count == 1 %} <span class="text-muted mr-2">(Single Lab)</span>{% endif %}
                 {% endif %}
-            </span>
-            {% if discordance_status.level != 'single_submission' %}
-                {% if discordance_status.lab_count == 1 %} <span class="text-muted mr-2">(Single Lab)</span>{% endif %}
-            {% endif %}
-            {% if ccg.latest_report and ccg.latest_report.resolution != 'C' %}
-                <a href="{% url 'discordance_report' ccg.latest_report.id %}" class="hover-link">Click for Discordance Report</a>
-            {% endif %}
-            {% if discordance_status.has_ignored_clin_sigs %}
-                <div>{{ 'i'|severity_icon }} <span class="text-info">Some clinical significances do not count towards discordance calculations.</span></div>
-            {% endif %}
-            {% if ccg.pending_status %}<span class="mr-2 hover-detail" title="There is an active import, the status will be calculated when it completes.">(<i class="fa-regular fa-clock fa-spin fa-animate-1"></i> Pending)</span>{% endif %}
+                {% if ccg.latest_report and ccg.latest_report.resolution != 'C' %}
+                    <a href="{% url 'discordance_report' ccg.latest_report.id %}" class="hover-link">Click for Discordance Report</a>
+                {% endif %}
+                {% if discordance_status.has_ignored_clin_sigs %}
+                    <div>{{ 'i'|severity_icon }} <span class="text-info">Some clinical significances do not count towards discordance calculations.</span></div>
+                {% endif %}
+                {% if ccg.pending_status %}<span class="mr-2 hover-detail" title="There is an active import, the status will be calculated when it completes.">(<i class="fa-regular fa-clock fa-spin fa-animate-1"></i> Pending)</span>{% endif %}
+            </div>
         </div>
     {% endwith %}
 {% endfor %}
