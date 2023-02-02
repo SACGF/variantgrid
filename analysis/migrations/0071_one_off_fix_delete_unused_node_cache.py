@@ -3,6 +3,7 @@
 from django.db import migrations
 from manual.operations.manual_operations import ManualOperation
 
+
 def _might_have_obsolete_node_cache(apps):
     AnalysisNode = apps.get_model("analysis", "AnalysisNode")
     return AnalysisNode.objects.filter(parents_should_cache=True).exists()
