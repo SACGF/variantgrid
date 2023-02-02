@@ -4,7 +4,7 @@
 # CosmicCodingMuts.normal.grch37.vcf.gz
 # CosmicCodingMuts.normal.grch37.vcf.gz.tbi
 
-BASE_URL=https://variantgrid.com/static/annotation_download
+BASE_URL=https://variantgrid.com/download/annotation/VEP/annotation_data/GRCh38
 
 cd annotation_data/GRCh38
 
