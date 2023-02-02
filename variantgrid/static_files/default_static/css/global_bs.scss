@@ -1139,8 +1139,11 @@ a .c-hgvs-body {
 }
 
 .c-hgvs-body {
-  .c-hgvs-transcript, .c-hgvs-nomen, .c-hgvs-gene-symbol-b {
+  .c-hgvs-transcript, .c-hgvs-gene-symbol-b {
     white-space: nowrap;
+    word-break: normal;
+  }
+  .c-hgvs-nomen {
     word-break: normal;
   }
   .c-hgvs-gene-symbol {

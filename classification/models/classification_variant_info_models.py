@@ -245,6 +245,11 @@ class ImportedAlleleInfoValidationTagEntry:
         else:
             return self.severity
 
+    def as_json(self):
+        return {
+            "severity": self.severity,
+            "label": f"{self.category_pretty} {self.field_pretty}"
+        }
 
     def __lt__(self, other):
         return (self.category, self.field) < (other.category, other.field)
@@ -274,13 +279,17 @@ class ImportedAlleleInfoValidation(TimeStampedModel):
     def validation_tags_typed(self) -> ImportedAlleleInfoValidationTags:
         return self.validation_tags or {}
 
-    @property
-    def validation_tags_list(self) -> List[ImportedAlleleInfoValidationTagEntry]:
+    @staticmethod
+    def validation_tags_list_from_dict(validation_dict: ImportedAlleleInfoValidationTags):
         items: List[ImportedAlleleInfoValidationTagEntry] = []
-        for category, sub_issues_dict in self.validation_tags_typed.items():
+        for category, sub_issues_dict in validation_dict.items():
             for field, severity in sub_issues_dict.items():
                 items.append(ImportedAlleleInfoValidationTagEntry(category=category, field=field, severity=severity))
         return sorted(items)
+
+    @property
+    def validation_tags_list(self) -> List[ImportedAlleleInfoValidationTagEntry]:
+        return ImportedAlleleInfoValidation.validation_tags_list_from_dict(self.validation_tags_typed)
 
     @staticmethod
     def should_include(validation_tags: ImportedAlleleInfoValidationTags):

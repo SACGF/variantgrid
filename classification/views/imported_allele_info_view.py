@@ -10,6 +10,7 @@ from django.shortcuts import render, get_object_or_404
 from requests import Response
 
 from classification.models import ImportedAlleleInfo, ImportedAlleleInfoStatus, Classification
+from classification.models.classification_variant_info_models import ImportedAlleleInfoValidation
 from genes.hgvs import CHGVS, CHGVSDiff, chgvs_diff_description
 from library.django_utils import get_url_from_view_path
 from library.guardian_utils import is_superuser
@@ -74,6 +75,13 @@ class ImportedAlleleInfoColumns(DatatableConfig[ImportedAlleleInfo]):
                 "url": allele.get_absolute_url()
             }
 
+    @staticmethod
+    def render_validation(data: CellData):
+        return {
+            "include": data.get('latest_validation__include') is True,
+            "tags": [tag.as_json() for tag in ImportedAlleleInfoValidation.validation_tags_list_from_dict(data.get('latest_validation__validation_tags'))]
+        }
+
     def __init__(self, request: HttpRequest):
         super().__init__(request)
         self.search_box_enabled = True
@@ -114,18 +122,21 @@ class ImportedAlleleInfoColumns(DatatableConfig[ImportedAlleleInfo]):
                 renderer=ImportedAlleleInfoColumns.render_c_hgvs,
                 client_renderer='VCTable.hgvs'
             ),
-            RichColumn(
-                key='allele',
-                label='Allele',
-                orderable=True,
-                renderer=ImportedAlleleInfoColumns.render_allele,
-                client_renderer='TableFormat.linkUrl'
-            ),
+            # RichColumn(
+            #     key='allele',
+            #     label='Allele',
+            #     orderable=True,
+            #     renderer=ImportedAlleleInfoColumns.render_allele,
+            #     client_renderer='TableFormat.linkUrl'
+            # ),
             RichColumn(
                 key='latest_validation__include',
                 label="Include",
                 orderable=True,
-                client_renderer='TableFormat.boolean.bind(null, "false_is_error")'
+                extra_columns=['latest_validation__validation_tags'],
+                renderer=ImportedAlleleInfoColumns.render_validation,
+                # client_renderer='TableFormat.boolean.bind(null, "false_is_error")'
+                client_renderer='render_validation'
             ),
             RichColumn(
                 key='classification_count',

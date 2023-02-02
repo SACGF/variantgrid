@@ -1112,8 +1112,11 @@ a .c-hgvs-body .c-hgvs-transcript, a .c-hgvs-body .c-hgvs-nomen {
   color: #444488;
 }
 
-.c-hgvs-body .c-hgvs-transcript, .c-hgvs-body .c-hgvs-nomen, .c-hgvs-body .c-hgvs-gene-symbol-b {
+.c-hgvs-body .c-hgvs-transcript, .c-hgvs-body .c-hgvs-gene-symbol-b {
   white-space: nowrap;
+  word-break: normal;
+}
+.c-hgvs-body .c-hgvs-nomen {
   word-break: normal;
 }
 .c-hgvs-body .c-hgvs-gene-symbol {

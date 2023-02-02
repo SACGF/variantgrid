@@ -11,7 +11,7 @@
 {% block content %}
     <style>
         .dt-imported_c_hgvs, .dt-grch37__c_hgvs, .dt-grch38__c_hgvs {
-            width: 25%;
+            width: 20%;
         }
     </style>
     <script>
@@ -23,6 +23,19 @@
         }
         function applyFilters() {
             $('#imported-allele-info-datatables').DataTable().ajax.reload();
+        }
+        function render_validation(data, type, row) {
+            let dom = $('<div>');
+            if (data.include) {
+                $('<i>', {class: 'fas fa-check-circle text-success'}).appendTo(dom);
+            } else {
+                $('<i>', {class: 'fas fa-times-circle text-danger'}).appendTo(dom);
+            }
+            for (let tag of data.tags) {
+                let color = tag.severity == "E" ? "text-danger" : "text-warning"
+                $('<div>', {text: tag.label, class: color}).appendTo(dom);
+            }
+            return dom.prop('outerHTML');
         }
     </script>
     <div class="container-table">
