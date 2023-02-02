@@ -103,9 +103,11 @@ $(document).ready(function() {
     const container = $("{{ transcript_select_jquery }}");
     const radioContainer = '#variant-transcript-select-tag-container';
     const transcriptRadio = $('input[type=radio]', radioContainer);
-    transcriptRadio.click(function() {
-        const transcriptId = $('[type="radio"]:checked', radioContainer).val();
-        setTranscriptInfo(transcriptId);
+    transcriptRadio.change(function() {
+        if ($(this).is(":checked")) {
+            const transcriptId = $(this).val();
+            setTranscriptInfo(transcriptId);
+        }
     });
     transcriptRadio.appendTo(container);
 

@@ -233,13 +233,14 @@ function enhanceAndMonitor() {
         }},
 
         // if have a wide checkbox row, make it so clicking anywhere on the row activates the checkbox
+        // if it is not already selected.
         {test: '.list-group-checkbox', func: (node) => {
             node.click(function(event) {
-                $(this).find('input[type=radio]').prop("checked", true);
+                $(this).find(':radio:not(:checked)').prop("checked", true);
             });
         }},
-        // similar but for radio buttons
-        {test: '.radio-row', func: (node) => {node.click(event => {$(event.currentTarget).find('[type="radio"]').prop('checked', 'checked').change();});}},
+        // similar but for radio buttons (only change if not already checked)
+        {test: '.radio-row', func: (node) => {node.click(event => {$(event.currentTarget).find(':radio:not(:checked)').prop('checked', 'checked').change();});}},
         // we don't generally allow future dates
         {test: '.date-picker', func: (node) => {node.datepicker({changeYear: true, yearRange: "-120:+0"});}},
 
