@@ -39,7 +39,7 @@
             {% endfor %}
         {% else %}<span class="no-value">None</span>{% endif %}
     {% endlabelled %}
-    {% labelled label="Can Include in Exports" %}{{ allele_info.latest_validation.include | boolean }} {% admin_link allele_info.latest_validation %}{% endlabelled %}
+    {% labelled label="Can Include in Exports" %}{{ allele_info.latest_validation.include | boolean }} {% admin_link allele_info %}{% endlabelled %}
     {% if allele_info.latest_validation.confirmed %}
         {% labelled label="Manually Confirmed" %}{{ True | boolean }} by {{ allele_info.latest_validation.confirmed_by }}{% endlabelled %}
         {% labelled label="Confirmed Note" %}{{ allele_info.latest_validation.confirmed_by_note | multi_line_text }}{% endlabelled %}
@@ -63,11 +63,13 @@
         {% labelled label="Gene Symbol(s)" %}
             {% for gene_symbol in allele_info.gene_symbols %}
                 <div><a class="hover-link" href="{% url 'view_gene_symbol' gene_symbol.pk %}">{{ gene_symbol }}</a></div>
+                {% empty %}<span class="no-value">-</span>
             {% endfor %}
         {% endlabelled %}
-        {% labelled label="Transcripts" %}
+        {% labelled label="Transcript(s)" %}
             {% for transcript in allele_info.transcripts %}
                 <div><a class="hover-link" href="{{ transcript.get_absolute_url }}">{{ transcript }}</a></div>
+                {% empty %}<span class="no-value">-</span>
             {% endfor %}
         {% endlabelled %}
         {% if not on_allele_page %}

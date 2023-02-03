@@ -18,6 +18,7 @@ from classification.models.classification_import_run import ClassificationImport
 from classification.models.classification_variant_info_models import ResolvedVariantInfo, ImportedAlleleInfoValidation
 from classification.tasks.classification_import_map_and_insert_task import ClassificationImportMapInsertTask
 from library.guardian_utils import admin_bot
+from library.log_utils import log_admin_change
 from snpdb.admin_utils import ModelAdminBasics, admin_action, admin_list_column, AllValuesChoicesFieldListFilter, \
     admin_model_action
 from snpdb.models import GenomeBuild, Lab
@@ -740,12 +741,38 @@ class ImportedAlleleInfoAdmin(ModelAdminBasics):
             allele_info.apply_validation(force_update=True)
             allele_info.save()
 
-    @admin_action("Reset Confirmation")
-    def reset_confirmation(self, request, queryset: QuerySet[ImportedAlleleInfo]):
-        for allele_info in queryset:
-            if latest := allele_info.latest_validation:
-                latest.remove_override()
-                latest.save()
+    @admin_action("Confirm Include")
+    def override_approve(self, request, queryset: QuerySet[ImportedAlleleInfo]):
+        queryset = queryset.select_related('latest_validation')
+        iai: ImportedAlleleInfo
+        for iai in queryset:
+            iaiv = iai.latest_validation
+            iaiv.include = True
+            iaiv.confirmed = True
+            iaiv.confirmed_by = request.user
+            iaiv.save()
+
+    @admin_action("Confirm Exclude")
+    def override_reject(self, request, queryset: QuerySet[ImportedAlleleInfo]):
+        queryset = queryset.select_related('latest_validation')
+        iai: ImportedAlleleInfo
+        for iai in queryset:
+            iaiv = iai.latest_validation
+            iaiv.include = False
+            iaiv.confirmed = True
+            iaiv.confirmed_by = request.user
+            iaiv.save()
+
+    @admin_action("Confirm Reset")
+    def remove_confirmation(self, request, queryset: QuerySet[ImportedAlleleInfo]):
+        queryset = queryset.select_related('latest_validation')
+        iai: ImportedAlleleInfo
+        for iai in queryset:
+            iavi = iai.latest_validation
+            iavi.include = ImportedAlleleInfoValidation.should_include(iavi.validation_tags)
+            iavi.confirmed = False
+            iavi.confirmed_by = None
+            iavi.save()
 
     def has_add_permission(self, request):
         return False
@@ -761,25 +788,3 @@ class ImportedAlleleInfoValidationAdmin(ModelAdminBasics):
         if f.name == 'confirmed_by_note':
             return False
         return True
-
-    @admin_action("Confirm Include")
-    def override_approve(self, request, queryset: QuerySet[ImportedAlleleInfoValidation]):
-        for iaiv in queryset:
-            iaiv.include = True
-            iaiv.confirmed = True
-            iaiv.confirmed_by = request.user
-            iaiv.save()
-
-    @admin_action("Confirm Exclude")
-    def override_reject(self, request, queryset: QuerySet[ImportedAlleleInfoValidation]):
-        for iaiv in queryset:
-            iaiv.include = False
-            iaiv.confirmed = True
-            iaiv.confirmed_by = request.user
-            iaiv.save()
-
-    @admin_action("Confirm Reset")
-    def remove_confirmation(self, request, queryset: QuerySet[ImportedAlleleInfoValidation]):
-        for iaiv in queryset:
-            iaiv.remove_override()
-            iaiv.save()

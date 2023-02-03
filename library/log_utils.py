@@ -11,7 +11,10 @@ import markdown
 import requests
 import rollbar
 from django.conf import settings
+from django.contrib.admin.options import get_content_type_for_model
 from django.contrib.auth.models import User
+from django.db.models import Model
+from django.http import HttpRequest
 from django.utils import timezone
 from markdown import markdown
 from rest_framework.request import Request
@@ -61,6 +64,26 @@ def report_event(name: str, request: Request = None, extra_data: Dict = None):
                          date=timezone.now(),
                          details=details,
                          severity=LogLevel.INFO)
+
+
+def log_admin_change(object: Model, message: str, user: Optional[User] = None):
+    """
+    Log that an object has been successfully changed.
+
+    The default implementation creates an admin LogEntry object.
+    """
+    from django.contrib.admin.models import CHANGE, LogEntry
+    if not user:
+        user = get_current_logged_in_user()
+
+    return LogEntry.objects.log_action(
+        user_id=user.pk,
+        content_type_id=get_content_type_for_model(object).pk,
+        object_id=object.pk,
+        object_repr=str(object),
+        action_flag=CHANGE,
+        change_message=message,
+    )
 
 
 def report_message(message: str, level: str = 'warning', request=None, extra_data: dict = None):

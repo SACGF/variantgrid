@@ -13,6 +13,7 @@ from django.utils.encoding import smart_str
 from django_json_widget.widgets import JSONEditorWidget
 from guardian.admin import GuardedModelAdminMixin
 
+from library.log_utils import log_admin_change
 from library.utils import delimited_row, WrappablePartial
 
 
@@ -77,6 +78,8 @@ def admin_action(short_description: str):
             else:
                 messages.info(request, message=f"Called \"{short_description}\" on {queryset.count()} records")
 
+            for record in queryset:
+                log_admin_change(record, short_description)
             return method(*args, **kwargs)
         wrapper.short_description = short_description
         wrapper.line_number = inspect.getsourcelines(method)[1]

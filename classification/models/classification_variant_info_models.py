@@ -278,7 +278,11 @@ class ImportedAlleleInfoValidation(TimeStampedModel):
     confirmed_by_note = TextField(null=True, blank=True)
 
     def __str__(self):
-        return "Validation (Include)" if self.include else "Validation (Exclude)"
+        tag_string = ""
+        if validation_tag_list := self.validation_tags_list:
+            tag_string = "\n".join([str(tag) for tag in self.validation_tags_list])
+
+        return f"Include : {self.include}\nConfirmed : {self.confirmed}\n{tag_string}"
 
     @property
     def validation_tags_typed(self) -> ImportedAlleleInfoValidationTags:
@@ -304,11 +308,6 @@ class ImportedAlleleInfoValidation(TimeStampedModel):
                     if value == "E":
                         return False
         return True
-
-    def remove_override(self):
-        self.include = ImportedAlleleInfoValidation.should_include(self.validation_tags)
-        self.confirmed = False
-        self.confirmed_by = None
 
 
 _DIFF_TO_VALIDATION_KEY = {
@@ -380,6 +379,7 @@ class ImportedAlleleInfo(TimeStampedModel):
         unique_together = ('imported_c_hgvs', 'imported_g_hgvs', 'imported_transcript', 'imported_genome_build_patch_version')
 
     def _calculate_validation(self) -> ImportedAlleleInfoValidationTags:
+
         validation_dict: ImportedAlleleInfoValidationTags = {}
         imported_c_hgvs = self.imported_c_hgvs_obj
         normalized_c_hgvs: Optional[CHGVS] = None
