@@ -242,7 +242,7 @@ class VariantCoordinate(FormerTuple):
 
     @property
     def as_tuple(self) -> Tuple:
-        return (self.chrom, self.pos, self.ref, self.alt)
+        return self.chrom, self.pos, self.ref, self.alt
 
     def __str__(self):
         return f"{self.chrom}:{self.pos} {self.ref}>{self.alt}"
