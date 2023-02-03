@@ -320,7 +320,7 @@ class QCGeneCoverageGrid(JqGridUserRowConfig):
 
 class UncoveredGenesGrid(QCGeneCoverageGrid):
 
-    def __init__(self, user, min_depth=settings.SEQAUTO_MIN_COVERAGE, **kwargs):
+    def __init__(self, user, min_depth, **kwargs):
         self.min_depth = min_depth
         super().__init__(user, **kwargs)
 

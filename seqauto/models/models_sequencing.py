@@ -85,6 +85,7 @@ class EnrichmentKit(models.Model):
     # see also VCFSourceSettings (which does the same thing based on VCF header)
     sample_variants_type = models.CharField(max_length=1, choices=VariantsType.choices, default=VariantsType.UNKNOWN)
     variant_zygosity_count = models.BooleanField(default=True)
+    min_coverage = models.IntegerField(null=True)  # Use system default (SEQAUTO_MIN_COVERAGE) if not set
     obsolete = models.BooleanField(default=False)
 
     @staticmethod

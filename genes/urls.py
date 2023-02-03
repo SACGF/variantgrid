@@ -67,7 +67,7 @@ urlpatterns = [
     perm_path('gene_coverage/grid/<int:gene_coverage_collection_id>/<slug:op>/', JQGridView.as_view(grid=QCGeneCoverageGrid), name='gene_coverage_collection_grid'),
     perm_path('gene_coverage/grid/<int:gene_coverage_collection_id>/<slug:op>/<path:gene_list_id_list>/',
               JQGridView.as_view(grid=QCGeneCoverageGrid), name='gene_coverage_collection_gene_list_grid'),
-    perm_path('uncovered_genes/grid/<int:gene_coverage_collection_id>/<slug:op>/<path:gene_list_id_list>', JQGridView.as_view(grid=UncoveredGenesGrid), name='uncovered_genes_grid'),
+    perm_path('uncovered_genes/grid/<int:gene_coverage_collection_id>/<slug:op>/<path:gene_list_id_list>/min_depth/<int:min_depth>/', JQGridView.as_view(grid=UncoveredGenesGrid), name='uncovered_genes_grid'),
 
     perm_path('autocomplete/PanelAppPanel/aus', views_autocomplete.PanelAppPanelAusAutocompleteView.as_view(),
               name='panel_app_panel_aus_autocomplete'),

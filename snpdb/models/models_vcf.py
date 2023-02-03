@@ -285,6 +285,20 @@ class Sample(SortByPKMixin, models.Model):
     def is_somatic(self):
         return self.variants_type in VariantsType.SOMATIC_TYPES
 
+    @cached_property
+    def enrichment_kit(self):
+        try:
+            return self.samplefromsequencingsample.sequencing_sample.enrichment_kit
+        except ObjectDoesNotExist:
+            return None
+
+    def get_minimum_coverage(self) -> int:
+        """ When should we be concerned """
+        if self.enrichment_kit:
+            if self.enrichment_kit.min_coverage is not None:
+                return self.enrichment_kit.min_coverage
+        return settings.SEQAUTO_MIN_COVERAGE
+
     def can_view(self, user):
         vcf_read_perm = DjangoPermission.perm(self.vcf, DjangoPermission.READ)
         sample_read_perm = DjangoPermission.perm(self, DjangoPermission.READ)
@@ -626,6 +640,7 @@ class VCFBedIntersection(models.Model):
 
     @staticmethod
     def get_for_vcf_and_enrichment_kit(vcf, enrichment_kit):
+        pbi = None
         try:
             kwargs = {'vcf': vcf,
                       'genomic_intervals': enrichment_kit.genomic_intervals,
@@ -637,17 +652,14 @@ class VCFBedIntersection(models.Model):
             pass
         except:
             log_traceback()
-            pbi = None
         return pbi
 
     @staticmethod
     def get_with_enrichment_kit_for_sample(sample):
-        try:
-            enrichment_kit = sample.samplefromsequencingsample.sequencing_sample.enrichment_kit
+        if sample.enrichment_kit:
             pbi = VCFBedIntersection.get_for_vcf_and_enrichment_kit(sample.vcf, enrichment_kit)
             return pbi, enrichment_kit
-        except:
-            return None, None
+        return None, None
 
     def __str__(self):
         num_records = 0
