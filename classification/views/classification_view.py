@@ -65,51 +65,54 @@ class ClassificationView(APIView):
 
         importer = BulkClassificationInserter(user=user, api_version=self.api_version)
         data = request.data
+
         if isinstance(data, list):
-            json_data = []
-            for record_data in data:
-                result = importer.insert(record_data)
-                json_data.append(result)
+            # we got a list of records
+            # just map that into the expected dictionary
+            data = {
+                'import_id': 'legacy',
+                'records': data,
+                'status': 'complete'
+            }
+
+        if isinstance(data.get('records'), list):
+
+            records = data.get('records')
+            complete_identifier = None
+            classification_import_run: Optional[ClassificationImportRun] = None
+
+            if import_id := data.get('import_id'):
+                # prefix import_id with username, so users can't overwrite each other
+                import_id = f"{user.username}#{import_id}"
+                status = data.get('status')
+                completed = status == 'complete'
+                if completed:
+                    complete_identifier = import_id
+                classification_import_run = ClassificationImportRun.record_classification_import(identifier=import_id)
+
+            per_json_data = []
+            for record_data in records:
+                result = importer.insert(record_data, import_run=classification_import_run)
+                result.notify_if_required()
+                if classification_import_run:
+                    classification_import_run.increment_status(result.status)
+                per_json_data.append(result)
+
+            if classification_import_run:
+                classification_import_run.save()
+            json_data = {"results": per_json_data}
+
+            if complete_identifier:
+                # have to mark is_complete=True at the end after import has run
+                ClassificationImportRun.record_classification_import(
+                    identifier=import_id,
+                    is_complete=True)
 
         else:
-            if isinstance(data.get('records'), list):
-
-                records = data.get('records')
-                complete_identifier = None
-                classification_import_run: Optional[ClassificationImportRun] = None
-
-                if import_id := data.get('import_id'):
-                    # prefix import_id with username, so users can't overwrite each other
-                    import_id = f"{user.username}#{import_id}"
-                    status = data.get('status')
-                    completed = status == 'complete'
-                    if completed:
-                        complete_identifier = import_id
-                    classification_import_run = ClassificationImportRun.record_classification_import(identifier=import_id)
-
-                per_json_data = []
-                for record_data in records:
-                    result = importer.insert(record_data, import_run=classification_import_run)
-                    result.notify_if_required()
-                    if classification_import_run:
-                        classification_import_run.increment_status(result.status)
-                    per_json_data.append(result)
-
-                if classification_import_run:
-                    classification_import_run.save()
-                json_data = {"results": per_json_data}
-
-                if complete_identifier:
-                    # have to mark is_complete=True at the end after import has run
-                    ClassificationImportRun.record_classification_import(
-                        identifier=import_id,
-                        is_complete=True)
-
-            else:
-                # single record
-                json_data = importer.insert(data, record_id)
-                if json_data.internal_error:
-                    return Response(status=HTTP_500_INTERNAL_SERVER_ERROR, data=force_json(json_data))
+            # single record - this should only be used by the web form
+            json_data = importer.insert(data, record_id)
+            if json_data.internal_error:
+                return Response(status=HTTP_500_INTERNAL_SERVER_ERROR, data=force_json(json_data))
 
         importer.finish()
 
