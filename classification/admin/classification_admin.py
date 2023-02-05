@@ -3,7 +3,7 @@ from typing import Set, Union
 
 from django.contrib import admin, messages
 from django.contrib.admin import RelatedFieldListFilter, BooleanFieldListFilter
-from django.db.models import QuerySet
+from django.db.models import QuerySet, Q
 from django.utils import timezone
 
 from annotation.models.models import AnnotationVersion
@@ -672,6 +672,25 @@ class MatchingOnFilter(admin.SimpleListFilter):
         return queryset
 
 
+class ValidationFilter(admin.SimpleListFilter):
+    title = "Validation"
+    parameter_name = "validation"
+
+    def lookups(self, request, model_admin):
+        return [("gene_symbol", "Gene Symbol")]
+
+    def queryset(self, request, queryset: QuerySet[ImportedAlleleInfo]):
+        if self.value() == "gene_symbol":
+            return queryset.filter(
+                Q(latest_validation__validation_tags__normalize__gene_symbol_change__isnull=False) | \
+                Q(latest_validation__validation_tags__liftover__gene_symbol_change__isnull=False)
+            ).filter(
+                Q(latest_validation__validation_tags__normalize__c_nomen_change__isnull=True) & \
+                Q(latest_validation__validation_tags__liftover__c_nomen_change__isnull=True) & \
+                Q(latest_validation__validation_tags__builds__missing_37__isnull=True) & \
+                Q(latest_validation__validation_tags__builds__missing_38__isnull=True)
+            )
+
 
 class ImportedAlleleInfoValidationInline(admin.TabularInline):
     model = ImportedAlleleInfoValidation
@@ -701,10 +720,11 @@ class ImportedAlleleInfoAdmin(ModelAdminBasics):
         "validation_include",
         "grch37",
         "grch38",
-        "variant_coordinate",
-        "created"
+        "latest_validation"
+        #"variant_coordinate",
+        #"created"
     )
-    list_filter = ('imported_genome_build_patch_version', 'status', 'latest_validation__confirmed', MatchingOnFilter)
+    list_filter = ('imported_genome_build_patch_version', 'status', 'latest_validation__confirmed', ValidationFilter, MatchingOnFilter)
     search_fields = ('imported_c_hgvs', 'imported_g_hgvs')
     inlines = (ImportedAlleleInfoValidationInline,)
 
