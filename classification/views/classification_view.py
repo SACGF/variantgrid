@@ -7,7 +7,7 @@ from django.core.exceptions import PermissionDenied
 from django.utils.decorators import method_decorator
 from rest_framework.generics import get_object_or_404
 from rest_framework.response import Response
-from rest_framework.status import HTTP_200_OK, HTTP_500_INTERNAL_SERVER_ERROR
+from rest_framework.status import HTTP_200_OK, HTTP_500_INTERNAL_SERVER_ERROR, HTTP_400_BAD_REQUEST
 from rest_framework.views import APIView
 
 from classification.classification_stats import get_lab_gene_counts
@@ -69,11 +69,7 @@ class ClassificationView(APIView):
         if isinstance(data, list):
             # we got a list of records
             # just map that into the expected dictionary
-            data = {
-                'import_id': 'legacy',
-                'records': data,
-                'status': 'complete'
-            }
+            return Response(status=HTTP_400_BAD_REQUEST, data={"error": "Endpoint requires dictionary with keys of data, import_id and status, no longer accepts lists of records"})
 
         if isinstance(data.get('records'), list):
 
