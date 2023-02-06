@@ -7,6 +7,19 @@
 {% block submenu %}{% menu_bar_data %}{% endblock %}
 
 {% block content %}
+    <script>
+        function classificationFilter(data, type) {
+            data.transcript_id = "{{ transcript.pk }}";
+            return data;
+        }
+
+        $(document).ready(function() {
+            let tableDom = $('#vc-datatable').on('draw.dt', () => {
+                Flags.instance.init({userId: '{{user.id}}'});
+            });
+        });
+    </script>
+
     <div class="container">
         <h3>Transcript {{ transcript }}</h3>
 
@@ -69,5 +82,12 @@
                 {% endfor %}
             </tbody>
         </table>
+
+        <div class="container-table mt-4">
+            <h4>Classifications</h4>
+            Filtering on records resolved to transcript <b>{{ transcript }}</b>
+            <table id="vc-datatable" class="classification-table" data-datatable-url="{% url 'classification_datatables' %}" data-datatable-data='classificationFilter'></table>
+        </div>
+
     </div>
 {% endblock content %}

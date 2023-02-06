@@ -328,6 +328,24 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
             else:
                 return qs.none()
 
+        if transcript_id := self.get_query_param("transcript_id"):
+            q_transcript_37 = Q(classification__allele_info__grch37__transcript_version__transcript_id=transcript_id)
+            q_transcript_38 = Q(classification__allele_info__grch38__transcript_version__transcript_id=transcript_id)
+            filters.append(q_transcript_37 | q_transcript_38)
+
+        if transcript_version_str := self.get_query_param("transcript_version"):
+            tv_filters = []
+            if tv_37 := TranscriptVersion.filter_by_accession(transcript_version_str, GenomeBuild.grch37()).first():
+                tv_filters.append(Q(classification__allele_info__grch37__transcript_version=tv_37))
+            if tv_38 := TranscriptVersion.filter_by_accession(transcript_version_str, GenomeBuild.grch38()).first():
+                tv_filters.append(Q(classification__allele_info__grch38__transcript_version=tv_38))
+
+            if tv_filters:
+                q_or = reduce(operator.or_, tv_filters)
+                filters.append(q_or)
+            else:
+                return qs.none()
+
         if settings.VARIANT_CLASSIFICATION_GRID_SHOW_ORIGIN:
             allele_origin = self.get_query_param("allele_origin")
             if allele_origin:
