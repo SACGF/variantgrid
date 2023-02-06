@@ -128,62 +128,59 @@ class ClassificationExportFormatter2VCF(ClassificationExportFormatter2):
 
 
     def row(self, data: AlleleData) -> List[str]:
-        vcms = data.cms
-        if not vcms:
-            return []
+        if (vcms := data.cms) and (target_variant := data.cached_variant) and (locus := target_variant.locus) and (contig := locus.contig):
+            cols = []
 
-        cols = []
-        # CHROM, POS, ID, REF, ALT, QUAL, FILTER, INFO
-        target_variant = data.cached_variant
-        locus = target_variant.locus
-        contig = locus.contig
-        cols.append(contig.name)  # CHROM
-        cols.append(locus.position)  # POS
-        cols.append(self.format_details.db_prefix + str(target_variant.id))  # ID
-        cols.append(locus.ref)  # REF
-        cols.append(target_variant.alt)  # ALT
-        cols.append('.')  # QUAL
-        cols.append('PASS')  # FILTER
-        info = f'count={len(vcms)}'
-        url = get_url_from_view_path(reverse("view_allele_from_variant", kwargs={"variant_id": target_variant.id}))
-        info += f';url={self.vcf_safe(url)}'
+            # CHROM, POS, ID, REF, ALT, QUAL, FILTER, INFO
+            cols.append(contig.name)  # CHROM
+            cols.append(locus.position)  # POS
+            cols.append(self.format_details.db_prefix + str(target_variant.id))  # ID
+            cols.append(locus.ref)  # REF
+            cols.append(target_variant.alt)  # ALT
+            cols.append('.')  # QUAL
+            cols.append('PASS')  # FILTER
+            info = f'count={len(vcms)}'
+            url = get_url_from_view_path(reverse("view_allele_from_variant", kwargs={"variant_id": target_variant.id}))
+            info += f';url={self.vcf_safe(url)}'
 
-        # add lab names, and also calculate if we have conflicting classifications and include that flag if appropriate
-        cs_counts = {}
-        lab_names = []
-        c_hgvses = []
-        discordances = []
-        conditions = []
+            # add lab names, and also calculate if we have conflicting classifications and include that flag if appropriate
+            cs_counts = {}
+            lab_names = []
+            c_hgvses = []
+            discordances = []
+            conditions = []
 
-        for record in vcms:
-            lab_names.append(self.vcf_safe(str(record.classification.lab)))
-            cs = record.get(SpecialEKeys.CLINICAL_SIGNIFICANCE, None)
-            if cs:
-                cs_counts[cs] = cs_counts.get(cs, 0) + 1
-            c_hgvs = record.classification.allele_info[data.source.genome_build].c_hgvs_full or ''
-
-            c_hgvses.append(c_hgvs)
-            discordances.append('1' if self.classification_filter.is_discordant(record) else '0')
-            conditions.append(self.vcf_safe(record.condition_text))
-
-        info += f';lab=' + ','.join(lab_names) + ';chgvs=' + ','.join(c_hgvses)
-        if len(cs_counts) > 1:
-            info += ';multiple_clinical_significances'
-        info += f';discordant=' + ','.join(discordances)
-        info += f';condition=' + ','.join(conditions)
-
-        # loop through all the keys we're choosing to print out
-        for ekey in self.report_keys:
-            info += f';{ekey.key}='
-            parts = []
             for record in vcms:
-                parts.append(self.generate_value_for_key(ekey, record))
-            info += ','.join(parts)
+                lab_names.append(self.vcf_safe(str(record.classification.lab)))
+                cs = record.get(SpecialEKeys.CLINICAL_SIGNIFICANCE, None)
+                if cs:
+                    cs_counts[cs] = cs_counts.get(cs, 0) + 1
+                c_hgvs = record.classification.allele_info[data.source.genome_build].c_hgvs_full or ''
 
-        cols.append(info)  # INFO
+                c_hgvses.append(c_hgvs)
+                discordances.append('1' if self.classification_filter.is_discordant(record) else '0')
+                conditions.append(self.vcf_safe(record.condition_text))
 
-        self.row_count += 1
-        return [ExportFormatter.write_single_row(cols, '\t')]
+            info += f';lab=' + ','.join(lab_names) + ';chgvs=' + ','.join(c_hgvses)
+            if len(cs_counts) > 1:
+                info += ';multiple_clinical_significances'
+            info += f';discordant=' + ','.join(discordances)
+            info += f';condition=' + ','.join(conditions)
+
+            # loop through all the keys we're choosing to print out
+            for ekey in self.report_keys:
+                info += f';{ekey.key}='
+                parts = []
+                for record in vcms:
+                    parts.append(self.generate_value_for_key(ekey, record))
+                info += ','.join(parts)
+
+            cols.append(info)  # INFO
+
+            self.row_count += 1
+            return [ExportFormatter.write_single_row(cols, '\t')]
+        else:
+            return []
 
     def content_type(self) -> str:
         return "text/plain"

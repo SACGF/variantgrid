@@ -520,7 +520,11 @@ class Variant(models.Model):
 
     @property
     def sort_string(self) -> str:
-        padded_contig = (self.locus.contig.name or '').rjust(2, '0')
+        padded_contig = self.locus.contig.name or ''
+        if padded_contig.isnumeric():
+            padded_contig = padded_contig.rjust(2, '0')
+        else:
+            padded_contig = padded_contig.rjust(2, '9')
         padded_position = f'{self.locus.position or 0:09d}'
         return f"{padded_contig}-{padded_position}"
 

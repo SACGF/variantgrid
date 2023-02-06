@@ -2,7 +2,10 @@ import time
 from typing import Dict
 
 from django.core.management import BaseCommand
+from django.db.models import Q
+
 from classification.models import Classification, ImportedAlleleInfo, classification_flag_types
+from classification.models.classification_variant_info_models import ResolvedVariantInfo
 from flags.models import FlagComment, FlagType
 from library.guardian_utils import admin_bot
 from library.utils import first
@@ -16,6 +19,7 @@ class Command(BaseCommand):
         # parser.add_argument('--file', type=str, help='If provided expects a csv where the first column is a combination of genome build and imported c.hgvs it expects to import')
         # parser.add_argument('--missing', action='store_true', default=False, help='Attempt to rematch only classifications not linked to a variant - one at a time')
         parser.add_argument('--extra', action='store_true', default=False, help='Populate the allele_info of a classification')
+        parser.add_argument('--sort', action='store_true', default=False, help='Fixes sort order for non-numerical chromosones')
         parser.add_argument('--validation', action='store_true', default=False, help='Perform validation on the pre-existing normalising/liftovers')
 
     def report_unmatched(self):
@@ -28,6 +32,7 @@ class Command(BaseCommand):
 
         mode_extra = options.get('extra')
         mode_validation = options.get('validation')
+        mode_sort = options.get('sort')
 
         # if mode_all and mode_missing:
         #     raise ValueError("all and missing are mutually exclusive parameters")
@@ -40,10 +45,12 @@ class Command(BaseCommand):
 
         if mode_extra:
             self.handle_extra()
-            return
+
         if mode_validation:
             self.handle_validation()
-            return
+
+        if mode_sort:
+            self.handle_fix_sort_order()
 
         # row_count = 0
         # batch_size = 50
@@ -98,6 +105,16 @@ class Command(BaseCommand):
 
     def sleep_for_delay(self):
         time.sleep(10)
+
+    def handle_fix_sort_order(self):
+        updates = 0
+        for rv in ResolvedVariantInfo.objects.all():
+            actual_sort_string = rv.variant.sort_string
+            if rv.genomic_sort != actual_sort_string:
+                rv.genomic_sort = actual_sort_string
+                rv.save()
+                updates += 1
+        print(f"Updated {updates} variant info")
 
     def handle_extra(self):
         i = 0
