@@ -123,11 +123,11 @@ class ClassificationDashboard:
         discordant = FlagCollection.filter_for_open_flags(qs=vcqs, flag_types=[
             classification_flag_types.discordant
         ])
-        variant_matching = FlagCollection.filter_for_open_flags(qs=vcqs, flag_types=[
-            classification_flag_types.matching_variant_flag,
-            classification_flag_types.matching_variant_warning_flag,
-            classification_flag_types.transcript_version_change_flag
-        ])
+        # variant_matching = FlagCollection.filter_for_open_flags(qs=vcqs, flag_types=[
+        #     classification_flag_types.matching_variant_flag,
+        #     classification_flag_types.matching_variant_warning_flag,
+        #     classification_flag_types.transcript_version_change_flag
+        # ])
         suggestions = FlagCollection.filter_for_open_flags(qs=vcqs, flag_types=[
             classification_flag_types.suggestion,
         ])
@@ -155,7 +155,7 @@ class ClassificationDashboard:
             "significance_change": significance_change.count(),
             "variant_matching_issues": variant_matching_issues.count(),
             "discordant": discordant.count(),
-            "variant_matching": variant_matching.count(),
+            # "variant_matching": variant_matching.count(),
             "suggestions": suggestions.count(),
             "unshared": unshared.count(),
             "withdrawn": withdrawn.count(),

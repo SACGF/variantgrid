@@ -278,11 +278,11 @@ class ClassificationApiExportView(APIView):
             'classification__clinical_context',
             'classification__allele_info__grch37',
             'classification__allele_info__grch38',
-            'classification__allele_info__allele_info__allele__clingen_allele',
+            'classification__allele_info__allele__clingen_allele',
             'classification__flag_collection')
 
         if allele := request.query_params.get('allele'):
-            qs = qs.filter(classification__allele_id=int(allele))
+            qs = qs.filter(classification__allele_info__allele_id=int(allele))
 
         formatter_kwargs = {
             "genome_build": genome_build,
