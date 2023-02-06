@@ -56,7 +56,7 @@ class ClassificationExportFormatter2VCF(ClassificationExportFormatter2):
         )
 
     def generate_info_for_key(self, ekey: EvidenceKey):
-        return f'##INFO=<ID={ekey.key},Number=.,Type=String,Description="{ekey.pretty_label}">\n'
+        return f'##INFO=<ID={ekey.key},Number=.,Type=String,Description="{ekey.pretty_label}">'
 
     def generate_value_for_key(self, ekey: EvidenceKey, record: ClassificationModification):
         return self.vcf_safe(record.get(ekey.key, None))
@@ -122,7 +122,8 @@ class ClassificationExportFormatter2VCF(ClassificationExportFormatter2):
         # if len(self.error_message_ids):
         #     out += [f'##readme=Warning at least {len(self.error_message_ids)} records had issues with their variants and could not be included']
 
-        out += ExportFormatter.write_single_row(['#CHROM', 'POS', 'ID', 'REF', 'ALT', 'QUAL', 'FILTER', 'INFO'], delimiter='\t')
+        out = [line + "\n" for line in out]
+        out += [ExportFormatter.write_single_row(['#CHROM', 'POS', 'ID', 'REF', 'ALT', 'QUAL', 'FILTER', 'INFO'], delimiter='\t')]
         return out
 
 

@@ -490,11 +490,13 @@ class ClassificationFilter:
             if exclude_labs := [lab for lab in self.exclude_sources if isinstance(lab, Lab)]:
                 cms = cms.exclude(classification__lab__in=exclude_labs)
 
-        cms = cms.order_by('-classification__allele_info__allele_id', '-classification__allele_info', '-classification__id')
-
+       # cms = cms.order_by('-classification__allele_info__allele_id', '-classification__allele_info', '-classification__id')
         genome_build_str = '37'
         if self.genome_build.is_version(38):
             genome_build_str = '38'
+
+        genomic_sort = f'classification__allele_info__grch{genome_build_str}__genomic_sort'
+        cms = cms.order_by(genomic_sort, '-classification__id')
 
         cms = cms.select_related(
             'classification',
