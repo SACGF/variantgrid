@@ -14,6 +14,7 @@ from threadlocals.threadlocals import get_current_request
 from classification.views.exports.classification_export_filter import AlleleData, ClassificationFilter
 from library.guardian_utils import bot_group
 from library.log_utils import NotificationBuilder, report_exc_info
+from snpdb.models import GenomeBuild
 
 
 class ClassificationExportFormatter2(ABC):
@@ -30,6 +31,10 @@ class ClassificationExportFormatter2(ABC):
     @property
     def is_genome_build_relevant(self) -> bool:
         return True
+
+    @property
+    def genome_build(self) -> GenomeBuild:
+        return self.classification_filter.genome_build
 
     def filename(self, part: Optional[int] = None, extension_override: Optional[str] = None) -> str:
         """

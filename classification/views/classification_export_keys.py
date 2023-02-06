@@ -163,7 +163,7 @@ class ExportFormatterKeys(BaseExportFormatter):
             self.key_counters[e_key.key] = KeyCount(e_key=e_key)
 
     def process(self):
-        for vcm in self.qs:
+        for vcm in self.qs.iterator(chunk_size=1000):
             self.count_classification(vcm)
 
     def export(self, as_attachment: bool = True) -> StreamingHttpResponse:
