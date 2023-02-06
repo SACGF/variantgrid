@@ -1702,7 +1702,7 @@ class GeneList(models.Model):
         qs = user_qs | sample_gene_list_qs
         if success_only:
             qs = qs.filter(import_status=ImportStatus.SUCCESS)
-        return qs
+        return qs.distinct()  # Sometimes gene list can be reached multiple ways via 'or' above
 
     @staticmethod
     def _visible_gene_lists(gene_lists_qs):
