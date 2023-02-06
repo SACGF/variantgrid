@@ -197,12 +197,11 @@ class ImportedAlleleInfoColumns(DatatableConfig[ImportedAlleleInfo]):
             pass
         return qs.filter(reduce(operator.or_, ors))
 
-@user_passes_test(is_superuser)
+
 def view_imported_allele_info(request: HttpRequest) -> Response:
     return render(request, "classification/imported_allele_info.html", {})
 
 
-@user_passes_test(is_superuser)
 def view_imported_allele_info_detail(request: HttpRequest, pk: int):
     allele_info = get_object_or_404(ImportedAlleleInfo, pk=pk)
     # just split up c.hgvs into logical parts, and then the diff will reset with each new group (treat it as different words)
