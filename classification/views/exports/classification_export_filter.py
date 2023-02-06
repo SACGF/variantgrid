@@ -495,7 +495,7 @@ class ClassificationFilter:
             genome_build_str = '38'
 
         genomic_sort = f'classification__allele_info__grch{genome_build_str}__genomic_sort'
-        cms = cms.order_by(genomic_sort, '-classification__id')
+        cms = cms.order_by(genomic_sort, 'classification__id')
 
         cms = cms.select_related(
             'classification',

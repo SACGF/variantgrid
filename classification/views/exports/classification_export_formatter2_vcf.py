@@ -22,6 +22,7 @@ class FormatDetailsVCFEncodingLevel(str, Enum):
     BASIC = "basic"
     FULL = "full"
 
+
 @dataclass(frozen=True)
 class FormatDetailsVCF:
     encoding_level: FormatDetailsVCFEncodingLevel
@@ -35,6 +36,7 @@ class FormatDetailsVCF:
         return FormatDetailsVCF(
             encoding_level=encoding_level
         )
+
 
 @register_classification_exporter("vcf")
 class ClassificationExportFormatter2VCF(ClassificationExportFormatter2):
