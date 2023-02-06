@@ -234,12 +234,11 @@ def get_variant_allele_for_variant(genome_build: GenomeBuild, variant: Variant,
         msg = f"No ClinGenAllele for non-standard variant: {variant}"
         raise ClinGenAlleleAPIException(msg)
 
-    try:
-        va = VariantAllele.objects.get(variant=variant, genome_build=genome_build)
+    # In a very rare race condition, we may have 2 VariantAlleles created, in which case just use 1st
+    if va := VariantAllele.objects.filter(variant=variant, genome_build=genome_build).order_by("pk").first():
         if va.needs_clingen_call():
             va = variant_allele_clingen(genome_build, variant, existing_variant_allele=va, clingen_api=clingen_api)
-
-    except VariantAllele.DoesNotExist:
+    else:
         if settings.CLINGEN_ALLELE_REGISTRY_LOGIN:
             va = variant_allele_clingen(genome_build, variant, clingen_api=clingen_api)
         else:
