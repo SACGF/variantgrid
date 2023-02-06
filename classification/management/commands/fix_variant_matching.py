@@ -107,6 +107,7 @@ class Command(BaseCommand):
         time.sleep(10)
 
     def handle_fix_sort_order(self):
+        print("Updating sort order - this may take a few minutes")
         updates = 0
         for rv in ResolvedVariantInfo.objects.all():
             actual_sort_string = rv.variant.sort_string
