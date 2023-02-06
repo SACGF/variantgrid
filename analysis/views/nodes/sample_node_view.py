@@ -7,8 +7,10 @@ class SampleNodeView(GeneCoverageNodeView):
     model = SampleNode
     form_class = SampleNodeForm
 
-    def _get_minimum_coverage(self) -> int:
-        return self.object.get_minimum_coverage()
+    def _get_minimum_coverage_required(self) -> int:
+        if self.object.sample:
+            return self.object.sample.get_minimum_coverage_required()
+        return super()._get_minimum_coverage_required()
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)

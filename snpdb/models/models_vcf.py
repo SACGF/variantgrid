@@ -292,8 +292,7 @@ class Sample(SortByPKMixin, models.Model):
         except ObjectDoesNotExist:
             return None
 
-    def get_minimum_coverage(self) -> int:
-        """ When should we be concerned """
+    def get_minimum_coverage_required(self) -> int:
         if self.enrichment_kit:
             if self.enrichment_kit.min_coverage is not None:
                 return self.enrichment_kit.min_coverage

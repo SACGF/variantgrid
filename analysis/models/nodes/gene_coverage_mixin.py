@@ -38,7 +38,7 @@ class GeneCoverageMixin:
             for sample in self.get_samples():
                 if gene_coverage_collection := GeneCoverageCollection.get_gene_coverage_for_sample(sample):
                     uncovered_genes = gene_coverage_collection.get_uncovered_gene_symbols(
-                        gene_symbols, sample.get_minimum_coverage())
+                        gene_symbols, sample.get_minimum_coverage_required())
                 else:
                     uncovered_genes = None
                 gene_sample_coverage_and_uncovered.append((sample, gene_coverage_collection, uncovered_genes))

@@ -5,7 +5,7 @@ from analysis.views.nodes import NodeView
 
 class GeneCoverageNodeView(NodeView):
 
-    def _get_minimum_coverage(self) -> int:
+    def _get_minimum_coverage_required(self) -> int:
         return settings.SEQAUTO_MIN_COVERAGE
 
     def get_context_data(self, **kwargs):
@@ -33,7 +33,7 @@ class GeneCoverageNodeView(NodeView):
                     uncovered_gene_names = ','.join(map(str, uncovered_genes))
                     incomplete_gene_coverage.append((sample, gene_coverage_collection, uncovered_gene_names))
 
-        context.update({"min_coverage": self._get_min_coverage(),
+        context.update({"min_coverage": self._get_minimum_coverage_required(),
                         "sample_coverage_and_uncovered": sample_coverage_and_uncovered,
                         "incomplete_gene_coverage": incomplete_gene_coverage})
         return context

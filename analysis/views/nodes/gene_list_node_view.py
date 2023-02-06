@@ -12,10 +12,10 @@ class GeneListNodeView(GeneCoverageNodeView):
     model = GeneListNode
     form_class = GeneListNodeForm
 
-    def _get_minimum_coverage(self) -> int:
+    def _get_minimum_coverage_required(self) -> int:
         if self.object.sample:
-            return self.object.sample.get_minimum_coverage()
-        return super()._get_minimum_coverage()
+            return self.object.sample.get_minimum_coverage_required()
+        return super()._get_minimum_coverage_required()
 
     def _get_form_initial(self):
         form_initial = super()._get_form_initial()
