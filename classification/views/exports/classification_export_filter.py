@@ -15,7 +15,6 @@ from classification.enums import ShareLevel, ClinicalContextStatus
 from classification.enums.discordance_enums import DiscordanceReportResolution
 from classification.models import ClassificationModification, Classification, classification_flag_types, \
     DiscordanceReport, ClinicalContext, ImportedAlleleInfo
-from classification.models.classification_variant_info_models import ImportedAlleleInfoValidation
 from flags.models import FlagsMixin, Flag, FlagComment
 from library.utils import batch_iterator, local_date_string
 from snpdb.models import GenomeBuild, Lab, Organization, allele_flag_types, Allele, Variant, VariantAllele
@@ -25,7 +24,6 @@ from snpdb.models import GenomeBuild, Lab, Organization, allele_flag_types, Alle
 class ClassificationIssue:
     classification: ClassificationModification
     withdrawn = False
-    validation_tags: Optional[ImportedAlleleInfoValidation] = None
     validation_include = False
     not_matched = False
 
@@ -476,7 +474,8 @@ class ClassificationFilter:
         else:
             cms = ClassificationModification.objects.filter(is_last_published=True)
 
-        cms = cms.filter(share_level__in=self._share_levels)
+        if self.min_share_level != ShareLevel.LAB:
+            cms = cms.filter(share_level__in=self._share_levels)
 
         if not self.since:
             # can only exclude withdrawn from complete consideration
@@ -495,7 +494,7 @@ class ClassificationFilter:
             genome_build_str = '38'
 
         genomic_sort = f'classification__allele_info__grch{genome_build_str}__genomic_sort'
-        cms = cms.order_by(genomic_sort, 'classification__id')
+        cms = cms.order_by(genomic_sort, 'classification__allele_info__allele', 'classification__lab', '-classification__id')
 
         cms = cms.select_related(
             'classification',

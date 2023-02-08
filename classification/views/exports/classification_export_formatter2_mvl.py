@@ -371,7 +371,7 @@ class ClassificationExportFormatter2MVL(ClassificationExportFormatter2):
 
             # can't juse simple JSON because we don't want to close this off yet
             mvl_json_extra = self.format_details.mvl_json_extra
-            return \
+            return [
 f"""{{
     "username": "{make_json_safe(mvl_json_extra.username)}",
     "mvlId": {mvl_json_extra.mvl_id},
@@ -379,12 +379,13 @@ f"""{{
     "importOption": "{make_json_safe(mvl_json_extra.import_option)}",
     "molecularVariants": [
 """
+            ]
         else:
             raise ValueError(f"Unexpected file format {self.format_details.format}")
 
     def footer(self) -> List[str]:
         if self.file_format == FormatDetailsMVLFileFormat.JSON:
-            return ["\n\t]\n}"]
+            return ["]}"]
         else:
             return []
 
@@ -417,7 +418,7 @@ f"""{{
                 if not self.first_row:
                     row_json = f",{row_json}"
                 self.first_row = False
-                row_json = f"\t\t{row_json}\n"
+                row_json = f"\t\t{row_json}"
                 output.append(row_json)
             return output
 

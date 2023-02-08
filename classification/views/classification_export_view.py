@@ -18,13 +18,14 @@ from rest_framework.request import Request
 from rest_framework.views import APIView
 
 from classification.enums.classification_enums import ShareLevel
+from classification.models import Classification
 from classification.models.classification import ClassificationModification
 from classification.models.classification_ref import ClassificationRef
 from classification.views.classification_export_json import ExportFormatterJSON
 from classification.views.classification_export_keys import ExportFormatterKeys
 from classification.views.classification_export_redcap import ExportFormatterRedcap, \
     export_redcap_definition
-from classification.views.classification_export_report import ExportFormatterReport
+from classification.views.classification_export_report import ClassificationReport
 from classification.views.classification_export_utils import ConflictStrategy, \
     VCFEncoding, BaseExportFormatter
 from classification.views.classification_export_vcf import ExportFormatterVCF
@@ -309,18 +310,12 @@ class ClassificationApiExportView(APIView):
         return formatter.export()
 
 
-def _single_classification_mod_qs(request: HttpRequest, record_id) -> QuerySet:
-    vcm = ClassificationRef.init_from_obj(request.user, record_id).modification
-    qs = ClassificationModification.objects.filter(pk=vcm.id)
-    return qs
-
-
 @not_minified_response
 def template_report(request: HttpRequest, classification_id) -> HttpResponseBase:
-    qs = _single_classification_mod_qs(request, classification_id)
-    genome_build = UserSettings.get_for_user(request.user).default_genome_build
+    c = Classification.objects.get(pk=classification_id)
+    c.check_can_view(request.user)
 
-    return ExportFormatterReport(user=request.user, genome_build=genome_build, qs=qs).export(as_attachment=False)
+    return ClassificationReport(c.last_published_version, user=request.user).serve()
 
 
 def redcap_data_dictionary(request: HttpRequest) -> HttpResponseBase:

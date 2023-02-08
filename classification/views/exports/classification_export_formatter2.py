@@ -2,7 +2,7 @@ import zipfile
 from abc import ABC, abstractmethod
 from datetime import datetime
 from io import StringIO
-from typing import Optional, List, Iterator, Tuple, Any, Callable
+from typing import Optional, List, Iterator, Tuple, Any, Callable, Iterable
 
 from django.http import HttpResponse, StreamingHttpResponse
 from django.http.response import HttpResponseBase
@@ -91,17 +91,19 @@ class ClassificationExportFormatter2(ABC):
         pass
 
     def _peekable_data(self) -> peekable:  # peekable[List[str]]
-        def row_iterator():
-            for allele_data in self.classification_filter.allele_data_filtered_pre_processed(self.batch_pre_cache()):
-                if rows := self.row(allele_data):
-                    yield rows
-        return peekable(row_iterator())
+        return peekable(self.row_generator())
+
+    def with_new_lines(self, data: List[str]) -> List[str]:
+        if data:
+            return [row + ("" if row.endswith("\n") else "\n") for row in data]
+        else:
+            return []
 
     def _yield_streaming_entry_str(self, source: peekable) -> Iterator[List[str]]:
         # source should be a peekable of List[str]
         # yield's a file's worth of data (in several chunks)
 
-        if header := self.header():
+        if header := self.with_new_lines(self.header()):
             yield header
 
         this_entry_row_count = 0
@@ -124,7 +126,7 @@ class ClassificationExportFormatter2(ABC):
             else:
                 break
 
-        if footer := self.footer():
+        if footer := self.with_new_lines(self.footer()):
             yield footer
 
     def _yield_streaming_entry_bytes(self, source: peekable) -> Iterator[bytes]:
@@ -180,15 +182,16 @@ class ClassificationExportFormatter2(ABC):
         :return: An iterator for a single streaming file, call either this or yield_file
         """
         try:
-            for header in self.header():
+            for header in self.with_new_lines(self.header()):
                 yield header
-            for allele_data in self.classification_filter.allele_data_filtered_pre_processed(self.batch_pre_cache()):
 
-                row_data = self.row(allele_data)
-                for row in row_data:
+            for rows in self.row_generator():
+                rows = self.with_new_lines(rows)
+                for row in rows:
                     self.row_count += 1
                     yield row
-            for footer in self.footer():
+
+            for footer in self.with_new_lines(self.footer()):
                 yield footer
         except:
             report_exc_info()
@@ -218,6 +221,11 @@ class ClassificationExportFormatter2(ABC):
         :return: A list of rows to be \n at the top of each file
         """
         return []
+
+    def row_generator(self) -> Iterable[List[str]]:
+        for allele_data in self.classification_filter.allele_data_filtered_pre_processed(self.batch_pre_cache()):
+            if rows := self.row(allele_data):
+                yield self.with_new_lines(rows)
 
     @abstractmethod
     def row(self, allele_data: AlleleData) -> List[str]:

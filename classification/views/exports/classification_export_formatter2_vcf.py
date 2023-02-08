@@ -124,7 +124,6 @@ class ClassificationExportFormatter2VCF(ClassificationExportFormatter2):
         # if len(self.error_message_ids):
         #     out += [f'##readme=Warning at least {len(self.error_message_ids)} records had issues with their variants and could not be included']
 
-        out = [line + "\n" for line in out]
         out += [ExportFormatter.write_single_row(['#CHROM', 'POS', 'ID', 'REF', 'ALT', 'QUAL', 'FILTER', 'INFO'], delimiter='\t')]
         return out
 

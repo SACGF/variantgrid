@@ -506,24 +506,6 @@ class ExportFormatter(BaseExportFormatter):
         else:
             return True
 
-    # @cached_property
-    # def classification_warning_flags(self):
-    #     return set(Flag.objects.filter(
-    #         flag_type__in=[classification_flag_types.matching_variant_warning_flag,
-    #                        classification_flag_types.transcript_version_change_flag
-    #                        ],
-    #         resolution__status=FlagStatus.OPEN
-    #     ).values_list('collection_id', flat=True).distinct())
-    #
-    # def passes_flag_check(self, vcm: ClassificationModification) -> bool:
-    #     outstanding_warning = vcm.classification.flag_collection_id in self.classification_warning_flags
-    #
-    #     if outstanding_warning:
-    #         self.record_errors(vcm.id, 'Requires confirmation of variant match')
-    #         return False
-    #
-    #     return True
-
     def passes_flag_check(self, vcm: ClassificationModification) -> bool:
         try:
             return vcm.classification.allele_info.latest_validation.include

@@ -1,5 +1,6 @@
 from typing import Optional
 
+from django.contrib.auth.models import User
 from django.http import HttpResponse
 from django.template import engines
 
@@ -11,40 +12,31 @@ from classification.views.classification_export_utils import ExportFormatter
 from snpdb.models import GenomeBuild
 
 
-class ExportFormatterReport(ExportFormatter):
+class ClassificationReport:
     """
     Formats using report for the corresponding lab.
     Typically you'd only use for a single record
     """
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, classification: ClassificationModification, user: User):
+        self.classification = classification
+        self.user = user
 
-    def row_iterator(self):
-        return self.qs.all()
-
-    def header(self) -> Optional[str]:
-        return None
-
-    def export(self, as_attachment: bool = True):
-        self.prepare_groups()
-
+    def serve(self):
         row_datas = []
         # only support 1 record for now
-        vcm = self.raw_qs.first()
+        vcm = self.classification
         row_data = self.row_data(vcm)
         row_datas.append(row_data)
 
-        self.row_count += 1
         report = ClassificationReportTemplate.preferred_template_for(vcm)
         template_str = report.template or 'No report template has been configured'
         django_engine = engines['django']
         template = django_engine.from_string(template_str)
         content = template.render({'record': row_datas[0]})
 
-        response = HttpResponse(content=content, content_type=self.content_type())
-        if as_attachment:
-            response['Content-Disposition'] = f'attachment; filename="{self.filename()}"'
+        response = HttpResponse(content=content, content_type='text/html')
+        # response['Content-Disposition'] = f'attachment; filename="{self.filename()}"'
         return response
 
     def row_data(self, record: ClassificationModification) -> dict:
@@ -78,9 +70,3 @@ class ExportFormatterReport(ExportFormatter):
         context['acmg_criteria'] = record.criteria_strength_summary(e_keys)
         context['editable'] = record.classification.can_write(self.user)
         return context
-
-    def content_type(self) -> str:
-        return 'text/html'
-
-    def filename(self) -> str:
-        return self.generate_filename(prefix='report', include_genome_build=False, extension='html')
