@@ -5,15 +5,14 @@ from typing import Optional, List, Iterator
 from django.http import HttpRequest
 
 from classification.enums import SpecialEKeys
-from classification.models import ClassificationJsonParams, ClassificationModification, EvidenceKeyMap
-from classification.views.classification_export_utils import ExportFormatter
+from classification.models import ClassificationModification, EvidenceKeyMap
 from classification.views.exports.classification_export_decorator import register_classification_exporter
 from classification.views.exports.classification_export_filter import ClassificationFilter, AlleleData, \
     ClassificationIssue
 from classification.views.exports.classification_export_formatter2 import ClassificationExportFormatter2
 from flags.models import FlagComment, Flag
 from library.django_utils import get_url_from_view_path
-from library.utils import export_column, ExportDataType, ExportRow
+from library.utils import export_column, ExportDataType, ExportRow, delimited_row
 
 
 @dataclass(frozen=True)
@@ -83,7 +82,7 @@ class ClassificationExportFormatter2Flags(ClassificationExportFormatter2):
         )
 
     def header(self) -> List[str]:
-        return [ExportFormatter.write_single_row(ProblemRow.csv_header(), delimiter=',')]
+        return [delimited_row(ProblemRow.csv_header(), delimiter=',')]
 
     def iterate_problems(self, ci: ClassificationIssue) -> Iterator[Problem]:
         vcm = ci.classification
@@ -127,7 +126,7 @@ class ClassificationExportFormatter2Flags(ClassificationExportFormatter2):
                 continue
 
             for problem in self.iterate_problems(row):
-                output.append( ExportFormatter.write_single_row(ProblemRow(row.classification, problem).to_csv(), ",") )
+                output.append( delimited_row(ProblemRow(row.classification, problem).to_csv(), ",") )
 
         return output
 

@@ -10,11 +10,13 @@ from django.http.response import HttpResponseBase
 
 from classification.enums import EvidenceKeyValueType
 from classification.models import EvidenceKey, Classification, EvidenceKeyMap, ClassificationModification
-from classification.views.classification_export_utils import KeyValueFormatter, ExportFormatter, UsedKeyTracker
+from classification.views.classification_export_utils import KeyValueFormatter, UsedKeyTracker
 from classification.views.exports.classification_export_decorator import register_classification_exporter
 from classification.views.exports.classification_export_filter import ClassificationFilter, AlleleData
 from classification.views.exports.classification_export_formatter2 import ClassificationExportFormatter2
 from classification.views.exports.classification_export_utils import CitationCounter
+from library.utils import delimited_row
+
 
 # WARNING: REDCap export ignores the since parameter
 # WARNING: REDCap export ignores variant warnings
@@ -118,7 +120,7 @@ class ClassificationExportFormatter2RedCap(ClassificationExportFormatter2):
                                            evidence_weights, citations]
                 row_values = row_values + self.used_key_arrays[idx].row(vcm)
 
-            yield [ExportFormatter.write_single_row(row_values, delimiter=',')]
+            yield [delimited_row(row_values, delimiter=',')]
 
 
 REDCAP_PREFIX = 'vc_'

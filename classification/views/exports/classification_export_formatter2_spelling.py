@@ -9,12 +9,11 @@ from django.http import HttpRequest
 
 from classification.enums import SpecialEKeys
 from classification.models import ClassificationModification
-from classification.views.classification_export_utils import ExportFormatter
 from classification.views.exports.classification_export_decorator import register_classification_exporter
 from classification.views.exports.classification_export_filter import ClassificationFilter, AlleleData
 from classification.views.exports.classification_export_formatter2 import ClassificationExportFormatter2
 from library.django_utils import get_url_from_view_path
-from library.utils import ExportRow, export_column
+from library.utils import ExportRow, export_column, delimited_row
 
 RE_HAS_BAD_CHAR = re.compile(r"[\d._]")
 
@@ -85,12 +84,12 @@ class ClassificationExportFormatter2Spelling(ClassificationExportFormatter2):
         return "csv"
 
     def header(self) -> List[str]:
-        return [ExportFormatter.write_single_row(ClassificationSpellingRow.csv_header())]
+        return [delimited_row(ClassificationSpellingRow.csv_header(), ",")]
 
     def footer(self) -> List[str]:
         suspect_count_list = [(word, count) for word, count in self.suspect_count.items()]
         suspect_count_list.sort(key=lambda x: x[1], reverse=True)
-        return [ExportFormatter.write_single_row([
+        return [delimited_row([
             "", "", "Total Classifications Occurred In", "\n".join(f"{wc[0]}: {wc[1]}" for wc in suspect_count_list)
         ])]
 
@@ -101,6 +100,6 @@ class ClassificationExportFormatter2Spelling(ClassificationExportFormatter2):
             for suspect_word in spelling_row.suspect_words_set:
                 self.suspect_count[suspect_word] += 1
             rows.append(
-                ExportFormatter.write_single_row(spelling_row.to_csv())
+                delimited_row(spelling_row.to_csv())
             )
         return rows

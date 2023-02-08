@@ -16,23 +16,15 @@ from htmlmin.decorators import not_minified_response
 from requests.models import Response
 from rest_framework.request import Request
 from rest_framework.views import APIView
-
-from classification.enums.classification_enums import ShareLevel
 from classification.models import Classification
 from classification.models.classification import ClassificationModification
 from classification.models.classification_ref import ClassificationRef
-from classification.views.classification_export_json import ExportFormatterJSON
-from classification.views.classification_export_keys import ExportFormatterKeys
-from classification.views.classification_export_redcap import ExportFormatterRedcap, \
-    export_redcap_definition
 from classification.views.classification_export_report import ClassificationReport
-from classification.views.classification_export_utils import ConflictStrategy, \
-    VCFEncoding, BaseExportFormatter
-from classification.views.classification_export_vcf import ExportFormatterVCF
 from classification.views.exports import ClassificationExportFormatter2CSV
 from classification.views.exports.classification_export_decorator import UnsupportedExportType
 from classification.views.exports.classification_export_filter import ClassificationFilter
 from classification.views.exports.classification_export_formatter2_csv import FormatDetailsCSV
+from classification.views.exports.classification_export_formatter2_redcap import export_redcap_definition
 from classification.views.exports.classification_export_view import serve_export
 from library.django_utils import get_url_from_view_path
 from snpdb.genome_build_manager import GenomeBuildManager
@@ -204,110 +196,8 @@ class ClassificationApiExportView(APIView):
         return orgs
 
     def get(self, request: Request, **kwargs) -> HttpResponseBase:
-
-        file_format = request.query_params.get('type')
-
-        try:
-            return serve_export(request)
-        except UnsupportedExportType:
-            # assume that the default import will handle it if type wasn't handled elsewhere
-            pass
-
-        # deprecating all this... eventually
-
-        since = None
-        since_str = request.query_params.get('since', None)
-        if since_str:
-            since = parse_since(since_str)
-
-        build_name = request.query_params.get('build', 'GRCh38')
-        share_level = request.query_params.get('share_level', 'public')
-        genome_build = GenomeBuild.get_name_or_alias(build_name)
-        pretty = request.query_params.get('value_format') == 'labels'
-
-        conflict_strategy = request.query_params.get('conflict_strategy', ConflictStrategy.MOST_PATHOGENIC)
-        encoding = request.query_params.get('encoding', VCFEncoding.BASIC)
-        cs_override_labels = {}
-        for key in ['b', 'lb', 'vus', 'lp', 'p']:
-            cs_label = request.query_params.get(f'cs_{key}')
-            if cs_label:
-                cs_override_labels[key.upper()] = cs_label
-
-        qs = ClassificationModification.objects.filter(is_last_published=True)
-        # only include excluded if we have a since and need to report deltas of records being withdrawn
-        if not since:
-            qs = qs.exclude(classification__withdrawn=True)
-
-        # so the below looks a little switched around but is currently correct
-        # the parameter share_level of 'public' should be changed to 'app_users'
-        if share_level == 'public':
-            qs = qs.filter(share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS)
-        elif share_level == '3rd_party':
-            qs = qs.filter(share_level=ShareLevel.PUBLIC)
-
-        # always restrict to user for security reasons (even if possibly redundant)
-        qs = ClassificationModification.filter_for_user(request.user, qs)
-
-        exclude_labs = request.query_params.get('exclude_labs', None)
-        include_labs = request.query_params.get('include_labs', None)
-        exclude_orgs = request.query_params.get('exclude_orgs', None)
-
-        if include_labs:
-            include_lab_array = ClassificationApiExportView.string_to_labs(include_labs)
-            qs = qs.filter(classification__lab__in=include_lab_array)
-        if exclude_labs:
-            exclude_lab_array = ClassificationApiExportView.string_to_labs(exclude_labs)
-            qs = qs.exclude(classification__lab__in=exclude_lab_array)
-        if exclude_orgs:
-            exclude_org_array = ClassificationApiExportView.string_to_orgs(exclude_orgs)
-            qs = qs.exclude(classification__lab__organization__in=exclude_org_array)
-
-        if file_format == 'mvl':
-            transcript_strategy = request.query_params.get('transcript_strategy', 'refseq')
-            if transcript_strategy == 'refseq':
-                # exclude non NC/NR/NX transcripts
-                acceptable_transcripts: List[Q] = [
-                    Q(published_evidence__c_hgvs__value__startswith=tran) for tran in ALISSA_ACCEPTED_TRANSCRIPTS
-                ]
-                qs = qs.filter(reduce(operator.or_, acceptable_transcripts))
-
-        formatter: BaseExportFormatter
-        qs = qs.select_related(
-            'classification',
-            'classification__lab',
-            'classification__lab__organization',
-            'classification__clinical_context',
-            'classification__allele_info__grch37',
-            'classification__allele_info__grch38',
-            'classification__allele_info__allele__clingen_allele',
-            'classification__flag_collection')
-
-        if allele := request.query_params.get('allele'):
-            qs = qs.filter(classification__allele_info__allele_id=int(allele))
-
-        formatter_kwargs = {
-            "genome_build": genome_build,
-            "qs": qs,
-            "user": request.user,
-            "since": since
-        }
-
-        if file_format == 'json':
-            formatter = ExportFormatterJSON(**formatter_kwargs)
-        elif file_format == 'redcap':
-            formatter = ExportFormatterRedcap(**formatter_kwargs)
-        elif file_format == 'vcf':
-            formatter = ExportFormatterVCF(encoding=encoding, **formatter_kwargs)
-        elif file_format == 'keys':
-            formatter = ExportFormatterKeys(qs=qs)
-        else:
-            raise ValueError(f'Unsupported export format {file_format}')
-
-        if request.query_params.get('benchmark') == 'true':
-            benchmarks = formatter.benchmark()
-            return render(request, "snpdb/benchmark.html", {"content": benchmarks})
-
-        return formatter.export()
+        # will throw a UnsupportedExportType if
+        return serve_export(request)
 
 
 @not_minified_response

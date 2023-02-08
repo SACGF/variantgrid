@@ -41,8 +41,7 @@ from classification.models.clinical_context_models import ClinicalContext
 from classification.models.evidence_key import EvidenceKeyMap
 from classification.models.flag_types import classification_flag_types
 from classification.views.classification_datatables import ClassificationColumns
-from classification.views.classification_export_redcap import ExportFormatterRedcap
-from classification.views.exports import ClassificationExportFormatter2CSV
+from classification.views.exports import ClassificationExportFormatter2CSV, ClassificationExportFormatter2RedCap
 from classification.views.exports.classification_export_filter import ClassificationFilter
 from classification.views.exports.classification_export_formatter2_csv import FormatDetailsCSV
 from flags.models import Flag, FlagComment
@@ -472,7 +471,13 @@ def export_classifications_grid(request):
 def export_classifications_grid_redcap(request):
     genome_build = UserSettings.get_for_user(request.user).default_genome_build
     qs = classification_qs(request)
-    return ExportFormatterRedcap(user=request.user, genome_build=genome_build, qs=qs).export()
+    return ClassificationExportFormatter2RedCap(
+        classification_filter=ClassificationFilter(
+            user=request.user,
+            genome_build=genome_build,
+            starting_query=qs
+        )
+    ).serve()
 
 
 @require_POST

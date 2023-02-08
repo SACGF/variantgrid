@@ -8,7 +8,6 @@ from classification.models import ClassificationJsonParams, ClassificationReport
 from classification.models.classification import ClassificationModification, \
     Classification
 from classification.models.evidence_key import EvidenceKeyMap
-from classification.views.classification_export_utils import ExportFormatter
 from snpdb.models import GenomeBuild
 
 

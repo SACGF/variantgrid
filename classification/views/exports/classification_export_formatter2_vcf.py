@@ -10,11 +10,11 @@ from django.urls import reverse
 
 from classification.enums import SpecialEKeys
 from classification.models import EvidenceKey, ClassificationModification, EvidenceKeyMap
-from classification.views.classification_export_utils import ExportFormatter
 from classification.views.exports.classification_export_decorator import register_classification_exporter
 from classification.views.exports.classification_export_filter import ClassificationFilter, AlleleData
 from classification.views.exports.classification_export_formatter2 import ClassificationExportFormatter2
 from library.django_utils import get_url_from_view_path
+from library.utils import delimited_row
 from snpdb.models import GenomeBuildContig
 
 
@@ -124,7 +124,7 @@ class ClassificationExportFormatter2VCF(ClassificationExportFormatter2):
         # if len(self.error_message_ids):
         #     out += [f'##readme=Warning at least {len(self.error_message_ids)} records had issues with their variants and could not be included']
 
-        out += [ExportFormatter.write_single_row(['#CHROM', 'POS', 'ID', 'REF', 'ALT', 'QUAL', 'FILTER', 'INFO'], delimiter='\t')]
+        out += [delimited_row(['#CHROM', 'POS', 'ID', 'REF', 'ALT', 'QUAL', 'FILTER', 'INFO'], delimiter='\t')]
         return out
 
 
@@ -179,7 +179,7 @@ class ClassificationExportFormatter2VCF(ClassificationExportFormatter2):
             cols.append(info)  # INFO
 
             self.row_count += 1
-            return [ExportFormatter.write_single_row(cols, '\t')]
+            return [delimited_row(cols, '\t')]
         else:
             return []
 
