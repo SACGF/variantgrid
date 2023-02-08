@@ -4,7 +4,7 @@ from classification.models import EvidenceKey, EvidenceKeyMap
 from classification.models.evidence_mixin import VCBlobDict
 from classification.views.exports.classification_export_decorator import register_classification_exporter
 from classification.views.exports.classification_export_filter import ClassificationFilter, AlleleData
-from classification.views.exports.classification_export_formatter2 import ClassificationExportFormatter2
+from classification.views.exports.classification_export_formatter import ClassificationExportFormatter2
 import json
 
 """
@@ -143,7 +143,7 @@ class KeyCount:
         return data
 
 @register_classification_exporter("keys")
-class ClassificationExportFormatter2Keys(ClassificationExportFormatter2):
+class ClassificationExportFormatterKeys(ClassificationExportFormatter2):
     """
     Exports data in the format that Agilent's Alissa can import it
     """
@@ -158,9 +158,9 @@ class ClassificationExportFormatter2Keys(ClassificationExportFormatter2):
         super().__init__(classification_filter=classification_filter)
 
     @classmethod
-    def from_request(cls, request: HttpRequest) -> 'ClassificationExportFormatter2Keys':
+    def from_request(cls, request: HttpRequest) -> 'ClassificationExportFormatterKeys':
         classification_filter = ClassificationFilter.from_request(request)
-        return ClassificationExportFormatter2Keys(
+        return ClassificationExportFormatterKeys(
             classification_filter=classification_filter
         )
 

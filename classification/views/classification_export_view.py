@@ -20,11 +20,11 @@ from classification.models import Classification
 from classification.models.classification import ClassificationModification
 from classification.models.classification_ref import ClassificationRef
 from classification.views.classification_export_report import ClassificationReport
-from classification.views.exports import ClassificationExportFormatter2CSV
+from classification.views.exports import ClassificationExportFormatterCSV
 from classification.views.exports.classification_export_decorator import UnsupportedExportType
 from classification.views.exports.classification_export_filter import ClassificationFilter
-from classification.views.exports.classification_export_formatter2_csv import FormatDetailsCSV
-from classification.views.exports.classification_export_formatter2_redcap import export_redcap_definition
+from classification.views.exports.classification_export_formatter_csv import FormatDetailsCSV
+from classification.views.exports.classification_export_formatter_redcap import export_redcap_definition
 from classification.views.exports.classification_export_view import serve_export
 from library.django_utils import get_url_from_view_path
 from snpdb.genome_build_manager import GenomeBuildManager
@@ -226,7 +226,7 @@ def record_csv(request: HttpRequest, classification_id) -> HttpResponseBase:
     ]
     file_prefix = "_".join(filename_parts)
 
-    return ClassificationExportFormatter2CSV(
+    return ClassificationExportFormatterCSV(
         ClassificationFilter(
             user=request.user,
             genome_build=GenomeBuildManager.get_current_genome_build(),

@@ -19,7 +19,7 @@ from classification.models.classification import Classification, \
 from classification.models.clinvar_export_sync import clinvar_export_sync
 from classification.views.classification_accumulation_graph import \
     AccumulationReportMode, get_accumulation_graph_data
-from classification.views.exports import ClassificationExportFormatter2Flags
+from classification.views.exports import ClassificationExportFormatterFlags
 from classification.views.exports.classification_export_filter import ClassificationFilter
 from flags.models import FlagCollection
 from snpdb.genome_build_manager import GenomeBuildManager
@@ -180,7 +180,7 @@ def issues_download(request: HttpRequest, lab_id: Union[int, str] = 0):
         genome_build=GenomeBuild.grch38(),  # note that genome build for ExportFormatterFlags has no effect
         include_sources=lab_picker.selected_labs
     )
-    exporter = ClassificationExportFormatter2Flags(filter)
+    exporter = ClassificationExportFormatterFlags(filter)
     return exporter.serve()
     #
     # exporter = ExportFormatterFlags(

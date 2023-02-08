@@ -5,19 +5,19 @@ from django.http import HttpRequest
 from classification.models import ClassificationJsonParams, ClassificationModification
 from classification.views.exports.classification_export_decorator import register_classification_exporter
 from classification.views.exports.classification_export_filter import ClassificationFilter, AlleleData
-from classification.views.exports.classification_export_formatter2 import ClassificationExportFormatter2
+from classification.views.exports.classification_export_formatter import ClassificationExportFormatter2
 
 
 @register_classification_exporter("json")
-class ClassificationExportFormatter2JSON(ClassificationExportFormatter2):
+class ClassificationExportFormatterJSON(ClassificationExportFormatter2):
 
     def __init__(self, classification_filter: ClassificationFilter):
         self.first_row = True
         super().__init__(classification_filter=classification_filter)
 
     @classmethod
-    def from_request(cls, request: HttpRequest) -> 'ClassificationExportFormatter2JSON':
-        return ClassificationExportFormatter2JSON(
+    def from_request(cls, request: HttpRequest) -> 'ClassificationExportFormatterJSON':
+        return ClassificationExportFormatterJSON(
             classification_filter=ClassificationFilter.from_request(request)
         )
 

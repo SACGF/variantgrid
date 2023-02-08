@@ -10,7 +10,7 @@ from classification.enums import SpecialEKeys
 from classification.models import EvidenceKeyMap
 from classification.views.exports.classification_export_decorator import register_classification_exporter
 from classification.views.exports.classification_export_filter import ClassificationFilter, AlleleData
-from classification.views.exports.classification_export_formatter2 import ClassificationExportFormatter2
+from classification.views.exports.classification_export_formatter import ClassificationExportFormatter2
 from library.django_utils import get_url_from_view_path
 from library.utils import ExportRow, export_column, delimited_row
 
@@ -205,11 +205,11 @@ class ClinVarCompareRow(ExportRow):
 
 
 @register_classification_exporter("clinvar_compare")
-class ClassificationExportFormatter2ClinVarCompare(ClassificationExportFormatter2):
+class ClassificationExportFormatterClinVarCompare(ClassificationExportFormatter2):
 
     @classmethod
     def from_request(cls, request: HttpRequest) -> 'ClassificationExportFormatter2CSV':
-        return ClassificationExportFormatter2ClinVarCompare(
+        return ClassificationExportFormatterClinVarCompare(
             classification_filter=ClassificationFilter.from_request(request)
         )
 

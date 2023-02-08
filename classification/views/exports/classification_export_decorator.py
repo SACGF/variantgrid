@@ -2,7 +2,7 @@ from typing import Callable, Dict
 
 from django.http import HttpRequest
 
-from classification.views.exports.classification_export_formatter2 import ClassificationExportFormatter2
+from classification.views.exports.classification_export_formatter import ClassificationExportFormatter2
 
 ExportFormatterFactory = Callable[[HttpRequest], ClassificationExportFormatter2]
 

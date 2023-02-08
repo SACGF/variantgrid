@@ -13,7 +13,7 @@ from classification.models import EvidenceKey, Classification, EvidenceKeyMap, C
 from classification.views.classification_export_utils import KeyValueFormatter, UsedKeyTracker
 from classification.views.exports.classification_export_decorator import register_classification_exporter
 from classification.views.exports.classification_export_filter import ClassificationFilter, AlleleData
-from classification.views.exports.classification_export_formatter2 import ClassificationExportFormatter2
+from classification.views.exports.classification_export_formatter import ClassificationExportFormatter2
 from classification.views.exports.classification_export_utils import CitationCounter
 from library.utils import delimited_row
 
@@ -35,7 +35,7 @@ class RedcapGroup:
         return bool(self.data)
 
 @register_classification_exporter("redcap")
-class ClassificationExportFormatter2RedCap(ClassificationExportFormatter2):
+class ClassificationExportFormatterRedCap(ClassificationExportFormatter2):
     """
     Exports data in the format that Agilent's Alissa can import it
     """
@@ -47,9 +47,9 @@ class ClassificationExportFormatter2RedCap(ClassificationExportFormatter2):
         super().__init__(classification_filter=classification_filter)
 
     @classmethod
-    def from_request(cls, request: HttpRequest) -> 'ClassificationExportFormatter2RedCap':
+    def from_request(cls, request: HttpRequest) -> 'ClassificationExportFormatterRedCap':
         classification_filter = ClassificationFilter.from_request(request)
-        return ClassificationExportFormatter2RedCap(
+        return ClassificationExportFormatterRedCap(
             classification_filter=classification_filter
         )
 

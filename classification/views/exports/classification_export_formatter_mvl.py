@@ -16,7 +16,7 @@ from classification.views.classification_export_utils import ConflictStrategy
 from classification.views.exports.classification_export_decorator import register_classification_exporter
 from classification.views.exports.classification_export_filter import AlleleData, ClassificationFilter, \
     DiscordanceReportStatus
-from classification.views.exports.classification_export_formatter2 import ClassificationExportFormatter2
+from classification.views.exports.classification_export_formatter import ClassificationExportFormatter2
 from classification.views.exports.classification_export_utils import CHGVSData, CitationCounter
 from library.django_utils import get_url_from_view_path
 from library.utils import delimited_row, export_column, ExportRow
@@ -335,7 +335,7 @@ class MVLEntry(ExportRow):
 
 
 @register_classification_exporter("mvl")
-class ClassificationExportFormatter2MVL(ClassificationExportFormatter2):
+class ClassificationExportFormatterMVL(ClassificationExportFormatter2):
     """
     Exports data in the format that Agilent's Alissa can import it
     """
@@ -351,9 +351,9 @@ class ClassificationExportFormatter2MVL(ClassificationExportFormatter2):
         return self.format_details.format
 
     @classmethod
-    def from_request(cls, request: HttpRequest) -> 'ClassificationExportFormatter2MVL':
+    def from_request(cls, request: HttpRequest) -> 'ClassificationExportFormatterMVL':
         classification_filter = ClassificationFilter.from_request(request)
-        return ClassificationExportFormatter2MVL(
+        return ClassificationExportFormatterMVL(
             classification_filter=classification_filter,
             format_details=FormatDetailsMVL.from_request(request)
         )

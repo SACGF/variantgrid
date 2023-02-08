@@ -22,9 +22,9 @@ from annotation.models import AnnotationRun, AnnotationVersion, ClassificationMo
 from annotation.transcripts_annotation_selections import VariantTranscriptSelections
 from classification.models import ImportedAlleleInfo
 from classification.models.classification_import_run import ClassificationImportRun
-from classification.views.exports import ClassificationExportFormatter2CSV
+from classification.views.exports import ClassificationExportFormatterCSV
 from classification.views.exports.classification_export_filter import ClassificationFilter
-from classification.views.exports.classification_export_formatter2_csv import FormatDetailsCSV
+from classification.views.exports.classification_export_formatter_csv import FormatDetailsCSV
 from eventlog.models import create_event
 from genes.hgvs import HGVSMatcher
 from genes.models import CanonicalTranscriptCollection, GeneSymbol
@@ -454,7 +454,7 @@ def export_classifications_allele(request, allele_id: int):
     CSV export of what is currently filtered into the classification grid
     """
     allele = Allele.objects.get(pk=allele_id)
-    return ClassificationExportFormatter2CSV(
+    return ClassificationExportFormatterCSV(
         ClassificationFilter(
             user=request.user,
             genome_build=GenomeBuildManager.get_current_genome_build(),

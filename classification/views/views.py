@@ -41,9 +41,9 @@ from classification.models.clinical_context_models import ClinicalContext
 from classification.models.evidence_key import EvidenceKeyMap
 from classification.models.flag_types import classification_flag_types
 from classification.views.classification_datatables import ClassificationColumns
-from classification.views.exports import ClassificationExportFormatter2CSV, ClassificationExportFormatter2RedCap
+from classification.views.exports import ClassificationExportFormatterCSV, ClassificationExportFormatterRedCap
 from classification.views.exports.classification_export_filter import ClassificationFilter
-from classification.views.exports.classification_export_formatter2_csv import FormatDetailsCSV
+from classification.views.exports.classification_export_formatter_csv import FormatDetailsCSV
 from flags.models import Flag, FlagComment
 from flags.models.models import FlagType
 from genes.forms import GeneSymbolForm
@@ -457,7 +457,7 @@ def export_classifications_grid(request):
     """
     genome_build = UserSettings.get_for_user(request.user).default_genome_build
     qs = classification_qs(request)
-    return ClassificationExportFormatter2CSV(
+    return ClassificationExportFormatterCSV(
         ClassificationFilter(
             user=request.user,
             genome_build=GenomeBuildManager.get_current_genome_build(),
@@ -471,7 +471,7 @@ def export_classifications_grid(request):
 def export_classifications_grid_redcap(request):
     genome_build = UserSettings.get_for_user(request.user).default_genome_build
     qs = classification_qs(request)
-    return ClassificationExportFormatter2RedCap(
+    return ClassificationExportFormatterRedCap(
         classification_filter=ClassificationFilter(
             user=request.user,
             genome_build=genome_build,

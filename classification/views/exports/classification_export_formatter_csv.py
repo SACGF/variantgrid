@@ -11,7 +11,7 @@ from classification.views.classification_export_utils import UsedKeyTracker, Key
 from classification.views.exports.classification_export_decorator import register_classification_exporter
 from classification.views.exports.classification_export_filter import AlleleData, ClassificationFilter, \
     DiscordanceReportStatus
-from classification.views.exports.classification_export_formatter2 import ClassificationExportFormatter2
+from classification.views.exports.classification_export_formatter import ClassificationExportFormatter2
 from classification.views.exports.classification_export_utils import CitationCounter
 from library.utils import delimited_row, export_column, ExportRow, ExportDataType
 from snpdb.models import GenomeBuild
@@ -168,7 +168,7 @@ class ClassificationMeta(ExportRow):
 
 
 @register_classification_exporter("csv")
-class ClassificationExportFormatter2CSV(ClassificationExportFormatter2):
+class ClassificationExportFormatterCSV(ClassificationExportFormatter2):
 
     def __init__(self, classification_filter: ClassificationFilter, format_details: FormatDetailsCSV):
         self.format_details = format_details
@@ -178,8 +178,8 @@ class ClassificationExportFormatter2CSV(ClassificationExportFormatter2):
         super().__init__(classification_filter=classification_filter)
 
     @classmethod
-    def from_request(cls, request: HttpRequest) -> 'ClassificationExportFormatter2CSV':
-        return ClassificationExportFormatter2CSV(
+    def from_request(cls, request: HttpRequest) -> 'ClassificationExportFormatterCSV':
+        return ClassificationExportFormatterCSV(
             classification_filter=ClassificationFilter.from_request(request),
             format_details=FormatDetailsCSV.from_request(request)
         )

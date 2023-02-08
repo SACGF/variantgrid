@@ -9,7 +9,7 @@ from classification.models import ClassificationModification, EvidenceKeyMap
 from classification.views.exports.classification_export_decorator import register_classification_exporter
 from classification.views.exports.classification_export_filter import ClassificationFilter, AlleleData, \
     ClassificationIssue
-from classification.views.exports.classification_export_formatter2 import ClassificationExportFormatter2
+from classification.views.exports.classification_export_formatter import ClassificationExportFormatter2
 from flags.models import FlagComment, Flag
 from library.django_utils import get_url_from_view_path
 from library.utils import export_column, ExportDataType, ExportRow, delimited_row
@@ -66,7 +66,7 @@ class ProblemRow(ExportRow):
 
 
 @register_classification_exporter("flags")
-class ClassificationExportFormatter2Flags(ClassificationExportFormatter2):
+class ClassificationExportFormatterFlags(ClassificationExportFormatter2):
 
     CODE_SUBSTITUTE = {'mandatory': 'Missing value'}
 
@@ -76,8 +76,8 @@ class ClassificationExportFormatter2Flags(ClassificationExportFormatter2):
         super().__init__(classification_filter=classification_filter)
 
     @classmethod
-    def from_request(cls, request: HttpRequest) -> 'ClassificationExportFormatter2Flags':
-        return ClassificationExportFormatter2Flags(
+    def from_request(cls, request: HttpRequest) -> 'ClassificationExportFormatterFlags':
+        return ClassificationExportFormatterFlags(
             classification_filter=ClassificationFilter.from_request(request)
         )
 
@@ -94,7 +94,7 @@ class ClassificationExportFormatter2Flags(ClassificationExportFormatter2):
                 for validation in validations:
                     key_label = self.e_keys.get(key).pretty_label
                     code = validation.get('code', '')
-                    code = ClassificationExportFormatter2Flags.CODE_SUBSTITUTE.get(code, code)
+                    code = ClassificationExportFormatterFlags.CODE_SUBSTITUTE.get(code, code)
                     code = (code[0].upper() + code[1:]).replace('_', ' ')
                     message = validation.get('message')
                     yield Problem(code=code, message=f'{key_label}: {message}')

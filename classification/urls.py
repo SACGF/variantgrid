@@ -24,7 +24,7 @@ from classification.views.condition_matching_view import condition_matching_view
 from classification.views.discordance_report_views import discordance_report_view, export_discordance_report, \
     discordance_reports_view, discordance_reports_history_detail, discordance_reports_active_detail
 from classification.views.evidence_keys_view import EvidenceKeysView
-from classification.views.exports.classification_export_formatter2_redcap import redcap_data_dictionary
+from classification.views.exports.classification_export_formatter_redcap import redcap_data_dictionary
 from classification.views.imported_allele_info_view import view_imported_allele_info, ImportedAlleleInfoColumns, \
     view_imported_allele_info_detail, download_allele_info
 from classification.views.views import classification_import_tool, AutopopulateView

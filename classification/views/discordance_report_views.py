@@ -20,9 +20,9 @@ from classification.models.classification_groups import ClassificationGroupUtils
 from classification.models.discordance_models import DiscordanceReport
 from classification.models.evidence_key import EvidenceKeyOption
 from classification.views.classification_dashboard_view import ClassificationDashboard
-from classification.views.exports import ClassificationExportFormatter2CSV
+from classification.views.exports import ClassificationExportFormatterCSV
 from classification.views.exports.classification_export_filter import ClassificationFilter
-from classification.views.exports.classification_export_formatter2_csv import FormatDetailsCSV
+from classification.views.exports.classification_export_formatter_csv import FormatDetailsCSV
 from genes.hgvs import CHGVS
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.lab_picker import LabPickerData
@@ -365,7 +365,7 @@ def export_discordance_report(request: HttpRequest, discordance_report_id: int) 
 
     vcs_qs = ClassificationModification.objects.filter(pk__in=[vcm.id for vcm in include])
 
-    return ClassificationExportFormatter2CSV(
+    return ClassificationExportFormatterCSV(
         ClassificationFilter(
             user=request.user,
             genome_build=GenomeBuildManager.get_current_genome_build(),
