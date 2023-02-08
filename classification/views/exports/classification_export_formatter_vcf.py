@@ -178,7 +178,6 @@ class ClassificationExportFormatterVCF(ClassificationExportFormatter2):
 
             cols.append(info)  # INFO
 
-            self.row_count += 1
             return [delimited_row(cols, '\t')]
         else:
             return []
