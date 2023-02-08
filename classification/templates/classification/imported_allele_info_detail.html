@@ -56,7 +56,6 @@
             {% labelled label="Allele" %}
                 {% if allele_info.allele %}
                     <a class="hover-link" href="{{ allele_info.allele.get_absolute_url }}">{{ allele_info.allele }}</a>
-                    <div class="flags d-inline-block" style="margin-left:12px" data-flags="{{ allele_info.allele.flag_collection_id }}">...</div>
                 {% else %}<span class="no-value">-</span>{% endif %}
             {% endlabelled %}
         {% endif %}

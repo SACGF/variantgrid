@@ -33,7 +33,7 @@ from classification.enums import ClinicalSignificance, SubmissionSource, ShareLe
 from classification.models.classification_import_run import ClassificationImportRun
 from classification.models.classification_patcher import patch_fuzzy_age
 from classification.models.classification_utils import \
-    ValidationMerger, ClassificationJsonParams, VariantCoordinateFromEvidence, PatchMeta, ClassificationPatchResponse
+    ValidationMerger, ClassificationJsonParams, PatchMeta, ClassificationPatchResponse
 from classification.models.classification_variant_info_models import ImportedAlleleInfo, ImportedAlleleInfoStatus
 from classification.models.evidence_key import EvidenceKeyValueType, \
     EvidenceKey, EvidenceKeyMap, VCDataDict, WipeMode, VCDataCell
@@ -2091,55 +2091,6 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 allele_info_dict["genome_builds"] = genome_builds
 
         return allele_info_dict
-
-
-    def _get_variant_coordinates_from_evidence(self) -> VariantCoordinateFromEvidence:
-        vcfe = VariantCoordinateFromEvidence(self)
-        genome_build = self.get_genome_build()
-        hgvs_matcher = HGVSMatcher(genome_build)
-        key_errors = self.get_key_errors()
-
-        for k in SpecialEKeys.VARIANT_LINKING_HGVS_KEYS:
-            value = self.get(k)
-            if value:
-                if k in key_errors:
-                    vcfe.record(value, error=key_errors[k].get('message', 'Validation Error'))
-                else:
-                    try:
-                        ret = hgvs_matcher.get_variant_tuple_used_transcript_kind_and_method(value)
-                        vcord, used_transcript_accession, _, method = ret
-                        message = f"HGVS matched by '{method}'"
-                        vcfe.record(value, vcord, message=message, transcript_accession=used_transcript_accession)
-                        if vcord:
-                            return vcfe
-                    except Exception as e:
-                        vcfe.record(value, error=str(e))
-
-        variant_coordinate = self.get(SpecialEKeys.VARIANT_COORDINATE)
-        if variant_coordinate:
-            if SpecialEKeys.VARIANT_COORDINATE in key_errors:
-                vcfe.record(variant_coordinate,
-                            error=key_errors[SpecialEKeys.VARIANT_COORDINATE].get('message', 'Validation Error'))
-            else:
-                try:
-                    vcord = Variant.get_tuple_from_string(variant_coordinate, genome_build)
-                    vcfe.record(variant_coordinate, vcord)
-                    if vcord:
-                        return vcfe
-                except Exception as e:
-                    vcfe.record(variant_coordinate, error=str(e))
-
-        return vcfe
-
-    def get_variant_coordinates_from_evidence(self, update_flags=False) -> Optional[VariantCoordinate]:
-        """
-        @param update_flags: if True, put comments into variant matching flags about what we're doing
-        @return: returns VariantCoordinate(chrom, position, ref, alt) - or None.
-        """
-        vcfe = self._get_variant_coordinates_from_evidence()
-        if update_flags:
-            vcfe.report()
-        return vcfe.variant_coordinate
 
     @staticmethod
     def get_url_for_pk(pk):

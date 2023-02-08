@@ -359,34 +359,34 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
                         Q(published_evidence__allele_origin__value__isnull=True)
                     )
 
-        if issues_type := self.get_query_param("issues"):
-            flag_types = None
-            if issues_type == 'data':
-                flag_types = [
-                    classification_flag_types.matching_variant_flag,
-                    classification_flag_types.matching_variant_warning_flag,
-                    classification_flag_types.unshared_flag,
-                    classification_flag_types.classification_outstanding_edits]
-            elif issues_type == 'discussion':
-                flag_types = [
-                    classification_flag_types.discordant,
-                    classification_flag_types.internal_review,
-                    classification_flag_types.significance_change,
-                    classification_flag_types.suggestion
-                ]
-            elif issues_type == 'withdrawn':
-                flag_types = [
-                    classification_flag_types.classification_withdrawn
-                ]
-
-            vcqs = FlagCollection.filter_for_open_flags(
-                Classification.filter_for_user(user=self.user),
-                flag_types=flag_types  # if flag types was not set it will be all flag types
-            ).order_by('-created')
-
-            filters.append(Q(
-                classification__in=Subquery(vcqs.values('pk')),
-            ))
+        # if issues_type := self.get_query_param("issues"):
+        #     flag_types = None
+        #     if issues_type == 'data':
+        #         flag_types = [
+        #             classification_flag_types.matching_variant_flag,
+        #             classification_flag_types.matching_variant_warning_flag,
+        #             classification_flag_types.unshared_flag,
+        #             classification_flag_types.classification_outstanding_edits]
+        #     elif issues_type == 'discussion':
+        #         flag_types = [
+        #             classification_flag_types.discordant,
+        #             classification_flag_types.internal_review,
+        #             classification_flag_types.significance_change,
+        #             classification_flag_types.suggestion
+        #         ]
+        #     elif issues_type == 'withdrawn':
+        #         flag_types = [
+        #             classification_flag_types.classification_withdrawn
+        #         ]
+        #
+        #     vcqs = FlagCollection.filter_for_open_flags(
+        #         Classification.filter_for_user(user=self.user),
+        #         flag_types=flag_types  # if flag types was not set it will be all flag types
+        #     ).order_by('-created')
+        #
+        #     filters.append(Q(
+        #         classification__in=Subquery(vcqs.values('pk')),
+        #     ))
 
         # ClassificationListGrid is also used on patient/sample page so we
         # need to filter by samples

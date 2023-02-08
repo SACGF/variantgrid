@@ -13,17 +13,17 @@ class ClassificationFlagTypes:
     def submitted_flag(self) -> FlagType:
         return FlagType.objects.get(pk='classification_submitted')
 
-    @cached_property
-    def matching_variant_flag(self) -> FlagType:
-        return FlagType.objects.get(pk='classification_matching_variant')
+    # @cached_property
+    # def matching_variant_flag(self) -> FlagType:
+    #     return FlagType.objects.get(pk='classification_matching_variant')
 
-    @cached_property
-    def matching_variant_warning_flag(self) -> FlagType:
-        return FlagType.objects.get(pk='classification_matching_variant_warning')
+    # @cached_property
+    # def matching_variant_warning_flag(self) -> FlagType:
+    #     return FlagType.objects.get(pk='classification_matching_variant_warning')
 
-    @cached_property
-    def transcript_version_change_flag(self) -> FlagType:
-        return FlagType.objects.get(pk='classification_transcript_version_change')
+    # @cached_property
+    # def transcript_version_change_flag(self) -> FlagType:
+    #     return FlagType.objects.get(pk='classification_transcript_version_change')
 
     @cached_property
     def unshared_flag(self) -> FlagType:

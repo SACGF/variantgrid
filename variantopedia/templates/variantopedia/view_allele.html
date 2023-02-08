@@ -9,7 +9,7 @@
 {% block head %}
 <script>
     $(document).ready(function() {
-        Flags.instance.init({userId: '{{user.id}}', filter:'#allele-card'});
+        // Flags.instance.init({userId: '{{user.id}}', filter:'#allele-card'});
 
         EKeys.load().then(eKeys => {
             let vcLinks = new VCLinks(eKeys);

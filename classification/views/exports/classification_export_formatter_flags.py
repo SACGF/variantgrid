@@ -68,7 +68,7 @@ class ProblemRow(ExportRow):
 @register_classification_exporter("flags")
 class ClassificationExportFormatterFlags(ClassificationExportFormatter2):
 
-    CODE_SUBSTITUTE = {'mandatory': 'Missing value'}
+    CODE_SUBSTITUTE = {'mandatory': 'Missing Value'}
 
     def __init__(self, classification_filter: ClassificationFilter):
         self.first_row = True
@@ -117,7 +117,7 @@ class ClassificationExportFormatterFlags(ClassificationExportFormatter2):
             if (allele_info := ci.classification.classification.allele_info) and (validation := allele_info.latest_validation):
                 errors = [row for row in validation.validation_tags_list if row.severity == 'E']
                 for error in errors:
-                    yield Problem(code="variant_matching", message=f"{error.category_pretty} {error.field_pretty}")
+                    yield Problem(code="Variant Matching", message=f"{error.category_pretty} {error.field_pretty}")
 
     def row(self, data: AlleleData) -> List[str]:
         output: List[str] = []

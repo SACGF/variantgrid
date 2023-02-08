@@ -423,25 +423,12 @@ class ClassificationFilter:
             created__gte=self.since
         ))
 
-    @cached_property
-    def _since_flagged_allele_ids(self) -> Set[int]:
-        """
-        :return: A set of allele IDs that have relevant flags that have changed since the since date
-        """
-        return flag_ids_to(Allele, FlagComment.objects.filter(
-            flag__flag_type__in={
-                allele_flag_types.allele_37_not_38
-            },
-            created__gte=self.since
-        ))
 
     def _passes_since(self, allele_data: AlleleData) -> bool:
         """
         Is there anything about this AlleleData that indicates it should be included since the since date
         """
         if not self.since:
-            return True
-        if allele_data.allele_id and allele_data.allele_id in self._since_flagged_allele_ids:
             return True
         for cmi in allele_data.all_cms:
             cm = cmi.classification

@@ -2,14 +2,11 @@ import time
 from typing import Dict
 
 from django.core.management import BaseCommand
-from django.db.models import Q
-
-from classification.models import Classification, ImportedAlleleInfo, classification_flag_types
+from classification.models import Classification, ImportedAlleleInfo
 from classification.models.classification_variant_info_models import ResolvedVariantInfo
 from flags.models import FlagComment, FlagType
 from library.guardian_utils import admin_bot
 from library.utils import first
-from snpdb.models import allele_flag_types
 
 
 class Command(BaseCommand):
@@ -142,9 +139,13 @@ class Command(BaseCommand):
                     flag_dict[flag_collection.pk] = flag_comment
             return flag_dict
 
-        manually_closed_variant_warning = get_flag_comments(flag_type=classification_flag_types.matching_variant_warning_flag, resolution_id='vm_confirmed')
-        manually_closed_37_not_38 = get_flag_comments(flag_type=allele_flag_types.allele_37_not_38, resolution_id='closed')
-        manually_closed_transcript_ver_changed = get_flag_comments(flag_type=classification_flag_types.transcript_version_change_flag, resolution_id='tv_accepted')
+        matching_variant_warning_flag_type = FlagType.objects.get(id='classification_matching_variant_warning')
+        classification_transcript_version_change_flag_type = FlagType.objects.get(id='classification_transcript_version_change')
+        flag_type_37_not_38 = FlagType.objects.get(pk='allele_37_not_38')
+
+        manually_closed_variant_warning = get_flag_comments(flag_type=matching_variant_warning_flag_type, resolution_id='vm_confirmed')
+        manually_closed_37_not_38 = get_flag_comments(flag_type=flag_type_37_not_38, resolution_id='closed')
+        manually_closed_transcript_ver_changed = get_flag_comments(flag_type=classification_transcript_version_change_flag_type, resolution_id='tv_accepted')
 
         print(f"variant matching count = {len(manually_closed_variant_warning)}")
         print(f"37 not 38 flag count = {len(manually_closed_37_not_38)}")

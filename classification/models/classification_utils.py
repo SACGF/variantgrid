@@ -224,57 +224,6 @@ class ClassificationJsonParams:
         self.fix_data_types = fix_data_types
 
 
-class VariantCoordinateFromEvidence:
-    """
-    Used to extract the variant coordinates that we can then use for variant matching
-    Also keeps track of which values we used or which values we couldn't for diagnostic purposes
-    """
-    def __init__(self, classification: 'Classification'):
-        """
-        :param classification: The classification we're extracting data from
-        """
-        from classification.models import classification_flag_types
-        self.variant_coordinate = None
-        self.transcript_accession = None
-        self.messages = []
-        self.matching_flag = classification.flag_collection_safe.get_flag_of_type(
-            flag_type=classification_flag_types.matching_variant_flag, open_only=True)
-        try:
-            genome_build = classification.get_genome_build()
-            self.genome_build_str = genome_build.name
-        except:
-            self.genome_build_str = 'No genome build'
-
-    def record(self, value: str, variant_coordinate: Optional[VariantCoordinate] = None,
-               transcript_accession: Optional[str] = None,
-               message: Optional[str] = None, error: Optional[str] = None) -> None:
-        """
-        Record what value we're using (or attempted to use) to get the variant coordinates
-        :param value: The source value we tried to extract VariantCoordinate from e.g. a c.hgvs, g.hgvs or variant coordinate string
-        :param variant_coordinate: The variant coordinate we processed from the value (or None if we couldn't)
-        :param transcript_accession: Transcript used to resolve HGVS
-        :param message: If present, add message
-        :param error: If present, indicates the reason why we couldn't extract a variant_coordinate from the value
-        """
-        if variant_coordinate:
-            self.variant_coordinate = variant_coordinate
-
-        if transcript_accession:
-            self.transcript_accession = transcript_accession
-
-        if error:
-            self.messages.append(f'Attempted to match {self.genome_build_str} {value}, error = {error}')
-        elif variant_coordinate:
-            ref = variant_coordinate.ref
-            if len(ref) > 50:
-                ref = ref[:50] + '...'
-            self.messages.append(f'Matching on {self.genome_build_str} {value} resolved to {variant_coordinate.chrom}:{variant_coordinate.pos} {ref}->{variant_coordinate.alt}')
-        else:
-            self.messages.append(f'Attempted to match {self.genome_build_str} {value}, could not derive coordinate')
-
-        if message:
-            self.messages.append(message)
-
     def report(self) -> None:
         """
         Record all information about the VariantMatching evidence on the VariantMatching flag of the Classification
