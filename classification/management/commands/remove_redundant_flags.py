@@ -18,6 +18,7 @@ class Command(BaseCommand):
 
         delete_flag_of_type('classification_matching_variant')
         delete_flag_of_type('classification_matching_variant_warning')
+        delete_flag_of_type('classification_transcript_version_change')
         delete_flag_of_type('allele_37_not_38')
         delete_flag_of_type('allele_missing_38')
         delete_flag_of_type('allele_missing_37')

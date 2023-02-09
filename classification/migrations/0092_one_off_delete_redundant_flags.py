@@ -10,6 +10,7 @@ def _check_has_flags(apps):
     return FlagType.objects.filter(id__in=[
         'classification_matching_variant',
         'classification_matching_variant_warning',
+        'classification_transcript_version_change',
         'allele_37_not_38',
         'allele_missing_38',
         'allele_missing_37'
