@@ -16,7 +16,8 @@ from classification.enums.discordance_enums import DiscordanceReportResolution
 from classification.models import ClassificationModification, Classification, classification_flag_types, \
     DiscordanceReport, ClinicalContext, ImportedAlleleInfo
 from flags.models import FlagsMixin, Flag, FlagComment
-from library.utils import batch_iterator, local_date_string
+from library.log_utils import report_event, AdminNotificationBuilder
+from library.utils import batch_iterator, local_date_string, DebugTimer
 from snpdb.models import GenomeBuild, Lab, Organization, allele_flag_types, Allele, Variant, VariantAllele
 
 
@@ -386,6 +387,7 @@ class ClassificationFilter:
         Ids are not necessarily part of this import
         :return: A set of classification IDs
         """
+        timer = DebugTimer()
         discordance_status: Dict[int, DiscordanceReportStatus] = {}
         for cc in ClinicalContext.objects.filter(status=ClinicalContextStatus.DISCORDANT):
             dr = DiscordanceReport.latest_report(cc)
@@ -401,6 +403,10 @@ class ClassificationFilter:
             for c in dr.actively_discordant_classification_ids():
                 discordance_status[c] = status
 
+        timer.tick("Calculated all discordance statuses")
+        anb = AdminNotificationBuilder(message="Import processing")
+        anb.add_markdown(str(timer))
+        anb.send()
         return discordance_status
 
     def is_discordant(self, cm: ClassificationModification) -> DiscordanceReportStatus:
