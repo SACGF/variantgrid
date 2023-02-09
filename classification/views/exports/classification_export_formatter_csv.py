@@ -186,7 +186,7 @@ class ClassificationExportFormatterCSV(ClassificationExportFormatter):
 
     @cached_property
     def used_keys(self) -> UsedKeyTracker:
-        
+
         used_keys = UsedKeyTracker(
             self.classification_filter.user,
             self.e_keys, KeyValueFormatter(),
@@ -195,7 +195,7 @@ class ClassificationExportFormatterCSV(ClassificationExportFormatter):
             ignore_evidence_keys=self.format_details.ignore_evidence_keys
         )
         # apparently this is signficantly quicker than the attempt to use an aggregate
-        for evidence in self.classification_filter.cms_qs.values_list('published_evidence', flat=True):
+        for evidence in self.classification_filter.cms_qs.values_list('published_evidence', flat=True).iterator(chunk_size=1000):
            used_keys.check_evidence(evidence)
         # below took up to 3 minutes in Shariant test, vs 7 seconds of just iterating through the evidence twice
         # used_keys.check_evidence_qs(self.classification_filter.cms_qs)
