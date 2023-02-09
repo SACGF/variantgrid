@@ -400,7 +400,7 @@ class ClinicalContext(FlagsMixin, TimeStampedModel):
 
     @property
     def classifications_qs(self) -> QuerySet[Classification]:
-        return Classification.objects.filter(clinical_context=self, share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS, withdrawn=False)
+        return self.classification_set.filter(share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS, withdrawn=False)
 
     @property
     def classifications_associated_qs(self) -> QuerySet[Classification]:
@@ -408,8 +408,10 @@ class ClinicalContext(FlagsMixin, TimeStampedModel):
 
     @property
     def classification_modifications(self) -> List[ClassificationModification]:
-        vcms = [vcm for vcm in (vc.last_published_version for vc in self.classifications_qs) if vcm is not None]
-        return vcms
+        return list(ClassificationModification.objects.filter(
+            is_last_published=True,
+            classification__in=self.classifications_qs
+        ).select_related('classification__lab').all())
 
     def to_json(self) -> dict:
         return {

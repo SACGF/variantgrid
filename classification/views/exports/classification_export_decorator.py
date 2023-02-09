@@ -2,9 +2,9 @@ from typing import Callable, Dict
 
 from django.http import HttpRequest
 
-from classification.views.exports.classification_export_formatter import ClassificationExportFormatter2
+from classification.views.exports.classification_export_formatter import ClassificationExportFormatter
 
-ExportFormatterFactory = Callable[[HttpRequest], ClassificationExportFormatter2]
+ExportFormatterFactory = Callable[[HttpRequest], ClassificationExportFormatter]
 
 
 _classification_export_registry: Dict[str, ExportFormatterFactory] = {}
@@ -22,7 +22,7 @@ def register_classification_exporter(format_type: str):
     return _wrapper
 
 
-def classification_exporter_for_request(request: HttpRequest) -> ClassificationExportFormatter2:
+def classification_exporter_for_request(request: HttpRequest) -> ClassificationExportFormatter:
     format_type = request.query_params.get('type')
     if factory := _classification_export_registry.get(format_type):
         return factory(request)

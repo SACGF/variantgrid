@@ -12,7 +12,7 @@ from classification.enums import SpecialEKeys
 from classification.models import EvidenceKey, ClassificationModification, EvidenceKeyMap
 from classification.views.exports.classification_export_decorator import register_classification_exporter
 from classification.views.exports.classification_export_filter import ClassificationFilter, AlleleData
-from classification.views.exports.classification_export_formatter import ClassificationExportFormatter2
+from classification.views.exports.classification_export_formatter import ClassificationExportFormatter
 from library.django_utils import get_url_from_view_path
 from library.utils import delimited_row
 from snpdb.models import GenomeBuildContig
@@ -39,7 +39,7 @@ class FormatDetailsVCF:
 
 
 @register_classification_exporter("vcf")
-class ClassificationExportFormatterVCF(ClassificationExportFormatter2):
+class ClassificationExportFormatterVCF(ClassificationExportFormatter):
     """
     Exports data in the format that Agilent's Alissa can import it
     """
@@ -95,7 +95,7 @@ class ClassificationExportFormatterVCF(ClassificationExportFormatter2):
             genome_build_str = '38'
 
         contig_field = f'classification__allele_info__grch{genome_build_str}__variant__locus__contig'
-        contigs = self.classification_filter.cms_qs().values_list(contig_field, flat=True).order_by(contig_field).distinct()
+        contigs = self.classification_filter.cms_qs.values_list(contig_field, flat=True).order_by(contig_field).distinct()
 
         for gbc in GenomeBuildContig.objects.filter(genome_build=genome_build, contig__in=contigs).order_by('order').select_related(
                 'contig'):

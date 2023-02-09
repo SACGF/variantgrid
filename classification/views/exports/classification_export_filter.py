@@ -451,6 +451,7 @@ class ClassificationFilter:
                 share_levels.add(sl)
         return share_levels
 
+    @cached_property
     def cms_qs(self) -> QuerySet[ClassificationModification]:
         """
         Returns a new QuerySet of all classifications BEFORE
@@ -465,7 +466,8 @@ class ClassificationFilter:
             cms = cms.filter(share_level__in=self._share_levels)
 
         if not self.since:
-            # can only exclude withdrawn from complete consideration
+            # only worry about withdrawn if doing 'since' (as we might need to report the withdrawing (json),
+            # or at least be aware of it for changes (mvl))
             cms = cms.exclude(classification__withdrawn=True)
 
         if labs := self.include_sources:
@@ -493,20 +495,12 @@ class ClassificationFilter:
             f'classification__allele_info__grch{genome_build_str}__variant__locus__contig',
             f'classification__allele_info__grch{genome_build_str}__variant__locus__ref',
             f'classification__allele_info__grch{genome_build_str}__variant__alt',
-            'classification__lab',
             'classification__lab__organization',
             'classification__clinical_context'
         )
 
         if allele_id := self.allele:
             cms = cms.filter(classification__allele_info__allele_id=allele_id)
-
-        # Always safe to exclude these (unless we want them in a CSV) even with since changes
-        # couldn't show these ones if we wanted to
-
-        ## Let these bad records in just so they can be put into errors
-        # cms = cms.exclude(classification__allele__isnull=True).exclude(classification__variant__isnull=True)
-        # cms = cms.exclude(**{f'{self.c_hgvs_col}__isnull': True})
 
         # PERMISSION CHECK
         cms = get_objects_for_user(self.user, ClassificationModification.get_read_perm(), cms, accept_global_perms=True)
@@ -539,7 +533,7 @@ class ClassificationFilter:
         Is not filtered at this point
         """
         allele_data: Optional[AlleleData] = None
-        for cm in self.cms_qs().iterator(chunk_size=1000):
+        for cm in self.cms_qs.iterator(chunk_size=1000):
             if allele_info := cm.classification.allele_info:
                 allele_id = cm.classification.allele_id
                 # FIXME: make an AlleleData for no Allele

@@ -244,8 +244,7 @@ class DiscordanceReport(TimeStampedModel):
 
     @staticmethod
     def latest_report(clinical_context: ClinicalContext) -> 'DiscordanceReport':
-        return DiscordanceReport.objects.filter(clinical_context=clinical_context)\
-            .order_by('-created').first()
+        return clinical_context.discordancereport_set.order_by('-created').first()
 
     @property
     def is_latest(self):

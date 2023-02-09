@@ -17,7 +17,7 @@ from library.log_utils import NotificationBuilder, report_exc_info
 from snpdb.models import GenomeBuild
 
 
-class ClassificationExportFormatter2(ABC):
+class ClassificationExportFormatter(ABC):
     """
     Extend this class to export classification data into different formats
     """
@@ -66,7 +66,7 @@ class ClassificationExportFormatter2(ABC):
         """
         if self.classification_filter.benchmarking:
             for count, row in enumerate(self._yield_single_file()):
-                if count > 1000:
+                if count > 100:
                     break
             return render(get_current_request(), "snpdb/benchmark.html", {"content": "TODO"})
 

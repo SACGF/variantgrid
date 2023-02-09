@@ -11,7 +11,7 @@ from classification.enums import SpecialEKeys
 from classification.models import ClassificationModification
 from classification.views.exports.classification_export_decorator import register_classification_exporter
 from classification.views.exports.classification_export_filter import ClassificationFilter, AlleleData
-from classification.views.exports.classification_export_formatter import ClassificationExportFormatter2
+from classification.views.exports.classification_export_formatter import ClassificationExportFormatter
 from library.django_utils import get_url_from_view_path
 from library.utils import ExportRow, export_column, delimited_row
 
@@ -63,7 +63,7 @@ class ClassificationSpellingRow(ExportRow):
 
 
 @register_classification_exporter("spelling")
-class ClassificationExportFormatterSpelling(ClassificationExportFormatter2):
+class ClassificationExportFormatterSpelling(ClassificationExportFormatter):
 
     @classmethod
     def from_request(cls, request: HttpRequest) -> 'ClassificationExportFormatterSpelling':

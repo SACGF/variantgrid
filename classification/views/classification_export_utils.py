@@ -133,6 +133,10 @@ class UsedKeyTracker:
         return all_props
 
     def check_evidence_qs(self, qs: QuerySet[ClassificationModification]):
+        """
+        By performing an aggregate over the entire queryset, work out which columns
+        have values, the old way was to just review all the data twice.
+        """
         all_key_properties = self.all_key_properties()
         aggregate_list = [kp.count_aggregate() for kp in all_key_properties]
         result_dict = qs.aggregate(*aggregate_list)

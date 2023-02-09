@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 from functools import cached_property
-from io import StringIO
 from typing import List, Optional, Dict, Set
 
 from django.http import HttpRequest
@@ -11,7 +10,7 @@ from classification.views.classification_export_utils import UsedKeyTracker, Key
 from classification.views.exports.classification_export_decorator import register_classification_exporter
 from classification.views.exports.classification_export_filter import AlleleData, ClassificationFilter, \
     DiscordanceReportStatus
-from classification.views.exports.classification_export_formatter import ClassificationExportFormatter2
+from classification.views.exports.classification_export_formatter import ClassificationExportFormatter
 from classification.views.exports.classification_export_utils import CitationCounter
 from library.utils import delimited_row, export_column, ExportRow, ExportDataType
 from snpdb.models import GenomeBuild
@@ -168,11 +167,11 @@ class ClassificationMeta(ExportRow):
 
 
 @register_classification_exporter("csv")
-class ClassificationExportFormatterCSV(ClassificationExportFormatter2):
+class ClassificationExportFormatterCSV(ClassificationExportFormatter):
 
     def __init__(self, classification_filter: ClassificationFilter, format_details: FormatDetailsCSV):
         self.format_details = format_details
-        self.errors_io: Optional[StringIO] = None
+        self.error_rows: List[str] = []
         self.e_keys = EvidenceKeyMap.cached()
         self.grouping_utils = ClassificationGroupUtils()
         super().__init__(classification_filter=classification_filter)
@@ -196,7 +195,7 @@ class ClassificationExportFormatterCSV(ClassificationExportFormatter2):
         # for evidence in self.classification_filter.cms_qs().values_list('published_evidence', flat=True):
         #    used_keys.check_evidence(evidence)
         # todo cache cms_qs?
-        used_keys.check_evidence_qs(self.classification_filter.cms_qs())
+        used_keys.check_evidence_qs(self.classification_filter.cms_qs)
 
         return used_keys
 
@@ -207,7 +206,7 @@ class ClassificationExportFormatterCSV(ClassificationExportFormatter2):
         return "csv"
 
     def header(self) -> List[str]:
-        self.errors_io = StringIO()
+        self.error_rows = []
         header = RowID.csv_header(self._categories) + ClassificationMeta.csv_header(self._categories) + self.used_keys.header()
         return [delimited_row(header, delimiter=',')]
 
@@ -215,20 +214,16 @@ class ClassificationExportFormatterCSV(ClassificationExportFormatter2):
         # record error to report them in the footer
         if issues := allele_data.issues:
             for issue in issues:
-                self.errors_io.writelines(self.to_row(issue.classification,  allele_data=allele_data, message=issue.message))
-        rows = []
+                if not issue.withdrawn:
+                    self.error_rows.append(self.to_row(issue.classification,  allele_data=allele_data, message=issue.message))
+        rows: List[str] = []
         for vcm in allele_data.cms:
             rows.append(self.to_row(vcm, allele_data=allele_data))
 
         return rows
 
     def footer(self) -> List[str]:
-        footer_content = self.errors_io.getvalue()
-        self.errors_io.close()
-        if footer_content:
-            return [footer_content]
-        else:
-            return []
+        return self.error_rows
 
     @cached_property
     def _categories(self) -> Optional[Dict]:

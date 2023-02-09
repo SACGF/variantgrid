@@ -13,7 +13,7 @@ from classification.models import EvidenceKey, Classification, EvidenceKeyMap, C
 from classification.views.classification_export_utils import KeyValueFormatter, UsedKeyTracker
 from classification.views.exports.classification_export_decorator import register_classification_exporter
 from classification.views.exports.classification_export_filter import ClassificationFilter, AlleleData
-from classification.views.exports.classification_export_formatter import ClassificationExportFormatter2
+from classification.views.exports.classification_export_formatter import ClassificationExportFormatter
 from classification.views.exports.classification_export_utils import CitationCounter
 from library.utils import delimited_row
 
@@ -35,7 +35,7 @@ class RedcapGroup:
         return bool(self.data)
 
 @register_classification_exporter("redcap")
-class ClassificationExportFormatterRedCap(ClassificationExportFormatter2):
+class ClassificationExportFormatterRedCap(ClassificationExportFormatter):
     """
     Exports data in the format that Agilent's Alissa can import it
     """
@@ -88,7 +88,7 @@ class ClassificationExportFormatterRedCap(ClassificationExportFormatter2):
         raise ValueError("row() is not supported in REDCap Export")
 
     def redcap_rows(self) -> Iterable[RedcapGroup]:
-        qs = self.classification_filter.cms_qs()
+        qs = self.classification_filter.cms_qs
         qs = qs.exclude(**{f'published_evidence__{self.group_on}__value__isnull': True})
         # Have to use RawSQL to get to order by jsonb values, you can include them in a filter/exclude
         # but they just don't work in order_by normally

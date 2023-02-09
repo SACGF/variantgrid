@@ -5,11 +5,11 @@ from django.http import HttpRequest
 from classification.models import ClassificationJsonParams, ClassificationModification
 from classification.views.exports.classification_export_decorator import register_classification_exporter
 from classification.views.exports.classification_export_filter import ClassificationFilter, AlleleData
-from classification.views.exports.classification_export_formatter import ClassificationExportFormatter2
+from classification.views.exports.classification_export_formatter import ClassificationExportFormatter
 
 
 @register_classification_exporter("json")
-class ClassificationExportFormatterJSON(ClassificationExportFormatter2):
+class ClassificationExportFormatterJSON(ClassificationExportFormatter):
 
     def __init__(self, classification_filter: ClassificationFilter):
         self.first_row = True
