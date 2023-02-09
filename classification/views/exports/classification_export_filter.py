@@ -492,6 +492,7 @@ class ClassificationFilter:
             'classification__allele_info__allele',
             'classification__allele_info__allele__clingen_allele',
             f'classification__allele_info__grch{genome_build_str}__variant',
+            f'classification__allele_info__grch{genome_build_str}__genome_build',
             f'classification__allele_info__grch{genome_build_str}__variant__locus',
             f'classification__allele_info__grch{genome_build_str}__variant__locus__contig',
             f'classification__allele_info__grch{genome_build_str}__variant__locus__ref',

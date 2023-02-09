@@ -547,7 +547,7 @@ class ImportedAlleleInfo(TimeStampedModel):
 
     @property
     def resolved_builds(self) -> List[ResolvedVariantInfo]:
-        return list(ResolvedVariantInfo.objects.filter(allele_info=self))
+        return list(ResolvedVariantInfo.objects.filter(allele_info=self).select_related('genome_build'))
 
     def update_variant_coordinate(self):
         # TODO, support variant_coordinate being provided
