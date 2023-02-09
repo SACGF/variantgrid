@@ -21,7 +21,7 @@
     {% labelled label=c_hgvses.2.identifier value_css="text-monospace" %}{{ c_hgvses.2.html }}{% endlabelled %}
     {% labelled label=variant_coordinate_label value_css="text-monospace" %}{{ allele_info.variant_coordinate }}{% endlabelled %}
 
-    <hr>
+    <hr style="border-top:1px dashed lightgrey"/>
     {% if allele_info.status != "M" %}
         {% labelled label="Matching Status" %}{{ allele_info.get_status_display }}{% endlabelled %}
     {% endif %}

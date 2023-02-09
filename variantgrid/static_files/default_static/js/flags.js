@@ -868,27 +868,6 @@ let Flags = (function () {
                     <ol><li>From the classification form, ensure there are no validation errors stopping this record from being published.</li>
                     <li>At the bottom of the form, click the tick to submit the outstanding changes.</li></ol></div>`
                     );
-                } else if (this.flag_type === 'classification_matching_variant') {
-                    return $(`<div>
-                    This classification is not yet linked to a variant
-                    <ol><li>If this has a status of In Progress we should match it to a variant shortly, no action required.</li>
-                    <li>If this has a status of Matching Failed we were unable to normalise the variant provided based on the c.hgvs and genome build values.
-                    Please click the bug icon in the top menu bar or contact support for help in resolving this.</li></ol></div>
-                    `);
-                } else if (this.flag_type === 'classification_matching_variant_warning') {
-                    return $(`<div>
-                    This classification has been matched to a variant, but requires a manual check to ensure it was matched correctly
-                    <ol><li>If you believe it was matched correctly, select a status of Variant Confirmed and Save</li>
-                    <li>If you believe that this is not the variant intended, select a status of Variant Rejected and Save. An admin will then attempt to fix the problem.</li>
-                    </ol></div>
-                    `);
-                 } else if (this.flag_type === 'classification_transcript_version_change') {
-                    return $(`<div>
-                    This classification has been matched to a variant, but we did not have the requested transcript version on file and had to migrate it to another version of the same transcript.
-                    <ol><li>If you believe the change of transcript version in this case has no impact on the variant, select a status of Change Accepted and Save.</li>
-                    <li>If you believe this change is significant and that this classification should not apply to the variant on the new transcript, select a status of Change Rejected and Save. An admin will then attempt to fix the problem.</li>
-                    </ol></div>
-                    `);
                 } else if (this.flag_type === 'classification_internal_review') {
                     return $(`<div>
                     This classification is marked as currently being internally reviewed.
@@ -935,21 +914,6 @@ let Flags = (function () {
                     <li>Review the content of the classification to make sure it's ready to be shared.</li>
                     <li>At the bottom of the form, click the Share to submit at a higher share level.</li></ol></div>
                     `);
-                } else if (this.flag_type === 'allele_missing_37') {
-                    return $(`<div>
-                    This allele is missing a variant for GRCh37 and can't be lifted over in exports.<br/>
-                    Our admins are looking at this allele and working on a fix.
-                    </div>`);
-                } else if (this.flag_type === 'allele_missing_38') {
-                    return $(`<div>
-                    This allele is missing a variant for GRCh38 and can't be lifted over in exports.<br/>
-                    Our admins are looking at this allele and working on a fix.
-                    </div>`);
-                } else if (this.flag_type === 'allele_37_not_38') {
-                    return $(`<div>
-                    For a given transcript, the c.hgvs produced for this allele produces a different value for GRCh37 to GRCh38.<br/>
-                    Our admins are looking at this allele and working on a fix.
-                    </div>`);
                 }
                 return $('<div>');
             },
