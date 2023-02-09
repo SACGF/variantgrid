@@ -387,7 +387,6 @@ class ClassificationFilter:
         Ids are not necessarily part of this import
         :return: A set of classification IDs
         """
-        timer = DebugTimer()
         discordance_status: Dict[int, DiscordanceReportStatus] = {}
         for cc in ClinicalContext.objects.filter(status=ClinicalContextStatus.DISCORDANT):
             dr = DiscordanceReport.latest_report(cc)
@@ -403,10 +402,6 @@ class ClassificationFilter:
             for c in dr.actively_discordant_classification_ids():
                 discordance_status[c] = status
 
-        timer.tick("Calculated all discordance statuses")
-        anb = AdminNotificationBuilder(message="Import processing")
-        anb.add_markdown(str(timer))
-        anb.send()
         return discordance_status
 
     def is_discordant(self, cm: ClassificationModification) -> DiscordanceReportStatus:

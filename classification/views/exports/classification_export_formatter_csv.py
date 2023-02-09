@@ -12,7 +12,8 @@ from classification.views.exports.classification_export_filter import AlleleData
     DiscordanceReportStatus
 from classification.views.exports.classification_export_formatter import ClassificationExportFormatter
 from classification.views.exports.classification_export_utils import CitationCounter
-from library.utils import delimited_row, export_column, ExportRow, ExportDataType
+from library.log_utils import AdminNotificationBuilder
+from library.utils import delimited_row, export_column, ExportRow, ExportDataType, DebugTimer
 from snpdb.models import GenomeBuild
 
 
@@ -185,6 +186,9 @@ class ClassificationExportFormatterCSV(ClassificationExportFormatter):
 
     @cached_property
     def used_keys(self) -> UsedKeyTracker:
+
+        timer = DebugTimer()
+
         used_keys = UsedKeyTracker(
             self.classification_filter.user,
             self.e_keys, KeyValueFormatter(),
@@ -196,6 +200,11 @@ class ClassificationExportFormatterCSV(ClassificationExportFormatter):
         #    used_keys.check_evidence(evidence)
         # todo cache cms_qs?
         used_keys.check_evidence_qs(self.classification_filter.cms_qs)
+
+        timer.tick("Calculated all used evidence keys")
+        anb = AdminNotificationBuilder(message="Import Timings")
+        anb.add_markdown(str(timer))
+        anb.send()
 
         return used_keys
 
