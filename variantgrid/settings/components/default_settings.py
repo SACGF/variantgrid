@@ -505,6 +505,8 @@ PATHOLOGY_TEST_CASE_EXTERNAL_CODE = None
 PEDIGREE_MIN_COHORT_SAMPLE_MATCHES_FOR_AUTO_MATCH = 3
 PEDIGREE_MADELINE2_COMMAND = None  # Install https://madeline.med.umich.edu/madeline/ set this to "madeline2"
 
+REQUESTS_DISABLE_IPV6 = True  # we've found a performance penalty w/IPv6
+
 INITIAL_USER_DATA_PREFIX_KWARGS = {}  # Create UserDataPrefix object to setup IGV for new users
 
 USER_SETTINGS_SHOW_GROUPS = True
