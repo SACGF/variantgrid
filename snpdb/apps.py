@@ -19,6 +19,10 @@ class SnpdbConfig(AppConfig):
         # Add newly created users to public group
         post_save.connect(user_post_save_handler, sender=User)
 
+        if settings.REQUESTS_DISABLE_IPV6:
+            import requests
+            requests.packages.urllib3.util.connection.HAS_IPV6 = False
+
         # Make global settings share read only with this group by default
         post_save.connect(group_post_save_handler, sender=Group)
 
