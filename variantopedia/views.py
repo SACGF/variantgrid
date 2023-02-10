@@ -47,6 +47,7 @@ from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_user_settings import UserSettings
 from snpdb.serializers import VariantAlleleSerializer
 from snpdb.variant_sample_information import VariantSampleInformation
+from sync.models import SyncDestination
 from upload.models import ModifiedImportedVariant
 from upload.upload_stats import get_vcf_variant_upload_stats
 from variantgrid.celery import app
@@ -222,6 +223,7 @@ def server_status(request):
         "highest_variant_annotated": highest_variant_annotated,
         "sample_enrichment_kits_df": sample_enrichment_kits_df,
         "total_counts": total_counts,
+        "sync_destination_reports": SyncDestination.get_reports(),
     }
     return render(request, "variantopedia/server_status.html", context)
 

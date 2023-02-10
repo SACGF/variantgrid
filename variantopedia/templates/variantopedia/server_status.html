@@ -274,6 +274,15 @@
             {% labelled label="Total Shared Classifications" %}{{ total_counts.classifications_shared | intcomma }}{% endlabelled %}
             {% labelled label="Total Un-Shared Classifications" %}{{ total_counts.classifications_unshared | intcomma }}{% endlabelled %}
 
+            {% if sync_destination_reports %}
+            <h4>Sync Destinations</h4>
+                <ul>
+                {% for report in sync_destination_reports %}
+                    <li>{{ report }}</li>
+                {% endfor %}
+                </ul>
+            {% endif %}
+
         {% end_ui_register_tab_embedded %}
 
         {% ui_register_tab url="view_upload_stats_detail" url_check=True label="Upload Stats" tab_set="server_status" %}
