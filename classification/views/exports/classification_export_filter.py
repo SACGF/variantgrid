@@ -5,6 +5,7 @@ from functools import cached_property, reduce
 from operator import __or__
 from typing import List, Type, Union, Set, Optional, Dict, Iterator, Any, Callable
 
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.db.models import QuerySet, Q
 from django.http import HttpRequest
@@ -389,23 +390,23 @@ class ClassificationFilter:
         """
         discordance_status: Dict[int, DiscordanceReportStatus] = {}
         for cc in ClinicalContext.objects.filter(status=ClinicalContextStatus.DISCORDANT):
-            dr = DiscordanceReport.latest_report(cc)
+            if dr := DiscordanceReport.latest_report(cc):
+                status: Optional[DiscordanceReportStatus]
+                if dr.is_pending_concordance:
+                    status = DiscordanceReportStatus.PENDING_CONCORDANCE
+                elif dr.resolution == DiscordanceReportResolution.CONTINUED_DISCORDANCE:
+                    status = DiscordanceReportStatus.CONTINUED
+                else:
+                    status = DiscordanceReportStatus.ON_GOING
 
-            status: Optional[DiscordanceReportStatus]
-            if dr.is_pending_concordance:
-                status = DiscordanceReportStatus.PENDING_CONCORDANCE
-            elif dr.resolution == DiscordanceReportResolution.CONTINUED_DISCORDANCE:
-                status = DiscordanceReportStatus.CONTINUED
-            else:
-                status = DiscordanceReportStatus.ON_GOING
-
-            for c in dr.actively_discordant_classification_ids():
-                discordance_status[c] = status
+                for c in dr.actively_discordant_classification_ids():
+                    discordance_status[c] = status
 
         return discordance_status
 
     def is_discordant(self, cm: ClassificationModification) -> DiscordanceReportStatus:
-        return self._discordant_classification_ids.get(cm.classification_id)
+        if settings.DISCORDANCE_ENABLED:
+            return self._discordant_classification_ids.get(cm.classification_id)
 
     @cached_property
     def _since_flagged_classification_ids(self) -> Set[int]:
