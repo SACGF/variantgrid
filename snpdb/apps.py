@@ -9,6 +9,7 @@ class SnpdbConfig(AppConfig):
 
     def ready(self):
         from snpdb.models import Trio
+        from django.conf import settings
         from django.contrib.auth.models import User, Group
         from seqauto.signals import backend_vcf_import_success_signal
         from snpdb.signals.signal_handlers import backend_vcf_import_success_handler, trio_save_handler, \
