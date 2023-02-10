@@ -34,10 +34,12 @@ class RedcapGroup:
     def __bool__(self):
         return bool(self.data)
 
+
 @register_classification_exporter("redcap")
 class ClassificationExportFormatterRedCap(ClassificationExportFormatter):
     """
-    Exports data in the format that Agilent's Alissa can import it
+    Exports data in the format that RedCap can import it.
+    @see https://www.project-redcap.org/
     """
 
     def __init__(self, classification_filter: ClassificationFilter):

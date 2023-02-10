@@ -142,10 +142,11 @@ class KeyCount:
             data['reference_counts'] = self.dbrefs
         return data
 
+
 @register_classification_exporter("keys")
 class ClassificationExportFormatterKeys(ClassificationExportFormatter):
     """
-    Exports data in the format that Agilent's Alissa can import it
+    Exports data in a format to generate reports on evidence keys
     """
 
     def __init__(self, classification_filter: ClassificationFilter):
