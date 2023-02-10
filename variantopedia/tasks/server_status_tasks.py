@@ -2,6 +2,7 @@ from random import randint
 
 import celery
 from django.urls import reverse
+from django.utils.timesince import timesince
 
 from classification.models import Classification
 from library.django_utils import get_url_from_view_path
@@ -73,4 +74,34 @@ def notify_server_status():
         f"\n:cry: {Classification.dashboard_total_unshared_classifications():,} : Classifications Un-Shared",
         indented=True
     )
+
+    sync_destination_info = []
+    for sync_destination in SyncDestination.objects.all():
+        last_attempt = SyncRun.objects.filter(destination=sync_destination).order_by('-created').first()
+
+        # Some environments may temporarily disable them (in which case we want to know)
+        # So report if any have ever tried
+        if sync_destination.enabled or last_attempt:
+            if last_attempt:
+                time_since_last_attempt = timesince(last_attempt.modified)
+            else:
+                time_since_last_attempt = "never"
+
+            if last_success := SyncRun.objects.filter(destination=sync_destination, status=SyncStatus.SUCCESS).order_by('-created').first():
+                time_since_last_success = timesince(last_success.modified)
+            else:
+                time_since_last_success = "never"
+
+            sd_info = f"{sync_destination} - last success: {time_since_last_success}"
+            if last_attempt != last_success:
+                sd_info += f", last attempt: {time_since_last_attempt}"
+            if not sync_destination.enabled:
+                sd_info += " (**currently disabled**)"
+            sync_destination_info.append(sd_info)
+
+    if sync_destination_info:
+        nb.add_markdown("*Sync Destinations*")
+        for sd_info in sync_destination_info:
+            nb.add_markdown(sd_info)
+
     nb.send()
