@@ -97,7 +97,7 @@ def notify_server_status():
             if last_attempt != last_success:
                 sd_info += f", last attempt: {time_since_last_attempt}"
             if not sync_destination.enabled:
-                sd_info += " (**currently disabled**)"
+                sd_info += " (*currently disabled*)"
             sync_destination_info.append(sd_info)
 
     if sync_destination_info:
