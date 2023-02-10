@@ -102,7 +102,6 @@ def notify_server_status():
 
     if sync_destination_info:
         nb.add_markdown("*Sync Destinations*")
-        for sd_info in sync_destination_info:
-            nb.add_markdown(sd_info)
+        nb.add_markdown("\n".join(sync_destination_info))
 
     nb.send()
