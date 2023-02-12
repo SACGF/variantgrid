@@ -108,6 +108,7 @@ def sync_shariant_download(sync_destination: SyncDestination, full_sync: bool = 
                                 auth=shariant.auth(),
                                 params=params,
                                 stream=False)
+        response.raise_for_status()
 
         last_modified = response.headers.get('Last-Modified')
         evidence_keys = EvidenceKeyMap.instance()
