@@ -12,7 +12,7 @@ from genes.hgvs import HGVSMatcher, CHGVS, CHGVSDiff
 from genes.models import TranscriptVersion, GeneSymbol, Transcript
 from library.cache import timed_cache
 from library.log_utils import report_exc_info
-from library.utils import pretty_label, IconWithTooltip
+from library.utils import pretty_label, IconWithTooltip, md5sum_str
 from snpdb.models import GenomeBuild, Variant, Allele, GenomeBuildPatchVersion, VariantCoordinate
 
 """
@@ -327,9 +327,14 @@ class ImportedAlleleInfo(TimeStampedModel):
     """
     The c.hgvs exactly as it was imported without any normalization
     Note - only provide this OR g_hgvs, not both
+    
+    Imported c.HGVS can be unlimited length while Postgres can only make constraints (in unique_together)
+    of a bit less than 3k so we need to use the md5sum as the unique_together
     """
+    imported_c_hgvs_md5_hash = TextField(null=True, blank=True)
 
     imported_g_hgvs = TextField(null=True, blank=True)
+    imported_g_hgvs_md5_hash = TextField(null=True, blank=True)
 
     imported_transcript = TextField(null=True, blank=True)
     """
@@ -352,7 +357,8 @@ class ImportedAlleleInfo(TimeStampedModel):
             return None
 
     matched_variant = ForeignKey(Variant, null=True, blank=True, on_delete=SET_NULL)
-    """ not used for any logic other than storing the variant that was matched (so we can later find allele, and variants of other builds) """
+    """ not used for any logic other than storing the variant that was matched (so we can later find allele, and
+    variants of other builds) """
 
     allele = ForeignKey(Allele, null=True, blank=True, on_delete=SET_NULL)
     """ set this once it's matched, but record can exist prior to variant matching """
@@ -375,7 +381,16 @@ class ImportedAlleleInfo(TimeStampedModel):
     """ Use this to resolved the variant and liftover """
 
     class Meta:
-        unique_together = ('imported_c_hgvs', 'imported_g_hgvs', 'imported_transcript', 'imported_genome_build_patch_version')
+        unique_together = ('imported_c_hgvs_md5_hash', 'imported_g_hgvs_md5_hash',
+                           'imported_transcript', 'imported_genome_build_patch_version')
+
+    def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
+        if self.imported_c_hgvs and not self.imported_c_hgvs_md5_hash:
+            self.imported_c_hgvs_md5_hash = md5sum_str(self.imported_c_hgvs)
+        if self.imported_g_hgvs and not self.imported_g_hgvs_md5_hash:
+            self.imported_g_hgvs_md5_hash = md5sum_str(self.imported_g_hgvs)
+
+        super().save(force_insert=force_insert, force_update=force_update, using=using, update_fields=update_fields)
 
     def _calculate_validation(self) -> ImportedAlleleInfoValidationTags:
 
@@ -507,6 +522,7 @@ class ImportedAlleleInfo(TimeStampedModel):
 
         if icon:
             return IconWithTooltip("ml-1 " + icon, tooltip)
+
     @property
     def issue_icon(self) -> Optional[IconWithTooltip]:
         return ImportedAlleleInfo.icon_for(self.status, self.latest_validation.include if self.latest_validation else False)
@@ -590,7 +606,6 @@ class ImportedAlleleInfo(TimeStampedModel):
             report_exc_info(extra_data={"kwargs": kwargs})
             raise
 
-
     @property
     def variant_info_for_imported_genome_build(self) -> Optional[ResolvedVariantInfo]:
         return self[self.imported_genome_build_patch_version.genome_build]
@@ -627,7 +642,6 @@ class ImportedAlleleInfo(TimeStampedModel):
 
             # should we actually do allele info changed signal? or save it for after we've matched
             allele_info_changed_signal.send(sender=ImportedAlleleInfo, allele_info=self)
-
 
     def refresh_and_save(self, force_update=False):
         """

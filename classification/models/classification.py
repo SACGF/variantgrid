@@ -48,7 +48,7 @@ from library.django_utils.guardian_permissions_mixin import GuardianPermissionsM
 from library.guardian_utils import clear_permissions
 from library.log_utils import report_exc_info, report_event
 from library.utils import empty_to_none, nest_dict, cautious_attempt_html_to_text, DebugTimer, \
-    invalidate_cached_property
+    invalidate_cached_property, md5sum_str
 from ontology.models import OntologyTerm, OntologySnake, OntologyTermRelation
 from snpdb.clingen_allele import populate_clingen_alleles_for_variants
 from snpdb.genome_build_manager import GenomeBuildManager
@@ -745,7 +745,6 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         # self.update_allele_info_from_classification()
         self.allele_info.refresh_and_save(force_update=True)
 
-
     def update_allele(self):
         # Updates the allele based off the variant
         # Warning, does not call save()
@@ -769,8 +768,10 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             fields = {"imported_genome_build_patch_version": genome_build_patch_version}
             if c_hgvs := self.imported_c_hgvs:
                 fields["imported_c_hgvs"] = c_hgvs
+                fields["imported_c_hgvs_md5_hash"] = md5sum_str(c_hgvs)
             elif g_hgvs := self.imported_g_hgvs:
                 fields["imported_g_hgvs"] = g_hgvs
+                fields["imported_g_hgvs_md5_hash"] = md5sum_str(g_hgvs)
                 fields["imported_transcript"] = self.transcript
             else:
                 # need either c.hgvs, g.hgvs (in future, re-support variant_coordinate)
