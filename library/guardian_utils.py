@@ -27,7 +27,6 @@ def public_group():
     return g
 
 
-@cache_memoize(timeout=DAY_SECS)
 def admin_bot():
     return User.objects.get(username='admin_bot')
 
