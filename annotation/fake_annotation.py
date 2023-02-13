@@ -21,12 +21,14 @@ from snpdb.tests.utils.vcf_testing_utils import slowly_create_loci_and_variants_
 
 
 def get_fake_vep_version(genome_build: GenomeBuild, annotation_consortium, columns_version: int):
-    fake_version = {"genome_build": genome_build,
+    fake_version = {"id": None,
+                    "genome_build": genome_build,
+                    "assembly": str(genome_build),
                     "annotation_consortium": annotation_consortium,
                     "columns_version": columns_version}
     for f in VariantAnnotationVersion._meta.fields:  # @UndefinedVariable
-        if f.name in ("id", "columns_version"):
-            continue  # Don't set these
+        if f.name in fake_version:
+            continue  # already set
         if isinstance(f, IntegerField):
             value = -1
         elif isinstance(f, TextField):
