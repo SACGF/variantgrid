@@ -74,7 +74,7 @@ class Test(URLTestCase):
             ("activity", {}, 200),
             ("classification_dashboard", {"lab_id": self.lab.pk}, 200),
             ('classification_import_tool', {}, 200),
-            ('hgvs_issues', {}, 200),
+            ('view_imported_allele_info', {}, 200),
             # ("clinical_context", {"pk": self.allele.pk}, 200), # Needs clinical context on allele
         ]
         self._test_urls(ADMIN_URL_NAMES_AND_KWARGS, self.user_admin)
