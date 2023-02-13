@@ -35,11 +35,6 @@ def create_classification_for_sample_and_variant_objects(
     # TODO - if you have > 1 labs then redirect to pick page.
     lab = user_settings.get_lab()
 
-
-    data = {
-
-    }
-
     kwargs = {"user": user,
               "lab": lab,
               "variant": variant,
