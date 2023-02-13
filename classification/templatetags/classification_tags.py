@@ -256,7 +256,7 @@ class ClinicalGrouping:
 
     def __init__(self, cc: Optional[ClinicalContext]):
         self.cc = cc
-        self.latest_report = DiscordanceReport.latest_report(cc)
+        self.latest_report = DiscordanceReport.latest_report(cc) if cc else None
         self.vcms = []
 
     @property
