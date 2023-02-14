@@ -598,8 +598,7 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
             html_summary = self._get_method_summary()
         else:
             html_summary = "<b>incorrectly configured</b><ul>"
-            for error in errors:
-                html_summary += f"<li>{error}</li>"
+            html_summary += "".join([f"<li>{error}</li>" for error in errors])
             html_summary += "</ul>"
         return html_summary
 
