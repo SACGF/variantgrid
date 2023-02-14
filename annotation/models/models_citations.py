@@ -59,7 +59,7 @@ class CitationSource(models.TextChoices):
 
             "C": CitationSource.PUBMED_CENTRAL,
             "PMCID": CitationSource.PUBMED_CENTRAL,
-            "PubMedCentral": CitationSource.PUBMED_CENTRAL,
+            "PUBMEDCENTRAL": CitationSource.PUBMED_CENTRAL,
 
             "N": CitationSource.NCBI_BOOKSHELF,
             "NBK": CitationSource.NCBI_BOOKSHELF,
