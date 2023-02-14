@@ -17,7 +17,13 @@ CITATIONS_URL = "https://ftp.ncbi.nlm.nih.gov/pub/clinvar/tab_delimited/var_cita
 
 
 def store_clinvar_citations_from_web(cached_web_resource):
-    df = pd.read_csv(CITATIONS_URL, sep='\t', index_col=None)
+    df = pd.read_csv(CITATIONS_URL, sep='\t', index_col=None,
+                     dtype={ALLELE_ID: int,
+                            VARIATION_ID: int,
+                            "rs": str,
+                            "nsv": str,
+                            CITATION_SOURCE: str,
+                            CITATION_ID: str})
     for col in [ALLELE_ID, VARIATION_ID, CITATION_SOURCE, CITATION_ID]:
         if col not in df.columns:
             msg = f"Expected column '{col}' in tsv from {CITATIONS_URL}"
