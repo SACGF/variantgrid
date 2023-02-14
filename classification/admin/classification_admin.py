@@ -11,11 +11,13 @@ from classification.autopopulate_evidence_keys.evidence_from_variant import get_
 from classification.classification_import import reattempt_variant_matching
 from classification.enums.classification_enums import EvidenceCategory, SpecialEKeys, SubmissionSource, ShareLevel
 from classification.models import EvidenceKey, EvidenceKeyMap, DiscordanceReport, DiscordanceReportClassification, \
-    send_discordance_notification, ClinicalContext, ClassificationReportTemplate, ClassificationModification, \
-    UploadedClassificationsUnmapped, ClinicalContextRecalcTrigger, ImportedAlleleInfo, ClassificationImport
+ClinicalContext, ClassificationReportTemplate, ClassificationModification, \
+    UploadedClassificationsUnmapped, ImportedAlleleInfo, ClassificationImport
 from classification.models.classification import Classification
 from classification.models.classification_import_run import ClassificationImportRun, ClassificationImportRunStatus
 from classification.models.classification_variant_info_models import ResolvedVariantInfo, ImportedAlleleInfoValidation
+from classification.models.clinical_context_models import ClinicalContextRecalcTrigger
+from classification.signals import send_discordance_notification
 from classification.tasks.classification_import_map_and_insert_task import ClassificationImportMapInsertTask
 from library.guardian_utils import admin_bot
 from snpdb.admin_utils import ModelAdminBasics, admin_action, admin_list_column, AllValuesChoicesFieldListFilter, \

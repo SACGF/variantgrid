@@ -16,6 +16,7 @@ from django.db.models import Value, IntegerField
 from django.db.models.aggregates import Count
 from django.db.models.deletion import CASCADE, SET_NULL
 from django.db.models.query_utils import Q
+from django.db.models.signals import post_delete
 from django.dispatch import receiver
 from django.utils import timezone
 from django_dag.models import node_factory, edge_factory
@@ -28,7 +29,7 @@ from analysis.models.enums import GroupOperation, NodeStatus, NodeColors, NodeEr
 from analysis.models.models_analysis import Analysis
 from analysis.models.nodes.node_counts import get_extra_filters_q, get_node_counts_and_labels_dict
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
-from classification.models import Classification, post_delete
+from classification.models import Classification
 from library.constants import DAY_SECS
 from library.django_utils import thread_safe_unique_together_get_or_create
 from library.log_utils import report_event, log_traceback

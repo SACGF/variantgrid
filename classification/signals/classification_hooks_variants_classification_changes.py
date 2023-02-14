@@ -2,7 +2,8 @@ from django.contrib.auth.models import User
 from django.dispatch import receiver
 
 from classification.models import classification_post_publish_signal, Classification, ClassificationModification, \
-    variants_classification_changed_signal, allele_info_changed_signal, ImportedAlleleInfo
+    variants_classification_changed_signal, ImportedAlleleInfo
+from classification.models.classification_variant_info_models import allele_info_changed_signal
 from library.utils import DebugTimer
 from snpdb.models import Allele
 

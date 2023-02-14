@@ -243,7 +243,11 @@ class CHGVS:
 
     @property
     def variant(self) -> Optional[str]:
-        # variant is a better name for what comes after the c. than "raw_c"
+        # variant was an alternative name to raw_c, but c_dot is the best name
+        return self.raw_c
+
+    @property
+    def c_dot(self) -> Optional[str]:
         return self.raw_c
 
     @property
