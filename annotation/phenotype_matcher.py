@@ -307,7 +307,7 @@ class PhenotypeMatcher:
                         new_entries[no_vitamin_text] = hpo
 
                         b_vitamin = words[1]
-                        dash_text = 'b-%s deficiency' % b_vitamin[1:]
+                        dash_text = f'b-{b_vitamin[1:]} deficiency'
                         new_entries[dash_text] = hpo
 
         hpo_pks.update(new_entries)
