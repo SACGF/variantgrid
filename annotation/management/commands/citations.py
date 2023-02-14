@@ -1,7 +1,6 @@
 from django.core.management import BaseCommand
 
 from annotation.models import Citation, CitationFetchRequest
-from annotation.models.models_citations import CitationRequest
 from library.utils import batch_iterator
 
 

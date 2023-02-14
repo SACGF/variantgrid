@@ -31,7 +31,7 @@ from seqauto.illumina.illumina_sequencers import SEQUENCING_RUN_REGEX
 from seqauto.models import SequencingRun, Experiment
 from snpdb.clingen_allele import get_clingen_allele
 from snpdb.models import VARIANT_PATTERN, LOCUS_PATTERN, LOCUS_NO_REF_PATTERN, DBSNP_PATTERN, Allele, Contig, \
-    ClinGenAllele, GenomeBuild, Sample, Variant, Sequence, VariantCoordinate, UserSettings, Organization, Lab, VCF, \
+    ClinGenAllele, GenomeBuild, Sample, Variant, VariantCoordinate, UserSettings, Organization, Lab, VCF, \
     DbSNP, Cohort, HGVS_UNCLEANED_PATTERN
 from snpdb.search2 import SearchInput, SearchResponseRecordAbstract, SearchResponse
 from upload.models import ModifiedImportedVariant

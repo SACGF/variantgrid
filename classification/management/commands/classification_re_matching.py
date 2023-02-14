@@ -1,11 +1,4 @@
-import re
-
 from django.core.management import BaseCommand
-from django.db.models import QuerySet
-
-from classification.classification_import import reattempt_variant_matching
-from classification.models import Classification
-from library.guardian_utils import admin_bot
 
 
 class Command(BaseCommand):

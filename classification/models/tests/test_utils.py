@@ -2,7 +2,6 @@ from typing import Tuple
 
 from django.contrib.auth.models import User
 
-from classification.models import Classification
 from snpdb.models import Lab, Organization, Country
 
 

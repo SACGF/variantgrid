@@ -17,9 +17,8 @@ from classification.enums.discordance_enums import DiscordanceReportResolution
 from classification.models import ClassificationModification, Classification, classification_flag_types, \
     DiscordanceReport, ClinicalContext, ImportedAlleleInfo
 from flags.models import FlagsMixin, Flag, FlagComment
-from library.log_utils import report_event, AdminNotificationBuilder
-from library.utils import batch_iterator, local_date_string, DebugTimer
-from snpdb.models import GenomeBuild, Lab, Organization, allele_flag_types, Allele, Variant, VariantAllele
+from library.utils import batch_iterator, local_date_string
+from snpdb.models import GenomeBuild, Lab, Organization, Allele, Variant
 
 
 @dataclass

@@ -5,10 +5,10 @@ from typing import Optional, List, Iterable, TypeVar, Generic, Set, Dict
 
 from django.contrib.auth.models import User
 
+from classification.criteria_strengths import CriteriaStrength
 from classification.enums import SpecialEKeys, CriteriaEvaluation, ShareLevel
 from classification.models import ClassificationModification, EvidenceKeyMap, CuratedDate, ConditionResolved, \
     classification_flag_types, ImportedAlleleInfo
-from classification.criteria_strengths import CriteriaStrength
 from classification.models.flag_types import ClassificationFlagTypes
 from flags.models import Flag, FlagStatus
 from genes.hgvs import CHGVS, PHGVS

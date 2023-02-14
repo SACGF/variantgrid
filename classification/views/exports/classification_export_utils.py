@@ -1,6 +1,7 @@
 from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import List, Dict, Iterable, Set, Tuple, Any
+
 from annotation.models import Citation, CitationFetchRequest
 from annotation.models.models_citations import CitationIdNormalized, CitationSource
 from classification.enums import SpecialEKeys

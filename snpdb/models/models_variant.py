@@ -1,11 +1,9 @@
-import collections
 import logging
 import re
-from functools import cached_property
 from dataclasses import dataclass
+from functools import cached_property
 from typing import Optional, Pattern, Tuple, Iterable, Set, Union, Dict, Any
 
-import django.dispatch
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.db import models, IntegrityError
@@ -26,7 +24,6 @@ from library.django_utils.django_partition import RelatedModelsPartitionModel
 from library.genomics import format_chrom
 from library.utils import md5sum_str, FormerTuple
 from snpdb.models import Wiki
-from snpdb.models.flag_types import allele_flag_types
 from snpdb.models.models_clingen_allele import ClinGenAllele
 from snpdb.models.models_enums import AlleleConversionTool, AlleleOrigin, ProcessingStatus
 from snpdb.models.models_genome import Contig, GenomeBuild, GenomeBuildContig

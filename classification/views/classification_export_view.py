@@ -1,12 +1,9 @@
-import operator
 import re
 from datetime import datetime, timedelta
-from functools import reduce
 from typing import List
 from urllib.parse import unquote_plus
 
 from django.conf import settings
-from django.db.models import QuerySet, Q
 from django.http.request import HttpRequest
 from django.http.response import HttpResponse, HttpResponseBase
 from django.shortcuts import render
@@ -16,12 +13,12 @@ from htmlmin.decorators import not_minified_response
 from requests.models import Response
 from rest_framework.request import Request
 from rest_framework.views import APIView
+
 from classification.models import Classification
 from classification.models.classification import ClassificationModification
 from classification.models.classification_ref import ClassificationRef
 from classification.views.classification_export_report import ClassificationReport
 from classification.views.exports import ClassificationExportFormatterCSV
-from classification.views.exports.classification_export_decorator import UnsupportedExportType
 from classification.views.exports.classification_export_filter import ClassificationFilter
 from classification.views.exports.classification_export_formatter_csv import FormatDetailsCSV
 from classification.views.exports.classification_export_formatter_redcap import export_redcap_definition

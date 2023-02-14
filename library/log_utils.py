@@ -14,7 +14,6 @@ from django.conf import settings
 from django.contrib.admin.options import get_content_type_for_model
 from django.contrib.auth.models import User
 from django.db.models import Model
-from django.http import HttpRequest
 from django.utils import timezone
 from markdown import markdown
 from rest_framework.request import Request

@@ -1,7 +1,5 @@
 from django.core.management import BaseCommand
 
-from classification.models import Classification
-
 
 class Command(BaseCommand):
 

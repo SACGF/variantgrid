@@ -6,8 +6,8 @@ import celery
 from django.conf import settings
 from django.utils import timezone
 
-from library.utils.file_utils import name_from_filename, mk_path
 from library.log_utils import get_traceback
+from library.utils.file_utils import name_from_filename, mk_path
 from seqauto.models import SeqAutoRun
 from seqauto.models.models_enums import SequencingFileType
 from seqauto.pbs.create_jobs import create_jobs_and_launch_script

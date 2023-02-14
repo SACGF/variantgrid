@@ -54,7 +54,7 @@ from snpdb.clingen_allele import populate_clingen_alleles_for_variants
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import Variant, Lab, Sample
 from snpdb.models.models_genome import GenomeBuild
-from snpdb.models.models_variant import AlleleSource, Allele, VariantCoordinate, VariantAllele
+from snpdb.models.models_variant import AlleleSource, Allele, VariantAllele
 
 ChgvsKey = namedtuple('CHGVS', ['short', 'column', 'build'])
 

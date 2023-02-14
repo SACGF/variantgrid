@@ -1,10 +1,9 @@
 import operator
-from dataclasses import dataclass
+import re
 from functools import reduce
 from typing import Optional
 
-from django.contrib.auth.decorators import user_passes_test
-from django.db.models import QuerySet, Q, Count, F
+from django.db.models import QuerySet, Q, Count
 from django.http import HttpRequest
 from django.shortcuts import render, get_object_or_404
 from requests import Response
@@ -13,13 +12,11 @@ from classification.models import ImportedAlleleInfo, ImportedAlleleInfoStatus, 
 from classification.models.classification_variant_info_models import ImportedAlleleInfoValidation
 from genes.hgvs import CHGVS, CHGVSDiff, chgvs_diff_description
 from library.django_utils import get_url_from_view_path
-from library.guardian_utils import is_superuser
 from library.utils import MultiDiff, MultiDiffInput, ExportRow, export_column
 from library.utils.django_utils import render_ajax_view
 from snpdb.admin_utils import get_admin_url
 from snpdb.models import GenomeBuild, Lab, Allele
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, CellData, SortOrder
-import re
 
 
 class ImportedAlleleInfoColumns(DatatableConfig[ImportedAlleleInfo]):

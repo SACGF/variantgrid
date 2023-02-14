@@ -15,8 +15,7 @@ from classification.autopopulate_evidence_keys.evidence_from_sample_and_patient 
 from classification.autopopulate_evidence_keys.evidence_from_variant import get_evidence_fields_for_variant, \
     AutopopulateData
 from classification.enums import SubmissionSource, SpecialEKeys
-from classification.models import EvidenceKey, Classification, ClassificationImport, ImportedAlleleInfo, \
-    ImportedAlleleInfoStatus
+from classification.models import EvidenceKey, Classification, ClassificationImport
 from classification.tasks.classification_import_process_variants_task import liftover_classification_import
 from library.git import Git
 from snpdb.models import GenomeBuild, ImportSource, Sample, UserSettings, Variant

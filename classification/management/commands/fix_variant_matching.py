@@ -2,6 +2,7 @@ import time
 from typing import Dict
 
 from django.core.management import BaseCommand
+
 from classification.models import Classification, ImportedAlleleInfo
 from classification.models.classification_variant_info_models import ResolvedVariantInfo
 from flags.models import FlagComment, FlagType

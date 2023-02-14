@@ -1,7 +1,9 @@
 import json
 from functools import cached_property
 from typing import List
+
 from django.http import HttpRequest
+
 from classification.models import ClassificationJsonParams, ClassificationModification
 from classification.views.exports.classification_export_decorator import register_classification_exporter
 from classification.views.exports.classification_export_filter import ClassificationFilter, AlleleData

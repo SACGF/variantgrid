@@ -1,11 +1,13 @@
+import json
 from typing import List, Optional, Dict, Any
+
 from django.http import HttpRequest
+
 from classification.models import EvidenceKey, EvidenceKeyMap
 from classification.models.evidence_mixin import VCBlobDict
 from classification.views.exports.classification_export_decorator import register_classification_exporter
 from classification.views.exports.classification_export_filter import ClassificationFilter, AlleleData
 from classification.views.exports.classification_export_formatter import ClassificationExportFormatter
-import json
 
 """
 For generating a report about the usage of evidence keys.

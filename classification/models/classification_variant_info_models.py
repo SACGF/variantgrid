@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import Optional, List, Dict, Any, TypedDict, Literal
+
 import django.dispatch
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -8,6 +9,7 @@ from django.db.models import TextField, ForeignKey, CASCADE, SET_NULL, OneToOneF
     CharField, JSONField, BooleanField
 from django.utils.timezone import now
 from model_utils.models import TimeStampedModel
+
 from genes.hgvs import HGVSMatcher, CHGVS, CHGVSDiff
 from genes.models import TranscriptVersion, GeneSymbol, Transcript
 from library.cache import timed_cache

@@ -18,7 +18,6 @@ from classification.models.classification_import_run import ClassificationImport
 from classification.models.classification_variant_info_models import ResolvedVariantInfo, ImportedAlleleInfoValidation
 from classification.tasks.classification_import_map_and_insert_task import ClassificationImportMapInsertTask
 from library.guardian_utils import admin_bot
-from library.log_utils import log_admin_change
 from snpdb.admin_utils import ModelAdminBasics, admin_action, admin_list_column, AllValuesChoicesFieldListFilter, \
     admin_model_action
 from snpdb.models import GenomeBuild, Lab

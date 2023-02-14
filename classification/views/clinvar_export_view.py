@@ -1,3 +1,4 @@
+import io
 import json
 import re
 from collections import defaultdict
@@ -14,6 +15,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
 from django.views import View
 from django.views.decorators.http import require_POST
+
 from classification.enums import SpecialEKeys
 from classification.models import ClinVarExport, ClinVarExportBatch, ClinVarExportBatchStatus, \
     EvidenceKeyMap, ClinVarExportStatus, ClinVarExportSubmission
@@ -23,13 +25,11 @@ from classification.views.classification_dashboard_view import ClassificationDas
 from genes.hgvs import CHGVS
 from library.cache import timed_cache
 from library.django_utils import add_save_message, get_url_from_view_path
-from library.log_utils import report_event
 from library.utils import html_to_text, export_column, ExportRow, local_date_string, ExportDataType
 from snpdb.lab_picker import LabPickerData
 from snpdb.models import ClinVarKey, Lab, Allele, GenomeBuild
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder, CellData
 from uicore.json.json_types import JsonDataType
-import io
 
 
 @timed_cache(size_limit=30, ttl=60)

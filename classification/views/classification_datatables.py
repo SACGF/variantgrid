@@ -1,16 +1,15 @@
 import operator
-from dataclasses import dataclass
 from functools import cached_property, reduce
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, Any, List, Optional
 
 from django.conf import settings
-from django.db.models import Q, Subquery, When, Case, TextField, Value, IntegerField, QuerySet
+from django.db.models import Q, When, Case, TextField, Value, IntegerField, QuerySet
 from django.db.models.fields.json import KeyTextTransform, KeyTransform
 from django.db.models.functions import Lower, Cast
 from django.http import HttpRequest
 
 from classification.enums import SpecialEKeys, EvidenceCategory, ShareLevel
-from classification.models import ClassificationModification, classification_flag_types, Classification, EvidenceKeyMap, \
+from classification.models import ClassificationModification, EvidenceKeyMap, \
     ImportedAlleleInfo
 from classification.models.classification_utils import classification_gene_symbol_filter
 from flags.models import FlagCollection, FlagStatus

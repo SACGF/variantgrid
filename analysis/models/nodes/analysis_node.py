@@ -30,10 +30,10 @@ from analysis.models.nodes.node_counts import get_extra_filters_q, get_node_coun
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
 from classification.models import Classification, post_delete
 from library.constants import DAY_SECS
-from library.utils.database_utils import queryset_to_sql
 from library.django_utils import thread_safe_unique_together_get_or_create
 from library.log_utils import report_event, log_traceback
 from library.utils import format_percent
+from library.utils.database_utils import queryset_to_sql
 from snpdb.models import BuiltInFilters, Sample, Variant, VCFFilter, Wiki, Cohort, VariantCollection, \
     ProcessingStatus, GenomeBuild, AlleleSource, Contig, SampleFilePath
 from snpdb.variant_collection import write_sql_to_variant_collection

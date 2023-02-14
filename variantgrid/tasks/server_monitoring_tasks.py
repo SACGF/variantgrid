@@ -8,8 +8,8 @@ import requests
 from django.conf import settings
 
 from library.constants import MINUTE_SECS
-from library.utils.file_utils import get_disk_usage
 from library.log_utils import report_message
+from library.utils.file_utils import get_disk_usage
 
 
 @dataclass

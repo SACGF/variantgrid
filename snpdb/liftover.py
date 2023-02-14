@@ -13,9 +13,9 @@ from django.contrib.auth.models import User
 from django.db.models.query_utils import Q
 
 from library.django_utils.django_file_utils import get_import_processing_dir
+from library.genomics.vcf_utils import write_vcf_from_tuples
 from library.guardian_utils import admin_bot
 from library.log_utils import log_traceback
-from library.genomics.vcf_utils import write_vcf_from_tuples
 from snpdb.clingen_allele import populate_clingen_alleles_for_variants
 from snpdb.models.models_enums import ImportSource, AlleleConversionTool, AlleleOrigin
 from snpdb.models.models_genome import GenomeBuild, Contig, GenomeFasta

@@ -13,7 +13,7 @@ from flags.models import FlagCollection
 from genes.models import GeneSymbol, Gene, Transcript
 from library.log_utils import NotificationBuilder
 from library.utils import VarsDict
-from snpdb.models import VariantCoordinate, Allele, Lab
+from snpdb.models import Allele, Lab
 
 
 @dataclass

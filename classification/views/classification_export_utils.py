@@ -1,32 +1,19 @@
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import datetime
 from enum import Enum
 from functools import cached_property
-from typing import List, Union, Iterable, Optional, Dict, Tuple, Set, Any, Mapping
+from typing import List, Iterable, Optional, Dict, Tuple, Set, Any, Mapping
 
 from django.contrib.auth.models import User
-from django.db.models import Q, Count
+from django.db.models import Count
 from django.db.models.query import QuerySet
-from django.http.response import StreamingHttpResponse
-from threadlocals.threadlocals import get_current_request
 
 from classification.enums import SpecialEKeys
-from classification.models.classification import ClassificationModification, \
-    Classification
+from classification.models.classification import ClassificationModification
 from classification.models.evidence_key import EvidenceKeyMap, EvidenceKey
-from classification.models.flag_types import classification_flag_types
-from flags.models import FlagComment
-from flags.models.enums import FlagStatus
-from flags.models.models import Flag
 from genes.hgvs import CHGVS
-from library.guardian_utils import bot_group
-from library.log_utils import log_traceback, report_exc_info, report_message, NotificationBuilder
-from library.utils import delimited_row, DebugTimer, local_date_string
-from snpdb.models import Contig
-from snpdb.models.flag_types import allele_flag_types
-from snpdb.models.models_genome import GenomeBuild, GenomeBuildContig
-from snpdb.models.models_variant import VariantAllele, Allele
+from library.log_utils import report_message
+from snpdb.models.models_genome import GenomeBuild
 
 
 class KeyValueFormatter:

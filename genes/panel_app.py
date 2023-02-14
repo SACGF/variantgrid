@@ -4,13 +4,12 @@ from typing import Dict, Optional
 import requests
 from rest_framework.exceptions import NotFound
 
-from annotation.models import CachedWebResource, ImportStatus
+from annotation.models import CachedWebResource
 from genes.gene_matching import GeneSymbolMatcher
 from genes.models import PanelAppPanelRelevantDisorders, PanelAppPanel, PanelAppServer, PanelAppPanelLocalCache, \
-    PanelAppPanelLocalCacheGeneSymbol, GeneSymbol, GeneList, GeneListCategory, create_fake_gene_list
+    PanelAppPanelLocalCacheGeneSymbol, GeneSymbol, create_fake_gene_list
 from genes.serializers import GeneListGeneSymbolSerializer
 from library.constants import MINUTE_SECS
-from library.guardian_utils import admin_bot, add_public_group_read_permission
 
 PANEL_APP_PREFIX = "panel-app"
 PANEL_APP_LIST_PANELS_PATH = "/api/v1/panels/"

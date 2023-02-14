@@ -10,10 +10,10 @@ from jfu.http import upload_receive, UploadResponse, JFUResponse
 from annotation.models.models_phenotype_match import TextPhenotypeMatch
 from annotation.phenotype_matching import create_phenotype_description
 from library.django_utils import add_save_message, set_form_read_only
-from library.utils.file_utils import rm_if_exists
 from library.guardian_utils import assign_permission_to_user_and_groups
 from library.log_utils import log_traceback
 from library.utils import invert_dict
+from library.utils.file_utils import rm_if_exists
 from ontology.forms import OMIMForm, HPOForm, HGNCForm, MONDOForm
 from patients import forms
 from patients.forms import PatientSearchForm, PatientContactForm

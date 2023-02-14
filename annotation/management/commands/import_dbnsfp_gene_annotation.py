@@ -5,8 +5,8 @@ from django.core.management import BaseCommand, CommandError
 
 from annotation.models import DBNSFPGeneAnnotationVersion, DBNSFPGeneAnnotation
 from genes.models import GeneSymbol
-from library.utils.file_utils import file_md5sum
 from library.pandas_utils import df_nan_to_none
+from library.utils.file_utils import file_md5sum
 
 
 class Command(BaseCommand):

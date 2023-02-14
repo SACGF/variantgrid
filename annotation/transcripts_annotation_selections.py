@@ -1,5 +1,5 @@
-from functools import cached_property
 import operator
+from functools import cached_property
 
 from django.conf import settings
 from django.forms.models import model_to_dict

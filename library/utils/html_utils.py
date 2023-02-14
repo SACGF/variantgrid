@@ -1,7 +1,6 @@
 import html
 import re
 import uuid
-from dataclasses import dataclass
 from html import escape
 from typing import Optional, Set, Dict
 

@@ -4,7 +4,6 @@ from django.contrib.auth.models import User
 from snpdb.admin_utils import ModelAdminBasics, admin_list_column
 from snpdb.models import ProcessingStatus
 from snpdb.user_settings_manager import UserSettingsManager
-from . import models
 from .models import UploadStep, UploadPipeline, UploadedFile, UploadedVCF, UploadedClassificationImport
 
 

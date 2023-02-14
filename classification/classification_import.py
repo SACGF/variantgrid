@@ -11,9 +11,9 @@ from classification.models.classification import ClassificationImport
 from classification.models.classification_import_run import ClassificationImportRun
 from classification.tasks.classification_import_process_variants_task import ClassificationImportProcessVariantsTask
 from library.django_utils.django_file_utils import get_import_processing_dir
+from library.genomics.vcf_utils import write_vcf_from_tuples
 from library.log_utils import report_exc_info
 from library.utils import full_class_name
-from library.genomics.vcf_utils import write_vcf_from_tuples
 from snpdb.models import Variant, ImportSource
 from snpdb.models.models_variant import VariantCoordinate
 from snpdb.variant_pk_lookup import VariantPKLookup

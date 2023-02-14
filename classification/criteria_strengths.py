@@ -2,7 +2,9 @@ from collections import defaultdict
 from dataclasses import dataclass
 from functools import cached_property
 from typing import Optional, Iterable, List, Union, Set, Dict
+
 from django.utils.safestring import SafeString
+
 from classification.enums import CriteriaEvaluation
 from library.utils import first
 

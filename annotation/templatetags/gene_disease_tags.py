@@ -1,4 +1,5 @@
 from collections import Counter, defaultdict
+
 from django.template import Library
 
 from ontology.models import GeneDiseaseClassification, OntologyVersion

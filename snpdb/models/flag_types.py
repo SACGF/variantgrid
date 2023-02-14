@@ -1,6 +1,6 @@
 from functools import cached_property
 
-from flags.models.models import FlagTypeContext, FlagType
+from flags.models.models import FlagTypeContext
 
 
 class AlleleFlagTypes:

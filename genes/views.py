@@ -17,7 +17,6 @@ from django.utils.datastructures import OrderedSet
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 from django.views.decorators.http import require_POST
-from django.views.decorators.vary import vary_on_cookie
 from django.views.generic import TemplateView
 from global_login_required import login_not_required
 
@@ -44,7 +43,7 @@ from genes.models import GeneInfo, CanonicalTranscriptCollection, GeneListCatego
     PanelAppServer, SampleGeneList, HGNC, GeneVersion, TranscriptVersionSequenceInfo, NoTranscript
 from genes.models_enums import AnnotationConsortium
 from genes.serializers import SampleGeneListSerializer
-from library.constants import MINUTE_SECS, DAY_SECS, WEEK_SECS
+from library.constants import MINUTE_SECS, WEEK_SECS
 from library.django_utils import get_field_counts, add_save_message
 from library.utils import defaultdict_to_dict, LazyAttribute, segment
 from ontology.models import OntologySnake, OntologyService, OntologyTerm

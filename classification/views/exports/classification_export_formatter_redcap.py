@@ -1,6 +1,6 @@
 import csv
-import re
 import io
+import re
 from typing import List, Iterable
 
 from django.db.models import OrderBy

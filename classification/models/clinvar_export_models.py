@@ -1,12 +1,14 @@
 from dataclasses import dataclass
+from functools import cached_property
 from typing import Optional, List, Iterable, Dict
+
 from django.db import models, transaction
 from django.db.models import QuerySet, TextChoices
 from django.urls import reverse
 from django.utils.timezone import now
 from frozendict import frozendict
-from functools import cached_property
 from model_utils.models import TimeStampedModel
+
 from classification.models import ClassificationModification, ConditionResolved
 from library.utils import first, invalidate_cached_property
 from snpdb.models import ClinVarKey, Allele

@@ -49,9 +49,9 @@ from flags.models.models import FlagType
 from genes.forms import GeneSymbolForm
 from genes.hgvs import get_kind_and_transcript_accession_from_invalid_hgvs
 from library.django_utils import require_superuser, get_url_from_view_path
-from library.utils.file_utils import rm_if_exists
 from library.log_utils import log_traceback
 from library.utils import delimited_row
+from library.utils.file_utils import rm_if_exists
 from snpdb.forms import SampleChoiceForm, UserSelectForm, LabSelectForm
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import Variant, UserSettings, Sample, Lab, Allele

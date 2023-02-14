@@ -8,6 +8,7 @@ from django.db.models import Model
 from django.db.models.query import QuerySet
 from django.template import Library
 from django.utils.safestring import mark_safe
+
 from annotation.manual_variant_entry import check_can_create_variants, CreateManualVariantForbidden
 from classification.criteria_strengths import CriteriaStrength, AcmgPointScore
 from classification.enums import SpecialEKeys

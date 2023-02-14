@@ -6,10 +6,10 @@ import celery
 from celery.result import AsyncResult
 from django.db.models.query_utils import Q
 
-from library.utils.database_utils import run_sql
 from library.django_utils.django_postgres import pg_sql_array, model_to_insert_sql
 from library.log_utils import log_traceback
 from library.utils import single_quote
+from library.utils.database_utils import run_sql
 from patients.models_enums import Zygosity
 from snpdb.common_variants import get_common_filter
 from snpdb.grid_columns.grid_sample_columns import get_left_outer_join_on_variant

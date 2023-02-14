@@ -1,7 +1,6 @@
 from django.conf import settings
 from django.db.models.signals import post_save
 from django.dispatch.dispatcher import receiver
-from django.urls import reverse
 
 from classification.enums.classification_enums import ShareLevel
 from classification.models.classification import \

@@ -1,6 +1,6 @@
 import logging
-from functools import cached_property
 from collections import Counter, defaultdict
+from functools import cached_property
 
 import pandas as pd
 from django.conf import settings

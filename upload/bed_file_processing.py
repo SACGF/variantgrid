@@ -6,8 +6,8 @@ import subprocess
 from django.conf import settings
 
 from library import genomics
-from library.utils.file_utils import mk_path
 from library.genomics.bed_file import BedFileReader
+from library.utils.file_utils import mk_path
 
 
 def process_bed_file(bed_file, processed_file, has_chr):

@@ -5,9 +5,9 @@ from django.core.exceptions import FieldError
 from django.core.paginator import Paginator
 from django.db import connection
 
-from library.utils.database_utils import iter_dictfetchall
 from library.jqgrid.jqgrid_user_row_config import JqGridUserRowConfig
 from library.utils import Struct, double_quote
+from library.utils.database_utils import iter_dictfetchall
 
 
 def get_overrides(columns, column_data, model_field=True, queryset_field=True):
