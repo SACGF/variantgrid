@@ -54,5 +54,5 @@ class CitationAdmin(ModelAdminBasics):
         CitationFetchRequest.fetch_all_now(queryset, cache_age=timedelta(seconds=0))
 
     @admin_action("Load (if Unloaded)")
-    def force_refresh(self, request, queryset: QuerySet[Citation]):
+    def load_if_unloaded(self, request, queryset: QuerySet[Citation]):
         CitationFetchRequest.fetch_all_now(queryset)
