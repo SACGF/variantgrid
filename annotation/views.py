@@ -229,6 +229,7 @@ def annotation_detail(request):
 
     context = {
         "annotations_all_imported": annotations_all_imported,
+        "all_ontologies_accounted_for": all_ontologies_accounted_for,
         "genome_build_annotations": genome_build_annotations,
         "ensembl_biomart_transcript_genes": ensembl_biomart_transcript_genes,
         "ontology_services": ontology_services,

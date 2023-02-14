@@ -275,7 +275,7 @@ wget ftp://ftp.ncbi.nlm.nih.gov/gene/DATA/GENE_INFO/Mammalia/Homo_sapiens.gene_i
             {% for ontology_import in ontology_imports %}
                 <div><b>{{ ontology_import.context }}</b> : {% timestamp ontology_import.last_import.processed_date time_ago=True %}</div>
             {% endfor %}
-            {% install-instructions "Ontology Imports" installed=ontology_imports %}
+            {% install-instructions "Ontology Imports" installed=all_ontologies_accounted_for %}
                 <div>
                     <b>HGNC</b><br/>
                     OntologyTerms have a redundant copy of HGNC to help map relationships between terms and genes. To load HGNC OntologyTerms

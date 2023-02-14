@@ -71,9 +71,17 @@ class Command(BaseCommand):
             return
 
         if gar_id:
-            if not ov_id:
-                raise ValueError("You must specify ontology-version when gene-annotation-release is specified")
-            ontology_version = OntologyVersion.objects.get(pk=ov_id)
+            if num_ontology_versions := OntologyVersion.objects.all().count():
+                if num_ontology_versions == 1:
+                    ontology_version = OntologyVersion.objects.get()
+                elif ov_id:
+                    ontology_version = OntologyVersion.objects.get(pk=ov_id)
+                else:
+                    raise ValueError("You must specify ontology-version when gene-annotation-release is specified "
+                                     "and more than 1 ontology version exists")
+            else:
+                raise ValueError("No ontology versions - you need to import this first (see annotation page)")
+
             if dbnsfp_gene_version_id:
                 dbnsfp_gene_version = DBNSFPGeneAnnotationVersion.objects.get(pk=dbnsfp_gene_version_id)
             gene_annotation_release = GeneAnnotationRelease.objects.get(pk=gar_id)
