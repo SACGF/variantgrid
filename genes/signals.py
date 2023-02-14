@@ -7,7 +7,7 @@ from genes.models import GeneListCategory
 from genes.tasks.cached_web_resource_tasks import PanelAppEnglandPanelsWebResourceTask, \
     PanelAppAustraliaPanelsWebResourceTask, GnomADGeneConstraintWebResourceTask, PfamWebResourceTask, \
     UniProtWebResourceTask, RefSeqGeneSummaryWebResourceTask, HGNCWebResourceTask, LRGRefSeqGeneWebResourceTask, \
-    RefSeqGeneInfoWebResourceTask, MANEWebResourceTask
+    RefSeqGeneInfoWebResourceTask, RefSeqSequenceInfoWebResourceTask, MANEWebResourceTask
 
 # For some reason this doesn't work as a variable, has to be stored here...
 gnomad_gene_constraint_post_save_handler = CachedWebResource.named_handler_factory(settings.CACHED_WEB_RESOURCE_GNOMAD_GENE_CONSTRAINT,
@@ -32,6 +32,8 @@ pfam_post_save_handler = CachedWebResource.named_handler_factory(settings.CACHED
 refseq_gene_summary_post_save_handler = CachedWebResource.named_handler_factory(settings.CACHED_WEB_RESOURCE_REFSEQ_GENE_SUMMARY, RefSeqGeneSummaryWebResourceTask)
 
 refseq_gene_info_post_save_handler = CachedWebResource.named_handler_factory(settings.CACHED_WEB_RESOURCE_REFSEQ_GENE_INFO, RefSeqGeneInfoWebResourceTask)
+
+refseq_sequence_info_post_save_handler = CachedWebResource.named_handler_factory(settings.CACHED_WEB_RESOURCE_REFSEQ_SEQUENCE_INFO, RefSeqSequenceInfoWebResourceTask)
 
 uniprot_post_save_handler = CachedWebResource.named_handler_factory(settings.CACHED_WEB_RESOURCE_UNIPROT, UniProtWebResourceTask)
 

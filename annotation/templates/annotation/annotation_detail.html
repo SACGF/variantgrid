@@ -244,24 +244,6 @@ wget ftp://ftp.ncbi.nlm.nih.gov/gene/DATA/GENE_INFO/Mammalia/Homo_sapiens.gene_i
              {% endinstall-instructions %}
         {% endlabelled %}
 
-        {% labelled label="TranscriptVersion Sequence Info" %}
-            {% if transcript_version_sequence_info %}
-                {{ transcript_version_sequence_info }}
-                {% for fasta_import in transcript_fasta_imports %}
-                    <div title="{{ fasta_import.md5_hash }}">
-                        {{ fasta_import }} ({{ fasta_import.created|localtime }})
-                    </div>
-                {% endfor %}
-            {% else %}
-                <div class="no-value">None</div>
-            {% endif %}
-            {% install-instructions "TranscriptVersion Sequence Info" installed=transcript_fasta_imports %}
-            This is genome build independent, so just download most recently updated version.
-<code>wget https://ftp.ncbi.nlm.nih.gov/refseq/H_sapiens/annotation/GRCh38_latest/refseq_identifiers/GRCh38_latest_rna.fna.gz
-{{ python_command }} manage.py import_transcript_fasta --annotation-consortium=RefSeq ${VARIANTGRID_SETUP_DATA}/GRCh38_latest_rna.fna.gz</code>
-             {% endinstall-instructions %}
-        {% endlabelled %}
-
         {% for ontology_count in ontology_counts %}
             {% labelled label=ontology_count.service %}
                 {{ ontology_count.count | intcomma }}

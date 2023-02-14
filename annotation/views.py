@@ -206,23 +206,6 @@ def annotation_detail(request):
     hpa_version = HumanProteinAtlasAnnotationVersion.objects.order_by("-annotation_date").first()
     hpa_counts = HumanProteinAtlasAnnotation.objects.filter(version=hpa_version).count()
 
-    transcript_fasta_imports = list(TranscriptVersionSequenceInfoFastaFileImport.objects.all().order_by("created"))
-    tvi_qs = TranscriptVersionSequenceInfo.objects.all()
-    tvi_api_count = tvi_qs.filter(fasta_import__isnull=True).count()
-    tvi_fasta_count = tvi_qs.filter(fasta_import__isnull=False).count()
-    if tvi_total := tvi_api_count + tvi_fasta_count:
-        transcript_version_sequence_info = f"{tvi_total} total"
-        subtotals = []
-        if tvi_api_count:
-            subtotals.append(f"{tvi_api_count} from API")
-        if tvi_fasta_count:
-            subtotals.append(f"{tvi_fasta_count} from {len(transcript_fasta_imports)} imports")
-        if subtotals:
-            subtotal = ", ".join(subtotals)
-            transcript_version_sequence_info += f" ({subtotal})"
-    else:
-        transcript_version_sequence_info = None
-
     if dbnsfp_gene_annotation := DBNSFPGeneAnnotationVersion.latest():
         num_records = dbnsfp_gene_annotation.dbnsfpgeneannotation_set.count()
         dbnsfp_gene_annotation = f"dbNSFP gene - version: {dbnsfp_gene_annotation.version}, {num_records} records"
@@ -256,8 +239,6 @@ def annotation_detail(request):
         "diagnostic_gene_list": diagnostic_gene_list,
         "hpa_version": hpa_version,
         "hpa_counts": hpa_counts,
-        "transcript_version_sequence_info": transcript_version_sequence_info,
-        "transcript_fasta_imports": transcript_fasta_imports,
         "dbnsfp_gene_annotation": dbnsfp_gene_annotation,
         "num_annotation_columns": VariantGridColumn.objects.count(),
         "cached_web_resources": cached_web_resources,
