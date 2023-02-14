@@ -65,7 +65,7 @@ def report_event(name: str, request: Request = None, extra_data: Dict = None):
                          severity=LogLevel.INFO)
 
 
-def log_admin_change(object: Model, message: str, user: Optional[User] = None):
+def log_admin_change(obj: Model, message: str, user: Optional[User] = None):
     """
     Log that an object has been successfully changed.
 
@@ -77,9 +77,9 @@ def log_admin_change(object: Model, message: str, user: Optional[User] = None):
 
     return LogEntry.objects.log_action(
         user_id=user.pk,
-        content_type_id=get_content_type_for_model(object).pk,
-        object_id=object.pk,
-        object_repr=str(object),
+        content_type_id=get_content_type_for_model(obj).pk,
+        object_id=obj.pk,
+        object_repr=str(obj),
         action_flag=CHANGE,
         change_message=message,
     )
@@ -411,7 +411,7 @@ def console_logger():
 
 
 def get_traceback():
-    exec_type, exec_value, _ = sys.exc_info()
+    _, exec_value, _ = sys.exc_info()
     return "".join(traceback.format_exception(exec_value.__class__, exec_value, exec_value.__traceback__))
 
 

@@ -213,9 +213,9 @@ class EvidenceKey(TimeStampedModel):
         else:
             return {}
 
-    def option_dictionary_property(self, property: str) -> Dict[str, Any]:
+    def option_dictionary_property(self, prop: str) -> Dict[str, Any]:
         if options := self.virtual_options:
-            return {x.get('key'): x.get(property) for x in options if property in x}
+            return {x.get('key'): x.get(prop) for x in options if prop in x}
         else:
             return {}
 

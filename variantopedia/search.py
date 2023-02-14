@@ -258,13 +258,14 @@ class SearchResults:
         self.search_errors: Dict[SearchError, Set[GenomeBuild]] = defaultdict(set)
 
     @staticmethod
-    def from_search_response(input: SearchInput, response: SearchResponse) -> 'SearchResults':
-        sr = SearchResults(search_string=input.search_string,
-                           genome_build_preferred=input.genome_build_preferred)
+    def from_search_response(search_input: SearchInput, response: SearchResponse) -> 'SearchResults':
+        sr = SearchResults(search_string=search_input.search_string,
+                           genome_build_preferred=search_input.genome_build_preferred)
         sr.search_types.add(response.search_type)
-        sr.search_string = input.search_string
-        sr.genome_build_preferred = input.genome_build_preferred
-        sr.results = [SearchResult.from_search_result_abs(search_type=response.search_type, result=result) for result in response.results]
+        sr.search_string = search_input.search_string
+        sr.genome_build_preferred = search_input.genome_build_preferred
+        sr.results = [SearchResult.from_search_result_abs(search_type=response.search_type, result=result) for result in
+                      response.results]
         return sr
 
     def append_search_type(self, search_type: str):
@@ -410,7 +411,7 @@ class Searcher:
         search_responses = search_input.search()
 
         for search_response in search_responses:
-            search_results.extend(SearchResults.from_search_response(input=search_input, response=search_response))
+            search_results.extend(SearchResults.from_search_response(search_input=search_input, response=search_response))
         # END NEW CODE
 
         search_results.complete()

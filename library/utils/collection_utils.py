@@ -276,16 +276,16 @@ class LimitedCollection(Generic[T]):
         return self.true_count > 0
 
 
-def segment(iterable: Iterable[T], filter: Callable[[T], bool]) -> Tuple[List[T], List[T]]:
+def segment(iterable: Iterable[T], filter_func: Callable[[T], bool]) -> Tuple[List[T], List[T]]:
     """
     :param iterable An iterable bunch of data to be split into two
-    :param filter A filter to run over each element of iterable, to put it into a pass or fail list
+    :param filter_func A filter to run over each element of iterable, to put it into a pass or fail list
     :returns two lists, the first being elements that passed the filter, the second being ones that failed
     """
     passes: List[T] = []
     fails: List[T] = []
     for element in iterable:
-        if filter(element):
+        if filter_func(element):
             passes.append(element)
         else:
             fails.append(element)
