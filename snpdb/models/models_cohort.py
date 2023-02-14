@@ -205,8 +205,8 @@ class Cohort(GuardianPermissionsAutoInitialSaveMixin, SortByPKMixin, TimeStamped
 
         raise PermissionDenied(f"You do not have permissions to access cohort id {cohort.pk}")
 
-    @staticmethod
-    def filter_for_user(user, group_data=True, success_status_only=True):
+    @classmethod
+    def filter_for_user(cls, user, group_data=True, success_status_only=True):
         cohort_qs = get_objects_for_user(user, 'snpdb.view_cohort', accept_global_perms=False)
 
         # Also ones we have access to vcfs
