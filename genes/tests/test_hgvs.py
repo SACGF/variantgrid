@@ -57,7 +57,7 @@ class TestHGVS(TestCase):
             ("BRCA1(nm_000059.4):c.316+5G>A",  [swap_warning, uc_warning]),
         ]
         for hgvs_string, expected_warnings in TEST_CASES:
-            fixed_hgvs, fix_messages = HGVSMatcher.fix_gene_transcript(hgvs_string)
+            _, fix_messages = HGVSMatcher.fix_gene_transcript(hgvs_string)
             for ew in expected_warnings:
                 self.assertIn(ew, fix_messages, f"Warning for {hgvs_string}")
 

@@ -224,7 +224,7 @@ class SequencingRun(SeqAutoRecord):
         except Exception as e:
             SeqAutoMessage.objects.update_or_create(record=self, severity=LogLevel.ERROR,
                                                     sample_sheet_qc_exception=sample_sheet_qc_exception,
-                                                    message="QC not loaded",
+                                                    message=f"QC not loaded: {e}",
                                                     defaults={"open": True})
 
     def get_current_sample_sheet(self):

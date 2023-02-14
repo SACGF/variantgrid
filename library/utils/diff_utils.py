@@ -159,6 +159,7 @@ class MultiDiffInput:
     identifier: Any
     text: str
 
+
 @dataclass(frozen=True)
 class MultiDiffOutput:
     input: MultiDiffInput

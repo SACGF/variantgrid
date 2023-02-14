@@ -252,7 +252,7 @@ class OntologyIdNormalized:
         try:
             num_part = int(postfix)
             clean_id: str
-            if expected_length := OntologyService.EXPECTED_LENGTHS[prefix]:
+            if OntologyService.EXPECTED_LENGTHS[prefix]:
                 clean_id = OntologyService.index_to_id(prefix, num_part)
             else:
                 # variable length IDs like DOID

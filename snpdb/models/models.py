@@ -280,7 +280,7 @@ class ClinVarKey(TimeStampedModel):
             if not raw_value:
                 raw_value = ""
 
-            if assertion_method_lookup := self.assertion_method_lookup:
+            if self.assertion_method_lookup:
                 if lookups := self.assertion_method_lookup.get("lookups"):
                     for lookup in lookups:
                         if match_text := lookup.get("match"):
