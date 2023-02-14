@@ -102,4 +102,3 @@ class IconWithTooltip:
             "icon": self.icon,
             "tooltip": self.tooltip
         }
-

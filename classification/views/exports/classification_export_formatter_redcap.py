@@ -85,7 +85,6 @@ class ClassificationExportFormatterRedCap(ClassificationExportFormatter):
         writer.writerow(header_array)
         return [out.getvalue()]
 
-
     def row(self, allele_data: AlleleData) -> List[str]:
         raise ValueError("row() is not supported in REDCap Export")
 

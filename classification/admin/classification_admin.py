@@ -728,7 +728,6 @@ class ImportedAlleleInfoAdmin(ModelAdminBasics):
     search_fields = ('imported_c_hgvs', 'imported_g_hgvs')
     inlines = (ImportedAlleleInfoValidationInline,)
 
-
     @admin_list_column("Imported HGVS", "imported_c_hgvs")
     def imported_hgvs(self, obj: ImportedAlleleInfo):
         return obj.imported_c_hgvs or obj.imported_g_hgvs

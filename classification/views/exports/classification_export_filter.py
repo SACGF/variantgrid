@@ -425,7 +425,6 @@ class ClassificationFilter:
             created__gte=self.since
         ))
 
-
     def _passes_since(self, allele_data: AlleleData) -> bool:
         """
         Is there anything about this AlleleData that indicates it should be included since the since date

@@ -12,7 +12,7 @@ def _inject_option_into_evidence_key(apps, _schema_editor, evidence_key_name, op
             for old_option in options:
                 if old_option.get('key') == option.get('key'):
                     print(f"{option.get('key')} already in options")
-                    return # value already tehre
+                    return  # value already tehre
             options.append(option)
             evidence_key.save()
         else:

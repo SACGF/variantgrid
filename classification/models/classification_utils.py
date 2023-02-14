@@ -223,7 +223,6 @@ class ClassificationJsonParams:
         self.hardcode_extra_data = hardcode_extra_data
         self.fix_data_types = fix_data_types
 
-
     def report(self) -> None:
         """
         Record all information about the VariantMatching evidence on the VariantMatching flag of the Classification

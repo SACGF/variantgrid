@@ -172,7 +172,7 @@ class ClassificationExportFormatterKeys(ClassificationExportFormatter):
         self.rows_with_errors += len([issue for issue in data.all_cms if issue.validation_include])
         for ci in data.all_cms:
             if ci.withdrawn:
-                continue # don't count withdrawn
+                continue  # don't count withdrawn
             if ci.has_issue:
                 # still count towards total
                 self.rows_with_errors += 1

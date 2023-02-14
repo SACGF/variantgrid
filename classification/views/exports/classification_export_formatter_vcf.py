@@ -80,7 +80,6 @@ class ClassificationExportFormatterVCF(ClassificationExportFormatter):
             value = value.replace(',', '.')
             return value
 
-
     def header(self) -> List[str]:
         out = []
         out += [
@@ -126,7 +125,6 @@ class ClassificationExportFormatterVCF(ClassificationExportFormatter):
 
         out += [delimited_row(['#CHROM', 'POS', 'ID', 'REF', 'ALT', 'QUAL', 'FILTER', 'INFO'], delimiter='\t')]
         return out
-
 
     def row(self, data: AlleleData) -> List[str]:
         if (vcms := data.cms) and (target_variant := data.cached_variant) and (locus := target_variant.locus) and (contig := locus.contig):
