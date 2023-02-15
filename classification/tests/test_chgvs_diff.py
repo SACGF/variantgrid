@@ -10,6 +10,12 @@ def diff(c1: str, c2: str) -> CHGVSDiff:
 # noinspection SpellCheckingInspection,SpellCheckingInspection
 class CHGVSDiffTests(TestCase):
 
+    def test_c_dot_same(self):
+        self.assertTrue(CHGVS.c_dot_equivalent('c.22G>A', 'c.22G>A'))
+        self.assertTrue(CHGVS.c_dot_equivalent('c.4205_4208del', 'c.4205_4208delTGCC'))
+        self.assertTrue(CHGVS.c_dot_equivalent('c.4205_4208del4', 'c.4205_4208delTGCC'))
+        self.assertFalse(CHGVS.c_dot_equivalent('c.4205_4208del1', 'c.4205_4208del2'))
+
     def test_insert_gene(self):
         cd = diff('NM_000022.3:c.22G>A', 'NM_000022.3(ADA):c.22G>A')
         self.assertEqual(cd, CHGVSDiff.SAME)
@@ -47,6 +53,9 @@ class CHGVSDiffTests(TestCase):
 
         cd = diff('NM_001083961.1(WDR62):c.4205_4208del4', 'NM_001083961.1(WDR62):c.4205_4208delTGCC')
         self.assertEqual(cd, CHGVSDiff.DIFF_RAW_CGVS_EXPANDED)
+
+        cd = diff('NM_001083961.1(WDR62):c.4205_4208del4', 'NM_001083961.1(WDR62):c.4205_4208del1')
+        self.assertEqual(cd, CHGVSDiff.DIFF_RAW_CGVS)
 
         # size has changed
         cd = diff('NM_001083961.1(WDR62):c.4205_4208del4', 'NM_001083961.1(WDR62):c.4205_4208delT')

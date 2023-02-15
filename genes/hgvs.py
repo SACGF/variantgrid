@@ -181,6 +181,41 @@ class CHGVS:
     HGVS_REGEX = re.compile('(.*?)(?:[(](.*?)[)])?:([a-z][.].*)')
     NUM_PART = re.compile('^[a-z][.]([0-9]+)(.*?)$')
 
+    C_DOT_PARTS = re.compile(r'^(?P<pos>.*?)(?P<op>del|dup|ins)(?P<nuc>.*?)(ins(?P<ins>.*?))?$')
+
+    @staticmethod
+    def c_dot_equivalent(c_dot_1: str, c_dot_2: str) -> bool:
+        def is_nucleotides_equiv(nuc1: str, nuc2: str) -> bool:
+            if not nuc1 or not nuc2:
+                # explicit vs non explicit
+                return True
+            if nuc1 == nuc2:
+                return True
+            if nuc1.isnumeric() and not nuc2.isnumeric() and int(nuc1) == len(nuc2):
+                return True
+            if nuc2.isnumeric() and not nuc1.isnumeric() and int(nuc2) == len(nuc1):
+                return True
+            return False
+
+        if c_dot_1 == c_dot_2:
+            return True
+        if (c1_m := CHGVS.C_DOT_PARTS.match(c_dot_1)) and (c2_m := CHGVS.C_DOT_PARTS.match(c_dot_2)):
+            if c1_m.group('pos') != c2_m.group('pos'):
+                return False
+            if c1_m.group('op') != c2_m.group('op'):
+                return False
+            if bool(c1_m.group('ins')) != bool(c2_m.group('ins')):
+                # one is a delins, the other is not
+                return False
+            if not is_nucleotides_equiv(c1_m.group('nuc'), c2_m.group('nuc')):
+                return False
+            if not is_nucleotides_equiv(c1_m.group('ins'), c2_m.group('ins')):
+                return False
+            return True
+        # can't compare, and wasn't exactly the same
+        return False
+
+
     def __init__(self, full_c_hgvs: str, transcript: str = None):
         if transcript:
             transcript = self._clean_transcript(transcript)
@@ -367,33 +402,12 @@ class CHGVS:
             if self.gene.lower() != other.gene.lower():
                 cdiff = cdiff | CHGVSDiff.DIFF_GENE
 
-        def trailing_okay(trail_1, trail_2):
-            if trail_1 == trail_2:
-                return True
-            if not trail_1 or not trail_2:
-                return True
-            if str.isdigit(trailing1) and int(trailing1) == len(trailing2):
-                return True
-            if str.isdigit(trailing2) and int(trailing2) == len(trailing1):
-                return True
-            return False
-
         if self.raw_c != other.raw_c:
-            found_c_diff = False
-            if self.raw_c and other.raw_c:
-                r_regex = re.compile(r"(.*?(?:del|dup|ins))(.*)", re.RegexFlag.IGNORECASE)
-                m1 = r_regex.match(self.raw_c)
-                m2 = r_regex.match(other.raw_c)
-                if m1 and m2 and m1.group(1) == m2.group(1):
-                    # allowed combos
-                    # num and anything, blank and anything
-                    trailing1 = m1.group(2)
-                    trailing2 = m2.group(2)
-                    if trailing_okay(trailing1, trailing2):
-                        found_c_diff = True
-                        cdiff = cdiff | CHGVSDiff.DIFF_RAW_CGVS_EXPANDED
-            if not found_c_diff:
+            if CHGVS.c_dot_equivalent(self.raw_c, other.raw_c):
+                cdiff = cdiff | CHGVSDiff.DIFF_RAW_CGVS_EXPANDED
+            else:
                 cdiff = cdiff | CHGVSDiff.DIFF_RAW_CGVS
+
         return cdiff
 
 
