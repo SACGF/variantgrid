@@ -878,7 +878,7 @@ class HotspotGraphView(TemplateView):
             tv_list = list(sorted(tv_qs, key=lambda tv: (tv.canonical_score, tv.version), reverse=True))
             if tv_list:
                 # First, we look for canonical in our gene annotation release
-                canonical, non_canonical = segment(tv_list, filter=lambda tv: tv.canonical_score)
+                canonical, non_canonical = segment(tv_list, filter_func=lambda tv: tv.canonical_score)
                 if self._prefer_canonical_with_diff_version:
                     SEARCH_ORDER = [
                         ("canonical", canonical, True),

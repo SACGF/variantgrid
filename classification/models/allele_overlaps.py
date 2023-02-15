@@ -362,7 +362,7 @@ class OverlapsCalculator:
 
     @property
     def overlap_sets(self) -> List[OverlapSet]:
-        segmented = segment(self.overlaps, filter=lambda overlap: overlap.is_multi_lab)
+        segmented = segment(self.overlaps, filter_func=lambda overlap: overlap.is_multi_lab)
         return [
             OverlapSet(segmented[0], label="Multi-Lab"),
             OverlapSet(segmented[1], label="Single-Lab"),
