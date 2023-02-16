@@ -288,7 +288,10 @@ class ModelAdminBasics(admin.ModelAdmin):
     def _get_fields(self, request, obj=None, **kwargs) -> List[str]:
         first: List[str] = []
         second: List[str] = []
+        exclude_us = self.exclude or set()
         for f in self.model._meta.fields:
+            if f.name in exclude_us:
+                continue
             if isinstance(f, (AutoField, ForeignKey)):
                 # put ids and foreign keys first
                 # first.append(f.name)

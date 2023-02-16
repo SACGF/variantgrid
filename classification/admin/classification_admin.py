@@ -622,9 +622,10 @@ class DiscordanceReportAdmin(ModelAdminBasics):
 class UploadedClassificationsUnmappedAdmin(ModelAdminBasics):
     list_display = ("pk", "lab", "created", "filename", "validation_summary", "status", "comment")
     list_filter = (('lab', RelatedFieldListFilter), ('status', AllValuesChoicesFieldListFilter))
+    exclude = ('validation_list', )  # excludes validation_list that can be too big
 
     def is_readonly_field(self, f) -> bool:
-        if f.name in ("url", "filename"):
+        if f.name in ("url", "filename", "file_size"):
             return True
         return super().is_readonly_field(f)
 

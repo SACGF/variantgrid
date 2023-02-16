@@ -13,7 +13,8 @@ from django.urls import reverse
 from django.utils.timezone import now
 from django.views import View
 
-from classification.models import ClassificationImportRun, resolve_uploaded_url_to_handle, FileHandle
+from classification.models import ClassificationImportRun, resolve_uploaded_url_to_handle, FileHandle, \
+    UploadedClassificationsUnmappedValidationRow
 from classification.models.uploaded_classifications_unmapped import UploadedClassificationsUnmapped, \
     UploadedClassificationsUnmappedStatus
 from classification.tasks.classification_import_map_and_insert_task import ClassificationImportMapInsertTask
@@ -72,6 +73,19 @@ def view_uploaded_classification_unmapped(request: HttpRequest, uploaded_classif
     })
 
 
+def upload_classification_unmapped_download_validation(request: HttpRequest, uploaded_classification_unmapped_id: int):
+    user = request.user
+    record = UploadedClassificationsUnmapped.objects.filter(pk=uploaded_classification_unmapped_id).filter(
+        lab__in=Lab.valid_labs_qs(user, admin_check=True)).first()
+
+    filename = record.filename
+    if '.' in filename:
+        filename = filename[0:filename.index('.')]
+
+    response = StreamingHttpResponse(UploadedClassificationsUnmappedValidationRow.csv_generator(record.validation_list_objs()), content_type='text/csv')
+    response['Content-Disposition'] = f'attachment; filename="{filename}_validation.csv"'
+    return response
+
 def view_uploaded_classification_unmapped_detail(request: HttpRequest, uploaded_classification_unmapped_id: int):
     user = request.user
     record = UploadedClassificationsUnmapped.objects.filter(pk=uploaded_classification_unmapped_id).filter(
@@ -102,7 +116,7 @@ def view_uploaded_classification_unmapped_detail(request: HttpRequest, uploaded_
 def view_uploaded_classification_unmapped_validation_detail(request: HttpRequest, uploaded_classification_unmapped_id: int):
     user = request.user
     record = UploadedClassificationsUnmapped.objects.filter(pk=uploaded_classification_unmapped_id).filter(
-        lab__in=Lab.valid_labs_qs(user, admin_check=True))
+        lab__in=Lab.valid_labs_qs(user, admin_check=True)).first()
     if not record:
         raise PermissionDenied("You do not have access to this file")
     return render(request, 'classification/uploaded_classifications_unmapped_validation_detail.html', {"record": record})

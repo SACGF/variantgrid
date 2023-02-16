@@ -3,9 +3,11 @@ from typing import Union, Optional, Dict, List, Tuple, Any, Iterable
 
 from django.contrib.auth.models import User
 from django.db import models
+from django.urls import reverse
 from model_utils.models import TimeStampedModel
 
 from classification.models.uploaded_file_types import FileHandle, resolve_uploaded_url_to_handle
+from library.utils import ExportRow, export_column
 from snpdb.models import Lab
 
 
@@ -21,37 +23,36 @@ class UploadedClassificationsUnmappedStatus(models.TextChoices):
     Processed = 'MP', 'Processed'
 
 
-class UploadedClassificationsUnmappedValidationRow:
+class UploadedClassificationsUnmappedValidationRow(ExportRow):
 
     def __init__(self, row: Dict[str, Any]):
         self._row = row
 
-    @property
     def filename(self):
         return self._row.get('file')
 
-    @property
+    @export_column("line number")
     def line_number(self) -> Optional[int]:
         try:
             return int(self._row.get('row'))
         except:
             return None
 
-    @property
-    def filename_line_number(self) -> str:
-        return f"{self.filename or '?'}:{self.line_number or '?'}"
+    @export_column("severity")
+    def severity(self):
+        return self._row.get('severity')
 
     @property
+    def filename_line_number(self) -> str:
+        return f"{self.filename() or '?'}:{self.line_number() or '?'}"
+
+    @export_column("category")
     def category(self):
         return self._row.get('category')
 
-    @property
+    @export_column("message")
     def message(self):
         return self._row.get('message')
-
-    @property
-    def severity(self):
-        return self._row.get('severity')
 
 
 class UploadedClassificationsUnmapped(TimeStampedModel):
@@ -74,9 +75,12 @@ class UploadedClassificationsUnmapped(TimeStampedModel):
     def __str__(self):
         return f"(file_id={self.pk}) {self.lab} {self.filename} {self.created}"
 
-    def validation_list_objs(self) -> Iterable[UploadedClassificationsUnmappedValidationRow]:
+    def get_absolute_url(self):
+        return reverse('classification_upload_unmapped_status', kwargs={'uploaded_classification_unmapped_id': self.pk})
+
+    def validation_list_objs(self) -> List[UploadedClassificationsUnmappedValidationRow]:
         if messages := self.validation_list.get('messages'):
-            return (UploadedClassificationsUnmappedValidationRow(entry) for entry in messages)
+            return [UploadedClassificationsUnmappedValidationRow(entry) for entry in messages]
         return []
 
     @property

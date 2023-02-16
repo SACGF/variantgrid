@@ -6,12 +6,12 @@
     <hr/>
     <h5 class="my-4">Mapping Summary</h5>
     {% for prop in record.validation_summary_properties %}
-        {% labelled label=prop.0|code_to_english %}{{ prop.1 }}{% endlabelled %}
+        {% labelled label=prop.0|code_to_english %}{{ prop.1|value }}{% endlabelled %}
     {% endfor %}
     <hr/>
     <h5 class="my-4">Mapping Validation Messages</h5>
     {% for message_count in record.message_counts %}
-        {% labelled label=message_count.0 %}{{ message_count.1 }}{% endlabelled %}
+        {% labelled label=message_count.0 %}{{ message_count.1|value }}{% endlabelled %}
     {% endfor %}
     {% if record.validation_list %}
         {% if in_progress %}<p class="text-info">Full validation details are available when the import has completed.</p>
