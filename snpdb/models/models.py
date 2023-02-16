@@ -590,8 +590,8 @@ class Lab(models.Model):
         super().save(**kwargs)
         if self.group_name:
             # pre-create the groups
-            self.group
-            self.group_institution
+            _ = self.group
+            _ = self.group_institution
             # TODO assign the lab permissions to the groups
             # but also make sure this doesn't break RunX1
 

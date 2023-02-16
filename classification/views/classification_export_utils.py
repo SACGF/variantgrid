@@ -57,11 +57,11 @@ class KeyProperty:
     key: str
     # warning, naming this variable "property" causes confusion for the compiler below with @property
     # doesn't seem to cause any issues during runtime though
-    property: str
+    prop: str
 
     @property
     def field(self) -> str:
-        return f"published_evidence__{self.key}__{self.property}"
+        return f"published_evidence__{self.key}__{self.prop}"
 
     @property
     def count_key(self) -> str:
@@ -76,11 +76,11 @@ class KeyProperty:
             used_key = UsedKey()
             used_key_dict[self.key] = used_key
 
-        if self.property == 'value':
+        if self.prop == 'value':
             used_key.has_value = True
-        elif self.property == 'note':
+        elif self.prop == 'note':
             used_key.has_note = True
-        elif self.property == 'explain':
+        elif self.prop == 'explain':
             used_key.has_explain = True
 
 
@@ -116,7 +116,7 @@ class UsedKeyTracker:
             properties.append('explain')
         for e_key in self.keys_ignore_exclude:
             for prop in properties:
-                all_props.append(KeyProperty(key=e_key.key, property=prop))
+                all_props.append(KeyProperty(key=e_key.key, prop=prop))
         return all_props
 
     def check_evidence_qs(self, qs: QuerySet[ClassificationModification]):
