@@ -420,7 +420,6 @@ class Searcher:
     def search_within(self, genome_build: Optional[GenomeBuild] = None) -> SearchResults:
         """
         :param genome_build: If provided, only searches that use genome_build will be run, if None will search genome_build agnostic searches
-        :param annotation_consortia: If provided, only annotation consortia searches will be run
         :return: SearchResults
         """
         variant_qs: Optional[QuerySet]

@@ -273,7 +273,7 @@ class ClinVarKey(TimeStampedModel):
 
     def assertion_criteria_vg_to_code(self, vg_value: str) -> Optional[JsonObjType]:
         """
-        :param raw_value: Value as stored in the evidence key
+        :param vg_value: Value as stored in the evidence key
         :return: The code we map to, None indicates we don't have a mapping
         """
         def map_value(raw_value: str):
@@ -377,7 +377,7 @@ class ClinVarKeyExcludePattern(TimeStampedModel):
 
     def __str__(self):
         from classification.models import EvidenceKeyMap
-        return EvidenceKeyMap.cached_key(self.evidence_key).pretty_label + " : " + (self.name or self.pattern_str)
+        return EvidenceKeyMap.cached_key(self.evidence_key).pretty_label + " : " + (self.name or self.pattern)
 
 
 class Country(models.Model):

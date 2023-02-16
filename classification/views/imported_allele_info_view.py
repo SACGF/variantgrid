@@ -163,9 +163,9 @@ class ImportedAlleleInfoColumns(DatatableConfig[ImportedAlleleInfo]):
         if (missing_build := self.get_query_param('missing_build')) and missing_build == 'true':
             # show records where only 1 build is missing
             qs = qs.filter(
-                (Q(latest_validation__validation_tags__builds__missing_37__isnull=False) & \
+                (Q(latest_validation__validation_tags__builds__missing_37__isnull=False) &
                  Q(latest_validation__validation_tags__builds__missing_38__isnull=True)) |
-                (Q(latest_validation__validation_tags__builds__missing_37__isnull=True) & \
+                (Q(latest_validation__validation_tags__builds__missing_37__isnull=True) &
                  Q(latest_validation__validation_tags__builds__missing_38__isnull=False))
             )
 

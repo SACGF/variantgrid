@@ -33,7 +33,7 @@ def _get_panel_app_panel_api_json(panel_app_panel):
     # Panel App isn't very REST-ful - returns 200 for missing data but we'll return 404
     if detail := json_data.get("detail"):
         if detail == "Not found.":
-            raise NotFound(detail=f"PanelApp couldn't find {panel_app_panel.panel_id} ({url})")
+            raise NotFound(detail=f"PanelApp couldn't find {panel_app_panel.panel_id} ({r.url})")
 
     return json_data
 
