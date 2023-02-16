@@ -108,7 +108,7 @@ def create_fake_clinvar_data(clinvar_version: ClinVarVersion):
         "highest_pathogenicity": 5
     }
     ClinVar.objects.get_or_create(version=clinvar_version, variant=variant, defaults=defaults)
-    citation = CitationIdNormalized(source=CitationSource.PUBMED, index=20613862).for_bulk_create()
+    citation = CitationIdNormalized.from_parts(source=CitationSource.PUBMED, index=20613862).for_bulk_create()
     citation.save()
     cvcc, _ = ClinVarCitationsCollection.objects.get_or_create(pk=1)
 

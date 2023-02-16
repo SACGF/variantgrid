@@ -26,7 +26,7 @@ class Command(BaseCommand):
         log_level_choices = invert_dict(dict(LogLevel.CHOICES))
         log_level = log_level_choices.get(severity)
         if log_level is None:
-            raise ArgumentError(f"Severity must be one of '{','.join(log_level_choices.keys())}'")
+            raise ArgumentError(None, f"Severity must be one of '{','.join(log_level_choices.keys())}'")
 
         if clear_all:
             print("Deleting all site messages")

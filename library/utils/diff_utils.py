@@ -194,7 +194,7 @@ class MultiDiffOutput:
         text = input.text or ''
         parts: List[str]
         if match := pattern.match(text):
-            parts = match.groups()
+            parts = list(match.groups())
             return MultiDiffOutput(
                 input=input,
                 parts=parts,

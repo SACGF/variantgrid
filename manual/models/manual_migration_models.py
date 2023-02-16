@@ -54,7 +54,7 @@ class ManualMigrationOutstanding:
 
         outstanding_required = ManualMigrationRequired.objects.filter(task=task, created__gte=last_success_date).order_by('created')
         if not outstanding_required:
-            return False
+            return None
 
         last_attempt = ManualMigrationAttempt.objects.filter(task=task).order_by('-created').first()
         if last_attempt == last_success:

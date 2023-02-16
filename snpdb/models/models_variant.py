@@ -439,7 +439,7 @@ class Variant(models.Model):
     def can_have_annotation(self) -> bool:
         return self.is_standard_variant
 
-    def as_tuple(self) -> VariantCoordinate:
+    def as_tuple(self) -> Tuple[str, int, str, str]:
         return self.locus.contig.name, self.locus.position, self.locus.ref.seq, self.alt.seq
 
     def is_abbreviated(self):

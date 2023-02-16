@@ -39,7 +39,7 @@ class ClinVarCompareValue(int, Enum):
             ClinVarCompareValue.AGREEMENT: "agreement",
             ClinVarCompareValue.NOVEL: "novel",
             ClinVarCompareValue.NOT_CALCULATED: "error"
-        }[self.value]
+        }[self]
 
     def __str__(self):
         return f"{self.value} {self.label}"

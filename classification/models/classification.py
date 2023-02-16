@@ -581,7 +581,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         return Classification.objects.filter(lab__external=False, withdrawn=False).exclude(lab__name__icontains='legacy').exclude(share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS).count()
 
     @staticmethod
-    def dashboard_report_classifications_of_interest(since) -> Iterable[ClassificationOutstandingIssues]:
+    def dashboard_report_classifications_of_interest(since) -> List[ClassificationOutstandingIssues]:
         min_age = datetime.utcnow().replace(tzinfo=timezone.utc) - timedelta(
             minutes=2)  # give records 2 minutes to matching properly before reporting
 

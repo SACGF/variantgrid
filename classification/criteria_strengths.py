@@ -1,7 +1,7 @@
 from collections import defaultdict
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Optional, Iterable, List, Union, Set, Dict
+from typing import Optional, Iterable, List, Union, Set, Dict, Tuple
 
 from django.utils.safestring import SafeString
 
@@ -90,7 +90,7 @@ class CriteriaStrength:
         return format(self)
 
     @property
-    def _sort_key(self) -> int:
+    def _sort_key(self) -> Tuple[int, str]:
         index = 0
         try:
             index = CriteriaEvaluation.ALL_STRENGTHS.index(self.strength)

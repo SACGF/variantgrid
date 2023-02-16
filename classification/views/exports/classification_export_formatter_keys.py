@@ -168,7 +168,7 @@ class ClassificationExportFormatterKeys(ClassificationExportFormatter):
         )
 
     def header(self) -> List[str]:
-        return None
+        return []
 
     def row(self, data: AlleleData) -> List[str]:
         self.rows_with_errors += len([issue for issue in data.all_cms if issue.validation_include])
@@ -185,6 +185,7 @@ class ClassificationExportFormatterKeys(ClassificationExportFormatter):
             for key, counter in self.key_counters.items():
                 blob = data.get(key)
                 counter.count(blob, source=classification.id)
+        return []
 
     def footer(self) -> List[str]:
         self.row_count = 1

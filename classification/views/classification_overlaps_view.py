@@ -5,8 +5,8 @@ from typing import Optional, Union
 from django.conf import settings
 from django.db import transaction
 from django.http.request import HttpRequest
+from django.http.response import HttpResponseBase
 from django.shortcuts import render, redirect, get_object_or_404
-from requests.models import Response
 
 from classification.models import ClassificationRef
 from classification.models.allele_overlaps import OverlapsCalculator
@@ -19,7 +19,7 @@ from snpdb.models import Allele
 from snpdb.models.models_variant import Variant
 
 
-def view_overlaps(request: HttpRequest, lab_id=None) -> Response:
+def view_overlaps(request: HttpRequest, lab_id=None) -> HttpResponseBase:
     lab_picker = LabPickerData.from_request(request, lab_id, 'overlaps')
     if redirect_response := lab_picker.check_redirect():
         return redirect_response
@@ -27,7 +27,7 @@ def view_overlaps(request: HttpRequest, lab_id=None) -> Response:
     return render(request, "classification/overlaps.html", {"lab_picker_data": lab_picker})
 
 
-def view_overlaps_detail(request: HttpRequest, lab_id: Optional[Union[str, int]] = None) -> Response:
+def view_overlaps_detail(request: HttpRequest, lab_id: Optional[Union[str, int]] = None) -> HttpResponseBase:
     return render(request, "classification/overlaps_detail.html", {
         "overlaps": OverlapsCalculator(perspective=LabPickerData.from_request(request, lab_id))
     })
@@ -36,7 +36,7 @@ def view_overlaps_detail(request: HttpRequest, lab_id: Optional[Union[str, int]]
 # POST only
 
 @transaction.atomic()
-def post_clinical_context(request: HttpRequest) -> Response:
+def post_clinical_context(request: HttpRequest) -> HttpResponseBase:
 
     came_from_variant_id = request.POST.get('variant')
     came_from_allele_id = request.POST.get('allele')
@@ -83,7 +83,7 @@ def post_clinical_context(request: HttpRequest) -> Response:
 
 
 @require_superuser
-def view_clinical_context(request: HttpRequest, pk: int) -> Response:
+def view_clinical_context(request: HttpRequest, pk: int) -> HttpResponseBase:
     cc = get_object_or_404(ClinicalContext, pk=pk)
     user = request.user
     context = {"cc": cc, "timezone": settings.TIME_ZONE}

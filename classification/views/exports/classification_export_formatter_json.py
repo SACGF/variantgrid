@@ -1,6 +1,6 @@
 import json
 from functools import cached_property
-from typing import List
+from typing import List, Optional
 
 from django.http import HttpRequest
 
@@ -48,7 +48,7 @@ class ClassificationExportFormatterJSON(ClassificationExportFormatter):
     def footer(self) -> List[str]:
         return ["]}"]
 
-    def to_row(self, vcm: ClassificationModification, withdrawn: bool) -> str:
+    def to_row(self, vcm: ClassificationModification, withdrawn: bool) -> Optional[str]:
         json_values = vcm.as_json(self.json_params)
         if 'fatal_error' in json_values:
             return None

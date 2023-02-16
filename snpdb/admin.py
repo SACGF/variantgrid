@@ -162,7 +162,7 @@ class ClinVarKeyAdmin(ModelAdminBasics):
     @admin_action("ClinVar Export Prepare")
     def prepare_clinvar(self, request, queryset):
         from classification.models.clinvar_export_prepare import ClinvarExportPrepare
-        report = ClinvarExportPrepare().update_export_records_for_keys(list(queryset.all()))
+        report = ClinvarExportPrepare().update_export_records_for_keys(set(queryset.all()))
         if len(report) > 10:
             self.message_user(request, message="Showing first 10 messages", level=messages.INFO)
         for report_row in report[0:10]:

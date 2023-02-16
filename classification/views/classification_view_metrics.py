@@ -3,7 +3,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from datetime import timedelta, datetime
 from functools import cached_property, reduce
-from typing import Any, List, Callable, TypeVar, Generic, Optional
+from typing import Any, List, Callable, TypeVar, Generic, Optional, Type
 
 from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
@@ -94,7 +94,7 @@ class ViewEventCounts:
         return sorted((Counted(pk, count, resolver) for pk, count in id_to_count.items()), reverse=True)
 
     @staticmethod
-    def resolver_for_model(model: Model):
+    def resolver_for_model(model: Type[Model]):
         def resolver(pk: Any):
             if pk:
                 if first := model.objects.filter(pk=pk).first():

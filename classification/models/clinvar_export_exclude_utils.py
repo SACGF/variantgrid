@@ -158,7 +158,7 @@ class ClinVarExcludePatternUtil:
             is_last_published=True
         )
 
-    def ignore_pattern_for(self, record: EvidenceMixin) -> ExcludeRecord:
+    def ignore_pattern_for(self, record: ClassificationModification) -> ExcludeRecord:
         return ExcludeRecord(record, self.matching_exclude_patterns(record))
 
     def run_all(self, apply: bool) -> Dict[ExcludeStatus, List[int]]:

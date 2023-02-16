@@ -129,7 +129,7 @@ class Citation(TimeStampedModel):
         return self.id.replace(":", ": ")
 
     @property
-    def _first_and_single_author(self) -> Tuple[str, str]:
+    def _first_and_single_author(self) -> Tuple[str, bool]:
         first_author = self.authors_short
         single_author = self.authors_short == self.authors
         if self.authors and not first_author:
@@ -140,11 +140,11 @@ class Citation(TimeStampedModel):
         return first_author, single_author
 
     @property
-    def first_author(self):
+    def first_author(self) -> str:
         return self._first_and_single_author[0]
 
     @property
-    def single_author(self):
+    def single_author(self) -> bool:
         return self._first_and_single_author[1]
 
     @property

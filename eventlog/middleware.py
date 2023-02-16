@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Any
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -93,7 +93,7 @@ class PageViewsMiddleware:
                         all_params = {**view_kwargs}
                         for key, value in {**request.GET.dict(), **request.POST.dict()}.items():
                             key: str
-                            value: str
+                            value: Any
                             if value.lower() == "true":
                                 value = True
                             elif value.lower() == "false":

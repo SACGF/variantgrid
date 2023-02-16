@@ -47,10 +47,10 @@ class JsonMessages:
 
     messages: List[JsonMessage] = field(default_factory=list)
 
-    def errors(self) -> List[JsonMessage]:
+    def errors(self) -> 'JsonMessages':
         return JsonMessages(messages=[mess for mess in self.messages if mess.severity == "error"])
 
-    def warnings(self) -> List[JsonMessage]:
+    def warnings(self) -> 'JsonMessages':
         return JsonMessages(messages=[mess for mess in self.messages if mess.severity == "warning"])
 
     @staticmethod

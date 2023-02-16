@@ -132,7 +132,7 @@ class ExportRow:
         return export_methods
 
     @classmethod
-    def _data_generator(cls, data: Iterable[Any]) -> Iterator[Any]:
+    def _data_generator(cls: Type, data: Iterable[Any]) -> Iterator[Any]:
         for row_data in data:
             if row_data is None:
                 continue

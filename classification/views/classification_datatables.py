@@ -28,7 +28,7 @@ ALLELE_KNOWN_VALUES = ALLELE_GERMLINE_VALUES + ALLELE_SOMATIC_VALUES
 class ClassificationColumns(DatatableConfig[ClassificationModification]):
 
     def render_c_hgvs(self, row: Dict[str, Any]) -> JsonDataType:
-        def get_preferred_chgvs_json() -> CHGVS:
+        def get_preferred_chgvs_json() -> Dict:
             nonlocal row
             for index, genome_build in enumerate(self.genome_build_prefs):
                 if c_hgvs_string := row.get(ClassificationModification.column_name_for_build(genome_build)):

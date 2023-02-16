@@ -100,7 +100,7 @@ class IteratorFile:
             self.next_chunk = None
             return rv
 
-    def readline(self) -> str:
+    def readline(self) -> Optional[str]:
         if self.next_chunk is None:
             return None
         try:

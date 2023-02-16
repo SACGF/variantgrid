@@ -8,6 +8,7 @@ from django.contrib import admin, messages
 from django.db import models
 from django.db.models import AutoField, ForeignKey, DateTimeField, Model
 from django.http import HttpResponse, StreamingHttpResponse, HttpResponseRedirect
+from django.http.response import HttpResponseBase
 from django.urls import path, NoReverseMatch, reverse
 from django.utils.encoding import smart_str
 from django_json_widget.widgets import JSONEditorWidget
@@ -154,7 +155,7 @@ def inject_self_to_decorated(wrapped, self_instance):
         return wrapped
 
 
-def export_as_csv(modeladmin, request, queryset) -> HttpResponse:
+def export_as_csv(modeladmin, request, queryset) -> HttpResponseBase:
     """
     Action to be provided against all models
     """

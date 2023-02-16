@@ -192,7 +192,7 @@ class ClassificationApiExportView(APIView):
         orgs = [o for o in orgs if o]
         return orgs
 
-    def get(self, request: Request, **kwargs) -> HttpResponseBase:
+    def get(self, request: HttpRequest, **kwargs) -> HttpResponseBase:
         # will throw a UnsupportedExportType if
         return serve_export(request)
 

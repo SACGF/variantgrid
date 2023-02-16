@@ -487,7 +487,7 @@ class Lab(models.Model):
         return self.group.user_set.filter(is_active=True)
 
     @cached_property
-    def lab_users(self) -> List[User]:
+    def lab_users(self) -> List[LabUser]:
         users = list(self.group.user_set.filter(is_active=True))
         heads = set(self.labhead_set.values_list('user_id', flat=True))
         lab_users: List[LabUser] = []
