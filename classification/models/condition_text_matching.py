@@ -590,8 +590,6 @@ class ConditionMatchingSuggestion:
                 if term.is_stub:
                     if term.ontology_service in OntologyService.LOCAL_ONTOLOGY_PREFIXES:
                         text = f"{term.id} : no copy of this term in our system"
-                        if term.ontology_service == OntologyService.OMIM:
-                            text += f". {settings.SITE_NAME} only stores 'phenotype' OMIM terms. Maybe this term is an OMIM gene?"
 
                         self.add_message(ConditionMatchingMessage(severity="warning", text=text))
                     else:

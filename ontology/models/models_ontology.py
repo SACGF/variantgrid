@@ -414,8 +414,11 @@ class OntologyTerm(TimeStampedModel):
         If the OntologyTerm doesn't exist in the database, will create an OntologyTerm but
         WONT persist it to the database
         """
-        if not isinstance(id_str, OntologyIdNormalized):
+        if isinstance(id_str, OntologyIdNormalized):
+            normal_id = id_str
+        else:
             normal_id = OntologyIdNormalized.normalize(id_str)
+
         if normal_id.clean:
             if existing := OntologyTerm.objects.filter(id=normal_id.full_id).first():
                 return existing

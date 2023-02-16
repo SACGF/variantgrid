@@ -114,10 +114,11 @@ class ConditionTextMatchingAPI(APIView):
 
         data = request.data.get("changes")
         ctm: Optional[ConditionTextMatch] = None
-        errors: List[str] = []
+        all_errors: List[str] = []
         for update in data:
             terms = update.get('terms')
             valid_terms: List[str] = []
+            errors: List[str] = []
             if terms:
                 terms = [term.strip() for term in terms]
                 for term in terms:
@@ -127,30 +128,30 @@ class ConditionTextMatchingAPI(APIView):
                             valid_terms.append(om.id)
                         except ValueError:
                             errors.append(f'"{term}" is not a valid ontology term.')
+            all_errors += errors
+            if not errors:
+                ctm = ct.conditiontextmatch_set.get(pk=update.get('ctm_id'))
+                ctm.condition_xrefs = valid_terms
+                ctm.condition_multi_operation = MultiCondition(update.get('joiner') or MultiCondition.NOT_DECIDED)
+                ctm.last_edited_by = request.user
+                ctm.save()
 
-        if not errors:
-            ctm = ct.conditiontextmatch_set.get(pk=update.get('ctm_id'))
-            ctm.condition_xrefs = valid_terms
-            ctm.condition_multi_operation = MultiCondition(update.get('joiner') or MultiCondition.NOT_DECIDED)
-            ctm.last_edited_by = request.user
-            ctm.save()
-
-            update_condition_text_match_counts(ct)
-            ct.save()
+                update_condition_text_match_counts(ct)
+                ct.save()
 
         if len(data) == 1 and ctm and not ctm.is_root and not (ctm.is_gene_level and not ctm.condition_xrefs):
             # if we only have 1 suggestion, and it's not the root, and isn't a blanked out record with empty conditions
             cms = ConditionMatchingSuggestion(ctm)
             cms.validate()
             return Response({
-                "errors": errors,
+                "errors": all_errors,
                 "suggestions": [cms.as_json()],
                 "count_outstanding": ct.classifications_count_outstanding
             })
         else:
             suggestions = condition_matching_suggestions(ct)
             return Response({
-                "errors": errors,
+                "errors": all_errors,
                 "suggestions": [cms.as_json() for cms in suggestions],
                 "count_outstanding": ct.classifications_count_outstanding
             })
