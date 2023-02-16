@@ -3,6 +3,7 @@ from typing import List, Optional
 from django.conf import settings
 from django.db import models
 from django.db.models.deletion import CASCADE
+from django.utils.timesince import timesince
 from django_extensions.db.models import TimeStampedModel
 
 from sync.models.enums import SyncStatus
@@ -50,10 +51,10 @@ class SyncDestination(models.Model):
             else:
                 time_since_last_success = "never"
 
-            sd_info = f"{sync_destination} - last success: {time_since_last_success}"
+            sd_info = f"{self} - last success: {time_since_last_success}"
             if last_attempt != last_success:
                 sd_info += f", last attempt: {time_since_last_attempt}"
-            if not sync_destination.enabled:
+            if not self.enabled:
                 sd_info += " (*currently disabled*)"
 
         return sd_info
@@ -63,7 +64,7 @@ class SyncDestination(models.Model):
         reports = []
         for sd in SyncDestination.objects.order_by("pk").all():
             if report := sd.report():
-                repors.append(report)
+                reports.append(report)
         return reports
 
     def __str__(self):
