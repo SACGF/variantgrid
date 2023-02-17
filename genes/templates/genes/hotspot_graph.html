@@ -272,7 +272,12 @@
                 annotations: annotations,
             };
 
-            Plotly.newPlot(selector, data, layout);
+            let config = {
+                showLink: true,
+                plotlyServerURL: "https://chart-studio.plotly.com"
+            };
+
+            Plotly.newPlot(selector, data, layout, config);
 
             let myPlot = document.getElementById(selector);
             myPlot.on('plotly_click', function (data) {
