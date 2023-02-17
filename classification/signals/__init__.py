@@ -1,3 +1,4 @@
+from classification.signals.classification_health_checks import *   # so we load the receivers
 from classification.signals.classification_hooks_assign_owner import *   # so we load the receivers
 from classification.signals.classification_hooks_discordance_notifications import *
 from classification.signals.classification_hooks_discordance_status import *  # so we load the receivers
