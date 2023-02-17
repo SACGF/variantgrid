@@ -247,7 +247,7 @@ def get_variant_allele_for_variant(genome_build: GenomeBuild, variant: Variant,
             va = VariantAllele.objects.create(variant_id=variant.pk,
                                               genome_build=genome_build,
                                               allele=allele,
-                                              origin=AlleleOrigin.variant_origin(variant, genome_build))
+                                              origin=AlleleOrigin.variant_origin(variant, allele, genome_build))
     return va
 
 
@@ -281,7 +281,7 @@ def variant_allele_clingen(genome_build, variant, existing_variant_allele=None,
             va = VariantAllele.objects.create(variant_id=variant.pk,
                                               genome_build=genome_build,
                                               allele=allele,
-                                              origin=AlleleOrigin.variant_origin(variant, genome_build),
+                                              origin=AlleleOrigin.variant_origin(variant, allele, genome_build),
                                               error=api_response)
 
     else:
@@ -400,7 +400,7 @@ def link_allele_to_existing_variants(allele: Allele, conversion_tool,
                     raise
 
             if variant:
-                defaults = {"origin": AlleleOrigin.variant_origin(variant, genome_build),
+                defaults = {"origin": AlleleOrigin.variant_origin(variant, allele, genome_build),
                             "conversion_tool": conversion_tool}
                 va, _ = VariantAllele.objects.get_or_create(variant=variant,
                                                             genome_build=genome_build,
