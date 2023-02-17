@@ -148,7 +148,10 @@ class AllClassificationsAlleleSource(TimeStampedModel, AlleleSource):
         # Note: This deliberately only gets classifications where the submitting variant was against this genome build
         # ie we don't use Classification.get_variant_q_from_classification_qs() to get liftovers
         contigs_q = Variant.get_contigs_q(self.genome_build)
-        return Variant.objects.filter(contigs_q, classification__isnull=False)
+
+        not_lifted_over_variant_ids = ImportedAlleleInfo.objects.filter(matched_variant__isnull=False, allele__isnull=True).values_list('allele_id', flat=True)
+
+        return Variant.objects.filter(contigs_q, id__in=not_lifted_over_variant_ids)
 
     def liftover_complete(self, genome_build: GenomeBuild):
         ImportedAlleleInfo.relink_variants()
