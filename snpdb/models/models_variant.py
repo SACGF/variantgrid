@@ -326,7 +326,7 @@ class Variant(models.Model):
         return Q(locus__contig__name__iexact=chrom) | Q(locus__contig__ucsc_name__iexact=chrom)
 
     @staticmethod
-    def get_contigs_q(genome_build: GenomeBuild):
+    def get_contigs_q(genome_build: GenomeBuild) -> Q:
         """ Restrict to contigs in a genome build """
         return Q(locus__contig__genomebuildcontig__genome_build=genome_build)
 

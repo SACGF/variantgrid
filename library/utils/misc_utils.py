@@ -63,6 +63,7 @@ def is_not_none(obj):
 
 class ChoicesEnum(Enum):
     """
+    Deprecated: Use models.TextChoices now instead
     Extend this for enums that are going to work as Choices for models
     """
 

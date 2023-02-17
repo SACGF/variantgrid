@@ -4,7 +4,8 @@ from typing import Optional
 from django.contrib import messages
 from django.db.models import Q
 from django.db.models.functions import Length
-from django.http import StreamingHttpResponse
+from django.http import StreamingHttpResponse, HttpRequest
+from django.http.response import HttpResponseBase
 from django.shortcuts import render
 
 from classification.models import ConditionText, top_level_suggestion, condition_matching_suggestions, \
@@ -18,7 +19,7 @@ from ontology.models import OntologySnake, OntologyVersion, OntologyTermStatus, 
 from ontology.ontology_matching import OntologyMatching, SearchText, normalize_condition_text
 
 
-def condition_match_test_download_view(request):
+def condition_match_test_download_view(request: HttpRequest) -> HttpResponseBase:
 
     def result_iterator():
         try:
