@@ -1,19 +1,13 @@
-from collections import defaultdict
 from dataclasses import dataclass
 from enum import Enum
 from functools import cached_property
-from typing import List, Iterable, Optional, Dict, Tuple, Set, Any, Mapping
-
+from typing import List, Iterable, Optional, Dict, Set, Any, Mapping
 from django.contrib.auth.models import User
 from django.db.models import Count
 from django.db.models.query import QuerySet
-
-from classification.enums import SpecialEKeys
 from classification.models.classification import ClassificationModification
 from classification.models.evidence_key import EvidenceKeyMap, EvidenceKey
 from genes.hgvs import CHGVS
-from library.log_utils import report_message
-from snpdb.models.models_genome import GenomeBuild
 
 
 class KeyValueFormatter:
@@ -257,74 +251,3 @@ class TranscriptGroup:
     @property
     def chgvs(self):
         return self.highest_transcript_chgvs
-
-
-class AlleleGroup:
-    """
-    A bunch of records linked to variants with the same allele
-    Also contains a "target_variant" from the desired genome_build
-    """
-
-    def __init__(self, source: 'ExportFormatter', allele_id: int, allele_flag_collection_id: int, genome_build: GenomeBuild):
-        self.source = source
-        self.allele_id = allele_id
-        self.allele_flag_collection_id = allele_flag_collection_id
-        self.target_variant = None
-        self.genome_build = genome_build
-        self.variant_ids = []
-        self.data: List[ClassificationModification] = []
-        self.withdrawn: List[ClassificationModification] = []
-        self.failed: List[ClassificationModification] = []
-        self.source = source
-
-    def filter_out_transcripts(self, transcripts: Set[str]) -> List[ClassificationModification]:
-        """
-        Returns ClassificationModificats there weren't included due to errors
-        """
-        passes: List[ClassificationModification] = []
-        fails: List[ClassificationModification] = []
-
-        for vcm in self.data:
-            if vcm.transcript in transcripts:
-                fails.append(vcm)
-            else:
-                passes.append(vcm)
-        if fails:
-            self.data = passes
-
-        return fails
-
-    def liftover(self, vcm: ClassificationModification) -> CHGVS:
-        chgvs_str = vcm.classification.get_c_hgvs(self.genome_build, use_full=self.source.use_full_chgvs)
-        if not chgvs_str:
-            raise ValueError(f"Unable to generate c.hgvs full={self.source.use_full_chgvs}, this record should have been filtered out")
-        return CHGVS(vcm.classification.get_c_hgvs(self.genome_build, use_full=self.source.use_full_chgvs))
-
-    def iter_c_hgvs(self) -> Iterable[Tuple[CHGVS, List[ClassificationModification]]]:
-        by_transcript: Dict[CHGVS, List[ClassificationModification]] = defaultdict(list)
-
-        for vcm in self.data:
-            c_parts = self.liftover(vcm)
-            if c_parts:
-                by_transcript[c_parts].append(vcm)
-
-        for c_hgvs, vcms in by_transcript.items():
-            yield c_hgvs, vcms
-
-    def iter_c_hgvs_versionless_transcripts(self) -> Iterable[Tuple[CHGVS, List[VariantWithChgvs]]]:
-        by_versionless_transcript: Dict[str, TranscriptGroup] = defaultdict(TranscriptGroup)
-
-        for vcm in self.data:
-            c_parts = self.liftover(vcm)
-            if c_parts:
-                transcript_parts = c_parts.transcript_parts
-                if transcript_parts:
-                    transcript_no_version = transcript_parts.identifier
-                    by_versionless_transcript[transcript_no_version].add(VariantWithChgvs(vcm=vcm, chgvs=c_parts))
-                else:
-                    report_message('MVL export : Could not extract transcript from c.hgvs', extra_data={'chgvs': c_parts.full_c_hgvs})
-            else:
-                report_message('MVL export : Could not liftover', extra_data={'imported_chgvs': vcm.get(SpecialEKeys.C_HGVS), 'id': vcm.classification_id})
-
-        for _, transcript_groups in by_versionless_transcript.items():
-            yield transcript_groups.highest_transcript_chgvs, transcript_groups.vcmcs
