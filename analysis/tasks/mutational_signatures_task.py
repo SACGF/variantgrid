@@ -17,7 +17,6 @@ def calculate_mutational_signature(sample_id):
     sample = Sample.objects.get(pk=sample_id)
 
     ms = MutationSignatures(sigdatafile=settings.MUTATIONAL_SIGNATURE_DATA_FILE,
-                            siginfofile=settings.MUTATIONAL_SIGNATURE_INFO_FILE,
                             iterations=settings.MUTATIONAL_SIGNATURE_ITERATIONS,
                             sampling=settings.MUTATIONAL_SIGNATURE_SAMPLING_FRACTION)
 

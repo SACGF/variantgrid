@@ -53,7 +53,8 @@ class Command(BaseCommand):
         self._validate_has_required_data()
 
         if options["add_new_to_existing"]:
-            self._add_new_columns_to_existing()
+            ontology_version = self._get_ontology_version(ov_id)
+            self._add_new_columns_to_existing(ontology_version)
             return
 
         dbnsfp_gene_version = DBNSFPGeneAnnotationVersion.objects.all().order_by("created").last()
@@ -71,16 +72,7 @@ class Command(BaseCommand):
             return
 
         if gar_id:
-            if num_ontology_versions := OntologyVersion.objects.all().count():
-                if num_ontology_versions == 1:
-                    ontology_version = OntologyVersion.objects.get()
-                elif ov_id:
-                    ontology_version = OntologyVersion.objects.get(pk=ov_id)
-                else:
-                    raise ValueError("You must specify ontology-version when gene-annotation-release is specified "
-                                     "and more than 1 ontology version exists")
-            else:
-                raise ValueError("No ontology versions - you need to import this first (see annotation page)")
+            ontology_version = self._get_ontology_version(ov_id)
 
             if dbnsfp_gene_version_id:
                 dbnsfp_gene_version = DBNSFPGeneAnnotationVersion.objects.get(pk=dbnsfp_gene_version_id)
@@ -118,6 +110,20 @@ class Command(BaseCommand):
 
                 gav = self._create_gene_annotation_version(gar, av.ontology_version, dbnsfp_gene_version)
                 self._populate_gene_annotation_version(gav, gene_symbols)
+
+    @staticmethod
+    def _get_ontology_version(ov_id):
+        if num_ontology_versions := OntologyVersion.objects.all().count():
+            if num_ontology_versions == 1:
+                ontology_version = OntologyVersion.objects.get()
+            elif ov_id:
+                ontology_version = OntologyVersion.objects.get(pk=ov_id)
+            else:
+                raise ValueError("You must specify ontology-version when gene-annotation-release is specified "
+                                 "and more than 1 ontology version exists")
+        else:
+            raise ValueError("No ontology versions - you need to import this first (see annotation page)")
+        return ontology_version
 
     @staticmethod
     def _validate_has_required_data():
@@ -158,7 +164,7 @@ class Command(BaseCommand):
                 print(f"Updating {len(gene_annotation)} records....")
                 GeneAnnotation.objects.bulk_update(gene_annotation, ["dbnsfp_gene_id"], batch_size=2000)
 
-    def _add_new_columns_to_existing(self):
+    def _add_new_columns_to_existing(self, ontology_version):
         """ As we only added not changed columns, can just populate existing annotation """
         UPDATE_COLUMNS = ["mondo_terms", "gene_disease_moderate_or_above", "gene_disease_supportive_or_below"]
 
@@ -180,7 +186,8 @@ class Command(BaseCommand):
                                                                           max_depth=0)
                 uc_symbol = gene_symbol.upper()
                 hgnc_data[uc_symbol]["mondo_terms"] = self.TERM_JOIN_STRING.join((str(lt) for lt in snake.leafs()))
-                hgnc_data[uc_symbol]["gene_disease"] = self._get_gene_disease(gene_symbol, Command.TERM_JOIN_STRING)
+                hgnc_data[uc_symbol]["gene_disease"] = self._get_gene_disease(ontology_version,
+                                                                              gene_symbol, Command.TERM_JOIN_STRING)
 
             gene_annotation = []
             for uc_symbol, data in hgnc_data.items():

@@ -75,7 +75,7 @@ def handle_vep_warnings(annotation_run: AnnotationRun, bulk_inserter):
                 elif re.match(r"WARNING: VCF line on line \d+ looks incomplete, skipping:", line):
                     next_line_incomplete = True
                 elif next_line_incomplete:
-                    if m := re.match(r".*variant_id=(\d+)"):
+                    if m := re.match(r".*variant_id=(\d+)", line):
                         incomplete_variant_ids.add(int(m.group(1)))
                     next_line_incomplete = False
 
