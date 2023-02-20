@@ -195,8 +195,6 @@ function transcriptFunc(transcriptId, data) {
         applyValue(name, value);
     });
 
-    handlePubMedLinks(data.pubmed);
-
     formatField($("#cosmic_id"), cosmicLink);
     formatField($("#cosmic_legacy_id"), cosmicLink);
     formatField($("#gnomad_gene_constraint_retrieval"), gnomadGeneConstraintRetrieval);
@@ -445,6 +443,9 @@ $(document).ready(function() {
         populateVariantAllele({link_data: linkData});
     {% endif %}
     }
+
+    handlePubMedLinks("{{ variant_annotation.pubmed }}");
+    formatField($("#dbsnp_rs_id"), formatDBSNP);
 
     // load hardcoded values through
     applyVariantValues();

@@ -532,6 +532,46 @@ function formatClinGenAlleleId(cellValue) {
 }
 
 
+function splitAndLink(rawValue, split, buildLinkFunc) {
+    let formattedValue = '';
+    if (rawValue) {
+        const raw_value_list = rawValue.split(split);
+        const links = [];
+        for(let i=0 ; i<raw_value_list.length ; ++i) {
+            let value = raw_value_list[i];
+            links.push(buildLinkFunc(value));
+        }
+        formattedValue = links.join();
+    }
+    return formattedValue;
+}
+
+function formatDBSNP(dbsnp_rs_ids) {
+    function buildDBSNPLink(dbsnp_id) {
+        return "<a title='View dbSNP in new window' target='_blank' href='https://www.ncbi.nlm.nih.gov/snp/" + dbsnp_id + "'>" + dbsnp_id + "</a>"
+    }
+    return splitAndLink(dbsnp_rs_ids, "&", buildDBSNPLink);
+}
+
+
+function formatPubMed(pubmed) {
+    function buildPubMedLink(pubmed_id) {
+        return "<a title='View PubMed article in new window' target='_blank' href='https://pubmed.ncbi.nlm.nih.gov/" + pubmed_id + "'>" + pubmed_id + "</a>"
+    }
+    return splitAndLink(pubmed, "&", buildPubMedLink);
+}
+
+
+function formatOntologyTerms(ontology_terms) {
+    function buildOntologyTermLink(ontology_term) {
+        let termSlug = ontology_term.split(" ")[0].replace(":", "_");
+        let url = Urls.ontology_term(termSlug);
+        return "<a title='View Ontology Term in new window' target='_blank' href='" + url + "'>" + ontology_term + "</a>"
+    }
+    return splitAndLink(ontology_terms, " | ", buildOntologyTermLink);
+}
+
+
 function unitAsPercentFormatter(unitValue) {
     let percentValue = "";
     // Allele Frequency missing data passed as "." to match VCF
@@ -552,6 +592,9 @@ jQuery.extend($.fn.fmatter , {
     'cosmicLink' : cosmicLink,
     'omimLink' : omimLink,
     'formatClinGenAlleleId': formatClinGenAlleleId,
+    'formatDBSNP': formatDBSNP,
+    'formatOntologyTerms': formatOntologyTerms,
+    'formatPubMed': formatPubMed,
     'geneSymbolLink' : geneSymbolLink,
     'geneSymbolNewWindowLink' : geneSymbolNewWindowLink,
     'gnomadFilteredFormatter' : gnomadFilteredFormatter,
