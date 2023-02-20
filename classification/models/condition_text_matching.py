@@ -784,14 +784,13 @@ def search_text_to_suggestion(search_text: SearchText, term: OntologyTerm) -> Co
             if term.ontology_service == OntologyService.MONDO:
                 if omim_term := OntologyTermRelation.as_omim(term):
                     omim_name = omim_term.name
-                    for part in [p.strip() for p in omim_name.split(';')]:
-                        # TODO, determine if we want to check the 2nd part of the OMIM (the acronymn part)
-                        # as it can be quite ambiguous but we're still checking the gene symbol
-                        if search_text.effective_equals(SearchText(part)):
-                            safe_alias = True  # still mark it as True so we don't have a validation message
-                            cms.alias_index = match_info.alias_index
-                            cms.matched_via_alias_and_exact_term = omim_term.id
-                            break
+                    parts = [p.strip() for p in omim_name.split(';')]
+                    full_name = parts[0]
+                    # we could loop through all the name parts, but don't want to as the OMIM acronymn is a little too ambigious
+                    if search_text.effective_equals(SearchText(full_name)):
+                        safe_alias = True  # still mark it as True so we don't have a validation message
+                        cms.alias_index = match_info.alias_index
+                        cms.matched_via_alias_and_exact_term = omim_term.id
 
             if not safe_alias:
                 cms.add_message(ConditionMatchingMessage(severity="info", text=f"Text matched on alias of {term.id}"))
