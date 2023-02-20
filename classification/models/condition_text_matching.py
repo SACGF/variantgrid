@@ -488,6 +488,9 @@ class ConditionMatchingSuggestion:
         self.alias_index: Optional[int] = None
         """ If not null, the index of the alias of the term we matched via text, useful to determine auto-assign """
 
+        self.matched_via_alias_and_exact_term: Optional[str] = None
+        """ If not null, the ID of a term from another ontology that this text matched """
+
         self.merged = False
         """ Was this suggestion merged, e.g. if there was an condition text 'BAM' that matched Best At Motoneuron and Blood Attacked Myliver """
 
@@ -532,7 +535,7 @@ class ConditionMatchingSuggestion:
             if len(terms) != 1:
                 return False
 
-            if self.alias_index is not None:
+            if self.alias_index is not None and self.matched_via_alias_and_exact_term is None:
                 return False
 
             for message in self.messages:
@@ -639,7 +642,7 @@ def check_for_withdrawn(sender, flag_comment: FlagComment, old_resolution: FlagR
             ConditionTextMatch.sync_condition_text_classification(cl.last_published_version, attempt_automatch=True, update_counts=True)
 
 
-@timed_cache(size_limit=2)
+# @timed_cache(size_limit=2)
 def top_level_suggestion(text: str) -> ConditionMatchingSuggestion:
     """ Make a suggestion at the root level for the given normalised text """
     if suggestion := embedded_ids_check(text):
@@ -777,6 +780,19 @@ def search_text_to_suggestion(search_text: SearchText, term: OntologyTerm) -> Co
                 if alias in [name_part.strip() for name_part in term.name.split(";")]:
                     # alias is part one of the name parts, would barely refer to it as an alias
                     safe_alias = True
+
+            if term.ontology_service == OntologyService.MONDO:
+                if omim_term := OntologyTermRelation.as_omim(term):
+                    omim_name = omim_term.name
+                    for part in [p.strip() for p in omim_name.split(';')]:
+                        # TODO, determine if we want to check the 2nd part of the OMIM (the acronymn part)
+                        # as it can be quite ambiguous but we're still checking the gene symbol
+                        if search_text.effective_equals(SearchText(part)):
+                            safe_alias = True  # still mark it as True so we don't have a validation message
+                            cms.alias_index = match_info.alias_index
+                            cms.matched_via_alias_and_exact_term = omim_term.id
+                            break
+
             if not safe_alias:
                 cms.add_message(ConditionMatchingMessage(severity="info", text=f"Text matched on alias of {term.id}"))
                 cms.alias_index = match_info.alias_index

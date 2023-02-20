@@ -534,16 +534,24 @@ class OntologyTermRelation(PostgresPartitionedModel, TimeStampedModel):
         return None
 
     @staticmethod
-    def as_mondo(term: OntologyTerm) -> Optional[OntologyTerm]:
-        if term.ontology_service == OntologyService.MONDO:
+    def _as_ontology(term: OntologyTerm, service: OntologyService) -> Optional[OntologyTerm]:
+        if term.ontology_service == service:
             return term
 
-        q_dest_modo = Q(source_term=term) & Q(dest_term__ontology_service=OntologyService.MONDO)
-        q_source_modo = Q(dest_term=term) & Q(source_term__ontology_service=OntologyService.MONDO)
-        otr_qs = OntologyTermRelation.objects.filter(q_dest_modo | q_source_modo, relation=OntologyRelation.EXACT)
+        q_dest_service = Q(source_term=term) & Q(dest_term__ontology_service=service)
+        q_source_service = Q(dest_term=term) & Q(source_term__ontology_service=service)
+        otr_qs = OntologyTermRelation.objects.filter(q_dest_service | q_source_service, relation=OntologyRelation.EXACT)
         if mondo_rel := otr_qs.first():
             return mondo_rel.other_end(term)
         return None
+
+    @staticmethod
+    def as_mondo(term: OntologyTerm) -> Optional[OntologyTerm]:
+        return OntologyTermRelation._as_ontology(term, OntologyService.MONDO)
+
+    @staticmethod
+    def as_omim(term: OntologyTerm) -> Optional[OntologyTerm]:
+        return OntologyTermRelation._as_ontology(term, OntologyService.OMIM)
 
     @staticmethod
     def relations_of(term: OntologyTerm, otr_qs: Optional[QuerySet['OntologyTermRelation']] = None) -> List['OntologyTermRelation']:
