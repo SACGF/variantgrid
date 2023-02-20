@@ -97,12 +97,6 @@ class JqGrid:
                 override['index'] = f
                 self._overrides[f] = override
 
-    def update_overrides(self, override: dict):
-        for k, v in override.items():
-            old_override = self._overrides.get(k, {})
-            old_override.update(v)
-            self._overrides[k] = old_override
-
     def get_override(self, field_name):
         return self._overrides.get(field_name, {})
 

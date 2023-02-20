@@ -135,3 +135,10 @@ def invalidate_cached_property(obj, property_name: str):
     """ Invalidates without throwing exception if not defined """
     if property_name in obj.__dict__:
         delattr(obj, property_name)
+
+
+def update_dict_of_dict_values(dict_to_update: Dict[Any, Dict], new_values: Dict[Any, Dict]):
+    for k, v in new_values.items():
+        old_values = dict_to_update.get(k, {})
+        old_values.update(v)
+        dict_to_update[k] = old_values

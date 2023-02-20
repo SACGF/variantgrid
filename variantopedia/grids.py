@@ -13,6 +13,7 @@ from annotation.annotation_version_querysets import get_variant_queryset_for_lat
 from annotation.models import AnnotationVersion
 from genes.hgvs import HGVSMatcher
 from library.jqgrid.jqgrid_user_row_config import JqGridUserRowConfig
+from library.utils import update_dict_of_dict_values
 from snpdb.grid_columns.custom_columns import get_custom_column_fields_override_and_sample_position
 from snpdb.grids import AbstractVariantGrid
 from snpdb.models import Variant, VariantZygosityCountCollection, GenomeBuild, Tag, VariantWiki
@@ -72,9 +73,8 @@ class AllVariantsGrid(AbstractVariantGrid):
         self.fields = fields
         super().__init__(user)
         af_show_in_percent = settings.VARIANT_ALLELE_FREQUENCY_CLIENT_SIDE_PERCENT
-        override.update(self._get_standard_overrides(af_show_in_percent))
-        self.update_overrides(override)
-
+        update_dict_of_dict_values(self._overrides, self._get_standard_overrides(af_show_in_percent))
+        update_dict_of_dict_values(self._overrides, override)
         self.vzcc = VariantZygosityCountCollection.get_global_germline_counts()
         self.extra_filters = kwargs.pop("extra_filters", {})
         self.extra_config.update({'sortname': self.vzcc.germline_counts_alias,
@@ -116,9 +116,8 @@ class NearbyVariantsGrid(AbstractVariantGrid):
         self.fields = fields
         super().__init__(user)
         af_show_in_percent = settings.VARIANT_ALLELE_FREQUENCY_CLIENT_SIDE_PERCENT
-        override.update(self._get_standard_overrides(af_show_in_percent))
-        self.update_overrides(override)
-
+        update_dict_of_dict_values(self._overrides, self._get_standard_overrides(af_show_in_percent))
+        update_dict_of_dict_values(self._overrides, override)
         self.extra_config.update({'sortname': "locus__position",
                                   'sortorder': "desc",
                                   'shrinkToFit': False})
@@ -210,12 +209,13 @@ class TaggedVariantGrid(AbstractVariantGrid):
         self.annotation_version = AnnotationVersion.latest(genome_build)
         fields, override, _ = get_custom_column_fields_override_and_sample_position(user_settings.columns,
                                                                                     self.annotation_version)
-        af_show_in_percent = settings.VARIANT_ALLELE_FREQUENCY_CLIENT_SIDE_PERCENT
-        override.update(self._get_standard_overrides(af_show_in_percent))
         fields.remove("tags")
         self.fields = fields
         super().__init__(user)
-        self.update_overrides(override)
+
+        af_show_in_percent = settings.VARIANT_ALLELE_FREQUENCY_CLIENT_SIDE_PERCENT
+        update_dict_of_dict_values(self._overrides, self._get_standard_overrides(af_show_in_percent))
+        update_dict_of_dict_values(self._overrides, override)
         self.extra_config.update({'sortname': "locus__position",
                                   'sortorder': "asc",
                                   'shrinkToFit': False})

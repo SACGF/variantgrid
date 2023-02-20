@@ -19,7 +19,7 @@ from library.jqgrid.jqgrid_sql import get_overrides
 from library.jqgrid.jqgrid_user_row_config import JqGridUserRowConfig
 from library.pandas_jqgrid import DataFrameJqGrid
 from library.unit_percent import get_allele_frequency_formatter
-from library.utils import md5sum_str
+from library.utils import md5sum_str, update_dict_of_dict_values
 from ontology.grids import AbstractOntologyGenesGrid
 from ontology.models import OntologyTermRelation, GeneDiseaseClassification, OntologyVersion
 from patients.models_enums import Zygosity
@@ -52,7 +52,7 @@ class VariantGrid(AbstractVariantGrid):
         if default_sort_by_column:
             self.extra_config['sortname'] = default_sort_by_column.variant_column
 
-        self.update_overrides(override)
+        update_dict_of_dict_values(self._overrides, override)
 
         self.node = node
         self.name = node.name
@@ -142,8 +142,9 @@ class VariantGrid(AbstractVariantGrid):
         annotation_version = node.analysis.annotation_version
         fields, overrides, sample_columns_position = get_custom_column_fields_override_and_sample_position(ccc, annotation_version)
         fields.extend(node.get_extra_columns())
-        overrides.update(node.get_extra_colmodel_overrides())
-        overrides.update(self._get_standard_overrides(af_show_in_percent))
+
+        update_dict_of_dict_values(overrides, self._get_standard_overrides(af_show_in_percent))
+        update_dict_of_dict_values(overrides, node.get_extra_colmodel_overrides())
         cohorts, visibility = node.get_cohorts_and_sample_visibility()
         if cohorts:
             sample_columns, sample_overrides = VariantGrid.get_grid_genotype_columns_and_overrides(cohorts, visibility, af_show_in_percent)
@@ -151,7 +152,8 @@ class VariantGrid(AbstractVariantGrid):
                 fields = fields[:sample_columns_position] + sample_columns + fields[sample_columns_position:]
             else:
                 fields.extend(sample_columns)
-            overrides.update(sample_overrides)
+
+            update_dict_of_dict_values(overrides, sample_overrides)
         return fields, overrides
 
     @staticmethod
