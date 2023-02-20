@@ -642,7 +642,7 @@ def check_for_withdrawn(sender, flag_comment: FlagComment, old_resolution: FlagR
             ConditionTextMatch.sync_condition_text_classification(cl.last_published_version, attempt_automatch=True, update_counts=True)
 
 
-# @timed_cache(size_limit=2)
+@timed_cache(size_limit=2)
 def top_level_suggestion(text: str) -> ConditionMatchingSuggestion:
     """ Make a suggestion at the root level for the given normalised text """
     if suggestion := embedded_ids_check(text):
