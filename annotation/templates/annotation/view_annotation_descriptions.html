@@ -176,7 +176,11 @@
             <div class='card mt-4'>
                 <div class="card-header align-center">
                     <div class="color-box {{ annotation_level|lower }}-column">&nbsp;</div>
-                    <div class="annotation-level-title"><b>{{ annotation_level }} Level</b> Annotated by an <a class="hover-link" href="{% url 'variant_annotation_runs' %}">Variant Annotation Run</a> - can have different values per transcript</div>
+                    <div class="annotation-level-title"><b>{{ annotation_level }} Level</b> Annotated by an <a class="hover-link" href="{% url 'variant_annotation_runs' %}">Variant Annotation Run</a>
+                        {% if annotation_level == 'Transcript' %}
+                          - can have different values per transcript
+                        {% endif %}
+                    </div>
                 </div>
                 <div class="card-body">
                     <table class='annotations-table table'>
