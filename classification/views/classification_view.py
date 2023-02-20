@@ -1,4 +1,5 @@
-import collections
+from collections.abc import Mapping
+
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
@@ -66,7 +67,7 @@ class BulkInserter:
                 if not id_part:
                     keys_label = ', '.join(data.keys())
                     raise ClassificationProcessError(f'Must provide "id" segment with submission - keys = ({keys_label})')
-                if isinstance(id_part, collections.Mapping):
+                if isinstance(id_part, Mapping):
                     id_part['user'] = user
                     record_ref = ClassificationRef.init_from_parts(**id_part)
                 else:

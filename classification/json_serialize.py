@@ -1,5 +1,5 @@
-import collections
 import json
+from collections.abc import Mapping
 
 
 # A little hack that will make call 'to_json' on any non json serializable class
@@ -17,7 +17,7 @@ def strip_json(json_values):
     Remove null, empty strings and false and empty lists from JSON values
     (contents of arrays wont be affected)
     """
-    if isinstance(json_values, collections.Mapping):
+    if isinstance(json_values, Mapping):
         ret_value = {}
         for key, value in json_values.items():
             if value == '' or value is None or value is False or (isinstance(value, list) and not value):

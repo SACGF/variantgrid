@@ -1,5 +1,5 @@
-import collections
 from collections import defaultdict
+from collections.abc import Mapping
 from datetime import datetime
 
 from django.conf import settings
@@ -77,7 +77,7 @@ class UsedKeyTracker:
         has_value = False
         has_note = False
         for key, valueObj in vcm.evidence.items():
-            if isinstance(valueObj, collections.Mapping):
+            if isinstance(valueObj, Mapping):
                 has_value = valueObj.get('value') is not None
                 has_note = valueObj.get('note') is not None
 
