@@ -108,7 +108,6 @@ def view_karyomapping_gene(request, pk):
     context = {"kag": karyomapping_gene,
                "iv": iv,
                "strand": strand,
-               "karyotype_bin_labels": KaryotypeBins.KARYOTYPE_LABEL_ORDER,
                "karyotype_bin_labels": KaryotypeBins.KARYOTYPE_LABEL_ORDER,  # Want order
                "variant_id_lookup": variant_id_lookup,
                "karyotype_bin_scatter_data": karyotype_bin_scatter_data,
