@@ -1,6 +1,7 @@
 {% extends "uicore/page/base.html" %}
 {% load datatable_tags %}
 {% load classification_tags %}
+{% load ontology_tags %}
 {% load ui_menu_bars %}
 {% load ui_help %}
 {% load ui_utils %}
@@ -32,7 +33,7 @@
                 Text that matches an OMIM name (if it matches an OMIM alias then it will only be a suggestion). In either scenario the OMIM term should be converted
                 to the equivalent MONDO term.
             </p>
-            <p>
+            <div>
                 The following validation warnings can only happen in suggestions:
                 <ul>
                 <li>The term was found by converting a stray number to an OMIM ID</li>
@@ -45,7 +46,7 @@
                 <li>A term has the word "obsolete" in its name e.g. MONDO:0200001</li>
                 <li>The term doesn't exist in our database</li>
                 </ul>
-            </p>
+            </div>
         {% end_page_help_embedded %}
 
         <div><a href="{% url 'condition_obsoletes' %}" class="hover-link">See Obsolete Relationships</a></div>
@@ -77,31 +78,83 @@
                         Top level terms can only be auto-assigned if they come from embedded ID matches.<br/>
                         Gene level terms can be auto-assigned if:  no warnings/errors, gene association, and all leaf terms.
                     </div>
-                    {% labelled label="Suggested Term" %}{% if suggestion.terms %}
+                    {% labelled label="Suggested Term(s)" %}{% if suggestion.terms %}
                         {% for term in suggestion.terms %}
-                            <a href="{% url 'ontology_term' term.url_safe_id %}">{{ term.id }}</a> {{ term.name }}
+                            <div>{% ontology_term term show_link=True %}</div>
                         {% endfor %}
-                    {% endif %}{% endlabelled %}
-                    {% labelled label="Can auto-assign (without confirmation)" %}{{ is_auto_assignable }}{% endlabelled %}
-                    {% if suggestion.messages %}
-                        {% labelled label="Term warnings" %}
-                            <ul class="list-group">
-                                {% for message in suggestion.messages %}
-                                    <li class="list-group-item">{{ message.severity | severity_icon }} {{ message.text }}</li>
-                                {% endfor %}
-                            </ul>
-                        {% endlabelled %}
+                    {% else %}
+                        <span class="no-value">No auto-suggestion could be determined</span>
                     {% endif %}
-                    {% labelled label="Term IDs found in text" %}{{ suggestion.ids_found_in_text|default_if_none:'False' }}{% endlabelled %}
-                    {% labelled label="All terms are leafs" %}{{ suggestion.is_all_leafs }}{% endlabelled %}
-                    {% labelled label="Alias index" %}{{ suggestion.alias_index|default_if_none:'' }}
-                        {% if suggestion.matched_via_alias_and_exact_term %}, Matches {{ suggestion.matched_via_alias_and_exact_term }}{% endif %}
                     {% endlabelled %}
-                    {% labelled label="Has gene symbol assoc" %}{{ has_gene_symbol|default_if_none:'' }}{% endlabelled %}
+                    {% if suggestion.terms %}
+                        {% labelled label="Can auto-assign (without confirmation)" %}{{ is_auto_assignable|boolean }}{% endlabelled %}
+                        {% if suggestion.messages %}
+                            {% labelled label="Warnings" %}
+                                <ul class="list-group">
+                                    {% for message in suggestion.messages %}
+                                        <li class="list-group-item">{{ message.severity | severity_icon }} {{ message.text }}</li>
+                                    {% endfor %}
+                                </ul>
+                            {% endlabelled %}
+                        {% endif %}
+                        {% labelled label="Term ID(s) found in text" %}{{ suggestion.ids_found_in_text|boolean }}{% endlabelled %}
+
+                        {% labelled label="Alias Index" %}
+                            {% if suggestion.alias_index is None %}
+                                <span class="no-value">-</span>
+                            {% else %}
+                                {{ suggestion.alias_index }}
+                                {% if suggestion.matched_via_alias_and_exact_term %}, Matches {{ suggestion.matched_via_alias_and_exact_term }}{% endif %}
+                            {% endif %}
+                        {% endlabelled %}
+
+                        {% for suggestion_detail in suggestion_details %}
+                            {% if suggestion_details|length > 1 %}
+                                <hr/>
+                                {% labelled label="For Term" %}{% ontology_term suggestion_detail.term show_link=True %}{% endlabelled %}
+                            {% endif %}
+                            {% if gene_symbol %}
+                                {% labelled label="Has Gene Relationship" %}{{ suggestion_detail.has_gene_symbol_relationship|boolean }}{% endlabelled %}
+                            {% endif %}
+                            {% labelled label="Descendants" %}
+                                {% with descendants=suggestion_detail.descendants %}
+                                    {% if descendants %}
+
+                                        <table class="table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Term</th>
+                                                    <th>Depth</th>
+                                                    {% if gene_symbol %}<th>Has Relationship to {{ gene_symbol }}</th>{% endif %}
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for descendant in descendants %}
+                                                    <tr>
+                                                        <td>{% ontology_term descendant.term %}</td>
+                                                        <td>{{ descendant.depth }}</td>
+                                                        {% if gene_symbol %}<td>{{ descendant.has_gene_symbol_relationship|boolean }}</td>{% endif %}
+                                                    </tr>
+                                                {% endfor %}
+                                                {% if descendants.limited_to %}
+                                                    <td colspan="{% if gene_symbol %}2{% else %}1{% endif %}">
+                                                        <span class="text-info">Limiting descendant results to {{ descendants.limited_to }}</span>
+                                                    </td>
+
+                                                {% endif %}
+                                            </tbody>
+                                        </table>
+                                    {% else %}
+                                        <span class="no-value">Is leaf term {{ True|boolean }}</span>
+                                    {% endif %}
+                                {% endwith %}
+                            {% endlabelled %}
+                        {% endfor %}
+                    {% endif %}
                 </div>
             </div>
 
-            {% if auto_matches %}
+            {% if user_search_results %}
             <h4 class="mt-4">User Picker Suggestions</h4>
             <table class="table">
                 <thead>
@@ -110,17 +163,17 @@
                         <th>Score</th>
                     </tr>
                 </thead>
-                {% for auto_match in auto_matches %}
+                {% for user_search_result in user_search_results %}
                     <tr>
-                        <td><a href="{% url 'ontology_term' auto_match.term.url_safe_id %}" class="hover-link">{{ auto_match.term.id }}</a><br/>
-                            {{ auto_match.term.name }}
-                            {% if auto_match.term.definition %}<br/><span class="text-muted wy-text-small">{{ auto_match.term.definition }}</span>{% endif %}
+                        <td><a href="{% url 'ontology_term' user_search_result.term.url_safe_id %}" class="hover-link">{{ user_search_result.term.id }}</a><br/>
+                            {{ user_search_result.term.name }}
+                            {% if user_search_result.term.definition %}<br/><span class="text-muted wy-text-small">{{ user_search_result.term.definition }}</span>{% endif %}
                         </td>
                         <td width="200px">
-                            {% if auto_match.gene_relationships %}<div>Gene Matches ({% for snake in auto_match.gene_relationships %}{{ snake.start_source }}{% if not forloop.last %}, {% endif %}{% endfor %})</div>{% endif %}
-                            {% if auto_match.direct_reference %}<div>Embedded ID</div>{% endif %}
-                            {% if auto_match.text_search %}<div>Text Search</div>{% endif %}<br/>
-                            {% if auto_match.term.is_obsolete %}<div>{{ auto_match.term.warning_text }}</div>{% endif %}<br/>
+                            {% if user_search_result.gene_relationships %}<div>Gene Matches ({% for snake in user_search_result.gene_relationships %}{{ snake.start_source }}{% if not forloop.last %}, {% endif %}{% endfor %})</div>{% endif %}
+                            {% if user_search_result.direct_reference %}<div>Embedded ID</div>{% endif %}
+                            {% if user_search_result.text_search %}<div>Text Search</div>{% endif %}<br/>
+                            {% if user_search_result.term.is_obsolete %}<div>{{ user_search_result.term.warning_text }}</div>{% endif %}<br/>
                         </td>
                     </tr>
                 {% endfor %}

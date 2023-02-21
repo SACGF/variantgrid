@@ -1,5 +1,7 @@
+from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional
+from functools import cached_property
+from typing import Optional, List
 
 from django.contrib import messages
 from django.db.models import Q
@@ -15,7 +17,7 @@ from library.django_utils import require_superuser
 from library.log_utils import report_exc_info
 from library.utils import delimited_row
 from ontology.models import OntologySnake, OntologyVersion, OntologyTermStatus, OntologyImportSource, \
-    OntologyTermRelation, GeneDiseaseClassification
+    OntologyTermRelation, GeneDiseaseClassification, OntologyTerm, OntologyTermDescendant
 from ontology.ontology_matching import OntologyMatching, SearchText, normalize_condition_text
 
 
@@ -90,14 +92,72 @@ def condition_match_test_download_view(request: HttpRequest) -> HttpResponseBase
     return response
 
 
+class _DescendantTermCheck:
+    def __init__(self, descendant: OntologyTermDescendant, gene_symbol: Optional[GeneSymbol]):
+        self.descendant = descendant
+        self.gene_symbol = gene_symbol
+
+    @property
+    def term(self) -> OntologyTerm:
+        return self.descendant.term
+
+    @property
+    def depth(self) -> int:
+        return self.descendant.depth
+
+    @property
+    def has_gene_symbol_relationship(self) -> Optional[bool]:
+        if gene_symbol := self.gene_symbol:
+            return OntologySnake.has_gene_relationship(self.term, gene_symbol)
+
+
+@dataclass
+class _DescendantTermChecks:
+    descendants: List[_DescendantTermCheck]
+    limited_to: Optional[int]
+
+    def __bool__(self):
+        return bool(self.descendants)
+
+    def __iter__(self):
+        return iter(self.descendants)
+
+    def __len__(self):
+        return len(self.descendants)
+
+
+class _SuggestionDetail:
+
+    def __init__(self, term: OntologyTerm, gene_symbol: Optional[GeneSymbol]):
+        self.term = term
+        self.gene_symbol = gene_symbol
+
+    @cached_property
+    def has_gene_symbol_relationship(self) -> Optional[bool]:
+        if gene_symbol := self.gene_symbol:
+            return OntologySnake.has_gene_relationship(self.term, gene_symbol)
+
+    @cached_property
+    def descendants(self) -> _DescendantTermChecks:
+        descendants, truncated_results = OntologySnake.all_descendants_of(self.term,
+                                                                          limit=_TRUNCATE_DESCENDANTS_TO)
+        suggestion_descendants: List[_DescendantTermCheck] = [_DescendantTermCheck(descendant, gene_symbol=self.gene_symbol) for descendant in descendants]
+        return _DescendantTermChecks(
+            descendants=suggestion_descendants,
+            limited_to=_TRUNCATE_DESCENDANTS_TO if truncated_results else None
+        )
+
+
+_TRUNCATE_DESCENDANTS_TO = 10
+
 def condition_match_test_view(request):
     condition_text = request.GET.get("condition_text")
     gene_symbol_str = request.GET.get("gene_symbol")
-    auto_matches = []
+    user_search_results: Optional[OntologyMatching] = None
     attempted = False
-    suggestion = None
+    suggestion: Optional[ConditionMatchingSuggestion] = None
+    suggestion_details: List[_SuggestionDetail] = []
     gene_symbol: Optional[GeneSymbol] = None
-    has_gene_symbol: Optional[bool] = None
 
     valid = False
     if condition_text:
@@ -107,24 +167,30 @@ def condition_match_test_view(request):
             if not gene_symbol:
                 messages.add_message(request, messages.WARNING, f"Could not find Gene Symbol '{gene_symbol_str}'")
                 valid = False
+
+    descendants: List[_DescendantTermCheck] = []
     if valid:
-        auto_matches = OntologyMatching.from_search(condition_text, gene_symbol_str)
-        for error in auto_matches.errors:
+        user_search_results = OntologyMatching.from_search(condition_text, gene_symbol_str)
+        for error in user_search_results.errors:
             messages.error(request, error)
 
         suggestion = top_level_suggestion(normalize_condition_text(condition_text))
         if suggestion and gene_symbol:
-            has_gene_symbol = OntologySnake.has_gene_relationship(suggestion.terms[0], gene_symbol)
+            for suggested_term in suggestion.terms:
+                suggestion_details.append(
+                    _SuggestionDetail(term=suggested_term, gene_symbol=gene_symbol)
+                )
+
         attempted = True
 
     context = {
         "condition_text": condition_text,
         "search_text": SearchText(condition_text) if condition_text else None,
         "gene_symbol": gene_symbol_str,
-        "auto_matches": auto_matches,
+        "user_search_results": user_search_results,
         "suggestion": suggestion,
+        "suggestion_details": suggestion_details,
         "is_auto_assignable": suggestion.is_auto_assignable(gene_symbol) if suggestion else None,
-        "has_gene_symbol": has_gene_symbol,
         "attempted": attempted
     }
 

@@ -9,7 +9,7 @@ import re
 from collections import defaultdict
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Optional, List, Dict, Set, Union, Tuple, Iterable
+from typing import Optional, List, Dict, Set, Union, Tuple, Iterable, Any
 
 from cache_memoize import cache_memoize
 from django.conf import settings
@@ -338,7 +338,7 @@ class OntologyTerm(TimeStampedModel):
     def is_leaf(self) -> bool:
         # Warning, just meant to be called on MONDO terms
         if not self.is_stub and self.ontology_service == OntologyService.MONDO:
-            return not OntologyTermRelation.objects.filter(dest_term=self, relation=OntologyRelation.IS_A).exists()
+            return not OntologyVersion.get_latest_and_live_ontology_qs().filter(dest_term=self, relation=OntologyRelation.IS_A).exists()
         return True
 
     @property
@@ -762,6 +762,19 @@ class OntologySnakeStep:
         return self.relation.other_end(self.dest_term)
 
 
+@dataclass
+class OntologyTermDescendant:
+    term: OntologyTerm
+    depth: int
+
+    @property
+    def sort_key(self) -> Any:
+        return self.depth, self.term
+
+    def __lt__(self, other):
+        return self.sort_key < other.sort_key
+
+
 class OntologySnake:
     """
     Use to "Snake" through Ontology nodes, typically to resolve to/from gene symbols.
@@ -865,6 +878,42 @@ class OntologySnake:
             if level >= max_levels:
                 return []
         return []
+
+    @staticmethod
+    def all_descendants_of(term: OntologyTerm, limit: int = 100, otr_qs: QuerySet[OntologyTermRelation] = None) -> Tuple[List[OntologyTermDescendant], bool]:
+        """
+        :param term: The term to find all descendants of
+        :param limit: The maximum number of results returned
+        :param otr_qs: A query limiting relationships, if not provided will use latest OntologyVersion
+        :return: A list of unique descendants and a boolean indicating True = More results but truncated
+        """
+        if otr_qs is None:
+            otr_qs = OntologyVersion.get_latest_and_live_ontology_qs()
+
+        review_terms: Set[OntologyTerm] = {term}
+        reviewed_terms: Set[OntologyTerm] = {term}
+        results: List[OntologyTermDescendant] = []
+
+        depth = 1
+        while review_terms:
+            next_level = OntologyVersion.get_latest_and_live_ontology_qs().filter(dest_term__in=review_terms, relation=OntologyRelation.IS_A)
+            review_terms = set()
+
+            for child_relationship in next_level:
+                child = child_relationship.source_term
+                if child not in reviewed_terms:
+                    results.append(OntologyTermDescendant(child, depth))
+                    if len(results) >= limit:
+                        return results, True
+
+                    reviewed_terms.add(child)  # don't look at this term again in case of multiple inheritance (if some other branch has it as a child again)
+                    review_terms.add(child)  # but this should be the first time we're looking at it, so see if it has any children
+
+            depth += 1
+
+        results.sort()
+        return results, False
+
 
     # TODO only allow EXACT between two anythings that aren't Gene Symbols
     @staticmethod
