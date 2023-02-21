@@ -119,7 +119,6 @@
                             {% labelled label="Descendants" %}
                                 {% with descendants=suggestion_detail.descendants %}
                                     {% if descendants %}
-
                                         <table class="table">
                                             <thead>
                                                 <tr>
@@ -140,7 +139,6 @@
                                                     <td colspan="{% if gene_symbol %}2{% else %}1{% endif %}">
                                                         <span class="text-info">Limiting descendant results to {{ descendants.limited_to }}</span>
                                                     </td>
-
                                                 {% endif %}
                                             </tbody>
                                         </table>

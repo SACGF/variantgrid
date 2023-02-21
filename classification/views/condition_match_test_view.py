@@ -175,7 +175,7 @@ def condition_match_test_view(request):
             messages.error(request, error)
 
         suggestion = top_level_suggestion(normalize_condition_text(condition_text))
-        if suggestion and gene_symbol:
+        if suggestion:
             for suggested_term in suggestion.terms:
                 suggestion_details.append(
                     _SuggestionDetail(term=suggested_term, gene_symbol=gene_symbol)
