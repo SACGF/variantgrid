@@ -73,7 +73,7 @@
                                     {% endfor %}<br>{% endif %}
                                         <a class="hover-link" href="{{ search_result.record.get_absolute_url }}">{{ search_result.record }}</a>
                                         {% if search_summary %}
-                                            {% search_summary search_result %}
+                                            {% search_summary request.user search_result %}
                                         {% endif %}
                                     </td>
                                 </tr>

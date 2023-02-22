@@ -13,10 +13,10 @@ from variantopedia.interesting_nearby import interesting_summary
 register = Library()
 
 
-@register.inclusion_tag("variantopedia/tags/search_summary.html", takes_context=True)
-def search_summary(context, search_result):
-    user = context["user"]
+@register.inclusion_tag("variantopedia/tags/search_summary.html")
+def search_summary(user: User, search_result):
     record = search_result.record
+    context = {}
     if isinstance(record, Variant):
         summary, tag_counts = _variant_interesting_summary(user, record, search_result.genome_build)
         context["summary"] = summary
