@@ -373,32 +373,22 @@ def search(request):
     if form.is_valid() and form.cleaned_data['search']:
         search_string = form.cleaned_data['search']
         classify = form.cleaned_data.get('classify')
-        try:
-            search_results = search_data(request.user, search_string, classify)
-            results, _search_types, _search_errors = search_results.non_debug_results, search_results.search_types, search_results.search_errors
-            details = f"'{search_string}' calculated {len(results)} results."
-            create_event(request.user, 'search', details=details)
+        search_results = search_data(request.user, search_string, classify)
+        results, _search_types, _search_errors = search_results.non_debug_results, search_results.search_types, search_results.search_errors
+        details = f"'{search_string}' calculated {len(results)} results."
+        create_event(request.user, 'search', details=details)
 
-            # don't auto load unless there is only 1 preferred result
-            if preferred_result := search_results.single_preferred_result():
-                return redirect(preferred_result.record)
+        # don't auto load unless there is only 1 preferred result
+        if preferred_result := search_results.single_preferred_result():
+            return redirect(preferred_result.record)
 
-            # Attempt to give hints on why nothing was found
-            for search_error, genome_builds in search_results.search_errors.items():
-                text = f"{search_error.search_type}: {search_error.error}"
-                if genome_builds:
-                    genome_builds_str = ", ".join(gb.name for gb in sorted(genome_builds))
-                    text += f" ({genome_builds_str})"
-                messages.add_message(request, messages.ERROR, text)
-
-        except Exception as e:
-            raise
-            report_exc_info(extra_data={
-                'search_string': search_string,
-                'classify': classify
-            })
-            msg = f"An error occurred during search: {e}"
-            messages.add_message(request, messages.ERROR, msg, extra_tags='save-message')
+        # Attempt to give hints on why nothing was found
+        for search_error, genome_builds in search_results.search_errors.items():
+            text = f"{search_error.search_type}: {search_error.error}"
+            if genome_builds:
+                genome_builds_str = ", ".join(gb.name for gb in sorted(genome_builds))
+                text += f" ({genome_builds_str})"
+            messages.add_message(request, messages.ERROR, text)
 
     epk_qs = ExternalPK.objects.values_list("external_type", flat=True)
     external_codes = list(sorted(epk_qs.distinct()))
