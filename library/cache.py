@@ -4,6 +4,12 @@ import time
 
 
 def timed_cache(size_limit=0, ttl=0, quick_key_access=False):
+    """
+    :param size_limit: If function takes parameters, max number of parameter combos to cache
+    :param ttl: Time to live (in seconds)
+    :param quick_key_access: When False takes up less space, when True is faster
+    """
+
     def decorator(func):
         storage = {}
         ttls = {}
@@ -42,13 +48,16 @@ def timed_cache(size_limit=0, ttl=0, quick_key_access=False):
             if ttl != 0:
                 while True:
                     oldest_key = None
+                    found_key = False
                     if quick_key_access:
                         if keys:
                             oldest_key = keys[0]
+                            found_key = True
                     else:
                         if storage.keys():
                             oldest_key = list(storage.keys())[0]
-                    if not oldest_key:
+                            found_key = True
+                    if not found_key:
                         break
 
                     # If they key has expired, remove the entry and it's quick access key if quick_key_access=True

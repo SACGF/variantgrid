@@ -687,6 +687,7 @@ class OntologyVersion(TimeStampedModel):
         return OntologyTermRelation.objects.filter(from_import__in=self.get_ontology_imports())
 
     @staticmethod
+    @timed_cache(ttl=60, quick_key_access=True)
     def get_latest_and_live_ontology_qs():
         latest = OntologyVersion.latest()
         # live relationships of panelappau aren't versioned
