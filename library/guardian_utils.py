@@ -1,3 +1,4 @@
+from functools import lru_cache
 from typing import Union, List
 
 from django.conf import settings
@@ -24,6 +25,7 @@ def public_group():
     return g
 
 
+@lru_cache()
 def admin_bot():
     return User.objects.get(username='admin_bot')
 

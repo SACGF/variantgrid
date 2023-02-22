@@ -427,6 +427,10 @@ def view_allele(request, allele_id: int):
         user=request.user,
         allele=allele,
         published=True
+    ).select_related(
+        'classification__allele_info__allele',
+        'classification__allele_info__imported_genome_build_patch_version',
+        'classification__allele_info__latest_validation'
     )
 
     allele_merge_log_qs = AlleleMergeLog.objects.filter(Q(old_allele=allele) | Q(new_allele=allele)).order_by("pk")

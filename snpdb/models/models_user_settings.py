@@ -342,7 +342,11 @@ class UserSettings:
 
     @staticmethod
     def get_for_user(user: User) -> 'UserSettings':
-        return UserSettings.get_for(user=user)
+        # this ensures that for the currently logged in user, we only have to get their UserSettings once
+        # responsbilities between this and UserSettingsManager area  bit mixed, might be best to remove
+        # UserSettingsManager and move the code into here
+        from snpdb.user_settings_manager import UserSettingsManager
+        return UserSettingsManager.get_user_settings(user)
 
     @cached_property
     def initial_perm_read_and_write_groups(self) -> Tuple[Set[Group], Set[Group]]:
@@ -412,11 +416,10 @@ class UserSettings:
 
     @staticmethod
     def get_genome_build_or_default(user: User, genome_build_name: Optional[str] = None) -> GenomeBuild:
-        user_settings = UserSettings.get_for_user(user)
         if genome_build_name:
             genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
         else:
-            genome_build = user_settings.default_genome_build
+            genome_build = UserSettings.get_for_user(user).default_genome_build
         return genome_build
 
     @staticmethod

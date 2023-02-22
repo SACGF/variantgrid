@@ -5,6 +5,7 @@ from typing import Optional
 
 from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
+from django.db.models import QuerySet
 from django.http.response import Http404
 
 from classification.enums import SubmissionSource
@@ -54,11 +55,15 @@ class ClassificationRef:
         if self.cached_record:
             return self.cached_record
 
+        qs: QuerySet[Classification] = None
         if self.rid:
-            return Classification.objects.filter(pk=self.rid).first()
-
-        if self.lab_record_id:
-            return Classification.objects.filter(lab=self.lab, lab_record_id=self.lab_record_id).first()
+            qs = Classification.objects.filter(pk=self.rid)
+        elif self.lab_record_id:
+            qs = Classification.objects.filter(lab=self.lab, lab_record_id=self.lab_record_id)
+        else:
+            raise ValueError("No rid or lab_record_id")
+        qs = qs.select_related('lab__organization', 'allele_info__latest_validation')
+        return qs.first()
 
     @cached_property
     def modification(self) -> ClassificationModification:

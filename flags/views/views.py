@@ -14,7 +14,6 @@ from flags.models.models import FlagResolution, FlagTypeResolution, fetch_flag_i
 from library.django_utils import ensure_timezone_aware
 from library.utils import empty_to_none
 from snpdb.models import Lab, AvatarDetails
-from snpdb.models.models_user_settings import UserSettings
 
 
 class CommentDetails:
@@ -217,7 +216,6 @@ class FlagHelper:
 
         users_json = []
         for user in self.users.values():
-            user_settings = UserSettings.get_for_user(user)
             avatar = AvatarDetails.avatar_for(user)
             json_entry = {
                 'id': user.id,
