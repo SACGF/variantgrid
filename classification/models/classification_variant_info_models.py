@@ -325,18 +325,22 @@ class ImportedAlleleInfo(TimeStampedModel):
     As well as only having to resolve unique imported data once
     """
 
+    """
+    Imported c.HGVS/g.HGVS can be very long while Postgres can only make constraints (in unique_together)
+    of a bit less than 3k so we need to use the md5sum as the unique_together
+    
+    As we only provide one of imported_c_hgvs/imported_g_hgvs fields - we'll just hash the field we use
+    into a single column
+    """
+    imported_md5_hash = TextField(null=True, blank=True)
+
     imported_c_hgvs = TextField(null=True, blank=True)
     """
     The c.hgvs exactly as it was imported without any normalization
     Note - only provide this OR g_hgvs, not both
-    
-    Imported c.HGVS can be unlimited length while Postgres can only make constraints (in unique_together)
-    of a bit less than 3k so we need to use the md5sum as the unique_together
     """
-    imported_c_hgvs_md5_hash = TextField(null=True, blank=True)
 
     imported_g_hgvs = TextField(null=True, blank=True)
-    imported_g_hgvs_md5_hash = TextField(null=True, blank=True)
 
     imported_transcript = TextField(null=True, blank=True)
     """
@@ -383,14 +387,11 @@ class ImportedAlleleInfo(TimeStampedModel):
     """ Use this to resolved the variant and liftover """
 
     class Meta:
-        unique_together = ('imported_c_hgvs_md5_hash', 'imported_g_hgvs_md5_hash',
-                           'imported_transcript', 'imported_genome_build_patch_version')
+        unique_together = ('imported_md5_hash', 'imported_transcript', 'imported_genome_build_patch_version')
 
     def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
-        if self.imported_c_hgvs and not self.imported_c_hgvs_md5_hash:
-            self.imported_c_hgvs_md5_hash = md5sum_str(self.imported_c_hgvs)
-        if self.imported_g_hgvs and not self.imported_g_hgvs_md5_hash:
-            self.imported_g_hgvs_md5_hash = md5sum_str(self.imported_g_hgvs)
+        if not self.imported_md5_hash:
+            self.imported_md5_hash = md5sum_str(self.imported_c_hgvs or self.imported_g_hgvs)
 
         super().save(force_insert=force_insert, force_update=force_update, using=using, update_fields=update_fields)
 

@@ -771,10 +771,10 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             fields = {"imported_genome_build_patch_version": genome_build_patch_version}
             if c_hgvs := self.imported_c_hgvs:
                 fields["imported_c_hgvs"] = c_hgvs
-                fields["imported_c_hgvs_md5_hash"] = md5sum_str(c_hgvs)
+                fields["imported_md5_hash"] = md5sum_str(c_hgvs)
             elif g_hgvs := self.imported_g_hgvs:
                 fields["imported_g_hgvs"] = g_hgvs
-                fields["imported_g_hgvs_md5_hash"] = md5sum_str(g_hgvs)
+                fields["imported_md5_hash"] = md5sum_str(g_hgvs)
                 fields["imported_transcript"] = self.transcript
             else:
                 # need either c.hgvs, g.hgvs (in future, re-support variant_coordinate)
