@@ -57,26 +57,16 @@ def get_custom_column_fields_override_and_sample_position(custom_columns_collect
 SELECT_INTERNALLY_CLASSIFIED_SQL = """
 select string_agg(coalesce(classification_classification.clinical_significance, 'U'), '|')
 from classification_classification
-where classification_classification.variant_id in (
-    select snpdb_variantallele.variant_id
-    from snpdb_variantallele
-    where
-    allele_id in (
-        select allele_id from snpdb_variantallele where variant_id = snpdb_variant.id
-    )
+where classification_classification.allele_id in (
+    select allele_id from snpdb_variantallele where variant_id = snpdb_variant.id
 )
 """
 
 SELECT_MAX_INTERNAL_CLASSIFICATION = """
 select max(coalesce(classification_classification.clinical_significance, '0'))
 from classification_classification
-where classification_classification.variant_id in (
-    select snpdb_variantallele.variant_id
-    from snpdb_variantallele
-    where
-    allele_id in (
-        select allele_id from snpdb_variantallele where variant_id = snpdb_variant.id
-    )
+where classification_classification.allele_id in (
+    select allele_id from snpdb_variantallele where variant_id = snpdb_variant.id
 )
 """
 
@@ -85,14 +75,8 @@ SELECT_TAGGED_SQL = """
 select string_agg(coalesce(analysis_varianttag.tag_id, 'U'), '|')
 from analysis_varianttag
 where (
-    analysis_varianttag.variant_id = snpdb_variant.id
-    or analysis_varianttag.variant_id in (
-        select snpdb_variantallele.variant_id
-        from snpdb_variantallele
-        where
-        allele_id in (
-            select allele_id from snpdb_variantallele where variant_id = snpdb_variant.id
-        )
+    analysis_varianttag.allele_id in (
+        select allele_id from snpdb_variantallele where variant_id = snpdb_variant.id
     )
 )
 """
