@@ -4,7 +4,7 @@ beautifulsoup4==4.10.0
 bgzip==0.4.0
 # Biopython - UniProt parsing broken in v1.79 Can go back to normal package next release
 git+https://github.com/biopython/biopython@bd7aa851f798d79ef0f4c7813a6b12d38c3158f2#egg=biopython
-cdot==0.2.11
+cdot==0.2.13
 celery==5.2.3
 ConfigArgParse==1.5.3
 coreapi==2.3.3
