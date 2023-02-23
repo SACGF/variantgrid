@@ -121,7 +121,7 @@ class Command(BaseCommand):
             if i % 100 == 0:
                 print(f"Processed {i} classifications")
             # use force_update so we can be sure that the validation objects have been made
-            if c.update_allele_info_from_classification(force_update=True):
+            if c.update_allele_info_from_classification(force_update=False):
                 c.save(update_modified=False)
         print(f"Finished {i} classifications")
 
