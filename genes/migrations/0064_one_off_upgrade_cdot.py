@@ -28,6 +28,6 @@ class Migration(migrations.Migration):
 
     operations = [
         ManualOperation.operation_other(args=[
-            "Update pyHGVS library - sudo python3 -m pip install --force --upgrade git+https://github.com/SACGF/hgvs#egg=pyhgvs"],
+            "Update cdot library - sudo python3 -m pip install --upgrade cdot"],
             test=_test_old_cdot_version),
     ]
