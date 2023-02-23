@@ -654,7 +654,8 @@ def nearby_variants(request, variant_id, annotation_version_id):
     variant_annotation_version = annotation_version.variant_annotation_version
     variant_annotation = variant.variantannotation_set.filter(version=variant_annotation_version).first()
     context = {
-        "method_summaries": get_method_summaries(variant, distance=settings.VARIANT_DETAILS_NEARBY_RANGE),
+        "method_summaries": get_method_summaries(variant, annotation_version,
+                                                 distance=settings.VARIANT_DETAILS_NEARBY_RANGE),
         "genome_build": annotation_version.genome_build,
         "variant": variant,
         "variant_annotation": variant_annotation

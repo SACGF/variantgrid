@@ -50,7 +50,7 @@
         <div><b>Method:</b> {{ method_summaries.codon }}</div>
         <div>
             {% if codon.exists %}
-                {% jqgrid 'nearby_variants_grid' 'nearby_codon' template_name='jqgrid/variant_details_link_grid.html' variant_id=variant.pk region_type='codon' search=False %}
+                {% jqgrid 'nearby_variants_grid' 'nearby_codon' template_name='jqgrid/variant_details_link_grid.html' variant_id=variant.pk genome_build_name=genome_build.name region_type='codon' search=False %}
             {% else %}
                 -
             {% endif %}
@@ -60,7 +60,7 @@
         <div><b>Method:</b> {{ method_summaries.exon }}</div>
         <div>
             {% if exon.exists %}
-                {% jqgrid 'nearby_variants_grid' 'nearby_exon' template_name='jqgrid/variant_details_link_grid.html' variant_id=variant.pk region_type='exon' search=False %}
+                {% jqgrid 'nearby_variants_grid' 'nearby_exon' template_name='jqgrid/variant_details_link_grid.html' variant_id=variant.pk genome_build_name=genome_build.name region_type='exon' search=False %}
             {% else %}
                 -
             {% endif %}
@@ -70,21 +70,39 @@
         <div><b>Method:</b> {{ method_summaries.domain }}</div>
         <div>
             {% if domain.exists %}
-                {% jqgrid 'nearby_variants_grid' 'nearby_domain' template_name='jqgrid/variant_details_link_grid.html' variant_id=variant.pk region_type='domain' search=False %}
+                {% jqgrid 'nearby_variants_grid' 'nearby_domain' template_name='jqgrid/variant_details_link_grid.html' variant_id=variant.pk genome_build_name=genome_build.name region_type='domain' search=False %}
             {% else %}
                 -
             {% endif %}
         </div>
 
+        <h4>Gene</h4>
+        <div><b>Method:</b> {{ method_summaries.genes }}</div>
+        {% if genes %}
+            {% for gene_symbol, gene_nearby in genes.items %}
+                <h3><a href="{% url 'view_gene_symbol' gene_symbol %}">{{ gene_symbol }}</a></h3>
+                <div>
+                    {% if gene_nearby.exists %}
+                        {% jqgrid 'nearby_gene_variants_grid' 'nearby_gene'|add:gene_symbol template_name='jqgrid/variant_details_link_grid.html' variant_id=variant.pk genome_build_name=genome_build.name region_type='genes' gene_symbol=gene_symbol search=False %}
+                    {% else %}
+                        -
+                    {% endif %}
+                </div>
+            {% endfor %}
+        {% else %}
+            <div>
+                -
+            </div>
+        {% endif %}
+
         <h4>Range</h4>
         <div><b>Method:</b> {{ method_summaries.range }}</div>
         <div>
             {% if range.exists %}
-                {% jqgrid 'nearby_variants_grid' 'nearby_range' template_name='jqgrid/variant_details_link_grid.html' variant_id=variant.pk region_type='range' search=False %}
+                {% jqgrid 'nearby_variants_grid' 'nearby_range' template_name='jqgrid/variant_details_link_grid.html' variant_id=variant.pk genome_build_name=genome_build.name region_type='range' search=False %}
             {% else %}
                 -
             {% endif %}
-
         </div>
 
     </div>

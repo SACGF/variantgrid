@@ -220,6 +220,12 @@ class GeneSymbol(models.Model):
 
         return source_has_extra and other_has_extra
 
+    @staticmethod
+    def overlapping_variant(variant, variant_annotation_version) -> QuerySet['GeneSymbol']:
+        vta_qs = variant.varianttranscriptannotation_set.filter(version=variant_annotation_version)
+        symbol_names = list(vta_qs.values_list("transcript_version__gene_version__gene_symbol", flat=True).distinct())
+        return GeneSymbol.objects.filter(pk__in=symbol_names)
+
     def __lt__(self, other):
         return self.symbol < other.symbol
 

@@ -104,12 +104,14 @@ class AllVariantsGrid(AbstractVariantGrid):
 class NearbyVariantsGrid(AbstractVariantGrid):
     caption = 'Nearby Variants'
 
-    def __init__(self, user, variant_id, region_type, **kwargs):
+    def __init__(self, user, variant_id, genome_build_name, region_type, gene_symbol=None, **kwargs):
         self.variant = get_object_or_404(Variant, pk=variant_id)
+        self.genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
         self.region_type = region_type
+        self.gene_symbol = gene_symbol
 
         user_settings = UserSettings.get_for_user(user)
-        self.annotation_version = AnnotationVersion.latest(user_settings.default_genome_build)
+        self.annotation_version = AnnotationVersion.latest(self.genome_build)
         fields, override, _ = get_custom_column_fields_override_and_sample_position(user_settings.columns,
                                                                                     self.annotation_version)
         fields.remove("tags")
@@ -124,7 +126,12 @@ class NearbyVariantsGrid(AbstractVariantGrid):
 
     def _get_base_queryset(self) -> QuerySet:
         region_filters = get_nearby_qs(self.variant, self.annotation_version)
-        return region_filters[self.region_type]
+        rf_data = region_filters[self.region_type]
+        if self.gene_symbol:
+            qs = rf_data[self.gene_symbol]
+        else:
+            qs = rf_data
+        return qs
 
 
 class VariantTagsGrid(JqGridUserRowConfig):

@@ -3,7 +3,14 @@
 {% labelled label="Codon"  id="nearby_codon" %}{{ codon_summary }}{% tag_counts codon_tag_counts %}{% endlabelled %}
 {% labelled label="Exon"   id="nearby_exon" %}{{ exon_summary }}{% tag_counts exon_tag_counts %}{% endlabelled %}
 {% labelled label="Domain" id="nearby_domain" %}{{ domain_summary }}{% tag_counts domain_tag_counts %}{% endlabelled %}
+{% if genes %}
+    {% for gene_symbol, gene_nearby in genes.items %}
+        {% labelled label="Gene: "|add:gene_symbol %}{{ gene_nearby.summary }}{% tag_counts gene_nearby.tag_counts %}{% endlabelled %}
+    {% endfor %}
+{% else %}
+    {% labelled label="Genes"%}{% endlabelled %}
+{% endif %}
 {% labelled label="Range (+/- "|add:distance_str|add:")" id="nearby_range" %}{{ range_summary }}{% tag_counts domain_tag_counts %}{% endlabelled %}
-{% if codon_summary or exon_summary or domain_summary or range_summary %}
+{% if codon_summary or exon_summary or domain_summary or genes or range_summary %}
     {% labelled label="Details" id="nearby_details" %}<a href="{% url 'nearby_variants_annotation_version' variant.pk annotation_version.pk %}">See nearby variants...</a>{% endlabelled %}
 {% endif %}

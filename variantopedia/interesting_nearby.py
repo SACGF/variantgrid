@@ -9,12 +9,14 @@ from django.contrib.postgres.aggregates import StringAgg
 from django.db.models import Count, Sum, Q
 
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
+from annotation.models import VariantTranscriptAnnotation, AnnotationVersion
 from classification.enums import ClinicalSignificance
 from classification.models import Classification
+from genes.models import GeneSymbol
 from snpdb.models import Variant, VariantZygosityCountCollection
 
 
-def get_method_summaries(variant, distance=None):
+def get_method_summaries(variant, annotation_version, distance=None):
     if distance is None:
         distance = settings.VARIANT_DETAILS_NEARBY_RANGE
 
@@ -36,6 +38,12 @@ def get_method_summaries(variant, distance=None):
     else:
         domain_summary = "Not in an annotated domain - no domain search performed"
 
+    vav = annotation_version.variant_annotation_version
+    if GeneSymbol.overlapping_variant(variant, vav).exists():
+        gene_summary = f"{settings.ANNOTATION_VEP_DISTANCE}bp up or downstream of a gene"
+    else:
+        gene_summary = "Intergenic, no gene search performed"
+
     start = variant.start - distance
     end = variant.end + distance
     range_summary = f"{variant.locus.contig.name}: {start}-{end} ({distance} bases)"
@@ -44,6 +52,7 @@ def get_method_summaries(variant, distance=None):
         "codon": codon_summary,
         "exon": exon_summary,
         "domain": domain_summary,
+        "genes": gene_summary,
         "range": range_summary,
     }
 
@@ -60,6 +69,7 @@ def get_nearby_qs(variant, annotation_version, distance=None):
         "codon": filter_variant_codon(qs, variant),
         "exon": filter_variant_exon(qs, variant),
         "domain": filter_variant_domain(qs, variant),
+        "genes": get_gene_symbol_filters(qs, variant, annotation_version),
         "range": filter_variant_range(qs, variant, distance=distance),
     }
 
@@ -67,19 +77,35 @@ def get_nearby_qs(variant, annotation_version, distance=None):
 def get_nearby_summaries(user, variant, annotation_version, distance=None, clinical_significance=False):
     if distance is None:
         distance = settings.VARIANT_DETAILS_NEARBY_RANGE
-    nearby_qs = get_nearby_qs(variant, annotation_version, distance=distance)
+    nearby_qs_dict = get_nearby_qs(variant, annotation_version, distance=distance)
     kwargs = {
         "user": user,
         "genome_build": annotation_version.genome_build,
         "clinical_significance": clinical_significance
     }
 
-    nearby_summaries = {}
-    for region, qs in nearby_qs.items():
+    def get_summary(qs, prefix=None):
         summary, tag_counts = interesting_summary(qs, **kwargs)
-        nearby_summaries[f"{region}_summary"] = summary
-        nearby_summaries[f"{region}_tag_counts"] = tag_counts
+        if prefix:
+            prefix_label = [prefix]
+        else:
+            prefix_label = []
+        summary_label = "_".join(prefix_label + ["summary"])
+        tag_counts_label = "_".join(prefix_label + ["tag_counts"])
+        return {
+            summary_label: summary,
+            tag_counts_label: tag_counts,
+        }
 
+    gene_summaries = {}
+    for gene_symbol, qs in nearby_qs_dict.pop("genes").items():
+        gene_summaries[gene_symbol] = get_summary(qs)
+
+    nearby_summaries = {}
+    for region, qs in nearby_qs_dict.items():
+        nearby_summaries.update(get_summary(qs, prefix=region))
+
+    nearby_summaries["genes"] = gene_summaries
     return nearby_summaries
 
 
@@ -241,3 +267,13 @@ def filter_variant_domain(qs, variant: Variant):
     else:
         qs = qs.none()
     return qs
+
+
+def get_gene_symbol_filters(qs, variant: Variant, annotation_version: AnnotationVersion) -> Dict:
+    gene_qs_dict = {}
+    vav = annotation_version.variant_annotation_version
+    for gene_symbol in GeneSymbol.overlapping_variant(variant, vav).order_by("pk"):
+        genes_qs = vav.gene_annotation_release.genes_for_symbol(gene_symbol)
+        q = VariantTranscriptAnnotation.get_overlapping_genes_q(vav, genes_qs)
+        gene_qs_dict[str(gene_symbol)] = qs.filter(q)
+    return gene_qs_dict

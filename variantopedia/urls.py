@@ -49,9 +49,12 @@ urlpatterns = [
     # Grids
     perm_path('wiki/datatable/', DatabaseTableView.as_view(column_class=VariantWikiColumns),
               name='variant_wiki_datatable'),
-    perm_path('nearby/grid/<variant_id>/<region_type>/<slug:op>/',
+    perm_path('nearby/grid/<variant_id>/<genome_build_name>/<region_type>/<slug:op>/',
               JQGridView.as_view(grid=NearbyVariantsGrid, csv_download=True),
               name='nearby_variants_grid'),
+    perm_path('nearby/grid/<variant_id>/<genome_build_name>/<region_type>/<gene_symbol>/<slug:op>/',
+              JQGridView.as_view(grid=NearbyVariantsGrid, csv_download=True),
+              name='nearby_gene_variants_grid'),
     perm_path('all_variants/grid/<genome_build_name>/<slug:op>/', JQGridView.as_view(grid=AllVariantsGrid, csv_download=True),
               name='all_variants_grid'),
     perm_path('tags/grid/<genome_build_name>/<slug:op>/',
