@@ -39,15 +39,25 @@ def queryset_to_sql(queryset: QuerySet, pretty=False) -> str:
 
 
 def get_select_from_where_parts_str(sql_str: str) -> Tuple[str, str, str]:
-    from_pos = sql_str.find("FROM")
-    where_pos = sql_str.find("WHERE", from_pos)
-    if where_pos < 0:
-        where_pos = len(sql_str)
+    parsed = sqlparse.parse(sql_str)
+    tokens = parsed[0].tokens
+    from_token_index = None
+    where_token_index = None
 
-    select_part = sql_str[:from_pos]
-    from_part = sql_str[from_pos:where_pos]
-    where_part = sql_str[where_pos:]
-    return select_part, from_part, where_part
+    for i, token in enumerate(tokens):
+        if token.is_keyword:
+            if token.value.upper() == "FROM":
+                from_token_index = i
+        elif isinstance(token, sqlparse.sql.Where):
+            where_token_index = i
+
+    if where_token_index is None:
+        where_token_index = len(tokens)
+
+    select_statement = sqlparse.sql.Statement(tokens[:from_token_index])
+    from_statement = sqlparse.sql.Statement(tokens[from_token_index:where_token_index])
+    where_statement = sqlparse.sql.Statement(tokens[where_token_index:])
+    return str(select_statement), str(from_statement), str(where_statement)
 
 
 def get_queryset_select_from_where_parts(qs: QuerySet) -> Tuple[str, str, str]:
@@ -56,7 +66,7 @@ def get_queryset_select_from_where_parts(qs: QuerySet) -> Tuple[str, str, str]:
     return get_select_from_where_parts_str(sql_str)
 
 
-def get_queryset_column_names(queryset: QuerySet, extra_columns: Iterable[str]) -> List[str]:
+def get_queryset_column_names(queryset: QuerySet, extra_columns: List[str]) -> List[str]:
     extra_names = list(queryset.query.extra_select)
     field_names = list(queryset.query.values_select)
     annotation_names = list(queryset.query.annotation_select)  # aggregate_select => annotation_select in Django 1.8

@@ -1,7 +1,13 @@
-from django.contrib.auth.models import User
-from django.db.models import Q
+from typing import Dict
 
+from django.contrib.auth.models import User
+from django.contrib.postgres.aggregates import StringAgg
+from django.db.models import Q, OuterRef, Subquery, Max, Value
+from django.db.models.functions import Coalesce
+
+from analysis.models import VariantTag
 from annotation.models import AnnotationVersion, ColumnVEPField
+from classification.models import Classification
 from library.jqgrid.jqgrid_sql import get_overrides
 from snpdb.models import CustomColumn, CustomColumnsCollection
 from snpdb.models.models_enums import ColumnAnnotationLevel
@@ -72,7 +78,7 @@ where classification_classification.allele_id in (
 
 
 SELECT_TAGGED_SQL = """
-select string_agg(coalesce(analysis_varianttag.tag_id, 'U'), '|')
+select string_agg(analysis_varianttag.tag_id, '|')
 from analysis_varianttag
 where (
     analysis_varianttag.allele_id in (
@@ -94,3 +100,22 @@ def get_variantgrid_extra_alias_and_select_columns(user: User, exclude_analysis=
         "tags_global": tags_global_sql,
     }
     return alias_and_select.items()
+
+
+def get_variantgrid_extra_annotate(user: User, exclude_analysis=None) -> Dict:
+
+    classification_qs = Classification.filter_for_user(user).filter(allele__variantallele__variant_id=OuterRef("id"))
+    internally_classified = classification_qs.annotate(cs=Coalesce("clinical_significance", Value('U'))).values("allele").annotate(cs_summary=StringAgg("cs", delimiter='|')).values_list("cs_summary")
+    max_internal_classification = classification_qs.annotate(cs=Coalesce("clinical_significance", Value('0'))).values("allele").annotate(cs_max=Max("clinical_significance")).values_list("cs_max")
+
+    tags_qs = VariantTag.filter_for_user(user).filter(allele__variantallele__variant_id=OuterRef("id"))
+    if exclude_analysis:
+        tags_qs = tags_qs.filter(Q(analysis__isnull=True) | Q(analysis__id__ne=exclude_analysis.pk))
+    tags_global = tags_qs.values("allele").annotate(tags=StringAgg("tag_id", delimiter='|')).values_list("tags")
+
+    return {
+        "internally_classified": Subquery(internally_classified[:1]),
+        "max_internal_classification": Subquery(max_internal_classification[:1]),
+        "tags_global": Subquery(tags_global[:1]),
+    }
+
