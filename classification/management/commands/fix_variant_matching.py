@@ -8,6 +8,7 @@ from classification.models.classification_variant_info_models import ResolvedVar
 from flags.models import FlagComment, FlagType
 from library.guardian_utils import admin_bot
 from library.utils import first
+from snpdb.models import GenomeBuild
 
 
 class Command(BaseCommand):
@@ -19,6 +20,7 @@ class Command(BaseCommand):
         parser.add_argument('--extra', action='store_true', default=False, help='Populate the allele_info of a classification')
         parser.add_argument('--sort', action='store_true', default=False, help='Fixes sort order for non-numerical chromosones')
         parser.add_argument('--validation', action='store_true', default=False, help='Perform validation on the pre-existing normalising/liftovers')
+        parser.add_argument('--non-coding', action='store_true', default=False, help='Fix issue #762 NR had c. instead of n.')
 
     def report_unmatched(self):
         print(f"Unmatched count = {Classification.objects.filter(variant__isnull=True).count()}")
@@ -31,6 +33,7 @@ class Command(BaseCommand):
         mode_extra = options.get('extra')
         mode_validation = options.get('validation')
         mode_sort = options.get('sort')
+        mode_non_coding = options.get('non_coding')
 
         # if mode_all and mode_missing:
         #     raise ValueError("all and missing are mutually exclusive parameters")
@@ -49,6 +52,9 @@ class Command(BaseCommand):
 
         if mode_sort:
             self.handle_fix_sort_order()
+
+        if mode_non_coding:
+            self.handle_fix_non_coding()
 
         # row_count = 0
         # batch_size = 50
@@ -230,6 +236,33 @@ class Command(BaseCommand):
                             latest_validation.confirmed_by = first(users)
                             latest_validation.confirmed_by_note = "\n".join(comments) if comments else ""
                             latest_validation.save()
+
+    @staticmethod
+    def handle_fix_non_coding():
+        rvi_qs = ResolvedVariantInfo.objects.filter(allele_info__imported_c_hgvs__icontains='n.',
+                                                    c_hgvs__icontains='c.')
+        iai_ids_to_fix = list(rvi_qs.values_list("allele_info_id", flat=True).distinct())
+        print(f"Fixing ResolvedVariantInfo for {len(iai_ids_to_fix)} ImportedAlleleInfo")
+        rvi_qs.delete()
+
+        for iai in ImportedAlleleInfo.objects.filter(pk__in=iai_ids_to_fix):
+            try:
+                variant_37 = iai.allele.variant_for_build(GenomeBuild.grch37())
+                iai.grch37 = ResolvedVariantInfo.get_or_create(allele_info=iai, genome_build=GenomeBuild.grch37(),
+                                                               variant=variant_37)
+            except ValueError:
+                pass
+
+            try:
+                variant_38 = iai.allele.variant_for_build(GenomeBuild.grch38())
+                iai.grch38 = ResolvedVariantInfo.get_or_create(allele_info=iai, genome_build=GenomeBuild.grch38(),
+                                                               variant=variant_38)
+            except ValueError:
+                pass
+
+            iai.apply_validation(force_update=True)
+            iai.save()
+
 
     # def handle_batch(self, batch: List[Classification]):
     #     ClassificationImportRun.record_classification_import("variant_rematching", len(batch))
