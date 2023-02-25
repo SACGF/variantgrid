@@ -147,7 +147,9 @@ def domain_to_pfam(value):
 
 
 def pubmed_formatter(value):
-    return "\n".join([f"PMID:{p}" for p in value.split(VEP_SEPARATOR)])
+    if value:
+        value = "\n".join([f"PMID:{p}" for p in value.split(VEP_SEPARATOR)])
+    return value
 
 
 def ekey_from_vg_column_formatters():
