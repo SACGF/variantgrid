@@ -444,7 +444,7 @@ $(document).ready(function() {
     {% endif %}
     }
 
-    handlePubMedLinks("{{ variant_annotation.pubmed }}");
+    handlePubMedLinks("{{ variant_annotation.pubmed|default_if_none:''|safe }}");
     formatField($("#dbsnp_rs_id"), formatDBSNP);
 
     // load hardcoded values through
