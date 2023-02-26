@@ -84,11 +84,14 @@ def validate_variant_fields(sender, **kwargs) -> Optional[ValidationMerger]:  # 
                 except NoTranscript:
                     # this should find its way into Validation Matching flag
                     pass
-                except ValueError as ve:
-                    # shouldn't happen as other validation should have already done this
-                    vm.add_message(evidence_key, code=ValidationCode.MATCHING_ERROR, severity='error', message=f'Error attempting to parse variant coordinate ({ve})')
                 except:
-                    vm.add_message(evidence_key, code=ValidationCode.MATCHING_ERROR, severity='error', message='Error attempting to parse variant coordinate')
+                    # this should be handled by ImportedAlleleInfo
+                    pass
+                # except ValueError as ve:
+                #     # shouldn't happen as other validation should have already done this
+                #     vm.add_message(evidence_key, code=ValidationCode.MATCHING_ERROR, severity='error', message=f'Error attempting to parse variant coordinate ({ve})')
+                # except:
+                #     vm.add_message(evidence_key, code=ValidationCode.MATCHING_ERROR, severity='error', message='Error attempting to parse variant coordinate')
 
     # check for this because if there were parsing errors we wont have any variant_values
     if len(variant_map) > 1:

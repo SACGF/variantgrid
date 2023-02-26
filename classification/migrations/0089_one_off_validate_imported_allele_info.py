@@ -17,7 +17,7 @@ class Migration(migrations.Migration):
 
     operations = [
         ManualOperation(
-            task_id=ManualOperation.task_id_manage(["fix_variant_matching", "--validation"]),
+            task_id=ManualOperation.task_id_manage(["fix_variant_matching", "--revalidate_chgvs"]),
             test=_check_has_classifications
         )
     ]
