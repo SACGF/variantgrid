@@ -206,9 +206,9 @@ def view_imported_allele_info_detail(request: HttpRequest, pk: int):
         '(?P<transcript>[^.]+?)'
         '(?P<transcript_version>\.[0-9]+)?'
         '(?P<gene_symbol>[(].*[)])?'
-        '(?P<c_dot>:c\.)'
-        '(?P<c_nomen_pos>[0-9]+)'
-        '(?P<c_nomen_change>.*)'
+        '(?P<c_dot>:[cng]\.)'
+        '(?P<c_nomen_pos>[0-9]*)'
+        '(?P<c_nomen_change>.*?)'
     )
     multi_diff = MultiDiff(HGVS_REGEX)
     parts = [MultiDiffInput(f"Imported ({allele_info.imported_genome_build_patch_version})", allele_info.imported_c_hgvs)]
