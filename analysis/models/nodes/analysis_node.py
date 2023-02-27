@@ -771,9 +771,13 @@ class AnalysisNode(node_factory('AnalysisEdge', base_model=TimeStampedModel)):
         """ Can overwrite and set to False to use parent counts """
         return True
 
+    def parent_count(self) -> int:
+        return AnalysisEdge.objects.filter(child=self).count()
+
     def get_unmodified_single_parent_node(self) -> Optional['AnalysisNode']:
         """ If a node doesn't modify single parent - can use that in some places to re-use cache """
-        if self.is_valid() and self.has_input() and not self.modifies_parents():
+
+        if self.has_input() and self.parent_count() == 1 and self.is_valid() and not self.modifies_parents():
             try:
                 return self.get_single_parent()
             except ValueError:

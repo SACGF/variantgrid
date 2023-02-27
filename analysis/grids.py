@@ -64,6 +64,10 @@ class VariantGrid(AbstractVariantGrid):
         self.node_count = node_count
         self._set_post_data(node, extra_filters)
 
+    def _get_permission_user(self):
+        """ We use the analysis user so it's consistent between users """
+        return self.node.analysis.user
+
     def _get_base_queryset(self) -> QuerySet:
         return self.node.get_queryset()
 

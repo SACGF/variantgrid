@@ -7,7 +7,7 @@ from django.db.models.functions import Coalesce
 
 from analysis.models import VariantTag
 from annotation.models import AnnotationVersion, ColumnVEPField
-from classification.models import Classification
+from classification.models import Classification, ClassificationModification
 from library.jqgrid.jqgrid_sql import get_overrides
 from snpdb.models import CustomColumn, CustomColumnsCollection
 from snpdb.models.models_enums import ColumnAnnotationLevel
@@ -61,10 +61,9 @@ def get_custom_column_fields_override_and_sample_position(custom_columns_collect
 
 
 def get_variantgrid_extra_annotate(user: User, exclude_analysis=None) -> Dict:
-
-    classification_qs = Classification.filter_for_user(user).filter(allele__variantallele__variant_id=OuterRef("id"))
-    internally_classified = classification_qs.annotate(cs=Coalesce("clinical_significance", Value('U'))).values("allele").annotate(cs_summary=StringAgg("cs", delimiter='|')).values_list("cs_summary")
-    max_internal_classification = classification_qs.annotate(cs=Coalesce("clinical_significance", Value('0'))).values("allele").annotate(cs_max=Max("clinical_significance")).values_list("cs_max")
+    classification_qs = ClassificationModification.latest_for_user(user).filter(classification__allele__variantallele__variant_id=OuterRef("id"))
+    internally_classified = classification_qs.annotate(cs=Coalesce("classification__clinical_significance", Value('U'))).values("classification__allele").annotate(cs_summary=StringAgg("cs", delimiter='|')).values_list("cs_summary")
+    max_internal_classification = classification_qs.annotate(cs=Coalesce("classification__clinical_significance", Value('0'))).values("classification__allele").annotate(cs_max=Max("classification__clinical_significance")).values_list("cs_max")
 
     tags_qs = VariantTag.filter_for_user(user).filter(allele__variantallele__variant_id=OuterRef("id"))
     if exclude_analysis:

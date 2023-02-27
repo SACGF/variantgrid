@@ -396,6 +396,9 @@ class AbstractVariantGrid(JqGridSQL):
     def _get_base_queryset(self) -> QuerySet:
         raise NotImplementedError()
 
+    def _get_permission_user(self):
+        return self.user
+
     def _get_queryset(self, request):
         qs = self._get_base_queryset()
         # Annotate so we can use global_variant_zygosity in grid columns
@@ -439,7 +442,8 @@ class AbstractVariantGrid(JqGridSQL):
 
     def _get_grid_only_annotation_kwargs(self):
         """ Things not used in counts etc - only to display grid """
-        return get_variantgrid_extra_annotate(self.user)
+        user = self._get_permission_user()
+        return get_variantgrid_extra_annotate(user)
 
     def _get_sql_and_columns(self, values_queryset, order_by: str):
         new_columns, select_part, from_part, where_part = self._get_new_columns_select_from_where_parts(values_queryset)

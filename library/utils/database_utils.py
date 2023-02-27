@@ -5,6 +5,9 @@ from django.db import connection, transaction
 # 970: Added transaction wrapper due to Postgres hanging query
 from django.db.models import QuerySet
 
+from library.cache import timed_cache
+from library.constants import DAY_SECS
+
 
 @transaction.atomic
 def run_sql(sql, params=None) -> Tuple[Any, int]:
@@ -38,6 +41,7 @@ def queryset_to_sql(queryset: QuerySet, pretty=False) -> str:
     return query_sql
 
 
+@timed_cache(ttl=DAY_SECS)
 def get_select_from_where_parts_str(sql_str: str) -> Tuple[str, str, str]:
     parsed = sqlparse.parse(sql_str)
     tokens = parsed[0].tokens
