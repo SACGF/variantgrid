@@ -1,11 +1,47 @@
+from typing import List
+
 from django.dispatch import receiver
 
 from classification.enums import ShareLevel
-from classification.models import Classification, classification_flag_types
+from classification.models import Classification, classification_flag_types, ImportedAlleleInfo, \
+    ImportedAlleleInfoStatus
 from flags.models import FlagType
 from flags.models.flag_health_check import flag_chanced_since
 from library.health_check import health_check_signal, \
-    HealthCheckRequest, HealthCheckTotalAmount, HealthCheckRecentActivity
+    HealthCheckRequest, HealthCheckTotalAmount, HealthCheckRecentActivity, HealthCheckStat
+
+
+@receiver(signal=health_check_signal)
+def allele_info_health_check(sender, health_request: HealthCheckRequest, **kwargs):
+    output: List[HealthCheckStat] = []
+
+    for status in [ImportedAlleleInfoStatus.PROCESSING, ImportedAlleleInfoStatus.MATCHED_IMPORTED_BUILD]:
+        not_complete = ImportedAlleleInfo.objects.filter(status=status).count()
+        if not_complete:
+            output.append(HealthCheckTotalAmount(
+                emoji=":hourglass_flowing_sand:",
+                amount=not_complete,
+                name=f"Imported Allele Matching in status of {status.name}"
+            ))
+
+    last_failures = ImportedAlleleInfo.objects.filter(latest_validation__created__gte=health_request.since, latest_validation__include=False).\
+        select_related('imported_genome_build_patch_version')
+    last_failures_count = last_failures.count()
+
+    if last_failures_count:
+        extra = None
+        if last_failures_count <= 5:
+            extra = ", ".join(f"{failure.imported_c_hgvs} {failure.imported_genome_build_patch_version}" for failure in last_failures)
+
+        output.append(HealthCheckRecentActivity(
+            emoji=":warning:",
+            name="Variant Matching Issues",
+            amount=last_failures_count,
+            extra=extra,
+            stand_alone=True  # doesn't make sense ot merge this with other activity numbers
+        ))
+
+    return output
 
 
 @receiver(signal=health_check_signal)
