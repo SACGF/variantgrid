@@ -882,9 +882,10 @@ const VCForm = (function() {
             if (vc_value) {
                 return vc_value;
             }
-            if (this.allele.resolved) {
+            if (this.allele && this.allele.resolved) {
                 return this.allele.resolved.full;
             }
+            return this.value(SpecialEKeys.G_HGVS);
         },
 
         populateForm(restrictToKeysSet) {
