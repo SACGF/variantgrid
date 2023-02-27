@@ -646,15 +646,15 @@ class ImportedAlleleInfo(TimeStampedModel):
             # should we actually do allele info changed signal? or save it for after we've matched
             allele_info_changed_signal.send(sender=ImportedAlleleInfo, allele_info=self)
 
-    def refresh_and_save(self, force_update=False):
+    def refresh_and_save(self, force_update=False, liftover_complete=False):
         """
         Updates linked variants (c.hgvs, etc)
         """
         if va := self.matched_variant:
             # chances are that variant is linked to an allele now
-            self.set_variant_and_save(matched_variant=va, force_update=force_update)
+            self.set_variant_and_save(matched_variant=va, force_update=force_update, liftover_complete=liftover_complete)
 
-    def set_variant_and_save(self, matched_variant: Variant, message: Optional[str] = None, force_update: bool = False):
+    def set_variant_and_save(self, matched_variant: Variant, message: Optional[str] = None, force_update: bool = False, liftover_complete: bool = False):
         """
         Call to update this object, and attached ResolvedVariantInfos (will check if matched_variant has an attached allele).
         If the variant is not yet attached to an allele (or the attached allele doesn't have a variant for each build yet
@@ -697,7 +697,7 @@ class ImportedAlleleInfo(TimeStampedModel):
             # no allele, but we do have the variant for the current genome build
             self._update_variant(self.imported_genome_build_patch_version.genome_build, matched_variant, force_update)
 
-        if applied_all:
+        if applied_all or liftover_complete:
             self.status = ImportedAlleleInfoStatus.MATCHED_ALL_BUILDS
         else:
             self.status = ImportedAlleleInfoStatus.MATCHED_IMPORTED_BUILD
