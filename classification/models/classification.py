@@ -2070,7 +2070,6 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 "variant_coordinate": allele_info.variant_coordinate
             }
 
-
             if (genome_build := self.get_genome_build_opt()) and \
                     (preferred_build := allele_info[self.get_genome_build()]) and \
                     (c_hgvs := preferred_build.c_hgvs_obj):
@@ -2083,8 +2082,8 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 include = latest_validation.include
 
             resolved_dict["include"] = include
-            resolved_dict.update(ImportedAlleleInfo.icon_for(status=allele_info.status,
-                                                             include=include).as_json())
+            if warning_icon := ImportedAlleleInfo.icon_for(status=allele_info.status, include=include):
+                resolved_dict.update(warning_icon.as_json())
 
             allele_info_dict["resolved"] = resolved_dict
 
