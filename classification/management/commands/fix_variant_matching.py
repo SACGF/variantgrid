@@ -19,6 +19,8 @@ class Command(BaseCommand):
         # parser.add_argument('--missing', action='store_true', default=False, help='Attempt to rematch only classifications not linked to a variant - one at a time')
         parser.add_argument('--extra', action='store_true', default=False, help='Populate the allele_info of a classification')
         parser.add_argument('--sort', action='store_true', default=False, help='Fixes sort order for non-numerical chromosones')
+        parser.add_argument('--revalidate_chgvs', action='store_true', default=False,
+                            help='Perform re-validation on any records without outstanding c.hgvs issues')
         parser.add_argument('--validation', action='store_true', default=False, help='Perform validation on the pre-existing normalising/liftovers')
         parser.add_argument('--non-coding', action='store_true', default=False, help='Fix issue #762 NR had c. instead of n.')
 
@@ -33,6 +35,7 @@ class Command(BaseCommand):
         mode_extra = options.get('extra')
         mode_validation = options.get('validation')
         mode_sort = options.get('sort')
+        mode_revalidation_chgvs = options.get('revalidate_chgvs')
         mode_non_coding = options.get('non_coding')
 
         # if mode_all and mode_missing:
@@ -53,6 +56,8 @@ class Command(BaseCommand):
         if mode_sort:
             self.handle_fix_sort_order()
 
+        if mode_revalidation_chgvs:
+            self.handle_revalidate_chgvs()
         if mode_non_coding:
             self.handle_fix_non_coding()
 
@@ -134,6 +139,21 @@ class Command(BaseCommand):
             if c.update_allele_info_from_classification(force_update=False):
                 c.save(update_modified=False)
         print(f"Finished {i} classifications")
+
+    def handle_revalidate_chgvs(self):
+        def c_hgvs_validation(c: Classification) -> str:
+            if c_hgvs := c.evidence.get('c_hgvs'):
+                if validation := c_hgvs.get('validation'):
+                    return ", ".join(vm.get('message') for vm in validation)
+            return "<no issues - but check imported allele info>"
+
+        user = admin_bot()
+        for c in Classification.objects.filter(evidence__c_hgvs__validation__isnull=False):
+            before = c_hgvs_validation(c)
+            # revalidate calls save
+            c.revalidate(user=user)
+            after = c_hgvs_validation(c)
+            print(f"{c.id} from {before} to {after}")
 
     def handle_validation(self):
         def get_flag_comments(flag_type: FlagType, resolution_id: str) -> Dict[int, FlagComment]:

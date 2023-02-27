@@ -9,6 +9,9 @@ from variantgrid.settings.env.shariant import *  # pylint: disable=wildcard-impo
 
 # we import Shariant settings, all that's left is the overrides
 
+# don't allow non admin users in while we're validation
+MAINTENANCE_MODE = True
+
 # import all the base settings #
 SITE_ID = 6
 SLACK['emoji'] = ':mouse:'

@@ -2077,10 +2077,13 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             elif c_hgvs_raw := self.get(SpecialEKeys.C_HGVS):
                 resolved_dict.update(CHGVS(c_hgvs_raw).to_json())
 
-            resolved_dict["allele_id"] = allele_info.allele_id
-            resolved_dict["status"] = allele_info.status
+            include = False
             if latest_validation := allele_info.latest_validation:
-                resolved_dict["include"] = latest_validation.include
+                include = latest_validation.include
+
+            resolved_dict["include"] = include
+            if warning_icon := ImportedAlleleInfo.icon_for(status=allele_info.status, include=include):
+                resolved_dict.update(warning_icon.as_json())
 
             allele_info_dict["resolved"] = resolved_dict
 
