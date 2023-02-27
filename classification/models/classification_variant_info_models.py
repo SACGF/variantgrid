@@ -684,20 +684,23 @@ class ImportedAlleleInfo(TimeStampedModel):
             self.save()
 
         applied_all = False
+        applied_any = False
         if matched_allele:
             # we have an allele, attempt to update config of relevant genome builds
             missing_variant = False
             for genome_build in ImportedAlleleInfo._genome_builds():
                 variant = self.allele.variant_for_build_optional(genome_build)
                 self._update_variant(genome_build, variant, force_update)
-                if not variant:
+                if variant:
+                    applied_any = True
+                else:
                     missing_variant = True
             applied_all = not missing_variant
         elif matched_variant:
             # no allele, but we do have the variant for the current genome build
             self._update_variant(self.imported_genome_build_patch_version.genome_build, matched_variant, force_update)
 
-        if applied_all or liftover_complete:
+        if applied_all or (liftover_complete and applied_any):
             self.status = ImportedAlleleInfoStatus.MATCHED_ALL_BUILDS
         else:
             self.status = ImportedAlleleInfoStatus.MATCHED_IMPORTED_BUILD
