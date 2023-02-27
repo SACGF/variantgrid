@@ -9,6 +9,7 @@ from flags.models import FlagType
 from flags.models.flag_health_check import flag_chanced_since
 from library.health_check import health_check_signal, \
     HealthCheckRequest, HealthCheckTotalAmount, HealthCheckRecentActivity, HealthCheckStat
+from library.utils import pretty_label
 
 
 @receiver(signal=health_check_signal)
@@ -21,7 +22,7 @@ def allele_info_health_check(sender, health_request: HealthCheckRequest, **kwarg
             output.append(HealthCheckTotalAmount(
                 emoji=":hourglass_flowing_sand:",
                 amount=not_complete,
-                name=f"Imported Allele Matching in status of {status.name}"
+                name=f"Imported Allele Matching in status of {status.label}"
             ))
 
     last_failures = ImportedAlleleInfo.objects.filter(latest_validation__created__gte=health_request.since, latest_validation__include=False).\
