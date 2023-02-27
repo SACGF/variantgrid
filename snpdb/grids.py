@@ -13,8 +13,8 @@ from library.jqgrid.jqgrid_user_row_config import JqGridUserRowConfig
 from library.unit_percent import get_allele_frequency_formatter
 from library.utils import calculate_age
 from library.utils.database_utils import get_queryset_column_names, \
-    get_queryset_select_from_where_parts
-from snpdb.grid_columns.custom_columns import get_variantgrid_extra_alias_and_select_columns
+    get_queryset_select_from_where_parts, queryset_to_sql
+from snpdb.grid_columns.custom_columns import get_variantgrid_extra_annotate
 from snpdb.models import VCF, Cohort, Sample, ImportStatus, \
     GenomicIntervalsCollection, CustomColumnsCollection, Variant, Trio, UserGridConfig, GenomeBuild, ClinGenAllele, \
     VariantZygosityCountCollection, TagColorsCollection
@@ -396,6 +396,9 @@ class AbstractVariantGrid(JqGridSQL):
     def _get_base_queryset(self) -> QuerySet:
         raise NotImplementedError()
 
+    def _get_permission_user(self):
+        return self.user
+
     def _get_queryset(self, request):
         qs = self._get_base_queryset()
         # Annotate so we can use global_variant_zygosity in grid columns
@@ -411,10 +414,12 @@ class AbstractVariantGrid(JqGridSQL):
         return qs
 
     def get_values_queryset(self, request, field_names: List = None):
+        queryset = self._get_queryset(request)
         if field_names is None:
             field_names = self.get_queryset_field_names()
-
-        queryset = self._get_queryset(request)
+            a_kwargs = self._get_grid_only_annotation_kwargs()
+            queryset = queryset.annotate(**a_kwargs)
+            field_names.extend(a_kwargs)
         return queryset.values(*field_names)
 
     def get_sql_params_and_columns(self, request):
@@ -435,20 +440,19 @@ class AbstractVariantGrid(JqGridSQL):
         sql, column_names = self._get_sql_and_columns(values_queryset, order_by)
         return sql, [], column_names, is_sorted
 
-    def _get_variantgrid_extra_alias_and_select_columns(self):
-        return get_variantgrid_extra_alias_and_select_columns(self.user)
+    def _get_grid_only_annotation_kwargs(self):
+        """ Things not used in counts etc - only to display grid """
+        user = self._get_permission_user()
+        return get_variantgrid_extra_annotate(user)
 
     def _get_sql_and_columns(self, values_queryset, order_by: str):
         new_columns, select_part, from_part, where_part = self._get_new_columns_select_from_where_parts(values_queryset)
 
         extra_column_selects = []
-        for alias, select in self._get_variantgrid_extra_alias_and_select_columns():
-            extra_column_selects.append(f'({select}) as "{alias}"')
-            new_columns.append(alias)
-
         if order_by:  # SELECT DISTINCT, ORDER BY expressions must appear in select list
             extra_column_selects.append(order_by)
-        select_part += ",\n" + ",\n".join(extra_column_selects)
+        if extra_column_selects:
+            select_part += ",\n" + ",\n".join(extra_column_selects)
 
         sql = '\n'.join([select_part, from_part, where_part])
         column_names = get_queryset_column_names(values_queryset, new_columns)

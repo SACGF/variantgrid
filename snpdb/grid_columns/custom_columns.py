@@ -1,7 +1,13 @@
-from django.contrib.auth.models import User
-from django.db.models import Q
+from typing import Dict
 
+from django.contrib.auth.models import User
+from django.contrib.postgres.aggregates import StringAgg
+from django.db.models import Q, OuterRef, Subquery, Max, Value
+from django.db.models.functions import Coalesce
+
+from analysis.models import VariantTag
 from annotation.models import AnnotationVersion, ColumnVEPField
+from classification.models import Classification, ClassificationModification
 from library.jqgrid.jqgrid_sql import get_overrides
 from snpdb.models import CustomColumn, CustomColumnsCollection
 from snpdb.models.models_enums import ColumnAnnotationLevel
@@ -54,43 +60,18 @@ def get_custom_column_fields_override_and_sample_position(custom_columns_collect
     return fields, override, sample_columns_position
 
 
-SELECT_INTERNALLY_CLASSIFIED_SQL = """
-select string_agg(coalesce(classification_classification.clinical_significance, 'U'), '|')
-from classification_classification
-where classification_classification.allele_id in (
-    select allele_id from snpdb_variantallele where variant_id = snpdb_variant.id
-)
-"""
+def get_variantgrid_extra_annotate(user: User, exclude_analysis=None) -> Dict:
+    classification_qs = ClassificationModification.latest_for_user(user).filter(classification__allele__variantallele__variant_id=OuterRef("id"))
+    internally_classified = classification_qs.annotate(cs=Coalesce("classification__clinical_significance", Value('U'))).values("classification__allele").annotate(cs_summary=StringAgg("cs", delimiter='|')).values_list("cs_summary")
+    max_internal_classification = classification_qs.annotate(cs=Coalesce("classification__clinical_significance", Value('0'))).values("classification__allele").annotate(cs_max=Max("classification__clinical_significance")).values_list("cs_max")
 
-SELECT_MAX_INTERNAL_CLASSIFICATION = """
-select max(coalesce(classification_classification.clinical_significance, '0'))
-from classification_classification
-where classification_classification.allele_id in (
-    select allele_id from snpdb_variantallele where variant_id = snpdb_variant.id
-)
-"""
-
-
-SELECT_TAGGED_SQL = """
-select string_agg(coalesce(analysis_varianttag.tag_id, 'U'), '|')
-from analysis_varianttag
-where (
-    analysis_varianttag.allele_id in (
-        select allele_id from snpdb_variantallele where variant_id = snpdb_variant.id
-    )
-)
-"""
-
-
-def get_variantgrid_extra_alias_and_select_columns(user: User, exclude_analysis=None):
-    # TODO: Need to add user level security to classifications and tags
-    tags_global_sql = SELECT_TAGGED_SQL
+    tags_qs = VariantTag.filter_for_user(user).filter(allele__variantallele__variant_id=OuterRef("id"))
     if exclude_analysis:
-        tags_global_sql += " AND (analysis_varianttag.analysis_id IS NULL OR analysis_varianttag.analysis_id <> %d)" % exclude_analysis.pk
+        tags_qs = tags_qs.filter(Q(analysis__isnull=True) | Q(analysis__id__ne=exclude_analysis.pk))
+    tags_global = tags_qs.values("allele").annotate(tags=StringAgg("tag_id", delimiter='|')).values_list("tags")
 
-    alias_and_select = {
-        "internally_classified": SELECT_INTERNALLY_CLASSIFIED_SQL,
-        "max_internal_classification": SELECT_MAX_INTERNAL_CLASSIFICATION,
-        "tags_global": tags_global_sql,
+    return {
+        "internally_classified": Subquery(internally_classified[:1]),
+        "max_internal_classification": Subquery(max_internal_classification[:1]),
+        "tags_global": Subquery(tags_global[:1]),
     }
-    return alias_and_select.items()

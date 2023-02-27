@@ -24,7 +24,7 @@ from ontology.grids import AbstractOntologyGenesGrid
 from ontology.models import OntologyTermRelation, GeneDiseaseClassification, OntologyVersion
 from patients.models_enums import Zygosity
 from snpdb.grid_columns.custom_columns import get_custom_column_fields_override_and_sample_position, \
-    get_variantgrid_extra_alias_and_select_columns
+    get_variantgrid_extra_annotate
 from snpdb.grid_columns.grid_sample_columns import get_columns_and_sql_parts_for_cohorts, get_available_format_columns
 from snpdb.grids import AbstractVariantGrid
 from snpdb.models import VariantGridColumn, UserGridConfig, VCFFilter, Sample, CohortGenotype
@@ -64,6 +64,10 @@ class VariantGrid(AbstractVariantGrid):
         self.node_count = node_count
         self._set_post_data(node, extra_filters)
 
+    def _get_permission_user(self):
+        """ We use the analysis user so it's consistent between users """
+        return self.node.analysis.user
+
     def _get_base_queryset(self) -> QuerySet:
         return self.node.get_queryset()
 
@@ -98,8 +102,9 @@ class VariantGrid(AbstractVariantGrid):
             q = get_extra_filters_q(analysis.user, analysis.genome_build, self.node_count.label)
         return q
 
-    def _get_variantgrid_extra_alias_and_select_columns(self):
-        return get_variantgrid_extra_alias_and_select_columns(self.user, exclude_analysis=self.node.analysis)
+    def _get_grid_only_annotation_kwargs(self):
+        """ Things not used in counts etc - only to display grid """
+        return get_variantgrid_extra_annotate(self.user, exclude_analysis=self.node.analysis)
 
     def _get_new_columns_select_from_where_parts(self, values_queryset) -> Tuple[List[str], str, str, str]:
         cohorts, _visibility = self.node.get_cohorts_and_sample_visibility()
