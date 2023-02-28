@@ -22,10 +22,14 @@ def allele_info_health_check(sender, health_request: HealthCheckRequest, **kwarg
             output.append(HealthCheckTotalAmount(
                 emoji=":hourglass_flowing_sand:",
                 amount=not_complete,
-                name=f"Imported Allele Matching in status of {status.label}"
+                name=f"Imported Allele Matching in status of \"{status.label}\""
             ))
 
-    last_failures = ImportedAlleleInfo.objects.filter(latest_validation__created__gte=health_request.since, latest_validation__include=False).\
+    last_failures = ImportedAlleleInfo.objects.filter(
+        latest_validation__created__gte=health_request.since,
+        latest_validation__created__lte=health_request.now,
+        latest_validation__include=False
+    ).\
         select_related('imported_genome_build_patch_version')
     last_failures_count = last_failures.count()
 

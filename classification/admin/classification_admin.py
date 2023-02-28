@@ -11,8 +11,8 @@ from classification.autopopulate_evidence_keys.evidence_from_variant import get_
 from classification.classification_import import reattempt_variant_matching
 from classification.enums.classification_enums import EvidenceCategory, SpecialEKeys, SubmissionSource, ShareLevel
 from classification.models import EvidenceKey, EvidenceKeyMap, DiscordanceReport, DiscordanceReportClassification, \
-ClinicalContext, ClassificationReportTemplate, ClassificationModification, \
-    UploadedClassificationsUnmapped, ImportedAlleleInfo, ClassificationImport
+    ClinicalContext, ClassificationReportTemplate, ClassificationModification, \
+    UploadedClassificationsUnmapped, ImportedAlleleInfo, ClassificationImport, ImportedAlleleInfoStatus
 from classification.models.classification import Classification
 from classification.models.classification_import_run import ClassificationImportRun, ClassificationImportRunStatus
 from classification.models.classification_variant_info_models import ResolvedVariantInfo, ImportedAlleleInfoValidation
@@ -784,7 +784,7 @@ class ImportedAlleleInfoAdmin(ModelAdminBasics):
             iaiv.confirmed_by = request.user
             iaiv.save()
 
-    @admin_action("Confirm Reset")
+    @admin_action("Confirm Reset to Default")
     def remove_confirmation(self, request, queryset: QuerySet[ImportedAlleleInfo]):
         queryset = queryset.select_related('latest_validation')
         iai: ImportedAlleleInfo
@@ -794,6 +794,22 @@ class ImportedAlleleInfoAdmin(ModelAdminBasics):
             iavi.confirmed = False
             iavi.confirmed_by = None
             iavi.save()
+
+    @admin_action("Mark as Completed")
+    def remove_confirmation(self, request, queryset: QuerySet[ImportedAlleleInfo]):
+        iai: ImportedAlleleInfo
+        marked_complete = 0
+        marked_failed = 0
+        for iai in queryset.filter(status__in=(ImportedAlleleInfoStatus.PROCESSING, ImportedAlleleInfoStatus.MATCHED_IMPORTED_BUILD)):
+            if iai.allele_id and (iai.grch37_id or iai.grch38_id):
+                iai.status = ImportedAlleleInfoStatus.MATCHED_ALL_BUILDS
+                marked_complete += 1
+            else:
+                iai.status = ImportedAlleleInfoStatus.FAILED
+                marked_failed += 1
+            iai.save()
+        self.message_user(request, message=f'Records now marked as complete {marked_complete}, records marked as failure {marked_failed}',
+                          level=messages.INFO)
 
     def has_add_permission(self, request):
         return False
