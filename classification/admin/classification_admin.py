@@ -12,7 +12,8 @@ from classification.classification_import import reattempt_variant_matching
 from classification.enums.classification_enums import EvidenceCategory, SpecialEKeys, SubmissionSource, ShareLevel
 from classification.models import EvidenceKey, EvidenceKeyMap, DiscordanceReport, DiscordanceReportClassification, \
     ClinicalContext, ClassificationReportTemplate, ClassificationModification, \
-    UploadedClassificationsUnmapped, ImportedAlleleInfo, ClassificationImport, ImportedAlleleInfoStatus
+    UploadedClassificationsUnmapped, ImportedAlleleInfo, ClassificationImport, ImportedAlleleInfoStatus, \
+    classification_flag_types
 from classification.models.classification import Classification
 from classification.models.classification_import_run import ClassificationImportRun, ClassificationImportRunStatus
 from classification.models.classification_variant_info_models import ResolvedVariantInfo, ImportedAlleleInfoValidation
@@ -317,10 +318,10 @@ class ClassificationAdmin(ModelAdminBasics):
         in_error = 0
         published = 0
         for vc in queryset:
-            if vc.share_level_enum >= share_level:
-                already_published += 1
-            elif vc.has_errors():
+            if vc.has_errors():
                 in_error += 1
+            if vc.share_level_enum >= share_level and not vc.has_outstanding_changes():
+                already_published += 1
             else:
                 try:
                     vc.publish_latest(user=request.user, share_level=share_level)
@@ -328,11 +329,18 @@ class ClassificationAdmin(ModelAdminBasics):
                 except ValueError as ve:
                     self.message_user(request, message='Error when publishing - ' + str(ve),
                                       level=messages.ERROR)
+            if not in_error and not vc.has_outstanding_changes():
+                vc.flag_collection.ensure_resolution(
+                    flag_type=classification_flag_types.classification_outstanding_edits,
+                    resolution='closed'
+                )
+
         if already_published:
             self.message_user(request, message=f"({already_published}) records had been previously published", level=messages.INFO)
         if in_error:
             self.message_user(request, message=f"({in_error}) records can't be published due to validation errors", level=messages.ERROR)
-        self.message_user(request, message=f"({published}) records have been freshly published", level=messages.INFO)
+        if published:
+            self.message_user(request, message=f"({published}) records have been freshly published", level=messages.INFO)
 
     @admin_action("Publish: Organisation")
     def publish_org(self, request, queryset):
