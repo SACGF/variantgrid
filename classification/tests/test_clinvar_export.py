@@ -5,12 +5,13 @@ from django.test import TestCase, override_settings
 
 from classification.enums import SpecialEKeys, SubmissionSource, ShareLevel
 from classification.models import Classification, ClinVarExport, ClinVarExportBatch, ClinVarExportStatus, \
-    ClinVarExportRequestType, ClinVarExportRequest, ClinVarExportBatchStatus
+    ClinVarExportRequestType, ClinVarExportRequest, ClinVarExportBatchStatus, ImportedAlleleInfo
+from classification.models.classification_variant_info_models import ResolvedVariantInfo, ImportedAlleleInfoValidation
 from classification.models.clinvar_export_prepare import ClinvarExportPrepare
 from classification.models.clinvar_export_sync import clinvar_export_sync, ClinVarResponseOutcome
 from classification.models.tests.test_utils import ClassificationTestUtils
 from library.guardian_utils import admin_bot
-from snpdb.models import GenomeBuild, ClinVarKey
+from snpdb.models import GenomeBuild, ClinVarKey, GenomeBuildPatchVersion
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant, create_mock_allele
 from uicore.json.json_types import JsonObjType
 
@@ -160,12 +161,29 @@ class TestClinVarExport(TestCase):
 
         c.publish_latest(user=admin_bot(), share_level=ShareLevel.PUBLIC)
 
+        allele_info = ImportedAlleleInfo.objects.create(
+            allele=allele,
+            imported_genome_build_patch_version=GenomeBuildPatchVersion.get_unspecified_patch_version_for(GenomeBuild.grch37()),
+            imported_c_hgvs="NM_000001.2(TECTA):c.1913G>A"
+        )
+        validation = ImportedAlleleInfoValidation.objects.create(
+            imported_allele_info=allele_info,
+            include=True
+        )
+        variant_info = ResolvedVariantInfo.objects.create(
+            genome_build=GenomeBuild.grch37(),
+            variant=variant,
+            allele_info=allele_info,
+            c_hgvs="NM_000001.2(TECTA):c.1913G>A",
+            c_hgvs_full="NM_000001.2(TECTA):c.1913G>A"
+        )
+        allele_info.grch37 = variant_info
+        allele_info.latest_validation = validation
+        allele_info.save()
+
         c.variant = variant
         c.allele = allele
-        c.update_allele_info_from_classification()
-        c.allele_info.grch37.c_hgvs = "NM_000001.2(TECTA):c.1913G>A"
-        c.allele_info.grch37.c_hgvs_full = "NM_000001.2(TECTA):c.1913G>A"
-        c.allele_info.grch37.save()
+        c.allele_info = allele_info
         # c.chgvs_grch37 = "NM_000001.2(TECTA):c.1913G>A"
         # c.chgvs_grch37_full = "NM_000001.2(TECTA):c.1913G>A"
         c.condition_resolution = {"sort_text": "ataxia-telangiectasia with generalized skin pigmentation and early death",
