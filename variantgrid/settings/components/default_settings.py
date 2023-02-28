@@ -521,6 +521,8 @@ SEARCH_VARIANT_REQUIRE_CLASSIFICATION_FOR_NON_ADMIN = False  # set True to only 
 SEARCH_SUMMARY = True
 SEARCH_SUMMARY_VARIANT_SHOW_CLINVAR = True
 SEARCH_SUMMARY_VARIANT_SHOW_CLASSIFICATIONS = True
+SEARCH_CLASSIFICATION_HGVS_SUFFIX = True  # search for 'c.407T>A'
+
 SILENCED_SYSTEM_CHECKS = ['models.E006']  # 'captcha.recaptcha_test_key_error']
 SITE_ID = 2
 SITE_MESSAGE = None  # displayed at the top of all logged-in pages

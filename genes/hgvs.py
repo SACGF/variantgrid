@@ -497,7 +497,7 @@ class HGVSMatcher:
     TRANSCRIPT_NO_UNDERSCORE = re.compile(r"(NM|NC)(\d+)")
     TRANSCRIPT_UNDERSCORE_REPLACE = r"\g<1>_\g<2>"
     # noinspection RegExpSingleCharAlternation
-    HGVS_SLOPPY_PATTERN = re.compile(r"(\d):?(c|g|p)\.?(\d+)")
+    HGVS_SLOPPY_PATTERN = re.compile(r"(\d):?(c|g|n|p)\.?(\d+)")
     HGVS_SLOPPY_REPLACE = r"\g<1>:\g<2>.\g<3>"
     HGVS_TRANSCRIPT_NO_CDOT = re.compile(r"^(NM_|ENST)\d+.*:\d+")
     HGVS_CONTIG_NO_GDOT = re.compile(r"^NC_\d+.*:\d+")

@@ -2,10 +2,13 @@ import operator
 from functools import reduce
 from typing import Any, Union, Optional
 
+from django.conf import settings
 from django.db.models import Q
 from django.dispatch import receiver
 from django.utils.safestring import SafeString
+from pyhgvs import HGVSName, InvalidHGVSName
 
+from annotation.models import VariantAnnotationVersion
 from classification.enums import SpecialEKeys
 from classification.models import Classification, ClassificationModification, EvidenceKeyMap
 from snpdb.models import Lab, Organization
@@ -59,16 +62,36 @@ def search_classifications(sender: Any, search_input: SearchInput, **kwargs) -> 
             if lab_qs:
                 filters.append(Q(classification__lab_record_id=lab_record_id) & Q(classification__lab__in=lab_qs))
 
-    q_vcm = reduce(operator.or_, filters)
-    vcm_qs = ClassificationModification.filter_for_user(search_input.user).filter(is_last_published=True)
-    vcm_ids = vcm_qs.filter(q_vcm).values('classification')
+    # We can also filter for c.HGVS in classifications
+    if settings.SEARCH_CLASSIFICATION_HGVS_SUFFIX:
+        if search_string.startswith("c.") or search_string.startswith("n."):
+            cdna = search_string[2:]
+            try:
+                hgvs_name = HGVSName()
+                hgvs_name.parse_cdna(cdna)  # Valid HGVS cdna section
+
+                # Look for direct string in evidence
+                filters.append(Q(classification__evidence__c_hgvs__icontains=search_string))
+
+                # Look for HGVS in transcript annotation pointing to classified allele
+                vav = VariantAnnotationVersion.latest(search_input.genome_build_preferred)
+                vta_path = "classification__allele__variantallele__variant__varianttranscriptannotation"
+                filters.append(Q(**{f"{vta_path}__version": vav,
+                                    f"{vta_path}__hgvs_c__endswith": search_string}))
+
+            except InvalidHGVSName:
+                pass
+
+    q_cm = reduce(operator.or_, filters)
+    cm_qs = ClassificationModification.filter_for_user(search_input.user).filter(is_last_published=True)
+    cm_ids = cm_qs.filter(q_cm).values('classification')
 
     # check for source ID but only for labs that the user belongs to
-    vcm_source_ids = vcm_qs.filter(classification__lab__in=Lab.valid_labs_qs(search_input.user, admin_check=True)).filter(
+    cm_source_ids = cm_qs.filter(classification__lab__in=Lab.valid_labs_qs(search_input.user, admin_check=True)).filter(
         classification__last_source_id=search_string).values('classification')
 
     # convert from modifications back to Classification so absolute_url returns the editable link
-    qs = Classification.objects.filter(Q(pk__in=vcm_ids) | Q(pk__in=vcm_source_ids))
+    qs = Classification.objects.filter(Q(pk__in=cm_ids) | Q(pk__in=cm_source_ids))
     response.extend(SearchResponseClassification.from_iterable(qs))
 
     return response

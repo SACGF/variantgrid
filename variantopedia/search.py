@@ -665,25 +665,26 @@ def search_hgvs(search_string: str, user: User, genome_build: GenomeBuild, varia
     # TODO: alter initial_score based on warning messages of alt not matching?
     # also - _lrg_get_variant_tuple should add matches_reference to search warnings list
 
-    try:
-        results = get_results_from_variant_tuples(variant_qs, variant_tuple)
-        variant = results.get()
-        if classify:
-            transcript_id = hgvs_matcher.get_transcript_id(hgvs_string,
-                                                           transcript_version=False)
-            return [SearchResult(ClassifyVariant(variant, transcript_id),
-                                 message=search_messages, initial_score=initial_score)]
-        return [SearchResult(variant, message=search_messages, initial_score=initial_score,
-                             is_single_build=kind == 'g')]
-    except Variant.DoesNotExist:
-        variant_string = Variant.format_tuple(*variant_tuple)
-        variant_string_abbreviated = Variant.format_tuple(*variant_tuple, abbreviate=True)
-        search_messages.append(f"'{search_string}' resolved to {variant_string_abbreviated}")
-        results = [SearchResult(CreateManualVariant(genome_build, variant_string),
-                                message=search_messages, initial_score=initial_score)]
-        results.extend(search_for_alt_alts(variant_qs, variant_tuple, search_messages))
-        return results
-
+    if variant_tuple:
+        try:
+            results = get_results_from_variant_tuples(variant_qs, variant_tuple)
+            variant = results.get()
+            if classify:
+                transcript_id = hgvs_matcher.get_transcript_id(hgvs_string,
+                                                               transcript_version=False)
+                return [SearchResult(ClassifyVariant(variant, transcript_id),
+                                     message=search_messages, initial_score=initial_score)]
+            return [SearchResult(variant, message=search_messages, initial_score=initial_score,
+                                 is_single_build=kind == 'g')]
+        except Variant.DoesNotExist:
+            variant_string = Variant.format_tuple(*variant_tuple)
+            variant_string_abbreviated = Variant.format_tuple(*variant_tuple, abbreviate=True)
+            search_messages.append(f"'{search_string}' resolved to {variant_string_abbreviated}")
+            results = [SearchResult(CreateManualVariant(genome_build, variant_string),
+                                    message=search_messages, initial_score=initial_score)]
+            results.extend(search_for_alt_alts(variant_qs, variant_tuple, search_messages))
+            return results
+    return []
 
 def search_for_alt_alts(variant_qs: QuerySet, variant_tuple: VariantCoordinate, messages: List[str]) -> VARIANT_SEARCH_RESULTS:
     if not messages:
