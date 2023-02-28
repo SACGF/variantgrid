@@ -10,6 +10,15 @@ from library.utils import DebugTimer
 
 
 @receiver(classification_post_publish_signal, sender=Classification)
+def turn_off_unsubmitted_edits(sender, classification, previously_published, newly_published, user, debug_timer: DebugTimer, **kwargs):  # pylint: disable=unused-argument
+    # somewhat redundant to Classification.insert() but if publish is called without an insert, the outstanding edits flag wont be closed
+    classification.flag_collection_safe.ensure_resolution(
+        flag_type=classification_flag_types.classification_outstanding_edits,
+        resolution='closed'
+    )
+
+
+@receiver(classification_post_publish_signal, sender=Classification)
 def published(sender, classification, previously_published, newly_published, user, debug_timer: DebugTimer, **kwargs):  # pylint: disable=unused-argument
 
     if classification.share_level_enum.index > ShareLevel.INSTITUTION.index:
