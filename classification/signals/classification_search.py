@@ -75,8 +75,10 @@ def search_classifications(sender: Any, search_input: SearchInput, **kwargs) -> 
 
                 # Look for HGVS in transcript annotation pointing to classified allele
                 vav = VariantAnnotationVersion.latest(search_input.genome_build_preferred)
-                vta_path = "classification__allele__variantallele__variant__varianttranscriptannotation"
-                filters.append(Q(**{f"{vta_path}__version": vav,
+                va_path = "classification__allele__variantallele"
+                vta_path = f"{va_path}__variant__varianttranscriptannotation"
+                filters.append(Q(**{f"{va_path}__genome_build": search_input.genome_build_preferred,
+                                    f"{vta_path}__version": vav,
                                     f"{vta_path}__hgvs_c__endswith": search_string}))
 
             except InvalidHGVSName:
