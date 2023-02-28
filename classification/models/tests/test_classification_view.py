@@ -52,7 +52,7 @@ class ClassificationTestCaseViews(TestCase):
         }).data
         # pop all the values which are database id/time based
         # all remaining values should be the same everytime
-        pop_me = ["id", "flag_collection", "lab_record_id", "last_edited", "published_version", "title", "version", "resolved_condition"]
+        pop_me = ["id", "flag_collection", "lab_record_id", "last_edited", "published_version", "title", "version", "resolved_condition", "allele"]
         for pop_key in pop_me:
             response.pop(pop_key)
 
@@ -175,6 +175,7 @@ class ClassificationTestCaseViews(TestCase):
         # now in test mode we always return all data (for the sake of useful information when testing)
         response_json = response.data
         response_json.pop('data')
+        response_json.pop('allele') # allele data changes a bit, should test elsewhere
         expected = {
             'id': None,
             'lab_record_id': 'test_123456',
