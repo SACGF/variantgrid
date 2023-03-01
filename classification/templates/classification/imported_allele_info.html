@@ -79,11 +79,15 @@
                 </div>
                 <br/>
                 <div class="form-check-inline">
-                    <input type="checkbox" class="form-check-input" id="in_progress" onclick="applyFilters()"/>
+                    <input type="radio" name="status" class="form-check-input" id="any_status" checked="checked" onclick="applyFilters()"/>
+                    <label for="any_status" title="Only show records that claim they're still being resolved">Any Status</label>
+                </div>
+                <div class="form-check-inline">
+                    <input type="radio" name="status" class="form-check-input" id="in_progress" onclick="applyFilters()"/>
                     <label for="in_progress" title="Only show records that claim they're still being resolved">In Progress</label>
                 </div>
                 <div class="form-check-inline">
-                    <input type="checkbox" class="form-check-input" id="errors_mode" onclick="applyFilters()"/>
+                    <input type="radio" name="status" class="form-check-input" id="errors_mode" onclick="applyFilters()"/>
                     <label for="errors_mode" title="Only show records that failed to resolve to an allele">Failed</label>
                 </div>
             </div>
