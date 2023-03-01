@@ -199,8 +199,8 @@ def view_imported_allele_info(request: HttpRequest) -> Response:
     return render(request, "classification/imported_allele_info.html", {})
 
 
-def view_imported_allele_info_detail(request: HttpRequest, pk: int):
-    allele_info = get_object_or_404(ImportedAlleleInfo, pk=pk)
+def view_imported_allele_info_detail(request: HttpRequest, allele_info_id: int):
+    allele_info = get_object_or_404(ImportedAlleleInfo, pk=allele_info_id)
     # just split up c.hgvs into logical parts, and then the diff will reset with each new group (treat it as different words)
     HGVS_REGEX = re.compile(
         '(?P<transcript>[^.]+?)'
@@ -236,14 +236,14 @@ def view_imported_allele_info_detail(request: HttpRequest, pk: int):
             liftover_diff = c37c.diff(c38c)
 
     return render_ajax_view(request, "classification/imported_allele_info_detail.html", {
-        "allele_info": get_object_or_404(ImportedAlleleInfo, pk=pk),
+        "allele_info": allele_info,
         "c_hgvses": diff_output,
         "normalized_diff": chgvs_diff_description(normalized_diff) if normalized_diff else None,
         "liftover_diff": chgvs_diff_description(liftover_diff) if liftover_diff else None,
         "variant_coordinate_label": f"Normalised Variant Coordinate ({allele_info.imported_genome_build_patch_version})",
         "validation_tags": allele_info.latest_validation.validation_tags_list if allele_info.latest_validation else None,
         "on_allele_page": request.GET.get("on_allele_page") == "true"
-    })
+    }, menubar='classification')
 
 
 class ImportedAlleleInfoDownload(ExportRow):

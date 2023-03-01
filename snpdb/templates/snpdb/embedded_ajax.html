@@ -1,6 +1,13 @@
 {% extends "uicore/page/base.html" %}
+{% load ui_menu_bars %}
 {% block title %}{{ site_name }}{% endblock %}
-{% block submenu %}{% endblock submenu %}
+{% block submenu %}
+    {% if menubar == 'classification' %}
+        {% menu_bar_classifications %}
+    {% endif %}
+{% endblock submenu %}
 {% block content %}
+    <div class="container">
     {{ embedded_content|safe }}
+    </div>
 {% endblock %}

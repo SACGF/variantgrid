@@ -148,7 +148,7 @@ urlpatterns = [
     perm_path('clinical_context/<int:pk>', view_clinical_context, name='clinical_context'),
 
     perm_path('imported_allele_info', view_imported_allele_info, name='view_imported_allele_info'),
-    perm_path('imported_allele_info/<int:pk>', view_imported_allele_info_detail, name='view_imported_allele_info_detail'),
+    perm_path('imported_allele_info/<int:allele_info_id>', view_imported_allele_info_detail, name='view_imported_allele_info_detail'),
     perm_path('imported_allele_info/download', download_allele_info, name='imported_allele_info_download'),
 
     perm_path('classification_graphs', views.classification_graphs, name='classification_graphs'),

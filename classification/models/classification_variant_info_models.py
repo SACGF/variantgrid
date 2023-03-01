@@ -7,6 +7,7 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.db.models import TextField, ForeignKey, CASCADE, SET_NULL, OneToOneField, TextChoices, \
     CharField, JSONField, BooleanField
+from django.urls import reverse
 from django.utils.timezone import now
 from model_utils.models import TimeStampedModel
 
@@ -388,6 +389,9 @@ class ImportedAlleleInfo(TimeStampedModel):
 
     class Meta:
         unique_together = ('imported_md5_hash', 'imported_transcript', 'imported_genome_build_patch_version')
+
+    def get_absolute_url(self):
+        return reverse('view_imported_allele_info_detail', kwargs={'allele_info_id': self.pk})
 
     def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
         if not self.imported_md5_hash:

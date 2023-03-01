@@ -2,6 +2,11 @@
 {% load js_tags %}
 {% load classification_tags %}
 <div>
+
+    {% if render_mode == 'embedded' %}
+        <h4>Imported Allele Info ({{ allele_info.pk }})</h4>
+    {% endif %}
+
     {% comment %}
     {% for diff_text in c_hgvses %}
         {% labelled label=diff_text.identifier value_css="text-monospace" %}{{ diff_text.html }}{% endlabelled %}
