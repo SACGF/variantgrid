@@ -174,7 +174,7 @@ class ImportedAlleleInfoColumns(DatatableConfig[ImportedAlleleInfo]):
         if (exclude := self.get_query_param('exclude')) and exclude == 'true':
             qs = qs.filter(latest_validation__include=False)
         if (error_mode := self.get_query_param('errors_mode')) and error_mode == 'true':
-            qs = qs.filter(Q(status=ImportedAlleleInfoStatus.FAILED))  # | Q(grch37__isnull=True) | Q(grch38__isnull=True))
+            qs = qs.filter(Q(status=ImportedAlleleInfoStatus.FAILED) | Q(latest_validation__validation_tags__general__hgvs_issue__isnull=False))  # | Q(grch37__isnull=True) | Q(grch38__isnull=True))
         if (in_progress := self.get_query_param('in_progress')) and in_progress == 'true':
             qs = qs.filter(Q(status__in=(ImportedAlleleInfoStatus.PROCESSING, ImportedAlleleInfoStatus.MATCHED_IMPORTED_BUILD)))
 
