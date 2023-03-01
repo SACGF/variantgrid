@@ -395,11 +395,11 @@ class ImportedAlleleInfo(TimeStampedModel):
     def get_absolute_url(self):
         return reverse('view_imported_allele_info_detail', kwargs={'allele_info_id': self.pk})
 
-    def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
+    def save(self, force_insert=False, force_update=False, using=None, update_fields=None, **kwargs):
         if not self.imported_md5_hash:
             self.imported_md5_hash = md5sum_str(self.imported_c_hgvs or self.imported_g_hgvs)
 
-        super().save(force_insert=force_insert, force_update=force_update, using=using, update_fields=update_fields)
+        super().save(force_insert=force_insert, force_update=force_update, using=using, update_fields=update_fields, **kwargs)
 
     def _calculate_validation(self) -> ImportedAlleleInfoValidationTags:
 

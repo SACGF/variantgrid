@@ -22,7 +22,10 @@ class Command(BaseCommand):
         parser.add_argument('--revalidate_chgvs', action='store_true', default=False,
                             help='Perform re-validation on any records without outstanding c.hgvs issues')
         parser.add_argument('--validation', action='store_true', default=False, help='Perform validation on the pre-existing normalising/liftovers')
+        # should have been called migrate validation, but is referenced in other scripts now
+
         parser.add_argument('--non-coding', action='store_true', default=False, help='Fix issue #762 NR had c. instead of n.')
+        parser.add_argument('--revalidate', action='store_true', default=False)
 
     def report_unmatched(self):
         print(f"Unmatched count = {Classification.objects.filter(variant__isnull=True).count()}")
@@ -37,6 +40,7 @@ class Command(BaseCommand):
         mode_sort = options.get('sort')
         mode_revalidation_chgvs = options.get('revalidate_chgvs')
         mode_non_coding = options.get('non_coding')
+        mode_revalidate = options.get('revalidate')
 
         # if mode_all and mode_missing:
         #     raise ValueError("all and missing are mutually exclusive parameters")
@@ -60,6 +64,9 @@ class Command(BaseCommand):
             self.handle_revalidate_chgvs()
         if mode_non_coding:
             self.handle_fix_non_coding()
+
+        if mode_revalidate:
+            self.handle_revalidate()
 
         # row_count = 0
         # batch_size = 50
@@ -139,6 +146,15 @@ class Command(BaseCommand):
             if c.update_allele_info_from_classification(force_update=False):
                 c.save(update_modified=False)
         print(f"Finished {i} classifications")
+
+    def handle_revalidate(self):
+        i = 0
+        for i, allele_info in enumerate(ImportedAlleleInfo.objects.all()):
+            allele_info.apply_validation(force_update=True)
+            allele_info.save()
+            if i % 1000 == 0:
+                print(f"Revalidated {i} records")
+        print(f"Revalidated {i} records")
 
     def handle_revalidate_chgvs(self):
         def c_hgvs_validation(c: Classification) -> str:
