@@ -6,8 +6,9 @@
     {% if validations %}
         {% if validations|length > 500 %}
             <p>Showing 500 of {{ validations|length|value }} validation records</p>
-            <p><a href="{% url 'classification_upload_unmapped_status_download_validation' record.pk %}" class="download-link">Download all issues here</a></p>
         {% endif %}
+        <p><a href="{% url 'classification_upload_unmapped_status_download_validation' record.pk %}" class="download-link">Download all issues here</a></p>
+
         <table class="table">
             <tr>
                 <th>Source</th>
