@@ -2,7 +2,7 @@ import zipfile
 from abc import ABC, abstractmethod
 from datetime import datetime
 from io import StringIO
-from typing import Optional, List, Iterator, Tuple, Any, Callable, Iterable
+from typing import Optional, List, Iterator, Tuple, Any, Callable, Iterable, Generator
 
 from django.http import HttpResponse, StreamingHttpResponse
 from django.http.response import HttpResponseBase
@@ -80,8 +80,23 @@ class ClassificationExportFormatter(ABC):
             self.file_count = 1
             # can stream in single file
             response = StreamingHttpResponse(self._yield_single_file(), self.content_type())
+            response['Last-Modified'] = self.classification_filter.last_modified_header
             response['Content-Disposition'] = f'attachment; filename="{self.filename()}"'
             return response
+
+    def serve_in_memory(self) -> Iterator[str]:
+        data_peek = self._peekable_data()
+
+        while data_peek.peek(default=False):
+            def next_file() -> str:
+                str_buffer = StringIO()
+                for str_data in self._yield_streaming_entry_str(source=data_peek):
+                    str_buffer.writelines(str_data)
+                str_buffer.flush()
+                return str_buffer.getvalue()
+
+            yield next_file()
+
 
     @abstractmethod
     def content_type(self) -> str:
@@ -152,6 +167,7 @@ class ClassificationExportFormatter(ABC):
         # Had some issues with stream_zip telling macOS couldn't extract file, but then being able to manually extract the downloaded file fine
         # not sure if the error is on macOS, stream_zip or my implementation, so using non streaming version for now
         response = StreamingHttpResponse(stream_zip(self._yield_streaming_zip_entries()), content_type='application/zip')
+        response['Last-Modified'] = self.classification_filter.last_modified_header
         response['Content-Disposition'] = f'attachment; filename="{self.filename(extension_override="zip")}"'
         return response
 
@@ -173,6 +189,7 @@ class ClassificationExportFormatter(ABC):
 
                 zf.writestr(self.filename(part=self.file_count), next_file())
 
+        response['Last-Modified'] = self.classification_filter.last_modified_header
         response['Content-Disposition'] = f'attachment; filename="{self.filename(extension_override="zip")}"'
         self.send_stats()
         return response
