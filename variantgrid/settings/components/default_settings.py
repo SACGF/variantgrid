@@ -1009,7 +1009,8 @@ def get_shariant_sync_secrets() -> dict:
     if set(sync.keys()) == set(sync_fields):
         raise ValueError("Old secret 'SYNC' detected - need to use SyncDestination.config['sync_details'] as keys")
 
-    return {sd: get_secrets(f"SYNC.{sd}", sync_fields) for sd in sync}
+    sync_all_fields = ["enabled", "username", "password", "host", "oauth_url", "client_id", "app_username", "app_password"]
+    return {sd: get_secrets(f"SYNC.{sd}", sync_all_fields, False) for sd in sync}
 
 
 def get_aws_secrets() -> dict:

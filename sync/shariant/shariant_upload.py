@@ -16,6 +16,7 @@ from sync.models.models import SyncDestination, SyncRun
 from sync.models.models_classification_sync import ClassificationModificationSyncRecord
 from sync.shariant.historical_ekey_converter import HistoricalEKeyConverter
 from sync.shariant.query_json_filter import QueryJsonFilter
+from sync.sync_runner import register_sync_runner, SyncRunner
 
 # add variant_type to private fields as the key has been deprecated
 SHARIANT_PRIVATE_FIELDS = ['patient_id', 'family_id', 'sample_id', 'patient_summary', 'internal_use', 'variant_type', 'age_units']
@@ -58,7 +59,8 @@ def batch_iterator_end(iterable: Iterable[T], batch_size: int = 10) -> Iterable[
         yield batch, True
 
 
-class ClassificationUploader:
+@register_sync_runner(config={"type": {"shariant", "variantgrid"}, "direction": "upload"})
+class VariantGridUploadSyncer(SyncRunner):
 
     def __init__(self, sync_destination: SyncDestination):
         self.sync_destination = sync_destination
@@ -182,7 +184,3 @@ class ClassificationUploader:
 
         return run
 
-
-# method is here for backwards compatibility, prefer to use ClassificationUploader directly
-def sync_shariant_upload(sync_destination: SyncDestination, full_sync: bool = False, max_rows: Optional[int] = None) -> SyncRun:
-    return ClassificationUploader(sync_destination).sync(full_sync=full_sync, max_rows=max_rows)
