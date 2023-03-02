@@ -1,7 +1,8 @@
 {% extends "uicore/page/base.html" %}
+{% load js_tags %}
+{% load settings_tags %}
 {% load ui_help %}
 {% load ui_utils %}
-{% load js_tags %}
 {% load ui_menu_bars %}
 {% load tz %}
 {% block title %}{{ accession }}{% endblock title %}
@@ -14,7 +15,7 @@
     }
 
     $(document).ready(function() {
-        let tableDom = $('#vc-datatable').on('draw.dt', () => {
+        $('#vc-datatable').on('draw.dt', () => {
             Flags.instance.init({userId: '{{user.id}}'});
         });
     });
@@ -176,12 +177,15 @@
         {% endfor %}
     {% endif %}
 
-    <div class="container-table mt-4">
-        <h4>Classifications</h4>
-        Filtering on records resolved to transcript version <b>{{ accession }}</b>
-        <table id="vc-datatable" class="classification-table" data-datatable-url="{% url 'classification_datatables' %}" data-datatable-data='classificationFilter'></table>
-    </div>
-
+    {% settings_value 'VIEW_TRANSCRIPT_VERSION_SHOW_CLASSIFICATIONS' as show_classifications %}
+    {% if show_classifications %}
+        <div class="container-table mt-4">
+            <h4>Classifications</h4>
+            Filtering on records resolved to transcript version <b>{{ accession }}</b>
+            Note: This will <b>not</b> show different versions of the same transcript
+            <table id="vc-datatable" class="classification-table" data-datatable-url="{% url 'classification_datatables' %}" data-datatable-data='classificationFilter'></table>
+        </div>
+    {% endif %}
 
 </div>
 {% endblock content %}
