@@ -9,6 +9,7 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.db.models import QuerySet, Q
 from django.http import HttpRequest
+from django.utils.timezone import now
 from guardian.shortcuts import get_objects_for_user
 from threadlocals.threadlocals import get_current_request
 
@@ -220,12 +221,18 @@ class ClassificationFilter:
     benchmarking: bool = False
     path_info: Optional[str] = None
     request_params: Optional[dict] = None
+    _last_modified: str = None
 
     def __post_init__(self):
+        self._last_modified = now().strftime("%a, %d %b %Y %H:%M:%S GMT")
         if self.path_info and self.request_params:
             pass
         elif request := get_current_request():
             self.record_request_details(request)
+
+    @property
+    def last_modified_header(self) -> str:
+        return self._last_modified
 
     def record_request_details(self, request):
         if not self.path_info:
