@@ -34,8 +34,10 @@ def run_sync(sync_destination: SyncDestination, full_sync: bool = False, max_row
         }
     }
     """
+
+    sync_run_instance = SyncRunInstance(sync_destination=sync_destination, full_sync=full_sync, max_rows=max_rows)
     try:
-        sync_runner_for_destination(sync_destination).sync(full_sync=full_sync, max_rows=max_rows)
-    except:
-        report_exc_info(extra_data={"sync_name": sync_destination.name})
-        raise
+        sync_runner_for_destination(sync_destination).sync(sync_run_instance)
+    finally:
+        if sync_run_instance.sync_run.status == SyncStatus.IN_PROGRESS:
+            sync_run_instance.run_failed()

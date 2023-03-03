@@ -1,22 +1,18 @@
 import socket
-from typing import Dict, Optional, Iterable, List, TypeVar, Union
-
-import requests
+from typing import Dict, Iterable, List, TypeVar, Union
 from django.db.models import QuerySet
-
 from classification.enums.classification_enums import ShareLevel
 from classification.models import EvidenceKeyMap
 from classification.models.classification import ClassificationModification
 from classification.models.classification_utils import ClassificationJsonParams
 from library.constants import MINUTE_SECS
 from library.guardian_utils import admin_bot
-from library.oauth import OAuthConnector
-from sync.models.enums import SyncStatus
-from sync.models.models import SyncDestination, SyncRun
+from library.oauth import ServerAuth
+from sync.models.models import SyncDestination
 from sync.models.models_classification_sync import ClassificationModificationSyncRecord
 from sync.shariant.historical_ekey_converter import HistoricalEKeyConverter
 from sync.shariant.query_json_filter import QueryJsonFilter
-from sync.sync_runner import register_sync_runner, SyncRunner
+from sync.sync_runner import register_sync_runner, SyncRunner, SyncRunInstance
 
 # add variant_type to private fields as the key has been deprecated
 SHARIANT_PRIVATE_FIELDS = ['patient_id', 'family_id', 'sample_id', 'patient_summary', 'internal_use', 'variant_type', 'age_units']
@@ -69,7 +65,7 @@ class VariantGridUploadSyncer(SyncRunner):
         self.filters = config.get('filters', {})
         mapping = config.get('mapping', {})
 
-        self.shariant = OAuthConnector.shariant_oauth_connector(sync_destination.sync_details)
+        self.shariant = ServerAuth.for_sync_details(sync_destination.sync_details)
         self.lab_mappings = mapping.get('labs', {})
         self.share_level_mappings = mapping.get('share_levels', {})
         self.user_mappings = mapping.get('users', {})
@@ -130,57 +126,44 @@ class VariantGridUploadSyncer(SyncRunner):
 
         return formatted_json
 
-    def sync(self, full_sync: bool = False, max_rows: Optional[int] = None) -> SyncRun:
-        qs = self.records_to_sync(full_sync=full_sync)
+    def sync(self, sync_run_instance: SyncRunInstance):
+        qs = self.records_to_sync(full_sync=sync_run_instance.full_sync)
 
         rows_uploaded = 0
-        run = SyncRun(destination=self.sync_destination, status=SyncStatus.IN_PROGRESS)
-        run.save()
 
         if not qs.exists():
-            run.status = SyncStatus.NO_RECORDS
-            run.save()
+            sync_run_instance.run_completed(had_records=False)
         else:
-            if max_rows is not None:
+            if max_rows := sync_run_instance.max_rows:
                 qs = qs[:max_rows]
 
             site_name = socket.gethostname().lower().split('.')[0].replace('-', '')
-            try:
-                for batch, finished in batch_iterator_end(qs, batch_size=50):
-                    # providing import_id and status:complete when we're done lets Shariant know
-                    # when the upload has been completed
-                    json_to_send = {
-                        "records": [self.classification_to_json(vcm) for vcm in batch],
-                        "import_id": site_name
-                    }
-                    if finished:
-                        json_to_send["status"] = "complete"
-                    # print(json.dumps(json_to_send))
-                    auth = self.shariant.auth()
+            for batch, finished in batch_iterator_end(qs, batch_size=50):
+                # providing import_id and status:complete when we're done lets Shariant know
+                # when the upload has been completed
+                json_to_send = {
+                    "records": [self.classification_to_json(vcm) for vcm in batch],
+                    "import_id": site_name
+                }
+                if finished:
+                    json_to_send["status"] = "complete"
+                # print(json.dumps(json_to_send))
+                other_variant_grid = sync_run_instance.server_auth()
 
-                    response = requests.post(
-                        self.shariant.url('classification/api/classifications/v2/record/'),
-                        auth=auth,
-                        json=json_to_send,
-                        timeout=MINUTE_SECS,
+                response = other_variant_grid.post(
+                    url_suffix='classification/api/classifications/v2/record/',
+                    json=json_to_send,
+                    timeout=MINUTE_SECS,
+                )
+                response.raise_for_status()
+                # results are sent back in an array in the same order they were sent up
+                results = response.json().get('results')
+
+                for record, result in zip(batch, results):
+                    rows_uploaded += 1
+                    ClassificationModificationSyncRecord.objects.create(
+                        run=sync_run_instance.sync_run,
+                        classification_modification=record,
+                        meta=result
                     )
-                    response.raise_for_status()
-                    # results are sent back in an array in the same order they were sent up
-                    results = response.json().get('results')
-
-                    for record, result in zip(batch, results):
-                        rows_uploaded += 1
-                        ClassificationModificationSyncRecord.objects.create(run=run, classification_modification=record,
-                                                                            meta=result)
-
-                run.status = SyncStatus.SUCCESS
-                run.save()
-            finally:
-                # a bit of a hack so I can let the exception just fall through to rollbar
-                # while still updating the status of the run
-                if run.status == SyncStatus.IN_PROGRESS:
-                    run.status = SyncStatus.FAILED
-                    run.save()
-
-        return run
-
+            sync_run_instance.run_completed(had_records=True)

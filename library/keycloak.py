@@ -7,7 +7,7 @@ from django.conf import settings
 from django.contrib.auth.models import User
 
 from library.constants import MINUTE_SECS
-from library.oauth import OAuthConnector
+from library.oauth import ServerAuth
 from snpdb.models.models import Lab
 from snpdb.models.models_user_settings import UserSettings
 
@@ -32,9 +32,9 @@ class KeycloakNewUser:
 
 class Keycloak:
 
-    def __init__(self, connector: OAuthConnector = None):
+    def __init__(self, connector: ServerAuth = None):
         if not connector:
-            connector = OAuthConnector.keycloak_connector()
+            connector = ServerAuth.keycloak_connector()
         self.connector = connector
         self.realm = settings.KEY_CLOAK_REALM
 

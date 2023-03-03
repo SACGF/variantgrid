@@ -1,31 +1,25 @@
 import time
-from datetime import datetime
 from typing import Optional, Dict
-
 import ijson
-import requests
-from dateutil import tz
-
 from classification.models.evidence_key import EvidenceKeyMap
 from classification.views.classification_view import BulkClassificationInserter
 from library.constants import MINUTE_SECS
 from library.guardian_utils import admin_bot
-from library.oauth import OAuthConnector
+from library.oauth import ServerAuth
 from library.utils import make_json_safe_in_place, batch_iterator
 from snpdb.models.models import Lab, Organization, Country
-from sync.models.enums import SyncStatus
-from sync.models.models import SyncDestination, SyncRun
-from sync.sync_runner import SyncRunner, register_sync_runner
+from sync.models.models import SyncRun
+from sync.sync_runner import SyncRunner, register_sync_runner, SyncRunInstance
 
 
 @register_sync_runner(config={"type": {"shariant", "variantgrid"}, "direction": "download"})
 class VariantGridDownloadSyncer(SyncRunner):
 
-    def sync(self, full_sync: bool = False, max_rows: Optional[int] = None) -> SyncRun:
+    def sync(self, sync_run_instance: SyncRunInstance):
         sync_destination = self.sync_destination
 
         config = sync_destination.config
-        shariant = OAuthConnector.shariant_oauth_connector(sync_destination.sync_details)
+        other_variant_grid = ServerAuth.for_sync_details(sync_destination.sync_details)
 
         required_build = config.get('genome_build', 'GRCh37')
         params = {'share_level': 'public',
@@ -40,13 +34,10 @@ class VariantGridDownloadSyncer(SyncRunner):
         if exclude_orgs:
             params['exclude_orgs'] = ','.join(exclude_orgs)
 
-        if not full_sync:
+        if not sync_run_instance.full_sync:
             last_download: SyncRun
-            if last_download := SyncRun.objects.filter(destination=sync_destination, status=SyncStatus.SUCCESS).order_by('-created').first():
-                if meta := last_download.meta:
-                    if since_str := meta.get('server_date'):
-                        since = datetime.strptime(since_str, "%a, %d %b %Y %H:%M:%S %Z").replace(tzinfo=tz.UTC).timestamp()
-                        params['since'] = str(since)
+            if since := sync_run_instance.last_success_server_date():
+                params['since'] = str(since.timestamp())
 
         def sanitize_data(known_keys: EvidenceKeyMap, data: dict, source_url: str) -> dict:
             skipped_keys = []
@@ -72,19 +63,19 @@ class VariantGridDownloadSyncer(SyncRunner):
 
             return sanitized
 
-        def shariant_download_to_upload(known_keys: EvidenceKeyMap, record: dict) -> Optional[Dict]:
-            meta = record.get('meta', {})
+        def shariant_download_to_upload(known_keys: EvidenceKeyMap, record_json: dict) -> Optional[Dict]:
+            meta = record_json.get('meta', {})
             record_id = meta.get('id')
 
-            source_url = shariant.url(f'classification/classification/{record_id}')
-            data = record.get('data') or {}  # data=None for deleted records returned via 'since' which is patch-like
+            source_url = other_variant_grid.url(f'classification/classification/{record_id}')
+            data = record_json.get('data') or {}  # data=None for deleted records returned via 'since' which is patch-like
             data = sanitize_data(known_keys, data, source_url)
             data = {
-                "id": record.get('id'),
-                "publish": record.get('publish'),
+                "id": record_json.get('id'),
+                "publish": record_json.get('publish'),
                 "data": data,
             }
-            if delete := record.get('delete'):
+            if delete := record_json.get('delete'):
                 data['delete'] = delete
                 return data
 
@@ -109,58 +100,52 @@ class VariantGridDownloadSyncer(SyncRunner):
                 )
             return data
 
-        run = SyncRun(destination=sync_destination, status=SyncStatus.IN_PROGRESS)
-        run.save()
-        try:
-            response = requests.get(shariant.url('classification/api/classifications/export'),
-                                    auth=shariant.auth(),
-                                    params=params,
-                                    stream=False,
-                                    timeout=MINUTE_SECS)
+        sync_run_instance.run_start()
+        response = other_variant_grid.get(
+            url_suffix='classification/api/classifications/export',
+            params=params,
+            stream=False,
+            timeout=MINUTE_SECS
+        )
 
-            last_modified = response.headers.get('Last-Modified')
-            evidence_keys = EvidenceKeyMap.instance()
+        last_modified = response.headers.get('Last-Modified')
+        evidence_keys = EvidenceKeyMap.instance()
 
-            count = 0
-            skipped = 0
+        count = 0
+        skipped = 0
 
-            def records():
-                nonlocal skipped
-                for record in ijson.items(response.content, 'records.item'):
-                    make_json_safe_in_place(record)
-                    mapped = shariant_download_to_upload(evidence_keys, record)
-                    if mapped:
-                        yield mapped
-                    else:
-                        skipped = skipped + 1
+        def records():
+            nonlocal skipped
+            for record_item in ijson.items(response.content, 'records.item'):
+                make_json_safe_in_place(record_item)
+                mapped = shariant_download_to_upload(evidence_keys, record_item)
+                if mapped:
+                    yield mapped
+                else:
+                    skipped = skipped + 1
 
-            first_batch = True
-            for batch in batch_iterator(records(), batch_size=50):
-                inserter = BulkClassificationInserter(user=admin_bot(), force_publish=True)
-                try:
-                    # give the process 10 seconds to breath between batches of 50 classifications
-                    # in case we're downloading giant chunks of data
-                    if not first_batch:
-                        time.sleep(10)
-                    first_batch = False
+        first_batch = True
+        for batch in batch_iterator(records(), batch_size=50):
+            inserter = BulkClassificationInserter(user=admin_bot(), force_publish=True)
+            try:
+                # give the process 10 seconds to breath between batches of 50 classifications
+                # in case we're downloading giant chunks of data
+                if not first_batch:
+                    time.sleep(10)
+                first_batch = False
 
-                    for record in batch:
-                        inserter.insert(record)
-                        count = count + 1
-                finally:
-                    inserter.finish()
+                for record in batch:
+                    inserter.insert(record)
+                    count = count + 1
+            finally:
+                inserter.finish()
 
-            run.status = SyncStatus.SUCCESS
-            run.meta = {
+        sync_run_instance.run_completed(
+            had_records=bool(count),
+            meta={
                 "params": params,
                 "records_upserted": count,
                 "records_skipped": skipped,
                 "server_date": last_modified
             }
-            run.save()
-        finally:
-            if run.status == SyncStatus.IN_PROGRESS:
-                run.status = SyncStatus.FAILED
-                run.save()
-
-        return run
+        )
