@@ -65,13 +65,15 @@ def get_nearby_qs(variant, annotation_version, distance=None):
     q = Variant.get_no_reference_q() & ~Q(pk=variant.pk)  # Exclude ref and self
     qs = qs.filter(q)
 
-    return {
+    qs_dict = {
         "codon": filter_variant_codon(qs, variant),
         "exon": filter_variant_exon(qs, variant),
         "domain": filter_variant_domain(qs, variant),
-        "genes": get_gene_symbol_filters(qs, variant, annotation_version),
         "range": filter_variant_range(qs, variant, distance=distance),
     }
+    if settings.VARIANT_DETAILS_NEARBY_SHOW_GENE:
+        qs_dict["genes"] = get_gene_symbol_filters(qs, variant, annotation_version)
+    return qs_dict
 
 
 def get_nearby_summaries(user, variant, annotation_version, distance=None, clinical_significance=False):
@@ -98,7 +100,7 @@ def get_nearby_summaries(user, variant, annotation_version, distance=None, clini
         }
 
     gene_summaries = {}
-    for gene_symbol, qs in nearby_qs_dict.pop("genes").items():
+    for gene_symbol, qs in nearby_qs_dict.pop("genes", {}).items():
         gene_summaries[gene_symbol] = get_summary(qs)
 
     nearby_summaries = {}
