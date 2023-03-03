@@ -42,10 +42,6 @@ class SyncDestinationAdmin(ModelAdminBasics):
     def run_sync_single(self, request, queryset):
         self._run_sync(request, queryset, max_rows=1)
 
-    @admin_action("Run now (delta sync) 10 rows")
-    def run_sync_ten(self, request, queryset):
-        self._run_sync(request, queryset, max_rows=10)
-
     @admin_action("Run now (full sync)")
     def run_sync_full(self, request, queryset):
         sync_destination: SyncDestination

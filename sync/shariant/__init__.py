@@ -1,2 +1,2 @@
-from sync.shariant.shariant_download import *
-from sync.shariant.shariant_upload import *
+from sync.shariant.variant_grid_download import *
+from sync.shariant.variant_grid_upload import *

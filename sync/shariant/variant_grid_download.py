@@ -16,6 +16,9 @@ from sync.sync_runner import SyncRunner, register_sync_runner, SyncRunInstance
 class VariantGridDownloadSyncer(SyncRunner):
 
     def sync(self, sync_run_instance: SyncRunInstance):
+        if sync_run_instance.max_rows:
+            raise ValueError("VariantGridDownloadSyncer does not support max_rows")
+
         sync_destination = self.sync_destination
 
         config = sync_destination.config

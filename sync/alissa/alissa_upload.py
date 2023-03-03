@@ -14,9 +14,11 @@ import json
 
 
 @register_sync_runner(config={"type": "alissa", "direction": "upload"})
-class AlissaUploadSync(SyncRunner):
+class AlissaUploadSyncer(SyncRunner):
 
     def sync(self, sync_run_instance: SyncRunInstance):
+        if sync_run_instance.max_rows:
+            raise ValueError("AlissaUploadSyncer does not support max_rows")
 
         exclude_group_names = sync_run_instance.get_config("exclude_sources")
         excludes = set()

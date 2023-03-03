@@ -1,4 +1,4 @@
-from library.log_utils import report_exc_info
+from sync.models import SyncStatus
 from sync.shariant import *  # to get decorators to register
 from sync.alissa import *  # to get decorators to register
 from sync.sync_runner import sync_runner_for_destination
@@ -41,3 +41,4 @@ def run_sync(sync_destination: SyncDestination, full_sync: bool = False, max_row
     finally:
         if sync_run_instance.sync_run.status == SyncStatus.IN_PROGRESS:
             sync_run_instance.run_failed()
+    return sync_run_instance.sync_run

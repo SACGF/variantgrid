@@ -9,9 +9,11 @@ from sync.sync_runner import SyncRunner, register_sync_runner, SyncRunInstance
 
 
 @register_sync_runner(config={"type": "alissa", "direction": "download"})
-class AlissaDownloadSync(SyncRunner):
+class AlissaDownloadSyncer(SyncRunner):
 
     def sync(self, sync_run_instance: SyncRunInstance):
+        if sync_run_instance.max_rows:
+            raise ValueError("AlissaDownloadSyncer does not support max_rows")
 
         destination_lab = Lab.objects.filter(group_name=sync_run_instance.get_config("lab")).get()
 
