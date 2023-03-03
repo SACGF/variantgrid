@@ -41,7 +41,8 @@ from genes.models_enums import AnnotationConsortium, HGNCStatus, GeneSymbolAlias
 from library.constants import HOUR_SECS, WEEK_SECS, MINUTE_SECS
 from library.django_utils import SortByPKMixin
 from library.django_utils.django_partition import RelatedModelsPartitionModel
-from library.guardian_utils import assign_permission_to_user_and_groups, DjangoPermission, admin_bot
+from library.guardian_utils import assign_permission_to_user_and_groups, DjangoPermission, admin_bot, \
+    add_public_group_read_permission
 from library.log_utils import log_traceback
 from library.utils import get_single_element, iter_fixed_chunks
 from library.utils.file_utils import mk_path
@@ -1938,6 +1939,9 @@ class PanelAppPanelLocalCache(TimeStampedModel):
             gene_matcher.create_gene_list_gene_symbols(gene_list, gene_names_list)
             gene_list.import_status = ImportStatus.SUCCESS
             gene_list.save()
+
+            # PanelApp gene list should be public
+            add_public_group_read_permission(gene_list)
 
         print(f"Returning gene list: {gene_list.pk}")
         return gene_list
