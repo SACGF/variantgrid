@@ -15,6 +15,14 @@ from genes.hgvs import CHGVS, PHGVS
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import Allele, GenomeBuild, Lab
 
+
+# This is the primary way of displaying classifications (not count the big fat listing)
+# It has the advantage of consolidating records, so labs that provide 10 records for the same variant
+# and labs that can only provide 1, are treated equally.
+# It has the significant disadvantage of being live calculated rather than referenced in the database
+# so no pagination, etc
+
+
 D = TypeVar("D")
 
 

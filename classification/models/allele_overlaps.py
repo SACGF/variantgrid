@@ -18,7 +18,6 @@ from library.utils import group_by_key, segment, first
 from snpdb.lab_picker import LabPickerData
 from snpdb.models import Allele, Lab
 
-
 @dataclass(frozen=True)
 class _PatientIdLab:
     lab: Lab
@@ -27,6 +26,10 @@ class _PatientIdLab:
 
 @dataclass(frozen=True)
 class PatientCount:
+    """
+    Used to attempt to count how many unique patients each lab has seen.
+    Is complicated by spotty use of patient_id, and some labs only being able to provide one classification per allele
+    """
 
     counts: Dict[_PatientIdLab, int]
 

@@ -3,12 +3,12 @@ from typing import List
 
 from django.dispatch import receiver
 
-from library.health_check import health_check_signal, HealthCheckAge
+from library.health_check import health_check_signal, HealthCheckAge, HealthCheckRequest
 from sync.models import SyncRun, SyncDestination, SyncStatus
 
 
 @receiver(signal=health_check_signal)
-def sync_health_check(sender, health_request, **kwargs):
+def sync_health_check(sender, health_request: HealthCheckRequest, **kwargs):
     # Report when each enabled sync run was last successfully performed
     responses: List[HealthCheckAge] = []
     for sync_destination in SyncDestination.objects.filter(enabled=True):
