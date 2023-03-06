@@ -20,17 +20,19 @@ from django.urls.base import reverse_lazy
 from django.utils import timezone
 from django.utils.timezone import localtime
 from redis import Redis
+from threadlocals.threadlocals import get_current_request
 
 from library.utils import invert_dict
 
 
 def get_url_from_view_path(view_path):
-    """ If you have the request object, you are probably better off using
-        request.build_absolute_uri(view_path) """
+    if request := get_current_request():
+        return request.build_absolute_uri(view_path)
+
+    # dirty fallback if we don't have a request
     from django.contrib.sites.models import Site
     current_site = Site.objects.get_current()
     protocol = 'http'
-    # TODO can do better than this for determining https vs http
     if 'shariant.org.au' in current_site.domain or 'variantgrid.com.au' in current_site.domain:
         protocol = 'https'
     return f'{protocol}://{current_site.domain}{view_path}'
