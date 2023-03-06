@@ -9,18 +9,20 @@ register = Library()
 
 @register.inclusion_tag("annotation/tags/gene_disease.html")
 def gene_disease(gene_symbol):
+    context = {
+        "gene_symbol": gene_symbol,
+    }
+
     ontology_version = OntologyVersion.latest()
     try:
         gene_disease_relations = ontology_version.gene_disease_relations(gene_symbol,
                                                                          min_classification=GeneDiseaseClassification.DISPUTED)
+        context["gene_disease_relations"] = gene_disease_relations
+        context["gene_disease_summary"] = _get_gene_disease_summary(gene_disease_relations)
     except ValueError:  # No HGNC for symbol
-        gene_disease_relations = None
+        pass
 
-    return {
-        "gene_symbol": gene_symbol,
-        "gene_disease_relations": gene_disease_relations,
-        "gene_disease_summary": _get_gene_disease_summary(gene_disease_relations),
-    }
+    return context
 
 
 def _get_gene_disease_summary(gene_disease_relations):
