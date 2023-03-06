@@ -10,6 +10,12 @@ from sync.sync_runner import SyncRunner, register_sync_runner, SyncRunInstance
 
 @register_sync_runner(config={"type": "alissa", "direction": "download"})
 class AlissaDownloadSyncer(SyncRunner):
+    """
+    Downloads require teh destination lab to have a S3 upload directory and to be automated.
+    required config parameters:
+        mvl_id: Index of the mvl to be downloaded from Alissa (managed variant list)
+        lab: The lab the mvl is to be synced to
+    """
 
     def sync(self, sync_run_instance: SyncRunInstance):
         if sync_run_instance.max_rows:

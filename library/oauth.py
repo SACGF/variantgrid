@@ -11,6 +11,12 @@ from requests_oauthlib.oauth2_session import OAuth2Session
 
 
 class ServerAuth:
+    """
+    Previously called OAuth but handles a URL to a server with:
+    BASIC_AUTH
+    OAUTH
+    OAUTH where you need BASIC_AUTH first
+    """
 
     @staticmethod
     def for_sync_details(sync_details):

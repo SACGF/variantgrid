@@ -3,16 +3,16 @@ from dataclasses import dataclass
 from datetime import datetime
 from functools import cached_property
 from typing import Optional, Callable, Dict, List
-
 from dateutil import tz
-
-from library.log_utils import report_exc_info
 from library.oauth import ServerAuth
 from sync.models import SyncStatus
 from sync.models.models import SyncDestination, SyncRun
 
 
 class SyncRunInstance:
+    """
+    Passed to a SyncRunner providing all the parameters it should need to complete a sync
+    """
 
     def __init__(self,
                  sync_destination: SyncDestination,
