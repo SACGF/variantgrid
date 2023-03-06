@@ -565,15 +565,25 @@ class DiscordanceReportClassificationAdmin(admin.TabularInline):
 
 @admin.register(DiscordanceReport)
 class DiscordanceReportAdmin(ModelAdminBasics):
-    list_display = ["pk", "allele", "report_started_date", "days_open", "classification_count", "clinical_sigs", "labs"]
+    list_display = ["pk", "report_started_date", "c_hgvs",  "days_open", "classification_count", "clinical_sigs", "labs"]
     list_select_related = ('clinical_context', 'clinical_context__allele')
     list_filter = [DiscordanceReportAdminLabFilter]
     inlines = (DiscordanceReportClassificationAdmin,)
 
-    @admin_list_column("Allele", order_field="clinical_context__allele__pk")
-    def allele(self, obj: DiscordanceReport) -> str:
+    # @admin_list_column("Allele", order_field="clinical_context__allele__pk")
+    # def allele(self, obj: DiscordanceReport) -> str:
+    #     cc = obj.clinical_context
+    #     return str(cc.allele)
+
+    @admin_list_column("c.HGVS")
+    def c_hgvs(self, obj: DiscordanceReport):
+        for record in obj.discordancereportclassification_set.select_related('classification_original__classification__allele_info'):
+            if allele_info := record.classification_original.classification.allele_info:
+                if c_hgvs := allele_info.grch38:
+                    return c_hgvs
+        # if can't find any 38 c.HGVSs, fallback onto Allele
         cc = obj.clinical_context
-        return str(cc.allele)
+        return str(cc.allele.clingen_allele)
 
     @admin_list_column("Clinical Significances")
     def clinical_sigs(self, obj: DiscordanceReport) -> str:
@@ -584,8 +594,9 @@ class DiscordanceReportAdmin(ModelAdminBasics):
         e_key_cs = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE)
         sorter = e_key_cs.classification_sorter_value
         sorted_list = sorted(clinical_sigs, key=lambda x: (sorter(x), x))
-        pretty = ", ".join([e_key_cs.pretty_value(cs) for cs in sorted_list])
-        return pretty
+        return sorted_list
+        # pretty = ", ".join([e_key_cs.pretty_value(cs) for cs in sorted_list])
+        # return pretty
 
     @admin_list_column()
     def days_open(self, obj: DiscordanceReport) -> Union[int, str]:
