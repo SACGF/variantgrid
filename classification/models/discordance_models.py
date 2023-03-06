@@ -26,7 +26,8 @@ from classification.models.flag_types import classification_flag_types, Classifi
 from flags.models.enums import FlagStatus
 from flags.models.models import FlagComment
 from genes.hgvs import CHGVS
-from library.utils import invalidate_cached_property
+from library.django_utils import get_url_from_view_path
+from library.utils import invalidate_cached_property, ExportRow, export_column, ExportDataType
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.lab_picker import LabPickerData
 from snpdb.models import Lab, GenomeBuild
@@ -345,9 +346,51 @@ class DiscordanceReport(TimeStampedModel):
 # TODO all the below classes are utilites, consider moving them out
 
 
-class DiscordanceReportRowData:
+class DiscordanceReportRowData(ExportRow):
 
-    # TODO merge this with DiscordanceReportViewTemplate?
+    @export_column(label="id")
+    def _id(self):
+        return self.discordance_report.id
+
+    @export_column(label="Discordance Date", data_type=ExportDataType.date)
+    def _discordance_date(self):
+        return self.discordance_report.report_started_date
+
+    @export_column(label="URL")
+    def _url(self):
+        return get_url_from_view_path(self.discordance_report.get_absolute_url())
+
+    @export_column(label="status")
+    def _status(self):
+        return self.discordance_report.resolution_text
+
+    @export_column(label="c.HGVS")
+    def _chgvs(self):
+        return str(self.c_hgvs)
+
+    @export_column(label="Lab Significances")
+    def _lab_significances(self):
+        summaries = self.lab_significances
+        rows = []
+        for summary in summaries:
+            row_parts = [f"{summary.lab}: {summary.clinical_significance_from}"]
+            if summary.count > 1:
+                row_parts.append(f" x {summary.count}")
+            if summary.clinical_significance_from != summary.clinical_significance_to:
+                row_parts.append(f" -> {summary.clinical_significance_to}")
+                if summary.pending:
+                    row_parts.append(" (pending)")
+            rows.append(" ".join(row_parts))
+        return "\n".join(rows)
+
+    @export_column(label="Conditions")
+    def _conditions(self):
+        rows = set()
+        for cm in self.discordance_report.all_classification_modifications:
+            if condition := cm.classification.condition_resolution_obj:
+                rows.add(condition.as_plain_text)
+        return "\n".join(sorted(rows))
+
 
     def __init__(self, discordance_report: DiscordanceReport, perspective: LabPickerData):
         self.discordance_report = discordance_report
