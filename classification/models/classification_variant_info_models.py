@@ -610,7 +610,7 @@ class ImportedAlleleInfo(TimeStampedModel):
     @staticmethod
     def _tidy_input_value(key: str, value: str) -> str:
         # try to do only very safe tidying up of c.HGVS values, e.g. removing random spaces
-        if "md5" not in key:
+        if key in ("imported_c_hgvs", "imported_g_hgvs") and isinstance(value, str):
             value = value.replace(' ', '')
         return value
 
