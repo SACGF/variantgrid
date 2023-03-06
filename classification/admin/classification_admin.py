@@ -289,7 +289,7 @@ class ClassificationAdmin(ModelAdminBasics):
     @admin_action("Matching: Re-Match Variant")
     def reattempt_variant_matching(self, request, queryset: QuerySet[Classification]):
         for classification in queryset:
-            _, created = classification.ensure_allele_info_with_created()
+            _, created = classification.ensure_allele_info_with_created(force_allele_info_update_check=True)
             if created:
                 classification.save()
 
