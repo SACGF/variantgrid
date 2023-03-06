@@ -5,9 +5,11 @@
 <div id="gene-symbol-info-tab">
 
     {% labelled label="Symbol" help=annotation_description.gene_symbol %}
-        <a href="{% url 'view_gene_symbol' hgnc.gene_symbol %}">{{ hgnc.gene_symbol }}</a>
+        <a href="{% url 'view_gene_symbol' gene_symbol %}">{{ gene_symbol }}</a>
     {% endlabelled %}
+    {% if hgnc %}
     {% labelled label="Approved Name" help=annotation_description.hgnc_name %}{{ hgnc.approved_name }}{% endlabelled %}
+    {% endif %}
     {% labelled label="Summary" help=annotation_description.refseq_gene_summary %}{{ gene_summary }}{% endlabelled %}
 
     <a id='show-full-gene-info-link' class="toggle-link" data-toggle="collapse" href=".full-gene-info">Show all</a>
