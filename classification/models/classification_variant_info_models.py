@@ -237,7 +237,7 @@ class ImportedAlleleInfoValidationTagEntry:
 
     @property
     def field_pretty(self) -> str:
-        return pretty_label(self.field).replace("C Nomen", "c.nomen")
+        return pretty_label(self.field).replace("C Nomen", "c.nomen").replace("Hgvs", "HGVS")
 
     @property
     def severity_pretty(self) -> str:
