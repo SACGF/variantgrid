@@ -1,5 +1,12 @@
+from abc import ABC
+from typing import List, TypeVar, Type, Union, Any, Generic
+
+from django.db import models
+from django.http import HttpRequest
+from django.urls import register_converter, resolve
 from rest_framework import routers
 from rest_framework.urlpatterns import format_suffix_patterns
+from threadlocals.threadlocals import get_current_request
 
 from classification.views import clinvar_export_view
 from classification.views import views, classification_dashboard_view, \
@@ -38,7 +45,146 @@ from variantgrid.perm_path import perm_path
 
 router = routers.DefaultRouter()
 
-urlpatterns = [
+class PBContext:
+
+    def __init__(self):
+        self.patterns = []
+        self.segments = []
+        self.path = ""
+
+    def push(self, segment: str):
+        self.segments.append(segment)
+        self.path = "/".join(self.segments)
+
+    def pop(self):
+        self.segments.pop()
+        self.path = "/".join(self.segments)
+
+    def register_view(self, view, **kwargs):
+        self.patterns.append(
+            perm_path(self.path, view, **kwargs)
+        )
+
+
+class PB:
+
+    def __init__(self, segment: str):
+        self.segment = segment
+        self._view = None
+        self._name = None
+        self._children: List[PB] = []
+
+    def view(self, view=None, name=None) -> 'PB':
+        self._view = view
+        self._name = name
+        return self
+
+    def children(self, *args) -> 'PB':
+        self._children += args
+        return self
+
+    def _url_patterns(self, context: PBContext):
+        context.push(self.segment)
+        if _view := self._view:
+            context.register_view(_view, name=self._name)
+        if self.children:
+            for child in self._children:
+                child._url_patterns(context)
+        context.pop()
+
+    def url_patterns(self):
+        context = PBContext()
+        self._url_patterns(context=context)
+        return context.patterns
+
+"""
+Could some information then be passed to the view?
+If View is wrapped, could put resolution in view builder, or in view
+PB.intParam(param="uploaded_classification_unmapped" resolver=upload_classification_unmapped_id).children(
+
+)
+"""
+
+T = TypeVar("T", bound=models.Model)
+
+
+class SecureModelInstance(Generic[T]):
+
+    def __init__(self,
+                 fetcher: Any,
+                 param: Any):
+        self.fetcher = fetcher
+        self.param = param
+
+    def instance(self, request: HttpRequest):
+        return self.fetcher.instance(self.param, request)
+
+class SecureModelFetcher(Generic[T]):
+
+    _regex = '[0-9]+'
+
+    def __init__(self,
+                 model: Type[T],
+                 field: str = "pk",
+                 check_read: bool = False,
+                 check_lab: Union[str, bool] = False):
+        self.model = model
+        self.check_read = check_read
+        self.check_lab = check_lab
+
+    def __call__(self):
+        return self
+
+    @property
+    def regex(self):
+        return self._regex
+
+    def instance(self, param: Any, request: HttpRequest) -> T:
+        qs = self.model.objects.filter(**{self.field:param})
+        if request.user.is_superuser:
+            return qs.get()
+        if self.check_lab:
+            from snpdb.models import Lab
+            qs = qs.filter(lab__in=Lab.valid_labs_qs(request.user))
+        inst = qs.get()
+        if self.check_read:
+            pass
+            # todo check read permission
+        return inst
+
+
+
+
+class SecureModelConverter(ABC):
+    regex = '[0-9]+'
+
+    def fetcher(self) -> SecureModelFetcher:
+        pass
+
+    def to_python(self, value):
+
+
+
+urlpatterns = \
+    PB("classification").children(
+        PB("import_upload").view(UploadedClassificationsUnmappedView.as_view(), "classification_upload_unmapped").children(
+            PB("file").children(
+               PB("<int:uploaded_classification_unmapped_id>").view(view_uploaded_classification_unmapped, name="classification_upload_unmapped_status").children(
+                   PB("download_validation").view(upload_classification_unmapped_download_validation, name="classification_upload_unmapped_status_download_validation"),
+                   PB("detail").view(view_uploaded_classification_unmapped_detail, name="classification_upload_unmapped_status_detail"),
+                   PB("validation_detail").view(view_uploaded_classification_unmapped_validation_detail, name="classification_upload_unmapped_status_validation_detail")
+               )
+            ),
+            PB("datatable").view(DatabaseTableView.as_view(column_class=UploadedClassificationsUnmappedColumns), name='classification_upload_unmapped_datatable'),
+            PB("download").children(
+                PB("int:uploaded_classification_unmapped_id").view(download_classification_unmapped_file, name='classification_upload_unmapped_download')
+            ),
+            PB("str:lab_id").view(UploadedClassificationsUnmappedView.as_view(), name="classification_upload_unmapped_lab")
+        )
+    ).url_patterns()
+
+
+urlpatterns += [
     perm_path('activity', views.activity, name='activity'),
     perm_path('activity/lab/<int:lab_id>', views.activity, name='activity_lab'),
     perm_path('activity/user/<int:user_id>', views.activity, name='activity_user'),
@@ -51,15 +197,15 @@ urlpatterns = [
     perm_path('classification/view_metrics/detail', view_page_metrics_detail, name="classification_view_metrics_detail"),
 
     # this is uploading the entire import file, distinct from attaching a file to a classification
-    perm_path('classification/import_upload', UploadedClassificationsUnmappedView.as_view(), name="classification_upload_unmapped"),
-    # TODO move file lab into another subfolder as it gets a bit confused with upload page
-    perm_path('classification/import_upload/file/<int:uploaded_classification_unmapped_id>', view_uploaded_classification_unmapped, name="classification_upload_unmapped_status"),
-    perm_path('classification/import_upload/file/<int:uploaded_classification_unmapped_id>/download_validation', upload_classification_unmapped_download_validation, name="classification_upload_unmapped_status_download_validation"),
-    perm_path('classification/import_upload/file/<int:uploaded_classification_unmapped_id>/detail', view_uploaded_classification_unmapped_detail, name="classification_upload_unmapped_status_detail"),
-    perm_path('classification/import_upload/file/<int:uploaded_classification_unmapped_id>/validation_detail', view_uploaded_classification_unmapped_validation_detail, name="classification_upload_unmapped_status_validation_detail"),
-    perm_path('classification/import_upload/datatable', DatabaseTableView.as_view(column_class=UploadedClassificationsUnmappedColumns), name='classification_upload_unmapped_datatable'),
-    perm_path('classification/import_upload/download/<int:uploaded_classification_unmapped_id>', download_classification_unmapped_file, name='classification_upload_unmapped_download'),
-    perm_path('classification/import_upload/<str:lab_id>', UploadedClassificationsUnmappedView.as_view(), name="classification_upload_unmapped_lab"),
+    # perm_path('classification/import_upload', UploadedClassificationsUnmappedView.as_view(), name="classification_upload_unmapped"),
+    # # TODO move file lab into another subfolder as it gets a bit confused with upload page
+    # perm_path('classification/import_upload/file/<int:uploaded_classification_unmapped_id>', view_uploaded_classification_unmapped, name="classification_upload_unmapped_status"),
+    # perm_path('classification/import_upload/file/<int:uploaded_classification_unmapped_id>/download_validation', upload_classification_unmapped_download_validation, name="classification_upload_unmapped_status_download_validation"),
+    # perm_path('classification/import_upload/file/<int:uploaded_classification_unmapped_id>/detail', view_uploaded_classification_unmapped_detail, name="classification_upload_unmapped_status_detail"),
+    # perm_path('classification/import_upload/file/<int:uploaded_classification_unmapped_id>/validation_detail', view_uploaded_classification_unmapped_validation_detail, name="classification_upload_unmapped_status_validation_detail"),
+    # perm_path('classification/import_upload/datatable', DatabaseTableView.as_view(column_class=UploadedClassificationsUnmappedColumns), name='classification_upload_unmapped_datatable'),
+    # perm_path('classification/import_upload/download/<int:uploaded_classification_unmapped_id>', download_classification_unmapped_file, name='classification_upload_unmapped_download'),
+    # perm_path('classification/import_upload/<str:lab_id>', UploadedClassificationsUnmappedView.as_view(), name="classification_upload_unmapped_lab"),
 
     perm_path('classification/create', views.create_classification, name='create_classification'),
     perm_path('classification/create_from_hgvs/<genome_build_name>/<hgvs_string>', views.create_classification_from_hgvs, name='create_classification_from_hgvs'),
@@ -89,7 +235,6 @@ urlpatterns = [
     perm_path('clinvar_export_batch/<int:clinvar_export_batch_id>/download', clinvar_export_view.clinvar_export_batch_download, name='clinvar_export_batch_download'),
 
     perm_path('condition_matchings', condition_matchings_view, name='condition_matchings'),
-    perm_path('condition_matchings/<str:lab_id>', condition_matchings_view, name='condition_matchings_lab'),
     perm_path('condition_matchings/<str:lab_id>', condition_matchings_view, name='condition_matchings_lab'),
     perm_path('condition_matching/datatable/<str:lab_id>', DatabaseTableView.as_view(column_class=ConditionTextColumns), name='condition_text_datatable'),
     perm_path('condition_matching/<int:pk>', condition_matching_view, name='condition_matching'),
