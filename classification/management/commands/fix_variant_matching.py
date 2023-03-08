@@ -2,6 +2,7 @@ import time
 from typing import Dict
 
 from django.core.management import BaseCommand
+from django.db.models import Q
 
 from classification.models import Classification, ImportedAlleleInfo
 from classification.models.classification_variant_info_models import ResolvedVariantInfo
@@ -275,8 +276,9 @@ class Command(BaseCommand):
 
     @staticmethod
     def handle_fix_non_coding():
-        rvi_qs = ResolvedVariantInfo.objects.filter(allele_info__imported_c_hgvs__icontains='n.',
-                                                    c_hgvs__icontains='c.')
+        q1 = Q(allele_info__imported_c_hgvs__icontains='n.', c_hgvs__icontains='c.')
+        q2 = Q(allele_info__imported_c_hgvs__icontains='c.', c_hgvs__icontains='n.')
+        rvi_qs = ResolvedVariantInfo.objects.filter(q1 | q2)
         iai_ids_to_fix = list(rvi_qs.values_list("allele_info_id", flat=True).distinct())
         print(f"Fixing ResolvedVariantInfo for {len(iai_ids_to_fix)} ImportedAlleleInfo")
         rvi_qs.delete()
