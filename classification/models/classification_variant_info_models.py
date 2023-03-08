@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Optional, List, Dict, Any, TypedDict, Literal
+from typing import Optional, List, Dict, Any, TypedDict, Literal, Tuple
 
 import django.dispatch
 from django.conf import settings
@@ -237,7 +237,7 @@ class ImportedAlleleInfoValidationTagEntry:
 
     @property
     def field_pretty(self) -> str:
-        return pretty_label(self.field).replace("C Nomen", "c.nomen")
+        return pretty_label(self.field).replace("C Nomen", "c.nomen").replace("Hgvs", "HGVS")
 
     @property
     def severity_pretty(self) -> str:
@@ -608,9 +608,17 @@ class ImportedAlleleInfo(TimeStampedModel):
             self.status = ImportedAlleleInfoStatus.FAILED
 
     @staticmethod
+    def _tidy_input_value(key: str, value: str) -> str:
+        # try to do only very safe tidying up of c.HGVS values, e.g. removing random spaces
+        if key in ("imported_c_hgvs", "imported_g_hgvs") and isinstance(value, str):
+            value = value.replace(' ', '')
+        return value
+
+    @staticmethod
     def get_or_create(**kwargs: Dict[str, Any]) -> 'ImportedAlleleInfo':
+        tidied = {key: ImportedAlleleInfo._tidy_input_value(key, value) for key, value in kwargs.items()}
         try:
-            allele_info, created = ImportedAlleleInfo.objects.get_or_create(**kwargs)
+            allele_info, created = ImportedAlleleInfo.objects.get_or_create(**tidied)
             if created:
                 allele_info.update_variant_coordinate()
                 allele_info.apply_validation()
@@ -618,7 +626,7 @@ class ImportedAlleleInfo(TimeStampedModel):
             return allele_info
         except ImportedAlleleInfo.MultipleObjectsReturned:
             # don't think this happens anymore, but just give us some better reporting if it does
-            report_exc_info(extra_data={"kwargs": kwargs})
+            report_exc_info(extra_data={"kwargs": tidied})
             raise
 
     @property

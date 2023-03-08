@@ -759,9 +759,9 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
     def ensure_allele_info(self) -> Optional[ImportedAlleleInfo]:
         return self.ensure_allele_info_with_created()[0]
 
-    def ensure_allele_info_with_created(self) -> Tuple[Optional[ImportedAlleleInfo], bool]:
+    def ensure_allele_info_with_created(self, force_allele_info_update_check: bool = False) -> Tuple[Optional[ImportedAlleleInfo], bool]:
         created = False
-        if not self.allele_info:
+        if not self.allele_info or force_allele_info_update_check:
             try:
                 genome_build_patch_version = self.get_genome_build_patch_version()
             except Exception:
@@ -781,8 +781,11 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 return None, False
 
             allele_info = ImportedAlleleInfo.get_or_create(**fields)
-            self.allele_info = allele_info
-            created = True
+            if self.allele_info == allele_info:
+                created = False
+            else:
+                self.allele_info = allele_info
+                created = True
         return self.allele_info, created
 
     def update_allele_info_from_classification(self, force_update: bool = False) -> bool:
