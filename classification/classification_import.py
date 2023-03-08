@@ -128,7 +128,7 @@ def _add_post_data_insertion_upload_steps(upload_pipeline: UploadPipeline):
         sort_order += 1
 
 
-def reattempt_variant_matching(user: User, queryset: QuerySet[ImportedAlleleInfo]) -> Tuple[int, int]:
+def reattempt_variant_matching(user: User, queryset: QuerySet[ImportedAlleleInfo], clear_existing: bool = False) -> Tuple[int, int]:
     """ @:returns (valid_record_count, invalid_record_count) """
 
     qs: QuerySet[ImportedAlleleInfo] = queryset.order_by('imported_genome_build_patch_version')
@@ -165,7 +165,7 @@ def reattempt_variant_matching(user: User, queryset: QuerySet[ImportedAlleleInfo
                     imports_by_genome[genome_build.pk] = ClassificationImport.objects.create(user=user,
                                                                                              genome_build=genome_build)
                 vc_import = imports_by_genome[genome_build.pk]
-                allele_info.set_variant_prepare_for_rematch_and_save(vc_import)
+                allele_info.set_variant_prepare_for_rematch_and_save(vc_import, clear_existing=clear_existing)
                 allele_info.save()
                 valid_this_loop += 1
 

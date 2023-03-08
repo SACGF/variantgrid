@@ -296,7 +296,7 @@ class ClassificationAdmin(ModelAdminBasics):
         allele_info_ids = queryset.values_list('allele_info', flat=True)
         allele_info_qs = ImportedAlleleInfo.objects.filter(id__in=allele_info_ids)
 
-        valid_record_count, invalid_record_count = reattempt_variant_matching(request.user, allele_info_qs)
+        valid_record_count, invalid_record_count = reattempt_variant_matching(request.user, allele_info_qs, True)
         if invalid_record_count:
             self.message_user(request, f'Records with missing or invalid builds/coordinates : {invalid_record_count}')
         self.message_user(request, f'Records re-matching : {valid_record_count}')
