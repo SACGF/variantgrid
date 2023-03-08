@@ -23,9 +23,9 @@
     }
 
     function checkIfAllChecked(toggle, array) {
-        var numChecked = 0;
+        let numChecked = 0;
         array.each(function() { numChecked += $(this).is(":checked"); });
-        var allChecked = numChecked == array.length;
+        const allChecked = numChecked == array.length;
         $(toggle).prop('checked', allChecked);
     }
 
@@ -89,7 +89,7 @@
         data.gene_symbol = blankToNull($('#id_gene_symbol').val());
         data.lab = blankToNull($('#id_lab').val());
         data.user = blankToNull($('#id_user').val());
-        data.allele_origin = blankToNull($('#origin-select').val());
+        data.allele_origin = blankToNull($('#id_allele_origin').val());
         data.id_filter = blankToNull($('#id_filter').val());
         let flags = [];
         $('input[flagtypeid]').each((index, dom) => {
@@ -118,7 +118,7 @@
     }
 
     $(document).ready(() => {
-        $('#id_gene_symbol, #id_lab, #id_user').change(function() {
+        $('#id_gene_symbol, #id_lab, #id_user, #id_allele_origin').change(function() {
             filterGrid();
         });
 
@@ -186,14 +186,8 @@
             {% endif %}
             {% if VARIANT_CLASSIFICATION_GRID_SHOW_ORIGIN %}
             <div class="col-md-4 col-lg-2">
-                <br/>
-                <select id="origin-select" class="form-control">
-                    <option hidden selected>Select Origin</option>
-                    <option value=""></option>
-                    <option value="germline">Germline</option>
-                    <option value="somatic">Somatic</option>
-                    <option value="other">Origin Other</option>
-                </select>
+                <br />
+                {% crispy allele_origin_form form_helper.horizontal_no_labels %}
             </div>
             {% endif %}
             {% if VARIANT_CLASSIFICATION_ID_FILTER %}

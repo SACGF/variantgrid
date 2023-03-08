@@ -33,6 +33,7 @@ from classification.classification_changes import ClassificationChanges
 from classification.classification_stats import get_grouped_classification_counts, \
     get_classification_counts, get_criteria_counts
 from classification.enums import SubmissionSource, SpecialEKeys
+from classification.forms import ClassificationAlleleOriginForm
 from classification.models import ClassificationAttachment, Classification, \
     ClassificationRef, ClassificationJsonParams, ClassificationConsensus, ClassificationReportTemplate, ReportNames, \
     ConditionResolvedDict, DiscordanceReport
@@ -150,6 +151,7 @@ def classifications(request):
         "gene_form": GeneSymbolForm(),
         "user_form": UserSelectForm(),
         "lab_form": LabSelectForm(),
+        "allele_origin_form": ClassificationAlleleOriginForm(),
         "labs": Lab.valid_labs_qs(request.user),
         "search_and_classify_form": search_and_classify_form,
         "genome_build": user_settings.default_genome_build,
