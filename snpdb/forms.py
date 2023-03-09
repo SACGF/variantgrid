@@ -14,7 +14,7 @@ from guardian.shortcuts import assign_perm, remove_perm
 
 from annotation.models import ManualVariantEntry
 from annotation.models.models_enums import ManualVariantEntryType
-from library.django_utils.autocomplete_utils import ModelSelect2
+from library.django_utils.autocomplete_utils import ModelSelect2, ModelSelect2Multiple
 from library.forms import ROFormMixin
 from library.guardian_utils import DjangoPermission
 from snpdb import models
@@ -99,6 +99,15 @@ class LabSelectForm(forms.Form):
                                  required=False,
                                  widget=ModelSelect2(url='lab_autocomplete',
                                                      attrs={'data-placeholder': 'Lab...'}))
+
+
+class LabMultiSelectForm(forms.Form):
+    lab = forms.ModelMultipleChoiceField(queryset=Lab.objects.all(),
+                                         required=False,
+                                         widget=ModelSelect2Multiple(url='lab_autocomplete',
+                                                                     attrs={'data-placeholder': 'Lab...'}))
+
+
 
 
 class TagForm(forms.Form):

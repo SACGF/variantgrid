@@ -305,7 +305,8 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
                 filters.append(Q(classification__user__pk=user_id))
 
         if lab_id := self.get_query_param('lab'):
-            filters.append(Q(classification__lab__pk=lab_id))
+            lab_list = lab_id.split(",")
+            filters.append(Q(classification__lab__pk__in=lab_list))
 
         if flags := self.get_query_json("flags"):
             # Use inner query vs join to only return unique results

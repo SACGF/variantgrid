@@ -16,6 +16,10 @@
         text-align: center;
         padding: 2px;
     }
+
+    .filter-row>div {
+        z-index: 1000;
+    }
 </style>
 <script>
     function filterGrid() {
@@ -87,7 +91,7 @@
 
     function classificationFilter(data, type) {
         data.gene_symbol = blankToNull($('#id_gene_symbol').val());
-        data.lab = blankToNull($('#id_lab').val());
+        data.lab = blankToNull($('#id_lab').val().join(','));
         data.user = blankToNull($('#id_user').val());
         data.allele_origin = blankToNull($('#id_allele_origin').val());
         data.id_filter = blankToNull($('#id_filter').val());
@@ -118,7 +122,7 @@
     }
 
     $(document).ready(() => {
-        $('#id_gene_symbol, #id_lab, #id_user, #id_allele_origin').change(function() {
+        $('#id_gene_symbol, #id_lab, #id_user, #id_allele_origin').on("change", function() {
             filterGrid();
         });
 
