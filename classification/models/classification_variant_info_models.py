@@ -651,6 +651,8 @@ class ImportedAlleleInfo(TimeStampedModel):
 
     def hard_reset_matching_info(self):
         self.status = ImportedAlleleInfoStatus.PROCESSING
+        self.matched_variant = None
+        self.allele = None
         for genome_build in [GenomeBuild.grch37(), GenomeBuild.grch38()]:
             self._update_variant(genome_build=genome_build, variant=None)
         self.update_variant_coordinate()
