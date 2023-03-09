@@ -9,7 +9,6 @@ from django.db.models import QuerySet
 from classification.models import ImportedAlleleInfo, ImportedAlleleInfoStatus
 from classification.models.classification import ClassificationImport
 from classification.models.classification_import_run import ClassificationImportRun
-from classification.models.classification_inserter import VariantResolver
 from classification.tasks.classification_import_process_variants_task import ClassificationImportProcessVariantsTask
 from library.django_utils.django_file_utils import get_import_processing_dir
 from library.genomics.vcf_utils import write_vcf_from_tuples
@@ -130,11 +129,9 @@ def _add_post_data_insertion_upload_steps(upload_pipeline: UploadPipeline):
 
 def reattempt_variant_matching(user: User, queryset: QuerySet[ImportedAlleleInfo], clear_existing: bool = False) -> Tuple[int, int]:
     """ @:returns (valid_record_count, invalid_record_count) """
-
-    variant_matcher = VariantResolver(user=user)
-
+    from classification.models.variant_resolver import VariantResolver
     qs: QuerySet[ImportedAlleleInfo] = queryset.order_by('imported_genome_build_patch_version')
-    variant_matcher = VariantResolver(user=user, force_mode=True)
+    variant_matcher = VariantResolver(user=user)
     queue_count = 0
 
     ClassificationImportRun.record_classification_import("admin-variant-rematch")
