@@ -2386,7 +2386,7 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
 
     def get_absolute_url(self):
         return reverse('view_classification',
-                       kwargs={'record_id': str(self.classification.id) + '.' + str(self.created.timestamp())})
+                       kwargs={'classification_id': str(self.classification.id) + '.' + str(self.created.timestamp())})
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
