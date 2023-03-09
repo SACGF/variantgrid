@@ -18,7 +18,7 @@ class VariantResolver:
         self.limit = limit
 
     def _classification_import_from(self, genome_build: GenomeBuild):
-        if existing := self.ci_by_gb[genome_build]:
+        if existing := self.ci_by_gb.get(genome_build):
             return existing
         new_import = ClassificationImport.objects.create(genome_build=genome_build, user=self.user)
         self.ci_by_gb[genome_build] = new_import

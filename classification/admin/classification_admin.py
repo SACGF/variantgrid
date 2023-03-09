@@ -756,7 +756,7 @@ class ImportedAlleleInfoAdmin(ModelAdminBasics):
             return latest_validation.include
         return False
 
-    @admin_action("Re-Match Soft (non destructive)")
+    @admin_action("Re-Match Soft")
     def re_match_soft(self, request, queryset: QuerySet[ImportedAlleleInfo]):
         """
         Soft remwatch will leave everything linked while attempting to match again
@@ -769,7 +769,7 @@ class ImportedAlleleInfoAdmin(ModelAdminBasics):
         rematched = reattempt_variant_matching(request.user, queryset, False)
         self.message_user(request, message=f"Allele Infos rematched {rematched}")
 
-    @admin_action("Re-Match Hard")
+    @admin_action("Re-Match Hard (unmatched, rematches)")
     def re_match_hard(self, request, queryset: QuerySet[ImportedAlleleInfo]):
         """
         Hard rematch will reset the imported allele info, and match from the start
