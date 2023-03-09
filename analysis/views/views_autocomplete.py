@@ -9,7 +9,7 @@ from library.django_utils.autocomplete_utils import AutocompleteView
 
 @method_decorator([cache_page(MINUTE_SECS), vary_on_cookie], name='dispatch')
 class AnalysisAutocompleteView(AutocompleteView):
-    fields = ['name']
+    fields = ['pk', 'name']
 
     def get_user_queryset(self, user):
         qs = Analysis.filter_for_user(user)
