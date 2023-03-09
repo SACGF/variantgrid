@@ -14,6 +14,7 @@ from django.db.models.query_utils import Q
 from django.urls.base import reverse
 from pyhgvs import HGVSName, InvalidHGVSName
 
+from analysis.models import Analysis
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
 from annotation.manual_variant_entry import check_can_create_variants, CreateManualVariantForbidden
 from annotation.models.models import AnnotationVersion
@@ -38,6 +39,7 @@ from upload.models import ModifiedImportedVariant
 from variantgrid.perm_path import get_visible_url_names
 from variantopedia.models import SearchTypes
 
+ANALYSIS_PREFIX_PATTERN = re.compile(r"^a(\d+)$")
 DB_PREFIX_PATTERN = re.compile(fr"^(v|{settings.VARIANT_VCF_DB_PREFIX})(\d+)$")
 VARIANT_VCF_PATTERN = re.compile(r"((?:chr)?\S*)\s+(\d+)\s+\.?\s*([GATC]+)\s+([GATC]+)")
 VARIANT_GNOMAD_PATTERN = re.compile(r"(?:chr)?(\S*)-(\d+)-([GATC]+)-([GATC]+)")
@@ -356,6 +358,7 @@ class Searcher:
             (SearchTypes.COSMIC, COSMIC_PATTERN, search_cosmic),
         ]
         self.genome_agnostic_searches = [
+            (SearchTypes.ANALYSIS, ANALYSIS_PREFIX_PATTERN, search_analysis_id),
             (SearchTypes.GENE_SYMBOL, GENE_SYMBOL_PATTERN, search_gene_symbol),  # special case
             (SearchTypes.GENE, GENE_PATTERN, search_gene),  # special case
             (SearchTypes.EXPERIMENT, HAS_ALPHA_PATTERN, search_experiment),
@@ -686,6 +689,7 @@ def search_hgvs(search_string: str, user: User, genome_build: GenomeBuild, varia
             return results
     return []
 
+
 def search_for_alt_alts(variant_qs: QuerySet, variant_tuple: VariantCoordinate, messages: List[str]) -> VARIANT_SEARCH_RESULTS:
     if not messages:
         messages = []
@@ -768,10 +772,16 @@ def search_variant_gnomad(search_string: str, user: User, genome_build: GenomeBu
 
 
 def search_variant_id(search_string: str, **kwargs) -> VARIANT_SEARCH_RESULTS:
-    m = re.match(DB_PREFIX_PATTERN, search_string)
-    if m:
+    if m := re.match(DB_PREFIX_PATTERN, search_string):
         variant_id = m.group(2)
         return Variant.objects.filter(pk=variant_id)
+    return None
+
+
+def search_analysis_id(search_string: str, **kwargs):
+    if m := re.match(ANALYSIS_PREFIX_PATTERN, search_string):
+        analysis_id = m.group(1)
+        return Analysis.objects.filter(pk=analysis_id)
     return None
 
 

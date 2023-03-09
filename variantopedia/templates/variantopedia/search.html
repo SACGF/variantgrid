@@ -129,6 +129,11 @@
                             <span class="example">OMIM:616299</span> or <span class="example">HP:0001332</span> or <span class="example">MONDO:0002974</span><br/>or text such as <span class="example">intestinal polyposis</span>
                             <br/>or for a dedicated MONDO search <a class="external-link" href="https://www.ebi.ac.uk/ols/ontologies/mondo">OLS Ontology Search</a>
                         {% endlabelled %}
+                        {% if url_name_visible.analysis %}
+                            {% labelled label="Analysis" %}
+                                a1105 -> For analyis "1105"
+                            {% endlabelled %}
+                        {% endif %}
                         {% if url_name_visible.patients %}
                             {% labelled label="Cohort" %}
                                 case insensitive search match in name

@@ -1,6 +1,7 @@
 
 
 class SearchTypes:
+    ANALYSIS = "Analysis"
     CLASSIFICATION = "Classification"
     CLINGEN_ALLELE_ID = "ClinGen Allele ID"
     COHORT = "Cohort"
