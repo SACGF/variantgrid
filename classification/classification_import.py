@@ -9,12 +9,12 @@ from django.db.models import QuerySet
 from classification.models import ImportedAlleleInfo, ImportedAlleleInfoStatus
 from classification.models.classification import ClassificationImport
 from classification.models.classification_import_run import ClassificationImportRun
+from classification.models.classification_inserter import VariantResolver
 from classification.tasks.classification_import_process_variants_task import ClassificationImportProcessVariantsTask
 from library.django_utils.django_file_utils import get_import_processing_dir
 from library.genomics.vcf_utils import write_vcf_from_tuples
-from library.log_utils import report_exc_info
 from library.utils import full_class_name
-from snpdb.models import Variant, ImportSource
+from snpdb.models import Variant
 from snpdb.models.models_variant import VariantCoordinate
 from snpdb.variant_pk_lookup import VariantPKLookup
 from upload.models import UploadedFile, UploadPipeline, UploadStep, \
@@ -131,57 +131,26 @@ def _add_post_data_insertion_upload_steps(upload_pipeline: UploadPipeline):
 def reattempt_variant_matching(user: User, queryset: QuerySet[ImportedAlleleInfo], clear_existing: bool = False) -> Tuple[int, int]:
     """ @:returns (valid_record_count, invalid_record_count) """
 
+    variant_matcher = VariantResolver(user=user)
+
     qs: QuerySet[ImportedAlleleInfo] = queryset.order_by('imported_genome_build_patch_version')
-    invalid_record_count = 0
-    valid_record_count = 0
-    valid_this_loop = 0
-    imports_by_genome: Dict[int, ClassificationImport] = {}
-    max_size = 100
-
-    def process_outstanding():
-        # processes the contents of imports_by_genome
-        # and then clears out the appropriate variables
-        nonlocal valid_this_loop
-        nonlocal valid_record_count
-        nonlocal imports_by_genome
-
-        if imports_by_genome:
-            for vc_import in imports_by_genome.values():
-                process_classification_import(vc_import, ImportSource.API)
-            ClassificationImportRun.record_classification_import("admin-variant-rematch", valid_this_loop)
-
-            # reset variables and continue
-            valid_record_count += valid_this_loop
-            valid_this_loop = 0
-            imports_by_genome.clear()
+    variant_matcher = VariantResolver(user=user, force_mode=True)
+    queue_count = 0
 
     ClassificationImportRun.record_classification_import("admin-variant-rematch")
     try:
         for allele_info in qs:
-            try:
-                # classification.revalidate(user=user)
-                genome_build = allele_info.imported_genome_build_patch_version.genome_build
-                if genome_build.pk not in imports_by_genome:
-                    imports_by_genome[genome_build.pk] = ClassificationImport.objects.create(user=user,
-                                                                                             genome_build=genome_build)
-                vc_import = imports_by_genome[genome_build.pk]
-                allele_info.set_variant_prepare_for_rematch_and_save(vc_import, clear_existing=clear_existing)
-                allele_info.save()
-                valid_this_loop += 1
+            if clear_existing:
+                allele_info.hard_reset_matching_info()
+            queued = variant_matcher.queue_resolve(allele_info)
+            if queued:
+                queue_count += 1
+                if queue_count % 100 == 0:
+                    ClassificationImportRun.record_classification_import("admin-variant-rematch", queue_count)
+                    queue_count = 0
 
-            except BaseException:
-                report_exc_info()  # temporary until we're sure we're not responsible for all of this
-                invalid_record_count += 1
-
-            if valid_this_loop >= max_size:
-                process_outstanding()
-                sleep(2)  # minor pause to stop the variant matcher from being bombarded
-
-        process_outstanding()
-
+        return variant_matcher.process_queue()
     finally:
         # got to give time for variant matching to complete, a bit hacky
         sleep(10)
-        ClassificationImportRun.record_classification_import("admin-variant-rematch", is_complete=True)
-
-    return valid_record_count, invalid_record_count
+        ClassificationImportRun.record_classification_import("admin-variant-rematch", queue_count, is_complete=True)

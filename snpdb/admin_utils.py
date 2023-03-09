@@ -7,7 +7,7 @@ from django.conf import settings
 from django.contrib import admin, messages
 from django.db import models
 from django.db.models import AutoField, ForeignKey, DateTimeField, Model
-from django.http import HttpResponse, StreamingHttpResponse, HttpResponseRedirect
+from django.http import StreamingHttpResponse, HttpResponseRedirect
 from django.http.response import HttpResponseBase
 from django.urls import path, NoReverseMatch, reverse
 from django.utils.encoding import smart_str
@@ -117,7 +117,8 @@ def admin_model_action(url_slug: str, short_description: Optional[str] = None, i
 def admin_list_column(
         short_description: Optional[str] = None,
         order_field: Optional[str] = None,
-        is_boolean: bool = False
+        is_boolean: bool = False,
+        limit: int = 30
         ):
     """
     Decorator, mark a function as acting like an admin list column if class extends ModelAdminBasics
@@ -129,7 +130,13 @@ def admin_list_column(
     def decorator(method):
         def wrapper(*args, **kwargs):
             # empty wrapper, we just want to modify short_description and mark as is_action
-            return method(*args, **kwargs)
+            result = method(*args, **kwargs)
+            if result and limit:
+                text = str(result)
+                if len(text) > limit:
+                    result = text[0:limit] + "..."
+            return result
+
         if short_description:
             wrapper.short_description = short_description
         if order_field:

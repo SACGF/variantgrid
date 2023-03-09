@@ -87,5 +87,5 @@ class Command(BaseCommand):
             c.revalidate(user)
 
         print(f"Rematching...")
-        valid_record_count, invalid_record_count = reattempt_variant_matching(user, classification_qs)
-        print(f"{valid_record_count=}, {invalid_record_count=}")
+        matched_count = reattempt_variant_matching(user, classification_qs)
+        print(f"{matched_count=}")

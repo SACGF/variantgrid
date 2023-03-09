@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Optional, List, Dict, Any, TypedDict, Literal, Tuple
+from typing import Optional, List, Dict, Any, TypedDict, Literal
 
 import django.dispatch
 from django.conf import settings
@@ -580,7 +580,9 @@ class ImportedAlleleInfo(TimeStampedModel):
     def resolved_builds(self) -> List[ResolvedVariantInfo]:
         return list(ResolvedVariantInfo.objects.filter(allele_info=self).select_related('genome_build'))
 
-    def update_variant_coordinate(self):
+    def update_variant_coordinate(self) -> bool:
+        """ returns if a valid variant_coordinate could be derived """
+
         # TODO, support variant_coordinate being provided
         # Code used to check to see if transcript was supported here
         # but it's better to do that in the validation step
@@ -647,24 +649,35 @@ class ImportedAlleleInfo(TimeStampedModel):
         self.status = ImportedAlleleInfoStatus.FAILED
         self.save()
 
-    def set_variant_prepare_for_rematch_and_save(self, classification_import: 'ClassificationImport', clear_existing: bool = False):
-        # TODO, instead of cleainng everything out, can we just provide classification_import?
+    def hard_reset_matching_info(self):
         self.status = ImportedAlleleInfoStatus.PROCESSING
+        for genome_build in [GenomeBuild.grch37(), GenomeBuild.grch38()]:
+            self._update_variant(genome_build=genome_build, variant=None)
         self.update_variant_coordinate()
-        self.classification_import = classification_import
+        self.classification_import = None
+        self.apply_validation()
         self.save()
-        if clear_existing:
-            self.matched_variant = None
-            self.allele = None
+        allele_info_changed_signal.send(sender=ImportedAlleleInfo, allele_info=self)
 
-            # should we actually do allele info changed signal? or save it for after we've matched
-            for genome_build in [GenomeBuild.grch37(), GenomeBuild.grch38()]:
-                self._update_variant(genome_build=genome_build, variant=None)
-            self.apply_validation()
-            self.save()
 
-            # should we actually do allele info changed signal? or save it for after we've matched
-            allele_info_changed_signal.send(sender=ImportedAlleleInfo, allele_info=self)
+    # def set_variant_prepare_for_rematch_and_save(self, classification_import: 'ClassificationImport', clear_existing: bool = False):
+    #     # TODO, instead of cleaning everything out, can we just provide classification_import?
+    #     self.status = ImportedAlleleInfoStatus.PROCESSING
+    #     self.update_variant_coordinate()
+    #     self.classification_import = classification_import
+    #     self.save()
+    #     if clear_existing:
+    #         self.matched_variant = None
+    #         self.allele = None
+    #
+    #         # should we actually do allele info changed signal? or save it for after we've matched
+    #         for genome_build in [GenomeBuild.grch37(), GenomeBuild.grch38()]:
+    #             self._update_variant(genome_build=genome_build, variant=None)
+    #         self.apply_validation()
+    #         self.save()
+    #
+    #         # should we actually do allele info changed signal? or save it for after we've matched
+    #         allele_info_changed_signal.send(sender=ImportedAlleleInfo, allele_info=self)
 
     def refresh_and_save(self, force_update=False, liftover_complete=False):
         """
@@ -689,7 +702,10 @@ class ImportedAlleleInfo(TimeStampedModel):
             raise ValueError("ImportedAlleleInfo.update_and_save requires a matched_variant, instead call reset_with_status")
 
         if not force_update and self.matched_variant == matched_variant and self.status == ImportedAlleleInfoStatus.MATCHED_ALL_BUILDS:
-            # nothing to do, and no force update
+            # nothing to do, and no force update, just update message if we need to
+            if message and message != self.message:
+                self.message = message
+                self.save()
             return
 
         self.matched_variant = matched_variant

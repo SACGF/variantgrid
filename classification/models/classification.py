@@ -109,7 +109,6 @@ class ClassificationImport(models.Model):
     def __str__(self):
         return f"ClassificationImport ({self.genome_build})"
 
-
 class ClassificationImportAlleleSource(AlleleSource):
     """ A model to indicate that variants need to be linked to an allele and lifted over to other builds """
     classification_import = models.ForeignKey(ClassificationImport, null=True, on_delete=CASCADE)
@@ -810,14 +809,14 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         else:
             return False
 
-    def attempt_set_variant_info_from_pre_existing_imported_allele_info(self) -> bool:
+    def attempt_set_variant_info_from_pre_existing_imported_allele_info(self) -> ImportedAlleleInfo:
         """
         Link to ImportedAlleleInfo (if haven't already), then update classification with any existing ImportedAlleleInfo
         :return: True if there's nothing more to do, False if this may still require matching
         """
         allele_info = self.ensure_allele_info()
         self.apply_allele_info_to_classification()
-        return allele_info.status in {ImportedAlleleInfoStatus.MATCHED_ALL_BUILDS, ImportedAlleleInfoStatus.FAILED}
+        return allele_info
 
     # def set_variant_failed_matching(self, message: Optional[str] = None):
     #     if allele_info := self.ensure_allele_info():
