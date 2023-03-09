@@ -43,6 +43,7 @@ HTSeq
 ijson
 ipython
 kombu
+levenshtein
 Markdown
 matplotlib
 more_itertools
@@ -58,7 +59,6 @@ psycopg2
 PyPDF2
 pysam
 python_dateutil
-python_Levenshtein
 pyvcf3
 # Have trouble with Celery workers shutting down with newer versions of Redis
 redis==3.5.3
