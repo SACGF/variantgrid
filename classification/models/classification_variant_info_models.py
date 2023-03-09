@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Optional, List, Dict, Any, TypedDict, Literal
+from typing import Optional, List, Dict, Any, TypedDict, Literal, Tuple
 
 import django.dispatch
 from django.conf import settings
@@ -394,6 +394,16 @@ class ImportedAlleleInfo(TimeStampedModel):
 
     def get_absolute_url(self):
         return reverse('view_imported_allele_info_detail', kwargs={'allele_info_id': self.pk})
+
+    @property
+    def variant_coordinates_imported_and_resolved(self) -> Tuple[VariantCoordinate, VariantCoordinate]:
+        imported_vc: Optional[VariantCoordinate] = self.variant_coordinate_obj
+        resolved_vc: Optional[VariantCoordinate] = None
+
+        if vi := self.variant_info_for_imported_genome_build:
+            resolved_vc = vi.variant.coordinate
+
+        return imported_vc, resolved_vc
 
     def save(self, force_insert=False, force_update=False, using=None, update_fields=None, **kwargs):
         if not self.imported_md5_hash:

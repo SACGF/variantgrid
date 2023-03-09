@@ -27,6 +27,7 @@ class Command(BaseCommand):
 
         parser.add_argument('--non-coding', action='store_true', default=False, help='Fix issue #762 NR had c. instead of n.')
         parser.add_argument('--revalidate', action='store_true', default=False)
+        parser.add_argument('--variant_coordinate', action='store_true', default=False, help='Validates Variant Coordinates')
 
     def report_unmatched(self):
         print(f"Unmatched count = {Classification.objects.filter(variant__isnull=True).count()}")
@@ -42,6 +43,7 @@ class Command(BaseCommand):
         mode_revalidation_chgvs = options.get('revalidate_chgvs')
         mode_non_coding = options.get('non_coding')
         mode_revalidate = options.get('revalidate')
+        mode_variant_coordinate = options.get('variant_coordinate')
 
         # if mode_all and mode_missing:
         #     raise ValueError("all and missing are mutually exclusive parameters")
@@ -68,6 +70,9 @@ class Command(BaseCommand):
 
         if mode_revalidate:
             self.handle_revalidate()
+
+        if mode_variant_coordinate:
+            self.handle_coordinate_validation()
 
         # row_count = 0
         # batch_size = 50
@@ -133,6 +138,12 @@ class Command(BaseCommand):
                 rv.save()
                 updates += 1
         print(f"Updated {updates} variant info")
+
+    def handle_coordinate_validation(self):
+        for iai in ImportedAlleleInfo.objects.all():
+            ivc, rvc = iai.variant_coordinates_imported_and_resolved
+            if rvc and rvc != ivc:
+                print(f"{iai.pk}\t{ivc}\t{rvc}")
 
     def handle_extra(self):
         i = 0
