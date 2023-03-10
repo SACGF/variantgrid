@@ -57,6 +57,7 @@ SEQAUTO_SAMPLE_SHEET_EXTRA_COLUMNS = ["SAPOrderNumber", "Sex", "Panel", "R1kDVer
 
 _SA_PATH_ENRICHMENT_KITS = [{"name": "roche_1k_disease", "version": 6}, {"name": "medical_exomes"}]
 SEQAUTO_COVERAGE_ENRICHMENT_KITS = _SA_PATH_ENRICHMENT_KITS
+GENES_DEFAULT_CANONICAL_TRANSCRIPT_COLLECTION_ID = 1
 GENE_GRID_DEFAULT_ENRICHMENT_KITS = _SA_PATH_ENRICHMENT_KITS
 # Fields must be from GoldCoverageSummary and COLUMNS + LABELS must line up!
 GENE_GRID_ENRICHMENT_KIT_COLUMNS = ['depth_20x_5th_percentile']
