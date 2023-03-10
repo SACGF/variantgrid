@@ -59,6 +59,7 @@ class GeneSymbolMatcher:
 
         if save:
             GeneListGeneSymbol.objects.bulk_create(gene_list_gene_symbols, ignore_conflicts=True)
+            gene_list.update_modified()
             self._match_symbols_to_genes_in_releases()
 
         return gene_list_gene_symbols

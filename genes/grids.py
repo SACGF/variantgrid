@@ -31,7 +31,7 @@ class GeneListsGrid(JqGridUserRowConfig):
     model = GeneList
     caption = 'Gene Lists'
     # Category is only shown when gene_id provided (hidden set in get_colmodels)
-    fields = ["id", "category__name", "name", "user__username", "import_status"]
+    fields = ["id", "category__name", "name", "user__username", "import_status", "created", "modified"]
     colmodel_overrides = {
         'id': {"hidden": True},
         "name": {"width": 400,

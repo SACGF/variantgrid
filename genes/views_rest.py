@@ -91,7 +91,8 @@ class ModifyGeneListView(APIView):
 
         modification_info = f"Added manually by {request.user} on {timezone.now()}"
         gene_additions_modification_info = {gene: modification_info for gene in gene_additions}
-        num_added, num_deleted = gene_list.add_and_remove_gene_symbols(gene_additions, gene_deletions, gene_additions_modification_info)
+        num_added, num_deleted = gene_list.add_and_remove_gene_symbols(gene_additions, gene_deletions,
+                                                                       gene_additions_modification_info)
         return Response(status=HTTP_200_OK, data={"num_added": num_added, "num_deleted": num_deleted})
 
 
