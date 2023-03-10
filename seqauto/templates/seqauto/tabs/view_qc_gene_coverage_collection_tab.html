@@ -6,6 +6,6 @@
 </style>
 {% if gene_coverage %}
 <div id="gene-coverage">
-{% jqgrid 'gene_coverage_collection_grid' 'GeneCoverage' False None 'jqgrid/jqgrid.html' None False gene_coverage_collection_id=gene_coverage.pk %}
+{% jqgrid 'gene_coverage_collection_grid' 'GeneCoverage' False None 'jqgrid/jqgrid.html' None False download_grid_json_as_csv=True gene_coverage_collection_id=gene_coverage.pk %}
 </div>
 {% endif %}
