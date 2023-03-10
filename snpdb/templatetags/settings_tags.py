@@ -15,3 +15,8 @@ def settings_value(name):
         {% if ENABLE_FEATURE_A %}
     """
     return getattr(settings, name, "")
+
+
+@register.filter(name="settings_value")
+def settings_value_filter(name):
+    return getattr(settings, name, "")

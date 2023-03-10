@@ -688,6 +688,7 @@ INBOX_ENABLED = True
 HELP_URL = "https://variantgrid.readthedocs.io/en/latest/"
 LOGIN_URL = '/accounts/login/'
 LOGIN_REDIRECT_URL = "dashboard"  # Remember to put @terms_required around this view
+LOGO_VIEW_NAME = "index"
 LOGIN_USERNAME_PLACEHOLDER = None
 LOGOUT_REDIRECT_URL = '/'
 
