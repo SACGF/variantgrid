@@ -25,7 +25,8 @@ def get_variant_queryset_for_latest_annotation_version(genome_build):
 
 
 def get_variant_queryset_for_annotation_version(annotation_version):
-    return get_queryset_for_annotation_version(Variant, annotation_version)
+    qs = get_queryset_for_annotation_version(Variant, annotation_version)
+    return qs.filter(Variant.get_contigs_q(annotation_version.genome_build))
 
 
 def get_queryset_for_latest_annotation_version(klass, genome_build):
@@ -39,7 +40,6 @@ def get_queryset_for_annotation_version(klass, annotation_version):
     assert annotation_version, "Must provide 'annotation_version'"
     qs = get_queryset_with_transformer_hook(klass=klass)
     qs.add_sql_transformer(annotation_version.sql_partition_transformer)
-    qs = qs.filter(Variant.get_contigs_q(annotation_version.genome_build))
     return qs
 
 
