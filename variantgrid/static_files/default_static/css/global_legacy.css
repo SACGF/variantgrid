@@ -1161,6 +1161,14 @@ a.clinical-context {
   background-image: url(/static/icons/sequencers/nextseq_icon.png);
 }
 
+.novaseq-5000 {
+  background-image: url(/static/icons/sequencers/novaseq_icon.png);
+}
+
+.novaseq-6000 {
+  background-image: url(/static/icons/sequencers/novaseq_icon.png);
+}
+
 .miseq {
   background-image: url(/static/icons/sequencers/miseq_icon.png);
 }

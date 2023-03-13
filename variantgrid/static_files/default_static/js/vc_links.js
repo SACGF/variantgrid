@@ -112,7 +112,7 @@ let VCLinks = (function() {
             links.push(this.makeLink('PDB', 'https://www.rcsb.org', '/uniprot/@@', SpecialEKeys.UNIPROT_ID, 'Protein Data Bank'));
             links.push(this.generateUcsc());
             links.push(this.makeLink('Uniprot ID', 'https://www.uniprot.org/uniprot/', '@@', SpecialEKeys.UNIPROT_ID));
-            links.push(this.generateVarsome());
+            // links.push(this.generateVarsome());
 
             return links;
         },
