@@ -6,7 +6,7 @@ from django.core.cache import cache
 
 from annotation.annotation_versions import get_annotation_range_lock_and_unannotated_count
 from annotation.models import AnnotationRun
-from annotation.models.models import AnnotationVersion
+from annotation.models.models import AnnotationVersion, AnnotationRangeLock
 from annotation.tasks.annotate_variants import annotate_variants
 from library.log_utils import log_traceback
 from snpdb.models import GenomeBuild, ImportStatus, Sample, VCF
@@ -42,15 +42,24 @@ def annotation_scheduler(active=True):
         log_traceback()
 
 
+def _handle_range_lock(range_lock):
+    annotation_run = AnnotationRun.objects.create(annotation_range_lock=range_lock)
+    annotate_variants.apply_async((annotation_run.pk,))  # @UndefinedVariable
+
+
 def _handle_variant_annotation_version(variant_annotation_version):
+    # If we crash in the wrong place, we may end up with unassigned range locks
+    for range_lock in AnnotationRangeLock.objects.filter(version=variant_annotation_version,
+                                                         annotationrun__isnull=True):
+        logging.warning("Assigned orphaned annotation range lock")
+        _handle_range_lock(range_lock)
+
     range_lock, unannotated_count = get_annotation_range_lock_and_unannotated_count(variant_annotation_version,
                                                                                     settings.ANNOTATION_VEP_BATCH_MIN,
                                                                                     settings.ANNOTATION_VEP_BATCH_MAX)
     if range_lock is not None:
         range_lock.save()
-        annotation_run = AnnotationRun.objects.create(annotation_range_lock=range_lock)
-        annotate_variants.apply_async((annotation_run.pk,))  # @UndefinedVariable
-        logging.info("Scheduled annotate_variants job")
+        _handle_range_lock(range_lock)
     else:
         if unannotated_count:
             logging.warning("Unannotated variants but couldn't get a lock.")

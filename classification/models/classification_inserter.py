@@ -1,12 +1,11 @@
 from typing import Dict, Optional, Set, Mapping
 
-from django.conf import settings
 from django.contrib.auth.models import User
 from django.db import transaction
 from django.utils.timezone import now
 
 from classification.enums import ShareLevel, ForceUpdate, SubmissionSource, SpecialEKeys
-from classification.models import ClassificationImport, ClassificationProcessError, ClassificationRef, \
+from classification.models import ClassificationProcessError, ClassificationRef, \
     EvidenceMixin, classification_flag_types, ClassificationJsonParams, ClassificationModification, \
     ClassificationPatchResponse, ClassificationImportRun
 from classification.models.classification_utils import ClassificationPatchStatus

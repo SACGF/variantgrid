@@ -671,7 +671,6 @@ class ImportedAlleleInfo(TimeStampedModel):
         self.save()
         allele_info_changed_signal.send(sender=ImportedAlleleInfo, allele_info=self)
 
-
     # def set_variant_prepare_for_rematch_and_save(self, classification_import: 'ClassificationImport', clear_existing: bool = False):
     #     # TODO, instead of cleaning everything out, can we just provide classification_import?
     #     self.status = ImportedAlleleInfoStatus.PROCESSING

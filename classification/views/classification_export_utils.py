@@ -2,9 +2,11 @@ from dataclasses import dataclass
 from enum import Enum
 from functools import cached_property
 from typing import List, Iterable, Optional, Dict, Set, Any, Mapping
+
 from django.contrib.auth.models import User
 from django.db.models import Count
 from django.db.models.query import QuerySet
+
 from classification.models.classification import ClassificationModification
 from classification.models.evidence_key import EvidenceKeyMap, EvidenceKey
 from genes.hgvs import CHGVS

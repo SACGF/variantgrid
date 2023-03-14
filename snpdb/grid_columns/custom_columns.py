@@ -7,7 +7,7 @@ from django.db.models.functions import Coalesce
 
 from analysis.models import VariantTag
 from annotation.models import AnnotationVersion, ColumnVEPField
-from classification.models import Classification, ClassificationModification
+from classification.models import ClassificationModification
 from library.jqgrid.jqgrid_sql import get_overrides
 from snpdb.models import CustomColumn, CustomColumnsCollection
 from snpdb.models.models_enums import ColumnAnnotationLevel

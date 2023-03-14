@@ -9,12 +9,12 @@ def _test_old_cdot(apps):
     TranscriptVersion = apps.get_model("genes", "TranscriptVersion")
 
     if not TranscriptVersion.objects.exists():
-        return False  # No transcripts, mew install
+        return False  # No transcripts, new install
 
     if cdot_transcript := TranscriptVersion.objects.filter(data__cdot__isnull=False).first():
         cdot_version = tuple(int(i) for i in cdot_transcript.data["cdot"].split("."))
-        return cdot_version < (0, 2, 12)  # This is release with MANE/RefSeq etc tags
-    return False
+        return cdot_version < (0, 2, 12)  # This is release with MANE/RefSeq etc. tags
+    return True  # ancient version of transcript annotations (no cdot version entry)
 
 
 class Migration(migrations.Migration):

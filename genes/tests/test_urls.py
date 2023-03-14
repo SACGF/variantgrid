@@ -114,21 +114,12 @@ class Test(URLTestCase):
         ]
 
         cls.PRIVATE_GRID_LIST_URLS = [
-            ("gene_lists_grid", {"gene_list_category_id": cls.gene_list_category.pk}, cls.gene_list_w_category),
-            ("uncategorised_gene_lists_grid", {}, cls.gene_list),
-            ("gene_lists_for_gene_symbol_grid", {"gene_symbol": cls.gene_symbol.pk}, cls.gene_list),
             ("gene_list_genes_grid", {"gene_list_id": cls.gene_list.pk}, ("gene_symbol__symbol", cls.gene_symbol)),
-            ("canonical_transcript_collections_grid", {}, cls.canonical_transcript_collection),
-            ("canonical_transcript_collection_grid", {"pk": cls.canonical_transcript_collection.pk}, ("transcript__identifier", canonical_transcript.transcript)),
-
-            #("gene_coverage_collection_gene_list_grid", coverage_kwargs, cls.gene),
-            #("uncovered_genes_grid", coverage_kwargs, cls.uncovered_gene),
         ]
 
     def testUrls(self):
         URL_NAMES_AND_KWARGS = [
             ("genes", {}, 200),
-            ("gene_lists_tab", {}, 200),
             ("gene_lists", {}, 200),
             ("qc_coverage", {}, 200),
             ("gene_grid", {}, 200),

@@ -32,7 +32,7 @@ from library.django_utils import require_superuser, highest_pk, get_field_counts
 from library.enums.log_level import LogLevel
 from library.git import Git
 from library.guardian_utils import admin_bot
-from library.log_utils import report_exc_info, log_traceback, report_message, slack_bot_username
+from library.log_utils import log_traceback, report_message, slack_bot_username
 from pathtests.models import cases_for_user
 from patients.models import ExternalPK, Clinician
 from seqauto.models import VCFFromSequencingRun, get_20x_gene_coverage

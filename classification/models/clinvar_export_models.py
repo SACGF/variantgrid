@@ -103,9 +103,6 @@ class ClinVarExport(TimeStampedModel):
         else:
             return "Submission has Errors"
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
     def __str__(self):
         parts = [f"ClinVarExport ({self.pk})"]
         if self.scv:

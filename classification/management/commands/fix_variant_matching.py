@@ -312,7 +312,6 @@ class Command(BaseCommand):
             iai.apply_validation(force_update=True)
             iai.save()
 
-
     # def handle_batch(self, batch: List[Classification]):
     #     ClassificationImportRun.record_classification_import("variant_rematching", len(batch))
     #     user = admin_bot()

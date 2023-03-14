@@ -2,7 +2,6 @@
 
 from django.db import migrations
 
-from annotation.management.commands.gene_annotation import bad_gene_annotation
 from manual.operations.manual_operations import ManualOperation
 
 

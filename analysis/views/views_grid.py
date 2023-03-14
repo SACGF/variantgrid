@@ -1,6 +1,8 @@
 import logging
+import operator
 import re
 import time
+from collections import Counter
 from io import StringIO
 from urllib.parse import urlencode
 
@@ -105,6 +107,17 @@ def format_items_iterator(analysis, sample_ids, items):
                 val = item.get(sample_field)
                 if val and val == -1:
                     item[sample_field] = "."
+
+        if tags_global := item["tags_global"]:
+            tag_counts = Counter(tags_global.split("|"))
+            summarised_tags = []
+            for tag, count in sorted(tag_counts.items(), key=operator.itemgetter(1), reverse=True):
+                if count > 1:
+                    summarised_tags.append(f"{tag} x {count}")
+                else:
+                    summarised_tags.append(tag)
+
+            item["tags_global"] = ", ".join(summarised_tags)
 
         variant_id = item["id"]
         tags = variant_tags.get(variant_id)

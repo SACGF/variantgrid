@@ -13,9 +13,6 @@ class MergeNode(AnalysisNode):
     min_inputs = 1
     max_inputs = AnalysisNode.PARENT_CAP_NOT_SET
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
     def modifies_parents(self):
         return self._num_unique_parents_in_queryset > 1
 

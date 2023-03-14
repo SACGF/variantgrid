@@ -189,7 +189,6 @@ class GenomeBuild(models.Model, SortMetaOrderingMixin):
 
     @cached_property
     def genome_fasta(self):
-        from snpdb.models import GenomeFasta
         return GenomeFasta.get_for_genome_build(self)
 
     @property

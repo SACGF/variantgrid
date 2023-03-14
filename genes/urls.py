@@ -1,8 +1,11 @@
 from rest_framework.urlpatterns import format_suffix_patterns
 
-from genes import views, views_autocomplete, views_rest
-from genes.grids import GeneListsGrid, CanonicalTranscriptGrid, GeneListGenesGrid, GenesGrid, QCGeneCoverageGrid, \
-    UncoveredGenesGrid, CanonicalTranscriptCollectionsGrid, GeneSymbolVariantsGrid, GeneSymbolWikiColumns
+from genes.grids import GeneListGenesGrid, GenesGrid, QCGeneCoverageGrid, \
+    UncoveredGenesGrid, GeneSymbolVariantsGrid, GeneSymbolWikiColumns, \
+    GeneListColumns, CanonicalTranscriptCollectionColumns, CanonicalTranscriptColumns
+from genes.views import views, views_autocomplete, views_rest
+from genes.views.views_hotspot_graphs import HotspotGraphView, ClassificationsHotspotGraphView, CohortHotspotGraphView, \
+    PublicRUNX1HotspotGraphView
 from library.django_utils.jqgrid_view import JQGridView
 from snpdb.views.datatable_view import DatabaseTableView
 from variantgrid.perm_path import perm_path
@@ -19,7 +22,6 @@ urlpatterns = [
     perm_path('view_transcript_version/<transcript_id>/<int:version>', views.view_transcript_version, name='view_transcript_version'),
     perm_path('view_transcript_accession/<transcript_accession>', views.view_transcript_accession, name='view_transcript_accession'),
     perm_path('gene_symbol_info_tab/<gene_symbol>/tool_tips/<tool_tips>', views.gene_symbol_info_tab, name='gene_symbol_info_tab'),
-    perm_path('gene_lists_tab', views.gene_lists_tab, name='gene_lists_tab'),
     perm_path('gene_lists', views.gene_lists, name='gene_lists'),
     perm_path('gene_lists/create_custom', views.create_custom_gene_list, name='create_custom_gene_list'),
     perm_path('view_gene_list/<int:gene_list_id>', views.view_gene_list, name='view_gene_list'),
@@ -35,34 +37,41 @@ urlpatterns = [
     perm_path('wiki', views.gene_wiki, name='gene_wiki'),
 
     perm_path('hotspot_graph/gene_symbol/<genome_build_name>/<gene_symbol>',
-              views.HotspotGraphView.as_view(), name='gene_symbol_hotspot_graph'),
+              HotspotGraphView.as_view(), name='gene_symbol_hotspot_graph'),
     perm_path('hotspot_graph/gene_symbol/<genome_build_name>/<gene_symbol>/transcript/<transcript_accession>',
-              views.HotspotGraphView.as_view(), name='gene_symbol_transcript_version_hotspot_graph'),
+              HotspotGraphView.as_view(), name='gene_symbol_transcript_version_hotspot_graph'),
     perm_path('hotspot_graph/gene/<genome_build_name>/<gene_id>',
-              views.HotspotGraphView.as_view(), name='gene_hotspot_graph'),
+              HotspotGraphView.as_view(), name='gene_hotspot_graph'),
     perm_path('hotspot_graph/transcript/<genome_build_name>/<transcript_id>',
-              views.HotspotGraphView.as_view(), name='transcript_hotspot_graph'),
+              HotspotGraphView.as_view(), name='transcript_hotspot_graph'),
     perm_path('hotspot_graph/classifications/gene_symbol/<genome_build_name>/<gene_symbol>',
-              views.ClassificationsHotspotGraphView.as_view(), name='classifications_gene_symbol_hotspot_graph'),
+              ClassificationsHotspotGraphView.as_view(), name='classifications_gene_symbol_hotspot_graph'),
     perm_path('hotspot_graph/classifications/gene_symbol/<genome_build_name>/<gene_symbol>/transcript/<transcript_accession>',
-              views.ClassificationsHotspotGraphView.as_view(), name='classifications_gene_symbol_transcript_version_hotspot_graph'),
+              ClassificationsHotspotGraphView.as_view(), name='classifications_gene_symbol_transcript_version_hotspot_graph'),
     perm_path('hotspot_graph/classifications/gene/<genome_build_name>/<gene_id>',
-              views.ClassificationsHotspotGraphView.as_view(), name='classifications_gene_hotspot_graph'),
+              ClassificationsHotspotGraphView.as_view(), name='classifications_gene_hotspot_graph'),
     perm_path('hotspot_graph/classifications/transcript/<genome_build_name>/<transcript_id>',
-              views.ClassificationsHotspotGraphView.as_view(), name='classifications_transcript_hotspot_graph'),
+              ClassificationsHotspotGraphView.as_view(), name='classifications_transcript_hotspot_graph'),
     perm_path('hotspot_graph/cohort/<int:cohort_id>/<transcript_id>',
-              views.CohortHotspotGraphView.as_view(), name='cohort_hotspot_graph'),
-    perm_path('hotspot_graph/public', views.PublicRUNX1HotspotGraphView.as_view(), name='public_hotspot_graph'),
+              CohortHotspotGraphView.as_view(), name='cohort_hotspot_graph'),
+    perm_path('hotspot_graph/public', PublicRUNX1HotspotGraphView.as_view(), name='public_hotspot_graph'),
 
+    # Grids
     perm_path('wiki/datatable', DatabaseTableView.as_view(column_class=GeneSymbolWikiColumns),
               name='gene_wiki_datatable'),
     perm_path('gene/grid/<gene_symbol>/<genome_build_name>/<slug:op>/', JQGridView.as_view(grid=GeneSymbolVariantsGrid), name='gene_symbol_variants_grid'),
-    perm_path('gene_lists/category/grid/<int:gene_list_category_id>/<slug:op>/', JQGridView.as_view(grid=GeneListsGrid, delete_row=True), name='gene_lists_grid'),
-    perm_path('gene_lists/uncategorised/grid/<slug:op>/', JQGridView.as_view(grid=GeneListsGrid, delete_row=True), name='uncategorised_gene_lists_grid'),
-    perm_path('gene_lists/gene/grid/<gene_symbol>/<slug:op>/', JQGridView.as_view(grid=GeneListsGrid), name='gene_lists_for_gene_symbol_grid'),
+
+    perm_path('gene_lists/datatable/', DatabaseTableView.as_view(column_class=GeneListColumns),
+              name='gene_lists_datatable'),
     perm_path('gene_list_genes/grid/<int:gene_list_id>/<slug:op>/', JQGridView.as_view(grid=GeneListGenesGrid, delete_row=True, csv_download=True), name='gene_list_genes_grid'),
-    perm_path('canonical_transcript_collections/grid/<slug:op>/', JQGridView.as_view(grid=CanonicalTranscriptCollectionsGrid), name='canonical_transcript_collections_grid'),
-    perm_path('canonical_transcript_collection/grid/<int:pk>/<slug:op>/', JQGridView.as_view(grid=CanonicalTranscriptGrid), name='canonical_transcript_collection_grid'),
+
+
+    perm_path('canonical_transcript_collections/datatable/',
+              DatabaseTableView.as_view(column_class=CanonicalTranscriptCollectionColumns),
+              name='canonical_transcript_collections_datatable'),
+    perm_path('canonical_transcript_collection/datatable/',
+              DatabaseTableView.as_view(column_class=CanonicalTranscriptColumns),
+              name='canonical_transcript_datatable'),
     perm_path('genes/grid/<genome_build_name>/<slug:op>/', JQGridView.as_view(grid=GenesGrid, csv_download=True), name='genes_grid'),
     perm_path('gene_coverage/grid/<int:gene_coverage_collection_id>/<slug:op>/', JQGridView.as_view(grid=QCGeneCoverageGrid), name='gene_coverage_collection_grid'),
     perm_path('gene_coverage/grid/<int:gene_coverage_collection_id>/<slug:op>/<path:gene_list_id_list>/',

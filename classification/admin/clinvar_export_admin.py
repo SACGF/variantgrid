@@ -57,7 +57,7 @@ class InterpretationSummaryLengthFilter(admin.SimpleListFilter):
         ">=": "__gte"
     }
 
-    def lookups(self, request, models_admin):
+    def lookups(self, request, model_admin):
         return [
             ('=0', 'Empty'),
             ('<200', '199 or less characters'),

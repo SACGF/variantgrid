@@ -490,7 +490,7 @@ class VariantAnnotationVersion(SubVersionPartition):
                     release = "105.20201022"
                     gff_url = f"http://ftp.ncbi.nlm.nih.gov/refseq/H_sapiens/annotation/annotation_releases/{release}/GCF_000001405.25_GRCh37.p13/GCF_000001405.25_GRCh37.p13_genomic.gff.gz"
             elif self.genome_build.name == "GRCh38":
-                if m := re.match("(109.20\d{6}) - GCF_000001405.39_GRCh38.p13_genomic.gff", self.refseq):
+                if m := re.match(r"(109.20\d{6}) - GCF_000001405.39_GRCh38.p13_genomic.gff", self.refseq):
                     release = m.group(1)
                     gff_url = f"http://ftp.ncbi.nlm.nih.gov/refseq/H_sapiens/annotation/annotation_releases/{release}/GCF_000001405.39_GRCh38.p13/GCF_000001405.39_GRCh38.p13_genomic.gff.gz"
                 else:
@@ -516,11 +516,11 @@ class VariantAnnotationVersion(SubVersionPartition):
             # These ones got renamed as the filename wasn't unique
             if self.annotation_consortium == AnnotationConsortium.REFSEQ:
                 if self.genome_build.name == "GRCh37":
-                    if m := re.match("http://ftp.ncbi.nlm.nih.gov/refseq/H_sapiens/annotation/annotation_releases/(105.20\d{6})/GCF_000001405.25_GRCh37.p13/(GCF_000001405.25_GRCh37.p13_genomic).gff.gz", gff_url):
+                    if m := re.match(r"http://ftp.ncbi.nlm.nih.gov/refseq/H_sapiens/annotation/annotation_releases/(105.20\d{6})/GCF_000001405.25_GRCh37.p13/(GCF_000001405.25_GRCh37.p13_genomic).gff.gz", gff_url):
                         name_components = [m.group(2), m.group(1), "gff"]
                 elif self.genome_build.name == "GRCh38":
                     # GCF_000001405.39_GRCh38.p13_genomic.109.20210514.gff.json.gz
-                    if m := re.match("http://ftp.ncbi.nlm.nih.gov/refseq/H_sapiens/annotation/annotation_releases/(109.20\d{6})/GCF_000001405.39_GRCh38.p13/(GCF_000001405.39_GRCh38.p13_genomic).gff.gz", gff_url):
+                    if m := re.match(r"http://ftp.ncbi.nlm.nih.gov/refseq/H_sapiens/annotation/annotation_releases/(109.20\d{6})/GCF_000001405.39_GRCh38.p13/(GCF_000001405.39_GRCh38.p13_genomic).gff.gz", gff_url):
                         name_components = [m.group(2), m.group(1), "gff"]
             name_components.append("json.gz")
 

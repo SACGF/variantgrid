@@ -1570,7 +1570,7 @@ class GeneListCategory(models.Model):
         return self.name
 
 
-class GeneList(models.Model):
+class GeneList(TimeStampedModel):
     """ Stores a gene/transcript list (to be used as a filter) """
 
     category = models.ForeignKey(GeneListCategory, null=True, blank=True, on_delete=CASCADE)
@@ -1683,6 +1683,10 @@ class GeneList(models.Model):
         name_or_symbol_match = Q(original_name__in=gene_symbol_deletions) | Q(gene_symbol__in=gene_symbol_deletions)
         qs = self.genelistgenesymbol_set.filter(name_or_symbol_match)
         num_deleted = qs.delete()
+
+        if num_added or num_deleted:
+            self.update_modified()
+
         return num_added, num_deleted
 
     @staticmethod
@@ -1721,6 +1725,9 @@ class GeneList(models.Model):
         qs = cls._visible_gene_lists(gene_lists_qs)
         gene_symbol = get_object_or_404(GeneSymbol, pk=gene_symbol)
         return qs.filter(genelistgenesymbol__gene_symbol=gene_symbol)
+
+    def update_modified(self):
+        GeneList.objects.filter(pk=self.pk).update(modified=timezone.now())
 
     def __str__(self):
         return f"{self.name} ({self.genelistgenesymbol_set.count()} x genes)"

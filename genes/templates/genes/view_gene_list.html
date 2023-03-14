@@ -1,5 +1,6 @@
 {% extends menu_genes_base %}
 {% load static %}
+{% load tz %}
 {% load help_tags %}
 {% load jqgrid_tags %}
 {% load wiki_tags %}
@@ -26,6 +27,15 @@
                 {% csrf_token %}
 
     			<fieldset class="form-fields small">
+                    <p>
+                        <label for="id_created">Created:</label>
+                        <input id="id_created" name="created" readonly disabled=disabled value="{{ gene_list.created|localtime }}" />
+                    </p>
+                    <p>
+                        <label for="id_modified">Modified:</label>
+                        <input id="id_modified" name="modified" readonly disabled=disabled value="{{ gene_list.modified|localtime }}" />
+                    </p>
+
     			{{ gene_list_form.as_p }}
                 {% if has_write_permission %}
                     <div class="buttons">

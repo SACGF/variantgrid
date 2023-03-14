@@ -505,7 +505,8 @@ class IlluminaFlowcellQC(SeqAutoRecord):
 
     @staticmethod
     def get_path_from_sequencing_run(sequencing_run):
-        illuminate_dir = settings.SEQAUTO_ILLUMINATE_QC_DIR_PATTERN % sequencing_run.get_params()
+        illuminate_dir = settings.SEQAUTO_ILLUMINATE_QC_DIR_PATTERN % sequencing_run.get_params()  # this may fail if
+        # sa path signals haven't handled enrichment kit
         return os.path.join(illuminate_dir, "illuminate_report.txt")
 
     @staticmethod
