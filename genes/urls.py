@@ -1,9 +1,9 @@
 from rest_framework.urlpatterns import format_suffix_patterns
 
 from genes import views, views_autocomplete, views_rest
-from genes.grids import CanonicalTranscriptGrid, GeneListGenesGrid, GenesGrid, QCGeneCoverageGrid, \
-    UncoveredGenesGrid, CanonicalTranscriptCollectionsGrid, GeneSymbolVariantsGrid, GeneSymbolWikiColumns, \
-    GeneListColumns
+from genes.grids import GeneListGenesGrid, GenesGrid, QCGeneCoverageGrid, \
+    UncoveredGenesGrid, GeneSymbolVariantsGrid, GeneSymbolWikiColumns, \
+    GeneListColumns, CanonicalTranscriptCollectionColumns, CanonicalTranscriptColumns
 from library.django_utils.jqgrid_view import JQGridView
 from snpdb.views.datatable_view import DatabaseTableView
 from variantgrid.perm_path import perm_path
@@ -62,8 +62,14 @@ urlpatterns = [
     perm_path('gene_lists/datatable/', DatabaseTableView.as_view(column_class=GeneListColumns),
               name='gene_lists_datatable'),
     perm_path('gene_list_genes/grid/<int:gene_list_id>/<slug:op>/', JQGridView.as_view(grid=GeneListGenesGrid, delete_row=True, csv_download=True), name='gene_list_genes_grid'),
-    perm_path('canonical_transcript_collections/grid/<slug:op>/', JQGridView.as_view(grid=CanonicalTranscriptCollectionsGrid), name='canonical_transcript_collections_grid'),
-    perm_path('canonical_transcript_collection/grid/<int:pk>/<slug:op>/', JQGridView.as_view(grid=CanonicalTranscriptGrid), name='canonical_transcript_collection_grid'),
+
+
+    perm_path('canonical_transcript_collections/datatable/',
+              DatabaseTableView.as_view(column_class=CanonicalTranscriptCollectionColumns),
+              name='canonical_transcript_collections_datatable'),
+    perm_path('canonical_transcript_collection/datatable/',
+              DatabaseTableView.as_view(column_class=CanonicalTranscriptColumns),
+              name='canonical_transcript_datatable'),
     perm_path('genes/grid/<genome_build_name>/<slug:op>/', JQGridView.as_view(grid=GenesGrid, csv_download=True), name='genes_grid'),
     perm_path('gene_coverage/grid/<int:gene_coverage_collection_id>/<slug:op>/', JQGridView.as_view(grid=QCGeneCoverageGrid), name='gene_coverage_collection_grid'),
     perm_path('gene_coverage/grid/<int:gene_coverage_collection_id>/<slug:op>/<path:gene_list_id_list>/',

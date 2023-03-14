@@ -15,6 +15,7 @@ from annotation.models.models import AnnotationVersion, GeneAnnotationVersion, I
 from genes.models import CanonicalTranscript, GeneList, GeneSymbol, \
     GeneCoverageCanonicalTranscript, CanonicalTranscriptCollection, GeneCoverageCollection, TranscriptVersion, \
     GeneListGeneSymbol, GeneAnnotationRelease, ReleaseGeneVersion, GeneSymbolWiki
+from genes.models_enums import AnnotationConsortium
 from library.django_utils.jqgrid_view import JQGridViewOp
 from library.jqgrid.jqgrid_user_row_config import JqGridUserRowConfig
 from library.utils import update_dict_of_dict_values
@@ -42,10 +43,6 @@ class GeneListColumns(DatatableConfig[GeneList]):
                        default_sort=SortOrder.DESC),
             RichColumn('num_genes'),
         ]
-
-    @staticmethod
-    def render_name(row: Dict[str, Any]) -> JsonDataType:
-        return {"id": row["id"], "name": row["name"]}
 
     @staticmethod
     def render_import_status(row: Dict[str, Any]):
@@ -222,43 +219,59 @@ class GenesGrid(JqGridUserRowConfig):
                                   'grid_export_url': grid_export_url})
 
 
-class CanonicalTranscriptCollectionsGrid(JqGridUserRowConfig):
-    model = CanonicalTranscriptCollection
-    caption = 'CanonicalTranscripts'
-    fields = ["id", "description", "annotation_consortium"]
-    colmodel_overrides = {'id': {'editable': False, 'width': 90, 'fixed': True,
-                                 'formatter': 'viewCanonicalTranscriptCollection'}}
+class CanonicalTranscriptCollectionColumns(DatatableConfig[CanonicalTranscriptCollection]):
+    def __init__(self, request: HttpRequest):
+        super().__init__(request)
+        self.rich_columns = [
+            RichColumn('id',
+                       renderer=self.view_primary_key,
+                       client_renderer='TableFormat.linkUrl'),
+            RichColumn('description'),
+            RichColumn('annotation_consortium', orderable=True, renderer=self.render_annotation_consortium),
+            RichColumn('created', client_renderer='TableFormat.timestamp', orderable=True),
+            RichColumn('modified', client_renderer='TableFormat.timestamp', orderable=True,
+                       default_sort=SortOrder.DESC),
+            RichColumn('enrichment_kits'),
+            RichColumn('num_transcripts'),
+        ]
 
-    def __init__(self, user):
-        super().__init__(user)
+    @staticmethod
+    def render_annotation_consortium(row: Dict[str, Any]):
+        return AnnotationConsortium(row["annotation_consortium"]).label
 
-        queryset = self.model.objects.all()
-        queryset = queryset.annotate(enrichment_kits=StringAgg("enrichmentkit__name", ',', output_field=TextField()))
-        field_names = self.get_field_names() + ["enrichment_kits"]
-        self.queryset = queryset.values(*field_names)
+    def get_initial_queryset(self) -> QuerySet[GeneList]:
+        qs = CanonicalTranscriptCollection.objects.all()
+        return qs.annotate(enrichment_kits=StringAgg("enrichmentkit__name", ',', output_field=TextField()),
+                           num_transcripts=Count("canonicaltranscript"))
 
-    def get_colmodels(self, remove_server_side_only=False):
-        colmodels = super().get_colmodels(remove_server_side_only=remove_server_side_only)
-        enrichment_kits_colmodel = {'index': 'enrichment_kits', 'name': 'enrichment_kits',
-                                    'label': 'Enrichment Kits', 'width': 230}
-        colmodels += [enrichment_kits_colmodel]
-        return colmodels
+    def filter_queryset(self, qs: QuerySet[GeneList]) -> QuerySet[GeneList]:
+        if gene_symbol_id := self.get_query_param('gene_symbol'):  # This is on gene page
+            gene_symbol = get_object_or_404(GeneSymbol, pk=gene_symbol_id)
+            qs = GeneList.visible_gene_lists_containing_gene_symbol(qs, gene_symbol)
+        return qs
 
 
-class CanonicalTranscriptGrid(JqGridUserRowConfig):
-    model = CanonicalTranscript
-    caption = 'CanonicalTranscripts'
-    fields = ["gene_symbol__symbol", "transcript__identifier", "original_gene_symbol", "original_transcript"]
-    colmodel_overrides = {'gene_symbol__symbol': {'label': "Matched Symbol"},
-                          'transcript__identifier': {'label': "Matched Transcript"}}
+class CanonicalTranscriptColumns(DatatableConfig[CanonicalTranscript]):
+    def __init__(self, request: HttpRequest):
+        super().__init__(request)
+        self.rich_columns = [
+            RichColumn('gene_symbol__symbol', label="Matched Gene Symbol"),
+            RichColumn('transcript__identifier', label="Matched Transcript"),
+            RichColumn('original_gene_symbol'),
+            RichColumn('original_transcript'),
+        ]
 
-    def __init__(self, user, pk):
-        super().__init__(user)
-        canonical_transcript_collection = get_object_or_404(CanonicalTranscriptCollection, pk=pk)
-        queryset = self.model.objects.all()
-        queryset = queryset.filter(collection=canonical_transcript_collection)
+    @staticmethod
+    def render_annotation_consortium(row: Dict[str, Any]):
+        return AnnotationConsortium(row["annotation_consortium"]).label
 
-        self.queryset = queryset.values(*self.get_field_names())
+    def get_initial_queryset(self) -> QuerySet[GeneList]:
+        return CanonicalTranscript.objects.all()
+
+    def filter_queryset(self, qs: QuerySet[GeneList]) -> QuerySet[GeneList]:
+        if collection_id := self.get_query_param('collection_id'):
+            qs = qs.filter(collection_id=collection_id)
+        return qs
 
 
 class QCGeneCoverageGrid(JqGridUserRowConfig):
