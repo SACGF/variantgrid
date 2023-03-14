@@ -108,8 +108,6 @@ class LabMultiSelectForm(forms.Form):
                                                                      attrs={'data-placeholder': 'Lab...'}))
 
 
-
-
 class TagForm(forms.Form):
     tag = forms.ModelChoiceField(queryset=Tag.objects.all(),
                                  widget=ModelSelect2(url='tag_autocomplete',

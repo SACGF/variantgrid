@@ -97,7 +97,6 @@ class ClassificationExportFormatter(ABC):
 
             yield next_file()
 
-
     @abstractmethod
     def content_type(self) -> str:
         """

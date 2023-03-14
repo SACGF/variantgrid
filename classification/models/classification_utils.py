@@ -351,4 +351,3 @@ def classification_gene_symbol_filter(gene_symbol: Union[str, GeneSymbol]) -> Op
             return match_gene | match_evidence
 
     return None
-

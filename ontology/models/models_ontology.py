@@ -915,7 +915,6 @@ class OntologySnake:
         results.sort()
         return results, False
 
-
     # TODO only allow EXACT between two anythings that aren't Gene Symbols
     @staticmethod
     def snake_from(term: OntologyTerm, to_ontology: OntologyService,

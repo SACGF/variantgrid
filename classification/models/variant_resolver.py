@@ -47,4 +47,3 @@ class VariantResolver:
         self.ci_by_gb.clear()
         self.pending_count = 0
         return self.all_count
-

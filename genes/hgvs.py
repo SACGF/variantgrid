@@ -215,7 +215,6 @@ class CHGVS:
         # can't compare, and wasn't exactly the same
         return False
 
-
     def __init__(self, full_c_hgvs: str, transcript: str = None):
         if transcript:
             transcript = self._clean_transcript(transcript)
