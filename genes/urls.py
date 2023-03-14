@@ -1,9 +1,11 @@
 from rest_framework.urlpatterns import format_suffix_patterns
 
-from genes import views, views_autocomplete, views_rest
 from genes.grids import GeneListGenesGrid, GenesGrid, QCGeneCoverageGrid, \
     UncoveredGenesGrid, GeneSymbolVariantsGrid, GeneSymbolWikiColumns, \
     GeneListColumns, CanonicalTranscriptCollectionColumns, CanonicalTranscriptColumns
+from genes.views import views, views_autocomplete, views_rest
+from genes.views.views_hotspot_graphs import HotspotGraphView, ClassificationsHotspotGraphView, CohortHotspotGraphView, \
+    PublicRUNX1HotspotGraphView
 from library.django_utils.jqgrid_view import JQGridView
 from snpdb.views.datatable_view import DatabaseTableView
 from variantgrid.perm_path import perm_path
@@ -35,24 +37,24 @@ urlpatterns = [
     perm_path('wiki', views.gene_wiki, name='gene_wiki'),
 
     perm_path('hotspot_graph/gene_symbol/<genome_build_name>/<gene_symbol>',
-              views.HotspotGraphView.as_view(), name='gene_symbol_hotspot_graph'),
+              HotspotGraphView.as_view(), name='gene_symbol_hotspot_graph'),
     perm_path('hotspot_graph/gene_symbol/<genome_build_name>/<gene_symbol>/transcript/<transcript_accession>',
-              views.HotspotGraphView.as_view(), name='gene_symbol_transcript_version_hotspot_graph'),
+              HotspotGraphView.as_view(), name='gene_symbol_transcript_version_hotspot_graph'),
     perm_path('hotspot_graph/gene/<genome_build_name>/<gene_id>',
-              views.HotspotGraphView.as_view(), name='gene_hotspot_graph'),
+              HotspotGraphView.as_view(), name='gene_hotspot_graph'),
     perm_path('hotspot_graph/transcript/<genome_build_name>/<transcript_id>',
-              views.HotspotGraphView.as_view(), name='transcript_hotspot_graph'),
+              HotspotGraphView.as_view(), name='transcript_hotspot_graph'),
     perm_path('hotspot_graph/classifications/gene_symbol/<genome_build_name>/<gene_symbol>',
-              views.ClassificationsHotspotGraphView.as_view(), name='classifications_gene_symbol_hotspot_graph'),
+              ClassificationsHotspotGraphView.as_view(), name='classifications_gene_symbol_hotspot_graph'),
     perm_path('hotspot_graph/classifications/gene_symbol/<genome_build_name>/<gene_symbol>/transcript/<transcript_accession>',
-              views.ClassificationsHotspotGraphView.as_view(), name='classifications_gene_symbol_transcript_version_hotspot_graph'),
+              ClassificationsHotspotGraphView.as_view(), name='classifications_gene_symbol_transcript_version_hotspot_graph'),
     perm_path('hotspot_graph/classifications/gene/<genome_build_name>/<gene_id>',
-              views.ClassificationsHotspotGraphView.as_view(), name='classifications_gene_hotspot_graph'),
+              ClassificationsHotspotGraphView.as_view(), name='classifications_gene_hotspot_graph'),
     perm_path('hotspot_graph/classifications/transcript/<genome_build_name>/<transcript_id>',
-              views.ClassificationsHotspotGraphView.as_view(), name='classifications_transcript_hotspot_graph'),
+              ClassificationsHotspotGraphView.as_view(), name='classifications_transcript_hotspot_graph'),
     perm_path('hotspot_graph/cohort/<int:cohort_id>/<transcript_id>',
-              views.CohortHotspotGraphView.as_view(), name='cohort_hotspot_graph'),
-    perm_path('hotspot_graph/public', views.PublicRUNX1HotspotGraphView.as_view(), name='public_hotspot_graph'),
+              CohortHotspotGraphView.as_view(), name='cohort_hotspot_graph'),
+    perm_path('hotspot_graph/public', PublicRUNX1HotspotGraphView.as_view(), name='public_hotspot_graph'),
 
     # Grids
     perm_path('wiki/datatable', DatabaseTableView.as_view(column_class=GeneSymbolWikiColumns),

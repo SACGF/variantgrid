@@ -13,7 +13,7 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from genes.models import GeneListCategory, GeneList, GeneSymbol
-from genes.views import add_gene_list_unmatched_genes_message
+from genes.views.views import add_gene_list_unmatched_genes_message
 from library.django_utils import add_save_message
 from pathtests.forms import SelectPathologyTestForm, SelectPathologyTestVersionForm, \
     PathologyTestOrderForm, CaseForm, CreatePathologyTestForm, PathologyTestVersionForm
