@@ -64,9 +64,9 @@ class VCFListGrid(JqGridUserRowConfig):
                                   'sortname': 'id',
                                   'sortorder': 'desc'})
 
-    def delete_row(self, vcf_id):
+    def delete_row(self, pk):
         """ Do async as it may be slow """
-        soft_delete_vcfs(self.user, vcf_id)
+        soft_delete_vcfs(self.user, pk)
 
 
 # TODO: Merge this an cohort grid below into 1
@@ -169,10 +169,10 @@ class SamplesListGrid(JqGridUserRowConfig):
                                   'sortname': 'id',
                                   'sortorder': 'desc'})
 
-    def delete_row(self, sample_id):
+    def delete_row(self, pk):
         """ Do async as it may take a few secs to delete """
 
-        sample = Sample.get_for_user(self.user, sample_id)
+        sample = Sample.get_for_user(self.user, pk)
         sample.check_can_write(self.user)
         Sample.objects.filter(pk=sample.pk).update(import_status=ImportStatus.MARKED_FOR_DELETION)
         task = remove_soft_deleted_vcfs_task.si()  # @UndefinedVariable

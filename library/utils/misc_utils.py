@@ -13,13 +13,13 @@ FLOAT_REGEX = r'([-+]?[0-9]*\.?[0-9]+.|Infinity)'
 
 class DjangoJSONEncoder(JSONEncoder):
 
-    def default(self, obj):
-        if isinstance(obj, QuerySet):
+    def default(self, o):
+        if isinstance(o, QuerySet):
             # `default` must return a python serializable
             # structure, the easiest way is to load the JSON
             # string produced by `serialize` and return it
-            return json.loads(serialize('json', obj))
-        return JSONEncoder.default(self, obj)
+            return json.loads(serialize('json', o))
+        return JSONEncoder.default(self, o)
 
 
 class Struct:
