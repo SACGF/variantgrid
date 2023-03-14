@@ -13,7 +13,7 @@ from library.jqgrid.jqgrid_user_row_config import JqGridUserRowConfig
 from library.unit_percent import get_allele_frequency_formatter
 from library.utils import calculate_age
 from library.utils.database_utils import get_queryset_column_names, \
-    get_queryset_select_from_where_parts, queryset_to_sql
+    get_queryset_select_from_where_parts
 from snpdb.grid_columns.custom_columns import get_variantgrid_extra_annotate
 from snpdb.models import VCF, Cohort, Sample, ImportStatus, \
     GenomicIntervalsCollection, CustomColumnsCollection, Variant, Trio, UserGridConfig, GenomeBuild, ClinGenAllele, \

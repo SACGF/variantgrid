@@ -6,7 +6,6 @@ from operator import attrgetter
 from typing import List, Optional, Dict, Iterable, Set
 
 import requests
-from django.conf import settings
 from django.contrib.auth.models import User
 from django.contrib.postgres.fields import ArrayField
 from django.db import models, transaction
