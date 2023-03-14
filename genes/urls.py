@@ -1,8 +1,9 @@
 from rest_framework.urlpatterns import format_suffix_patterns
 
 from genes import views, views_autocomplete, views_rest
-from genes.grids import GeneListsGrid, CanonicalTranscriptGrid, GeneListGenesGrid, GenesGrid, QCGeneCoverageGrid, \
-    UncoveredGenesGrid, CanonicalTranscriptCollectionsGrid, GeneSymbolVariantsGrid, GeneSymbolWikiColumns
+from genes.grids import CanonicalTranscriptGrid, GeneListGenesGrid, GenesGrid, QCGeneCoverageGrid, \
+    UncoveredGenesGrid, CanonicalTranscriptCollectionsGrid, GeneSymbolVariantsGrid, GeneSymbolWikiColumns, \
+    GeneListColumns
 from library.django_utils.jqgrid_view import JQGridView
 from snpdb.views.datatable_view import DatabaseTableView
 from variantgrid.perm_path import perm_path
@@ -19,7 +20,6 @@ urlpatterns = [
     perm_path('view_transcript_version/<transcript_id>/<int:version>', views.view_transcript_version, name='view_transcript_version'),
     perm_path('view_transcript_accession/<transcript_accession>', views.view_transcript_accession, name='view_transcript_accession'),
     perm_path('gene_symbol_info_tab/<gene_symbol>/tool_tips/<tool_tips>', views.gene_symbol_info_tab, name='gene_symbol_info_tab'),
-    perm_path('gene_lists_tab', views.gene_lists_tab, name='gene_lists_tab'),
     perm_path('gene_lists', views.gene_lists, name='gene_lists'),
     perm_path('gene_lists/create_custom', views.create_custom_gene_list, name='create_custom_gene_list'),
     perm_path('view_gene_list/<int:gene_list_id>', views.view_gene_list, name='view_gene_list'),
@@ -54,12 +54,13 @@ urlpatterns = [
               views.CohortHotspotGraphView.as_view(), name='cohort_hotspot_graph'),
     perm_path('hotspot_graph/public', views.PublicRUNX1HotspotGraphView.as_view(), name='public_hotspot_graph'),
 
+    # Grids
     perm_path('wiki/datatable', DatabaseTableView.as_view(column_class=GeneSymbolWikiColumns),
               name='gene_wiki_datatable'),
     perm_path('gene/grid/<gene_symbol>/<genome_build_name>/<slug:op>/', JQGridView.as_view(grid=GeneSymbolVariantsGrid), name='gene_symbol_variants_grid'),
-    perm_path('gene_lists/category/grid/<int:gene_list_category_id>/<slug:op>/', JQGridView.as_view(grid=GeneListsGrid, delete_row=True), name='gene_lists_grid'),
-    perm_path('gene_lists/uncategorised/grid/<slug:op>/', JQGridView.as_view(grid=GeneListsGrid, delete_row=True), name='uncategorised_gene_lists_grid'),
-    perm_path('gene_lists/gene/grid/<gene_symbol>/<slug:op>/', JQGridView.as_view(grid=GeneListsGrid), name='gene_lists_for_gene_symbol_grid'),
+
+    perm_path('gene_lists/datatable/', DatabaseTableView.as_view(column_class=GeneListColumns),
+              name='gene_lists_datatable'),
     perm_path('gene_list_genes/grid/<int:gene_list_id>/<slug:op>/', JQGridView.as_view(grid=GeneListGenesGrid, delete_row=True, csv_download=True), name='gene_list_genes_grid'),
     perm_path('canonical_transcript_collections/grid/<slug:op>/', JQGridView.as_view(grid=CanonicalTranscriptCollectionsGrid), name='canonical_transcript_collections_grid'),
     perm_path('canonical_transcript_collection/grid/<int:pk>/<slug:op>/', JQGridView.as_view(grid=CanonicalTranscriptGrid), name='canonical_transcript_collection_grid'),

@@ -12,7 +12,7 @@ from django.urls.base import reverse
 
 from analysis.models import VariantTag
 from annotation.models.models import AnnotationVersion, GeneAnnotationVersion, InvalidAnnotationVersionError
-from genes.models import CanonicalTranscript, GeneListCategory, GeneList, GeneSymbol, \
+from genes.models import CanonicalTranscript, GeneList, GeneSymbol, \
     GeneCoverageCanonicalTranscript, CanonicalTranscriptCollection, GeneCoverageCollection, TranscriptVersion, \
     GeneListGeneSymbol, GeneAnnotationRelease, ReleaseGeneVersion, GeneSymbolWiki
 from library.django_utils.jqgrid_view import JQGridViewOp
@@ -20,63 +20,47 @@ from library.jqgrid.jqgrid_user_row_config import JqGridUserRowConfig
 from library.utils import update_dict_of_dict_values
 from snpdb.grid_columns.custom_columns import get_custom_column_fields_override_and_sample_position
 from snpdb.grids import AbstractVariantGrid
-from snpdb.models import UserSettings, Q, VariantGridColumn, Tag
+from snpdb.models import UserSettings, Q, VariantGridColumn, Tag, ImportStatus
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.variant_queries import get_variant_queryset_for_gene_symbol, variant_qs_filter_has_internal_data
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
 from uicore.json.json_types import JsonDataType
 
 
-class GeneListsGrid(JqGridUserRowConfig):
-    model = GeneList
-    caption = 'Gene Lists'
-    # Category is only shown when gene_id provided (hidden set in get_colmodels)
-    fields = ["id", "category__name", "name", "user__username", "import_status", "created", "modified"]
-    colmodel_overrides = {
-        'id': {"hidden": True},
-        "name": {"width": 400,
-                 'formatter': 'linkFormatter',
-                 'formatter_kwargs': {"icon_css_class": "gene-list-icon",
-                                      "url_name": "view_gene_list",
-                                      "url_object_column": "id"}},
-        'user__username': {'label': 'Uploaded by'},
-        'category__name': {"label": "Category", "hidden": True}
-    }
+class GeneListColumns(DatatableConfig[GeneList]):
+    def __init__(self, request: HttpRequest):
+        super().__init__(request)
+        self.rich_columns = [
+            RichColumn('id',
+                       renderer=self.view_primary_key,
+                       client_renderer='TableFormat.linkUrl'),
+            RichColumn('name'),
+            RichColumn('user__username', name='user', orderable=True),
+            RichColumn('import_status', orderable=True, renderer=self.render_import_status),
+            RichColumn('created', client_renderer='TableFormat.timestamp', orderable=True),
+            RichColumn('modified', client_renderer='TableFormat.timestamp', orderable=True,
+                       default_sort=SortOrder.DESC),
+            RichColumn('num_genes'),
+        ]
 
-    def __init__(self, user, **kwargs):
-        super().__init__(user)
+    @staticmethod
+    def render_name(row: Dict[str, Any]) -> JsonDataType:
+        return {"id": row["id"], "name": row["name"]}
 
-        queryset = GeneList.filter_for_user(user, success_only=False)
-        gene_list_category_id = kwargs.pop("gene_list_category_id", None)
-        gene_symbol_id = kwargs.pop("gene_symbol", None)
-        self.show_category = bool(gene_symbol_id)
+    @staticmethod
+    def render_import_status(row: Dict[str, Any]):
+        return ImportStatus(row["import_status"]).label
 
-        if gene_symbol_id:
+    def get_initial_queryset(self) -> QuerySet[GeneList]:
+        qs = GeneList.filter_for_user(self.user, success_only=False)
+        qs = qs.filter(category__isnull=True)  # only show non-special ones
+        return qs.annotate(num_genes=Count("genelistgenesymbol"))
+
+    def filter_queryset(self, qs: QuerySet[GeneList]) -> QuerySet[GeneList]:
+        if gene_symbol_id := self.get_query_param('gene_symbol'):  # This is on gene page
             gene_symbol = get_object_or_404(GeneSymbol, pk=gene_symbol_id)
-            queryset = GeneList.visible_gene_lists_containing_gene_symbol(queryset, gene_symbol)
-        else:
-            if gene_list_category_id:
-                gene_list_category_id = int(gene_list_category_id)
-                gene_list_category = GeneListCategory.objects.get(pk=gene_list_category_id)
-                if gene_list_category.public:
-                    queryset = GeneList.objects.all()
-                queryset = queryset.filter(category=gene_list_category)
-            else:
-                queryset = queryset.filter(category__isnull=True)
-
-        queryset = queryset.annotate(num_genes=Count("genelistgenesymbol"))
-        field_names = self.get_field_names() + ["num_genes"]
-        self.queryset = queryset.values(*field_names)
-
-    def get_colmodels(self, remove_server_side_only=False):
-        colmodels = super().get_colmodels(remove_server_side_only=remove_server_side_only)
-        gene_list_genes_colmodel = {'index': 'num_genes', 'name': 'num_genes', 'label': '# gene symbols'}
-        colmodels += [gene_list_genes_colmodel]
-        if self.show_category:
-            for cm in colmodels:
-                if cm['index'] == 'category__name':
-                    cm['hidden'] = False
-        return colmodels
+            qs = GeneList.visible_gene_lists_containing_gene_symbol(qs, gene_symbol)
+        return qs
 
 
 class GeneListGenesGrid(JqGridUserRowConfig):

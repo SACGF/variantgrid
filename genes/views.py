@@ -580,15 +580,11 @@ def gene_symbol_info_tab(request, gene_symbol, tool_tips):
     return render(request, 'genes/gene_symbol_info_tab.html', context=context)
 
 
-def gene_lists_tab(request):
-    context = {"categories": GeneListCategory.get_gene_list_categories()}
-    return render(request, 'genes/gene_lists_tab.html', context=context)
-
-
 def gene_lists(request):
-    context = {"create_gene_list_form": NamedCustomGeneListForm(username=request.user),
-               "gene_list_form": UserGeneListForm(),
-               "categories": GeneListCategory.get_gene_list_categories()}
+    context = {
+        "create_gene_list_form": NamedCustomGeneListForm(username=request.user),
+        "gene_list_form": UserGeneListForm(),
+    }
     return render(request, 'genes/gene_lists.html', context=context)
 
 
