@@ -72,6 +72,7 @@ class VariantGridOIDCAuthenticationBackend(OIDCAuthenticationBackend):
         # currently only variantgrid permission
         is_super_user = False
         is_bot = False
+        is_tester = False
         for vg in variant_grid_groups:
             permission = '/'.join(vg)
             if permission == 'admin':
@@ -79,9 +80,12 @@ class VariantGridOIDCAuthenticationBackend(OIDCAuthenticationBackend):
             elif permission == 'bot':
                 groups.add('variantgrid/bot')
                 is_bot = True
+            elif permission == 'tester':
+                groups.add('variantgrid/tester')
+                is_tester = True
 
         if settings.MAINTENANCE_MODE:
-            if 'variantgrid/tester' in groups:
+            if is_tester:
                 # testers are allowed to login during maintenance mode
                 pass
             elif not is_super_user or is_bot:
