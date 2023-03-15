@@ -50,20 +50,18 @@ def load_gencc(file_or_filename, file_hash: str, force: bool, url: str = None) -
     gencc_df: DataFrame = df_nan_to_none(read_csv(file_or_filename, sep=","))
 
     # only want strong and definitive relationships
-    # gencc_df = gencc_df[gencc_df.classification_title.isin(["Definitive", "Strong"])]
     gencc_df = gencc_df.sort_values(by=["gene_curie", "disease_curie"])
-    gencc_grouped = gencc_df.groupby(["gene_curie", "disease_curie"])
     gene_disease_classification_lookup = {e.label: e for e in GeneDiseaseClassification}
 
     num_gene_disease_relationships = 0
-    for group_name, df_group in gencc_grouped:
+    for _, df_group in gencc_df.groupby(["gene_curie", "disease_curie"]):
         gene_id = df_group["gene_curie"].iloc[0]
         mondo_id = df_group["disease_curie"].iloc[0]
         gene_symbol = df_group["gene_symbol"].iloc[0]
         sources = []
         classifications = set()
 
-        for row_index, row in df_group.iterrows():
+        for _, row in df_group.iterrows():
             submitter_title = row["submitter_title"]
             if settings.GENE_RELATION_PANEL_APP_LIVE_UPDATE and submitter_title == "PanelApp Australia":
                 continue
