@@ -1,6 +1,5 @@
 {% comment %}All styles are embedded because this is also used in emails{% endcomment %}
 {% if not c_hgvs.full_c_hgvs %}<span class="no-value">-</span>{% else %}
-<span style="font-family: monospace">
     {% if c_hgvs.is_desired_build == False or c_hgvs.is_normalised == False %}
 {% comment %}Specfically check for False rather than not as these properties default to None and are rarely populated{% endcomment %}
         <div class="text-info">
@@ -11,7 +10,14 @@
         <span class="text-info">{{ c_hgvs.genome_build }}</span><span>&nbsp;</span>
     {% endif %}
     <span class="c-hgvs-body" style="white-space: nowrap">
-        <span class="c-hgvs-transcript">{{ c_hgvs.transcript }}</span>{% if c_hgvs.gene_symbol %}(<span class="c-hgvs-gene-symbol" style="color:#6c757d; letter-spacing: 0.5px">{{ c_hgvs.gene_symbol }}</span>){% endif %}:</span><span class="c-hgvs-nomen" style="word-break: break-all">{{ c_hgvs.raw_c }}
+        <span class="c-hgvs-transcript">{{ c_hgvs.transcript }}</span>
+        {% if c_hgvs.gene_symbol %}
+            <span class="c-hgvs-gene-symbol-b">
+                <span class="bracket">(</span><span class="c-hgvs-gene-symbol">{{ c_hgvs.gene_symbol }}</span><span class="bracket">)</span>
+            </span>
+        {% endif %}
+        <span class="colon">:</span>
+        <span class="c-hgvs-nomen" style="word-break: break-all">{{ c_hgvs.raw_c }}</span>
     </span>
-</span>
+
 {% endif %}

@@ -101,7 +101,6 @@ table.dataTable tr.odd:hover .toggle-link:before, table.dataTable tr.even:hover 
 table.dataTable .dt-detail {
   font-size: 12px;
   color: #444444;
-  font-family: monospace;
 }
 table.dataTable tr.child td.child {
   padding-top: 0;
@@ -1109,9 +1108,19 @@ table .fa-hand-point-right {
 }
 
 a .c-hgvs-body .c-hgvs-transcript, a .c-hgvs-body .c-hgvs-nomen {
-  color: #444488;
+  color: #444488 !important;
 }
 
+.c-hgvs-body .bracket {
+  margin-left: 2pt;
+  margin-right: 2pt;
+  color: #555;
+}
+.c-hgvs-body .colon {
+  margin-left: -1pt;
+  margin-right: 1pt;
+  color: #444;
+}
 .c-hgvs-body .c-hgvs-transcript, .c-hgvs-body .c-hgvs-gene-symbol-b {
   white-space: nowrap;
   word-break: normal;
@@ -1120,6 +1129,8 @@ a .c-hgvs-body .c-hgvs-transcript, a .c-hgvs-body .c-hgvs-nomen {
   word-break: break-all;
 }
 .c-hgvs-body .c-hgvs-gene-symbol {
+  margin-left: 1pt;
+  margin-right: 1pt;
   color: #6c757d;
   letter-spacing: 0.5px;
 }
