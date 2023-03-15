@@ -671,25 +671,6 @@ class ImportedAlleleInfo(TimeStampedModel):
         self.save()
         allele_info_changed_signal.send(sender=ImportedAlleleInfo, allele_info=self)
 
-    # def set_variant_prepare_for_rematch_and_save(self, classification_import: 'ClassificationImport', clear_existing: bool = False):
-    #     # TODO, instead of cleaning everything out, can we just provide classification_import?
-    #     self.status = ImportedAlleleInfoStatus.PROCESSING
-    #     self.update_variant_coordinate()
-    #     self.classification_import = classification_import
-    #     self.save()
-    #     if clear_existing:
-    #         self.matched_variant = None
-    #         self.allele = None
-    #
-    #         # should we actually do allele info changed signal? or save it for after we've matched
-    #         for genome_build in [GenomeBuild.grch37(), GenomeBuild.grch38()]:
-    #             self._update_variant(genome_build=genome_build, variant=None)
-    #         self.apply_validation()
-    #         self.save()
-    #
-    #         # should we actually do allele info changed signal? or save it for after we've matched
-    #         allele_info_changed_signal.send(sender=ImportedAlleleInfo, allele_info=self)
-
     def refresh_and_save(self, force_update=False, liftover_complete=False):
         """
         Updates linked variants (c.hgvs, etc)

@@ -415,17 +415,6 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
     """ Deprecated -  """
     allele = models.ForeignKey(Allele, null=True, on_delete=PROTECT)
 
-    # These fields were all deleted in favour of allele_info
-    # chgvs_grch37 = models.TextField(blank=True, null=True)
-    # chgvs_grch38 = models.TextField(blank=True, null=True)
-    #
-    # chgvs_grch37_full = models.TextField(blank=True, null=True)
-    # chgvs_grch38_full = models.TextField(blank=True, null=True)
-    #
-    # transcript_version_grch37 = models.ForeignKey(TranscriptVersion, null=True, blank=True, on_delete=SET_NULL, related_name='classification_37')
-    # transcript_version_grch38 = models.ForeignKey(TranscriptVersion, null=True, blank=True, on_delete=SET_NULL, related_name='classification_38')
-    ## END SO MANY DERIVED FIELDS
-
     allele_info = models.ForeignKey(ImportedAlleleInfo, null=True, blank=True, on_delete=SET_NULL)
     """ Keeps links to common builds (37, 38) for quick access to c.hgvs, transcript etc. Is shared between classifications with same import data """
 
@@ -622,36 +611,6 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
     @classmethod
     def order_by_evidence(cls, key_id: str):
         return RawSQL('cast(evidence->>%s as jsonb)->>%s', (key_id, 'value'))
-    #
-    # @staticmethod
-    # def relink_variants(vc_import: Optional[ClassificationImport] = None) -> int:
-    #     """
-    #         Call after import/liftover as variants may not have been processed enough at the time of "set_variant"
-    #         Updates all records that have a variant but not cached c.hgvs values or no clinical context.
-    #
-    #         :param vc_import: if provided only classifications associated to this import will have their values set
-    #         :return: A tuple of records now correctly set and those still outstanding
-    #     """
-    #
-    #     tests = Q(allele_info__isnull=True)
-    #     if GenomeBuild.grch37().is_annotated:
-    #         tests |= Q(allele_info__grch37__isnull=True)
-    #     if GenomeBuild.grch38().is_annotated:
-    #         tests |= Q(allele_info__grch38__isnull=True)
-    #
-    #     requires_relinking = Classification.objects.filter(tests)
-    #     if vc_import:
-    #         requires_relinking = requires_relinking.filter(classification_import=vc_import)
-    #
-    #     relink_count = requires_relinking.count()
-    #
-    #     vc: Classification
-    #     for vc in requires_relinking:
-    #         vc.set_variant(vc.variant)
-    #         vc.save()
-    #
-    #     logging.info("Bulk Update of variant relinking complete")
-    #     return relink_count
 
     @property
     def variant_coordinate(self):
@@ -818,34 +777,6 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         self.apply_allele_info_to_classification()
         return allele_info
 
-    # def set_variant_failed_matching(self, message: Optional[str] = None):
-    #     if allele_info := self.ensure_allele_info():
-    #         allele_info.set_matching_failed(message=message)
-    #
-    # @transaction.atomic()
-    # def set_variant(self, variant: Variant = None, message: str = None):
-    #     """
-    #     DEPRECATED - go via the AlleleInfo instead
-    #
-    #     Updates the data in the AlleleInfo (force_update=True) with the provided variant
-    #     @param variant The variant that we matched on, can't be None (see set_variant_failed_matching)
-    #     @param message Any message to include about a matching failure or success
-    #     @param failed If we're unable to match and wont be able to match again in future
-    #
-    #     Calling set_variant will automatically call .save()
-    #     If there is no variant and failed = True, any classification_import will be unset
-    #     can alternatively set variant to None to re-trigger matching
-    #     """
-    #     if not variant:
-    #         raise ValueError("set_variant requires a non-None variant, use set_variant_prepare_for_rematch or set_variant_failed_matching")
-    #
-    #     if allele_info := self.ensure_allele_info():
-    #         allele_info.set_variant_and_save(matched_variant=variant, message=message, force_update=True)
-    #         # below is done automatically via a signal
-    #         # self.apply_allele_info_to_classification()
-    #     else:
-    #         raise ValueError("Can't derive GenomeBuild, can't make AlleleInfo, therfore can't set_variant")
-
     def apply_allele_info_to_classification(self):
         if not self.allele_info:
             raise ValueError("Can't apply_allele_info when no allele_info has been set")
@@ -945,11 +876,6 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                                 lab=lab,
                                 lab_record_id=lab_record_id,
                                 **kwargs)
-
-        # -- this has to be done after calls to create now
-        # so we can fire any logic that needs to happen upon linking to a variant
-        # if record.variant:
-        #    record.set_variant(record.variant)
 
         if populate_with_defaults:
             for e_key in record.evidence_keys.all_keys:
@@ -1144,17 +1070,6 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         if value is not None:
             # remove support for existing_variant_id
             # variant matching is best done through allele_info stuff now
-
-            # special keys just
-            # if e_key.key == 'existing_variant_id':
-            #     try:
-            #         self.set_variant(Variant.objects.get(pk=int(value)))
-            #         # self.requires_auto_population = True
-            #         return None  # clear out the value
-            #     except:
-            #         cell.add_validation(code=ValidationCode.MATCHING_ERROR, severity='error',
-            #                             message="Couldn't resolve Variant " + str(value) + ")")
-            #
             if e_key.key == 'existing_sample_id':
                 try:
                     self.sample = Sample.objects.get(pk=int(value))
@@ -2024,42 +1939,6 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             visible_evidence[k] = value
         return visible_evidence
 
-    # def get_variant_info_dict(self):
-    #     allele = self.allele_object
-    #     genome_builds = {}
-    #     valid_builds = GenomeBuild.builds_with_annotation_cached()
-    #     for variant_allele in allele.variantallele_set.filter(genome_build__in=valid_builds) \
-    #             .select_related(
-    #         'variant',
-    #         'variant__locus',
-    #         'variant__locus__ref',
-    #         'variant__locus__contig',
-    #         'variant__alt',
-    #         'genome_build'
-    #     ):
-    #         variant = variant_allele.variant
-    #         hgvs_matcher = HGVSMatcher(genome_build=variant_allele.genome_build)
-    #         # getting the g_hgvs is a relatively expensive operation
-    #         # investigate removing it as nothing uses it (as far as I know)
-    #         g_hgvs = hgvs_matcher.variant_to_g_hgvs(variant)
-    #         c_hgvs = self.get_c_hgvs(variant_allele.genome_build)
-    #         build_info = {
-    #             SpecialEKeys.VARIANT_COORDINATE: str(variant),
-    #             SpecialEKeys.G_HGVS: g_hgvs,
-    #             SpecialEKeys.C_HGVS: c_hgvs,
-    #             # "origin" : variant_allele.get_origin_display(),
-    #             "variant_id": variant.pk,
-    #         }
-    #         # origin / conversion tool etc a little bit too detailed for end users downloading this
-    #         """
-    #         if variant_allele.allele_linking_tool:
-    #             build_info["conversion_tool"] = variant_allele.get_allele_linking_tool_display()
-    #
-    #         if variant_allele.error:
-    #             build_info["error"] = variant_allele.error
-    #         """
-    #         genome_builds[variant_allele.genome_build.name] = build_info
-
     def get_allele_info_dict(self) -> Optional[Dict[str, Any]]:
         allele_info_dict = {}
         if allele_info := self.allele_info:
@@ -2256,19 +2135,6 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         return self._generate_c_hgvs_extra(genome_build).format()
 
     def __str__(self) -> str:
-        """
-        if self.variant:
-            variant_details = str(self.variant)
-        else:
-            variant_details_list = []
-            for ek in SpecialEKeys.VARIANT_LINKING_HGVS_KEYS:
-                hgvs_val = self.get(ek)
-                if hgvs_val:
-                    variant_details_list.append(hgvs_val)
-                    break
-            variant_details_list.append("(not linked to variant)")
-            variant_details = " ".join(variant_details_list)
-        """
         genome_build = GenomeBuildManager.get_current_genome_build()
         cached_c_hgvs = self.get_c_hgvs(genome_build=genome_build)
         if not cached_c_hgvs:
