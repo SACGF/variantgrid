@@ -27,8 +27,7 @@ from snpdb.models.models_enums import ImportStatus
 
 def user_is_clinician(user):
     try:
-        user.clinician
-        return True
+        return user.clinician is not None
     except Clinician.DoesNotExist:
         return False
 

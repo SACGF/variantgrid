@@ -203,13 +203,6 @@ class Allele(FlagsMixin, models.Model):
         else:
             return f"Allele {self.pk}"
 
-    def validate(self, liftover_complete=True):
-        """
-        DEPRECATED, done by ImportedAlleleInfo now
-        :param liftover_complete: If False does not check for missing representations
-        """
-        pass
-
 
 @receiver(flag_collection_extra_info_signal, sender=FlagCollection)
 def get_extra_info(flag_infos: FlagInfos, user: User, **kwargs):  # pylint: disable=unused-argument

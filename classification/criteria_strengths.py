@@ -304,7 +304,6 @@ class CriteriaSummarizer:
         any_not_met = False
 
         for strengths in self.strengths:
-            single_has_value: bool = False
             # if we only want to compare when we have criteria
             values = strengths[item]
             if not isinstance(values, list):

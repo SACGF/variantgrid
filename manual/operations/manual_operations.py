@@ -8,7 +8,7 @@ class ManualOperation(Operation):
     reversable = False
     reduces_to_sql = False
 
-    def __init__(self, task_id: str, note: Optional[str] = None, test: Callable = None, *args, **kwargs):
+    def __init__(self, task_id: str, note: Optional[str] = None, test: Callable = None):
         """ test - optional callable, only create manual operation if test returns True  """
         self.task_id = task_id
         self.note = note

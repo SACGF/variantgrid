@@ -8,9 +8,7 @@ from genes.models import GeneCoverageCollection, GeneSymbol
 
 class GeneCoverageMixin:
     def _load(self):
-        # TODO: Also add to analysis settings and require that too
-        check_for_gene_coverage = settings.SEQAUTO_ENABLED
-        if check_for_gene_coverage:
+        if settings.SEQAUTO_ENABLED:
             self.has_gene_coverage = self.calculate_if_has_gene_coverage()
             logging.debug("has_gene_coverage = %s", self.has_gene_coverage)
             if not self.has_gene_coverage:

@@ -58,7 +58,7 @@ class GeneListNode(AncestorSampleMixin, GeneCoverageMixin, AnalysisNode):
             lambda: [self.pathology_test_version.gene_list] if self.pathology_test_version else [],
             lambda: [gln_pap.gene_list for gln_pap in self.genelistnodepanelapppanel_set.all()],
         ]
-        getter = GENE_LISTS[self.accordion_panel]
+        getter = GENE_LISTS[int(self.accordion_panel)]
         return [gl for gl in getter() if gl is not None]
 
     def _get_node_q_hash(self) -> str:

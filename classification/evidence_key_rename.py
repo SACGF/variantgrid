@@ -33,7 +33,7 @@ class EvidenceKeyRenamer:
         Classification = self.apps.get_model("classification", "Classification")
         ClassificationModification = self.apps.get_model("classification", "ClassificationModification")
 
-        kwargs = {"evidence__%s__isnull" % self.old_key: False}
+        kwargs = {f"evidence__{self.old_key}__isnull": False}
         for vc in Classification.objects.filter(**kwargs):
             self._rename_in_dict(vc.evidence)
             vc.save(update_fields=["evidence"])
@@ -86,21 +86,23 @@ class EvidenceSelectKeyRenamer:
 
     def _update_in_dict(self, data: dict):
         if data:
-            if blob := data.get(self.key):
-                if isinstance(blob, dict):
-                    if value := blob.get('value'):
-                        if isinstance(value, list):
-                            if self.old_option in value:
-                                index = value.index(self.old_option)
-                                value[index] = self.new_option
-                        elif value == self.old_option:
-                            blob['value'] = self.new_option
+            blob = data.get(self.key)
+            if not isinstance(blob, dict):
+                return
+
+            if value := blob.get('value'):
+                if isinstance(value, list):
+                    if self.old_option in value:
+                        index = value.index(self.old_option)
+                        value[index] = self.new_option
+                elif value == self.old_option:
+                    blob['value'] = self.new_option
 
     def _migrate_data(self):
         Classification = self.apps.get_model("classification", "Classification")
         ClassificationModification = self.apps.get_model("classification", "ClassificationModification")
 
-        kwargs = {"evidence__%s__isnull" % self.key: False}
+        kwargs = {f"evidence__{self.key}__isnull": False}
         for vc in Classification.objects.filter(**kwargs):
             self._update_in_dict(vc.evidence)
             vc.save(update_fields=["evidence"])

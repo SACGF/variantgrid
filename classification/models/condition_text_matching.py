@@ -610,7 +610,7 @@ class ConditionMatchingSuggestion:
         return None
 
     def __bool__(self):
-        return not not self.terms or not not self.messages
+        return bool(self.terms) or bool(self.messages)
 
 
 @receiver(classification_post_publish_signal, sender=Classification)

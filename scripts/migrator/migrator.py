@@ -118,7 +118,7 @@ class GitSubMigration(SubMigration):
 
     def run(self) -> MigrationResult:
         print_cyan(str(self))
-        completed_process = subprocess.run("git pull", shell=True)
+        completed_process = subprocess.run("git pull", shell=True, check=False)
         if completed_process.returncode != 0:
             return MigrationResult(status=MigrationStatus.FAILURE,
                                    note=f"Subprocess failed with error code {completed_process.returncode}")
@@ -139,10 +139,11 @@ class CommandSubMigration(SubMigration):
         print_cyan(str(self))
         print_purple("-----------")
         cmd = str(self)
-        completed_process = subprocess.run(cmd, shell=True)
+        completed_process = subprocess.run(cmd, shell=True, check=False)
         print_purple("-----------")
         if completed_process.returncode != 0:
-            return MigrationResult(status=MigrationStatus.FAILURE, note=f"Subprocess failed with error code {completed_process.returncode}")
+            note = f"Subprocess failed with error code {completed_process.returncode}"
+            return MigrationResult(status=MigrationStatus.FAILURE, note=note)
         return MigrationResult(status=MigrationStatus.SUCCESS)
 
     def __str__(self):
@@ -175,8 +176,9 @@ class Migrator:
         CommandSubMigration.manage_py(["migrate"]).using(key="m", task_id="manage*migrate"),
         CommandSubMigration.manage_py(["collectstatic_js_reverse"]).using(key="r",
                                                                           task_id="manage*collectstatic_js_reverse"),
-        # collectstatic without warning for conflicting files has been an issue for 6 years https://code.djangoproject.com/ticket/26583
-        # maybe it'll get fixed soon? For now (since we've never had a problem) just turn off all verbosity
+        # collectstatic without warning for conflicting files has been an issue for 6 years
+        # see https://code.djangoproject.com/ticket/26583 maybe it'll get fixed soon? For now (since we've never had
+        # a problem) just turn off all verbosity
         CommandSubMigration.manage_py(["collectstatic", "-v", "0", "--noinput"]).using(key="c",
                                                                                        task_id="manage*collectstatic"),
         CommandSubMigration.script(["deployed.sh"]).using(key="d")
