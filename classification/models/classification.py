@@ -104,10 +104,12 @@ class ClassificationImport(models.Model):
     genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)
 
     def get_variants_qs(self) -> QuerySet[Variant]:
-        return Variant.objects.filter(pk__in=ImportedAlleleInfo.objects.filter(classification_import=self).values_list('matched_variant', flat=True))
+        mv_ids = ImportedAlleleInfo.objects.filter(classification_import=self).values_list('matched_variant', flat=True)
+        return Variant.objects.filter(pk__in=mv_ids)
 
     def __str__(self):
         return f"ClassificationImport ({self.genome_build})"
+
 
 class ClassificationImportAlleleSource(AlleleSource):
     """ A model to indicate that variants need to be linked to an allele and lifted over to other builds """
@@ -146,10 +148,9 @@ class AllClassificationsAlleleSource(TimeStampedModel, AlleleSource):
     def get_variants_qs(self) -> QuerySet[Variant]:
         # Note: This deliberately only gets classifications where the submitting variant was against this genome build
         # ie we don't use Classification.get_variant_q_from_classification_qs() to get liftovers
+        qs = ImportedAlleleInfo.objects.filter(matched_variant__isnull=False, allele__isnull=True)
+        not_lifted_over_variant_ids = qs.values_list('allele_id', flat=True)
         contigs_q = Variant.get_contigs_q(self.genome_build)
-
-        not_lifted_over_variant_ids = ImportedAlleleInfo.objects.filter(matched_variant__isnull=False, allele__isnull=True).values_list('allele_id', flat=True)
-
         return Variant.objects.filter(contigs_q, id__in=not_lifted_over_variant_ids)
 
     def liftover_complete(self, genome_build: GenomeBuild):
@@ -171,10 +172,9 @@ def get_extra_info(flag_infos: FlagInfos, user: User, **kwargs) -> None:  # pyli
 
     vcs = Classification.objects.filter(flag_collection__in=flag_infos.ids).select_related('lab')
     drcs = DiscordanceReportClassification.objects.filter(classification_original__classification__in=vcs,
-                                                          report__resolution=DiscordanceReportResolution.ONGOING) \
-        .values_list('classification_original__classification', 'report')
+                                                          report__resolution=DiscordanceReportResolution.ONGOING)
     drcs_dict = {}
-    for drc in drcs:
+    for drc in drcs.values_list('classification_original__classification', 'report'):
         drcs_dict[drc[0]] = drc[1]
 
     for vc in vcs:
@@ -297,7 +297,8 @@ class ConditionResolved:
 
         if more_general:
             # if presented with different types, and we can switch over to MONDO, do so
-            if not more_general.is_multi_condition and resolved_1.single_term.ontology_service != resolved_2.single_term.ontology_service:
+            if not more_general.is_multi_condition and \
+                    resolved_1.single_term.ontology_service != resolved_2.single_term.ontology_service:
                 if mondo_term := more_general.mondo_term:
                     more_general = ConditionResolved(terms=[mondo_term])
             return more_general
@@ -337,7 +338,8 @@ class ConditionResolved:
                 join = self.join or MultiCondition.NOT_DECIDED
                 text = f"{text}; {self.join.label}"
 
-            resolved_term_dicts: List[ConditionResolvedTermDict] = [ConditionResolved.term_to_dict(term) for term in self.terms]
+            resolved_term_dicts: List[ConditionResolvedTermDict] = [ConditionResolved.term_to_dict(term) for term in
+                                                                    self.terms]
 
             jsoned: ConditionResolvedDict = {
                 "resolved_terms": resolved_term_dicts,
@@ -416,11 +418,13 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
     allele = models.ForeignKey(Allele, null=True, on_delete=PROTECT)
 
     allele_info = models.ForeignKey(ImportedAlleleInfo, null=True, blank=True, on_delete=SET_NULL)
-    """ Keeps links to common builds (37, 38) for quick access to c.hgvs, transcript etc. Is shared between classifications with same import data """
+    """ Keeps links to common builds (37, 38) for quick access to c.hgvs, transcript etc. Is shared between 
+        classifications with same import data """
 
     @property
     def allele_object(self) -> Allele:
-        """ The new preferred way to reference the allele, so we can eventually remove allele from the classification object """
+        """ The new preferred way to reference the allele, so we can eventually remove allele from the
+            classification object """
         try:
             return self.allele_info.allele
         except AttributeError:
@@ -445,7 +449,8 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
     """ The current share level of the classification, combined with lab determines the permissions """
 
     annotation_version = models.ForeignKey(AnnotationVersion, null=True, blank=True, on_delete=SET_NULL)
-    """ If created from a variant and auto-populated, with which version of annotations. If null was created via import """
+    """ If created from a variant and auto-populated, with which version of annotations. If null was
+        created via import """
 
     clinical_context = models.ForeignKey('ClinicalContext', null=True, blank=True, on_delete=SET_NULL)
     """ After being matched to a variant, this will be set to the default clinical_context for the allele
@@ -565,11 +570,13 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
 
     @staticmethod
     def dashboard_total_shared_classifications() -> int:
-        return Classification.objects.filter(lab__external=False, share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS, withdrawn=False).exclude(lab__name__icontains='legacy').count()
+        return Classification.objects.filter(lab__external=False, share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS,
+                                             withdrawn=False).exclude(lab__name__icontains='legacy').count()
 
     @staticmethod
     def dashboard_total_unshared_classifications() -> int:
-        return Classification.objects.filter(lab__external=False, withdrawn=False).exclude(lab__name__icontains='legacy').exclude(share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS).count()
+        qs = Classification.objects.filter(lab__external=False, withdrawn=False).exclude(lab__name__icontains='legacy')
+        return qs.exclude(share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS).count()
 
     @staticmethod
     def dashboard_report_classifications_of_interest(since) -> List[ClassificationOutstandingIssues]:
@@ -756,7 +763,8 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 return False
 
         if allele_info := self.ensure_allele_info():
-            allele_info.update_variant_coordinate()  # only need this for systems that were migrated when half of the AlleleInfo was done
+            # only need update_variant_coordinate for systems that were migrated when half of the AlleleInfo was done
+            allele_info.update_variant_coordinate()
             allele_info.update_status()
             allele_info.apply_validation()
             allele_info.save()
@@ -863,7 +871,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             :param save: Should be True unless we're in test mode
             :param source: see patch_value
             :param make_fields_immutable: see patch_value
-            :param populate_with_defaults: if True with populate data with defaults as defined by the EvidenceKeys overrides
+            :param populate_with_defaults: populate data with defaults as defined by the EvidenceKeys overrides
         """
         if data is None:
             data = {}
@@ -1145,7 +1153,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 if e_key.value_type == EvidenceKeyValueType.FREE_ENTRY:
                     # strip out HTML from single row files to keep our data simple
                     # allow HTML in text areas
-                    if not value.startswith("http"):  # this makes beautiful soap angry thinking we're asking it to go to the URL
+                    if not value.startswith("http"):  # makes beautiful soap angry thinking we want to go to the URL
                         value = cautious_attempt_html_to_text(value)
 
                 cell.value = value
@@ -1353,7 +1361,8 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             :param leave_existing_values: Only update empty fields
             :param save: saves to the database (leave as False if test mode or going to do other changes)
             :param make_patch_fields_immutable: Make all fields updated in this patch immutable.
-            :param remove_api_immutable: If True, immutability level (under variantgrid) is removed from all fields. Requires source: SubissionSource.VariantGrid
+            :param remove_api_immutable: If True, immutability level (under variantgrid) is removed from all fields.
+                                         Requires source: SubissionSource.VariantGrid
             :param initial_data: if True, divides c.hgvs to
             :param revalidate_all: if True, runs validation over all fields we have, otherwise only the values being patched
             :param ignore_if_only_patching: if provided, if only these fields are different in the patch, don't both to patch anything
@@ -1367,7 +1376,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         key_dict: EvidenceKeyMap = self.evidence_keys
 
         use_evidence = VCDataDict(copy.deepcopy(self.evidence),
-                                  evidence_keys=self.evidence_keys)  # make a deep copy so we don't accidentally mutate the data
+                                  evidence_keys=self.evidence_keys)  # deep copy so don't accidentally mutate the data
         patch = VCDataDict(data=EvidenceMixin.to_patch(patch),
                            evidence_keys=self.evidence_keys)  # the patch we're going to apply ontop of the evidence
 
@@ -1512,14 +1521,16 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 patched.raw = cell.diff(None)
             elif cell.raw is None:
                 if not source.can_edit(existing_immutability):
-                    patch_response.append_warning(key=key, code="immutable", message=f"Cannot change immutable value for {key} from {existing.value} to blank")
+                    message = f"Cannot change immutable value for {key} from {existing.value} to blank"
+                    patch_response.append_warning(key=key, code="immutable", message=message)
                     patched.wipe(WipeMode.POP)  # reject entire change if attempting to change immutable value
                 else:
                     patched.wipe(WipeMode.SET_NONE)
             else:
                 patched.raw = cell.diff(dest=existing, ignore_if_omitted={'immutable'})
                 if ('value' in patched or 'explain' in patched) and not source.can_edit(existing_immutability):
-                    patch_response.append_warning(key=key, code="immutable", message=f"Cannot change immutable value or explain for {key} from {existing.value} to {patched.value}")
+                    msg = f"Cannot change immutable value or explain for {key} from {existing.value} to {patched.value}"
+                    patch_response.append_warning(key=key, code="immutable", message=msg)
                     patched.wipe(WipeMode.POP)  # reject entire change if attempting to change immutable value
                 else:
 
@@ -1584,7 +1595,8 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             self.clinical_significance = clinical_significance_choice
             pending_modification.clinical_significance = clinical_significance_choice
 
-            patch_response.append_warning(code="patched", message='Patched changed values for ' + ', '.join(sorted(diffs_only_patch.keys())))
+            message = 'Patched changed values for ' + ', '.join(sorted(diffs_only_patch.keys()))
+            patch_response.append_warning(code="patched", message=message)
 
             if save:
                 self.save()
@@ -1952,7 +1964,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             }
 
             if (genome_build := self.get_genome_build_opt()) and \
-                    (preferred_build := allele_info[self.get_genome_build()]) and \
+                    (preferred_build := allele_info[genome_build]) and \
                     (c_hgvs := preferred_build.c_hgvs_obj):
                 resolved_dict.update(c_hgvs.to_json())
             elif c_hgvs_raw := self.get(SpecialEKeys.C_HGVS):
@@ -2339,7 +2351,8 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
             and not self.published
 
     @transaction.atomic()
-    def publish(self, share_level: Union[ShareLevel, str, int], user: User, vc: 'Classification', debug_timer: DebugTimer = DebugTimer.NullTimer) -> bool:
+    def publish(self, share_level: Union[ShareLevel, str, int], user: User, vc: 'Classification',
+                debug_timer: DebugTimer = DebugTimer.NullTimer) -> bool:
         """
         :param share_level: The share level we want to publish as
         :param user: The user who initiated the publishing
@@ -2444,11 +2457,12 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
 
     def is_significantly_equal(self, other: 'ClassificationModification', care_about_explains: bool = False) -> bool:
         """
-        Determines as far as a user is concerned if two versions of a classification are equal based on evidence key data and share level.
-        Would typically be used to determine if should show the column in history.
+        Determines as far as a user is concerned if two versions of a classification are equal based on evidence key
+        data and share level.
+        Would typically be used to determine if we should show the column in history.
         Raises an error if run on different classification ids.
         :param other: Another modification
-        :param care_about_explains: True if a change in only the explain should cause records not to be considered the same
+        :param care_about_explains: True = change in only 'explain' should cause records not to be considered the same
         :return: True if the user should see these as the same, False otherwise
         """
         if self.classification_id != other.classification_id:
@@ -2525,8 +2539,8 @@ class ClassificationConsensus:
             self.vcm: Optional[ClassificationModification] = None
             if allele:
                 variants = allele.variants
-            vcms = list(ClassificationModification.latest_for_user(user=user, variant=variants, published=True).filter(classification__lab__external=False).all())
-            if vcms:
+            qs = ClassificationModification.latest_for_user(user=user, variant=variants, published=True)
+            if vcms := list(qs.filter(classification__lab__external=False)):
                 vcms.sort(key=lambda vcm: vcm.curated_date_check)
                 self.vcm = vcms[-1]
 
