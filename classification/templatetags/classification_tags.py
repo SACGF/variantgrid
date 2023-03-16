@@ -376,6 +376,16 @@ def c_hgvs(c_hgvs: Union[CHGVS, ClassificationModification, str], show_genome_bu
     return {"c_hgvs": c_hgvs, "show_genome_build": show_genome_build and c_hgvs.genome_build is not None}
 
 
+@register.inclusion_tag("classification/tags/allele.html")
+def allele(allele: Allele):
+    return {"allele": allele}
+
+
+@register.inclusion_tag("classification/tags/gene_symbol.html")
+def gene_symbol(gene_symbol: GeneSymbol):
+    return {"gene_symbol": gene_symbol}
+
+
 @register.inclusion_tag("classification/tags/classification_row.html", takes_context=True)
 def classification_row(
         context,

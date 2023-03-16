@@ -92,25 +92,31 @@
             {% endfor %}
         </td>
         <td>
-            {% if group.allele %}<a class="hover-link" href="{% url 'view_allele' group.allele.id %}">{{ group.allele }}</a>{% else %}<span class="no-value">-</span>{% endif %}
+            {% if group.allele %}{% allele group.allele %}{% else %}<span class="no-value">-</span>{% endif %}
         </td>
         <td>
-            {% if group.gene_symbol %}<a class="hover-link" href="{% url 'view_gene_symbol' group.gene_symbol %}" style="letter-spacing: 0.5px">{{ group.gene_symbol }}</a>{% else %}<span class="no-value">-</span>{% endif %}
-        </td>
-        <td>
-            {% for record in group.modifications %}
-                <div class="mt-2 d-flex" style="align-items:center;position:relative;top:5px">
-                    <a class="hover-link" style="font-weight:bold" href="{% url 'view_classification' record.classification_id %}">{{ record.classification.lab_record_id }}</a>
-                    {{ record.classification.allele_info.issue_icon|default_if_none:'' }}
-                    <div class="flags d-inline-block" style="margin-left:12px" data-flags="{{ record.classification.flag_collection_id }}">...</div>
-                </div>
+            {% for gene_symbol in group.gene_symbols %}
+                <div>{% gene_symbol gene_symbol %}</div>
+            {% empty %}
+                <span class="no-value">-</span>
             {% endfor %}
-            {% if group.excluded_record_count %}
-                <div class="mt-2 text-secondary">Note: multiple records for the same patient were submitted. Only showing the most recent record per patient.</div>
-            {% endif %}
-            {% if group.count > 1 %}
-                <div class="mt-3"><a class="hover-link" href="{% url 'classification_diff' %}?cids={{ group.diff_ids }}">Compare {{ group.count }} Records</a></div>
-            {% endif %}
+        </td>
+        <td>
+            <div>
+                {% for record in group.modifications %}
+                    <div class="mt-2 d-flex" style="align-items:center;position:relative;top:5px">
+                        <a class="hover-link" style="font-weight:bold" href="{% url 'view_classification' record.classification_id %}">{{ record.classification.lab_record_id }}</a>
+                        {{ record.classification.allele_info.issue_icon|default_if_none:'' }}
+                        <div class="flags d-inline-block" style="margin-left:12px" data-flags="{{ record.classification.flag_collection_id }}">...</div>
+                    </div>
+                {% endfor %}
+                {% if group.excluded_record_count %}
+                    <div class="mt-2 text-secondary">Note: multiple records for the same patient were submitted. Only showing the most recent record per patient.</div>
+                {% endif %}
+                {% if group.count > 1 %}
+                    <div class="mt-3"><a class="hover-link" href="{% url 'classification_diff' %}?cids={{ group.diff_ids }}">Compare {{ group.count }} Records</a></div>
+                {% endif %}
+            </div>
         </td>
     {% endif %}
 </tr>

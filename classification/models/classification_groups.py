@@ -12,6 +12,7 @@ from classification.models import ClassificationModification, EvidenceKeyMap, Cu
 from classification.models.flag_types import ClassificationFlagTypes
 from flags.models import Flag, FlagStatus
 from genes.hgvs import CHGVS, PHGVS
+from genes.models import GeneSymbol
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import Allele, GenomeBuild, Lab
 
@@ -207,6 +208,13 @@ class ClassificationGroup:
     @property
     def gene_symbol(self) -> Optional[str]:
         return self.most_recent.get(SpecialEKeys.GENE_SYMBOL)
+
+    @property
+    def gene_symbols(self) -> List[GeneSymbol]:
+        gene_symbols: Set[GeneSymbol] = set()
+        for allele_info in self.allele_infos:
+            gene_symbols.update(allele_info.gene_symbols )
+        return gene_symbols
 
     @staticmethod
     def sort_modifications(mod1: ClassificationModification):
