@@ -15,8 +15,9 @@
             <span class="c-hgvs-gene-symbol-b">
                 <span class="bracket">(</span><span class="c-hgvs-gene-symbol">{{ c_hgvs.gene_symbol }}</span><span class="bracket">)</span>
             </span>
-        {% endif %}
-        <span class="colon">:</span>
+            <span class="colon">:</span>
+        {% else %}:{% endif %}
+
         <span class="c-hgvs-nomen" style="word-break: break-all">{{ c_hgvs.raw_c }}</span>
     </span>
 
