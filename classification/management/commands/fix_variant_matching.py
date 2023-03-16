@@ -245,7 +245,7 @@ class Command(BaseCommand):
                         if approved_flag := manually_closed_37_not_38.get(allele_flag_pk):
                             has_liftover_issues = False
                             if text := approved_flag.text:
-                                comments.add(text)
+                                comments.add("37 != 38: " + text)
                             users.add(approved_flag.user)
 
                     classifications = Classification.objects.filter(allele_info=allele_info)
@@ -253,7 +253,7 @@ class Command(BaseCommand):
                         if approved_flag := manually_closed_variant_warning.get(classification.flag_collection_id):
                             has_normal_issues = False
                             if text := approved_flag.text:
-                                comments.add(text)
+                                comments.add("Variant Matching Warning: " + text)
                             users.add(approved_flag.user)
 
                     if not has_normal_issues and not has_liftover_issues and not has_general_issues and not has_builds_issues:
@@ -275,7 +275,7 @@ class Command(BaseCommand):
                             if approved_flag := manually_closed_transcript_ver_changed.get(classification.flag_collection_id):
                                 was_confirmed = True
                                 if text := approved_flag.text:
-                                    comments.add(text)
+                                    comments.add("Transcript Version Change: " + text)
                                 users.add(approved_flag.user)
 
                         if was_confirmed:
