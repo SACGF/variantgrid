@@ -1,0 +1,34 @@
+##fileformat=VCFv4.2
+##DRAGENVersion=<ID=dragen,Version="SW: 07.021.645.4.0.3, HW: 07.021.645">
+##reference=file:///staging/reference/v4.0/hg38+alt_masked+cnv+graph+hla+rna-8-r2.0-1
+##contig=<ID=chr2,length=242193529>
+##contig=<ID=chr3,length=198295559>
+##contig=<ID=chr4,length=190214555>
+##ALT=<ID=CNV,Description="Copy number variant region">
+##ALT=<ID=DEL,Description="Deletion relative to the reference">
+##ALT=<ID=DUP,Description="Region of elevated copy number relative to the reference">
+##INFO=<ID=REFLEN,Number=1,Type=Integer,Description="Number of REF positions included in this record">
+##INFO=<ID=SVLEN,Number=.,Type=Integer,Description="Difference in length between REF and ALT alleles">
+##INFO=<ID=SVTYPE,Number=1,Type=String,Description="Type of structural variant">
+##INFO=<ID=END,Number=1,Type=Integer,Description="End position of the variant described in this record">
+##INFO=<ID=CIPOS,Number=2,Type=Integer,Description="Confidence interval around POS">
+##INFO=<ID=CIEND,Number=2,Type=Integer,Description="Confidence interval around END">
+##FILTER=<ID=cnvLength,Description="CNV with length below 10000">
+##FILTER=<ID=cnvQual,Description="CNV with quality below 10">
+##FILTER=<ID=cnvBinSupportRatio,Description="CNV with low supporting number of bins with respect to event length">
+##FILTER=<ID=cnvCopyRatio,Description="CNV with copy ratio within +/- 0.2 of 1.0">
+##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
+##FORMAT=<ID=SM,Number=1,Type=Float,Description="Linear copy ratio of the segment mean">
+##FORMAT=<ID=CN,Number=1,Type=Integer,Description="Estimated copy number">
+##FORMAT=<ID=BC,Number=1,Type=Integer,Description="Number of bins in the region">
+##FORMAT=<ID=PE,Number=2,Type=Integer,Description="Number of improperly paired end reads at start and stop breakpoints">
+##CoverageUniformity=0.132380
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	sample_1
+chr2	59287963	DRAGEN:LOSS:chr2:59287964-59289107	N	<DEL>	42	cnvLength	SVLEN=-1144;SVTYPE=CNV;END=59289107;REFLEN=1144	GT:SM:CN:BC:PE	1/1:0.0279135:0:1:32,56
+chr2	126341550	DRAGEN:GAIN:chr2:126341551-126375561	N	<DUP>	38	PASS	SVLEN=34011;SVTYPE=CNV;END=126375561;REFLEN=34011	GT:SM:CN:BC:PE	./1:1.49815:3:21:4,11
+chr2	126375562	DRAGEN:REF:chr2:126375562-126477290	N	.	39	PASS	END=126477290;REFLEN=101729	GT:SM:CN:BC:PE	./.:1.01295:2:61:11,14
+chr3	53221623	DRAGEN:LOSS:chr3:53221624-53257628	N	<DEL>	42	PASS	SVLEN=-36005;SVTYPE=CNV;END=53257628;REFLEN=36005	GT:SM:CN:BC:PE	0/1:0.484547:1:31:15,17
+chr3	89673674	DRAGEN:GAIN:chr3:89673675-89812019	N	<DUP>	76	PASS	SVLEN=138345;SVTYPE=CNV;END=89812019;REFLEN=138345	GT:SM:CN:BC:PE	./1:1.83864:4:37:1,24
+chr4	50374328	DRAGEN:REF:chr4:50374328-63092570	N	.	77	PASS	END=63092570;REFLEN=2618243	GT:SM:CN:BC:PE	./.:0.988703:2:2233:11,21
+chr4	51382327	DRAGEN:LOSS:chr4:50372328-50374327	N	<DEL>	24	cnvLength	SVLEN=-2000;SVTYPE=CNV;END=50374327;REFLEN=2000	GT:SM:CN:BC:PE	0/1:0.309591:1:2:3,11
+chr4	89258449	DRAGEN:GAIN:chr4:89258450-89278923	N	<DUP>	10	PASS	SVLEN=20474;SVTYPE=CNV;END=89278923;REFLEN=20474	GT:SM:CN:BC:PE	./1:1.29624:3:10:4,25

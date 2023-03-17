@@ -1,0 +1,130 @@
+##fileformat=VCFv4.2
+##ALT=<ID=DEL,Description="Deletion">
+##ALT=<ID=DUP:TANDEM,Description="Tandem Duplication">
+##ALT=<ID=INS,Description="Insertion">
+##FILTER=<ID=DRAGENHardQUAL,Description="Set if true:QUAL < 10.4139">
+##FILTER=<ID=DRAGENIndelHardQUAL,Description="Set if true:QUAL < 7.83">
+##FILTER=<ID=DRAGENSnpHardQUAL,Description="Set if true:QUAL < 10.41">
+##FILTER=<ID=HomRef,Description="homozygous reference call (filter applied at sample level)">
+##FILTER=<ID=LowDepth,Description="Set if true:DP <= 1">
+##FILTER=<ID=LowGQ,Description="Set if true:GQ = 0">
+##FILTER=<ID=MaxDepth,Description="Depth is greater than 3x the median chromosome depth near one or both variant breakends (not applied to records with KnownSVScoring flag)">
+##FILTER=<ID=MaxMQ0Frac,Description="For a small variant (<1000 bases), the fraction of reads in all samples with MAPQ0 around either breakend exceeds 0.4 (not applied to records with KnownSVScoring flag)">
+##FILTER=<ID=MinGQ,Description="GQ score is less than 5 (filter applied at sample level; not applied to records with KnownSVScoring flag)">
+##FILTER=<ID=MinQUAL,Description="QUAL score is less than 20 (not applied to records with KnownSVScoring flag)">
+##FILTER=<ID=NoPairSupport,Description="For variants significantly larger than the paired read fragment size, no paired reads support the alternate allele in any sample (not applied to records with KnownSVScoring flag)">
+##FILTER=<ID=Ploidy,Description="For DEL & DUP variants, the genotypes of overlapping variants (with similar size) are inconsistent with diploid expectation (not applied to records with KnownSVScoring flag)">
+##FILTER=<ID=PloidyConflict,Description="Genotype call from variant caller not consistent with chromosome ploidy">
+##FILTER=<ID=RMxNRepeatRegion,Description="Site filtered because all or part of the variant allele is a repeat of the reference">
+##FILTER=<ID=SampleFT,Description="No sample passes all the sample-level filters">
+##FILTER=<ID=base_quality,Description="Site filtered because median base quality of alt reads at this locus does not meet threshold">
+##FILTER=<ID=filtered_reads,Description="Site filtered because too large a fraction of reads have been filtered out">
+##FILTER=<ID=fragment_length,Description="Site filtered because absolute difference between the median fragment length of alt reads and median fragment length of ref reads at this locus exceeds threshold">
+##FILTER=<ID=lod_fstar,Description="Variant does not meet likelihood threshold (default threshold is 6.3)">
+##FILTER=<ID=long_indel,Description="Site filtered because the indel length is too long">
+##FILTER=<ID=low_depth,Description="Site filtered because the read depth is too low">
+##FILTER=<ID=low_frac_info_reads,Description="Site filtered because the fraction of informative reads is below threshold">
+##FILTER=<ID=low_normal_depth,Description="Site filtered because the normal sample read depth is too low">
+##FILTER=<ID=mapping_quality,Description="Site filtered because median mapping quality of alt reads at this locus does not meet threshold">
+##FILTER=<ID=multiallelic,Description="Site filtered because more than two alt alleles pass tumor LOD">
+##FILTER=<ID=no_reliable_supporting_read,Description="Site filtered because no reliable supporting somatic read exists">
+##FILTER=<ID=non_homref_normal,Description="Site filtered because the normal sample genotype is not homozygous reference">
+##FILTER=<ID=panel_of_normals,Description="Seen in at least one sample in the panel of normals vcf">
+##FILTER=<ID=read_position,Description="Site filtered because median of distances between start/end of read and this locus is below threshold">
+##FILTER=<ID=str_contraction,Description="Site filtered due to suspected PCR error where the alt allele is one repeat unit less than the reference">
+##FILTER=<ID=strand_artifact,Description="Site filtered because of severe strand bias">
+##FILTER=<ID=too_few_supporting_reads,Description="Site filtered because there are too few supporting reads in the tumor sample">
+##FILTER=<ID=weak_evidence,Description="Somatic variant score does not meet threshold">
+##FORMAT=<ID=AD,Number=R,Type=Integer,Description="Allelic depths (counting only informative reads out of the total reads) for the ref and alt alleles in the order listed">
+##FORMAT=<ID=AF,Number=A,Type=Float,Description="Allele fractions for alt alleles in the order listed">
+##FORMAT=<ID=DN,Number=1,Type=String,Description="Possible values are 'Inherited', 'DeNovo' or 'LowDQ'. Threshold for passing de novo call: SNPs: 0.05, INDELs: 0.02">
+##FORMAT=<ID=DP,Number=1,Type=Integer,Description="Approximate read depth (reads with MQ=255 or with bad mates are filtered)">
+##FORMAT=<ID=DPL,Number=.,Type=Integer,Description="Normalized, Phred-scaled likelihoods used for DQ calculation">
+##FORMAT=<ID=DQ,Number=1,Type=Float,Description="De novo quality">
+##FORMAT=<ID=F1R2,Number=R,Type=Integer,Description="Count of reads in F1R2 pair orientation supporting each allele">
+##FORMAT=<ID=F2R1,Number=R,Type=Integer,Description="Count of reads in F2R1 pair orientation supporting each allele">
+##FORMAT=<ID=FT,Number=.,Type=String,Description="Genotype-level filter">
+##FORMAT=<ID=GP,Number=G,Type=Float,Description="Phred-scaled posterior probabilities for genotypes as defined in the VCF specification">
+##FORMAT=<ID=GQ,Number=1,Type=Integer,Description="Genotype Quality">
+##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
+##FORMAT=<ID=MIN_DP,Number=1,Type=Integer,Description="Minimum DP observed within the GVCF block">
+##FORMAT=<ID=PL,Number=G,Type=Integer,Description="Normalized, Phred-scaled likelihoods for genotypes as defined in the VCF specification">
+##FORMAT=<ID=PP,Number=G,Type=Integer,Description="Phred-scaled posterior genotype probabilities using pedigree prior probabilities">
+##FORMAT=<ID=PR,Number=.,Type=Integer,Description="Spanning paired-read support for the ref and alt alleles in the order listed">
+##FORMAT=<ID=PS,Number=1,Type=Integer,Description="Physical phasing ID information, where each unique ID within a given sample (but not across samples) connects records within a phasing group">
+##FORMAT=<ID=SQ,Number=A,Type=Float,Description="Somatic quality">
+##FORMAT=<ID=SR,Number=.,Type=Integer,Description="Split reads for the ref and alt alleles in the order listed, for reads where P(allele|read)>0.999">
+##INFO=<ID=AC,Number=A,Type=Integer,Description="Allele count in genotypes, for each ALT allele, in the same order as listed">
+##INFO=<ID=AF,Number=A,Type=Float,Description="Allele Frequency, for each ALT allele, in the same order as listed">
+##INFO=<ID=AN,Number=1,Type=Integer,Description="Total number of alleles in called genotypes">
+##INFO=<ID=BND_DEPTH,Number=1,Type=Integer,Description="Read depth at local translocation breakend">
+##INFO=<ID=CIEND,Number=2,Type=Integer,Description="Confidence interval around END">
+##INFO=<ID=CIGAR,Number=A,Type=String,Description="CIGAR alignment for each alternate indel allele">
+##INFO=<ID=CIPOS,Number=2,Type=Integer,Description="Confidence interval around POS">
+##INFO=<ID=DP,Number=1,Type=Integer,Description="Approximate read depth (informative and non-informative); some reads may have been filtered based on mapq etc.">
+##INFO=<ID=DUPHOMLEN,Number=.,Type=Integer,Description="Length of base pair identical homology at event breakpoints excluding duplicated reference sequence">
+##INFO=<ID=DUPHOMSEQ,Number=.,Type=String,Description="Sequence of base pair identical homology at event breakpoints excluding duplicated reference sequence">
+##INFO=<ID=DUPSVINSLEN,Number=.,Type=Integer,Description="Length of inserted sequence after duplicated reference sequence">
+##INFO=<ID=DUPSVINSSEQ,Number=.,Type=String,Description="Inserted sequence after duplicated reference sequence">
+##INFO=<ID=DUPSVLEN,Number=.,Type=Integer,Description="Length of duplicated reference sequence">
+##INFO=<ID=END,Number=1,Type=Integer,Description="Stop position of the interval">
+##INFO=<ID=EVENT,Number=1,Type=String,Description="ID of event associated to breakend">
+##INFO=<ID=FS,Number=1,Type=Float,Description="Phred-scaled p-value using Fisher's exact test to detect strand bias">
+##INFO=<ID=FractionInformativeReads,Number=1,Type=Float,Description="The fraction of informative reads out of the total reads">
+##INFO=<ID=HOMLEN,Number=.,Type=Integer,Description="Length of base pair identical homology at event breakpoints">
+##INFO=<ID=HOMSEQ,Number=.,Type=String,Description="Sequence of base pair identical homology at event breakpoints">
+##INFO=<ID=IMPRECISE,Number=0,Type=Flag,Description="Imprecise structural variation">
+##INFO=<ID=JUNCTION_QUAL,Number=1,Type=Integer,Description="If the SV junction is part of an EVENT (ie. a multi-adjacency variant), this field provides the QUAL value for the adjacency in question only">
+##INFO=<ID=LEFT_SVINSSEQ,Number=.,Type=String,Description="Known left side of insertion for an insertion of unknown length">
+##INFO=<ID=MATEID,Number=.,Type=String,Description="ID of mate breakend">
+##INFO=<ID=MATE_BND_DEPTH,Number=1,Type=Integer,Description="Read depth at remote translocation mate breakend">
+##INFO=<ID=MQ,Number=1,Type=Float,Description="RMS Mapping Quality">
+##INFO=<ID=MQRankSum,Number=1,Type=Float,Description="Z-score From Wilcoxon rank sum test of Alt vs. Ref read mapping qualities">
+##INFO=<ID=QD,Number=1,Type=Float,Description="Variant Confidence/Quality by Depth">
+##INFO=<ID=RIGHT_SVINSSEQ,Number=.,Type=String,Description="Known right side of insertion for an insertion of unknown length">
+##INFO=<ID=ReadPosRankSum,Number=1,Type=Float,Description="Z-score from Wilcoxon rank sum test of Alt vs. Ref read position bias">
+##INFO=<ID=SOMATIC,Number=0,Type=Flag,Description="At least one variant at this position is somatic">
+##INFO=<ID=SOR,Number=1,Type=Float,Description="Symmetric Odds Ratio of 2x2 contingency table to detect strand bias">
+##INFO=<ID=SVINSLEN,Number=.,Type=Integer,Description="Length of insertion">
+##INFO=<ID=SVINSSEQ,Number=.,Type=String,Description="Sequence of insertion">
+##INFO=<ID=SVLEN,Number=.,Type=Integer,Description="Difference in length between REF and ALT alleles">
+##INFO=<ID=SVTYPE,Number=1,Type=String,Description="Type of structural variant">
+##contig=<ID=chr1,length=248956422>
+##contig=<ID=chr2,length=242193529>
+##contig=<ID=chr3,length=198295559>
+##contig=<ID=chr4,length=190214555>
+##contig=<ID=chr5,length=181538259>
+##contig=<ID=chr6,length=170805979>
+##contig=<ID=chr7,length=159345973>
+##contig=<ID=chr8,length=145138636>
+##contig=<ID=chr9,length=138394717>
+##contig=<ID=chr10,length=133797422>
+##contig=<ID=chr11,length=135086622>
+##contig=<ID=chr12,length=133275309>
+##contig=<ID=chr13,length=114364328>
+##contig=<ID=chr14,length=107043718>
+##contig=<ID=chr15,length=101991189>
+##contig=<ID=chr16,length=90338345>
+##contig=<ID=chr17,length=83257441>
+##contig=<ID=chr18,length=80373285>
+##contig=<ID=chr19,length=58617616>
+##contig=<ID=chr20,length=64444167>
+##contig=<ID=chr21,length=46709983>
+##contig=<ID=chr22,length=50818468>
+##contig=<ID=chrX,length=156040895>
+##contig=<ID=chrY,length=57227415>
+##contig=<ID=chrM,length=16569>
+##reference=file:///scratch/reference/index/reference.bin
+##source=DRAGEN 05.021.609.3.9.5
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	sample1	sample2	sample3
+chr2	12329710	MantaDEL:0:3504:3605:0:0:0	T	<DEL>	999	PASS	CIEND=0,18;CIPOS=0,18;END=12332765;HOMLEN=18;HOMSEQ=GAAAATATTAAAACTAAG;SVLEN=-3055;SVTYPE=DEL	GT:FT:GQ:PL:PR:SR	0/1:PASS:642:999,0,639:37,23:17,24	0/1:PASS:336:834,0,333:19,11:15,14	0/1:PASS:587:999,0,584:36,17:16,17
+chr3	23407685	MantaDEL:121834:1:2:0:0:0	T	<DEL>	559	PASS	CIEND=-354,355;CIPOS=-537,538;END=23409783;IMPRECISE;SVLEN=-2098;SVTYPE=DEL	GT:FT:GQ:PL:PR	0/1:PASS:334:384,0,621:43,18	0/0:HomRef:182:0,132,827:44,0	0/1:PASS:224:274,0,525:36,14
+chr4	113976066	MantaINS:132824:0:0:1:5:0	C	<INS>	999	PASS	CIEND=0,3;CIPOS=0,3;END=113976066;HOMLEN=3;HOMSEQ=AGC;LEFT_SVINSSEQ=AGCTGGGACTATAGGCAGGGGCCACTGCACCCAGCTCATTTTTGTATTTTTGGTAGAGACAGGGCTTCGCTTTGTTGGCCAGGCTCGTCT;RIGHT_SVINSSEQ=AAATTACACATTAAAAATTTTGTATTTTTTTATGTGTAATTAATTTTGTATGTGTAATTTTTTTTAATTTGTCTTCCT;SVTYPE=INS	GT:FT:GQ:PL:PR:SR	1/1:PASS:35:563,38,0:0,0:0,13	1/1:PASS:50:863,53,0:0,0:0,18	1/1:PASS:68:999,71,0:0,0:0,26
+chr5	94757140	MantaDUP:TANDEM:133731:0:1:0:1:0	C	<INS>	125	PASS	CIEND=0,1;CIPOS=0,1;DUPHOMLEN=1;DUPHOMSEQ=A;DUPSVLEN=88;END=94757140;SVLEN=88;SVTYPE=INS	GT:FT:GQ:PL:PR:SR	0/1:PASS:114:164,0,251:0,0:22,8	0/0:HomRef:14:36,0,277:0,0:20,2	0/1:PASS:10:60,0,309:0,1:24,3
+chr2	123281925	MantaDEL:0:7505:7506:0:0:0	T	<DEL>	999	PASS	CIEND=0,10;CIPOS=0,10;END=123284717;HOMLEN=10;HOMSEQ=TCAAATTCTT;SVLEN=-2792;SVTYPE=DEL	GT:FT:GQ:PL:PR:SR	0/1:PASS:65:999,0,62:17,52:4,29	0/1:PASS:577:627,0,635:40,8:14,11	1/1:PASS:15:999,18,0:8,34:1,28
+chr6	149097192	MantaINS:0:4047:4047:0:3:0	G	<INS>	289	PASS	CIEND=0,12;CIPOS=0,12;END=149097192;HOMLEN=12;HOMSEQ=ATGGCCTGAGTG;LEFT_SVINSSEQ=ATGGCCTGAGTGCTGTCTCTTATACACATCTCCGAGCCCACGAGACTAGAGAATACATCTCGTATGCCGTCTTCTGCTTGAA;RIGHT_SVINSSEQ=TCGCGGCGTGCGTGGGGGGTGTGTGGTGGGGGGTTTGGGTCCTTTTGGGTGGGGGGGGGGGGGGGGGGGGGGGGGGGGGCCGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGC;SVTYPE=INS	GT:FT:GQ:PL:PR:SR	0/1:PASS:118:168,0,208:0,0:12,13	0/1:PASS:63:113,0,247:0,0:13,7	0/1:PASS:108:158,0,308:0,0:19,11
+chr7	172755673	MantaINS:143841:0:0:0:5:0	C	<INS>	226	PASS	CIEND=0,42;CIPOS=0,42;END=172755673;HOMLEN=42;HOMSEQ=ATTCGCTGTCTGGGGTTGGAGCCACACCTGGTCTGGGGCATT;LEFT_SVINSSEQ=ATTCGCTGTCTGGGGTTGGAGCCACACCTGGTCTGGGGCATTCGCTGTCCTGGGTCAGAGCCCCTCCTGGTCTGGGACATTCGCTGTCTGGGGGTGGAGCCACACCTGGTGTGGGGCAGTTGCTG;RIGHT_SVINSSEQ=GACAATCCACAGAGACAATACTATAATTGAAA;SVTYPE=INS	GT:FT:GQ:PL:PR:SR	0/1:PASS:144:199,0,142:0,0:9,5	0/0:HomRef:88:0,38,219:0,0:10,0	0/1:PASS:77:127,0,110:0,0:8,4
+chr8	92553895	MantaINS:22561:18:18:1:3:0	A	<INS>	884	PASS	END=92553896;LEFT_SVINSSEQ=CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAGTTGGGTTTAGGGACCCCGGGTGGTTTGCCGGGGGAAGTTAGTGTGGCACCAGCACACCCAGCCCCCCCGGG;RIGHT_SVINSSEQ=CCGGGGGCCCCCCCACCACAACCCAAAACTCCCAAACCCCTACAAAACACCAAAACCACCCCCACAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA;SVTYPE=INS	GT:FT:GQ:PL:PR:SR	0/1:PASS:23:80,0,21:0,0:0,3	1/1:PASS:18:348,21,0:0,0:0,11	1/1:PASS:16:612,19,0:0,1:0,16
+chr9	99044537	MantaDEL:145527:2:4:0:0:0	C	<DEL>	999	PASS	CIEND=0,2;CIPOS=0,2;END=99087902;HOMLEN=2;HOMSEQ=AC;SVLEN=-43365;SVTYPE=DEL	GT:FT:GQ:PL:PR:SR	0/1:PASS:678:728,0,772:32,17:49,9	1/1:PASS:102:999,105,0:2,28:5,28	0/1:PASS:500:999,0,497:29,18:27,16
+chr13	99628722	MantaDEL:0:3454:12393:0:0:0	T	<DEL>	999	PASS	CIEND=0,11;CIPOS=0,11;END=99634264;HOMLEN=11;HOMSEQ=AAGATCGTGTC;SVLEN=-5542;SVTYPE=DEL	GT:FT:GQ:PL:PR:SR	0/1:PASS:729:847,0,726:26,12:39,16	0/1:PASS:519:746,0,516:22,12:25,14	0/0:HomRef:305:0,255,999:47,0:62,0
+chr14	117124	MantaDEL:42518:0:1:0:0:0	G	<DEL>	999	PASS	CIEND=0,2;CIPOS=0,2;END=123266;HOMLEN=2;HOMSEQ=AA;SVLEN=-6142;SVTYPE=DEL	GT:FT:GQ:PL:PR:SR	0/1:PASS:381:999,0,378:17,22:21,14	0/0:HomRef:263:0,213,999:45,0:47,0	0/1:PASS:525:999,0,522:26,27:18,10
