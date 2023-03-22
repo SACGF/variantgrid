@@ -72,17 +72,6 @@ class ChoicesEnum(Enum):
         return [(tag.value, tag.name) for tag in cls]
 
 
-def timestamp_as_number_formatter(row: Dict, field: str):
-    """
-    Useful for JQGrids where we want to send down time as a timestamp so we can put it in the user's timezone
-    :param row: JQGrid row object
-    :param field: field to access row (row[field] should be a timestamp)
-    :return: unix time
-    """
-    val = row[field]
-    return val.timestamp() if val else None
-
-
 def count(obj: Any) -> int:
     if obj is None:
         return 0

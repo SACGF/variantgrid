@@ -14,7 +14,6 @@ from django.db.models import Q
 from analysis.models import Analysis, AnalysisEdge, NodeStatus, NodeTask
 from analysis.models.nodes.node_utils import get_nodes_by_id, get_toposorted_nodes_from_parent_value_data
 from analysis.tasks.node_update_tasks import wait_for_node
-from library.celery_utils import execute_task
 from library.log_utils import log_traceback
 
 
@@ -28,7 +27,12 @@ def create_and_launch_analysis_tasks(analysis_id, run_async=True):
         raise
 
     for t in tasks:
-        execute_task(t, run_async=run_async)
+        if run_async:
+            t.apply_async()
+        else:
+            result = t.apply()
+            if not result.successful():
+                raise Exception(result.result)
 
 
 def _get_analysis_update_tasks(analysis_id) -> List:

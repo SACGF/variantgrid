@@ -11,7 +11,7 @@ from library.django_utils import thread_safe_unique_together_get_or_create
 from library.django_utils.django_file_utils import get_import_processing_filename
 from library.genomics.vcf_utils import VCFConstant
 from library.git import Git
-from library.postgres_utils import postgres_arrays
+from library.utils.database_utils import postgres_arrays
 from library.utils import double_quote
 from patients.models_enums import Zygosity
 from snpdb.common_variants import get_classified_high_frequency_variants_qs

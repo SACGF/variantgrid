@@ -377,22 +377,6 @@ def generalised_diff_function(coeffs, observed_freq, minimization="LS", sigdata=
     return diff_sum
 
 
-def reorder_list(original_list, new_index_order):
-    new_list = []
-    for x in new_index_order:
-        new_list.append(original_list[x])
-    return new_list
-
-    # =================================================================
-    # the Jacobian, probably not needed for now
-    # def jacobian(self, coeffs):
-    #     grad = [0]*n_sigs
-    #     for x in range(n_sigs):
-    #         for k in range(96):
-    #             grad[x] = 2 * sigdata[x][k] * (coeffs[x]*sigdata[x][k]-freq_norm[k])
-    #     grad = np.asarray(grad)
-    #     return grad
-
 # --------------------------------------------------------------
 
 

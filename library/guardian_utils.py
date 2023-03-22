@@ -75,10 +75,6 @@ def groups_map(klass, ids, id_field='id'):
     return id_to_group
 
 
-def highest_group_map(klass, ids, id_field='id'):
-    return [(key, highest_group(groups)) for key, groups in groups_map(klass, ids, id_field).items()]
-
-
 class DjangoPermission:
     READ = 'view'
     WRITE = 'change'
@@ -131,16 +127,6 @@ def clear_permissions(obj, permissions):
     for group in groups:
         for permission in permissions:
             remove_perm(permission, group, obj)
-
-
-def print_permissions(obj):
-    """
-    Prints all users and objects that have any permissions to the object
-    """
-    users = get_users_with_perms(obj)
-    groups = get_groups_with_perms(obj)
-    print(users)
-    print(groups)
 
 
 def check_can_write(obj, user):
