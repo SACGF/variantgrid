@@ -53,7 +53,7 @@ from library.django_utils import require_superuser, get_url_from_view_path
 from library.log_utils import log_traceback
 from library.utils import delimited_row
 from library.utils.file_utils import rm_if_exists
-from snpdb.forms import SampleChoiceForm, UserSelectForm, LabMultiSelectForm
+from snpdb.forms import SampleChoiceForm, UserSelectForm, LabMultiSelectForm, LabSelectForm
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import Variant, UserSettings, Sample, Lab, Allele
 from snpdb.models.models_genome import GenomeBuild
@@ -145,12 +145,17 @@ def classifications(request):
     for ft in flag_types:
         flag_type_json.append({'id': ft.pk, 'label': ft.label, 'description': ft.description})
 
+    if settings.VARIANT_CLASSIFICATION_GRID_MULTI_LAB_FILTER:
+        lab_form = LabMultiSelectForm()
+    else:
+        lab_form = LabSelectForm()
+
     context = {
         "can_create_classification": Classification.can_create_via_web_form(request.user),
         "flag_types": flag_type_json,
         "gene_form": GeneSymbolForm(),
         "user_form": UserSelectForm(),
-        "lab_form": LabMultiSelectForm(),
+        "lab_form": lab_form,
         "allele_origin_form": ClassificationAlleleOriginForm(),
         "labs": Lab.valid_labs_qs(request.user),
         "search_and_classify_form": search_and_classify_form,
