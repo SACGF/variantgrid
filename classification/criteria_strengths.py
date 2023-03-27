@@ -139,7 +139,7 @@ class AcmgPointScore:
         has_non_standard = False
         for score in scores:
             if score.has_unspecified:
-                unspecified = unspecified
+                unspecified = score
             elif score.has_criteria:
                 if not biggest_score or biggest_score < score:
                     biggest_score = score
