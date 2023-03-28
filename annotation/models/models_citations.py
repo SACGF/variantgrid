@@ -152,7 +152,10 @@ class Citation(TimeStampedModel):
         if self.error:
             return "Could not retrieve citation"
         elif not self.title:
-            return "Have not retrieved citation"
+            # TODO fix this scenario so it doesn't happen
+            # seems to be caused by PMID retrieval having errors embedded in the JSON that aren't parsed out properly
+            # e.g. {"id:":["858964 Error occurred: PMID 29858964 is a duplicate of PMID 30740739"]}
+            return "Could not retrieve citation"
         else:
             return self.title
 
