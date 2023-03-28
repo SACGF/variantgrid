@@ -1,7 +1,7 @@
 {% load classification_tags %}
 {% load ui_utils %}
 {% if imported_allele_info %}
-    <a data-toggle="ajax-modal" href="{% url 'view_imported_allele_info_detail' imported_allele_info.pk %}?on_allele_page={% if on_allele_page %}true{% else %}false{% endif %}">
+    <a data-toggle="ajax-modal" href="{% url 'view_imported_allele_info_detail' imported_allele_info.pk %}?on_allele_page={% if on_allele_page %}true{% else %}false{% endif %}" data-title="{{ imported_allele_info }}">
     {{ imported_allele_info.imported_genome_build_patch_version }}<br/>{% c_hgvs imported_allele_info.imported_c_hgvs %}
     {{ imported_allele_info.issue_icon|default_if_none:'' }}
     </a>

@@ -395,6 +395,9 @@ class ImportedAlleleInfo(TimeStampedModel):
     def get_absolute_url(self):
         return reverse('view_imported_allele_info_detail', kwargs={'allele_info_id': self.pk})
 
+    def __str__(self):
+        return f"{self.imported_genome_build_patch_version} {self.imported_c_hgvs or self.imported_g_hgvs}"
+
     @property
     def variant_coordinates_imported_and_resolved(self) -> Tuple[VariantCoordinate, VariantCoordinate]:
         imported_vc: Optional[VariantCoordinate] = self.variant_coordinate_obj
