@@ -198,28 +198,34 @@ class ImportedAlleleInfoColumns(DatatableConfig[ImportedAlleleInfo]):
 def view_imported_allele_info(request: HttpRequest) -> Response:
     return render(request, "classification/imported_allele_info.html", {})
 
-
 def view_imported_allele_info_detail(request: HttpRequest, allele_info_id: int):
     allele_info = get_object_or_404(ImportedAlleleInfo, pk=allele_info_id)
     # just split up c.hgvs into logical parts, and then the diff will reset with each new group (treat it as different words)
-    HGVS_REGEX = re.compile(
-        '(?P<transcript>[^.]+?)'
-        '(?P<transcript_version>\.[0-9]+)?'
-        '(?P<gene_symbol>[(].*[)])?'
-        '(?P<c_dot>:[cng]\.)'
-        '(?P<c_nomen_pos>[0-9]*)'
-        '(?P<c_nomen_change>.*?$)'
-    )
-    multi_diff = MultiDiff(HGVS_REGEX)
+
+    HGVS_BASE_REGEX_STR = '^(?P<transcript>[^.]+?)(?P<transcript_version>\.[0-9]+)?(?P<gene_symbol>[(].*[)])?(?P<c_dot>:[cng]\.)'
+
+    HGVS_REGEX_BASIC = re.compile(HGVS_BASE_REGEX_STR + '(?P<c_nomen_pos>[0-9+_-]*)(?P<c_nomen_change>.*?)$')
+    HGVS_REGEX_REF_ALT = re.compile(HGVS_BASE_REGEX_STR + '(?P<c_nomen_pos>[0-9+_-]*?)(?P<ref>[ACTG]+)(?P<operation>>)(?P<alt>[ACTG]+)$')
+    HGVS_REGEX_DEL_INS = re.compile(HGVS_BASE_REGEX_STR + '(?P<c_nomen_pos>[0-9+_-]*?)(?P<del>del)(?P<ref>[ACTG]*)(?P<ins>del)(?P<alt>[ACTG]*)$')
+    HGVS_REGEX_SIMPLE_OP = re.compile(HGVS_BASE_REGEX_STR + '(?P<c_nomen_pos>[0-9+_-]*?)(?P<operation>dup|del|ins)(?P<alt>[ACTG]*)$')
+
+    use_regex = HGVS_REGEX_BASIC
+    regex_attempt_order = [HGVS_REGEX_REF_ALT, HGVS_REGEX_DEL_INS, HGVS_REGEX_SIMPLE_OP]
+    for regex in regex_attempt_order:
+        if regex.match(allele_info.imported_c_hgvs):
+            use_regex = regex
+            break
+
+    multi_diff = MultiDiff(use_regex)
     parts = [MultiDiffInput(f"Imported ({allele_info.imported_genome_build_patch_version})", allele_info.imported_c_hgvs)]
     if allele_info.imported_genome_build_patch_version.genome_build == GenomeBuild.grch37():
         parts += [
-            MultiDiffInput("Normalised (GRCh37)", allele_info.grch37.c_hgvs if allele_info.grch37 else None),
+            MultiDiffInput("Normalised (GRCh37)", allele_info.grch37.c_hgvs if allele_info.grch37 else None, is_reference=True),
             MultiDiffInput("Liftover (GRCh38)", allele_info.grch38.c_hgvs if allele_info.grch38 else None)
         ]
     else:
         parts += [
-            MultiDiffInput("Normalised (GRCh38)", allele_info.grch38.c_hgvs if allele_info.grch38 else None),
+            MultiDiffInput("Normalised (GRCh38)", allele_info.grch38.c_hgvs if allele_info.grch38 else None, is_reference=True),
             MultiDiffInput("Liftover (GRCh37)", allele_info.grch37.c_hgvs if allele_info.grch37 else None)
         ]
 
