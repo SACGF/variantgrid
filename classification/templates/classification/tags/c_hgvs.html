@@ -9,7 +9,7 @@
     {% elif show_genome_build %}
         <span class="text-info">{{ c_hgvs.genome_build }}</span><span>&nbsp;</span>
     {% endif %}
-    <span class="c-hgvs-body" style="white-space: nowrap">
+    <span class="c-hgvs-body">
         <span class="c-hgvs-transcript">{{ c_hgvs.transcript }}</span>
         {% if c_hgvs.gene_symbol %}
             <span class="c-hgvs-gene-symbol-b">
@@ -18,7 +18,7 @@
             <span class="colon">:</span>
         {% else %}:{% endif %}
 
-        <span class="c-hgvs-nomen" style="word-break: break-all">{{ c_hgvs.raw_c }}</span>
+        <span class="c-hgvs-nomen">{{ c_hgvs.raw_c }}</span>
     </span>
 
 {% endif %}
