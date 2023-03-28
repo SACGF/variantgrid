@@ -114,6 +114,9 @@ td.dt-preview {
     font-size: 12px;
     overflow-x: hidden;
 }
+td.dt-hgvs {
+  min-width: 200px;
+}
 
 // when we expand on that preview to show more details
 table.dataTable {

@@ -92,6 +92,10 @@ td.dt-preview {
   overflow-x: hidden;
 }
 
+td.dt-hgvs {
+  min-width: 200px;
+}
+
 table.dataTable tr.odd:hover, table.dataTable tr.even:hover {
   background-color: #f8f8f8;
 }
