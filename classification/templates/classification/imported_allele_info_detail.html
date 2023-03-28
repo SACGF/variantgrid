@@ -60,7 +60,7 @@
         {% if not on_allele_page %}
             {% labelled label="Allele" %}
                 {% if allele_info.allele %}
-                    <a class="hover-link" href="{{ allele_info.allele.get_absolute_url }}">{{ allele_info.allele }}</a>
+                    {% allele allele_info.allele %}
                 {% else %}<span class="no-value">-</span>{% endif %}
             {% endlabelled %}
         {% endif %}
