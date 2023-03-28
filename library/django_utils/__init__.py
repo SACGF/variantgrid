@@ -1,13 +1,11 @@
 import datetime
 import operator
-from collections import defaultdict
 from functools import reduce
 from functools import wraps, partial
 from typing import List, Tuple, Dict
 
 import nameparser
 from dateutil import parser
-from django.conf import settings
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
 from django.core.exceptions import PermissionDenied, ValidationError, ObjectDoesNotExist
@@ -19,7 +17,6 @@ from django.db.models.query_utils import Q
 from django.urls.base import reverse_lazy
 from django.utils import timezone
 from django.utils.timezone import localtime
-from redis import Redis
 from threadlocals.threadlocals import get_current_request
 
 from library.utils import invert_dict
@@ -100,21 +97,6 @@ def get_model_fields_and_formatted_values_tuples_list(model):
     return rows
 
 
-def column_arrays_from_values_queryset(qs, *fields, **formatters):
-    column_arrays = defaultdict(list)
-    keys = [f.split('__')[-1] for f in fields]
-    annotation_run_values = qs.values(*fields)
-    for value in annotation_run_values:
-        for k, field in zip(keys, fields):
-            v = value[field]
-            f = formatters.get(field)
-            if f:
-                v = f(v)
-            column_arrays[k].append(v)
-
-    return column_arrays
-
-
 def get_choices_formatter(choices, default=None):
     lookup = {}
     for choice, label in choices:
@@ -160,11 +142,6 @@ def get_field_counts(qs, field):
 
 
 staff_only = partial(staff_member_required, login_url=reverse_lazy('staff_only'))
-
-
-def get_redis(**kwargs):
-    port = kwargs.pop("port", settings.REDIS_PORT)
-    return Redis(port=port, decode_responses=True, **kwargs)
 
 
 def get_lower_choice(choices, value):
