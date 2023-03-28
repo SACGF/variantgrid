@@ -180,12 +180,13 @@ class MultiDiffOutput:
         if len(self.diffs) == 1 and not self.diffs[0].text:
             return ""
 
-        if self.unique_matches_reference:
-            return SafeString(f"<span class='diff-text'>{escape(self.input.text)}</span>")
-        else:
-            return SafeString("<span class='diff-text'>" + "".join(
-                f"<span class='diff-text-{diff.operation_name}'>{escape(diff.text)}</span>" for diff in self.diffs
-            ) + "</span>")
+        # could render items that match the reference differnetly, but needs more work not to add to the confusion
+        # if self.unique_matches_reference:
+        #     return SafeString(f"<span class='diff-text'>{escape(self.input.text)}</span>")
+        # else:
+        return SafeString("<span class='diff-text'>" + "".join(
+            f"<span class='diff-text-{diff.operation_name}'>{escape(diff.text)}</span>" for diff in self.diffs
+        ) + "</span>")
 
     def append(self, op: str, segment: str) -> 'MultiDiffOutput':
         if not self.diffs or self.diffs[-1].operation != op:
