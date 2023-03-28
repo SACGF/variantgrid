@@ -206,7 +206,7 @@ def view_imported_allele_info_detail(request: HttpRequest, allele_info_id: int):
 
     HGVS_REGEX_BASIC = re.compile(HGVS_BASE_REGEX_STR + '(?P<c_nomen_pos>[0-9+_-]*)(?P<c_nomen_change>.*?)$')
     HGVS_REGEX_REF_ALT = re.compile(HGVS_BASE_REGEX_STR + '(?P<c_nomen_pos>[0-9+_-]*?)(?P<ref>[ACTG]+)(?P<operation>>)(?P<alt>[ACTG]+)$')
-    HGVS_REGEX_DEL_INS = re.compile(HGVS_BASE_REGEX_STR + '(?P<c_nomen_pos>[0-9+_-]*?)(?P<del>del)(?P<ref>[ACTG]*)(?P<ins>del)(?P<alt>[ACTG]*)$')
+    HGVS_REGEX_DEL_INS = re.compile(HGVS_BASE_REGEX_STR + '(?P<c_nomen_pos>[0-9+_-]*?)(?P<del>del)(?P<ref>[ACTG]*)(?P<ins>ins)(?P<alt>[ACTG]*)$')
     HGVS_REGEX_SIMPLE_OP = re.compile(HGVS_BASE_REGEX_STR + '(?P<c_nomen_pos>[0-9+_-]*?)(?P<operation>dup|del|ins)(?P<alt>[ACTG]*)$')
 
     use_regex = HGVS_REGEX_BASIC
