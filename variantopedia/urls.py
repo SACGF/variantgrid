@@ -3,7 +3,7 @@ from snpdb.views.datatable_view import DatabaseTableView
 from variantgrid.perm_path import perm_path
 from variantopedia import views
 from variantopedia.grids import AllVariantsGrid, NearbyVariantsGrid, TaggedVariantGrid, \
-    VariantTagsGrid, VariantWikiColumns
+    VariantTagsGrid, VariantWikiColumns, VariantTagsColumns
 
 urlpatterns = [
     perm_path('variants', views.variants, name='variants'),
@@ -49,6 +49,9 @@ urlpatterns = [
     # Grids
     perm_path('wiki/datatable/', DatabaseTableView.as_view(column_class=VariantWikiColumns),
               name='variant_wiki_datatable'),
+    perm_path('variant/<int:variant_id>/tags/datatable/', DatabaseTableView.as_view(column_class=VariantTagsColumns),
+              name='variant_tags_datatable'),
+
     perm_path('nearby/grid/<variant_id>/<genome_build_name>/<region_type>/<slug:op>/',
               JQGridView.as_view(grid=NearbyVariantsGrid, csv_download=True),
               name='nearby_variants_grid'),

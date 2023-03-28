@@ -1,6 +1,6 @@
 import operator
 from functools import reduce
-from typing import Dict, Any, Optional
+from typing import Optional
 
 from django.conf import settings
 from django.db.models import TextField, Value, QuerySet, Q
@@ -18,7 +18,7 @@ from snpdb.grid_columns.custom_columns import get_custom_column_fields_override_
 from snpdb.grids import AbstractVariantGrid
 from snpdb.models import Variant, VariantZygosityCountCollection, GenomeBuild, Tag, VariantWiki
 from snpdb.models.models_user_settings import UserSettings, UserGridConfig
-from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
+from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder, CellData
 from uicore.json.json_types import JsonDataType
 from variantopedia.interesting_nearby import get_nearby_qs
 
@@ -40,14 +40,14 @@ class VariantWikiColumns(DatatableConfig[VariantWiki]):
         ]
 
     @staticmethod
-    def render_variant(row: Dict[str, Any]) -> JsonDataType:
-        variant_id = row["variant"]
+    def render_variant(cell: CellData) -> JsonDataType:
+        variant_id = cell["variant"]
         variant = get_object_or_404(Variant, pk=variant_id)
         genome_build = next(iter(variant.genome_builds))
         g_hgvs = HGVSMatcher(genome_build).variant_to_g_hgvs(variant)
         return {"id": variant_id, "g_hgvs": g_hgvs}
 
-    def render_genome_build(self, _row: Dict[str, Any]) -> JsonDataType:
+    def render_genome_build(self, _cell: CellData) -> JsonDataType:
         return self.get_query_param('genome_build')
 
     def get_initial_queryset(self) -> QuerySet[VariantWiki]:
@@ -240,3 +240,28 @@ class TaggedVariantGrid(AbstractVariantGrid):
         if not user_grid_config.show_group_data:
             tags_qs = tags_qs.filter(user=self.user)
         return VariantTag.variants_for_build_q(genome_build, tags_qs, self.tag_ids)
+
+
+class VariantTagsColumns(DatatableConfig[VariantTag]):
+    """ This is for showing on the variant page """
+    def __init__(self, request: HttpRequest):
+        super().__init__(request)
+        self.download_csv_button_enabled = True
+
+        # self.expand_client_renderer = DatatableConfig._row_expand_ajax('eventlog_detail', expected_height=120)
+        self.rich_columns = [
+            RichColumn('id', visible=False),
+            RichColumn('tag', client_renderer='tagRenderer', orderable=True),
+            RichColumn('analysis', client_renderer='analysisLinkRenderer'),
+            RichColumn('user__username', name='user', orderable=True),
+            RichColumn('created', client_renderer='TableFormat.timestamp', orderable=True,
+                       default_sort=SortOrder.DESC),
+            RichColumn('created', name='time_ago', client_renderer='TableFormat.timeAgo'),
+        ]
+
+    def get_initial_queryset(self) -> QuerySet[VariantTag]:
+        variant_id = self.get_query_param('variant_id')
+        variant = Variant.objects.get(pk=variant_id)
+        # Not going to use anything build specific so don't care about build
+        genome_build = next(iter(variant.genome_builds))
+        return VariantTag.get_for_build(genome_build, variant_qs=variant.equivalent_variants)

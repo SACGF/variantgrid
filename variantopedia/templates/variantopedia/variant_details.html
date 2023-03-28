@@ -9,6 +9,22 @@
 {% render_tag_styles_and_formatter %}
 <script type="text/javascript">
 
+function analysisLinkRenderer(data, type, row) {
+    if (row.analysis) {
+        let analysisLink = $("<a />", {
+            href : Urls.analysis(row.analysis),
+            text : row.analysis,
+        });
+        return $(analysisLink).prop('outerHTML');
+    }
+    return data;
+}
+
+function tagRenderer(data, type, row) {
+    let variantTagHtml = `<span class='grid-tag tagged-${row.tag}' title='Tagged as ${row.tag}' id="variant-tag-${row.id}" variant_tag_id='${row.id}' tag_id='${row.tag}'><span class='user-tag-colored'>${row.tag}</span></span>`;
+    return $(variantTagHtml).prop('outerHTML');
+}
+
 function getBams() {
     return [];
 }
@@ -316,66 +332,6 @@ function populateVariantAllele(data) {
     });
 }
 
-function variantDetailsTagClickHandler() {
-    const variantTag = $(this);
-    const innerSpan = $(".user-tag-colored", variantTag);
-
-    function removeClickHandler() {
-        const variantTagId = variantTag.attr('variant_tag_id');
-        const tagId = variantTag.attr("tag_id");
-
-        const removeTagCallback = function () {
-            $(`#variant-tag-${variantTagId}`).parents("tr").remove();
-        };
-        let data = 'variant_id={{ variant.pk }}';
-        data += "&genome_build_name={{ genome_build.pk }}";
-        data += '&tag_id=' + tagId;
-        data += '&variant_tag_id=' + variantTagId;
-        data += '&op=' + 'del';
-        $.ajax({
-            type: "POST",
-            data: data,
-            url: Urls.set_variant_tag('V'),
-            success : removeTagCallback,
-        });
-    }
-    deleteItemClickHandler(variantTag, innerSpan, removeClickHandler);
-}
-
-/*
-    Variant Tagging
-
-    NOTE: variant_details.html can be loaded via analysis, which also includes 'analysis.js' so the tagging functions
-    below have to be unique from existing JS functions to not cause any issues
-*/
-function variantDetailsAddVariantTag(variantTagData) {
-    const tag = variantTagData.tag;
-    // console.log("addVariantTag:");
-    // console.log(variantTagData);
-    const tagsTable = $("table#tags-table");
-    let tagRow = $("<tr/>"); // tag, analysis, user, timestamp
-    let variantTagClasses = `grid-tag tagged-${tag}`;
-    let variantTag = `<span class='${variantTagClasses}' title='Tagged as ${tag}' id="variant-tag-${variantTagData.id}" variant_tag_id='${variantTagData.id}' tag_id='${tag}'><span class='user-tag-colored'>${tag}</span></span>`;
-    let tagTd = $("<td/>").append(variantTag);
-    let analysisTd = "<td></td>";
-    if (variantTagData.analysis) {
-        const analysisUrl = Urls.analysis(variantTagData.analysis.id);
-        analysisTd = `<td><a class='hover-link' href="${analysisUrl}">${variantTagData.analysis.name}</a></td>`;
-    }
-    let userTd = `<td><span title="${variantTagData.user.first_name} ${variantTagData.user.last_name}">${variantTagData.user.username}</span></td>`;
-    let createdTd = $("<td/>").append(createTimestampDom(variantTagData.created, false));
-    let timeAgoTd = $("<td/>").append(createTimestampDom(variantTagData.created, true));
-    tagRow.append(tagTd);
-    tagRow.append(analysisTd);
-    tagRow.append(userTd);
-    tagRow.append(createdTd);
-    tagRow.append(timeAgoTd);
-    tagsTable.append(tagRow);
-
-    if (variantTagData.can_write) {
-        $(`#variant-tag-${variantTagData.id}`).click(variantDetailsTagClickHandler);
-    }
-}
 
 function variantDetailsShowTagAutocomplete() {
     const showTagButton = $("#show-tag-autocomplete");
@@ -393,7 +349,7 @@ function variantDetailsShowTagAutocomplete() {
             const successFunc = function (data) {
                 // We can return success but with empty data if it's a dupe (so don't add)
                 if (!$.isEmptyObject(data)) {
-                    variantDetailsAddVariantTag(data);
+                    $('#variant-tags-datatable').DataTable().ajax.reload();
                 }
                 showTagButton.show();
                 tagForm.hide();
@@ -415,14 +371,6 @@ function variantDetailsShowTagAutocomplete() {
 
 
 $(document).ready(function() {
-    {% if variant_tags %}
-        const variantTags = {{ variant_tags|safe }};
-        for (let i=0 ; i<variantTags.length ; ++i) {
-            variantDetailsAddVariantTag(variantTags[i]);
-        }
-        $("table#tags-table").show();
-    {% endif %}
-
 	$("#variant_sample_information").load('{% url 'variant_sample_information' variant.id genome_build.pk %}');
 
     let variantAllele = {{ variant_allele | jsonify }};
@@ -539,32 +487,6 @@ function applyVariantValues() {
         </div>
     </div>
 
-    {% if url_name_visible.variant_tags %}
-    <div class="container mt-4">
-        <h4>Tags</h4>
-        <table id='tags-table' class="table hidden">
-            <thead>
-                <tr><th>Tag</th><th>Analysis</th><th>Username</th><th>Date</th><th>Time Ago</th>
-            </thead>
-        </table>
-        {% if view_variant %}
-        {% comment %} Disable creating tags when loading via analysis grid. {% endcomment %}
-        <div class="d-flex">
-            <div>
-                <a href="javascript:variantDetailsShowTagAutocomplete()" id="show-tag-autocomplete" title="Add new tag"><div class="click-to-add-button d-inline-block"></div>&nbsp;Add Tag</a>
-            </div>
-            <form id="variant-tag-form" class="hidden flex-row flex-grow">
-                {% csrf_token %}
-                {{ tag_form.tag }}
-                {{ tag_form.media }}
-            </form>
-        </div>
-        {% else %}
-            Please create new tags in the grid, not on this page.
-        {% endif %}
-    </div>
-    {% endif %}
-
     {% if classifications_new_grouping %}
         <div class="container mt-4">
             <h4>Classifications</h4>
@@ -589,6 +511,31 @@ function applyVariantValues() {
             </div>
         {% endif %}
     {% endif %}
+
+    {% if url_name_visible.variant_tags %}
+    <div class="container mt-4">
+        <h4>Tags</h4>
+
+        <table id="variant-tags-datatable" class="sticky-header" data-datatable-responsive="true" data-datatable-url="{% url 'variant_tags_datatable' variant.pk %}"></table>
+
+        {% if view_variant %}
+        {% comment %} Disable creating tags when loading via analysis grid. {% endcomment %}
+        <div class="d-flex">
+            <div>
+                <a href="javascript:variantDetailsShowTagAutocomplete()" id="show-tag-autocomplete" title="Add new tag"><div class="click-to-add-button d-inline-block"></div>&nbsp;Add Tag</a>
+            </div>
+            <form id="variant-tag-form" class="hidden flex-row flex-grow">
+                {% csrf_token %}
+                {{ tag_form.tag }}
+                {{ tag_form.media }}
+            </form>
+        </div>
+        {% else %}
+            Please create new tags in the grid, not on this page.
+        {% endif %}
+    </div>
+    {% endif %}
+
 
 {% if show_annotation and variant_annotation %}
     <div class="container">

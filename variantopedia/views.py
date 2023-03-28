@@ -1,4 +1,3 @@
-import json
 import operator
 import re
 from collections import defaultdict
@@ -16,7 +15,6 @@ from django.urls import reverse
 from django.views.decorators.http import require_POST
 
 from analysis.models import VariantTag
-from analysis.serializers import VariantTagSerializer
 from annotation.models import AnnotationRun, AnnotationVersion, ClassificationModification, Classification, ClinVar, \
     VariantAnnotationVersion, VariantAnnotation
 from annotation.transcripts_annotation_selections import VariantTranscriptSelections
@@ -69,7 +67,7 @@ def strip_celery_from_keys(celery_state):
     worker_status = {}
     if celery_state:
         for worker_string, data in celery_state.items():
-            m = re.match(".*@(.*?)$", worker_string)
+            m = re.match(r".*@(.*?)$", worker_string)
             if m:
                 worker = m.group(1)
                 worker_status[worker] = data
@@ -558,10 +556,6 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
         if not variant_allele.needs_clingen_call():
             variant_allele_data = VariantAlleleSerializer.data_with_link_data(variant_allele)
 
-    variant_tag_list = []
-    for vt in VariantTag.get_for_build(genome_build, variant_qs=variant.equivalent_variants):
-        variant_tag_list.append(VariantTagSerializer(vt, context={"request": request}).data)
-
     annotation_description = {}
     if user_settings.tool_tips:
         annotation_description = VariantGridColumn.get_column_descriptions()
@@ -593,7 +587,6 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
         "variant": variant,
         "variant_allele": variant_allele_data,
         "variant_annotation": variant_annotation,
-        "variant_tags": json.dumps(variant_tag_list),
         "vts": vts,
     }
     if extra_context:
