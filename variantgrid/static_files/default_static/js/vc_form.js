@@ -2168,18 +2168,19 @@ VCTable.format_hgvs = (parts) => {
         cDom.append($('<span>', {text: transcript, class:'c-hgvs-transcript'}));
         if (geneSymbol) {
             cDom.append($('<span>', {class: 'c-hgvs-gene-symbol-b', html:[
-                $('<span>', {text: "(", class: 'mx-1'}),
+                $('<span>', {text: "(", class: 'bracket'}),
                 $('<span>', {class: 'c-hgvs-gene-symbol', text: geneSymbol}),
-                $('<span>', {text: "):", class: 'ml-1', style: 'letter-spacing: 2px'})
+                $('<span>', {text: ")", class: 'bracket', style: 'letter-spacing: 2px'})
             ]}));
         }
+        cDom.append($('<span>', {text: ":", class: 'colon'}));
         // used to be display:inline-block; but that doesn't underline
         cDom.append($('<span>', {class:'c-hgvs-nomen', text: limitLength(cNomen, 100)}));
     } else {
         cDom.append(limitLength(parts.full, 100));
     }
     if (url) {
-        cDom = $('<a>', {href: url, html: cDom});
+        cDom = $('<a>', {href: url, html: cDom, class: 'hover-link'});
     }
     dom.append(cDom);
     if (icon) {

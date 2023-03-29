@@ -158,6 +158,7 @@ def diff_text(a: str, b: str) -> DiffBuilder:
 class MultiDiffInput:
     identifier: Any
     text: str
+    is_reference: bool = False
 
 
 @dataclass(frozen=True)
@@ -166,6 +167,7 @@ class MultiDiffOutput:
     parts: Optional[List[str]]
     matched: Optional[bool]
     diffs: List[DiffTextSegment] = field(default_factory=list)
+    matches_reference: bool = False
 
     @property
     def identifier(self):
@@ -178,6 +180,10 @@ class MultiDiffOutput:
         if len(self.diffs) == 1 and not self.diffs[0].text:
             return ""
 
+        # could render items that match the reference differnetly, but needs more work not to add to the confusion
+        # if self.unique_matches_reference:
+        #     return SafeString(f"<span class='diff-text'>{escape(self.input.text)}</span>")
+        # else:
         return SafeString("<span class='diff-text'>" + "".join(
             f"<span class='diff-text-{diff.operation_name}'>{escape(diff.text)}</span>" for diff in self.diffs
         ) + "</span>")
@@ -189,22 +195,33 @@ class MultiDiffOutput:
             self.diffs[-1].text += segment
         return self
 
+    @property
+    def unique_matches_reference(self) -> bool:
+        """
+        Did this text match the reference exactly without being the reference itself
+        """
+        return not self.input.is_reference and self.matches_reference
+
     @staticmethod
-    def from_input(input: MultiDiffInput, pattern: Pattern):
+    def from_input(input: MultiDiffInput, pattern: Pattern, reference: Optional[MultiDiffInput]):
         text = input.text or ''
+        matches_reference = text and reference and text == reference.text
+
         parts: List[str]
         if match := pattern.match(text):
             parts = list(match.groups())
             return MultiDiffOutput(
                 input=input,
                 parts=parts,
-                matched=True
+                matched=True,
+                matches_reference=matches_reference
             )
         else:
             return MultiDiffOutput(
                 input=input,
                 parts=None,
                 matched=False,
+                matches_reference=matches_reference
             ).append('u', text)
 
 
@@ -228,7 +245,9 @@ class MultiDiff:
             first_compare = compare[0]
             return [MultiDiffOutput(input=first_compare, matched=None, parts=[]).append(' ', first_compare.text)]
         else:
-            outputs = [MultiDiffOutput.from_input(input, self.re_parts) for input in compare]
+            reference = first(comp for comp in compare if comp.is_reference)
+
+            outputs = [MultiDiffOutput.from_input(input, self.re_parts, reference=reference) for input in compare]
             comparing = [output for output in outputs if output.matched]
             for index in range(0, self.re_parts.groups):
                 compare_parts = [compare.parts[index] or '' for compare in comparing]

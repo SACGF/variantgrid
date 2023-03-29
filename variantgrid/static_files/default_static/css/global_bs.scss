@@ -114,6 +114,9 @@ td.dt-preview {
     font-size: 12px;
     overflow-x: hidden;
 }
+td.dt-hgvs {
+  min-width: 200px;
+}
 
 // when we expand on that preview to show more details
 table.dataTable {
@@ -129,7 +132,7 @@ table.dataTable {
         font-size: 12px;
         // white-space: pre-wrap;
         color: #444444;
-        font-family: monospace;
+        // font-family: monospace;
     }
     tr.child {
         td.child {
@@ -1134,11 +1137,21 @@ table .fa-hand-point-right {
 
 a .c-hgvs-body {
   .c-hgvs-transcript, .c-hgvs-nomen {
-    color: #444488;
+    color: #444488 !important;
   }
 }
 
 .c-hgvs-body {
+  .bracket {
+    margin-left: 2pt;
+    margin-right: 2pt;
+    color: #555;
+  }
+  .colon {
+    margin-left: -1pt;
+    margin-right: 1pt;
+    color: #444;
+  }
   .c-hgvs-transcript, .c-hgvs-gene-symbol-b {
     white-space: nowrap;
     word-break: normal;
@@ -1147,7 +1160,10 @@ a .c-hgvs-body {
     word-break: break-all;
   }
   .c-hgvs-gene-symbol {
-    color:#6c757d; letter-spacing: 0.5px;
+    margin-left: 1pt;
+    margin-right: 1pt;
+    color:#6c757d;
+    letter-spacing: 0.5px;
   }
 }
 

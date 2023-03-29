@@ -1,7 +1,8 @@
 import urllib
+import re
 from dataclasses import dataclass
 from enum import Enum
-from typing import List
+from typing import List, Dict
 
 from django.conf import settings
 from django.contrib.sites.models import Site
@@ -143,14 +144,21 @@ class ClassificationExportFormatterVCF(ClassificationExportFormatter):
             info += f';url={self.vcf_safe(url)}'
 
             # add lab names, and also calculate if we have conflicting classifications and include that flag if appropriate
-            cs_counts = {}
-            lab_names = []
-            c_hgvses = []
-            discordances = []
-            conditions = []
+            cs_counts: Dict[str, int] = {}
+            lab_names: List[str] = []
+            c_hgvses: List[str] = []
+            discordances: List[str] = []
+            conditions: List[str] = []
+
+            def vcf_tidy(text: str):
+                text = re.sub('[^0-9a-zA-Z]+', ' ', text)
+                text = re.sub(' {2,}', ' ', text)
+                return text
 
             for record in vcms:
-                lab_names.append(self.vcf_safe(str(record.classification.lab)))
+                lab_name = self.vcf_safe(vcf_tidy(record.classification.lab.organization.name) + '/' + vcf_tidy(record.classification.lab.name))
+
+                lab_names.append(lab_name)
                 cs = record.get(SpecialEKeys.CLINICAL_SIGNIFICANCE, None)
                 if cs:
                     cs_counts[cs] = cs_counts.get(cs, 0) + 1

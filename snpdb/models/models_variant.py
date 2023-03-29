@@ -50,6 +50,13 @@ class Allele(FlagsMixin, models.Model):
         return FlagTypeContext.objects.get(pk="allele")
 
     @property
+    def compact_str(self):
+        if clingen := self.clingen_allele:
+            return str(clingen)
+        else:
+            return str(self)
+
+    @property
     def metrics_logging_key(self):
         return "allele_id", self.pk
 

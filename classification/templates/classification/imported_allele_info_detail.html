@@ -60,7 +60,7 @@
         {% if not on_allele_page %}
             {% labelled label="Allele" %}
                 {% if allele_info.allele %}
-                    <a class="hover-link" href="{{ allele_info.allele.get_absolute_url }}">{{ allele_info.allele }}</a>
+                    {% allele allele_info.allele %}
                 {% else %}<span class="no-value">-</span>{% endif %}
             {% endlabelled %}
         {% endif %}
@@ -78,11 +78,11 @@
         {% endlabelled %}
         {% if not on_allele_page %}
             {% labelled label="Classifications" %}
-                {% for classification in allele_info.classification_set.all %}
+                {% for classification in classifications %}
                     <div>
-                    {% classification_quick classification %}
-                        <div class="flags d-inline-block" style="margin-left:12px" data-flags="{{ classification.flag_collection_id }}">...</div>
+                    {% classification_quick classification mode="compact" %}
                     </div>
+                    {% empty %}<span class="no-value">-</span>
                 {% endfor %}
             {% endlabelled %}
         {% endif %}

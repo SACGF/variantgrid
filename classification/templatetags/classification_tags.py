@@ -245,12 +245,12 @@ def clinical_context(context, cc: ClinicalContext, show_link: Optional[bool] = N
 
 
 @register.inclusion_tag("classification/tags/classification_quick.html", takes_context=True)
-def classification_quick(context, vc: Union[Classification, ClassificationModification], show_clinical_grouping=True):
+def classification_quick(context, vc: Union[Classification, ClassificationModification], show_clinical_grouping=True, mode: Optional[str] = "detailed"):
     user = context.request.user
     vcm = vc
     if isinstance(vc, Classification):
         vcm = ClassificationModification.latest_for_user(user=user, classification=vc, published=True, exclude_withdrawn=False).first()
-    return {"vcm": vcm, "show_clinical_grouping": show_clinical_grouping}
+    return {"vcm": vcm, "show_clinical_grouping": show_clinical_grouping, "mode": mode}
 
 
 class ClinicalGrouping:
@@ -374,6 +374,16 @@ def c_hgvs(c_hgvs: Union[CHGVS, ClassificationModification, str], show_genome_bu
         show_genome_build = c_hgvs.is_desired_build is False or c_hgvs.is_normalised is False
 
     return {"c_hgvs": c_hgvs, "show_genome_build": show_genome_build and c_hgvs.genome_build is not None}
+
+
+@register.inclusion_tag("classification/tags/allele.html")
+def allele(allele: Allele):
+    return {"allele": allele}
+
+
+@register.inclusion_tag("classification/tags/gene_symbol.html")
+def gene_symbol(gene_symbol: GeneSymbol):
+    return {"gene_symbol": gene_symbol}
 
 
 @register.inclusion_tag("classification/tags/classification_row.html", takes_context=True)

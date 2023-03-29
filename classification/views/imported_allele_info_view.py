@@ -145,7 +145,7 @@ class ImportedAlleleInfoColumns(DatatableConfig[ImportedAlleleInfo]):
     def get_initial_queryset(self) -> QuerySet[ImportedAlleleInfo]:
         ae: ImportedAlleleInfo = ImportedAlleleInfo.objects.first()
         return ImportedAlleleInfo.objects.all().annotate(
-            classification_count=Count('classification')
+            classification_count=Count('classification', filter=Q(classification__withdrawn=False))
         )
 
     def filter_queryset(self, qs: QuerySet[ImportedAlleleInfo]) -> QuerySet[ImportedAlleleInfo]:
@@ -198,28 +198,40 @@ class ImportedAlleleInfoColumns(DatatableConfig[ImportedAlleleInfo]):
 def view_imported_allele_info(request: HttpRequest) -> Response:
     return render(request, "classification/imported_allele_info.html", {})
 
-
 def view_imported_allele_info_detail(request: HttpRequest, allele_info_id: int):
     allele_info = get_object_or_404(ImportedAlleleInfo, pk=allele_info_id)
     # just split up c.hgvs into logical parts, and then the diff will reset with each new group (treat it as different words)
-    HGVS_REGEX = re.compile(
-        '(?P<transcript>[^.]+?)'
-        '(?P<transcript_version>\.[0-9]+)?'
-        '(?P<gene_symbol>[(].*[)])?'
-        '(?P<c_dot>:[cng]\.)'
-        '(?P<c_nomen_pos>[0-9]*)'
-        '(?P<c_nomen_change>.*?$)'
-    )
-    multi_diff = MultiDiff(HGVS_REGEX)
-    parts = [MultiDiffInput(f"Imported ({allele_info.imported_genome_build_patch_version})", allele_info.imported_c_hgvs)]
+
+    HGVS_BASE_REGEX_STR = '^(?P<transcript>[^.]+?)(?P<transcript_version>\.[0-9]+)?(?P<gene_symbol>[(].*[)])?(?P<c_dot>:[cng]\.)'
+
+    HGVS_REGEX_BASIC = re.compile(HGVS_BASE_REGEX_STR + '(?P<c_nomen_pos>[0-9+_-]*)(?P<c_nomen_change>.*?)$')
+    HGVS_REGEX_REF_ALT = re.compile(HGVS_BASE_REGEX_STR + '(?P<c_nomen_pos>[0-9+_-]*?)(?P<ref>[ACTG]+)(?P<operation>>)(?P<alt>[ACTG]+)$')
+    HGVS_REGEX_DEL_INS = re.compile(HGVS_BASE_REGEX_STR + '(?P<c_nomen_pos>[0-9+_-]*?)(?P<del>del)(?P<ref>[ACTG]*)(?P<ins>ins)(?P<alt>[ACTG]*)$')
+    HGVS_REGEX_SIMPLE_OP = re.compile(HGVS_BASE_REGEX_STR + '(?P<c_nomen_pos>[0-9+_-]*?)(?P<operation>dup|del|ins)(?P<alt>[ACTG]*)$')
+
+    FALLBACK_HGVS = re.compile("(?P<all>.*)")
+
+    use_text = allele_info.imported_c_hgvs or (allele_info.grch37.c_hgvs if allele_info.grch37 else None) or (allele_info.grch38.c_hgvs if allele_info.grch38 else None)
+
+    use_regex = FALLBACK_HGVS
+    regex_attempt_order = [HGVS_REGEX_REF_ALT, HGVS_REGEX_DEL_INS, HGVS_REGEX_SIMPLE_OP, HGVS_REGEX_BASIC]
+    for regex in regex_attempt_order:
+        if regex.match(use_text):
+            use_regex = regex
+            break
+
+    multi_diff = MultiDiff(use_regex)
+    parts = []
+    if allele_info.imported_c_hgvs:
+        parts += [MultiDiffInput(f"Imported ({allele_info.imported_genome_build_patch_version})", allele_info.imported_c_hgvs)]
     if allele_info.imported_genome_build_patch_version.genome_build == GenomeBuild.grch37():
         parts += [
-            MultiDiffInput("Normalised (GRCh37)", allele_info.grch37.c_hgvs if allele_info.grch37 else None),
+            MultiDiffInput("Normalised (GRCh37)", allele_info.grch37.c_hgvs if allele_info.grch37 else None, is_reference=True),
             MultiDiffInput("Liftover (GRCh38)", allele_info.grch38.c_hgvs if allele_info.grch38 else None)
         ]
     else:
         parts += [
-            MultiDiffInput("Normalised (GRCh38)", allele_info.grch38.c_hgvs if allele_info.grch38 else None),
+            MultiDiffInput("Normalised (GRCh38)", allele_info.grch38.c_hgvs if allele_info.grch38 else None, is_reference=True),
             MultiDiffInput("Liftover (GRCh37)", allele_info.grch37.c_hgvs if allele_info.grch37 else None)
         ]
 
@@ -235,6 +247,9 @@ def view_imported_allele_info_detail(request: HttpRequest, allele_info_id: int):
         if (c37c := c37.c_hgvs_obj) and (c38c := c38.c_hgvs_obj):
             liftover_diff = c37c.diff(c38c)
 
+    classifications = Classification.filter_for_user(user=request.user, queryset=allele_info.classification_set.filter(withdrawn=False))
+    classifications = sorted(classifications, key=lambda x: (x.lab, x.pk))
+
     return render_ajax_view(request, "classification/imported_allele_info_detail.html", {
         "allele_info": allele_info,
         "c_hgvses": diff_output,
@@ -242,7 +257,8 @@ def view_imported_allele_info_detail(request: HttpRequest, allele_info_id: int):
         "liftover_diff": chgvs_diff_description(liftover_diff) if liftover_diff else None,
         "variant_coordinate_label": f"Normalised Variant Coordinate ({allele_info.imported_genome_build_patch_version})",
         "validation_tags": allele_info.latest_validation.validation_tags_list if allele_info.latest_validation else None,
-        "on_allele_page": request.GET.get("on_allele_page") == "true"
+        "on_allele_page": request.GET.get("on_allele_page") == "true",
+        "classifications": classifications
     }, menubar='classification')
 
 
