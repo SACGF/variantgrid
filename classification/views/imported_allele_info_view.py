@@ -236,6 +236,8 @@ def view_imported_allele_info_detail(request: HttpRequest, allele_info_id: int):
         ]
 
     diff_output = multi_diff.diffs(parts)
+    if not allele_info.imported_c_hgvs:
+        diff_output = [None] + diff_output
 
     normalized_diff: Optional[CHGVSDiff] = None
     liftover_diff: Optional[CHGVSDiff] = None
