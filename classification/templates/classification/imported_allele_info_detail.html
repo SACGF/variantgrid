@@ -13,7 +13,7 @@
     {% endfor %}
     {% endcomment %}
     {% if allele_info.imported_g_hgvs %}
-        {% labelled label="Imported g.HGVS" value_css="text-monospace"  %}{{ allele_info.imported_g_hgvs }}{% endlabelled %}
+        {% labelled label=g_hgvs_label value_css="text-monospace"  %}{{ allele_info.imported_g_hgvs }}{% endlabelled %}
     {% else %}
         {% labelled label=c_hgvses.0.identifier value_css="text-monospace" %}{{ c_hgvses.0.html }}{% endlabelled %}
     {% endif %}

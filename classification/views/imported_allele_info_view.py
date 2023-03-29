@@ -254,6 +254,7 @@ def view_imported_allele_info_detail(request: HttpRequest, allele_info_id: int):
 
     return render_ajax_view(request, "classification/imported_allele_info_detail.html", {
         "allele_info": allele_info,
+        "g_hgvs_label": f"Imported g.HGVS ({allele_info.imported_genome_build_patch_version})",
         "c_hgvses": diff_output,
         "normalized_diff": chgvs_diff_description(normalized_diff) if normalized_diff else None,
         "liftover_diff": chgvs_diff_description(liftover_diff) if liftover_diff else None,
