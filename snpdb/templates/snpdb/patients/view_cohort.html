@@ -61,10 +61,8 @@
 	.cohort-message {
 		display: none;
 	}
-	
 </style>
-{% endblock %}
-{% block jshead %}
+<script>
 	const CC_STATUS_MODIFIED = "modified";
 	const CC_STATUS_RUNNING = "running";
 	const CC_STATUS_COMPLETE = "complete";
@@ -78,12 +76,12 @@
 	}
 
 	function getSelectedSamples(grid) {
-		var samples = [];
+		let samples = [];
 
 		$("input.sample-checkbox", grid).each(function() {
 			if ($(this).is(":checked")) {
-				var sampleId = $(this).attr("sample_id")
-				samples.push(sampleId);
+                const sampleId = $(this).attr("sample_id");
+                samples.push(sampleId);
 			}
 		});
 		return samples;
@@ -98,7 +96,7 @@
 		let totalSamples = $("input.sample-checkbox", "#right-grid").length;
         let samplesTabState = null;
         
-		if (totalSamples == 0) {
+		if (totalSamples === 0) {
 			$('#no-cohort-samples').show();
 			samplesTabState = "error";
 		} else {
@@ -106,25 +104,28 @@
 				$(".multiple-samples").show();
 			}
 
+            const launchTaskButton = $("#launch-cohort-count-task-button");
+            const taskInfo = $('#task-info');
+            const launchTask = $('#launch-task');
+
 			if (cohortCountStatus == CC_STATUS_MODIFIED) {
 			    $("#related-data-container").hide();
-				$("#launch-task").show();
+                launchTaskButton.attr('disabled', false);
+				launchTask.show();
                 samplesTabState = "warning";
 			} else if (cohortCountStatus == CC_STATUS_RUNNING) {
-				var task_info = $('#task-info');
-				var loading_icon = $('<div>').attr({class : 'loading icon16', style: 'margin-right:10px;'});
-				task_info.html(loading_icon);
-				task_info.append("Cohort Count task is running...");
-				$('#task-info').show();
+                const loading_icon = $('<div>').attr({class: 'loading icon16', style: 'margin-right:10px;'});
+                taskInfo.html(loading_icon);
+				taskInfo.append("Cohort Count task is running...");
+				taskInfo.show();
 			} else if (cohortCountStatus == CC_STATUS_COMPLETE) {
-				var html = "Your cohort has been processed successfully. ";
-				$('#task-info').html(html);
-				$('#task-info').show();
+				taskInfo.html("Your cohort has been processed successfully. ");
+				taskInfo.show();
 			} else if (cohortCountStatus == CC_STATUS_FAILURE) {
-                var html = "<b>Cohort Processing failed</b> - click to try again?";
-                $('#task-info').html(html);
-                $('#task-info').show();
-                $("#launch-task").show();
+                taskInfo.html("<b>Cohort Processing failed</b> - click to try again?");
+                taskInfo.show();
+                launchTaskButton.attr('disabled', false);
+                launchTask.show();
 			}
 
 			if (cohortCountStatus == CC_STATUS_COMPLETE) {
@@ -155,8 +156,8 @@
 	}
 
 	function editCohortSample(cohortOp, samples) {
-		var data = 'cohort_op=' + cohortOp + '&sample_ids=' + JSON.stringify(samples);
-		$.ajax({
+        const data = 'cohort_op=' + cohortOp + '&sample_ids=' + JSON.stringify(samples);
+        $.ajax({
 		    type: "POST",
 	    	data: data,
 	    	url: "{% url 'cohort_sample_edit' cohort.pk %}",
@@ -167,19 +168,19 @@
 	
 	function addToCohort() {
 		cohortCountStatus = CC_STATUS_MODIFIED;
-		var samples = getSelectedSamples("#left-grid");
-		editCohortSample('add', samples);
+        const samples = getSelectedSamples("#left-grid");
+        editCohortSample('add', samples);
 	}
 
 	function removeFromCohort() {
 		cohortCountStatus = CC_STATUS_MODIFIED;
-		var samples = getSelectedSamples("#right-grid");
-		editCohortSample('remove', samples);
+        const samples = getSelectedSamples("#right-grid");
+        editCohortSample('remove', samples);
 	}
 
 	function selectAll(checkbox, grid) {
-		var checked = $(checkbox).is(":checked");
-		$("input.sample-checkbox", grid).each(function() {
+        const checked = $(checkbox).is(":checked");
+        $("input.sample-checkbox", grid).each(function() {
 			$(this).prop('checked', checked);
 		});
 	}
@@ -187,9 +188,9 @@
 	function setupCohortGrid(grid, pagerId, cohortOp) {
 		$(function () {
 	    	$.getJSON("{% url 'cohort_sample_grid' op='config' cohort_id=cohort.pk %}", function(data) {
-				var postData = data["postData"] || {};
-				var extraFilters = {"cohort_op" : cohortOp};
-				postData["extra_filters"] = JSON.stringify(extraFilters);
+                const postData = data["postData"] || {};
+                const extraFilters = {"cohort_op": cohortOp};
+                postData["extra_filters"] = JSON.stringify(extraFilters);
 
 				data["postData"] = postData;
 				data['sortname'] = 'id';
@@ -225,22 +226,22 @@
 
 	function poll_cohort_task(data) {
 	    if ("status" in data) {
-	       var status = data["status"];
-	       if (status == "SUCCESS") {
+            const status = data["status"];
+            if (status == "SUCCESS") {
 	           cohortCountStatus = CC_STATUS_COMPLETE;
 	       } else {
 	           cohortCountStatus = CC_STATUS_FAILURE;
 	       }
 	       messageCheck();
 	    } else if ("celery_task" in data) {
-            var celery_task = data["celery_task"];
-    		cohortCountStatus = CC_STATUS_RUNNING;
+            const celery_task = data["celery_task"];
+            cohortCountStatus = CC_STATUS_RUNNING;
 		    messageCheck();
 		    poll_task_status(celery_task, count_complete, count_complete_failure);
 		}
 	}
 	
-	POLL_FREQUENCY = 1000;
+	const POLL_FREQUENCY = 1000;
 	
 	function poll_task_status(celery_task, success, failure) {
 		const POLL_URL = Urls.job_state(celery_task);
@@ -264,38 +265,40 @@
 
     function showDetailsTab() {
         $("#details-tab").show();
-        // $('#details').show();
         $("#cohort-tabs").tabs({"active" : 0});
     }
     
-
-{% endblock %}
-
-{% block jsdocumentready %}
+$(document).ready(function() {
 	jQuery.extend($.fn.fmatter , {
    		viewSampleLink : function(sampleId) {
-   			var attr = {'type' : 'checkbox', 'class': 'sample-checkbox', sample_id : sampleId};
-			var checkbox = $("<input/>", attr);
-			var checkbox_html = $('<div>').append(checkbox).html();
-			var url = Urls.view_sample(sampleId);
-			var sampleLink = "<a class='grid-link' href='" + url + "'><div class='grid-link-icon view-details-link'></div></a>";
-	    	return "<span>" + checkbox_html + " " + sampleLink + "</span>";
+            const attr = {'type': 'checkbox', 'class': 'sample-checkbox', sample_id: sampleId};
+            const checkbox = $("<input/>", attr);
+            const checkbox_html = $('<div>').append(checkbox).html();
+            const url = Urls.view_sample(sampleId);
+            const sampleLink = "<a class='grid-link' href='" + url + "'><div class='grid-link-icon view-details-link'></div></a>";
+            return "<span>" + checkbox_html + " " + sampleLink + "</span>";
 		}
 	});
 
     $("button#change-name").button();
 
-	$("#launch-cohort-count-task-button").button().click(function () {
-    	$.getJSON("{% url 'create_cohort_genotype' cohort.id %}", function(data) {
-			poll_cohort_task(data);
-    	});
+    let launchTaskButton = $("#launch-cohort-count-task-button");
+	launchTaskButton.click(function () {
+        launchTaskButton.attr('disabled', "disabled");
+        $.ajax({
+            type: "POST",
+            url: "{% url 'create_cohort_genotype' cohort.id %}",
+            success: function(data) {
+    			poll_cohort_task(data);
+            }
+        });
 	});
 
-	var grid = $("#left-grid");
-	setupCohortGrid(grid, '#left-pager', 'exclude_cohort');
+    let grid = $("#left-grid");
+    setupCohortGrid(grid, '#left-pager', 'exclude_cohort');
 
-	var grid = $("#right-grid");
-	setupCohortGrid(grid, '#right-pager', 'show_cohort');
+    grid = $("#right-grid");
+    setupCohortGrid(grid, '#right-pager', 'show_cohort');
 
 	$("#add-to-cohort-button").attr('href', "javascript:addToCohort()");
 	$("#remove-from-cohort-button").attr('href', "javascript:removeFromCohort()");
@@ -310,13 +313,13 @@
 		    count_complete_failure("Failed");
 		{% endif %}
 	{% elif cohort_genotype_collection.celery_task %}
-		var celery_task = "{{ cohort_genotype_collection.celery_task }}";
-		poll_cohort_task({"celery_task" : celery_task});
+        const celery_task = "{{ cohort_genotype_collection.celery_task }}";
+        poll_cohort_task({"celery_task" : celery_task});
 	{% endif %}
 	
    $('#id_sample', 'form#cohort-form').change(function() {
-        var sample_id = $(this).val();
-        if (sample_id) {
+       const sample_id = $(this).val();
+       if (sample_id) {
             editCohortSample('add', [sample_id.toString()]);
             clearAutocompleteChoice($(this));
         }
@@ -331,8 +334,8 @@
     hideDetailsTab();    
 {% endif %}
     
-
-
+})
+</script>
 {% endblock %}
 {% load help_tags %}
 {% block submenu_page_content %}
