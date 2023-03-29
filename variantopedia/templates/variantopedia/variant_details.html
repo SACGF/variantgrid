@@ -352,6 +352,7 @@ function variantDetailsShowTagAutocomplete() {
                     $('#variant-tags-datatable').DataTable().ajax.reload();
                 }
                 showTagButton.show();
+                $("#variant-tags-datatable-wrapper").show();
                 tagForm.hide();
             };
             let data = 'variant_id={{ variant.pk }}';
@@ -516,7 +517,9 @@ function applyVariantValues() {
     <div class="container mt-4">
         <h4>Tags</h4>
 
-        <table id="variant-tags-datatable" class="sticky-header" data-datatable-responsive="true" data-datatable-url="{% url 'variant_tags_datatable' variant.pk %}"></table>
+        <div id="variant-tags-datatable-wrapper" class="{% if not has_tags %}hidden{% endif %}">
+            <table id="variant-tags-datatable" class="sticky-header" data-datatable-responsive="true" data-datatable-url="{% url 'variant_tags_datatable' variant.pk %}"></table>
+        </div>
 
         {% if view_variant %}
         {% comment %} Disable creating tags when loading via analysis grid. {% endcomment %}
