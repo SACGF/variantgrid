@@ -145,7 +145,7 @@ class ImportedAlleleInfoColumns(DatatableConfig[ImportedAlleleInfo]):
     def get_initial_queryset(self) -> QuerySet[ImportedAlleleInfo]:
         ae: ImportedAlleleInfo = ImportedAlleleInfo.objects.first()
         return ImportedAlleleInfo.objects.all().annotate(
-            classification_count=Count('classification')
+            classification_count=Count('classification', filter=Q(classification__withdrawn=False))
         )
 
     def filter_queryset(self, qs: QuerySet[ImportedAlleleInfo]) -> QuerySet[ImportedAlleleInfo]:
@@ -241,6 +241,9 @@ def view_imported_allele_info_detail(request: HttpRequest, allele_info_id: int):
         if (c37c := c37.c_hgvs_obj) and (c38c := c38.c_hgvs_obj):
             liftover_diff = c37c.diff(c38c)
 
+    classifications = Classification.filter_for_user(user=request.user, queryset=allele_info.classification_set.filter(withdrawn=False))
+    classifications = sorted(classifications, key=lambda x: (x.lab, x.pk))
+
     return render_ajax_view(request, "classification/imported_allele_info_detail.html", {
         "allele_info": allele_info,
         "c_hgvses": diff_output,
@@ -248,7 +251,8 @@ def view_imported_allele_info_detail(request: HttpRequest, allele_info_id: int):
         "liftover_diff": chgvs_diff_description(liftover_diff) if liftover_diff else None,
         "variant_coordinate_label": f"Normalised Variant Coordinate ({allele_info.imported_genome_build_patch_version})",
         "validation_tags": allele_info.latest_validation.validation_tags_list if allele_info.latest_validation else None,
-        "on_allele_page": request.GET.get("on_allele_page") == "true"
+        "on_allele_page": request.GET.get("on_allele_page") == "true",
+        "classifications": sorted(allele_info.classification_set.filter(withdrawn=False).all(), key=lambda x: (x.lab, x.pk))
     }, menubar='classification')
 
 
