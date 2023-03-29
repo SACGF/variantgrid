@@ -310,16 +310,16 @@ class ImportedAlleleInfoDownload(ExportRow):
 
     @export_column(label="Classification Count")
     def classification_count(self):
-        return Classification.objects.filter(allele_info=self.allele_info).count()
+        return Classification.objects.filter(allele_info=self.allele_info, withdrawn=False).count()
 
     @export_column(label="Allele URL")
-    def classification_count(self):
+    def allele_url(self):
         if allele := self.allele_info.allele:
             return get_url_from_view_path(allele.get_absolute_url())
 
     @export_column(label="Involved Labs")
     def involved_labs(self):
-        return ", ".join([str(lab) for lab in sorted(Lab.objects.filter(pk__in=Classification.objects.filter(allele_info=self.allele_info).values_list('lab', flat=True)).select_related('organization'))])
+        return ", ".join([str(lab) for lab in sorted(Lab.objects.filter(pk__in=Classification.objects.filter(allele_info=self.allele_info, withdrawn=False).values_list('lab', flat=True)).select_related('organization'))])
 
 
 def download_allele_info(request: HttpRequest):
