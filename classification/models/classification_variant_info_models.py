@@ -508,6 +508,18 @@ class ImportedAlleleInfo(TimeStampedModel):
             return CHGVS(self.imported_c_hgvs)
 
     @property
+    def imported_g_hgvs_obj(self) -> Optional[CHGVS]:
+        if self.imported_g_hgvs:
+            return CHGVS(self.imported_g_hgvs)
+
+    def imported_hgvs_obj(self) -> Optional[CHGVS]:
+        if c_hgvs := self.imported_c_hgvs_obj:
+            return c_hgvs
+        if g_hgvs := self.imported_g_hgvs_obj:
+            return g_hgvs
+        return None
+
+    @property
     def get_transcript(self) -> str:
         if self.imported_transcript:
             return self.imported_transcript

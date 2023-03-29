@@ -209,15 +209,21 @@ def view_imported_allele_info_detail(request: HttpRequest, allele_info_id: int):
     HGVS_REGEX_DEL_INS = re.compile(HGVS_BASE_REGEX_STR + '(?P<c_nomen_pos>[0-9+_-]*?)(?P<del>del)(?P<ref>[ACTG]*)(?P<ins>ins)(?P<alt>[ACTG]*)$')
     HGVS_REGEX_SIMPLE_OP = re.compile(HGVS_BASE_REGEX_STR + '(?P<c_nomen_pos>[0-9+_-]*?)(?P<operation>dup|del|ins)(?P<alt>[ACTG]*)$')
 
-    use_regex = HGVS_REGEX_BASIC
-    regex_attempt_order = [HGVS_REGEX_REF_ALT, HGVS_REGEX_DEL_INS, HGVS_REGEX_SIMPLE_OP]
+    FALLBACK_HGVS = re.compile("(?P<all>.*)")
+
+    use_text = allele_info.imported_c_hgvs or (allele_info.grch37.c_hgvs if allele_info.grch37 else None) or (allele_info.grch38.c_hgvs if allele_info.grch38 else None)
+
+    use_regex = FALLBACK_HGVS
+    regex_attempt_order = [HGVS_REGEX_REF_ALT, HGVS_REGEX_DEL_INS, HGVS_REGEX_SIMPLE_OP, HGVS_REGEX_BASIC]
     for regex in regex_attempt_order:
-        if regex.match(allele_info.imported_c_hgvs):
+        if regex.match(use_text):
             use_regex = regex
             break
 
     multi_diff = MultiDiff(use_regex)
-    parts = [MultiDiffInput(f"Imported ({allele_info.imported_genome_build_patch_version})", allele_info.imported_c_hgvs)]
+    parts = []
+    if allele_info.imported_c_hgvs:
+        parts += [MultiDiffInput(f"Imported ({allele_info.imported_genome_build_patch_version})", allele_info.imported_c_hgvs)]
     if allele_info.imported_genome_build_patch_version.genome_build == GenomeBuild.grch37():
         parts += [
             MultiDiffInput("Normalised (GRCh37)", allele_info.grch37.c_hgvs if allele_info.grch37 else None, is_reference=True),
@@ -252,7 +258,7 @@ def view_imported_allele_info_detail(request: HttpRequest, allele_info_id: int):
         "variant_coordinate_label": f"Normalised Variant Coordinate ({allele_info.imported_genome_build_patch_version})",
         "validation_tags": allele_info.latest_validation.validation_tags_list if allele_info.latest_validation else None,
         "on_allele_page": request.GET.get("on_allele_page") == "true",
-        "classifications": sorted(allele_info.classification_set.filter(withdrawn=False).all(), key=lambda x: (x.lab, x.pk))
+        "classifications": classifications
     }, menubar='classification')
 
 
