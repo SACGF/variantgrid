@@ -35,6 +35,7 @@ class Command(BaseCommand):
         genome_build = GenomeBuild.get_name_or_alias(build_name)
         genome_fasta = GenomeFasta.get_for_genome_build(genome_build)
         chrom_to_contig_id = genome_build.get_chrom_contig_id_mappings()
+        contig_lengths = dict(genome_build.contigs.values_list("pk", "length"))
         contig_to_fasta_names = genome_fasta.get_contig_id_to_name_mappings()
 
         if vcf_filename == '-':
@@ -68,6 +69,17 @@ class Command(BaseCommand):
                 contig_id = chrom_to_contig_id.get(chrom)
                 fasta_chrom = None
                 if contig_id:
+                    valid_position = False
+                    try:
+                        position = int(columns[1])
+                        length = contig_lengths[contig_id]
+                        valid_position = 0 < position < length
+                    except ValueError:
+                        pass
+                    if not valid_position:
+                        skipped_records["position out of range"] += 1
+                        continue
+
                     fasta_chrom = contig_to_fasta_names.get(contig_id)
 
                 if not fasta_chrom:
