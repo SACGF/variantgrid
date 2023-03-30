@@ -1,0 +1,36 @@
+<script>
+    function removeTagCallback() {
+        // when you click the detail - it closes for some reason, so can't really update it.
+        // instead we'll just update the overall grid of counts
+        // $('#variant-tag-detail-datatable').DataTable().ajax.reload();
+        $('#variant-tags-datatable').DataTable().ajax.reload();
+    }
+
+    function removeTag(variant_tag_id) {
+        let data = 'variant_id={{ variant.pk }}';
+        data += '&tag_id={{ tag }}';
+        data += '&variant_tag_id=' + variant_tag_id;
+        data += '&op=' + 'del';
+        $.ajax({
+            type: "POST",
+            data: data,
+            url: Urls.set_variant_tag('V'),
+            success : removeTagCallback,
+        });
+    }
+
+    function tagDetailRenderer(data, type, row) {
+        let cellValue = null;
+        if (row.can_write) {
+            let deleteLink = $("<a/>").attr({
+                href: `javascript:removeTag(${row.id})`,
+            });
+            let button = $('<span style="display: inline-block;" class="click-to-delete-button" title="" data-original-title="Remove tag" data-p="1"></span>');
+            deleteLink.append(button);
+            cellValue = deleteLink.prop('outerHTML');
+        }
+        return cellValue;
+    }
+</script>
+
+<table id="variant-tag-detail-datatable" class="sticky-header" data-datatable-responsive="true" data-datatable-url="{% url 'variant_tag_detail_datatable' variant.pk tag %}"></table>

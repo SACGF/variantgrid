@@ -9,6 +9,11 @@
 {% render_tag_styles_and_formatter %}
 <script type="text/javascript">
 
+function viewTagDetail(tag) {
+    return Urls.variant_tag_detail({{ variant.pk }}, tag);
+}
+
+
 function analysisLinkRenderer(data, type, row) {
     if (row.analysis) {
         let analysisLink = $("<a />", {
@@ -518,7 +523,7 @@ function applyVariantValues() {
         <h4>Tags</h4>
 
         <div id="variant-tags-datatable-wrapper" class="{% if not has_tags %}hidden{% endif %}">
-            <table id="variant-tags-datatable" class="sticky-header" data-datatable-responsive="true" data-datatable-url="{% url 'variant_tags_datatable' variant.pk %}"></table>
+            <table id="variant-tags-datatable" class="sticky-header" data-datatable-responsive="true" data-datatable-url="{% url 'variant_tag_counts_datatable' variant.pk %}"></table>
         </div>
 
         {% if view_variant %}

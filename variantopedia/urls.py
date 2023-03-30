@@ -3,7 +3,7 @@ from snpdb.views.datatable_view import DatabaseTableView
 from variantgrid.perm_path import perm_path
 from variantopedia import views
 from variantopedia.grids import AllVariantsGrid, NearbyVariantsGrid, TaggedVariantGrid, \
-    VariantTagsGrid, VariantWikiColumns, VariantTagsColumns
+    VariantTagsGrid, VariantWikiColumns, VariantTagCountsColumns, VariantTagDetailColumns
 
 urlpatterns = [
     perm_path('variants', views.variants, name='variants'),
@@ -46,11 +46,16 @@ urlpatterns = [
     perm_path('variant_sample_information/<int:variant_id>/<genome_build_name>', views.variant_sample_information,
               name='variant_sample_information'),
 
+    perm_path('variant/<int:variant_id>/tag/<tag>/detail', views.variant_tag_detail, name='variant_tag_detail'),
+
     # Grids
     perm_path('wiki/datatable/', DatabaseTableView.as_view(column_class=VariantWikiColumns),
               name='variant_wiki_datatable'),
-    perm_path('variant/<int:variant_id>/tags/datatable/', DatabaseTableView.as_view(column_class=VariantTagsColumns),
-              name='variant_tags_datatable'),
+    perm_path('variant/<int:variant_id>/tag_counts/datatable/', DatabaseTableView.as_view(column_class=VariantTagCountsColumns),
+              name='variant_tag_counts_datatable'),
+    perm_path('variant/<int:variant_id>/tag/<tag>/datatable/',
+              DatabaseTableView.as_view(column_class=VariantTagDetailColumns),
+              name='variant_tag_detail_datatable'),
 
     perm_path('nearby/grid/<variant_id>/<genome_build_name>/<region_type>/<slug:op>/',
               JQGridView.as_view(grid=NearbyVariantsGrid, csv_download=True),

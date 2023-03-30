@@ -1,13 +1,15 @@
 import operator
 from functools import reduce
-from typing import Optional
+from typing import Optional, Dict, Any
 
 from django.conf import settings
-from django.db.models import TextField, Value, QuerySet, Q
+from django.db.models import TextField, Value, QuerySet, Q, Count, Max
 from django.http import HttpRequest
 from django.shortcuts import get_object_or_404
+from django.urls import reverse
 
 from analysis.models import VariantTag, Analysis
+from analysis.serializers import VariantTagSerializer
 from annotation.annotation_version_querysets import get_variant_queryset_for_latest_annotation_version, \
     get_variant_queryset_for_annotation_version
 from annotation.models import AnnotationVersion
@@ -242,16 +244,41 @@ class TaggedVariantGrid(AbstractVariantGrid):
         return VariantTag.variants_for_build_q(genome_build, tags_qs, self.tag_ids)
 
 
-class VariantTagsColumns(DatatableConfig[VariantTag]):
+class VariantTagCountsColumns(DatatableConfig[VariantTag]):
     """ This is for showing on the variant page """
     def __init__(self, request: HttpRequest):
         super().__init__(request)
-        self.download_csv_button_enabled = True
+        self.expand_client_renderer = DatatableConfig._row_expand_ajax('viewTagDetail', id_field="tag")
 
-        # self.expand_client_renderer = DatatableConfig._row_expand_ajax('eventlog_detail', expected_height=120)
         self.rich_columns = [
-            RichColumn('id', visible=False),
             RichColumn('tag', client_renderer='tagRenderer', orderable=True),
+            RichColumn('count', orderable=True),
+            RichColumn('last_created', client_renderer='TableFormat.timestamp', orderable=True,
+                       default_sort=SortOrder.DESC),
+            RichColumn('last_created', name='time_ago', client_renderer='TableFormat.timeAgo'),
+        ]
+
+    def _get_sort_tiebreaker(self) -> str:
+        return "tag"
+
+    def get_initial_queryset(self) -> QuerySet[VariantTag]:
+        variant_id = self.get_query_param('variant_id')
+        variant = Variant.objects.get(pk=variant_id)
+        # Not going to use anything build specific so don't care about build
+        genome_build = next(iter(variant.genome_builds))
+        qs = VariantTag.get_for_build(genome_build, variant_qs=variant.equivalent_variants)
+        qs = qs.values("tag").annotate(count=Count("id"), last_created=Max("created")).order_by("tag")
+        return qs
+
+
+class VariantTagDetailColumns(DatatableConfig[VariantTag]):
+    """ This is the detail expanded on variant tags page """
+    def __init__(self, request: HttpRequest):
+        super().__init__(request)
+
+        self.rich_columns = [
+            RichColumn('id', client_renderer='tagDetailRenderer'),
+            RichColumn('id', name='can_write', visible=False, renderer=self.can_write),
             RichColumn('analysis', client_renderer='analysisLinkRenderer'),
             RichColumn('user__username', name='user', orderable=True),
             RichColumn('created', client_renderer='TableFormat.timestamp', orderable=True,
@@ -259,9 +286,21 @@ class VariantTagsColumns(DatatableConfig[VariantTag]):
             RichColumn('created', name='time_ago', client_renderer='TableFormat.timeAgo'),
         ]
 
+    def can_write(self, row: Dict[str, Any]):
+        """ This is really inefficient as it instantiates an object per row that has already had values() called on
+            it. Perhaps it would be more efficient to be able to swap in a serializer to produce each row
+            however that takes a lot of messing around with DatabaseTableView/DatatableConfig """
+        variant_tag = VariantTag.objects.get(pk=row["id"])
+        return variant_tag.can_write(self.user)
+
     def get_initial_queryset(self) -> QuerySet[VariantTag]:
         variant_id = self.get_query_param('variant_id')
+        tag_name = self.get_query_param('tag')
+
         variant = Variant.objects.get(pk=variant_id)
+        tag = Tag.objects.get(pk=tag_name)
         # Not going to use anything build specific so don't care about build
         genome_build = next(iter(variant.genome_builds))
-        return VariantTag.get_for_build(genome_build, variant_qs=variant.equivalent_variants)
+        qs = VariantTag.get_for_build(genome_build, variant_qs=variant.equivalent_variants)
+        qs = qs.filter(tag=tag)
+        return qs

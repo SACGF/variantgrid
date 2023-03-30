@@ -40,7 +40,7 @@ from snpdb.forms import TagForm
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.liftover import create_liftover_pipelines
 from snpdb.models import Variant, Sample, VCF, get_igv_data, Allele, AlleleMergeLog, \
-    AlleleConversionTool, ImportSource, AlleleOrigin, VariantAlleleSource, VariantGridColumn
+    AlleleConversionTool, ImportSource, AlleleOrigin, VariantAlleleSource, VariantGridColumn, Tag
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_user_settings import UserSettings
 from snpdb.serializers import VariantAlleleSerializer
@@ -296,6 +296,18 @@ def database_statistics(request):
                "num_samples": num_samples,
                "variant_stats": variant_stats}
     return render(request, "variantopedia/database_statistics_detail.html", context)
+
+
+def variant_tag_detail(request, variant_id, tag):
+    """ Loaded via tags grid on variant page """
+
+    variant = Variant.objects.get(pk=variant_id)
+    tag = get_object_or_404(Tag, pk=tag)
+    context = {
+        "variant": variant,
+        "tag": tag,
+    }
+    return render(request, "variantopedia/variant_tag_detail.html", context)
 
 
 def view_variant(request, variant_id, genome_build_name=None):
