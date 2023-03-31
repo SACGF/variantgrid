@@ -166,8 +166,7 @@ class UploadPipeline(models.Model):
         self.progress_status = f"Error: {error_message}"
         self.save()
 
-        if vcf := self.vcf:
-            set_vcf_and_samples_import_status(vcf, ImportStatus.ERROR)
+        self._set_related_data_import_status(ImportStatus.ERROR)
 
         user = self.uploaded_file.user
         name = f"import_{self.file_type}_failed"
@@ -176,6 +175,17 @@ class UploadPipeline(models.Model):
         message = f"UploadPipeline {self.pk} failed. " \
             f"Filename: {self.get_file_type_display} Error: {error_message}"
         report_message(message, level='error')
+
+    def _set_related_data_import_status(self, import_status: ImportStatus):
+        if vcf := self.vcf:
+            set_vcf_and_samples_import_status(vcf, import_status)
+        elif self.uploaded_file.file_type == UploadedFileTypes.VCF_INSERT_VARIANTS_ONLY:
+            try:
+                mvec = self.uploaded_file.uploadedmanualvariantentrycollection.collection
+                mvec.import_status = import_status
+                mvec.save()
+            except ObjectDoesNotExist:
+                pass
 
     @property
     def vcf(self):
