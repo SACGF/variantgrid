@@ -750,6 +750,8 @@ def search_variant_match(m: Match, user: User, genome_build: GenomeBuild, varian
         if results.exists():
             return results
 
+        if errors := Variant.validate(genome_build, chrom, position):
+            raise ValueError(", ".join(errors))
         variant_string = Variant.format_tuple(chrom, position, ref, alt)
         search_message = f"The variant {variant_string} does not exist in the database"
         return [SearchResult(CreateManualVariant(genome_build, variant_string), message=search_message)]
