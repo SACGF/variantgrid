@@ -73,6 +73,8 @@
                 }
             });
         });
+{% else %}
+        picker.attr("disabled", "disabled");
 {% endif %}
 	});
 </script>
