@@ -61,8 +61,9 @@ def get_custom_column_fields_override_and_sample_position(custom_columns_collect
 
 
 def get_variantgrid_extra_annotate(user: User, exclude_analysis=None) -> Dict:
-    classification_qs = ClassificationModification.latest_for_user(user).filter(classification__allele__variantallele__variant_id=OuterRef("id"))
+    classification_qs = ClassificationModification.latest_for_user(user).filter(classification__allele__variantallele__variant_id=OuterRef("id")).order_by("pk")  # So comma sep fields line up
     internally_classified = classification_qs.annotate(cs=Coalesce("classification__clinical_significance", Value('U'))).values("classification__allele").annotate(cs_summary=StringAgg("cs", delimiter='|')).values_list("cs_summary")
+    internally_classified_labs = classification_qs.annotate(cln=Coalesce("classification__lab__name", Value(''))).values("classification__allele").annotate(c_lab=StringAgg("cln", delimiter='|')).values_list("c_lab")
     max_internal_classification = classification_qs.annotate(cs=Coalesce("classification__clinical_significance", Value('0'))).values("classification__allele").annotate(cs_max=Max("classification__clinical_significance")).values_list("cs_max")
 
     tags_qs = VariantTag.filter_for_user(user).filter(allele__variantallele__variant_id=OuterRef("id"))
@@ -72,6 +73,7 @@ def get_variantgrid_extra_annotate(user: User, exclude_analysis=None) -> Dict:
 
     return {
         "internally_classified": Subquery(internally_classified[:1]),
+        "internally_classified_labs": Subquery(internally_classified_labs[:1]),
         "max_internal_classification": Subquery(max_internal_classification[:1]),
         "tags_global": Subquery(tags_global[:1]),
     }
