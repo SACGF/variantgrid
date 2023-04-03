@@ -938,6 +938,10 @@ class TranscriptVersion(SortByPKMixin, models.Model):
     def _sum_intervals(intervals: List[Tuple]):
         return sum(b - a for a, b in intervals)
 
+    @property
+    def genome_build_data(self) -> Dict:
+        return self.data.get("genome_builds", {}).get(self.genome_build.name, {})
+
     @cached_property
     def pyhgvs_data(self):
         transcript_json = self.data.copy()
@@ -999,7 +1003,9 @@ class TranscriptVersion(SortByPKMixin, models.Model):
         """ 'tag' has been in cdot since 0.2.12 """
         REMOVE_TAGS = {"basic"}  # This is on pretty much every Ensembl transcript
         tag_list = []
-        if tag_list_str := self.data.get("tag"):
+        # 'tag' was in the transcript in versions 0.2.12 - 0.2.13
+        # It is inside genome build data after 0.2.14
+        if tag_list_str := self.genome_build_data.get("tag") or self.data.get("tag"):
             tag_list = sorted(tag for tag in tag_list_str.split(",") if tag not in REMOVE_TAGS)
         return tag_list
 
