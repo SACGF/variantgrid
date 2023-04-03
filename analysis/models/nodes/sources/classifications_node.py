@@ -1,11 +1,12 @@
-from typing import Optional
+from typing import Optional, List
 
 from django.db import models
-from django.db.models import Q
+from django.db.models import Q, CASCADE
 
 from analysis.models.nodes.analysis_node import AnalysisNode
 from classification.enums import ClinicalSignificance
 from classification.models.classification import Classification
+from snpdb.models import Lab
 
 
 class ClassificationsNode(AnalysisNode):
@@ -33,7 +34,11 @@ class ClassificationsNode(AnalysisNode):
         for field, cs in self.FIELD_CLINICAL_SIGNIFICANCE.items():
             if getattr(self, field):
                 cs_list.append(cs)
-        return Classification.get_variant_q(self.analysis.user, self.analysis.genome_build, cs_list)
+        lab_list = list(self.get_labs())
+        return Classification.get_variant_q(self.analysis.user, self.analysis.genome_build, cs_list, lab_list)
+
+    def get_labs(self):
+        return Lab.objects.filter(pk__in=self.classificationsnodelab_set.all().values_list("lab", flat=True))
 
     def get_node_name(self):
         return self.get_node_class_label()
@@ -59,4 +64,14 @@ class ClassificationsNode(AnalysisNode):
             method_summary += "Any classification"
         else:
             method_summary += ", ".join(fields)
+
+        if labs := self.get_labs():
+            method_summary += f". Restricted to labs: {','.join([l.name for l in labs])}"
+
         return method_summary
+
+
+class ClassificationsNodeLab(models.Model):
+    node = models.ForeignKey(ClassificationsNode, on_delete=CASCADE)
+    lab = models.ForeignKey(Lab, on_delete=CASCADE)
+

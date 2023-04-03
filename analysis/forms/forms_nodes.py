@@ -39,7 +39,7 @@ from library.utils import md5sum_str
 from ontology.models import OntologyTerm
 from patients.models_enums import GnomADPopulation
 from snpdb.forms import GenomeBuildAutocompleteForwardMixin
-from snpdb.models import GenomicInterval, ImportStatus, Sample, VCFFilter, Tag
+from snpdb.models import GenomicInterval, ImportStatus, Sample, VCFFilter, Tag, Lab
 
 # Can use this for ModelForm.exclude to only use node specific fields
 ANALYSIS_NODE_FIELDS = fields_for_model(AnalysisNode)
@@ -198,9 +198,26 @@ class BuiltInFilterNodeForm(BaseNodeForm):
 
 
 class ClassificationsNodeForm(BaseNodeForm):
+    lab = forms.ModelMultipleChoiceField(queryset=Lab.objects.all(),
+                                         required=False,
+                                         widget=ModelSelect2Multiple(url='lab_autocomplete',
+                                                                     attrs={'data-placeholder': 'Lab...'}))
+
     class Meta:
         model = ClassificationsNode
-        fields = ('other', 'benign', 'likely_benign', 'vus', 'likely_pathogenic', 'pathogenic')
+        fields = ('lab', 'other', 'benign', 'likely_benign', 'vus', 'likely_pathogenic', 'pathogenic')
+
+    def save(self, commit=True):
+        node = super().save(commit=False)
+
+        lab_set = node.classificationsnodelab_set
+        lab_set.all().delete()
+        for lab in self.cleaned_data["lab"]:
+            lab_set.create(lab=lab)
+
+        if commit:
+            node.save()
+        return node
 
 
 class CohortNodeForm(VCFSourceNodeForm):

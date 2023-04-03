@@ -36,6 +36,7 @@ from classification.models.classification import Classification
 from classification.views.classification_datatables import ClassificationColumns
 from library.django_utils import highest_pk
 from library.jqgrid.jqgrid import JqGrid
+from snpdb.models import Lab
 from snpdb.models.models_variant import Variant
 
 
@@ -93,6 +94,11 @@ class ClassificationsNodeView(NodeView):
                 plural = "s"
             context["out_of_date_message"] = f"{count} new classification{plural} since last save."
         return context
+
+    def _get_form_initial(self):
+        form_initial = super()._get_form_initial()
+        form_initial["lab"] = self.object.get_labs()
+        return form_initial
 
 
 class CohortNodeView(NodeView):

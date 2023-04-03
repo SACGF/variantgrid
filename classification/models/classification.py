@@ -2009,17 +2009,23 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         return match_gene | match_evidence
 
     @staticmethod
-    def get_classifications_qs(user: User, clinical_significance_list: Iterable[str] = None) -> QuerySet:
-        vcm_qs = ClassificationModification.latest_for_user(user, published=True)
+    def get_classifications_qs(user: User, clinical_significance_list: Iterable[str] = None,
+                               lab_list: Iterable[Lab] = None) -> QuerySet:
+        cm_qs = ClassificationModification.latest_for_user(user, published=True)
         if clinical_significance_list:
-            vcm_qs = vcm_qs.filter(clinical_significance__in=clinical_significance_list)
-        return Classification.objects.filter(pk__in=vcm_qs.values('classification'))
+            cm_qs = cm_qs.filter(clinical_significance__in=clinical_significance_list)
+        qs = Classification.objects.filter(pk__in=cm_qs.values('classification'))
+        if lab_list:
+            qs = qs.filter(lab__in=lab_list)
+        return qs
 
     @staticmethod
-    def get_variant_q(user: User, genome_build: GenomeBuild, clinical_significance_list: Iterable[str] = None) -> Q:
+    def get_variant_q(user: User, genome_build: GenomeBuild,
+                      clinical_significance_list: Iterable[str] = None,
+                      lab_list: Iterable[Lab] = None) -> Q:
         """ returns a Q object filtering variants to those with a PUBLISHED classification
             (optionally classification clinical significance in clinical_significance_list """
-        vc_qs = Classification.get_classifications_qs(user, clinical_significance_list)
+        vc_qs = Classification.get_classifications_qs(user, clinical_significance_list, lab_list)
         return Classification.get_variant_q_from_classification_qs(vc_qs, genome_build)
 
     @staticmethod
