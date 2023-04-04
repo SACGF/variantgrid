@@ -4,12 +4,13 @@ from typing import Dict
 from django.core.management import BaseCommand
 from django.db.models import Q
 
+from classification.management.commands.fix_migrate_flags_to_imported_allele_info import FlagDatabase
 from classification.models import Classification, ImportedAlleleInfo
 from classification.models.classification_variant_info_models import ResolvedVariantInfo
 from flags.models import FlagComment, FlagType
 from library.guardian_utils import admin_bot
 from library.utils import first
-from snpdb.models import GenomeBuild
+from snpdb.models import GenomeBuild, Allele
 
 
 class Command(BaseCommand):
@@ -183,107 +184,109 @@ class Command(BaseCommand):
             after = c_hgvs_validation(c)
             print(f"{c.id} from {before} to {after}")
 
+
     def handle_validation(self):
-        def get_flag_comments(flag_type: FlagType, resolution_id: str) -> Dict[int, FlagComment]:
-            flag_dict: Dict[int, FlagComment] = {}
-            manual_closed_flag_comments = FlagComment.objects.filter(
-                flag__flag_type=flag_type,
-                resolution__id=resolution_id).exclude(user=admin_bot()) \
-                .select_related('flag', 'flag__collection')
-            for flag_comment in manual_closed_flag_comments:
-                flag_collection = flag_comment.flag.collection
-                # have to make sure we don't have an open flag of the type, only closed
-                if not flag_collection.get_open_flag_of_type(
-                        flag_type=flag_type):
-                    flag_dict[flag_collection.pk] = flag_comment
-            return flag_dict
-
-        matching_variant_warning_flag_type = FlagType.objects.get(id='classification_matching_variant_warning')
-        classification_transcript_version_change_flag_type = FlagType.objects.get(id='classification_transcript_version_change')
-        flag_type_37_not_38 = FlagType.objects.get(pk='allele_37_not_38')
-
-        manually_closed_variant_warning = get_flag_comments(flag_type=matching_variant_warning_flag_type, resolution_id='vm_confirmed')
-        manually_closed_37_not_38 = get_flag_comments(flag_type=flag_type_37_not_38, resolution_id='closed')
-        manually_closed_transcript_ver_changed = get_flag_comments(flag_type=classification_transcript_version_change_flag_type, resolution_id='tv_accepted')
-
-        print(f"variant matching count = {len(manually_closed_variant_warning)}")
-        print(f"37 not 38 flag count = {len(manually_closed_37_not_38)}")
-
-        for i, allele_info in enumerate(ImportedAlleleInfo.objects.all()):
-            if i % 100 == 0:
-                print(f"Processed {i} allele infos")
-            allele_info.apply_validation(force_update=True)
-            allele_info.save()
-
-            if allele := allele_info.allele:
-                latest_validation = allele_info.latest_validation
-                if not latest_validation.include:
-
-                    has_normal_issues = False
-                    has_liftover_issues = False
-                    has_general_issues = False
-                    has_builds_issues = False
-
-                    if normalize_issues := latest_validation.validation_tags_typed.get("normalize"):
-                        has_normal_issues = [True for severity in normalize_issues.values() if severity == "E"]
-                    if liftover_issues := latest_validation.validation_tags_typed.get("liftover"):
-                        has_liftover_issues = [True for severity in liftover_issues.values() if severity == "E"]
-                    if general_issues := latest_validation.validation_tags_typed.get("general"):
-                        has_general_issues = [True for severity in general_issues.values() if severity == "E"]
-                    if build_issues := latest_validation.validation_tags_typed.get("builds"):
-                        has_builds_issues = [True for severity in build_issues.values() if severity == "E"]
-
-                    if not has_normal_issues and not has_liftover_issues and not has_general_issues and not has_builds_issues:
-                        print("Why was this excluded in the first place if no E?")
-                        print("Dev should investigate")
-                        print(latest_validation.validation_tags_typed)
-                        return
-
-                    comments = set()
-                    users = set()
-                    if allele_flag_pk := allele.flag_collection_id:
-                        if approved_flag := manually_closed_37_not_38.get(allele_flag_pk):
-                            has_liftover_issues = False
-                            if text := approved_flag.text:
-                                comments.add("37 != 38: " + text)
-                            users.add(approved_flag.user)
-
-                    classifications = Classification.objects.filter(allele_info=allele_info)
-                    for classification in classifications:
-                        if approved_flag := manually_closed_variant_warning.get(classification.flag_collection_id):
-                            has_normal_issues = False
-                            if text := approved_flag.text:
-                                comments.add("Variant Matching Warning: " + text)
-                            users.add(approved_flag.user)
-
-                    if not has_normal_issues and not has_liftover_issues and not has_general_issues and not has_builds_issues:
-                        latest_validation.include = True
-                        latest_validation.confirmed = True
-                        latest_validation.confirmed_by = first(users)
-                        latest_validation.confirmed_by_note = "\n".join(comments) if comments else ""
-                        latest_validation.save()
-                        print(f"Confirmed something to true on allele {allele}")
-
-                elif tags := latest_validation.validation_tags_list:
-                    transcript_ver_changes = [tag for tag in tags if tag.field == 'transcript_version_change']
-                    if transcript_ver_changes and len(transcript_ver_changes) == len(tags):
-                        classifications = Classification.objects.filter(allele_info=allele_info)
-                        was_confirmed = False
-                        comments = set()
-                        users = set()
-                        for classification in classifications:
-                            if approved_flag := manually_closed_transcript_ver_changed.get(classification.flag_collection_id):
-                                was_confirmed = True
-                                if text := approved_flag.text:
-                                    comments.add("Transcript Version Change: " + text)
-                                users.add(approved_flag.user)
-
-                        if was_confirmed:
-                            print("Confirmed transcript version change")
-                            latest_validation.confirmed = True
-                            latest_validation.confirmed_by = first(users)
-                            latest_validation.confirmed_by_note = "\n".join(comments) if comments else ""
-                            latest_validation.save()
+        FlagDatabase.run()
+        # def get_flag_comments(flag_type: FlagType, resolution_id: str) -> Dict[int, FlagComment]:
+        #     flag_dict: Dict[int, FlagComment] = {}
+        #     manual_closed_flag_comments = FlagComment.objects.filter(
+        #         flag__flag_type=flag_type,
+        #         resolution__id=resolution_id).exclude(user=admin_bot()) \
+        #         .select_related('flag', 'flag__collection')
+        #     for flag_comment in manual_closed_flag_comments:
+        #         flag_collection = flag_comment.flag.collection
+        #         # have to make sure we don't have an open flag of the type, only closed
+        #         if not flag_collection.get_open_flag_of_type(
+        #                 flag_type=flag_type):
+        #             flag_dict[flag_collection.pk] = flag_comment
+        #     return flag_dict
+        #
+        # matching_variant_warning_flag_type = FlagType.objects.get(id='classification_matching_variant_warning')
+        # classification_transcript_version_change_flag_type = FlagType.objects.get(id='classification_transcript_version_change')
+        # flag_type_37_not_38 = FlagType.objects.get(pk='allele_37_not_38')
+        #
+        # manually_closed_variant_warning = get_flag_comments(flag_type=matching_variant_warning_flag_type, resolution_id='vm_confirmed')
+        # manually_closed_37_not_38 = get_flag_comments(flag_type=flag_type_37_not_38, resolution_id='closed')
+        # manually_closed_transcript_ver_changed = get_flag_comments(flag_type=classification_transcript_version_change_flag_type, resolution_id='tv_accepted')
+        #
+        # print(f"variant matching count = {len(manually_closed_variant_warning)}")
+        # print(f"37 not 38 flag count = {len(manually_closed_37_not_38)}")
+        #
+        # for i, allele_info in enumerate(ImportedAlleleInfo.objects.all()):
+        #     if i % 100 == 0:
+        #         print(f"Processed {i} allele infos")
+        #     allele_info.apply_validation(force_update=True)
+        #     allele_info.save()
+        #
+        #     if allele := allele_info.allele:
+        #         latest_validation = allele_info.latest_validation
+        #         if not latest_validation.include:
+        #
+        #             has_normal_issues = False
+        #             has_liftover_issues = False
+        #             has_general_issues = False
+        #             has_builds_issues = False
+        #
+        #             if normalize_issues := latest_validation.validation_tags_typed.get("normalize"):
+        #                 has_normal_issues = [True for severity in normalize_issues.values() if severity == "E"]
+        #             if liftover_issues := latest_validation.validation_tags_typed.get("liftover"):
+        #                 has_liftover_issues = [True for severity in liftover_issues.values() if severity == "E"]
+        #             if general_issues := latest_validation.validation_tags_typed.get("general"):
+        #                 has_general_issues = [True for severity in general_issues.values() if severity == "E"]
+        #             if build_issues := latest_validation.validation_tags_typed.get("builds"):
+        #                 has_builds_issues = [True for severity in build_issues.values() if severity == "E"]
+        #
+        #             if not has_normal_issues and not has_liftover_issues and not has_general_issues and not has_builds_issues:
+        #                 print("Why was this excluded in the first place if no E?")
+        #                 print("Dev should investigate")
+        #                 print(latest_validation.validation_tags_typed)
+        #                 return
+        #
+        #             comments = set()
+        #             users = set()
+        #             if allele_flag_pk := allele.flag_collection_id:
+        #                 if approved_flag := manually_closed_37_not_38.get(allele_flag_pk):
+        #                     has_liftover_issues = False
+        #                     if text := approved_flag.text:
+        #                         comments.add("37 != 38: " + text)
+        #                     users.add(approved_flag.user)
+        #
+        #             classifications = Classification.objects.filter(allele_info=allele_info)
+        #             for classification in classifications:
+        #                 if approved_flag := manually_closed_variant_warning.get(classification.flag_collection_id):
+        #                     has_normal_issues = False
+        #                     if text := approved_flag.text:
+        #                         comments.add("Variant Matching Warning: " + text)
+        #                     users.add(approved_flag.user)
+        #
+        #             if not has_normal_issues and not has_liftover_issues and not has_general_issues and not has_builds_issues:
+        #                 latest_validation.include = True
+        #                 latest_validation.confirmed = True
+        #                 latest_validation.confirmed_by = first(users)
+        #                 latest_validation.confirmed_by_note = "\n".join(comments) if comments else ""
+        #                 latest_validation.save()
+        #                 print(f"Confirmed something to true on allele {allele}")
+        #
+        #         elif tags := latest_validation.validation_tags_list:
+        #             transcript_ver_changes = [tag for tag in tags if tag.field == 'transcript_version_change']
+        #             if transcript_ver_changes and len(transcript_ver_changes) == len(tags):
+        #                 classifications = Classification.objects.filter(allele_info=allele_info)
+        #                 was_confirmed = False
+        #                 comments = set()
+        #                 users = set()
+        #                 for classification in classifications:
+        #                     if approved_flag := manually_closed_transcript_ver_changed.get(classification.flag_collection_id):
+        #                         was_confirmed = True
+        #                         if text := approved_flag.text:
+        #                             comments.add("Transcript Version Change: " + text)
+        #                         users.add(approved_flag.user)
+        #
+        #                 if was_confirmed:
+        #                     print("Confirmed transcript version change")
+        #                     latest_validation.confirmed = True
+        #                     latest_validation.confirmed_by = first(users)
+        #                     latest_validation.confirmed_by_note = "\n".join(comments) if comments else ""
+        #                     latest_validation.save()
 
     @staticmethod
     def handle_fix_non_coding():

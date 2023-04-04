@@ -355,6 +355,10 @@ class ImportedAlleleInfo(TimeStampedModel):
     The genome build used to import
     Should this be the raw 
     """
+    @property
+    def imported_genome_build(self) -> Optional[GenomeBuild]:
+        if patch_version := self.imported_genome_build_patch_version:
+            return patch_version.genome_build
 
     variant_coordinate = TextField(null=True, blank=True)
 
