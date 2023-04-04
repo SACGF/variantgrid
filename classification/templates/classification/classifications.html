@@ -91,7 +91,7 @@
 
     function classificationFilter(data, type) {
         data.gene_symbol = blankToNull($('#id_gene_symbol').val());
-        data.lab = blankToNull($('#id_lab').val().join(','));
+        data.lab = blankToNull($('#id_lab').val());
         data.user = blankToNull($('#id_user').val());
         data.allele_origin = blankToNull($('#id_allele_origin').val());
         data.id_filter = blankToNull($('#id_filter').val());
