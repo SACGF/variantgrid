@@ -149,7 +149,8 @@ class FlagDatabase:
                 allele_identifier = AlleleIdentifier(imported_allele_info.allele_id, identifier=CHGVSIdentifier(c_hgvs=c_hgvs, genome_build=imported_allele_info.imported_genome_build))
 
                 if matches := self.all_flag_data_for_c_hgvs(allele_identifier):
-                    all_comments = list(itertools.chain(*match.comments for match in matches))
+                    comment_arrays = [match.comments for match in matches]
+                    all_comments = list(itertools.chain(*comment_arrays))
                     all_closed_flags = set()
                     all_closed_flags.update(match.manually_closed_flags for match in matches)
 
