@@ -174,7 +174,7 @@ class ClinvarExportPrepare:
             'classification__allele_info__allele',
             'classification__lab',
             'classification__lab__clinvar_key'
-        ).order_by('classification__allele_id', 'classification__lab__clinvar_key_id')
+        ).order_by('classification__allele_id', 'classification__lab__clinvar_key_id').iterator(chunk_size=1000)
 
         combined_log = []
 
@@ -189,8 +189,8 @@ class ClinvarExportPrepare:
         # loop through ClinVarAlleles for clinvar key that we didn't find by looking at all the non-withdrawn classifications for that lab
         # i.e. these will be the alleles that
         for clinvar_key in clinvar_keys:
-            for allele_id in ClinVarAllele.objects.filter(clinvar_key=clinvar_key).exclude(allele__in=clinvar_key_to_processed_alleles.get(clinvar_key, [])).values_list('allele', flat=True):
-                allele = Allele.objects.get(pk=allele_id)
+            for cva in ClinVarAllele.objects.filter(clinvar_key=clinvar_key).exclude(allele__in=clinvar_key_to_processed_alleles.get(clinvar_key, [])).select_related('allele').iterator():
+                allele = cva.allele
                 combined_log += ClinvarExportPrepare.process_allele(clinvar_key=clinvar_key, allele=allele, modifications=[])
 
         completed_date = timezone.now()
