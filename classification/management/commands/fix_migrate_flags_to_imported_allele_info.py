@@ -91,8 +91,8 @@ class FlagDatabase:
         flag_collection_to_allele_identifier = dict()
 
         # map classification flags to identifiers
-        for classification_data in Classification.objects.iterator().values_list('flag_collection__id', 'allele_id',
-                                                                                 'evidence__c_hgvs__value', 'evidence__genome_build__value'):
+        for classification_data in Classification.objects.values_list('flag_collection__id', 'allele_id',
+                                                                                 'evidence__c_hgvs__value', 'evidence__genome_build__value').iterator():
             flag_collection_id, allele_id, c_hgvs, genome_build_str = classification_data
             genome_build: Optional[GenomeBuild] = None
             if genome_build_str:
@@ -101,12 +101,11 @@ class FlagDatabase:
                 except GenomeBuild.DoesNotExist:
                     pass
 
-            flag_collection_to_allele_identifier[flag_collection_id] = AlleleIdentifier(allele_id=allele_id,
-                                                                                        genome_build=genome_build,
-                                                                                        c_hgvs=c_hgvs)
+            if genome_build:
+                flag_collection_to_allele_identifier[flag_collection_id] = AlleleIdentifier(allele_id=allele_id, identifier=CHGVSIdentifier(genome_build=genome_build, imported_c_hgvs=c_hgvs))
 
         # map allele flags to identifiers
-        for allele_data in Allele.objects.iterator().values_list('flag_collection__id', 'pk'):
+        for allele_data in Allele.objects.filter(flag_collection__id__isnull=False).values_list('flag_collection__id', 'pk').iterator():
             flag_collection_id, allele_id = allele_data
             flag_collection_to_allele_identifier[flag_collection_id] = AlleleIdentifier(allele_id=allele_id)
 
@@ -143,21 +142,21 @@ class FlagDatabase:
         if not self.allele_to_flags:
             print("No relevant flags detected, nothing to do")
 
-        for imported_allele_info in ImportedAlleleInfo.objects.iterator().select_related('latest_validation', 'imported_genome_build'):
+        for imported_allele_info in ImportedAlleleInfo.objects.select_related('latest_validation', 'imported_genome_build_patch_version__genome_build').iterator():
             latest_validation = imported_allele_info.latest_validation
             if c_hgvs := imported_allele_info.imported_c_hgvs:
-                allele_identifier = AlleleIdentifier(imported_allele_info.allele_id, identifier=CHGVSIdentifier(c_hgvs=c_hgvs, genome_build=imported_allele_info.imported_genome_build))
+                allele_identifier = AlleleIdentifier(imported_allele_info.allele_id, identifier=CHGVSIdentifier(imported_c_hgvs=c_hgvs, genome_build=imported_allele_info.imported_genome_build))
 
                 if matches := self.all_flag_data_for_c_hgvs(allele_identifier):
                     comment_arrays = [match.comments for match in matches]
                     all_comments = list(itertools.chain(*comment_arrays))
                     all_closed_flags = set()
-                    all_closed_flags.update(match.manually_closed_flags for match in matches)
+                    all_closed_flags.update(*(match.manually_closed_flags for match in matches))
 
                     all_comments = list(sorted(all_comments, key=lambda c: c.created))
 
                     def convert_flag_comment(comment: FlagComment) -> str:
-                        return f"({comment.created} - {comment.flag.flag_type.label}) @ {comment.flag.user} - {comment.text}"
+                        return f"({comment.created:%Y-%m-%d %H:%M} - {comment.flag.flag_type.label} @ {comment.user}) - {comment.text}"
 
                     comment_line = "\n\n".join(convert_flag_comment(comment) for comment in all_comments)
 
