@@ -48,10 +48,13 @@
     {% labelled label="Can Include in Exports" %}{{ allele_info.latest_validation.include | boolean }} {% admin_link allele_info %}{% endlabelled %}
     {% if allele_info.latest_validation.confirmed %}
         {% labelled label="Manually Confirmed" %}{{ True | boolean }} by {{ allele_info.latest_validation.confirmed_by }}{% endlabelled %}
-        {% labelled label="Confirmed Note" %}{{ allele_info.latest_validation.confirmed_by_note | multi_line_text }}{% endlabelled %}
     {% else %}
         {% labelled label="Manually Confirmed" %}{{ False | boolean }}{% endlabelled %}
     {% endif %}
+    {% if allele_info.latest_validation.confirmed or allele_info.latest_validation.confirmed_by_note %}
+        {% labelled label="Confirmed Note" %}{{ allele_info.latest_validation.confirmed_by_note | multi_line_text }}{% endlabelled %}
+    {% endif %}
+
     {% if allele_info.message %}
         {% labelled label="Note" %}{{ allele_info.message }}{% endlabelled %}
     {% endif %}
