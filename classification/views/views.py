@@ -145,17 +145,12 @@ def classifications(request):
     for ft in flag_types:
         flag_type_json.append({'id': ft.pk, 'label': ft.label, 'description': ft.description})
 
-    if settings.VARIANT_CLASSIFICATION_GRID_MULTI_LAB_FILTER:
-        lab_form = LabMultiSelectForm()
-    else:
-        lab_form = LabSelectForm()
-
     context = {
         "can_create_classification": Classification.can_create_via_web_form(request.user),
         "flag_types": flag_type_json,
         "gene_form": GeneSymbolForm(),
         "user_form": UserSelectForm(),
-        "lab_form": lab_form,
+        "lab_form": LabSelectForm(),
         "allele_origin_form": ClassificationAlleleOriginForm(),
         "labs": Lab.valid_labs_qs(request.user),
         "search_and_classify_form": search_and_classify_form,

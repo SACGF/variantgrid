@@ -89,18 +89,9 @@
         setAutocompleteValue('#id_user', '{{ user.id }}', '{{ user.username }}');
     }
 
-    function getLabValue() {
-        // Lab select can use settings to be normal autocomplete (string) or multi-select autocomplete (array)
-        let labVal = $('#id_lab').val();
-        if (Array.isArray(labVal)) {
-            labVal = labVal.join(',');
-        }
-        return labVal;
-    }
-
     function classificationFilter(data, type) {
         data.gene_symbol = blankToNull($('#id_gene_symbol').val());
-        data.lab = blankToNull(getLabValue());
+        data.lab = blankToNull($('#id_lab').val());
         data.user = blankToNull($('#id_user').val());
         data.allele_origin = blankToNull($('#id_allele_origin').val());
         data.id_filter = blankToNull($('#id_filter').val());

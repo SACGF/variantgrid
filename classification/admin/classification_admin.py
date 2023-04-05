@@ -320,7 +320,7 @@ class ClassificationAdmin(ModelAdminBasics):
         for vc in queryset:
             if vc.has_errors():
                 in_error += 1
-            if vc.share_level_enum >= share_level and not vc.has_outstanding_changes():
+            elif vc.share_level_enum >= share_level and not vc.has_outstanding_changes():
                 already_published += 1
             else:
                 try:

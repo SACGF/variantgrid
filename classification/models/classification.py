@@ -25,6 +25,7 @@ from django.dispatch.dispatcher import receiver
 from django.urls.base import reverse
 from django_extensions.db.models import TimeStampedModel
 from guardian.shortcuts import assign_perm, get_objects_for_user
+from pandas.io.html import _remove_whitespace
 
 from annotation.models.models import AnnotationVersion, VariantAnnotationVersion, VariantAnnotation
 from annotation.regexes import db_ref_regexes, DbRegexes
@@ -632,7 +633,10 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
 
     @property
     def imported_c_hgvs(self):
-        return self.get(SpecialEKeys.C_HGVS)
+        if c_hgvs := self.get(SpecialEKeys.C_HGVS):
+            # remove any white space inside the c.HGVS
+            c_hgvs = re.sub(r'\s+', '', c_hgvs)
+            return c_hgvs
 
     @property
     def imported_g_hgvs(self):

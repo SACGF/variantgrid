@@ -13,9 +13,10 @@
     {% endfor %}
     {% endcomment %}
     {% if allele_info.imported_g_hgvs %}
-        {% labelled label="Imported g.HGVS" value_css="text-monospace"  %}{{ allele_info.imported_g_hgvs }}{% endlabelled %}
+        {% labelled label=g_hgvs_label value_css="text-monospace"  %}{{ allele_info.imported_g_hgvs }}{% endlabelled %}
+    {% else %}
+        {% labelled label=c_hgvses.0.identifier value_css="text-monospace" %}{{ c_hgvses.0.html }}{% endlabelled %}
     {% endif %}
-    {% labelled label=c_hgvses.0.identifier value_css="text-monospace" %}{{ c_hgvses.0.html }}{% endlabelled %}
     {% if normalized_diff %}
         {% labelled label="Normalised Diffs" label_css="text-muted" value_css="text-muted" %}<i class="fa-solid fa-arrows-up-down"></i> {{ normalized_diff|separator:', ' }}{% endlabelled %}
     {% endif %}
@@ -47,10 +48,13 @@
     {% labelled label="Can Include in Exports" %}{{ allele_info.latest_validation.include | boolean }} {% admin_link allele_info %}{% endlabelled %}
     {% if allele_info.latest_validation.confirmed %}
         {% labelled label="Manually Confirmed" %}{{ True | boolean }} by {{ allele_info.latest_validation.confirmed_by }}{% endlabelled %}
-        {% labelled label="Confirmed Note" %}{{ allele_info.latest_validation.confirmed_by_note | multi_line_text }}{% endlabelled %}
     {% else %}
         {% labelled label="Manually Confirmed" %}{{ False | boolean }}{% endlabelled %}
     {% endif %}
+    {% if allele_info.latest_validation.confirmed or allele_info.latest_validation.confirmed_by_note %}
+        {% labelled label="Confirmed Note" %}{{ allele_info.latest_validation.confirmed_by_note | multi_line_text }}{% endlabelled %}
+    {% endif %}
+
     {% if allele_info.message %}
         {% labelled label="Note" %}{{ allele_info.message }}{% endlabelled %}
     {% endif %}

@@ -236,6 +236,8 @@ def view_imported_allele_info_detail(request: HttpRequest, allele_info_id: int):
         ]
 
     diff_output = multi_diff.diffs(parts)
+    if not allele_info.imported_c_hgvs:
+        diff_output = [None] + diff_output
 
     normalized_diff: Optional[CHGVSDiff] = None
     liftover_diff: Optional[CHGVSDiff] = None
@@ -252,6 +254,7 @@ def view_imported_allele_info_detail(request: HttpRequest, allele_info_id: int):
 
     return render_ajax_view(request, "classification/imported_allele_info_detail.html", {
         "allele_info": allele_info,
+        "g_hgvs_label": f"Imported g.HGVS ({allele_info.imported_genome_build_patch_version})",
         "c_hgvses": diff_output,
         "normalized_diff": chgvs_diff_description(normalized_diff) if normalized_diff else None,
         "liftover_diff": chgvs_diff_description(liftover_diff) if liftover_diff else None,
@@ -307,16 +310,16 @@ class ImportedAlleleInfoDownload(ExportRow):
 
     @export_column(label="Classification Count")
     def classification_count(self):
-        return Classification.objects.filter(allele_info=self.allele_info).count()
+        return Classification.objects.filter(allele_info=self.allele_info, withdrawn=False).count()
 
     @export_column(label="Allele URL")
-    def classification_count(self):
+    def allele_url(self):
         if allele := self.allele_info.allele:
             return get_url_from_view_path(allele.get_absolute_url())
 
     @export_column(label="Involved Labs")
     def involved_labs(self):
-        return ", ".join([str(lab) for lab in sorted(Lab.objects.filter(pk__in=Classification.objects.filter(allele_info=self.allele_info).values_list('lab', flat=True)).select_related('organization'))])
+        return ", ".join([str(lab) for lab in sorted(Lab.objects.filter(pk__in=Classification.objects.filter(allele_info=self.allele_info, withdrawn=False).values_list('lab', flat=True)).select_related('organization'))])
 
 
 def download_allele_info(request: HttpRequest):

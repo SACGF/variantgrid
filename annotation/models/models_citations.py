@@ -215,7 +215,7 @@ class CitationIdNormalized:
         else:
             raise ValueError(f"Unexpected citation source {self.source}")
 
-    CITATION_SPLIT_RE = re.compile(r"(?P<prefix>[a-z ]+)\s*(?P<semicolon>:)?\s*(?P<number_prefix>[a-z]+)?(?P<number>[0-9]+)", re.IGNORECASE)
+    CITATION_SPLIT_RE = re.compile(r"^(?P<prefix>[a-z ]+)\s*(?P<semicolon>:)?\s*(?P<number_prefix>[a-z]+)?(?P<number>[0-9]+)$", re.IGNORECASE)
     """
     Used to split citation strings into parts, e.g. PMCID: PMC32432232 prefix=PMCID, semicolon=: number_prefix=PMC, number=32432232
     """
