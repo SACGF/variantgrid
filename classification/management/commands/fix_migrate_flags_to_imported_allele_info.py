@@ -127,7 +127,7 @@ class FlagDatabase:
             flag__flag_type__in={matching_variant_warning_flag_type, classification_transcript_version_change_flag_type}
         ).exclude(user=admin_bot()).order_by('-created'):
             if allele_identifier := self.flag_collection_to_identifier.get(comment.flag.collection_id):
-                self.flag_data_for_identifier(allele_identifier).comments.append(comment)
+                self.flag_data_for_identifier(allele_identifier).add_comment(comment)
 
         # allele flags
         for comment in FlagComment.objects.select_related('flag').filter(
@@ -136,7 +136,7 @@ class FlagDatabase:
             if flag_data := comment.flag.data:
                 if transcript := flag_data.get('transcript'):
                     if allele_identifier := self.flag_collection_to_identifier.get(comment.flag.collection_id):
-                        self.flag_data_for_identifier(allele_identifier.with_transcript(transcript)).comments.append(comment)
+                        self.flag_data_for_identifier(allele_identifier.with_transcript(transcript)).add_comment(comment)
 
     def apply_to_imported_allele_infos(self):
         if not self.allele_to_flags:
@@ -170,7 +170,7 @@ class FlagDatabase:
                         elif tag.severity == "E":
                             outstanding_issues.add("OTHER_ERROR_CANT_CONFIRM")
 
-                    if outstanding_issues.issubset(all_closed_flags):
+                    if latest_validation.validation_tags_list and outstanding_issues.issubset(all_closed_flags):
                         latest_validation.confirmed = True
                         latest_validation.confirmed_by = all_comments[0].user
 
