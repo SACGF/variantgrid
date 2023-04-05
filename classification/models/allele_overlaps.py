@@ -228,10 +228,10 @@ class ClinicalGroupingOverlap:
 
 class AlleleOverlap(OverlapState):
     """
-    Details of all overlaps for clnical groupings within an allele.
+    Details of all overlaps for clinical groupings within an allele.
     Most of the important details are kept in ClinicalGroupingOverlap, but we like to order things in Allele
     so report the most extreme details from the clinical groupings.
-    (In most cases Clincal Groupigns are just going to be the default, and unshared)
+    (In most cases Clincal Groupings are just going to be the default, and unshared)
     """
 
     def __init__(self, calculator_state: OverlapsCalculatorState, allele: Allele):
@@ -275,6 +275,7 @@ class AlleleOverlap(OverlapState):
     def clinical_groupings(self) -> List[ClinicalGroupingOverlap]:
         return sorted(self.context_map.values())
 
+    @property
     def c_hgvses(self) -> List[CHGVS]:
         return sorted(self._c_hgvses)
 
