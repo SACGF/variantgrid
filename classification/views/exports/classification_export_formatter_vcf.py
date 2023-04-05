@@ -162,7 +162,7 @@ class ClassificationExportFormatterVCF(ClassificationExportFormatter):
                 cs = record.get(SpecialEKeys.CLINICAL_SIGNIFICANCE, None)
                 if cs:
                     cs_counts[cs] = cs_counts.get(cs, 0) + 1
-                c_hgvs = record.classification.allele_info[data.source.genome_build].c_hgvs_full or ''
+                c_hgvs = record.classification.allele_info[data.source.genome_build].c_hgvs or ''
 
                 c_hgvses.append(c_hgvs)
                 discordances.append('1' if self.classification_filter.is_discordant(record) else '0')
