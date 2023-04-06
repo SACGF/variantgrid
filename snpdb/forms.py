@@ -1,4 +1,6 @@
 import collections
+from dataclasses import dataclass
+from functools import cached_property
 
 from crispy_forms.bootstrap import FieldWithButtons
 from crispy_forms.layout import Layout, Submit, Field
@@ -14,6 +16,7 @@ from guardian.shortcuts import assign_perm, remove_perm
 
 from annotation.models import ManualVariantEntry
 from annotation.models.models_enums import ManualVariantEntryType
+from library.cache import timed_cache
 from library.django_utils.autocomplete_utils import ModelSelect2, ModelSelect2Multiple
 from library.forms import ROFormMixin
 from library.guardian_utils import DjangoPermission
@@ -366,6 +369,36 @@ class BlankNullBooleanSelect(NullBooleanSelect):
         self.choices[0] = (tup[0], "-")
 
 
+class SettingsFormFeatures:
+    """
+    Calculates which features (as relevant to the settings override forms) are enabled.
+    Probably should be its own independent named class as the fact that the features are referenced
+    on the settings form are second to if they're enabled features or not.
+    Alternatively could just get an instance of SettingsOverrideForm to see if igv_links_enabled but that seems like overkill
+    """
+
+    @cached_property
+    def analysis_enabled(self) -> bool:
+        return get_visible_url_names().get("analysis")
+
+    @cached_property
+    def upload_enabled(self) -> bool:
+        return self.analysis_enabled and get_visible_url_names().get("upload")
+
+    @cached_property
+    def igv_links_enabled(self) -> bool:
+        return any((self.analysis_enabled, settings.VARIANT_DETAILS_SHOW_ANNOTATION, settings.VARIANT_DETAILS_SHOW_SAMPLES))
+
+    @cached_property
+    def discordance_enabled(self) -> bool:
+        return settings.DISCORDANCE_ENABLED
+
+
+@timed_cache()
+def get_settings_form_features() -> SettingsFormFeatures:
+    return SettingsFormFeatures()
+
+
 class SettingsOverrideForm(BaseModelForm):
     """ Warning: This hides some fields (in _hide_unused_fields) so not all fields from model will exist """
     class Meta:
@@ -403,22 +436,17 @@ class SettingsOverrideForm(BaseModelForm):
         self._hide_unused_fields()
 
     def _hide_unused_fields(self):
-        visible_url_names = get_visible_url_names()
-        analysis_enabled = visible_url_names.get("analysis")
-        upload_enabled = visible_url_names.get("upload") and analysis_enabled
-        igv_links_enabled = any((analysis_enabled,
-                                 settings.VARIANT_DETAILS_SHOW_ANNOTATION,
-                                 settings.VARIANT_DETAILS_SHOW_SAMPLES))
+        settings_config = get_settings_form_features()
         field_visibility = {
             # "email_weekly_updates": settings.DISCORDANCE_ENABLED, # this is also used for release note updates
-            "email_discordance_updates": settings.DISCORDANCE_ENABLED,
-            "columns": analysis_enabled,
-            "default_sort_by_column": analysis_enabled,
-            "variant_link_in_analysis_opens_new_tab": analysis_enabled,
-            "tool_tips": analysis_enabled,
-            "node_debug_tab": analysis_enabled,
-            "import_messages": upload_enabled,
-            "igv_port": igv_links_enabled,
+            "email_discordance_updates": settings_config.discordance_enabled,
+            "columns": settings_config.analysis_enabled,
+            "default_sort_by_column": settings_config.analysis_enabled,
+            "variant_link_in_analysis_opens_new_tab": settings_config.analysis_enabled,
+            "tool_tips": settings_config.analysis_enabled,
+            "node_debug_tab": settings_config.analysis_enabled,
+            "import_messages": settings_config.upload_enabled,
+            "igv_port": settings_config.igv_links_enabled,
         }
 
         for f, visible in field_visibility.items():

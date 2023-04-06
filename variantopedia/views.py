@@ -36,7 +36,7 @@ from patients.models import ExternalPK, Clinician
 from seqauto.models import VCFFromSequencingRun, get_20x_gene_coverage
 from seqauto.seqauto_stats import get_sample_enrichment_kits_df
 from snpdb.clingen_allele import link_allele_to_existing_variants
-from snpdb.forms import TagForm
+from snpdb.forms import TagForm, get_settings_form_features
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.liftover import create_liftover_pipelines
 from snpdb.models import Variant, Sample, VCF, get_igv_data, Allele, AlleleMergeLog, \
@@ -599,6 +599,7 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
         "show_samples": settings.VARIANT_DETAILS_SHOW_SAMPLES,
         "tag_form": TagForm(),
         "tool_tips": user_settings.tool_tips,
+        "igv_links_enabled": get_settings_form_features().igv_links_enabled,
         "variant": variant,
         "variant_allele": variant_allele_data,
         "variant_annotation": variant_annotation,

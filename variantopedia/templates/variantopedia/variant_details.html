@@ -302,6 +302,7 @@ function populateVariantAllele(data) {
     }
 
     $("#variant_coordinate").text(data.link_data.variant_string);
+    data.link_data.igv_links_enabled = {{ igv_links_enabled | jsonify }};
     if (data.link_data.variant_string !== data.link_data.variant_coordinate) {
         const link = $("<a />").text("show all bases").attr({
             id: "show-variant-coordinate-link",
