@@ -1949,10 +1949,9 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         visible_evidence = {}
         for k, v in evidence.items():
             if k in visible_keys:
-                value = v
-            else:
-                value = {'value': "(hidden)", 'hidden': True}
-            visible_evidence[k] = value
+                visible_evidence[k] = v
+            elif 'value' in v or 'explain' in v or 'note' in v:
+                visible_evidence[k] = {'value': "(hidden)", 'hidden': True}
         return visible_evidence
 
     def get_allele_info_dict(self) -> Optional[Dict[str, Any]]:
