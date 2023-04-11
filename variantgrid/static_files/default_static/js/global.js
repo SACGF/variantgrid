@@ -30,8 +30,8 @@ function tweakAjax() {
     });
 
     $(document).ajaxError(function(event, jqxhr, settings, thrownError) {
-        console.log(settings);
         if (settings.suppressErrors) {
+            console.log("suppressErrors = True")
             return;
         }
         // only relevant when using ODIC https://mozilla-django-oidc.readthedocs.io/en/stable/xhr.html
@@ -42,13 +42,17 @@ function tweakAjax() {
                 location.reload();
             //}
         }
-        console.log("Ajax error");
+        console.log(`Ajax error: ${thrownError}`);
         console.log(event);
         console.log(jqxhr);
+
         // messagePoller.stop_polling();
         // $.blockUI({ message: $('#ajax-error') });
     });
 }
+
+let globalPreviewCache = {};
+let globalPreviewableDbs = new Set(["OMIM", "MONDO", "HPO", "PMID", "PMC", "PUBMED", "NCBIBOOKSHELF"]);
 
 function enhanceAndMonitor() {
     let popoverOpts = {
@@ -349,6 +353,59 @@ function enhanceAndMonitor() {
         {test: '[data-citation-id]',
             func: (node) => {
                 CitationsManager.defaultManager.populate(node);
+            }
+        },
+
+        {test: '[data-preview-db]',
+            // When provided with a preview
+            func: (node) => {
+                let $node = $(node);
+                let db = node.attr('data-preview-db').toUpperCase();
+                let idx = node.attr('data-preview-id');
+                let combinedId = `${db}:${idx}`;
+
+                function previewPromise(request_db, request_idx) {
+                    return new Promise((resolve, reject) => {
+                        $.ajax({
+                            type: "GET",
+                            url: Urls.preview_data(db, idx),
+                            // url: `/snpdb/preview/${request_db}/${request_idx}`,
+                            async: true,
+                            success: (results, textStatus, jqXHR) => {
+                                resolve(results);
+                            },
+                            error: (call, status, text) => {
+                                reject([call, status, text]);
+                            }
+                        });
+                    });
+                }
+
+                let existingPromise = globalPreviewCache[combinedId];
+                if (!existingPromise) {
+                    if (globalPreviewableDbs.has(db)) {
+                        existingPromise = previewPromise(db, idx);
+                    } else {
+                        //   console.log(`Unsupported DB for fetching: ${db}`);
+                        existingPromise = Promise.resolve({"found": false});
+                    }
+                    globalPreviewCache[combinedId] = existingPromise;
+                }
+
+                existingPromise.then((data) => {
+                    let refSummary = $node.children('.ref-summary');
+                    if (data.found === false) {
+                        refSummary.text('');
+                    } else {
+                        refSummary.text(data.title);
+                        refSummary.addClass('hover-detail');
+                        refSummary.addClass('text-secondary');
+                    }
+                    if (data.summary) {
+                        $node.tooltip({html:true, trigger : 'hover', title: data.summary});
+                        $node.click(function(e) {$(this).tooltip('hide');});
+                    }
+                });
             }
         }
 

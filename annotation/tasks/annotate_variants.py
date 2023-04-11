@@ -9,7 +9,7 @@ from django.utils import timezone
 from annotation.annotation_version_querysets import get_unannotated_variants_qs
 from annotation.models import AnnotationStatus, GenomeBuild
 from annotation.models.models import AnnotationRun, InvalidAnnotationVersionError
-from annotation.signals.signals import annotation_run_complete_signal
+from annotation.signals.manual_signals import annotation_run_complete_signal
 from annotation.vcf_files.import_vcf_annotations import import_vcf_annotations
 from annotation.vep_annotation import get_vep_command
 from eventlog.models import create_event

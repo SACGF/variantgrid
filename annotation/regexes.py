@@ -95,16 +95,10 @@ class DbRefRegexResult:
         self.cregx = cregx
         self.idx = cregx.fix_id(idx)
         self.match = match
-        self.internal_id = None
-        self.summary = None
 
         # this is where we check our database to see if we know what this reference is about
         if self.db in OntologyService.LOCAL_ONTOLOGY_PREFIXES:
             term_id = f"{self.db}:{self.idx}"
-            if term := OntologyTerm.objects.filter(id=term_id).first():
-                self.summary = term.name
-                if not term.is_valid_for_condition:
-                    self.summary += " (obsolete or not phenotype)"
 
         # no longer pre-emptively load citation, save that for rendering
         # but normalise the ID
@@ -143,12 +137,7 @@ class DbRefRegexResult:
         return self.cregx.db
 
     def to_json(self):
-        jsonny = {'id': f'{self.db}: {self.idx}', 'db': self.db, 'idx': self.idx, 'url': self.url}
-        if self.summary:
-            jsonny['summary'] = self.summary
-        if self.internal_id:
-            jsonny['internal_id'] = self.internal_id
-        return jsonny
+        return {'id': f'{self.db}: {self.idx}', 'db': self.db, 'idx': self.idx, 'url': self.url}
 
     def __str__(self):
         return f'{self.cregx.db}:{self.idx}'

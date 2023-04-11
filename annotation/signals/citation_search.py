@@ -14,7 +14,7 @@ class SearchResponseCitation(SearchResponseRecordAbstract[CitationSource]):
 
 
 @receiver(search_signal, sender=SearchInput)
-def search_citations(sender: Any, search_input: SearchInput, **kwargs) -> SearchResponse:
+def citation_search(sender: Any, search_input: SearchInput, **kwargs) -> SearchResponse:
     response: SearchResponse[Citation] = SearchResponse(SearchResponseCitation)
 
     try:
