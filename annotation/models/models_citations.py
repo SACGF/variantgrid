@@ -237,7 +237,6 @@ class CitationIdNormalized:
         index = str(index)
         use_source = CitationSource.from_legacy_code(source)
         if not use_source:
-            print(f"Unexpected source {source}")
             raise ValueError(f"Unexpected source for Citation ID {source}")
 
         if match := CitationIdNormalized.NUMER_STRIP_RE.match(index):
