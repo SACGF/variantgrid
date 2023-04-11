@@ -53,14 +53,22 @@ class CHGVSFlagData:
     def __init__(self, identifier: CHGVSIdentifier):
         self.identifier = identifier
 
+        self.open_flags: Set[str] = set()
         self.manually_closed_flags: Set[str] = set()
         self.comments: List[FlagComment] = []
 
     def add_comment(self, flag_comment: FlagComment):
-        self.comments.append(flag_comment)
-        if flag_comment.flag.resolution.status == FlagStatus.CLOSED:
-            flag_type = flag_comment.flag.flag_type.pk
-            self.manually_closed_flags.add(flag_type)
+        flag_type = flag_comment.flag.flag_type.pk
+        if not flag_comment.user == admin_bot():
+            self.comments.append(flag_comment)
+            if flag_comment.flag.resolution.status == FlagStatus.CLOSED:
+                self.manually_closed_flags.add(flag_type)
+        if flag_comment.flag.resolution.status == FlagStatus.OPEN:
+            self.open_flags.add(flag_type)
+
+    @property
+    def closed_flags(self) -> Set[str]:
+        return self.manually_closed_flags - self.open_flags
 
 
 class AlleleData:
@@ -125,14 +133,14 @@ class FlagDatabase:
         # classification flags - comments
         for comment in FlagComment.objects.select_related('flag').filter(
             flag__flag_type__in={matching_variant_warning_flag_type, classification_transcript_version_change_flag_type}
-        ).exclude(user=admin_bot()).order_by('-created'):
+        ).order_by('-created'):
             if allele_identifier := self.flag_collection_to_identifier.get(comment.flag.collection_id):
                 self.flag_data_for_identifier(allele_identifier).add_comment(comment)
 
         # allele flags
         for comment in FlagComment.objects.select_related('flag').filter(
             flag__flag_type__in={flag_type_37_not_38}
-        ).exclude(user=admin_bot()).order_by('-created'):
+        ).order_by('-created'):
             if flag_data := comment.flag.data:
                 if transcript := flag_data.get('transcript'):
                     if allele_identifier := self.flag_collection_to_identifier.get(comment.flag.collection_id):
@@ -151,7 +159,7 @@ class FlagDatabase:
                     comment_arrays = [match.comments for match in matches]
                     all_comments = list(itertools.chain(*comment_arrays))
                     all_closed_flags = set()
-                    all_closed_flags.update(*(match.manually_closed_flags for match in matches))
+                    all_closed_flags.update(*(match.closed_flags for match in matches))
 
                     all_comments = list(sorted(all_comments, key=lambda c: c.created))
 
@@ -173,6 +181,10 @@ class FlagDatabase:
                     if latest_validation.validation_tags_list and outstanding_issues.issubset(all_closed_flags):
                         latest_validation.confirmed = True
                         latest_validation.confirmed_by = all_comments[0].user
+                    else:
+                        # undo previous times where it was set
+                        latest_validation.confirmed = None
+                        latest_validation.confirmed_by = None
 
                     latest_validation.save()
 
