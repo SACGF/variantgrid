@@ -66,6 +66,21 @@ class ClinVarExport(TimeStampedModel):
     submission_grouping_validated = models.JSONField(null=False, blank=False, default=dict)
     submission_body_validated = models.JSONField(null=False, blank=False, default=dict)
 
+    def refresh_condition_resolution_details(self) -> bool:
+        """
+        If the condition sort text / display text has gotten out of date (as the term has updated itself) this will
+        update the record
+        :return: True if a change was detected and saved, False if no change was detected
+        """
+        if cond_obj := self.condition_resolved:
+            cond_json = cond_obj.to_json()
+            if self.condition != cond_json:
+                self.condition = cond_json
+                invalidate_cached_property(self, '_condition_resolved')
+                self.save()
+                return True
+        return False
+
     @property
     def all_errors(self) -> JsonMessages:
         return self.submission_grouping.all_messages.errors() + \
