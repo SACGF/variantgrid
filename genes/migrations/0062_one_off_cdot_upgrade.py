@@ -2,20 +2,6 @@
 
 from django.db import migrations
 
-from manual.operations.manual_operations import ManualOperation
-
-
-def _test_old_cdot(apps):
-    TranscriptVersion = apps.get_model("genes", "TranscriptVersion")
-
-    if not TranscriptVersion.objects.exists():
-        return False  # No transcripts, new install
-
-    if cdot_transcript := TranscriptVersion.objects.filter(data__cdot__isnull=False).first():
-        cdot_version = tuple(int(i) for i in cdot_transcript.data["cdot"].split("."))
-        return cdot_version < (0, 2, 12)  # This is release with MANE/RefSeq etc. tags
-    return True  # ancient version of transcript annotations (no cdot version entry)
-
 
 class Migration(migrations.Migration):
 
@@ -24,10 +10,5 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        ManualOperation.operation_other(args=["Update cdot - import_gene_annotation with cdot transcript DATA >= 0.2.12"
-                                              " You can do this by running: "
-                                              "./annotation/annotation_data/cdot_update.sh or manually, see"
-                                              "https://github.com/SACGF/cdot/wiki/Download-JSON.gz-files"
-                                              "Any cdot 0.2.X code is ok"],
-                                        test=_test_old_cdot),
+        # Left blank - replaced by genes 0068
     ]
