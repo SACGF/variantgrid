@@ -168,7 +168,7 @@ class Citation(TimeStampedModel):
         if self.source == CitationSource.PUBMED:
             return f"https://www.ncbi.nlm.nih.gov/pubmed/{self.index}"
         elif self.source == CitationSource.PUBMED_CENTRAL:
-            return f"https://www.ncbi.nlm.nih.gov/pmc/?term={self.index}"
+            return f"https://www.ncbi.nlm.nih.gov/pmc/articles/{self.index}"
         else:
             return f"https://www.ncbi.nlm.nih.gov/books/{self.index}"
 
