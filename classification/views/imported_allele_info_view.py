@@ -307,7 +307,7 @@ class ImportedAlleleInfoDownload(ExportRow):
 
     @export_column(label="c.HGVS (38) sort")
     def c_hgvs_38_sort(self):
-        if c38 := self.allele_info[GenomeBuild.grch37()]:
+        if c38 := self.allele_info[GenomeBuild.grch38()]:
             return c38.genomic_sort
 
     @export_column(label="Included")
