@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from django.core.management import BaseCommand
 
 from annotation.models import Citation, CitationFetchRequest
