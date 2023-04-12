@@ -179,14 +179,21 @@ class FlagDatabase:
                             outstanding_issues.add("OTHER_ERROR_CANT_CONFIRM")
 
                     if latest_validation.validation_tags_list and outstanding_issues.issubset(all_closed_flags):
+                        latest_validation.include = True
                         latest_validation.confirmed = True
                         latest_validation.confirmed_by = all_comments[0].user
+                        latest_validation.save()
                     else:
                         # undo previous times where it was set
-                        latest_validation.confirmed = None
-                        latest_validation.confirmed_by = None
+                        was_confirmed = latest_validation.confirmed
 
-                    latest_validation.save()
+                        latest_validation.confirmed = False
+                        latest_validation.confirmed_by = None
+                        latest_validation.save()
+                        if was_confirmed:
+                            print(f"Unconfirmed AlleleInfo {imported_allele_info.pk}")
+                            imported_allele_info.apply_validation(force_update=True)
+                            imported_allele_info.save()
 
     @staticmethod
     def run():
