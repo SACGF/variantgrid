@@ -48,8 +48,9 @@ T = TypeVar("T")
 
 class SearchResponseRecordAbstract(ABC, Generic[T]):
 
-    def __init__(self, record: T):
+    def __init__(self, record: T, search_input: Optional[SearchInput] = None):
         self.record = record
+        self.search_input = search_input
 
     @classmethod
     def search_type(cls) -> str:
@@ -84,10 +85,11 @@ class SearchResponseRecordAbstract(ABC, Generic[T]):
 
 class SearchResponse(Generic[T]):
 
-    def __init__(self, response_type: Type[SearchResponseRecordAbstract]):
+    def __init__(self, response_type: Type[SearchResponseRecordAbstract], search_input: Optional[SearchInput] = None):
         self.response_type = response_type
         self.results: List[SearchResponseRecordAbstract] = []
         self.valid_search = False
+        self.search_input = search_input
 
     @property
     def search_type(self):
@@ -95,8 +97,8 @@ class SearchResponse(Generic[T]):
 
     def add(self, record: Union[T, SearchResponseRecordAbstract]):
         if not isinstance(record, SearchResponseRecordAbstract):
-            record = self.response_type(record)
-        self.results.append(self.response_type(record=record))
+            record = self.response_type(record, search_input=self.search_input)
+        self.results.append(record)
 
     def extend(self, iterable: Iterable[T]):
         for r in iterable:

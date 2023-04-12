@@ -262,6 +262,10 @@ class CitationIdNormalized:
         citation_id = citation_id.strip().upper()
         if parts := CitationIdNormalized.CITATION_SPLIT_RE.match(citation_id):
             prefix = parts.group('prefix')
+            if number_prefix := parts.group('number_prefix'):
+                if number_prefix == "PMC":
+                    prefix = CitationSource.PUBMED_CENTRAL
+
             number = parts.group('number')
 
             return CitationIdNormalized.from_parts(prefix, number)
