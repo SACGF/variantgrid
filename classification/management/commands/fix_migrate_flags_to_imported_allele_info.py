@@ -162,6 +162,8 @@ class FlagDatabase:
                     all_closed_flags.update(*(match.closed_flags for match in matches))
 
                     all_comments = list(sorted(all_comments, key=lambda c: c.created))
+                    if not all_comments:
+                        continue
 
                     def convert_flag_comment(comment: FlagComment) -> str:
                         return f"({comment.created:%Y-%m-%d %H:%M} - {comment.flag.flag_type.label} @ {comment.user}) - {comment.text}"
