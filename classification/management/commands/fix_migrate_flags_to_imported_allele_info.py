@@ -185,17 +185,6 @@ class FlagDatabase:
                         latest_validation.confirmed = True
                         latest_validation.confirmed_by = all_comments[0].user
                         latest_validation.save()
-                    else:
-                        # undo previous times where it was set
-                        was_confirmed = latest_validation.confirmed
-
-                        latest_validation.confirmed = False
-                        latest_validation.confirmed_by = None
-                        latest_validation.save()
-                        if was_confirmed:
-                            print(f"Unconfirmed AlleleInfo {imported_allele_info.pk}")
-                            imported_allele_info.apply_validation(force_update=True)
-                            imported_allele_info.save()
 
     @staticmethod
     def run():
