@@ -28,14 +28,15 @@ Going via CitationFetchRequest should generally be the only way you interact wit
 """
 
 
-DATE_PUBLISHED_RE = re.compile("^([0-9]+).*?$")
+DATE_PUBLISHED_RE = re.compile(".*?([0-9]{4}).*?")
 
 
 def get_year_from_date(date_published: str) -> str:
     if not date_published:
         return ""
     year = ""
-    if year_match := DATE_PUBLISHED_RE.fullmatch(date_published):
+    # sometimes year is "winter 2019", we just care about the 2019 part
+    if year_match := DATE_PUBLISHED_RE.match(date_published):
         year = year_match.group(1)
     return year
 
@@ -543,7 +544,7 @@ class CitationFetchRequest:
                 if existing := citations_by_id.get(fetch.normalised_id.full_id):
                     fetch.citation = existing
                     # Special case of having JSON populated but not the appropriate fields
-                    # This will be the case if teh citation was migrated
+                    # This will be the case if the citation was migrated
                     if existing.data_json and not existing.last_loaded:
                         if existing.source in {CitationSource.PUBMED, CitationSource.PUBMED_CENTRAL}:
                             CitationFetchRequest._populate_from_entrez(existing, existing.data_json)
