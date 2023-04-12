@@ -2,14 +2,6 @@
 
 from django.db import migrations
 
-from manual.operations.manual_operations import ManualOperation
-
-
-def _test_has_nr_transcripts(apps):
-    """ Only give this warning for existing installations that have NR transcripts """
-    Transcript = apps.get_model("genes", "Transcript")
-    return Transcript.objects.filter(identifier__startswith='NR_').exists()
-
 
 class Migration(migrations.Migration):
 
@@ -18,7 +10,5 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        ManualOperation.operation_other(args=[
-            "Update pyHGVS library - sudo python3 -m pip install --force --upgrade git+https://github.com/SACGF/hgvs#egg=pyhgvs"],
-                                        test=_test_has_nr_transcripts),
+        # This has been left blank - we have a later test for required PyHGVS versions
     ]
