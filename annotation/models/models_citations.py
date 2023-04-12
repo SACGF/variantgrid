@@ -643,7 +643,9 @@ class CitationFetchRequest:
 
         # TODO could we just store published date and extract year?
         citation.year = get_year_from_date(record.get("DP"))
-        if authors_list := record.get("FAU"):
+
+        # CN is corporate "Corporate Authors", fall back on that if no FAU
+        if authors_list := record.get("FAU") or record.get("CN"):
             first_author = authors_list[0]
             first_author_last = first_author.split(",")[0]
             citation.authors_short = first_author_last

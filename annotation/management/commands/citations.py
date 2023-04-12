@@ -1,7 +1,5 @@
 from datetime import timedelta
-
 from django.core.management import BaseCommand
-
 from annotation.models import Citation, CitationFetchRequest
 from annotation.models.models_citations import CitationSource
 from library.utils import batch_iterator
@@ -37,11 +35,26 @@ class Command(BaseCommand):
                     if pmc_id != citation.index:
                         bad_citations.append(citation)
                         print(f"{citation} has data from wrong id {pmc_id}")
+                    elif not citation.authors and citation.data_json.get("CN"):
+                        bad_citations.append(citation)
+                        print(f"{citation} didn't have an author but did have corporate authors")
+                    elif not citation.year and citation.data_json.get("DP"):
+                        bad_citations.append(citation)
+                        year = citation.data_json.get("DP")
+                        print(f"{citation} didn't have year - maybe it can be parsed from {year}")
+
                 elif citation.source == CitationSource.PUBMED:
                     pmid = citation.data_json.get("PMID")
                     if pmid != citation.index:
                         bad_citations.append(citation)
                         print(f"{citation} has data from wrong id {pmid}")
+                    elif not citation.authors and citation.data_json.get("CN"):
+                        bad_citations.append(citation)
+                        print(f"{citation} didn't have an author but did have corporate authors")
+                    elif not citation.year and citation.data_json.get("DP"):
+                        bad_citations.append(citation)
+                        year = citation.data_json.get("DP")
+                        print(f"{citation} didn't have year - maybe it can be parsed from {year}")
 
             for citation in bad_citations:
                 citation.data_json = None
