@@ -81,7 +81,7 @@ def parse_words(text_phenotype, input_words_and_spans, phenotype_matcher) -> Lis
 
 
 def split_adj_noun_and_noun(words, tags, spans):
-    """ This is used to transform eg "long fingers and toes" into "long fingers and long toes"
+    """ This is used to transform e.g. "long fingers and toes" into "long fingers and long toes"
         I looked and this pattern doesn't appear in HPO terms so is ok to split up """
 
     new_words_and_spans = []

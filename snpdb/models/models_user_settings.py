@@ -111,7 +111,7 @@ class TagColor(TimeStampedModel):
 
 
 class UserPageAck(TimeStampedModel):
-    """ Used for eg I've read the notices on this page """
+    """ Used for e.g. I've read the notices on this page """
     user = models.ForeignKey(User, on_delete=CASCADE)
     page_id = models.TextField()
 

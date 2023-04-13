@@ -157,7 +157,7 @@ class PathologyTestGeneModificationRequest(TimeStampedModel):
 
 
 class RelatedGeneLists(models.ForeignKey):
-    """ A way to link eg competitor tests to yours """
+    """ A way to link e.g. competitor tests to yours """
     pathology_test = models.ForeignKey(PathologyTest, on_delete=CASCADE)
     gene_list = models.ForeignKey(GeneList, on_delete=CASCADE)
     comments = models.TextField(blank=True)
@@ -255,7 +255,7 @@ class PathologyTestOrderPopulation(models.Model):
 
 
 def get_external_order_system_last_checked():
-    # TODO: Make this more general - eg register somewhere in settings?
+    # TODO: Make this more general - e.g. register somewhere in settings?
     try:
         from sapath.models.sapath_helix import HelixNGSOrdersImport
         return HelixNGSOrdersImport.get_last_checked()

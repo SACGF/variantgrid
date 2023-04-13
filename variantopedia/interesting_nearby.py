@@ -211,7 +211,7 @@ def get_transcripts_and_codons(variant: Variant):
     transcript_codons = {}
     transcript_qs = variant.varianttranscriptannotation_set.filter(exon__isnull=False, hgvs_c__isnull=False)
     for t, hgvs_c in transcript_qs.values_list("transcript_id", "hgvs_c"):
-        if m := re.match(r".*(:c\.\d+)", hgvs_c):  # Pulls out eg ":c.1057"
+        if m := re.match(r".*(:c\.\d+)", hgvs_c):  # Pulls out e.g. ":c.1057"
             codon = m.group(1)
             transcript_codons[t] = codon
     return transcript_codons

@@ -90,7 +90,7 @@ class NodeGridConfig(NodeJSONGetView):
 
 
 def format_items_iterator(analysis, sample_ids, items):
-    """ A few things are done in JS formatters, eg changing -1 to missing values (? in grid) and tags
+    """ A few things are done in JS formatters, e.g. changing -1 to missing values (? in grid) and tags
         We can't just add tags via node queryset (in monkey patch func above) as we'll get an issue with
         tacked on zygosity columns etc not being in GROUP BY or aggregate func. So, just patch items via iterator """
 

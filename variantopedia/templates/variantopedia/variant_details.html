@@ -6,6 +6,14 @@
 {% load ui_help %}
 {% load settings_tags %}
 {% load user_tag_color_tags %}
+{% load settings_tags %}
+
+{% settings_value 'ANNOTATION_PUBMED_SEARCH_TERMS_ENABLED' as annotation_pubmed_search_terms_enabled %}
+{% settings_value 'VARIANT_DETAILS_SHOW_ANNOTATION' as show_annotation %}
+{% settings_value 'VARIANT_DETAILS_SHOW_GENE_COVERAGE' as show_gene_coverage %}
+{% settings_value 'VARIANT_DETAILS_SHOW_SAMPLES' as show_samples %}
+{% settings_value 'VARIANT_SHOW_CANONICAL_HGVS' as variant_show_canonical_hgvs %}
+
 {% render_tag_styles_and_formatter %}
 <script type="text/javascript">
 
@@ -835,7 +843,7 @@ function applyVariantValues() {
                                 {% endif %}
                             {% endwith %}
                         {% endlabelled %}
-                        {% if ANNOTATION_PUBMED_SEARCH_TERMS_ENABLED %}
+                        {% if annotation_pubmed_search_terms_enabled %}
                             {% labelled id='pubmed_search_terms' label='PubMed Search' hint="tiny" %}
                                 {% with pubmed_search_term=variant_annotation.get_pubmed_search_terms %}
                                     {% if pubmed_search_term %}

@@ -1001,8 +1001,8 @@ class HGVSMatcher:
         cleaned_hgvs = clean_string(hgvs_string)  # remove non-printable characters
         cleaned_hgvs = cleaned_hgvs.replace(" ", "")  # No whitespace in HGVS
         cleaned_hgvs = cleaned_hgvs.replace("::", ":")  # Fix double colon
-        # Lowercase mutation types, eg NM_032638:c.1126_1133DUP - won't matter if also changes gene name as that's
-        # case insensitive
+        # Lowercase mutation types, e.g. NM_032638:c.1126_1133DUP - won't matter if also changes gene name as that's
+        # case-insensitive
         MUTATION_TYPES = ["ins", "del", "dup", "inv"]  # Will also handle delins and del...ins
         for mt in MUTATION_TYPES:
             cleaned_hgvs = cleaned_hgvs.replace(mt.upper(), mt)

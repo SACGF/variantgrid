@@ -179,7 +179,7 @@ VARIANTGRID_APP_DIR = os.path.join(BASE_DIR, "variantgrid")
 
 ### annotation
 
-# GeneAnnotation is only in analyses, as an optimisation to stpre eg per-gene ontology records.
+# GeneAnnotation is only in analyses, as an optimisation to stpre e.g. per-gene ontology records.
 ANNOTATION_GENE_ANNOTATION_VERSION_ENABLED = True
 
 VG_REFERENCE_DIR = os.path.join(VARIANTGRID_APP_DIR, "data", "reference")
@@ -347,7 +347,7 @@ CLINGEN_ALLELE_REGISTRY_PASSWORD = get_secret("CLINGEN_ALLELE_REGISTRY.password"
 CLINGEN_ALLELE_REGISTRY_MAX_MANUAL_REQUESTS = 10_000  # On nodes and VCFs
 CLINGEN_ALLELE_REGISTRY_REQUIRE_REF_ALLELE = True
 
-NO_DNA_CONTROL_REGEX = "(^|[^a-zA-Z])NDC([^a-zA-Z]|$)"  # No DNA Control - eg _NDC_ or -NDC_
+NO_DNA_CONTROL_REGEX = "(^|[^a-zA-Z])NDC([^a-zA-Z]|$)"  # No DNA Control - e.g. _NDC_ or -NDC_
 
 VCF_DOWNLOAD_ADMIN_ONLY = False
 VCF_IMPORT_DELETE_TEMP_FILES_ON_SUCCESS = not DEBUG
@@ -475,7 +475,7 @@ VARIANT_CLASSIFICATION_STATS_USE_SHARED = False  # False=Use visible to user. Tr
 VARIANT_CLASSIFICATION_GRID_SHOW_PHGVS = True
 VARIANT_CLASSIFICATION_GRID_SHOW_SAMPLE = True
 VARIANT_CLASSIFICATION_GRID_MULTI_LAB_FILTER = True
-VARIANT_CLASSIFICAITON_SHOW_SPECIMEN_ID = True
+VARIANT_CLASSIFICATION_SHOW_SPECIMEN_ID = True
 VARIANT_CLASSIFICATION_NEW_GROUPING = False
 
 # Require people to click "my sample's not here" (ie encourage them to find it)
@@ -666,7 +666,7 @@ IMPORT_TASK_FACTORY_IMPORTS = (
     'upload.import_task_factories.import_task_factories',
 )
 
-# To be able to automatically do things after VCF import - eg damage counts
+# To be able to automatically do things after VCF import - e.g. damage counts
 FINISH_IMPORT_VCF_STEP_TASKS_CLASSES = []
 
 # Turn ON in production!
@@ -893,10 +893,10 @@ SOMALIER = {
 
 # @see https://github.com/SACGF/variantgrid/wiki/URL---Menu-configuration
 # Before URLs are registered, the URLS_APP_REGISTER and URLS_NAME_REGISTER are looked up
-# To make a whitelist - change the default to False, then add overrides, eg 'url_name' : True for allowed
+# To make a whitelist - change the default to False, then add overrides, e.g. 'url_name' : True for allowed
 # To make a blacklist - leave default as True, add 'url_name' : False
 
-# Use this to handle url registration at the app level (to eg block and entire app)
+# Use this to handle url registration at the app level (to e.g. block and entire app)
 _URLS_APP_REGISTER_DEFAULT = True
 _URLS_APP_REGISTER_OVERRIDE = {}  # Keys are app names (eg "seqauto" or "snpdb")
 URLS_APP_REGISTER = defaultdict(lambda: _URLS_APP_REGISTER_DEFAULT, _URLS_APP_REGISTER_OVERRIDE)

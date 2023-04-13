@@ -43,7 +43,7 @@ class ClinGenAlleleServerException(ClinGenAllele.ClinGenAlleleRegistryException)
         self.description = json_str
 
     def is_unknown_reference(self):
-        """ Eg error is they don't have that particular transcript - could retry """
+        """ e.g. error is they don't have that particular transcript - could retry """
         if self.status_code == 500:
             if message := self.response_json.get("message"):
                 return "Unknown reference" in message

@@ -1008,7 +1008,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
     def process_option_values(cell: VCDataCell, values: List[Any]) -> Optional[List[str]]:
         e_key = cell.e_key
         options = e_key.virtual_options or []
-        # Do a case insensitive check for each value against the key and any aliases
+        # Do a case-insensitive check for each value against the key and any aliases
         # if there's a match to any of those, normalise back to the key (with the case of the key)
         results: List[str] = []
         # remove duplicates

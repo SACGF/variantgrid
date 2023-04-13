@@ -105,7 +105,7 @@ def save_hgnc_records(existing_hgnc_ids: Set, records: List):
             for alias in alias_list:
                 alias = alias.strip().upper()
                 if alias == gene_symbol_id:
-                    continue  # Our aliases are case insensitive so no need to store these
+                    continue  # Our aliases are case-insensitive so no need to store these
                 gene_symbol_aliases.append(GeneSymbolAlias(alias=alias,
                                                            gene_symbol_id=gene_symbol_id,
                                                            source=GeneSymbolAliasSource.HGNC))

@@ -88,7 +88,7 @@ def _get_analysis_update_tasks(analysis_id) -> List:
             topo_sorted = get_toposorted_nodes_from_parent_value_data(nodes_by_id, parent_value_data)
 
             # Ensure cache loading tasks are only triggered once. Cache can come from different toposort level/groups
-            # eg MergeNode asks parent Venn to cache (which is was already doing)
+            # e.g. MergeNode asks parent Venn to cache (which is was already doing)
             all_cache_jobs = set()
             for grp in topo_sorted:
                 group_cache_jobs = _add_jobs_for_group(node_versions_to_update, dependencies, grp, groups, all_cache_jobs)

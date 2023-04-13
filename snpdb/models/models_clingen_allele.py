@@ -14,7 +14,7 @@ from snpdb.models.models_genome import GenomeBuild, Contig
 
 class ClinGenAllele(TimeStampedModel):
     """ Canonical Allele - @see http://reg.clinicalgenome.org """
-    # id = "CA" stripped off, eg CA7169043 => 7169043
+    # id = "CA" stripped off, e.g. CA7169043 => 7169043
     id = models.BigIntegerField(primary_key=True)
     api_response = models.JSONField(null=False)  # returned
 

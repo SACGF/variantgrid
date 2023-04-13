@@ -134,7 +134,7 @@ class CreateGeneListView(APIView):
 
 
 class TextToGeneListView(APIView):
-    """ Text to gene list (doesn't actually save). Used to eg check gene names """
+    """ Text to gene list (doesn't actually save). Used to e.g. check gene names """
 
     def post(self, request, *args, **kwargs):
         # Needed to be post as ~500 genes exceeded GET limit of ~4k

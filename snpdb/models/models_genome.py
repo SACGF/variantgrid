@@ -78,7 +78,7 @@ class GenomeBuild(models.Model, SortMetaOrderingMixin):
     @staticmethod
     def detect_from_filename(filename) -> Optional['GenomeBuild']:
         """ Attempt to detect from filename
-            eg "foo_grch37.bed" (returns GRCh37) - must only contain name/alias from 1 build """
+            e.g. "foo_grch37.bed" (returns GRCh37) - must only contain name/alias from 1 build """
 
         lc_filename = filename.lower()
         possible_builds = set()
@@ -301,7 +301,7 @@ class GenomeBuildPatchVersion(models.Model):
 
 class Contig(models.Model):
     """ Contigs don't directly link to genome build so builds can share contigs
-        eg hg19 and GRCh37 are the same except for mitochondrion
+        e.g. hg19 and GRCh37 are the same except for mitochondrion
         @see annotation.reference_contigs.get_assembly_report_df """
 
     name = models.TextField()

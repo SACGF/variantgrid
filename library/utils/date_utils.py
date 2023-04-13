@@ -12,7 +12,7 @@ def time_since(start: datetime) -> timedelta:
 
 
 def local_date_string() -> str:
-    """ Returns eg '2022-07-18' """
+    """ Returns e.g. '2022-07-18' """
     return localtime(timezone.now()).strftime("%Y-%m-%d")
 
 

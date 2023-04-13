@@ -81,7 +81,7 @@ class EnrichmentKit(models.Model):
     genomic_intervals = models.ForeignKey(GenomicIntervalsCollection, null=True, blank=True, on_delete=SET_NULL)
     gene_list = models.ForeignKey(GeneList, null=True, blank=True, on_delete=PROTECT)
     canonical_transcript_collection = models.ForeignKey(CanonicalTranscriptCollection, null=True, blank=True, on_delete=SET_NULL)
-    # If configured to anything other than UNKNOWN - will set Sample.variants_type - used for eg a somatic panel
+    # If configured to anything other than UNKNOWN - will set Sample.variants_type - used for e.g. a somatic panel
     # see also VCFSourceSettings (which does the same thing based on VCF header)
     sample_variants_type = models.CharField(max_length=1, choices=VariantsType.choices, default=VariantsType.UNKNOWN)
     variant_zygosity_count = models.BooleanField(default=True)

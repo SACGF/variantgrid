@@ -11,7 +11,7 @@ from django.db.models.query_utils import Q
 
 class AutocompleteView(autocomplete.Select2QuerySetView):
     """ Requires logged in user.
-        Case insensitive match for ANY of fields """
+        Case-insensitive match for ANY of fields """
     fields = []
 
     def get_user_queryset(self, user):

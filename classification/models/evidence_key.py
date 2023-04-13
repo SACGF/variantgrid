@@ -40,7 +40,7 @@ class EvidenceKey(TimeStampedModel):
 
     max_share_level = models.CharField(max_length=16, choices=ShareLevel.choices(), default='logged_in_users')
     """
-    max_share_level restricts sharing on an evidence-key level eg Public allows evidence
+    max_share_level restricts sharing on an evidence-key level e.g. Public allows evidence
     key level sharing to anon users or exporting to external systems, while setting to
     INSTITUTION restricts visibility of a particular field even if the classification is public
     """

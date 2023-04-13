@@ -51,9 +51,6 @@ def classification_group_row(group: ClassificationGroup, sub_row: Optional[int] 
         "group": group,
         "row_class": f"cc-{sub_row} collapse" if sub_row else "",
         "sub_index": sub_index,
-        "show_username": settings.VARIANT_CLASSIFICATION_GRID_SHOW_USERNAME,
-        "show_allele_origin": settings.VARIANT_CLASSIFICATION_GRID_SHOW_ORIGIN,
-        "show_specimen_id": settings.VARIANT_CLASSIFICAITON_SHOW_SPECIMEN_ID
     }
 
 
@@ -440,7 +437,7 @@ def classification_row(
         "show_clinical_context": show_clinical_context,
         "edit_clinical_context": edit_clinical_context,
         "show_allele_origin": settings.VARIANT_CLASSIFICATION_GRID_SHOW_ORIGIN,
-        "show_specimen_id": settings.VARIANT_CLASSIFICAITON_SHOW_SPECIMEN_ID
+        "show_specimen_id": settings.VARIANT_CLASSIFICATION_SHOW_SPECIMEN_ID
     }
 
 

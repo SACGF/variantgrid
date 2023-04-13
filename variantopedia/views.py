@@ -403,13 +403,13 @@ def search(request):
     epk_qs = ExternalPK.objects.values_list("external_type", flat=True)
     external_codes = list(sorted(epk_qs.distinct()))
 
-    context = {"user_settings": user_settings,
-               "form": form,
-               "search": search_string,
-               "search_results": search_results,
-               "external_codes": external_codes,
-               "variant_vcf_db_prefix": settings.VARIANT_VCF_DB_PREFIX,
-               "search_summary": settings.SEARCH_SUMMARY}
+    context = {
+        "user_settings": user_settings,
+        "form": form,
+        "search": search_string,
+        "search_results": search_results,
+        "external_codes": external_codes,
+    }
     return render(request, "variantopedia/search.html", context)
 
 
@@ -444,14 +444,14 @@ def view_allele(request, allele_id: int):
     )
 
     allele_merge_log_qs = AlleleMergeLog.objects.filter(Q(old_allele=allele) | Q(new_allele=allele)).order_by("pk")
-    context = {"allele": allele,
-               "edit_clinical_groupings": request.GET.get('edit_clinical_groupings') == 'True',
-               "allele_merge_log_qs": allele_merge_log_qs,
-               "clingen_url": settings.CLINGEN_ALLELE_REGISTRY_DOMAIN,
-               "classifications": latest_classifications,
-               "annotated_builds": GenomeBuild.builds_with_annotation(),
-               "imported_alleles": ImportedAlleleInfo.objects.filter(allele=allele)
-               }
+    context = {
+        "allele": allele,
+        "edit_clinical_groupings": request.GET.get('edit_clinical_groupings') == 'True',
+        "allele_merge_log_qs": allele_merge_log_qs,
+        "classifications": latest_classifications,
+        "annotated_builds": GenomeBuild.builds_with_annotation(),
+        "imported_alleles": ImportedAlleleInfo.objects.filter(allele=allele)
+    }
     return render(request, "variantopedia/view_allele.html", context)
 
 
@@ -579,7 +579,6 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
     has_tags = VariantTag.get_for_build(genome_build, variant_qs=variant.equivalent_variants).exists()
 
     context = {
-        "ANNOTATION_PUBMED_SEARCH_TERMS_ENABLED": settings.ANNOTATION_PUBMED_SEARCH_TERMS_ENABLED,
         "annotation_description": annotation_description,
         "annotation_version": annotation_version,
         "can_create_classification": Classification.can_create_via_web_form(request.user),
@@ -594,9 +593,6 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
         "num_variant_annotation_versions": num_variant_annotation_versions,
         "num_clinvar_citations": num_clinvar_citations,
         "clinvar_citations": clinvar_citations,
-        "show_annotation": settings.VARIANT_DETAILS_SHOW_ANNOTATION,
-        "show_gene_coverage": settings.VARIANT_DETAILS_SHOW_GENE_COVERAGE,
-        "show_samples": settings.VARIANT_DETAILS_SHOW_SAMPLES,
         "tag_form": TagForm(),
         "tool_tips": user_settings.tool_tips,
         "igv_links_enabled": get_settings_form_features().igv_links_enabled,

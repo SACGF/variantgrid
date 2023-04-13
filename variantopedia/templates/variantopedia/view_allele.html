@@ -5,6 +5,8 @@
 {% load ui_utils %}
 {% load ui_help %}
 {% load ui_menu_bars %}
+{% load settings_tags %}
+
 {% block submenu %}{% menu_bar_data %}{% endblock submenu %}
 {% block head %}
 <script>
@@ -42,6 +44,8 @@
 
 {% block title %}{{ allele }}{% endblock %}
 {% block content %}
+    {% settings_value 'CLINGEN_ALLELE_REGISTRY_DOMAIN' as clingen_url %}
+
     <div class="container">
         {% page_help page_id='variantdetails/view_allele_help' title='Allele' %}
 

@@ -164,7 +164,7 @@ class Wiki(TimeStampedModel):
 
 class ImportedWikiCollection(models.Model):
     """ VCF imports only support 1 file at a time, so we can't import a multi build file easily """
-    match_column_name = models.TextField()  # eg gene/variant
+    match_column_name = models.TextField()  # e.g. gene/variant
     genome_build = models.ForeignKey('GenomeBuild', null=True, on_delete=CASCADE)
 
 
@@ -421,7 +421,7 @@ class ContactDetails:
 
 class Lab(models.Model):
     name = models.TextField()
-    external = models.BooleanField(default=False, blank=True)  # From somewhere else, eg Shariant
+    external = models.BooleanField(default=False, blank=True)  # From somewhere else, e.g. Shariant
     city = models.TextField()
     state = models.ForeignKey(State, null=True, on_delete=PROTECT)
     country = models.ForeignKey(Country, null=True, on_delete=PROTECT)
