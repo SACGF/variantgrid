@@ -300,6 +300,16 @@ class ImportedAlleleInfoDownload(ExportRow):
     def differences(self):
         return "\n".join(str(tag) for tag in self.allele_info.latest_validation.validation_tags_list)
 
+    @export_column(label="c.HGVS (37) sort")
+    def c_hgvs_37_sort(self):
+        if c37 := self.allele_info[GenomeBuild.grch37()]:
+            return c37.genomic_sort
+
+    @export_column(label="c.HGVS (38) sort")
+    def c_hgvs_38_sort(self):
+        if c38 := self.allele_info[GenomeBuild.grch38()]:
+            return c38.genomic_sort
+
     @export_column(label="Included")
     def included(self):
         return self.allele_info.latest_validation.include

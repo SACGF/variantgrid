@@ -28,14 +28,15 @@ Going via CitationFetchRequest should generally be the only way you interact wit
 """
 
 
-DATE_PUBLISHED_RE = re.compile("^([0-9]+).*?$")
+DATE_PUBLISHED_RE = re.compile(".*?([0-9]{4}).*?")
 
 
 def get_year_from_date(date_published: str) -> str:
     if not date_published:
         return ""
     year = ""
-    if year_match := DATE_PUBLISHED_RE.fullmatch(date_published):
+    # sometimes year is "winter 2019", we just care about the 2019 part
+    if year_match := DATE_PUBLISHED_RE.match(date_published):
         year = year_match.group(1)
     return year
 
@@ -167,7 +168,7 @@ class Citation(TimeStampedModel):
         if self.source == CitationSource.PUBMED:
             return f"https://www.ncbi.nlm.nih.gov/pubmed/{self.index}"
         elif self.source == CitationSource.PUBMED_CENTRAL:
-            return f"https://www.ncbi.nlm.nih.gov/pmc/?term={self.index}"
+            return f"https://www.ncbi.nlm.nih.gov/pmc/articles/{self.index}"
         else:
             return f"https://www.ncbi.nlm.nih.gov/books/{self.index}"
 
@@ -237,7 +238,6 @@ class CitationIdNormalized:
         index = str(index)
         use_source = CitationSource.from_legacy_code(source)
         if not use_source:
-            print(f"Unexpected source {source}")
             raise ValueError(f"Unexpected source for Citation ID {source}")
 
         if match := CitationIdNormalized.NUMER_STRIP_RE.match(index):
@@ -262,6 +262,10 @@ class CitationIdNormalized:
         citation_id = citation_id.strip().upper()
         if parts := CitationIdNormalized.CITATION_SPLIT_RE.match(citation_id):
             prefix = parts.group('prefix')
+            if number_prefix := parts.group('number_prefix'):
+                if number_prefix == "PMC":
+                    prefix = CitationSource.PUBMED_CENTRAL
+
             number = parts.group('number')
 
             return CitationIdNormalized.from_parts(prefix, number)
@@ -544,7 +548,7 @@ class CitationFetchRequest:
                 if existing := citations_by_id.get(fetch.normalised_id.full_id):
                     fetch.citation = existing
                     # Special case of having JSON populated but not the appropriate fields
-                    # This will be the case if teh citation was migrated
+                    # This will be the case if the citation was migrated
                     if existing.data_json and not existing.last_loaded:
                         if existing.source in {CitationSource.PUBMED, CitationSource.PUBMED_CENTRAL}:
                             CitationFetchRequest._populate_from_entrez(existing, existing.data_json)
@@ -643,7 +647,9 @@ class CitationFetchRequest:
 
         # TODO could we just store published date and extract year?
         citation.year = get_year_from_date(record.get("DP"))
-        if authors_list := record.get("FAU"):
+
+        # CN is corporate "Corporate Authors", fall back on that if no FAU
+        if authors_list := record.get("FAU") or record.get("CN"):
             first_author = authors_list[0]
             first_author_last = first_author.split(",")[0]
             citation.authors_short = first_author_last
