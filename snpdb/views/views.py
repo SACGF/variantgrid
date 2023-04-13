@@ -550,7 +550,11 @@ def manual_variant_entry(request):
                 variants_text = form.cleaned_data['variants_text']
                 genome_build_pk = form.cleaned_data['genome_build']
                 genome_build = GenomeBuild.objects.get(pk=genome_build_pk)
-                create_manual_variants(request.user, genome_build, variants_text)
+                try:
+                    create_manual_variants(request.user, genome_build, variants_text)
+                except ValueError as ve:
+                    messages.add_message(request, messages.ERROR, ve)
+                    valid = False
                 form = forms.ManualVariantEntryForm(None, user=request.user)  # Reset form
 
             add_save_message(request, valid, "Manually entered variants")
