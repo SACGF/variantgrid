@@ -82,7 +82,7 @@ class Command(BaseCommand):
 
     def _import_dbnsfp_gene(self, filename: str, dbnsfp_version):
         records = []
-        df = pd.read_csv(filename, sep='\t', index_col=None)
+        df = pd.read_csv(filename, sep='\t', index_col=None, low_memory=False)
         df = df_nan_to_none(df.replace(".", None))
         gene_symbols = GeneSymbol.get_upper_case_lookup()
         new_gene_symbols = set()

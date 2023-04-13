@@ -362,7 +362,7 @@ def load_phenotype_to_genes(filename: str, force: bool):
         deleted = OntologyTermRelation.objects.filter(from_import__in=old_imports).delete()
         print(f"{deleted} relationships removed")
 
-    by_hpo = df.groupby(["hpo_id"])
+    by_hpo = df.groupby("hpo_id")
     for hpo_id, by_hpo_data in by_hpo:
         # make HPO stubs in case HPO import hasn't happened yet
         hpo_name = by_hpo_data["hpo_name"].iloc[0]
@@ -373,7 +373,7 @@ def load_phenotype_to_genes(filename: str, force: bool):
             primary_source=False
         )
 
-        by_omim = by_hpo_data.groupby(["omim_id"])
+        by_omim = by_hpo_data.groupby("omim_id")
         for omim_id, by_omim_data in by_omim:
             # link HPO -> OMIM
             ontology_builder.add_ontology_relation(
@@ -382,13 +382,13 @@ def load_phenotype_to_genes(filename: str, force: bool):
                 relation=OntologyRelation.ASSOCIATED
             )
 
-    by_gene = df.groupby(["entrez_gene_symbol"])
+    by_gene = df.groupby("entrez_gene_symbol")
     for gene_symbol, gene_data in by_gene:
         # IMPORTANT, the gene_id is the entrez gene_id, not the HGNC gene id
         try:
             hgnc_term = OntologyTerm.get_gene_symbol(gene_symbol)
 
-            by_omim = gene_data.groupby(["omim_id"])
+            by_omim = gene_data.groupby("omim_id")
             for omim_id, by_omim_data in by_omim:
                 ontology_builder.add_ontology_relation(
                     source_term_id=omim_id,
