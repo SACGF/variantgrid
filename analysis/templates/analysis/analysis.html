@@ -4,6 +4,7 @@
 {% load analysis_node_tags %}
 {% load js_tags %}
 {% load user_tag_color_tags %}
+{% load settings_tags %}
 
 {% block head %}
 <script src="{% static 'js/lib/jquery.jsPlumb-1.4.1-all-min.js' %}"></script>
@@ -273,7 +274,8 @@
                         <span id="number-of-tags"></span>
                     </a>
                     <a id="input-samples-button" class="toolbar-button" href="javascript:inputSamples()" title="Show Input Samples"></a>
-                    {% if ANALYSIS_DUAL_SCREEN_MODE_FEATURE_ENABLED %}
+                    {% settings_value 'ANALYSIS_DUAL_SCREEN_MODE_FEATURE_ENABLED' as analysis_dual_screen_mode_feature_enabled %}
+                    {% if analysis_dual_screen_mode_feature_enabled %}
                     <a id="dual-screen-button" class="toolbar-button" href="javascript:startDualScreenMode()" title="Dual Screen Mode"></a>
                     {% endif %}
                     </div>

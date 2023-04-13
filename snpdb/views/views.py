@@ -667,8 +667,6 @@ def view_user_settings(request):
         'user_contact_form': user_contact_form,
         'user_settings_form': user_settings_override_form,
         'group_initial_perm_forms': group_initial_perm_forms,
-        'accounts_email': settings.ACCOUNTS_EMAIL,
-        'account_manage_url': settings.OIDC_USER_SERVICES,
         'override_source': override_source,
         'override_values': override_values,
         'labs_by_group_name': labs_by_group_name,

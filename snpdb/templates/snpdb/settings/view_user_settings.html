@@ -10,6 +10,7 @@
 {% load user_tags %}
 {% load ui_tabs_builder %}
 {% load classification_tags %}
+{% load settings_tags %}
 {% block title %}Settings{% endblock %}
 {% block submenu %}{% menu_bar_settings %}{% endblock submenu %}
 {% block head %}
@@ -28,6 +29,7 @@
 <div class="container">
     {% ui_register_tab_embedded label="User Details" tab_set="user_tabs" %}
         {% if use_oidc %}
+            {% settings_value 'ACCOUNTS_EMAIL' as accounts_email %}
             <form method="post" action="{{ form_url }}">
                 {% csrf_token %}
                 <input name="action" type="hidden" value="password-reset"/>

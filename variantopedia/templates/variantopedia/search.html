@@ -4,6 +4,8 @@
 {% load ui_menu_bars %}
 {% load search_tags %}
 {% load user_tag_color_tags %}
+{% load settings_tags %}
+
 {% block submenu %}{% menu_bar_data %}{% endblock %}
 
 {% block title %}Search{% endblock %}
@@ -35,6 +37,8 @@
     </script>
 {% endblock %}
 {% block content %}
+    {% settings_value 'VARIANT_VCF_DB_PREFIX' as variant_vcf_db_prefix %}
+    {% settings_value 'SEARCH_SUMMARY' as show_search_summary %}
 
     <div class="container">
         <h3>Search</h3>
@@ -72,7 +76,7 @@
                                         <span class="search-message text-danger">{{ message|safe }}</span>
                                     {% endfor %}<br>{% endif %}
                                         <a class="hover-link" href="{{ search_result.record.get_absolute_url }}">{{ search_result.record }}</a>
-                                        {% if search_summary %}
+                                        {% if show_search_summary %}
                                             {% search_summary request.user search_result %}
                                         {% endif %}
                                     </td>
