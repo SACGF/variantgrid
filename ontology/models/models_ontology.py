@@ -25,7 +25,8 @@ from genes.models import GeneSymbol
 from library.cache import timed_cache
 from library.constants import DAY_SECS, WEEK_SECS
 from library.log_utils import report_exc_info
-from library.utils import Constant
+from library.preview_request import PreviewData
+from library.utils import Constant, pretty_label
 
 
 class OntologyImportSource:
@@ -284,6 +285,15 @@ class OntologyTerm(TimeStampedModel):
     from_import = models.ForeignKey(OntologyImport, on_delete=PROTECT)
 
     move_to_re = re.compile(r"MOVED TO (\d+)")
+
+    @property
+    def preview(self) -> PreviewData:
+        return PreviewData.for_object(
+            self,
+            icon="fa-solid fa-disease",
+            title="Term Not Found" if self.is_stub else self.name,
+            summary=self.definition
+        )
 
     def __str__(self):
         return f"{self.id} {self.name}"

@@ -1,6 +1,7 @@
-from typing import Any
+from typing import Any, Union, Type
 
 from django.dispatch import receiver
+from django.utils.safestring import SafeString
 
 from genes.models import GeneSymbol
 from ontology.models import OntologyTerm, OntologyService
@@ -10,8 +11,8 @@ from snpdb.search2 import SearchResponseRecordAbstract, search_signal, SearchInp
 class SearchResponseOntology(SearchResponseRecordAbstract[OntologyTerm]):
 
     @classmethod
-    def search_type(cls) -> str:
-        return "Ontology"
+    def result_class(cls) -> Type:
+        return OntologyTerm
 
 
 @receiver(search_signal, sender=SearchInput)

@@ -1,8 +1,8 @@
 import re
-from abc import ABC
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from re import Match, IGNORECASE
-from typing import Optional, TypeVar, Generic, Union, List, Iterable, Type
+from typing import Optional, TypeVar, Generic, Union, List, Iterable, Type, Pattern
 
 import django
 from django.contrib.auth.models import User
@@ -10,6 +10,8 @@ from django.utils.safestring import SafeString
 
 from genes.models_enums import AnnotationConsortium
 from library.log_utils import report_message
+from library.preview_request import PreviewData
+from library.utils import pretty_label
 from snpdb.models import GenomeBuild
 
 search_signal = django.dispatch.Signal()
@@ -22,8 +24,11 @@ class SearchInput:
     search_string: str
     genome_build_preferred: GenomeBuild
 
-    def matches_pattern(self, pattern: str) -> Match:
-        return re.match(pattern, self.search_string, IGNORECASE)
+    def matches_pattern(self, pattern: Union[str, Pattern]) -> Match:
+        if isinstance(pattern, str):
+            return re.match(pattern, self.search_string, IGNORECASE)
+        else:
+            return pattern.match(self.search_string)
 
     def matches_has_alpha(self) -> bool:
         return bool(self.matches_pattern(HAS_ALPHA_PATTERN))
@@ -53,8 +58,17 @@ class SearchResponseRecordAbstract(ABC, Generic[T]):
         self.search_input = search_input
 
     @classmethod
-    def search_type(cls) -> str:
+    @abstractmethod
+    def result_class(cls) -> Type[T]:
         pass
+
+    @classmethod
+    def category(cls) -> str:
+        return pretty_label(cls.result_class()._meta.verbose_name)
+
+    @property
+    def preview(self) -> PreviewData:
+        return self.record.preview
 
     @classmethod
     def from_iterable(cls, iterable: Iterable[T]) -> List:
@@ -67,16 +81,6 @@ class SearchResponseRecordAbstract(ABC, Generic[T]):
     @property
     def annotation_consortia(self) -> Optional[AnnotationConsortium]:
         return None
-
-    # TODO, we might want to add context in so we can get better rendering
-    def display(self) -> Union[str, SafeString]:
-        return str(self.record)
-
-    def __str__(self):
-        return self.display()
-
-    def get_absolute_url(self) -> str:
-        return self.record.get_absolute_url()
 
     @property
     def messages(self) -> Optional[List[str]]:
@@ -93,7 +97,7 @@ class SearchResponse(Generic[T]):
 
     @property
     def search_type(self):
-        return self.response_type.search_type()
+        return self.response_type.category()
 
     def add(self, record: Union[T, SearchResponseRecordAbstract]):
         if not isinstance(record, SearchResponseRecordAbstract):

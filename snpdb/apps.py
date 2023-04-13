@@ -8,6 +8,7 @@ from django.db.models.signals import post_save
 class SnpdbConfig(AppConfig):
     name = 'snpdb'
 
+    # noinspection PyUnresolvedReferences
     def ready(self):
         # pylint: disable=import-outside-toplevel
         from snpdb.models import Trio
@@ -17,6 +18,9 @@ class SnpdbConfig(AppConfig):
             user_post_save_handler, group_post_save_handler
         from snpdb.signals import vcf_health_check  # pylint: disable=unused-import
         from snpdb.signals import disk_usage_health_check  # pylint: disable=unused-import
+        from snpdb.signals import lab_search
+        from snpdb.signals import organization_search
+        from snpdb.signals import user_search
         # pylint: enable=import-outside-toplevel
 
         backend_vcf_import_success_signal.connect(backend_vcf_import_success_handler)

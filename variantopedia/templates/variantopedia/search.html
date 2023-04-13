@@ -1,4 +1,5 @@
 {% extends "uicore/page/base.html" %}
+{% load english_tags %}
 {% load crispy_forms_field %}
 {% load ui_utils %}
 {% load ui_menu_bars %}
@@ -23,6 +24,10 @@
             padding: 3px 3px 3px 0;
             color: #444;
             display: block;
+        }
+        .search-results a:hover .search-identifier {
+            color: #44a;
+            text-decoration: underline;
         }
     </style>
     <script>
@@ -58,34 +63,72 @@
                 {% endif %}
             </p>
             <div id='results' class="mt-4">
-                <h4>Results</h4>
                 {% if search_results.results %}
+                    <h4>{% count search_results.results singular="1 Result" plural="Results" %} Found for "{{ search }}"</h4>
+
+                    <ul class="list-group search-results">
+                        {% for search_result in search_results.results %}
+                            {% with preview=search_result.preview %}
+                                <a class="list-group-item list-group-item-action {% if search_result.messages %}list-group-item-warning{% endif %}" href="{{ preview.internal_url }}">
+                                    <div class="row" style="color:#444">
+                                        <div class="col-2 text-right">
+                                            {% if preview.icon %}<i class="{{ preview.icon }} mr-2" style="opacity:0.75"></i>{% endif %}
+                                            <label>{{ preview.category }}</label>
+                                            <span>
+                                            {% with extras=search_result.header_extra %}
+                                                {% if extras %}
+                                                    {% for extra in extras %}
+                                                        &nbsp;<span class="text-small">{{ extra }}</span>
+                                                    {% endfor %}
+                                                {% endif %}
+                                            {% endwith %}
+                                            </span>
+                                        </div>
+                                        <div class="col-10">
+                                            <label class="search-identifier">{{ preview.identifier }}</label>{% if preview.title %}&nbsp;<span class="search-title">{{ preview.title }}</span>{% endif %}
+                                            {% if search_summary %}
+                                                {% search_summary request.user search_result %}
+                                            {% endif %}
+                                            {% if search_result.messages %}
+                                                <div class="mt-2">
+                                                    {% for message in search_result.messages %}
+                                                        <div class="text-danger">{{ 'W' | severity_icon }}{{ message }}</div>
+                                                    {% endfor %}
+                                                </div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </a>
+                            {% endwith %}
+                        {% endfor %}
+                    </ul>
+
+                    {% comment %}
                     <table class="table">
                         {% for search_result in search_results.results %}
-                            {% if not search_result.is_debug_data %}
-                                <tr {% if not search_result.is_preferred_build or not search_result.is_preferred_annotation %}
-                                    class="not-preferred hover-detail" title="Search result is not in preferred build and/or annotation consortium"
-                                {% endif %}
-                                >
-                                    <td>{{ search_result.header_string }}</td>
-                                    <td>{% if search_result.messages %}{% for message in search_result.messages %}
-                                        <span class="search-message text-danger">{{ message }}</span>
-                                    {% endfor %}<br>{% endif %}
-                                        <a class="hover-link" href="{{ search_result.record.get_absolute_url }}">{{ search_result.record }}</a>
-                                        {% if search_summary %}
-                                            {% search_summary request.user search_result %}
-                                        {% endif %}
-                                    </td>
-                                </tr>
+                            <tr {% if not search_result.is_preferred_build or not search_result.is_preferred_annotation %}
+                                class="not-preferred hover-detail" title="Search result is not in preferred build and/or annotation consortium"
                             {% endif %}
+                            >
+                                <td>{{ search_result.header_string }}</td>
+                                <td>{% if search_result.messages %}{% for message in search_result.messages %}
+                                    <span class="search-message text-danger">{{ message }}</span>
+                                {% endfor %}<br>{% endif %}
+                                    <a class="hover-link" href="{{ search_result.record.get_absolute_url }}">{{ search_result.record }}</a>
+                                    {% if search_summary %}
+                                        {% search_summary request.user search_result %}
+                                    {% endif %}
+                                </td>
+                            </tr>
                         {% endfor %}
                     </table>
+                    {% endcomment %}
                 {% else %}
-                    <p class="error-value" style="padding-left:20px;">No results found.</p>
+                    <h4><span class="no-value">No Results Found</span></h4>
+                    <hr/>
                 {% endif %}
             </div>
         {% endif %}
-
         <div class="mt-4">
         <h4>Accepted Inputs</h4>
         <div class="row equal">

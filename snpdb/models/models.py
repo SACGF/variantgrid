@@ -30,6 +30,7 @@ from model_utils.managers import InheritanceManager
 
 from classification.enums.classification_enums import ShareLevel
 from library.enums.log_level import LogLevel
+from library.preview_request import PreviewData
 from library.utils import import_class, JsonObjType
 
 
@@ -189,6 +190,13 @@ class Organization(models.Model):
         ordering = ['name']
         verbose_name = 'Organisation'
         verbose_name_plural = 'Organisations'
+
+    @property
+    def preview(self) -> PreviewData:
+        return PreviewData.for_object(
+            self,
+            icon="fa-solid fa-building"
+        )
 
     def __lt__(self, other):
         return self.name < other.name
@@ -456,6 +464,13 @@ class Lab(models.Model):
 
     class Meta:
         ordering = ['name']
+
+    @property
+    def preview(self) -> PreviewData:
+        return PreviewData.for_object(
+            self,
+            icon="fa-solid fa-flask"
+        )
 
     @property
     def contact_details(self) -> ContactDetails:

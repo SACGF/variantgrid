@@ -48,6 +48,7 @@ from genes.models import Gene
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
 from library.guardian_utils import clear_permissions
 from library.log_utils import report_exc_info, report_event
+from library.preview_request import PreviewData
 from library.utils import empty_to_none, nest_dict, cautious_attempt_html_to_text, DebugTimer, \
     invalidate_cached_property, md5sum_str
 from ontology.models import OntologyTerm, OntologySnake, OntologyTermRelation
@@ -473,6 +474,21 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
 
     last_source_id = models.TextField(blank=True, null=True)
     last_import_run = models.ForeignKey(ClassificationImportRun, null=True, blank=True, on_delete=SET_NULL)
+
+    @property
+    def preview(self) -> PreviewData:
+
+        last_published = self.last_published_version
+        clin_sig = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE). \
+                       pretty_value(last_published.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)) or 'Unclassified'
+        title = f"{clin_sig}"  # TODO add more data here
+
+        return PreviewData.for_object(
+            obj=self,
+            icon="fa-solid fa-clipboard",
+            identifier=self.friendly_label,
+            title=title
+        )
 
     @staticmethod
     def is_supported_transcript(transcript_or_hgvs: str):

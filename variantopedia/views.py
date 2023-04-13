@@ -384,13 +384,13 @@ def search(request):
         search_string = form.cleaned_data['search']
         classify = form.cleaned_data.get('classify')
         search_results = search_data(request.user, search_string, classify)
-        results, _search_types, _search_errors = search_results.non_debug_results, search_results.search_types, search_results.search_errors
+        results, _search_types, _search_errors = search_results.results, search_results.search_types, search_results.search_errors
         details = f"'{search_string}' calculated {len(results)} results."
         create_event(request.user, 'search', details=details)
 
         # don't auto load unless there is only 1 preferred result
         if preferred_result := search_results.single_preferred_result():
-            return redirect(preferred_result.record)
+            return redirect(preferred_result.preview.internal_url)
 
         # Attempt to give hints on why nothing was found
         for search_error, genome_builds in search_results.search_errors.items():

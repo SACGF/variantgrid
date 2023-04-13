@@ -1,15 +1,13 @@
 import operator
 from functools import reduce
-from typing import Any, Union, Optional
+from typing import Any, Optional, Type
 
 from django.conf import settings
 from django.db.models import Q
 from django.dispatch import receiver
-from django.utils.safestring import SafeString
 from pyhgvs import HGVSName, InvalidHGVSName
 
 from annotation.models import VariantAnnotationVersion
-from classification.enums import SpecialEKeys
 from classification.models import Classification, ClassificationModification, EvidenceKeyMap
 from snpdb.models import Lab, Organization
 from snpdb.search2 import SearchResponseRecordAbstract, search_signal, SearchInput, SearchResponse
@@ -18,19 +16,12 @@ from snpdb.search2 import SearchResponseRecordAbstract, search_signal, SearchInp
 class SearchResponseClassification(SearchResponseRecordAbstract[Classification]):
 
     @classmethod
-    def search_type(cls) -> str:
-        return "Classification"
-
-    def display(self) -> Union[str, SafeString]:
-        last_published = self.record.last_published_version
-        classification: Classification = self.record
-        clin_sig = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE).\
-            pretty_value(last_published.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)) or 'Unclassified'
-        return f"({clin_sig}) {classification.lab.name} / {classification.lab_record_id}"
+    def result_class(cls) -> Type:
+        return Classification
 
 
 @receiver(search_signal, sender=SearchInput)
-def search_classifications(sender: Any, search_input: SearchInput, **kwargs) -> SearchResponse:
+def classification_search(sender: Any, search_input: SearchInput, **kwargs) -> SearchResponse:
     response: SearchResponse[SearchResponseClassification] = SearchResponse(SearchResponseClassification)
 
     search_string = search_input.search_string

@@ -25,6 +25,7 @@ from genes.models import TranscriptVersion, Transcript, MissingTranscript, Gene,
 from genes.models_enums import AnnotationConsortium
 from library.genomics import format_chrom
 from library.log_utils import report_message
+from library.preview_request import PreviewData
 from library.utils import clean_string
 from patients.models import ExternalPK, Patient
 from pedigree.models import Pedigree
@@ -136,17 +137,19 @@ def search_data(user: User, search_string: str, classify: bool) -> 'SearchResult
 
 class SearchResult:
 
-    def __init__(self, record: Any,
+    def __init__(self,
+                 record: Any,
+                 preview: Optional[PreviewData] = None,
                  genome_builds: Optional[Set[GenomeBuild]] = None,
                  annotation_consortia: Optional[List[str]] = None,  # why isn't this a set?
                  message: Optional[Union[str, List[str]]] = None,
-                 is_debug_data: bool = False,
                  initial_score: int = 0,
                  is_single_build: bool = False):
         """
         :param is_single_build: set to make result in non-preferred build be a preferred result (default=False)
         """
         self.record = record
+        self._preview = preview
         self.genome_build = None  # Set as we display search results for each build
         self.genome_builds = genome_builds
         self.annotation_consortia = annotation_consortia or []
@@ -157,7 +160,6 @@ class SearchResult:
             message = [message]
 
         self.messages: Optional[List[str]] = message
-        self.is_debug_data = is_debug_data
         self.initial_score = initial_score
         self.is_single_build = is_single_build
         self.search_type: Optional[str] = None
@@ -165,8 +167,18 @@ class SearchResult:
         self.is_preferred_build: Optional[bool] = None
         self.is_preferred_annotation: Optional[bool] = None
 
+    @property
+    def preview(self):
+        # can't do this on init, as search_type is provided later
+        if p := self._preview:
+            return p
+        return PreviewData.for_object(
+            self.record,
+            category=self.search_type
+        )
+
     @staticmethod
-    def from_search_result_abs(search_type: str, result: SearchResponseRecordAbstract[Any]):
+    def from_search_result_abs(result: SearchResponseRecordAbstract[Any]):
         genome_builds: Set[GenomeBuild] = set()
         annotation_consortias: List[str] = []
         if genome_build := result.genome_build:
@@ -176,11 +188,12 @@ class SearchResult:
 
         sr = SearchResult(
             record=result.record,
+            preview=result.preview,
             genome_builds=genome_builds,
             annotation_consortia=annotation_consortias,
             message=result.messages
         )
-        sr.search_type = search_type
+        sr.search_type = result.preview.category
         return sr
 
     def apply_search_score(self, preferred_genome_build: GenomeBuild):
@@ -190,25 +203,30 @@ class SearchResult:
     @property
     def header_string(self):
         text = self.search_type
-        extras = []
-        for ac in self.annotation_consortia:
-            extras.append(AnnotationConsortium(ac).name)
-        if self.genome_builds:
-            extras.extend((genome_build.name for genome_build in self.genome_builds))
-
-        if extras:
+        if extras := self.header_extra:
             text = f"{text} ({', '.join(extras)})"
 
         return text
 
     @property
+    def header_extra(self) -> List[str]:
+        extras = []
+        for ac in self.annotation_consortia:
+            extras.append(AnnotationConsortium(ac).name)
+        if self.genome_builds:
+            extras.extend((genome_build.name for genome_build in self.genome_builds))
+        return extras
+
+    @property
+    def annotation_consortia_names(self) -> List[str]:
+        return [AnnotationConsortium(ac).name for ac in self.annotation_consortia]
+
+    @property
     def is_preferred(self):
-        return self.is_preferred_build and self.is_preferred_annotation and not self.is_debug_data and not self.messages
+        return self.is_preferred_build and self.is_preferred_annotation and not self.messages
 
     @cached_property
     def preference_score(self):
-        if self.is_debug_data:
-            return 0
 
         score = self.initial_score
         if self.is_preferred_build:
@@ -266,7 +284,7 @@ class SearchResults:
         sr.search_types.add(response.search_type)
         sr.search_string = search_input.search_string
         sr.genome_build_preferred = search_input.genome_build_preferred
-        sr.results = [SearchResult.from_search_result_abs(search_type=response.search_type, result=result) for result in
+        sr.results = [SearchResult.from_search_result_abs(result=result) for result in
                       response.results]
         return sr
 
@@ -313,10 +331,6 @@ class SearchResults:
                 }
             )
 
-    @property
-    def non_debug_results(self):
-        return [result for result in self.results if not result.is_debug_data]
-
     def single_preferred_result(self) -> Optional[SearchResult]:
         preferred = [result for result in self.results if result.is_preferred]
         if len(preferred) == 1:
@@ -359,7 +373,7 @@ class Searcher:
         ]
         self.genome_agnostic_searches = [
             (SearchTypes.ANALYSIS, ANALYSIS_PREFIX_PATTERN, search_analysis_id),
-            (SearchTypes.GENE_SYMBOL, GENE_SYMBOL_PATTERN, search_gene_symbol),  # special case
+            # (SearchTypes.GENE_SYMBOL, GENE_SYMBOL_PATTERN, search_gene_symbol),  # special case
             (SearchTypes.GENE, GENE_PATTERN, search_gene),  # special case
             (SearchTypes.EXPERIMENT, HAS_ALPHA_PATTERN, search_experiment),
             (SearchTypes.EXTERNAL_PK, HAS_ALPHA_PATTERN, search_external_pk),
@@ -367,8 +381,8 @@ class Searcher:
             (SearchTypes.SEQUENCING_RUN, SEQUENCING_RUN_REGEX, search_sequencing_run),
             (SearchTypes.TRANSCRIPT, TRANSCRIPT_PATTERN, search_transcript),
             (SearchTypes.VARIANT, DB_PREFIX_PATTERN, search_variant_id),
-            (SearchTypes.LAB, MIN_3_ALPHA, search_lab),
-            (SearchTypes.ORG, MIN_3_ALPHA, search_org),
+            #(SearchTypes.LAB, MIN_3_ALPHA, search_lab),
+            #(SearchTypes.ORG, MIN_3_ALPHA, search_org),
             # now done via new search
             # (SearchTypes.ONTOLOGY, ONTOLOGY_PATTERN, search_ontology),
             # (SearchTypes.ONTOLOGY, HAS_ALPHA_PATTERN, search_ontology_name)
@@ -869,9 +883,9 @@ def get_results_from_variant_tuples(qs: QuerySet, data: VariantCoordinate, any_a
     return results
 
 
-def search_lab(search_string: str, **kwargs) -> Iterable[Lab]:
-    return Lab.objects.filter(organization__active=True).filter(name__icontains=search_string)
-
-
-def search_org(search_string: str, **kwargs) -> Iterable[Organization]:
-    return Organization.objects.filter(active=True).filter(Q(short_name__icontains=search_string) | Q(name__icontains=search_string))
+# def search_lab(search_string: str, **kwargs) -> Iterable[Lab]:
+#     return Lab.objects.filter(organization__active=True).filter(name__icontains=search_string)
+#
+#
+# def search_org(search_string: str, **kwargs) -> Iterable[Organization]:
+#     return Organization.objects.filter(active=True).filter(Q(short_name__icontains=search_string) | Q(name__icontains=search_string))

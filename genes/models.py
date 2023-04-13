@@ -44,6 +44,7 @@ from library.django_utils.django_partition import RelatedModelsPartitionModel
 from library.guardian_utils import assign_permission_to_user_and_groups, DjangoPermission, admin_bot, \
     add_public_group_read_permission
 from library.log_utils import log_traceback
+from library.preview_request import PreviewData
 from library.utils import get_single_element, iter_fixed_chunks
 from library.utils.file_utils import mk_path
 from snpdb.models import Wiki, Company, Sample, DataState
@@ -200,6 +201,15 @@ class GeneSymbol(models.Model):
     @cached_property
     def alias_meta(self) -> 'GeneSymbolAliasesMeta':
         return GeneSymbolAliasesMeta(self)
+
+    @property
+    def preview(self) -> PreviewData:
+        return PreviewData.for_object(
+            obj=self,
+            icon="fa-solid fa-dna",
+            identifier=self.name,
+            title=""
+        )
 
     def has_different_genes(self, other: 'GeneSymbol') -> bool:
         """

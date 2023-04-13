@@ -213,7 +213,7 @@ class GeneSymbolViewInfo:
             if self.genome_build != self.desired_genome_build:
                 warnings.append(f"This symbol is not associated with any genes in build {self.desired_genome_build}, viewing in build {self.genome_build}")
         else:
-            warnings.append("There are no genes linked against this symbol!")
+            warnings.append("There are no genes linked against this symbol")
         return warnings
 
     @cached_property

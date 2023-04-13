@@ -1,25 +1,35 @@
-from typing import Any
-
+from functools import cached_property
+from typing import Any, Type, Optional, List
 from django.contrib.auth.models import User
 from django.db.models import Q
 from django.dispatch import receiver
-from django.urls import reverse
-
+from library.preview_request import PreviewData
+from snpdb.models import AvatarDetails
 from snpdb.search2 import SearchResponseRecordAbstract, search_signal, SearchInput, SearchResponse
 
 
 class SearchResponseUser(SearchResponseRecordAbstract[User]):
 
     @classmethod
-    def search_type(cls) -> str:
-        return "Users"
+    def result_class(cls) -> Type:
+        return User
 
-    def get_absolute_url(self) -> str:
-        return reverse('view_user', kwargs={"pk": self.record.pk})
+    @classmethod
+    def category(cls) -> str:
+        return "User"
+
+    @cached_property
+    def preview(self) -> PreviewData:
+        return AvatarDetails.avatar_for(self.record).preview()
+
+    @property
+    def messages(self) -> Optional[List[str]]:
+        if not self.record.is_active:
+            return ["User is inactive"]
 
 
 @receiver(search_signal, sender=SearchInput)
-def search_users(sender: Any, search_input: SearchInput, **kwargs) -> SearchResponse:
+def user_search(sender: Any, search_input: SearchInput, **kwargs) -> SearchResponse:
     response: SearchResponse[User] = SearchResponse(SearchResponseUser)
     if search_input.user.is_superuser and search_input.matches_has_alpha():
         response.extend(User.objects.filter(

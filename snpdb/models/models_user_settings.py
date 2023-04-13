@@ -2,6 +2,7 @@ import dataclasses
 from collections import defaultdict
 from dataclasses import dataclass
 from functools import cached_property
+from html import escape
 from typing import Optional, List, Tuple, Dict, Set
 
 from avatar.templatetags.avatar_tags import avatar_url
@@ -12,12 +13,14 @@ from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models.deletion import SET_NULL, CASCADE
 from django.urls import reverse
+from django.utils.safestring import SafeString
 from django_extensions.db.models import TimeStampedModel
 from model_utils.managers import InheritanceManager
 
 from library.django_utils import thread_safe_unique_together_get_or_create
 from library.django_utils.avatar import SpaceThemedAvatarProvider
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsAutoInitialSaveMixin
+from library.preview_request import PreviewData
 from library.utils import string_deterministic_hash, rgb_invert
 from snpdb.models.models import Tag, Lab, Organization
 from snpdb.models.models_columns import CustomColumnsCollection, CustomColumn
@@ -227,6 +230,28 @@ class UserSettingsOverride(SettingsOverride):
 @dataclass(frozen=True)
 class AvatarDetails:
     user: User
+
+    def preview(self) -> PreviewData:
+        # icon = f'<div style="background-color:{ self.background_color }; background-image: url({ self.url }); height:1.3rem;width:1.3rem;border:2px solid { self.background_color }" class="background-image d-inline-block mr-1 rounded"></div>'
+
+        title = ""
+        if self.user.is_superuser:
+            title = "Admin"
+        elif labs := list(sorted(Lab.valid_labs_qs(self.user))):
+            if len(labs) > 1:
+                # TODO list orgs
+                title = f"{len(labs)} lab affiliations"
+            else:
+                title = str(labs[0])
+
+        return PreviewData.for_object(
+            obj=self.user,
+            category="User",
+            icon="fa-solid fa-user",
+            identifier=self.preferred_label,
+            title=title,
+            internal_url=reverse('view_user', kwargs={"pk": self.user.pk})
+        )
 
     @staticmethod
     def avatar_for(user: User):

@@ -5,10 +5,12 @@ from django.db.models.signals import post_save, pre_delete
 class GenesConfig(AppConfig):
     name = 'genes'
 
+    # noinspection PyUnresolvedReferences
     def ready(self):
+        from genes.signals import gene_symbol_search
         from annotation.models.models import CachedWebResource
         from genes.models import CachedThirdPartyGeneList
-        from genes.signals import hgnc_post_save_handler, lrg_ref_seq_gene_post_save_handler, \
+        from genes.signals.manual_signals import hgnc_post_save_handler, lrg_ref_seq_gene_post_save_handler, \
             mane_post_save_handler, \
             panel_app_england_panels_post_save_handler, panel_app_australia_panels_post_save_handler, \
             pfam_post_save_handler, \

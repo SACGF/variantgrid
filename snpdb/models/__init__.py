@@ -10,4 +10,3 @@ from .models_user_settings import *
 from .models_variant import *
 from .models_vcf import *
 from .models_zygosity_counts import *
-from .user_search import *  # for search signals

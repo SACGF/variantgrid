@@ -1,19 +1,22 @@
-from typing import Any, Optional, List
+from typing import Any, Optional, List, Union, Type
 
 from django.dispatch import receiver
+from django.utils.safestring import SafeString
 
 from annotation.models.models_citations import CitationSource, CitationIdNormalized, Citation
+from ontology.models import OntologyTerm
 from snpdb.search2 import SearchResponseRecordAbstract, SearchInput, search_signal, SearchResponse
 
 
 class SearchResponseCitation(SearchResponseRecordAbstract[Citation]):
 
     @classmethod
-    def search_type(cls) -> str:
-        return "Citation"
+    def result_class(cls) -> Type:
+        return OntologyTerm
 
     @property
     def messages(self) -> Optional[List[str]]:
+        issues = []
         input_string = self.search_input.search_string
         tidy_input = input_string.replace(' ', '').upper()
         if ':' in tidy_input:
@@ -21,7 +24,13 @@ class SearchResponseCitation(SearchResponseRecordAbstract[Citation]):
             search_prefix = CitationSource.from_legacy_code(tidy_input[:colon_index])
             suffix = tidy_input[colon_index+1:]
             if self.record.source != search_prefix or self.record.index != suffix:
-                return [f'Normalising "{input_string}" to "{self.record.id}"']
+                issues.append(f'Normalising "{input_string}" to "{self.record.id}"')
+        if self.record.error:
+            issues.append("Could not retrieve summary for citation")
+
+        if issues:
+            return issues
+
         return None
 
 
