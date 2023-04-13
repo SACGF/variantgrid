@@ -21,7 +21,7 @@ from annotation.models.models import AnnotationVersion
 from classification.models.classification import Classification, \
     CreateNoClassificationForbidden
 from genes.hgvs import HGVSMatcher
-from genes.models import TranscriptVersion, Transcript, MissingTranscript, Gene, GeneSymbol, GeneSymbolAlias
+from genes.models import TranscriptVersion, Transcript, MissingTranscript, Gene, GeneSymbol, GeneSymbolAlias, MANE
 from genes.models_enums import AnnotationConsortium
 from library.genomics import format_chrom
 from library.log_utils import report_message
@@ -594,24 +594,53 @@ def _search_hgvs_using_gene_symbol(gene_symbol, search_messages,
     results_by_record = defaultdict(list)
     transcript_accessions_by_record = defaultdict(list)
     allele = HGVSName(hgvs_string).format(use_gene=False)
-    for gene in gene_symbol.genes:
-        tv_qs = TranscriptVersion.objects.filter(genome_build=genome_build, gene_version__gene=gene)
-        latest_tv_qs = tv_qs.order_by("transcript_id", "-version").distinct("transcript_id")
-        for transcript_version in latest_tv_qs:
-            transcript_hgvs = f"{transcript_version.accession}:{allele}"
-            try:
-                for result in search_hgvs(transcript_hgvs, user, genome_build, variant_qs):
-                    result.annotation_consortia = [gene.annotation_consortium]
-                    results_by_record[result.record].append(result)
-                    transcript_accessions_by_record[result.record].append(transcript_version.accession)
-            except Exception as e:
-                # Just swallow all these errors
-                logging.warning(e)
+
+    transcript_versions = set()
+    transcript_version_messages = {}
+    other_transcripts_message = None  # Want this to be after transcripts used message
+
+    if settings.SEARCH_HGVS_GENE_SYMBOL_USE_MANE:
+        if mane := MANE.objects.get(symbol=gene_symbol):
+            for ac in AnnotationConsortium:
+                if tv := mane.get_transcript_version(ac):
+                    transcript_versions.add(tv)
+                    transcript_version_messages[tv.accession] = "MANE"
+
+    if settings.SEARCH_HGVS_GENE_SYMBOL_USE_ALL_TRANSCRIPTS:
+        for gene in gene_symbol.genes:
+            tv_qs = TranscriptVersion.objects.filter(genome_build=genome_build, gene_version__gene=gene)
+            # Take latest version for each transcript
+            for tv in tv_qs.order_by("transcript_id", "-version").distinct("transcript_id"):
+                transcript_versions.add(tv)
+    else:
+        tv_qs = TranscriptVersion.objects.filter(genome_build=genome_build, gene_version__gene__in=gene_symbol.genes)
+        if num_other := tv_qs.exclude(transcript__in=[tv.transcript for tv in transcript_versions]).distinct("transcript_id").count():
+            gene_page_link = f"<a href='{gene_symbol.get_absolute_url()}'>{gene_symbol} gene page</a>"
+            other_transcripts_message = f"Warning: there are {num_other} other transcripts for this genome build " \
+                                        f"which may give different results. You may wish to view the " \
+                                        f"{gene_page_link} for all results"
+
+    # TODO: Sort transcript_versions somehow
+    for transcript_version in transcript_versions:
+        transcript_hgvs = f"{transcript_version.accession}:{allele}"
+        try:
+            for result in search_hgvs(transcript_hgvs, user, genome_build, variant_qs):
+                result.annotation_consortia = [transcript_version.transcript.annotation_consortium]
+                results_by_record[result.record].append(result)
+                tv_message = str(transcript_version.accession)
+                if msg := transcript_version_messages.get(transcript_version.accession):
+                    tv_message += f" ({msg})"
+                transcript_accessions_by_record[result.record].append(tv_message)
+        except Exception as e:
+            # Just swallow all these errors
+            logging.warning(e)
 
     for record, results_for_record in results_by_record.items():
         unique_messages = {m: True for m in search_messages}  # Use dict for uniqueness
         result_message = f"Results for: {', '.join(transcript_accessions_by_record[record])}"
         unique_messages[result_message] = True
+        if other_transcripts_message:
+            unique_messages[other_transcripts_message] = True
         # Go through messages for each result together, so they stay in same order
         for messages in zip_longest(*[r.messages for r in results_for_record]):
             for m in messages:

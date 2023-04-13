@@ -69,7 +69,7 @@
                                 >
                                     <td>{{ search_result.header_string }}</td>
                                     <td>{% if search_result.messages %}{% for message in search_result.messages %}
-                                        <span class="search-message text-danger">{{ message }}</span>
+                                        <span class="search-message text-danger">{{ message|safe }}</span>
                                     {% endfor %}<br>{% endif %}
                                         <a class="hover-link" href="{{ search_result.record.get_absolute_url }}">{{ search_result.record }}</a>
                                         {% if search_summary %}
