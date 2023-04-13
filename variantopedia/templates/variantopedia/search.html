@@ -92,7 +92,7 @@
                                             {% if search_result.messages %}
                                                 <div class="mt-2">
                                                     {% for message in search_result.messages %}
-                                                        <div class="text-danger">{{ 'W' | severity_icon }}{{ message }}</div>
+                                                        <div class="text-danger">{{ 'W' | severity_icon }}{{ message|safe }}</div>
                                                     {% endfor %}
                                                 </div>
                                             {% endif %}
@@ -108,18 +108,21 @@
                         {% for search_result in search_results.results %}
                             <tr {% if not search_result.is_preferred_build or not search_result.is_preferred_annotation %}
                                 class="not-preferred hover-detail" title="Search result is not in preferred build and/or annotation consortium"
+                            {% if not search_result.is_debug_data %}
+                                <tr {% if not search_result.is_preferred_build or not search_result.is_preferred_annotation %}
+                                    class="not-preferred hover-detail" title="Search result is not in preferred build and/or annotation consortium"
+                                {% endif %}
+                                    <td>{{ search_result.header_string }}</td>
+                                    <td>{% if search_result.messages %}{% for message in search_result.messages %}
+                                        <span class="search-message text-danger">{{ message|safe }}</span>
+                                    {% endfor %}<br>{% endif %}
+                                        <a class="hover-link" href="{{ search_result.record.get_absolute_url }}">{{ search_result.record }}</a>
+                                        {% if search_summary %}
+                                            {% search_summary request.user search_result %}
+                                        {% endif %}
+                                    </td>
+                                </tr>
                             {% endif %}
-                            >
-                                <td>{{ search_result.header_string }}</td>
-                                <td>{% if search_result.messages %}{% for message in search_result.messages %}
-                                    <span class="search-message text-danger">{{ message }}</span>
-                                {% endfor %}<br>{% endif %}
-                                    <a class="hover-link" href="{{ search_result.record.get_absolute_url }}">{{ search_result.record }}</a>
-                                    {% if search_summary %}
-                                        {% search_summary request.user search_result %}
-                                    {% endif %}
-                                </td>
-                            </tr>
                         {% endfor %}
                     </table>
                     {% endcomment %}
