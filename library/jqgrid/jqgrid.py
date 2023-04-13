@@ -104,7 +104,7 @@ class JqGrid:
         # You can't join into a JSON field like values("json_field__key")
         # normally, but can use a trick see https://stackoverflow.com/a/45369944/295724
 
-        # You annotate into the query, field by field, eg "json_field__json_key_0__json_key_1", ops will be:
+        # You annotate into the query, field by field, e.g. "json_field__json_key_0__json_key_1", ops will be:
         # qs = qs.annotate(json_key_0__json_key_1=KeyTransform("json_key_0", "json_field"))
         # qs = qs.annotate(json_field__json_key_0__json_key_1=KeyTransform("json_key_1", "json_key_0__json_key_1")
 

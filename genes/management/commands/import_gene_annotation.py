@@ -81,7 +81,7 @@ class Command(BaseCommand):
         return import_source
 
     def _create_release(self, genome_build: GenomeBuild, annotation_consortium, release_version, cdot_data, cdot_version):
-        """ A GeneAnnotationRelease doesn't change/store transcript data, but does keep track of eg what
+        """ A GeneAnnotationRelease doesn't change/store transcript data, but does keep track of e.g. what
             symbols are used and how things are linked together """
 
         # A release should be from a single GTF - so all URLs should be the same, so take any one

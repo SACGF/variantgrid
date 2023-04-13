@@ -222,7 +222,7 @@ class CohortNode(AbstractCohortBasedNode, AbstractZygosityCountNode):
 
     @staticmethod
     def get_help_text() -> str:
-        return "A collection of multiple samples, eg 'control group' or 'poor responders'"
+        return "A collection of multiple samples, e.g. 'control group' or 'poor responders'"
 
     @staticmethod
     def get_node_class_label():

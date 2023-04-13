@@ -10,7 +10,7 @@ from library.jqgrid.jqgrid import JqGrid, format_operation
 from snpdb.models import VariantGridColumn, Variant
 
 
-# TODO: This node has quite a few redundant operations - eg it will filter the queryset
+# TODO: This node has quite a few redundant operations - e.g. it will filter the queryset
 # By the filter, and then have it re-applied by jqgrid. Maybe we could override the filter
 # method if already filtered, to save work.
 # But: Get it right, then get it fast.....

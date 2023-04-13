@@ -158,7 +158,7 @@ def liftover_alleles(allele_qs, user: User = None):
 
 
 def _liftover_using_same_contig(genome_build, av_tuples: List[Tuple[int, int]]):
-    """ Special case of eg Mitochondria that has the same contig across multiple builds
+    """ Special case of e.g. Mitochondria that has the same contig across multiple builds
         we just need to create a VariantAllele object - will already have annotation for both builds """
 
     variant_alleles = []

@@ -177,7 +177,7 @@ class SeqAutoMessage(TimeStampedModel):
 class SequencingRun(SeqAutoRecord):
     """ Represents a flowcell (or other technology with multiple sequencing samples) """
     name = models.TextField(primary_key=True)
-    date = models.DateField(null=True)  # Eg from the sequencing name - used to sort
+    date = models.DateField(null=True)  # e.g. from the sequencing name - used to sort
     sequencer = models.ForeignKey(Sequencer, on_delete=CASCADE)
     gold_standard = models.BooleanField(default=False)
     bad = models.BooleanField(default=False)
@@ -519,7 +519,7 @@ class IlluminaFlowcellQC(SeqAutoRecord):
 
 class ReadQ30(models.Model):
     illumina_flowcell_qc = models.ForeignKey(IlluminaFlowcellQC, on_delete=CASCADE)
-    sequencer_read_id = models.IntegerField()  # Eg HiSeq= [R1,Index,R2], NextSeq/MiSeq=[R1,Index1,Index2,R2]
+    sequencer_read_id = models.IntegerField()  # e.g. HiSeq= [R1,Index,R2], NextSeq/MiSeq=[R1,Index1,Index2,R2]
     read = models.CharField(max_length=2, choices=SequencerRead.choices)
     percent = models.FloatField()
     is_index = models.BooleanField(default=False)

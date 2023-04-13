@@ -55,7 +55,7 @@ def store_refseq_gene_info_from_web(cached_web_resource: CachedWebResource):
                 s = s.upper()
                 known_symbols.add(s)
                 if s == gene_symbol_id:
-                    continue  # Our aliases are case insensitive so no need to store these
+                    continue  # Our aliases are case-insensitive so no need to store these
                 gene_symbol_aliases.append(GeneSymbolAlias(alias=s,
                                                            gene_symbol_id=gene_symbol_id,
                                                            source=GeneSymbolAliasSource.NCBI))

@@ -43,7 +43,7 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument('--replace', action='store_true', help="Replace existing version if exists")
-        parser.add_argument('--dbnsfp-version', required=True, help="dbNSFP version eg '4.3'")
+        parser.add_argument('--dbnsfp-version', required=True, help="dbNSFP version e.g. '4.3'")
         parser.add_argument('dbnsfp_gene_filename')
 
     def handle(self, *args, **options):

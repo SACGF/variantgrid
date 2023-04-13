@@ -87,7 +87,7 @@ class HGNC(models.Model):
     ensembl_gene_id = models.TextField(null=True, blank=True)
     gene_group_ids = models.TextField(null=True, blank=True)
     gene_groups = models.TextField(null=True, blank=True)
-    # Believe it or not, gene_symbol is not unique - eg MMP21 has multiple entries
+    # Believe it or not, gene_symbol is not unique - e.g. MMP21 has multiple entries
     gene_symbol = models.ForeignKey('GeneSymbol', on_delete=CASCADE)
     hgnc_import = models.ForeignKey(HGNCImport, on_delete=CASCADE)
     location = models.TextField(null=True, blank=True)
@@ -454,7 +454,7 @@ class GeneVersion(models.Model):
         Genes/TranscriptVersion needs to be able to represent both RefSeq and Ensembl """
     gene = models.ForeignKey(Gene, on_delete=CASCADE)
     version = models.IntegerField()  # RefSeq GeneIDs are always 0 (not versioned) need non-null for unique_together
-    # symbol can be null as Ensembl has genes w/o symbols, eg ENSG00000238009 (lncRNA)
+    # symbol can be null as Ensembl has genes w/o symbols, e.g. ENSG00000238009 (lncRNA)
     gene_symbol = models.ForeignKey(GeneSymbol, null=True, on_delete=CASCADE)
     # HGNC assignment - hgnc_identifier is set from the annotation file
     #                   hgnc (ForeignKey) is linked to our HGNC models
@@ -732,7 +732,7 @@ class TranscriptVersion(SortByPKMixin, models.Model):
     @cached_property
     def gene_symbol(self):
         """ Returns HGNC symbol if available (to keep consistency between builds) or GeneVersion symbol (from GFF)
-            GeneVersion symbol from GFF can diverge eg Entrez GeneID: 6901 - TAZ(37) and TAFAZZIN(38) """
+            GeneVersion symbol from GFF can diverge e.g. Entrez GeneID: 6901 - TAZ(37) and TAFAZZIN(38) """
         if hgnc := self.gene_version.hgnc:
             gene_symbol = hgnc.gene_symbol
         else:
@@ -1399,7 +1399,7 @@ class GeneAnnotationRelease(models.Model):
 
         This release can be set on a VariantAnnotationVersion to be able to get genes/transcripts from a VEP build
     """
-    version = models.TextField()  # Needs to support eg "109.20190607"
+    version = models.TextField()  # Needs to support e.g. "109.20190607"
     annotation_consortium = models.CharField(max_length=1, choices=AnnotationConsortium.choices)
     genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)
     gene_annotation_import = models.ForeignKey(GeneAnnotationImport, on_delete=CASCADE)

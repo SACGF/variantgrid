@@ -145,7 +145,7 @@ class OntologyRelation:
 
 class GeneDiseaseClassification(models.TextChoices):
     # @see https://thegencc.org/faq.html#validity-termsdelphi-survey - where sort order comes from
-    # Not using eg "GENCC:100009" (= Supportive) as that has different sort order than page above
+    # Not using e.g. "GENCC:100009" (= Supportive) as that has different sort order than page above
     REFUTED = "1", "Refuted Evidence"
     NO_KNOWN = "2", "No Known Disease Relationship"
     ANIMAL = "3", "Animal Model Only"

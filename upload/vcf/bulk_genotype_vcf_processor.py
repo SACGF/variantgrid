@@ -41,7 +41,7 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
     # v15. Any genotype as '.' -> unknown zygosity
     # v16. Don't insert a reference variant for each unknown ALT (only if provided) - version never deployed
     # v17. Use refactored RedisVariantPKLookup
-    # v18. Handle Mixed diploid/haploid calls eg male chrX GT=1 - see https://github.com/brentp/cyvcf2/issues/227
+    # v18. Handle Mixed diploid/haploid calls e.g. male chrX GT=1 - see https://github.com/brentp/cyvcf2/issues/227
     # v19. Go back to using CyVCF code as of version >= 0.30.14
     # v20. Split into common/uncommon genotype collections
     VCF_IMPORTER_VERSION = 20  # Change this if you make a major change to the code.
@@ -206,8 +206,8 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
 
                 pl[missing] = CohortGenotype.MISSING_NUMBER_VALUE  # Handle individual PL array entry missing
                 for i, (gt, genotype) in enumerate(zip(gt_types, variant.genotypes)):
-                    # CyVCF2 genotypes entry for sample is eg [0, 1, True] (last element = is phased)
-                    # Handle case where PL is not variant.ploidy + 1 - eg where male chrX given as haploid, ie GT=1
+                    # CyVCF2 genotypes entry for sample is e.g. [0, 1, True] (last element = is phased)
+                    # Handle case where PL is not variant.ploidy + 1 - e.g. where male chrX given as haploid, ie GT=1
                     # see https://github.com/brentp/cyvcf2/issues/227
                     ploidy = len(genotype) - 1
                     pl_index_lookup = BulkGenotypeVCFProcessor.CYVCF_PL_INDEX_FOR_PLOIDY[ploidy]

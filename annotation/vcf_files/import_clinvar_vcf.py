@@ -149,7 +149,7 @@ class BulkClinVarInserter:
                         highest_pathogenicity = pathogenicity
             else:
                 # 3 out of 50504 records in 20210828 with Conflicting_interpretations_of_pathogenicity are missing
-                # CLNSIGCONF (conflicting_clinical_significance), eg see
+                # CLNSIGCONF (conflicting_clinical_significance), e.g. see
                 # https://www.ncbi.nlm.nih.gov/clinvar/variation/161486/
                 # As this is really low we'll just skip setting highest pathogenicity in those ones, but will die
                 # If there are a few as that could mean ClinVar has changed the INFO fields

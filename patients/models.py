@@ -222,7 +222,7 @@ class Patient(GuardianPermissionsMixin, HasPhenotypeDescriptionMixin, Externally
 
 
 class PatientPopulation(models.Model):
-    """ Can have many-to-one - eg Obama would have an entry for
+    """ Can have many-to-one - e.g. Obama would have an entry for
         both AFRICAN_AFRICAN_AMERICAN and NON_FINNISH_EUROPEAN """
     patient = models.ForeignKey(Patient, on_delete=CASCADE)
     population = models.CharField(max_length=3, choices=PopulationGroup.choices)

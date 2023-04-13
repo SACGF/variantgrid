@@ -13,7 +13,7 @@ DBSNP_PATTERN = re.compile(r"^rs(\d+)$")
 
 class DbSNP(TimeStampedModel):
     """ Wrapper around DbSNP API service, @see https://api.ncbi.nlm.nih.gov/variation/v0/ """
-    # id = "rs" stripped off, eg rs121964969 => 121964969
+    # id = "rs" stripped off, e.g. rs121964969 => 121964969
     id = models.IntegerField(primary_key=True)
     api_response = models.JSONField(null=False)  # returned
 

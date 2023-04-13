@@ -143,7 +143,7 @@ class BulkVEPVCFAnnotationInserter:
         extract_dbsnp = get_extract_existing_variation("rs")
         format_empty_as_none = get_format_empty_as_none(empty_values=EMPTY_VALUES)
 
-        # Some annotations return multiple results eg 2 frequencies eg "0.6764&0.2433"
+        # Some annotations return multiple results e.g. 2 frequencies e.g. "0.6764&0.2433"
         # Need to work out what to do (eg pick max)
         self.field_formatters = {
             "af_1kg": format_pick_highest_float,

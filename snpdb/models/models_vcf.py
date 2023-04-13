@@ -67,7 +67,7 @@ class VCF(models.Model):
     fake_data = models.ForeignKey(FakeData, null=True, blank=True, on_delete=CASCADE)
     header = models.TextField(null=True)
     source = models.TextField(blank=True)
-    # Most callers put allele depths in AD eg AD=[10,12] but some can split into separate ref/alt fields
+    # Most callers put allele depths in AD e.g. AD=[10,12] but some can split into separate ref/alt fields
     allele_depth_field = models.TextField(null=True)
     # If AF is provided, we use it, otherwise if it is null we calculate it ourselves (post normalization w/VT)
     # which can sometimes cause issues with splitting multi-alts

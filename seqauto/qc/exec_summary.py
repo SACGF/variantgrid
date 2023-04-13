@@ -46,7 +46,7 @@ def load_exec_summary(klass, exec_summary_filename):
         f = QCEXEC_FIELDS.get(k)
         if f and not pd.isna(v):
             internal_type = type_converters[f]
-            # Integers come out as eg "42.0" so need to convert to float first then int
+            # Integers come out as e.g. "42.0" so need to convert to float first then int
             if internal_type in ('FloatField', 'IntegerField'):
                 v = float(v)
             if internal_type == 'IntegerField':
