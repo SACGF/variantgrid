@@ -103,7 +103,8 @@ urlpatterns = [
     perm_path('classification/<classification_id>/classification.csv', classification_export_view.record_csv, name='classification_csv'),
     perm_path('classification/<classification_id>/report.html', classification_export_view.template_report, name='view_template_report'),
     perm_path('classification/<classification_id>/history', views.classification_history, name='classification_history'),
-    perm_path('classification/<classification_id>', views.view_classification, name='view_classification'),  # classificaiton ID might have a version in it (e.g. a dot)
+    # classification ID might have a version in it (e.g. a dot)
+    perm_path('classification/<classification_id>', views.view_classification, name='view_classification'),
 
     perm_path('evidence_keys/<max_share_level>', views.evidence_keys, name='evidence_keys_max_share_level'),
     perm_path('evidence_keys', views.evidence_keys, name='evidence_keys'),

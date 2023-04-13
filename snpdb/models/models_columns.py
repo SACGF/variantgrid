@@ -44,7 +44,7 @@ class VariantGridColumn(models.Model):
 
     @property
     def ekey_note(self) -> Optional[str]:
-        """ Add a note on field when autopopulating classificaiton """
+        """ Add a note on field when autopopulating classification """
         # From columns version 2, we switched to rank scores - need to document this in EKey note
         note = None
         if self.pk.endswith("_rankscore"):
