@@ -5,6 +5,7 @@
 {% load compress %}
 {% load ui_help %}
 {% load ui_menu_bars %}
+{% load settings_tags %}
 {% block title %}Classifications{% endblock %}
 {% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
 {% block head %}
@@ -140,6 +141,11 @@
 </script>
 {% endblock %}
 {% block content %}
+    {% settings_value 'VARIANT_CLASSIFICATION_GRID_SHOW_USERNAME' as VARIANT_CLASSIFICATION_GRID_SHOW_USERNAME %}
+    {% settings_value 'VARIANT_CLASSIFICATION_GRID_SHOW_ORIGIN' as VARIANT_CLASSIFICATION_GRID_SHOW_ORIGIN %}
+    {% settings_value 'VARIANT_CLASSIFICATION_ID_FILTER' as VARIANT_CLASSIFICATION_ID_FILTER %}
+    {% settings_value 'VARIANT_CLASSIFICATION_REDCAP_EXPORT' as VARIANT_CLASSIFICATION_REDCAP_EXPORT %}
+
     <div class="container">
         {% if labs.count > 0 and can_create_classification %}
             <form method="get" action="{% url 'search' %}">
