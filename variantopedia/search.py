@@ -377,7 +377,7 @@ class Searcher:
             (SearchTypes.GENE, GENE_PATTERN, search_gene),  # special case
             (SearchTypes.EXPERIMENT, HAS_ALPHA_PATTERN, search_experiment),
             (SearchTypes.EXTERNAL_PK, HAS_ALPHA_PATTERN, search_external_pk),
-            (SearchTypes.PATIENT, HAS_ALPHA_PATTERN, search_patient),
+            #(SearchTypes.PATIENT, HAS_ALPHA_PATTERN, search_patient),
             (SearchTypes.SEQUENCING_RUN, SEQUENCING_RUN_REGEX, search_sequencing_run),
             (SearchTypes.TRANSCRIPT, TRANSCRIPT_PATTERN, search_transcript),
             (SearchTypes.VARIANT, DB_PREFIX_PATTERN, search_variant_id),
@@ -872,16 +872,16 @@ def search_clingen_allele(search_string: str, user: User, genome_build: GenomeBu
     return None
 
 
-def search_patient(search_string: str, user: User, **kwargs) -> Iterable[Patient]:
-    parts = search_string.split(",")
-    if len(parts) == 2:
-        (last_name, first_name) = parts
-        q_last = Q(last_name__iexact=last_name.strip())
-        q_first = Q(first_name__iexact=first_name.strip())
-        patient_q = q_last & q_first
-    else:
-        patient_q = Q(last_name__iexact=search_string) | Q(first_name__iexact=search_string)
-    return Patient.filter_for_user(user).filter(patient_q)
+# def search_patient(search_string: str, user: User, **kwargs) -> Iterable[Patient]:
+#     parts = search_string.split(",")
+#     if len(parts) == 2:
+#         (last_name, first_name) = parts
+#         q_last = Q(last_name__iexact=last_name.strip())
+#         q_first = Q(first_name__iexact=first_name.strip())
+#         patient_q = q_last & q_first
+#     else:
+#         patient_q = Q(last_name__iexact=search_string) | Q(first_name__iexact=search_string)
+#     return Patient.filter_for_user(user).filter(patient_q)
 
 
 def search_sequencing_run(search_string: str, **kwargs) -> Iterable[SequencingRun]:
