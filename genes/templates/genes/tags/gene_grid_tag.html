@@ -5,6 +5,13 @@
 {% load ui_utils %}
 {% load crispy_forms_tags %}
 {% load crispy_forms_field %}
+{% load settings_tags %}
+
+{% settings_value 'GENE_GRID_ENRICHMENT_KIT_COLUMNS' as ENRICHMENT_KIT_COLUMNS %}
+{% settings_value 'GENE_GRID_ENRICHMENT_KIT_COLUMN_TOOL_TIPS' as ENRICHMENT_KIT_COLUMN_TOOL_TIPS %}
+{% settings_value 'GENE_GRID_ENRICHMENT_KIT_COLUMN_LABELS' as ENRICHMENT_KIT_COLUMN_LABELS %}
+{% settings_value 'GENE_GRID_ENRICHMENT_KIT_COLUMN_LABEL_TOOL_TIPS' as ENRICHMENT_KIT_COLUMN_LABEL_TOOL_TIPS %}
+
 <script type="text/javascript" src="{% static 'js/lib/plotly-latest.min.js' %}"></script>
 <script type="text/javascript" src="{% static 'js/plotly_helper.js' %}"></script>
 <script type="text/javascript" src="{% static 'js/panel_app.js' %}"></script>
