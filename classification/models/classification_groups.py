@@ -286,6 +286,12 @@ class ClassificationGroup:
 
     @cached_property
     def variant_sort(self) -> str:
+        if allele_infos := self.allele_infos:
+            for allele_info in allele_infos:
+                if variant_info := allele_info[self.genome_build]:
+                    if genomic_sort := variant_info.genomic_sort:
+                        return genomic_sort
+
         return self.c_hgvs.sort_str
 
     @property
