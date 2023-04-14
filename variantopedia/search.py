@@ -600,7 +600,7 @@ def _search_hgvs_using_gene_symbol(gene_symbol, search_messages,
     other_transcripts_message = None  # Want this to be after transcripts used message
 
     if settings.SEARCH_HGVS_GENE_SYMBOL_USE_MANE:
-        if mane := MANE.objects.get(symbol=gene_symbol):
+        if mane := MANE.objects.filter(symbol=gene_symbol).first():
             for ac in AnnotationConsortium:
                 if tv := mane.get_transcript_version(ac):
                     transcript_versions.add(tv)
