@@ -1,8 +1,8 @@
 import re
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from re import Match, IGNORECASE
-from typing import Optional, TypeVar, Generic, Union, List, Iterable, Type, Pattern, Any
+from typing import Optional, TypeVar, Generic, Union, List, Iterable, Type, Pattern, Any, Set
 
 import django
 from django.contrib.auth.models import User
@@ -54,7 +54,7 @@ T = TypeVar("T")
 @dataclass
 class SearchResult2:
     preview: PreviewData
-    genome_build: Optional[GenomeBuild] = None
+    genome_builds: Optional[Set[GenomeBuild]] = None
     annotation_consortium: Optional[AnnotationConsortium] = None
     messages: Optional[List[str]] = None
 
@@ -76,7 +76,7 @@ class SearchResponse:
         self.results.append(search_result)
         self.searched_categories.add(search_result.preview.category)
 
-    def add(self, obj: Any, messages: Optional[List[str]] = None, genome_build: Optional[GenomeBuild] = None, annotation_consortium: Optional[GenomeBuild] = None):
+    def add(self, obj: Any, messages: Optional[List[str]] = None, genome_builds: Optional[Set[GenomeBuild]] = None, annotation_consortium: Optional[GenomeBuild] = None):
         if not isinstance(obj, PreviewData):
             preview = obj.preview
             if not preview:
@@ -84,7 +84,7 @@ class SearchResponse:
             obj = preview
         if not isinstance(obj, PreviewData):
             raise ValueError(f"Can't add {obj} as search result preview")
-        self.add_search_result(SearchResult2(preview=obj, messages=messages, genome_build=genome_build, annotation_consortium=annotation_consortium))
+        self.add_search_result(SearchResult2(preview=obj, messages=messages, genome_builds=genome_builds, annotation_consortium=annotation_consortium))
 
     def extend(self, iterable: Iterable, messages: Optional[List[str]] = None, genome_build: Optional[GenomeBuild] = None, annotation_consortium: Optional[GenomeBuild] = None):
         for obj in iterable:

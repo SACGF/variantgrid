@@ -181,15 +181,13 @@ class SearchResult:
     def from_search_result_abs(result: SearchResult2):
         genome_builds: Set[GenomeBuild] = set()
         annotation_consortias: List[str] = []
-        if genome_build := result.genome_build:
-            genome_builds.add(genome_build)
         if annotation_consortia := result.annotation_consortium:
             annotation_consortias.append(annotation_consortia)
 
         sr = SearchResult(
             record=None,
             preview=result.preview,
-            genome_builds=genome_builds,
+            genome_builds=result.genome_builds or set(),
             annotation_consortia=annotation_consortias,
             message=result.messages
         )
