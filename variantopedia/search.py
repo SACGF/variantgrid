@@ -596,7 +596,7 @@ def _search_hgvs_using_gene_symbol(gene_symbol, search_messages,
     allele = HGVSName(hgvs_string).format(use_gene=False)
 
     transcript_versions = set()
-    transcript_version_messages = {}
+    mane_transcripts = set()
     other_transcripts_message = None  # Want this to be after transcripts used message
 
     if settings.SEARCH_HGVS_GENE_SYMBOL_USE_MANE:
@@ -604,7 +604,7 @@ def _search_hgvs_using_gene_symbol(gene_symbol, search_messages,
             for ac in AnnotationConsortium:
                 if tv := mane.get_transcript_version(ac):
                     transcript_versions.add(tv)
-                    transcript_version_messages[tv.accession] = "MANE"
+                    mane_transcripts.add(tv.accession)
 
     if settings.SEARCH_HGVS_GENE_SYMBOL_USE_ALL_TRANSCRIPTS:
         for gene in gene_symbol.genes:
@@ -628,8 +628,8 @@ def _search_hgvs_using_gene_symbol(gene_symbol, search_messages,
                 result.annotation_consortia = [transcript_version.transcript.annotation_consortium]
                 results_by_record[result.record].append(result)
                 tv_message = str(transcript_version.accession)
-                if msg := transcript_version_messages.get(transcript_version.accession):
-                    tv_message += f" ({msg})"
+                if transcript_version.accession in mane_transcripts:
+                    tv_message += f" (MANE)"
                 transcript_accessions_by_record[result.record].append(tv_message)
         except Exception as e:
             # Just swallow all these errors
@@ -656,6 +656,12 @@ def _search_hgvs_using_gene_symbol(gene_symbol, search_messages,
         initial_score = results_for_record[0].initial_score
         results.append(SearchResult(record, message=messages, initial_score=initial_score,
                                     annotation_consortia=list(unique_annotation_consortia)))
+
+    if not results:
+        if settings.SEARCH_HGVS_GENE_SYMBOL_USE_MANE and not settings.SEARCH_HGVS_GENE_SYMBOL_USE_ALL_TRANSCRIPTS:
+            search_messages.append(f"Only searched MANE transcripts: {', '.join(mane_transcripts)}")
+            results.append(SearchResult(None, message=search_messages))
+
     return results
 
 
@@ -712,8 +718,10 @@ def search_hgvs(search_string: str, user: User, genome_build: GenomeBuild, varia
             variant_string = Variant.format_tuple(*variant_tuple)
             variant_string_abbreviated = Variant.format_tuple(*variant_tuple, abbreviate=True)
             search_messages.append(f"'{search_string}' resolved to {variant_string_abbreviated}")
-            results = [SearchResult(CreateManualVariant(genome_build, variant_string),
-                                    message=search_messages, initial_score=initial_score)]
+            results = []
+            cmv = CreateManualVariant(genome_build, variant_string)
+            if cmv.is_valid_for_user(user):
+                results.append(SearchResult(cmv, message=search_messages, initial_score=initial_score))
             results.extend(search_for_alt_alts(variant_qs, variant_tuple, search_messages))
             return results
     return []
