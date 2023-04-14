@@ -8,21 +8,14 @@ from django.dispatch import receiver
 from pyhgvs import HGVSName, InvalidHGVSName
 
 from annotation.models import VariantAnnotationVersion
-from classification.models import Classification, ClassificationModification, EvidenceKeyMap
+from classification.models import Classification, ClassificationModification
 from snpdb.models import Lab, Organization
-from snpdb.search2 import SearchResponseRecordAbstract, search_signal, SearchInput, SearchResponse
-
-
-class SearchResponseClassification(SearchResponseRecordAbstract[Classification]):
-
-    @classmethod
-    def result_class(cls) -> Type:
-        return Classification
+from snpdb.search2 import search_signal, SearchInput, SearchResponse
 
 
 @receiver(search_signal, sender=SearchInput)
 def classification_search(sender: Any, search_input: SearchInput, **kwargs) -> SearchResponse:
-    response: SearchResponse[SearchResponseClassification] = SearchResponse(SearchResponseClassification)
+    response = SearchResponse("Classification")
 
     search_string = search_input.search_string
     """ Search for LabId which can be either:
@@ -85,6 +78,6 @@ def classification_search(sender: Any, search_input: SearchInput, **kwargs) -> S
 
     # convert from modifications back to Classification so absolute_url returns the editable link
     qs = Classification.objects.filter(Q(pk__in=cm_ids) | Q(pk__in=cm_source_ids))
-    response.extend(SearchResponseClassification.from_iterable(qs))
+    response.extend(qs)
 
     return response

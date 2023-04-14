@@ -2,7 +2,7 @@ import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from re import Match, IGNORECASE
-from typing import Optional, TypeVar, Generic, Union, List, Iterable, Type, Pattern
+from typing import Optional, TypeVar, Generic, Union, List, Iterable, Type, Pattern, Any
 
 import django
 from django.contrib.auth.models import User
@@ -39,10 +39,10 @@ class SearchInput:
         for caller, response in response_tuples:
             if response:
                 if isinstance(response, SearchResponse):
-                    if response.valid_search:
-                        valid_responses.append(response)
+                    valid_responses.append(response)
                 else:
                     # TODO see if there's a more useful way we can pass exceptions?
+                    print(caller)
                     report_message("Error during search", 'error', extra_data={"target": str(response), "caller": str(caller)})
 
         return valid_responses
@@ -51,63 +51,41 @@ class SearchInput:
 T = TypeVar("T")
 
 
-class SearchResponseRecordAbstract(ABC, Generic[T]):
-
-    def __init__(self, record: T, search_input: Optional[SearchInput] = None):
-        self.record = record
-        self.search_input = search_input
-
-    @classmethod
-    @abstractmethod
-    def result_class(cls) -> Type[T]:
-        pass
-
-    @classmethod
-    def category(cls) -> str:
-        return pretty_label(cls.result_class()._meta.verbose_name)
-
-    @property
-    def preview(self) -> PreviewData:
-        return self.record.preview
-
-    @classmethod
-    def from_iterable(cls, iterable: Iterable[T]) -> List:
-        return [cls(r) for r in iterable]
-
-    @property
-    def genome_build(self) -> Optional[GenomeBuild]:
-        return None
-
-    @property
-    def annotation_consortia(self) -> Optional[AnnotationConsortium]:
-        return None
-
-    @property
-    def messages(self) -> Optional[List[str]]:
-        return None
+@dataclass
+class SearchResult2:
+    preview: PreviewData
+    genome_build: Optional[GenomeBuild] = None
+    annotation_consortium: Optional[AnnotationConsortium] = None
+    messages: Optional[List[str]] = None
 
 
-class SearchResponse(Generic[T]):
+class SearchResponse:
 
-    def __init__(self, response_type: Type[SearchResponseRecordAbstract], search_input: Optional[SearchInput] = None):
-        self.response_type = response_type
-        self.results: List[SearchResponseRecordAbstract] = []
-        self.valid_search = False
-        self.search_input = search_input
+    def __init__(self, *args):
+        self.searched_categories = set()
+        self.results = list()
+        for arg in args:
+            self.add_search_category(arg)
 
-    @property
-    def search_type(self):
-        return self.response_type.category()
+    def add_search_category(self, obj):
+        if not isinstance(obj, str):
+            obj = obj.preview_category()
+        self.searched_categories.add(obj)
 
-    def add(self, record: Union[T, SearchResponseRecordAbstract]):
-        if not isinstance(record, SearchResponseRecordAbstract):
-            record = self.response_type(record, search_input=self.search_input)
-        self.results.append(record)
+    def add_search_result(self, search_result: SearchResult2):
+        self.results.append(search_result)
+        self.searched_categories.add(search_result.preview.category)
 
-    def extend(self, iterable: Iterable[T]):
-        for r in iterable:
-            self.add(r)
-        self.mark_valid_search()
+    def add(self, obj: Any, messages: Optional[List[str]] = None, genome_build: Optional[GenomeBuild] = None, annotation_consortium: Optional[GenomeBuild] = None):
+        if not isinstance(obj, PreviewData):
+            preview = obj.preview
+            if not preview:
+                raise ValueError(f"{obj} had None preview")
+            obj = preview
+        if not isinstance(obj, PreviewData):
+            raise ValueError(f"Can't add {obj} as search result preview")
+        self.add_search_result(SearchResult2(preview=obj, messages=messages, genome_build=genome_build, annotation_consortium=annotation_consortium))
 
-    def mark_valid_search(self):
-        self.valid_search = True
+    def extend(self, iterable: Iterable, messages: Optional[List[str]] = None, genome_build: Optional[GenomeBuild] = None, annotation_consortium: Optional[GenomeBuild] = None):
+        for obj in iterable:
+            self.add(obj, messages=messages, genome_build=genome_build, annotation_consortium=annotation_consortium)

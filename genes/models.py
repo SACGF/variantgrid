@@ -44,7 +44,7 @@ from library.django_utils.django_partition import RelatedModelsPartitionModel
 from library.guardian_utils import assign_permission_to_user_and_groups, DjangoPermission, admin_bot, \
     add_public_group_read_permission
 from library.log_utils import log_traceback
-from library.preview_request import PreviewData
+from library.preview_request import PreviewData, PreviewableModel
 from library.utils import get_single_element, iter_fixed_chunks
 from library.utils.file_utils import mk_path
 from snpdb.models import Wiki, Company, Sample, DataState
@@ -167,7 +167,7 @@ class UniProt(models.Model):
         return self.accession
 
 
-class GeneSymbol(models.Model):
+class GeneSymbol(models.Model, PreviewableModel):
     symbol = CITextField(primary_key=True)
 
     @staticmethod
@@ -202,14 +202,13 @@ class GeneSymbol(models.Model):
     def alias_meta(self) -> 'GeneSymbolAliasesMeta':
         return GeneSymbolAliasesMeta(self)
 
+    @classmethod
+    def preview_icon(cls) -> str:
+        return "fa-solid fa-dna"
+
     @property
     def preview(self) -> PreviewData:
-        return PreviewData.for_object(
-            obj=self,
-            icon="fa-solid fa-dna",
-            identifier=self.name,
-            title=""
-        )
+        return self.preview_with(identifier=self.name)
 
     def has_different_genes(self, other: 'GeneSymbol') -> bool:
         """
@@ -581,6 +580,13 @@ class Transcript(models.Model):
     identifier = models.TextField(primary_key=True)
     annotation_consortium = models.CharField(max_length=1, choices=AnnotationConsortium.choices)
 
+    @property
+    def preview(self) -> PreviewData:
+        return PreviewData.for_object(
+            obj=self,
+            icon="fa-solid fa-timeline"
+       )
+
     def get_absolute_url(self):
         kwargs = {"transcript_id": self.identifier}
         return reverse("view_transcript", kwargs=kwargs)
@@ -638,6 +644,13 @@ class TranscriptVersion(SortByPKMixin, models.Model):
     import_source = models.ForeignKey(GeneAnnotationImport, on_delete=CASCADE)
     biotype = models.TextField(null=True)  # Ensembl has gene + transcript biotypes
     data = models.JSONField(null=False, blank=True, default=dict)  # for cdot data
+
+    @property
+    def preview(self) -> PreviewData:
+        return PreviewData.for_object(
+            obj=self,
+            icon="fa-solid fa-timeline"
+       )
 
     # These are in data.tags
     CANONICAL_SCORES = {

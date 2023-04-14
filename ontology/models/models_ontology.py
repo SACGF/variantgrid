@@ -25,7 +25,7 @@ from genes.models import GeneSymbol
 from library.cache import timed_cache
 from library.constants import DAY_SECS, WEEK_SECS
 from library.log_utils import report_exc_info
-from library.preview_request import PreviewData
+from library.preview_request import PreviewData, PreviewableModel
 from library.utils import Constant, pretty_label
 
 
@@ -268,7 +268,7 @@ class OntologyIdNormalized:
         return self.full_id
 
 
-class OntologyTerm(TimeStampedModel):
+class OntologyTerm(TimeStampedModel, PreviewableModel):
 
     """
     id is Term as it should be referenced <prefix>:<zero padded index> e.g.
@@ -286,11 +286,13 @@ class OntologyTerm(TimeStampedModel):
 
     move_to_re = re.compile(r"MOVED TO (\d+)")
 
+    @classmethod
+    def preview_icon(cls) -> str:
+        return "fa-solid fa-disease"
+
     @property
     def preview(self) -> PreviewData:
-        return PreviewData.for_object(
-            self,
-            icon="fa-solid fa-disease",
+        return self.preview_with(
             title="Term Not Found" if self.is_stub else self.name,
             summary=self.definition
         )

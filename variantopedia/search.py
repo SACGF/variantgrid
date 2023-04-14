@@ -35,7 +35,7 @@ from snpdb.clingen_allele import get_clingen_allele
 from snpdb.models import VARIANT_PATTERN, LOCUS_PATTERN, LOCUS_NO_REF_PATTERN, DBSNP_PATTERN, Allele, Contig, \
     ClinGenAllele, GenomeBuild, Sample, Variant, VariantCoordinate, UserSettings, Organization, Lab, VCF, \
     DbSNP, Cohort, HGVS_UNCLEANED_PATTERN
-from snpdb.search2 import SearchInput, SearchResponseRecordAbstract, SearchResponse
+from snpdb.search2 import SearchInput, SearchResponse, SearchResult2
 from upload.models import ModifiedImportedVariant
 from variantgrid.perm_path import get_visible_url_names
 from variantopedia.models import SearchTypes
@@ -178,16 +178,16 @@ class SearchResult:
         )
 
     @staticmethod
-    def from_search_result_abs(result: SearchResponseRecordAbstract[Any]):
+    def from_search_result_abs(result: SearchResult2):
         genome_builds: Set[GenomeBuild] = set()
         annotation_consortias: List[str] = []
         if genome_build := result.genome_build:
             genome_builds.add(genome_build)
-        if annotation_consortia := result.annotation_consortia:
+        if annotation_consortia := result.annotation_consortium:
             annotation_consortias.append(annotation_consortia)
 
         sr = SearchResult(
-            record=result.record,
+            record=None,
             preview=result.preview,
             genome_builds=genome_builds,
             annotation_consortia=annotation_consortias,
@@ -281,7 +281,8 @@ class SearchResults:
     def from_search_response(search_input: SearchInput, response: SearchResponse) -> 'SearchResults':
         sr = SearchResults(search_string=search_input.search_string,
                            genome_build_preferred=search_input.genome_build_preferred)
-        sr.search_types.add(response.search_type)
+        for category in response.searched_categories:
+            sr.search_types.add(category)
         sr.search_string = search_input.search_string
         sr.genome_build_preferred = search_input.genome_build_preferred
         sr.results = [SearchResult.from_search_result_abs(result=result) for result in
@@ -428,7 +429,9 @@ class Searcher:
         search_responses = search_input.search()
 
         for search_response in search_responses:
-            search_results.extend(SearchResults.from_search_response(search_input=search_input, response=search_response))
+            search_results.extend(
+                SearchResults.from_search_response(search_input=search_input, response=search_response)
+            )
         # END NEW CODE
 
         search_results.complete()

@@ -1,3 +1,4 @@
+from abc import ABC, abstractmethod
 from typing import Optional, Union
 from attr import dataclass
 from django.db.models import Model
@@ -11,6 +12,54 @@ preview_request_signal: Signal = Signal()
 """
 Receive (and return a PreviewData) if your module is capable of providing some tooltip previews of links
 """
+
+
+class PreviewableModel:
+
+    @classmethod
+    def preview_category(cls) -> str:
+        return pretty_label(cls._meta.verbose_name)
+
+    @classmethod
+    def preview_icon(cls) -> str:
+        return "fa-solid fa-circle"
+
+    def preview_with(
+            self,
+            category: Optional[str] = None,
+            identifier: Optional[str] = None,
+            title: Optional[str] = None,
+            icon: Optional[str] = None,
+            summary: Optional[Union[str, SafeString]] = None,
+            internal_url: Optional[str] = None,
+            external_url: Optional[str] = None
+    ) -> 'PreviewData':
+
+        if not identifier:
+            if isinstance(self.pk, str):
+                identifier = self.pk
+                if title is None:
+                    title = str(self)
+            else:
+                identifier = str(self)
+
+        if not internal_url and hasattr(self, "get_absolute_url"):
+            internal_url = self.get_absolute_url()
+
+        return PreviewData(
+            category=category or self.preview_category(),
+            icon=icon or self.preview_icon(),
+            identifier=identifier,
+            title=title,
+            summary=summary,
+            internal_url=internal_url,
+            external_url=external_url
+        )
+
+    @property
+    def preview(self) -> 'PreviewData':
+        return self.preview_with()
+
 
 @dataclass
 class PreviewData:

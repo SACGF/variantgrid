@@ -1,20 +1,8 @@
-from typing import Any, Union, Type
-
+from typing import Any
 from django.db.models import Q
 from django.dispatch import receiver
-from django.utils.safestring import SafeString
-
-from genes.models import GeneSymbol
-from ontology.models import OntologyTerm, OntologyService
 from patients.models import Patient
-from snpdb.search2 import SearchResponseRecordAbstract, search_signal, SearchInput, SearchResponse
-
-
-class SearchResponsePatient(SearchResponseRecordAbstract[Patient]):
-
-    @classmethod
-    def result_class(cls) -> Type:
-        return Patient
+from snpdb.search2 import search_signal, SearchInput, SearchResponse
 
 
 @receiver(search_signal, sender=SearchInput)
@@ -30,6 +18,6 @@ def patient_search(sender: Any, search_input: SearchInput, **kwargs) -> SearchRe
         else:
             patient_q = Q(last_name__iexact=search_string) | Q(first_name__iexact=search_string)
 
-        response: SearchResponse[SearchResponsePatient] = SearchResponse(SearchResponsePatient)
+        response = SearchResponse(Patient)
         response.extend(Patient.filter_for_user(search_input.user).filter(patient_q))
         return response
