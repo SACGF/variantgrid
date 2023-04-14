@@ -15,7 +15,7 @@ from snpdb.search2 import search_signal, SearchInput, SearchResponse
 
 @receiver(search_signal, sender=SearchInput)
 def classification_search(sender: Any, search_input: SearchInput, **kwargs) -> SearchResponse:
-    response = SearchResponse("Classification")
+    response = SearchResponse(Classification)
 
     search_string = search_input.search_string
     """ Search for LabId which can be either:

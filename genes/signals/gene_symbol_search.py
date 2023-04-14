@@ -19,6 +19,6 @@ def gene_symbol_alias_search(sender: Any, search_input: SearchInput, **kwargs) -
 
         aliases = GeneSymbolAlias.objects.filter(alias=search_string).exclude(gene_symbol__in=gene_symbols)
         for alias in aliases:
-            response.add(alias, messages=[f"{alias.alias} is an alias for {alias.gene_symbol}"])
+            response.add(alias.gene_symbol, messages=[f"{alias.alias} is an alias for {alias.gene_symbol}"])
 
         return response

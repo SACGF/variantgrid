@@ -1,6 +1,6 @@
 from typing import Any
 from django.dispatch import receiver
-from annotation.models import CitationFetchRequest
+from annotation.models import CitationFetchRequest, Citation
 from annotation.models.models_citations import CitationSource, CitationIdNormalized
 from snpdb.search2 import SearchInput, search_signal, SearchResponse
 
@@ -9,7 +9,7 @@ from snpdb.search2 import SearchInput, search_signal, SearchResponse
 def search_citations(sender: Any, search_input: SearchInput, **kwargs) -> SearchResponse:
     try:
         normal_id = CitationIdNormalized.normalize_id(search_input.search_string)
-        response = SearchResponse("Citation")
+        response = SearchResponse(Citation)
 
         citation = normal_id.get_or_create()
         CitationFetchRequest.fetch_all_now([normal_id])
