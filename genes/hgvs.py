@@ -486,10 +486,11 @@ class VariantCoordinateAndDetails(FormerTuple):
     transcript_accession: str
     kind: str
     method: str
+    matches_reference: bool
 
     @property
     def as_tuple(self) -> Tuple:
-        return (self.variant_coordinate, self.transcript_accession, self.kind, self.method)
+        return self.variant_coordinate, self.transcript_accession, self.kind, self.method, self.matches_reference
 
 
 class HGVSMatcher:
@@ -602,18 +603,20 @@ class HGVSMatcher:
                 return hgvs_name, transcript_version
         return None, None
 
-    def _lrg_get_variant_tuple(self, hgvs_string: str) -> Tuple[Tuple, str]:
+    def _lrg_get_variant_tuple(self, hgvs_string: str) -> Tuple[Tuple, str, bool]:
         hgvs_name = HGVSName(hgvs_string)
         new_hgvs_name, transcript_version = self._lrg_get_hgvs_name_and_transcript_version(self.genome_build, hgvs_name)
         if new_hgvs_name:
             new_hgvs_string = new_hgvs_name.format()
             method = f"{self.HGVS_METHOD_PYHGVS} as '{new_hgvs_string}' (from LRG_RefSeqGene)"
-            variant_tuple, _matches_reference = self._pyhgvs_get_variant_tuple_and_reference_match(new_hgvs_string,
+            variant_tuple, matches_reference = self._pyhgvs_get_variant_tuple_and_reference_match(new_hgvs_string,
                                                                                                    transcript_version)
-            return variant_tuple, method
+            return variant_tuple, method, matches_reference
 
         try:
-            return self._clingen_get_variant_tuple(hgvs_string), self.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY
+            # ClinGen fails if reference base is different so matches_reference is always True
+            matches_reference = True
+            return self._clingen_get_variant_tuple(hgvs_string), self.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY, matches_reference
         except ClinGenAllele.ClinGenAlleleRegistryException as cga_re:
             raise ValueError(f"Could not retrieve {hgvs_string} from ClinGen Allele Registry") from cga_re
 
@@ -638,7 +641,7 @@ class HGVSMatcher:
         cache.set(key, True, timeout=WEEK_SECS)
 
     def get_variant_tuple(self, hgvs_string: str) -> VariantCoordinate:
-        return self.get_variant_tuple_used_transcript_kind_and_method(hgvs_string)[0]
+        return self.get_variant_tuple_used_transcript_kind_method_and_matches_reference(hgvs_string)[0]
 
     @staticmethod
     def _get_sort_key_transcript_version_and_methods(version, prefer_pyhgvs=True, closest=False):
@@ -720,15 +723,16 @@ class HGVSMatcher:
         sort_key = self._get_sort_key_transcript_version_and_methods(version, prefer_pyhgvs=prefer_pyhgvs, closest=closest)
         return sorted(tv_and_method, key=sort_key)
 
-    def get_variant_tuple_used_transcript_kind_and_method(self, hgvs_string: str) -> VariantCoordinateAndDetails:
+    def get_variant_tuple_used_transcript_kind_method_and_matches_reference(self, hgvs_string: str) -> VariantCoordinateAndDetails:
         """ Returns variant_tuple and method for HGVS resolution = """
 
         used_transcript_accession = None
         method = None
+        matches_reference = None
         hgvs_name = HGVSName(hgvs_string)
         kind = hgvs_name.kind
         if self._is_lrg(hgvs_name):
-            variant_tuple, method = self._lrg_get_variant_tuple(hgvs_string)
+            variant_tuple, method, matches_reference = self._lrg_get_variant_tuple(hgvs_string)
         elif hgvs_name.kind in ('c', 'n'):
             transcript_accession = hgvs_name.transcript
             if not transcript_accession:
@@ -749,6 +753,7 @@ class HGVSMatcher:
                     if self._clingen_allele_registry_ok(tv.accession):
                         error_message = f"Could not convert '{hgvs_string}' using ClinGenAllele Registry: %s"
                         try:
+                            matches_reference = True  # ClnGen fails if different
                             variant_tuple = self._clingen_get_variant_tuple(hgvs_string_for_version)
                         except ClinGenAlleleServerException as cga_se:
                             # If it's unknown reference we can just retry with another version, other errors are fatal
@@ -798,7 +803,8 @@ class HGVSMatcher:
             variant_coordinate=VariantCoordinate(chrom, position, ref, alt),
             transcript_accession=used_transcript_accession,
             kind=kind,
-            method=method
+            method=method,
+            matches_reference=matches_reference
         )
 
     def _get_hgvs_and_pyhgvs_transcript(self, hgvs_string: str):
@@ -1047,13 +1053,17 @@ class HGVSMatcher:
         transcript_ok = HGVSMatcher._looks_like_transcript(hgvs_name.transcript)
         if not transcript_ok and hgvs_name.gene:
             # fix gene/transcript swap and lower case separately to get separate warnings.
-            if HGVSMatcher._looks_like_transcript(hgvs_name.gene.upper()):  # Need to upper here
+            uc_gene = hgvs_name.gene.upper()
+            if HGVSMatcher._looks_like_transcript(uc_gene):  # Need to upper here
                 old_transcript = hgvs_name.transcript
                 hgvs_name.transcript = hgvs_name.gene
                 hgvs_name.gene = old_transcript
                 if hgvs_name.gene:
                     fixed_messages.append(f"Warning: swapped gene/transcript")
                 transcript_ok = HGVSMatcher._looks_like_transcript(hgvs_name.transcript)
+            elif HGVSMatcher._looks_like_hgvs_prefix(uc_gene):
+                hgvs_name.gene = uc_gene
+                fixed_messages.append(f"Warning: Upper cased HGVS prefix")
 
         if not transcript_ok:
             if hgvs_name.transcript:
@@ -1066,14 +1076,18 @@ class HGVSMatcher:
 
     @staticmethod
     def _looks_like_transcript(prefix: str) -> bool:
+        return HGVSMatcher._looks_like_hgvs_prefix(prefix, refseq_types=('mRNA', 'RNA'))
+
+    @staticmethod
+    def _looks_like_hgvs_prefix(prefix: str, refseq_types=None) -> bool:
         """ copied from pyhgvs.models.hgvs_name.HGVSName.parse_prefix """
         if prefix.startswith('ENST') or prefix.startswith('LRG_'):
             return True
 
-        refseq_type = get_refseq_type(prefix)
-        if refseq_type in ('mRNA', 'RNA'):
+        if refseq_type := get_refseq_type(prefix):
+            if refseq_types is not None:
+                return refseq_type in refseq_types
             return True
-
         return False
 
     @classmethod
