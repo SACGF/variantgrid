@@ -658,8 +658,12 @@ def _search_hgvs_using_gene_symbol(gene_symbol, search_messages,
                                     annotation_consortia=list(unique_annotation_consortia)))
 
     if not results:
+        # In some special cases, add in special messages for no result
         if settings.SEARCH_HGVS_GENE_SYMBOL_USE_MANE and not settings.SEARCH_HGVS_GENE_SYMBOL_USE_ALL_TRANSCRIPTS:
-            search_messages.append(f"Only searched MANE transcripts: {', '.join(mane_transcripts)}")
+            messages = search_messages + [f"Only searched MANE transcripts: {', '.join(mane_transcripts)}"]
+            results.append(SearchResult(None, message=messages))
+
+        if not (settings.SEARCH_HGVS_GENE_SYMBOL_USE_MANE or settings.SEARCH_HGVS_GENE_SYMBOL_USE_ALL_TRANSCRIPTS):
             results.append(SearchResult(None, message=search_messages))
 
     return results
