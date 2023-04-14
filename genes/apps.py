@@ -8,6 +8,8 @@ class GenesConfig(AppConfig):
     # noinspection PyUnresolvedReferences
     def ready(self):
         from genes.signals import gene_symbol_search
+        from genes.signals import transcript_search
+
         from annotation.models.models import CachedWebResource
         from genes.models import CachedThirdPartyGeneList
         from genes.signals.manual_signals import hgnc_post_save_handler, lrg_ref_seq_gene_post_save_handler, \

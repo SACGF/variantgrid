@@ -380,7 +380,7 @@ class Searcher:
             (SearchTypes.EXTERNAL_PK, HAS_ALPHA_PATTERN, search_external_pk),
             #(SearchTypes.PATIENT, HAS_ALPHA_PATTERN, search_patient),
             (SearchTypes.SEQUENCING_RUN, SEQUENCING_RUN_REGEX, search_sequencing_run),
-            (SearchTypes.TRANSCRIPT, TRANSCRIPT_PATTERN, search_transcript),
+            # (SearchTypes.TRANSCRIPT, TRANSCRIPT_PATTERN, search_transcript),
             (SearchTypes.VARIANT, DB_PREFIX_PATTERN, search_variant_id),
             #(SearchTypes.LAB, MIN_3_ALPHA, search_lab),
             #(SearchTypes.ORG, MIN_3_ALPHA, search_org),
@@ -585,22 +585,22 @@ def search_gene(search_string: str, **kwargs) -> Iterable[Gene]:
     return []
 
 
-def search_transcript(search_string: str, **kwargs) -> VARIANT_SEARCH_RESULTS:
-    """ return Transcript or TranscriptVersion (build independent) """
-    transcript_id, version = TranscriptVersion.get_transcript_id_and_version(search_string)
-    obj = None
-    message = None
-    if version:
-        obj = TranscriptVersion.objects.filter(transcript_id=transcript_id, version=version).first()
-        if obj is None:
-            message = f"Unknown transcript version {version}, see transcript page for available versions."
-
-    if obj is None:  # No version specified or loading version failed
-        obj = Transcript.objects.filter(identifier=transcript_id).first()
-
-    if obj:
-        return [SearchResult(obj, message=message)]
-    return []
+# def search_transcript(search_string: str, **kwargs) -> VARIANT_SEARCH_RESULTS:
+#     """ return Transcript or TranscriptVersion (build independent) """
+#     transcript_id, version = TranscriptVersion.get_transcript_id_and_version(search_string)
+#     obj = None
+#     message = None
+#     if version:
+#         obj = TranscriptVersion.objects.filter(transcript_id=transcript_id, version=version).first()
+#         if obj is None:
+#             message = f"Unknown transcript version {version}, see transcript page for available versions."
+#
+#     if obj is None:  # No version specified or loading version failed
+#         obj = Transcript.objects.filter(identifier=transcript_id).first()
+#
+#     if obj:
+#         return [SearchResult(obj, message=message)]
+#     return []
 
 
 def _search_hgvs_using_gene_symbol(gene_symbol, search_messages,

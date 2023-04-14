@@ -575,17 +575,14 @@ class GeneVersion(models.Model):
 TranscriptParts = namedtuple('TranscriptParts', ['identifier', 'version'])
 
 
-class Transcript(models.Model):
+class Transcript(models.Model, PreviewableModel):
     """ A stable identifier - has versions with actual transcript details """
     identifier = models.TextField(primary_key=True)
     annotation_consortium = models.CharField(max_length=1, choices=AnnotationConsortium.choices)
 
-    @property
-    def preview(self) -> PreviewData:
-        return PreviewData.for_object(
-            obj=self,
-            icon="fa-solid fa-timeline"
-       )
+    @classmethod
+    def preview_icon(cls) -> str:
+        return "fa-solid fa-timeline"
 
     def get_absolute_url(self):
         kwargs = {"transcript_id": self.identifier}
@@ -624,7 +621,7 @@ class Transcript(models.Model):
         return self.identifier
 
 
-class TranscriptVersion(SortByPKMixin, models.Model):
+class TranscriptVersion(SortByPKMixin, models.Model, PreviewableModel):
     """ We store the ID and version separately, ie:
         ENST00000284274.4 => transcript=ENST00000284274, version=4
 
@@ -645,12 +642,15 @@ class TranscriptVersion(SortByPKMixin, models.Model):
     biotype = models.TextField(null=True)  # Ensembl has gene + transcript biotypes
     data = models.JSONField(null=False, blank=True, default=dict)  # for cdot data
 
+    @classmethod
+    def preview_icon(cls) -> str:
+        return Transcript.preview_icon()
+
     @property
     def preview(self) -> PreviewData:
-        return PreviewData.for_object(
-            obj=self,
-            icon="fa-solid fa-timeline"
-       )
+        return self.preview_with(
+            identifier=f"{self.transcript.identifier}.{self.version}"
+        )
 
     # These are in data.tags
     CANONICAL_SCORES = {

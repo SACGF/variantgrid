@@ -39,7 +39,9 @@ class PreviewableModel:
             if isinstance(self.pk, str):
                 identifier = self.pk
                 if title is None:
-                    title = str(self)
+                    str_title = str(self)
+                    if str_title != identifier:
+                        title = str_title
             else:
                 identifier = str(self)
 
