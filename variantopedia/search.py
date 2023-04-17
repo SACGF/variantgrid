@@ -248,6 +248,12 @@ class SearchResult:
 class SearchError:
     search_type: str
     error: Any
+    log_level: int = logging.ERROR
+
+
+class SearchWarning(ValueError):
+    """ Search Exception if you want to print out as a warning rather than error """
+    pass
 
 
 class SearchResults:
@@ -276,13 +282,15 @@ class SearchResults:
     def append_result(self, result: Any):
         self.results.append(result)
 
-    def append_error(self, search_type: str, error: Any, genome_build: Optional[GenomeBuild] = None):
+    def append_error(self, search_type: str, error: Any, genome_build: Optional[GenomeBuild] = None,
+                     log_level: int = logging.ERROR):
         errors = []
         if cause := getattr(error, "__cause__", None):
             errors.append(str(cause))
         errors.append(str(error))
         for error_string in errors:
-            genome_builds = self.search_errors[SearchError(search_type=search_type, error=error_string)]
+            search_error = SearchError(search_type=search_type, error=error_string, log_level=log_level)
+            genome_builds = self.search_errors[search_error]
             if genome_build:
                 genome_builds.add(genome_build)
 
@@ -493,7 +501,11 @@ class Searcher:
                             results.append_result(sr)
 
                 except Exception as e:
-                    results.append_error(search_type, e, genome_build)
+                    if isinstance(e, SearchWarning):
+                        log_level = logging.WARNING
+                    else:
+                        log_level = logging.ERROR
+                    results.append_error(search_type, e, genome_build, log_level=log_level)
         return results
 
 
@@ -589,10 +601,7 @@ def search_transcript(search_string: str, **kwargs) -> VARIANT_SEARCH_RESULTS:
 def _search_hgvs_using_gene_symbol(gene_symbol, search_messages,
                                    hgvs_string: str, user: User, genome_build: GenomeBuild, variant_qs: QuerySet) -> VARIANT_SEARCH_RESULTS:
     results = []
-    if gene_symbol:
-        search_messages.append(f"Warning: HGVS requires transcript, given symbol: '{gene_symbol}'")
-    else:
-        search_messages.append(f"Warning: HGVS requires transcript")
+    search_messages.append(f"Warning: HGVS requires transcript, given symbol: '{gene_symbol}'")
     # Group results + hgvs by result.record hashcode
     results_by_record = defaultdict(list)
     transcript_accessions_by_record = defaultdict(list)
@@ -663,12 +672,11 @@ def _search_hgvs_using_gene_symbol(gene_symbol, search_messages,
     if not results:
         # In some special cases, add in special messages for no result
         if settings.SEARCH_HGVS_GENE_SYMBOL_USE_MANE and not settings.SEARCH_HGVS_GENE_SYMBOL_USE_ALL_TRANSCRIPTS:
-            messages = search_messages + [f"Only searched MANE transcripts: {', '.join(mane_transcripts)}"]
-            results.append(SearchResult(None, message=messages))
+            message = "\n".join(search_messages + [f"Only searched MANE transcripts: {', '.join(mane_transcripts)}"])
+            raise SearchWarning(message)
 
         if not (settings.SEARCH_HGVS_GENE_SYMBOL_USE_MANE or settings.SEARCH_HGVS_GENE_SYMBOL_USE_ALL_TRANSCRIPTS):
-            pass  # In spreadsheet - Emma wants it to bomb out and give "no results" rather than a message now
-            # results.append(SearchResult(None, message=search_messages))
+            raise SearchWarning("\n".join(search_messages))
 
     return results
 

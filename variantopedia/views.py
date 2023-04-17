@@ -398,7 +398,7 @@ def search(request):
             if genome_builds:
                 genome_builds_str = ", ".join(gb.name for gb in sorted(genome_builds))
                 text += f" ({genome_builds_str})"
-            messages.add_message(request, messages.ERROR, text)
+            messages.add_message(request, search_error.log_level, text)
 
     epk_qs = ExternalPK.objects.values_list("external_type", flat=True)
     external_codes = list(sorted(epk_qs.distinct()))
