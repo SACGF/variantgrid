@@ -390,7 +390,8 @@ def search(request):
 
         # don't auto load unless there is only 1 preferred result
         if preferred_result := search_results.single_preferred_result():
-            return redirect(preferred_result.preview.internal_url)
+            # return redirect(preferred_result.preview.internal_url)
+            pass
 
         # Attempt to give hints on why nothing was found
         for search_error, genome_builds in search_results.search_errors.items():

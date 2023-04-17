@@ -91,6 +91,6 @@ class SearchResponse:
             raise ValueError(f"Can't add {obj} as search result preview")
         self.add_search_result(SearchResult2(preview=obj, messages=messages, genome_builds=genome_builds, annotation_consortium=annotation_consortium))
 
-    def extend(self, iterable: Iterable, messages: Optional[List[str]] = None, genome_build: Optional[GenomeBuild] = None, annotation_consortium: Optional[GenomeBuild] = None):
+    def extend(self, iterable: Iterable, messages: Optional[List[str]] = None, genome_builds: Optional[Set[GenomeBuild]] = None, annotation_consortium: Optional[GenomeBuild] = None):
         for obj in iterable:
-            self.add(obj, messages=messages, genome_build=genome_build, annotation_consortium=annotation_consortium)
+            self.add(obj, messages=messages, genome_builds=genome_builds, annotation_consortium=annotation_consortium)

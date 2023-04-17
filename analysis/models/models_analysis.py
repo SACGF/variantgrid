@@ -19,13 +19,14 @@ from annotation.models import AnnotationVersion, InvalidAnnotationVersionError
 from genes.models import CanonicalTranscriptCollection
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsAutoInitialSaveMixin
 from library.guardian_utils import admin_bot, assign_permission_to_user_and_groups
+from library.preview_request import PreviewableModel
 from snpdb.models import CustomColumnsCollection, CustomColumn, \
     UserSettings, AbstractNodeCountSettings, Sample
 from snpdb.models.models_enums import BuiltInFilters
 from snpdb.models.models_genome import GenomeBuild
 
 
-class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
+class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel, PreviewableModel):
     # Changing some analysis settings alters node editors/grids - and we need to increment version to expire node cache
     VERSION_BUMP_FIELDS = ["custom_columns_collection", "default_sort_by_column"]
 
@@ -52,6 +53,10 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
     class Meta:
         verbose_name = 'Analysis'
         verbose_name_plural = 'Analyses'
+
+    @classmethod
+    def preview_icon(cls) -> str:
+        return "fa-solid fa-network-wired"
 
     def __str__(self):
         name = self.name or f"Analysis {self.pk}"
