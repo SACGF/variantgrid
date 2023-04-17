@@ -7,5 +7,6 @@ class PatientsConfig(AppConfig):
     # noinspection PyUnresolvedReferences
     def ready(self):
         # pylint: disable=import-outside-toplevel
+        from patients.signals import external_pk_search
         from patients.signals import patient_search
         # pylint: enable=import-outside-toplevel

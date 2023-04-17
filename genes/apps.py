@@ -9,6 +9,7 @@ class GenesConfig(AppConfig):
     def ready(self):
         from genes.signals import gene_symbol_search
         from genes.signals import transcript_search
+        from genes.signals import gene_search
 
         from annotation.models.models import CachedWebResource
         from genes.models import CachedThirdPartyGeneList

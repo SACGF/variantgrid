@@ -51,10 +51,14 @@ class ExternalModelManager(TimeStampedModel):
         return name
 
 
-class ExternalPK(models.Model):
+class ExternalPK(models.Model, PreviewModelMixin):
     code = models.TextField()
     external_type = models.TextField()
     external_manager = models.ForeignKey(ExternalModelManager, on_delete=CASCADE)
+
+    @classmethod
+    def preview_icon(cls) -> str:
+        return "fa-solid fa-person-walking-arrow-right"
 
     class Meta:
         unique_together = ('code', 'external_type', 'external_manager')

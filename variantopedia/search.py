@@ -373,9 +373,9 @@ class Searcher:
         self.genome_agnostic_searches = [
             # (SearchTypes.ANALYSIS, ANALYSIS_PREFIX_PATTERN, search_analysis_id),
             # (SearchTypes.GENE_SYMBOL, GENE_SYMBOL_PATTERN, search_gene_symbol),  # special case
-            (SearchTypes.GENE, GENE_PATTERN, search_gene),  # special case
-            (SearchTypes.EXPERIMENT, HAS_ALPHA_PATTERN, search_experiment),
-            (SearchTypes.EXTERNAL_PK, HAS_ALPHA_PATTERN, search_external_pk),
+            #(SearchTypes.GENE, GENE_PATTERN, search_gene),  # special case
+            #(SearchTypes.EXPERIMENT, HAS_ALPHA_PATTERN, search_experiment),
+            #(SearchTypes.EXTERNAL_PK, HAS_ALPHA_PATTERN, search_external_pk),
             #(SearchTypes.PATIENT, HAS_ALPHA_PATTERN, search_patient),
             (SearchTypes.SEQUENCING_RUN, SEQUENCING_RUN_REGEX, search_sequencing_run),
             # (SearchTypes.TRANSCRIPT, TRANSCRIPT_PATTERN, search_transcript),
@@ -566,21 +566,21 @@ def search_gene_symbol(search_string: str, **kwargs) -> Iterable[Union[GeneSymbo
     return gene_symbols + aliases
 
 
-def search_gene(search_string: str, **kwargs) -> Iterable[Gene]:
-    """ Symbols have been separated into search_gene_symbol - this returns Gene objects """
-
-    CONSORTIUM_REGEX = {
-        r"(ENSG\d+)": AnnotationConsortium.ENSEMBL,
-        r"Gene:(\d+)": AnnotationConsortium.REFSEQ,
-        r"GeneID:(\d+)": AnnotationConsortium.REFSEQ,
-        r"Gene ID:(\d+)": AnnotationConsortium.REFSEQ,
-    }
-
-    for c_regex, annotation_consortium in CONSORTIUM_REGEX.items():
-        if m := re.match(c_regex, search_string, re.IGNORECASE):
-            gene_id = m.group(1)
-            return Gene.objects.filter(identifier=gene_id, annotation_consortium=annotation_consortium)
-    return []
+# def search_gene(search_string: str, **kwargs) -> Iterable[Gene]:
+#     """ Symbols have been separated into search_gene_symbol - this returns Gene objects """
+#
+#     CONSORTIUM_REGEX = {
+#         r"(ENSG\d+)": AnnotationConsortium.ENSEMBL,
+#         r"Gene:(\d+)": AnnotationConsortium.REFSEQ,
+#         r"GeneID:(\d+)": AnnotationConsortium.REFSEQ,
+#         r"Gene ID:(\d+)": AnnotationConsortium.REFSEQ,
+#     }
+#
+#     for c_regex, annotation_consortium in CONSORTIUM_REGEX.items():
+#         if m := re.match(c_regex, search_string, re.IGNORECASE):
+#             gene_id = m.group(1)
+#             return Gene.objects.filter(identifier=gene_id, annotation_consortium=annotation_consortium)
+#     return []
 
 
 # def search_transcript(search_string: str, **kwargs) -> VARIANT_SEARCH_RESULTS:
@@ -861,28 +861,28 @@ def search_variant_id(search_string: str, **kwargs) -> VARIANT_SEARCH_RESULTS:
 #     return None
 
 
-def search_experiment(search_string: str, **kwargs) -> Iterable[Experiment]:
-    return Experiment.objects.filter(name__icontains=search_string)
+# def search_experiment(search_string: str, **kwargs) -> Iterable[Experiment]:
+#     return Experiment.objects.filter(name__icontains=search_string)
 
 
-def search_external_pk(search_string: str, user: User, **kwargs):
-    # Returns related objects
-    RELATED_OBJECT_FIELDS = ["case", "pathologytestorder", "patient"]
-    results = []
-    for external_pk in ExternalPK.objects.filter(code__iexact=search_string):
-        for f in RELATED_OBJECT_FIELDS:
-            try:
-                obj = getattr(external_pk, f)
-                try:
-                    obj.check_can_view(user)
-                except PermissionDenied:
-                    continue  # Don't add to results
-                except AttributeError:
-                    pass  # No permissions - ok to add to results
-                results.append(obj)
-            except ObjectDoesNotExist:
-                pass
-    return results
+# def search_external_pk(search_string: str, user: User, **kwargs):
+#     # Returns related objects
+#     RELATED_OBJECT_FIELDS = ["case", "pathologytestorder", "patient"]
+#     results = []
+#     for external_pk in ExternalPK.objects.filter(code__iexact=search_string):
+#         for f in RELATED_OBJECT_FIELDS:
+#             try:
+#                 obj = getattr(external_pk, f)
+#                 try:
+#                     obj.check_can_view(user)
+#                 except PermissionDenied:
+#                     continue  # Don't add to results
+#                 except AttributeError:
+#                     pass  # No permissions - ok to add to results
+#                 results.append(obj)
+#             except ObjectDoesNotExist:
+#                 pass
+#     return results
 
 
 def search_clingen_allele(search_string: str, user: User, genome_build: GenomeBuild, variant_qs: QuerySet, **kwargs) -> VARIANT_SEARCH_RESULTS:

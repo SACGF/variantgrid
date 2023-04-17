@@ -206,10 +206,6 @@ class GeneSymbol(models.Model, PreviewModelMixin):
     def preview_icon(cls) -> str:
         return "fa-solid fa-dna"
 
-    @property
-    def preview(self) -> PreviewData:
-        return self.preview_with(identifier=self.name)
-
     def has_different_genes(self, other: 'GeneSymbol') -> bool:
         """
         Tries to work out if genes are equivilant, not that sometimes refseq or ensembl assign gene ids to both the
@@ -380,12 +376,16 @@ class GeneAnnotationImport(TimeStampedModel):
         return self.url
 
 
-class Gene(models.Model):
+class Gene(PreviewModelMixin, models.Model):
     """ A stable identifier - build independent - has build specific versions with gene details """
     FAKE_GENE_ID_PREFIX = "unknown_"  # Legacy from when we allowed inserting GenePred w/o GFF3
     identifier = models.TextField(primary_key=True)
     annotation_consortium = models.CharField(max_length=1, choices=AnnotationConsortium.choices)
     summary = models.TextField(null=True, blank=True)  # Only used by RefSeq
+
+    @classmethod
+    def preview_icon(cls) -> str:
+        return "fa-solid fa-dna"
 
     @property
     def is_legacy(self):

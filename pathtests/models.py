@@ -6,6 +6,7 @@ from django_extensions.db.models import TimeStampedModel
 
 from genes.models import GeneList, GeneSymbol
 from library.enums import ModificationOperation
+from library.preview_request import PreviewModelMixin
 from pathtests.models_enums import PathologyTestGeneModificationOutcome, \
     CaseState, InvestigationType, CaseWorkflowStatus
 from patients.models import Patient, Clinician, ExternallyManagedModel, TEST_PATIENT_KWARGS
@@ -163,7 +164,7 @@ class RelatedGeneLists(models.ForeignKey):
     comments = models.TextField(blank=True)
 
 
-class Case(ExternallyManagedModel):
+class Case(PreviewModelMixin, ExternallyManagedModel):
     name = models.TextField(null=True, blank=True)
     lead_scientist = models.ForeignKey(User, null=True, blank=True, on_delete=SET_NULL)
     result_required_date = models.DateTimeField(null=True, blank=True)
@@ -173,6 +174,10 @@ class Case(ExternallyManagedModel):
     status = models.CharField(max_length=1, choices=CaseState.choices, default=CaseState.OPEN)
     workflow_status = models.CharField(max_length=2, choices=CaseWorkflowStatus.choices, default=CaseWorkflowStatus.NA)
     investigation_type = models.CharField(max_length=1, choices=InvestigationType.choices, default=InvestigationType.SINGLE_SAMPLE)
+
+    @classmethod
+    def preview_icon(cls) -> str:
+        return "fa-solid fa-file"
 
     def get_absolute_url(self):
         return reverse("view_case", kwargs={"pk": self.pk})
@@ -219,7 +224,7 @@ def cases_for_user(user):
     #cases_qs = get_cases_qs().filter(lead_scientist__in=users_list)
 
 
-class PathologyTestOrder(ExternallyManagedModel):
+class PathologyTestOrder(PreviewModelMixin, ExternallyManagedModel):
     """ external_pk = usually comes from LIMS
         custom_gene_list = override of pathology_test_version
     """
@@ -234,6 +239,10 @@ class PathologyTestOrder(ExternallyManagedModel):
     order_completed = models.DateTimeField(null=True)
     experiment = models.ForeignKey(Experiment, null=True, on_delete=SET_NULL)
     sequencing_run = models.ForeignKey(SequencingRun, null=True, on_delete=SET_NULL)
+
+    @classmethod
+    def preview_icon(cls) -> str:
+        return "fa-solid fa-clipboard-list"
 
     def get_absolute_url(self):
         return reverse("view_pathology_test_order", kwargs={"pk": self.pk})
