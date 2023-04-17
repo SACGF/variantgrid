@@ -9,7 +9,7 @@ from annotation.models.models import AnnotationVersion, VCFAnnotationStats
 from annotation.tasks.calculate_sample_stats import calculate_vcf_stats
 from library.log_utils import log_traceback
 from library.utils import full_class_name
-from seqauto.signals import backend_vcf_import_success_signal
+from seqauto.signals.signals_list import backend_vcf_import_success_signal
 from snpdb.import_status import set_vcf_and_samples_import_status
 from snpdb.models import VCF
 from snpdb.models.models_enums import ImportStatus, VariantsType, ProcessingStatus

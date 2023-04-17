@@ -13,7 +13,7 @@ class SnpdbConfig(AppConfig):
         # pylint: disable=import-outside-toplevel
         from snpdb.models import Trio
         from django.contrib.auth.models import User, Group
-        from seqauto.signals import backend_vcf_import_success_signal
+        from seqauto.signals.signals_list import backend_vcf_import_success_signal
         from snpdb.signals.signal_handlers import backend_vcf_import_success_handler, trio_post_save_handler, \
             user_post_save_handler, group_post_save_handler
         from snpdb.signals import vcf_health_check  # pylint: disable=unused-import
