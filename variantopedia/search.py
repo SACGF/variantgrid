@@ -604,7 +604,10 @@ def search_gene(search_string: str, **kwargs) -> Iterable[Gene]:
 def _search_hgvs_using_gene_symbol(gene_symbol, search_messages,
                                    hgvs_string: str, user: User, genome_build: GenomeBuild, variant_qs: QuerySet) -> VARIANT_SEARCH_RESULTS:
     results = []
-    search_messages.append(f"Warning: HGVS requires transcript, given symbol: '{gene_symbol}'")
+    if gene_symbol:
+        search_messages.append(f"Warning: HGVS requires transcript, given symbol: '{gene_symbol}'")
+    else:
+        search_messages.append(f"Warning: HGVS requires transcript")
     # Group results + hgvs by result.record hashcode
     results_by_record = defaultdict(list)
     transcript_accessions_by_record = defaultdict(list)

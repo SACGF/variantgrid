@@ -214,6 +214,8 @@ class Citation(TimeStampedModel, PreviewableModel):
         Removes all the derived data in a Citation
         Generally call before populating data
         """
+        self.error = None
+        self.data_json = None
         self.title = None
         self.journal = None
         self.journal_short = None
@@ -633,6 +635,7 @@ class CitationFetchRequest:
                     if not fetch.fetched:
                         fetch.fetched = True
                         fetch.citation.last_loaded = now()
+                        fetch.citation.blank_out()
                         fetch.citation.error = error_message
             except ValueError:
                 pass
