@@ -27,6 +27,7 @@ from library.constants import DAY_SECS
 from library.enums.log_level import LogLevel
 from library.genomics.vcf_utils import get_variant_caller_and_version_from_vcf
 from library.log_utils import get_traceback, log_traceback
+from library.preview_request import PreviewModelMixin
 from library.utils import sorted_nicely
 from library.utils.file_utils import name_from_filename, remove_gz_if_exists
 from patients.models import FakeData, Patient
@@ -174,7 +175,7 @@ class SeqAutoMessage(TimeStampedModel):
         return f"{self.seqauto_run} {self.get_severity_display()} {record}: {self.message}"
 
 
-class SequencingRun(SeqAutoRecord):
+class SequencingRun(PreviewModelMixin, SeqAutoRecord):
     """ Represents a flowcell (or other technology with multiple sequencing samples) """
     name = models.TextField(primary_key=True)
     date = models.DateField(null=True)  # e.g. from the sequencing name - used to sort
@@ -189,6 +190,10 @@ class SequencingRun(SeqAutoRecord):
     has_basecalls = models.BooleanField(default=False)
     has_interop = models.BooleanField(default=False)  # Quality, Index and Tile
     fake_data = models.ForeignKey(FakeData, null=True, blank=True, on_delete=CASCADE)
+
+    @classmethod
+    def preview_icon(cls) -> str:
+        return "fa-solid fa-person-running"
 
     def _validate(self):
         sample_sheet_changed_code = "sample_sheet_changed"

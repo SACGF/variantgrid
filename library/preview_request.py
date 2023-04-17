@@ -4,6 +4,7 @@ from attr import dataclass
 from django.db.models import Model
 from django.dispatch import Signal
 from django.http import JsonResponse
+from django.urls import NoReverseMatch
 from django.utils.safestring import SafeString
 from library.log_utils import report_message
 from library.utils import pretty_label
@@ -46,7 +47,10 @@ class PreviewModelMixin:
                 identifier = str(self)
 
         if not internal_url and hasattr(self, "get_absolute_url"):
-            internal_url = self.get_absolute_url()
+            try:
+                internal_url = self.get_absolute_url()
+            except NoReverseMatch:
+                internal_url = "javascript:alert('Could not load a view for this type of result')"
 
         return PreviewData(
             category=category or self.preview_category(),
