@@ -667,7 +667,8 @@ def _search_hgvs_using_gene_symbol(gene_symbol, search_messages,
             results.append(SearchResult(None, message=messages))
 
         if not (settings.SEARCH_HGVS_GENE_SYMBOL_USE_MANE or settings.SEARCH_HGVS_GENE_SYMBOL_USE_ALL_TRANSCRIPTS):
-            results.append(SearchResult(None, message=search_messages))
+            pass  # In spreadsheet - Emma wants it to bomb out and give "no results" rather than a message now
+            # results.append(SearchResult(None, message=search_messages))
 
     return results
 
@@ -721,7 +722,7 @@ def search_hgvs(search_string: str, user: User, genome_build: GenomeBuild, varia
             transcript_version = TranscriptVersion.get(used_transcript_accession, genome_build,
                                                        annotation_consortium=annotation_consortium)
             alias_symbol_strs = transcript_version.gene_version.gene_symbol.alias_meta.alias_symbol_strs
-            if hgvs_name.gene not in alias_symbol_strs:
+            if hgvs_name.gene.upper() not in [a.upper() for a in alias_symbol_strs]:
                 search_messages.append(f"Warning: symbol '{hgvs_name.gene}' not associated with transcript "
                                        f"{used_transcript_accession} (known symbols='{', '.join(alias_symbol_strs)}')")
 
