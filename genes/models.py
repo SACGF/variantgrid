@@ -44,7 +44,7 @@ from library.django_utils.django_partition import RelatedModelsPartitionModel
 from library.guardian_utils import assign_permission_to_user_and_groups, DjangoPermission, admin_bot, \
     add_public_group_read_permission
 from library.log_utils import log_traceback
-from library.preview_request import PreviewData, PreviewableModel
+from library.preview_request import PreviewData, PreviewModelMixin
 from library.utils import get_single_element, iter_fixed_chunks
 from library.utils.file_utils import mk_path
 from snpdb.models import Wiki, Company, Sample, DataState
@@ -167,7 +167,7 @@ class UniProt(models.Model):
         return self.accession
 
 
-class GeneSymbol(models.Model, PreviewableModel):
+class GeneSymbol(models.Model, PreviewModelMixin):
     symbol = CITextField(primary_key=True)
 
     @staticmethod
@@ -575,7 +575,7 @@ class GeneVersion(models.Model):
 TranscriptParts = namedtuple('TranscriptParts', ['identifier', 'version'])
 
 
-class Transcript(models.Model, PreviewableModel):
+class Transcript(models.Model, PreviewModelMixin):
     """ A stable identifier - has versions with actual transcript details """
     identifier = models.TextField(primary_key=True)
     annotation_consortium = models.CharField(max_length=1, choices=AnnotationConsortium.choices)
@@ -621,7 +621,7 @@ class Transcript(models.Model, PreviewableModel):
         return self.identifier
 
 
-class TranscriptVersion(SortByPKMixin, models.Model, PreviewableModel):
+class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
     """ We store the ID and version separately, ie:
         ENST00000284274.4 => transcript=ENST00000284274, version=4
 

@@ -5,7 +5,7 @@ from django.db.models import CASCADE, PROTECT
 from django.urls import reverse
 
 from genes.models import GeneList, CanonicalTranscriptCollection
-from library.preview_request import PreviewableModel
+from library.preview_request import PreviewModelMixin
 from seqauto.illumina import illumina_sequencers
 from seqauto.models.models_enums import DataGeneration, EnrichmentKitType
 from snpdb.models import Manufacturer, GenomicIntervalsCollection, SET_NULL, LabProject, VariantsType
@@ -162,7 +162,7 @@ class ExperimentManager(models.Manager):
         return super().get_or_create(default, **kwargs)
 
 
-class Experiment(PreviewableModel, models.Model):
+class Experiment(PreviewModelMixin, models.Model):
     """ What was sequenced in the flowcell - ie you can resequence something and 2 SequencingRuns will have the
         same Experiment. Set from RunParameters.xml ExperimentName in the SequencingRun directory """
     name = models.TextField(primary_key=True)

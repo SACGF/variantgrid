@@ -16,7 +16,7 @@ from library.django_utils.django_file_system_storage import PrivateUploadStorage
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
 from library.enums.file_attachments import AttachmentFileType
 from library.enums.titles import Title
-from library.preview_request import PreviewData, PreviewableModel
+from library.preview_request import PreviewData, PreviewModelMixin
 from library.utils import calculate_age
 from patients.models_enums import NucleicAcid, Mutation, Sex, PopulationGroup
 
@@ -101,7 +101,7 @@ def patient_name(first_name, last_name):
 # But as this isn't always available - hardcode age etc using _underscore prefixed fields
 
 
-class Patient(GuardianPermissionsMixin, HasPhenotypeDescriptionMixin, ExternallyManagedModel, PreviewableModel):
+class Patient(GuardianPermissionsMixin, HasPhenotypeDescriptionMixin, ExternallyManagedModel, PreviewModelMixin):
     family_code = models.TextField(null=True, blank=True)
     first_name = models.TextField(null=True, blank=True)
     last_name = models.TextField(null=True)

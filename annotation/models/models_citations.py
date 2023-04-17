@@ -16,7 +16,7 @@ from django.utils.timezone import now
 from django_extensions.db.models import TimeStampedModel
 
 from library.log_utils import report_exc_info
-from library.preview_request import PreviewData, PreviewableModel
+from library.preview_request import PreviewData, PreviewModelMixin
 from library.utils import JsonObjType, first
 
 """
@@ -78,7 +78,7 @@ class EntrezDbType(str, Enum):
     BOOKSHELF = "books"
 
 
-class Citation(TimeStampedModel, PreviewableModel):
+class Citation(TimeStampedModel, PreviewModelMixin):
 
     id = TextField(primary_key=True)
     """

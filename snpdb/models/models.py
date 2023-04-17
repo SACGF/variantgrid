@@ -30,7 +30,7 @@ from model_utils.managers import InheritanceManager
 
 from classification.enums.classification_enums import ShareLevel
 from library.enums.log_level import LogLevel
-from library.preview_request import PreviewData, PreviewableModel
+from library.preview_request import PreviewData, PreviewModelMixin
 from library.utils import import_class, JsonObjType
 
 
@@ -178,7 +178,7 @@ class ImportedWiki(models.Model):
     modified = models.DateTimeField()  # Time on original server
 
 
-class Organization(models.Model, PreviewableModel):
+class Organization(models.Model, PreviewModelMixin):
     # If you add fields @see OrganizationAdmin
     name = models.TextField()
     short_name = models.TextField(blank=False, null=True)  # Don't use for anything other than human labels
@@ -416,7 +416,7 @@ class ContactDetails:
         return bool(self.website) or bool(self.phone) or bool(self.email)
 
 
-class Lab(models.Model, PreviewableModel):
+class Lab(models.Model, PreviewModelMixin):
     name = models.TextField()
     external = models.BooleanField(default=False, blank=True)  # From somewhere else, e.g. Shariant
     city = models.TextField()

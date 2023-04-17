@@ -48,7 +48,7 @@ from genes.models import Gene
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
 from library.guardian_utils import clear_permissions
 from library.log_utils import report_exc_info, report_event
-from library.preview_request import PreviewData, PreviewableModel
+from library.preview_request import PreviewData, PreviewModelMixin
 from library.utils import empty_to_none, nest_dict, cautious_attempt_html_to_text, DebugTimer, \
     invalidate_cached_property, md5sum_str
 from ontology.models import OntologyTerm, OntologySnake, OntologyTermRelation
@@ -406,7 +406,7 @@ class ClassificationOutstandingIssues:
         return f"({self.classification.friendly_label}) {', '.join(self.issues)} {', '.join(self.flags)}"
 
 
-class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeStampedModel, PreviewableModel):
+class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeStampedModel, PreviewModelMixin):
     """
     A Variant Classification, belongs to a lab and user. Keeps a full history using ClassificationModification
     The data is free form basked on EvidenceKey (rather than one column per possible field)

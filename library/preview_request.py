@@ -14,7 +14,7 @@ Receive (and return a PreviewData) if your module is capable of providing some t
 """
 
 
-class PreviewableModel:
+class PreviewModelMixin:
 
     @classmethod
     def preview_category(cls) -> str:
