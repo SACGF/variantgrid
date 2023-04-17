@@ -682,7 +682,8 @@ def _search_hgvs_using_gene_symbol(gene_symbol, search_messages,
             results.append(SearchResult(None, message=messages))
 
         if not (settings.SEARCH_HGVS_GENE_SYMBOL_USE_MANE or settings.SEARCH_HGVS_GENE_SYMBOL_USE_ALL_TRANSCRIPTS):
-            results.append(SearchResult(None, message=search_messages))
+            pass  # In spreadsheet - Emma wants it to bomb out and give "no results" rather than a message now
+            # results.append(SearchResult(None, message=search_messages))
 
     return results
 
@@ -702,7 +703,8 @@ def search_hgvs(search_string: str, user: User, genome_build: GenomeBuild, varia
     try:
         variant_tuple, used_transcript_accession, kind, method, matches_reference = hgvs_matcher.get_variant_tuple_used_transcript_kind_method_and_matches_reference(hgvs_string)
         if matches_reference is False:
-            search_messages.append(f"Warning: reference base mismatch")
+            ref_base = variant_tuple[2]
+            search_messages.append(f"Warning: Using reference '{ref_base}' from our build {genome_build.name}")
 
     except (MissingTranscript, Contig.ContigNotInBuildError):
         # contig triggered from g.HGVS from another genome build - can't do anything just return no results
@@ -722,6 +724,8 @@ def search_hgvs(search_string: str, user: User, genome_build: GenomeBuild, varia
                 search_message = f"Error reading HGVS: '{hgvs_error}'"
                 return [SearchResult(ClassifyNoVariantHGVS(genome_build, original_hgvs_string), message=search_message)]
 
+        raise hgvs_error
+
     if used_transcript_accession:
         if used_transcript_accession not in hgvs_string:
             search_messages.append(f"Warning: Used transcript version '{used_transcript_accession}'")
@@ -733,7 +737,7 @@ def search_hgvs(search_string: str, user: User, genome_build: GenomeBuild, varia
             transcript_version = TranscriptVersion.get(used_transcript_accession, genome_build,
                                                        annotation_consortium=annotation_consortium)
             alias_symbol_strs = transcript_version.gene_version.gene_symbol.alias_meta.alias_symbol_strs
-            if hgvs_name.gene not in alias_symbol_strs:
+            if hgvs_name.gene.upper() not in [a.upper() for a in alias_symbol_strs]:
                 search_messages.append(f"Warning: symbol '{hgvs_name.gene}' not associated with transcript "
                                        f"{used_transcript_accession} (known symbols='{', '.join(alias_symbol_strs)}')")
 
