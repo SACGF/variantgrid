@@ -377,7 +377,7 @@ class Searcher:
             #(SearchTypes.EXPERIMENT, HAS_ALPHA_PATTERN, search_experiment),
             #(SearchTypes.EXTERNAL_PK, HAS_ALPHA_PATTERN, search_external_pk),
             #(SearchTypes.PATIENT, HAS_ALPHA_PATTERN, search_patient),
-            (SearchTypes.SEQUENCING_RUN, SEQUENCING_RUN_REGEX, search_sequencing_run),
+            #(SearchTypes.SEQUENCING_RUN, SEQUENCING_RUN_REGEX, search_sequencing_run),
             # (SearchTypes.TRANSCRIPT, TRANSCRIPT_PATTERN, search_transcript),
             (SearchTypes.VARIANT, DB_PREFIX_PATTERN, search_variant_id),
             #(SearchTypes.LAB, MIN_3_ALPHA, search_lab),
@@ -919,8 +919,8 @@ def search_clingen_allele(search_string: str, user: User, genome_build: GenomeBu
 #     return Patient.filter_for_user(user).filter(patient_q)
 
 
-def search_sequencing_run(search_string: str, **kwargs) -> Iterable[SequencingRun]:
-    return SequencingRun.objects.filter(name__icontains=search_string)
+# def search_sequencing_run(search_string: str, **kwargs) -> Iterable[SequencingRun]:
+#     return SequencingRun.objects.filter(name__icontains=search_string)
 
 
 def get_results_from_variant_tuples(qs: QuerySet, data: VariantCoordinate, any_alt: bool = False) -> Union[QuerySet, Iterable[Variant]]:

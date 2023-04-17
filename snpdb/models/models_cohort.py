@@ -23,6 +23,7 @@ from library.django_utils import SortByPKMixin
 from library.django_utils.django_partition import RelatedModelsPartitionModel
 from library.django_utils.django_postgres import PostgresRealField
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsAutoInitialSaveMixin
+from library.preview_request import PreviewModelMixin
 from library.utils import invert_dict
 from patients.models_enums import Zygosity
 from snpdb.models.models_enums import ImportStatus
@@ -31,7 +32,7 @@ from snpdb.models.models_variant import Variant
 from snpdb.models.models_vcf import VCF, Sample
 
 
-class Cohort(GuardianPermissionsAutoInitialSaveMixin, SortByPKMixin, TimeStampedModel):
+class Cohort(GuardianPermissionsAutoInitialSaveMixin, PreviewModelMixin, SortByPKMixin, TimeStampedModel):
     """ Cohort - a collection of samples
 
         We pack data from all of the samples (zygosity, allele_depth, read_depth, genotype_quality, phred_likelihood) into 1 row
@@ -51,6 +52,10 @@ class Cohort(GuardianPermissionsAutoInitialSaveMixin, SortByPKMixin, TimeStamped
     # Deal with parent_cohort delete in snpdb.signals.signal_handlers.pre_delete_cohort
     parent_cohort = models.ForeignKey("self", null=True, related_name="sub_cohort_set", on_delete=DO_NOTHING)
     sample_count = models.IntegerField(null=True)
+
+    @classmethod
+    def preview_icon(cls) -> str:
+        return "fa-solid fa-people-arrows"
 
     @property
     def has_genotype(self):
