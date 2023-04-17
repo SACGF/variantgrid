@@ -33,6 +33,11 @@ class SearchInput:
     def matches_has_alpha(self) -> bool:
         return bool(self.matches_pattern(HAS_ALPHA_PATTERN))
 
+    @property
+    def search_words(self) -> List[str]:
+        words = [word.strip() for word in self.search_string.split(" ")]
+        return [word for word in words if word]
+
     def search(self) -> List['SearchResponse']:
         valid_responses: List[SearchResponse] = []
         response_tuples = search_signal.send_robust(sender=SearchInput, search_input=self)
