@@ -687,7 +687,8 @@ def search_hgvs(search_string: str, user: User, genome_build: GenomeBuild, varia
     try:
         variant_tuple, used_transcript_accession, kind, method, matches_reference = hgvs_matcher.get_variant_tuple_used_transcript_kind_method_and_matches_reference(hgvs_string)
         if matches_reference is False:
-            search_messages.append(f"Warning: reference base mismatch")
+            ref_base = variant_tuple[2]
+            search_messages.append(f"Warning: Using reference '{ref_base}' from our build {genome_build.name}")
 
     except (MissingTranscript, Contig.ContigNotInBuildError):
         # contig triggered from g.HGVS from another genome build - can't do anything just return no results
