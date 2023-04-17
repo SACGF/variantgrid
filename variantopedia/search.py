@@ -707,6 +707,8 @@ def search_hgvs(search_string: str, user: User, genome_build: GenomeBuild, varia
                 search_message = f"Error reading HGVS: '{hgvs_error}'"
                 return [SearchResult(ClassifyNoVariantHGVS(genome_build, original_hgvs_string), message=search_message)]
 
+        raise hgvs_error
+
     if used_transcript_accession:
         if used_transcript_accession not in hgvs_string:
             search_messages.append(f"Warning: Used transcript version '{used_transcript_accession}'")
