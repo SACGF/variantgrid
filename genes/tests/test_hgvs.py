@@ -38,6 +38,7 @@ class TestHGVS(TestCase):
             "NM_001754.5(RUNX1):c557T>A",  # Has gene, Missing "."
             "NC_000007.13:117199563G>T",  # Missing "g."
             "NC_000007.13:g117199563G>T",  # Missing "."
+            "NM_000350.2(ABCA4):c-52delC",  # Missing "." with "-"
         ]
 
         for bad_hgvs in BAD_HGVS:
