@@ -146,11 +146,15 @@ class FlagDatabase:
                     if allele_identifier := self.flag_collection_to_identifier.get(comment.flag.collection_id):
                         self.flag_data_for_identifier(allele_identifier.with_transcript(transcript)).add_comment(comment)
 
-    def apply_to_imported_allele_infos(self):
+    def apply_to_imported_allele_infos(self, allele_id: Optional[int] = None):
         if not self.allele_to_flags:
             print("No relevant flags detected, nothing to do")
 
-        for imported_allele_info in ImportedAlleleInfo.objects.select_related('latest_validation', 'imported_genome_build_patch_version__genome_build').iterator():
+        iai_qs = ImportedAlleleInfo.objects.select_related('latest_validation', 'imported_genome_build_patch_version__genome_build')
+        if allele_id:
+            iai_qs = iai_qs.filter(allele_id=allele_id)
+
+        for imported_allele_info in iai_qs.iterator():
             latest_validation = imported_allele_info.latest_validation
             if c_hgvs := imported_allele_info.imported_c_hgvs:
                 allele_identifier = AlleleIdentifier(imported_allele_info.allele_id, identifier=CHGVSIdentifier(imported_c_hgvs=c_hgvs, genome_build=imported_allele_info.imported_genome_build))
@@ -160,6 +164,9 @@ class FlagDatabase:
                     all_comments = list(itertools.chain(*comment_arrays))
                     all_closed_flags = set()
                     all_closed_flags.update(*(match.closed_flags for match in matches))
+
+                    all_open_flags = set()
+                    all_open_flags.update(*(match.open_flags for match in matches))
 
                     all_comments = list(sorted(all_comments, key=lambda c: c.created))
                     if not all_comments:
@@ -181,17 +188,25 @@ class FlagDatabase:
                             outstanding_issues.add("OTHER_ERROR_CANT_CONFIRM")
 
                     if latest_validation.validation_tags_list and outstanding_issues.issubset(all_closed_flags):
+                        if latest_validation.include and all_open_flags:
+                            # we're already including this, and there's some warning flags that are still open
+                            # so don't confirm anything
+                            # in practical terms this means we won't confirm entries that had some closed
+                            # transcript flags but still had an open one
+                            continue
+
+                        print(f"Allele Info {imported_allele_info.pk} marked as include/confirmed")
                         latest_validation.include = True
                         latest_validation.confirmed = True
                         latest_validation.confirmed_by = all_comments[0].user
                         latest_validation.save()
 
     @staticmethod
-    def run():
+    def run(allele_id: Optional[int] = None):
         flag_database = FlagDatabase()
         print("Populating flag data into memory")
         flag_database.populate()
         print("Done")
         print("Applying flag data to imported allele info validation")
-        flag_database.apply_to_imported_allele_infos()
+        flag_database.apply_to_imported_allele_infos(allele_id=allele_id)
         print("Done")

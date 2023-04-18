@@ -127,7 +127,7 @@ def _add_post_data_insertion_upload_steps(upload_pipeline: UploadPipeline):
         sort_order += 1
 
 
-def reattempt_variant_matching(user: User, queryset: QuerySet[ImportedAlleleInfo], clear_existing: bool = False) -> Tuple[int, int]:
+def reattempt_variant_matching(user: User, queryset: QuerySet[ImportedAlleleInfo], clear_existing: bool = False):
     """ @:returns (valid_record_count, invalid_record_count) """
     from classification.models.variant_resolver import VariantResolver
     qs: QuerySet[ImportedAlleleInfo] = queryset.order_by('imported_genome_build_patch_version')
