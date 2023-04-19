@@ -22,6 +22,7 @@ from flags.models import FlagCollection, flag_collection_extra_info_signal, Flag
 from flags.models.models import FlagsMixin, FlagTypeContext
 from library.django_utils.django_partition import RelatedModelsPartitionModel
 from library.genomics import format_chrom
+from library.preview_request import PreviewModelMixin
 from library.utils import md5sum_str, FormerTuple
 from snpdb.models import Wiki
 from snpdb.models.models_clingen_allele import ClinGenAllele
@@ -35,12 +36,16 @@ VARIANT_PATTERN = re.compile(r"^(MT|(?:chr)?(?:[XYM]|\d+)):(\d+)[,\s]*([GATC]+)>
 HGVS_UNCLEANED_PATTERN = re.compile(r"(^(N[MC]_|ENST)\d+.*:|[cnmg]\.|[^:]:[cnmg]).*\d+")
 
 
-class Allele(FlagsMixin, models.Model):
+class Allele(FlagsMixin, PreviewModelMixin, models.Model):
     """ Genome build independent - ie GRCh37 and GRCh38 variants for same change point to same allele
         This is generally done via ClinGen Allele Registry, but sometimes that can fail.
         Linked against Variant with VariantAllele below """
 
     clingen_allele = models.OneToOneField(ClinGenAllele, null=True, on_delete=CASCADE)
+
+    @classmethod
+    def preview_icon(cls) -> str:
+        return "fa-solid fa-a p-1 text-light border rounded bg-dark"
 
     def get_absolute_url(self):
         # will show allele if there is one, otherwise go to variant page

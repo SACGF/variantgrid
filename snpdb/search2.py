@@ -1,18 +1,15 @@
 import re
-from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from re import Match, IGNORECASE
-from typing import Optional, TypeVar, Generic, Union, List, Iterable, Type, Pattern, Any, Set
-
+from typing import Optional, TypeVar, Union, List, Iterable, Pattern, Any, Set
 import django
+from django.conf import settings
 from django.contrib.auth.models import User
-from django.utils.safestring import SafeString
-
+from django.db.models import QuerySet
 from genes.models_enums import AnnotationConsortium
 from library.log_utils import report_message
 from library.preview_request import PreviewData
-from library.utils import pretty_label
-from snpdb.models import GenomeBuild
+from snpdb.models import GenomeBuild, Variant
 
 search_signal = django.dispatch.Signal()
 HAS_ALPHA_PATTERN = r"[a-zA-Z]"
@@ -51,6 +48,25 @@ class SearchInput:
                     report_message("Error during search", 'error', extra_data={"target": str(response), "caller": str(caller)})
 
         return valid_responses
+
+    def get_visible_variants(self, genome_build: GenomeBuild) -> QuerySet[Variant]:
+        """ Shariant wants to restrict search to only classified variants """
+
+        from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
+        from annotation.models import AnnotationVersion
+        from classification.models import Classification
+
+        annotation_version = AnnotationVersion.latest(genome_build)
+        variant_qs = get_variant_queryset_for_annotation_version(annotation_version)
+        variant_qs = variant_qs.filter(Variant.get_contigs_q(genome_build))  # restrict to build
+        if settings.SEARCH_VARIANT_REQUIRE_CLASSIFICATION_FOR_NON_ADMIN and not self.user.is_superuser:
+            variant_qs = variant_qs.filter(Classification.get_variant_q(self.user, genome_build))
+
+        return variant_qs
+
+    @property
+    def genome_builds(self) -> Set[GenomeBuild]:
+        return GenomeBuild.builds_with_annotation()
 
 
 T = TypeVar("T")
