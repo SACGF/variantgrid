@@ -8,62 +8,18 @@
 {% block content %}
     <div class="container">
         <h3>Changelog</h3>
-
-        {% if not sapath_enabled %}
-            <div class="card">
-                <div class="card-header">April 12, 2021</div>
-                <div class="card-body">
-                    <ul>
-                        <li>Allele Frequency - now in range 0-1 (not percent) - and uses values in VCF if provided.</li>
-                        <li>Variant Tags can be added/removed from variant details page</li>
-                    </ul>
-                </div>
-            </div>
-
-            <div class="card mt-4">
-                <div class="card-header">March 10, 2021</div>
-                <div class="card-body">
-                    <ul>
-                        <li>Ontology (OMIM/HPO) updates</li>
-                        <li>Analysis - GeneListNode - filter to PanelApp panels</li>
-                        <li>gnomAD 3 (GRCh38 only) - 4 new fields: AC/AN, popmax AC/AN (autopop classifications)</li>
-                        <li>Variant tags liftover between builds</li>
-                        <li>DamageNode renamed to EffectNode - now has splicing, domain, literature filters</li>
-                        <li>Custom Columns - can change name</li>
-                    </ul>
-                </div>
-            </div>
-
-            <div class="card mt-4">
-                <div class="card-header">Jan 11, 2021</div>
-                <div class="card-body">
-                    <ul>
-                        <li>Support GRCh38 genome build</li>
-                        <li><a class="hover-link" target="_blank" href="https://genomemedicine.biomedcentral.com/articles/10.1186/s13073-020-00761-2">Somalier</a> - tool to check sample relatedness (see sample page)</li>
-                        <li>Added PanelApp Australia to GeneGrid</li>
-                        <li>Gene Symbol page shows PanelApp info</li>
-                    </ul>
-                </div>
-            </div>
-
-            <div class="card mt-4">
-                <div class="card-header">November 24, 2020</div>
-                <div class="card-body">
-                    <ul>
-                        <li>Show tags from other analyses</li>
-                        <li>Analyses can be locked (via analysis settings) and set to read-only</li>
-                        <li>Nearby Variants + Classifications</li>
-                        <li>MONDO terms are now recognised in the classification form</li>
-                        <li>merge & venn joins should be much faster</li>
-                    </ul>
-                </div>
-            </div>
-
-        {% else %}
-
-            <!-- For SA Path, show all as one big VG3 upgrade -->
             <div class="card mt-4">
                 <div class="card-header">HotFixes</div>
+
+                <div class="card-body">
+                    <h4>HotFix 21 (Deployed X April 2023)</h4>
+
+                    <ul>
+                        <li><a href="https://github.com/SACGF/variantgrid/issues/721">#721 Somalier VCF export broken on some VCFs</a></li>
+                        <li><a href="https://github.com/SACGF/variantgrid/issues/786">#786 - analysis template - be able to save even if sample is an analysis variable</a></li>
+                        <li><a href="https://github.com/SACGF/variantgrid_sapath/issues/289">SAP#289 - Classification export broken</a></li>
+                    </ul>
+                </div>
 
                 <div class="card-body">
                     <h4>HotFix 21 (Deployed 11 March 2023)</h4>
@@ -389,8 +345,6 @@
                     </ul>
                 </div>
             </div>
-
-        {% endif %}
 
     </div>
 {% endblock content %}
