@@ -56,7 +56,7 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel, Previe
 
     @classmethod
     def preview_icon(cls) -> str:
-        return "fa-solid fa-network-wired"
+        return "fa-solid fa-diagram-project"
 
     def __str__(self):
         name = self.name or f"Analysis {self.pk}"

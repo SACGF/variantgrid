@@ -1,11 +1,12 @@
-from typing import Any, List
-from django.dispatch import receiver
+from typing import List, Optional
 from genes.models import GeneSymbol
 from ontology.models import OntologyTerm, OntologyService, OntologyTermStatus
-from snpdb.search2 import search_signal, SearchInput, SearchResponse
+from snpdb.search2 import search_receiver, HAS_ALPHA_PATTERN, \
+    SearchInputInstance, SearchExample
+import re
 
 
-def validate_ontology(term: OntologyTerm) -> List[str]:
+def validate_ontology(term: OntologyTerm) -> Optional[List[str]]:
     if term.is_stub:
         return ["We do not have this term in our database"]
     elif term.status == OntologyTermStatus.DEPRECATED:
@@ -14,22 +15,40 @@ def validate_ontology(term: OntologyTerm) -> List[str]:
         return ["Note this term is not a suitable value for condition"]
 
 
-@receiver(search_signal, sender=SearchInput)
-def search_ontology(sender: Any, search_input: SearchInput, **kwargs) -> SearchResponse:
-    response = SearchResponse()
+ONTOLOGY_TERM_PATTERN = re.compile(r"\w+[:_]\s*.*")
+
+
+@search_receiver(
+    search_type=OntologyTerm,
+    pattern=ONTOLOGY_TERM_PATTERN,
+    sub_name="Ontology by ID",
+    example=SearchExample(
+        note="Search by the term's identifier, supports MONDO, OMIM, HP",
+        example="MONDO:0010726"
+    )
+)
+def ontology_search_id(search_input: SearchInputInstance):
     # search by ID
     try:
-        if search_input.matches_pattern(r"\w+[:_]\s*.*"):
-            response.add_search_category(OntologyTerm)
-            term = OntologyTerm.get_or_stub(search_input.search_string)
-            response.add(term, validate_ontology(term))
+        term = OntologyTerm.get_or_stub(search_input.search_string)
+        yield term, validate_ontology(term)
     except ValueError:
         # might not be a valid ontology, there's a lot of text that passes the search_input
         pass
 
+
+@search_receiver(
+    search_type=OntologyTerm,
+    pattern=HAS_ALPHA_PATTERN,
+    sub_name="Ontology by name",
+    example=SearchExample(
+        note="Search by part of the term's name",
+        example="Rett syndrome"
+    )
+)
+def ontology_search_name(search_input: SearchInputInstance):
     # search by text (but not if matches Gene Symbol - better solution would be to match but give gene symbol higher priority)
-    if search_input.matches_has_alpha() and not GeneSymbol.objects.filter(symbol=search_input.search_string).exists():
-        response.add_search_category(OntologyTerm)
+    if not GeneSymbol.objects.filter(symbol=search_input.search_string).exists():
 
         for ontology_service in [OntologyService.MONDO, OntologyService.OMIM, OntologyService.HPO]:
 
@@ -43,6 +62,4 @@ def search_ontology(sender: Any, search_input: SearchInput, **kwargs) -> SearchR
 
             # limit results to 20 for each kind, need to give the user an overall warning that we're doing this
             for obj in qs[0:20]:
-                response.add(obj, messages=validate_ontology(obj))
-
-    return response
+                yield obj, validate_ontology(obj)

@@ -4,7 +4,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from functools import cached_property
 from itertools import zip_longest
-from typing import Set, Iterable, Union, Optional, Match, List, Any, Dict
+from typing import Set, Iterable, Union, Optional, Match, List, Any, Dict, Tuple
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -26,7 +26,7 @@ from genes.models_enums import AnnotationConsortium
 from library.genomics import format_chrom
 from library.log_utils import report_message
 from library.preview_request import PreviewData
-from library.utils import clean_string
+from library.utils import clean_string, group_by_key
 from patients.models import ExternalPK, Patient
 from pedigree.models import Pedigree
 from seqauto.illumina.illumina_sequencers import SEQUENCING_RUN_REGEX
@@ -140,6 +140,7 @@ class SearchResult:
     def __init__(self,
                  record: Any,
                  preview: Optional[PreviewData] = None,
+                 sub_name: Optional[str] = None,
                  genome_builds: Optional[Set[GenomeBuild]] = None,
                  annotation_consortia: Optional[List[str]] = None,  # why isn't this a set?
                  message: Optional[Union[str, List[str]]] = None,
@@ -150,6 +151,7 @@ class SearchResult:
         """
         self.record = record
         self._preview = preview
+        self.sub_name = sub_name
         self.genome_build = None  # Set as we display search results for each build
         self.genome_builds = genome_builds
         self.annotation_consortia = annotation_consortia or []
@@ -178,7 +180,7 @@ class SearchResult:
         )
 
     @staticmethod
-    def from_search_result_abs(result: SearchResult2):
+    def from_search_result_abs(result: SearchResult2, sub_name: Optional[str] = None) -> 'SearchResult':
         genome_builds: Set[GenomeBuild] = set()
         annotation_consortias: List[str] = []
         if annotation_consortia := result.annotation_consortium:
@@ -187,9 +189,10 @@ class SearchResult:
         sr = SearchResult(
             record=None,
             preview=result.preview,
+            sub_name=sub_name,
             genome_builds=result.genome_builds or set(),
             annotation_consortia=annotation_consortias,
-            message=result.messages
+            message=result.messages if result.messages else None
         )
         sr.search_type = result.preview.category
         return sr
@@ -281,16 +284,24 @@ class SearchResults:
         self.search_types: Set[str] = set()
         self.search_errors: Dict[SearchError, Set[GenomeBuild]] = defaultdict(set)
 
+        self.search_infos: List[SearchResult] = []
+
+    @cached_property
+    def grouped_search_infos(self) -> List[SearchResponse]:
+        return sorted(self.search_infos, key=lambda sr: sr.search_type.preview_category())
+
     @staticmethod
     def from_search_response(search_input: SearchInput, response: SearchResponse) -> 'SearchResults':
         sr = SearchResults(search_string=search_input.search_string,
                            genome_build_preferred=search_input.genome_build_preferred)
-        for category in response.searched_categories:
-            sr.search_types.add(category)
+
+        if response.matched_pattern:
+            sr.search_types.add(response.search_type.preview_category())
         sr.search_string = search_input.search_string
         sr.genome_build_preferred = search_input.genome_build_preferred
-        sr.results = [SearchResult.from_search_result_abs(result=result) for result in
-                      response.results]
+        sr.results = [SearchResult.from_search_result_abs(result=result, sub_name=response.sub_name) for result in
+                      response.optimized_results]
+        sr.search_infos = [response]
         return sr
 
     def append_search_type(self, search_type: str):
@@ -317,6 +328,7 @@ class SearchResults:
 
         self.results.extend(other.results)
         self.search_types = self.search_types.union(other.search_types)
+        self.search_infos.extend(other.search_infos)
 
     @property
     def search_types_string(self):
@@ -364,19 +376,19 @@ class Searcher:
         MIN_3_ALPHA = re.compile(r"[a-zA-Z]{3,}")
 
         self.genome_build_searches = [
-            (SearchTypes.COHORT, NOT_WHITESPACE, search_cohort),
+            #(SearchTypes.COHORT, NOT_WHITESPACE, search_cohort),
             (SearchTypes.DBSNP, DBSNP_PATTERN, search_dbsnp),
             (SearchTypes.HGVS, HGVS_UNCLEANED_PATTERN, search_hgvs),
             (SearchTypes.LOCUS, LOCUS_PATTERN, search_locus),
             (SearchTypes.LOCUS, LOCUS_NO_REF_PATTERN, search_locus),
-            (SearchTypes.PEDIGREE, NOT_WHITESPACE, search_pedigree),
-            (SearchTypes.SAMPLE, NOT_WHITESPACE, search_sample),
-            (SearchTypes.VCF, NOT_WHITESPACE, search_vcf),
+            #(SearchTypes.PEDIGREE, NOT_WHITESPACE, search_pedigree),
+            #(SearchTypes.SAMPLE, HAS_ALPHA_PATTERN, search_sample),
+            #(SearchTypes.VCF, NOT_WHITESPACE, search_vcf),
             (SearchTypes.VARIANT, VARIANT_PATTERN, search_variant),
-            (SearchTypes.CLINGEN_ALLELE_ID, CLINGEN_ALLELE_PATTERN, search_clingen_allele),
+            #(SearchTypes.CLINGEN_ALLELE_ID, CLINGEN_ALLELE_PATTERN, search_clingen_allele),
             (SearchTypes.VARIANT, VARIANT_VCF_PATTERN, search_variant_vcf),
             (SearchTypes.VARIANT, VARIANT_GNOMAD_PATTERN, search_variant_gnomad),
-            (SearchTypes.COSMIC, COSMIC_PATTERN, search_cosmic),
+            #(SearchTypes.COSMIC, COSMIC_PATTERN, search_cosmic),
         ]
         self.genome_agnostic_searches = [
             # (SearchTypes.ANALYSIS, ANALYSIS_PREFIX_PATTERN, search_analysis_id),
@@ -424,11 +436,12 @@ class Searcher:
     def search(self) -> SearchResults:
         search_results = SearchResults(search_string=self.search_string, genome_build_preferred=self.genome_build_preferred)
 
-        # do genome build agnostic search
-        search_results.extend(self.search_within(genome_build=None))
-        for genome_build in self.genome_build_all:
-            # do genome build specific searches
-            search_results.extend(self.search_within(genome_build=genome_build))
+        if self.search_string:
+            # do genome build agnostic search
+            search_results.extend(self.search_within(genome_build=None))
+            for genome_build in self.genome_build_all:
+                # do genome build specific searches
+                search_results.extend(self.search_within(genome_build=genome_build))
 
         # TODO: Migrate everything to the new search
         search_input = SearchInput(user=self.user, search_string=self.search_string, genome_build_preferred=self.genome_build_preferred)
@@ -539,13 +552,13 @@ def get_visible_variants(user: User, genome_build: GenomeBuild) -> VARIANT_SEARC
     return variant_qs
 
 
-def search_cosmic(search_string: str, user: User, variant_qs: QuerySet, **kwargs) -> VARIANT_SEARCH_RESULTS:
-    results = None
-    if search_string.startswith("COSV"):
-        results = variant_qs.filter(variantannotation__cosmic_id__contains=search_string)
-    elif search_string.startswith("COSM"):
-        results = variant_qs.filter(variantannotation__cosmic_legacy_id__contains=search_string)
-    return results
+# def search_cosmic(search_string: str, user: User, variant_qs: QuerySet, **kwargs) -> VARIANT_SEARCH_RESULTS:
+#     results = None
+#     if search_string.startswith("COSV"):
+#         results = variant_qs.filter(variantannotation__cosmic_id__contains=search_string)
+#     elif search_string.startswith("COSM"):
+#         results = variant_qs.filter(variantannotation__cosmic_legacy_id__contains=search_string)
+#     return results
 
 
 def search_dbsnp(search_string, user, genome_build: GenomeBuild, variant_qs: QuerySet, **kwargs) -> VARIANT_SEARCH_RESULTS:
@@ -569,13 +582,13 @@ def search_dbsnp(search_string, user, genome_build: GenomeBuild, variant_qs: Que
     return search_results
 
 
-def search_gene_symbol(search_string: str, **kwargs) -> Iterable[Union[GeneSymbol, GeneSymbolAlias]]:
-    # Gene symbols / aliases use Postgres case-insensitive text, so don't need iexact
-    gene_symbols = list(GeneSymbol.objects.filter(symbol=search_string))
-    # only return a GeneSymbol alias if we're not returning the source GeneSymbol
-    gene_symbol_strs = {gene_symbol.symbol for gene_symbol in gene_symbols}
-    aliases = list(GeneSymbolAlias.objects.filter(alias=search_string).exclude(alias__in=gene_symbol_strs))
-    return gene_symbols + aliases
+# def search_gene_symbol(search_string: str, **kwargs) -> Iterable[Union[GeneSymbol, GeneSymbolAlias]]:
+#     # Gene symbols / aliases use Postgres case-insensitive text, so don't need iexact
+#     gene_symbols = list(GeneSymbol.objects.filter(symbol=search_string))
+#     # only return a GeneSymbol alias if we're not returning the source GeneSymbol
+#     gene_symbol_strs = {gene_symbol.symbol for gene_symbol in gene_symbols}
+#     aliases = list(GeneSymbolAlias.objects.filter(alias=search_string).exclude(alias__in=gene_symbol_strs))
+#     return gene_symbols + aliases
 
 
 # def search_gene(search_string: str, **kwargs) -> Iterable[Gene]:
@@ -808,23 +821,23 @@ def search_locus(search_string: str, genome_build: GenomeBuild, variant_qs: Quer
     return variant_qs.filter(**kwargs)
 
 
-def search_sample(search_string: str, user: User, genome_build: GenomeBuild, **kwargs) -> Iterable[Sample]:
-    return Sample.filter_for_user(user).filter(name__icontains=search_string,
-                                               vcf__genome_build=genome_build)
+# def search_sample(search_string: str, user: User, genome_build: GenomeBuild, **kwargs) -> Iterable[Sample]:
+#     return Sample.filter_for_user(user).filter(name__icontains=search_string,
+#                                                vcf__genome_build=genome_build)
 
 
-def search_cohort(search_string: str, user: User, genome_build: GenomeBuild, **kwargs) -> Iterable[Sample]:
-    return Cohort.filter_for_user(user).filter(name__icontains=search_string,
-                                               genome_build=genome_build)
+# def search_cohort(search_string: str, user: User, genome_build: GenomeBuild, **kwargs) -> Iterable[Sample]:
+#     return Cohort.filter_for_user(user).filter(name__icontains=search_string,
+#                                                genome_build=genome_build)
 
 
-def search_pedigree(search_string: str, user: User, genome_build: GenomeBuild, **kwargs) -> Iterable[Sample]:
-    return Pedigree.filter_for_user(user).filter(name__icontains=search_string,
-                                                 cohort__genome_build=genome_build)
+# def search_pedigree(search_string: str, user: User, genome_build: GenomeBuild, **kwargs) -> Iterable[Sample]:
+#     return Pedigree.filter_for_user(user).filter(name__icontains=search_string,
+#                                                  cohort__genome_build=genome_build)
 
 
-def search_vcf(search_string: str, user: User, genome_build: GenomeBuild, **kwargs) -> Iterable[Sample]:
-    return VCF.filter_for_user(user).filter(name__icontains=search_string, genome_build=genome_build)
+# def search_vcf(search_string: str, user: User, genome_build: GenomeBuild, **kwargs) -> Iterable[Sample]:
+#     return VCF.filter_for_user(user).filter(name__icontains=search_string, genome_build=genome_build)
 
 
 def search_variant_match(m: Match, user: User, genome_build: GenomeBuild, variant_qs: QuerySet, **kwargs) -> VARIANT_SEARCH_RESULTS:
@@ -897,22 +910,22 @@ def search_variant_id(search_string: str, **kwargs) -> VARIANT_SEARCH_RESULTS:
 #     return results
 
 
-def search_clingen_allele(search_string: str, user: User, genome_build: GenomeBuild, variant_qs: QuerySet, **kwargs) -> VARIANT_SEARCH_RESULTS:
-    if ClinGenAllele.looks_like_id(search_string):
-        clingen_allele = get_clingen_allele(search_string)
-        if settings.PREFER_ALLELE_LINKS:
-            return [clingen_allele.allele]
-
-        variant_qs = variant_qs.filter(variantallele__allele__clingen_allele=clingen_allele,
-                                       variantallele__genome_build=genome_build)
-        if variant_qs.exists():
-            return variant_qs
-        variant_string = clingen_allele.get_variant_string(genome_build)
-        variant_string_abbreviated = clingen_allele.get_variant_string(genome_build, abbreviate=True)
-        search_message = f"'{clingen_allele}' resolved to '{variant_string_abbreviated}'"
-        return [SearchResult(CreateManualVariant(genome_build, variant_string), message=search_message)]
-
-    return None
+# def search_clingen_allele(search_string: str, user: User, genome_build: GenomeBuild, variant_qs: QuerySet, **kwargs) -> VARIANT_SEARCH_RESULTS:
+#     if ClinGenAllele.looks_like_id(search_string):
+#         clingen_allele = get_clingen_allele(search_string)
+#         if settings.PREFER_ALLELE_LINKS:
+#             return [clingen_allele.allele]
+#
+#         variant_qs = variant_qs.filter(variantallele__allele__clingen_allele=clingen_allele,
+#                                        variantallele__genome_build=genome_build)
+#         if variant_qs.exists():
+#             return variant_qs
+#         variant_string = clingen_allele.get_variant_string(genome_build)
+#         variant_string_abbreviated = clingen_allele.get_variant_string(genome_build, abbreviate=True)
+#         search_message = f"'{clingen_allele}' resolved to '{variant_string_abbreviated}'"
+#         return [SearchResult(CreateManualVariant(genome_build, variant_string), message=search_message)]
+#
+#     return None
 
 
 # def search_patient(search_string: str, user: User, **kwargs) -> Iterable[Patient]:

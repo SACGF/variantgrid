@@ -58,6 +58,9 @@ class Cohort(GuardianPermissionsAutoInitialSaveMixin, PreviewModelMixin, SortByP
         return "fa-solid fa-people-arrows"
 
     @property
+    def preview(self) -> 'PreviewData':
+        return self.preview_with(identifier=self.name, title=f"{self.sample_count} samples")
+    @property
     def has_genotype(self):
         if self.vcf:
             return self.vcf.has_genotype

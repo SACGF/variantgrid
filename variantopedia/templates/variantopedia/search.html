@@ -34,8 +34,12 @@
         .list-group-item-action {
             cursor: pointer;
         }
-        .list-group-item-action label {
+        .list-group-item-action .search-identifier {
+            color: #444466;
             cursor: pointer !important;
+        }
+        .search-results .list-group-item {
+            background-color: #fafaff;
         }
     </style>
     <script>
@@ -80,10 +84,11 @@
                         {% for search_result in search_results.results %}
                             {% with preview=search_result.preview %}
                                 <a class="list-group-item list-group-item-action {% if search_result.messages %}list-group-item-warning{% endif %}" href="{{ preview.internal_url }}">
-                                    <div class="row" style="color:#444">
+                                    <div class="row d-flex align-items-center" style="color:#444">
                                         <div class="col-2 text-right">
                                             {% if preview.icon %}<i class="{{ preview.icon }} mr-2" style="opacity:0.75"></i>{% endif %}
                                             <label>{{ preview.category }}</label>
+                                            {% if search_result.sub_name %}<div class="text-info text-small">via {{ search_result.sub_name }} Search</div>{% endif %}
                                             <span>
                                             {% with extras=search_result.header_extra %}
                                                 {% if extras %}
@@ -144,7 +149,34 @@
                 {% endif %}
             </div>
         {% endif %}
-        <div class="mt-4">
+
+        <div class="card mt-4">
+            <div class="card-header">Accepted Inputs</div>
+            <div class="card-body">
+                {% for search_result in search_results.grouped_search_infos %}
+                    <div class="row d-flex align-items-center" style="min-height:30px;">
+                        <div class="col-4 text-right">
+                            <i class="{{ search_result.preview_icon }} mr-2" style="opacity:0.75"></i>
+                            <label>
+                                {{ search_result.preview_category }}
+                                {% if search_result.sub_name %} ({{ search_result.sub_name }}){% endif %}
+                            </label>
+                        </div>
+                        <div class="col-8">
+                            {% if search_result.admin_only %}<i class="fa-solid fa-key mr-2"></i>{% endif %}
+                            {% if search_result.example %}
+                                {% if search_result.example.note %}{{ search_result.example.note }}{% endif %}
+                                {% if search_result.example.example %}<span class="example">{{ search_result.example.example }}</span>{% endif %}
+                            {% else %}
+                                You can search for this
+                            {% endif %}
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        {% comment %}
         <h4>Accepted Inputs</h4>
         <div class="row equal">
             <div class="col-12 col-lg-6">
@@ -175,7 +207,7 @@
                             1 word, case insensitive name match <span class="example">gata2</span>, <span class="example">GATA2</span>.<br/>
                         {% endlabelled %}
                         {% if url_name_visible.genes %}
-                            {% comment %}This stuff is still searchable even if genes URL is not visible, but of limited use in such environments{% endcomment %}
+                            // This stuff is still searchable even if genes URL is not visible, but of limited use in such environments
                             {% labelled label="Gene ID" %}
                                 <span class="example">ENSG00000179348</span>
                             {% endlabelled %}
@@ -231,5 +263,6 @@
             </div>
         </div>
         </div>
+        {% endcomment %}
     </div>
 {% endblock %}

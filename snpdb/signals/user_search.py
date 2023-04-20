@@ -1,24 +1,30 @@
-from typing import Any
 from django.contrib.auth.models import User
 from django.db.models import Q
-from django.dispatch import receiver
-from snpdb.models import AvatarDetails
-from snpdb.search2 import search_signal, SearchInput, SearchResponse
+from snpdb.models import UserPreview
+from snpdb.search2 import search_receiver, SearchInputInstance, \
+    HAS_ALPHA_PATTERN, SearchExample
 
 
-@receiver(search_signal, sender=SearchInput)
-def user_search(sender: Any, search_input: SearchInput, **kwargs) -> SearchResponse:
-    if search_input.user.is_superuser and search_input.matches_has_alpha():
-        response = SearchResponse("User")
-        for user in User.objects.filter(
-            Q(username__icontains=search_input.search_string) or
-            Q(first_name__icontains=search_input.search_string) or
-            Q(last_name__icontains=search_input.search_string) or
-            Q(email__icontains=search_input.search_string)
-        ):
-            messages = []
-            if not user.is_active:
-                messages = ["User is inactive"]
-            response.add(AvatarDetails.avatar_for(user).preview(), messages=messages)
+#FIXME make a new class for search result for user that can be previewable
 
-        return response
+@search_receiver(
+    search_type=UserPreview,
+    pattern=HAS_ALPHA_PATTERN,
+    admin_only=True,
+    example=SearchExample(
+        note="Search on username, name or email",
+        example="jane@institute.org.au"
+    )
+)
+def user_search(search_input: SearchInputInstance):
+    # TODO search for search-words across all fields (so you can search for first name last name for example)
+    for user in User.objects.filter(
+        Q(username__icontains=search_input.search_string) or
+        Q(first_name__icontains=search_input.search_string) or
+        Q(last_name__icontains=search_input.search_string) or
+        Q(email__icontains=search_input.search_string)
+    ):
+        messages = []
+        if not user.is_active:
+            messages = ["User is inactive"]
+        yield UserPreview(user), messages

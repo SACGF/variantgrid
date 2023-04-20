@@ -1,18 +1,17 @@
 import re
-from typing import Type, Any
-
-from django.dispatch import receiver
-
 from snpdb.models import Organization
-from snpdb.search2 import search_signal, SearchInput, SearchResponse
+from snpdb.search2 import search_receiver, SearchInputInstance, SearchExample
 
 MIN_3_ALPHA = re.compile(r"[a-zA-Z]{3,}")
 
 
-
-@receiver(search_signal, sender=SearchInput)
-def organization_search(sender: Any, search_input: SearchInput, **kwargs) -> SearchResponse:
-    if search_input.matches_pattern(MIN_3_ALPHA):
-        response = SearchResponse(Organization)
-        response.extend(Organization.objects.filter(active=True).filter(name__icontains=search_input.search_string.upper()))
-        return response
+@search_receiver(
+    search_type=Organization,
+    pattern=MIN_3_ALPHA,
+    example=SearchExample(
+        note="3 or more letter of the organisation's name",
+        example="institute"
+    )
+)
+def organization_search(search_input: SearchInputInstance):
+    yield Organization.objects.filter(active=True).filter(search_input.q_words())

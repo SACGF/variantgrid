@@ -1,4 +1,5 @@
 import re
+from typing import Optional
 
 from django.db import models
 from django.db.models import CASCADE, PROTECT
@@ -172,6 +173,10 @@ class Experiment(PreviewModelMixin, models.Model):
     @classmethod
     def preview_icon(cls) -> str:
         return "fa-solid fa-flask-vial"
+
+    @classmethod
+    def preview_if_url_visible(cls) -> Optional[str]:
+        return 'data'
 
     @staticmethod
     def clean_experiment_name(experiment_name):

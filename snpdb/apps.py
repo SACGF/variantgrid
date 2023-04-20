@@ -22,6 +22,10 @@ class SnpdbConfig(AppConfig):
         from snpdb.signals import organization_search
         from snpdb.signals import user_search
         from snpdb.signals import allele_search
+        from snpdb.signals import cohort_search
+        from snpdb.signals import sample_search
+        from snpdb.signals import vcf_search
+        from snpdb.signals import variant_search
         # pylint: enable=import-outside-toplevel
 
         backend_vcf_import_success_signal.connect(backend_vcf_import_success_handler)

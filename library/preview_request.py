@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Optional, Union
+from typing import Optional, Union, Any
 from attr import dataclass
 from django.db.models import Model
 from django.dispatch import Signal
@@ -8,6 +8,7 @@ from django.urls import NoReverseMatch
 from django.utils.safestring import SafeString
 from library.log_utils import report_message
 from library.utils import pretty_label
+from variantgrid.perm_path import get_visible_url_names
 
 preview_request_signal: Signal = Signal()
 """
@@ -22,6 +23,16 @@ class PreviewModelMixin:
         return pretty_label(cls._meta.verbose_name)
 
     @classmethod
+    def preview_if_url_visible(cls) -> Optional[str]:
+        return None
+
+    @classmethod
+    def preview_enabled(cls) -> bool:
+        if url_name := cls.preview_if_url_visible():
+            return bool(get_visible_url_names().get(url_name))
+        return True
+
+    @classmethod
     def preview_icon(cls) -> str:
         return "fa-solid fa-circle"
 
@@ -33,33 +44,22 @@ class PreviewModelMixin:
             icon: Optional[str] = None,
             summary: Optional[Union[str, SafeString]] = None,
             internal_url: Optional[str] = None,
-            external_url: Optional[str] = None
+            external_url: Optional[str] = None,
+            genome_build: Optional['GenomeBuild'] = None,
+            annotation_consortium: Optional['AnnotationConsortium'] = None
     ) -> 'PreviewData':
 
-        if not identifier:
-            if isinstance(self.pk, str):
-                identifier = self.pk
-                if title is None:
-                    str_title = str(self)
-                    if str_title != identifier:
-                        title = str_title
-            else:
-                identifier = str(self)
-
-        if not internal_url and hasattr(self, "get_absolute_url"):
-            try:
-                internal_url = self.get_absolute_url()
-            except NoReverseMatch:
-                internal_url = "javascript:alert('Could not load a view for this type of result')"
-
-        return PreviewData(
+        return PreviewData.for_object(
+            self,
             category=category or self.preview_category(),
-            icon=icon or self.preview_icon(),
             identifier=identifier,
             title=title,
+            icon=icon or self.preview_icon(),
             summary=summary,
             internal_url=internal_url,
-            external_url=external_url
+            external_url=external_url,
+            genome_build=genome_build,
+            annotation_consortium=annotation_consortium
         )
 
     @property
@@ -76,6 +76,9 @@ class PreviewData:
     summary: Optional[Union[str, SafeString]] = None
     internal_url: Optional[str] = None
     external_url: Optional[str] = None
+    genome_build: Optional['GenomeBuild'] = None
+    annotation_consortium: Optional['AnnotationConsortium'] = None
+    obj: Optional[Any] = None
 
     @staticmethod
     def for_object(
@@ -86,29 +89,48 @@ class PreviewData:
             icon: Optional[str] = None,
             summary: Optional[Union[str, SafeString]] = None,
             internal_url: Optional[str] = None,
-            external_url: Optional[str] = None
-        ):
-        category = category or pretty_label(obj._meta.verbose_name)
+            external_url: Optional[str] = None,
+            genome_build: Optional['GenomeBuild'] = None,
+            annotation_consortium: Optional['AnnotationConsortium'] = None):
+
+        if not category:
+            if hasattr(obj, "_meta"):
+                category = obj._meta.verbose_name
+            else:
+                category = pretty_label(obj.__class__.__name__)
+
         if not identifier:
-            if isinstance(obj.pk, str):
+            if hasattr(obj, "pk") and isinstance(obj.pk, str):
                 identifier = obj.pk
                 if title is None:
                     title = str(obj)
             else:
                 identifier = str(obj)
 
-        if hasattr(obj, "get_absolute_url"):
-            internal_url = internal_url or obj.get_absolute_url()
+        if not internal_url and hasattr(obj, "get_absolute_url"):
+            try:
+                internal_url = obj.get_absolute_url()
+            except NoReverseMatch:
+                internal_url = "javascript:alert('Could not load a view for this type of result')"
+
+        if genome_build is None and hasattr(obj, "genome_build"):
+            genome_build = obj.genome_build
+
+        if annotation_consortium is None and hasattr(obj, "annotation_consortium"):
+            annotation_consortium = obj.annotation_consortium
+
         return PreviewData(
+            obj=obj,
             category=category,
             icon=icon,
             identifier=identifier,
             title=title,
             summary=summary,
             internal_url=internal_url,
-            external_url=external_url
+            external_url=external_url,
+            genome_build=genome_build,
+            annotation_consortium=annotation_consortium
         )
-
 
 
     def as_json(self):

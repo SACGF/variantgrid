@@ -197,6 +197,7 @@ if _SHARIANT_MODE:
 #SAPATH_APP = 'sapath.apps.SapathConfig'
 #INSTALLED_APPS += [SAPATH_APP]
 
+
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': True,
@@ -282,7 +283,7 @@ URLS_NAME_REGISTER.update({  # Disable selected snpdb urls
     "cohorts": False,
     "patient_record_imports": False,
     "patient_term_approvals": False,
-    "patients": False,
+    "patients": True,
 
     "gene_lists": False,
     "genes": False,

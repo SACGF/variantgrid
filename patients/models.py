@@ -1,4 +1,5 @@
 import os
+from typing import Optional
 
 import nameparser
 from django.conf import settings
@@ -59,6 +60,10 @@ class ExternalPK(models.Model, PreviewModelMixin):
     @classmethod
     def preview_icon(cls) -> str:
         return "fa-solid fa-person-walking-arrow-right"
+
+    @classmethod
+    def preview_if_url_visible(cls) -> Optional[str]:
+        return 'patients'
 
     class Meta:
         unique_together = ('code', 'external_type', 'external_manager')
@@ -132,6 +137,10 @@ class Patient(GuardianPermissionsMixin, HasPhenotypeDescriptionMixin, Externally
     @classmethod
     def preview_icon(cls) -> str:
         return "fa-solid fa-user-injured"
+
+    @classmethod
+    def preview_if_url_visible(cls) -> Optional[str]:
+        return 'patients'
 
     @property
     def preview(self) -> PreviewData:

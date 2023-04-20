@@ -1,18 +1,24 @@
+import operator
 import re
+from abc import ABC
+from collections import defaultdict
 from dataclasses import dataclass, field
+from functools import reduce, cached_property
 from re import Match, IGNORECASE
-from typing import Optional, TypeVar, Union, List, Iterable, Pattern, Any, Set
-import django
+from typing import Optional, TypeVar, Union, List, Iterable, Pattern, Any, Set, Callable, Type, Dict
+from django.dispatch import Signal
 from django.conf import settings
 from django.contrib.auth.models import User
-from django.db.models import QuerySet
+from django.db.models import QuerySet, Q
 from genes.models_enums import AnnotationConsortium
-from library.log_utils import report_message
-from library.preview_request import PreviewData
-from snpdb.models import GenomeBuild, Variant
+from library.log_utils import report_message, report_exc_info
+from library.preview_request import PreviewData, PreviewModelMixin
+from snpdb.models import GenomeBuild, Variant, Allele
+from variantgrid.perm_path import get_visible_url_names
 
-search_signal = django.dispatch.Signal()
-HAS_ALPHA_PATTERN = r"[a-zA-Z]"
+search_signal = Signal()
+HAS_ALPHA_PATTERN = re.compile(r"[a-zA-Z]")
+HAS_ANYTHING = re.compile(r".+")
 
 
 @dataclass(frozen=True)
@@ -27,13 +33,27 @@ class SearchInput:
         else:
             return pattern.match(self.search_string)
 
-    def matches_has_alpha(self) -> bool:
-        return bool(self.matches_pattern(HAS_ALPHA_PATTERN))
-
     @property
     def search_words(self) -> List[str]:
         words = [word.strip() for word in self.search_string.split(" ")]
         return [word for word in words if word]
+
+    def q_words(self, field_name: str = "name", test: str = "icontains") -> Q:
+        """
+        Returns Qs and-ed together to split search into words and make sure the words individually are contained
+        in the result. So if you searched for "one two" you would get records with "one thing and two" because the
+        words are contained, just not necessarily in the order given.
+        :param field_name: name by default, The field that should be checked against e.g. "name" results in "name__icontains=<word>"
+        :param test: icontains by default, alternatively can do contains.
+        :return: A Q to filter your query set with
+        """
+        if words := self.search_words:
+            qs: List[Q] = []
+            for word in words:
+                qs.append(Q(**{f"{field_name}__{test}": word}))
+            return reduce(operator.and_, qs)
+        else:
+            raise ValueError("No tokens found in search, can't generate q_words")
 
     def search(self) -> List['SearchResponse']:
         valid_responses: List[SearchResponse] = []
@@ -69,24 +89,112 @@ class SearchInput:
         return GenomeBuild.builds_with_annotation()
 
 
-T = TypeVar("T")
+@dataclass(frozen=True)
+class SearchInputInstance:
+    expected_type: Type
+    search_input: SearchInput
+    match: Match
+
+    # def matches_pattern(self, pattern: Union[str, Pattern]) -> Match:
+    #     return self.search_input.matches_pattern(pattern)
+
+    @cached_property
+    def results(self):
+        return SearchResponse(self.expected_type)
+
+    @property
+    def user(self):
+        return self.search_input.user
+
+    @property
+    def search_string(self):
+        return self.search_input.search_string
+
+    @property
+    def genome_builds(self) -> Set[GenomeBuild]:
+        return self.search_input.genome_builds
+
+    def get_visible_variants(self, genome_build: GenomeBuild) -> QuerySet[Variant]:
+        return self.search_input.get_visible_variants(genome_build=genome_build)
+
+    @property
+    def search_words(self) -> List[str]:
+        return self.search_input.search_words
+
+    def q_words(self, field_name: str = "name", test: str = "icontains") -> Q:
+        return self.search_input.q_words(field_name=field_name, test=test)
 
 
 @dataclass
 class SearchResult2:
     preview: PreviewData
-    genome_builds: Optional[Set[GenomeBuild]] = None
-    annotation_consortium: Optional[AnnotationConsortium] = None
     messages: Optional[List[str]] = None
 
+    @property
+    def genome_builds(self):
+        if gb := self.preview.genome_build:
+            return {gb}
+        return None
 
+    @property
+    def annotation_consortium(self):
+        if ac := self.preview.annotation_consortium:
+            return ac
+        return None
+
+    @staticmethod
+    def convert(data: Any) -> List['SearchResult2']:
+        if isinstance(data, (tuple, list)):
+            data = list(data)
+            messages = []
+            for entry in data[1:]:
+                if isinstance(entry, list):
+                    messages.extend(entry)
+                elif isinstance(entry, str):
+                    messages.append(entry)
+                elif entry is None:
+                    pass
+                else:
+                    raise ValueError(f"Not sure what to do with search result extra {entry}")
+            previews = SearchResult2._convert_to_previews(data[0])
+            return [SearchResult2(preview=preview, messages=messages) for preview in previews]
+        else:
+            previews = SearchResult2._convert_to_previews(data)
+            return [SearchResult2(preview=preview) for preview in previews]
+
+    @staticmethod
+    def _convert_to_previews(data: Any) -> List[PreviewData]:
+        if isinstance(data, PreviewData):
+            return [data]
+        elif isinstance(data, QuerySet):
+            return list(obj.preview for obj in data)
+        else:
+            return [data.preview]
+
+
+@dataclass(frozen=True)
+class SearchExample:
+    note: Optional[str] = None
+    example: Optional[str] = None
+
+
+@dataclass
 class SearchResponse:
+    search_type: PreviewModelMixin
+    matched_pattern: bool = False
+    sub_name: Optional[str] = None
+    admin_only: bool = False
+    example: Optional[SearchExample] = None
+    results: List[SearchResult2] = field(default_factory=list)
 
-    def __init__(self, *args):
-        self.searched_categories = set()
-        self.results = list()
-        for arg in args:
-            self.add_search_category(arg)
+    @property
+    def preview_category(self):
+        # django templates don't handle {{ UserPreview.preview_category }} for some unknown reason, works for all models classes
+        return self.search_type.preview_category()
+
+    @property
+    def preview_icon(self):
+        return self.search_type.preview_icon()
 
     def add_search_category(self, obj):
         if not isinstance(obj, str):
@@ -95,18 +203,70 @@ class SearchResponse:
 
     def add_search_result(self, search_result: SearchResult2):
         self.results.append(search_result)
-        self.searched_categories.add(search_result.preview.category)
 
-    def add(self, obj: Any, messages: Optional[List[str]] = None, genome_builds: Optional[Set[GenomeBuild]] = None, annotation_consortium: Optional[GenomeBuild] = None):
-        if not isinstance(obj, PreviewData):
-            preview = obj.preview
-            if not preview:
-                raise ValueError(f"{obj} had None preview")
-            obj = preview
-        if not isinstance(obj, PreviewData):
-            raise ValueError(f"Can't add {obj} as search result preview")
-        self.add_search_result(SearchResult2(preview=obj, messages=messages, genome_builds=genome_builds, annotation_consortium=annotation_consortium))
+    @property
+    def optimized_results(self):
+        if settings.PREFER_ALLELE_LINKS:
+            if self.search_type == Variant:
+                allele_to_variants: Dict[Allele, List[SearchResult2]] = defaultdict(list)
+                regular_results = list()
+                had_allele = False
+                for result in self.results:
+                    if obj := result.preview.obj:
+                        if isinstance(obj, Variant):
+                            if allele := obj.allele:
+                                allele_to_variants[allele].append(result)
+                                had_allele = True
+                    if not had_allele:
+                        regular_results.append(result)
 
-    def extend(self, iterable: Iterable, messages: Optional[List[str]] = None, genome_builds: Optional[Set[GenomeBuild]] = None, annotation_consortium: Optional[GenomeBuild] = None):
-        for obj in iterable:
-            self.add(obj, messages=messages, genome_builds=genome_builds, annotation_consortium=annotation_consortium)
+                if allele_to_variants:
+                    for allele, variant_results in allele_to_variants.items():
+                        regular_results.append(
+                            # FIXME remove redundant messages
+                            SearchResult2(preview=allele.preview, messages=reduce(operator.__add__, (variant.messages for variant in variant_results if variant.messages), []))
+                        )
+                return regular_results
+        return self.results
+
+
+def search_receiver(
+        search_type: Optional[Type[PreviewModelMixin]] = None,
+        pattern: Pattern = HAS_ANYTHING,
+        admin_only: bool = False,
+        sub_name: Optional[str] = None,
+        example: Optional[SearchExample] = None
+    ):
+    def _decorator(func):
+        def search_func(sender: Any, search_input: SearchInput, **kwargs):
+            try:
+                if admin_only and not search_input.user.is_superuser:
+                    return None
+                if search_type and not search_type.preview_enabled():
+                    return None
+
+                response = SearchResponse(
+                    search_type=search_type,
+                    admin_only=admin_only,
+                    sub_name=sub_name,
+                    example=example)
+
+                if match := pattern.match(search_input.search_string):
+                    response.matched_pattern = True
+                    # FIXME don't do this just for the made up connector function
+                    # return something that returns SearchResponse so testing is easier
+                    for result in func(SearchInputInstance(expected_type=search_type, search_input=search_input, match=match)):
+                        for search_result in SearchResult2.convert(result):
+                            response.add_search_result(search_result)
+
+                return response
+            except:
+                # FIXME make this an overall search error
+                print(f"Error handling search_receiver on {func}")
+                report_exc_info()
+                raise
+
+        search_signal.connect(search_func)
+        return func
+
+    return _decorator

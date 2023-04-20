@@ -23,7 +23,7 @@ from flags.models.models import FlagsMixin, FlagTypeContext
 from library.django_utils.django_partition import RelatedModelsPartitionModel
 from library.genomics import format_chrom
 from library.preview_request import PreviewModelMixin
-from library.utils import md5sum_str, FormerTuple
+from library.utils import md5sum_str, FormerTuple, first
 from snpdb.models import Wiki
 from snpdb.models.models_clingen_allele import ClinGenAllele
 from snpdb.models.models_enums import AlleleConversionTool, AlleleOrigin, ProcessingStatus
@@ -314,7 +314,7 @@ class Locus(models.Model):
         return f"{self.chrom}:{self.position} {self.ref}"
 
 
-class Variant(models.Model):
+class Variant(PreviewModelMixin, models.Model):
     """ Variants represent the different alleles at a locus
         Usually 2+ per line in a VCF file (ref + >= 1 alts pointing to the same locus for the row)
         There is only 1 Variant for a given locus/alt per database (handled via insertion queues) """
@@ -325,6 +325,10 @@ class Variant(models.Model):
 
     class Meta:
         unique_together = ("locus", "alt")
+
+    @classmethod
+    def preview_icon(cls) -> str:
+        return "fa-solid fa-v p-1 text-light border rounded bg-dark"
 
     @staticmethod
     def get_chrom_q(chrom):
@@ -402,6 +406,10 @@ class Variant(models.Model):
         params = ["locus__contig__name", "locus__position", "locus__ref__seq", "alt__seq"]
         return Variant.objects.get(locus__contig__genomebuildcontig__genome_build=genome_build,
                                    **dict(zip(params, variant_tuple)))
+
+    @property
+    def genome_build(self) -> Optional[GenomeBuild]:
+        return first(self.genome_builds)
 
     @cached_property
     def genome_builds(self) -> Set['GenomeBuild']:

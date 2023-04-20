@@ -1,13 +1,7 @@
-from typing import Any
-
-from django.dispatch import receiver
 from seqauto.models import Experiment
-from snpdb.search2 import SearchResponse, SearchInput, search_signal
+from snpdb.search2 import search_receiver, HAS_ALPHA_PATTERN, SearchInputInstance
 
 
-@receiver(search_signal, sender=SearchInput)
-def experiment_search(sender: Any, search_input: SearchInput, **kwargs) -> SearchResponse:
-    if search_input.matches_has_alpha():
-        search_response = SearchResponse()
-        search_response.extend(Experiment.objects.filter(name__icontains=search_input.search_string))
-        return search_response
+@search_receiver(search_type=Experiment, pattern=HAS_ALPHA_PATTERN)
+def experiment_search(search_input: SearchInputInstance):
+    yield Experiment.objects.filter(search_input.q_words())

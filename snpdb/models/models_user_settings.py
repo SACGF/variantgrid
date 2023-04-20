@@ -20,7 +20,7 @@ from model_utils.managers import InheritanceManager
 from library.django_utils import thread_safe_unique_together_get_or_create
 from library.django_utils.avatar import SpaceThemedAvatarProvider
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsAutoInitialSaveMixin
-from library.preview_request import PreviewData
+from library.preview_request import PreviewData, PreviewModelMixin
 from library.utils import string_deterministic_hash, rgb_invert
 from snpdb.models.models import Tag, Lab, Organization
 from snpdb.models.models_columns import CustomColumnsCollection, CustomColumn
@@ -227,13 +227,25 @@ class UserSettingsOverride(SettingsOverride):
         return f"UserSettings for {self.user}"
 
 
-@dataclass(frozen=True)
-class AvatarDetails:
-    user: User
+class UserPreview(PreviewModelMixin):
 
-    def preview(self) -> PreviewData:
-        # icon = f'<div style="background-color:{ self.background_color }; background-image: url({ self.url }); height:1.3rem;width:1.3rem;border:2px solid { self.background_color }" class="background-image d-inline-block mr-1 rounded"></div>'
+    def __init__(self, user: User):
+        self.user = user
 
+    @cached_property
+    def avatar(self):
+        return AvatarDetails.avatar_for(self.user)
+
+    @classmethod
+    def preview_category(cls) -> str:
+        return "User"
+
+    @classmethod
+    def preview_icon(cls) -> str:
+        return "fa-solid fa-user"
+
+    @property
+    def preview(self):
         title = ""
         if self.user.is_superuser:
             title = "Admin"
@@ -247,11 +259,15 @@ class AvatarDetails:
         return PreviewData.for_object(
             obj=self.user,
             category="User",
-            icon="fa-solid fa-user",
-            identifier=self.preferred_label,
+            identifier=self.avatar.preferred_label,
             title=title,
             internal_url=reverse('view_user', kwargs={"pk": self.user.pk})
         )
+
+
+@dataclass(frozen=True)
+class AvatarDetails:
+    user: User
 
     @staticmethod
     def avatar_for(user: User):

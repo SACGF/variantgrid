@@ -195,6 +195,10 @@ class SequencingRun(PreviewModelMixin, SeqAutoRecord):
     def preview_icon(cls) -> str:
         return "fa-solid fa-person-running"
 
+    @classmethod
+    def preview_if_url_visible(cls) -> Optional[str]:
+        return 'data'
+
     def _validate(self):
         sample_sheet_changed_code = "sample_sheet_changed"
 

@@ -1,21 +1,25 @@
 import operator
 from functools import reduce
-from typing import Any, Optional, Type
+from typing import Optional
 
 from django.conf import settings
 from django.db.models import Q
-from django.dispatch import receiver
 from pyhgvs import HGVSName, InvalidHGVSName
 
 from annotation.models import VariantAnnotationVersion
 from classification.models import Classification, ClassificationModification
 from snpdb.models import Lab, Organization
-from snpdb.search2 import search_signal, SearchInput, SearchResponse
+from snpdb.search2 import search_receiver, SearchInputInstance, SearchExample
 
 
-@receiver(search_signal, sender=SearchInput)
-def classification_search(sender: Any, search_input: SearchInput, **kwargs) -> SearchResponse:
-    response = SearchResponse(Classification)
+@search_receiver(
+    search_type=Classification,
+    example=SearchExample(
+        note="The lab record ID",
+        example="vc1545"
+    )
+)
+def classification_search(search_input: SearchInputInstance):
 
     search_string = search_input.search_string
     """ Search for LabId which can be either:
@@ -46,6 +50,8 @@ def classification_search(sender: Any, search_input: SearchInput, **kwargs) -> S
             if lab_qs:
                 filters.append(Q(classification__lab_record_id=lab_record_id) & Q(classification__lab__in=lab_qs))
 
+    # FIXME put this in its own search, or just remove it and the setting
+    # maybe have variants report how many classifcations they have
     # We can also filter for c.HGVS in classifications
     if settings.SEARCH_CLASSIFICATION_HGVS_SUFFIX:
         if search_string.startswith("c.") or search_string.startswith("n."):
@@ -77,7 +83,5 @@ def classification_search(sender: Any, search_input: SearchInput, **kwargs) -> S
         classification__last_source_id=search_string).values('classification')
 
     # convert from modifications back to Classification so absolute_url returns the editable link
-    qs = Classification.objects.filter(Q(pk__in=cm_ids) | Q(pk__in=cm_source_ids))
-    response.extend(qs)
+    yield Classification.objects.filter(Q(pk__in=cm_ids) | Q(pk__in=cm_source_ids))
 
-    return response

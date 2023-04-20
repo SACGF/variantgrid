@@ -380,26 +380,31 @@ def search(request):
     user_settings = UserSettings.get_for_user(request.user)
 
     search_results: Optional[SearchResults] = None
+    search_string = ""
+    classify = False
     if form.is_valid() and form.cleaned_data['search']:
         search_string = form.cleaned_data['search']
         classify = form.cleaned_data.get('classify')
-        search_results = search_data(request.user, search_string, classify)
-        results, _search_types, _search_errors = search_results.results, search_results.search_types, search_results.search_errors
-        details = f"'{search_string}' calculated {len(results)} results."
-        create_event(request.user, 'search', details=details)
 
-        # don't auto load unless there is only 1 preferred result
-        if preferred_result := search_results.single_preferred_result():
-            # return redirect(preferred_result.preview.internal_url)
-            pass
+    # always perform a "search" so we can get told what kind of searches are enabled
+    # note that searching on "" doesn't actually invoke any of the other search logic
+    search_results = search_data(request.user, search_string, classify)
+    results, _search_types, _search_errors = search_results.results, search_results.search_types, search_results.search_errors
+    details = f"'{search_string}' calculated {len(results)} results."
+    create_event(request.user, 'search', details=details)
 
-        # Attempt to give hints on why nothing was found
-        for search_error, genome_builds in search_results.search_errors.items():
-            text = f"{search_error.search_type}: {search_error.error}"
-            if genome_builds:
-                genome_builds_str = ", ".join(gb.name for gb in sorted(genome_builds))
-                text += f" ({genome_builds_str})"
-            messages.add_message(request, search_error.log_level, text)
+    # don't auto load unless there is only 1 preferred result
+    if preferred_result := search_results.single_preferred_result():
+        # return redirect(preferred_result.preview.internal_url)
+        pass
+
+    # Attempt to give hints on why nothing was found
+    for search_error, genome_builds in search_results.search_errors.items():
+        text = f"{search_error.search_type}: {search_error.error}"
+        if genome_builds:
+            genome_builds_str = ", ".join(gb.name for gb in sorted(genome_builds))
+            text += f" ({genome_builds_str})"
+        messages.add_message(request, search_error.log_level, text)
 
     epk_qs = ExternalPK.objects.values_list("external_type", flat=True)
     external_codes = list(sorted(epk_qs.distinct()))

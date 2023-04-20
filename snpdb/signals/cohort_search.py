@@ -1,3 +1,13 @@
-# def search_cohort(search_string: str, user: User, genome_build: GenomeBuild, **kwargs) -> Iterable[Sample]:
-#     return Cohort.filter_for_user(user).filter(name__icontains=search_string,
-#                                                genome_build=genome_build)
+from re import Match
+from snpdb.models import Cohort
+from snpdb.search2 import search_receiver, SearchInputInstance, SearchExample
+
+
+@search_receiver(
+    search_type=Cohort,
+    example=SearchExample(
+        note="Provide part of the cohort's name"
+    )
+)
+def search_cohort(search_input: SearchInputInstance):
+    yield Cohort.filter_for_user(search_input.user).filter(genome_build__in=search_input.genome_builds).filter(search_input.q_words())

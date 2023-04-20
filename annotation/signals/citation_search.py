@@ -1,15 +1,18 @@
-from typing import Any
-from django.dispatch import receiver
 from annotation.models import CitationFetchRequest, Citation
 from annotation.models.models_citations import CitationSource, CitationIdNormalized
-from snpdb.search2 import SearchInput, search_signal, SearchResponse
+from snpdb.search2 import search_receiver, SearchInputInstance, SearchExample
 
 
-@receiver(search_signal, sender=SearchInput)
-def search_citations(sender: Any, search_input: SearchInput, **kwargs) -> SearchResponse:
+@search_receiver(
+    search_type=Citation,
+    example=SearchExample(
+        note="PMID, PMCID or NBK ID",
+        example="PMID:25741868"
+    )
+)
+def search_citations(search_input: SearchInputInstance):
     try:
         normal_id = CitationIdNormalized.normalize_id(search_input.search_string)
-        response = SearchResponse(Citation)
 
         citation = normal_id.get_or_create()
         CitationFetchRequest.fetch_all_now([normal_id])
@@ -26,8 +29,6 @@ def search_citations(sender: Any, search_input: SearchInput, **kwargs) -> Search
         if citation.error:
             messages.append("Could not retrieve citation")
 
-        response.add(citation, messages=messages)
-        return response
+        yield citation, messages
     except ValueError:
         pass
-
