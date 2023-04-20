@@ -180,6 +180,7 @@ class SearchExample:
 
 @dataclass
 class SearchResponse:
+    search_input: SearchInput
     search_type: PreviewModelMixin
     matched_pattern: bool = False
     sub_name: Optional[str] = None
@@ -190,19 +191,20 @@ class SearchResponse:
     @property
     def preview_category(self):
         # django templates don't handle {{ UserPreview.preview_category }} for some unknown reason, works for all models classes
-        return self.search_type.preview_category()
+        return self.search_type_effective.preview_category()
 
     @property
     def preview_icon(self):
-        return self.search_type.preview_icon()
-
-    def add_search_category(self, obj):
-        if not isinstance(obj, str):
-            obj = obj.preview_category()
-        self.searched_categories.add(obj)
+        return self.search_type_effective.preview_icon()
 
     def add_search_result(self, search_result: SearchResult2):
         self.results.append(search_result)
+
+    @property
+    def search_type_effective(self) -> PreviewModelMixin:
+        if settings.PREFER_ALLELE_LINKS and self.search_type == Variant:
+            return Allele
+        return self.search_type
 
     @property
     def optimized_results(self):
@@ -222,9 +224,18 @@ class SearchResponse:
 
                 if allele_to_variants:
                     for allele, variant_results in allele_to_variants.items():
+                        genome_builds = set([vr.preview.genome_build for vr in variant_results])
+                        has_preferred_allele = self.search_input.genome_build_preferred in genome_builds
+
+                        # FIXME we already have support for genome build ranking, change to use that
+                        messages = reduce(operator.__add__, (variant.messages for variant in variant_results if variant.messages), [])
+                        if not has_preferred_allele:
+                            genome_build_str = ", ".join([gb.name for gb in sorted(genome_builds)])
+                            messages.append(f"Found in {genome_build_str}")
+
                         regular_results.append(
                             # FIXME remove redundant messages
-                            SearchResult2(preview=allele.preview, messages=reduce(operator.__add__, (variant.messages for variant in variant_results if variant.messages), []))
+                            SearchResult2(preview=allele.preview, messages=messages)
                         )
                 return regular_results
         return self.results
@@ -246,6 +257,7 @@ def search_receiver(
                     return None
 
                 response = SearchResponse(
+                    search_input=search_input,
                     search_type=search_type,
                     admin_only=admin_only,
                     sub_name=sub_name,

@@ -41,6 +41,9 @@
         .search-results .list-group-item {
             background-color: #fafaff;
         }
+        .searched {
+            color: #448844 !important;
+        }
     </style>
     <script>
         $(document).ready(() => {
@@ -68,6 +71,7 @@
         </form>
 
         {% if search %}
+            {% comment %}
             <p>
                 <b>Searched:</b>
                 {% if search_results.search_types %}
@@ -76,6 +80,7 @@
                     <b>error - could not recognise search pattern.</b>
                 {% endif %}
             </p>
+            {% endcomment %}
             <div id='results' class="mt-4">
                 {% if search_results.results %}
                     <h4>{% count search_results.results singular="1 Result" plural="Results" %} Found for "{{ search }}"</h4>
@@ -85,7 +90,7 @@
                             {% with preview=search_result.preview %}
                                 <a class="list-group-item list-group-item-action {% if search_result.messages %}list-group-item-warning{% endif %}" href="{{ preview.internal_url }}">
                                     <div class="row d-flex align-items-center" style="color:#444">
-                                        <div class="col-2 text-right">
+                                        <div class="col-4 text-right">
                                             {% if preview.icon %}<i class="{{ preview.icon }} mr-2" style="opacity:0.75"></i>{% endif %}
                                             <label>{{ preview.category }}</label>
                                             {% if search_result.sub_name %}<div class="text-info text-small">via {{ search_result.sub_name }} Search</div>{% endif %}
@@ -99,7 +104,7 @@
                                             {% endwith %}
                                             </span>
                                         </div>
-                                        <div class="col-10">
+                                        <div class="col-8">
                                             <label class="search-identifier">{{ preview.identifier }}</label>{% if preview.title %}&nbsp;<span class="search-title">{{ preview.title }}</span>{% endif %}
                                             {% if search_summary %}
                                                 {% search_summary request.user search_result %}
@@ -156,17 +161,23 @@
                 {% for search_result in search_results.grouped_search_infos %}
                     <div class="row d-flex align-items-center" style="min-height:30px;">
                         <div class="col-4 text-right">
-                            <i class="{{ search_result.preview_icon }} mr-2" style="opacity:0.75"></i>
-                            <label>
-                                {{ search_result.preview_category }}
-                                {% if search_result.sub_name %} ({{ search_result.sub_name }}){% endif %}
-                            </label>
+                            {% ifchanged search_result.preview_category %}
+                                <i class="{{ search_result.preview_icon }} mr-2 {% if not search_result.sub_name and search_result.matched_pattern %}searched{% endif %}" style="opacity:0.75"></i>
+                                <label>
+                                    {{ search_result.preview_category }}
+                                </label>
+                            {% endifchanged %}
                         </div>
                         <div class="col-8">
                             {% if search_result.admin_only %}<i class="fa-solid fa-key mr-2"></i>{% endif %}
+                            {% if search_result.sub_name %}
+                                <label {% if search_result.matched_pattern %}class="searched"{% endif %}>{{ search_result.sub_name }}</label><span class="d-inline mx-1">-</span>
+                            {% endif %}
                             {% if search_result.example %}
-                                {% if search_result.example.note %}{{ search_result.example.note }}{% endif %}
-                                {% if search_result.example.example %}<span class="example">{{ search_result.example.example }}</span>{% endif %}
+                                {% if search_result.example.note %}
+                                    {{ search_result.example.note }}
+                                {% endif %}
+                                {% if search_result.example.example %}<span class="example ml-1">{{ search_result.example.example }}</span>{% endif %}
                             {% else %}
                                 You can search for this
                             {% endif %}
@@ -174,6 +185,11 @@
                     </div>
                 {% endfor %}
             </div>
+            {% if search %}
+                <div class="card-footer">
+                    Inputs highlighted in green were included in this search.
+                </div>
+            {% endif %}
         </div>
 
         {% comment %}
@@ -264,5 +280,15 @@
         </div>
         </div>
         {% endcomment %}
+
+        <div class="alert alert-warning mt-4">
+            Search is under development.<br/>
+            Many of the variant searches have not been converted to the new method.<br/>
+            The ability to create variants if they're not present is not available.<br/>
+            Patterns of when a search is active need to be tweaked.<br/>
+            Disabling searches for features not active in certain environments needs to be tweaked.<br/>
+            And just a lot of internal fixes to go. ETC
+        </div>
     </div>
+
 {% endblock %}

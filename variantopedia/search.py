@@ -288,7 +288,7 @@ class SearchResults:
 
     @cached_property
     def grouped_search_infos(self) -> List[SearchResponse]:
-        return sorted(self.search_infos, key=lambda sr: sr.search_type.preview_category())
+        return sorted(self.search_infos, key=lambda sr: (sr.preview_category, sr.sub_name.upper() if sr.sub_name else ""))
 
     @staticmethod
     def from_search_response(search_input: SearchInput, response: SearchResponse) -> 'SearchResults':
@@ -296,7 +296,7 @@ class SearchResults:
                            genome_build_preferred=search_input.genome_build_preferred)
 
         if response.matched_pattern:
-            sr.search_types.add(response.search_type.preview_category())
+            sr.search_types.add(response.preview_category)
         sr.search_string = search_input.search_string
         sr.genome_build_preferred = search_input.genome_build_preferred
         sr.results = [SearchResult.from_search_result_abs(result=result, sub_name=response.sub_name) for result in
@@ -377,10 +377,10 @@ class Searcher:
 
         self.genome_build_searches = [
             #(SearchTypes.COHORT, NOT_WHITESPACE, search_cohort),
-            (SearchTypes.DBSNP, DBSNP_PATTERN, search_dbsnp),
+            #(SearchTypes.DBSNP, DBSNP_PATTERN, search_dbsnp),
             (SearchTypes.HGVS, HGVS_UNCLEANED_PATTERN, search_hgvs),
-            (SearchTypes.LOCUS, LOCUS_PATTERN, search_locus),
-            (SearchTypes.LOCUS, LOCUS_NO_REF_PATTERN, search_locus),
+            #(SearchTypes.LOCUS, LOCUS_PATTERN, search_locus),
+            #(SearchTypes.LOCUS, LOCUS_NO_REF_PATTERN, search_locus),
             #(SearchTypes.PEDIGREE, NOT_WHITESPACE, search_pedigree),
             #(SearchTypes.SAMPLE, HAS_ALPHA_PATTERN, search_sample),
             #(SearchTypes.VCF, NOT_WHITESPACE, search_vcf),
@@ -802,23 +802,23 @@ def search_for_alt_alts(variant_qs: QuerySet, variant_tuple: VariantCoordinate, 
     return variants
 
 
-def search_locus(search_string: str, genome_build: GenomeBuild, variant_qs: QuerySet, **kwargs) -> VARIANT_SEARCH_RESULTS:
-    if m := re.match(LOCUS_PATTERN, search_string):
-        chrom, position, ref = m.groups()
-        chrom = format_chrom(chrom, genome_build.reference_fasta_has_chr)
-    else:
-        if m := re.match(r"([^:]+):(\d+)", search_string):  # No ref supplied
-            chrom, position = m.groups()
-            chrom = format_chrom(chrom, genome_build.reference_fasta_has_chr)
-            ref = None
-        else:
-            return None
-
-    kwargs = {"locus__contig__name": chrom,
-              "locus__position": position}
-    if ref:
-        kwargs["locus__ref__seq"] = ref
-    return variant_qs.filter(**kwargs)
+# def search_locus(search_string: str, genome_build: GenomeBuild, variant_qs: QuerySet, **kwargs) -> VARIANT_SEARCH_RESULTS:
+#     if m := re.match(LOCUS_PATTERN, search_string):
+#         chrom, position, ref = m.groups()
+#         chrom = format_chrom(chrom, genome_build.reference_fasta_has_chr)
+#     else:
+#         if m := re.match(r"([^:]+):(\d+)", search_string):  # No ref supplied
+#             chrom, position = m.groups()
+#             chrom = format_chrom(chrom, genome_build.reference_fasta_has_chr)
+#             ref = None
+#         else:
+#             return None
+#
+#     kwargs = {"locus__contig__name": chrom,
+#               "locus__position": position}
+#     if ref:
+#         kwargs["locus__ref__seq"] = ref
+#     return variant_qs.filter(**kwargs)
 
 
 # def search_sample(search_string: str, user: User, genome_build: GenomeBuild, **kwargs) -> Iterable[Sample]:

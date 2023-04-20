@@ -21,7 +21,7 @@ ONTOLOGY_TERM_PATTERN = re.compile(r"\w+[:_]\s*.*")
 @search_receiver(
     search_type=OntologyTerm,
     pattern=ONTOLOGY_TERM_PATTERN,
-    sub_name="Ontology by ID",
+    sub_name="By ID",
     example=SearchExample(
         note="Search by the term's identifier, supports MONDO, OMIM, HP",
         example="MONDO:0010726"
@@ -40,7 +40,7 @@ def ontology_search_id(search_input: SearchInputInstance):
 @search_receiver(
     search_type=OntologyTerm,
     pattern=HAS_ALPHA_PATTERN,
-    sub_name="Ontology by name",
+    sub_name="By name",
     example=SearchExample(
         note="Search by part of the term's name",
         example="Rett syndrome"

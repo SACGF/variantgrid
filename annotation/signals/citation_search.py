@@ -1,10 +1,11 @@
 from annotation.models import CitationFetchRequest, Citation
 from annotation.models.models_citations import CitationSource, CitationIdNormalized
 from snpdb.search2 import search_receiver, SearchInputInstance, SearchExample
-
+import re
 
 @search_receiver(
     search_type=Citation,
+    pattern=re.compile(".*:.*"),
     example=SearchExample(
         note="PMID, PMCID or NBK ID",
         example="PMID:25741868"

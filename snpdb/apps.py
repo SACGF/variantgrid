@@ -21,7 +21,6 @@ class SnpdbConfig(AppConfig):
         from snpdb.signals import lab_search
         from snpdb.signals import organization_search
         from snpdb.signals import user_search
-        from snpdb.signals import allele_search
         from snpdb.signals import cohort_search
         from snpdb.signals import sample_search
         from snpdb.signals import vcf_search
