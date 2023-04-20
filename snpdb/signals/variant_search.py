@@ -1,12 +1,14 @@
 import re
+from re import Match
 
+from django.contrib.auth.models import User
 from django.db.models import QuerySet
 
 from genes.hgvs import HGVSMatcher
 from library.genomics import format_chrom
 from snpdb.clingen_allele import get_clingen_allele
 from snpdb.models import Variant, LOCUS_PATTERN, LOCUS_NO_REF_PATTERN, DbSNP, DBSNP_PATTERN, VariantCoordinate, \
-    ClinGenAllele
+    ClinGenAllele, GenomeBuild
 from snpdb.search2 import search_receiver, SearchInputInstance, SearchExample
 
 COSMIC_PATTERN = re.compile(r"^(COS[VM]).*$", re.IGNORECASE)
@@ -127,6 +129,76 @@ def get_results_from_variant_tuples(qs: QuerySet, data: VariantCoordinate, any_a
             # the filter of "real" variants
             # results = ModifiedImportedVariant.get_variants_for_unnormalized_variant_any_alt(chrom, position, ref)
     return results
+
+
+def search_variant_match(search_input: SearchInputInstance):
+    for genome_build in search_input.genome_builds:
+        chrom, position, ref, alt = search_input.match.groups()
+        chrom, position, ref, alt = Variant.clean_variant_fields(chrom, position, ref, alt,
+                                                                 want_chr=genome_build.reference_fasta_has_chr)
+        results = get_results_from_variant_tuples(search_input.get_visible_variants(genome_build), (chrom, position, ref, alt))
+        if results.exists():
+            return results
+
+        if errors := Variant.validate(genome_build, chrom, position):
+            # FIXME have overall errors
+            #raise ValueError(", ".join(errors))
+            pass
+
+        # fixme have missing variant
+        # variant_string = Variant.format_tuple(chrom, position, ref, alt)
+        # search_message = f"The variant {variant_string} does not exist in the database"
+        # return [SearchResult(CreateManualVariant(genome_build, variant_string), message=search_message)]
+
+
+VARIANT_VCF_PATTERN = re.compile(r"((?:chr)?\S*)\s+(\d+)\s+\.?\s*([GATC]+)\s+([GATC]+)")
+
+@search_receiver(
+    search_type=Variant,
+    pattern=VARIANT_VCF_PATTERN,
+    sub_name="VCF",
+    example=SearchExample(
+        note="((?:chr)?\S*)\s+(\d+)\s+\.?\s*([GATC]+)\s+([GATC]+) fixme",
+        example="TODO"
+    )
+)
+def variant_search_vcf(search_input: SearchInputInstance):
+    if results := search_variant_match(search_input):
+        yield results
+
+
+VARIANT_GNOMAD_PATTERN = re.compile(r"(?:chr)?(\S*)-(\d+)-([GATC]+)-([GATC]+)")
+
+
+@search_receiver(
+    search_type=Variant,
+    pattern=VARIANT_GNOMAD_PATTERN,
+    sub_name="gnomAD",
+    example=SearchExample(
+        note="(?:chr)?(\S*)-(\d+)-([GATC]+)-([GATC]+) fixme",
+        example="TODO"
+    )
+)
+def search_variant_gnomad(search_input: SearchInputInstance):
+    if results := search_variant_match(search_input):
+        yield results
+
+
+VARIANT_PATTERN = re.compile(r"^(MT|(?:chr)?(?:[XYM]|\d+)):(\d+)[,\s]*([GATC]+)>(=|[GATC]+)$", re.IGNORECASE)
+
+
+@search_receiver(
+    search_type=Variant,
+    pattern=VARIANT_GNOMAD_PATTERN,
+    sub_name="Variant Pattern",
+    example=SearchExample(
+        note="^(MT|(?:chr)?(?:[XYM]|\d+)):(\d+)[,\s]*([GATC]+)>(=|[GATC]+)$ fixme",
+        example="TODO"
+    )
+)
+def search_variant_variant(search_input: SearchInputInstance):
+    if results := search_variant_match(search_input):
+        yield results
 
 
 @search_receiver(

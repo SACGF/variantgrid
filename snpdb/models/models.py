@@ -463,6 +463,10 @@ class Lab(models.Model, PreviewModelMixin):
         ordering = ['name']
 
     @classmethod
+    def preview_category(cls) -> str:
+        return "Organisation Lab"
+
+    @classmethod
     def preview_icon(cls) -> str:
         return "fa-solid fa-flask"
 

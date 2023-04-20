@@ -38,10 +38,13 @@
             color: #444466;
             cursor: pointer !important;
         }
-        .search-results .list-group-item {
-            background-color: #fafaff;
+        .search-results .list-group-item-action {
+            background-color: #fafafc;
         }
-        .searched {
+        .search-results .list-group-item-action:hover {
+            background-color: #f6f6ff;
+        }
+        .searched, .searched label {
             color: #448844 !important;
         }
     </style>
@@ -59,7 +62,9 @@
     {% settings_value 'SEARCH_SUMMARY' as show_search_summary %}
 
     <div class="container">
-        <h3>Search</h3>
+        <div>
+            <h3>Search</h3>
+        </div>
 
         <form id="search-form inline-form" method="get">
             <div class="input-group">
@@ -82,9 +87,18 @@
             </p>
             {% endcomment %}
             <div id='results' class="mt-4">
-                {% if search_results.results %}
-                    <h4>{% count search_results.results singular="1 Result" plural="Results" %} Found for "{{ search }}"</h4>
+                <div class="row">
+                    {% if search_results.results %}
+                        <h4 class="col-8">{% count search_results.results singular="1 Result" plural="Results" %} Found for "{{ search }}"</h4>
+                    {% else %}
+                        <h4 class="col-8 no-value">No Results Found</h4>
+                    {% endif %}
+                    <div class="col-4 text-right">
+                        <a class="hover-link" href="{% url 'view_user_settings' %}" title="Default Genome Build can be changed on the user settings page under Settings">Preferred Genome Build</a> : {{ search_results.genome_build_preferred }}
+                    </div>
+                </div>
 
+                {% if search_results.results %}
                     <ul class="list-group search-results">
                         {% for search_result in search_results.results %}
                             {% with preview=search_result.preview %}
@@ -148,9 +162,6 @@
                         {% endfor %}
                     </table>
                     {% endcomment %}
-                {% else %}
-                    <h4><span class="no-value">No Results Found</span></h4>
-                    <hr/>
                 {% endif %}
             </div>
         {% endif %}
@@ -160,9 +171,9 @@
             <div class="card-body">
                 {% for search_result in search_results.grouped_search_infos %}
                     <div class="row d-flex align-items-center" style="min-height:30px;">
-                        <div class="col-4 text-right">
+                        <div class="col-4 text-right {% if not search_result.sub_name and search_result.matched_pattern %}searched{% endif %}">
                             {% ifchanged search_result.preview_category %}
-                                <i class="{{ search_result.preview_icon }} mr-2 {% if not search_result.sub_name and search_result.matched_pattern %}searched{% endif %}" style="opacity:0.75"></i>
+                                <i class="{{ search_result.preview_icon }} mr-2" style="opacity:0.75"></i>
                                 <label>
                                     {{ search_result.preview_category }}
                                 </label>
@@ -187,7 +198,7 @@
             </div>
             {% if search %}
                 <div class="card-footer">
-                    Inputs highlighted in green were included in this search.
+                    Inputs highlighted in <span class="searched">green</span> were included in this search.
                 </div>
             {% endif %}
         </div>
@@ -283,11 +294,10 @@
 
         <div class="alert alert-warning mt-4">
             Search is under development.<br/>
-            Many of the variant searches have not been converted to the new method.<br/>
+            Many of the variant searches have not been converted to the new method, and the ones that do need notes and examples<br/>
             The ability to create variants if they're not present is not available.<br/>
             Patterns of when a search is active need to be tweaked.<br/>
-            Disabling searches for features not active in certain environments needs to be tweaked.<br/>
-            And just a lot of internal fixes to go. ETC
+            And just a lot of little fixes here and there.xx
         </div>
     </div>
 

@@ -42,8 +42,8 @@ from variantopedia.models import SearchTypes
 
 #ANALYSIS_PREFIX_PATTERN = re.compile(r"^a(\d+)$")
 DB_PREFIX_PATTERN = re.compile(fr"^(v|{settings.VARIANT_VCF_DB_PREFIX})(\d+)$")
-VARIANT_VCF_PATTERN = re.compile(r"((?:chr)?\S*)\s+(\d+)\s+\.?\s*([GATC]+)\s+([GATC]+)")
-VARIANT_GNOMAD_PATTERN = re.compile(r"(?:chr)?(\S*)-(\d+)-([GATC]+)-([GATC]+)")
+#VARIANT_VCF_PATTERN = re.compile(r"((?:chr)?\S*)\s+(\d+)\s+\.?\s*([GATC]+)\s+([GATC]+)")
+#VARIANT_GNOMAD_PATTERN = re.compile(r"(?:chr)?(\S*)-(\d+)-([GATC]+)-([GATC]+)")
 MAX_RESULTS_PER_TYPE = 50
 
 
@@ -386,8 +386,8 @@ class Searcher:
             #(SearchTypes.VCF, NOT_WHITESPACE, search_vcf),
             (SearchTypes.VARIANT, VARIANT_PATTERN, search_variant),
             #(SearchTypes.CLINGEN_ALLELE_ID, CLINGEN_ALLELE_PATTERN, search_clingen_allele),
-            (SearchTypes.VARIANT, VARIANT_VCF_PATTERN, search_variant_vcf),
-            (SearchTypes.VARIANT, VARIANT_GNOMAD_PATTERN, search_variant_gnomad),
+            #(SearchTypes.VARIANT, VARIANT_VCF_PATTERN, search_variant_vcf),
+            #(SearchTypes.VARIANT, VARIANT_GNOMAD_PATTERN, search_variant_gnomad),
             #(SearchTypes.COSMIC, COSMIC_PATTERN, search_cosmic),
         ]
         self.genome_agnostic_searches = [
@@ -408,14 +408,14 @@ class Searcher:
         ]
 
         exclude_search_types = set()
-        visible_url_parts = get_visible_url_names()
-        if not visible_url_parts.get('patients'):
-            exclude_search_types.add(SearchTypes.PATIENT)
-            exclude_search_types.add(SearchTypes.SAMPLE)
-            exclude_search_types.add(SearchTypes.EXTERNAL_PK)
-        if not visible_url_parts.get('data'):
-            exclude_search_types.add(SearchTypes.EXPERIMENT)
-            exclude_search_types.add(SearchTypes.SEQUENCING_RUN)
+        # visible_url_parts = get_visible_url_names()
+        # if not visible_url_parts.get('patients'):
+        #     exclude_search_types.add(SearchTypes.PATIENT)
+        #     exclude_search_types.add(SearchTypes.SAMPLE)
+        #     exclude_search_types.add(SearchTypes.EXTERNAL_PK)
+        # if not visible_url_parts.get('data'):
+        #     exclude_search_types.add(SearchTypes.EXPERIMENT)
+        #     exclude_search_types.add(SearchTypes.SEQUENCING_RUN)
 
         self.exclude_search_types = exclude_search_types
 
@@ -561,25 +561,25 @@ def get_visible_variants(user: User, genome_build: GenomeBuild) -> VARIANT_SEARC
 #     return results
 
 
-def search_dbsnp(search_string, user, genome_build: GenomeBuild, variant_qs: QuerySet, **kwargs) -> VARIANT_SEARCH_RESULTS:
-    # Do via API as a full table scan takes way too long with big data
-    dbsnp = DbSNP.get(search_string)
-
-    matcher = HGVSMatcher(genome_build)
-    search_results = []
-    for data in dbsnp.get_alleles_for_genome_build(genome_build):
-        if hgvs_string := data.get("hgvs"):
-            dbsnp_message = f"dbSNP '{search_string}' resolved to '{hgvs_string}'"
-            variant_tuple = matcher.get_variant_tuple(hgvs_string)
-            results = get_results_from_variant_tuples(variant_qs, variant_tuple)
-            if results.exists():
-                for r in results:
-                    search_results.append(SearchResult(r, message=dbsnp_message))
-            else:
-                variant_string = Variant.format_tuple(*variant_tuple)
-                search_results.append(SearchResult(CreateManualVariant(genome_build, variant_string),
-                                                   message=dbsnp_message))
-    return search_results
+# def search_dbsnp(search_string, user, genome_build: GenomeBuild, variant_qs: QuerySet, **kwargs) -> VARIANT_SEARCH_RESULTS:
+#     # Do via API as a full table scan takes way too long with big data
+#     dbsnp = DbSNP.get(search_string)
+#
+#     matcher = HGVSMatcher(genome_build)
+#     search_results = []
+#     for data in dbsnp.get_alleles_for_genome_build(genome_build):
+#         if hgvs_string := data.get("hgvs"):
+#             dbsnp_message = f"dbSNP '{search_string}' resolved to '{hgvs_string}'"
+#             variant_tuple = matcher.get_variant_tuple(hgvs_string)
+#             results = get_results_from_variant_tuples(variant_qs, variant_tuple)
+#             if results.exists():
+#                 for r in results:
+#                     search_results.append(SearchResult(r, message=dbsnp_message))
+#             else:
+#                 variant_string = Variant.format_tuple(*variant_tuple)
+#                 search_results.append(SearchResult(CreateManualVariant(genome_build, variant_string),
+#                                                    message=dbsnp_message))
+#     return search_results
 
 
 # def search_gene_symbol(search_string: str, **kwargs) -> Iterable[Union[GeneSymbol, GeneSymbolAlias]]:
@@ -862,14 +862,14 @@ def search_variant(search_string: str, user: User, genome_build: GenomeBuild, va
     return search_variant_match(m, user, genome_build, variant_qs, **kwargs)
 
 
-def search_variant_vcf(search_string: str, user: User, genome_build: GenomeBuild, variant_qs: QuerySet, **kwargs) -> VARIANT_SEARCH_RESULTS:
-    m = VARIANT_VCF_PATTERN.match(search_string)
-    return search_variant_match(m, user, genome_build, variant_qs, **kwargs)
+# def search_variant_vcf(search_string: str, user: User, genome_build: GenomeBuild, variant_qs: QuerySet, **kwargs) -> VARIANT_SEARCH_RESULTS:
+#     m = VARIANT_VCF_PATTERN.match(search_string)
+#     return search_variant_match(m, user, genome_build, variant_qs, **kwargs)
 
 
-def search_variant_gnomad(search_string: str, user: User, genome_build: GenomeBuild, variant_qs: QuerySet, **kwargs) -> VARIANT_SEARCH_RESULTS:
-    m = VARIANT_GNOMAD_PATTERN.match(search_string)
-    return search_variant_match(m, user, genome_build, variant_qs, **kwargs)
+# def search_variant_gnomad(search_string: str, user: User, genome_build: GenomeBuild, variant_qs: QuerySet, **kwargs) -> VARIANT_SEARCH_RESULTS:
+#     m = VARIANT_GNOMAD_PATTERN.match(search_string)
+#     return search_variant_match(m, user, genome_build, variant_qs, **kwargs)
 
 
 def search_variant_id(search_string: str, **kwargs) -> VARIANT_SEARCH_RESULTS:

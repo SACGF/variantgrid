@@ -30,6 +30,7 @@ from snpdb.models.models_enums import ImportStatus
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_variant import Variant
 from snpdb.models.models_vcf import VCF, Sample
+from variantgrid.perm_path import get_visible_url_names
 
 
 class Cohort(GuardianPermissionsAutoInitialSaveMixin, PreviewModelMixin, SortByPKMixin, TimeStampedModel):
@@ -57,9 +58,14 @@ class Cohort(GuardianPermissionsAutoInitialSaveMixin, PreviewModelMixin, SortByP
     def preview_icon(cls) -> str:
         return "fa-solid fa-people-arrows"
 
+    @classmethod
+    def preview_enabled(cls) -> bool:
+        return get_visible_url_names().get("patients")
+
     @property
     def preview(self) -> 'PreviewData':
         return self.preview_with(identifier=self.name, title=f"{self.sample_count} samples")
+
     @property
     def has_genotype(self):
         if self.vcf:

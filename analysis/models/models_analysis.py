@@ -24,6 +24,7 @@ from snpdb.models import CustomColumnsCollection, CustomColumn, \
     UserSettings, AbstractNodeCountSettings, Sample
 from snpdb.models.models_enums import BuiltInFilters
 from snpdb.models.models_genome import GenomeBuild
+from variantgrid.perm_path import get_visible_url_names
 
 
 class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel, PreviewModelMixin):
@@ -57,6 +58,10 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel, Previe
     @classmethod
     def preview_icon(cls) -> str:
         return "fa-solid fa-diagram-project"
+
+    @classmethod
+    def preview_enabled(cls) -> bool:
+        return bool(get_visible_url_names().get('analysis'))
 
     def __str__(self):
         name = self.name or f"Analysis {self.pk}"

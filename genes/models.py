@@ -206,6 +206,10 @@ class GeneSymbol(models.Model, PreviewModelMixin):
     def preview_icon(cls) -> str:
         return "fa-solid fa-dna"
 
+    @property
+    def preview(self):
+        return self.preview_with(title="")
+
     def has_different_genes(self, other: 'GeneSymbol') -> bool:
         """
         Tries to work out if genes are equivilant, not that sometimes refseq or ensembl assign gene ids to both the

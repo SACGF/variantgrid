@@ -270,7 +270,7 @@ VARIANT_SHOW_CANONICAL_HGVS = False
 # Lock down Shariant menu - hide a lot of VariantGrid urls
 # Completely hide URLS from these apps
 
-URLS_APP_REGISTER.update({"analysis": True,
+URLS_APP_REGISTER.update({"analysis": False,
                           "expression": False,
                           "pathtests": False,
                           "pedigree": False,
@@ -283,7 +283,7 @@ URLS_NAME_REGISTER.update({  # Disable selected snpdb urls
     "cohorts": False,
     "patient_record_imports": False,
     "patient_term_approvals": False,
-    "patients": True,
+    "patients": False,
 
     "gene_lists": False,
     "genes": False,

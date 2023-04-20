@@ -30,6 +30,7 @@ from snpdb.models.models_enums import ImportStatus, VariantsType, ProcessingStat
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_genomic_interval import GenomicIntervalsCollection
 from snpdb.models.models_variant import Variant, VariantCollection, AlleleSource
+from variantgrid.perm_path import get_visible_url_names
 
 
 @Field.register_lookup
@@ -90,6 +91,10 @@ class VCF(models.Model, PreviewModelMixin):
     @classmethod
     def preview_icon(cls) -> str:
         return "fa-regular fa-file-lines"
+
+    @classmethod
+    def preview_enabled(cls) -> bool:
+        return get_visible_url_names().get('data')
 
     @cached_property
     def has_filters(self):

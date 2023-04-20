@@ -93,13 +93,13 @@ class PreviewData:
             genome_build: Optional['GenomeBuild'] = None,
             annotation_consortium: Optional['AnnotationConsortium'] = None):
 
-        if not category:
+        if category is None:
             if hasattr(obj, "_meta"):
                 category = obj._meta.verbose_name
             else:
                 category = pretty_label(obj.__class__.__name__)
 
-        if not identifier:
+        if identifier is None:
             if hasattr(obj, "pk") and isinstance(obj.pk, str):
                 identifier = obj.pk
                 if title is None:
@@ -107,7 +107,7 @@ class PreviewData:
             else:
                 identifier = str(obj)
 
-        if not internal_url and hasattr(obj, "get_absolute_url"):
+        if internal_url is None and hasattr(obj, "get_absolute_url"):
             try:
                 internal_url = obj.get_absolute_url()
             except NoReverseMatch:
