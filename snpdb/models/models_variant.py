@@ -2,7 +2,7 @@ import logging
 import re
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Optional, Pattern, Tuple, Iterable, Set, Union, Dict, Any
+from typing import Optional, Pattern, Tuple, Iterable, Set, Union, Dict, Any, List
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -361,7 +361,7 @@ class Variant(PreviewModelMixin, models.Model):
         return qs.annotate(**kwargs)
 
     @staticmethod
-    def validate(genome_build, chrom, position) -> list[str]:
+    def validate(genome_build, chrom, position) -> List[str]:
         errors = []
         try:
             contig = genome_build.chrom_contig_mappings[chrom]
