@@ -60,8 +60,8 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel, Previe
         return "fa-solid fa-diagram-project"
 
     @classmethod
-    def preview_enabled(cls) -> bool:
-        return bool(get_visible_url_names().get('analysis'))
+    def preview_if_url_visible(cls) -> str:
+        return 'analysis'
 
     def __str__(self):
         name = self.name or f"Analysis {self.pk}"

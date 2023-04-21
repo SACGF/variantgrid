@@ -93,8 +93,8 @@ class VCF(models.Model, PreviewModelMixin):
         return "fa-regular fa-file-lines"
 
     @classmethod
-    def preview_enabled(cls) -> bool:
-        return get_visible_url_names().get('data')
+    def preview_if_url_visible(cls) -> bool:
+        return 'data'
 
     @cached_property
     def has_filters(self):

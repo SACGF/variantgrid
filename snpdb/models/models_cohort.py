@@ -59,8 +59,8 @@ class Cohort(GuardianPermissionsAutoInitialSaveMixin, PreviewModelMixin, SortByP
         return "fa-solid fa-people-arrows"
 
     @classmethod
-    def preview_enabled(cls) -> bool:
-        return get_visible_url_names().get("patients")
+    def preview_if_url_visible(cls) -> str:
+        return "patients"
 
     @property
     def preview(self) -> 'PreviewData':

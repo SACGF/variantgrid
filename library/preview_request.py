@@ -17,23 +17,40 @@ Receive (and return a PreviewData) if your module is capable of providing some t
 
 
 class PreviewModelMixin:
+    """
+    Having models implement this class makes it easier for search results to give summaries, PreviewData
+    can be used in other contexts like providing information about IDs found in text
+    """
 
     @classmethod
     def preview_category(cls) -> str:
+        """
+        Provide an English language name for this data
+        """
         return pretty_label(cls._meta.verbose_name)
 
     @classmethod
     def preview_if_url_visible(cls) -> Optional[str]:
+        """
+        If this app is included, but this model is sometimes not considered active, what URL must be visible
+        for this app to surface
+        """
         return None
 
     @classmethod
     def preview_enabled(cls) -> bool:
+        """
+        If this returns false, pretend like the model doesn't exist, don't search for it
+        """
         if url_name := cls.preview_if_url_visible():
             return bool(get_visible_url_names().get(url_name))
         return True
 
     @classmethod
     def preview_icon(cls) -> str:
+        """
+        A set of classes (typically font awesome) to put in a <i class_name=""></i> to give a visual clue as to the data
+        """
         return "fa-solid fa-circle"
 
     def preview_with(
@@ -49,6 +66,11 @@ class PreviewModelMixin:
             annotation_consortium: Optional['AnnotationConsortium'] = None
     ) -> 'PreviewData':
 
+        """
+        Utility function to provide PreviewData for an instance with all the defaults
+        provided by the mixin and the ones that PreviewData.for_object calculate.
+        """
+        # TODO maybe get rid of this method and have PreviewData.for_object check all the defaults here
         return PreviewData.for_object(
             self,
             category=category or self.preview_category(),

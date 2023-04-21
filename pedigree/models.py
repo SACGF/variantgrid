@@ -134,8 +134,8 @@ class Pedigree(GuardianPermissionsAutoInitialSaveMixin, PreviewModelMixin, SortB
         return "fa-solid fa-network-wired"
 
     @classmethod
-    def preview_enabled(cls) -> bool:
-        return get_visible_url_names().get('pedigrees')
+    def preview_if_url_visible(cls) -> str:
+        return 'pedigrees'
 
     @property
     def genome_build(self):

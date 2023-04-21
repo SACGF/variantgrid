@@ -248,12 +248,25 @@ def search_receiver(
         sub_name: Optional[str] = None,
         example: Optional[SearchExample] = None
     ):
+    """
+    Wrap around a method that takes a SearchInputInstance and yields QuerySets and/or individual objects, optionally as part of a tuple
+    where the subsequent items are validation messages.
+    Note that the wrapped method will take a SearchInput and return a SearchResponse object.
+    :param search_type: Something that has preview_category(), preview_icon() and preview_enabled() for overall properties of the search
+    :param pattern: A regex pattern that must be met for the search to be invoked. The search will be passed a SearchInputInstance with the match result
+    :param admin_only: Is this search for admin users only, wont be invokved or displayed for non admins.
+    :param sub_name: Are there multiple search implementations for the same search_type, if so give them a sub_name
+    :param example: An example (to be presented to the user) of how to use this search
+    :return: A wrapped call that will obey the above (e.g. preview_enabled(), admin_only) and return a SearchResponse
+    """
     def _decorator(func):
         def search_func(sender: Any, search_input: SearchInput, **kwargs):
             try:
                 if admin_only and not search_input.user.is_superuser:
+                    # if only for admin users, don't include it for non admin
                     return None
                 if search_type and not search_type.preview_enabled():
+                    #
                     return None
 
                 response = SearchResponse(
@@ -263,10 +276,8 @@ def search_receiver(
                     sub_name=sub_name,
                     example=example)
 
-                if match := pattern.match(search_input.search_string):
+                if match := pattern.search(search_input.search_string):
                     response.matched_pattern = True
-                    # FIXME don't do this just for the made up connector function
-                    # return something that returns SearchResponse so testing is easier
                     for result in func(SearchInputInstance(expected_type=search_type, search_input=search_input, match=match)):
                         for search_result in SearchResult2.convert(result):
                             response.add_search_result(search_result)
