@@ -580,15 +580,16 @@ class CreateClassificationForVariantView(TemplateView):
         lab, lab_error = UserSettings.get_lab_and_error(self.request.user)
 
         consensus = ClassificationConsensus(variant, self.request.user)
-        return {'variant': variant,
-                "genome_build": genome_build,
-                "form_post_url": self._get_form_post_url(),
-                'variant_sample_autocomplete_form': self._get_sample_form(),
-                "vts": vts,
-                "lab": lab,
-                "lab_error": lab_error,
-                "initially_require_sample": settings.VARIANT_CLASSIFICATION_WEB_FORM_CREATE_INITIALLY_REQUIRE_SAMPLE,
-                "consensus": consensus}
+        return {
+            'variant': variant,
+            "genome_build": genome_build,
+            "form_post_url": self._get_form_post_url(),
+            'variant_sample_autocomplete_form': self._get_sample_form(),
+            "vts": vts,
+            "lab": lab,
+            "lab_error": lab_error,
+            "consensus": consensus
+        }
 
 
 def create_classification_from_hgvs(request, genome_build_name, hgvs_string):

@@ -149,6 +149,9 @@
     <div class="container">
         {% if labs.count > 0 and can_create_classification %}
             <form method="get" action="{% url 'search' %}">
+                {% for hidden in search_and_classify_form.hidden_fields %}
+                    {{ hidden }}
+                {% endfor %}
                 <div class="card">
                     <div class="card-header">Create Classification</div>
                     <div class="card-body">
