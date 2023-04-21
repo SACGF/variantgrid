@@ -5,9 +5,12 @@
 {% load ui_utils %}
 {% load js_tags %}
 {% load classification_tags %}
+{% load settings_tags %}
 
 {% block title %}Variant Classification{% endblock %}
 {% block head %}
+{% settings_value 'VARIANT_CLASSIFICATION_WEB_FORM_CREATE_INITIALLY_REQUIRE_SAMPLE' as initially_require_sample %}
+
 <style>
     .pill {
         display: inline-block;
