@@ -10,7 +10,7 @@ MIN_3_ALPHA = re.compile(r"[a-zA-Z]{3,}")
     pattern=MIN_3_ALPHA,
     example=SearchExample(
         note="3 or more letter of the organisation's name",
-        example="institute"
+        examples=["institute"]
     )
 )
 def organization_search(search_input: SearchInputInstance):

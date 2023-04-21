@@ -8,7 +8,7 @@ import re
     pattern=re.compile(".*:.*"),
     example=SearchExample(
         note="PMID, PMCID or NBK ID",
-        example="PMID:25741868"
+        examples=["PMID:25741868", "PMCID:PMC23433", "NBK100238"]
     )
 )
 def search_citations(search_input: SearchInputInstance):

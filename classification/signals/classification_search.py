@@ -16,7 +16,7 @@ from snpdb.search2 import search_receiver, SearchInputInstance, SearchExample
     search_type=Classification,
     example=SearchExample(
         note="The lab record ID",
-        example="vc1545"
+        examples=["vc1545"]
     )
 )
 def classification_search(search_input: SearchInputInstance):

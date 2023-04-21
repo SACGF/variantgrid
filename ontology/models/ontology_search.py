@@ -24,7 +24,7 @@ ONTOLOGY_TERM_PATTERN = re.compile(r"\w+[:_]\s*.*")
     sub_name="By ID",
     example=SearchExample(
         note="Search by the term's identifier, supports MONDO, OMIM, HP",
-        example="MONDO:0010726"
+        examples=["MONDO:0010726", "OMIM:616299", "HP:0001332"]
     )
 )
 def ontology_search_id(search_input: SearchInputInstance):
@@ -43,7 +43,7 @@ def ontology_search_id(search_input: SearchInputInstance):
     sub_name="By name",
     example=SearchExample(
         note="Search by part of the term's name",
-        example="Rett syndrome"
+        examples=["Rett syndrome"]
     )
 )
 def ontology_search_name(search_input: SearchInputInstance):
@@ -51,6 +51,8 @@ def ontology_search_name(search_input: SearchInputInstance):
     if not GeneSymbol.objects.filter(symbol=search_input.search_string).exists():
 
         for ontology_service in [OntologyService.MONDO, OntologyService.OMIM, OntologyService.HPO]:
+
+            # TODO support for roman numerals interchanging with numbers
 
             qs = OntologyTerm.objects.filter(ontology_service=ontology_service).order_by('status', 'name', 'index')
             for word in search_input.search_words:

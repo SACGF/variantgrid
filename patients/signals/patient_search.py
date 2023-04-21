@@ -7,7 +7,7 @@ from snpdb.search2 import search_receiver, SearchInputInstance, SearchExample
     search_type=Patient,
     example=SearchExample(
         note="(Last Name, First Name) or Last Name or First Name",
-        example="Smith, Alvin"
+        examples=["Smith, Alvin"]
     )
 )
 def patient_search(search_input: SearchInputInstance):

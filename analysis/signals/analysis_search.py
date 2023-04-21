@@ -11,7 +11,7 @@ ANALYSIS_PREFIX_PATTERN = re.compile(r"^a(\d+)$")
     pattern=ANALYSIS_PREFIX_PATTERN,
     example=SearchExample(
         note="'a' followed by the analysis ID",
-        example="a1105"
+        examples=["a1105"]
     )
 )
 def search_analysis(search_input: SearchInputInstance):

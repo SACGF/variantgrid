@@ -44,7 +44,7 @@ class VariantToAnnotate(PreviewModelMixin):
     sub_name="COSMIC",
     example=SearchExample(
         note="Provide the COSMIC ID",
-        example="COSV53567516"
+        examples=["COSV53567516"]
     )
 )
 def variant_cosmic_search(search_input: SearchInputInstance):
@@ -62,7 +62,7 @@ def variant_cosmic_search(search_input: SearchInputInstance):
     sub_name="Locus w/out Ref",
     example=SearchExample(
         note="Provide chromosome and position",
-        example="chr1:169519049"
+        examples=["chr1:169519049"]
     )
 )
 def search_variant_locus_no_ref(search_input: SearchInputInstance):
@@ -81,7 +81,7 @@ def search_variant_locus_no_ref(search_input: SearchInputInstance):
     sub_name="Locus with Ref",
     example=SearchExample(
         note="TO DO provide an example with ref",
-        example="chr1:169519049"
+        examples=["chr1:169519049"]
     )
 )
 def search_variant_locus_with_ref(search_input: SearchInputInstance):
@@ -99,7 +99,7 @@ def search_variant_locus_with_ref(search_input: SearchInputInstance):
     search_type=Variant,
     pattern=ClinGenAllele.CLINGEN_ALLELE_CODE_PATTERN,
     sub_name="ClinGen Allele ID",
-    example=SearchExample(note="ClinGen Allele ID", example="CA285410130")
+    example=SearchExample(note="ClinGen Allele ID", examples=["CA285410130"])
 )
 def allele_search(search_input: SearchInputInstance):
     search_string = search_input.search_string
@@ -183,7 +183,7 @@ VARIANT_VCF_PATTERN = re.compile(r"((?:chr)?\S*)\s+(\d+)\s+\.?\s*([GATC]+)\s+([G
     sub_name="VCF",
     example=SearchExample(
         note="((?:chr)?\S*)\s+(\d+)\s+\.?\s*([GATC]+)\s+([GATC]+) fixme",
-        example="TODO"
+        examples=["TODO"]
     )
 )
 def variant_search_vcf(search_input: SearchInputInstance):
@@ -200,7 +200,7 @@ VARIANT_GNOMAD_PATTERN = re.compile(r"(?:chr)?(\S*)-(\d+)-([GATC]+)-([GATC]+)")
     sub_name="gnomAD",
     example=SearchExample(
         note="(?:chr)?(\S*)-(\d+)-([GATC]+)-([GATC]+) fixme",
-        example="TODO"
+        examples=["TODO"]
     )
 )
 def search_variant_gnomad(search_input: SearchInputInstance):
@@ -217,7 +217,7 @@ VARIANT_PATTERN = re.compile(r"^(MT|(?:chr)?(?:[XYM]|\d+)):(\d+)[,\s]*([GATC]+)>
     sub_name="Variant Pattern",
     example=SearchExample(
         note="^(MT|(?:chr)?(?:[XYM]|\d+)):(\d+)[,\s]*([GATC]+)>(=|[GATC]+)$ fixme",
-        example="TODO"
+        examples=["TODO"]
     )
 )
 def search_variant_variant(search_input: SearchInputInstance):
@@ -231,7 +231,7 @@ def search_variant_variant(search_input: SearchInputInstance):
     sub_name="dbSNP ID",
     example=SearchExample(
         note="Provide the variant's dbSNP ID",
-        example="rs6025"
+        examples=["rs6025"]
     )
 )
 def search_variant_db_snp(search_input: SearchInputInstance):
@@ -351,7 +351,7 @@ def _search_hgvs_using_gene_symbol(
     example=SearchExample(
         note="Provide a c. or g. HGVS",
         # FIXME, really need the ability to provide more examples
-        example="NM_000492.3(CFTR):c.1438G>T"
+        examples=["NM_000492.3(CFTR):c.1438G>T"]
     )
 )
 def search_hgvs(search_input: SearchInputInstance):
@@ -463,7 +463,7 @@ DB_PREFIX_PATTERN = re.compile(fr"^(v|{settings.VARIANT_VCF_DB_PREFIX})(\d+)$")
     sub_name="By ID",
     example=SearchExample(
         note="Provide the variant ID as it appears in VCF exports",
-        example=f"{settings.VARIANT_VCF_DB_PREFIX}4638674"
+        examples=[f"{settings.VARIANT_VCF_DB_PREFIX}4638674"]
     )
 )
 def search_variant_id(search_input: SearchInputInstance):

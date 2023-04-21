@@ -13,7 +13,7 @@ from snpdb.search2 import search_receiver, SearchInputInstance, \
     admin_only=True,
     example=SearchExample(
         note="Search on username, name or email",
-        example="jane@institute.org.au"
+        examples=["jane@institute.org.au", "Lisa"]
     )
 )
 def user_search(search_input: SearchInputInstance):

@@ -183,7 +183,7 @@ class SearchResult2:
 @dataclass(frozen=True)
 class SearchExample:
     note: Optional[str] = None
-    example: Optional[str] = None
+    examples: Optional[List[str]] = None
 
 
 @dataclass

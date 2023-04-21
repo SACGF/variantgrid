@@ -10,7 +10,7 @@ TRANSCRIPT_PATTERN = re.compile(r"^(ENST|NM_|NR_|XR_)\d+\.?\d*$")
     pattern=TRANSCRIPT_PATTERN,
     example=SearchExample(
         note="Transcript starting with NM, NR, XR or ENST, version number optional",
-        example="NM_001394372"
+        examples=["NM_001394372"]
     )
 )
 def search_transcript(search_input: SearchInputInstance):

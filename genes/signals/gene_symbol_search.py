@@ -10,7 +10,7 @@ GENE_SYMBOL_PATTERN = re.compile(r"^[a-zA-Z][\da-zA-Z0-9-]+")
     pattern=GENE_SYMBOL_PATTERN,
     example=SearchExample(
         note="Full gene symbol identifier",
-        example="gata2"
+        examples=["gata2"]
     )
 )
 def gene_symbol_alias_search(search_input: SearchInputInstance):
