@@ -2,7 +2,7 @@ stream-zip
 more-itertools
 beautifulsoup4
 bgzip
-Bio
+biopython>=1.81
 cdot
 celery
 ConfigArgParse
