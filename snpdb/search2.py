@@ -279,6 +279,6 @@ def search_receiver(
                 raise
 
         search_signal.connect(search_func)
-        return func
+        return search_func
 
     return _decorator
