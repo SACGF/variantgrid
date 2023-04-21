@@ -378,13 +378,13 @@ class Searcher:
         self.genome_build_searches = [
             #(SearchTypes.COHORT, NOT_WHITESPACE, search_cohort),
             #(SearchTypes.DBSNP, DBSNP_PATTERN, search_dbsnp),
-            (SearchTypes.HGVS, HGVS_UNCLEANED_PATTERN, search_hgvs),
+            #(SearchTypes.HGVS, HGVS_UNCLEANED_PATTERN, search_hgvs),
             #(SearchTypes.LOCUS, LOCUS_PATTERN, search_locus),
             #(SearchTypes.LOCUS, LOCUS_NO_REF_PATTERN, search_locus),
             #(SearchTypes.PEDIGREE, NOT_WHITESPACE, search_pedigree),
             #(SearchTypes.SAMPLE, HAS_ALPHA_PATTERN, search_sample),
             #(SearchTypes.VCF, NOT_WHITESPACE, search_vcf),
-            (SearchTypes.VARIANT, VARIANT_PATTERN, search_variant),
+            #(SearchTypes.VARIANT, VARIANT_PATTERN, search_variant),
             #(SearchTypes.CLINGEN_ALLELE_ID, CLINGEN_ALLELE_PATTERN, search_clingen_allele),
             #(SearchTypes.VARIANT, VARIANT_VCF_PATTERN, search_variant_vcf),
             #(SearchTypes.VARIANT, VARIANT_GNOMAD_PATTERN, search_variant_gnomad),
@@ -399,7 +399,7 @@ class Searcher:
             #(SearchTypes.PATIENT, HAS_ALPHA_PATTERN, search_patient),
             #(SearchTypes.SEQUENCING_RUN, SEQUENCING_RUN_REGEX, search_sequencing_run),
             # (SearchTypes.TRANSCRIPT, TRANSCRIPT_PATTERN, search_transcript),
-            (SearchTypes.VARIANT, DB_PREFIX_PATTERN, search_variant_id),
+            #(SearchTypes.VARIANT, DB_PREFIX_PATTERN, search_variant_id),
             #(SearchTypes.LAB, MIN_3_ALPHA, search_lab),
             #(SearchTypes.ORG, MIN_3_ALPHA, search_org),
             # now done via new search
@@ -626,180 +626,180 @@ def get_visible_variants(user: User, genome_build: GenomeBuild) -> VARIANT_SEARC
 #     return []
 
 
-def _search_hgvs_using_gene_symbol(gene_symbol, search_messages,
-                                   hgvs_string: str, user: User, genome_build: GenomeBuild, variant_qs: QuerySet) -> VARIANT_SEARCH_RESULTS:
-    results = []
-    search_messages.append(f"Warning: HGVS requires transcript, given symbol: '{gene_symbol}'")
-    # Group results + hgvs by result.record hashcode
-    results_by_record = defaultdict(list)
-    transcript_accessions_by_record = defaultdict(list)
-    allele = HGVSName(hgvs_string).format(use_gene=False)
-
-    transcript_versions = set()
-    mane_transcripts = set()
-    other_transcripts_message = None  # Want this to be after transcripts used message
-
-    if settings.SEARCH_HGVS_GENE_SYMBOL_USE_MANE:
-        if mane := MANE.objects.filter(symbol=gene_symbol).first():
-            for ac in AnnotationConsortium:
-                if tv := mane.get_transcript_version(ac):
-                    transcript_versions.add(tv)
-                    mane_transcripts.add(tv.accession)
-
-    if settings.SEARCH_HGVS_GENE_SYMBOL_USE_ALL_TRANSCRIPTS:
-        for gene in gene_symbol.genes:
-            tv_qs = TranscriptVersion.objects.filter(genome_build=genome_build, gene_version__gene=gene)
-            # Take latest version for each transcript
-            for tv in tv_qs.order_by("transcript_id", "-version").distinct("transcript_id"):
-                transcript_versions.add(tv)
-    else:
-        tv_qs = TranscriptVersion.objects.filter(genome_build=genome_build, gene_version__gene__in=gene_symbol.genes)
-        if num_other := tv_qs.exclude(transcript__in=[tv.transcript for tv in transcript_versions]).distinct("transcript_id").count():
-            gene_page_link = f"<a href='{gene_symbol.get_absolute_url()}'>{gene_symbol} gene page</a>"
-            other_transcripts_message = f"Warning: there are {num_other} other transcripts for this genome build " \
-                                        f"which may give different results. You may wish to view the " \
-                                        f"{gene_page_link} for all results"
-
-    # TODO: Sort transcript_versions somehow
-    for transcript_version in transcript_versions:
-        transcript_hgvs = f"{transcript_version.accession}:{allele}"
-        try:
-            for result in search_hgvs(transcript_hgvs, user, genome_build, variant_qs):
-                result.annotation_consortia = [transcript_version.transcript.annotation_consortium]
-                results_by_record[result.record].append(result)
-                tv_message = str(transcript_version.accession)
-                if transcript_version.accession in mane_transcripts:
-                    tv_message += f" (MANE)"
-                transcript_accessions_by_record[result.record].append(tv_message)
-        except Exception as e:
-            # Just swallow all these errors
-            logging.warning(e)
-
-    for record, results_for_record in results_by_record.items():
-        unique_messages = {m: True for m in search_messages}  # Use dict for uniqueness
-        result_message = f"Results for: {', '.join(transcript_accessions_by_record[record])}"
-        unique_messages[result_message] = True
-        if other_transcripts_message:
-            unique_messages[other_transcripts_message] = True
-        # Go through messages for each result together, so they stay in same order
-        for messages in zip_longest(*[r.messages for r in results_for_record]):
-            for m in messages:
-                if m:
-                    unique_messages[m] = True
-
-        unique_annotation_consortia = set()
-        for r in results_for_record:
-            unique_annotation_consortia.update(r.annotation_consortia)
-
-        messages = list(unique_messages.keys())
-        # All weights should be the same, just take 1st
-        initial_score = results_for_record[0].initial_score
-        results.append(SearchResult(record, message=messages, initial_score=initial_score,
-                                    annotation_consortia=list(unique_annotation_consortia)))
-
-    if not results:
-        # In some special cases, add in special messages for no result
-        if settings.SEARCH_HGVS_GENE_SYMBOL_USE_MANE and not settings.SEARCH_HGVS_GENE_SYMBOL_USE_ALL_TRANSCRIPTS:
-            message = "\n".join(search_messages + [f"Only searched MANE transcripts: {', '.join(mane_transcripts)}"])
-            raise SearchWarning(message)
-
-        if not (settings.SEARCH_HGVS_GENE_SYMBOL_USE_MANE or settings.SEARCH_HGVS_GENE_SYMBOL_USE_ALL_TRANSCRIPTS):
-            raise SearchWarning("\n".join(search_messages))
-
-    return results
-
-
-def search_hgvs(search_string: str, user: User, genome_build: GenomeBuild, variant_qs: QuerySet, **kwargs) -> VARIANT_SEARCH_RESULTS:
-    hgvs_matcher = HGVSMatcher(genome_build)
-    classify = kwargs.get("classify")
-    # can add on search_message to objects to (stop auto-jump and show message)
-    initial_score = 0
-    hgvs_string = search_string
-    original_hgvs_string = hgvs_string
-    variant_tuple = None
-    used_transcript_accession = None
-    kind = None
-    hgvs_string, search_messages = HGVSMatcher.clean_hgvs(hgvs_string)
-
-    try:
-        variant_tuple, used_transcript_accession, kind, method, matches_reference = hgvs_matcher.get_variant_tuple_used_transcript_kind_method_and_matches_reference(hgvs_string)
-        if matches_reference is False:
-            ref_base = variant_tuple[2]
-            search_messages.append(f"Warning: Using reference '{ref_base}' from our build {genome_build.name}")
-
-    except (MissingTranscript, Contig.ContigNotInBuildError):
-        # contig triggered from g.HGVS from another genome build - can't do anything just return no results
-        return []
-    except (ValueError, NotImplementedError) as hgvs_error:
-        try:
-            if gene_symbol := hgvs_matcher.get_gene_symbol_if_no_transcript(hgvs_string):
-                if results := _search_hgvs_using_gene_symbol(gene_symbol, search_messages,
-                                                             hgvs_string, user, genome_build, variant_qs):
-                    return results
-        except InvalidHGVSName:
-            # might just not be a HGVS name at all
-            pass
-
-        if variant_tuple is None:
-            if classify:
-                search_message = f"Error reading HGVS: '{hgvs_error}'"
-                return [SearchResult(ClassifyNoVariantHGVS(genome_build, original_hgvs_string), message=search_message)]
-
-        raise hgvs_error
-
-    if used_transcript_accession:
-        if used_transcript_accession not in hgvs_string:
-            search_messages.append(f"Warning: Used transcript version '{used_transcript_accession}'")
-
-        hgvs_name = HGVSName(hgvs_string)
-        # If these were in wrong order they have been switched now
-        if hgvs_name.transcript and hgvs_name.gene:
-            annotation_consortium = AnnotationConsortium.get_from_transcript_accession(used_transcript_accession)
-            transcript_version = TranscriptVersion.get(used_transcript_accession, genome_build,
-                                                       annotation_consortium=annotation_consortium)
-            alias_symbol_strs = transcript_version.gene_version.gene_symbol.alias_meta.alias_symbol_strs
-            if hgvs_name.gene.upper() not in [a.upper() for a in alias_symbol_strs]:
-                search_messages.append(f"Warning: symbol '{hgvs_name.gene}' not associated with transcript "
-                                       f"{used_transcript_accession} (known symbols='{', '.join(alias_symbol_strs)}')")
-
-    # TODO: alter initial_score based on warning messages of alt not matching?
-    # also - _lrg_get_variant_tuple should add matches_reference to search warnings list
-
-    if variant_tuple:
-        try:
-            results = get_results_from_variant_tuples(variant_qs, variant_tuple)
-            variant = results.get()
-            if classify:
-                transcript_id = hgvs_matcher.get_transcript_id(hgvs_string,
-                                                               transcript_version=False)
-                return [SearchResult(ClassifyVariant(variant, transcript_id),
-                                     message=search_messages, initial_score=initial_score)]
-            return [SearchResult(variant, message=search_messages, initial_score=initial_score,
-                                 is_single_build=kind == 'g')]
-        except Variant.DoesNotExist:
-            variant_string = Variant.format_tuple(*variant_tuple)
-            variant_string_abbreviated = Variant.format_tuple(*variant_tuple, abbreviate=True)
-            search_messages.append(f"'{search_string}' resolved to {variant_string_abbreviated}")
-            results = []
-            cmv = CreateManualVariant(genome_build, variant_string)
-            if cmv.is_valid_for_user(user):
-                results.append(SearchResult(cmv, message=search_messages, initial_score=initial_score))
-            results.extend(search_for_alt_alts(variant_qs, variant_tuple, search_messages))
-            return results
-    return []
+# def _search_hgvs_using_gene_symbol(gene_symbol, search_messages,
+#                                    hgvs_string: str, user: User, genome_build: GenomeBuild, variant_qs: QuerySet) -> VARIANT_SEARCH_RESULTS:
+#     results = []
+#     search_messages.append(f"Warning: HGVS requires transcript, given symbol: '{gene_symbol}'")
+#     # Group results + hgvs by result.record hashcode
+#     results_by_record = defaultdict(list)
+#     transcript_accessions_by_record = defaultdict(list)
+#     allele = HGVSName(hgvs_string).format(use_gene=False)
+#
+#     transcript_versions = set()
+#     mane_transcripts = set()
+#     other_transcripts_message = None  # Want this to be after transcripts used message
+#
+#     if settings.SEARCH_HGVS_GENE_SYMBOL_USE_MANE:
+#         if mane := MANE.objects.filter(symbol=gene_symbol).first():
+#             for ac in AnnotationConsortium:
+#                 if tv := mane.get_transcript_version(ac):
+#                     transcript_versions.add(tv)
+#                     mane_transcripts.add(tv.accession)
+#
+#     if settings.SEARCH_HGVS_GENE_SYMBOL_USE_ALL_TRANSCRIPTS:
+#         for gene in gene_symbol.genes:
+#             tv_qs = TranscriptVersion.objects.filter(genome_build=genome_build, gene_version__gene=gene)
+#             # Take latest version for each transcript
+#             for tv in tv_qs.order_by("transcript_id", "-version").distinct("transcript_id"):
+#                 transcript_versions.add(tv)
+#     else:
+#         tv_qs = TranscriptVersion.objects.filter(genome_build=genome_build, gene_version__gene__in=gene_symbol.genes)
+#         if num_other := tv_qs.exclude(transcript__in=[tv.transcript for tv in transcript_versions]).distinct("transcript_id").count():
+#             gene_page_link = f"<a href='{gene_symbol.get_absolute_url()}'>{gene_symbol} gene page</a>"
+#             other_transcripts_message = f"Warning: there are {num_other} other transcripts for this genome build " \
+#                                         f"which may give different results. You may wish to view the " \
+#                                         f"{gene_page_link} for all results"
+#
+#     # TODO: Sort transcript_versions somehow
+#     for transcript_version in transcript_versions:
+#         transcript_hgvs = f"{transcript_version.accession}:{allele}"
+#         try:
+#             for result in search_hgvs(transcript_hgvs, user, genome_build, variant_qs):
+#                 result.annotation_consortia = [transcript_version.transcript.annotation_consortium]
+#                 results_by_record[result.record].append(result)
+#                 tv_message = str(transcript_version.accession)
+#                 if transcript_version.accession in mane_transcripts:
+#                     tv_message += f" (MANE)"
+#                 transcript_accessions_by_record[result.record].append(tv_message)
+#         except Exception as e:
+#             # Just swallow all these errors
+#             logging.warning(e)
+#
+#     for record, results_for_record in results_by_record.items():
+#         unique_messages = {m: True for m in search_messages}  # Use dict for uniqueness
+#         result_message = f"Results for: {', '.join(transcript_accessions_by_record[record])}"
+#         unique_messages[result_message] = True
+#         if other_transcripts_message:
+#             unique_messages[other_transcripts_message] = True
+#         # Go through messages for each result together, so they stay in same order
+#         for messages in zip_longest(*[r.messages for r in results_for_record]):
+#             for m in messages:
+#                 if m:
+#                     unique_messages[m] = True
+#
+#         unique_annotation_consortia = set()
+#         for r in results_for_record:
+#             unique_annotation_consortia.update(r.annotation_consortia)
+#
+#         messages = list(unique_messages.keys())
+#         # All weights should be the same, just take 1st
+#         initial_score = results_for_record[0].initial_score
+#         results.append(SearchResult(record, message=messages, initial_score=initial_score,
+#                                     annotation_consortia=list(unique_annotation_consortia)))
+#
+#     if not results:
+#         # In some special cases, add in special messages for no result
+#         if settings.SEARCH_HGVS_GENE_SYMBOL_USE_MANE and not settings.SEARCH_HGVS_GENE_SYMBOL_USE_ALL_TRANSCRIPTS:
+#             message = "\n".join(search_messages + [f"Only searched MANE transcripts: {', '.join(mane_transcripts)}"])
+#             raise SearchWarning(message)
+#
+#         if not (settings.SEARCH_HGVS_GENE_SYMBOL_USE_MANE or settings.SEARCH_HGVS_GENE_SYMBOL_USE_ALL_TRANSCRIPTS):
+#             raise SearchWarning("\n".join(search_messages))
+#
+#     return results
 
 
-def search_for_alt_alts(variant_qs: QuerySet, variant_tuple: VariantCoordinate, messages: List[str]) -> VARIANT_SEARCH_RESULTS:
-    if not messages:
-        messages = []
-    variants = []
-    results = get_results_from_variant_tuples(variant_qs, variant_tuple, any_alt=True)
-    for result in results:
-        this_messages = []
-        this_messages.extend(messages)
-        this_messages.append(f"Warning: No results for alt '{variant_tuple.alt}', but found this using alt '{result.alt}'")
-        variants.append(SearchResult(record=result, message=this_messages))
-    return variants
+# def search_hgvs(search_string: str, user: User, genome_build: GenomeBuild, variant_qs: QuerySet, **kwargs) -> VARIANT_SEARCH_RESULTS:
+#     hgvs_matcher = HGVSMatcher(genome_build)
+#     classify = kwargs.get("classify")
+#     # can add on search_message to objects to (stop auto-jump and show message)
+#     initial_score = 0
+#     hgvs_string = search_string
+#     original_hgvs_string = hgvs_string
+#     variant_tuple = None
+#     used_transcript_accession = None
+#     kind = None
+#     hgvs_string, search_messages = HGVSMatcher.clean_hgvs(hgvs_string)
+#
+#     try:
+#         variant_tuple, used_transcript_accession, kind, method, matches_reference = hgvs_matcher.get_variant_tuple_used_transcript_kind_method_and_matches_reference(hgvs_string)
+#         if matches_reference is False:
+#             ref_base = variant_tuple[2]
+#             search_messages.append(f"Warning: Using reference '{ref_base}' from our build {genome_build.name}")
+#
+#     except (MissingTranscript, Contig.ContigNotInBuildError):
+#         # contig triggered from g.HGVS from another genome build - can't do anything just return no results
+#         return []
+#     except (ValueError, NotImplementedError) as hgvs_error:
+#         try:
+#             if gene_symbol := hgvs_matcher.get_gene_symbol_if_no_transcript(hgvs_string):
+#                 if results := _search_hgvs_using_gene_symbol(gene_symbol, search_messages,
+#                                                              hgvs_string, user, genome_build, variant_qs):
+#                     return results
+#         except InvalidHGVSName:
+#             # might just not be a HGVS name at all
+#             pass
+#
+#         if variant_tuple is None:
+#             if classify:
+#                 search_message = f"Error reading HGVS: '{hgvs_error}'"
+#                 return [SearchResult(ClassifyNoVariantHGVS(genome_build, original_hgvs_string), message=search_message)]
+#
+#         raise hgvs_error
+#
+#     if used_transcript_accession:
+#         if used_transcript_accession not in hgvs_string:
+#             search_messages.append(f"Warning: Used transcript version '{used_transcript_accession}'")
+#
+#         hgvs_name = HGVSName(hgvs_string)
+#         # If these were in wrong order they have been switched now
+#         if hgvs_name.transcript and hgvs_name.gene:
+#             annotation_consortium = AnnotationConsortium.get_from_transcript_accession(used_transcript_accession)
+#             transcript_version = TranscriptVersion.get(used_transcript_accession, genome_build,
+#                                                        annotation_consortium=annotation_consortium)
+#             alias_symbol_strs = transcript_version.gene_version.gene_symbol.alias_meta.alias_symbol_strs
+#             if hgvs_name.gene.upper() not in [a.upper() for a in alias_symbol_strs]:
+#                 search_messages.append(f"Warning: symbol '{hgvs_name.gene}' not associated with transcript "
+#                                        f"{used_transcript_accession} (known symbols='{', '.join(alias_symbol_strs)}')")
+#
+#     # TODO: alter initial_score based on warning messages of alt not matching?
+#     # also - _lrg_get_variant_tuple should add matches_reference to search warnings list
+#
+#     if variant_tuple:
+#         try:
+#             results = get_results_from_variant_tuples(variant_qs, variant_tuple)
+#             variant = results.get()
+#             if classify:
+#                 transcript_id = hgvs_matcher.get_transcript_id(hgvs_string,
+#                                                                transcript_version=False)
+#                 return [SearchResult(ClassifyVariant(variant, transcript_id),
+#                                      message=search_messages, initial_score=initial_score)]
+#             return [SearchResult(variant, message=search_messages, initial_score=initial_score,
+#                                  is_single_build=kind == 'g')]
+#         except Variant.DoesNotExist:
+#             variant_string = Variant.format_tuple(*variant_tuple)
+#             variant_string_abbreviated = Variant.format_tuple(*variant_tuple, abbreviate=True)
+#             search_messages.append(f"'{search_string}' resolved to {variant_string_abbreviated}")
+#             results = []
+#             cmv = CreateManualVariant(genome_build, variant_string)
+#             if cmv.is_valid_for_user(user):
+#                 results.append(SearchResult(cmv, message=search_messages, initial_score=initial_score))
+#             results.extend(search_for_alt_alts(variant_qs, variant_tuple, search_messages))
+#             return results
+#     return []
+#
+#
+# def search_for_alt_alts(variant_qs: QuerySet, variant_tuple: VariantCoordinate, messages: List[str]) -> VARIANT_SEARCH_RESULTS:
+#     if not messages:
+#         messages = []
+#     variants = []
+#     results = get_results_from_variant_tuples(variant_qs, variant_tuple, any_alt=True)
+#     for result in results:
+#         this_messages = []
+#         this_messages.extend(messages)
+#         this_messages.append(f"Warning: No results for alt '{variant_tuple.alt}', but found this using alt '{result.alt}'")
+#         variants.append(SearchResult(record=result, message=this_messages))
+#     return variants
 
 
 # def search_locus(search_string: str, genome_build: GenomeBuild, variant_qs: QuerySet, **kwargs) -> VARIANT_SEARCH_RESULTS:
@@ -840,26 +840,26 @@ def search_for_alt_alts(variant_qs: QuerySet, variant_tuple: VariantCoordinate, 
 #     return VCF.filter_for_user(user).filter(name__icontains=search_string, genome_build=genome_build)
 
 
-def search_variant_match(m: Match, user: User, genome_build: GenomeBuild, variant_qs: QuerySet, **kwargs) -> VARIANT_SEARCH_RESULTS:
-    if m:
-        chrom, position, ref, alt = m.groups()
-        chrom, position, ref, alt = Variant.clean_variant_fields(chrom, position, ref, alt,
-                                                                 want_chr=genome_build.reference_fasta_has_chr)
-        results = get_results_from_variant_tuples(variant_qs, (chrom, position, ref, alt))
-        if results.exists():
-            return results
+# def search_variant_match(m: Match, user: User, genome_build: GenomeBuild, variant_qs: QuerySet, **kwargs) -> VARIANT_SEARCH_RESULTS:
+#     if m:
+#         chrom, position, ref, alt = m.groups()
+#         chrom, position, ref, alt = Variant.clean_variant_fields(chrom, position, ref, alt,
+#                                                                  want_chr=genome_build.reference_fasta_has_chr)
+#         results = get_results_from_variant_tuples(variant_qs, (chrom, position, ref, alt))
+#         if results.exists():
+#             return results
+#
+#         if errors := Variant.validate(genome_build, chrom, position):
+#             raise ValueError(", ".join(errors))
+#         variant_string = Variant.format_tuple(chrom, position, ref, alt)
+#         search_message = f"The variant {variant_string} does not exist in the database"
+#         return [SearchResult(CreateManualVariant(genome_build, variant_string), message=search_message)]
+#     return None
 
-        if errors := Variant.validate(genome_build, chrom, position):
-            raise ValueError(", ".join(errors))
-        variant_string = Variant.format_tuple(chrom, position, ref, alt)
-        search_message = f"The variant {variant_string} does not exist in the database"
-        return [SearchResult(CreateManualVariant(genome_build, variant_string), message=search_message)]
-    return None
 
-
-def search_variant(search_string: str, user: User, genome_build: GenomeBuild, variant_qs: QuerySet, **kwargs) -> VARIANT_SEARCH_RESULTS:
-    m = VARIANT_PATTERN.match(search_string)
-    return search_variant_match(m, user, genome_build, variant_qs, **kwargs)
+# def search_variant(search_string: str, user: User, genome_build: GenomeBuild, variant_qs: QuerySet, **kwargs) -> VARIANT_SEARCH_RESULTS:
+#     m = VARIANT_PATTERN.match(search_string)
+#     return search_variant_match(m, user, genome_build, variant_qs, **kwargs)
 
 
 # def search_variant_vcf(search_string: str, user: User, genome_build: GenomeBuild, variant_qs: QuerySet, **kwargs) -> VARIANT_SEARCH_RESULTS:

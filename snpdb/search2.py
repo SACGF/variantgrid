@@ -18,7 +18,7 @@ from variantgrid.perm_path import get_visible_url_names
 
 search_signal = Signal()
 HAS_ALPHA_PATTERN = re.compile(r"[a-zA-Z]")
-HAS_ANYTHING = re.compile(r".+")
+HAS_ANYTHING = re.compile(r".")
 
 
 @dataclass(frozen=True)
@@ -142,8 +142,16 @@ class SearchResult2:
             return ac
         return None
 
+    def add_message(self, message: str):
+        if self.messages is None:
+            self.messages = [message]
+        else:
+            self.messages.append(message)
+
     @staticmethod
     def convert(data: Any) -> List['SearchResult2']:
+        if isinstance(data, SearchResult2):
+            return [data]
         if isinstance(data, (tuple, list)):
             data = list(data)
             messages = []
@@ -247,7 +255,7 @@ def search_receiver(
         admin_only: bool = False,
         sub_name: Optional[str] = None,
         example: Optional[SearchExample] = None
-    ):
+    ) -> Callable[[Callable], Callable[[SearchInput], SearchResponse]]:
     """
     Wrap around a method that takes a SearchInputInstance and yields QuerySets and/or individual objects, optionally as part of a tuple
     where the subsequent items are validation messages.
