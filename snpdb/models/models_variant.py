@@ -317,6 +317,8 @@ class Variant(models.Model):
     REFERENCE_ALT = "="
     locus = models.ForeignKey(Locus, on_delete=CASCADE)
     alt = models.ForeignKey(Sequence, on_delete=CASCADE)
+    # end depends on length of ref/alt so can't be on a locus
+    end = models.IntegerField(null=True)
 
     class Meta:
         unique_together = ("locus", "alt")
@@ -514,8 +516,8 @@ class Variant(models.Model):
     def start(self):
         return self.locus.position
 
-    @property
-    def end(self):
+    def get_end(self):
+        # TODO: We can use end once we have populated it
         return self.locus.position + max(self.locus.ref.length, self.alt.length)
 
     @staticmethod
