@@ -175,7 +175,7 @@ def search_variant_match(search_input: SearchInputInstance):
         # return [SearchResult(CreateManualVariant(genome_build, variant_string), message=search_message)]
 
 
-VARIANT_VCF_PATTERN = re.compile(r"((?:chr)?\S*)\s+(\d+)\s+\.?\s*([GATC]+)\s+([GATC]+)")
+VARIANT_VCF_PATTERN = re.compile(r"((?:chr)?\S*)\s+(\d+)\s+\.?\s*([GATC]+)\s+([GATC]+)", re.IGNORECASE)
 
 @search_receiver(
     search_type=Variant,
@@ -191,7 +191,7 @@ def variant_search_vcf(search_input: SearchInputInstance):
         yield results
 
 
-VARIANT_GNOMAD_PATTERN = re.compile(r"(?:chr)?(\S*)-(\d+)-([GATC]+)-([GATC]+)")
+VARIANT_GNOMAD_PATTERN = re.compile(r"(?:chr)?(\S*)-(\d+)-([GATC]+)-([GATC]+)", re.IGNORECASE)
 
 
 @search_receiver(
@@ -199,8 +199,8 @@ VARIANT_GNOMAD_PATTERN = re.compile(r"(?:chr)?(\S*)-(\d+)-([GATC]+)-([GATC]+)")
     pattern=VARIANT_GNOMAD_PATTERN,
     sub_name="gnomAD",
     example=SearchExample(
-        note="(?:chr)?(\S*)-(\d+)-([GATC]+)-([GATC]+) fixme",
-        examples=["TODO"]
+        note="A variant coordinate as formatted by gnomAD",
+        examples=["1-169519049-T-C"]
     )
 )
 def search_variant_gnomad(search_input: SearchInputInstance):
@@ -216,8 +216,8 @@ VARIANT_PATTERN = re.compile(r"^(MT|(?:chr)?(?:[XYM]|\d+)):(\d+)[,\s]*([GATC]+)>
     pattern=VARIANT_PATTERN,
     sub_name="Variant Pattern",
     example=SearchExample(
-        note="^(MT|(?:chr)?(?:[XYM]|\d+)):(\d+)[,\s]*([GATC]+)>(=|[GATC]+)$ fixme",
-        examples=["TODO"]
+        note="Standard vairant format",
+        examples=["1:169519049 T>C"]
     )
 )
 def search_variant_variant(search_input: SearchInputInstance):
@@ -351,7 +351,7 @@ def _search_hgvs_using_gene_symbol(
     example=SearchExample(
         note="Provide a c. or g. HGVS",
         # FIXME, really need the ability to provide more examples
-        examples=["NM_000492.3(CFTR):c.1438G>T"]
+        examples=["NM_001080463.1:c.5972T>A", "NM_000492.3(CFTR):c.1438G>T", "NC_000007.13:g.117199563G>T"]
     )
 )
 def search_hgvs(search_input: SearchInputInstance):

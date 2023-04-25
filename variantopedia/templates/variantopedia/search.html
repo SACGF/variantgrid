@@ -38,7 +38,7 @@
             color: #444466;
             cursor: pointer !important;
         }
-        .search-results .list-group-item-action {
+        .search-results .list-group-item-okay {
             background-color: #fafafc;
         }
         .search-results .list-group-item-action:hover {
@@ -102,7 +102,7 @@
                     <ul class="list-group search-results">
                         {% for search_result in search_results.results %}
                             {% with preview=search_result.preview %}
-                                <a class="list-group-item list-group-item-action {% if search_result.messages %}list-group-item-warning{% endif %}" href="{{ preview.internal_url }}">
+                                <a class="list-group-item list-group-item-action {% if search_result.messages %}list-group-item-warning{% else %}list-group-item-okay{% endif %}" href="{{ preview.internal_url }}">
                                     <div class="row d-flex align-items-center" style="color:#444">
                                         <div class="col-3 text-right">
                                             {% if preview.icon %}<i class="{{ preview.icon }} mr-2" style="opacity:0.75"></i>{% endif %}

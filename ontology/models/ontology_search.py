@@ -40,7 +40,7 @@ def ontology_search_id(search_input: SearchInputInstance):
 @search_receiver(
     search_type=OntologyTerm,
     pattern=HAS_ALPHA_PATTERN,
-    sub_name="By name",
+    sub_name="By Name",
     example=SearchExample(
         note="Search by part of the term's name",
         examples=["Rett syndrome"]

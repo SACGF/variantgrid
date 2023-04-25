@@ -259,6 +259,7 @@ class UserPreview(PreviewModelMixin):
         return PreviewData.for_object(
             obj=self.user,
             category="User",
+            icon=UserPreview.preview_icon(),
             identifier=self.avatar.preferred_label,
             title=title,
             internal_url=reverse('view_user', kwargs={"pk": self.user.pk})
