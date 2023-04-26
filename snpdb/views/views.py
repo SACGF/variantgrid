@@ -727,8 +727,10 @@ def view_user(request, pk):
     user = get_object_or_404(User, pk=pk)
     user_contact = UserContact.get_for_user(user)
 
-    context = {"user": user,
-               'user_contact': user_contact}
+    context = {
+        "other_user": user,
+        'user_contact': user_contact
+    }
     return render(request, 'snpdb/settings/view_user.html', context)
 
 
