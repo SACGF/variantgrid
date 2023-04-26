@@ -94,12 +94,36 @@
                         <h4 class="col-8 no-value">No Results Found</h4>
                     {% endif %}
                     <div class="col-4 text-right">
-                        <a class="hover-link" href="{% url 'view_user_settings' %}" title="Default Genome Build can be changed on the user settings page under Settings">Preferred Genome Build</a> : {{ search_results.genome_build_preferred }}
+                        <a class="hover-link" href="{% url 'view_user_settings' %}" title="Default Genome Build can be changed on the user settings page under Settings">Preferred Genome Build</a> : {{ search_results.search_input.genome_build_preferred }}
                     </div>
                 </div>
 
-                {% if search_results.results %}
+                {% if search_results.results or search_results.warnings %}
                     <ul class="list-group search-results">
+                        {% for warning in search_results.warnings %}
+                            <div class="list-group-item list-group-item-warning">
+                                <div class="row d-flex align-items-center" style="color:#444">
+                                    <div class="col-3 text-right">
+                                        {{ 'E' | severity_icon }}{% if warning.search_info.preview_icon %}<i class="{{ warning.search_info.preview_icon }} text-danger mr-2" style="opacity:0.75"></i>{% endif %}
+                                        <label>{{ warning.search_info.category }}</label>
+                                        {% if warning.search_info.sub_name %}<div class="text-info text-small">via {{ warning.search_info.sub_name }} Search</div>{% endif %}
+                                        <span>
+                                        {% with extras=search_result.header_extra %}
+                                            {% if extras %}
+                                                {% for extra in extras %}
+                                                    &nbsp;<span class="text-small">{{ extra }}</span>
+                                                {% endfor %}
+                                            {% endif %}
+                                        {% endwith %}
+                                        </span>
+                                    </div>
+                                    <div class="col-9">
+                                        <label>{{ warning.message }}</label>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endfor %}
+
                         {% for search_result in search_results.results %}
                             {% with preview=search_result.preview %}
                                 <a class="list-group-item list-group-item-action {% if search_result.messages %}list-group-item-warning{% else %}list-group-item-okay{% endif %}" href="{{ preview.internal_url }}">
@@ -111,6 +135,7 @@
                                             <span>
                                             {% with extras=search_result.header_extra %}
                                                 {% if extras %}
+                                                    <br/>
                                                     {% for extra in extras %}
                                                         &nbsp;<span class="text-small">{{ extra }}</span>
                                                     {% endfor %}

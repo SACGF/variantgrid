@@ -1,20 +1,17 @@
 import operator
 import re
-from abc import ABC
 from collections import defaultdict
 from dataclasses import dataclass, field
 from functools import reduce, cached_property
 from re import Match, IGNORECASE
-from typing import Optional, TypeVar, Union, List, Iterable, Pattern, Any, Set, Callable, Type, Dict
+from typing import Optional, Union, List, Pattern, Any, Set, Callable, Type, Dict
 from django.dispatch import Signal
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.db.models import QuerySet, Q
-from genes.models_enums import AnnotationConsortium
 from library.log_utils import report_message, report_exc_info
 from library.preview_request import PreviewData, PreviewModelMixin
 from snpdb.models import GenomeBuild, Variant, Allele
-from variantgrid.perm_path import get_visible_url_names
 
 search_signal = Signal()
 HAS_ALPHA_PATTERN = re.compile(r"[a-zA-Z]")
@@ -26,6 +23,7 @@ class SearchInput:
     user: User
     search_string: str
     genome_build_preferred: GenomeBuild
+    classify: bool = False
 
     def matches_pattern(self, pattern: Union[str, Pattern]) -> Match:
         if isinstance(pattern, str):
@@ -126,15 +124,33 @@ class SearchInputInstance:
 
 
 @dataclass
+class SearchWarning:
+    message: str
+
+
+@dataclass
+class SearchWarningForType:
+    warning: SearchWarning
+    search_info: Any
+
+    @property
+    def message(self):
+        return self.warning.message
+
+
+@dataclass
 class SearchResult2:
     preview: PreviewData
     messages: Optional[List[str]] = None
 
     @property
+    def search_type(self):
+        # Just here to bridge the gap between SeearchResult and SearchResult2
+        return self.preview.category
+
+    @property
     def genome_builds(self):
-        if gb := self.preview.genome_build:
-            return {gb}
-        return None
+        return self.preview.genome_builds
 
     @property
     def annotation_consortium(self):
@@ -179,6 +195,15 @@ class SearchResult2:
         else:
             return [data.preview]
 
+    @property
+    def header_extra(self) -> List[str]:
+        extras = []
+        if ac := self.preview.annotation_consortium:
+            extras.append(ac.name)
+        if self.preview.genome_builds:
+            extras.extend((genome_build.name for genome_build in sorted(self.genome_builds)))
+        return extras
+
 
 @dataclass(frozen=True)
 class SearchExample:
@@ -195,6 +220,11 @@ class SearchResponse:
     admin_only: bool = False
     example: Optional[SearchExample] = None
     results: List[SearchResult2] = field(default_factory=list)
+    warnings: List[SearchWarning] = field(default_factory=list)
+
+    @property
+    def search_warnings_with_type(self):
+        return [SearchWarningForType(warning=warning, search_info=self) for warning in self.warnings]
 
     @property
     def preview_category(self):
@@ -216,36 +246,38 @@ class SearchResponse:
 
     @property
     def optimized_results(self):
-        if settings.PREFER_ALLELE_LINKS:
-            if self.search_type == Variant:
-                allele_to_variants: Dict[Allele, List[SearchResult2]] = defaultdict(list)
-                regular_results = list()
-                had_allele = False
-                for result in self.results:
-                    if obj := result.preview.obj:
-                        if isinstance(obj, Variant):
-                            if allele := obj.allele:
-                                allele_to_variants[allele].append(result)
-                                had_allele = True
-                    if not had_allele:
-                        regular_results.append(result)
+        if self.results and settings.PREFER_ALLELE_LINKS and self.search_type == Variant:
+            allele_to_variants: Dict[Allele, List[SearchResult2]] = defaultdict(list)
+            regular_results = list()
+            had_allele = False
+            for result in self.results:
+                if obj := result.preview.obj:
+                    if isinstance(obj, Variant):
+                        if allele := obj.allele:
+                            allele_to_variants[allele].append(result)
+                            had_allele = True
+                if not had_allele:
+                    regular_results.append(result)
 
-                if allele_to_variants:
-                    for allele, variant_results in allele_to_variants.items():
-                        genome_builds = set([vr.preview.genome_build for vr in variant_results])
-                        has_preferred_allele = self.search_input.genome_build_preferred in genome_builds
+            if allele_to_variants:
+                for allele, variant_results in allele_to_variants.items():
+                    genome_builds = set().union(*[vr.preview.genome_builds for vr in variant_results if vr.preview.genome_builds])
+                    has_preferred_allele = self.search_input.genome_build_preferred in genome_builds
 
-                        # FIXME we already have support for genome build ranking, change to use that
-                        messages = reduce(operator.__add__, (variant.messages for variant in variant_results if variant.messages), [])
-                        if not has_preferred_allele:
-                            genome_build_str = ", ".join([gb.name for gb in sorted(genome_builds)])
-                            messages.append(f"Found in {genome_build_str}")
+                    # FIXME we already have support for genome build ranking, change to use that
+                    messages = reduce(operator.__add__, (variant.messages for variant in variant_results if variant.messages), [])
+                    # if not has_preferred_allele:
+                    #     genome_build_str = ", ".join([gb.name for gb in sorted(genome_builds)])
+                    #     messages.append(f"Found in {genome_build_str}")
 
-                        regular_results.append(
-                            # FIXME remove redundant messages
-                            SearchResult2(preview=allele.preview, messages=messages)
-                        )
-                return regular_results
+                    allele_preview = allele.preview
+                    allele_preview.genome_builds = genome_builds
+
+                    regular_results.append(
+                        # FIXME remove redundant messages
+                        SearchResult2(preview=allele_preview, messages=messages)
+                    )
+            return regular_results
         return self.results
 
 
@@ -262,40 +294,44 @@ def search_receiver(
     Note that the wrapped method will take a SearchInput and return a SearchResponse object.
     :param search_type: Something that has preview_category(), preview_icon() and preview_enabled() for overall properties of the search
     :param pattern: A regex pattern that must be met for the search to be invoked. The search will be passed a SearchInputInstance with the match result
-    :param admin_only: Is this search for admin users only, wont be invokved or displayed for non admins.
+    :param admin_only: Is this search for admin users only, won't be invoked or displayed for non admins.
     :param sub_name: Are there multiple search implementations for the same search_type, if so give them a sub_name
     :param example: An example (to be presented to the user) of how to use this search
     :return: A wrapped call that will obey the above (e.g. preview_enabled(), admin_only) and return a SearchResponse
     """
     def _decorator(func):
         def search_func(sender: Any, search_input: SearchInput, **kwargs):
+
+            if admin_only and not search_input.user.is_superuser:
+                # if only for admin users, don't include it for non admin
+                return None
+            if search_type and not search_type.preview_enabled():
+                #
+                return None
+
+            response = SearchResponse(
+                search_input=search_input,
+                search_type=search_type,
+                admin_only=admin_only,
+                sub_name=sub_name,
+                example=example)
+
             try:
-                if admin_only and not search_input.user.is_superuser:
-                    # if only for admin users, don't include it for non admin
-                    return None
-                if search_type and not search_type.preview_enabled():
-                    #
-                    return None
-
-                response = SearchResponse(
-                    search_input=search_input,
-                    search_type=search_type,
-                    admin_only=admin_only,
-                    sub_name=sub_name,
-                    example=example)
-
                 if match := pattern.search(search_input.search_string):
                     response.matched_pattern = True
                     for result in func(SearchInputInstance(expected_type=search_type, search_input=search_input, match=match)):
+                        if result is None:
+                            raise ValueError(f"Search {sender.__name__} returned None")
+                        if isinstance(result, SearchWarning):
+                            response.warnings.append(result)
                         for search_result in SearchResult2.convert(result):
                             response.add_search_result(search_result)
-
-                return response
-            except:
-                # FIXME make this an overall search error
+            except Exception as e:
+                response.warnings.append(SearchWarning(str(e)))
                 print(f"Error handling search_receiver on {func}")
                 report_exc_info()
-                raise
+
+            return response
 
         search_signal.connect(search_func)
         return search_func

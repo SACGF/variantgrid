@@ -2,40 +2,82 @@ import re
 from collections import defaultdict
 from itertools import zip_longest
 import logging
+from typing import Optional, List
+
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.db.models import QuerySet
+from django.urls import reverse
 from pyhgvs import HGVSName, InvalidHGVSName
+
+from annotation.manual_variant_entry import check_can_create_variants, CreateManualVariantForbidden
+from classification.models import Classification, CreateNoClassificationForbidden
 from genes.hgvs import HGVSMatcher
-from genes.models import MissingTranscript, MANE, TranscriptVersion
+from genes.models import MissingTranscript, MANE, TranscriptVersion, GeneSymbol
 from genes.models_enums import AnnotationConsortium
 from library.genomics import format_chrom
-from library.preview_request import PreviewModelMixin
+from library.preview_request import PreviewModelMixin, PreviewData
 from snpdb.clingen_allele import get_clingen_allele
 from snpdb.models import Variant, LOCUS_PATTERN, LOCUS_NO_REF_PATTERN, DbSNP, DBSNP_PATTERN, VariantCoordinate, \
     ClinGenAllele, GenomeBuild, Contig, HGVS_UNCLEANED_PATTERN
-from snpdb.search2 import search_receiver, SearchInputInstance, SearchExample, SearchResult2
-from variantopedia.search import SearchWarning
+from snpdb.search2 import search_receiver, SearchInputInstance, SearchExample, SearchResult2, SearchWarning
+from upload.models import ModifiedImportedVariant
 
 COSMIC_PATTERN = re.compile(r"^(COS[VM]).*$", re.IGNORECASE)
 
 
-class VariantToAnnotate(PreviewModelMixin):
+class VariantExtra:
 
-    @classmethod
-    def preview_icon(cls) -> str:
-        return "fa-solid fa-v p-1 text-light border rounded bg-success"
+    @staticmethod
+    def create_manual_variant(for_user: User, genome_build: GenomeBuild, variant_string: str) -> Optional['PreviewData']:
+        try:
+            check_can_create_variants(for_user)
+        except CreateManualVariantForbidden:
+            return None
 
-    @classmethod
-    def preview_category(cls) -> str:
-        return "Variant"
+        kwargs = {"genome_build_name": genome_build.pk, "variants_text": variant_string}
+        internal_url = reverse('create_manual_variant_entry_from_text', kwargs=kwargs)
+        return PreviewData(
+            category="Variant",
+            icon="fa-solid fa-circle-plus",
+            title="Click to create and annotate this variant",
+            internal_url=internal_url,
+            genome_builds={genome_build}
+        )
 
-    def __init__(self, note: str):
-        self.note = note
+    @staticmethod
+    def classify_variant(for_user: User, variant: Variant, transcript_id: str = None):
+        kwargs = {"variant_id": variant.pk}
+        if transcript_id:
+            name = "create_classification_for_variant_and_transcript"
+            kwargs["transcript_id"] = transcript_id
+        else:
+            name = "create_classification_for_variant"
+        internal_url = reverse(name, kwargs=kwargs)
+        return PreviewData(
+            category="Variant",
+            icon="fa-solid fa-circle-plus",
+            title="Click to classify variant",
+            internal_url=internal_url,
+            genome_builds=variant.genome_builds,
+            obj=variant
+        )
 
-    @property
-    def preview(self) -> 'PreviewData':
-        return self.preview_with(identifier=self.note)
+    @staticmethod
+    def classify_no_variant_hgvs(for_user: User, genome_build: GenomeBuild, hgvs_string: str):
+        try:
+            Classification.check_can_create_no_classification_via_web_form(for_user)
+        except CreateNoClassificationForbidden:
+            return None
+        kwargs = {"genome_build_name": genome_build.pk, "hgvs_string": hgvs_string}
+        internal_url = reverse('create_classification_from_hgvs', kwargs=kwargs)
+        return PreviewData(
+            category="Variant",
+            icon="fa-solid fa-circle-plus",
+            title=f"Click to classify from unvalidated HGVS: '{hgvs_string}'",
+            internal_url=internal_url,
+            genome_builds={genome_build}
+        )
 
 
 @search_receiver(
@@ -80,8 +122,8 @@ def search_variant_locus_no_ref(search_input: SearchInputInstance):
     pattern=LOCUS_PATTERN,
     sub_name="Locus with Ref",
     example=SearchExample(
-        note="TO DO provide an example with ref",
-        examples=["chr1:169519049"]
+        note="Provide chromosome and position and a reference",
+        examples=["chr1:169519049 A"]
     )
 )
 def search_variant_locus_with_ref(search_input: SearchInputInstance):
@@ -109,24 +151,15 @@ def allele_search(search_input: SearchInputInstance):
             try:
                 if variant := allele.variant_for_build(genome_build):
                     yield variant
+                else:
+                    variant_string = allele.get_variant_string(genome_build)
+                    # not sure the below message adds to anything
+                    # variant_string_abbreviated = allele.get_variant_string(genome_build, abbreviate=True)
+                    # search_message = f"'{allele}' resolved to '{variant_string_abbreviated}'"
+                    if create_manual := VariantExtra.create_manual_variant(search_input.user, genome_build=genome_build, variant_string=variant_string):
+                        yield create_manual
             except ValueError:
-                pass # need to re-add support for creating variants
-        #yield allele
-        # else:
-        #     # FIXME none of this will work, neither Variant or CreateManualVariant is previewable
-        #     # and have that allele just take you to the variant page
-        #     for genome_build in search_input.genome_builds:
-        #         variant_qs = variant_qs.filter(variantallele__allele__clingen_allele=clingen_allele,
-        #                                        variantallele__genome_build=genome_build)
-        #         if variant_qs.exists():
-        #             yield variant_qs
-        #         else:
-        #             if can_create_variants(search_input.user):
-        #                 variant_string = clingen_allele.get_variant_string(genome_build)
-        #                 variant_string_abbreviated = clingen_allele.get_variant_string(genome_build, abbreviate=True)
-        #                 search_message = f"'{clingen_allele}' resolved to '{variant_string_abbreviated}'"
-        #                 # FIXME, this isn't previewable
-        #                 yield CreateManualVariant(genome_build, variant_string), search_message
+                pass
 
 
 def get_results_from_variant_tuples(qs: QuerySet, data: VariantCoordinate, any_alt: bool = False):
@@ -145,13 +178,11 @@ def get_results_from_variant_tuples(qs: QuerySet, data: VariantCoordinate, any_a
 
     if not results:
         if not any_alt:
-            pass
-            # results = ModifiedImportedVariant.get_variants_for_unnormalized_variant(chrom, position, ref, alt)
+            yield ModifiedImportedVariant.get_variants_for_unnormalized_variant(chrom, position, ref, alt)
         else:
-            pass
             # should we really be searching ModifiedImportVariants with any alt? or should that just happen for
             # the filter of "real" variants
-            # results = ModifiedImportedVariant.get_variants_for_unnormalized_variant_any_alt(chrom, position, ref)
+            yield ModifiedImportedVariant.get_variants_for_unnormalized_variant_any_alt(chrom, position, ref)
     return results
 
 
@@ -165,14 +196,12 @@ def search_variant_match(search_input: SearchInputInstance):
             return results
 
         if errors := Variant.validate(genome_build, chrom, position):
-            # FIXME have overall errors
-            #raise ValueError(", ".join(errors))
-            pass
-
-        # fixme have missing variant
-        # variant_string = Variant.format_tuple(chrom, position, ref, alt)
-        # search_message = f"The variant {variant_string} does not exist in the database"
-        # return [SearchResult(CreateManualVariant(genome_build, variant_string), message=search_message)]
+            return SearchWarning(", ".join(errors))
+        else:
+            variant_string = Variant.format_tuple(chrom, position, ref, alt)
+            search_message = f"The variant {variant_string} does not exist in the database"
+            if create_manual := VariantExtra.create_manual_variant(search_input.user, genome_build=genome_build, variant_string=variant_string):
+                return create_manual, search_message
 
 
 VARIANT_VCF_PATTERN = re.compile(r"((?:chr)?\S*)\s+(\d+)\s+\.?\s*([GATC]+)\s+([GATC]+)", re.IGNORECASE)
@@ -180,10 +209,10 @@ VARIANT_VCF_PATTERN = re.compile(r"((?:chr)?\S*)\s+(\d+)\s+\.?\s*([GATC]+)\s+([G
 @search_receiver(
     search_type=Variant,
     pattern=VARIANT_VCF_PATTERN,
-    sub_name="VCF",
+    sub_name="VCF Format",
     example=SearchExample(
-        note="((?:chr)?\S*)\s+(\d+)\s+\.?\s*([GATC]+)\s+([GATC]+) fixme",
-        examples=["TODO"]
+        note="Variant coordinate as found in a VCF (across multiple columns)",
+        examples=["1 169519049 T C"]
     )
 )
 def variant_search_vcf(search_input: SearchInputInstance):
@@ -197,7 +226,7 @@ VARIANT_GNOMAD_PATTERN = re.compile(r"(?:chr)?(\S*)-(\d+)-([GATC]+)-([GATC]+)", 
 @search_receiver(
     search_type=Variant,
     pattern=VARIANT_GNOMAD_PATTERN,
-    sub_name="gnomAD",
+    sub_name="gnomAD Format",
     example=SearchExample(
         note="A variant coordinate as formatted by gnomAD",
         examples=["1-169519049-T-C"]
@@ -214,9 +243,9 @@ VARIANT_PATTERN = re.compile(r"^(MT|(?:chr)?(?:[XYM]|\d+)):(\d+)[,\s]*([GATC]+)>
 @search_receiver(
     search_type=Variant,
     pattern=VARIANT_PATTERN,
-    sub_name="Variant Pattern",
+    sub_name="IGV Format",
     example=SearchExample(
-        note="Standard vairant format",
+        note="Variant coordinate as seen in IGV",
         examples=["1:169519049 T>C"]
     )
 )
@@ -250,14 +279,13 @@ def search_variant_db_snp(search_input: SearchInputInstance):
                         yield r, dbsnp_message
                 else:
                     variant_string = Variant.format_tuple(*variant_tuple)
-                    # FIXME return CreateManualVariant again
-                    #search_results.append(SearchResult(CreateManualVariant(genome_build, variant_string),
-                    #                                   message=dbsnp_message))
-
+                    if create_manual := VariantExtra.create_manual_variant(for_user=search_input.user, variant_string=variant_string):
+                        yield create_manual, dbsnp_message
 
 
 def _search_hgvs_using_gene_symbol(
-        gene_symbol, search_messages,
+        gene_symbol: GeneSymbol,
+        search_messages: List[str],
         hgvs_string: str,
         user: User,
         genome_build: GenomeBuild,
@@ -331,17 +359,15 @@ def _search_hgvs_using_gene_symbol(
         initial_score = results_for_record[0].initial_score
         have_results = True
         yield SearchResult2(preview=record.preview(), messages=messages)
-        # results.append(SearchResult(record, message=messages, initial_score=initial_score,
-        #                             annotation_consortia=list(unique_annotation_consortia)))
 
     if not have_results:
         # In some special cases, add in special messages for no result
         if settings.SEARCH_HGVS_GENE_SYMBOL_USE_MANE and not settings.SEARCH_HGVS_GENE_SYMBOL_USE_ALL_TRANSCRIPTS:
             message = "\n".join(search_messages + [f"Only searched MANE transcripts: {', '.join(mane_transcripts)}"])
-            raise SearchWarning(message)
+            yield SearchWarning(message)
 
-        if not (settings.SEARCH_HGVS_GENE_SYMBOL_USE_MANE or settings.SEARCH_HGVS_GENE_SYMBOL_USE_ALL_TRANSCRIPTS):
-            raise SearchWarning("\n".join(search_messages))
+        elif not (settings.SEARCH_HGVS_GENE_SYMBOL_USE_MANE or settings.SEARCH_HGVS_GENE_SYMBOL_USE_ALL_TRANSCRIPTS):
+            yield SearchWarning("\n".join(search_messages))
 
 
 @search_receiver(
@@ -350,7 +376,6 @@ def _search_hgvs_using_gene_symbol(
     sub_name="HGVS",
     example=SearchExample(
         note="Provide a c. or g. HGVS",
-        # FIXME, really need the ability to provide more examples
         examples=["NM_001080463.1:c.5972T>A", "NM_000492.3(CFTR):c.1438G>T", "NC_000007.13:g.117199563G>T"]
     )
 )
@@ -400,9 +425,8 @@ def search_hgvs(search_input: SearchInputInstance):
             if variant_tuple is None:
                 if classify:
                     search_message = f"Error reading HGVS: '{hgvs_error}'"
-                    # return [SearchResult(ClassifyNoVariantHGVS(genome_build, original_hgvs_string), message=search_message)]
-                    # FIXME
-                    continue
+                    if classify_no_variant := VariantExtra.classify_no_variant_hgvs(for_user=search_input.user, hgvs_string=original_hgvs_string):
+                        yield classify_no_variant, search_message
 
             raise hgvs_error
 
@@ -457,6 +481,8 @@ def search_hgvs(search_input: SearchInputInstance):
 
 
 DB_PREFIX_PATTERN = re.compile(fr"^(v|{settings.VARIANT_VCF_DB_PREFIX})(\d+)$")
+
+
 @search_receiver(
     search_type=Variant,
     pattern=DB_PREFIX_PATTERN,

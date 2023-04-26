@@ -52,7 +52,7 @@ from variantgrid.celery import app
 from variantgrid.tasks.server_monitoring_tasks import get_disk_messages
 from variantopedia import forms
 from variantopedia.interesting_nearby import get_nearby_qs, get_method_summaries, get_nearby_summaries
-from variantopedia.search import search_data, SearchResults
+from variantopedia.search import search_data, CombinedSearchResponses
 from variantopedia.server_status import get_dashboard_notices
 from variantopedia.tasks.server_status_tasks import notify_server_status_now
 
@@ -379,7 +379,6 @@ def search(request):
 
     user_settings = UserSettings.get_for_user(request.user)
 
-    search_results: Optional[SearchResults] = None
     search_string = ""
     classify = False
     if form.is_valid() and form.cleaned_data['search']:
@@ -388,9 +387,11 @@ def search(request):
 
     # always perform a "search" so we can get told what kind of searches are enabled
     # note that searching on "" doesn't actually invoke any of the other search logic
-    search_results = search_data(request.user, search_string, classify)
-    results, _search_types, _search_errors = search_results.results, search_results.search_types, search_results.search_errors
-    details = f"'{search_string}' calculated {len(results)} results."
+
+    search_results = search_data(user=request.user, search_string=search_string, classify=classify)
+
+    #results, _search_types, _search_errors = search_results.results, search_results.search_types, search_results.search_errors
+    details = search_results.summary
     create_event(request.user, 'search', details=details)
 
     # don't auto load unless there is only 1 preferred result
@@ -399,22 +400,22 @@ def search(request):
         pass
 
     # Attempt to give hints on why nothing was found
-    for search_error, genome_builds in search_results.search_errors.items():
-        text = f"{search_error.search_type}: {search_error.error}"
-        if genome_builds:
-            genome_builds_str = ", ".join(gb.name for gb in sorted(genome_builds))
-            text += f" ({genome_builds_str})"
-        messages.add_message(request, search_error.log_level, text)
-
-    epk_qs = ExternalPK.objects.values_list("external_type", flat=True)
-    external_codes = list(sorted(epk_qs.distinct()))
+    # for search_error, genome_builds in search_results.search_errors.items():
+    #     text = f"{search_error.search_type}: {search_error.error}"
+    #     if genome_builds:
+    #         genome_builds_str = ", ".join(gb.name for gb in sorted(genome_builds))
+    #         text += f" ({genome_builds_str})"
+    #     messages.add_message(request, search_error.log_level, text)
+    #
+    # epk_qs = ExternalPK.objects.values_list("external_type", flat=True)
+    # external_codes = list(sorted(epk_qs.distinct()))
 
     context = {
         "user_settings": user_settings,
         "form": form,
         "search": search_string,
         "search_results": search_results,
-        "external_codes": external_codes,
+        # "external_codes": external_codes,
     }
     return render(request, "variantopedia/search.html", context)
 

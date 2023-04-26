@@ -1,5 +1,4 @@
-from abc import ABC, abstractmethod
-from typing import Optional, Union, Any
+from typing import Optional, Union, Any, Set, List
 from attr import dataclass
 from django.db.models import Model
 from django.dispatch import Signal
@@ -62,7 +61,7 @@ class PreviewModelMixin:
             summary: Optional[Union[str, SafeString]] = None,
             internal_url: Optional[str] = None,
             external_url: Optional[str] = None,
-            genome_build: Optional['GenomeBuild'] = None,
+            genome_builds: Optional[Set['GenomeBuild']] = None,
             annotation_consortium: Optional['AnnotationConsortium'] = None
     ) -> 'PreviewData':
 
@@ -80,7 +79,7 @@ class PreviewModelMixin:
             summary=summary,
             internal_url=internal_url,
             external_url=external_url,
-            genome_build=genome_build,
+            genome_builds=genome_builds,
             annotation_consortium=annotation_consortium
         )
 
@@ -98,7 +97,7 @@ class PreviewData:
     summary: Optional[Union[str, SafeString]] = None
     internal_url: Optional[str] = None
     external_url: Optional[str] = None
-    genome_build: Optional['GenomeBuild'] = None
+    genome_builds: Optional[Set['GenomeBuild']] = None
     annotation_consortium: Optional['AnnotationConsortium'] = None
     obj: Optional[Any] = None
 
@@ -112,7 +111,7 @@ class PreviewData:
             summary: Optional[Union[str, SafeString]] = None,
             internal_url: Optional[str] = None,
             external_url: Optional[str] = None,
-            genome_build: Optional['GenomeBuild'] = None,
+            genome_builds: Optional[Set['GenomeBuild']] = None,
             annotation_consortium: Optional['AnnotationConsortium'] = None):
 
         if category is None:
@@ -135,8 +134,11 @@ class PreviewData:
             except NoReverseMatch:
                 internal_url = "javascript:alert('Could not load a view for this type of result')"
 
-        if genome_build is None and hasattr(obj, "genome_build"):
-            genome_build = obj.genome_build
+        if genome_builds is None:
+            if hasattr(obj, "genome_build") and (genome_build := obj.genome_build):
+                genome_builds = {obj.genome_build}
+            elif hasattr(obj, "genome_builds"):
+                genome_builds = obj.genome_builds
 
         if annotation_consortium is None and hasattr(obj, "annotation_consortium"):
             annotation_consortium = obj.annotation_consortium
@@ -150,7 +152,7 @@ class PreviewData:
             summary=summary,
             internal_url=internal_url,
             external_url=external_url,
-            genome_build=genome_build,
+            genome_builds=genome_builds,
             annotation_consortium=annotation_consortium
         )
 

@@ -407,10 +407,6 @@ class Variant(PreviewModelMixin, models.Model):
         return Variant.objects.get(locus__contig__genomebuildcontig__genome_build=genome_build,
                                    **dict(zip(params, variant_tuple)))
 
-    @property
-    def genome_build(self) -> Optional[GenomeBuild]:
-        return first(self.genome_builds)
-
     @cached_property
     def genome_builds(self) -> Set['GenomeBuild']:
         gbc_qs = GenomeBuildContig.objects.filter(genome_build__in=GenomeBuild.builds_with_annotation(),

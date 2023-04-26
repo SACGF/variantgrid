@@ -31,7 +31,6 @@ from ontology.models import OntologyTerm, OntologySnake, OntologyTermRelation
 from snpdb.models import GenomeBuild, Variant, Allele, ClinVarKey
 from snpdb.search2 import SearchInput
 from snpdb.signals.variant_search import search_hgvs
-from variantopedia.search import SearchResult, ClassifyVariant
 
 C_HGVS_AND_P_DOT = re.compile(r"^(?P<c_hgvs>.+?)( \((?P<p_hgvs>p[.].+)\))?$")
 
@@ -279,8 +278,6 @@ class ClinVarLegacyRow:
                         variant: Optional[Variant] = None
                         if isinstance(result, Variant):
                             variant = result
-                        elif isinstance(result, ClassifyVariant):
-                            variant = result.variant
                         if variant:
                             if allele := variant.allele:
                                 allele_to_match_types[allele].add(ClinVarLegacyAlleleMatchType.VARIANT_PREFERRED_VARIANT)
