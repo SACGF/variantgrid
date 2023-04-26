@@ -249,8 +249,8 @@ class SearchResponse:
         if self.results and settings.PREFER_ALLELE_LINKS and self.search_type == Variant:
             allele_to_variants: Dict[Allele, List[SearchResult2]] = defaultdict(list)
             regular_results = list()
-            had_allele = False
             for result in self.results:
+                had_allele = False
                 if obj := result.preview.obj:
                     if isinstance(obj, Variant):
                         if allele := obj.allele:
@@ -262,19 +262,14 @@ class SearchResponse:
             if allele_to_variants:
                 for allele, variant_results in allele_to_variants.items():
                     genome_builds = set().union(*[vr.preview.genome_builds for vr in variant_results if vr.preview.genome_builds])
-                    has_preferred_allele = self.search_input.genome_build_preferred in genome_builds
 
-                    # FIXME we already have support for genome build ranking, change to use that
-                    messages = reduce(operator.__add__, (variant.messages for variant in variant_results if variant.messages), [])
-                    # if not has_preferred_allele:
-                    #     genome_build_str = ", ".join([gb.name for gb in sorted(genome_builds)])
-                    #     messages.append(f"Found in {genome_build_str}")
+                    all_messages = set().union(*(set(variant.messages) for variant in variant_results if variant.messages))
+                    messages = sorted(all_messages)
 
                     allele_preview = allele.preview
                     allele_preview.genome_builds = genome_builds
 
                     regular_results.append(
-                        # FIXME remove redundant messages
                         SearchResult2(preview=allele_preview, messages=messages)
                     )
             return regular_results
