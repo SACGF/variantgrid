@@ -178,11 +178,11 @@ def get_results_from_variant_tuples(qs: QuerySet, data: VariantCoordinate, any_a
 
     if not results:
         if not any_alt:
-            yield ModifiedImportedVariant.get_variants_for_unnormalized_variant(chrom, position, ref, alt)
+            return ModifiedImportedVariant.get_variants_for_unnormalized_variant(chrom, position, ref, alt)
         else:
             # should we really be searching ModifiedImportVariants with any alt? or should that just happen for
             # the filter of "real" variants
-            yield ModifiedImportedVariant.get_variants_for_unnormalized_variant_any_alt(chrom, position, ref)
+            return ModifiedImportedVariant.get_variants_for_unnormalized_variant_any_alt(chrom, position, ref)
     return results
 
 
