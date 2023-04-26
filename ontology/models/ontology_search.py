@@ -1,7 +1,7 @@
 from typing import List, Optional
 from genes.models import GeneSymbol
 from ontology.models import OntologyTerm, OntologyService, OntologyTermStatus
-from snpdb.search2 import search_receiver, HAS_ALPHA_PATTERN, \
+from snpdb.search import search_receiver, HAS_ALPHA_PATTERN, \
     SearchInputInstance, SearchExample
 import re
 

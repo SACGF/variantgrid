@@ -20,7 +20,7 @@ from library.preview_request import PreviewModelMixin, PreviewData
 from snpdb.clingen_allele import get_clingen_allele
 from snpdb.models import Variant, LOCUS_PATTERN, LOCUS_NO_REF_PATTERN, DbSNP, DBSNP_PATTERN, VariantCoordinate, \
     ClinGenAllele, GenomeBuild, Contig, HGVS_UNCLEANED_PATTERN
-from snpdb.search2 import search_receiver, SearchInputInstance, SearchExample, SearchResult2, SearchWarning
+from snpdb.search import search_receiver, SearchInputInstance, SearchExample, SearchResult, SearchWarning
 from upload.models import ModifiedImportedVariant
 
 COSMIC_PATTERN = re.compile(r"^(COS[VM]).*$", re.IGNORECASE)
@@ -358,7 +358,7 @@ def _search_hgvs_using_gene_symbol(
         # All weights should be the same, just take 1st
         initial_score = results_for_record[0].initial_score
         have_results = True
-        yield SearchResult2(preview=record.preview(), messages=messages)
+        yield SearchResult(preview=record.preview(), messages=messages)
 
     if not have_results:
         # In some special cases, add in special messages for no result

@@ -32,7 +32,7 @@ from library.git import Git
 from library.guardian_utils import admin_bot
 from library.log_utils import log_traceback, report_message, slack_bot_username
 from pathtests.models import cases_for_user
-from patients.models import ExternalPK, Clinician
+from patients.models import Clinician
 from seqauto.models import VCFFromSequencingRun, get_20x_gene_coverage
 from seqauto.seqauto_stats import get_sample_enrichment_kits_df
 from snpdb.clingen_allele import link_allele_to_existing_variants
@@ -52,7 +52,7 @@ from variantgrid.celery import app
 from variantgrid.tasks.server_monitoring_tasks import get_disk_messages
 from variantopedia import forms
 from variantopedia.interesting_nearby import get_nearby_qs, get_method_summaries, get_nearby_summaries
-from variantopedia.search import search_data, CombinedSearchResponses
+from snpdb.search import search_data
 from variantopedia.server_status import get_dashboard_notices
 from variantopedia.tasks.server_status_tasks import notify_server_status_now
 

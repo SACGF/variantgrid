@@ -3,8 +3,8 @@ from django.test import TestCase
 
 from annotation.tests.test_data_fake_genes import create_fake_transcript_version
 from snpdb.models import GenomeBuild, ClinGenAllele
+from snpdb.search import search_data
 from variantopedia.models import SearchTypes
-from variantopedia.search import search_data
 
 
 class TestSearch(TestCase):

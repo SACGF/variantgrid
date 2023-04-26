@@ -1,5 +1,5 @@
 from pedigree.models import Pedigree
-from snpdb.search2 import search_receiver, SearchInputInstance, SearchExample
+from snpdb.search import search_receiver, SearchInputInstance, SearchExample
 
 
 @search_receiver(

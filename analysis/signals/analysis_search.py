@@ -1,5 +1,5 @@
 from analysis.models import Analysis
-from snpdb.search2 import search_receiver, SearchInputInstance, SearchExample
+from snpdb.search import search_receiver, SearchInputInstance, SearchExample
 import re
 
 

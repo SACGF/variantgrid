@@ -1,5 +1,5 @@
 from seqauto.models import Experiment
-from snpdb.search2 import search_receiver, HAS_ALPHA_PATTERN, SearchInputInstance
+from snpdb.search import search_receiver, HAS_ALPHA_PATTERN, SearchInputInstance
 
 
 @search_receiver(search_type=Experiment, pattern=HAS_ALPHA_PATTERN)

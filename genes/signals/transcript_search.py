@@ -1,6 +1,6 @@
 import re
 from genes.models import Transcript, TranscriptVersion
-from snpdb.search2 import search_receiver, SearchInputInstance, SearchExample
+from snpdb.search import search_receiver, SearchInputInstance, SearchExample
 
 TRANSCRIPT_PATTERN = re.compile(r"^(ENST|NM_|NR_|XR_)\d+\.?\d*$")
 

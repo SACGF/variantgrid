@@ -1,6 +1,6 @@
 from typing import Any
 from snpdb.models import VCF
-from snpdb.search2 import SearchInput, search_receiver, SearchInputInstance, SearchExample
+from snpdb.search import SearchInput, search_receiver, SearchInputInstance, SearchExample
 
 
 @search_receiver(

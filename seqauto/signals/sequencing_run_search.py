@@ -1,6 +1,6 @@
 import re
 from seqauto.models import SequencingRun
-from snpdb.search2 import search_receiver, SearchInputInstance, SearchExample
+from snpdb.search import search_receiver, SearchInputInstance, SearchExample
 
 SEQUENCING_RUN_REGEX = re.compile(r"\d{6}[_-](NS|NB|M|D|SN|K|ST|A)(.{3,7})_\d{4}_(0{9}-.{5}|.{10})")
 

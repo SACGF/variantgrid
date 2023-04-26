@@ -2,7 +2,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from rest_framework.exceptions import PermissionDenied
 
 from patients.models import ExternalPK
-from snpdb.search2 import search_receiver, HAS_ALPHA_PATTERN, \
+from snpdb.search import search_receiver, HAS_ALPHA_PATTERN, \
     SearchInputInstance, SearchExample
 
 

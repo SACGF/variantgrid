@@ -29,7 +29,7 @@ from library.guardian_utils import admin_bot
 from library.log_utils import report_exc_info
 from ontology.models import OntologyTerm, OntologySnake, OntologyTermRelation
 from snpdb.models import GenomeBuild, Variant, Allele, ClinVarKey
-from snpdb.search2 import SearchInput
+from snpdb.search import SearchInput
 from snpdb.signals.variant_search import search_hgvs
 
 C_HGVS_AND_P_DOT = re.compile(r"^(?P<c_hgvs>.+?)( \((?P<p_hgvs>p[.].+)\))?$")

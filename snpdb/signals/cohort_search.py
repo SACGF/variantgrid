@@ -1,6 +1,6 @@
 from re import Match
 from snpdb.models import Cohort
-from snpdb.search2 import search_receiver, SearchInputInstance, SearchExample
+from snpdb.search import search_receiver, SearchInputInstance, SearchExample
 
 
 @search_receiver(

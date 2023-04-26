@@ -1,7 +1,7 @@
 import re
 from genes.models import Gene
 from genes.models_enums import AnnotationConsortium
-from snpdb.search2 import search_receiver, SearchInputInstance, SearchExample
+from snpdb.search import search_receiver, SearchInputInstance, SearchExample
 
 GENE_PATTERN = re.compile(r"(ENSG|Gene.*:)\d+")
 

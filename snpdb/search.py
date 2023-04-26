@@ -1,17 +1,22 @@
 import operator
 import re
+import itertools
 from collections import defaultdict
 from dataclasses import dataclass, field
-from functools import reduce, cached_property
-from re import Match, IGNORECASE
-from typing import Optional, Union, List, Pattern, Any, Set, Callable, Type, Dict
-from django.dispatch import Signal
+from functools import cached_property, reduce
+from re import IGNORECASE
+from typing import List, Set, Optional, Type, Pattern, Callable, Any, Match, Union, Dict
+
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.db.models import QuerySet, Q
-from library.log_utils import report_message, report_exc_info
-from library.preview_request import PreviewData, PreviewModelMixin
-from snpdb.models import GenomeBuild, Variant, Allele
+from django.dispatch import Signal
+
+from library.log_utils import report_exc_info, report_message
+from library.preview_request import PreviewModelMixin, PreviewData
+from library.utils import clean_string
+from snpdb.models import UserSettings, GenomeBuild, Variant, Allele
+
 
 search_signal = Signal()
 HAS_ALPHA_PATTERN = re.compile(r"[a-zA-Z]")
@@ -82,9 +87,9 @@ class SearchInput:
 
         return variant_qs
 
-    @property
+    @cached_property
     def genome_builds(self) -> Set[GenomeBuild]:
-        return GenomeBuild.builds_with_annotation()
+        return set(GenomeBuild.builds_with_annotation().all())
 
 
 @dataclass(frozen=True)
@@ -139,13 +144,12 @@ class SearchWarningForType:
 
 
 @dataclass
-class SearchResult2:
+class SearchResult:
     preview: PreviewData
     messages: Optional[List[str]] = None
 
     @property
     def search_type(self):
-        # Just here to bridge the gap between SeearchResult and SearchResult2
         return self.preview.category
 
     @property
@@ -165,8 +169,8 @@ class SearchResult2:
             self.messages.append(message)
 
     @staticmethod
-    def convert(data: Any) -> List['SearchResult2']:
-        if isinstance(data, SearchResult2):
+    def convert(data: Any) -> List['SearchResult']:
+        if isinstance(data, SearchResult):
             return [data]
         if isinstance(data, (tuple, list)):
             data = list(data)
@@ -180,11 +184,11 @@ class SearchResult2:
                     pass
                 else:
                     raise ValueError(f"Not sure what to do with search result extra {entry}")
-            previews = SearchResult2._convert_to_previews(data[0])
-            return [SearchResult2(preview=preview, messages=messages) for preview in previews]
+            previews = SearchResult._convert_to_previews(data[0])
+            return [SearchResult(preview=preview, messages=messages) for preview in previews]
         else:
-            previews = SearchResult2._convert_to_previews(data)
-            return [SearchResult2(preview=preview) for preview in previews]
+            previews = SearchResult._convert_to_previews(data)
+            return [SearchResult(preview=preview) for preview in previews]
 
     @staticmethod
     def _convert_to_previews(data: Any) -> List[PreviewData]:
@@ -219,7 +223,7 @@ class SearchResponse:
     sub_name: Optional[str] = None
     admin_only: bool = False
     example: Optional[SearchExample] = None
-    results: List[SearchResult2] = field(default_factory=list)
+    results: List[SearchResult] = field(default_factory=list)
     warnings: List[SearchWarning] = field(default_factory=list)
 
     @property
@@ -235,7 +239,7 @@ class SearchResponse:
     def preview_icon(self):
         return self.search_type_effective.preview_icon()
 
-    def add_search_result(self, search_result: SearchResult2):
+    def add_search_result(self, search_result: SearchResult):
         self.results.append(search_result)
 
     @property
@@ -247,7 +251,7 @@ class SearchResponse:
     @property
     def optimized_results(self):
         if self.results and settings.PREFER_ALLELE_LINKS and self.search_type == Variant:
-            allele_to_variants: Dict[Allele, List[SearchResult2]] = defaultdict(list)
+            allele_to_variants: Dict[Allele, List[SearchResult]] = defaultdict(list)
             regular_results = list()
             for result in self.results:
                 had_allele = False
@@ -270,11 +274,60 @@ class SearchResponse:
                     allele_preview.genome_builds = genome_builds
 
                     regular_results.append(
-                        SearchResult2(preview=allele_preview, messages=messages)
+                        SearchResult(preview=allele_preview, messages=messages)
                     )
             return regular_results
         return self.results
 
+
+class CombinedSearchResponses:
+
+    def __init__(self, search_input: SearchInput, responses: List[SearchResponse]):
+        self.search_input = search_input
+        self.responses = responses
+
+    @cached_property
+    def search_types(self) -> Set[str]:
+        search_types_set = set()
+        for response in self.responses:
+            if response.matched_pattern:
+                search_types_set.add(response.search_type.preview_category())
+        return search_types_set
+
+    @cached_property
+    def results(self):
+        result_list = list(itertools.chain.from_iterable([response.optimized_results for response in self.responses]))
+        # TODO, sort these
+        return result_list
+
+    @cached_property
+    def warnings(self):
+        warning_list = list(itertools.chain.from_iterable([response.search_warnings_with_type for response in self.responses]))
+        # TODO, sort these
+        return warning_list
+
+    def single_preferred_result(self):
+        return None
+
+    @property
+    def summary(self) -> str:
+        return f"{self.search_input.search_string}' calculated {len(self.results)} results."
+
+    @cached_property
+    def grouped_search_infos(self) -> List[SearchResponse]:
+        return sorted(self.responses, key=lambda sr: (sr.preview_category, sr.sub_name.upper() if sr.sub_name else ""))
+
+
+def search_data(user: User, search_string: str, classify: bool = False) -> CombinedSearchResponses:
+    user_settings = UserSettings.get_for_user(user)
+    search_input = SearchInput(
+        user=user,
+        search_string=clean_string(search_string),
+        genome_build_preferred=user_settings.default_genome_build,
+        classify=classify
+    )
+    responses = search_input.search()
+    return CombinedSearchResponses(search_input, responses)
 
 def search_receiver(
         search_type: Optional[Type[PreviewModelMixin]] = None,
@@ -317,10 +370,11 @@ def search_receiver(
                     for result in func(SearchInputInstance(expected_type=search_type, search_input=search_input, match=match)):
                         if result is None:
                             raise ValueError(f"Search {sender.__name__} returned None")
-                        if isinstance(result, SearchWarning):
+                        elif isinstance(result, SearchWarning):
                             response.warnings.append(result)
-                        for search_result in SearchResult2.convert(result):
-                            response.add_search_result(search_result)
+                        else:
+                            for search_result in SearchResult.convert(result):
+                                response.add_search_result(search_result)
             except Exception as e:
                 response.warnings.append(SearchWarning(str(e)))
                 print(f"Error handling search_receiver on {func}")

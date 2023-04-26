@@ -1,6 +1,6 @@
 import re
 from snpdb.models import Organization
-from snpdb.search2 import search_receiver, SearchInputInstance, SearchExample
+from snpdb.search import search_receiver, SearchInputInstance, SearchExample
 
 MIN_3_ALPHA = re.compile(r"[a-zA-Z]{3,}")
 

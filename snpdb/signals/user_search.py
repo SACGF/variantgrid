@@ -1,7 +1,7 @@
 from django.contrib.auth.models import User
 from django.db.models import Q
 from snpdb.models import UserPreview
-from snpdb.search2 import search_receiver, SearchInputInstance, \
+from snpdb.search import search_receiver, SearchInputInstance, \
     HAS_ALPHA_PATTERN, SearchExample
 
 

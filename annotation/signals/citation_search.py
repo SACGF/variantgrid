@@ -1,6 +1,6 @@
 from annotation.models import CitationFetchRequest, Citation
 from annotation.models.models_citations import CitationSource, CitationIdNormalized
-from snpdb.search2 import search_receiver, SearchInputInstance, SearchExample
+from snpdb.search import search_receiver, SearchInputInstance, SearchExample
 import re
 
 @search_receiver(

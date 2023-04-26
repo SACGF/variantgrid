@@ -9,7 +9,7 @@ from pyhgvs import HGVSName, InvalidHGVSName
 from annotation.models import VariantAnnotationVersion
 from classification.models import Classification, ClassificationModification
 from snpdb.models import Lab, Organization
-from snpdb.search2 import search_receiver, SearchInputInstance, SearchExample
+from snpdb.search import search_receiver, SearchInputInstance, SearchExample
 
 
 @search_receiver(

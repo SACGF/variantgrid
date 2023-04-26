@@ -196,7 +196,7 @@
             <div class="card-body">
                 {% for search_result in search_results.grouped_search_infos %}
                     <div class="row d-flex align-items-center" style="min-height:30px;">
-                        <div class="col-3 text-right {% if not search_result.sub_name and search_result.matched_pattern %}searched{% endif %}">
+                        <div class="col-3 text-right {% if not search_result.sub_name and search_result.matched_pattern and user.is_superuser %}searched{% endif %}">
                             {% ifchanged search_result.preview_category %}
                                 <i class="{{ search_result.preview_icon }} mr-2" style="opacity:0.75"></i>
                                 <label>
@@ -207,7 +207,7 @@
                         <div class="col-9">
                             {% if search_result.admin_only %}<i class="fa-solid fa-key mr-2"></i>{% endif %}
                             {% if search_result.sub_name %}
-                                <label {% if search_result.matched_pattern %}class="searched"{% endif %}>{{ search_result.sub_name }}</label><span class="d-inline mx-1">-</span>
+                                <label {% if search_result.matched_pattern and user.is_superuser %}class="searched"{% endif %}>{{ search_result.sub_name }}</label><span class="d-inline mx-1">-</span>
                             {% endif %}
                             {% if search_result.example %}
                                 {% if search_result.example.note %}
@@ -226,7 +226,7 @@
                     </div>
                 {% endfor %}
             </div>
-            {% if search %}
+            {% if search and user.is_superuser %}
                 <div class="card-footer">
                     Inputs highlighted in <span class="searched">green</span> were included in this search.
                 </div>

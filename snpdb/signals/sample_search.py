@@ -1,5 +1,5 @@
 from snpdb.models import Sample
-from snpdb.search2 import search_receiver, SearchInputInstance, HAS_ALPHA_PATTERN, SearchExample
+from snpdb.search import search_receiver, SearchInputInstance, HAS_ALPHA_PATTERN, SearchExample
 
 
 @search_receiver(
