@@ -29,7 +29,6 @@ class Command(BaseCommand):
             variant_qs = variant_qs.filter(end__isnull=True)
         variant_qs.update(end=Subquery(variant_subquery))
 
-
     def handle(self, *args, **options):
         # We want to do this in small batches - so use the variant annotation range locks which are all approx the same
         # size (even if a big gap between IDs)
