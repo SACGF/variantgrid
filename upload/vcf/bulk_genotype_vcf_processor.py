@@ -1,7 +1,8 @@
 import csv
+import json
 import logging
 import os
-from typing import Optional, Set
+from typing import Optional, Set, List, Dict
 
 import cyvcf2
 import numpy as np
@@ -9,7 +10,7 @@ from django.conf import settings
 
 from library.django_utils import thread_safe_unique_together_get_or_create
 from library.django_utils.django_file_utils import get_import_processing_filename
-from library.genomics.vcf_utils import VCFConstant
+from library.genomics.vcf_utils import VCFConstant, vcf_get_ref_alt_end
 from library.git import Git
 from library.utils.database_utils import postgres_arrays
 from library.utils import double_quote
@@ -44,7 +45,8 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
     # v18. Handle Mixed diploid/haploid calls e.g. male chrX GT=1 - see https://github.com/brentp/cyvcf2/issues/227
     # v19. Go back to using CyVCF code as of version >= 0.30.14
     # v20. Split into common/uncommon genotype collections
-    VCF_IMPORTER_VERSION = 20  # Change this if you make a major change to the code.
+    # v21. Support CNV, store unknown format/info fields
+    VCF_IMPORTER_VERSION = 21  # Change this if you make a major change to the code.
     # Need to distinguish between no entry and 0, can't use None w/postgres command line inserts
     DEFAULT_AD_FIELD = 'AD'  # What CyVCF2 uses
     # GL = Genotype Likelihood - used by freeBayes v1.2.0: log10-scaled likelihoods of the data given the called
@@ -85,11 +87,11 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
         self.cohort_genotype_collection = cohort_genotype_collection
         self.cohort_genotype_file_id = 0
 
-        num_samples = uploaded_vcf.vcf.genotype_samples
+        self.num_samples = uploaded_vcf.vcf.genotype_samples
         # We need to sum up the ADs of decomposed (single allele per row) VCF
         # So have to store variants til finished with locus
         self.last_locus_tuple = None
-        self.locus_ad_sum = np.zeros(num_samples, dtype='i')
+        self.locus_ad_sum = np.zeros(self.num_samples, dtype='i')
         self.locus_variant_hashes = []
         self.locus_filters = []
         self.locus_cohort_genotypes = []
@@ -106,7 +108,7 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
         # These are variant IDs that won't be kept in "common" CGC regardless of frequency
         self.uncommon_variant_ids = self._get_uncommon_variant_ids()
 
-        if num_samples:
+        if self.num_samples:
             # Only need this if we have genotypes (otherwise will be NoGenotypeProcessor)
             self.get_ref_alt_allele_depth = self.get_ref_alt_allele_depth_function(self.vcf)
         self.vcf_filter_map = uploaded_vcf.vcf.get_filter_dict()
@@ -236,6 +238,20 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
                     samples_filters_str = postgres_arrays(cleaned_sample_filters)
         return samples_filters_str
 
+    @staticmethod
+    def _get_format_json(num_samples: int, variant: cyvcf2.Variant) -> List[Dict]:
+        sample_formats = [{} for _ in range(num_samples)]
+        for k in variant.FORMAT:
+            fmt = variant.format(k).tolist()
+            for i in range(num_samples):
+                val = fmt[i]
+                sample_formats[i][k] = val
+        return sample_formats
+
+    @staticmethod
+    def _get_info_json(variant: cyvcf2.Variant) -> Dict:
+        return dict(variant.INFO)
+
     def finished_locus(self):
         """ sum(AD) for this locus and add data to arrays """
 
@@ -267,7 +283,7 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
 
     def process_entry(self, variant: cyvcf2.Variant):
         # Pre-processed by vcf_filter_unknown_contigs so only recognised contigs present
-        ref, alt = self.get_ref_alt(variant)
+        ref, alt, end = vcf_get_ref_alt_end(variant)
         locus_tuple = (variant.CHROM, variant.POS, ref)
 
         # These ADs come out with empty value as -1 - that's what we want to store
@@ -293,9 +309,11 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
             if self.last_locus_tuple != locus_tuple:
                 self.finished_locus()
 
-        alt_hash = self.variant_pk_lookup.get_variant_coordinate_hash(variant.CHROM, variant.POS, ref, alt)
+        alt_hash = self.variant_pk_lookup.get_variant_coordinate_hash(variant.CHROM, variant.POS, ref, alt, end)
         alt_zygosity = [BulkGenotypeVCFProcessor.ALT_CYVCF_GT_ZYGOSITIES[i] for i in variant.gt_types]
         alt_allele_depth_str = postgres_arrays(alt_allele_depth)
+        format_json = self._get_format_json(self.num_samples, variant)
+        info_json = self._get_info_json(variant)
 
         cohort_gt = [str(variant.num_hom_ref),
                      str(variant.num_het),
@@ -307,7 +325,9 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
                      read_depth_str,
                      genotype_quality_str,
                      phred_likelihood_str,
-                     samples_filters_str]
+                     samples_filters_str,
+                     json.dumps(format_json),
+                     json.dumps(info_json)]
 
         self.locus_variant_hashes.append(alt_hash)
         self.locus_filters.append(self.convert_filters(variant.FILTER))

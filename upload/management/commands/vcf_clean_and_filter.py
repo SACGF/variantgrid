@@ -93,26 +93,6 @@ class Command(BaseCommand):
                         skipped_records[skip_reason] += 1
                         continue
 
-                # Check ref / alt bases are ok
-                if settings.VARIANT_STANDARD_BASES_ONLY:
-                    ref = columns[3]
-                    alt = columns[4]
-                    if ref_standard_bases_pattern.sub("", ref):
-                        if ref.startswith("<") and ref.endswith(">"):
-                            skip_reason = f"REF = {ref}"
-                        else:
-                            skip_reason = "non-standard bases in REF sequence"
-                        skipped_records[skip_reason] += 1
-                        continue
-
-                    if alt_standard_bases_pattern.sub("", alt):
-                        if alt.startswith("<") and alt.endswith(">"):
-                            skip_reason = f"ALT = {alt}"
-                        else:
-                            skip_reason = "non-standard bases in ALT sequence"
-                        skipped_records[skip_reason] += 1
-                        continue
-
                 # Remove filters not in header
                 filter_column = columns[6]
                 if filter_column not in QUICK_ACCEPT_FILTERS:

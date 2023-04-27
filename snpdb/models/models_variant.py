@@ -321,7 +321,7 @@ class Variant(models.Model):
     end = models.IntegerField(null=True)
 
     class Meta:
-        unique_together = ("locus", "alt")
+        unique_together = ("locus", "alt", "end")  # Possible to have eg CNV with same alt = <INS> but diff end
 
     @staticmethod
     def get_chrom_q(chrom):

@@ -51,6 +51,11 @@ def _write_sorted_values_to_vcf_file(header_lines, sorted_values, f, info_dict):
         pos = data["locus__position"]
         ref = data["locus__ref__seq"]
         alt = data["alt__seq"]
+        end = data["end"]
+
+        is_symbolic = "<" in ref or "<" in alt
+        if is_symbolic:
+            raise ValueError("TODO: Handle symbolic ref/alts")
 
         if info_dict:
             infos_list = []

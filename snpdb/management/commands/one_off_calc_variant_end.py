@@ -1,7 +1,7 @@
 import numpy as np
 from django.core.management.base import BaseCommand
-from django.db.models import OuterRef, Subquery
-from django.db.models.functions import Greatest
+from django.db.models import OuterRef, Subquery, F
+from django.db.models.functions import Abs
 
 from annotation.models import AnnotationRangeLock
 from snpdb.models import Variant
@@ -17,21 +17,25 @@ class Command(BaseCommand):
         # So steps=20 will look in a 5k range
         parser.add_argument('--steps', type=int, default=20, required=False,
                             help="Number of steps to take in between AnnotationRangeLock regions (which are ~100k)")
+        parser.add_argument('--replace', action='store_true')
         parser.add_argument('--min-variant', type=int, required=False)
 
     @staticmethod
-    def update_variants_in_range(start, end):
-        variant_subquery = Variant.objects.filter(pk=OuterRef("pk")) \
-                               .annotate(longest=Greatest("locus__ref__length", "alt__length")) \
-                               .values_list("longest")[:1]
-        Variant.objects.filter(pk__gte=start, pk__lte=end) \
-            .filter(end__isnull=True).update(end=Subquery(variant_subquery))
+    def update_variants_in_range(start, end, replace=False):
+        calc_end = F("locus__position") + Abs(F("locus__ref__length") - F("alt__length"))
+        variant_subquery = Variant.objects.filter(pk=OuterRef("pk")).annotate(calc_end=calc_end).values("calc_end")[:1]
+        variant_qs = Variant.objects.filter(pk__gte=start, pk__lte=end)
+        if not replace:
+            variant_qs = variant_qs.filter(end__isnull=True)
+        variant_qs.update(end=Subquery(variant_subquery))
+
 
     def handle(self, *args, **options):
         # We want to do this in small batches - so use the variant annotation range locks which are all approx the same
         # size (even if a big gap between IDs)
         # Variants from different builds are mixed up together - we just want the biggest one
         steps = options["steps"]
+        replace = options["replace"]
         min_variant = options["min_variant"]
 
         highest_av = AnnotationRangeLock.objects.order_by("-max_variant").first()
@@ -52,5 +56,5 @@ class Command(BaseCommand):
                 num = end - start
                 if num == 0:
                     continue
-                self.update_variants_in_range(start, end)
+                self.update_variants_in_range(start, end, replace=replace)
                 last_max = end

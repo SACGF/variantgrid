@@ -1,6 +1,7 @@
 import cyvcf2
 from django.conf import settings
 
+from library.genomics.vcf_utils import vcf_get_ref_alt_end
 from library.git import Git
 from upload.models import VCFImporter
 from upload.vcf.abstract_bulk_vcf_processor import AbstractBulkVCFProcessor
@@ -25,8 +26,8 @@ class BulkMinimalVCFProcessor(AbstractBulkVCFProcessor):
         return vcf_importer
 
     def process_entry(self, variant):
-        ref, alt = self.get_ref_alt(variant)
-        variant_hash = self.variant_pk_lookup.get_variant_coordinate_hash(variant.CHROM, variant.POS, ref, alt)
+        ref, alt, end = vcf_get_ref_alt_end(variant)
+        variant_hash = self.variant_pk_lookup.get_variant_coordinate_hash(variant.CHROM, variant.POS, ref, alt, end)
         self.variant_hashes.append(variant_hash)
         self.add_modified_imported_variant(variant, variant_hash)
         self.batch_process_check()

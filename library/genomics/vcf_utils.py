@@ -4,6 +4,7 @@ import re
 from collections import defaultdict
 from typing import Tuple
 
+import cyvcf2
 import vcf
 
 from snpdb.models import Variant
@@ -96,3 +97,23 @@ def get_variant_caller_and_version_from_vcf(filename) -> Tuple[str, str]:
                     version = version.replace('"', "")  # Strip quotes
 
     return variant_caller, version
+
+
+def vcf_get_ref_alt_end(variant: cyvcf2.Variant):
+    ref = variant.REF.strip().upper()
+    if variant.ALT:
+        alt = variant.ALT[0].strip().upper()
+    else:
+        alt = Variant.REFERENCE_ALT
+
+    svlen = variant.INFO.get('SVLEN')
+    is_symbolic = "<" in ref or "<" in alt
+    if svlen is not None:
+        if not is_symbolic:
+            raise ValueError(f"SVLEN={svlen} info field provided for non-symbolic (not eg '<x>') {ref=},{alt=}")
+        end = variant.POS + abs(svlen)
+    else:
+        if is_symbolic:
+            raise ValueError(f"SVLEN info field MUST be provided for symbolic (ie '<x>') {ref=},{alt=}")
+        end = variant.POS + abs(len(ref) - len(alt))
+    return ref, alt, end
