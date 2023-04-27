@@ -1,4 +1,11 @@
-from django.db.models import Q
+from django.contrib.auth.models import User
+from django.db.models import Q, Value, CharField, Count
+from django.db.models.functions import Concat, Lower
+from django.dispatch import receiver
+
+from annotation.models import patients_qs_for_ontology_term
+from library.preview_request import preview_extra_signal, PreviewKeyValue
+from ontology.models import OntologyTerm
 from patients.models import Patient
 from snpdb.search import search_receiver, SearchInputInstance, SearchExample
 
@@ -6,19 +13,25 @@ from snpdb.search import search_receiver, SearchInputInstance, SearchExample
 @search_receiver(
     search_type=Patient,
     example=SearchExample(
-        note="(Last Name, First Name) or Last Name or First Name",
-        examples=["Smith, Alvin"]
+        note="3 or more letters of the patient's name",
+        examples=["Smith Alvin"]
     )
 )
 def patient_search(search_input: SearchInputInstance):
-    search_string = search_input.search_string
-    parts = search_string.split(",")
-    if len(parts) == 2:
-        (last_name, first_name) = parts
-        q_last = Q(last_name__iexact=last_name.strip())
-        q_first = Q(first_name__iexact=first_name.strip())
-        patient_q = q_last & q_first
-    else:
-        patient_q = Q(last_name__iexact=search_string) | Q(first_name__iexact=search_string)
+    yield Patient.objects.annotate(
+        combined_name=Concat('first_name', Value(' '), 'last_name', output_field=CharField())
+    ).filter(search_input.q_words('combined_name')).order_by(Lower('last_name'), Lower('first_name'))
 
-    yield Patient.filter_for_user(search_input.user).filter(patient_q)
+
+@receiver(preview_extra_signal, sender=OntologyTerm)
+def ontology_preview_patient_sample_extra(sender, user: User, obj: OntologyTerm, **kwargs):
+    if not Patient.preview_enabled():
+        return
+    patients_qs = patients_qs_for_ontology_term(user, obj)
+    data = patients_qs.aggregate(num_patients=Count("id", distinct=True), num_samples=Count("sample", distinct=True))
+    extras = []
+    if num_patients := data.get("num_patients"):
+        extras.append(PreviewKeyValue("Patient count", num_patients))
+        if num_samples := data.get("num_samples"):
+            extras.append(PreviewKeyValue("with Sample count", num_samples))
+    return extras

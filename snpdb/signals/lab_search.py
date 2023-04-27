@@ -1,17 +1,14 @@
 
 from snpdb.models import Lab
-from snpdb.search import search_receiver, SearchInputInstance, SearchExample
+from snpdb.search import search_receiver, SearchInputInstance, SearchExample, HAS_3_ALPHA_MIN
 import re
-
-
-MIN_3_ALPHA = re.compile(r"[a-zA-Z]{3,}")
 
 
 @search_receiver(
     search_type=Lab,
-    pattern=MIN_3_ALPHA,
+    pattern=HAS_3_ALPHA_MIN,
     example=SearchExample(
-        note="3 or more letter of the lab's name",
+        note="3 or more letters of the lab's name",
         examples=["molecular"]
     )
 )

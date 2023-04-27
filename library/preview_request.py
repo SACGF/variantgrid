@@ -1,3 +1,6 @@
+from dataclasses import field
+from datetime import datetime
+from functools import cached_property
 from typing import Optional, Union, Any, Set, List
 from attr import dataclass
 from django.db.models import Model
@@ -5,6 +8,7 @@ from django.dispatch import Signal
 from django.http import JsonResponse
 from django.urls import NoReverseMatch
 from django.utils.safestring import SafeString
+from threadlocals.threadlocals import get_current_user
 from library.log_utils import report_message
 from library.utils import pretty_label
 from variantgrid.perm_path import get_visible_url_names
@@ -13,6 +17,35 @@ preview_request_signal: Signal = Signal()
 """
 Receive (and return a PreviewData) if your module is capable of providing some tooltip previews of links
 """
+
+
+preview_extra_signal = Signal()
+"""
+Apps can receive this to return PreviewKeyValues for other app models, e.g. Classification can listen to this
+to provide Classification counts to Alleles
+"""
+
+
+@dataclass
+class PreviewKeyValue:
+    key: Optional[str] = None
+    value: Optional[Any] = None  # really we always want a value, but key is optional and want to order it first
+    important: bool = False
+
+    @property
+    def value_str(self) -> Union[str, SafeString]:
+        if isinstance(self.value, (str, SafeString)):
+            return self.value
+        elif isinstance(self.value, datetime):
+            return f"{datetime:%Y-%m-%d}"
+        else:
+            return str(self.value)
+
+    def __str__(self):
+        if self.key:
+            return f"{self.key}: {self.value}"
+        else:
+            return self.value
 
 
 class PreviewModelMixin:
@@ -59,11 +92,16 @@ class PreviewModelMixin:
             title: Optional[str] = None,
             icon: Optional[str] = None,
             summary: Optional[Union[str, SafeString]] = None,
+            summary_extra: Optional[List[PreviewKeyValue]] = None,
             internal_url: Optional[str] = None,
             external_url: Optional[str] = None,
             genome_builds: Optional[Set['GenomeBuild']] = None,
             annotation_consortium: Optional['AnnotationConsortium'] = None
     ) -> 'PreviewData':
+        if summary:
+            if not summary_extra:
+                summary_extra = []
+            summary_extra.append(PreviewKeyValue(value=summary, important=True))
 
         """
         Utility function to provide PreviewData for an instance with all the defaults
@@ -76,7 +114,7 @@ class PreviewModelMixin:
             identifier=identifier,
             title=title,
             icon=icon or self.preview_icon(),
-            summary=summary,
+            summary_extra=summary_extra,
             internal_url=internal_url,
             external_url=external_url,
             genome_builds=genome_builds,
@@ -94,7 +132,7 @@ class PreviewData:
     identifier: str
     title: Optional[str] = None
     icon: Optional[str] = None
-    summary: Optional[Union[str, SafeString]] = None
+    summary_extra: Optional[List[PreviewKeyValue]] = None
     internal_url: Optional[str] = None
     external_url: Optional[str] = None
     genome_builds: Optional[Set['GenomeBuild']] = None
@@ -108,7 +146,7 @@ class PreviewData:
             identifier: Optional[str] = None,
             title: Optional[str] = None,
             icon: Optional[str] = None,
-            summary: Optional[Union[str, SafeString]] = None,
+            summary_extra: Optional[List[PreviewKeyValue]] = None,
             internal_url: Optional[str] = None,
             external_url: Optional[str] = None,
             genome_builds: Optional[Set['GenomeBuild']] = None,
@@ -124,7 +162,9 @@ class PreviewData:
             if hasattr(obj, "pk") and isinstance(obj.pk, str):
                 identifier = obj.pk
                 if title is None:
-                    title = str(obj)
+                    test_title = str(obj)
+                    if test_title != identifier:
+                        title = test_title
             else:
                 identifier = str(obj)
 
@@ -143,19 +183,46 @@ class PreviewData:
         if annotation_consortium is None and hasattr(obj, "annotation_consortium"):
             annotation_consortium = obj.annotation_consortium
 
+        if isinstance(annotation_consortium, str):
+            from genes.models_enums import AnnotationConsortium
+            annotation_consortium = AnnotationConsortium(annotation_consortium)
+
         return PreviewData(
             obj=obj,
             category=category,
             icon=icon,
             identifier=identifier,
             title=title,
-            summary=summary,
+            summary_extra=summary_extra,
             internal_url=internal_url,
             external_url=external_url,
             genome_builds=genome_builds,
             annotation_consortium=annotation_consortium
         )
 
+    @cached_property
+    def summary_all(self):
+        return (self.summary_extra or []) + self._summary_external()
+
+    def _summary_external(self):
+        external_extra = []
+        if obj := self.obj:
+            # TODO getting current user isn't great, maybe PreviewData should have a reference to the user
+            user = get_current_user()
+            for caller, response in preview_extra_signal.send_robust(sender=obj.__class__, user=user, obj=obj):
+                if response:
+                    if isinstance(response, Exception):
+                        report_message("Error during preview", 'error',
+                                       extra_data={"target": str(response), "caller": str(caller)})
+                    else:
+                        external_extra.extend(response)
+        return external_extra
+
+    @property
+    def summary(self):
+        if extra := self.summary_all:
+            return ", ".join(str(kv) for kv in extra)
+        return None
 
     def as_json(self):
         summary = self.summary

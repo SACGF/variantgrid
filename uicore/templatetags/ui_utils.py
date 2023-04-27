@@ -12,7 +12,7 @@ from django.template.base import FilterExpression, kwarg_re
 from django.utils import html
 from django.utils.safestring import SafeString
 
-from library.utils import diff_text
+from library.utils import diff_text, html_id_safe
 from snpdb.admin_utils import get_admin_url
 from variantgrid.perm_path import get_visible_url_names
 
@@ -594,3 +594,8 @@ def value_with_icon(value: Optional[Any] = None, help: Optional[str] = None, ico
 @register.filter(name='separator')
 def separator(items: Iterable[Any] = None, separator: str = ','):
     return SafeString(separator.join(html.escape(str(x)) for x in items))
+
+
+@register.filter(name='id_safe')
+def id_safe(id: str):
+    return html_id_safe(id)

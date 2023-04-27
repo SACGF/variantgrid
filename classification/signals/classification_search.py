@@ -3,13 +3,20 @@ from functools import reduce
 from typing import Optional
 
 from django.conf import settings
+from django.contrib.auth.models import User
 from django.db.models import Q
+from django.dispatch import receiver
 from pyhgvs import HGVSName, InvalidHGVSName
+from threadlocals.threadlocals import get_current_user
 
 from annotation.models import VariantAnnotationVersion
-from classification.models import Classification, ClassificationModification
-from snpdb.models import Lab, Organization
+from classification.models import Classification, ClassificationModification, ImportedAlleleInfo
+from library.preview_request import preview_extra_signal, PreviewKeyValue
+from ontology.models import OntologyTerm
+from snpdb.genome_build_manager import GenomeBuildManager
+from snpdb.models import Lab, Organization, Allele
 from snpdb.search import search_receiver, SearchInputInstance, SearchExample
+from snpdb.user_settings_manager import UserSettingsManager
 
 
 @search_receiver(
@@ -85,3 +92,25 @@ def classification_search(search_input: SearchInputInstance):
     # convert from modifications back to Classification so absolute_url returns the editable link
     yield Classification.objects.filter(Q(pk__in=cm_ids) | Q(pk__in=cm_source_ids))
 
+
+@receiver(preview_extra_signal, sender=Allele)
+def allele_preview_classifications_extra(sender, user: User, obj: Allele, **kwargs):
+    cms = ClassificationModification.latest_for_user(user=user, allele=obj)
+    count = cms.count()
+    extras = [PreviewKeyValue("Classification Count", count)]
+    if count:
+        genome_build = GenomeBuildManager.get_current_genome_build()
+        column = ClassificationModification.column_name_for_build(genome_build)
+        if c_hgvs := sorted(c_hgvs for c_hgvs in cms.order_by(column).values_list(column, flat=True).distinct().all() if c_hgvs):
+            for hgvs in c_hgvs:
+                extras.append(PreviewKeyValue(genome_build.name, hgvs, important=True))
+
+    return extras
+
+
+@receiver(preview_extra_signal, sender=OntologyTerm)
+def ontology_preview_classifications_extra(sender, user: User, obj: OntologyTerm, **kwargs):
+    terms = [{"term_id": obj.pk}]
+    qs = Classification.filter_for_user(user).filter(condition_resolution__resolved_terms__contains=terms)
+    if num_classifications := qs.count():
+        return [PreviewKeyValue("Classification count", num_classifications)]

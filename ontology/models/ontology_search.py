@@ -1,8 +1,12 @@
 from typing import List, Optional
+
+from django.db.models.functions import Lower
+
 from genes.models import GeneSymbol
+from library.enums.log_level import LogLevel
 from ontology.models import OntologyTerm, OntologyService, OntologyTermStatus
 from snpdb.search import search_receiver, HAS_ALPHA_PATTERN, \
-    SearchInputInstance, SearchExample
+    SearchInputInstance, SearchExample, SearchMessage, HAS_3_ALPHA_MIN
 import re
 
 
@@ -21,7 +25,7 @@ ONTOLOGY_TERM_PATTERN = re.compile(r"\w+[:_]\s*.*")
 @search_receiver(
     search_type=OntologyTerm,
     pattern=ONTOLOGY_TERM_PATTERN,
-    sub_name="By ID",
+    sub_name="ID",
     example=SearchExample(
         note="Search by the term's identifier, supports MONDO, OMIM, HP",
         examples=["MONDO:0010726", "OMIM:616299", "HP:0001332"]
@@ -39,10 +43,10 @@ def ontology_search_id(search_input: SearchInputInstance):
 
 @search_receiver(
     search_type=OntologyTerm,
-    pattern=HAS_ALPHA_PATTERN,
-    sub_name="By Name",
+    pattern=HAS_3_ALPHA_MIN,
+    sub_name="Name",
     example=SearchExample(
-        note="Search by part of the term's name",
+        note="3 or more letters of the term's name",
         examples=["Rett syndrome"]
     )
 )
@@ -50,11 +54,12 @@ def ontology_search_name(search_input: SearchInputInstance):
     # search by text (but not if matches Gene Symbol - better solution would be to match but give gene symbol higher priority)
     if not GeneSymbol.objects.filter(symbol=search_input.search_string).exists():
 
+        limits = []
         for ontology_service in [OntologyService.MONDO, OntologyService.OMIM, OntologyService.HPO]:
 
             # TODO support for roman numerals interchanging with numbers
 
-            qs = OntologyTerm.objects.filter(ontology_service=ontology_service).order_by('status', 'name', 'index')
+            qs = OntologyTerm.objects.filter(ontology_service=ontology_service).order_by('status', Lower('name'), 'index')
             for word in search_input.search_words:
                 qs = qs.filter(name__icontains=word)
 
@@ -65,3 +70,10 @@ def ontology_search_name(search_input: SearchInputInstance):
             # limit results to 20 for each kind, need to give the user an overall warning that we're doing this
             for obj in qs[0:20]:
                 yield obj, validate_ontology(obj)
+
+            if count := qs.count():
+                if count > 20:
+                    limits.append(f"{ontology_service.name} returned {count} results - limiting to 20")
+
+        if limits:
+            yield SearchMessage("\n".join(limits), severity=LogLevel.INFO)

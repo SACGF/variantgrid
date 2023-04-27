@@ -5,13 +5,14 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from functools import cached_property, reduce
 from re import IGNORECASE
-from typing import List, Set, Optional, Type, Pattern, Callable, Any, Match, Union, Dict
+from typing import List, Set, Optional, Type, Pattern, Callable, Any, Match, Union, Dict, Tuple
 
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.db.models import QuerySet, Q
 from django.dispatch import Signal
 
+from library.enums.log_level import LogLevel
 from library.log_utils import report_exc_info, report_message
 from library.preview_request import PreviewModelMixin, PreviewData
 from library.utils import clean_string
@@ -21,6 +22,9 @@ from snpdb.models import UserSettings, GenomeBuild, Variant, Allele
 search_signal = Signal()
 HAS_ALPHA_PATTERN = re.compile(r"[a-zA-Z]")
 HAS_ANYTHING = re.compile(r".")
+HAS_3_ALPHA_MIN = re.compile(r"[a-zA-Z]{3,}")
+HAS_3_ANY = re.compile(r"\S{3,}")
+_SPLIT_GAPS = re.compile(r"[\s,]+")
 
 
 @dataclass(frozen=True)
@@ -38,8 +42,7 @@ class SearchInput:
 
     @property
     def search_words(self) -> List[str]:
-        words = [word.strip() for word in self.search_string.split(" ")]
-        return [word for word in words if word]
+        return [word for word in _SPLIT_GAPS.split(self.search_string) if word]
 
     def q_words(self, field_name: str = "name", test: str = "icontains") -> Q:
         """
@@ -98,8 +101,9 @@ class SearchInputInstance:
     search_input: SearchInput
     match: Match
 
-    # def matches_pattern(self, pattern: Union[str, Pattern]) -> Match:
-    #     return self.search_input.matches_pattern(pattern)
+    @property
+    def classify(self) -> bool:
+        return self.search_input.classify
 
     @cached_property
     def results(self):
@@ -129,24 +133,47 @@ class SearchInputInstance:
 
 
 @dataclass
-class SearchWarning:
+class SearchMessage:
     message: str
+    severity: LogLevel = LogLevel.WARNING
 
 
 @dataclass
-class SearchWarningForType:
-    warning: SearchWarning
+class SearchMessagesForType:
+    search_message: SearchMessage
     search_info: Any
 
     @property
+    def severity(self):
+        return self.search_message.severity
+
+    @property
     def message(self):
-        return self.warning.message
+        return self.search_message.message
 
 
 @dataclass
 class SearchResult:
     preview: PreviewData
     messages: Optional[List[str]] = None
+
+    def _preview_icon_severity(self, severity: str):
+        icon = self.preview.icon
+        if not severity:
+            return icon
+
+        # icon has a background colour built in, can replace that
+        if 'bg-' in icon:
+            return re.sub(r'bg-\w+', f'bg-{severity}', icon)
+        else:
+            return f"{icon} text-{severity}"
+
+    @property
+    def preview_icon_with_severity(self):
+        if self.messages:
+            return self._preview_icon_severity('warning')
+        else:
+            return self._preview_icon_severity('success')
 
     @property
     def search_type(self):
@@ -155,6 +182,12 @@ class SearchResult:
     @property
     def genome_builds(self):
         return self.preview.genome_builds
+
+    @property
+    def genome_build_names(self):
+        if gbs := self.preview.genome_builds:
+            return list(sorted(gbs))
+        return []
 
     @property
     def annotation_consortium(self):
@@ -199,16 +232,6 @@ class SearchResult:
         else:
             return [data.preview]
 
-    @property
-    def header_extra(self) -> List[str]:
-        extras = []
-        if ac := self.preview.annotation_consortium:
-            extras.append(ac.name)
-        if self.preview.genome_builds:
-            extras.extend((genome_build.name for genome_build in sorted(self.genome_builds)))
-        return extras
-
-
 @dataclass(frozen=True)
 class SearchExample:
     note: Optional[str] = None
@@ -224,11 +247,11 @@ class SearchResponse:
     admin_only: bool = False
     example: Optional[SearchExample] = None
     results: List[SearchResult] = field(default_factory=list)
-    warnings: List[SearchWarning] = field(default_factory=list)
+    messages: List[SearchMessage] = field(default_factory=list)
 
     @property
-    def search_warnings_with_type(self):
-        return [SearchWarningForType(warning=warning, search_info=self) for warning in self.warnings]
+    def search_messages_with_type(self):
+        return [SearchMessagesForType(search_message=message, search_info=self) for message in self.messages]
 
     @property
     def preview_category(self):
@@ -250,7 +273,8 @@ class SearchResponse:
 
     @property
     def optimized_results(self):
-        if self.results and settings.PREFER_ALLELE_LINKS and self.search_type == Variant:
+        # used to just test if self.search_type == Variant, but DJango in debug mode seems to get confused by that on dev restarts
+        if self.results and settings.PREFER_ALLELE_LINKS and self.search_type.preview_category() == "Variant":
             allele_to_variants: Dict[Allele, List[SearchResult]] = defaultdict(list)
             regular_results = list()
             for result in self.results:
@@ -286,6 +310,12 @@ class CombinedSearchResponses:
         self.search_input = search_input
         self.responses = responses
 
+    def search_counts(self) -> [Tuple[str, int]]:
+        counts = defaultdict(int)
+        for result in self.results:
+            counts[result.preview.category] += 1
+        return list(sorted([(key, value) for key, value in counts.items()], key=lambda x:x[0]))
+
     @cached_property
     def search_types(self) -> Set[str]:
         search_types_set = set()
@@ -295,19 +325,26 @@ class CombinedSearchResponses:
         return search_types_set
 
     @cached_property
-    def results(self):
-        result_list = list(itertools.chain.from_iterable([response.optimized_results for response in self.responses]))
+    def ordered_responses(self):
+        return list(sorted(self.responses, key=lambda x: x.search_type_effective.preview_category()))
+
+    @cached_property
+    def results(self) -> List[SearchResult]:
+        result_list = list(itertools.chain.from_iterable([response.optimized_results for response in self.ordered_responses]))
         # TODO, sort these
         return result_list
 
     @cached_property
-    def warnings(self):
-        warning_list = list(itertools.chain.from_iterable([response.search_warnings_with_type for response in self.responses]))
+    def messages(self):
+        message_list = list(itertools.chain.from_iterable([response.search_messages_with_type for response in self.responses]))
         # TODO, sort these
-        return warning_list
+        return message_list
 
     def single_preferred_result(self):
-        return None
+        if not self.messages and len(self.results) == 1:
+            first_result = self.results[0]
+            if not first_result.messages:
+                return first_result
 
     @property
     def summary(self) -> str:
@@ -370,13 +407,14 @@ def search_receiver(
                     for result in func(SearchInputInstance(expected_type=search_type, search_input=search_input, match=match)):
                         if result is None:
                             raise ValueError(f"Search {sender.__name__} returned None")
-                        elif isinstance(result, SearchWarning):
-                            response.warnings.append(result)
+                        elif isinstance(result, SearchMessage):
+                            response.messages.append(result)
                         else:
                             for search_result in SearchResult.convert(result):
                                 response.add_search_result(search_result)
             except Exception as e:
-                response.warnings.append(SearchWarning(str(e)))
+                # TODO, based on kind of exception, report it, or just "Something went wrong"
+                response.messages.append(SearchMessage(str(e), severity=LogLevel.ERROR))
                 print(f"Error handling search_receiver on {func}")
                 report_exc_info()
 

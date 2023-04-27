@@ -379,11 +379,13 @@ def search(request):
 
     user_settings = UserSettings.get_for_user(request.user)
 
-    search_string = ""
+    preview_mode = False
     classify = False
     if form.is_valid() and form.cleaned_data['search']:
         search_string = form.cleaned_data['search']
         classify = form.cleaned_data.get('classify')
+        if mode := form.cleaned_data.get('mode'):
+            preview_mode = mode == "preview"
 
     # always perform a "search" so we can get told what kind of searches are enabled
     # note that searching on "" doesn't actually invoke any of the other search logic
@@ -394,10 +396,10 @@ def search(request):
     details = search_results.summary
     create_event(request.user, 'search', details=details)
 
-    # don't auto load unless there is only 1 preferred result
-    if preferred_result := search_results.single_preferred_result():
-        # return redirect(preferred_result.preview.internal_url)
-        pass
+    # TODO, better managing of single search result
+    if not preview_mode:
+        if preferred_result := search_results.single_preferred_result():
+            return redirect(preferred_result.preview.internal_url)
 
     # Attempt to give hints on why nothing was found
     # for search_error, genome_builds in search_results.search_errors.items():

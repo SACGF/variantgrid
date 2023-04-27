@@ -1161,3 +1161,7 @@ function diffToggle(e) {
     diffBox.find('[data-diff-mode]').hide();
     diffBox.find(`[data-diff-mode=${mode}]`).show();
 }
+
+function isPhoneMode() {
+    return window.innerWidth < 991.98;
+}

@@ -22,7 +22,7 @@ from guardian.shortcuts import get_objects_for_user
 from library.django_utils import SortByPKMixin
 from library.guardian_utils import DjangoPermission
 from library.log_utils import log_traceback, report_event
-from library.preview_request import PreviewModelMixin
+from library.preview_request import PreviewModelMixin, PreviewKeyValue
 from patients.models import FakeData, Patient, Specimen
 from patients.models_enums import Sex
 from snpdb.models.models import Tag, LabProject
@@ -293,7 +293,11 @@ class Sample(SortByPKMixin, PreviewModelMixin, models.Model):
 
     @property
     def preview(self) -> 'PreviewData':
-        return self.preview_with(genome_build=self.vcf.genome_build)
+        return self.preview_with(
+            identifier=self.name,
+            genome_builds={self.vcf.genome_build},
+            summary_extra=[PreviewKeyValue("VCF", str(self.vcf))]
+        )
 
     @property
     def genome_build(self):

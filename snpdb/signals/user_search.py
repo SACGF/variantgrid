@@ -1,5 +1,6 @@
 from django.contrib.auth.models import User
-from django.db.models import Q
+from django.db.models import Q, Value, CharField
+from django.db.models.functions import Lower, Concat
 from snpdb.models import UserPreview
 from snpdb.search import search_receiver, SearchInputInstance, \
     HAS_ALPHA_PATTERN, SearchExample
@@ -17,13 +18,14 @@ from snpdb.search import search_receiver, SearchInputInstance, \
     )
 )
 def user_search(search_input: SearchInputInstance):
-    # TODO search for search-words across all fields (so you can search for first name last name for example)
-    for user in User.objects.filter(
-        Q(username__icontains=search_input.search_string) or
-        Q(first_name__icontains=search_input.search_string) or
-        Q(last_name__icontains=search_input.search_string) or
-        Q(email__icontains=search_input.search_string)
-    ):
+    user_combined_name_qs = User.objects.annotate(
+        combined_name=Concat('first_name',  Value(' '), 'last_name', output_field=CharField())
+    )
+    for user in user_combined_name_qs.filter(
+        search_input.q_words('username') |
+        search_input.q_words('combined_name') |
+        search_input.q_words('email')
+    ).order_by('-is_active', Lower('username')):
         messages = []
         if not user.is_active:
             messages = ["User is inactive"]

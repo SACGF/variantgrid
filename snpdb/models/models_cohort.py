@@ -23,7 +23,7 @@ from library.django_utils import SortByPKMixin
 from library.django_utils.django_partition import RelatedModelsPartitionModel
 from library.django_utils.django_postgres import PostgresRealField
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsAutoInitialSaveMixin
-from library.preview_request import PreviewModelMixin
+from library.preview_request import PreviewModelMixin, PreviewKeyValue
 from library.utils import invert_dict
 from patients.models_enums import Zygosity
 from snpdb.models.models_enums import ImportStatus
@@ -64,7 +64,10 @@ class Cohort(GuardianPermissionsAutoInitialSaveMixin, PreviewModelMixin, SortByP
 
     @property
     def preview(self) -> 'PreviewData':
-        return self.preview_with(identifier=self.name, title=f"{self.sample_count} samples")
+        return self.preview_with(
+            identifier=self.name,
+            summary_extra=[PreviewKeyValue("Sample count", self.sample_count)]
+        )
 
     @property
     def has_genotype(self):

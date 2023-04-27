@@ -17,7 +17,7 @@ from library.django_utils.django_file_system_storage import PrivateUploadStorage
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
 from library.enums.file_attachments import AttachmentFileType
 from library.enums.titles import Title
-from library.preview_request import PreviewData, PreviewModelMixin
+from library.preview_request import PreviewData, PreviewModelMixin, PreviewKeyValue
 from library.utils import calculate_age
 from patients.models_enums import NucleicAcid, Mutation, Sex, PopulationGroup
 
@@ -99,6 +99,14 @@ def patient_name(first_name, last_name):
         return f"{first_name} {last_name}"
     return last_name
 
+
+def patient_name_surname_first(first_name, last_name):
+    if not (first_name or last_name):
+        return 'Unknown Patient'
+    if first_name:
+        return f"{last_name}, {first_name}"
+    return last_name
+
 # PATIENT / SAMPLE AGES AND DATES:
 # We recommend using dates rather than storing age/deceased as age will not keep
 # up to date over time.
@@ -144,9 +152,18 @@ class Patient(GuardianPermissionsMixin, HasPhenotypeDescriptionMixin, Externally
 
     @property
     def preview(self) -> PreviewData:
+        parts = []
+        if self.sex:
+            parts.append(PreviewKeyValue(key="Sex", value=self.sex.title()))
+        if self.date_of_birth:
+            parts.append(PreviewKeyValue(key="DOB", value=self.date_of_birth))
+        if self.deceased:
+            parts.append(PreviewKeyValue(value="deceased"))
+
         return self.preview_with(
             identifier=self.external_pk or f"({self.pk})",
-            title=self.name
+            title=self.name_last_name_first,
+            summary_extra=parts
         )
 
     def can_write(self, user):
@@ -159,6 +176,10 @@ class Patient(GuardianPermissionsMixin, HasPhenotypeDescriptionMixin, Externally
     @property
     def name(self):
         return patient_name(self.first_name, self.last_name)
+
+    @property
+    def name_last_name_first(self):
+        return patient_name_surname_first(self.first_name, self.last_name)
 
     @property
     def deceased(self):
