@@ -133,10 +133,17 @@ class SearchInputInstance:
         return self.search_input.q_words(field_name=field_name, test=test)
 
 
-@dataclass
+@dataclass(frozen=True)
 class SearchMessageOverall:
     message: str
     severity: LogLevel = LogLevel.WARNING
+
+    def __lt__(self, other) -> bool:
+        return self.message < other.message
+
+    def __post_init__(self):
+        if not isinstance(self.message, str):
+            raise ValueError(f"Created a Search Message with something other than string {self.message}")
 
 
 @dataclass
@@ -163,6 +170,10 @@ class SearchResultMatchStrength(int, Enum):
 class SearchMessage:
     message: str
     severity: LogLevel = LogLevel.WARNING
+
+    def __post_init__(self):
+        if not isinstance(self.message, str):
+            raise ValueError(f"Created a Search Message with something other than string {self.message}")
 
     def __str__(self):
         return self.message
@@ -389,7 +400,7 @@ def _convert_variant_search_response_to_allele_search_response(variant_response:
     if no_allele_variants:
         for no_allele in no_allele_variants:
             no_allele.preview.category = "Allele"
-            no_allele.messages.append("This variant is not linked to an allele")
+            no_allele.messages.append(SearchMessage("This variant is not linked to an allele"))
             all_results.append(no_allele)
 
     return SearchResponse(
@@ -520,6 +531,7 @@ def search_receiver(
                 #
                 return None
 
+            overall_messages: Set[SearchMessageOverall] = set()
             response = SearchResponse(
                 search_input=search_input,
                 search_type=search_type,
@@ -537,7 +549,7 @@ def search_receiver(
                         if result is None:
                             raise ValueError(f"Search {sender.__name__} returned None")
                         elif isinstance(result, SearchMessageOverall):
-                            response.messages.append(result)
+                            overall_messages.add(result)
                         else:
 
                             # need to make sure Variable is allowed to return more results as they get halved into alleles
@@ -560,10 +572,11 @@ def search_receiver(
 
             except Exception as e:
                 # TODO, determine if the Exception type is valid for users or not
-                response.messages.append(SearchMessageOverall(str(e), severity=LogLevel.ERROR))
+                overall_messages.append(SearchMessageOverall(str(e), severity=LogLevel.ERROR))
                 print(f"Error handling search_receiver on {func}")
                 report_exc_info()
 
+            response.messages = list(sorted(overall_messages))
             if settings.PREFER_ALLELE_LINKS and response.search_type.preview_category() == "Variant":
                 response = _convert_variant_search_response_to_allele_search_response(response)
 
