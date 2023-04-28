@@ -27,7 +27,8 @@ from annotation.models.damage_enums import Polyphen2Prediction, FATHMMPrediction
 from annotation.models.models_citations import Citation, CitationFetchRequest, CitationFetchResponse
 from annotation.models.models_enums import AnnotationStatus, \
     VariantClass, ColumnAnnotationCategory, VEPPlugin, VEPCustom, ClinVarReviewStatus, VEPSkippedReason, \
-    ManualVariantEntryType, HumanProteinAtlasAbundance, EssentialGeneCRISPR, EssentialGeneCRISPR2, EssentialGeneGeneTrap
+    ManualVariantEntryType, HumanProteinAtlasAbundance, EssentialGeneCRISPR, EssentialGeneCRISPR2, \
+    EssentialGeneGeneTrap, VariantAnnotationPipelineType
 from genes.models import GeneSymbol, Gene, TranscriptVersion, Transcript, GeneAnnotationRelease
 from genes.models_enums import AnnotationConsortium
 from library.django_utils import object_is_referenced
@@ -571,7 +572,9 @@ class AnnotationRangeLock(models.Model):
 
 class AnnotationRun(TimeStampedModel):
     status = models.CharField(max_length=1, choices=AnnotationStatus.choices, default=AnnotationStatus.CREATED)
-    annotation_range_lock = models.OneToOneField(AnnotationRangeLock, null=True, on_delete=CASCADE)
+    annotation_range_lock = models.ForeignKey(AnnotationRangeLock, null=True, on_delete=CASCADE)
+    pipeline_type = models.CharField(max_length=1, choices=VariantAnnotationPipelineType.choices,
+                                     default=VariantAnnotationPipelineType.SNV)
     # task_id is used as a lock to prevent multiple Celery jobs from executing same job
     task_id = models.CharField(max_length=36, null=True)
     dump_start = models.DateTimeField(null=True)
@@ -592,6 +595,9 @@ class AnnotationRun(TimeStampedModel):
     vcf_annotated_filename = models.TextField(null=True)
     annotated_count = models.IntegerField(null=True)
     celery_task_logs = models.JSONField(null=False, default=dict)  # Key=task_id, so we keep logs from multiple runs
+
+    class Meta:
+        unique_together = ('annotation_range_lock', 'pipeline_type')
 
     @property
     def variant_annotation_version(self):

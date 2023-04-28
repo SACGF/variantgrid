@@ -65,6 +65,12 @@ class ClinGenClassification(models.TextChoices):
     DISPUTED = 'P', 'Disputed'
 
 
+class VariantAnnotationPipelineType(models.TextChoices):
+    """ We have standard long and short  """
+    SNV = "S", "Standard Short Variant"
+    CNV = "C", "CNV"
+
+
 class VariantClass(models.TextChoices):
     """ https://asia.ensembl.org/info/genome/variation/prediction/classification.html#classes """
 
