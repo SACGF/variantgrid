@@ -93,7 +93,7 @@ def omim_name_search(search_input: SearchInputInstance):
     ),
     match_strength=SearchResultMatchStrength.FUZZY_MATCH
 )
-def omim_name_search(search_input: SearchInputInstance):
+def mondo_name_search(search_input: SearchInputInstance):
     return _ontology_search_name(search_input=search_input, ontology_service=OntologyService.MONDO, preview_proxy=MONDO_PREVIEW)
 
 
