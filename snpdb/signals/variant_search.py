@@ -470,7 +470,7 @@ def search_hgvs(search_input: SearchInputInstance):
             except Variant.DoesNotExist:
                 variant_string = Variant.format_tuple(*variant_tuple)
                 variant_string_abbreviated = Variant.format_tuple(*variant_tuple, abbreviate=True)
-                search_messages.append(f'"{search_string}" resolved to "{variant_string_abbreviated}"')
+                search_messages.append(f'"{search_string}" resolved to "{variant_string_abbreviated}" from our build {genome_build}')
 
                 # manual variants
                 # results = []

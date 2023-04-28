@@ -103,7 +103,7 @@ def allele_preview_classifications_extra(sender, user: User, obj: Allele, **kwar
         column = ClassificationModification.column_name_for_build(genome_build)
         if c_hgvs := sorted(c_hgvs for c_hgvs in cms.order_by(column).values_list(column, flat=True).distinct().all() if c_hgvs):
             for hgvs in c_hgvs:
-                extras.append(PreviewKeyValue(genome_build.name, hgvs, dedicated_row=True))
+                extras.append(PreviewKeyValue(f"{genome_build.name}", hgvs, dedicated_row=True))
 
     return extras
 

@@ -163,7 +163,7 @@ class SearchResultMatchStrength(int, Enum):
 @dataclass
 class SearchResult:
     preview: PreviewData
-    messages: Optional[List[str]] = None
+    messages: List[str] = field(default_factory=list)
     sub_name: Optional[str] = None
     match_strength: SearchResultMatchStrength = None
     ignore_genome_build_mismatch: bool = False
@@ -221,10 +221,7 @@ class SearchResult:
         return None
 
     def add_message(self, message: str):
-        if self.messages is None:
-            self.messages = [message]
-        else:
-            self.messages.append(message)
+        self.messages.append(message)
 
 
 def _default_make_search_result(obj) -> Optional['SearchResult']:
@@ -313,62 +310,85 @@ class SearchResponse:
     @property
     def preview_category(self):
         # django templates don't handle {{ UserPreview.preview_category }} for some unknown reason, works for all models classes
-        return self.search_type_effective.preview_category()
+        return self.search_type.preview_category()
 
     @property
     def preview_icon(self):
-        return self.search_type_effective.preview_icon()
+        return self.search_type.preview_icon()
 
     def add_search_result(self, search_result: SearchResult):
         self.results.append(search_result)
 
-    @property
-    def search_type_effective(self) -> PreviewModelMixin:
-        if settings.PREFER_ALLELE_LINKS and self.search_type == Variant:
-            return Allele
-        return self.search_type
+    def __lt__(self, other):
+        return self.preview_category, self.sub_name or "" < other.preview_category, other.sub_name or ""
 
-    @property
-    def optimized_results(self):
-        # used to just test if self.search_type == Variant, but DJango in debug mode seems to get confused by that on dev restarts
-        if self.results and settings.PREFER_ALLELE_LINKS and self.search_type.preview_category() == "Variant":
-            allele_to_variants: Dict[Allele, List[SearchResult]] = defaultdict(list)
-            regular_results = list()
-            for result in self.results:
-                had_allele = False
-                if obj := result.preview.obj:
-                    if isinstance(obj, Variant):
-                        if allele := obj.allele:
-                            allele_to_variants[allele].append(result)
-                            had_allele = True
-                if not had_allele:
-                    regular_results.append(result)
 
-            if allele_to_variants:
-                for allele, variant_results in allele_to_variants.items():
-                    genome_builds = set().union(*[vr.preview.genome_builds for vr in variant_results if vr.preview.genome_builds])
+# consider moving this into variant_search... somehow - maybe provide a transformer in the decorator
+def _convert_variant_search_response_to_allele_search_response(variant_response: SearchResponse) -> SearchResponse:
+    """
+    We perform variant searches, but environments like to consolidate 37 and 38 variants to their alleles.
+    This method converts a SearchResponse for Variants into a SearchResponse for Alleles.
+    It will get cranky if there are variants without Alleles
+    """
+    allele_to_variants: Dict[Allele, List[SearchResult]] = defaultdict(list)
+    no_allele_variants: List[SearchResult] = []
+    allele_results: List[SearchResult] = []
+    non_variant_data: List[SearchResult] = []  # probably ManulCreateVariants etc, just call them Allele data
 
-                    all_messages = set().union(*(set(variant.messages) for variant in variant_results if variant.messages))
-                    messages = sorted(all_messages)
+    for result in variant_response.results:
+        had_allele = True
+        if obj := result.preview.obj:
+            if isinstance(obj, Variant):
+                if allele := obj.allele:
+                    allele_to_variants[allele].append(result)
+                else:
+                    no_allele_variants.append(result)
+            else:
+                non_variant_data.append(result)
+        else:
+            non_variant_data.append(result)
 
-                    strongest_match = max(variant.match_strength for variant in variant_results)
+    for allele, variant_results in allele_to_variants.items():
+        genome_builds = set().union(
+            *[vr.preview.genome_builds for vr in variant_results if vr.preview.genome_builds])
 
-                    ignore_genome_build_mismatch = any(variant.ignore_genome_build_mismatch for variant in variant_results)
+        all_messages = list(sorted(set().union(*(set(variant.messages) for variant in variant_results if variant.messages))))
+        if no_allele_variants:
+            report_message(f"Variant search returned variants not linked to allele", level='error', extra_data={"search_string": variant_response.search_input.search_string, "variant_id": no_allele_variants[0].preview.obj.pk})
 
-                    allele_preview = allele.preview
-                    allele_preview.genome_builds = genome_builds
+            # What's the user meant to be able to do with this? Better than not telling them
+            all_messages.append(SearchMessage(f"Variants not attached to an Allele were returned"))
 
-                    regular_results.append(
-                        SearchResult(
-                            preview=allele_preview,
-                            messages=messages,
-                            match_strength=strongest_match,
-                            ignore_genome_build_mismatch=ignore_genome_build_mismatch,
-                            genome_build_mismatch=self.search_input.genome_build_preferred not in genome_builds if genome_builds else False
-                        )
-                    )
-            return regular_results
-        return self.results
+        strongest_match = max(variant.match_strength for variant in variant_results)
+
+        ignore_genome_build_mismatch = any(variant.ignore_genome_build_mismatch for variant in variant_results)
+
+        allele_preview = allele.preview
+        allele_preview.genome_builds = genome_builds
+
+        allele_results.append(
+            SearchResult(
+                preview=allele_preview,
+                messages=all_messages,
+                match_strength=strongest_match,
+                ignore_genome_build_mismatch=ignore_genome_build_mismatch,
+                genome_build_mismatch=variant_response.search_input.genome_build_preferred not in genome_builds if genome_builds else False
+            )
+        )
+
+    all_results = allele_results + non_variant_data
+
+    return SearchResponse(
+        search_input=variant_response.search_input,
+        search_type=Allele,
+        matched_pattern=variant_response.matched_pattern,
+        messages=variant_response.messages,
+        example=variant_response.example,
+        sub_name=variant_response.sub_name,
+        admin_only=variant_response.admin_only,
+        results=all_results,
+        total_count=len(all_results)
+    )
 
 
 @dataclass
@@ -386,7 +406,7 @@ class CombinedSearchResponses:
 
     def __init__(self, search_input: SearchInput, responses: List[SearchResponse]):
         self.search_input = search_input
-        self.responses = responses
+        self.responses = list(sorted(responses))
 
     @cached_property
     def search_counts(self) -> List[SearchCount]:
@@ -394,7 +414,7 @@ class CombinedSearchResponses:
         for response in self.responses:
             # FIXME if the responses expected return type doesn't match a SearchResult's actual category
             # these counts all go to bunk, probably best to disallow that
-            category = response.search_type.preview_category()
+            category = response.preview_category
             sc = counts.get(category)
             if sc is None:
                 sc = SearchCount(category=category)
@@ -409,28 +429,12 @@ class CombinedSearchResponses:
         return any(sc for sc in self.search_counts if sc.excluded_results)
 
     @cached_property
-    def search_types(self) -> Set[str]:
-        search_types_set = set()
-        for response in self.responses:
-            if response.matched_pattern:
-                search_types_set.add(response.search_type.preview_category())
-        return search_types_set
-
-    @cached_property
-    def ordered_responses(self):
-        return list(sorted(self.responses, key=lambda x: x.search_type_effective.preview_category()))
-
-    @cached_property
     def results(self) -> List[SearchResult]:
-        result_list = list(itertools.chain.from_iterable([response.optimized_results for response in self.ordered_responses]))
-        # TODO, sort these
-        return result_list
+        return list(itertools.chain.from_iterable([response.results for response in self.responses]))
 
     @cached_property
     def messages(self) -> List[SearchMessagesForType]:
-        message_list = list(itertools.chain.from_iterable([response.search_messages_with_type for response in self.responses]))
-        # TODO, sort these
-        return message_list
+        return list(itertools.chain.from_iterable([response.search_messages_with_type for response in self.responses]))
 
     def single_preferred_result(self):
         if first(message for message in self.messages if message.severity == LogLevel.ERROR):
@@ -545,6 +549,9 @@ def search_receiver(
                 response.messages.append(SearchMessage(str(e), severity=LogLevel.ERROR))
                 print(f"Error handling search_receiver on {func}")
                 report_exc_info()
+
+            if settings.PREFER_ALLELE_LINKS and response.search_type.preview_category() == "Variant":
+                response = _convert_variant_search_response_to_allele_search_response(response)
 
             return response
 

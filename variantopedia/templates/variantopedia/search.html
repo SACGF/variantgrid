@@ -138,17 +138,6 @@
         </form>
 
         {% if search %}
-
-            {% comment %}
-            <p>
-                <b>Searched:</b>
-                {% if search_results.search_types %}
-                    {{ search_results.search_types_string }}.
-                {% else %}
-                    <b>error - could not recognise search pattern.</b>
-                {% endif %}
-            </p>
-            {% endcomment %}
             <div id='results' class="mt-4">
                 <div class="row">
                     {% if search_results.results %}
