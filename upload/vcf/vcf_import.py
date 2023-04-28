@@ -57,7 +57,7 @@ def set_allele_depth_format_fields(vcf: VCF, vcf_formats, vcf_source, default_al
 
     if ad is None:
         msg = f"Couldn't determine allele depth format field, source: '{vcf_source}', formats: {vcf_formats}"
-        raise ValueError(msg)
+        logging.warning(msg)
 
     vcf.allele_depth_field = ad
 

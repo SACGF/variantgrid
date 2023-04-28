@@ -178,7 +178,7 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
                 alt_depth[alt_depth == _NUMPY_INT_NAN_VALUE] = CohortGenotype.MISSING_NUMBER_VALUE
                 return ref_depth, alt_depth
             return get_ref_alt_depths
-        raise ValueError(f"Don't know how to get ref and alt allele depth for {vcf}")
+        return None
 
     @staticmethod
     def get_format_array_str(variant, field, as_type=None) -> Optional[str]:
@@ -286,13 +286,22 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
         ref, alt, end = vcf_get_ref_alt_end(variant)
         locus_tuple = (variant.CHROM, variant.POS, ref)
 
-        # These ADs come out with empty value as -1 - that's what we want to store
-        ref_allele_depth, alt_allele_depth = self.get_ref_alt_allele_depth(variant)
-        # We want empty values as 0 so that adding them is ok
-        empty_as_zero_ref_allele_depth = ref_allele_depth.copy()
-        empty_as_zero_ref_allele_depth[empty_as_zero_ref_allele_depth < 0] = 0
-        empty_as_zero_alt_allele_depth = alt_allele_depth.copy()
-        empty_as_zero_alt_allele_depth[empty_as_zero_alt_allele_depth < 0] = 0
+        if self.get_ref_alt_allele_depth:
+            # These ADs come out with empty value as -1 - that's what we want to store
+            ref_allele_depth, alt_allele_depth = self.get_ref_alt_allele_depth(variant)
+            # We want empty values as 0 so that adding them is ok
+            empty_as_zero_ref_allele_depth = ref_allele_depth.copy()
+            empty_as_zero_ref_allele_depth[empty_as_zero_ref_allele_depth < 0] = 0
+            empty_as_zero_alt_allele_depth = alt_allele_depth.copy()
+            empty_as_zero_alt_allele_depth[empty_as_zero_alt_allele_depth < 0] = 0
+            read_depth_str = self.get_format_array_str(variant, self.vcf.read_depth_field, as_type=int)
+            alt_allele_depth_str = postgres_arrays(alt_allele_depth)
+            self.locus_allele_depths.append(empty_as_zero_alt_allele_depth)
+            self.locus_ad_sum += empty_as_zero_ref_allele_depth + empty_as_zero_alt_allele_depth
+        else:
+            read_depth_str = ""
+            alt_allele_depth_str = ""
+            self.locus_allele_depths.append(np.NaN)
 
         if self.vcf.allele_frequency_field:
             allele_frequency_str = self.get_format_array_str(variant, self.vcf.allele_frequency_field, as_type=float)
@@ -300,7 +309,6 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
             # We'll calculate ourselves across locus
             allele_frequency_str = None
 
-        read_depth_str = self.get_format_array_str(variant, self.vcf.read_depth_field, as_type=int)
         genotype_quality_str = self.get_format_array_str(variant, self.vcf.genotype_quality_field, as_type=int)
         phred_likelihood_str = self.get_phred_likelihood_str(variant, variant.gt_types)
         samples_filters_str = self.get_samples_filters_str(variant)
@@ -311,7 +319,6 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
 
         alt_hash = self.variant_pk_lookup.get_variant_coordinate_hash(variant.CHROM, variant.POS, ref, alt, end)
         alt_zygosity = [BulkGenotypeVCFProcessor.ALT_CYVCF_GT_ZYGOSITIES[i] for i in variant.gt_types]
-        alt_allele_depth_str = postgres_arrays(alt_allele_depth)
         format_json = self._get_format_json(self.num_samples, variant)
         info_json = self._get_info_json(variant)
 
@@ -333,14 +340,12 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
         self.locus_filters.append(self.convert_filters(variant.FILTER))
         self.locus_cohort_genotypes.append(cohort_gt)
         self.locus_gnomad_af.append(variant.INFO.get("AF"))
-        self.locus_allele_depths.append(empty_as_zero_alt_allele_depth)
 
         if self.preprocess_vcf_import_info:
             self.add_modified_imported_variant(variant, alt_hash,
                                                miv_hash_list=self.locus_modified_imported_variant_hashes,
                                                miv_list=self.locus_modified_imported_variants)
 
-        self.locus_ad_sum += empty_as_zero_ref_allele_depth + empty_as_zero_alt_allele_depth
         self.last_read_depth_str = read_depth_str
         self.last_locus_tuple = locus_tuple
 
