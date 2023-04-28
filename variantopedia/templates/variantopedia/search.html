@@ -52,7 +52,8 @@
             text-transform: capitalize;
             font-weight: 500;
             margin-right: 4px;
-            color: #5c656d!important;
+            color: #444!important;
+            margin-top: 4px;
         }
         .extra.normal + .extra.normal {
             margin-left: 8px;
@@ -151,7 +152,7 @@
             <div id='results' class="mt-4">
                 <div class="row">
                     {% if search_results.results %}
-                        <h4 class="col-8">{% count search_results.results singular="1 Result" plural="Results" %} Found for "{{ search }}"</h4>
+                        <h4 class="col-8">{{ search_results.results|length }}{% if search_results.has_excluded_records %}*{% endif %}{% if search_results.results|length == 1 %} Result{% else %} Results{% endif %} Found for "{{ search }}"</h4>
                     {% else %}
                         <h4 class="col-8 no-value">No Results Found</h4>
                     {% endif %}
@@ -184,18 +185,18 @@
                                         class="list-group-item list-group-item-action list-group-item-okay result-{{ preview.category|id_safe }}" href="{{ preview.internal_url }}">
                                     <div class="row d-flex align-items-center" style="color:#444">
                                         <div class="col-3 text-right">
+                                            {% if single_preferred_result and single_preferred_result == search_result %}<i class="fa-solid fa-star text-success" title="This is the best result"></i>{% endif %}
                                             {% if preview.icon %}<i class="{{ search_result.preview_icon_with_severity }} mr-2" style="opacity:0.75"></i>{% endif %}
                                             <label>{{ preview.category }}</label>
                                             {% if search_result.sub_name %}<div class="text-small text-info">via {{ search_result.sub_name }} Search</div>{% endif %}
                                             {% if search_result.annotation_consortium %}
                                             <div class="text-small">
-                                                {% comment %}TODO add genome build{% endcomment %}
                                                 {{ search_result.annotation_consortium.name }}
                                             </div>
                                             {% endif %}
                                             {% if search_result.genome_build_names %}
                                                 <nomin class="d-block text-small">
-                                                    <span class="text-secondary">Matched using</span> {% for gb in search_result.genome_build_names %}{{ gb }}{% if not forloop.last %} and {% endif %}{% endfor %}
+                                                    <span class="text-secondary">{% if search_result.effective_genome_build_mismatch %}{{ 'W' | severity_icon }}{% endif %}Matched using</span> {% for gb in search_result.genome_build_names %}{{ gb }}{% if not forloop.last %} and {% endif %}{% endfor %}
                                                 </nomin>
                                             {% endif %}
                                         </div>
@@ -204,7 +205,7 @@
                                             {% if preview.title %}&nbsp;<span class="search-title">{{ preview.title }}</span>{% endif %}
                                             {% if preview.summary_all %}<nomin class="d-block text-small text-secondary extra-summary">
                                                 {% for extra in preview.summary_all %}
-                                                    <span class="extra {% if extra.important %}important d-block{% else %}normal d-inline-block{% endif %}">{% if extra.key %}<label>{{ extra.key }} </label> {% endif %}
+                                                    <span class="extra {% if extra.dedicated_row %}important d-block{% else %}normal d-inline-block{% endif %}">{% if extra.icon %}<i class="{{ extra.icon }} text-success mr-1"></i>{% endif %}{% if extra.key %}<label>{{ extra.key }} </label> {% endif %}
                                                         {{ extra.value|format_value:200 }}
                                                     </span>
                                                 {% endfor %}

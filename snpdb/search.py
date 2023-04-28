@@ -12,11 +12,12 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.db.models import QuerySet, Q
 from django.dispatch import Signal
+from more_itertools import take
 
 from library.enums.log_level import LogLevel
 from library.log_utils import report_exc_info, report_message
 from library.preview_request import PreviewModelMixin, PreviewData
-from library.utils import clean_string
+from library.utils import clean_string, first
 from snpdb.models import UserSettings, GenomeBuild, Variant, Allele
 
 
@@ -166,10 +167,20 @@ class SearchResult:
     sub_name: Optional[str] = None
     match_strength: SearchResultMatchStrength = None
     ignore_genome_build_mismatch: bool = False
+    # this is provided automatically by the search framework
+    genome_build_mismatch: Optional[bool] = None
 
     @property
-    def effective_match_strength(self):
+    def effective_match_strength(self) -> SearchResultMatchStrength:
         return self.match_strength or SearchResultMatchStrength.STRONG_MATCH
+
+    @property
+    def effective_genome_build_mismatch(self) -> bool:
+        return self.genome_build_mismatch is True and not self.ignore_genome_build_mismatch
+
+    @property
+    def is_perfectly_valid(self):
+        return not self.messages and not self.effective_genome_build_mismatch
 
     def _preview_icon_severity(self, severity: str):
         icon = self.preview.icon
@@ -296,7 +307,7 @@ class SearchResponse:
     total_count: int = 0
 
     @property
-    def search_messages_with_type(self):
+    def search_messages_with_type(self) -> List[SearchMessagesForType]:
         return [SearchMessagesForType(search_message=message, search_info=self) for message in self.messages]
 
     @property
@@ -340,11 +351,21 @@ class SearchResponse:
                     all_messages = set().union(*(set(variant.messages) for variant in variant_results if variant.messages))
                     messages = sorted(all_messages)
 
+                    strongest_match = max(variant.match_strength for variant in variant_results)
+
+                    ignore_genome_build_mismatch = any(variant.ignore_genome_build_mismatch for variant in variant_results)
+
                     allele_preview = allele.preview
                     allele_preview.genome_builds = genome_builds
 
                     regular_results.append(
-                        SearchResult(preview=allele_preview, messages=messages)
+                        SearchResult(
+                            preview=allele_preview,
+                            messages=messages,
+                            match_strength=strongest_match,
+                            ignore_genome_build_mismatch=ignore_genome_build_mismatch,
+                            genome_build_mismatch=self.search_input.genome_build_preferred not in genome_builds if genome_builds else False
+                        )
                     )
             return regular_results
         return self.results
@@ -367,6 +388,7 @@ class CombinedSearchResponses:
         self.search_input = search_input
         self.responses = responses
 
+    @cached_property
     def search_counts(self) -> List[SearchCount]:
         counts: Dict[str, SearchCount] = {}
         for response in self.responses:
@@ -381,6 +403,10 @@ class CombinedSearchResponses:
             sc.total += response.total_count
 
         return list(sorted((sc for sc in counts.values() if sc.resolved), key=lambda x: x.category))
+
+    @property
+    def has_excluded_records(self):
+        return any(sc for sc in self.search_counts if sc.excluded_results)
 
     @cached_property
     def search_types(self) -> Set[str]:
@@ -401,16 +427,29 @@ class CombinedSearchResponses:
         return result_list
 
     @cached_property
-    def messages(self):
+    def messages(self) -> List[SearchMessagesForType]:
         message_list = list(itertools.chain.from_iterable([response.search_messages_with_type for response in self.responses]))
         # TODO, sort these
         return message_list
 
     def single_preferred_result(self):
-        if not self.messages and len(self.results) == 1:
+        if first(message for message in self.messages if message.severity == LogLevel.ERROR):
+            return None
+
+        # If we have ID Matches, ignore other matches for auto-jumping to results
+        if id_matches := take(2, (result for result in self.results if result.match_strength == SearchResultMatchStrength.ID_MATCH)):
+            if len(id_matches) == 2:
+                return None
+            if id_matches[0].is_perfectly_valid:
+                return id_matches[0]
+
+        # alternatively if we only have 1 match, return it
+        elif len(self.results) == 1:
             first_result = self.results[0]
-            if not first_result.messages:
+            if first_result.is_perfectly_valid:
                 return first_result
+
+        # FIXME support for variant results across genome builds that haven't been merged into alleles
 
     @property
     def summary(self) -> str:
@@ -494,6 +533,8 @@ def search_receiver(
                                         search_result.match_strength = match_strength
                                     if sub_name:
                                         search_result.sub_name = sub_name
+                                    if search_result.genome_builds and search_input.genome_build_preferred not in search_result.genome_builds:
+                                        search_result.genome_build_mismatch = True
 
                                     response.add_search_result(search_result)
                                     limit -= 1

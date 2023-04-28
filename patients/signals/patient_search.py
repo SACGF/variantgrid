@@ -7,6 +7,7 @@ from annotation.models import patients_qs_for_ontology_term
 from library.preview_request import preview_extra_signal, PreviewKeyValue
 from ontology.models import OntologyTerm
 from patients.models import Patient
+from snpdb.models import Sample
 from snpdb.search import search_receiver, SearchInputInstance, SearchExample
 
 
@@ -31,7 +32,7 @@ def ontology_preview_patient_sample_extra(sender, user: User, obj: OntologyTerm,
     data = patients_qs.aggregate(num_patients=Count("id", distinct=True), num_samples=Count("sample", distinct=True))
     extras = []
     if num_patients := data.get("num_patients"):
-        extras.append(PreviewKeyValue("Patient count", num_patients))
+        extras.append(PreviewKeyValue.count(Patient, num_patients))
         if num_samples := data.get("num_samples"):
-            extras.append(PreviewKeyValue("with Sample count", num_samples))
+            extras.append(PreviewKeyValue.count(Sample, num_samples))
     return extras

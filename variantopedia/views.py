@@ -396,10 +396,9 @@ def search(request):
     details = search_results.summary
     create_event(request.user, 'search', details=details)
 
-    # TODO, better managing of single search result
-    if not preview_mode:
-        if preferred_result := search_results.single_preferred_result():
-            return redirect(preferred_result.preview.internal_url)
+    single_preferred_result = search_results.single_preferred_result()
+    if not preview_mode and single_preferred_result:
+        return redirect(single_preferred_result.preview.internal_url)
 
     # Attempt to give hints on why nothing was found
     # for search_error, genome_builds in search_results.search_errors.items():
@@ -417,6 +416,7 @@ def search(request):
         "form": form,
         "search": search_string,
         "search_results": search_results,
+        "single_preferred_result": single_preferred_result
         # "external_codes": external_codes,
     }
     return render(request, "variantopedia/search.html", context)

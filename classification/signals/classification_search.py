@@ -97,13 +97,13 @@ def classification_search(search_input: SearchInputInstance):
 def allele_preview_classifications_extra(sender, user: User, obj: Allele, **kwargs):
     cms = ClassificationModification.latest_for_user(user=user, allele=obj)
     count = cms.count()
-    extras = [PreviewKeyValue("Classification Count", count)]
+    extras = [PreviewKeyValue.count(Classification, count)]
     if count:
         genome_build = GenomeBuildManager.get_current_genome_build()
         column = ClassificationModification.column_name_for_build(genome_build)
         if c_hgvs := sorted(c_hgvs for c_hgvs in cms.order_by(column).values_list(column, flat=True).distinct().all() if c_hgvs):
             for hgvs in c_hgvs:
-                extras.append(PreviewKeyValue(genome_build.name, hgvs, important=True))
+                extras.append(PreviewKeyValue(genome_build.name, hgvs, dedicated_row=True))
 
     return extras
 
@@ -113,4 +113,4 @@ def ontology_preview_classifications_extra(sender, user: User, obj: OntologyTerm
     terms = [{"term_id": obj.pk}]
     qs = Classification.filter_for_user(user).filter(condition_resolution__resolved_terms__contains=terms)
     if num_classifications := qs.count():
-        return [PreviewKeyValue("Classification count", num_classifications)]
+        return [PreviewKeyValue.count(Classification, num_classifications)]

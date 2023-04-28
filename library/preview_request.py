@@ -31,7 +31,21 @@ to provide Classification counts to Alleles
 class PreviewKeyValue:
     key: Optional[str] = None
     value: Optional[Any] = None  # really we always want a value, but key is optional and want to order it first
-    important: bool = False
+    dedicated_row: bool = False
+    icon: Optional[str] = None
+    """
+    Highlights this bit of data as being linked to another data set (as opposed to a KeyValue that every record
+    of this type would hve. Worth highlighting)
+    """
+
+    @staticmethod
+    def count(preview_coordinator: 'PreviewModelMixin', amount: int) -> Optional['PreviewKeyValue']:
+        if preview_coordinator.preview_enabled():
+            return PreviewKeyValue(
+                key=f"{preview_coordinator.preview_category()} Count",
+                value=amount,
+                icon=preview_coordinator.preview_icon()
+            )
 
     @property
     def value_str(self) -> Union[str, SafeString]:
@@ -125,7 +139,7 @@ class PreviewModelMixin:
         if summary:
             if not summary_extra:
                 summary_extra = []
-            summary_extra.append(PreviewKeyValue(value=summary, important=True))
+            summary_extra.append(PreviewKeyValue(value=summary, dedicated_row=True))
 
         """
         Utility function to provide PreviewData for an instance with all the defaults

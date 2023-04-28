@@ -64,9 +64,12 @@ class Cohort(GuardianPermissionsAutoInitialSaveMixin, PreviewModelMixin, SortByP
 
     @property
     def preview(self) -> 'PreviewData':
+        extras = []
+        if samples := PreviewKeyValue.count(Sample, self.sample_count):
+            extras.append(samples)
         return self.preview_with(
             identifier=self.name,
-            summary_extra=[PreviewKeyValue("Sample count", self.sample_count)]
+            summary_extra=extras
         )
 
     @property
