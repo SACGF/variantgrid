@@ -2,7 +2,7 @@ from abc import ABC
 from dataclasses import field
 from datetime import datetime
 from functools import cached_property
-from typing import Optional, Union, Any, Set, List, Callable
+from typing import Optional, Union, Any, Set, List, Callable, Type
 from attr import dataclass
 from django.db.models import Model
 from django.dispatch import Signal
@@ -162,6 +162,9 @@ class PreviewModelMixin:
     @property
     def preview(self) -> 'PreviewData':
         return self.preview_with()
+
+
+PreviewCoordinator = Union[Type[PreviewModelMixin], PreviewProxyModel]
 
 
 @dataclass

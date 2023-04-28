@@ -20,7 +20,7 @@ from model_utils.managers import InheritanceManager
 from library.django_utils import thread_safe_unique_together_get_or_create
 from library.django_utils.avatar import SpaceThemedAvatarProvider
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsAutoInitialSaveMixin
-from library.preview_request import PreviewData, PreviewModelMixin
+from library.preview_request import PreviewData, PreviewModelMixin, PreviewKeyValue
 from library.utils import string_deterministic_hash, rgb_invert
 from snpdb.models.models import Tag, Lab, Organization
 from snpdb.models.models_columns import CustomColumnsCollection, CustomColumn
@@ -256,13 +256,20 @@ class UserPreview(PreviewModelMixin):
             else:
                 title = str(labs[0])
 
+        extras = []
+        if last_logged_in := self.user.last_login:
+            extras.append(PreviewKeyValue("Last Login", last_logged_in))
+        else:
+            extras.append(PreviewKeyValue(value="Has not logged in"))
+
         return PreviewData.for_object(
             obj=self.user,
             category="User",
             icon=UserPreview.preview_icon(),
             identifier=self.avatar.preferred_label,
             title=title,
-            internal_url=reverse('view_user', kwargs={"pk": self.user.pk})
+            internal_url=reverse('view_user', kwargs={"pk": self.user.pk}),
+            summary_extra=extras
         )
 
 

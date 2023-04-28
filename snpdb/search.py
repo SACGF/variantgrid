@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from functools import cached_property, reduce
 from re import IGNORECASE
-from typing import List, Set, Optional, Type, Pattern, Callable, Any, Match, Union, Dict, Tuple
+from typing import List, Set, Optional, Type, Pattern, Callable, Any, Match, Union, Dict
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -16,7 +16,7 @@ from more_itertools import take
 
 from library.enums.log_level import LogLevel
 from library.log_utils import report_exc_info, report_message
-from library.preview_request import PreviewModelMixin, PreviewData
+from library.preview_request import PreviewCoordinator, PreviewData
 from library.utils import clean_string, first
 from snpdb.models import UserSettings, GenomeBuild, Variant, Allele
 
@@ -71,8 +71,7 @@ class SearchInput:
                 if isinstance(response, SearchResponse):
                     valid_responses.append(response)
                 else:
-                    # TODO see if there's a more useful way we can pass exceptions?
-                    print(caller)
+                    # note this doesn't happen as exceptions during search are handled by the search_receiver
                     report_message("Error during search", 'error', extra_data={"target": str(response), "caller": str(caller)})
 
         return valid_responses
@@ -294,7 +293,7 @@ class SearchExample:
 @dataclass
 class SearchResponse:
     search_input: SearchInput
-    search_type: PreviewModelMixin
+    search_type: PreviewCoordinator
     matched_pattern: bool = False
     sub_name: Optional[str] = None
     admin_only: bool = False
@@ -333,10 +332,9 @@ def _convert_variant_search_response_to_allele_search_response(variant_response:
     allele_to_variants: Dict[Allele, List[SearchResult]] = defaultdict(list)
     no_allele_variants: List[SearchResult] = []
     allele_results: List[SearchResult] = []
-    non_variant_data: List[SearchResult] = []  # probably ManulCreateVariants etc, just call them Allele data
+    non_variant_data: List[SearchResult] = []  # probably ManulCreateVariants etc., just call them Allele data
 
     for result in variant_response.results:
-        had_allele = True
         if obj := result.preview.obj:
             if isinstance(obj, Variant):
                 if allele := obj.allele:
@@ -353,11 +351,6 @@ def _convert_variant_search_response_to_allele_search_response(variant_response:
             *[vr.preview.genome_builds for vr in variant_results if vr.preview.genome_builds])
 
         all_messages = list(sorted(set().union(*(set(variant.messages) for variant in variant_results if variant.messages))))
-        if no_allele_variants:
-            report_message(f"Variant search returned variants not linked to allele", level='error', extra_data={"search_string": variant_response.search_input.search_string, "variant_id": no_allele_variants[0].preview.obj.pk})
-
-            # What's the user meant to be able to do with this? Better than not telling them
-            all_messages.append(SearchMessage(f"Variants not attached to an Allele were returned"))
 
         strongest_match = max(variant.match_strength for variant in variant_results)
 
@@ -370,6 +363,7 @@ def _convert_variant_search_response_to_allele_search_response(variant_response:
             SearchResult(
                 preview=allele_preview,
                 messages=all_messages,
+                sub_name=variant_response.sub_name,
                 match_strength=strongest_match,
                 ignore_genome_build_mismatch=ignore_genome_build_mismatch,
                 genome_build_mismatch=variant_response.search_input.genome_build_preferred not in genome_builds if genome_builds else False
@@ -378,11 +372,18 @@ def _convert_variant_search_response_to_allele_search_response(variant_response:
 
     all_results = allele_results + non_variant_data
 
+    top_level_messages = variant_response.messages or []
+    if no_allele_variants:
+        for no_allele in no_allele_variants:
+            no_allele.preview.category = "Allele"
+            no_allele.messages.append("This variant is not linked to an allele")
+            all_results.append(no_allele)
+
     return SearchResponse(
         search_input=variant_response.search_input,
         search_type=Allele,
         matched_pattern=variant_response.matched_pattern,
-        messages=variant_response.messages,
+        messages=top_level_messages,
         example=variant_response.example,
         sub_name=variant_response.sub_name,
         admin_only=variant_response.admin_only,
@@ -477,7 +478,7 @@ def search_data(user: User, search_string: str, classify: bool = False) -> Combi
 
 
 def search_receiver(
-        search_type: Optional[Type[PreviewModelMixin]],
+        search_type: Optional[PreviewCoordinator],
         pattern: Pattern = HAS_ANYTHING,
         admin_only: bool = False,
         sub_name: Optional[str] = None,
