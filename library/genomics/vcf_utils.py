@@ -106,14 +106,15 @@ def vcf_get_ref_alt_end(variant: cyvcf2.Variant):
     else:
         alt = Variant.REFERENCE_ALT
 
-    svlen = variant.INFO.get('SVLEN')
     is_symbolic = "<" in ref or "<" in alt
-    if svlen is not None:
-        if not is_symbolic:
-            raise ValueError(f"SVLEN={svlen} info field provided for non-symbolic (not eg '<x>') {ref=},{alt=}")
-        end = variant.POS + abs(svlen)
+    if is_symbolic:
+        # Need to provide END or SVLEN
+        if end_info := variant.INFO.get('END'):
+            end = end_info
+        elif svlen_info := variant.INFO.get('SVLEN'):
+            end = variant.POS + abs(svlen_info)
+        else:
+            raise ValueError(f"SVLEN or END info field MUST be provided for symbolic (ie '<x>') {ref=},{alt=}")
     else:
-        if is_symbolic:
-            raise ValueError(f"SVLEN info field MUST be provided for symbolic (ie '<x>') {ref=},{alt=}")
         end = variant.POS + abs(len(ref) - len(alt))
     return ref, alt, end
