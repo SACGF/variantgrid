@@ -1,7 +1,8 @@
+from abc import ABC
 from dataclasses import field
 from datetime import datetime
 from functools import cached_property
-from typing import Optional, Union, Any, Set, List
+from typing import Optional, Union, Any, Set, List, Callable
 from attr import dataclass
 from django.db.models import Model
 from django.dispatch import Signal
@@ -48,6 +49,26 @@ class PreviewKeyValue:
             return self.value
 
 
+class PreviewProxyModel:
+
+    def __init__(self, preview_category: str, preview_icon: str, enabled_check: Optional[Callable[[], bool]] = None):
+        self._preview_category = preview_category
+        self._preview_icon = preview_icon
+        self._enabled_check = enabled_check
+
+    def preview_category(self):
+        return self._preview_category
+
+    def preview_icon(self):
+        return self._preview_icon
+
+    def preview_enabled(self):
+        if self._enabled_check:
+            return self._enabled_check()
+        else:
+            return True
+
+
 class PreviewModelMixin:
     """
     Having models implement this class makes it easier for search results to give summaries, PreviewData
@@ -59,7 +80,10 @@ class PreviewModelMixin:
         """
         Provide an English language name for this data
         """
-        return pretty_label(cls._meta.verbose_name)
+        if hasattr(cls, '_meta'):
+            return pretty_label(cls._meta.verbose_name)
+        else:
+            return pretty_label(cls.__name__)
 
     @classmethod
     def preview_if_url_visible(cls) -> Optional[str]:

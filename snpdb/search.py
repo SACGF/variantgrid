@@ -3,6 +3,7 @@ import re
 import itertools
 from collections import defaultdict
 from dataclasses import dataclass, field
+from enum import Enum
 from functools import cached_property, reduce
 from re import IGNORECASE
 from typing import List, Set, Optional, Type, Pattern, Callable, Any, Match, Union, Dict, Tuple
@@ -152,10 +153,23 @@ class SearchMessagesForType:
         return self.search_message.message
 
 
+class SearchResultMatchStrength(int, Enum):
+    FUZZY_MATCH = 1
+    STRONG_MATCH = 2
+    ID_MATCH = 3
+
+
 @dataclass
 class SearchResult:
     preview: PreviewData
     messages: Optional[List[str]] = None
+    sub_name: Optional[str] = None
+    match_strength: SearchResultMatchStrength = None
+    ignore_genome_build_mismatch: bool = False
+
+    @property
+    def effective_match_strength(self):
+        return self.match_strength or SearchResultMatchStrength.STRONG_MATCH
 
     def _preview_icon_severity(self, severity: str):
         icon = self.preview.icon
@@ -201,36 +215,67 @@ class SearchResult:
         else:
             self.messages.append(message)
 
-    @staticmethod
-    def convert(data: Any) -> List['SearchResult']:
-        if isinstance(data, SearchResult):
-            return [data]
-        if isinstance(data, (tuple, list)):
-            data = list(data)
-            messages = []
-            for entry in data[1:]:
-                if isinstance(entry, list):
-                    messages.extend(entry)
-                elif isinstance(entry, str):
-                    messages.append(entry)
-                elif entry is None:
-                    pass
-                else:
-                    raise ValueError(f"Not sure what to do with search result extra {entry}")
-            previews = SearchResult._convert_to_previews(data[0])
-            return [SearchResult(preview=preview, messages=messages) for preview in previews]
-        else:
-            previews = SearchResult._convert_to_previews(data)
-            return [SearchResult(preview=preview) for preview in previews]
+
+def _default_make_search_result(obj) -> Optional['SearchResult']:
+    if isinstance(obj, SearchResult):
+        return obj
+    else:
+        return SearchResult(preview=obj.preview)
+
+
+@dataclass
+class _SearchResultFactory:
+    source: Any
+    converter: Callable[[Any], SearchResult]
+    extra_messages: List[str]
 
     @staticmethod
-    def _convert_to_previews(data: Any) -> List[PreviewData]:
-        if isinstance(data, PreviewData):
-            return [data]
-        elif isinstance(data, QuerySet):
-            return list(obj.preview for obj in data)
+    def convert(output: Any):
+        source: Any
+        factory: Callable[[Any], SearchResult] = _default_make_search_result
+        extra_messages: List[str] = []
+        if isinstance(output, (tuple, list)):
+            source = output[0]
+            for extra in output[1:]:
+                if isinstance(extra, str):
+                    extra_messages.append(extra)
+                elif isinstance(extra, list):
+                    extra_messages += extra
+                elif isinstance(extra, Callable):
+                    factory = extra
+                else:
+                    raise ValueError(f"Search method yielded extra {extra}, expected str, list[str] or callable")
         else:
-            return [data.preview]
+            source = output
+
+        return _SearchResultFactory(source=source, converter=factory, extra_messages=extra_messages)
+
+    @property
+    def _iterable(self):
+        if isinstance(self.source, (list, QuerySet)):
+            return self.source
+        else:
+            return [self.source]
+
+    def __len__(self) -> int:
+        if isinstance(self.source, list):
+            return len(self.source)
+        elif isinstance(self.source, QuerySet):
+            return self.source.count()
+        else:
+            return 1
+
+    def iterate(self, limit: int = 20):
+        for obj in self._iterable[:limit]:
+            search_result = self.converter(obj)
+            if search_result is None:
+                continue
+            elif not isinstance(search_result, SearchResult):
+                raise ValueError(f"search result factory returned {search_result} instead of a SearchResult")
+            if self.extra_messages:
+                search_result.messages += self.extra_messages
+            yield search_result
+
 
 @dataclass(frozen=True)
 class SearchExample:
@@ -248,6 +293,7 @@ class SearchResponse:
     example: Optional[SearchExample] = None
     results: List[SearchResult] = field(default_factory=list)
     messages: List[SearchMessage] = field(default_factory=list)
+    total_count: int = 0
 
     @property
     def search_messages_with_type(self):
@@ -304,17 +350,37 @@ class SearchResponse:
         return self.results
 
 
+@dataclass
+class SearchCount:
+    category: str
+    resolved: int = 0
+    total: int = 0
+
+    @property
+    def excluded_results(self) -> bool:
+        return self.total > self.resolved
+
+
 class CombinedSearchResponses:
 
     def __init__(self, search_input: SearchInput, responses: List[SearchResponse]):
         self.search_input = search_input
         self.responses = responses
 
-    def search_counts(self) -> [Tuple[str, int]]:
-        counts = defaultdict(int)
-        for result in self.results:
-            counts[result.preview.category] += 1
-        return list(sorted([(key, value) for key, value in counts.items()], key=lambda x:x[0]))
+    def search_counts(self) -> List[SearchCount]:
+        counts: Dict[str, SearchCount] = {}
+        for response in self.responses:
+            # FIXME if the responses expected return type doesn't match a SearchResult's actual category
+            # these counts all go to bunk, probably best to disallow that
+            category = response.search_type.preview_category()
+            sc = counts.get(category)
+            if sc is None:
+                sc = SearchCount(category=category)
+                counts[category] = sc
+            sc.resolved += len(response.results)
+            sc.total += response.total_count
+
+        return list(sorted((sc for sc in counts.values() if sc.resolved), key=lambda x: x.category))
 
     @cached_property
     def search_types(self) -> Set[str]:
@@ -366,12 +432,14 @@ def search_data(user: User, search_string: str, classify: bool = False) -> Combi
     responses = search_input.search()
     return CombinedSearchResponses(search_input, responses)
 
+
 def search_receiver(
-        search_type: Optional[Type[PreviewModelMixin]] = None,
+        search_type: Optional[Type[PreviewModelMixin]],
         pattern: Pattern = HAS_ANYTHING,
         admin_only: bool = False,
         sub_name: Optional[str] = None,
-        example: Optional[SearchExample] = None
+        example: Optional[SearchExample] = None,
+        match_strength: Optional[SearchResultMatchStrength] = SearchResultMatchStrength.STRONG_MATCH
     ) -> Callable[[Callable], Callable[[SearchInput], SearchResponse]]:
     """
     Wrap around a method that takes a SearchInputInstance and yields QuerySets and/or individual objects, optionally as part of a tuple
@@ -382,6 +450,7 @@ def search_receiver(
     :param admin_only: Is this search for admin users only, won't be invoked or displayed for non admins.
     :param sub_name: Are there multiple search implementations for the same search_type, if so give them a sub_name
     :param example: An example (to be presented to the user) of how to use this search
+    :param match_strength: Provide an overall match strength to be used if the individual search results don't set it
     :return: A wrapped call that will obey the above (e.g. preview_enabled(), admin_only) and return a SearchResponse
     """
     def _decorator(func):
@@ -404,16 +473,34 @@ def search_receiver(
             try:
                 if match := pattern.search(search_input.search_string):
                     response.matched_pattern = True
+                    # as Variants get merged into Alleles, we want to avoid limiting them (except under extreme conditions)
+                    limit = 1000 if search_type.preview_category() == "Variant" else 50
+                    total_count = 0
                     for result in func(SearchInputInstance(expected_type=search_type, search_input=search_input, match=match)):
                         if result is None:
                             raise ValueError(f"Search {sender.__name__} returned None")
                         elif isinstance(result, SearchMessage):
                             response.messages.append(result)
                         else:
-                            for search_result in SearchResult.convert(result):
-                                response.add_search_result(search_result)
+
+                            # need to make sure Variable is allowed to return more results as they get halved into alleles
+                            factory = _SearchResultFactory.convert(result)
+
+                            total_count += len(factory)
+
+                            if limit > 0:
+                                for search_result in factory.iterate(limit=limit):
+                                    if match_strength and not search_result.match_strength:
+                                        search_result.match_strength = match_strength
+                                    if sub_name:
+                                        search_result.sub_name = sub_name
+
+                                    response.add_search_result(search_result)
+                                    limit -= 1
+                    response.total_count = total_count
+
             except Exception as e:
-                # TODO, based on kind of exception, report it, or just "Something went wrong"
+                # TODO, determine if the Exception type is valid for users or not
                 response.messages.append(SearchMessage(str(e), severity=LogLevel.ERROR))
                 print(f"Error handling search_receiver on {func}")
                 report_exc_info()

@@ -105,8 +105,12 @@
                     <hr/>
                 </div>
                 <div><label>Results</label></div>
-                {% for category, count in search_results.search_counts %}
-                    <div><a class="hover-link" onclick="scrollToResults('{{ category|id_safe }}')">{{ category }}</a> : <span class="d-inline-block" style="min-width:20px">{{ count|number }}</span></div>
+                {% for sc in search_results.search_counts %}
+                    <div>
+                        <a class="hover-link"
+                        {% if sc.excluded_results %}title="Calculated {{ sc.total }} results, limiting results to {{ sc.resolved }}"{% endif %}
+                        onclick="scrollToResults('{{ sc.category|id_safe }}')">{{ sc.category }}</a> : <span class="d-inline-block text-monospace" style="min-width:20px">{{ sc.resolved }}{% if sc.excluded_results %}*{% endif %}</span>
+                    </div>
                 {% endfor %}
 
             </div>

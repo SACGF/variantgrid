@@ -464,8 +464,8 @@ def search_hgvs(search_input: SearchInputInstance):
                         transcript_id=transcript_id,
                     ), search_messages
                 else:
-                    # TODO if kind == 'g' then doesn't matter what the preferred genome build is
-                    yield variant, search_messages
+                    # if kind == 'g' then doesn't matter what the preferred genome build is
+                    yield SearchResult(preview=variant.preview, messages=search_messages, ignore_genome_build_mismatch=(kind == 'g'))
 
             except Variant.DoesNotExist:
                 variant_string = Variant.format_tuple(*variant_tuple)

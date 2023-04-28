@@ -1,6 +1,6 @@
 import re
 from genes.models import GeneSymbol, GeneSymbolAlias
-from snpdb.search import search_receiver, SearchInputInstance, SearchExample
+from snpdb.search import search_receiver, SearchInputInstance, SearchExample, SearchResultMatchStrength
 
 GENE_SYMBOL_PATTERN = re.compile(r"^[a-zA-Z][\da-zA-Z0-9-]+")
 
@@ -11,7 +11,8 @@ GENE_SYMBOL_PATTERN = re.compile(r"^[a-zA-Z][\da-zA-Z0-9-]+")
     example=SearchExample(
         note="Full gene symbol identifier",
         examples=["gata2", "BRCA2"]
-    )
+    ),
+    match_strength=SearchResultMatchStrength.ID_MATCH
 )
 def gene_symbol_alias_search(search_input: SearchInputInstance):
     gene_symbols = GeneSymbol.objects.filter(symbol=search_input.search_string)
