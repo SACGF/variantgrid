@@ -1,22 +1,23 @@
 from functools import partial
-from typing import Optional
+from typing import Optional, List
 from django.db.models.functions import Lower
 from library.preview_request import PreviewProxyModel
 from ontology.models import OntologyTerm, OntologyService, OntologyTermStatus
-from snpdb.search import search_receiver, SearchInputInstance, SearchExample, HAS_3_ALPHA_MIN, SearchResult, SearchResultMatchStrength
+from snpdb.search import search_receiver, SearchInputInstance, SearchExample, HAS_3_ALPHA_MIN, SearchResult, \
+    SearchResultMatchStrength, SearchMessage
 import re
 
 
 def validate_ontology(term: OntologyTerm, preview_proxy: Optional[PreviewProxyModel] = None) -> SearchResult:
-    messages = []
+    messages: List[SearchMessage] = []
     if term.ontology_service not in OntologyService.LOCAL_ONTOLOGY_PREFIXES:
-        messages = [f"We do not store {term.ontology_service} locally. Ontology page will only provide external links."]
+        messages = [SearchMessage(f"We do not store {term.ontology_service} locally. Ontology page will only provide external links.")]
     elif term.is_stub:
-        messages = ["We do not have this term in our database"]
+        messages = [SearchMessage("We do not have this term in our database")]
     elif term.status == OntologyTermStatus.DEPRECATED:
-        messages = ["This term is obsolete"]
+        messages = [SearchMessage("This term is obsolete")]
     elif term.status == OntologyTermStatus.NON_CONDITION:
-        messages = ["Note this term is not a suitable value for condition"]
+        messages = [SearchMessage("Note this term is not a suitable value for condition")]
     preview = term.preview
     if preview_proxy:
         preview.category = preview_proxy.preview_category()

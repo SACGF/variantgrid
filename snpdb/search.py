@@ -134,14 +134,14 @@ class SearchInputInstance:
 
 
 @dataclass
-class SearchMessage:
+class SearchMessageOverall:
     message: str
     severity: LogLevel = LogLevel.WARNING
 
 
 @dataclass
-class SearchMessagesForType:
-    search_message: SearchMessage
+class SearchMessagesOverallForType:
+    search_message: SearchMessageOverall
     search_info: Any
 
     @property
@@ -159,10 +159,19 @@ class SearchResultMatchStrength(int, Enum):
     ID_MATCH = 3
 
 
+@dataclass(frozen=True)
+class SearchMessage:
+    message: str
+    severity: LogLevel = LogLevel.WARNING
+
+    def __str__(self):
+        return self.message
+
+
 @dataclass
 class SearchResult:
     preview: PreviewData
-    messages: List[str] = field(default_factory=list)
+    messages: List[SearchMessage] = field(default_factory=list)
     sub_name: Optional[str] = None
     match_strength: SearchResultMatchStrength = None
     ignore_genome_build_mismatch: bool = False
@@ -219,9 +228,6 @@ class SearchResult:
             return ac
         return None
 
-    def add_message(self, message: str):
-        self.messages.append(message)
-
 
 def _default_make_search_result(obj) -> Optional['SearchResult']:
     if isinstance(obj, SearchResult):
@@ -234,19 +240,26 @@ def _default_make_search_result(obj) -> Optional['SearchResult']:
 class _SearchResultFactory:
     source: Any
     converter: Callable[[Any], SearchResult]
-    extra_messages: List[str]
+    extra_messages: List[SearchMessage]
 
     @staticmethod
     def convert(output: Any):
         source: Any
         factory: Callable[[Any], SearchResult] = _default_make_search_result
-        extra_messages: List[str] = []
+        extra_messages: List[SearchMessage] = []
         if isinstance(output, (tuple, list)):
             source = output[0]
             for extra in output[1:]:
                 if isinstance(extra, str):
+                    extra_messages.append(SearchMessage(message=extra))
+                elif isinstance(extra, SearchMessage):
                     extra_messages.append(extra)
                 elif isinstance(extra, list):
+                    for extra_item in extra:
+                        if isinstance(extra_item, str):
+                            extra_messages.append(SearchMessage(message=extra_item))
+                        elif isinstance(extra_item, SearchMessage):
+                            extra_messages.append(extra_item)
                     extra_messages += extra
                 elif isinstance(extra, Callable):
                     factory = extra
@@ -299,12 +312,12 @@ class SearchResponse:
     admin_only: bool = False
     example: Optional[SearchExample] = None
     results: List[SearchResult] = field(default_factory=list)
-    messages: List[SearchMessage] = field(default_factory=list)
+    messages: List[SearchMessageOverall] = field(default_factory=list)
     total_count: int = 0
 
     @property
-    def search_messages_with_type(self) -> List[SearchMessagesForType]:
-        return [SearchMessagesForType(search_message=message, search_info=self) for message in self.messages]
+    def search_messages_with_type(self) -> List[SearchMessagesOverallForType]:
+        return [SearchMessagesOverallForType(search_message=message, search_info=self) for message in self.messages]
 
     @property
     def preview_category(self):
@@ -434,7 +447,7 @@ class CombinedSearchResponses:
         return list(itertools.chain.from_iterable([response.results for response in self.responses]))
 
     @cached_property
-    def messages(self) -> List[SearchMessagesForType]:
+    def messages(self) -> List[SearchMessagesOverallForType]:
         return list(itertools.chain.from_iterable([response.search_messages_with_type for response in self.responses]))
 
     def single_preferred_result(self):
@@ -523,7 +536,7 @@ def search_receiver(
                     for result in func(SearchInputInstance(expected_type=search_type, search_input=search_input, match=match)):
                         if result is None:
                             raise ValueError(f"Search {sender.__name__} returned None")
-                        elif isinstance(result, SearchMessage):
+                        elif isinstance(result, SearchMessageOverall):
                             response.messages.append(result)
                         else:
 
@@ -547,7 +560,7 @@ def search_receiver(
 
             except Exception as e:
                 # TODO, determine if the Exception type is valid for users or not
-                response.messages.append(SearchMessage(str(e), severity=LogLevel.ERROR))
+                response.messages.append(SearchMessageOverall(str(e), severity=LogLevel.ERROR))
                 print(f"Error handling search_receiver on {func}")
                 report_exc_info()
 
