@@ -22,7 +22,7 @@ from flags.models import FlagCollection, flag_collection_extra_info_signal, Flag
 from flags.models.models import FlagsMixin, FlagTypeContext
 from library.django_utils.django_partition import RelatedModelsPartitionModel
 from library.genomics import format_chrom
-from library.preview_request import PreviewModelMixin
+from library.preview_request import PreviewModelMixin, PreviewKeyValue
 from library.utils import md5sum_str, FormerTuple, first
 from snpdb.models import Wiki
 from snpdb.models.models_clingen_allele import ClinGenAllele
@@ -46,6 +46,13 @@ class Allele(FlagsMixin, PreviewModelMixin, models.Model):
     @classmethod
     def preview_icon(cls) -> str:
         return "fa-solid fa-a p-1 text-light border rounded bg-dark"
+
+    @property
+    def preview(self) -> 'PreviewData':
+        return self.preview_with(
+            identifier=f"Allele ({self.pk})",
+            summary_extra=[PreviewKeyValue("ClinGenAllele ID", str(self.clingen_allele) if self.clingen_allele else "Unknown")]
+        )
 
     def get_absolute_url(self):
         # will show allele if there is one, otherwise go to variant page

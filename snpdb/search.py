@@ -396,6 +396,7 @@ class SearchResponse:
         for i, result in enumerate(self.results):
             result.original_order = i
             result.parent = self
+            result.messages = list(sorted(result.messages))
         self.results = list(sorted(self.results))
 
     @property
@@ -657,7 +658,11 @@ def search_receiver(
             )
 
             if settings.PREFER_ALLELE_LINKS and response.search_type.preview_category() == "Variant":
-                response = _convert_variant_search_response_to_allele_search_response(response)
+                try:
+                    response = _convert_variant_search_response_to_allele_search_response(response)
+                except:
+                    report_exc_info()
+                    response.messages.append(SearchMessageOverall("Unexpected error when attempting to convert Variant results into Allele results"))
 
             return response
 

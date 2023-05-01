@@ -118,7 +118,7 @@ def allele_preview_classifications_extra(sender, user: User, obj: Allele, **kwar
 @receiver(preview_extra_signal, sender=Variant)
 def allele_preview_classifications_extra(sender, user: User, obj: Variant, **kwargs):
     if allele := obj.allele:
-        return _allele_preview_classifications_extra(user, obj)
+        return _allele_preview_classifications_extra(user, allele)
 
 
 @receiver(preview_extra_signal, sender=OntologyTerm)
