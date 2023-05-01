@@ -31,12 +31,30 @@ _SPLIT_GAPS = re.compile(r"[\s,]+")
 MAX_VARIANT_RESULTS = 100
 MAX_RESULTS_PER_SEARCH = 50
 
+
+"""
+Key components of search
+
+SearchInput: Handles all the adjustable parameters of search, the user who iniated the search, their preferred genome build, the text they're searching for etc.
+SearchInputInstance: As above but stores the regex match for a specific search (useful if a search's required pattern has capture groups)
+@search_receiver: A decoration on a method that takes a SearchInputInstance and gives a SearchResponse. There's a bit of decorator magic to do the conversion.
+SearchMessageOverall: A message that's against a specific search, but not against a specific search result
+SearchMessage: A message that's against a specific search result
+SearchResult: Relates to one row in the search result listing, keeps information such as preview data (icon, category, labels), and also gets some meta information from the SearchResponse that created it
+SearchResponse: A combination of SearchResults and SearchMessageOveralls
+SearchResponseCombined: The complete output of a search across all teh different types
+"""
+
+
 @dataclass(frozen=True)
 class SearchInput:
     user: User
     search_string: str
     genome_build_preferred: GenomeBuild
     classify: bool = False
+    """
+    Is this coming from the classify by c.HGVS form
+    """
 
     def matches_pattern(self, pattern: Union[str, Pattern]) -> Match:
         if isinstance(pattern, str):
@@ -46,6 +64,10 @@ class SearchInput:
 
     @property
     def search_words(self) -> List[str]:
+        """
+        Split on white space and commas in the search input - use when filtering on name
+        :return:
+        """
         return [word for word in _SPLIT_GAPS.split(self.search_string) if word]
 
     def q_words(self, field_name: str = "name", test: str = "icontains") -> Q:
@@ -57,6 +79,9 @@ class SearchInput:
         :param test: icontains by default, alternatively can do contains.
         :return: A Q to filter your query set with
         """
+
+        # TODO, this would be a good place to handle roman numerals and arabic as the inverse (per Ontology search)
+        # have a parameter to say if the substitution is desired
         if words := self.search_words:
             qs: List[Q] = []
             for word in words:
@@ -66,6 +91,10 @@ class SearchInput:
             raise ValueError("No tokens found in search, can't generate q_words")
 
     def search(self) -> List['SearchResponse']:
+        """
+        Execute the search by firing off the search_signal (which is connected to via @search_receiver)
+        :return:
+        """
         valid_responses: List[SearchResponse] = []
         response_tuples = search_signal.send_robust(sender=SearchInput, search_input=self)
         for caller, response in response_tuples:
@@ -95,11 +124,19 @@ class SearchInput:
 
     @cached_property
     def genome_builds(self) -> Set[GenomeBuild]:
+        """
+        Provide the list of genome builds that should be included in the search
+        """
         return set(GenomeBuild.builds_with_annotation().all())
 
 
 @dataclass(frozen=True)
 class SearchInputInstance:
+    """
+    When invoking individual @search_receivers, customise the SearchInputInstance to provide the pattern match.
+    Useful for @search_receivers that have a capture group, not real bonus otherwise
+    """
+
     expected_type: Type
     search_input: SearchInput
     match: Match
@@ -139,6 +176,7 @@ class SearchInputInstance:
 class SearchMessageOverall:
     message: str
     severity: LogLevel = LogLevel.WARNING
+    search_info: Optional['SearchResponse'] = None
 
     @property
     def _sort_order(self):
@@ -151,19 +189,8 @@ class SearchMessageOverall:
         if not isinstance(self.message, str):
             raise ValueError(f"Created a Search Message with something other than string {self.message}")
 
-
-@dataclass
-class SearchMessagesOverallForType:
-    search_message: SearchMessageOverall
-    search_info: Any
-
-    @property
-    def severity(self):
-        return self.search_message.severity
-
-    @property
-    def message(self):
-        return self.search_message.message
+    def with_response(self, search_response: 'SearchResponse'):
+        return SearchMessageOverall(message=self.message, severity=self.severity, search_info=search_response)
 
 
 class SearchResultMatchStrength(int, Enum):
@@ -398,10 +425,7 @@ class SearchResponse:
             result.parent = self
             result.messages = list(sorted(result.messages))
         self.results = list(sorted(self.results))
-
-    @property
-    def search_messages_with_type(self) -> List[SearchMessagesOverallForType]:
-        return [SearchMessagesOverallForType(search_message=message, search_info=self) for message in self.messages]
+        self.messages = [om.with_response(self) for om in self.messages]
 
     @property
     def preview_category(self):
@@ -533,8 +557,8 @@ class SearchResponsesCombined:
         return list(itertools.chain.from_iterable([response.results for response in self.responses]))
 
     @cached_property
-    def messages(self) -> List[SearchMessagesOverallForType]:
-        return list(itertools.chain.from_iterable([response.search_messages_with_type for response in self.responses]))
+    def messages(self) -> List[SearchMessageOverall]:
+        return list(itertools.chain.from_iterable([response.messages for response in self.responses]))
 
     def single_preferred_result(self):
         if first(message for message in self.messages if message.severity == LogLevel.ERROR):
@@ -641,7 +665,7 @@ def search_receiver(
 
             except Exception as e:
                 # TODO, determine if the Exception type is valid for users or not
-                overall_messages.append(SearchMessageOverall(str(e), severity=LogLevel.ERROR))
+                overall_messages.add(SearchMessageOverall(str(e), severity=LogLevel.ERROR))
                 print(f"Error handling search_receiver on {func}")
                 report_exc_info()
 
