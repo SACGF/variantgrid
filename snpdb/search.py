@@ -138,8 +138,12 @@ class SearchMessageOverall:
     message: str
     severity: LogLevel = LogLevel.WARNING
 
+    @property
+    def _sort_order(self):
+        return log_level_to_int(self.severity), self.message
+
     def __lt__(self, other) -> bool:
-        return self.message < other.message
+        return self._sort_order < other._sort_order
 
     def __post_init__(self):
         if not isinstance(self.message, str):
@@ -215,7 +219,15 @@ class SearchResult:
     # this is provided automatically by the search framework
 
     parent: Optional['SearchResponse'] = None
-    # should be populated by outside code
+    original_order: Optional[int] = None
+    # the above two should be populated by outside code
+
+    @property
+    def _sort_order(self):
+        return self.genome_build_mismatch, self.original_order
+
+    def __lt__(self, other):
+        return self._sort_order < other._sort_order
 
     @property
     def effective_match_strength(self) -> SearchResultMatchStrength:
@@ -375,6 +387,12 @@ class SearchResponse:
     messages: List[SearchMessageOverall] = field(default_factory=list)
     total_count: int = 0
 
+    def __post_init__(self):
+        for i, result in enumerate(self.results):
+            result.original_order = i
+            result.parent = self
+        self.results = list(sorted(self.results))
+
     @property
     def search_messages_with_type(self) -> List[SearchMessagesOverallForType]:
         return [SearchMessagesOverallForType(search_message=message, search_info=self) for message in self.messages]
@@ -387,9 +405,6 @@ class SearchResponse:
     @property
     def preview_icon(self):
         return self.search_type.preview_icon()
-
-    def add_search_result(self, search_result: SearchResult):
-        self.results.append(search_result)
 
     def __lt__(self, other):
         return (self.preview_category, self.sub_name or "") < (other.preview_category, other.sub_name or "")
@@ -451,7 +466,7 @@ def _convert_variant_search_response_to_allele_search_response(variant_response:
             no_allele.messages.append(SearchMessage("This variant is not linked to an allele", severity=LogLevel.INFO))
             all_results.append(no_allele)
 
-    response = SearchResponse(
+    return SearchResponse(
         search_input=variant_response.search_input,
         search_type=Allele,
         matched_pattern=variant_response.matched_pattern,
@@ -462,9 +477,6 @@ def _convert_variant_search_response_to_allele_search_response(variant_response:
         results=all_results,
         total_count=len(all_results)
     )
-    for result in response.results:
-        result.parent = response
-    return response
 
 
 @dataclass
@@ -583,19 +595,17 @@ def search_receiver(
                 return None
 
             overall_messages: Set[SearchMessageOverall] = set()
-            response = SearchResponse(
-                search_input=search_input,
-                search_type=search_type,
-                admin_only=admin_only,
-                sub_name=sub_name,
-                example=example)
+
+            matched_pattern = False
+            messages = []
+            results = []
+            total_count = 0
 
             try:
                 if match := pattern.search(search_input.search_string):
-                    response.matched_pattern = True
+                    matched_pattern = True
                     # as Variants get merged into Alleles, we want to avoid limiting them (except under extreme conditions)
                     limit = 1000 if search_type.preview_category() == "Variant" else 50
-                    total_count = 0
                     for result in func(SearchInputInstance(expected_type=search_type, search_input=search_input, match=match)):
                         if result is None:
                             raise ValueError(f"Search {sender.__name__} returned None")
@@ -615,10 +625,8 @@ def search_receiver(
                                     if sub_name:
                                         search_result.sub_name = sub_name
 
-                                    search_result.parent = response
-                                    response.add_search_result(search_result)
+                                    results.append(search_result)
                                     limit -= 1
-                    response.total_count = total_count
 
             except Exception as e:
                 # TODO, determine if the Exception type is valid for users or not
@@ -626,7 +634,18 @@ def search_receiver(
                 print(f"Error handling search_receiver on {func}")
                 report_exc_info()
 
-            response.messages = list(sorted(overall_messages))
+            response = SearchResponse(
+                search_input=search_input,
+                search_type=search_type,
+                admin_only=admin_only,
+                sub_name=sub_name,
+                example=example,
+                matched_pattern=matched_pattern,
+                results=results,
+                messages=list(sorted(overall_messages)),
+                total_count=total_count
+            )
+
             if settings.PREFER_ALLELE_LINKS and response.search_type.preview_category() == "Variant":
                 response = _convert_variant_search_response_to_allele_search_response(response)
 
