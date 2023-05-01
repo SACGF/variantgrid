@@ -131,9 +131,9 @@
                 </div>
             </div>
             <input id="search-mode" name="mode" type="hidden" value="{{ form.mode.value }}" />
-            <label class="form-check-label form-check-inline mt-2">
+            <label class="form-check-label form-check-inline mt-2" title="If ticked, automatically redirects if there's a single best record">
                 <input id='feeling-lucky' type='checkbox' value="lucky" class="form-check mr-2" {% if form.mode.value != 'preview' %}checked{% endif %} onclick="updateSearchMode()"/>
-                <nomin>I'm feeling lucky <span class="text-secondary"> - Auto open single valid result</span></nomin>
+                I'm feeling lucky
             </label>
         </form>
 
@@ -211,7 +211,7 @@
                                                 <div class="mt-2">
                                                     {% for message in search_result.genome_build_relevant_messages %}
                                                         <div class="text-danger">
-                                                            {{ message.severity | severity_icon }}{% if message.genome_build %}<label>{{ message.genome_build }}</label> {% endif %}{{ message|safe }}
+                                                            {{ message.severity | severity_icon }}{% if message.genome_build %}<label>{{ message.genome_build }}</label>{% endif %}&nbsp;{{ message.message|enrich }}
                                                         </div>
                                                     {% endfor %}
                                                 </div>

@@ -6,8 +6,6 @@ from snpdb.search import search_receiver, SearchInputInstance, \
     HAS_ALPHA_PATTERN, SearchExample
 
 
-#FIXME make a new class for search result for user that can be previewable
-
 @search_receiver(
     search_type=UserPreview,
     pattern=HAS_ALPHA_PATTERN,

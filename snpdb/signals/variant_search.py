@@ -16,6 +16,7 @@ from classification.models import Classification, CreateNoClassificationForbidde
 from genes.hgvs import HGVSMatcher
 from genes.models import MissingTranscript, MANE, TranscriptVersion, GeneSymbol
 from genes.models_enums import AnnotationConsortium
+from library.enums.log_level import LogLevel
 from library.genomics import format_chrom
 from library.preview_request import PreviewData
 from snpdb.clingen_allele import get_clingen_allele
@@ -416,7 +417,7 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
         variant_tuple, used_transcript_accession, kind, method, matches_reference = hgvs_matcher.get_variant_tuple_used_transcript_kind_method_and_matches_reference(hgvs_string)
         if matches_reference is False:
             ref_base = variant_tuple[2]
-            search_messages.append(SearchMessage(f'Using reference "{ref_base}" from our build', genome_build=genome_build))
+            search_messages.append(SearchMessage(f'Using reference "{ref_base}" from our build', LogLevel.ERROR))
 
     except (MissingTranscript, Contig.ContigNotInBuildError):
         # contig triggered from g.HGVS from another genome build - can't do anything just return no results
@@ -483,7 +484,7 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
         except Variant.DoesNotExist:
             # variant_string = Variant.format_tuple(*variant_tuple)
             variant_string_abbreviated = Variant.format_tuple(*variant_tuple, abbreviate=True)
-            search_messages.append(SearchMessage(f'"{hgvs_string}" resolved to "{variant_string_abbreviated}" from our build', genome_build=genome_build))
+            search_messages.append(SearchMessage(f'"{hgvs_string}" resolved to "{variant_string_abbreviated}" from our build', LogLevel.INFO))
 
             # manual variants
             # results = []
@@ -494,7 +495,7 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
             # search for alt alts
             alts = get_results_from_variant_tuples(variant_qs, variant_tuple, any_alt=True)
             for alt in alts:
-                alt_messages = search_messages + [SearchMessage(f'No results for alt "{variant_tuple.alt}", but found this using alt "{alt.alt}"')]
+                alt_messages = search_messages + [SearchMessage(f'No results for alt "{variant_tuple.alt}", but found this using alt "{alt.alt}"', severity=LogLevel.ERROR)]
                 yield SearchResult(alt.preview, messages=alt_messages)
 
 

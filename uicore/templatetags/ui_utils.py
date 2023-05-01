@@ -374,15 +374,15 @@ def severity_icon(severity: str, title: Optional[str] = None) -> str:
     severity = severity.upper()
     if severity.startswith('C'):  # critical
         classes += ['fa-bomb', 'text-danger']
-    if severity.startswith('E'):  # error
+    elif severity.startswith('E') or severity == 'DANGER':  # error
         classes += ['fa-exclamation-circle', 'text-danger']
-    if severity.startswith('W'):  # warning
+    elif severity.startswith('W'):  # warning
         classes += ['fa-exclamation-triangle', 'text-warning']
-    if severity.startswith('I'):  # info
+    elif severity.startswith('I'):  # info
         classes += ['fa-info-circle', 'text-info']
-    if severity.startswith('D'):  # debug
+    elif severity.startswith('D'):  # debug
         classes += ['fa-key', 'text-info']
-    if severity.startswith('S'):  # success
+    elif severity.startswith('S'):  # success
         classes += ['fa-check-circle', 'text-success']
     else:
         # not sure what this was meant to be
@@ -606,3 +606,21 @@ def separator(items: Iterable[Any] = None, separator: str = ','):
 @register.filter(name='id_safe')
 def id_safe(id: str):
     return html_id_safe(id)
+
+
+QUOTES_RE = re.compile(r'"(.*?)"')
+
+
+@register.filter(name='enrich')
+def enrich(text: str):
+    parts = []
+    is_quotes = False
+    for part in QUOTES_RE.split(text):
+        if part:
+            part = escape(part)
+            if is_quotes:
+                parts.append(f'<span class="quoted">{part}</span>')
+            else:
+                parts.append(part)
+        is_quotes = not is_quotes
+    return SafeString(" ".join(parts))

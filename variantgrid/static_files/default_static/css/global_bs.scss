@@ -1347,3 +1347,18 @@ li.help-item {
     margin-left: 4px;
     font-size: 10pt;
 }
+
+.quoted {
+
+  font-weight: 500;
+  &::before {
+    content: "\"";
+    font-weight: normal;
+    opacity: 0.5;
+  }
+  &::after {
+    content: "\"";
+    font-weight: normal;
+    opacity: 0.5;
+  }
+}

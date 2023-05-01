@@ -251,7 +251,6 @@ class UserPreview(PreviewModelMixin):
             title = "Admin"
         elif labs := list(sorted(Lab.valid_labs_qs(self.user))):
             if len(labs) > 1:
-                # TODO list orgs
                 title = f"{len(labs)} lab affiliations"
             else:
                 title = str(labs[0])

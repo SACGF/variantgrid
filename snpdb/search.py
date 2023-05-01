@@ -28,6 +28,8 @@ HAS_3_ALPHA_MIN = re.compile(r"[a-zA-Z]{3,}")
 HAS_3_ANY = re.compile(r"\S{3,}")
 _SPLIT_GAPS = re.compile(r"[\s,]+")
 
+MAX_VARIANT_RESULTS = 100
+MAX_RESULTS_PER_SEARCH = 50
 
 @dataclass(frozen=True)
 class SearchInput:
@@ -189,6 +191,9 @@ class SearchMessage:
 
     def __lt__(self, other: 'SearchMessage'):
         return self._sort_order < other._sort_order
+
+    def with_genome_build(self, genome_build: GenomeBuild) -> 'SearchMessage':
+        return SearchMessage(message=self.message, severity=self.severity, genome_build=genome_build)
 
 
 @dataclass(frozen=True)
@@ -428,6 +433,8 @@ def _convert_variant_search_response_to_allele_search_response(variant_response:
                 if allele := obj.allele:
                     allele_to_variants[allele].append(result)
                 else:
+                    # hack variant icon to be Allele icon even if there's no allele
+                    result.preview_icon = Allele.preview_icon()
                     no_allele_variants.append(result)
             else:
                 non_variant_data.append(result)
@@ -438,7 +445,11 @@ def _convert_variant_search_response_to_allele_search_response(variant_response:
         genome_builds = set().union(
             *[vr.preview.genome_builds for vr in variant_results if vr.preview.genome_builds])
 
-        all_messages = list(sorted(set().union(*(set(variant.messages) for variant in variant_results if variant.messages))))
+        all_messages = []
+        for variant in variant_results:
+            all_messages += [r.with_genome_build(first(variant.genome_builds)) for r in variant.messages]
+
+        all_messages = list(sorted(set(all_messages)))
 
         strongest_match = max(variant.match_strength for variant in variant_results)
 
@@ -463,7 +474,7 @@ def _convert_variant_search_response_to_allele_search_response(variant_response:
     if no_allele_variants:
         for no_allele in no_allele_variants:
             no_allele.preview.category = "Allele"
-            no_allele.messages.append(SearchMessage("This variant is not linked to an allele", severity=LogLevel.INFO))
+            no_allele.messages.append(SearchMessage("This variant is not yet linked to an allele", severity=LogLevel.INFO))
             all_results.append(no_allele)
 
     return SearchResponse(
@@ -597,7 +608,6 @@ def search_receiver(
             overall_messages: Set[SearchMessageOverall] = set()
 
             matched_pattern = False
-            messages = []
             results = []
             total_count = 0
 
@@ -605,7 +615,7 @@ def search_receiver(
                 if match := pattern.search(search_input.search_string):
                     matched_pattern = True
                     # as Variants get merged into Alleles, we want to avoid limiting them (except under extreme conditions)
-                    limit = 1000 if search_type.preview_category() == "Variant" else 50
+                    limit = MAX_VARIANT_RESULTS if search_type.preview_category() == "Variant" else MAX_RESULTS_PER_SEARCH
                     for result in func(SearchInputInstance(expected_type=search_type, search_input=search_input, match=match)):
                         if result is None:
                             raise ValueError(f"Search {sender.__name__} returned None")

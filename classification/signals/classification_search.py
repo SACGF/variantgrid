@@ -1,6 +1,6 @@
 import operator
 from functools import reduce
-from typing import Optional
+from typing import Optional, List
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -14,7 +14,7 @@ from classification.models import Classification, ClassificationModification, Im
 from library.preview_request import preview_extra_signal, PreviewKeyValue
 from ontology.models import OntologyTerm
 from snpdb.genome_build_manager import GenomeBuildManager
-from snpdb.models import Lab, Organization, Allele
+from snpdb.models import Lab, Organization, Allele, Variant
 from snpdb.search import search_receiver, SearchInputInstance, SearchExample
 from snpdb.user_settings_manager import UserSettingsManager
 
@@ -93,19 +93,32 @@ def classification_search(search_input: SearchInputInstance):
     yield Classification.objects.filter(Q(pk__in=cm_ids) | Q(pk__in=cm_source_ids))
 
 
-@receiver(preview_extra_signal, sender=Allele)
-def allele_preview_classifications_extra(sender, user: User, obj: Allele, **kwargs):
+def _allele_preview_classifications_extra(user: User, obj: Allele) -> List[PreviewKeyValue]:
     cms = ClassificationModification.latest_for_user(user=user, allele=obj)
-    count = cms.count()
-    extras = [PreviewKeyValue.count(Classification, count)]
+    extras = []
+    if count := cms.count():
+        extras += [PreviewKeyValue.count(Classification, count)]
     if count:
         genome_build = GenomeBuildManager.get_current_genome_build()
         column = ClassificationModification.column_name_for_build(genome_build)
-        if c_hgvs := sorted(c_hgvs for c_hgvs in cms.order_by(column).values_list(column, flat=True).distinct().all() if c_hgvs):
+        # provide the c.HGVS for alleles
+        if c_hgvs := sorted(
+                c_hgvs for c_hgvs in cms.order_by(column).values_list(column, flat=True).distinct().all() if c_hgvs):
             for hgvs in c_hgvs:
                 extras.append(PreviewKeyValue(f"{genome_build.name}", hgvs, dedicated_row=True))
 
     return extras
+
+
+@receiver(preview_extra_signal, sender=Allele)
+def allele_preview_classifications_extra(sender, user: User, obj: Allele, **kwargs):
+    return _allele_preview_classifications_extra(user, obj)
+
+
+@receiver(preview_extra_signal, sender=Variant)
+def allele_preview_classifications_extra(sender, user: User, obj: Variant, **kwargs):
+    if allele := obj.allele:
+        return _allele_preview_classifications_extra(user, obj)
 
 
 @receiver(preview_extra_signal, sender=OntologyTerm)
