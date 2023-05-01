@@ -150,11 +150,11 @@
                     </div>
                 </div>
 
-                {% if search_results.results or search_results.messages %}
+                {% if search_results.results or search_results.messages_overall %}
                     <nomin>
                     <ul class="list-group search-results">
                         {% comment %}TOP LEVEL SEARCH INFO/WARNINGS/ERRORS{% endcomment %}
-                        {% for message in search_results.messages %}
+                        {% for message in search_results.messages_overall %}
                             <div class="list-group-item list-group-item-warning">
                                 <div class="row d-flex align-items-center" style="color:#444">
                                     <div class="col-3 text-right">

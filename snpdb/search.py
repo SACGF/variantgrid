@@ -194,6 +194,13 @@ class SearchMessageOverall:
 
 
 class SearchResultMatchStrength(int, Enum):
+    """
+    Each @search_receiver will have a default search strength.
+    Just matching on parts of the name should return a fuzzy_match
+    Matching using logic (such as on a variant HGVS) is a strong match
+    Straight up providing the ID, e.g. PMID:3453453 or BRCA2 is an ID match
+    Helps determine if we should auto jump to any result
+    """
     FUZZY_MATCH = 1
     STRONG_MATCH = 2
     ID_MATCH = 3
@@ -225,6 +232,10 @@ class SearchMessage:
 
 @dataclass(frozen=True)
 class SearchResultGenomeBuildMessages:
+    """
+    Summary of genome builds in the response, and messages for that genome build.
+    Note that genome build agnostic messages will return an empty array of these
+    """
     genome_build: GenomeBuild
     messages: List[SearchMessage]
 
@@ -243,9 +254,12 @@ class SearchResultGenomeBuildMessages:
 
 @dataclass
 class SearchResult:
+    """
+    Represents a single record found in a search
+    """
+
     preview: PreviewData
     messages: List[SearchMessage] = field(default_factory=list)
-    sub_name: Optional[str] = None
     match_strength: SearchResultMatchStrength = None
     ignore_genome_build_mismatch: bool = False
     # this is provided automatically by the search framework
@@ -253,6 +267,11 @@ class SearchResult:
     parent: Optional['SearchResponse'] = None
     original_order: Optional[int] = None
     # the above two should be populated by outside code
+
+    @property
+    def sub_name(self) -> str:
+        if self.parent:
+            return self.parent.sub_name
 
     @property
     def _sort_order(self):
@@ -416,7 +435,7 @@ class SearchResponse:
     admin_only: bool = False
     example: Optional[SearchExample] = None
     results: List[SearchResult] = field(default_factory=list)
-    messages: List[SearchMessageOverall] = field(default_factory=list)
+    messages_overall: List[SearchMessageOverall] = field(default_factory=list)
     total_count: int = 0
 
     def __post_init__(self):
@@ -425,7 +444,7 @@ class SearchResponse:
             result.parent = self
             result.messages = list(sorted(result.messages))
         self.results = list(sorted(self.results))
-        self.messages = [om.with_response(self) for om in self.messages]
+        self.messages_overall = [om.with_response(self) for om in self.messages_overall]
 
     @property
     def preview_category(self):
@@ -487,7 +506,6 @@ def _convert_variant_search_response_to_allele_search_response(variant_response:
             SearchResult(
                 preview=allele_preview,
                 messages=all_messages,
-                sub_name=variant_response.sub_name,
                 match_strength=strongest_match,
                 ignore_genome_build_mismatch=ignore_genome_build_mismatch
             )
@@ -495,7 +513,7 @@ def _convert_variant_search_response_to_allele_search_response(variant_response:
 
     all_results = allele_results + non_variant_data
 
-    top_level_messages = variant_response.messages or []
+    top_level_messages = variant_response.messages_overall or []
     if no_allele_variants:
         for no_allele in no_allele_variants:
             no_allele.preview.category = "Allele"
@@ -506,7 +524,7 @@ def _convert_variant_search_response_to_allele_search_response(variant_response:
         search_input=variant_response.search_input,
         search_type=Allele,
         matched_pattern=variant_response.matched_pattern,
-        messages=top_level_messages,
+        messages_overall=top_level_messages,
         example=variant_response.example,
         sub_name=variant_response.sub_name,
         admin_only=variant_response.admin_only,
@@ -557,11 +575,11 @@ class SearchResponsesCombined:
         return list(itertools.chain.from_iterable([response.results for response in self.responses]))
 
     @cached_property
-    def messages(self) -> List[SearchMessageOverall]:
-        return list(itertools.chain.from_iterable([response.messages for response in self.responses]))
+    def messages_overall(self) -> List[SearchMessageOverall]:
+        return list(itertools.chain.from_iterable([response.messages_overall for response in self.responses]))
 
     def single_preferred_result(self):
-        if first(message for message in self.messages if message.severity == LogLevel.ERROR):
+        if first(message for message in self.messages_overall if message.severity == LogLevel.ERROR):
             return None
 
         # If we have ID Matches, ignore other matches for auto-jumping to results
@@ -657,8 +675,6 @@ def search_receiver(
                                 for search_result in factory.iterate(limit=limit):
                                     if match_strength and not search_result.match_strength:
                                         search_result.match_strength = match_strength
-                                    if sub_name:
-                                        search_result.sub_name = sub_name
 
                                     results.append(search_result)
                                     limit -= 1
@@ -677,7 +693,7 @@ def search_receiver(
                 example=example,
                 matched_pattern=matched_pattern,
                 results=results,
-                messages=list(sorted(overall_messages)),
+                messages_overall=list(sorted(overall_messages)),
                 total_count=total_count
             )
 
@@ -686,7 +702,7 @@ def search_receiver(
                     response = _convert_variant_search_response_to_allele_search_response(response)
                 except:
                     report_exc_info()
-                    response.messages.append(SearchMessageOverall("Unexpected error when attempting to convert Variant results into Allele results"))
+                    response.messages_overall.append(SearchMessageOverall("Unexpected error when attempting to convert Variant results into Allele results"))
 
             return response
 
