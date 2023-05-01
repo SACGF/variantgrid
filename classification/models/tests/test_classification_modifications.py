@@ -315,7 +315,7 @@ class ClassificationTestCaseModifications(TestCase):
             'db': 'PMID',
             'id': 'PMID: 123456',
             'idx': '123456',
-            'url': 'https://www.ncbi.nlm.nih.gov/pubmed/?term=123456'
+            'url': 'https://www.ncbi.nlm.nih.gov/pubmed/123456'
         })
 
         puby_2 = db_refs[1]
@@ -324,5 +324,5 @@ class ClassificationTestCaseModifications(TestCase):
             'db': 'PMID',
             'id': 'PMID: 555444',
             'idx': '555444',
-            'url': 'https://www.ncbi.nlm.nih.gov/pubmed/?term=555444'
+            'url': 'https://www.ncbi.nlm.nih.gov/pubmed/555444'
         })
