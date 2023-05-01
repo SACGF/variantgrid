@@ -192,7 +192,7 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
                 format_array_str = postgres_arrays(format_array.flat)
         return format_array_str
 
-    def get_phred_likelihood_str(self, variant, gt_types) -> Optional[str]:
+    def get_phred_likelihood_str(self, variant) -> Optional[str]:
         phred_likelihood_str = None
         if self.vcf.phred_likelihood_field:
             phred_likelihood = []
@@ -207,7 +207,7 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
                     return self.EMPTY_PL_ARRAY
 
                 pl[missing] = CohortGenotype.MISSING_NUMBER_VALUE  # Handle individual PL array entry missing
-                for i, (gt, genotype) in enumerate(zip(gt_types, variant.genotypes)):
+                for i, (gt, genotype) in enumerate(zip(variant.gt_types, variant.genotypes)):
                     # CyVCF2 genotypes entry for sample is e.g. [0, 1, True] (last element = is phased)
                     # Handle case where PL is not variant.ploidy + 1 - e.g. where male chrX given as haploid, ie GT=1
                     # see https://github.com/brentp/cyvcf2/issues/227
@@ -310,7 +310,7 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
             allele_frequency_str = None
 
         genotype_quality_str = self.get_format_array_str(variant, self.vcf.genotype_quality_field, as_type=int)
-        phred_likelihood_str = self.get_phred_likelihood_str(variant, variant.gt_types)
+        phred_likelihood_str = self.get_phred_likelihood_str(variant)
         samples_filters_str = self.get_samples_filters_str(variant)
 
         if self.last_locus_tuple:
@@ -318,23 +318,37 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
                 self.finished_locus()
 
         alt_hash = self.variant_pk_lookup.get_variant_coordinate_hash(variant.CHROM, variant.POS, ref, alt, end)
-        alt_zygosity = [BulkGenotypeVCFProcessor.ALT_CYVCF_GT_ZYGOSITIES[i] for i in variant.gt_types]
         format_json = self._get_format_json(self.num_samples, variant)
         info_json = self._get_info_json(variant)
 
-        cohort_gt = [str(variant.num_hom_ref),
-                     str(variant.num_het),
-                     str(variant.num_hom_alt),
-                     str(variant.num_unknown),
-                     ''.join(alt_zygosity),
-                     alt_allele_depth_str,
-                     allele_frequency_str,
-                     read_depth_str,
-                     genotype_quality_str,
-                     phred_likelihood_str,
-                     samples_filters_str,
-                     json.dumps(format_json),
-                     json.dumps(info_json)]
+        # If record is missing genotype call, calling any built in genotype methods can
+        # cause cyvcf2 to crash, @see https://github.com/brentp/cyvcf2/issues/17
+        has_genotype = self.vcf.genotype_field and variant.format(self.vcf.genotype_field)
+        if has_genotype:
+            alt_zygosity = [BulkGenotypeVCFProcessor.ALT_CYVCF_GT_ZYGOSITIES[i] for i in variant.gt_types]
+            cohort_gt = [
+                str(variant.num_hom_ref),
+                str(variant.num_het),
+                str(variant.num_hom_alt),
+                str(variant.num_unknown),
+                ''.join(alt_zygosity),
+            ]
+        else:
+            cohort_gt = [
+                "0", "0", "0", str(self.num_samples),
+                Zygosity.UNKNOWN_ZYGOSITY * self.num_samples
+            ]
+
+        cohort_gt += [
+            alt_allele_depth_str,
+            allele_frequency_str,
+            read_depth_str,
+            genotype_quality_str,
+            phred_likelihood_str,
+            samples_filters_str,
+            json.dumps(format_json),
+            json.dumps(info_json)
+        ]
 
         self.locus_variant_hashes.append(alt_hash)
         self.locus_filters.append(self.convert_filters(variant.FILTER))

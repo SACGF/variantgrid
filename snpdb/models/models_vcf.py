@@ -75,6 +75,7 @@ class VCF(models.Model):
     ref_depth_field = models.TextField(null=True)
     alt_depth_field = models.TextField(null=True)
     read_depth_field = models.TextField(null=True)
+    genotype_field = models.TextField(null=True)
     genotype_quality_field = models.TextField(null=True)
     phred_likelihood_field = models.TextField(null=True)
     sample_filters_field = models.TextField(null=True)
@@ -656,8 +657,8 @@ class VCFBedIntersection(models.Model):
     @staticmethod
     def get_with_enrichment_kit_for_sample(sample):
         if sample.enrichment_kit:
-            pbi = VCFBedIntersection.get_for_vcf_and_enrichment_kit(sample.vcf, enrichment_kit)
-            return pbi, enrichment_kit
+            pbi = VCFBedIntersection.get_for_vcf_and_enrichment_kit(sample.vcf, sample.enrichment_kit)
+            return pbi, sample.enrichment_kit
         return None, None
 
     def __str__(self):

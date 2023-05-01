@@ -186,6 +186,7 @@ def configure_vcf_from_header(vcf, vcf_reader):
     vcf.source = source
     if vcf.genotype_samples:  # Has sample format fields
         set_allele_depth_format_fields(vcf, vcf_formats, source, VCFConstant.DEFAULT_ALLELE_FIELD)
+        vcf.genotype_field = get_format_field(vcf_formats, VCFConstant.DEFAULT_GENOTYPE_FIELD)
         vcf.read_depth_field = get_format_field(vcf_formats, VCFConstant.DEFAULT_READ_DEPTH_FIELD)
         vcf.genotype_quality_field = get_format_field(vcf_formats, VCFConstant.DEFAULT_GENOTYPE_QUALITY_FIELD)
         vcf.phred_likelihood_field = get_phred_likelihood_field(vcf_formats, source,
