@@ -574,7 +574,7 @@ class AnnotationRun(TimeStampedModel):
     status = models.CharField(max_length=1, choices=AnnotationStatus.choices, default=AnnotationStatus.CREATED)
     annotation_range_lock = models.ForeignKey(AnnotationRangeLock, null=True, on_delete=CASCADE)
     pipeline_type = models.CharField(max_length=1, choices=VariantAnnotationPipelineType.choices,
-                                     default=VariantAnnotationPipelineType.SNV)
+                                     default=VariantAnnotationPipelineType.STANDARD)
     # task_id is used as a lock to prevent multiple Celery jobs from executing same job
     task_id = models.CharField(max_length=36, null=True)
     dump_start = models.DateTimeField(null=True)
@@ -593,6 +593,7 @@ class AnnotationRun(TimeStampedModel):
     vep_warnings = models.TextField(null=True)
     vcf_dump_filename = models.TextField(null=True)
     vcf_annotated_filename = models.TextField(null=True)
+    dump_count = models.IntegerField(null=True)
     annotated_count = models.IntegerField(null=True)
     celery_task_logs = models.JSONField(null=False, default=dict)  # Key=task_id, so we keep logs from multiple runs
 
@@ -616,14 +617,17 @@ class AnnotationRun(TimeStampedModel):
                 status = AnnotationStatus.DUMP_STARTED
             if self.dump_end:
                 status = AnnotationStatus.DUMP_COMPLETED
-            if self.annotation_start:
-                status = AnnotationStatus.ANNOTATION_STARTED
-            if self.annotation_end:
-                status = AnnotationStatus.ANNOTATION_COMPLETED
-            if self.upload_start:
-                status = AnnotationStatus.UPLOAD_STARTED
-            if self.upload_end:
+            if self.dump_count == 0:
                 status = AnnotationStatus.FINISHED
+            else:
+                if self.annotation_start:
+                    status = AnnotationStatus.ANNOTATION_STARTED
+                if self.annotation_end:
+                    status = AnnotationStatus.ANNOTATION_COMPLETED
+                if self.upload_start:
+                    status = AnnotationStatus.UPLOAD_STARTED
+                if self.upload_end:
+                    status = AnnotationStatus.FINISHED
         return status
 
     @property
@@ -641,6 +645,15 @@ class AnnotationRun(TimeStampedModel):
         for klass in [VariantAnnotation, VariantTranscriptAnnotation, VariantGeneOverlap]:
             qs = get_queryset_for_annotation_version(klass, annotation_version)
             qs.filter(annotation_run=self).delete()
+
+    def get_dump_filename(self) -> str:
+        PIPELINE_TYPE = {
+            VariantAnnotationPipelineType.STANDARD: "standard",
+            VariantAnnotationPipelineType.CNV: "cnv",
+        }
+        type_desc = PIPELINE_TYPE.get(self.pipeline_type, str(self.pipeline_type))
+        vcf_base_name = f"dump_{self.pk}_{type_desc}.vcf"
+        return os.path.join(settings.ANNOTATION_VCF_DUMP_DIR, vcf_base_name)
 
     def delete(self, using=None, keep_parents=False):
         self.delete_related_objects()
@@ -878,7 +891,7 @@ class VariantAnnotation(AbstractVariantAnnotation):
     # List of filters to describe variants that can be annotated
     VARIANT_ANNOTATION_Q = [
         Variant.get_no_reference_q(),
-        ~Q(alt__seq__in=['.', '*', "<DEL>"]),  # Exclude non-standard variants
+        ~Q(alt__seq__in=['.', '*']),  # Exclude non-standard variants
     ]
 
     @cached_property

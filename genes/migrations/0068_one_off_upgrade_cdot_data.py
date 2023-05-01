@@ -26,8 +26,8 @@ class Migration(migrations.Migration):
     operations = [
         ManualOperation.operation_other(args=["Update cdot - import_gene_annotation with cdot transcript DATA >= 0.2.16"
                                               " You can do this by running: "
-                                              "./annotation/annotation_data/cdot_update.sh or manually, see"
-                                              "https://github.com/SACGF/cdot/releases"
+                                              "./annotation/annotation_data/cdot_update.sh or manually, see "
+                                              "https://github.com/SACGF/cdot/releases "
                                               "Data only - no need to update the library code for this change"],
                                         test=_test_old_cdot),
     ]

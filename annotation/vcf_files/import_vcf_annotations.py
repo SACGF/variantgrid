@@ -84,6 +84,7 @@ def handle_vep_warnings(annotation_run: AnnotationRun, bulk_inserter):
         version = annotation_run.annotation_range_lock.version
         annotation_version = version.get_any_annotation_version()
         for v in get_unannotated_variants_qs(annotation_version,
+                                             pipeline_type=annotation_run.pipeline_type,
                                              min_variant_id=annotation_run.annotation_range_lock.min_variant_id,
                                              max_variant_id=annotation_run.annotation_range_lock.max_variant_id):
             if v.locus.contig.name in skipped_contigs:
