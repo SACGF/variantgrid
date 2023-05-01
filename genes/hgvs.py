@@ -1059,18 +1059,18 @@ class HGVSMatcher:
                 hgvs_name.transcript = hgvs_name.gene
                 hgvs_name.gene = old_transcript
                 if hgvs_name.gene:
-                    fixed_messages.append(f"Warning: swapped gene/transcript")
+                    fixed_messages.append(f"Swapped gene/transcript")
                 transcript_ok = HGVSMatcher._looks_like_transcript(hgvs_name.transcript)
             elif HGVSMatcher._looks_like_hgvs_prefix(uc_gene):
                 hgvs_name.gene = uc_gene
-                fixed_messages.append(f"Warning: Upper cased HGVS prefix")
+                fixed_messages.append(f"Upper cased HGVS prefix")
 
         if not transcript_ok:
             if hgvs_name.transcript:
                 uc_transcript = hgvs_name.transcript.upper()
                 if HGVSMatcher._looks_like_transcript(uc_transcript):
                     hgvs_name.transcript = uc_transcript
-                    fixed_messages.append(f"Warning: Upper cased transcript")
+                    fixed_messages.append(f"Upper cased transcript")
 
         return hgvs_name.format(), fixed_messages
 

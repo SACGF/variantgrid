@@ -107,10 +107,10 @@
                 </div>
                 <div><label>Results</label></div>
                 {% for sc in search_results.search_counts %}
-                    <div>
+                    <div style="position:relative">
                         <a class="hover-link"
                         {% if sc.excluded_results %}title="Calculated {{ sc.total }} results, limiting results to {{ sc.resolved }}"{% endif %}
-                        onclick="scrollToResults('{{ sc.category|id_safe }}')">{{ sc.category }}</a> : <span class="d-inline-block text-monospace" style="min-width:20px">{{ sc.resolved }}{% if sc.excluded_results %}*{% endif %}</span>
+                        onclick="scrollToResults('{{ sc.category|id_safe }}')">{{ sc.category }}</a> : <span class="d-inline-block text-monospace" style="min-width:20px">{{ sc.resolved }}{% if sc.excluded_results %}<span style="position:absolute;right:-10px">*</span>{% endif %}</span>
                     </div>
                 {% endfor %}
 
@@ -151,6 +151,7 @@
                 </div>
 
                 {% if search_results.results or search_results.messages %}
+                    <nomin>
                     <ul class="list-group search-results">
                         {% comment %}TOP LEVEL SEARCH INFO/WARNINGS/ERRORS{% endcomment %}
                         {% for message in search_results.messages %}
@@ -185,27 +186,33 @@
                                             {% endif %}
                                             {% if search_result.genome_build_names %}
                                                 <nomin class="d-block text-small">
-                                                    <span class="text-secondary">{% if search_result.effective_genome_build_mismatch %}{{ 'W' | severity_icon }}{% endif %}Matched using</span> {% for gb in search_result.genome_build_names %}{{ gb }}{% if not forloop.last %} and {% endif %}{% endfor %}
+                                                    <span class="text-secondary">{% if search_result.genome_build_mismatch %}{{ 'W' | severity_icon:'This is not your preferred genome build' }}{% endif %}
+                                                    Matched on </span> {% for gb_messages in search_result.genome_builds_with_messages %}
+                                                    <label
+                                                        {% if gb_messages.message_summary %}title="{{ gb_messages.message_summary }}" class="text-{{ gb_messages.severity_bs }} hover-detail"{% endif %}
+                                                    >{{ gb_messages.genome_build }}</label>
+                                                    {% if not forloop.last %} and {% endif %}{% endfor %}
                                                 </nomin>
                                             {% endif %}
                                         </div>
                                         <div class="col-9">
-                                            <label class="search-identifier">{{ preview.identifier }}</label>
-                                            {% if preview.title %}&nbsp;<span class="search-title">{{ preview.title }}</span>{% endif %}
-                                            {% if preview.summary_all %}<nomin class="d-block text-small text-secondary extra-summary">
+                                            <label class="search-identifier">{{ preview.identifier }}</label>&nbsp;{% if preview.title %}<span class="search-title">{{ preview.title }}</span>{% endif %}
+                                            {% if preview.summary_all %}<div class="d-block text-small text-secondary extra-summary">
                                                 {% for extra in preview.summary_all %}
                                                     <span class="extra {% if extra.dedicated_row %}important d-block{% else %}normal d-inline-block{% endif %}">{% if extra.icon %}<i class="{{ extra.icon }} text-success mr-1"></i>{% endif %}{% if extra.key %}<label>{{ extra.key }} </label> {% endif %}
                                                         {{ extra.value|format_value:200 }}
                                                     </span>
                                                 {% endfor %}
-                                            </nomin>{% endif %}
+                                            </div>{% endif %}
                                             {% if search_summary %}
                                                 {% search_summary request.user search_result %}
                                             {% endif %}
                                             {% if search_result.messages %}
                                                 <div class="mt-2">
-                                                    {% for message in search_result.messages %}
-                                                        <div class="text-danger">{{ message.severity | severity_icon }}{{ message|safe }}</div>
+                                                    {% for message in search_result.genome_build_relevant_messages %}
+                                                        <div class="text-danger">
+                                                            {{ message.severity | severity_icon }}{% if message.genome_build %}<label>{{ message.genome_build }}</label> {% endif %}{{ message|safe }}
+                                                        </div>
                                                     {% endfor %}
                                                 </div>
                                             {% endif %}
@@ -215,6 +222,7 @@
                             {% endwith %}
                         {% endfor %}
                     </ul>
+                    </nomin>
                 {% endif %}
             </div>
         {% endif %}

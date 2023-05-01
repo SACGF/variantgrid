@@ -15,7 +15,7 @@ from django.dispatch import Signal
 from more_itertools import take
 
 from library.enums.log_level import LogLevel
-from library.log_utils import report_exc_info, report_message
+from library.log_utils import report_exc_info, report_message, log_level_to_int, log_level_to_bootstrap
 from library.preview_request import PreviewCoordinator, PreviewData
 from library.utils import clean_string, first
 from snpdb.models import UserSettings, GenomeBuild, Variant, Allele
@@ -170,6 +170,7 @@ class SearchResultMatchStrength(int, Enum):
 class SearchMessage:
     message: str
     severity: LogLevel = LogLevel.WARNING
+    genome_build: Optional[GenomeBuild] = None
 
     def __post_init__(self):
         if not isinstance(self.message, str):
@@ -177,6 +178,31 @@ class SearchMessage:
 
     def __str__(self):
         return self.message
+
+    @property
+    def _sort_order(self):
+        return (self.genome_build.name if self.genome_build else "", self.severity, self.message)
+
+    def __lt__(self, other: 'SearchMessage'):
+        return self._sort_order < other._sort_order
+
+
+@dataclass(frozen=True)
+class SearchResultGenomeBuildMessages:
+    genome_build: GenomeBuild
+    messages: List[SearchMessage]
+
+    @cached_property
+    def message_summary(self):
+        if self.messages:
+            return f"In {self.genome_build}<br/>" + "<br/>".join(message.message for message in self.messages)
+
+    @cached_property
+    def severity_bs(self):
+        if self.messages:
+            max_log = max(*(m.severity for m in self.messages), key=lambda s: log_level_to_int(s) )
+            return log_level_to_bootstrap(max_log)
+        return ""
 
 
 @dataclass
@@ -187,19 +213,41 @@ class SearchResult:
     match_strength: SearchResultMatchStrength = None
     ignore_genome_build_mismatch: bool = False
     # this is provided automatically by the search framework
-    genome_build_mismatch: Optional[bool] = None
+
+    parent: Optional['SearchResponse'] = None
+    # should be populated by outside code
 
     @property
     def effective_match_strength(self) -> SearchResultMatchStrength:
         return self.match_strength or SearchResultMatchStrength.STRONG_MATCH
 
+    @cached_property
+    def genome_build_relevant_messages(self) -> [SearchMessage]:
+        preferred_gb = self.parent.search_input.genome_build_preferred
+        if not self.genome_builds:
+            return self.messages
+        elif preferred_gb not in self.genome_builds:
+            return self.messages
+        else:
+            return [message for message in self.messages if message.genome_build is None or message.genome_build == preferred_gb]
+
     @property
-    def effective_genome_build_mismatch(self) -> bool:
-        return self.genome_build_mismatch is True and not self.ignore_genome_build_mismatch
+    def genome_builds_with_messages(self) -> List[SearchResultGenomeBuildMessages]:
+        all_results = []
+        for genome_build in sorted(self.genome_builds):
+            messages = [message for message in self.messages if message.genome_build == genome_build]
+            all_results.append(SearchResultGenomeBuildMessages(genome_build=genome_build, messages=messages))
+        return all_results
+
+    @cached_property
+    def genome_build_mismatch(self) -> bool:
+        if not self.ignore_genome_build_mismatch and self.genome_builds and self.parent.search_input.genome_build_preferred not in self.genome_builds:
+            return True
+        return False
 
     @property
     def is_perfectly_valid(self):
-        return not self.messages and not self.effective_genome_build_mismatch
+        return not self.genome_build_relevant_messages and not self.genome_build_mismatch
 
     def _preview_icon_severity(self, severity: str):
         icon = self.preview.icon
@@ -214,10 +262,11 @@ class SearchResult:
 
     @property
     def preview_icon_with_severity(self):
-        if self.messages:
-            return self._preview_icon_severity('warning')
-        else:
-            return self._preview_icon_severity('success')
+        return self._preview_icon_severity('success')
+        # if self.messages:
+        #     return self._preview_icon_severity('warning')
+        # else:
+        #     return self._preview_icon_severity('success')
 
     @property
     def search_type(self):
@@ -314,7 +363,7 @@ class SearchExample:
     examples: Optional[List[str]] = None
 
 
-@dataclass
+@dataclass()
 class SearchResponse:
     search_input: SearchInput
     search_type: PreviewCoordinator
@@ -343,7 +392,7 @@ class SearchResponse:
         self.results.append(search_result)
 
     def __lt__(self, other):
-        return self.preview_category, self.sub_name or "" < other.preview_category, other.sub_name or ""
+        return (self.preview_category, self.sub_name or "") < (other.preview_category, other.sub_name or "")
 
 
 # consider moving this into variant_search... somehow - maybe provide a transformer in the decorator
@@ -389,8 +438,7 @@ def _convert_variant_search_response_to_allele_search_response(variant_response:
                 messages=all_messages,
                 sub_name=variant_response.sub_name,
                 match_strength=strongest_match,
-                ignore_genome_build_mismatch=ignore_genome_build_mismatch,
-                genome_build_mismatch=variant_response.search_input.genome_build_preferred not in genome_builds if genome_builds else False
+                ignore_genome_build_mismatch=ignore_genome_build_mismatch
             )
         )
 
@@ -400,10 +448,10 @@ def _convert_variant_search_response_to_allele_search_response(variant_response:
     if no_allele_variants:
         for no_allele in no_allele_variants:
             no_allele.preview.category = "Allele"
-            no_allele.messages.append(SearchMessage("This variant is not linked to an allele"))
+            no_allele.messages.append(SearchMessage("This variant is not linked to an allele", severity=LogLevel.INFO))
             all_results.append(no_allele)
 
-    return SearchResponse(
+    response = SearchResponse(
         search_input=variant_response.search_input,
         search_type=Allele,
         matched_pattern=variant_response.matched_pattern,
@@ -414,6 +462,9 @@ def _convert_variant_search_response_to_allele_search_response(variant_response:
         results=all_results,
         total_count=len(all_results)
     )
+    for result in response.results:
+        result.parent = response
+    return response
 
 
 @dataclass
@@ -427,7 +478,7 @@ class SearchCount:
         return self.total > self.resolved
 
 
-class CombinedSearchResponses:
+class SearchResponsesCombined:
 
     def __init__(self, search_input: SearchInput, responses: List[SearchResponse]):
         self.search_input = search_input
@@ -489,7 +540,7 @@ class CombinedSearchResponses:
         return sorted(self.responses, key=lambda sr: (sr.preview_category, sr.sub_name.upper() if sr.sub_name else ""))
 
 
-def search_data(user: User, search_string: str, classify: bool = False) -> CombinedSearchResponses:
+def search_data(user: User, search_string: str, classify: bool = False) -> SearchResponsesCombined:
     user_settings = UserSettings.get_for_user(user)
     search_input = SearchInput(
         user=user,
@@ -498,7 +549,7 @@ def search_data(user: User, search_string: str, classify: bool = False) -> Combi
         classify=classify
     )
     responses = search_input.search()
-    return CombinedSearchResponses(search_input, responses)
+    return SearchResponsesCombined(search_input, responses)
 
 
 def search_receiver(
@@ -563,9 +614,8 @@ def search_receiver(
                                         search_result.match_strength = match_strength
                                     if sub_name:
                                         search_result.sub_name = sub_name
-                                    if search_result.genome_builds and search_input.genome_build_preferred not in search_result.genome_builds:
-                                        search_result.genome_build_mismatch = True
 
+                                    search_result.parent = response
                                     response.add_search_result(search_result)
                                     limit -= 1
                     response.total_count = total_count

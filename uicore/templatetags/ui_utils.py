@@ -364,25 +364,32 @@ class ModalTag(template.Node):
 def severity_icon(severity: str, title: Optional[str] = None) -> str:
     if not severity:
         severity = 'I'
+
+    classes = ["fas"]
     title_html = ""
     if title:
+        classes.append('hover-detail')
         title_html = f' title="{title}"'
+
     severity = severity.upper()
     if severity.startswith('C'):  # critical
-        return SafeString(f'<i class="fas fa-bomb text-danger"{title_html}></i>')
+        classes += ['fa-bomb', 'text-danger']
     if severity.startswith('E'):  # error
-        return SafeString(f'<i class="fas fa-exclamation-circle text-danger"{title_html}></i>')
+        classes += ['fa-exclamation-circle', 'text-danger']
     if severity.startswith('W'):  # warning
-        return SafeString(f'<i class="fas fa-exclamation-triangle text-warning"{title_html}></i>')
+        classes += ['fa-exclamation-triangle', 'text-warning']
     if severity.startswith('I'):  # info
-        return SafeString(f'<i class="fas fa-info-circle text-info"{title_html}></i>')
+        classes += ['fa-info-circle', 'text-info']
     if severity.startswith('D'):  # debug
-        return SafeString(f'<i class="fas fa-key text-info"{title_html}></i>')
+        classes += ['fa-key', 'text-info']
     if severity.startswith('S'):  # success
-        return SafeString(f'<i class="fas fa-check-circle text-success"{title_html}></i>')
-    # debug
+        classes += ['fa-check-circle', 'text-success']
+    else:
+        # not sure what this was meant to be
+        classes += ['fa-question-circle', 'text-secondary']
 
-    return SafeString(f'<i class="fas fa-question-circle text-secondary"{title_html}></i>')
+    class_string = " ".join(class_str for class_str in classes)
+    return SafeString(f'<i class="{class_string}"{title_html}></i>')
 
 
 @register.filter()

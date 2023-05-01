@@ -402,6 +402,8 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
     hgvs_matcher = HGVSMatcher(genome_build)
     variant_qs = visible_variants
 
+    # TODO, add genome build to more of the SearchMessages that are genome build specific
+
     # can add on search_message to objects to (stop auto-jump and show message)
     original_hgvs_string = hgvs_string
     variant_tuple = None
@@ -414,7 +416,7 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
         variant_tuple, used_transcript_accession, kind, method, matches_reference = hgvs_matcher.get_variant_tuple_used_transcript_kind_method_and_matches_reference(hgvs_string)
         if matches_reference is False:
             ref_base = variant_tuple[2]
-            search_messages.append(SearchMessage(f'Using reference "{ref_base}" from our build {genome_build.name}'))
+            search_messages.append(SearchMessage(f'Using reference "{ref_base}" from our build', genome_build=genome_build))
 
     except (MissingTranscript, Contig.ContigNotInBuildError):
         # contig triggered from g.HGVS from another genome build - can't do anything just return no results
@@ -481,7 +483,7 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
         except Variant.DoesNotExist:
             # variant_string = Variant.format_tuple(*variant_tuple)
             variant_string_abbreviated = Variant.format_tuple(*variant_tuple, abbreviate=True)
-            search_messages.append(SearchMessage(f'"{hgvs_string}" resolved to "{variant_string_abbreviated}" from our build {genome_build}'))
+            search_messages.append(SearchMessage(f'"{hgvs_string}" resolved to "{variant_string_abbreviated}" from our build', genome_build=genome_build))
 
             # manual variants
             # results = []
