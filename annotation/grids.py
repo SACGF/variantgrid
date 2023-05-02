@@ -4,7 +4,7 @@ from typing import Dict, Any
 
 from django.db.models import QuerySet, ExpressionWrapper, F, fields
 
-from annotation.models import VariantAnnotationVersion, AnnotationRun, AnnotationStatus
+from annotation.models import VariantAnnotationVersion, AnnotationRun, AnnotationStatus, VariantAnnotationPipelineType
 from genes.models_enums import AnnotationConsortium
 from library.jqgrid.jqgrid_user_row_config import JqGridUserRowConfig
 from snpdb.models.models_genome import GenomeBuild
@@ -16,6 +16,10 @@ class AnnotationRunColumns(DatatableConfig):
     @staticmethod
     def status(row: Dict[str, Any]):
         return AnnotationStatus(row["status"]).label
+
+    @staticmethod
+    def pipeline_type(row: Dict[str, Any]):
+        return VariantAnnotationPipelineType(row["pipeline_type"]).label
 
     @staticmethod
     def format_timedelta(cell: CellData):
@@ -39,6 +43,7 @@ class AnnotationRunColumns(DatatableConfig):
         self.rich_columns = [
             RichColumn(key="id", label='ID', orderable=True, client_renderer='idRenderer'),
             RichColumn(key="status", orderable=True, renderer=self.status),
+            RichColumn(key="pipeline_type", orderable=True, renderer=self.pipeline_type),
             RichColumn(key="annotation_range_lock__version__genome_build__name", label='Build', orderable=True),
             RichColumn(key="annotation_range_lock__version__id", label='Version', orderable=True),
             RichColumn(key="annotation_range_lock__count", label='Var Count', orderable=True),

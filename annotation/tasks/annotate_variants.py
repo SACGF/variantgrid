@@ -88,10 +88,10 @@ def annotate_variants(annotation_run_id):
                        extra_data={'output': error_message,
                                    'error': tb})
 
+        create_event(None, "AnnotationRun failed", tb, severity=LogLevel.ERROR)
         annotation_run.error_exception = tb
         annotation_run.set_task_log("error_exception", tb)
         annotation_run.save()
-        create_event(None, "AnnotationRun failed", tb, severity=LogLevel.ERROR)
         raise
     finally:
         annotation_run.set_task_log("end", timezone.now())
@@ -137,8 +137,8 @@ def dump_and_annotate_variants(annotation_run):
         annotation_run.annotation_end = timezone.now()
     else:
         # Now we have standard/CNV type pipelines, it's possible some can be empty
-        annotation_run.dump_count = 0,
-        annotation_run.annotated_count = 0,
+        annotation_run.dump_count = 0
+        annotation_run.annotated_count = 0
 
     annotation_run.save()
 
@@ -168,7 +168,7 @@ def annotation_run_retry(annotation_run: AnnotationRun, upload_only=False) -> An
     else:
         # Delete old AnnotationRun then try again.
         old_annotation_run = annotation_run
-        annotation_run = AnnotationRun.objects.create()
+        annotation_run = AnnotationRun.objects.create(pipeline_type=old_annotation_run.pipeline_type)
         tasks = [
             delete_annotation_run.si(old_annotation_run.pk),
             assign_range_lock_to_annotation_run.si(annotation_run.pk, annotation_range_lock.pk),
