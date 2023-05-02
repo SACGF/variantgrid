@@ -282,7 +282,7 @@ def search_variant_db_snp(search_input: SearchInputInstance):
         matcher = HGVSMatcher(genome_build)
         for data in dbsnp.get_alleles_for_genome_build(genome_build):
             if hgvs_string := data.get("hgvs"):
-                dbsnp_message = f"dbSNP '{search_input.search_string}' resolved to '{hgvs_string}'"
+                dbsnp_message = SearchMessage(f'dbSNP "{search_input.search_string}" resolved to "{hgvs_string}"', severity=LogLevel.INFO)
                 variant_tuple = matcher.get_variant_tuple(hgvs_string)
                 results = get_results_from_variant_tuples(search_input.get_visible_variants(genome_build), variant_tuple)
                 if results.exists():
