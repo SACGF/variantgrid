@@ -248,6 +248,8 @@ class OntologyIdNormalized:
         prefix = parts[0].strip().upper()
         if prefix == "ORPHANET":  # Orphanet is the one ontology (so far) where the standard is sentance case
             prefix = "Orphanet"
+        elif prefix.upper() == "MIM":
+            prefix = "OMIM"
         prefix = OntologyService(prefix)
         postfix = parts[1].strip()
         try:
