@@ -3,7 +3,7 @@ from genes.models import Gene
 from genes.models_enums import AnnotationConsortium
 from snpdb.search import search_receiver, SearchInputInstance, SearchExample
 
-GENE_PATTERN = re.compile(r"(ENSG|Gene.*:)\d+")
+GENE_PATTERN = re.compile(r"(?P<prefix>ENSG|GENE\s*ID\s:\s*)(?P<id>\d+)", re.IGNORECASE)
 
 
 @search_receiver(
@@ -15,15 +15,11 @@ GENE_PATTERN = re.compile(r"(ENSG|Gene.*:)\d+")
     )
 )
 def gene_search(search_input: SearchInputInstance):
-    """ Symbols have been separated into search_gene_symbol - this returns Gene objects """
-    CONSORTIUM_REGEX = {
-        r"(ENSG\d+)": AnnotationConsortium.ENSEMBL,
-        r"Gene:(\d+)": AnnotationConsortium.REFSEQ,
-        r"GeneID:(\d+)": AnnotationConsortium.REFSEQ,
-        r"Gene ID:(\d+)": AnnotationConsortium.REFSEQ,
-    }
+    prefix = search_input.match.group('prefix')
+    gene_id = search_input.match.group('id')
+    consortium = AnnotationConsortium.REFSEQ
+    if prefix.upper().startswith("ENSG"):
+        consortium = AnnotationConsortium.ENSEMBL
+        gene_id = f"ENSG{gene_id}"
 
-    for c_regex, annotation_consortium in CONSORTIUM_REGEX.items():
-        if m := re.match(c_regex, search_input.search_string, re.IGNORECASE):
-            gene_id = m.group(1)
-            yield Gene.objects.filter(identifier=gene_id, annotation_consortium=annotation_consortium)
+    yield Gene.objects.filter(identifier=gene_id, annotation_consortium=consortium)
