@@ -290,7 +290,11 @@ def search_variant_db_snp(search_input: SearchInputInstance):
                         yield r, dbsnp_message
                 else:
                     variant_string = Variant.format_tuple(*variant_tuple)
-                    if create_manual := VariantExtra.create_manual_variant(for_user=search_input.user, variant_string=variant_string):
+                    if create_manual := VariantExtra.create_manual_variant(
+                        for_user=search_input.user,
+                        variant_string=variant_string,
+                        genome_build=genome_build
+                    ):
                         yield create_manual, dbsnp_message
 
 
