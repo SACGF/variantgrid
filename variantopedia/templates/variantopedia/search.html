@@ -133,7 +133,7 @@
             <input id="search-mode" name="mode" type="hidden" value="{{ form.mode.value }}" />
             <label class="form-check-label form-check-inline mt-2">
                 <input id='feeling-lucky' type='checkbox' value="lucky" class="form-check mr-2" {% if form.mode.value != 'preview' %}checked{% endif %} onclick="updateSearchMode()"/>
-                Automatically open single unambiguous search result
+                Automatically open single valid search result
             </label>
         </form>
 
@@ -163,7 +163,7 @@
                                         {% if message.search_info.sub_name %}<div class="text-info text-small">via {{ message.search_info.sub_name }} Search</div>{% endif %}
                                     </div>
                                     <div class="col-9">
-                                        <label>{{ message.message|format_value }}</label>
+                                        {{ message.message|enrich }}
                                     </div>
                                 </div>
                             </div>
