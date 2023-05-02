@@ -387,6 +387,13 @@ class Gene(PreviewModelMixin, models.Model):
     annotation_consortium = models.CharField(max_length=1, choices=AnnotationConsortium.choices)
     summary = models.TextField(null=True, blank=True)  # Only used by RefSeq
 
+    @property
+    def prefixed_identifier(self) -> str:
+        if self.annotation_consortium == AnnotationConsortium.REFSEQ:
+            return f"GeneID:{self.identifier}"
+        else:
+            return self.identifier
+
     @classmethod
     def preview_icon(cls) -> str:
         return "fa-solid fa-dna"
@@ -394,7 +401,7 @@ class Gene(PreviewModelMixin, models.Model):
     @property
     def preview(self) -> 'PreviewData':
         return self.preview_with(
-            identifier=self.identifier,
+            identifier=self.prefixed_identifier,
             summary=self.summary
         )
 
@@ -461,12 +468,7 @@ class Gene(PreviewModelMixin, models.Model):
         return self.identifier < other.identifier
 
     def __str__(self):
-        if self.annotation_consortium == AnnotationConsortium.REFSEQ:
-            gene_id_summary = f"GeneID:{self.identifier}"
-        else:
-            gene_id_summary = self.identifier
-
-        return f"{gene_id_summary} ({self.get_annotation_consortium_display()})"
+        return f"{self.prefixed_identifier} ({self.get_annotation_consortium_display()})"
 
 
 class GeneVersion(models.Model):
