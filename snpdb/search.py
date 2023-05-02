@@ -227,7 +227,7 @@ class SearchMessage:
 
     @property
     def _sort_order(self):
-        return (self.genome_build.name if self.genome_build else "", self.severity, self.message)
+        return self.genome_build.name if self.genome_build else "", log_level_to_int(self.severity), self.message
 
     def __lt__(self, other: 'SearchMessage'):
         return self._sort_order < other._sort_order
