@@ -162,15 +162,14 @@ def allele_search(search_input: SearchInputInstance):
             try:
                 if variant := allele.variant_for_build(genome_build):
                     yield variant
-                else:
-                    variant_string = clingen_allele.get_variant_string(genome_build)
-                    # not sure the below message adds to anything
-                    # variant_string_abbreviated = allele.get_variant_string(genome_build, abbreviate=True)
-                    # search_message = f"'{allele}' resolved to '{variant_string_abbreviated}'"
-                    if create_manual := VariantExtra.create_manual_variant(search_input.user, genome_build=genome_build, variant_string=variant_string):
-                        yield create_manual
+                    continue
             except ValueError:
                 pass
+            # if there was no variant for that allele
+            variant_string = clingen_allele.get_variant_string(genome_build)
+            variant_string_abbreviated = clingen_allele.get_variant_string(genome_build, abbreviate=True)
+            if create_manual := VariantExtra.create_manual_variant(search_input.user, genome_build=genome_build, variant_string=variant_string):
+                yield create_manual, SearchMessage(f'"{clingen_allele}" resolved to "{variant_string_abbreviated}"', severity=LogLevel.INFO)
 
 
 def get_results_from_variant_tuples(qs: QuerySet, data: VariantCoordinate, any_alt: bool = False) -> QuerySet[Variant]:
