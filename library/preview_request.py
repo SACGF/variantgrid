@@ -134,7 +134,7 @@ class PreviewModelMixin:
             internal_url: Optional[str] = None,
             external_url: Optional[str] = None,
             genome_builds: Optional[Set['GenomeBuild']] = None,
-            annotation_consortium: Optional['AnnotationConsortium'] = None
+            annotation_consortia: Optional[Set['AnnotationConsortium']] = None
     ) -> 'PreviewData':
         if summary:
             if not summary_extra:
@@ -156,7 +156,7 @@ class PreviewModelMixin:
             internal_url=internal_url,
             external_url=external_url,
             genome_builds=genome_builds,
-            annotation_consortium=annotation_consortium
+            annotation_consortia=annotation_consortia
         )
 
     @property
@@ -177,7 +177,7 @@ class PreviewData:
     internal_url: Optional[str] = None
     external_url: Optional[str] = None
     genome_builds: Optional[Set['GenomeBuild']] = None
-    annotation_consortium: Optional['AnnotationConsortium'] = None
+    annotation_consortia: Optional[Set['AnnotationConsortium']] = None
     # FIXME make annotation consortium into annotation consortia (plural) and add better error support
     obj: Optional[Any] = None
 
@@ -192,7 +192,7 @@ class PreviewData:
             internal_url: Optional[str] = None,
             external_url: Optional[str] = None,
             genome_builds: Optional[Set['GenomeBuild']] = None,
-            annotation_consortium: Optional['AnnotationConsortium'] = None):
+            annotation_consortia: Optional[Set['AnnotationConsortium']] = None):
 
         if category is None:
             if hasattr(obj, "_meta"):
@@ -222,12 +222,22 @@ class PreviewData:
             elif hasattr(obj, "genome_builds"):
                 genome_builds = obj.genome_builds
 
-        if annotation_consortium is None and hasattr(obj, "annotation_consortium"):
-            annotation_consortium = obj.annotation_consortium
+        if annotation_consortia is None:
+            if hasattr(obj, "annotation_consortium"):
+                annotation_consortia = set([obj.annotation_consortium])
+            elif hasattr(obj, "annotation_consortia"):
+                annotation_consortia = obj.annotation_consortia
 
-        if isinstance(annotation_consortium, str):
-            from genes.models_enums import AnnotationConsortium
-            annotation_consortium = AnnotationConsortium(annotation_consortium)
+        # make sure we're dealing with AnnotationConsortium and not pure string (easy to do when dealing with TextChoices)
+        if annotation_consortia:
+            def convert_consortium(obj: Any):
+                if isinstance(obj, str):
+                    from genes.models_enums import AnnotationConsortium
+                    return AnnotationConsortium(obj)
+                else:
+                    return obj
+
+            annotation_consortia = set([convert_consortium(obj) for obj in annotation_consortia])
 
         return PreviewData(
             obj=obj,
@@ -239,7 +249,7 @@ class PreviewData:
             internal_url=internal_url,
             external_url=external_url,
             genome_builds=genome_builds,
-            annotation_consortium=annotation_consortium
+            annotation_consortia=annotation_consortia
         )
 
     @cached_property

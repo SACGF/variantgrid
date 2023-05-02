@@ -180,10 +180,12 @@
                                             {% if preview.icon %}<i class="{{ search_result.preview_icon_with_severity }} mr-2" style="opacity:0.75"></i>{% endif %}
                                             <label>{{ preview.category }}</label>
                                             {% if search_result.sub_name %}<div class="text-small text-info">via {{ search_result.sub_name }} Search</div>{% endif %}
-                                            {% if search_result.annotation_consortium %}
-                                            <div class="text-small">
-                                                {{ search_result.annotation_consortium.name }}
-                                            </div>
+                                            {% if search_result.annotation_consortia %}
+                                                <div class="text-small">
+                                                    {% for consortia in search_result.annotation_consortia %}
+                                                        {{ consortia.label }}{% if not forloop.last %} and {% endif %}
+                                                    {% endfor %}
+                                                </div>
                                             {% endif %}
                                             {% if search_result.genome_builds %}
                                                 <nomin class="d-block text-small">

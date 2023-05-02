@@ -391,10 +391,9 @@ class SearchResult:
         return self.preview.genome_builds
 
     @property
-    def annotation_consortium(self):
-        if ac := self.preview.annotation_consortium:
-            return ac
-        return None
+    def annotation_consortia(self) -> Optional[List['AnnotationConsortia']]:
+        if consortia := self.preview.annotation_consortia:
+            return list(sorted(consortia))
 
 
 def _default_make_search_result(obj) -> Optional['SearchResult']:

@@ -392,6 +392,13 @@ class Gene(PreviewModelMixin, models.Model):
         return "fa-solid fa-dna"
 
     @property
+    def preview(self) -> 'PreviewData':
+        return self.preview_with(
+            identifier=self.identifier,
+            summary=self.summary
+        )
+
+    @property
     def is_legacy(self):
         """ Required internally, but probably shouldn't be shown to the user """
         return self.identifier.startswith(Gene.FAKE_GENE_ID_PREFIX)
