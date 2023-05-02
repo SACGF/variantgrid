@@ -461,7 +461,6 @@ class _SearchResultFactory:
                             extra_messages.append(SearchMessage(message=extra_item))
                         elif isinstance(extra_item, SearchMessage):
                             extra_messages.append(extra_item)
-                    extra_messages += extra
                 elif isinstance(extra, Callable):
                     factory = extra
                 else:

@@ -490,13 +490,11 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
         except Variant.DoesNotExist:
             # variant_string = Variant.format_tuple(*variant_tuple)
             variant_string_abbreviated = Variant.format_tuple(*variant_tuple, abbreviate=True)
-            search_messages.append(SearchMessage(f'"{hgvs_string}" resolved to "{variant_string_abbreviated}" from our build', LogLevel.INFO))
+            search_messages.append(SearchMessage(f'"{hgvs_string}" resolved to "{variant_string_abbreviated}" in our build', LogLevel.INFO))
 
             # manual variants
-            # results = []
-            # cmv = CreateManualVariant(genome_build, variant_string)
-            # if cmv.is_valid_for_user(user):
-            #     results.append(SearchResult(cmv, message=search_messages, initial_score=initial_score))
+            if cmv := VariantExtra.create_manual_variant(for_user=user, genome_build=genome_build, variant_string=hgvs_string):
+                yield cmv, search_messages
 
             # search for alt alts
             alts = get_results_from_variant_tuples(variant_qs, variant_tuple, any_alt=True)
