@@ -1274,7 +1274,7 @@ class TranscriptVersionSequenceInfo(TimeStampedModel):
             data = Entrez.efetch(db='nuccore', id=transcript_accession, rettype='gb', retmode='text')
         except HTTPError as e:
             if e.code == 400:
-                raise BadTranscript(f"Bad Transcript: Entrez API reports '{transcript_accession}' not found")
+                raise BadTranscript(f"Bad Transcript: Entrez API reports \"{transcript_accession}\" not found")
             raise e
         api_response = data.read()
         with StringIO(api_response) as f:

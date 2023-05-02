@@ -23,6 +23,6 @@ def search_transcript(search_input: SearchInputInstance):
             if transcript_version := TranscriptVersion.objects.filter(transcript=transcript, version=version).first():
                 yield transcript_version
             else:
-                yield transcript, f"Unknown transcript version {version}, see transcript page for available versions."
+                yield transcript, f"Unknown transcript version \"{version}\", see transcript page for available versions."
         else:
             yield transcript

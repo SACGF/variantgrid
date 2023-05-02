@@ -447,7 +447,7 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
 
         if variant_tuple is None:
             if classify:
-                search_message = SearchMessage(f"Error reading HGVS: '{hgvs_error}'")
+                search_message = SearchMessage(f"Error reading HGVS \"{hgvs_error}\"")
                 if classify_no_variant := VariantExtra.classify_no_variant_hgvs(for_user=user, hgvs_string=original_hgvs_string):
                     yield SearchResult(classify_no_variant, messages=[search_message])
 
@@ -456,7 +456,7 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
 
     if used_transcript_accession:
         if used_transcript_accession not in hgvs_string:
-            search_messages.append(SearchMessage(f"Used transcript version '{used_transcript_accession}'"))
+            search_messages.append(SearchMessage(f"Used transcript version \"{used_transcript_accession}\""))
 
         hgvs_name = HGVSName(hgvs_string)
         # If these were in wrong order they have been switched now
@@ -466,7 +466,7 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
                                                        annotation_consortium=annotation_consortium)
             alias_symbol_strs = transcript_version.gene_version.gene_symbol.alias_meta.alias_symbol_strs
             if hgvs_name.gene.upper() not in [a.upper() for a in alias_symbol_strs]:
-                search_messages.append(SearchMessage(f"Symbol '{hgvs_name.gene}' not associated with transcript "
+                search_messages.append(SearchMessage(f"Symbol \"{hgvs_name.gene}\" not associated with transcript "
                                        f"{used_transcript_accession} (known symbols='{', '.join(alias_symbol_strs)}')"))
 
     # TODO: alter initial_score based on warning messages of alt not matching?
