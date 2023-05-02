@@ -5,7 +5,7 @@ import re
 
 @search_receiver(
     search_type=Citation,
-    pattern=re.compile(".*:.*"),
+    pattern=re.compile(r"((PMID|PUBMED|PMCID)\s*:\s*(?:PMC)?[0-9]+|NBK[0-9]+)", flags=re.IGNORECASE),
     example=SearchExample(
         note="PMID, PMCID or NBK ID",
         examples=["PMID:25741868", "PMCID:PMC23433", "NBK100238"]
