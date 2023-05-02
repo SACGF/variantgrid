@@ -25,6 +25,7 @@ class SnpdbConfig(AppConfig):
         from snpdb.signals import sample_search
         from snpdb.signals import vcf_search
         from snpdb.signals import variant_search
+        from snpdb.signals import variant_zygosity_preview_extra
         # pylint: enable=import-outside-toplevel
 
         backend_vcf_import_success_signal.connect(backend_vcf_import_success_handler)

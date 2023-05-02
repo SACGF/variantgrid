@@ -25,4 +25,5 @@ def _variant_preview_zygosity_extar(variant: Variant):
 
 @receiver(preview_extra_signal, sender=Allele)
 def allele_preview_classifications_extra(sender, user: User, obj: Allele, **kwargs):
-    return [PreviewKeyValue(value=SafeString("This is <b>BOLD</b>"))]
+    # return [PreviewKeyValue(value=SafeString("This is <b>BOLD</b>"))]
+    pass
