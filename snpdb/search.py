@@ -237,7 +237,7 @@ class SearchMessage:
 
     @staticmethod
     def highest_severity(iterable: Iterable['SearchMessage']) -> LogLevel:
-        return max(iterable, key=lambda sm: log_level_to_int(sm), default=LogLevel.INFO)
+        return max((m.severity for m in iterable), key=lambda sm: log_level_to_int(sm), default=LogLevel.INFO)
 
 
 @dataclass(frozen=True)
@@ -359,7 +359,7 @@ class SearchResult:
         Make sure there are no relevant errors or genome build mismatch.
         Used to determine if a result can be auto-redirected to
         """
-        return SearchMessage.highest_severity(self.genome_build_relevant_messages) != 'E' and not self.genome_build_mismatch
+        return SearchMessage.highest_severity(self.genome_build_relevant_messages) not in ('W','E') and not self.genome_build_mismatch
 
     def _preview_icon_severity(self, severity: str):
         icon = self.preview.icon
