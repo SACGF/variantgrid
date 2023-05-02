@@ -214,7 +214,7 @@
                                                 <div class="mt-2">
                                                     {% for message in search_result.genome_build_relevant_messages %}
                                                         <div class="text-danger">
-                                                            {{ message.severity | severity_icon }}{% if message.genome_build %}<label>{{ message.genome_build }}</label>{% endif %}&nbsp;{{ message.message|enrich }}
+                                                            {{ message.severity | severity_icon }}&nbsp{{ message.message|enrich }}
                                                         </div>
                                                     {% endfor %}
                                                 </div>
