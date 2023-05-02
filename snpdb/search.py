@@ -745,11 +745,14 @@ class SearchResponsesCombined:
                 return None
             if id_matches[0].is_perfectly_valid:
                 return id_matches[0]
+            return None
+
+        correct_genome_build_results = [result for result in self.results if not result.genome_build_mismatch]
 
         # alternatively if we only have 1 match, return it
-        elif len(self.results) == 1:
-            first_result = self.results[0]
-            if first_result.is_perfectly_valid:
+        if len(correct_genome_build_results) == 1:
+            first_result = correct_genome_build_results[0]
+            if first_result.is_perfectly_valid and first_result.match_strength >= SearchResultMatchStrength.STRONG_MATCH:
                 return first_result
 
     @property
