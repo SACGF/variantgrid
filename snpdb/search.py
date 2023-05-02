@@ -399,6 +399,8 @@ def _default_make_search_result(obj) -> Optional['SearchResult']:
     """
     if isinstance(obj, SearchResult):
         return obj
+    elif isinstance(obj, PreviewData):
+        return SearchResult(preview=obj)
     else:
         return SearchResult(preview=obj.preview)
 
