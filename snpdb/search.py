@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from functools import cached_property, reduce
 from re import IGNORECASE
-from typing import List, Set, Optional, Type, Pattern, Callable, Any, Match, Union, Dict
+from typing import List, Set, Optional, Type, Pattern, Callable, Any, Match, Union, Dict, Iterable
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -229,6 +229,10 @@ class SearchMessage:
     def with_genome_build(self, genome_build: GenomeBuild) -> 'SearchMessage':
         return SearchMessage(message=self.message, severity=self.severity, genome_build=genome_build)
 
+    @staticmethod
+    def highest_severity(iterable: Iterable['SearchMessage']) -> LogLevel:
+        return max(iterable, key=lambda sm: log_level_to_int(sm), default=LogLevel.INFO)
+
 
 @dataclass(frozen=True)
 class SearchResultGenomeBuildMessages:
@@ -259,14 +263,37 @@ class SearchResult:
     """
 
     preview: PreviewData
+    """
+    The actual object returned by the search
+    """
+
     messages: List[SearchMessage] = field(default_factory=list)
+    """
+    Any validation messages associated with the preview
+    """
+
     match_strength: SearchResultMatchStrength = None
+    """
+    How strong was the match, will default to the @search_receiver's max strength
+    """
+
     ignore_genome_build_mismatch: bool = False
-    # this is provided automatically by the search framework
+    """
+    Very specific usage, if searching on g. where the genome build is built into the search data,
+    don't warn the user that the value returned isn't their default genome build
+    """
 
     parent: Optional['SearchResponse'] = None
+    """
+    Populated automatically, don't set this in @search_receivers
+    """
+
     original_order: Optional[int] = None
-    # the above two should be populated by outside code
+    """
+    Populated automatically, don't set this in @search_receivers.
+    Allows the SearchResponse to maintain the order of results as provided to it, but provide higher level sorting
+    based on preferred genome build or other factors
+    """
 
     @property
     def sub_name(self) -> str:
@@ -286,6 +313,11 @@ class SearchResult:
 
     @cached_property
     def genome_build_relevant_messages(self) -> [SearchMessage]:
+        """
+        What validation messages are relevant to show for this record, e.g. if it's a variant found using both 37 & 38
+        and the user's preferred genome build is 38, this will return messages associated to no genome build and to
+        38 (ignoring any associated to 37)
+        """
         preferred_gb = self.parent.search_input.genome_build_preferred
         if not self.genome_builds:
             return self.messages
@@ -296,6 +328,9 @@ class SearchResult:
 
     @property
     def genome_builds_with_messages(self) -> List[SearchResultGenomeBuildMessages]:
+        """
+        Lists genome build with associated messages
+        """
         all_results = []
         for genome_build in sorted(self.genome_builds):
             messages = [message for message in self.messages if message.genome_build == genome_build]
@@ -304,13 +339,21 @@ class SearchResult:
 
     @cached_property
     def genome_build_mismatch(self) -> bool:
+        """
+        Returns if the result is not genome build agnostic, is not associated with the user's preferred genome build, and the result doesn't
+        ignore genome build mismatches
+        """
         if not self.ignore_genome_build_mismatch and self.genome_builds and self.parent.search_input.genome_build_preferred not in self.genome_builds:
             return True
         return False
 
     @property
     def is_perfectly_valid(self):
-        return not self.genome_build_relevant_messages and not self.genome_build_mismatch
+        """
+        Make sure there are no relevant errors or genome build mismatch.
+        Used to determine if a result can be auto-redirected to
+        """
+        return SearchMessage.highest_severity(self.genome_build_relevant_messages) != 'E' and not self.genome_build_mismatch
 
     def _preview_icon_severity(self, severity: str):
         icon = self.preview.icon
@@ -325,6 +368,8 @@ class SearchResult:
 
     @property
     def preview_icon_with_severity(self):
+        # coloring the icon became too busy, we're already showing info/warning/error icons against the record
+        # no need to re-color the icon
         return self._preview_icon_severity('success')
         # if self.messages:
         #     return self._preview_icon_severity('warning')
@@ -332,18 +377,12 @@ class SearchResult:
         #     return self._preview_icon_severity('success')
 
     @property
-    def search_type(self):
+    def search_type(self) -> str:
         return self.preview.category
 
     @property
-    def genome_builds(self):
+    def genome_builds(self) -> Optional[Set[GenomeBuild]]:
         return self.preview.genome_builds
-
-    @property
-    def genome_build_names(self):
-        if gbs := self.preview.genome_builds:
-            return list(sorted(gbs))
-        return []
 
     @property
     def annotation_consortium(self):
@@ -353,6 +392,11 @@ class SearchResult:
 
 
 def _default_make_search_result(obj) -> Optional['SearchResult']:
+    """
+    This is the default converter for making an object into a SearchResult (based on what is yielded by a
+    @search_receiver. Handling of iterables, and tuple data is handled outside of this.
+    Note that a @search_receiver can return a factory Callable to replace this.
+    """
     if isinstance(obj, SearchResult):
         return obj
     else:
@@ -361,18 +405,45 @@ def _default_make_search_result(obj) -> Optional['SearchResult']:
 
 @dataclass
 class _SearchResultFactory:
+    """
+    Is in charge of converting raw output from a @search_receiver into SearchResults
+    """
+
     source: Any
+    """
+    Could be a
+    * QuerySet, a PreviewData, an instance of a PreviewModelMixin or list
+    * A tuple where the first item is any of the above, and the subsequent items are:
+    ** str, List[str], SearchMessage, List[SearchMessage] - to be converted to SearchMessage and applies to every
+    value from the first index.
+    ** A callable that takes a value from the first item of the tuple and creates a SearchResult (handy for providing
+    extra validation).
+    """
+
     converter: Callable[[Any], SearchResult]
+    """
+    A callable that takes a value from the first item of the tuple and creates a SearchResult (handy for providing
+    extra validation)
+    """
+
     extra_messages: List[SearchMessage]
+    """
+    If str, List[str] etc is provided in a tuple yielded from a @search_receiver, the messages apply to every object
+    that came from the first parameter
+    """
 
     @staticmethod
     def convert(output: Any):
         source: Any
         factory: Callable[[Any], SearchResult] = _default_make_search_result
         extra_messages: List[SearchMessage] = []
-        if isinstance(output, (tuple, list)):
+
+        if isinstance(output, tuple):
+            # if we got a tuple or a list, the first entry is the "source" and the subsequent values
+            # will be messages or a converter
             source = output[0]
             for extra in output[1:]:
+                # loop through the
                 if isinstance(extra, str):
                     extra_messages.append(SearchMessage(message=extra))
                 elif isinstance(extra, SearchMessage):
@@ -389,18 +460,28 @@ class _SearchResultFactory:
                 else:
                     raise ValueError(f"Search method yielded extra {extra}, expected str, list[str] or callable")
         else:
+            # should be a QuerySet (of PreviewModelMixin), list (of PreviewModelMixin instances), or a single instance of one
             source = output
 
         return _SearchResultFactory(source=source, converter=factory, extra_messages=extra_messages)
 
     @property
     def _iterable(self):
+        """
+        Turn source into a splicable iteratable object
+        :return:
+        """
         if isinstance(self.source, (list, QuerySet)):
             return self.source
         else:
             return [self.source]
 
     def __len__(self) -> int:
+        """
+        Returns the maximum number of results this factory could return
+        (importantly returns .count() on QuerySets). Allows us to return a max of 50 results, while also reporting
+        the maximum number of results that were returned.
+        """
         if isinstance(self.source, list):
             return len(self.source)
         elif isinstance(self.source, QuerySet):
@@ -408,7 +489,13 @@ class _SearchResultFactory:
         else:
             return 1
 
-    def iterate(self, limit: int = 20):
+    def iterate(self, limit: int = MAX_RESULTS_PER_SEARCH) -> Iterable[SearchResult]:
+        """
+        start spitting out SearchResponse up to a limit of records
+        :param limit: The maximum number of results to return, if multiple things were yielded keep reducing the limit based on how many
+        records were returned by previous _SearchResultFactories
+        :return: An iterator that will return 0 to limit SearchResult
+        """
         for obj in self._iterable[:limit]:
             search_result = self.converter(obj)
             if search_result is None:
@@ -422,23 +509,78 @@ class _SearchResultFactory:
 
 @dataclass(frozen=True)
 class SearchExample:
+    """
+    For a @search_receiver, provide an example of how the data can be searched. Is shown to the user.
+    """
+
     note: Optional[str] = None
+    """
+    English explanation of what text will activate this search
+    """
+
     examples: Optional[List[str]] = None
+    """
+    An example of input that will activate the search
+    """
 
 
 @dataclass()
 class SearchResponse:
+    """
+    The output of a @search_receiver, e.g. all the MONDO terms found by a MONDO name search. Variant search is
+    broken up into multiple searches e.g. c.HGVS, Variant Coordinate, and each will return a SearchResponse
+    """
+
     search_input: SearchInput
+    """
+    What was the input that resulted in this output
+    """
+
     search_type: PreviewCoordinator
+    """
+    What's our default icon and category
+    """
+
     matched_pattern: bool = False
+    """
+    Did the search input match the basic pattern required for this search to fire. If false, there should be no
+    results or messages_overall. If there was no search input we still get all the search_responses
+    """
+
     sub_name: Optional[str] = None
+    """
+    The sub_name as taken from the @search_receiver
+    """
+
     admin_only: bool = False
+    """
+    Is this search for admin users only
+    """
+
     example: Optional[SearchExample] = None
+    """
+    The example to show to the user
+    """
+
     results: List[SearchResult] = field(default_factory=list)
+    """
+    Actual search results if matched_pattern
+    """
+
     messages_overall: List[SearchMessageOverall] = field(default_factory=list)
+    """
+    Messages about the search overall that aren't linked to a single record.
+    Handy if the input is broken
+    """
+
     total_count: int = 0
+    """
+    How many search results were calculated (should be equal to or larger than the length of results)
+    """
 
     def __post_init__(self):
+        # once you create a SearchResponse, don't mutate it as __post_init__ fixes a few things
+        # can't make it frozen due to
         for i, result in enumerate(self.results):
             result.original_order = i
             result.parent = self
@@ -447,12 +589,13 @@ class SearchResponse:
         self.messages_overall = [om.with_response(self) for om in self.messages_overall]
 
     @property
-    def preview_category(self):
-        # django templates don't handle {{ UserPreview.preview_category }} for some unknown reason, works for all models classes
+    def preview_category(self) -> str:
+        # overall category (the category on individual results within a SearchResponse can be of different categories
+        # but this is not recommended
         return self.search_type.preview_category()
 
     @property
-    def preview_icon(self):
+    def preview_icon(self) -> str:
         return self.search_type.preview_icon()
 
     def __lt__(self, other):

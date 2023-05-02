@@ -131,9 +131,9 @@
                 </div>
             </div>
             <input id="search-mode" name="mode" type="hidden" value="{{ form.mode.value }}" />
-            <label class="form-check-label form-check-inline mt-2" title="If ticked, automatically redirects if there's a single best record">
+            <label class="form-check-label form-check-inline mt-2">
                 <input id='feeling-lucky' type='checkbox' value="lucky" class="form-check mr-2" {% if form.mode.value != 'preview' %}checked{% endif %} onclick="updateSearchMode()"/>
-                I'm feeling lucky
+                Automatically open best unambiguous valid search result
             </label>
         </form>
 
@@ -184,7 +184,7 @@
                                                 {{ search_result.annotation_consortium.name }}
                                             </div>
                                             {% endif %}
-                                            {% if search_result.genome_build_names %}
+                                            {% if search_result.genome_builds %}
                                                 <nomin class="d-block text-small">
                                                     <span class="text-secondary">{% if search_result.genome_build_mismatch %}{{ 'W' | severity_icon:'This is not your preferred genome build' }}{% endif %}
                                                     Matched on </span> {% for gb_messages in search_result.genome_builds_with_messages %}

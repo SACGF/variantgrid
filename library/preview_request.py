@@ -178,6 +178,7 @@ class PreviewData:
     external_url: Optional[str] = None
     genome_builds: Optional[Set['GenomeBuild']] = None
     annotation_consortium: Optional['AnnotationConsortium'] = None
+    # FIXME make annotation consortium into annotation consortia (plural) and add better error support
     obj: Optional[Any] = None
 
     @staticmethod
