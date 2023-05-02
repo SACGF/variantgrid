@@ -613,6 +613,11 @@ QUOTES_RE = re.compile(r'"(.*?)"')
 
 @register.filter(name='enrich')
 def enrich(text: str):
+    """
+    Take some plain text and make it look fancy as HTML. Currently just formats data in double quotes.
+    :param text: The text to be enriched
+    :return: HTML
+    """
     parts = []
     is_quotes = False
     for part in QUOTES_RE.split(text):
