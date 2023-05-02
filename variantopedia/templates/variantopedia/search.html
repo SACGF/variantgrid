@@ -3,7 +3,6 @@
 {% load crispy_forms_field %}
 {% load ui_utils %}
 {% load ui_menu_bars %}
-{% load search_tags %}
 {% load user_tag_color_tags %}
 {% load settings_tags %}
 {% load js_tags %}
@@ -207,9 +206,6 @@
                                                     </span>
                                                 {% endfor %}
                                             </div>{% endif %}
-                                            {% if search_summary %}
-                                                {% search_summary request.user search_result %}
-                                            {% endif %}
                                             {% if search_result.messages %}
                                                 <div class="mt-2">
                                                     {% for message in search_result.genome_build_relevant_messages %}
