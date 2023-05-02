@@ -11,7 +11,7 @@ GENE_PATTERN = re.compile(r"^(?P<prefix>ENSG|GENE\s*(?:ID)?\s*:\s*)(?P<id>\d+)$"
     pattern=GENE_PATTERN,
     example=SearchExample(
         note="Ensemble or RefSeq Gene reference",
-        examples=["GeneID:145"]
+        examples=["GeneID:2624"]
     )
 )
 def gene_search(search_input: SearchInputInstance):
