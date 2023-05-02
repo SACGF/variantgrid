@@ -210,7 +210,7 @@ def search_variant_match(search_input: SearchInputInstance):
             return SearchMessageOverall(", ".join(errors))
         else:
             variant_string = Variant.format_tuple(chrom, position, ref, alt)
-            search_message = f"The variant {variant_string} does not exist in the database"
+            search_message = f"The variant {variant_string} does not exist in our database"
             if create_manual := VariantExtra.create_manual_variant(search_input.user, genome_build=genome_build, variant_string=variant_string):
                 return create_manual, search_message
 

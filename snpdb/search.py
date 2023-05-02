@@ -16,7 +16,7 @@ from more_itertools import take
 
 from library.enums.log_level import LogLevel
 from library.log_utils import report_exc_info, report_message, log_level_to_int, log_level_to_bootstrap
-from library.preview_request import PreviewCoordinator, PreviewData
+from library.preview_request import PreviewCoordinator, PreviewData, PreviewModelMixin
 from library.utils import clean_string, first
 from snpdb.models import UserSettings, GenomeBuild, Variant, Allele
 
@@ -33,6 +33,8 @@ MAX_RESULTS_PER_SEARCH = 50
 
 
 """
+Important: If you just want to create a new search, jump to the @search_receiver and read the documention there
+
 Key components of search
 
 SearchInput: Handles all the adjustable parameters of search, the user who iniated the search, their preferred genome build, the text they're searching for etc.
@@ -99,6 +101,10 @@ class SearchInput:
         response_tuples = search_signal.send_robust(sender=SearchInput, search_input=self)
         for caller, response in response_tuples:
             if response:
+                if response is None:
+                    # we may occasionally skip searches for some reasons, such as we're here from classify
+                    # so we only care about variant matches
+                    continue
                 if isinstance(response, SearchResponse):
                     valid_responses.append(response)
                 else:
@@ -614,7 +620,7 @@ def _convert_variant_search_response_to_allele_search_response(variant_response:
     allele_to_variants: Dict[Allele, List[SearchResult]] = defaultdict(list)
     no_allele_variants: List[SearchResult] = []
     allele_results: List[SearchResult] = []
-    non_variant_data: List[SearchResult] = []  # probably ManulCreateVariants etc., just call them Allele data
+    non_variant_data: List[SearchResult] = []  # probably ManualCreateVariants etc
 
     for result in variant_response.results:
         if obj := result.preview.obj:
@@ -680,6 +686,10 @@ def _convert_variant_search_response_to_allele_search_response(variant_response:
 
 @dataclass
 class SearchCount:
+    """
+    Used to provide a search result count summary in the nav bar
+    """
+
     category: str
     resolved: int = 0
     total: int = 0
@@ -690,6 +700,9 @@ class SearchCount:
 
 
 class SearchResponsesCombined:
+    """
+    Is the complete output of a SearchInput across all searches
+    """
 
     def __init__(self, search_input: SearchInput, responses: List[SearchResponse]):
         self.search_input = search_input
@@ -740,18 +753,20 @@ class SearchResponsesCombined:
             if first_result.is_perfectly_valid:
                 return first_result
 
-        # FIXME support for variant results across genome builds that haven't been merged into alleles
-
     @property
     def summary(self) -> str:
+        # is recorded in the EventLog
         return f"{self.search_input.search_string}' calculated {len(self.results)} results."
-
-    @cached_property
-    def grouped_search_infos(self) -> List[SearchResponse]:
-        return sorted(self.responses, key=lambda sr: (sr.preview_category, sr.sub_name.upper() if sr.sub_name else ""))
 
 
 def search_data(user: User, search_string: str, classify: bool = False) -> SearchResponsesCombined:
+    """
+    Call externally to do all the magic of searching
+    :param user: The user performing the search
+    :param search_string: The text that we entered
+    :param classify: Have we come from a user wanting to classify a given HGVS
+    :return: SearchResponseCombined
+    """
     user_settings = UserSettings.get_for_user(user)
     search_input = SearchInput(
         user=user,
@@ -772,9 +787,40 @@ def search_receiver(
         match_strength: Optional[SearchResultMatchStrength] = SearchResultMatchStrength.STRONG_MATCH
     ) -> Callable[[Callable], Callable[[SearchInput], SearchResponse]]:
     """
-    Wrap around a method that takes a SearchInputInstance and yields QuerySets and/or individual objects, optionally as part of a tuple
-    where the subsequent items are validation messages.
-    Note that the wrapped method will take a SearchInput and return a SearchResponse object.
+    Wrap around a Callable[[SearchInputInstance], Generator[Any]]
+    The wrapped method can return:
+    A single PreviewData, Model[PreviewDataMixin], SearchResult
+    A QuerySet or List of PreviewDataMixin
+    A tuple where the first element is one of the above, and the subsequent items:
+    * SearchMessage or str that will be turned into SearchMessage and/or
+    * A Callable[[T], SearchResult] where T is what the first element returns (or the first element is a QuerySet of).
+
+    For some examples:
+
+    def super_simple_search(search_input: SearchInputInstance):
+        yield Model.objects.filter(xxx)
+
+    def simple_search(search_input: SearchInputInstance):
+        for x in filtered_results:
+            yield x
+
+    def medium_search(search_input: SearchInputInstance):
+        for x in filtered_results:
+            messages: List[str] = validate(x)
+            yield x, messages
+
+    def complicated_search(search_input: SearchInputInstance):
+        def validate_data(data):
+            ...
+            return SearchResult(preview_of_data(data), validation_message_for_data)
+        return Data.objects.filter(xxx), validate_data
+
+    The complicated_search example doesn't iterate over every result, but provide a method that will annotate a result with
+    validation messages. This is useful for lazily validating only relevant results when we're going to limit the results
+    returned to 50 for example.
+
+    Note that after the decoration, the wrapped method signature will take a SearchInput and return a SearchResponse object.
+
     :param search_type: Something that has preview_category(), preview_icon() and preview_enabled() for overall properties of the search
     :param pattern: A regex pattern that must be met for the search to be invoked. The search will be passed a SearchInputInstance with the match result
     :param admin_only: Is this search for admin users only, won't be invoked or displayed for non admins.
@@ -798,6 +844,9 @@ def search_receiver(
             matched_pattern = False
             results = []
             total_count = 0
+
+            if search_input.classify and search_type.preview_category() != "Variant":
+                return None
 
             try:
                 if match := pattern.search(search_input.search_string):

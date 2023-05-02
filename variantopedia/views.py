@@ -414,6 +414,7 @@ def search(request):
     context = {
         "user_settings": user_settings,
         "form": form,
+        "classify": classify,
         "search": search_string,
         "search_results": search_results,
         "single_preferred_result": single_preferred_result

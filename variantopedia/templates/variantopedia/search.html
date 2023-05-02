@@ -120,10 +120,11 @@
 
     <div class="container position-relative">
         <div>
-            <h3>Search</h3>
+            <h3>{% if classify %}Classify{% else %}Search{% endif %}</h3>
         </div>
 
         <form id="search-form inline-form" method="get">
+            {% if classify %}<input type="hidden" name="classify" value="True" />{% endif %}
             <div class="input-group">
                 <input id="big_search" class="form-control" name="search" placeholder="Search" value="{{ form.search.value }}" autofocus="autofocus">
                 <div class="input-group-append">
@@ -230,27 +231,27 @@
         <div class="card mt-4">
             <div class="card-header">Accepted Inputs</div>
             <div class="card-body">
-                {% for search_result in search_results.grouped_search_infos %}
+                {% for search_response in search_results.responses %}
                     <div class="row d-flex align-items-center" style="min-height:30px;">
-                        <div class="col-3 text-right {% if not search_result.sub_name and search_result.matched_pattern and user.is_superuser %}searched{% endif %}">
-                            {% ifchanged search_result.preview_category %}
-                                <i class="{{ search_result.preview_icon }} mr-2" style="opacity:0.75"></i>
+                        <div class="col-3 text-right {% if not search_response.sub_name and search_response.matched_pattern and user.is_superuser %}searched{% endif %}">
+                            {% ifchanged search_response.preview_category %}
+                                <i class="{{ search_response.preview_icon }} mr-2" style="opacity:0.75"></i>
                                 <label>
-                                    {{ search_result.preview_category }}
+                                    {{ search_response.preview_category }}
                                 </label>
                             {% endifchanged %}
                         </div>
                         <div class="col-9">
-                            {% if search_result.admin_only %}<i class="fa-solid fa-key mr-2"></i>{% endif %}
-                            {% if search_result.sub_name %}
-                                <label {% if search_result.matched_pattern and user.is_superuser %}class="searched"{% endif %}>{{ search_result.sub_name }}</label><span class="d-inline mx-1">-</span>
+                            {% if search_response.admin_only %}<i class="fa-solid fa-key mr-2"></i>{% endif %}
+                            {% if search_response.sub_name %}
+                                <label {% if search_response.matched_pattern and user.is_superuser %}class="searched"{% endif %}>{{ search_response.sub_name }}</label><span class="d-inline mx-1">-</span>
                             {% endif %}
-                            {% if search_result.example %}
-                                {% if search_result.example.note %}
-                                    {{ search_result.example.note }}
+                            {% if search_response.example %}
+                                {% if search_response.example.note %}
+                                    {{ search_response.example.note }}
                                 {% endif %}
-                                {% if search_result.example.examples %}
-                                    {% for example in search_result.example.examples %}
+                                {% if search_response.example.examples %}
+                                    {% for example in search_response.example.examples %}
                                         <span class="example ml-1">{{ example }}</span>
                                         <nomin> </nomin>
                                     {% endfor %}
