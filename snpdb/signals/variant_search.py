@@ -46,7 +46,8 @@ class VariantExtra:
             icon="fa-solid fa-circle-plus",
             title="Click to create and annotate this variant",
             internal_url=internal_url,
-            genome_builds={genome_build}
+            genome_builds={genome_build},
+            is_operation=True
         )
 
     @staticmethod
@@ -69,7 +70,8 @@ class VariantExtra:
             title="Click to classify variant",
             internal_url=internal_url,
             genome_builds=variant.genome_builds,
-            obj=variant
+            obj=variant,
+            is_operation=True
         )
 
     @staticmethod
@@ -86,7 +88,8 @@ class VariantExtra:
             icon="fa-solid fa-circle-plus",
             title=f"Click to classify from unvalidated HGVS: '{hgvs_string}'",
             internal_url=internal_url,
-            genome_builds={genome_build}
+            genome_builds={genome_build},
+            is_operation=True
         )
 
 

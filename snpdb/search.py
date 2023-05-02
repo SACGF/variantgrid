@@ -356,10 +356,10 @@ class SearchResult:
     @property
     def is_perfectly_valid(self):
         """
-        Make sure there are no relevant errors or genome build mismatch.
+        Make sure there are no relevant errors or genome build mismatch or if this is an operation that should probably not occur instantly.
         Used to determine if a result can be auto-redirected to
         """
-        return SearchMessage.highest_severity(self.genome_build_relevant_messages) not in ('W','E') and not self.genome_build_mismatch
+        return SearchMessage.highest_severity(self.genome_build_relevant_messages) not in ('W', 'E') and not self.genome_build_mismatch and not self.preview.is_operation
 
     def _preview_icon_severity(self, severity: str):
         icon = self.preview.icon

@@ -178,8 +178,8 @@ class PreviewData:
     external_url: Optional[str] = None
     genome_builds: Optional[Set['GenomeBuild']] = None
     annotation_consortia: Optional[Set['AnnotationConsortium']] = None
-    # FIXME make annotation consortium into annotation consortia (plural) and add better error support
     obj: Optional[Any] = None
+    is_operation: bool = False  # indicates that the preview data is the preview of an operation to create the data
 
     @staticmethod
     def for_object(
@@ -192,7 +192,8 @@ class PreviewData:
             internal_url: Optional[str] = None,
             external_url: Optional[str] = None,
             genome_builds: Optional[Set['GenomeBuild']] = None,
-            annotation_consortia: Optional[Set['AnnotationConsortium']] = None):
+            annotation_consortia: Optional[Set['AnnotationConsortium']] = None,
+            is_operation: bool = False):
 
         if category is None:
             if hasattr(obj, "_meta"):
@@ -249,7 +250,8 @@ class PreviewData:
             internal_url=internal_url,
             external_url=external_url,
             genome_builds=genome_builds,
-            annotation_consortia=annotation_consortia
+            annotation_consortia=annotation_consortia,
+            is_operation=is_operation
         )
 
     @cached_property
