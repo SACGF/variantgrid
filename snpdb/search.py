@@ -625,13 +625,16 @@ def _convert_variant_search_response_to_allele_search_response(variant_response:
     non_variant_data: List[SearchResult] = []  # probably ManualCreateVariants etc
 
     for result in variant_response.results:
+        if result.preview.icon == Variant.preview_icon():
+            result.preview.icon = Allele.preview_icon()
+        if result.preview.category == Variant.preview_category():
+            result.preview.category = Allele.preview_category()
+
         if obj := result.preview.obj:
             if isinstance(obj, Variant):
                 if allele := obj.allele:
                     allele_to_variants[allele].append(result)
                 else:
-                    # hack variant icon to be Allele icon even if there's no allele
-                    result.preview_icon = Allele.preview_icon()
                     no_allele_variants.append(result)
             else:
                 non_variant_data.append(result)
@@ -669,7 +672,6 @@ def _convert_variant_search_response_to_allele_search_response(variant_response:
     top_level_messages = variant_response.messages_overall or []
     if no_allele_variants:
         for no_allele in no_allele_variants:
-            no_allele.preview.category = "Allele"
             no_allele.messages.append(SearchMessage("This variant is not yet linked to an allele", severity=LogLevel.INFO))
             all_results.append(no_allele)
 
