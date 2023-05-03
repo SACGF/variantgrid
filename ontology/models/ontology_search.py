@@ -17,7 +17,7 @@ def validate_ontology(term: OntologyTerm, preview_proxy: Optional[PreviewProxyMo
     elif term.status == OntologyTermStatus.DEPRECATED:
         messages = [SearchMessage("This term is obsolete")]
     elif term.status == OntologyTermStatus.NON_CONDITION:
-        messages = [SearchMessage("Note this term is not a suitable value for condition")]
+        messages = [SearchMessage("Note this term is not a suitable value for a classification's condition")]
     preview = term.preview
     if preview_proxy:
         preview.category = preview_proxy.preview_category()

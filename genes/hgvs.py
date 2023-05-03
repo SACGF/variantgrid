@@ -18,7 +18,7 @@ from Bio.Data.IUPACData import protein_letters_1to3_extended
 from django.conf import settings
 from django.core.cache import cache
 from django.db.models import Max, Min
-from pyhgvs import HGVSName
+from pyhgvs import HGVSName, get_genomic_sequence
 from pyhgvs.models.hgvs_name import get_refseq_type
 from pyhgvs.utils import make_transcript
 
@@ -493,7 +493,34 @@ class VariantCoordinateAndDetails(FormerTuple):
         return self.variant_coordinate, self.transcript_accession, self.kind, self.method, self.matches_reference
 
 
+class HgvsMatchRefAllele:
+    """
+    This can replace matches_ref (by returning true when it does match)
+    """
+
+    @staticmethod
+    def instance(hgvs, genome, transcript=None) -> 'HgvsMatchRefAllele':
+        """Return True if reference allele matches genomic sequence."""
+        is_forward_strand = transcript.tx_position.is_forward_strand if transcript else True
+        ref, _ = hgvs.get_ref_alt(is_forward_strand,
+                                  raw_dup_alleles=True)  # get raw values so dup isn't always True
+        chrom, start, end = hgvs.get_raw_coords(transcript)
+        genome_ref = get_genomic_sequence(genome, chrom, start, end)
+
+        return HgvsMatchRefAllele(provided_ref=ref, calculated_ref=genome_ref)
+
+    def __init__(self, provided_ref: str, calculated_ref: str):
+        self.provided_ref = provided_ref
+        self.calculated_ref = calculated_ref
+
+    def __bool__(self):
+        return self.provided_ref == self.calculated_ref
+
+
 class HGVSMatcher:
+    # "NR", "NM", "NC", "ENST", "LRG_", "XR"}
+
+    TRANSCRIPT_PREFIX = re.compile(r"^(NR|NM|NC|ENST|LRG|XR)", re.IGNORECASE)
     TRANSCRIPT_NO_UNDERSCORE = re.compile(r"^(NM|NC)(\d+)")
     TRANSCRIPT_UNDERSCORE_REPLACE = r"\g<1>_\g<2>"
     # noinspection RegExpSingleCharAlternation
@@ -501,6 +528,12 @@ class HGVSMatcher:
     HGVS_SLOPPY_REPLACE = r"\g<1>:\g<2>.\g<3>"
     HGVS_TRANSCRIPT_NO_CDOT = re.compile(r"^(NM_|ENST)\d+.*:\d+")
     HGVS_CONTIG_NO_GDOT = re.compile(r"^NC_\d+.*:\d+")
+
+    C_DOT_REF_ALT_NUC = re.compile("(?P<ref>[gatc]+)>(?P<alt>[gatc=]+)$", re.IGNORECASE)
+
+    C_DOT_REF_DEL_INS_DUP_NUC = re.compile(r"(del(?P<del>[gatc]+))?(?P<op>ins|dup|del)(?P<ins>[gatc]*)$")
+    # captures things in teh form of delG, insG, dupG & delGinsC
+    # the del pattern at the start is only for delins, as otherwise the op del is captured
 
     HGVS_METHOD_PYHGVS = f"pyhgvs v{metadata.version('pyhgvs')}"
     HGVS_METHOD_CLINGEN_ALLELE_REGISTRY = "ClinGen Allele Registry"
@@ -557,8 +590,8 @@ class HGVSMatcher:
         chrom = contig.name
 
         fasta = self.genome_build.genome_fasta.fasta
-        matches_reference = pyhgvs.matches_ref_allele(hgvs_name, fasta, pyhgvs_transcript)
-        return (chrom, position, ref, alt), matches_reference
+        return (chrom, position, ref, alt), HgvsMatchRefAllele.instance(hgvs_name, fasta, pyhgvs_transcript)
+
 
     def _clingen_get_variant_tuple(self, hgvs_string: str):
         # ClinGen Allele Registry doesn't like gene names - so strip (unless LRG_)
@@ -1020,8 +1053,28 @@ class HGVSMatcher:
             # Best bet is to just strip all of them
             cleaned_hgvs = cleaned_hgvs.replace("(", "").replace(")", "")
 
+        if transcript_prefix_match := cls.TRANSCRIPT_PREFIX.search(cleaned_hgvs):
+            transcript_prefix = transcript_prefix_match.group(0)
+            if transcript_prefix != transcript_prefix.upper():
+                cleaned_hgvs = cls.TRANSCRIPT_PREFIX.sub(transcript_prefix.upper(), cleaned_hgvs)
+
         cleaned_hgvs = cls.TRANSCRIPT_NO_UNDERSCORE.sub(cls.TRANSCRIPT_UNDERSCORE_REPLACE, cleaned_hgvs)
         cleaned_hgvs = cls.HGVS_SLOPPY_PATTERN.sub(cls.HGVS_SLOPPY_REPLACE, cleaned_hgvs)
+
+        def fix_ref_alt(m):
+            return m.group('ref').upper() + '>' + m.group('alt').upper()
+
+        def fix_del_ins(m):
+            parts = []
+            if del_nucs := m.group('del'):
+                parts.append(f"del{del_nucs.upper()}")
+            parts.append(m.group('op'))
+            parts.append(m.group('ins').upper())
+            return "".join(parts)
+
+
+        cleaned_hgvs = cls.C_DOT_REF_ALT_NUC.sub(fix_ref_alt, cleaned_hgvs)
+        cleaned_hgvs = cls.C_DOT_REF_DEL_INS_DUP_NUC.sub(fix_del_ins, cleaned_hgvs)
 
         # If it contains a transcript and a colon, but no "c." then add it
         if cls.HGVS_TRANSCRIPT_NO_CDOT.match(cleaned_hgvs):

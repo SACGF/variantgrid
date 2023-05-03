@@ -739,7 +739,7 @@ class SearchResponsesCombined:
         return list(itertools.chain.from_iterable([response.messages_overall for response in self.responses]))
 
     def single_preferred_result(self):
-        if first(message for message in self.messages_overall if message.severity == LogLevel.ERROR):
+        if first(message for message in self.messages_overall if log_level_to_int(message.severity) >= log_level_to_int(LogLevel.WARNING)):
             return None
 
         # If we have ID Matches, ignore other matches for auto-jumping to results

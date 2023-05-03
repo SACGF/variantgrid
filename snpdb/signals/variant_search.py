@@ -13,7 +13,7 @@ from pyhgvs import HGVSName, InvalidHGVSName
 
 from annotation.manual_variant_entry import check_can_create_variants, CreateManualVariantForbidden
 from classification.models import Classification, CreateNoClassificationForbidden
-from genes.hgvs import HGVSMatcher
+from genes.hgvs import HGVSMatcher, HgvsMatchRefAllele
 from genes.models import MissingTranscript, MANE, TranscriptVersion, GeneSymbol
 from genes.models_enums import AnnotationConsortium
 from library.enums.log_level import LogLevel
@@ -414,16 +414,24 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
     # can add on search_message to objects to (stop auto-jump and show message)
     original_hgvs_string = hgvs_string
     variant_tuple = None
-    used_transcript_accession = None
+    used_transcript_accession: Optional[str] = None
     kind = None
-    hgvs_string, hgvs_search_messages = HGVSMatcher.clean_hgvs(hgvs_string)
-    search_messages: List[SearchMessage] = [SearchMessage(m) for m in hgvs_search_messages]
+    clean_hgvs_string, _ = HGVSMatcher.clean_hgvs(hgvs_string)
+    if clean_hgvs_string != hgvs_string:
+        yield SearchMessageOverall(f'Cleaned "{hgvs_string}" => "{clean_hgvs_string}"')
+        hgvs_string = clean_hgvs_string
+
+    search_messages: List[SearchMessage] = [] #[SearchMessage(m) for m in hgvs_search_messages]
 
     try:
         variant_tuple, used_transcript_accession, kind, method, matches_reference = hgvs_matcher.get_variant_tuple_used_transcript_kind_method_and_matches_reference(hgvs_string)
-        if matches_reference is False:
+        if not matches_reference:
             ref_base = variant_tuple[2]
-            search_messages.append(SearchMessage(f'Using reference "{ref_base}" from our build', LogLevel.ERROR))
+            if isinstance(matches_reference, HgvsMatchRefAllele):
+                search_messages.append(SearchMessage(f'Using reference "{ref_base}" from our build, in place of provided reference "{matches_reference.provided_ref}"', LogLevel.ERROR))
+            else:
+                search_messages.append(
+                    SearchMessage(f'Using reference "{ref_base}" from our build', LogLevel.ERROR))
 
     except (MissingTranscript, Contig.ContigNotInBuildError):
         # contig triggered from g.HGVS from another genome build - can't do anything just return no results
@@ -456,7 +464,26 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
 
     if used_transcript_accession:
         if used_transcript_accession not in hgvs_string:
-            search_messages.append(SearchMessage(f"Used transcript version \"{used_transcript_accession}\""))
+            old_transcript_version = None
+            # are we just inserting a version because none was provided, or are we changing it
+
+            if '.' in used_transcript_accession:
+                used_transcript_versionless = used_transcript_accession.split('.')[0]
+                if (used_transcript_versionless + '.') in hgvs_string:
+                    transcript_index = hgvs_string.index(used_transcript_versionless)
+                    transcript_version_index = transcript_index + len(used_transcript_versionless) + 1
+                    old_transcript_version = ''
+                    for c in hgvs_string[transcript_version_index:]:
+                        print(c)
+                        if '0' <= c <= '9':
+                            old_transcript_version += c
+                        else:
+                            break
+
+            if old_transcript_version:
+                search_messages.append(SearchMessage(f"Used transcript version \"{used_transcript_accession}\" instead of version \"{old_transcript_version}\"", severity=LogLevel.ERROR))
+            else:
+                search_messages.append(SearchMessage(f"Used transcript version \"{used_transcript_accession}\"", severity=LogLevel.INFO))
 
         hgvs_name = HGVSName(hgvs_string)
         # If these were in wrong order they have been switched now
