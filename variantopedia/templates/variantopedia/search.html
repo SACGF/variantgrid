@@ -172,8 +172,12 @@
                         {% for search_result in search_results.results %}
                             {% with preview=search_result.preview %}
                                 <a {% ifchanged preview.category %}id="results-{{ preview.category|id_safe }}"{% endifchanged %}
-                                        class="list-group-item list-group-item-action list-group-item-okay result-{{ preview.category|id_safe }}" href="{{ preview.internal_url }}">
+                                        class="list-group-item list-group-item-action list-group-item-okay result-{{ preview.category|id_safe }}" href="{{ preview.internal_url }}"
+                                        style="{% if search_result.genome_build_mismatch %}opacity:0.5{% endif %}"
+                                        >
                                     <div class="row d-flex align-items-center" style="color:#444">
+
+                                        {% comment %}"Header" information on the left{% endcomment %}
                                         <div class="col-3 text-right">
                                             {% if single_preferred_result and single_preferred_result == search_result %}<i class="fa-solid fa-star text-success" title="This is the best result"></i>{% endif %}
                                             {% if preview.icon %}<i class="{{ search_result.preview_icon_with_severity }} mr-2" style="opacity:0.75"></i>{% endif %}
@@ -197,12 +201,14 @@
                                                 </nomin>
                                             {% endif %}
                                         </div>
+
+                                        {% comment %}Record information on the right{% endcomment %}
                                         <div class="col-9">
                                             {% if search_result.messages %}
                                                 <div class="mb-2">
                                                     {% for message in search_result.genome_build_relevant_messages %}
                                                         <div class="text-danger">
-                                                            {{ message.severity | severity_icon }}&nbsp{{ message.message|enrich }}
+                                                            {{ message.severity | severity_icon }}&nbsp{{ message.message|enrich }}{% if message.genome_build and search_result.has_multiple_genome_builds %}&nbsp;<span class="text-secondary">({{ message.genome_build }})</span>{% endif %}
                                                         </div>
                                                     {% endfor %}
                                                 </div>

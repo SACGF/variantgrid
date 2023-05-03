@@ -322,7 +322,7 @@ class SearchResult:
         return self.match_strength or SearchResultMatchStrength.STRONG_MATCH
 
     @cached_property
-    def genome_build_relevant_messages(self) -> [SearchMessage]:
+    def genome_build_relevant_messages(self) -> Optional[SearchResultGenomeBuildMessages]:
         """
         What validation messages are relevant to show for this record, e.g. if it's a variant found using both 37 & 38
         and the user's preferred genome build is 38, this will return messages associated to no genome build and to
@@ -330,7 +330,7 @@ class SearchResult:
         """
         preferred_gb = self.parent.search_input.genome_build_preferred
         if not self.genome_builds:
-            return self.messages
+            return SearchResultGenomeBuildMessages(self.messages)
         elif preferred_gb not in self.genome_builds:
             return self.messages
         else:
@@ -356,6 +356,10 @@ class SearchResult:
         if not self.ignore_genome_build_mismatch and self.genome_builds and self.parent.search_input.genome_build_preferred not in self.genome_builds:
             return True
         return False
+
+    @cached_property
+    def has_multiple_genome_builds(self) -> bool:
+        return self.preview.genome_builds and len(self.preview.genome_builds) > 1
 
     @property
     def is_perfectly_valid(self):
@@ -630,6 +634,8 @@ def _convert_variant_search_response_to_allele_search_response(variant_response:
         if result.preview.category == Variant.preview_category():
             result.preview.category = Allele.preview_category()
 
+        result.messages = [r.with_genome_build(first(result.genome_builds)) for r in result.messages]
+
         if obj := result.preview.obj:
             if isinstance(obj, Variant):
                 if allele := obj.allele:
@@ -642,14 +648,8 @@ def _convert_variant_search_response_to_allele_search_response(variant_response:
             non_variant_data.append(result)
 
     for allele, variant_results in allele_to_variants.items():
-        genome_builds = set().union(
-            *[vr.preview.genome_builds for vr in variant_results if vr.preview.genome_builds])
-
-        all_messages = []
-        for variant in variant_results:
-            all_messages += [r.with_genome_build(first(variant.genome_builds)) for r in variant.messages]
-
-        all_messages = list(sorted(set(all_messages)))
+        genome_builds = set().union(*[vr.preview.genome_builds for vr in variant_results if vr.preview.genome_builds])
+        all_messages = list(sorted(set().union(*(v.messages for v in variant_results))))
 
         strongest_match = max(variant.match_strength for variant in variant_results)
 
