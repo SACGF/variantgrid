@@ -41,8 +41,7 @@ def allele_preview_classifications_extra(sender, user: User, obj: Allele, **kwar
 
 
 @receiver(preview_extra_signal, sender=Variant)
-def allele_preview_classifications_extra(sender, user: User, obj: Variant, **kwargs):
+def variant_preview_classifications_extra(sender, user: User, obj: Variant, **kwargs):
     # choice of GenomeBuild with a single variant is
     genome_build = first(obj.genome_builds)
-    if variant := obj.variant_for_build_optional(genome_build):
-        return _variant_preview_zygosity_extra(variant, genome_build)
+    return _variant_preview_zygosity_extra(obj, genome_build)
