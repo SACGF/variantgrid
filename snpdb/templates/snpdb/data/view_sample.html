@@ -134,19 +134,22 @@ $(document).ready(function() {
     {% if sample.samplestats.import_status == 'S' %}
         <div id="sample-stats">
         {% if not sample_stats_variant_class_df.empty %}
-            <h3>Variant Class</h3>
+            <h4>Variant Class</h4>
             {% render_dataframe sample_stats_variant_class_df 1 %}
         {% endif %}
 
         {% if not sample_stats_zygosity_df.empty %}
-            <h3>Zygosity</h3>
+            <h4>Zygosity</h4>
             {% render_dataframe sample_stats_zygosity_df 1 %}
         {% endif %}
 
         {% if sample_locus_count %}
-            <h3>Ploidy</h3>
-            <table>
-                <tr><th>Locus Count <th> Count
+            <h4>Ploidy</h4>
+            <table class="table df-table">
+                <thead>
+                    <tr><th>Locus Count <th> Count
+                </thead>
+                <tbody>
                 {% for slc in sample_locus_count %}
                     <tr><td>{{ slc.locus_count }}
                             {% if slc.locus_count == 1 %}
@@ -156,11 +159,12 @@ $(document).ready(function() {
                             {% endif %}
                         <td>{{ slc.count }}
                 {% endfor %}
+                </tbody>
             </table>
         {% endif %}
 
         {% if sex_guess %}
-        <h3>Sex</h3>
+        <h4>Sex</h4>
         {{ sample.samplestats.chrx_sex_guess }} (chrX Hom: {{ sample.samplestats.x_hom_count }}, Het: {{ sample.samplestats.x_het_count }})
         {% endif %}
         </div>
@@ -192,7 +196,7 @@ $(document).ready(function() {
                         </tr>
                     </table>
 
-                    <h3>Extract</h3>
+                    <h4>Extract</h4>
                     <table>
                         <tr>
                             <th>Date</th>
@@ -225,7 +229,7 @@ $(document).ready(function() {
     {% related_analyses_for_samples samples show_sample_info=False %}
 
     {% if somalier_enabled %}
-        <h3>Related Samples</h3>
+        <h4>Related Samples</h4>
 
         {% page_help page_id='data/related_samples_help' title='Related Samples' show_title=False %}
 

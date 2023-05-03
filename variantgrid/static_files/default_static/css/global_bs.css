@@ -55,6 +55,13 @@ tbody tr.dtrg-group.dtrg-start:not(:first-child) td {
   font-weight: 500;
 }
 
+.table.df-table td, .table.df-table th {
+  text-align: right;
+}
+.table.df-table th {
+  font-weight: 600;
+}
+
 .card-header {
   background-color: #e4e4e4;
   font-weight: 500;

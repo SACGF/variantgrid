@@ -76,6 +76,16 @@ tbody tr.dtrg-group.dtrg-start:not(:first-child) td {
 .table th {
     font-weight: 500;
 }
+
+.table.df-table {
+  td, th {
+    text-align: right;
+  }
+  th {
+    font-weight: 600;
+  }
+}
+
 // Rebranding of Bootstrap
 .card-header {
     background-color: #e4e4e4;
