@@ -736,7 +736,7 @@ class HGVSMatcher:
         elif hgvs_name.kind in ('c', 'n'):
             transcript_accession = hgvs_name.transcript
             if not transcript_accession:
-                msg = f"Could not parse: \"{hgvs_name.name}\" c.HGVS requires a transcript or LRG."
+                msg = f"Could not parse: \"{hgvs_name.name}\", c.HGVS requires a transcript or LRG."
                 if hgvs_name.gene:
                     msg += f" Gene = \"{hgvs_name.gene}\""
                 raise ValueError(msg)
@@ -1096,6 +1096,8 @@ class HGVSMatcher:
         hgvs = HGVSName(hgvs_name)
         if hgvs.transcript:
             return None  # only return symbol if transcript is not used
+        if not hgvs.gene:
+            return None
         return GeneSymbol.objects.filter(pk=hgvs.gene).first()
 
 

@@ -167,6 +167,10 @@ class SearchInputInstance:
     def genome_builds(self) -> Set[GenomeBuild]:
         return self.search_input.genome_builds
 
+    @property
+    def genome_build_preferred(self) -> GenomeBuild:
+        return self.search_input.genome_build_preferred
+
     def get_visible_variants(self, genome_build: GenomeBuild) -> QuerySet[Variant]:
         return self.search_input.get_visible_variants(genome_build=genome_build)
 
