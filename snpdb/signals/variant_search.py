@@ -422,15 +422,19 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
         hgvs_string = clean_hgvs_string
 
     search_messages: List[SearchMessage] = [] #[SearchMessage(m) for m in hgvs_search_messages]
+    reference_message: List[SearchMessage] = []
 
     try:
         variant_tuple, used_transcript_accession, kind, method, matches_reference = hgvs_matcher.get_variant_tuple_used_transcript_kind_method_and_matches_reference(hgvs_string)
         if not matches_reference:
             ref_base = variant_tuple[2]
-            if isinstance(matches_reference, HgvsMatchRefAllele):
-                search_messages.append(SearchMessage(f'Using reference "{ref_base}" from our build, in place of provided reference "{matches_reference.provided_ref}"', LogLevel.ERROR))
+
+            # reporting on the "provided" reference is slightly promblematic as it's not always provided directly, it could be indirectly
+
+            if isinstance(matches_reference, HgvsMatchRefAllele) and matches_reference.provided_ref:
+                reference_message.append(SearchMessage(f'Using reference "{ref_base}" from our build, in place of provided reference "{matches_reference.provided_ref}"', LogLevel.ERROR))
             else:
-                search_messages.append(
+                reference_message.append(
                     SearchMessage(f'Using reference "{ref_base}" from our build', LogLevel.ERROR))
 
     except (MissingTranscript, Contig.ContigNotInBuildError):
@@ -464,25 +468,28 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
 
     if used_transcript_accession:
         if used_transcript_accession not in hgvs_string:
-            old_transcript_version = None
+            reported = False
             # are we just inserting a version because none was provided, or are we changing it
 
             if '.' in used_transcript_accession:
-                used_transcript_versionless = used_transcript_accession.split('.')[0]
+                used_transcript_parts = used_transcript_accession.split('.')
+                used_transcript_versionless = used_transcript_parts[0]
+                used_transcript_version = used_transcript_parts[1]
                 if (used_transcript_versionless + '.') in hgvs_string:
                     transcript_index = hgvs_string.index(used_transcript_versionless)
                     transcript_version_index = transcript_index + len(used_transcript_versionless) + 1
                     old_transcript_version = ''
                     for c in hgvs_string[transcript_version_index:]:
-                        print(c)
                         if '0' <= c <= '9':
                             old_transcript_version += c
                         else:
                             break
+                    search_messages.append(SearchMessage(
+                        f"Using transcript \"{used_transcript_versionless}\" version \"{used_transcript_version}\" instead of provided version \"{old_transcript_version}\"",
+                        severity=LogLevel.ERROR))
+                    reported = True
 
-            if old_transcript_version:
-                search_messages.append(SearchMessage(f"Used transcript version \"{used_transcript_accession}\" instead of version \"{old_transcript_version}\"", severity=LogLevel.ERROR))
-            else:
+            if not reported:
                 search_messages.append(SearchMessage(f"Used transcript version \"{used_transcript_accession}\"", severity=LogLevel.INFO))
 
         hgvs_name = HGVSName(hgvs_string)
@@ -509,15 +516,16 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
                 yield VariantExtra.classify_variant(
                     for_user=user,
                     transcript_id=transcript_id,
-                ), search_messages
+                ), search_messages + reference_message
             else:
                 # if kind == 'g' then doesn't matter what the preferred genome build is
-                yield SearchResult(preview=variant.preview, messages=search_messages, ignore_genome_build_mismatch=(kind == 'g'))
+                yield SearchResult(preview=variant.preview, messages=search_messages + reference_message, ignore_genome_build_mismatch=(kind == 'g'))
 
         except Variant.DoesNotExist:
             # variant_string = Variant.format_tuple(*variant_tuple)
             variant_string_abbreviated = Variant.format_tuple(*variant_tuple, abbreviate=True)
             search_messages.append(SearchMessage(f'"{hgvs_string}" resolved to "{variant_string_abbreviated}" in our build', LogLevel.INFO))
+            # if we're saying what we're resolving to, no need to complain about reference_message
 
             # manual variants
             if cmv := VariantExtra.create_manual_variant(for_user=user, genome_build=genome_build, variant_string=hgvs_string):
