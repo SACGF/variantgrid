@@ -434,8 +434,10 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
             if isinstance(matches_reference, HgvsMatchRefAllele) and matches_reference.provided_ref:
                 reference_message.append(SearchMessage(f'Using reference "{ref_base}" from our build, in place of provided reference "{matches_reference.provided_ref}"', LogLevel.ERROR))
             else:
-                reference_message.append(
-                    SearchMessage(f'Using reference "{ref_base}" from our build', LogLevel.ERROR))
+                # if no reference was provided, do we even need to provide a message?
+                # e.g. this is providing a ref for when we have a delins, e.g. delinsGT => delCCinsGT
+                # reference_message.append(SearchMessage(f'Using reference "{ref_base}" from our build', LogLevel.INFO))
+                pass
 
     except (MissingTranscript, Contig.ContigNotInBuildError):
         # contig triggered from g.HGVS from another genome build - can't do anything just return no results
