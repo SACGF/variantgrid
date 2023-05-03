@@ -159,7 +159,7 @@
                                 <div class="row d-flex align-items-center" style="color:#444">
                                     <div class="col-3 text-right">
                                         {{ message.severity | severity_icon }}{% if message.search_info.preview_icon %}<i class="{{ message.search_info.preview_icon }} text-info mr-2" style="opacity:0.75"></i>{% endif %}
-                                        <label>{{ message.search_info.category }}</label>
+                                        <label>{{ message.search_info.preview_category }}</label>
                                         {% if message.search_info.sub_name %}<div class="text-info text-small">via {{ message.search_info.sub_name }} Search</div>{% endif %}
                                     </div>
                                     <div class="col-9">
