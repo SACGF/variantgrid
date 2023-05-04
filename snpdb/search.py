@@ -322,7 +322,7 @@ class SearchResult:
         return self.match_strength or SearchResultMatchStrength.STRONG_MATCH
 
     @cached_property
-    def genome_build_relevant_messages(self) -> Optional[SearchResultGenomeBuildMessages]:
+    def genome_build_relevant_messages(self) -> List[SearchMessage]:
         """
         What validation messages are relevant to show for this record, e.g. if it's a variant found using both 37 & 38
         and the user's preferred genome build is 38, this will return messages associated to no genome build and to
@@ -330,7 +330,7 @@ class SearchResult:
         """
         preferred_gb = self.parent.search_input.genome_build_preferred
         if not self.genome_builds:
-            return SearchResultGenomeBuildMessages(self.messages)
+            return self.messages
         elif preferred_gb not in self.genome_builds:
             return self.messages
         else:
