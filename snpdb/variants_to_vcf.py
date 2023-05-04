@@ -52,22 +52,24 @@ def _write_sorted_values_to_vcf_file(header_lines, sorted_values, f, info_dict):
         ref = data["locus__ref__seq"]
         alt = data["alt__seq"]
         end = data["end"]
+        info = {}
 
         is_symbolic = "<" in ref or "<" in alt
         if is_symbolic:
-            raise ValueError("TODO: Handle symbolic ref/alts")
+            info["END"] = end
 
         if info_dict:
-            infos_list = []
             for info_name, info_data in info_dict.items():
                 variant_path = info_data["variant_path"]
                 func = info_data.get("key_data_func", key_data_func)
                 value = func(variant_path, data)
-                infos_list.append(f"{info_name}={value}")
-            info = ';'.join(infos_list)
+                info[info_name] = value
+
+        if info:
+            info_str = ';'.join([f"{k}={v}" for k, v in info.items()])
         else:
-            info = '.'
-        line = '\t'.join(map(str, (chrom, pos, '.', ref, alt or ref, '.', '.', info)))
+            info_str = '.'
+        line = '\t'.join(map(str, (chrom, pos, '.', ref, alt or ref, '.', '.', info_str)))
         line_bytes = (line + '\n').encode()
         f.write(line_bytes)
         i += 1
