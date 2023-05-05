@@ -1083,7 +1083,8 @@ class HGVSMatcher:
             cleaned_hgvs = cleaned_hgvs.replace(":", ":g.")
 
         if hgvs_string != cleaned_hgvs:
-            search_messages.append(f'Cleaned "{hgvs_string}" => "{cleaned_hgvs}"')
+            # WARNING, THIS GETS IGNORED IN SEARCH, calling code just checks itself if there's been any difference
+            search_messages.append(f'Cleaned "{hgvs_string}" =>"{cleaned_hgvs}"')
 
         try:
             fixed_hgvs, fixed_messages = cls.fix_gene_transcript(cleaned_hgvs)
