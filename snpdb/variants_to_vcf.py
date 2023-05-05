@@ -1,3 +1,4 @@
+import re
 from collections import Counter
 from typing import Dict
 
@@ -41,6 +42,8 @@ def write_qs_to_vcf_file_sort_alphabetically(qs, f, info_dict=None):
 
 
 def _write_sorted_values_to_vcf_file(header_lines, sorted_values, f, info_dict):
+    symbolic_pattern = re.compile("<(.*)>")
+
     for line in header_lines:
         line_bytes = (line + '\n').encode()
         f.write(line_bytes)
@@ -54,9 +57,9 @@ def _write_sorted_values_to_vcf_file(header_lines, sorted_values, f, info_dict):
         end = data["end"]
         info = {}
 
-        is_symbolic = "<" in ref or "<" in alt
-        if is_symbolic:
+        if m := symbolic_pattern.match(alt):
             info["END"] = end
+            info["SVTYPE"] = m.group(1)
 
         if info_dict:
             for info_name, info_data in info_dict.items():

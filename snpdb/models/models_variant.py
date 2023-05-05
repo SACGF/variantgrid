@@ -285,9 +285,12 @@ class Sequence(models.Model):
             qs = qs.filter(q)
         return dict(qs.values_list("seq", "pk"))
 
-    def is_standard_sequence(self):
+    def is_standard_sequence(self) -> bool:
         """ only contains G/A/T/C/N """
         return not re.match(r"[^GATCN]", self.seq)
+
+    def is_symbolic(self) -> bool:
+        return self.seq.startswith("<") and self.seq.endswith(">")
 
 
 class Locus(models.Model):
@@ -439,10 +442,14 @@ class Variant(models.Model):
 
     @property
     def is_insertion(self) -> bool:
+        if self.alt.is_symbolic:
+            return self.alt.seq == "<INS>"
         return self.alt.seq != Variant.REFERENCE_ALT and self.locus.ref.length < self.alt.length
 
     @property
     def is_deletion(self) -> bool:
+        if self.alt.is_symbolic:
+            return self.alt.seq == "<DEL>"
         return self.alt.seq != Variant.REFERENCE_ALT and self.locus.ref.length > self.alt.length
 
     @property
@@ -451,7 +458,7 @@ class Variant(models.Model):
 
     @property
     def can_have_annotation(self) -> bool:
-        return self.is_standard_variant
+        return not self.is_reference
 
     def as_tuple(self) -> Tuple[str, int, str, str]:
         return self.locus.contig.name, self.locus.position, self.locus.ref.seq, self.alt.seq
