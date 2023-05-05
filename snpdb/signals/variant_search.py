@@ -345,13 +345,17 @@ def _search_hgvs_using_gene_symbol(
         try:
             for result in _search_hgvs_variants_results_only(transcript_hgvs, user, genome_build, variant_qs):
                 if isinstance(result, SearchResult):
-                    # FIXME, make preview take annotation_consortia (the plural) not the cons
-                    # result.annotation_consortia = [transcript_version.transcript.annotation_consortium]
-                    results_by_record[result.preview.obj].append(result)
-                    tv_message = str(transcript_version.accession)
-                    if transcript_version.accession in mane_transcripts:
-                        tv_message += f" (MANE)"
-                    transcript_accessions_by_record[result.preview.obj].append(tv_message)
+                    # TODO: do we need to set the annotation_consortia on the result?
+                    # result.preview.annotation_consortia = [transcript_version.transcript.annotation_consortium]
+                    if isinstance(result.preview.obj, Variant):
+                        results_by_record[result.preview.obj].append(result)
+                        tv_message = str(transcript_version.accession)
+                        if transcript_version.accession in mane_transcripts:
+                            tv_message += f" (MANE)"
+                        transcript_accessions_by_record[result.preview.obj].append(tv_message)
+                    else:
+                        # result is a ClassifyVariantHgvs or similar, yield it and only care about real variants for the rest
+                        yield result
         except Exception as e:
             # Just swallow all these errors
             logging.warning(e)
@@ -418,7 +422,8 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
     kind = None
     clean_hgvs_string, _ = HGVSMatcher.clean_hgvs(hgvs_string)
     if clean_hgvs_string != hgvs_string:
-        yield SearchMessageOverall(f'Cleaned "{hgvs_string}" => "{clean_hgvs_string}"', severity=LogLevel.INFO)
+        # TODO add proper support for "cleaned" where a before and after value are presented
+        yield SearchMessageOverall(f'Cleaned hgvs from \n"{hgvs_string}" to\n"{clean_hgvs_string}"', severity=LogLevel.INFO)
         hgvs_string = clean_hgvs_string
 
     search_messages: List[SearchMessage] = [] #[SearchMessage(m) for m in hgvs_search_messages]
