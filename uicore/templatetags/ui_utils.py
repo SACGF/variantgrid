@@ -12,6 +12,8 @@ from django.template.base import FilterExpression, kwarg_re
 from django.utils import html
 from django.utils.safestring import SafeString
 
+from library.enums.log_level import LogLevel
+from library.log_utils import log_level_to_bootstrap
 from library.utils import diff_text, html_id_safe
 from snpdb.admin_utils import get_admin_url
 from variantgrid.perm_path import get_visible_url_names
@@ -393,6 +395,11 @@ def severity_icon(severity: str, title: Optional[str] = None) -> str:
 
 
 @register.filter()
+def severity_bs(severity: LogLevel) -> str:
+    return log_level_to_bootstrap(severity)
+
+
+@register.filter()
 def danger_badge(count: Optional[int]) -> str:
     """
     If count is None, does nothing
@@ -623,6 +630,8 @@ def enrich(text: str):
     for part in QUOTES_RE.split(text):
         if part:
             part = escape(part)
+            part = part.replace("\n", "<br/>")
+
             if is_quotes:
                 parts.append(f'<span class="quoted">{part}</span>')
             else:

@@ -418,7 +418,7 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
     kind = None
     clean_hgvs_string, _ = HGVSMatcher.clean_hgvs(hgvs_string)
     if clean_hgvs_string != hgvs_string:
-        yield SearchMessageOverall(f'Cleaned "{hgvs_string}" => "{clean_hgvs_string}"')
+        yield SearchMessageOverall(f'Cleaned "{hgvs_string}" => "{clean_hgvs_string}"', severity=LogLevel.INFO)
         hgvs_string = clean_hgvs_string
 
     search_messages: List[SearchMessage] = [] #[SearchMessage(m) for m in hgvs_search_messages]
@@ -432,7 +432,7 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
             # reporting on the "provided" reference is slightly promblematic as it's not always provided directly, it could be indirectly
 
             if isinstance(matches_reference, HgvsMatchRefAllele) and matches_reference.provided_ref:
-                reference_message.append(SearchMessage(f'Using reference "{ref_base}" from our build, in place of provided reference "{matches_reference.provided_ref}"', LogLevel.ERROR))
+                reference_message.append(SearchMessage(f'Using reference "{ref_base}" from our build, in place of provided reference "{matches_reference.provided_ref}"', LogLevel.ERROR, substituted=True))
             else:
                 # if no reference was provided, do we even need to provide a message?
                 # e.g. this is providing a ref for when we have a delins, e.g. delinsGT => delCCinsGT
@@ -451,7 +451,7 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
                     if isinstance(result, SearchResult):
                         # don't count SearchMessageOverall as a result
                         has_results = True
-                    yield result
+                        yield result
                 if has_results:
                     return
 
@@ -488,7 +488,7 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
                             break
                     search_messages.append(SearchMessage(
                         f"Using transcript \"{used_transcript_versionless}\" version \"{used_transcript_version}\" instead of provided version \"{old_transcript_version}\"",
-                        severity=LogLevel.ERROR))
+                        severity=LogLevel.ERROR, substituted=True))
                     reported = True
 
             if not reported:
@@ -536,7 +536,7 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
             # search for alt alts
             alts = get_results_from_variant_tuples(variant_qs, variant_tuple, any_alt=True)
             for alt in alts:
-                alt_messages = search_messages + [SearchMessage(f'No results for alt "{variant_tuple.alt}", but found this using alt "{alt.alt}"', severity=LogLevel.ERROR)]
+                alt_messages = search_messages + [SearchMessage(f'No results for alt "{variant_tuple.alt}", but found this using alt "{alt.alt}"', severity=LogLevel.ERROR, substituted=True)]
                 yield SearchResult(alt.preview, messages=alt_messages)
 
 

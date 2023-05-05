@@ -769,9 +769,9 @@ class HGVSMatcher:
         elif hgvs_name.kind in ('c', 'n'):
             transcript_accession = hgvs_name.transcript
             if not transcript_accession:
-                msg = f"Could not parse: \"{hgvs_name.name}\", c.HGVS requires a transcript or LRG."
+                msg = f"Could not parse \"{hgvs_name.name}\" c.HGVS requires a transcript or LRG."
                 if hgvs_name.gene:
-                    msg += f" Gene = \"{hgvs_name.gene}\""
+                    msg += f"\nGene appears to be \"{hgvs_name.gene}\""
                 raise ValueError(msg)
 
             variant_tuple = None

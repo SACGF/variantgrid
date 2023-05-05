@@ -185,7 +185,7 @@ class SearchInputInstance:
 @dataclass(frozen=True)
 class SearchMessageOverall:
     message: str
-    severity: LogLevel = LogLevel.WARNING
+    severity: LogLevel = LogLevel.ERROR
     search_info: Optional['SearchResponse'] = None
 
     @property
@@ -221,6 +221,7 @@ class SearchMessage:
     message: str
     severity: LogLevel = LogLevel.WARNING
     genome_build: Optional[GenomeBuild] = None
+    substituted: bool = False
 
     def __post_init__(self):
         if not isinstance(self.message, str):
@@ -237,7 +238,7 @@ class SearchMessage:
         return self._sort_order < other._sort_order
 
     def with_genome_build(self, genome_build: GenomeBuild) -> 'SearchMessage':
-        return SearchMessage(message=self.message, severity=self.severity, genome_build=genome_build)
+        return SearchMessage(message=self.message, severity=self.severity, genome_build=genome_build, substituted=self.substituted)
 
     @staticmethod
     def highest_severity(iterable: Iterable['SearchMessage']) -> LogLevel:
