@@ -46,7 +46,7 @@ class AnnotationRunColumns(DatatableConfig):
             RichColumn(key="pipeline_type", orderable=True, renderer=self.pipeline_type),
             RichColumn(key="annotation_range_lock__version__genome_build__name", label='Build', orderable=True),
             RichColumn(key="annotation_range_lock__version__id", label='Version', orderable=True),
-            RichColumn(key="annotation_range_lock__count", label='Var Count', orderable=True),
+            RichColumn(key="dump_count", label='VCF Count', orderable=True),
             RichColumn(key="vep_skipped_count", label="VEP Skipped", orderable=True),
             RichColumn(key="annotation_range_lock__min_variant__id", label="Min Var", orderable=True),
             RichColumn(key="annotation_range_lock__max_variant__id", label="Max Var", orderable=True),
