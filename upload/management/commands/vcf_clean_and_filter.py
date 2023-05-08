@@ -1,6 +1,11 @@
 """
 Uploaded VCFs are first passed through this command to fix things that will cause VT to die (eg bad contigs)
 
+We also rename chromosomes to the RefSeq contig IDs used in our fasta file
+
+We don't use "bcftools annotate --rename-chrs" to do this as it fails if contigs are not defined in the header
+Which we unfortunately see sometimes.
+
 """
 import re
 import sys
@@ -11,7 +16,7 @@ from django.conf import settings
 from django.core.management.base import BaseCommand
 from vcf import Reader
 
-from snpdb.models import GenomeBuild
+from snpdb.models import GenomeBuild, GenomeFasta
 
 
 class Command(BaseCommand):
@@ -34,8 +39,10 @@ class Command(BaseCommand):
         skipped_filters_stats_file = options.get("skipped_filters_stats_file")
 
         genome_build = GenomeBuild.get_name_or_alias(build_name)
+        genome_fasta = GenomeFasta.get_for_genome_build(genome_build)
         chrom_to_contig_id = genome_build.get_chrom_contig_id_mappings()
         contig_lengths = dict(genome_build.contigs.values_list("pk", "length"))
+        contig_to_fasta_names = genome_fasta.get_contig_id_to_name_mappings()
 
         if vcf_filename == '-':
             f = sys.stdin
@@ -62,6 +69,7 @@ class Command(BaseCommand):
                     defined_filters = self._get_defined_vcf_filters(vcf_header_lines)
                 columns = line.split("\t")
                 chrom = columns[0]
+                fasta_chrom = None
                 if contig_id := chrom_to_contig_id.get(chrom):
                     valid_position = False
                     try:
@@ -73,10 +81,13 @@ class Command(BaseCommand):
                     if not valid_position:
                         skipped_records["position out of range"] += 1
                         continue
-                else:
+                    fasta_chrom = contig_to_fasta_names.get(contig_id)
+
+                if not fasta_chrom:
                     if skipped_contigs_stats_file:
                         skipped_contigs[chrom] += 1
                     continue
+                columns[0] = fasta_chrom
 
                 if skip_patterns:
                     if skip_reason := self._check_skip_line(skip_patterns, line):

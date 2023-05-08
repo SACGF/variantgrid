@@ -65,7 +65,6 @@ def preprocess_vcf(upload_step, remove_info=False, annotate_gnomad_af=False):
     MAX_STDERR_OUTPUT = 5000  # How much stderr output per process to store in DB
 
     VCF_CLEAN_AND_FILTER_SUB_STEP = "vcf_clean_and_filter"
-    RENAME_CHROMOSOMES = "rename_chromosomes"
     DECOMPOSE_SUB_STEP = "decompose"
     NORMALIZE_SUB_STEP = "normalize"
     UNIQ_SUB_STEP = "uniq"
@@ -106,16 +105,6 @@ def preprocess_vcf(upload_step, remove_info=False, annotate_gnomad_af=False):
         read_variants_cmd.append("--remove-info")
     pipe_commands[VCF_CLEAN_AND_FILTER_SUB_STEP] = read_variants_cmd
     sub_steps[VCF_CLEAN_AND_FILTER_SUB_STEP] = create_sub_step(upload_step, VCF_CLEAN_AND_FILTER_SUB_STEP, read_variants_cmd)
-
-    mapping_file = f"chrom_contig_mapping_{genome_build.name.lower()}.txt"
-    mapping_file = os.path.join(settings.BASE_DIR, "snpdb", "genome", "reference", mapping_file)
-    if not os.path.exists(mapping_file):
-        raise FileNotFoundError(mapping_file)
-
-    pipe_commands[RENAME_CHROMOSOMES] = ["bcftools", "annotate", "--rename-chrs", mapping_file]
-
-    # If you want to switch out to bcftools - try:
-    # ["bcftools", "norm", "--check-ref=w", ""]
 
     # VT isn't the bottleneck here, it's my programs - so no speed advantage to using "+" for Uncompressed BCF streams
     pipe_commands[DECOMPOSE_SUB_STEP] = [settings.VCF_IMPORT_VT_COMMAND, "decompose", "-s", "-"]
