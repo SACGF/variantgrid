@@ -438,7 +438,7 @@ class Variant(models.Model):
 
     @property
     def is_indel(self) -> bool:
-        return self.alt.seq != Variant.REFERENCE_ALT and self.locus.ref.length != self.alt.length
+        return self.is_insertion or self.is_deletion
 
     @property
     def is_insertion(self) -> bool:
@@ -524,7 +524,9 @@ class Variant(models.Model):
         return self.locus.position
 
     def get_end(self):
-        # TODO: We can use end once we have populated it
+        # TODO: Replace this with a call to end after everyone has run population migration
+        if self.end is not None:
+            return self.end
         return self.locus.position + max(self.locus.ref.length, self.alt.length)
 
     @staticmethod
