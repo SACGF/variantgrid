@@ -100,6 +100,10 @@ def get_variant_caller_and_version_from_vcf(filename) -> Tuple[str, str]:
     return variant_caller, version
 
 
+def vcf_allele_is_symbolic(allele: str) -> bool:
+    return allele.startswith("<") and allele.endswith(">")
+
+
 def vcf_get_ref_alt_end(variant: cyvcf2.Variant):
     ref = variant.REF.strip().upper()
     if variant.ALT:
@@ -107,8 +111,7 @@ def vcf_get_ref_alt_end(variant: cyvcf2.Variant):
     else:
         alt = Variant.REFERENCE_ALT
 
-    is_symbolic = "<" in ref or "<" in alt
-    if is_symbolic:
+    if vcf_allele_is_symbolic(ref) or vcf_allele_is_symbolic(alt):
         # Need to provide END or SVLEN
         if end_info := variant.INFO.get('END'):
             end = end_info
