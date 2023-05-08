@@ -323,7 +323,7 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
 
         # If record is missing genotype call, calling any built in genotype methods can
         # cause cyvcf2 to crash, @see https://github.com/brentp/cyvcf2/issues/17
-        has_genotype = self.vcf.genotype_field and variant.format(self.vcf.genotype_field)
+        has_genotype = self.vcf.genotype_field and variant.format(self.vcf.genotype_field) is not None
         if has_genotype:
             alt_zygosity = [BulkGenotypeVCFProcessor.ALT_CYVCF_GT_ZYGOSITIES[i] for i in variant.gt_types]
             cohort_gt = [
