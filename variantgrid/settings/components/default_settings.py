@@ -731,6 +731,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'termsandconditions',
     'crispy_forms',  # used to make bootstrap compatible forms
+    'crispy_bootstrap4',
     # Internal apps
     'analysis.apps.AnalysisConfig',
     'annotation.apps.AnnotationConfig',
@@ -751,6 +752,7 @@ INSTALLED_APPS = [
     'upload.apps.UploadConfig',
     'classification.apps.ClassificationConfig',
     'variantopedia',
+    'discussion'
     # Uncomment the next line to enable admin documentation:
     # 'django.contrib.admindocs',
 ]

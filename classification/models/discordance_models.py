@@ -23,6 +23,7 @@ from classification.models.classification import ClassificationModification, Cla
 from classification.models.classification_lab_summaries import ClassificationLabSummaryEntry, ClassificationLabSummary
 from classification.models.clinical_context_models import ClinicalContext
 from classification.models.flag_types import classification_flag_types, ClassificationFlagTypes
+from discussion.models import DiscussedModelMixin
 from flags.models.enums import FlagStatus
 from flags.models.models import FlagComment
 from genes.hgvs import CHGVS
@@ -40,7 +41,7 @@ class NotifyLevel(str, Enum):
     ALWAYS_NOTIFY = "always-notify"
 
 
-class DiscordanceReport(TimeStampedModel):
+class DiscordanceReport(TimeStampedModel, DiscussedModelMixin):
 
     resolution = models.TextField(default=DiscordanceReportResolution.ONGOING, choices=DiscordanceReportResolution.CHOICES, max_length=1, null=True, blank=True)
     # TODO remove continued discordane reason, it should be redundant to notes
