@@ -197,6 +197,7 @@ if _SHARIANT_MODE:
 #SAPATH_APP = 'sapath.apps.SapathConfig'
 #INSTALLED_APPS += [SAPATH_APP]
 
+
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': True,
@@ -269,7 +270,7 @@ VARIANT_SHOW_CANONICAL_HGVS = False
 # Lock down Shariant menu - hide a lot of VariantGrid urls
 # Completely hide URLS from these apps
 
-URLS_APP_REGISTER.update({"analysis": True,
+URLS_APP_REGISTER.update({"analysis": False,
                           "expression": False,
                           "pathtests": False,
                           "pedigree": False,
@@ -353,3 +354,4 @@ VARIANT_MANUAL_CREATE_BY_NON_ADMIN = False
 GENE_RELATION_PANEL_APP_LIVE_UPDATE = True
 COMPRESS_ENABLED = False
 VARIANT_CLASSIFICATION_ALLOW_DELETE = False
+SEQAUTO_ENABLED = True

@@ -30,6 +30,7 @@ from model_utils.managers import InheritanceManager
 
 from classification.enums.classification_enums import ShareLevel
 from library.enums.log_level import LogLevel
+from library.preview_request import PreviewData, PreviewModelMixin
 from library.utils import import_class, JsonObjType
 
 
@@ -177,7 +178,7 @@ class ImportedWiki(models.Model):
     modified = models.DateTimeField()  # Time on original server
 
 
-class Organization(models.Model):
+class Organization(models.Model, PreviewModelMixin):
     # If you add fields @see OrganizationAdmin
     name = models.TextField()
     short_name = models.TextField(blank=False, null=True)  # Don't use for anything other than human labels
@@ -189,6 +190,10 @@ class Organization(models.Model):
         ordering = ['name']
         verbose_name = 'Organisation'
         verbose_name_plural = 'Organisations'
+
+    @classmethod
+    def preview_icon(cls) -> str:
+        return "fa-solid fa-building"
 
     def __lt__(self, other):
         return self.name < other.name
@@ -411,7 +416,7 @@ class ContactDetails:
         return bool(self.website) or bool(self.phone) or bool(self.email)
 
 
-class Lab(models.Model):
+class Lab(models.Model, PreviewModelMixin):
     name = models.TextField()
     external = models.BooleanField(default=False, blank=True)  # From somewhere else, e.g. Shariant
     city = models.TextField()
@@ -456,6 +461,14 @@ class Lab(models.Model):
 
     class Meta:
         ordering = ['name']
+
+    @classmethod
+    def preview_category(cls) -> str:
+        return "Organisation Lab"
+
+    @classmethod
+    def preview_icon(cls) -> str:
+        return "fa-solid fa-flask"
 
     @property
     def contact_details(self) -> ContactDetails:

@@ -48,6 +48,7 @@ from genes.models import Gene
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
 from library.guardian_utils import clear_permissions
 from library.log_utils import report_exc_info, report_event
+from library.preview_request import PreviewData, PreviewModelMixin
 from library.utils import empty_to_none, nest_dict, cautious_attempt_html_to_text, DebugTimer, \
     invalidate_cached_property, md5sum_str
 from ontology.models import OntologyTerm, OntologySnake, OntologyTermRelation
@@ -405,7 +406,7 @@ class ClassificationOutstandingIssues:
         return f"({self.classification.friendly_label}) {', '.join(self.issues)} {', '.join(self.flags)}"
 
 
-class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeStampedModel):
+class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeStampedModel, PreviewModelMixin):
     """
     A Variant Classification, belongs to a lab and user. Keeps a full history using ClassificationModification
     The data is free form basked on EvidenceKey (rather than one column per possible field)
@@ -473,6 +474,23 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
 
     last_source_id = models.TextField(blank=True, null=True)
     last_import_run = models.ForeignKey(ClassificationImportRun, null=True, blank=True, on_delete=SET_NULL)
+
+    @classmethod
+    def preview_icon(cls) -> str:
+        return "fa-solid fa-clipboard"
+
+    @property
+    def preview(self) -> PreviewData:
+
+        last_published = self.last_published_version
+        clin_sig = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE). \
+                       pretty_value(last_published.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)) or 'Unclassified'
+        title = f"{clin_sig}"  # TODO add more data here
+
+        return self.preview_with(
+            identifier=self.friendly_label,
+            title=title
+        )
 
     @staticmethod
     def is_supported_transcript(transcript_or_hgvs: str):

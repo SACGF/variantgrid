@@ -5,6 +5,7 @@ import typing
 from dataclasses import dataclass, field
 from datetime import timedelta
 from enum import Enum
+from functools import cached_property
 from typing import Optional, Iterable, List, Dict, Set, Union, Any, Iterator, Tuple
 
 from Bio import Entrez, Medline
@@ -15,6 +16,7 @@ from django.utils.timezone import now
 from django_extensions.db.models import TimeStampedModel
 
 from library.log_utils import report_exc_info
+from library.preview_request import PreviewData, PreviewModelMixin
 from library.utils import JsonObjType, first
 
 """
@@ -76,7 +78,8 @@ class EntrezDbType(str, Enum):
     BOOKSHELF = "books"
 
 
-class Citation(TimeStampedModel):
+class Citation(TimeStampedModel, PreviewModelMixin):
+
     id = TextField(primary_key=True)
     """
     3rd party's unique ID for the citation, e.g. PMID:234434, BookShelf ID:NBK52333
@@ -162,6 +165,37 @@ class Citation(TimeStampedModel):
 
     def __str__(self):
         return self.id
+
+    @classmethod
+    def preview_icon(cls) -> str:
+        return "fa-solid fa-book"
+
+    @cached_property
+    def preview(self) -> PreviewData:
+        full_title: str
+        if not self.error:
+            text_segments: List[str] = []
+
+            if author_short := self.authors_short:
+                text_segments.append(author_short)
+                if not self.single_author:
+                    text_segments.append('et al')
+
+            if year := self.year:
+                text_segments.append(year)
+
+            title = self.title or "Could not load title"
+
+            text_segments.append(title)
+            full_title = " ".join(text_segments)
+        else:
+            full_title = "Could not retrieve citation"
+
+        return self.preview_with(
+            title=full_title,
+            summary=self.abstract,
+            external_url=self.get_external_url
+        )
 
     @property
     def get_external_url(self):

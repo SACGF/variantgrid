@@ -6,6 +6,7 @@ from typing import Dict, Optional, List
 
 from django.conf import settings
 from django.db import models
+from django.db.models import QuerySet
 from django.db.models.deletion import CASCADE
 from django.db.models.query_utils import Q
 
@@ -91,12 +92,12 @@ class GenomeBuild(models.Model, SortMetaOrderingMixin):
         return None
 
     @staticmethod
-    def builds_with_annotation():
+    def builds_with_annotation() -> QuerySet['GenomeBuild']:
         enabled_annotation = []
         for build_name, values in settings.ANNOTATION.items():
             if values.get("enabled"):
                 enabled_annotation.append(build_name)
-        return GenomeBuild.objects.filter(name__in=enabled_annotation)
+        return GenomeBuild.objects.filter(name__in=enabled_annotation).order_by('name')
 
     @staticmethod
     @timed_cache(ttl=60)

@@ -8,7 +8,7 @@ from html import escape
 from typing import Union, Any, Optional
 
 from django import template
-from django.utils.safestring import mark_safe
+from django.utils.safestring import mark_safe, SafeString
 
 from library.utils import format_significant_digits
 from uicore.json.json_types import JsonDataType
@@ -67,18 +67,28 @@ def limit_length(text, limit=100):
 
 
 @register.filter(is_safe=True)
-def format_value(val):
+def format_value(val, limit=0):
     if val is None:
         return mark_safe('<span class="no-value">None</span>')
     if val == "":
         return mark_safe('<span class="none">""</span>')
+    elif isinstance(val, (datetime.datetime, datetime.date)):
+        return f"{val:%Y-%m-%d}"
     if isinstance(val, (dict, list)):
         return mark_safe(f'<span class="json">{escape(json.dumps(val))}</span>')
     if isinstance(val, float):
         val = format(Decimal(str(val)).normalize(), 'f')
         return mark_safe(f'<span class="number">{val}</span>')
     if isinstance(val, int):
+        if val == 0:
+            return mark_safe('<span class="no-value">0</span>')
         return mark_safe(f'<span class="number">{val}</span>')
+    if isinstance(val, SafeString):
+        return val
+
+    val = str(val)
+    if limit:
+        val = limit_length(val, limit)
 
     val = escape(val)
     val = val.replace("\n", "<br/>")

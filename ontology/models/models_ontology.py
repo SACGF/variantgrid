@@ -25,7 +25,8 @@ from genes.models import GeneSymbol
 from library.cache import timed_cache
 from library.constants import DAY_SECS, WEEK_SECS
 from library.log_utils import report_exc_info
-from library.utils import Constant
+from library.preview_request import PreviewData, PreviewModelMixin
+from library.utils import Constant, pretty_label
 
 
 class OntologyImportSource:
@@ -247,6 +248,8 @@ class OntologyIdNormalized:
         prefix = parts[0].strip().upper()
         if prefix == "ORPHANET":  # Orphanet is the one ontology (so far) where the standard is sentance case
             prefix = "Orphanet"
+        elif prefix.upper() == "MIM":
+            prefix = "OMIM"
         prefix = OntologyService(prefix)
         postfix = parts[1].strip()
         try:
@@ -267,7 +270,7 @@ class OntologyIdNormalized:
         return self.full_id
 
 
-class OntologyTerm(TimeStampedModel):
+class OntologyTerm(TimeStampedModel, PreviewModelMixin):
 
     """
     id is Term as it should be referenced <prefix>:<zero padded index> e.g.
@@ -284,6 +287,17 @@ class OntologyTerm(TimeStampedModel):
     from_import = models.ForeignKey(OntologyImport, on_delete=PROTECT)
 
     move_to_re = re.compile(r"MOVED TO (\d+)")
+
+    @classmethod
+    def preview_icon(cls) -> str:
+        return "fa-solid fa-disease"
+
+    @property
+    def preview(self) -> PreviewData:
+        return self.preview_with(
+            title="Term Not Found" if self.is_stub else self.name,
+            summary=self.definition
+        )
 
     def __str__(self):
         return f"{self.id} {self.name}"

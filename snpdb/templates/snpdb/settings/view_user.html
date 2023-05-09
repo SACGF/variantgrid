@@ -6,7 +6,7 @@
 {% block submenu_page_content %}
     <div class="container">
         <div class="card">
-            <div class="card-header">View User</div>
+            <div class="card-header">View User {% admin_link other_user %}</div>
             <div class="card-body">
                 {% labelled label="Username" %}{{ other_user }}{% endlabelled %}
                 {% labelled label="Email" %}{{ email }}{% endlabelled %}

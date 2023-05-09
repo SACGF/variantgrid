@@ -5,7 +5,7 @@
 {{ block.super }}
 
 {% if cohorts_and_samples %}
-<div id='related-cohorts'>
+<div id='related-cohorts' class="mt-4">
     <h3>Cohorts</h3>
     <table>
         <tr>
@@ -16,9 +16,9 @@
     
     {% for cohort, samples in cohorts_and_samples %}
         <tr> 
-        <td><a href="{% url 'view_cohort' cohort.pk %}">{{ cohort }}</a>
+        <td><a class="hover-link" href="{% url 'view_cohort' cohort.pk %}">{{ cohort }}</a>
         {% if samples %}
-        <td>{{ samples }}
+            <td>{{ samples }}
         {% endif %}
     {% endfor %}
     </table>
@@ -27,7 +27,7 @@
 
 
 {% if trios_and_samples %}
-<div id='related-trios'>
+<div id='related-trios' class="mt-4">
     <h3>Trios</h3>
     {% for trio, samples in trios_and_samples %}
         <div> 

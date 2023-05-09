@@ -2,6 +2,7 @@ import dataclasses
 from collections import defaultdict
 from dataclasses import dataclass
 from functools import cached_property
+from html import escape
 from typing import Optional, List, Tuple, Dict, Set
 
 from avatar.templatetags.avatar_tags import avatar_url
@@ -12,12 +13,14 @@ from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models.deletion import SET_NULL, CASCADE
 from django.urls import reverse
+from django.utils.safestring import SafeString
 from django_extensions.db.models import TimeStampedModel
 from model_utils.managers import InheritanceManager
 
 from library.django_utils import thread_safe_unique_together_get_or_create
 from library.django_utils.avatar import SpaceThemedAvatarProvider
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsAutoInitialSaveMixin
+from library.preview_request import PreviewData, PreviewModelMixin, PreviewKeyValue
 from library.utils import string_deterministic_hash, rgb_invert
 from snpdb.models.models import Tag, Lab, Organization
 from snpdb.models.models_columns import CustomColumnsCollection, CustomColumn
@@ -222,6 +225,51 @@ class UserSettingsOverride(SettingsOverride):
 
     def __str__(self):
         return f"UserSettings for {self.user}"
+
+
+class UserPreview(PreviewModelMixin):
+
+    def __init__(self, user: User):
+        self.user = user
+
+    @cached_property
+    def avatar(self):
+        return AvatarDetails.avatar_for(self.user)
+
+    @classmethod
+    def preview_category(cls) -> str:
+        return "User"
+
+    @classmethod
+    def preview_icon(cls) -> str:
+        return "fa-solid fa-user"
+
+    @property
+    def preview(self):
+        title = ""
+        if self.user.is_superuser:
+            title = "Admin"
+        elif labs := list(sorted(Lab.valid_labs_qs(self.user))):
+            if len(labs) > 1:
+                title = f"{len(labs)} lab affiliations"
+            else:
+                title = str(labs[0])
+
+        extras = []
+        if last_logged_in := self.user.last_login:
+            extras.append(PreviewKeyValue("Last Login", last_logged_in))
+        else:
+            extras.append(PreviewKeyValue(value="Has not logged in"))
+
+        return PreviewData.for_object(
+            obj=self.user,
+            category="User",
+            icon=UserPreview.preview_icon(),
+            identifier=self.avatar.preferred_label,
+            title=title,
+            internal_url=reverse('view_user', kwargs={"pk": self.user.pk}),
+            summary_extra=extras
+        )
 
 
 @dataclass(frozen=True)

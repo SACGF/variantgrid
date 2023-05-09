@@ -17,7 +17,7 @@ from library.genomics.vcf_utils import cyvcf2_header_types, cyvcf2_header_get, V
 from library.guardian_utils import assign_permission_to_user_and_groups
 from seqauto.models import SampleSheetCombinedVCFFile, VCFFile, VCFFromSequencingRun, \
     SampleFromSequencingSample, QCGeneList
-from seqauto.signals import backend_vcf_import_start_signal
+from seqauto.signals.signals_list import backend_vcf_import_start_signal
 from snpdb.models import VCF, ImportStatus, Sample, VCFFilter, \
     Cohort, CohortSample, UserSettings, VCFSourceSettings, SampleFilePath
 from snpdb.models.models_enums import ImportSource, VariantsType, SampleFileType

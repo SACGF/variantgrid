@@ -52,8 +52,8 @@ class TestHGVS(TestCase):
             HGVSName(fixed_hgvs)
 
     def test_fix_gene_transcript(self):
-        swap_warning = "Warning: swapped gene/transcript"
-        uc_warning = "Warning: Upper cased transcript"
+        swap_warning = "Swapped gene/transcript"
+        uc_warning = "Upper cased transcript"
 
         TEST_CASES = [
             ("nm_000059.4:c.316+5G>A", [uc_warning]),

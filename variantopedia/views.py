@@ -32,7 +32,7 @@ from library.git import Git
 from library.guardian_utils import admin_bot
 from library.log_utils import log_traceback, report_message, slack_bot_username
 from pathtests.models import cases_for_user
-from patients.models import ExternalPK, Clinician
+from patients.models import Clinician
 from seqauto.models import VCFFromSequencingRun, get_20x_gene_coverage
 from seqauto.seqauto_stats import get_sample_enrichment_kits_df
 from snpdb.clingen_allele import link_allele_to_existing_variants
@@ -52,7 +52,7 @@ from variantgrid.celery import app
 from variantgrid.tasks.server_monitoring_tasks import get_disk_messages
 from variantopedia import forms
 from variantopedia.interesting_nearby import get_nearby_qs, get_method_summaries, get_nearby_summaries
-from variantopedia.search import search_data, SearchResults
+from snpdb.search import search_data
 from variantopedia.server_status import get_dashboard_notices
 from variantopedia.tasks.server_status_tasks import notify_server_status_now
 
@@ -379,36 +379,46 @@ def search(request):
 
     user_settings = UserSettings.get_for_user(request.user)
 
-    search_results: Optional[SearchResults] = None
+    preview_mode = False
+    classify = False
     if form.is_valid() and form.cleaned_data['search']:
         search_string = form.cleaned_data['search']
         classify = form.cleaned_data.get('classify')
-        search_results = search_data(request.user, search_string, classify)
-        results = search_results.non_debug_results
-        details = f"'{search_string}' calculated {len(results)} results."
-        create_event(request.user, 'search', details=details)
+        if mode := form.cleaned_data.get('mode'):
+            preview_mode = mode == "preview"
 
-        # don't auto load unless there is only 1 preferred result
-        if preferred_result := search_results.single_preferred_result():
-            return redirect(preferred_result.record)
+    # always perform a "search" so we can get told what kind of searches are enabled
+    # note that searching on "" doesn't actually invoke any of the other search logic
 
-        # Attempt to give hints on why nothing was found
-        for search_error, genome_builds in search_results.search_errors.items():
-            text = f"{search_error.search_type}: {search_error.error}"
-            if genome_builds:
-                genome_builds_str = ", ".join(gb.name for gb in sorted(genome_builds))
-                text += f" ({genome_builds_str})"
-            messages.add_message(request, search_error.log_level, text)
+    search_results = search_data(user=request.user, search_string=search_string, classify=classify)
 
-    epk_qs = ExternalPK.objects.values_list("external_type", flat=True)
-    external_codes = list(sorted(epk_qs.distinct()))
+    #results, _search_types, _search_errors = search_results.results, search_results.search_types, search_results.search_errors
+    details = search_results.summary
+    create_event(request.user, 'search', details=details)
+
+    single_preferred_result = search_results.single_preferred_result()
+    if not preview_mode and single_preferred_result:
+        return redirect(single_preferred_result.preview.internal_url)
+
+    # Attempt to give hints on why nothing was found
+    # for search_error, genome_builds in search_results.search_errors.items():
+    #     text = f"{search_error.search_type}: {search_error.error}"
+    #     if genome_builds:
+    #         genome_builds_str = ", ".join(gb.name for gb in sorted(genome_builds))
+    #         text += f" ({genome_builds_str})"
+    #     messages.add_message(request, search_error.log_level, text)
+    #
+    # epk_qs = ExternalPK.objects.values_list("external_type", flat=True)
+    # external_codes = list(sorted(epk_qs.distinct()))
 
     context = {
         "user_settings": user_settings,
         "form": form,
+        "classify": classify,
         "search": search_string,
         "search_results": search_results,
-        "external_codes": external_codes,
+        "single_preferred_result": single_preferred_result
+        # "external_codes": external_codes,
     }
     return render(request, "variantopedia/search.html", context)
 

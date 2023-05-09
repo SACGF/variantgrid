@@ -2,7 +2,7 @@ import logging
 import operator
 from collections import namedtuple
 from functools import cached_property, reduce
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Optional
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -22,6 +22,7 @@ from guardian.shortcuts import get_objects_for_user
 from library.django_utils import SortByPKMixin
 from library.guardian_utils import DjangoPermission
 from library.log_utils import log_traceback, report_event
+from library.preview_request import PreviewModelMixin, PreviewKeyValue
 from patients.models import FakeData, Patient, Specimen
 from patients.models_enums import Sex
 from snpdb.models.models import Tag, LabProject
@@ -29,6 +30,7 @@ from snpdb.models.models_enums import ImportStatus, VariantsType, ProcessingStat
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_genomic_interval import GenomicIntervalsCollection
 from snpdb.models.models_variant import Variant, VariantCollection, AlleleSource
+from variantgrid.perm_path import get_visible_url_names
 
 
 @Field.register_lookup
@@ -55,7 +57,7 @@ class Project(models.Model):
         return name
 
 
-class VCF(models.Model):
+class VCF(models.Model, PreviewModelMixin):
     name = models.TextField(null=True)
     date = models.DateTimeField()
     # genome_build will be set if imported successfully
@@ -86,6 +88,14 @@ class VCF(models.Model):
     class Meta:
         verbose_name = 'VCF'
         verbose_name_plural = 'VCFs'
+
+    @classmethod
+    def preview_icon(cls) -> str:
+        return "fa-regular fa-file-lines"
+
+    @classmethod
+    def preview_if_url_visible(cls) -> bool:
+        return 'data'
 
     @cached_property
     def has_filters(self):
@@ -261,7 +271,7 @@ class VCFTag(models.Model):
         return f"{self.tag}:{self.vcf}"
 
 
-class Sample(SortByPKMixin, models.Model):
+class Sample(SortByPKMixin, PreviewModelMixin, models.Model):
     """ A VCF sample storing genotype information
         Sample data is stored as packed fields in CohortGenotype (via vcf.cohort.cohortgenotypecollection) """
     vcf = models.ForeignKey(VCF, on_delete=CASCADE)
@@ -273,6 +283,22 @@ class Sample(SortByPKMixin, models.Model):
     specimen = models.ForeignKey(Specimen, null=True, blank=True, on_delete=SET_NULL)
     import_status = models.CharField(max_length=1, choices=ImportStatus.choices, default=ImportStatus.CREATED)
     variants_type = models.CharField(max_length=1, choices=VariantsType.choices, default=VariantsType.UNKNOWN)
+
+    @classmethod
+    def preview_icon(cls) -> str:
+        return "fa-solid fa-microscope"
+
+    @classmethod
+    def preview_if_url_visible(cls) -> Optional[str]:
+        return 'patients'
+
+    @property
+    def preview(self) -> 'PreviewData':
+        return self.preview_with(
+            identifier=self.name,
+            genome_builds={self.vcf.genome_build},
+            summary_extra=[PreviewKeyValue("VCF", str(self.vcf))]
+        )
 
     @property
     def genome_build(self):

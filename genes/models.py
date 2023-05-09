@@ -44,6 +44,7 @@ from library.django_utils.django_partition import RelatedModelsPartitionModel
 from library.guardian_utils import assign_permission_to_user_and_groups, DjangoPermission, admin_bot, \
     add_public_group_read_permission
 from library.log_utils import log_traceback
+from library.preview_request import PreviewData, PreviewModelMixin
 from library.utils import get_single_element, iter_fixed_chunks
 from library.utils.file_utils import mk_path
 from snpdb.models import Wiki, Company, Sample, DataState
@@ -166,7 +167,7 @@ class UniProt(models.Model):
         return self.accession
 
 
-class GeneSymbol(models.Model):
+class GeneSymbol(models.Model, PreviewModelMixin):
     symbol = CITextField(primary_key=True)
 
     @staticmethod
@@ -200,6 +201,14 @@ class GeneSymbol(models.Model):
     @cached_property
     def alias_meta(self) -> 'GeneSymbolAliasesMeta':
         return GeneSymbolAliasesMeta(self)
+
+    @classmethod
+    def preview_icon(cls) -> str:
+        return "fa-solid fa-dna"
+
+    @property
+    def preview(self):
+        return self.preview_with(title="")
 
     def has_different_genes(self, other: 'GeneSymbol') -> bool:
         """
@@ -371,12 +380,30 @@ class GeneAnnotationImport(TimeStampedModel):
         return self.url
 
 
-class Gene(models.Model):
+class Gene(PreviewModelMixin, models.Model):
     """ A stable identifier - build independent - has build specific versions with gene details """
     FAKE_GENE_ID_PREFIX = "unknown_"  # Legacy from when we allowed inserting GenePred w/o GFF3
     identifier = models.TextField(primary_key=True)
     annotation_consortium = models.CharField(max_length=1, choices=AnnotationConsortium.choices)
     summary = models.TextField(null=True, blank=True)  # Only used by RefSeq
+
+    @property
+    def prefixed_identifier(self) -> str:
+        if self.annotation_consortium == AnnotationConsortium.REFSEQ:
+            return f"GeneID:{self.identifier}"
+        else:
+            return self.identifier
+
+    @classmethod
+    def preview_icon(cls) -> str:
+        return "fa-solid fa-dna"
+
+    @property
+    def preview(self) -> 'PreviewData':
+        return self.preview_with(
+            identifier=self.prefixed_identifier,
+            summary=self.summary
+        )
 
     @property
     def is_legacy(self):
@@ -441,12 +468,7 @@ class Gene(models.Model):
         return self.identifier < other.identifier
 
     def __str__(self):
-        if self.annotation_consortium == AnnotationConsortium.REFSEQ:
-            gene_id_summary = f"GeneID:{self.identifier}"
-        else:
-            gene_id_summary = self.identifier
-
-        return f"{gene_id_summary} ({self.get_annotation_consortium_display()})"
+        return f"{self.prefixed_identifier} ({self.get_annotation_consortium_display()})"
 
 
 class GeneVersion(models.Model):
@@ -566,10 +588,14 @@ class GeneVersion(models.Model):
 TranscriptParts = namedtuple('TranscriptParts', ['identifier', 'version'])
 
 
-class Transcript(models.Model):
+class Transcript(models.Model, PreviewModelMixin):
     """ A stable identifier - has versions with actual transcript details """
     identifier = models.TextField(primary_key=True)
     annotation_consortium = models.CharField(max_length=1, choices=AnnotationConsortium.choices)
+
+    @classmethod
+    def preview_icon(cls) -> str:
+        return "fa-solid fa-timeline"
 
     def get_absolute_url(self):
         kwargs = {"transcript_id": self.identifier}
@@ -608,7 +634,7 @@ class Transcript(models.Model):
         return self.identifier
 
 
-class TranscriptVersion(SortByPKMixin, models.Model):
+class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
     """ We store the ID and version separately, ie:
         ENST00000284274.4 => transcript=ENST00000284274, version=4
 
@@ -628,6 +654,16 @@ class TranscriptVersion(SortByPKMixin, models.Model):
     import_source = models.ForeignKey(GeneAnnotationImport, on_delete=CASCADE)
     biotype = models.TextField(null=True)  # Ensembl has gene + transcript biotypes
     data = models.JSONField(null=False, blank=True, default=dict)  # for cdot data
+
+    @classmethod
+    def preview_icon(cls) -> str:
+        return Transcript.preview_icon()
+
+    @property
+    def preview(self) -> PreviewData:
+        return self.preview_with(
+            identifier=f"{self.transcript.identifier}.{self.version}"
+        )
 
     # These are in data.tags
     CANONICAL_SCORES = {
@@ -1238,7 +1274,7 @@ class TranscriptVersionSequenceInfo(TimeStampedModel):
             data = Entrez.efetch(db='nuccore', id=transcript_accession, rettype='gb', retmode='text')
         except HTTPError as e:
             if e.code == 400:
-                raise BadTranscript(f"Bad Transcript: Entrez API reports '{transcript_accession}' not found")
+                raise BadTranscript(f"Bad Transcript: Entrez API reports \"{transcript_accession}\" not found")
             raise e
         api_response = data.read()
         with StringIO(api_response) as f:
