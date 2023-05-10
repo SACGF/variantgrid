@@ -368,7 +368,7 @@ class LazyAttribute:
 
 class FormerTuple(ABC):
     """
-    Base class for converting tuples (or named tuples) to data classes while maintaing decomposition
+    Base class for converting tuples (or named tuples) to data classes while maintaining decomposition
     e.g.
     @dataclass(frozen=True)
     class VariantCoordinate(FormerTuple):

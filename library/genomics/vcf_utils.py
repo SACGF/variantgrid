@@ -7,7 +7,7 @@ from typing import Tuple
 import cyvcf2
 import vcf
 
-from snpdb.models import Variant
+from snpdb.models import Variant, Sequence
 
 
 class VCFConstant:
@@ -111,7 +111,7 @@ def vcf_get_ref_alt_end(variant: cyvcf2.Variant):
     else:
         alt = Variant.REFERENCE_ALT
 
-    if vcf_allele_is_symbolic(ref) or vcf_allele_is_symbolic(alt):
+    if Sequence.allele_is_symbolic(ref) or Sequence.allele_is_symbolic(alt):
         # Need to provide END or SVLEN
         if end_info := variant.INFO.get('END'):
             end = end_info

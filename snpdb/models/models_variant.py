@@ -7,7 +7,7 @@ from typing import Optional, Pattern, Tuple, Iterable, Set, Union, Dict, Any, Li
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.db import models, IntegrityError
-from django.db.models import Value as V, QuerySet, F
+from django.db.models import Value, QuerySet, F
 from django.db.models.deletion import CASCADE, DO_NOTHING
 from django.db.models.fields import TextField
 from django.db.models.functions import Greatest
@@ -23,7 +23,7 @@ from flags.models.models import FlagsMixin, FlagTypeContext
 from library.django_utils.django_partition import RelatedModelsPartitionModel
 from library.genomics import format_chrom
 from library.preview_request import PreviewModelMixin, PreviewKeyValue
-from library.utils import md5sum_str, FormerTuple, first
+from library.utils import md5sum_str, FormerTuple
 from snpdb.models import Wiki
 from snpdb.models.models_clingen_allele import ClinGenAllele
 from snpdb.models.models_enums import AlleleConversionTool, AlleleOrigin, ProcessingStatus
@@ -248,18 +248,27 @@ class VariantCoordinate(FormerTuple):
     pos: int
     ref: str
     alt: str
+    end: int
 
     @property
     def as_tuple(self) -> Tuple:
-        return self.chrom, self.pos, self.ref, self.alt
+        return self.chrom, self.pos, self.ref, self.alt, self.end
 
     def __str__(self):
-        return f"{self.chrom}:{self.pos} {self.ref}>{self.alt}"
+        s = f"{self.chrom}:{self.pos} {self.ref}>{self.alt}"
+        if self.end is not None:
+            s += f" (end={self.end})"
+        return s
 
     @staticmethod
     def from_clean_str(clean_str: str):
         if full_match := VARIANT_PATTERN.fullmatch(clean_str):
-            return VariantCoordinate(chrom=full_match.group(1), pos=int(full_match.group(2)), ref=full_match.group(3), alt=full_match.group(4))
+            chrom = full_match.group(1)
+            pos = int(full_match.group(2))
+            ref = full_match.group(3)
+            alt = full_match.group(4)
+            end = pos + abs(len(ref) - len(alt))
+            return VariantCoordinate(chrom, pos, ref, alt, end)
 
 
 class Sequence(models.Model):
@@ -297,12 +306,16 @@ class Sequence(models.Model):
             qs = qs.filter(q)
         return dict(qs.values_list("seq", "pk"))
 
+    @staticmethod
+    def allele_is_symbolic(seq: str) -> bool:
+        return seq.startswith("<") and seq.endswith(">")
+
     def is_standard_sequence(self) -> bool:
         """ only contains G/A/T/C/N """
         return not re.match(r"[^GATCN]", self.seq)
 
     def is_symbolic(self) -> bool:
-        return self.seq.startswith("<") and self.seq.endswith(">")
+        return self.allele_is_symbolic(self.seq)
 
 
 class Locus(models.Model):
@@ -366,9 +379,9 @@ class Variant(PreviewModelMixin, models.Model):
     @staticmethod
     def annotate_variant_string(qs, name="variant_string", path_to_variant=""):
         """ Return a "1:123321 G>C" style string in a query """
-        kwargs = {name: Concat(f"{path_to_variant}locus__contig__name", V(":"),
-                               f"{path_to_variant}locus__position", V(" "),
-                               f"{path_to_variant}locus__ref__seq", V(">"),
+        kwargs = {name: Concat(f"{path_to_variant}locus__contig__name", Value(":"),
+                               f"{path_to_variant}locus__position", Value(" "),
+                               f"{path_to_variant}locus__ref__seq", Value(">"),
                                f"{path_to_variant}alt__seq", output_field=TextField())}
         return qs.annotate(**kwargs)
 
@@ -385,7 +398,34 @@ class Variant(PreviewModelMixin, models.Model):
         return errors
 
     @staticmethod
-    def format_tuple(chrom, position, ref, alt, abbreviate=False) -> str:
+    def tuple_to_spdi(chrom, position, ref, alt, end) -> str:
+        """ SPDI: data model for variants and applications at NCBI
+            @see https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7523648/ """
+        p_str = str(position - 1)
+        if Sequence.allele_is_symbolic(alt):
+            length = end - position
+            if alt == "<DEL>":
+                d_str = length
+                i_str = ""
+            elif alt == "<INS>":
+                d_str = ""
+                i_str = length
+            else:
+                raise ValueError(f"Don't know how to handle alt={alt}")
+        else:
+            d_str = ref
+            i_str = alt
+        return f"{chrom}:{p_str}:{d_str}:{i_str}"
+
+    @staticmethod
+    def format_tuple(chrom, position, ref, alt, end, abbreviate=False) -> str:
+        is_symbolic = Sequence.allele_is_symbolic(ref) or Sequence.allele_is_symbolic(alt)
+        if is_symbolic:
+            if alt == "<CNV>":
+                # There's not really a format for these
+                return f"CNV {chrom}:{position}-{end}"
+            return Variant.tuple_to_spdi(chrom, position, ref, alt, end)
+
         if abbreviate:
             ref = Sequence.abbreviate(ref)
             alt = Sequence.abbreviate(alt)
@@ -469,6 +509,10 @@ class Variant(PreviewModelMixin, models.Model):
         return self.alt.seq != Variant.REFERENCE_ALT and self.locus.ref.length > self.alt.length
 
     @property
+    def is_symbolic(self) -> bool:
+        return self.locus.ref.is_symbolic() or self.alt.is_symbolic()
+
+    @property
     def can_have_clingen_allele(self) -> bool:
         return self.is_standard_variant or self.is_reference
 
@@ -476,8 +520,8 @@ class Variant(PreviewModelMixin, models.Model):
     def can_have_annotation(self) -> bool:
         return not self.is_reference
 
-    def as_tuple(self) -> Tuple[str, int, str, str]:
-        return self.locus.contig.name, self.locus.position, self.locus.ref.seq, self.alt.seq
+    def as_tuple(self) -> Tuple[str, int, str, str, int]:
+        return self.locus.contig.name, self.locus.position, self.locus.ref.seq, self.alt.seq, self.end
 
     def is_abbreviated(self):
         return str(self) != self.full_string

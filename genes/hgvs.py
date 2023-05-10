@@ -581,17 +581,17 @@ class HGVSMatcher:
             pyhgvs_transcript = self._create_pyhgvs_transcript(transcript_version)
             self._validate_in_transcript_range(pyhgvs_transcript, hgvs_name)
 
-        variant_tuple = pyhgvs.parse_hgvs_name(hgvs_string, self.genome_build.genome_fasta.fasta,
-                                               transcript=pyhgvs_transcript,
-                                               indels_start_with_same_base=False)
-
-        chrom, position, ref, alt = variant_tuple
+        # Need to send structural variants through here to normalize them
+        chrom, position, ref, alt = pyhgvs.parse_hgvs_name(hgvs_string, self.genome_build.genome_fasta.fasta,
+                                                           transcript=pyhgvs_transcript,
+                                                           indels_start_with_same_base=False)
         contig = self.genome_build.chrom_contig_mappings[chrom]
         chrom = contig.name
-
+        vcf_coords = hgvs_name.get_vcf_coords()
+        length = vcf_coords[2] - vcf_coords[1]
+        end = position + length
         fasta = self.genome_build.genome_fasta.fasta
-        return (chrom, position, ref, alt), HgvsMatchRefAllele.instance(hgvs_name, fasta, pyhgvs_transcript)
-
+        return (chrom, position, ref, alt, end), HgvsMatchRefAllele.instance(hgvs_name, fasta, pyhgvs_transcript)
 
     def _clingen_get_variant_tuple(self, hgvs_string: str):
         # ClinGen Allele Registry doesn't like gene names - so strip (unless LRG_)
@@ -643,7 +643,7 @@ class HGVSMatcher:
             new_hgvs_string = new_hgvs_name.format()
             method = f"{self.HGVS_METHOD_PYHGVS} as '{new_hgvs_string}' (from LRG_RefSeqGene)"
             variant_tuple, matches_reference = self._pyhgvs_get_variant_tuple_and_reference_match(new_hgvs_string,
-                                                                                                   transcript_version)
+                                                                                                  transcript_version)
             return variant_tuple, method, matches_reference
 
         try:
@@ -816,24 +816,24 @@ class HGVSMatcher:
             method = self.HGVS_METHOD_PYHGVS
             variant_tuple, matches_reference = self._pyhgvs_get_variant_tuple_and_reference_match(hgvs_string, None)
 
-        (chrom, position, ref, alt) = variant_tuple
+        (chrom, position, ref, alt, end) = variant_tuple
 
         ref = ref.upper()
         alt = alt.upper()
 
-        if settings.VARIANT_STANDARD_BASES_ONLY:
-            for k, v in {"alt": alt, "ref": ref}.items():
-                non_standard_bases = v
-                for n in "GATC":
-                    non_standard_bases = non_standard_bases.replace(n, "")
-                if non_standard_bases:
-                    reason = f"{k}={v} contains non-standard (A,C,G,T) bases: {non_standard_bases}"
-                    raise pyhgvs.InvalidHGVSName(hgvs_string, reason=reason)
+        # This used to check for non-standard bases. Now we need to allow symbolic eg <DUP>
+        # for k, v in {"alt": alt, "ref": ref}.items():
+        #     non_standard_bases = v
+        #     for n in "GATC":
+        #         non_standard_bases = non_standard_bases.replace(n, "")
+        #     if non_standard_bases:
+        #         reason = f"{k}={v} contains non-standard (A,C,G,T) bases: {non_standard_bases}"
+        #         raise pyhgvs.InvalidHGVSName(hgvs_string, reason=reason)
 
         if Variant.is_ref_alt_reference(ref, alt):
             alt = Variant.REFERENCE_ALT
         return VariantCoordinateAndDetails(
-            variant_coordinate=VariantCoordinate(chrom, position, ref, alt),
+            variant_coordinate=VariantCoordinate(chrom, position, ref, alt, end),
             transcript_accession=used_transcript_accession,
             kind=kind,
             method=method,
