@@ -1,12 +1,13 @@
 import inspect
 from functools import cached_property
-from typing import Optional, List, Iterator
+from typing import Optional, List, Iterator, Dict
 
 from dateutil.tz import gettz
 from django.conf import settings
 from django.contrib import admin, messages
 from django.db import models
 from django.db.models import AutoField, ForeignKey, DateTimeField, Model
+from django.forms import Widget
 from django.http import StreamingHttpResponse, HttpResponseRedirect
 from django.http.response import HttpResponseBase
 from django.urls import path, NoReverseMatch, reverse
@@ -16,7 +17,6 @@ from guardian.admin import GuardedModelAdminMixin
 
 from library.log_utils import log_admin_change
 from library.utils import delimited_row, WrappablePartial
-
 
 class AllValuesChoicesFieldListFilter(admin.AllValuesFieldListFilter):
     """
@@ -313,6 +313,12 @@ class ModelAdminBasics(admin.ModelAdmin):
 
     def get_fields(self, request, obj=None):
         return self._get_fields(request=request, obj=obj)
+
+    def widget_overrides(self) -> Dict[str, Widget]:
+        return {}
+
+    def get_form(self, request, obj=None, **kwargs):
+        return super().get_form(request, obj, widgets=self.widget_overrides(), **kwargs)
 
 
 class GuardedModelAdminBasics(GuardedModelAdminMixin, ModelAdminBasics):

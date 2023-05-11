@@ -186,6 +186,9 @@
 
             {% elif data.report.resolution is empty %}
                 <h4>Actions</h4>
+
+                <a href="{% url 'discordance_report_discuss' discordance_report_id=data.report.pk %}">Discuss</a>
+
                 {% if data.is_pending_concordance %}<p class="text-info">There are outstanding pending changes for this discordance. When labs re-submit with the agreed changes the discordance should be resolved. There is likely no need to action this.</p>{% endif %}
                 {% modal label="Action Discordance" show_prefix=False button=True %}
                     <form method="post" id="resolve-form">

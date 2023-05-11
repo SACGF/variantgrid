@@ -14,6 +14,7 @@ from django.utils.safestring import SafeString
 
 from library.enums.log_level import LogLevel
 from library.log_utils import log_level_to_bootstrap
+from library.preview_request import PreviewModelMixin
 from library.utils import diff_text, html_id_safe
 from snpdb.admin_utils import get_admin_url
 from variantgrid.perm_path import get_visible_url_names
@@ -505,6 +506,7 @@ def value_abs(value: Any) -> Any:
         return 0
     return value
 
+
 @register.filter()
 def segmented_text(text: str, divider: str = ':') -> str:
     if not text:
@@ -638,3 +640,8 @@ def enrich(text: str):
                 parts.append(part)
         is_quotes = not is_quotes
     return SafeString(" ".join(parts))
+
+
+@register.inclusion_tag("uicore/tags/preview_tag.html")
+def preview(obj: PreviewModelMixin):
+    return {"preview": obj.preview}

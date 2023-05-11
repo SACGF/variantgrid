@@ -1,1 +1,28 @@
-Discussion goes here
+{% extends "uicore/page/base.html" %}
+{% load crispy_forms_field %}
+{% load ui_help %}
+{% load ui_utils %}
+{% load ui_menu_bars %}
+{% load ui_tabs_builder %}
+{% load static %}
+{% load js_tags %}
+{% block submenu %}{% menu_bar_data %}{% endblock %}
+{% block title %}Discussion{% endblock %}
+
+{% block content %}
+    <div class="container">
+        <h4>Discussion</h4>
+        {% labelled label="Discussing" %}
+            {% preview answer_group.discussing.source_object %}
+        {% endlabelled %}
+        {% labelled label="On The Topic Of" %}
+            {{ answer_group.topic.name }}
+        {% endlabelled %}
+
+        <h4>Details of the Discussion</h4>
+        <div class="">
+            
+        </div>
+
+    </div>
+{% endblock %}

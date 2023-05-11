@@ -1372,3 +1372,22 @@ li.help-item {
     opacity: 0.5;
   }
 }
+
+.preview-data {
+  .preview-icon {
+    color: #888;
+    margin-right: 8px;
+  }
+  .preview-category {
+    font-weight: 500;
+  }
+  .preview-title {
+    font-weight: 500;
+  }
+  .preview-key-values {
+    font-size: smaller;
+    .preview-key {
+      font-weight: 500;
+    }
+  }
+}

@@ -27,6 +27,7 @@ from discussion.models import DiscussedModelMixin
 from flags.models.enums import FlagStatus
 from flags.models.models import FlagComment
 from genes.hgvs import CHGVS
+from library.preview_request import PreviewModelMixin, PreviewKeyValue
 from library.utils import invalidate_cached_property
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.lab_picker import LabPickerData
@@ -41,7 +42,7 @@ class NotifyLevel(str, Enum):
     ALWAYS_NOTIFY = "always-notify"
 
 
-class DiscordanceReport(TimeStampedModel, DiscussedModelMixin):
+class DiscordanceReport(TimeStampedModel, DiscussedModelMixin, PreviewModelMixin):
 
     resolution = models.TextField(default=DiscordanceReportResolution.ONGOING, choices=DiscordanceReportResolution.CHOICES, max_length=1, null=True, blank=True)
     # TODO remove continued discordane reason, it should be redundant to notes
@@ -59,6 +60,21 @@ class DiscordanceReport(TimeStampedModel, DiscussedModelMixin):
 
     cause_text = models.TextField(null=False, blank=True, default='')
     resolved_text = models.TextField(null=False, blank=True, default='')
+
+    def preview_category(cls) -> str:
+        return "Discordance Report"
+
+    def preview_icon(cls) -> str:
+        return "fa-solid fa-arrow-down-up-across-line"
+
+    def preview(self) -> 'PreviewData':
+        return self.preview_with(
+            identifier=f"DR_{self.pk}",
+            summary_extra=[
+                PreviewKeyValue(key="Allele", value=f"{self.clinical_context.allele:CA}"),
+                PreviewKeyValue(key="Status", value=f"{self.get_resolution_display() or 'Discordant'}")
+            ]
+        )
 
     class LabInvolvement(int, Enum):
         WITHDRAWN = 1

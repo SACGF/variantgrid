@@ -1326,4 +1326,21 @@ li.help-item :last-child {
   opacity: 0.5;
 }
 
+.preview-data .preview-icon {
+  color: #888;
+  margin-right: 8px;
+}
+.preview-data .preview-category {
+  font-weight: 500;
+}
+.preview-data .preview-title {
+  font-weight: 500;
+}
+.preview-data .preview-key-values {
+  font-size: smaller;
+}
+.preview-data .preview-key-values .preview-key {
+  font-weight: 500;
+}
+
 /*# sourceMappingURL=global_bs.css.map */
