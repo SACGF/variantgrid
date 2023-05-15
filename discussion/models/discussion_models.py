@@ -1,6 +1,8 @@
+from dataclasses import dataclass
 from functools import cached_property
-from typing import Optional, Any, Union
+from typing import Optional, Any, Union, List
 
+import itertools
 from django.contrib.auth.models import User
 from django.db.models import TextField, ForeignKey, JSONField, IntegerField, BooleanField, CASCADE, TextChoices, PROTECT
 from django.urls import reverse
@@ -13,9 +15,54 @@ class QuestionValueType(TextChoices):
     Disagreement = 'D', "Disagreement"
 
 
+@dataclass(frozen=True)
+class QuestionOption:
+    key: str
+    label: str
+
+
+DISCUSSION_METHODS = [
+    QuestionOption("email", "Email"),
+    QuestionOption("phone", "Phone"),
+    QuestionOption("video", "Video Call")
+]
+DISCUSSION_PARTICIPANTS = [
+    QuestionOption("curation", "Curation Scientists"),
+    QuestionOption("clinicians", "Clinicians"),
+    QuestionOption("external_experts", "External Experts")
+]
+
+
 class DiscussionTopic(TimeStampedModel):
     key = TextField(primary_key=True)
     name = TextField()
+    heading = TextField(default="")
+
+
+    def discussion_method_options(self):
+        return DISCUSSION_METHODS
+
+    def discussion_participant_options(self):
+        return DISCUSSION_PARTICIPANTS
+
+    @property
+    def questions(self) -> List['DiscussionQuestion']:
+        return list(self.discussionquestion_set.order_by('order').all())
+
+    @cached_property
+    def grouped_questions(self) -> List['GroupedQuestions']:
+        response: List['GroupedQuestion'] = []
+        for heading, questions in itertools.groupby(
+            self.discussionquestion_set.order_by('order'),
+            key=lambda x: x.heading
+        ):
+            response.append(
+                GroupedQuestions(
+                    heading=heading,
+                    questions=list(questions)
+                )
+            )
+        return response
 
 
 class DiscussionQuestion(TimeStampedModel):
@@ -68,7 +115,7 @@ class DiscussionAnswerGroup(TimeStampedModel):
     meeting_meta = JSONField(null=False, blank=False)
 
     def get_absolute_url(self):
-        return reverse("view_discussion_answer_group", kwargs={"discussion_answer_group": self.pk})
+        return reverse("edit_discussion", kwargs={"answer_group_pk": self.pk})
 
 
 class DiscussionAnswer(TimeStampedModel):
@@ -91,3 +138,9 @@ class DiscussedModelMixin(models.Model):
             self.discussions = discussions
             self.save(update_fields=['discussions'])
         return self.discussions
+
+
+@dataclass(frozen=True)
+class GroupedQuestions:
+    heading: str
+    questions: List[DiscussionQuestion]

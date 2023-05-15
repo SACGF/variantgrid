@@ -1343,4 +1343,15 @@ li.help-item :last-child {
   font-weight: 500;
 }
 
+.field-errors {
+  margin-top: 8px;
+  animation: fadeInOpacity ease-out 1s;
+}
+.field-errors div {
+  border: 1px solid #fee;
+  background-color: #fee;
+  padding: 8px;
+  border-radius: 4px;
+}
+
 /*# sourceMappingURL=global_bs.css.map */

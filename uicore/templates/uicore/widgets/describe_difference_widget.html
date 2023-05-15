@@ -1,0 +1,32 @@
+<label class="form-check-label ml-4 w-100">
+    <input type="checkbox"
+           class="form-check-input"
+           name="{{ widget.name }}"
+           data-toggle="collapse"
+           href="#{{ widget.name }}-detail"
+           value="on"
+           {% if widget.value.selected %}checked="checked"{% endif %}
+    >
+    {{ widget.attrs.label }}
+</label>
+{% if widget.attrs.help_text %}
+    <div class="text-secondary">
+        {{ widget.attrs.help_text }}
+    </div>
+{% endif %}
+<div id="{{ widget.name }}-detail" class="mt-4 collapse {% if widget.value.selected %}show{% endif %}">
+    <div class="row align-center justify-content-center">
+        <div class="col-4 text-right vertical-align-center"><label>Please provide details</label></div>
+        <div class="col-8 vertical-align-center"><input class="form-control" name="{{ widget.name }}-details" value="{{ widget.value.details|default_if_none:'' }}"/></div>
+    </div>
+    <div class="row align-center justify-content-center mt-4">
+        <div class="col-4 text-right vertical-align-center"><label>Was this difference resolved</label></div>
+        <div class="col-8 vertical-align-center">
+            <select class="form-control" name="{{ widget.name }}-resolution">
+                <option value="">-</option>
+                <option value="R" {% if widget.value.resolution == "R" %}selected="selected"{% endif %}>Resolved</option>
+                <option value="U" {% if widget.value.resolution == "U" %}selected="selected"{% endif %}>Still Outstanding</option>
+            </select>
+        </div>
+    </div>
+</div>

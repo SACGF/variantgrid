@@ -232,6 +232,9 @@ class LabelledValueTag(template.Node):
         elif hint == "inline":
             label_css = "m-2 align-self-center"
             value_css = "m-2"
+        elif hint == "large-label":
+            label_css = "col-12 col-md-4 text-md-right align-self-center"
+            value_css = "col-12 col-md-8 text-left text-break"
         else:
             label_css = "col-12 col-md-3 text-md-right align-self-center"
             value_css = "col-12 col-md-9 text-left text-break"
@@ -267,8 +270,7 @@ class LabelledValueTag(template.Node):
         errors: Optional[ErrorList]
         if filter_errors := self.errors:
             if errors := filter_errors.resolve(context):
-                for error in errors:
-                    output += f'<div class="text-danger">{error}</div>'
+                output += field_errors(errors)
 
         help_attr = ""
         if help_html:
@@ -645,3 +647,14 @@ def enrich(text: str):
 @register.inclusion_tag("uicore/tags/preview_tag.html")
 def preview(obj: PreviewModelMixin):
     return {"preview": obj.preview}
+
+
+@register.filter(name="field_errors")
+def field_errors(error_list):
+    if error_list:
+        output = '<div class="field-errors">'
+        for error in error_list:
+            output += f'<div class="text-danger"> <i class="text-danger fas fa-exclamation-circle"></i>{escape(error)}</div>'
+        output += "</div>"
+        return SafeString(output)
+    return ""

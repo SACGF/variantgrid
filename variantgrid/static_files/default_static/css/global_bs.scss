@@ -1391,3 +1391,14 @@ li.help-item {
     }
   }
 }
+
+.field-errors {
+  margin-top: 8px;
+  animation: fadeInOpacity ease-out 1s;
+  div {
+    border: 1px solid #fee;
+    background-color: #fee;
+    padding: 8px;
+    border-radius: 4px;
+  }
+}
