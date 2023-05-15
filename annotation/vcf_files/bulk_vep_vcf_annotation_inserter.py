@@ -86,7 +86,7 @@ class BulkVEPVCFAnnotationInserter:
         "PHENO",
         VEPColumns.PICK,
         "SOURCE",  # only populated when using --merged (which we don't use)
-        "SpliceAI_pred_SYMBOL",
+        # "SpliceAI_pred_SYMBOL",
         "STRAND",
         "SYMBOL_SOURCE",
     ]

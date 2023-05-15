@@ -296,6 +296,9 @@ class Sequence(models.Model):
             s = f"{s[:3]}...{s[-3:]}"
         return s
 
+    def __len__(self) -> int:
+        return self.length
+
     def __str__(self):
         return self.abbreviate(self.seq)
 
@@ -307,7 +310,7 @@ class Sequence(models.Model):
         return dict(qs.values_list("seq", "pk"))
 
     @staticmethod
-    def allele_is_symbolic(seq: str) -> bool:
+    def allele_is_symbolic(seq: Union[str, 'Sequence']) -> bool:
         return seq.startswith("<") and seq.endswith(">")
 
     def is_standard_sequence(self) -> bool:
@@ -316,6 +319,10 @@ class Sequence(models.Model):
 
     def is_symbolic(self) -> bool:
         return self.allele_is_symbolic(self.seq)
+
+    def startswith(self, prefix: str) -> bool:
+        """ To match str method, so allele_is_symbolic works above """
+        return self.seq.startswith(prefix)
 
 
 class Locus(models.Model):
@@ -441,7 +448,8 @@ class Variant(PreviewModelMixin, models.Model):
             chrom, position, ref, alt = Variant.clean_variant_fields(chrom, position, ref, alt,
                                                                      want_chr=genome_build.reference_fasta_has_chr)
             contig = genome_build.chrom_contig_mappings[chrom]
-            variant_tuple = VariantCoordinate(contig.name, int(position), ref, alt)
+            end = Variant.calculate_end(position, ref, alt)
+            variant_tuple = VariantCoordinate(contig.name, int(position), ref, alt, end)
         return variant_tuple
 
     @staticmethod
@@ -469,7 +477,8 @@ class Variant(PreviewModelMixin, models.Model):
     def coordinate(self) -> VariantCoordinate:
         locus = self.locus
         contig = locus.contig
-        return VariantCoordinate(chrom=contig.name, pos=locus.position, ref=locus.ref.seq, alt=self.alt.seq)
+        return VariantCoordinate(chrom=contig.name, pos=locus.position, ref=locus.ref.seq, alt=self.alt.seq,
+                                 end=self.end)
 
     @staticmethod
     def is_ref_alt_reference(ref, alt):
@@ -532,7 +541,7 @@ class Variant(PreviewModelMixin, models.Model):
         return self.format_tuple(*self.as_tuple())
 
     def __str__(self):
-        return self.format_tuple(self.locus.contig.name, self.locus.position, self.locus.ref, self.alt)
+        return self.format_tuple(self.locus.contig.name, self.locus.position, self.locus.ref, self.alt, self.end)
 
     def get_absolute_url(self):
         # will show allele if there is one, otherwise go to variant page
@@ -588,6 +597,14 @@ class Variant(PreviewModelMixin, models.Model):
         if self.end is not None:
             return self.end
         return self.locus.position + max(self.locus.ref.length, self.alt.length)
+
+    @staticmethod
+    def calculate_end_from_lengths(position, ref_length, alt_length) -> int:
+        return position + abs(ref_length - alt_length)
+
+    @staticmethod
+    def calculate_end(position, ref, alt) -> int:
+        return Variant.calculate_end_from_lengths(position, len(ref), len(alt))
 
     @staticmethod
     def clean_variant_fields(chrom, position, ref, alt, want_chr):

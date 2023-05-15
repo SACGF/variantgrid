@@ -204,7 +204,9 @@ def search_variant_match(search_input: SearchInputInstance):
         chrom, position, ref, alt = search_input.match.groups()
         chrom, position, ref, alt = Variant.clean_variant_fields(chrom, position, ref, alt,
                                                                  want_chr=genome_build.reference_fasta_has_chr)
-        results = get_results_from_variant_tuples(search_input.get_visible_variants(genome_build), VariantCoordinate(chrom, position, ref, alt))
+        end = Variant.calculate_end(position, ref, alt)
+        results = get_results_from_variant_tuples(search_input.get_visible_variants(genome_build),
+                                                  VariantCoordinate(chrom, position, ref, alt, end))
         if results.exists():
             return results
 
