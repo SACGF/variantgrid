@@ -1,0 +1,16 @@
+{% extends "uicore/page/base.html" %}
+{% load crispy_forms_tags %}
+{% load static %}
+{% load js_tags %}
+{% load classification_tags %}
+{% load ui_tabs_builder %}
+{% load ui_utils %}
+{% load ui_help %}
+{% load ui_menu_bars %}
+{% block title %}Discordance Report{% endblock %}
+{% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
+{% block content %}
+    <div class="container">
+        <div data-toggle="ajax" href="{% url 'review_detail' review.pk %}"></div>
+    </div>
+{% endblock %}

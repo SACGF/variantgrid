@@ -24,6 +24,7 @@ from classification.views.exports import ClassificationExportFormatterCSV
 from classification.views.exports.classification_export_filter import ClassificationFilter
 from classification.views.exports.classification_export_formatter_csv import FormatDetailsCSV
 from genes.hgvs import CHGVS
+from review.models import Review
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.lab_picker import LabPickerData
 from snpdb.models import Lab, GenomeBuild, Allele
@@ -280,7 +281,7 @@ def discordance_report_review(request: HttpRequest, discordance_report_id: int) 
         raise PermissionDenied("User is not involved with lab that's involved with discordance")
 
     discussed_object = data.report.reviews_safe
-    return redirect(reverse('start_review', kwargs={"reviewed_object_pk": discussed_object.pk, "topic_pk": "discordance_report"}))
+    return redirect(reverse('start_review', kwargs={"reviewed_object_id": discussed_object.pk, "topic_id": "discordance_report"}))
 
 
 def discordance_report_view(request: HttpRequest, discordance_report_id: int) -> HttpResponse:
@@ -386,3 +387,13 @@ def export_discordance_report(request: HttpRequest, discordance_report_id: int) 
             pretty=True
         )
     ).serve()
+
+
+def action_discordance_report_review(request: HttpRequest, review_id: int) -> HttpResponseBase:
+    review = Review.objects.get(pk=review_id)
+    discordance_report = review.reviewing.source_object
+
+    return render(request, "classification/discordance_report_action.html", {
+        "review": review,
+        "discordance_report": discordance_report
+    })

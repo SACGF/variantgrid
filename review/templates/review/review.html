@@ -29,11 +29,11 @@
             <div class="pt-4 pb-2 pr-4 border rounded">
 
                 {% labelled label="Reviewing" hint="large-label" %}
-                    {% preview answer_group.reviewing.source_object %}
+                    {% preview review.reviewing.source_object %}
                 {% endlabelled %}
 
                 {% labelled label="On The Topic Of" hint="large-label" %}
-                    {{ answer_group.topic.name }}
+                    {{ review.topic.name }}
                 {% endlabelled %}
 
                 {% labelled label="Date of Review" hint="large-label" errors=form.review_date.errors %}
@@ -58,7 +58,7 @@
 
             </div>
 
-            <h4>{{ answer_group.topic.heading }}</h4>
+            <h4>{{ review.topic.heading }}</h4>
             {{ form.non_field_errors | field_errors }}
             <div class="pt-4 pb-2 pr-4 border rounded">
                 {% for field in form.describe_difference_fields %}

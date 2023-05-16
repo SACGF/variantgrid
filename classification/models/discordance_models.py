@@ -23,7 +23,7 @@ from classification.models.classification import ClassificationModification, Cla
 from classification.models.classification_lab_summaries import ClassificationLabSummaryEntry, ClassificationLabSummary
 from classification.models.clinical_context_models import ClinicalContext
 from classification.models.flag_types import classification_flag_types, ClassificationFlagTypes
-from review.models import ReviewableModelMixin
+from review.models import ReviewableModelMixin, Review
 from flags.models.enums import FlagStatus
 from flags.models.models import FlagComment
 from genes.hgvs import CHGVS
@@ -192,6 +192,9 @@ class DiscordanceReport(TimeStampedModel, ReviewableModelMixin, PreviewModelMixi
     @property
     def reviewing_labs(self) -> Set[Lab]:
         return self.all_actively_involved_labs
+
+    def post_review_url(self, review: Review) -> str:
+        return reverse('discordance_report_review_action', kwargs={"review_id": review.pk})
 
     @cached_property
     def discordance_report_classifications(self) -> List['DiscordanceReportClassification']:

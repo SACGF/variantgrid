@@ -1,0 +1,11 @@
+{% load ui_utils %}
+<div class="card">
+    <div class="card-header">Review</div>
+    <div class="card-body">
+
+        {% labelled label="Review Of" %}{% preview review.reviewing.source_object %}{% endlabelled %}
+        {% labelled label="On The Topic Of" %}{{ review.topic.name }}{% endlabelled %}
+
+
+    </div>
+</div>

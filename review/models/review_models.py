@@ -74,8 +74,8 @@ class ReviewQuestion(TimeStampedModel):
 class ReviewedObject(TimeStampedModel):
     label = TextField()  # a label to refer to the object of the discussion
 
-    def new_review(self, topic: Union[ReviewTopic, str], user: User, context: Optional[str] = None) -> 'ReviewAnswerGroup':
-        return ReviewAnswerGroup(
+    def new_review(self, topic: Union[ReviewTopic, str], user: User, context: Optional[str] = None) -> 'Review':
+        return Review(
             reviewing=self,
             topic=topic,
             context=context,
@@ -102,7 +102,7 @@ class ReviewedObject(TimeStampedModel):
         return None
 
 
-class ReviewAnswerGroup(TimeStampedModel):
+class Review(TimeStampedModel):
     reviewing = ForeignKey(ReviewedObject, on_delete=CASCADE)
     topic = ForeignKey(ReviewTopic, on_delete=CASCADE)
     context = TextField(null=True, blank=True)
@@ -113,7 +113,7 @@ class ReviewAnswerGroup(TimeStampedModel):
     meeting_meta = JSONField(null=False, blank=False)
 
     def get_absolute_url(self):
-        return reverse("edit_review", kwargs={"answer_group_pk": self.pk})
+        return reverse("edit_review", kwargs={"review_id": self.pk})
 
     def next_step_url(self) -> str:
         return self.reviewing.source_object.post_review_url(review=self)
@@ -139,7 +139,7 @@ class ReviewableModelMixin(models.Model):
             self.save(update_fields=['reviews'])
         return self.reviews
 
-    def post_review_url(self, review: ReviewAnswerGroup) -> str:
+    def post_review_url(self, review: Review) -> str:
         return self.get_absolute_url()
 
 
