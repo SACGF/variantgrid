@@ -274,13 +274,13 @@ class DiscordanceReportTemplateData:
         return False
 
 
-def discordance_report_discuss(request: HttpRequest, discordance_report_id: int) -> HttpResponse:
+def discordance_report_review(request: HttpRequest, discordance_report_id: int) -> HttpResponse:
     data = DiscordanceReportTemplateData(discordance_report_id, user=request.user)
     if not data.is_user_editable:
         raise PermissionDenied("User is not involved with lab that's involved with discordance")
 
-    discussed_object = data.report.discussions_safe
-    return redirect(reverse('start_discussion', kwargs={"discussed_object_pk": discussed_object.pk, "topic_pk": "discordance"}))
+    discussed_object = data.report.reviews_safe
+    return redirect(reverse('start_review', kwargs={"reviewed_object_pk": discussed_object.pk, "topic_pk": "discordance_report"}))
 
 
 def discordance_report_view(request: HttpRequest, discordance_report_id: int) -> HttpResponse:

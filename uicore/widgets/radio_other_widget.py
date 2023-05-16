@@ -1,5 +1,7 @@
 from dataclasses import dataclass
 from typing import List, Tuple
+
+from django.db.models import Model
 from django.forms import ChoiceField
 import copy
 
@@ -101,9 +103,16 @@ class RadioOtherWidget(ChoiceWidget):
         """Return selected values as a list."""
         if value is None and self.allow_multiple_selected:
             return []
-        if not isinstance(value, (tuple, list)):
+        elif not isinstance(value, (tuple, list, set)):
             value = [value]
-        return [str(v) if v is not None else "" for v in value]
+
+        def format_single_value(v):
+            if isinstance(v, Model):
+                return str(v.pk)
+            else:
+                return str(v)
+
+        return [format_single_value(v) if v is not None else "" for v in value]
 
 
 class CheckboxOtherWidget(RadioOtherWidget):
@@ -113,27 +122,29 @@ class CheckboxOtherWidget(RadioOtherWidget):
 
 class ChoiceFieldWithOther(ChoiceField):
     widget = RadioOtherWidget
+    other_enabled = True
+
+    def widget_attrs(self, widget):
+        return {"other_enabled": self.other_enabled}
 
     def valid_value(self, value):
         return True
 
     def to_python(self, value):
         # don't want to turn an array into a string representation of an array
-        return value
-
-    def clean(self, value):
         return value
 
 
 class MultiChoiceFieldWithOther(ChoiceField):
     widget = CheckboxOtherWidget
+    other_enabled = True
+
+    def widget_attrs(self, widget):
+        return {"other_enabled": self.other_enabled}
 
     def valid_value(self, value):
         return True
 
     def to_python(self, value):
         # don't want to turn an array into a string representation of an array
-        return value
-
-    def clean(self, value):
         return value

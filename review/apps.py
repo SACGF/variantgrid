@@ -1,7 +1,7 @@
 from django.apps import AppConfig
 
 class DiscussionConfig(AppConfig):
-    name = 'discussion'
+    name = 'review'
 
     def ready(self):
         pass

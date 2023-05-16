@@ -23,7 +23,7 @@ from classification.views.condition_matching_view import condition_matching_view
     ConditionTextColumns, ConditionTextMatchingAPI
 from classification.views.discordance_report_views import discordance_report_view, export_discordance_report, \
     discordance_reports_view, discordance_reports_history_detail, discordance_reports_active_detail, \
-    discordance_report_discuss
+    discordance_report_review
 from classification.views.evidence_keys_view import EvidenceKeysView
 from classification.views.exports.classification_export_formatter_redcap import redcap_data_dictionary
 from classification.views.imported_allele_info_view import view_imported_allele_info, ImportedAlleleInfoColumns, \
@@ -131,7 +131,7 @@ urlpatterns = [
     perm_path('discordance_reports/<str:lab_id>/active_detail', discordance_reports_active_detail, name='discordance_reports_active_detail'),
     # 'classification' is redundant but there'll be other references to these URLs, so keep the URLs valid
     perm_path('classification/discordance_report/<int:discordance_report_id>', discordance_report_view, name='discordance_report_deprecated'),
-    perm_path('classification/discordance_report/<int:discordance_report_id>/discuss', discordance_report_discuss, name='discordance_report_discuss'),
+    perm_path('classification/discordance_report/<int:discordance_report_id>/review', discordance_report_review, name='discordance_report_review'),
     perm_path('classification/discordance_report/<int:discordance_report_id>/export', export_discordance_report, name='discordance_export_deprecated'),
 
     perm_path('discordance_report/<int:discordance_report_id>', discordance_report_view, name='discordance_report'),

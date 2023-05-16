@@ -50,7 +50,8 @@ class DescribeDifferenceWidget(Widget):
         is_selected = data.get(name) == "on"
         if is_selected:
             details = data.get(name + "-details")
-            resolution = DifferenceResolution(data.get(name + "-resolution"))
+            resolution = data.get(name + "-resolution")
+            resolution = DifferenceResolution(resolution) if resolution else None
             return DescribeDifference(
                 selected=True,
                 details=details,

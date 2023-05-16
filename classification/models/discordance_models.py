@@ -23,7 +23,7 @@ from classification.models.classification import ClassificationModification, Cla
 from classification.models.classification_lab_summaries import ClassificationLabSummaryEntry, ClassificationLabSummary
 from classification.models.clinical_context_models import ClinicalContext
 from classification.models.flag_types import classification_flag_types, ClassificationFlagTypes
-from discussion.models import DiscussedModelMixin
+from review.models import ReviewableModelMixin
 from flags.models.enums import FlagStatus
 from flags.models.models import FlagComment
 from genes.hgvs import CHGVS
@@ -42,7 +42,7 @@ class NotifyLevel(str, Enum):
     ALWAYS_NOTIFY = "always-notify"
 
 
-class DiscordanceReport(TimeStampedModel, DiscussedModelMixin, PreviewModelMixin):
+class DiscordanceReport(TimeStampedModel, ReviewableModelMixin, PreviewModelMixin):
 
     resolution = models.TextField(default=DiscordanceReportResolution.ONGOING, choices=DiscordanceReportResolution.CHOICES, max_length=1, null=True, blank=True)
     # TODO remove continued discordane reason, it should be redundant to notes
@@ -188,6 +188,10 @@ class DiscordanceReport(TimeStampedModel, DiscussedModelMixin, PreviewModelMixin
     @property
     def all_actively_involved_labs(self) -> Set[Lab]:
         return {lab for lab, status in self.involved_labs.items() if status == DiscordanceReport.LabInvolvement.ACTIVE}
+
+    @property
+    def reviewing_labs(self) -> Set[Lab]:
+        return self.all_actively_involved_labs
 
     @cached_property
     def discordance_report_classifications(self) -> List['DiscordanceReportClassification']:

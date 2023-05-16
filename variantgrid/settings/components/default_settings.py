@@ -752,7 +752,7 @@ INSTALLED_APPS = [
     'upload.apps.UploadConfig',
     'classification.apps.ClassificationConfig',
     'variantopedia',
-    'discussion'
+    'review'
     # Uncomment the next line to enable admin documentation:
     # 'django.contrib.admindocs',
 ]

@@ -5,25 +5,29 @@
             {{ option.label }}
         </label>
     {% endfor %}
-    <label class="form-check-label checkbox-row py-2 ml-4">
-         <input {% if widget.other.selected %}checked="checked"{% endif %} type="checkbox" class="form-check-input" name="{{ widget.name }}-other" value="on">
-         {{ widget.other.label }}
-    </label>
+    {% if widget.attrs.other_enabled %}
+        <label class="form-check-label checkbox-row py-2 ml-4">
+             <input {% if widget.other.selected %}checked="checked"{% endif %} type="checkbox" class="form-check-input" name="{{ widget.name }}-other" value="on">
+             {{ widget.other.label }}
+        </label>
+    {% endif %}
 </div>
-<div id="{{ widget.name }}-other-value" class="{% if not widget.other.selected %}collapse{% endif %}">
-    <input class="form-control" placeholder="Please specify" name="{{ widget.name }}-other-value" value="{{ widget.other.value }}" />
-</div>
-<script>
-    function other{{ widget.name }}Check() {
-        if ($("[name='{{ widget.name }}-other']").is(":checked")) {
-            $("#{{ widget.name }}-other-value").show();
-        } else {
-            $("#{{ widget.name }}-other-value").hide();
+{% if widget.attrs.other_enabled %}
+    <div id="{{ widget.name }}-other-value" class="{% if not widget.other.selected %}collapse{% endif %}">
+        <input class="form-control" placeholder="Please specify" name="{{ widget.name }}-other-value" value="{{ widget.other.value }}" />
+    </div>
+    <script>
+        function other{{ widget.name }}Check() {
+            if ($("[name='{{ widget.name }}-other']").is(":checked")) {
+                $("#{{ widget.name }}-other-value").show();
+            } else {
+                $("#{{ widget.name }}-other-value").hide();
+            }
         }
-    }
-    $(() => {
-        $("#{{ widget.name }}-selection .checkbox-row").click(() => {
-            other{{ widget.name }}Check();
+        $(() => {
+            $("#{{ widget.name }}-selection .checkbox-row").click(() => {
+                other{{ widget.name }}Check();
+            });
         });
-    });
-</script>
+    </script>
+{% endif %}

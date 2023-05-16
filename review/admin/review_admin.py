@@ -1,13 +1,13 @@
 from django.contrib.admin import TabularInline
 from django.contrib.admin.widgets import AdminTextInputWidget
 
-from discussion.models import DiscussionQuestion, DiscussionTopic
+from review.models import ReviewQuestion, ReviewTopic
 from snpdb.admin_utils import ModelAdminBasics
 from django.contrib import admin
 
 
-class DiscussionQuestionInline(TabularInline):
-    model = DiscussionQuestion
+class ReviewQuestionInline(TabularInline):
+    model = ReviewQuestion
     # fields = ("id", "flag_type", "user", "resolution", "data")
     show_change_link = True
 
@@ -30,9 +30,9 @@ class DiscussionQuestionInline(TabularInline):
         return True
 
 
-@admin.register(DiscussionTopic)
-class DiscussionQuestionTopicAdmin(ModelAdminBasics):
-    inlines = (DiscussionQuestionInline, )
+@admin.register(ReviewTopic)
+class ReviewQuestionTopicAdmin(ModelAdminBasics):
+    inlines = (ReviewQuestionInline,)
 
     def widget_overrides(self):
         return {
