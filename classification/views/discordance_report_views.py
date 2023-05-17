@@ -291,6 +291,54 @@ def discordance_report_view(request: HttpRequest, discordance_report_id: int) ->
             raise PermissionDenied("User is not involved with lab that's involved with discordance")
 
         action = request.POST.get('action')
+        if action == "reopen":
+            newly_opened = data.report.reopen_continued_discordance(cause='Discordance manually re-opened')
+            discordance_report_id = newly_opened.pk
+
+        return redirect(reverse('discordance_report', kwargs={'discordance_report_id': discordance_report_id}))
+
+    context = {
+        "data": data,
+        "buckets": EvidenceKeyMap.clinical_significance_to_bucket()
+    }
+
+    return render(request, "classification/discordance_report.html", context)
+
+
+def export_discordance_report(request: HttpRequest, discordance_report_id: int) -> HttpResponseBase:
+    report = DiscordanceReport.objects.get(pk=discordance_report_id)
+    dcs = DiscordanceReportClassification.objects.filter(report=report)
+    include: [ClassificationModification] = []
+    for dc in dcs:
+        if dc.clinical_context_effective == report.clinical_context and not dc.withdrawn_effective:
+            include.append(dc.classification_effective)
+
+    vcs_qs = ClassificationModification.objects.filter(pk__in=[vcm.id for vcm in include])
+
+    return ClassificationExportFormatterCSV(
+        ClassificationFilter(
+            user=request.user,
+            genome_build=GenomeBuildManager.get_current_genome_build(),
+            file_prefix=f"discordance_report_{discordance_report_id}",
+            file_include_date=False,
+            starting_query=vcs_qs
+        ),
+        format_details=FormatDetailsCSV(
+            pretty=True
+        )
+    ).serve()
+
+
+def action_discordance_report_review(request: HttpRequest, review_id: int) -> HttpResponseBase:
+    review = Review.objects.get(pk=review_id)
+    discordance_report = review.reviewing.source_object
+    data = DiscordanceReportTemplateData(discordance_report.pk, user=request.user)
+
+    if request.method == 'POST':
+        if not data.is_user_editable:
+            raise PermissionDenied("User is not involved with lab that's involved with discordance")
+
+        action = request.POST.get('action')
         if action == "action":
 
             notes = request.POST.get('notes')
@@ -351,49 +399,13 @@ def discordance_report_view(request: HttpRequest, discordance_report_id: int) ->
             else:
                 raise ValueError(f"Expected resolution of {resolution} but allele {report.clinical_context.allele_id} is not pending concordance")
 
-        elif action == "reopen":
-            newly_opened = data.report.reopen_continued_discordance(cause='Discordance manually re-opened')
-            discordance_report_id = newly_opened.pk
-
-        return redirect(reverse('discordance_report', kwargs={'discordance_report_id': discordance_report_id}))
+        return redirect(reverse('discordance_report', kwargs={'discordance_report_id': data.discordance_report_id}))
 
     context = {
+        "review": review,
+        "discordance_report": discordance_report,
         "data": data,
         "buckets": EvidenceKeyMap.clinical_significance_to_bucket()
     }
 
-    return render(request, "classification/discordance_report.html", context)
-
-
-def export_discordance_report(request: HttpRequest, discordance_report_id: int) -> HttpResponseBase:
-    report = DiscordanceReport.objects.get(pk=discordance_report_id)
-    dcs = DiscordanceReportClassification.objects.filter(report=report)
-    include: [ClassificationModification] = []
-    for dc in dcs:
-        if dc.clinical_context_effective == report.clinical_context and not dc.withdrawn_effective:
-            include.append(dc.classification_effective)
-
-    vcs_qs = ClassificationModification.objects.filter(pk__in=[vcm.id for vcm in include])
-
-    return ClassificationExportFormatterCSV(
-        ClassificationFilter(
-            user=request.user,
-            genome_build=GenomeBuildManager.get_current_genome_build(),
-            file_prefix=f"discordance_report_{discordance_report_id}",
-            file_include_date=False,
-            starting_query=vcs_qs
-        ),
-        format_details=FormatDetailsCSV(
-            pretty=True
-        )
-    ).serve()
-
-
-def action_discordance_report_review(request: HttpRequest, review_id: int) -> HttpResponseBase:
-    review = Review.objects.get(pk=review_id)
-    discordance_report = review.reviewing.source_object
-
-    return render(request, "classification/discordance_report_action.html", {
-        "review": review,
-        "discordance_report": discordance_report
-    })
+    return render(request, "classification/discordance_report_action.html", context)

@@ -1,17 +1,16 @@
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Optional, Any, Union, List, Set
-
-import itertools
+from typing import Optional, Union, List, Set, Type
 from django.contrib.auth.models import User
-from django.db.models import TextField, ForeignKey, JSONField, IntegerField, BooleanField, CASCADE, TextChoices, \
+from django.db.models import TextField, ForeignKey, JSONField, IntegerField, CASCADE, TextChoices, \
     PROTECT, DateField, ManyToManyField
 from django.urls import reverse
 from django.db import models
-from django_extensions import logging
+import logging
 from model_utils.models import TimeStampedModel
 
 from snpdb.models import Lab
+from uicore.widgets.describe_difference_widget import DifferenceResolution
 
 
 class QuestionValueType(TextChoices):
@@ -24,16 +23,40 @@ class QuestionOption:
     label: str
 
 
-REVIEW_MEDIUM = [
-    QuestionOption("email", "Email"),
-    QuestionOption("phone", "Phone"),
-    QuestionOption("video", "Video Call")
-]
-REVIEW_PARTICIPANTS = [
-    QuestionOption("curation", "Curation Scientists"),
-    QuestionOption("clinicians", "Clinicians"),
-    QuestionOption("external_experts", "External Experts")
-]
+# TODO are we ReviewMedium or ReviewMethod or something else?
+class ReviewMedium(TextChoices):
+    email = "email", "Email"
+    phone = "phone", "Phone"
+    video = "video", "Video"
+
+
+class ReviewParticipants(TextChoices):
+    curation = "curation", "Curation Scientists"
+    clinicians = "clinicians", "Clinicians"
+    external_experts = "external_experts", "External Experts"
+
+
+@dataclass(frozen=True)
+class ValueOther:
+    key: str
+    label: str
+
+    def __lt__(self, other):
+        def sort_value(vo: ValueOther):
+            return vo.key == "other", vo.label
+
+        return sort_value(self) < sort_value(other)
+
+    def __str__(self):
+        return self.label
+
+    @staticmethod
+    def from_str(value: str, text_choices_class: Type) -> 'ValueOther':
+        try:
+            choice = text_choices_class(value)
+            return ValueOther(key=value, label=choice.label)
+        except ValueError:
+            return ValueOther(key="other", label=value)
 
 
 class ReviewTopic(TimeStampedModel):
@@ -44,21 +67,6 @@ class ReviewTopic(TimeStampedModel):
     @property
     def questions(self) -> List['ReviewQuestion']:
         return list(self.reviewquestion_set.order_by('order').all())
-
-    @cached_property
-    def grouped_questions(self) -> List['GroupedQuestions']:
-        response: List['GroupedQuestion'] = []
-        for heading, questions in itertools.groupby(
-            self.discussionquestion_set.order_by('order'),
-            key=lambda x: x.heading
-        ):
-            response.append(
-                GroupedQuestions(
-                    heading=heading,
-                    questions=list(questions)
-                )
-            )
-        return response
 
 
 class ReviewQuestion(TimeStampedModel):
@@ -99,7 +107,16 @@ class ReviewedObject(TimeStampedModel):
 
         logging.warning('Could not find source object for FlagCollection %s', self.id)
 
-        return None
+        raise ValueError(f"Review {self.pk} does not appear to be attached to an object")
+
+
+@dataclass
+class ReviewAnswer:
+    # when we have other question types than difference, going to have to
+    # rework these models a bit
+    question: ReviewQuestion
+    details: str
+    resolution: DifferenceResolution
 
 
 class Review(TimeStampedModel):
@@ -117,6 +134,34 @@ class Review(TimeStampedModel):
 
     def next_step_url(self) -> str:
         return self.reviewing.source_object.post_review_url(review=self)
+
+    @property
+    def review_method(self) -> Optional[ValueOther]:
+        if method := self.meeting_meta.get("participants", {}).get("review_method"):
+            return ValueOther.from_str(method, ReviewMedium)
+
+    @property
+    def participants(self) -> List[ValueOther]:
+        if participants := self.meeting_meta.get("participants", {}).get("review_participants"):
+            return list(sorted(ValueOther.from_str(p, ReviewParticipants) for p in participants))
+        return []
+
+    @property
+    def answers(self) -> List[ReviewAnswer]:
+        if answers := self.meeting_meta.get("answers", {}):
+            answer_list = []
+            for key, answer in answers.items():
+                # TODO, put safety if no quesiton can be found
+                if question := ReviewQuestion.objects.get(topic=self.topic, key=key):
+                    answer_list.append(
+                        ReviewAnswer(
+                            question=question,
+                            details=answer.get("details"),
+                            resolution=DifferenceResolution(answer.get("resolution"))
+                        )
+                    )
+            return answer_list
+        return []
 
 
 class ReviewableModelMixin(models.Model):
@@ -141,9 +186,3 @@ class ReviewableModelMixin(models.Model):
 
     def post_review_url(self, review: Review) -> str:
         return self.get_absolute_url()
-
-
-@dataclass(frozen=True)
-class GroupedQuestions:
-    heading: str
-    questions: List[ReviewQuestion]

@@ -1,11 +1,32 @@
 {% load ui_utils %}
+{% load js_tags %}
 <div class="card">
     <div class="card-header">Review</div>
     <div class="card-body">
 
         {% labelled label="Review Of" %}{% preview review.reviewing.source_object %}{% endlabelled %}
         {% labelled label="On The Topic Of" %}{{ review.topic.name }}{% endlabelled %}
-
-
+        {% labelled label="On The Date" %}{{ review.review_date }}{% endlabelled %}
+        {% labelled label="Review Method" %}{{ review.review_method }}{% endlabelled %}
+        {% labelled label="Review Participants" %}
+            {% for item in review.participants %}
+                {% if not forloop.first %}<br/>{% endif %}
+                {{ item }}
+            {% endfor %}
+        {% endlabelled %}
+        {% labelled label="Reviewing Labs" %}
+            {% for lab in review.reviewing_labs.all %}
+                {% if not forloop.first %}<br/>{% endif %}
+                {{ lab }}
+            {% endfor %}
+        {% endlabelled %}
+        {% labelled label="Details" %}
+            {% for answer in review.answers %}
+                <div>
+                    <label>{{ answer.question.label }} : {{ answer.resolution.label }}</label>
+                    <div class="text-secondary">{{ answer.details }}</div>
+                </div>
+            {% endfor %}
+        {% endlabelled %}
     </div>
 </div>

@@ -68,12 +68,25 @@ class DiscordanceReport(TimeStampedModel, ReviewableModelMixin, PreviewModelMixi
         return "fa-solid fa-arrow-down-up-across-line"
 
     def preview(self) -> 'PreviewData':
+        from classification.models import ImportedAlleleInfo
+        all_chgvs = ImportedAlleleInfo.all_chgvs(self.clinical_context.allele)
+        preferred_genome_build = GenomeBuildManager.get_current_genome_build()
+        desired_builds = [c_hgvs for c_hgvs in all_chgvs if c_hgvs.genome_build == preferred_genome_build]
+        if not desired_builds:
+            desired_builds = all_chgvs
+
+        c_hgvs_key_values = []
+        for c_hgvs in desired_builds:
+            c_hgvs_key_values.append(
+                PreviewKeyValue(key=f"{c_hgvs.genome_build} c.HGVS", value=str(c_hgvs))
+            )
+
         return self.preview_with(
             identifier=f"DR_{self.pk}",
-            summary_extra=[
-                PreviewKeyValue(key="Allele", value=f"{self.clinical_context.allele:CA}"),
-                PreviewKeyValue(key="Status", value=f"{self.get_resolution_display() or 'Discordant'}")
-            ]
+            summary_extra=
+                [PreviewKeyValue(key="Allele", value=f"{self.clinical_context.allele:CA}")] +
+                c_hgvs_key_values +
+                [PreviewKeyValue(key="Status", value=f"{self.get_resolution_display() or 'Discordant'}")]
         )
 
     class LabInvolvement(int, Enum):

@@ -40,7 +40,7 @@ class ReviewForm(Form):
                 if bound.errors or bound.data:
                     # we have at least 1 checkbox ticked, all good
                     return data
-            raise ValidationError(f"At least one option under must be ticked")
+            raise ValidationError(f"At least one under must be ticked")
 
     def __init__(self, review: Review, data: Optional[Any] = None, initial: Optional[Any] = None):
         super().__init__(data=data, initial=initial)
@@ -82,7 +82,7 @@ class ReviewForm(Form):
             clean_data = self.cleaned_data
             print(clean_data)
 
-            # do we want to store value as an array, or as [value][key] = True
+            # FIXME, having ["participants"]["review_participants"] feels very redundant
             participant_values = {
                 "review_method": clean_data.get("review_method"),
                 "review_participants": clean_data.get("review_participants")
@@ -142,7 +142,7 @@ def new_review(request, reviewed_object_id: int, topic_id: str):
     })
 
 
-def edit_review(request, review_id, int):
+def edit_review(request, review_id: int):
     review = Review.objects.get(pk=review_id)
     discussed_object = review.reviewing
     discussion_form: Optional[ReviewForm]

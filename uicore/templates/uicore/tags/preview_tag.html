@@ -1,3 +1,4 @@
+{% load classification_tags %}
 <div class="preview-data">
     <i class="{{ preview.icon }} preview-icon"></i>
     <span class="preview-category">{{ preview.category }}</span>
@@ -10,7 +11,13 @@
             {% for kv in preview.summary_extra %}
                 <div class="preview-key-value">
                     <span class="preview-key">{{ kv.key }}</span>&nbsp;
-                    <span class="preview-value">{{ kv.value }}</span>
+                    <span class="preview-value">
+                        {% if "c.HGVS" in kv.key %}
+                            {% c_hgvs kv.value %}
+                        {% else %}
+                            {{ kv.value }}
+                        {% endif %}
+                    </span>
                 </div>
             {% endfor %}
         </div>
