@@ -40,7 +40,7 @@ class ReviewForm(Form):
                 if bound.errors or bound.data:
                     # we have at least 1 checkbox ticked, all good
                     return data
-            raise ValidationError(f"At least one under must be ticked")
+            raise ValidationError(f"At least one option must be ticked")
 
     def __init__(self, review: Review, data: Optional[Any] = None, initial: Optional[Any] = None):
         super().__init__(data=data, initial=initial)

@@ -1,10 +1,7 @@
 {% load classification_tags %}
 <div class="preview-data">
     <i class="{{ preview.icon }} preview-icon"></i>
-    <span class="preview-category">{{ preview.category }}</span>
-    <a class="preview-identifier" href="{{ preview.internal_url }}" target="_blank" class="hover-link">
-      {{ preview.identifier }}
-    </a>
+    <span class="preview-category">{{ preview.category }}</span>&nbsp;<a class="preview-identifier" href="{{ preview.internal_url }}" target="_blank" class="hover-link">{{ preview.identifier }}</a>
     {% if preview.title %}<span class="preview-title">{{ preview.title }}</span>{% endif %}
     {% if preview.summary_extra %}
         <div class="preview-key-values">
