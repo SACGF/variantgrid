@@ -29,7 +29,7 @@ HAS_3_ANY = re.compile(r"\S{3,}")
 _SPLIT_GAPS = re.compile(r"[\s,]+")
 
 MAX_VARIANT_RESULTS = 100
-MAX_RESULTS_PER_SEARCH = 50
+MAX_RESULTS_PER_SEARCH = 25
 
 
 """

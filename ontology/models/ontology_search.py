@@ -25,7 +25,7 @@ def validate_ontology(term: OntologyTerm, preview_proxy: Optional[PreviewProxyMo
     return SearchResult(preview, messages=messages)
 
 
-ONTOLOGY_TERM_PATTERN = re.compile(r"(MONDO|OMIM|MIM|HPO|HP|DOID|ORPHANET)\s*:\s*[0-9]+", re.IGNORECASE)
+ONTOLOGY_TERM_PATTERN = re.compile(r"^(MONDO|OMIM|MIM|HPO|HP|DOID|ORPHANET)\s*:\s*[0-9]+$", re.IGNORECASE)
 
 
 @search_receiver(
@@ -46,6 +46,29 @@ def ontology_search_id(search_input: SearchInputInstance):
             pass
         else:
             yield validate_ontology(term)
+    except ValueError:
+        # might not be a valid ontology, there's a lot of text that passes the search_input
+        pass
+
+
+@search_receiver(
+    search_type=OntologyTerm,
+    pattern=re.compile(r"^HGNC\s*:\s*(.*)$"),
+    sub_name="Gene Disease Relationships",
+    admin_only=True,
+    example=SearchExample(
+        note="HGNC: followed by a gene symbol",
+        examples=["HGNC:BRCA1"]
+    ),
+    match_strength=SearchResultMatchStrength.STRONG_MATCH
+)
+def ontology_search_hgnc(search_input: SearchInputInstance):
+    try:
+        term = OntologyTerm.get_or_stub(search_input.search_string)
+        preview = term.preview
+        preview.icon = 'fa fa-dna'
+        preview.category = "Gene Disease Relationships"
+        yield preview
     except ValueError:
         # might not be a valid ontology, there's a lot of text that passes the search_input
         pass
