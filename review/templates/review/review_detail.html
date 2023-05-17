@@ -23,8 +23,9 @@
         {% endlabelled %}
         {% labelled label="Details" %}
             {% for answer in review.answers %}
+                <hr style="border-top-style: dashed" />
                 <div>
-                    <label>{{ answer.question.label }} : {{ answer.resolution.label }}</label>
+                    <label>{{ answer.question.label }} : <span class="font-weight-bold {% if answer.resolution.value == "R" %}text-success{% else %}text-danger{% endif %}">{{ answer.resolution.label }}</span></label>
                     <div class="text-secondary">{{ answer.details }}</div>
                 </div>
             {% endfor %}

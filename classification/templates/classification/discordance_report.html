@@ -103,6 +103,7 @@
         <h4>Reviews</h4>
         {% for review in data.report.reviews_all %}
             <div data-toggle="ajax" href="{% url 'review_detail' review.pk %}?show_source_object=false" {% if not forloop.first %}class="mt-4"{% endif %}></div>
+            {% empty %}<div class="no-value">There are no reviews of this Discordance Report</div>
         {% endfor %}
 
         {% if data.is_user_editable %}

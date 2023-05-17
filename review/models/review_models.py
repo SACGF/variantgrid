@@ -3,7 +3,7 @@ from functools import cached_property
 from typing import Optional, Union, List, Set, Type
 from django.contrib.auth.models import User
 from django.db.models import TextField, ForeignKey, JSONField, IntegerField, CASCADE, TextChoices, \
-    PROTECT, DateField, ManyToManyField, QuerySet
+    PROTECT, DateField, ManyToManyField, QuerySet, BooleanField
 from django.urls import reverse
 from django.db import models
 import logging
@@ -66,7 +66,7 @@ class ReviewTopic(TimeStampedModel):
 
     @property
     def questions(self) -> List['ReviewQuestion']:
-        return list(self.reviewquestion_set.order_by('order').all())
+        return list(self.reviewquestion_set.filter(enabled=True).order_by('order').all())
 
 
 class ReviewQuestion(TimeStampedModel):
@@ -77,6 +77,7 @@ class ReviewQuestion(TimeStampedModel):
     heading = TextField()
     order = IntegerField(default=0)
     value_type = TextField(choices=QuestionValueType.choices, default=QuestionValueType.Disagreement)
+    enabled = BooleanField(default=True, blank=True)
 
 
 class ReviewedObject(TimeStampedModel):
@@ -188,4 +189,5 @@ class ReviewableModelMixin(models.Model):
         return self.get_absolute_url()
 
     def reviews_all(self) -> QuerySet[Review]:
-        return self.reviews.review_set.order_by('-review_date').all()
+        if reviews := self.reviews:
+            return reviews.review_set.order_by('-review_date').all()

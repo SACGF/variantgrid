@@ -80,7 +80,6 @@ class ReviewForm(Form):
         if self.is_valid():
             review = self.review
             clean_data = self.cleaned_data
-            print(clean_data)
 
             # FIXME, having ["participants"]["review_participants"] feels very redundant
             participant_values = {
