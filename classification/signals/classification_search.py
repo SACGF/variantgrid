@@ -124,6 +124,6 @@ def variant_preview_classifications_extra(sender, user: User, obj: Variant, **kw
 @receiver(preview_extra_signal, sender=OntologyTerm)
 def ontology_preview_classifications_extra(sender, user: User, obj: OntologyTerm, **kwargs):
     terms = [{"term_id": obj.pk}]
-    qs = Classification.filter_for_user(user).filter(condition_resolution__resolved_terms__contains=terms)
+    qs = ClassificationModification.latest_for_user(user=user, published=True, exclude_withdrawn=True, classification__condition_resolution__resolved_terms__contains=terms)
     if num_classifications := qs.count():
         return [PreviewKeyValue.count(Classification, num_classifications)]
