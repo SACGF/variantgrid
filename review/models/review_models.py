@@ -3,7 +3,7 @@ from functools import cached_property
 from typing import Optional, Union, List, Set, Type
 from django.contrib.auth.models import User
 from django.db.models import TextField, ForeignKey, JSONField, IntegerField, CASCADE, TextChoices, \
-    PROTECT, DateField, ManyToManyField
+    PROTECT, DateField, ManyToManyField, QuerySet
 from django.urls import reverse
 from django.db import models
 import logging
@@ -186,3 +186,6 @@ class ReviewableModelMixin(models.Model):
 
     def post_review_url(self, review: Review) -> str:
         return self.get_absolute_url()
+
+    def reviews_all(self) -> QuerySet[Review]:
+        return self.reviews.review_set.order_by('-review_date').all()

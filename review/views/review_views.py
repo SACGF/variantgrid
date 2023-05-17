@@ -167,7 +167,8 @@ def edit_review(request, review_id: int):
 def view_discussion_detail(request, review_id: int):
     review = Review.objects.get(pk=review_id)
     return render_ajax_view(request, 'review/review_detail.html', {
-        "review": review
+        "review": review,
+        "show_source_object": request.GET.get("show_source_object") != "false"
     })
 
 

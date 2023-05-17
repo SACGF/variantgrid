@@ -100,6 +100,11 @@
             {% classification_groups nlc.classifications group_utils=data.group_utils title=nlc.reason context_object=report %}
         {% endfor %}
 
+        <h4>Reviews</h4>
+        {% for review in data.report.reviews_all %}
+            <div data-toggle="ajax" href="{% url 'review_detail' review.pk %}?show_source_object=false" {% if not forloop.first %}class="mt-4"{% endif %}></div>
+        {% endfor %}
+
         {% if data.is_user_editable %}
             {% if data.provide_reopen %}
                 <h4>Actions</h4>
@@ -114,7 +119,6 @@
             {% elif data.report.resolution is empty %}
                 <h4>Actions</h4>
                 {% if data.is_pending_concordance %}<p class="text-info">There are outstanding pending changes for this discordance. When labs re-submit with the agreed changes the discordance should be resolved. There is likely no need to action this.</p>{% endif %}
-
                 <a class="btn btn-primary" href="{% url 'discordance_report_review' discordance_report_id=data.report.pk %}">Review</a>
 
             {% endif %}

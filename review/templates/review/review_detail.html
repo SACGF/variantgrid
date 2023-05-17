@@ -3,8 +3,9 @@
 <div class="card">
     <div class="card-header">Review</div>
     <div class="card-body">
-
-        {% labelled label="Review Of" %}{% preview review.reviewing.source_object %}{% endlabelled %}
+        {% if show_source_object %}
+            {% labelled label="Review Of" %}{% preview review.reviewing.source_object %}{% endlabelled %}
+        {% endif %}
         {% labelled label="On The Topic Of" %}{{ review.topic.name }}{% endlabelled %}
         {% labelled label="On The Date" %}{{ review.review_date }}{% endlabelled %}
         {% labelled label="Review Method" %}{{ review.review_method }}{% endlabelled %}
