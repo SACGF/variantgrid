@@ -686,7 +686,8 @@ class AbstractVariantAnnotation(models.Model):
     # The best way to see how these map to VEP fields is via the annotation details page
     amino_acids = models.TextField(null=True, blank=True)
     cadd_phred = models.FloatField(null=True, blank=True)
-    canonical = models.BooleanField(null=True, blank=True)  # TODO: This doesn't need to be nullable (default=False)
+    # TODO: This doesn't need to be nullable (default=False) - but will be slow. Change with next schema change
+    canonical = models.BooleanField(null=True, blank=True)
     nmd_escaping_variant = models.BooleanField(null=True, blank=True)
     codons = models.TextField(null=True, blank=True)
     consequence = models.TextField(null=True, blank=True)
