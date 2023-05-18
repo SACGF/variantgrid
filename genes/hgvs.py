@@ -11,7 +11,7 @@ import sys
 from dataclasses import dataclass
 from functools import cached_property
 from importlib import metadata
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Union
 
 import pyhgvs
 from Bio.Data.IUPACData import protein_letters_1to3_extended
@@ -572,7 +572,8 @@ class HGVSMatcher:
             if not within_transcript:
                 raise pyhgvs.InvalidHGVSName(f"'{hgvs_name.format()}' {description} {cdna_coord} resolves outside of transcript")
 
-    def _pyhgvs_get_variant_tuple_and_reference_match(self, hgvs_string: str, transcript_version) -> Tuple[Tuple, bool]:
+    def _pyhgvs_get_variant_tuple_and_reference_match(self, hgvs_string: str, transcript_version) -> \
+            Tuple[Tuple, Union[bool, 'HgvsMatchRefAllele']]:
         pyhgvs_transcript = None
         hgvs_name = HGVSName(hgvs_string)
 
@@ -587,7 +588,7 @@ class HGVSMatcher:
                                                            indels_start_with_same_base=False)
         contig = self.genome_build.chrom_contig_mappings[chrom]
         chrom = contig.name
-        vcf_coords = hgvs_name.get_vcf_coords()
+        vcf_coords = hgvs_name.get_vcf_coords(pyhgvs_transcript)
         length = vcf_coords[2] - vcf_coords[1]
         end = position + length
         fasta = self.genome_build.genome_fasta.fasta
@@ -896,7 +897,7 @@ class HGVSMatcher:
             We always generate the HGVS with full-length reference bases etc, as we adjust that in HGVSExtra.format()
         """
 
-        chrom, offset, ref, alt = variant.as_tuple()
+        chrom, offset, ref, alt, _end = variant.as_tuple()
         if alt == Variant.REFERENCE_ALT:
             alt = ref
 
