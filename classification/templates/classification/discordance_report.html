@@ -12,7 +12,7 @@
 {% block head %}
 <script>
     function reopenWarning() {
-        return window.confirm("This will re-open this Discordance, with the intent of having the involved labs discuss and come to a consensus. Are you sure you wish to re-open?");
+        return window.confirm("This will re-open this Discordance, with the intent of having the involved labs re-discuss and come to a consensus. Are you sure you wish to re-open?");
     }
 </script>
 {% endblock %}
@@ -101,7 +101,7 @@
         {% endfor %}
 
         <h4>Reviews</h4>
-        {% for review in data.report.reviews_all %}
+        {% for review in data.report.reviews_completed %}
             <div data-toggle="ajax" href="{% url 'review_detail' review.pk %}?show_source_object=false" {% if not forloop.first %}class="mt-4"{% endif %}></div>
             {% empty %}<div class="no-value">There are no reviews of this Discordance Report</div>
         {% endfor %}

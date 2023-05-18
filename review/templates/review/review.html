@@ -25,6 +25,8 @@
         <form method="post">
             {% csrf_token action="{{ request.path }}" %}
 
+            {% if not review.pk %}<h4>Step 1 of 2</h4>{% endif %}
+
             <div class="card">
                 <div class="card-header">
                     Review Attendance
@@ -44,7 +46,7 @@
                     {% endlabelled %}
                     <hr class="dashed" />
 
-                    {% labelled label="Method of Review" hint="large-label" errors=form.review_method.errors %}
+                    {% labelled label="Methods of Review" hint="large-label" errors=form.review_method.errors %}
                         {{ form.review_method }}
                     {% endlabelled %}
                     <hr class="dashed" />
@@ -94,7 +96,7 @@
                     {% endfor %}
                 </div>
                 <div class="card-footer">
-                    <input type="submit" class="btn btn-primary w-100" />
+                    <input type="submit" class="btn btn-primary" value="Next >>"/>
                 </div>
             </div>
         </form>

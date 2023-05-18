@@ -1,15 +1,22 @@
 {% load ui_utils %}
 {% load js_tags %}
 <div class="card">
-    <div class="card-header">Review</div>
+    <div class="card-header">Review {% admin_link review %}</div>
     <div class="card-body">
         {% if show_source_object %}
             {% labelled label="Review Of" %}{% preview review.reviewing.source_object %}{% endlabelled %}
         {% endif %}
         {% labelled label="On The Topic Of" %}{{ review.topic.name }}{% endlabelled %}
         {% labelled label="On The Date" %}{{ review.review_date }}{% endlabelled %}
-        {% labelled label="Review Method" %}{{ review.review_method }}{% endlabelled %}
-        {% labelled label="Review Participants" %}
+
+        {% labelled label="Methods of Review" %}
+            {% for item in review.review_method %}
+                {% if not forloop.first %}<br/>{% endif %}
+                {{ item }}
+            {% endfor %}
+        {% endlabelled %}
+
+        {% labelled label="Who was Involved" %}
             {% for item in review.participants %}
                 {% if not forloop.first %}<br/>{% endif %}
                 {{ item }}
@@ -23,12 +30,16 @@
         {% endlabelled %}
         {% labelled label="Details" %}
             {% for answer in review.answers %}
-                <hr style="border-top-style: dashed" />
+                <hr class="dashed" />
                 <div>
                     <label>{{ answer.question.label }} : <span class="font-weight-bold {% if answer.resolution.value == "R" %}text-success{% else %}text-danger{% endif %}">{{ answer.resolution.label }}</span></label>
                     <div class="text-secondary">{{ answer.details }}</div>
                 </div>
             {% endfor %}
         {% endlabelled %}
+        {% if review.post_review_data %}
+            <hr class="dashed" />
+            {{ review.post_review_data_formatted }}
+        {% endif %}
     </div>
 </div>

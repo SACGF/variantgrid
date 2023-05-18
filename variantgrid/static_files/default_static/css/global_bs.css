@@ -812,6 +812,11 @@ table.as_table td {
   word-break: break-word;
 }
 
+.formatted-text-new-lines {
+  white-space: pre;
+  word-break: break-word;
+}
+
 .code {
   font-family: monospace;
   color: #444;

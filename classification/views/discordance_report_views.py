@@ -346,14 +346,24 @@ def action_discordance_report_review(request: HttpRequest, review_id: int) -> Ht
             report.notes = notes or ''
             report.save()
 
+            review_data = []
+
             for lab_clin_sig in data.lab_clin_sigs:
                 key = f"{lab_clin_sig.lab.pk}-{lab_clin_sig.clin_sig}"
                 if updated_clin_sig := request.POST.get(key):
                     print(f"Lab {lab_clin_sig.lab} changing from {lab_clin_sig.clin_sig} to {updated_clin_sig}")
                     modifications = data.classifications_for_lab_clin_sig(lab_clin_sig)
                     classifications = [mod.classification for mod in modifications]
+                    pretty_lab_clin_sig =  EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE).pretty_value(lab_clin_sig.clin_sig)
                     if lab_clin_sig.clin_sig != updated_clin_sig:
                         pretty_clin_sig = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE).pretty_value(updated_clin_sig)
+
+                        review_data.append({
+                            "lab": lab_clin_sig.lab.group_name,
+                            "from": lab_clin_sig.clin_sig,
+                            "to": updated_clin_sig
+                        })
+
                         for classification in classifications:
                             comment = f"During discordance resolution it was agreed this classification be changed to {pretty_clin_sig}"
                             flag_data = {"to_clin_sig": updated_clin_sig}
@@ -365,6 +375,7 @@ def action_discordance_report_review(request: HttpRequest, review_id: int) -> Ht
                                 reopen=True,
                                 add_comment_if_open=False
                             )
+
                             if flag.data != flag_data:
                                 flag.data = flag_data
                                 flag.save()
@@ -382,6 +393,8 @@ def action_discordance_report_review(request: HttpRequest, review_id: int) -> Ht
                                 user=request.user,
                                 comment="Changed back to original value in Discordance Report action"
                             )
+
+            review.complete_with_data_and_save({"changes": review_data})
 
             # generate fresh to get rid of cached db objects and cached calculations
             data = data.refreshed()

@@ -892,6 +892,10 @@ table.as_table {
     white-space: pre-wrap;
     word-break: break-word;
 }
+.formatted-text-new-lines {
+  white-space: pre;
+  word-break: break-word;
+}
 
 .code {
     font-family: monospace;

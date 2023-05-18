@@ -1,4 +1,3 @@
-from dataclasses import dataclass
 from typing import Optional, List, Any
 from django import forms
 from django.contrib import messages
@@ -8,11 +7,11 @@ from django.shortcuts import render, redirect
 from django.utils import timezone
 
 from library.utils.django_utils import render_ajax_view
-from review.models import ReviewedObject, Review, ReviewTopic, ReviewQuestion
+from review.models import ReviewedObject, Review, ReviewTopic, ReviewQuestion, ReviewMedium, ReviewParticipants
 from review.widgets.multi_lab_selector import MultiChoiceLabField
 from snpdb.models import UserSettings
 from uicore.widgets.describe_difference_widget import DescribeDifferenceField, DescribeDifference
-from uicore.widgets.radio_other_widget import RadioOtherWidget, ChoiceFieldWithOther, MultiChoiceFieldWithOther
+from uicore.widgets.radio_other_widget import MultiChoiceFieldWithOther
 
 
 class ReviewForm(Form):
@@ -21,16 +20,12 @@ class ReviewForm(Form):
         widget=forms.TextInput(attrs={"class": "date-picker form-control"}),
         required=True
     )
-    review_method = ChoiceFieldWithOther(
-        choices=[("email", "Email"), ("phone", "Phone")],
+    review_method = MultiChoiceFieldWithOther(
+        choices=ReviewMedium.choices,
         required=True
     )
     review_participants = MultiChoiceFieldWithOther(
-        choices=[
-            ("curation", "Curation Scientists"),
-            ("clinicians", "Clinicians"),
-            ("external_experts", "External Experts")
-        ],
+        choices=ReviewParticipants.choices,
         required=True
     )
 
@@ -68,7 +63,7 @@ class ReviewForm(Form):
                 initial=DescribeDifference.from_json(question_values.get(question.key))
             )
 
-        review_date = review.review_date or timezone.now()
+        # review_date = review.review_date or timezone.now()
         self.fields["review_date"].initial = f"{timezone.now():%Y-%m-%d}"
         self.fields["review_method"].initial = participants.get("review_method")
         self.fields["review_participants"].initial = participants.get("review_participants")
@@ -103,7 +98,6 @@ class ReviewForm(Form):
                 # need to do this before we can assign reviewing labs
                 review.save()
 
-            reviewing_labs = clean_data.get("reviewing_labs")
             review.reviewing_labs.set(clean_data.get("reviewing_labs"))
 
             review.save()
@@ -130,7 +124,7 @@ def new_review(request, reviewed_object_id: int, topic_id: str):
 
             return redirect(discussion_form.review.next_step_url())
     else:
-        discussion_form = ReviewForm(review=review, initial={"reviewing_labs": set([UserSettings.get_for_user(request.user).default_lab])})
+        discussion_form = ReviewForm(review=review, initial={"reviewing_labs": {UserSettings.get_for_user(request.user).default_lab}})
 
     return render(request, 'review/review.html', {
         'reviewing': reviewed_object,
@@ -168,5 +162,3 @@ def view_discussion_detail(request, review_id: int):
         "review": review,
         "show_source_object": request.GET.get("show_source_object") != "false"
     })
-
-

@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Optional, Union, List, Set, Type
+from typing import Optional, Union, List, Set, Type, Dict
+
+import django.dispatch
 from django.contrib.auth.models import User
 from django.db.models import TextField, ForeignKey, JSONField, IntegerField, CASCADE, TextChoices, \
     PROTECT, DateField, ManyToManyField, QuerySet, BooleanField
@@ -8,7 +10,9 @@ from django.urls import reverse
 from django.db import models
 import logging
 from model_utils.models import TimeStampedModel
+from networkx.algorithms.chordal import _is_complete_graph
 
+from library.utils import first
 from snpdb.models import Lab
 from uicore.widgets.describe_difference_widget import DifferenceResolution
 
@@ -27,7 +31,7 @@ class QuestionOption:
 class ReviewMedium(TextChoices):
     email = "email", "Email"
     phone = "phone", "Phone"
-    video = "video", "Video"
+    video = "mtm", "Multidisciplinary Team Meeting"
 
 
 class ReviewParticipants(TextChoices):
@@ -86,11 +90,10 @@ class ReviewQuestion(TimeStampedModel):
 class ReviewedObject(TimeStampedModel):
     label = TextField()  # a label to refer to the object of the discussion
 
-    def new_review(self, topic: Union[ReviewTopic, str], user: User, context: Optional[str] = None) -> 'Review':
+    def new_review(self, topic: Union[ReviewTopic, str], user: User) -> 'Review':
         return Review(
             reviewing=self,
             topic=topic,
-            context=context,
             user=user
         )
 
@@ -126,12 +129,13 @@ class ReviewAnswer:
 class Review(TimeStampedModel):
     reviewing = ForeignKey(ReviewedObject, on_delete=CASCADE)
     topic = ForeignKey(ReviewTopic, on_delete=CASCADE)
-    context = TextField(null=True, blank=True)
     user = ForeignKey(User, on_delete=PROTECT)
     review_date = DateField()
     reviewing_labs = ManyToManyField(Lab)
 
     meeting_meta = JSONField(null=False, blank=False)
+    is_complete = BooleanField(default=False, blank=True)
+    post_review_data = JSONField(default=dict, blank=True)
 
     def __str__(self):
         try:
@@ -146,9 +150,13 @@ class Review(TimeStampedModel):
         return self.reviewing.source_object.post_review_url(review=self)
 
     @property
-    def review_method(self) -> Optional[ValueOther]:
+    def review_method(self) -> List[ValueOther]:
         if method := self.meeting_meta.get("participants", {}).get("review_method"):
-            return ValueOther.from_str(method, ReviewMedium)
+            # original code provided review_method as single select
+            if isinstance(method, str):
+                return [ValueOther.from_str(method, ReviewMedium)]
+            else:
+                return list(sorted(ValueOther.from_str(m, ReviewMedium) for m in method))
 
     @property
     def participants(self) -> List[ValueOther]:
@@ -172,6 +180,16 @@ class Review(TimeStampedModel):
                     )
             return answer_list
         return []
+
+    @cached_property
+    def post_review_data_formatted(self) -> str:
+        for caller, result in review_detail_signal.send(sender=self.reviewing.source_object.__class__, instance=self):
+            return result
+
+    def complete_with_data_and_save(self, data: Dict):
+        self.post_review_data = data
+        self.is_complete = True
+        self.save()
 
 
 class ReviewableModelMixin(models.Model):
@@ -200,3 +218,10 @@ class ReviewableModelMixin(models.Model):
     def reviews_all(self) -> QuerySet[Review]:
         if reviews := self.reviews:
             return reviews.review_set.order_by('-review_date').all()
+
+    def reviews_completed(self) -> QuerySet[Review]:
+        if reviews := self.reviews_all():
+            return reviews.filter(is_complete=True)
+
+
+review_detail_signal = django.dispatch.Signal()

@@ -15,13 +15,13 @@
     </div>
 {% endif %}
 <div id="{{ widget.name }}-detail" class="mt-4 collapse {% if widget.value.selected %}show{% endif %}">
-    <div class="row align-center justify-content-center">
-        <div class="col-4 text-right vertical-align-center"><label>Please provide details</label></div>
+    <div class="row">
+        <div class="col-4 text-right" style="margin-top: auto; margin-bottom: auto"><label>Please provide details</label></div>
         <div class="col-8 vertical-align-center"><input class="form-control" name="{{ widget.name }}-details" value="{{ widget.value.details|default_if_none:'' }}"/></div>
     </div>
     <div class="row align-center justify-content-center mt-4">
-        <div class="col-4 text-right vertical-align-center"><label>Was this difference resolved</label></div>
-        <div class="col-8 vertical-align-center">
+        <div class="col-4 text-right" style="margin-top: auto; margin-bottom: auto"><label>Was this difference resolved</label></div>
+        <div class="col-8">
             <select class="form-control" name="{{ widget.name }}-resolution">
                 <option value="">-</option>
                 <option value="R" {% if widget.value.resolution == "R" %}selected="selected"{% endif %}>Resolved</option>
