@@ -219,6 +219,11 @@ hr {
   width: 100%;
 }
 
+hr.dashed {
+  border-top-style: dashed;
+  padding-left: 20px;
+}
+
 label.form-check-label, label[for] {
   cursor: pointer;
 }

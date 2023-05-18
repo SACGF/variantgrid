@@ -64,6 +64,9 @@ class ReviewTopic(TimeStampedModel):
     name = TextField()
     heading = TextField(default="")
 
+    def __str__(self):
+        return self.name
+
     @property
     def questions(self) -> List['ReviewQuestion']:
         return list(self.reviewquestion_set.filter(enabled=True).order_by('order').all())
@@ -129,6 +132,12 @@ class Review(TimeStampedModel):
     reviewing_labs = ManyToManyField(Lab)
 
     meeting_meta = JSONField(null=False, blank=False)
+
+    def __str__(self):
+        try:
+            return f"Review \"{self.topic}\" on \"{self.reviewing.source_object}\" by {self.user} on {self.review_date}"
+        except:
+            return f"Review \"{self.topic}\" on ??? by {self.user} on {self.review_date}"
 
     def get_absolute_url(self):
         return reverse("edit_review", kwargs={"review_id": self.pk})

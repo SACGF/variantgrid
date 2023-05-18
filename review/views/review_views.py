@@ -127,8 +127,7 @@ def new_review(request, reviewed_object_id: int, topic_id: str):
         if discussion_form.is_valid():
             discussion_form.save()
             messages.add_message(request, level=messages.SUCCESS, message="Review saved successfully")
-            # return redirect(review.get_absolute_url())
-            # TODO, redirect if save is successful
+
             return redirect(discussion_form.review.next_step_url())
     else:
         discussion_form = ReviewForm(review=review, initial={"reviewing_labs": set([UserSettings.get_for_user(request.user).default_lab])})

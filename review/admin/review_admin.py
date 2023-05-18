@@ -1,7 +1,7 @@
 from django.contrib.admin import TabularInline
 from django.contrib.admin.widgets import AdminTextInputWidget
 
-from review.models import ReviewQuestion, ReviewTopic
+from review.models import ReviewQuestion, ReviewTopic, Review
 from snpdb.admin_utils import ModelAdminBasics
 from django.contrib import admin
 
@@ -39,3 +39,8 @@ class ReviewQuestionTopicAdmin(ModelAdminBasics):
             "key": admin.widgets.AdminTextInputWidget(),
             "name": admin.widgets.AdminTextInputWidget()
         }
+
+
+@admin.register(Review)
+class ReviewAdmin(ModelAdminBasics):
+    pass

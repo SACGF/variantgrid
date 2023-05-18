@@ -281,6 +281,11 @@ strong {
 hr {
     width: 100%;
 }
+hr.dashed {
+    border-top-style: dashed;
+    //width: calc(100% - 20px);
+  padding-left: 20px;
+}
 
 // give labels pointers
 label.form-check-label, label[for] {

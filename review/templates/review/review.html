@@ -24,63 +24,78 @@
     <div class="container">
         <form method="post">
             {% csrf_token action="{{ request.path }}" %}
-            <h4>Review</h4>
 
-            <div class="pt-4 pb-2 pr-4 border rounded">
+            <div class="card">
+                <div class="card-header">
+                    Review Attendance
+                    {% if review.pk %}{% admin_link review %}{% endif %}
+                </div>
+                <div class="card-body">
+                    {% labelled label="Reviewing" hint="large-label" %}
+                        {% preview review.reviewing.source_object %}
+                    {% endlabelled %}
 
-                {% labelled label="Reviewing" hint="large-label" %}
-                    {% preview review.reviewing.source_object %}
-                {% endlabelled %}
+                    {% labelled label="On The Topic Of" hint="large-label" %}
+                        {{ review.topic.name }}
+                    {% endlabelled %}
 
-                {% labelled label="On The Topic Of" hint="large-label" %}
-                    {{ review.topic.name }}
-                {% endlabelled %}
+                    {% labelled label="Date of Review" hint="large-label" errors=form.review_date.errors %}
+                        {{ form.review_date }}
+                    {% endlabelled %}
+                    <hr class="dashed" />
 
-                {% labelled label="Date of Review" hint="large-label" errors=form.review_date.errors %}
-                    {{ form.review_date }}
-                {% endlabelled %}
-                <hr style="border-top-style: dashed" />
+                    {% labelled label="Method of Review" hint="large-label" errors=form.review_method.errors %}
+                        {{ form.review_method }}
+                    {% endlabelled %}
+                    <hr class="dashed" />
 
-                {% labelled label="Method of Review" hint="large-label" errors=form.review_method.errors %}
-                    {{ form.review_method }}
-                {% endlabelled %}
-                <hr style="border-top-style: dashed" />
+                    {% labelled label="Who was Involved" hint="large-label" errors=form.review_participants.errors %}
+                        {{ form.review_participants }}
+                    {% endlabelled %}
 
-                {% labelled label="Who was Involved" hint="large-label" errors=form.review_participants.errors %}
-                    {{ form.review_participants }}
-                {% endlabelled %}
+                    <hr class="dashed" />
 
-                <hr style="border-top-style: dashed" />
-
-                {% labelled label="Reviewing Labs" hint="large-label" errors=form.reviewing_labs.errors %}
-                    {{ form.reviewing_labs }}
-                {% endlabelled %}
-
+                    {% labelled label="Reviewing Labs" hint="large-label" errors=form.reviewing_labs.errors %}
+                        {{ form.reviewing_labs }}
+                    {% endlabelled %}
+                </div>
             </div>
 
-            <h4>{{ review.topic.heading }}</h4>
-            {{ form.non_field_errors | field_errors }}
-            <div class="pt-4 pb-2 pr-4 border rounded">
-                {% for field in form.describe_difference_fields %}
-                    <div class="row">
-                        {% if not forloop.first %}
-                            <hr style="border-top-style: dashed" />
-                        {% endif %}
-                        <div class="col-12 col-md-4 text-md-right align-self-center">
-                            <label class="text-info">
-                                {{ field.field.category }}
-                            </label>
-                        </div>
-                        <div class="col-12 col-md-8 text-left text-break">
-                            {{ field }}
-                            {{ field.errors | field_errors }}
-                        </div>
-                    </div>
-                {% endfor %}
-            </div>
-
-            <div class="mt-4">
-                <input type="submit" class="btn btn-primary w-100" />
+            <div class="card mt-4">
+                <div class="card-header">{{ review.topic.heading }}</div>
+                <div class="card-body">
+                    {{ form.non_field_errors | field_errors }}
+                    {% for field in form.describe_difference_fields %}
+                        {% ifchanged field.field.category %}
+                            {% if not forloop.first %}
+                                <hr class="dashed" />
+                            {% endif %}
+                            <div class="row mt-2">
+                                <div class="col-12 col-md-4 text-md-right align-self-center">
+                                    <label class="text-info">
+                                        {{ field.field.category }}
+                                    </label>
+                                </div>
+                                <div class="col-12 col-md-8 text-left text-break">
+                                    {{ field }}
+                                    {{ field.errors | field_errors }}
+                                </div>
+                            </div>
+                        {% else %}
+                            <div class="row mt-2">
+                                <div class="col-12 col-md-4 text-md-right align-self-center"></div>
+                                <div class="col-12 col-md-8 text-left text-break">
+                                    <hr class="dashed" />
+                                    {{ field }}
+                                    {{ field.errors | field_errors }}
+                                </div>
+                            </div>
+                         {% endifchanged %}
+                    {% endfor %}
+                </div>
+                <div class="card-footer">
+                    <input type="submit" class="btn btn-primary w-100" />
+                </div>
             </div>
         </form>
     </div>
