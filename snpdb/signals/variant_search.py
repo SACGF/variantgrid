@@ -470,8 +470,8 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
                 if classify_no_variant := VariantExtra.classify_no_variant_hgvs(for_user=user, hgvs_string=original_hgvs_string):
                     yield SearchResult(classify_no_variant, messages=[search_message])
 
-        yield SearchMessageOverall(str(hgvs_error))
-        # raise hgvs_error
+        # yield SearchMessageOverall(str(hgvs_error))
+        raise hgvs_error
 
     if used_transcript_accession:
         if used_transcript_accession not in hgvs_string:
