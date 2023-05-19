@@ -712,13 +712,19 @@ class HGVSMatcher:
     def filter_best_transcripts_and_method_by_accession(self, transcript_accession, prefer_pyhgvs=True, closest=False) -> List[Tuple[TranscriptVersion, str]]:
         """ Get the best transcripts you'd want to match a HGVS against - assuming you will try multiple in order """
 
-        transcript_id, version = TranscriptVersion.get_transcript_id_and_version(transcript_accession)
+        transcript_id: str
+        version: int
+        try:
+            transcript_id, version = TranscriptVersion.get_transcript_id_and_version(transcript_accession)
+        except ValueError:
+            raise ValueError(f"Error parsing transcript version from \"{transcript_accession}\"")
+
         tv_qs = TranscriptVersion.objects.filter(genome_build=self.genome_build, transcript_id=transcript_id)
         if not settings.VARIANT_TRANSCRIPT_VERSION_BEST_ATTEMPT:
             if version:
                 return tv_qs.get(version=version)
             else:
-                raise ValueError("Transcript version must be provided if settings.VARIANT_TRANSCRIPT_VERSION_BEST_ATTEMPT=False")
+                raise ValueError("Transcript version must be provided")  #  if settings.VARIANT_TRANSCRIPT_VERSION_BEST_ATTEMPT=False
 
         tv_by_version = {tv.version: tv for tv in tv_qs}
         if not tv_by_version:
