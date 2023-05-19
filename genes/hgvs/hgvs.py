@@ -13,11 +13,13 @@ from functools import cached_property
 from importlib import metadata
 from typing import List, Optional, Tuple
 
+import hgvs as biocommons_hgvs  # we've used 'hgvs' a lot... need to remove
 import pyhgvs
 from Bio.Data.IUPACData import protein_letters_1to3_extended
 from django.conf import settings
 from django.core.cache import cache
 from django.db.models import Max, Min
+from hgvs.validator import ExtrinsicValidator
 from pyhgvs import HGVSName, get_genomic_sequence
 from pyhgvs.models.hgvs_name import get_refseq_type
 from pyhgvs.utils import make_transcript
@@ -498,14 +500,21 @@ class HgvsMatchRefAllele:
     This can replace matches_ref (by returning true when it does match)
     """
 
+    pattern = re.compile(".*?: Variant reference \((.*)\) does not agree with reference sequence \((.*)\)")
+
     @staticmethod
-    def instance(hgvs, genome, transcript=None) -> 'HgvsMatchRefAllele':
+    def instance(hdp, hgvs) -> 'HgvsMatchRefAllele':
         """Return True if reference allele matches genomic sequence."""
-        is_forward_strand = transcript.tx_position.is_forward_strand if transcript else True
-        ref, _ = hgvs.get_ref_alt(is_forward_strand,
-                                  raw_dup_alleles=True)  # get raw values so dup isn't always True
-        chrom, start, end = hgvs.get_raw_coords(transcript)
-        genome_ref = get_genomic_sequence(genome, chrom, start, end)
+
+        ev = ExtrinsicValidator(hdp)
+        valid, msg = ev._ref_is_valid(hgvs)
+        if valid:
+            ref = genome_ref = hgvs.posedit.edit.ref
+        else:
+            if m := HgvsMatchRefAllele.pattern.match(msg):
+                ref, genome_ref = m.groups()
+            else:
+                raise ValueError(f"Couldn't obtain ref/genome_ref from '{msg}'")
 
         return HgvsMatchRefAllele(provided_ref=ref, calculated_ref=genome_ref)
 
@@ -590,7 +599,8 @@ class HGVSMatcher:
         chrom = contig.name
 
         fasta = self.genome_build.genome_fasta.fasta
-        return (chrom, position, ref, alt), HgvsMatchRefAllele.instance(hgvs_name, fasta, pyhgvs_transcript)
+        matches_reference = HgvsMatchRefAllele.instance(hgvs_name, fasta, pyhgvs_transcript)  # TODO: Sig changed
+        return (chrom, position, ref, alt), matches_reference
 
 
     def _clingen_get_variant_tuple(self, hgvs_string: str):
