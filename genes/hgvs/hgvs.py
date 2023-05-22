@@ -6,6 +6,7 @@ https://github.com/SACGF/variantgrid/issues/839
 """
 import enum
 import logging
+import os
 import re
 import sys
 from dataclasses import dataclass
@@ -13,27 +14,35 @@ from functools import cached_property
 from importlib import metadata
 from typing import List, Optional, Tuple
 
-import hgvs as biocommons_hgvs  # we've used 'hgvs' a lot... need to remove
 import pyhgvs
 from Bio.Data.IUPACData import protein_letters_1to3_extended
 from django.conf import settings
 from django.core.cache import cache
 from django.db.models import Max, Min
+from hgvs.assemblymapper import AssemblyMapper
+from hgvs.edit import NARefAlt
+from hgvs.exceptions import HGVSDataNotAvailableError
+from hgvs.location import Interval, SimplePosition
+from hgvs.parser import Parser
+from hgvs.posedit import PosEdit
+from hgvs.sequencevariant import SequenceVariant
 from hgvs.validator import ExtrinsicValidator
-from pyhgvs import HGVSName, get_genomic_sequence
-from pyhgvs.models.hgvs_name import get_refseq_type
-from pyhgvs.utils import make_transcript
+from pyhgvs import HGVSName
 
+from genes.hgvs.data_provider import DjangoTranscriptDataProvider
+from genes.biocommons_hgvs_babelfish import Babelfish
 from genes.models import TranscriptVersion, TranscriptParts, Transcript, GeneSymbol, LRGRefSeqGene, BadTranscript, \
     NoTranscript
+from genes.refseq_transcripts import get_refseq_type
 from library.constants import WEEK_SECS
 from library.log_utils import report_exc_info
 from library.utils import clean_string, FormerTuple
 from snpdb.clingen_allele import get_clingen_allele_from_hgvs, get_clingen_allele_for_variant, \
     ClinGenAlleleServerException, ClinGenAlleleAPIException
 from snpdb.models import Variant, ClinGenAllele
-from snpdb.models.models_genome import GenomeBuild
+from snpdb.models.models_genome import GenomeBuild, Contig
 from snpdb.models.models_variant import VariantCoordinate
+from snpdb.variant_end import get_start_end
 
 
 class CHGVSDiff(enum.Flag):
@@ -503,13 +512,13 @@ class HgvsMatchRefAllele:
     pattern = re.compile(".*?: Variant reference \((.*)\) does not agree with reference sequence \((.*)\)")
 
     @staticmethod
-    def instance(hdp, hgvs) -> 'HgvsMatchRefAllele':
+    def instance(hdp, hgvs_variant: SequenceVariant) -> 'HgvsMatchRefAllele':
         """Return True if reference allele matches genomic sequence."""
 
         ev = ExtrinsicValidator(hdp)
-        valid, msg = ev._ref_is_valid(hgvs)
+        valid, msg = ev._ref_is_valid(hgvs_variant)
         if valid:
-            ref = genome_ref = hgvs.posedit.edit.ref
+            ref = genome_ref = hgvs_variant.posedit.edit.ref
         else:
             if m := HgvsMatchRefAllele.pattern.match(msg):
                 ref, genome_ref = m.groups()
@@ -544,7 +553,8 @@ class HGVSMatcher:
     # captures things in teh form of delG, insG, dupG & delGinsC
     # the del pattern at the start is only for delins, as otherwise the op del is captured
 
-    HGVS_METHOD_PYHGVS = f"pyhgvs v{metadata.version('pyhgvs')}"
+    HGVS_METHOD_PYHGVS = f"pyhgvs v{metadata.version('pyhgvs')}"  # From old version
+    HGVS_METHOD_BIOCOMMONS = f"BioCommons hgvs v{metadata.version('hgvs')}"
     HGVS_METHOD_CLINGEN_ALLELE_REGISTRY = "ClinGen Allele Registry"
 
     class TranscriptContigMismatchError(ValueError):
@@ -553,55 +563,68 @@ class HGVSMatcher:
     def __init__(self, genome_build: GenomeBuild):
         self.genome_build = genome_build
         self.attempt_clingen = True  # Stop on any non-recoverable error - keep going if unknown reference
+        self.hdp = DjangoTranscriptDataProvider(genome_build)
+        self.am = AssemblyMapper(self.hdp,
+                                 assembly_name=genome_build.name,
+                                 alt_aln_method='splign', replace_reference=True)
+        self.hp = Parser()
 
-    def _get_transcript_version_and_pyhgvs_transcript(self, transcript_name):
-        transcript_version = TranscriptVersion.get_transcript_version(self.genome_build, transcript_name,
-                                                                      best_attempt=settings.VARIANT_TRANSCRIPT_VERSION_BEST_ATTEMPT)
-        return transcript_version, self._create_pyhgvs_transcript(transcript_version)
-
-    @staticmethod
-    def _create_pyhgvs_transcript(transcript_version: TranscriptVersion):
-        return make_transcript(transcript_version.pyhgvs_data)
-
-    def _get_pyhgvs_transcript(self, transcript_name):
-        return self._get_transcript_version_and_pyhgvs_transcript(transcript_name)[1]
-
-    @staticmethod
-    def _validate_in_transcript_range(pyhgvs_transcript, hgvs_name: HGVSName):
-        # @see https://varnomen.hgvs.org/bg-material/numbering/
-        # Transcript Flanking: it is not allowed to describe variants in nucleotides beyond the boundaries of the
-        # reference sequence using the reference sequence
-        NAMES = {
-            "cdna_start": hgvs_name.cdna_start,
-            "cdna_end": hgvs_name.cdna_end,
+    def _hgvs_to_g(self, hgvs_string: str):
+        CONVERT_TO_G = {
+            'c': self.am.c_to_g,
+            'n': self.am.n_to_g,
         }
-        for description, cdna_coord in NAMES.items():
-            genomic_coord = pyhgvs_transcript.cdna_to_genomic_coord(cdna_coord)
-            within_transcript = pyhgvs_transcript.tx_position.chrom_start <= genomic_coord <= pyhgvs_transcript.tx_position.chrom_stop
-            if not within_transcript:
-                raise pyhgvs.InvalidHGVSName(f"'{hgvs_name.format()}' {description} {cdna_coord} resolves outside of transcript")
+        var_x = self.hp.parse_hgvs_variant(hgvs_string)
+        if converter := CONVERT_TO_G.get(var_x.type):
+            var_x = converter(var_x)
+        return var_x
 
-    def _pyhgvs_get_variant_tuple_and_reference_match(self, hgvs_string: str, transcript_version) -> Tuple[Tuple, bool]:
-        pyhgvs_transcript = None
-        hgvs_name = HGVSName(hgvs_string)
-
-        # Check transcript bounds
-        if transcript_version:
-            pyhgvs_transcript = self._create_pyhgvs_transcript(transcript_version)
-            self._validate_in_transcript_range(pyhgvs_transcript, hgvs_name)
-
-        variant_tuple = pyhgvs.parse_hgvs_name(hgvs_string, self.genome_build.genome_fasta.fasta,
-                                               transcript=pyhgvs_transcript,
-                                               indels_start_with_same_base=False)
-
-        chrom, position, ref, alt = variant_tuple
-        contig = self.genome_build.chrom_contig_mappings[chrom]
-        chrom = contig.name
-
-        fasta = self.genome_build.genome_fasta.fasta
-        matches_reference = HgvsMatchRefAllele.instance(hgvs_name, fasta, pyhgvs_transcript)  # TODO: Sig changed
+    def _hgvs_get_variant_tuple_and_reference_match(self, hgvs_string: str) -> Tuple[Tuple, bool]:
+        babelfish = Babelfish(self.hdp, self.genome_build.name)
+        var_g = self._hgvs_to_g(hgvs_string)
+        try:
+            (chrom, position, ref, alt, typ) = babelfish.hgvs_to_vcf(var_g)
+        except HGVSDataNotAvailableError:
+            raise Contig.ContigNotInBuildError()
+        matches_reference = HgvsMatchRefAllele.instance(self.hdp, var_g)
         return (chrom, position, ref, alt), matches_reference
 
+    def _variant_coords_to_hgvs(self, chrom, position, ref, alt, transcript_version=None):
+        ac = self.genome_build.convert_chrom_to_contig_name(chrom)
+
+        start, end = get_start_end(position, ref, alt)
+        if ref == '' and alt != '':
+            # insertion
+            end += 1
+        else:
+            start += 1
+
+        keep_left_anchor = False
+        if not keep_left_anchor:
+            pfx = os.path.commonprefix([ref, alt])
+            lp = len(pfx)
+            if lp > 0:
+                ref = ref[lp:]
+                alt = alt[lp:]
+                start += lp
+
+        var_g = SequenceVariant(ac=ac,
+                                type='g',
+                                posedit=PosEdit(Interval(start=SimplePosition(start),
+                                                         end=SimplePosition(end),
+                                                         uncertain=False),
+                                                NARefAlt(ref=ref if ref != '' else None,
+                                                         alt=alt if alt != '' else None,
+                                                         uncertain=False)))
+
+        if transcript_version:
+            # Coding non coding?
+            self.am.g_to_c(var_g, transcript_version)
+            pass
+        else:
+            hgvs_variant = var_g
+
+        return hgvs_variant
 
     def _clingen_get_variant_tuple(self, hgvs_string: str):
         # ClinGen Allele Registry doesn't like gene names - so strip (unless LRG_)
@@ -651,9 +674,8 @@ class HGVSMatcher:
         new_hgvs_name, transcript_version = self._lrg_get_hgvs_name_and_transcript_version(self.genome_build, hgvs_name)
         if new_hgvs_name:
             new_hgvs_string = new_hgvs_name.format()
-            method = f"{self.HGVS_METHOD_PYHGVS} as '{new_hgvs_string}' (from LRG_RefSeqGene)"
-            variant_tuple, matches_reference = self._pyhgvs_get_variant_tuple_and_reference_match(new_hgvs_string,
-                                                                                                   transcript_version)
+            method = f"{self.HGVS_METHOD_BIOCOMMONS} as '{new_hgvs_string}' (from LRG_RefSeqGene)"
+            variant_tuple, matches_reference = self._hgvs_get_variant_tuple_and_reference_match(new_hgvs_string)
             return variant_tuple, method, matches_reference
 
         try:
@@ -705,7 +727,7 @@ class HGVSMatcher:
                 # Latest to earliest
                 sort_keys = [-tv.version]
 
-            if method == HGVSMatcher.HGVS_METHOD_PYHGVS:
+            if method == HGVSMatcher.HGVS_METHOD_BIOCOMMONS:
                 method_sort = 1
             else:
                 method_sort = 2
@@ -759,7 +781,7 @@ class HGVSMatcher:
             if not transcript_version:
                 transcript_version = FakeTranscriptVersion(transcript_id=transcript_id, version=v)
             if transcript_version.hgvs_ok:
-                tv_and_method.append((transcript_version, HGVSMatcher.HGVS_METHOD_PYHGVS))
+                tv_and_method.append((transcript_version, HGVSMatcher.HGVS_METHOD_BIOCOMMONS))
             tv_and_method.append((transcript_version, HGVSMatcher.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY))
 
         # TODO: Maybe we should filter transcript versions that have the same length
@@ -790,7 +812,7 @@ class HGVSMatcher:
                 used_transcript_accession = tv.accession
                 hgvs_name.transcript = tv.accession
                 hgvs_string_for_version = hgvs_name.format()
-                if method == self.HGVS_METHOD_PYHGVS:
+                if method == self.HGVS_METHOD_BIOCOMMONS:
                     variant_tuple, matches_reference = self._pyhgvs_get_variant_tuple_and_reference_match(hgvs_string_for_version, tv)
                 elif method == self.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY:
                     if self._clingen_allele_registry_ok(tv.accession):
@@ -823,8 +845,8 @@ class HGVSMatcher:
                 else:
                     raise ValueError(f"'{transcript_accession}': No transcripts found")
         else:
-            method = self.HGVS_METHOD_PYHGVS
-            variant_tuple, matches_reference = self._pyhgvs_get_variant_tuple_and_reference_match(hgvs_string, None)
+            method = self.HGVS_METHOD_BIOCOMMONS
+            variant_tuple, matches_reference = self._hgvs_get_variant_tuple_and_reference_match(hgvs_string)
 
         (chrom, position, ref, alt) = variant_tuple
 
@@ -920,7 +942,7 @@ class HGVSMatcher:
             for transcript_version, method in self.filter_best_transcripts_and_method_by_accession(transcript_accession):
                 hgvs_method = f"{method}: {transcript_version}"
                 hgvs_methods[hgvs_method] = None
-                if method == self.HGVS_METHOD_PYHGVS:
+                if method == self.HGVS_METHOD_BIOCOMMONS:
 
                     # Sanity Check - make sure contig is the same
                     contig_mappings = self.genome_build.chrom_contig_mappings
@@ -931,9 +953,7 @@ class HGVSMatcher:
                                      f"{transcript_version.accession} contig={transcript_contig} (chrom={transcript_chrom})"
                         raise self.TranscriptContigMismatchError(contig_msg)
 
-                    pyhgvs_transcript = self._create_pyhgvs_transcript(transcript_version)
-                    hgvs_name = pyhgvs.variant_to_hgvs_name(chrom, offset, ref, alt, self.genome_build.genome_fasta.fasta,
-                                                            pyhgvs_transcript, max_allele_length=sys.maxsize)
+                    hgvs_name = self._variant_coords_to_hgvs(chrom, offset, ref, alt, transcript_version)
                 elif method == self.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY:
                     if self._clingen_allele_registry_ok(transcript_version.accession):
                         error_message = f"Could not convert '{variant}' ({transcript_version}) using {method}: %s"
@@ -975,9 +995,10 @@ class HGVSMatcher:
                 TranscriptVersion.raise_bad_or_missing_transcript(transcript_accession)
         else:
             # No transcript = Genomic HGVS
+
             hgvs_name = pyhgvs.variant_to_hgvs_name(chrom, offset, ref, alt, self.genome_build.genome_fasta.fasta,
                                                     transcript=None, max_allele_length=sys.maxsize)
-            hgvs_method = self.HGVS_METHOD_PYHGVS
+            hgvs_method = self.HGVS_METHOD_BIOCOMMONS
 
         return hgvs_name, hgvs_method
 
