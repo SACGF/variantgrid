@@ -6,6 +6,7 @@ from django.forms import Form, DateField, BoundField
 from django.shortcuts import render, redirect
 from django.utils import timezone
 
+from library.log_utils import log_admin_change
 from library.utils.django_utils import render_ajax_view
 from review.models import ReviewedObject, Review, ReviewTopic, ReviewQuestion, ReviewMedium, ReviewParticipants
 from review.widgets.multi_lab_selector import MultiChoiceLabField
@@ -99,8 +100,14 @@ class ReviewForm(Form):
                 review.save()
 
             review.reviewing_labs.set(clean_data.get("reviewing_labs"))
-
             review.save()
+
+            log_admin_change(
+                obj=self.review,
+                message=self.review.as_json(include_review_data=True, include_post_review_data=False),
+                user=review.user
+            )
+
             return review
 
     # class Meta:
@@ -136,12 +143,15 @@ def new_review(request, reviewed_object_id: int, topic_id: str):
 
 def edit_review(request, review_id: int):
     review = Review.objects.get(pk=review_id)
+    review.check_can_view(request.user)
+
     discussed_object = review.reviewing
     discussion_form: Optional[ReviewForm]
 
     if request.method == "POST":
         discussion_form = ReviewForm(review=review, data=request.POST)
         if discussion_form.is_valid():
+            review.user = request.user
             discussion_form.save()
             messages.add_message(request, level=messages.SUCCESS, message="Review saved successfully")
             # TODO, redirect if save is successful
@@ -158,6 +168,8 @@ def edit_review(request, review_id: int):
 
 def view_discussion_detail(request, review_id: int):
     review = Review.objects.get(pk=review_id)
+    review.check_can_view(request.user)
+
     return render_ajax_view(request, 'review/review_detail.html', {
         "review": review,
         "show_source_object": request.GET.get("show_source_object") != "false"

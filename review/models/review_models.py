@@ -1,23 +1,33 @@
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Optional, Union, List, Set, Type, Dict
+from typing import Union, List, Set, Type, Dict
 
 import django.dispatch
 from django.contrib.auth.models import User
+from django.core.exceptions import PermissionDenied
 from django.db.models import TextField, ForeignKey, JSONField, IntegerField, CASCADE, TextChoices, \
     PROTECT, DateField, ManyToManyField, QuerySet, BooleanField
 from django.urls import reverse
 from django.db import models
 import logging
 from model_utils.models import TimeStampedModel
-from networkx.algorithms.chordal import _is_complete_graph
-
-from library.utils import first
 from snpdb.models import Lab
 from uicore.widgets.describe_difference_widget import DifferenceResolution
 
 
+"""
+The review module allows users to perform a Review on any ReviewModelMixin. The only VG specific functionality comes from
+determining which labs are involved.
+
+A review will have some top level information about who was involved in the review, and then answers to questions based
+on the review's topic.
+"""
+
+
 class QuestionValueType(TextChoices):
+    """
+    The question type in a review topic, currently only supports disagreement, but we could support more in future
+    """
     Disagreement = 'D', "Disagreement"
 
 
@@ -28,6 +38,7 @@ class QuestionOption:
 
 
 # TODO are we ReviewMedium or ReviewMethod or something else?
+# TODO should these options be made configurable, or based on the topic?
 class ReviewMedium(TextChoices):
     email = "email", "Email"
     phone = "phone", "Phone"
@@ -42,6 +53,9 @@ class ReviewParticipants(TextChoices):
 
 @dataclass(frozen=True)
 class ValueOther:
+    # When choosing a value from a list of choices (with the option of other) represent that value here
+    # e.g. ReviewParticipants of clinicians and Student
+    # in the case of other, key = "other" nad label = what the user entered
     key: str
     label: str
 
@@ -77,17 +91,28 @@ class ReviewTopic(TimeStampedModel):
 
 
 class ReviewQuestion(TimeStampedModel):
+    """
+    A ReviewQuestion is something that's prompted to the Reviewer when filling in a Review.
+    For now, only one ReviewQuestion per review needs to be filled in as they sort of act like
+    a multiple choice (where multiple options can be selected)
+    """
     topic = ForeignKey(ReviewTopic, on_delete=CASCADE)
     key = TextField(primary_key=True)  # best to prefix this with the question group
     label = TextField()
     help = TextField(null=True, blank=True)
-    heading = TextField()
+    heading = TextField()  # note that the heading won't group things, the order of questions should match up with headings
     order = IntegerField(default=0)
     value_type = TextField(choices=QuestionValueType.choices, default=QuestionValueType.Disagreement)
     enabled = BooleanField(default=True, blank=True)
 
 
 class ReviewedObject(TimeStampedModel):
+    """
+    For an object to be reviewed, a ReviewedObject will be created pointing to it
+    TODO, is this really worth it compared to having ManyToMany?
+    it does make it obvious what the parent object of a Review should be
+    """
+
     label = TextField()  # a label to refer to the object of the discussion
 
     def new_review(self, topic: Union[ReviewTopic, str], user: User) -> 'Review':
@@ -134,8 +159,39 @@ class Review(TimeStampedModel):
     reviewing_labs = ManyToManyField(Lab)
 
     meeting_meta = JSONField(null=False, blank=False)
+    """
+    Contains the reviewers, medium and answers to all questions
+    """
+
     is_complete = BooleanField(default=False, blank=True)
+    """
+    After a review is complete, there's generally another step that's performed
+    """
     post_review_data = JSONField(default=dict, blank=True)
+
+    def as_json(self, include_review_data: bool = True, include_post_review_data: bool = False) -> Dict:
+        data = {}  # {"user": self.user.username}
+        if include_review_data:
+            data.update({
+                "reviewing_date": f"{self.review_date:%Y-%m-%d}",
+                "reviewing_labs": [lab.group_name for lab in self.reviewing_labs.all()],
+                "is_complete": self.is_complete,
+                "meeting_meta": self.meeting_meta
+            })
+        if include_post_review_data:
+            data["post_review_data"] = self.post_review_data
+        return data
+
+    def can_view(self, user: User) -> bool:
+        source_object = self.reviewing.source_object
+        if hasattr(source_object, "can_view"):
+            return source_object.can_view(user)
+        return True
+
+    def check_can_view(self, user):
+        if not self.can_view(user):
+            msg = f"You do not have READ permission to view {self.pk}"
+            raise PermissionDenied(msg)
 
     def __str__(self):
         try:
@@ -169,7 +225,7 @@ class Review(TimeStampedModel):
         if answers := self.meeting_meta.get("answers", {}):
             answer_list = []
             for key, answer in answers.items():
-                # TODO, put safety if no quesiton can be found
+                # TODO, put safety if no question can be found
                 if question := ReviewQuestion.objects.get(topic=self.topic, key=key):
                     answer_list.append(
                         ReviewAnswer(
@@ -194,6 +250,9 @@ class Review(TimeStampedModel):
 
 class ReviewableModelMixin(models.Model):
     reviews = ForeignKey(ReviewedObject, null=True, on_delete=CASCADE)
+    """
+    This has some subtle advantages to putting a ManyToMany reviews directly on the mixin (not 100% sure it's worth it though)
+    """
 
     class Meta:
         abstract = True
@@ -219,7 +278,7 @@ class ReviewableModelMixin(models.Model):
         if reviews := self.reviews:
             return reviews.review_set.order_by('-review_date').all()
 
-    def reviews_completed(self) -> QuerySet[Review]:
+    def reviews_filtered(self) -> QuerySet[Review]:
         if reviews := self.reviews_all():
             return reviews.filter(is_complete=True)
 

@@ -75,6 +75,9 @@ def log_admin_change(obj: Model, message: str, user: Optional[User] = None):
     if not user:
         user = get_current_logged_in_user()
 
+    if isinstance(message, dict):
+        message = json.dumps(message)
+
     return LogEntry.objects.log_action(
         user_id=user.pk,
         content_type_id=get_content_type_for_model(obj).pk,

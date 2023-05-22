@@ -24,6 +24,7 @@ from classification.views.exports import ClassificationExportFormatterCSV
 from classification.views.exports.classification_export_filter import ClassificationFilter
 from classification.views.exports.classification_export_formatter_csv import FormatDetailsCSV
 from genes.hgvs import CHGVS
+from library.log_utils import log_admin_change
 from review.models import Review
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.lab_picker import LabPickerData
@@ -106,7 +107,7 @@ class DiscordanceReportTemplateData:
 
     @property
     def is_user_editable(self):
-        return self.user.is_superuser or set(self.report.involved_labs.keys()).intersection(Lab.valid_labs_qs(self.user)) and self.latest_for_allele_if_not_this is None
+        return self.report.can_view(self.user) and self.latest_for_allele_if_not_this is None
 
     @property
     def clinical_context(self) -> ClinicalContext:
@@ -395,6 +396,11 @@ def action_discordance_report_review(request: HttpRequest, review_id: int) -> Ht
                             )
 
             review.complete_with_data_and_save({"changes": review_data})
+            log_admin_change(
+                obj=review,
+                message=review.as_json(include_review_data=False, include_post_review_data=True),
+                user=review.user
+            )
 
             # generate fresh to get rid of cached db objects and cached calculations
             data = data.refreshed()

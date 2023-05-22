@@ -9,6 +9,7 @@ from typing import Set, Optional, List, Dict, Tuple, Any, Iterable
 import django.dispatch
 from django.conf import settings
 from django.contrib.auth.models import User
+from django.core.exceptions import PermissionDenied
 from django.db import models, transaction
 from django.db.models import QuerySet
 from django.db.models.deletion import PROTECT, CASCADE
@@ -225,6 +226,14 @@ class DiscordanceReport(TimeStampedModel, ReviewableModelMixin, PreviewModelMixi
             status = DiscordanceReport.LabInvolvement.WITHDRAWN if effective_c.withdrawn else DiscordanceReport.LabInvolvement.ACTIVE
             lab_status[lab] = max(lab_status.get(lab, 0), status)
         return lab_status
+
+    def can_view(self, user: User):
+        return self.user_is_involved(user)
+
+    def check_can_view(self, user):
+        if not self.can_view(user):
+            msg = f"You do not have READ permission to view {self.pk}"
+            raise PermissionDenied(msg)
 
     def user_is_involved(self, user: User) -> bool:
         if user.is_superuser:

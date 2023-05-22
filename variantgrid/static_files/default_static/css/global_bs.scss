@@ -1382,11 +1382,12 @@ li.help-item {
   }
 }
 
+.preview-icon {
+  opacity: 0.6;
+  margin-right: 2px;
+}
+
 .preview-data {
-  .preview-icon {
-    color: #888;
-    margin-right: 8px;
-  }
   .preview-category {
     font-weight: 500;
   }

@@ -1336,10 +1336,11 @@ li.help-item :last-child {
   opacity: 0.5;
 }
 
-.preview-data .preview-icon {
-  color: #888;
-  margin-right: 8px;
+.preview-icon {
+  opacity: 0.6;
+  margin-right: 2px;
 }
+
 .preview-data .preview-category {
   font-weight: 500;
 }
