@@ -1,4 +1,3 @@
-import json
 import operator
 import re
 from collections import defaultdict
@@ -16,7 +15,6 @@ from django.urls import reverse
 from django.views.decorators.http import require_POST
 
 from analysis.models import VariantTag
-from analysis.serializers import VariantTagSerializer
 from annotation.models import AnnotationRun, AnnotationVersion, ClassificationModification, Classification, ClinVar, \
     VariantAnnotationVersion, VariantAnnotation
 from annotation.transcripts_annotation_selections import VariantTranscriptSelections
@@ -32,17 +30,17 @@ from library.django_utils import require_superuser, highest_pk, get_field_counts
 from library.enums.log_level import LogLevel
 from library.git import Git
 from library.guardian_utils import admin_bot
-from library.log_utils import report_exc_info, log_traceback, report_message, slack_bot_username
+from library.log_utils import log_traceback, report_message, slack_bot_username
 from pathtests.models import cases_for_user
-from patients.models import ExternalPK, Clinician
+from patients.models import Clinician
 from seqauto.models import VCFFromSequencingRun, get_20x_gene_coverage
 from seqauto.seqauto_stats import get_sample_enrichment_kits_df
 from snpdb.clingen_allele import link_allele_to_existing_variants
-from snpdb.forms import TagForm
+from snpdb.forms import TagForm, get_settings_form_features
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.liftover import create_liftover_pipelines
 from snpdb.models import Variant, Sample, VCF, get_igv_data, Allele, AlleleMergeLog, \
-    AlleleConversionTool, ImportSource, AlleleOrigin, VariantAlleleSource, VariantGridColumn
+    AlleleConversionTool, ImportSource, AlleleOrigin, VariantAlleleSource, VariantGridColumn, Tag
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_user_settings import UserSettings
 from snpdb.serializers import VariantAlleleSerializer
@@ -54,7 +52,7 @@ from variantgrid.celery import app
 from variantgrid.tasks.server_monitoring_tasks import get_disk_messages
 from variantopedia import forms
 from variantopedia.interesting_nearby import get_nearby_qs, get_method_summaries, get_nearby_summaries
-from variantopedia.search import search_data, SearchResults
+from snpdb.search import search_data
 from variantopedia.server_status import get_dashboard_notices
 from variantopedia.tasks.server_status_tasks import notify_server_status_now
 
@@ -69,7 +67,7 @@ def strip_celery_from_keys(celery_state):
     worker_status = {}
     if celery_state:
         for worker_string, data in celery_state.items():
-            m = re.match(".*@(.*?)$", worker_string)
+            m = re.match(r".*@(.*?)$", worker_string)
             if m:
                 worker = m.group(1)
                 worker_status[worker] = data
@@ -300,6 +298,18 @@ def database_statistics(request):
     return render(request, "variantopedia/database_statistics_detail.html", context)
 
 
+def variant_tag_detail(request, variant_id, tag):
+    """ Loaded via tags grid on variant page """
+
+    variant = Variant.objects.get(pk=variant_id)
+    tag = get_object_or_404(Tag, pk=tag)
+    context = {
+        "variant": variant,
+        "tag": tag,
+    }
+    return render(request, "variantopedia/variant_tag_detail.html", context)
+
+
 def view_variant(request, variant_id, genome_build_name=None):
     """ This is to open it with the normal menu around it (ie via search etc) """
     template = 'variantopedia/view_variant.html'
@@ -369,37 +379,47 @@ def search(request):
 
     user_settings = UserSettings.get_for_user(request.user)
 
-    search_results: Optional[SearchResults] = None
+    preview_mode = False
+    classify = False
     if form.is_valid() and form.cleaned_data['search']:
         search_string = form.cleaned_data['search']
         classify = form.cleaned_data.get('classify')
-        search_results = search_data(request.user, search_string, classify)
-        results, _search_types, _search_errors = search_results.non_debug_results, search_results.search_types, search_results.search_errors
-        details = f"'{search_string}' calculated {len(results)} results."
-        create_event(request.user, 'search', details=details)
+        if mode := form.cleaned_data.get('mode'):
+            preview_mode = mode == "preview"
 
-        # don't auto load unless there is only 1 preferred result
-        if preferred_result := search_results.single_preferred_result():
-            return redirect(preferred_result.record)
+    # always perform a "search" so we can get told what kind of searches are enabled
+    # note that searching on "" doesn't actually invoke any of the other search logic
 
-        # Attempt to give hints on why nothing was found
-        for search_error, genome_builds in search_results.search_errors.items():
-            text = f"{search_error.search_type}: {search_error.error}"
-            if genome_builds:
-                genome_builds_str = ", ".join(gb.name for gb in sorted(genome_builds))
-                text += f" ({genome_builds_str})"
-            messages.add_message(request, messages.ERROR, text)
+    search_results = search_data(user=request.user, search_string=search_string, classify=classify)
 
-    epk_qs = ExternalPK.objects.values_list("external_type", flat=True)
-    external_codes = list(sorted(epk_qs.distinct()))
+    #results, _search_types, _search_errors = search_results.results, search_results.search_types, search_results.search_errors
+    details = search_results.summary
+    create_event(request.user, 'search', details=details)
 
-    context = {"user_settings": user_settings,
-               "form": form,
-               "search": search_string,
-               "search_results": search_results,
-               "external_codes": external_codes,
-               "variant_vcf_db_prefix": settings.VARIANT_VCF_DB_PREFIX,
-               "search_summary": settings.SEARCH_SUMMARY}
+    single_preferred_result = search_results.single_preferred_result()
+    if not preview_mode and single_preferred_result:
+        return redirect(single_preferred_result.preview.internal_url)
+
+    # Attempt to give hints on why nothing was found
+    # for search_error, genome_builds in search_results.search_errors.items():
+    #     text = f"{search_error.search_type}: {search_error.error}"
+    #     if genome_builds:
+    #         genome_builds_str = ", ".join(gb.name for gb in sorted(genome_builds))
+    #         text += f" ({genome_builds_str})"
+    #     messages.add_message(request, search_error.log_level, text)
+    #
+    # epk_qs = ExternalPK.objects.values_list("external_type", flat=True)
+    # external_codes = list(sorted(epk_qs.distinct()))
+
+    context = {
+        "user_settings": user_settings,
+        "form": form,
+        "classify": classify,
+        "search": search_string,
+        "search_results": search_results,
+        "single_preferred_result": single_preferred_result
+        # "external_codes": external_codes,
+    }
     return render(request, "variantopedia/search.html", context)
 
 
@@ -434,14 +454,14 @@ def view_allele(request, allele_id: int):
     )
 
     allele_merge_log_qs = AlleleMergeLog.objects.filter(Q(old_allele=allele) | Q(new_allele=allele)).order_by("pk")
-    context = {"allele": allele,
-               "edit_clinical_groupings": request.GET.get('edit_clinical_groupings') == 'True',
-               "allele_merge_log_qs": allele_merge_log_qs,
-               "clingen_url": settings.CLINGEN_ALLELE_REGISTRY_DOMAIN,
-               "classifications": latest_classifications,
-               "annotated_builds": GenomeBuild.builds_with_annotation(),
-               "imported_alleles": ImportedAlleleInfo.objects.filter(allele=allele)
-               }
+    context = {
+        "allele": allele,
+        "edit_clinical_groupings": request.GET.get('edit_clinical_groupings') == 'True',
+        "allele_merge_log_qs": allele_merge_log_qs,
+        "classifications": latest_classifications,
+        "annotated_builds": GenomeBuild.builds_with_annotation(),
+        "imported_alleles": ImportedAlleleInfo.objects.filter(allele=allele)
+    }
     return render(request, "variantopedia/view_allele.html", context)
 
 
@@ -558,10 +578,6 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
         if not variant_allele.needs_clingen_call():
             variant_allele_data = VariantAlleleSerializer.data_with_link_data(variant_allele)
 
-    variant_tag_list = []
-    for vt in VariantTag.get_for_build(genome_build, variant_qs=variant.equivalent_variants):
-        variant_tag_list.append(VariantTagSerializer(vt, context={"request": request}).data)
-
     annotation_description = {}
     if user_settings.tool_tips:
         annotation_description = VariantGridColumn.get_column_descriptions()
@@ -570,8 +586,9 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
         annotation_description["maxentscan"] = "<a href='http://hollywood.mit.edu/burgelab/maxent/Xmaxentscan_scoreseq.html'>MaxEntScan</a> scores for human 5 prime splice sites."
         annotation_description["spliceai"] = "Deep Learning splicing predictor - see <a href='https://www.sciencedirect.com/science/article/pii/S0092867418316295?via%3Dihub'>SpliceAI</a>"
 
+    has_tags = VariantTag.get_for_build(genome_build, variant_qs=variant.equivalent_variants).exists()
+
     context = {
-        "ANNOTATION_PUBMED_SEARCH_TERMS_ENABLED": settings.ANNOTATION_PUBMED_SEARCH_TERMS_ENABLED,
         "annotation_description": annotation_description,
         "annotation_version": annotation_version,
         "can_create_classification": Classification.can_create_via_web_form(request.user),
@@ -580,20 +597,18 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
         "genes_canonical_transcripts": genes_canonical_transcripts,
         "genome_build": genome_build,
         "g_hgvs": g_hgvs,
+        "has_tags": has_tags,
         "latest_annotation_version": latest_annotation_version,
         "modified_normalised_variants": modified_normalised_variants,
         "num_variant_annotation_versions": num_variant_annotation_versions,
         "num_clinvar_citations": num_clinvar_citations,
         "clinvar_citations": clinvar_citations,
-        "show_annotation": settings.VARIANT_DETAILS_SHOW_ANNOTATION,
-        "show_gene_coverage": settings.VARIANT_DETAILS_SHOW_GENE_COVERAGE,
-        "show_samples": settings.VARIANT_DETAILS_SHOW_SAMPLES,
         "tag_form": TagForm(),
         "tool_tips": user_settings.tool_tips,
+        "igv_links_enabled": get_settings_form_features().igv_links_enabled,
         "variant": variant,
         "variant_allele": variant_allele_data,
         "variant_annotation": variant_annotation,
-        "variant_tags": json.dumps(variant_tag_list),
         "vts": vts,
     }
     if extra_context:

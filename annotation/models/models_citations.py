@@ -5,6 +5,7 @@ import typing
 from dataclasses import dataclass, field
 from datetime import timedelta
 from enum import Enum
+from functools import cached_property
 from typing import Optional, Iterable, List, Dict, Set, Union, Any, Iterator, Tuple
 
 from Bio import Entrez, Medline
@@ -15,6 +16,7 @@ from django.utils.timezone import now
 from django_extensions.db.models import TimeStampedModel
 
 from library.log_utils import report_exc_info
+from library.preview_request import PreviewData, PreviewModelMixin
 from library.utils import JsonObjType, first
 
 """
@@ -28,14 +30,15 @@ Going via CitationFetchRequest should generally be the only way you interact wit
 """
 
 
-DATE_PUBLISHED_RE = re.compile("^([0-9]+).*?$")
+DATE_PUBLISHED_RE = re.compile(".*?([0-9]{4}).*?")
 
 
 def get_year_from_date(date_published: str) -> str:
     if not date_published:
         return ""
     year = ""
-    if year_match := DATE_PUBLISHED_RE.fullmatch(date_published):
+    # sometimes year is "winter 2019", we just care about the 2019 part
+    if year_match := DATE_PUBLISHED_RE.match(date_published):
         year = year_match.group(1)
     return year
 
@@ -75,7 +78,8 @@ class EntrezDbType(str, Enum):
     BOOKSHELF = "books"
 
 
-class Citation(TimeStampedModel):
+class Citation(TimeStampedModel, PreviewModelMixin):
+
     id = TextField(primary_key=True)
     """
     3rd party's unique ID for the citation, e.g. PMID:234434, BookShelf ID:NBK52333
@@ -152,19 +156,53 @@ class Citation(TimeStampedModel):
         if self.error:
             return "Could not retrieve citation"
         elif not self.title:
-            return "Have not retrieved citation"
+            # TODO fix this scenario so it doesn't happen
+            # seems to be caused by PMID retrieval having errors embedded in the JSON that aren't parsed out properly
+            # e.g. {"id:":["858964 Error occurred: PMID 29858964 is a duplicate of PMID 30740739"]}
+            return "Could not retrieve citation"
         else:
             return self.title
 
     def __str__(self):
         return self.id
 
+    @classmethod
+    def preview_icon(cls) -> str:
+        return "fa-solid fa-book"
+
+    @cached_property
+    def preview(self) -> PreviewData:
+        full_title: str
+        if not self.error:
+            text_segments: List[str] = []
+
+            if author_short := self.authors_short:
+                text_segments.append(author_short)
+                if not self.single_author:
+                    text_segments.append('et al')
+
+            if year := self.year:
+                text_segments.append(year)
+
+            title = self.title or "Could not load title"
+
+            text_segments.append(title)
+            full_title = " ".join(text_segments)
+        else:
+            full_title = "Could not retrieve citation"
+
+        return self.preview_with(
+            title=full_title,
+            summary=self.abstract,
+            external_url=self.get_external_url
+        )
+
     @property
     def get_external_url(self):
         if self.source == CitationSource.PUBMED:
             return f"https://www.ncbi.nlm.nih.gov/pubmed/{self.index}"
         elif self.source == CitationSource.PUBMED_CENTRAL:
-            return f"https://www.ncbi.nlm.nih.gov/pmc/?term={self.index}"
+            return f"https://www.ncbi.nlm.nih.gov/pmc/articles/{self.index}"
         else:
             return f"https://www.ncbi.nlm.nih.gov/books/{self.index}"
 
@@ -176,6 +214,8 @@ class Citation(TimeStampedModel):
         Removes all the derived data in a Citation
         Generally call before populating data
         """
+        self.error = None
+        self.data_json = None
         self.title = None
         self.journal = None
         self.journal_short = None
@@ -212,7 +252,7 @@ class CitationIdNormalized:
         else:
             raise ValueError(f"Unexpected citation source {self.source}")
 
-    CITATION_SPLIT_RE = re.compile(r"(?P<prefix>[a-z ]+)\s*(?P<semicolon>:)?\s*(?P<number_prefix>[a-z]+)?(?P<number>[0-9]+)", re.IGNORECASE)
+    CITATION_SPLIT_RE = re.compile(r"^(?P<prefix>[a-z ]+)\s*(?P<semicolon>:)?\s*(?P<number_prefix>[a-z]+)?(?P<number>[0-9]+)$", re.IGNORECASE)
     """
     Used to split citation strings into parts, e.g. PMCID: PMC32432232 prefix=PMCID, semicolon=: number_prefix=PMC, number=32432232
     """
@@ -234,7 +274,6 @@ class CitationIdNormalized:
         index = str(index)
         use_source = CitationSource.from_legacy_code(source)
         if not use_source:
-            print(f"Unexpected source {source}")
             raise ValueError(f"Unexpected source for Citation ID {source}")
 
         if match := CitationIdNormalized.NUMER_STRIP_RE.match(index):
@@ -259,6 +298,10 @@ class CitationIdNormalized:
         citation_id = citation_id.strip().upper()
         if parts := CitationIdNormalized.CITATION_SPLIT_RE.match(citation_id):
             prefix = parts.group('prefix')
+            if number_prefix := parts.group('number_prefix'):
+                if number_prefix == "PMC":
+                    prefix = CitationSource.PUBMED_CENTRAL
+
             number = parts.group('number')
 
             return CitationIdNormalized.from_parts(prefix, number)
@@ -541,7 +584,7 @@ class CitationFetchRequest:
                 if existing := citations_by_id.get(fetch.normalised_id.full_id):
                     fetch.citation = existing
                     # Special case of having JSON populated but not the appropriate fields
-                    # This will be the case if teh citation was migrated
+                    # This will be the case if the citation was migrated
                     if existing.data_json and not existing.last_loaded:
                         if existing.source in {CitationSource.PUBMED, CitationSource.PUBMED_CENTRAL}:
                             CitationFetchRequest._populate_from_entrez(existing, existing.data_json)
@@ -592,6 +635,7 @@ class CitationFetchRequest:
                     if not fetch.fetched:
                         fetch.fetched = True
                         fetch.citation.last_loaded = now()
+                        fetch.citation.blank_out()
                         fetch.citation.error = error_message
             except ValueError:
                 pass
@@ -640,7 +684,9 @@ class CitationFetchRequest:
 
         # TODO could we just store published date and extract year?
         citation.year = get_year_from_date(record.get("DP"))
-        if authors_list := record.get("FAU"):
+
+        # CN is corporate "Corporate Authors", fall back on that if no FAU
+        if authors_list := record.get("FAU") or record.get("CN"):
             first_author = authors_list[0]
             first_author_last = first_author.split(",")[0]
             citation.authors_short = first_author_last

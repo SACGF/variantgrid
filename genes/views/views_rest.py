@@ -91,7 +91,8 @@ class ModifyGeneListView(APIView):
 
         modification_info = f"Added manually by {request.user} on {timezone.now()}"
         gene_additions_modification_info = {gene: modification_info for gene in gene_additions}
-        num_added, num_deleted = gene_list.add_and_remove_gene_symbols(gene_additions, gene_deletions, gene_additions_modification_info)
+        num_added, num_deleted = gene_list.add_and_remove_gene_symbols(gene_additions, gene_deletions,
+                                                                       gene_additions_modification_info)
         return Response(status=HTTP_200_OK, data={"num_added": num_added, "num_deleted": num_deleted})
 
 
@@ -133,7 +134,7 @@ class CreateGeneListView(APIView):
 
 
 class TextToGeneListView(APIView):
-    """ Text to gene list (doesn't actually save). Used to eg check gene names """
+    """ Text to gene list (doesn't actually save). Used to e.g. check gene names """
 
     def post(self, request, *args, **kwargs):
         # Needed to be post as ~500 genes exceeded GET limit of ~4k

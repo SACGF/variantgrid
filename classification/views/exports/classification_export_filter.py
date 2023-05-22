@@ -69,6 +69,12 @@ class AlleleData:
     allele_id: int
     all_cms: List[ClassificationIssue] = field(default_factory=list)  # misleading name, should be all_ci or something
 
+    def sort(self):
+        def record_order(ci: ClassificationIssue):
+            return ci.classification.lab.group_name, ci.classification.pk
+
+        self.all_cms.sort(key=record_order)
+
     cached_allele: Optional[Allele] = None
     cached_variant: Optional[Variant] = None
     cached_data: Dict[str, Any] = None
@@ -544,15 +550,17 @@ class ClassificationFilter:
         for cm in self.cms_qs.iterator(chunk_size=1000):
             if allele_info := cm.classification.allele_info:
                 allele_id = cm.classification.allele_id
-                # FIXME: make an AlleleData for no Allele
+
                 if not allele_data or allele_id != allele_data.allele_id:
                     if allele_data:
+                        allele_data.sort()
                         yield allele_data
 
                     allele_data = AlleleData.from_allele_info(source=self, allele_info=cm.classification.allele_info)
                 allele_data.all_cms.append(self._record_issues(allele_id=allele_id, cm=cm))
 
         if allele_data:
+            allele_data.sort()
             yield allele_data
 
     def _allele_data_filtered(self) -> Iterator[AlleleData]:

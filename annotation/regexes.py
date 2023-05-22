@@ -77,8 +77,8 @@ class DbRegexes:
     # smallest OMIM starts with a 1, so there's no 0 padding there, expect min length
     OMIM = DbRefRegex(db="OMIM", prefixes=["OMIM", "MIM"], link=OntologyService.URLS[OntologyService.OMIM], min_length=OntologyService.EXPECTED_LENGTHS[OntologyService.OMIM], expected_length=OntologyService.EXPECTED_LENGTHS[OntologyService.OMIM])
     ORPHA = DbRefRegex(db="Orphanet", prefixes=["ORPHANET", "ORPHA"], link=OntologyService.URLS[OntologyService.ORPHANET], expected_length=OntologyService.EXPECTED_LENGTHS[OntologyService.ORPHANET])
-    PUBMED_CENTRAL = DbRefRegex(db="PMCID", prefixes=["PMCID", "PubMedCentral", "PMC"], link="https://www.ncbi.nlm.nih.gov/pubmed/?term=PMC${1}", match_type=MatchType.OPT_ALPHA_MAN_NUMERIC)
-    PUBMED = DbRefRegex(db="PMID", prefixes=["PubMed", "PMID"], link="https://www.ncbi.nlm.nih.gov/pubmed/?term=${1}")
+    PUBMED_CENTRAL = DbRefRegex(db="PMCID", prefixes=["PMCID", "PubMedCentral", "PMC"], link="https://www.ncbi.nlm.nih.gov/pmc/articles/${1}", match_type=MatchType.OPT_ALPHA_MAN_NUMERIC)
+    PUBMED = DbRefRegex(db="PMID", prefixes=["PubMed", "PMID"], link="https://www.ncbi.nlm.nih.gov/pubmed/${1}")
     SNP = DbRefRegex(db="SNP", prefixes="rs", link="https://www.ncbi.nlm.nih.gov/snp/${1}", match_type=MatchType.SIMPLE_NUMBERS)
     SNOMEDCT = DbRefRegex(db="SNOMED-CT", prefixes=["SNOMED-CT", "SNOMEDCT"], link="https://snomedbrowser.com/Codes/Details/${1}")
     UNIPROTKB = DbRefRegex(db="UniProtKB", prefixes="UniProtKB", link="https://www.uniprot.org/uniprot/${1}", match_type=MatchType.ALPHA_NUMERIC)
@@ -95,16 +95,10 @@ class DbRefRegexResult:
         self.cregx = cregx
         self.idx = cregx.fix_id(idx)
         self.match = match
-        self.internal_id = None
-        self.summary = None
 
         # this is where we check our database to see if we know what this reference is about
         if self.db in OntologyService.LOCAL_ONTOLOGY_PREFIXES:
             term_id = f"{self.db}:{self.idx}"
-            if term := OntologyTerm.objects.filter(id=term_id).first():
-                self.summary = term.name
-                if not term.is_valid_for_condition:
-                    self.summary += " (obsolete or not phenotype)"
 
         # no longer pre-emptively load citation, save that for rendering
         # but normalise the ID
@@ -143,12 +137,7 @@ class DbRefRegexResult:
         return self.cregx.db
 
     def to_json(self):
-        jsonny = {'id': f'{self.db}: {self.idx}', 'db': self.db, 'idx': self.idx, 'url': self.url}
-        if self.summary:
-            jsonny['summary'] = self.summary
-        if self.internal_id:
-            jsonny['internal_id'] = self.internal_id
-        return jsonny
+        return {'id': f'{self.db}: {self.idx}', 'db': self.db, 'idx': self.idx, 'url': self.url}
 
     def __str__(self):
         return f'{self.cregx.db}:{self.idx}'

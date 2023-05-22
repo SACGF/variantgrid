@@ -148,15 +148,3 @@ def get_rendering_dict(node):
         "args": node_args
     }
 
-
-def create_node(node_class, analysis, **kwargs):
-    save = kwargs.pop("save", True)
-    node_kwargs = {"x": 10 + random.random() * 50,
-                   "y": 10 + random.random() * 20}
-    node_kwargs.update(kwargs)
-    node_kwargs["analysis"] = analysis
-    if save:
-        node = node_class.objects.create(**node_kwargs)
-    else:
-        node = node_class(**node_kwargs)
-    return node

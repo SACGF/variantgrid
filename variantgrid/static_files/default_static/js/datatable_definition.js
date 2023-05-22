@@ -470,16 +470,16 @@ TableFormat.severeNumber = function(severity, data, type, columns) {
     }
 };
 
-TableFormat.expandAjax = function(url, param, expectedHeight, data) {
+TableFormat.expandAjax = function(url_or_method, param, expectedHeight, data) {
     if (data) {
         let dataId = data[param];
         if (!dataId) {
             return `<i class="fas fa-bomb text-danger"></i> No value for "${param}" in this ${JSON.stringify(data)} : DEBUG - is ${param} a column in this table, visible or otherwise?`;
         }
         let ajaxId = `ajax_${dataId}`;
-        let reverseUrl = Urls[url];
+        let reverseUrl = window[url_or_method] || Urls[url_or_method];
         if (!reverseUrl) {
-            return `<i class="fas fa-bomb text-danger"></i> URL not configured for "${url} : Developer may need to run<br/>
+            return `<i class="fas fa-bomb text-danger"></i> Method or URL not configured for "${url_or_method} : Developer may need to run<br/>
             <div class="code">manage.py collectstatic_js_reverse</div>`;
         }
         if (param) {

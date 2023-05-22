@@ -128,3 +128,7 @@ def sql_delete_qs(qs, batch_size: Optional[int] = None) -> int:
         _, rowcount = run_sql(sql)
         total_rowcount += rowcount
     return total_rowcount
+
+
+def postgres_arrays(array):
+    return "{%s}" % ','.join([str(s) if s is not None else "NULL" for s in array])

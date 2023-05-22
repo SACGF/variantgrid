@@ -3,8 +3,8 @@ from django.test import TestCase
 
 from annotation.tests.test_data_fake_genes import create_fake_transcript_version
 from snpdb.models import GenomeBuild, ClinGenAllele
+from snpdb.search import search_data
 from variantopedia.models import SearchTypes
-from variantopedia.search import search_data
 
 
 class TestSearch(TestCase):
@@ -103,4 +103,4 @@ class TestSearch(TestCase):
         ]
         for transcript_version in TRANSCRIPT_VERSION:
             search_results = search_data(self.user, transcript_version, False)
-            self._verify_all_of_type(search_results, SearchTypes.TRANSCRIPT)
+            self._verify_all_of_type(search_results, "Transcript Version")

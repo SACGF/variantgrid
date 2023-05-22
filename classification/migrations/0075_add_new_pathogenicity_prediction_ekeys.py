@@ -56,7 +56,7 @@ def _add_new_pathogenicity_prediction_ekeys(apps, _schema_editor):
     ]
     EvidenceKey.objects.bulk_create(new_ekeys)
 
-    # Some of these already have previous values - eg cadd_phred for cadd
+    # Some of these already have previous values - e.g. cadd_phred for cadd
     ek_vg_columns = {
         "cadd": "cadd_raw_rankscore",
         "revel": "revel_rankscore",

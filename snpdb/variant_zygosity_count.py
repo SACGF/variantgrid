@@ -27,9 +27,8 @@ def create_variant_zygosity_counts():
             logging.info("Current variant_id=%d, Need to create for collection %s up to variant_id=%d",
                          max_vzc_variant_id, collection, max_variant_id)
 
-            params = {"table_name": collection.get_partition_table()}
-            sql = """INSERT INTO %(table_name)s
-                    (variant_id, collection_id, ref_count, het_count, hom_count, unk_count)\n""" % params
+            sql = f"""INSERT INTO {collection.get_partition_table()}
+                    (variant_id, collection_id, ref_count, het_count, hom_count, unk_count)\n"""
             sql += """select id, %s, 0, 0, 0, 0 from snpdb_variant where id > %s;"""
             run_sql(sql, [collection.pk, max_vzc_variant_id])
 
@@ -46,7 +45,7 @@ def _get_update_sql_and_params(collection: VariantZygosityCountCollection, vcf: 
     cgc = vcf.cohort.cohort_genotype_collection
     if sample:
         sample_index = cgc.get_sql_index_for_sample_id(sample.pk)
-        sample_zygosity = 'SUBSTRING("snpdb_cohortgenotype"."samples_zygosity", %d, 1)' % sample_index
+        sample_zygosity = f'SUBSTRING("snpdb_cohortgenotype"."samples_zygosity", {sample_index}, 1)'
         ref_count_delta = f"(case when {sample_zygosity} = 'R' then 1 else 0 end)"
         het_count_delta = f"(case when {sample_zygosity} = 'E' then 1 else 0 end)"
         hom_count_delta = f"(case when {sample_zygosity} = 'O' then 1 else 0 end)"

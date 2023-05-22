@@ -37,7 +37,7 @@ def _get_formatters(source_in_percent, dest_in_percent, missing_value=None) -> L
     else:
         if source_in_percent:
             formatters.append(partial(convert_from_percent_to_unit, missing_value=missing_value))
-        # Do we want a unit formatter, eg to limit sig figures?
+        # Do we want a unit formatter, e.g. to limit sig figures?
     return formatters
 
 

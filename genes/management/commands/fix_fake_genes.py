@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 """
-We inserted gene annotation (from eg Universal Transcript Archive) that was missing the Gene ID
+We inserted gene annotation (from e.g. Universal Transcript Archive) that was missing the Gene ID
 We thus inserted it as "unknown_GENE_SYMBOL"
 
 This command finds transcripts in the same build, and if all the genes are the same, switch to that

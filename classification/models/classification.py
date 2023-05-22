@@ -25,6 +25,7 @@ from django.dispatch.dispatcher import receiver
 from django.urls.base import reverse
 from django_extensions.db.models import TimeStampedModel
 from guardian.shortcuts import assign_perm, get_objects_for_user
+from pandas.io.html import _remove_whitespace
 
 from annotation.models.models import AnnotationVersion, VariantAnnotationVersion, VariantAnnotation
 from annotation.regexes import db_ref_regexes, DbRegexes
@@ -47,6 +48,7 @@ from genes.models import Gene
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
 from library.guardian_utils import clear_permissions
 from library.log_utils import report_exc_info, report_event
+from library.preview_request import PreviewData, PreviewModelMixin
 from library.utils import empty_to_none, nest_dict, cautious_attempt_html_to_text, DebugTimer, \
     invalidate_cached_property, md5sum_str
 from ontology.models import OntologyTerm, OntologySnake, OntologyTermRelation
@@ -104,7 +106,8 @@ class ClassificationImport(models.Model):
     genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)
 
     def get_variants_qs(self) -> QuerySet[Variant]:
-        return Variant.objects.filter(pk__in=ImportedAlleleInfo.objects.filter(classification_import=self).values_list('matched_variant', flat=True))
+        mv_ids = ImportedAlleleInfo.objects.filter(classification_import=self).values_list('matched_variant', flat=True)
+        return Variant.objects.filter(pk__in=mv_ids)
 
     def __str__(self):
         return f"ClassificationImport ({self.genome_build})"
@@ -147,10 +150,9 @@ class AllClassificationsAlleleSource(TimeStampedModel, AlleleSource):
     def get_variants_qs(self) -> QuerySet[Variant]:
         # Note: This deliberately only gets classifications where the submitting variant was against this genome build
         # ie we don't use Classification.get_variant_q_from_classification_qs() to get liftovers
+        qs = ImportedAlleleInfo.objects.filter(matched_variant__isnull=False, allele__isnull=True)
+        not_lifted_over_variant_ids = qs.values_list('allele_id', flat=True)
         contigs_q = Variant.get_contigs_q(self.genome_build)
-
-        not_lifted_over_variant_ids = ImportedAlleleInfo.objects.filter(matched_variant__isnull=False, allele__isnull=True).values_list('allele_id', flat=True)
-
         return Variant.objects.filter(contigs_q, id__in=not_lifted_over_variant_ids)
 
     def liftover_complete(self, genome_build: GenomeBuild):
@@ -172,10 +174,9 @@ def get_extra_info(flag_infos: FlagInfos, user: User, **kwargs) -> None:  # pyli
 
     vcs = Classification.objects.filter(flag_collection__in=flag_infos.ids).select_related('lab')
     drcs = DiscordanceReportClassification.objects.filter(classification_original__classification__in=vcs,
-                                                          report__resolution=DiscordanceReportResolution.ONGOING) \
-        .values_list('classification_original__classification', 'report')
+                                                          report__resolution=DiscordanceReportResolution.ONGOING)
     drcs_dict = {}
-    for drc in drcs:
+    for drc in drcs.values_list('classification_original__classification', 'report'):
         drcs_dict[drc[0]] = drc[1]
 
     for vc in vcs:
@@ -298,7 +299,8 @@ class ConditionResolved:
 
         if more_general:
             # if presented with different types, and we can switch over to MONDO, do so
-            if not more_general.is_multi_condition and resolved_1.single_term.ontology_service != resolved_2.single_term.ontology_service:
+            if not more_general.is_multi_condition and \
+                    resolved_1.single_term.ontology_service != resolved_2.single_term.ontology_service:
                 if mondo_term := more_general.mondo_term:
                     more_general = ConditionResolved(terms=[mondo_term])
             return more_general
@@ -338,7 +340,8 @@ class ConditionResolved:
                 join = self.join or MultiCondition.NOT_DECIDED
                 text = f"{text}; {self.join.label}"
 
-            resolved_term_dicts: List[ConditionResolvedTermDict] = [ConditionResolved.term_to_dict(term) for term in self.terms]
+            resolved_term_dicts: List[ConditionResolvedTermDict] = [ConditionResolved.term_to_dict(term) for term in
+                                                                    self.terms]
 
             jsoned: ConditionResolvedDict = {
                 "resolved_terms": resolved_term_dicts,
@@ -403,7 +406,7 @@ class ClassificationOutstandingIssues:
         return f"({self.classification.friendly_label}) {', '.join(self.issues)} {', '.join(self.flags)}"
 
 
-class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeStampedModel):
+class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeStampedModel, PreviewModelMixin):
     """
     A Variant Classification, belongs to a lab and user. Keeps a full history using ClassificationModification
     The data is free form basked on EvidenceKey (rather than one column per possible field)
@@ -416,23 +419,14 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
     """ Deprecated -  """
     allele = models.ForeignKey(Allele, null=True, on_delete=PROTECT)
 
-    # These fields were all deleted in favour of allele_info
-    # chgvs_grch37 = models.TextField(blank=True, null=True)
-    # chgvs_grch38 = models.TextField(blank=True, null=True)
-    #
-    # chgvs_grch37_full = models.TextField(blank=True, null=True)
-    # chgvs_grch38_full = models.TextField(blank=True, null=True)
-    #
-    # transcript_version_grch37 = models.ForeignKey(TranscriptVersion, null=True, blank=True, on_delete=SET_NULL, related_name='classification_37')
-    # transcript_version_grch38 = models.ForeignKey(TranscriptVersion, null=True, blank=True, on_delete=SET_NULL, related_name='classification_38')
-    ## END SO MANY DERIVED FIELDS
-
     allele_info = models.ForeignKey(ImportedAlleleInfo, null=True, blank=True, on_delete=SET_NULL)
-    """ Keeps links to common builds (37, 38) for quick access to c.hgvs, transcript etc. Is shared between classifications with same import data """
+    """ Keeps links to common builds (37, 38) for quick access to c.hgvs, transcript etc. Is shared between 
+        classifications with same import data """
 
     @property
     def allele_object(self) -> Allele:
-        """ The new preferred way to reference the allele, so we can eventually remove allele from the classification object """
+        """ The new preferred way to reference the allele, so we can eventually remove allele from the
+            classification object """
         try:
             return self.allele_info.allele
         except AttributeError:
@@ -457,7 +451,8 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
     """ The current share level of the classification, combined with lab determines the permissions """
 
     annotation_version = models.ForeignKey(AnnotationVersion, null=True, blank=True, on_delete=SET_NULL)
-    """ If created from a variant and auto-populated, with which version of annotations. If null was created via import """
+    """ If created from a variant and auto-populated, with which version of annotations. If null was
+        created via import """
 
     clinical_context = models.ForeignKey('ClinicalContext', null=True, blank=True, on_delete=SET_NULL)
     """ After being matched to a variant, this will be set to the default clinical_context for the allele
@@ -479,6 +474,23 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
 
     last_source_id = models.TextField(blank=True, null=True)
     last_import_run = models.ForeignKey(ClassificationImportRun, null=True, blank=True, on_delete=SET_NULL)
+
+    @classmethod
+    def preview_icon(cls) -> str:
+        return "fa-solid fa-clipboard"
+
+    @property
+    def preview(self) -> PreviewData:
+
+        last_published = self.last_published_version
+        clin_sig = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE). \
+                       pretty_value(last_published.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)) or 'Unclassified'
+        title = f"{clin_sig}"  # TODO add more data here
+
+        return self.preview_with(
+            identifier=self.friendly_label,
+            title=title
+        )
 
     @staticmethod
     def is_supported_transcript(transcript_or_hgvs: str):
@@ -577,11 +589,13 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
 
     @staticmethod
     def dashboard_total_shared_classifications() -> int:
-        return Classification.objects.filter(lab__external=False, share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS, withdrawn=False).exclude(lab__name__icontains='legacy').count()
+        return Classification.objects.filter(lab__external=False, share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS,
+                                             withdrawn=False).exclude(lab__name__icontains='legacy').count()
 
     @staticmethod
     def dashboard_total_unshared_classifications() -> int:
-        return Classification.objects.filter(lab__external=False, withdrawn=False).exclude(lab__name__icontains='legacy').exclude(share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS).count()
+        qs = Classification.objects.filter(lab__external=False, withdrawn=False).exclude(lab__name__icontains='legacy')
+        return qs.exclude(share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS).count()
 
     @staticmethod
     def dashboard_report_classifications_of_interest(since) -> List[ClassificationOutstandingIssues]:
@@ -623,36 +637,6 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
     @classmethod
     def order_by_evidence(cls, key_id: str):
         return RawSQL('cast(evidence->>%s as jsonb)->>%s', (key_id, 'value'))
-    #
-    # @staticmethod
-    # def relink_variants(vc_import: Optional[ClassificationImport] = None) -> int:
-    #     """
-    #         Call after import/liftover as variants may not have been processed enough at the time of "set_variant"
-    #         Updates all records that have a variant but not cached c.hgvs values or no clinical context.
-    #
-    #         :param vc_import: if provided only classifications associated to this import will have their values set
-    #         :return: A tuple of records now correctly set and those still outstanding
-    #     """
-    #
-    #     tests = Q(allele_info__isnull=True)
-    #     if GenomeBuild.grch37().is_annotated:
-    #         tests |= Q(allele_info__grch37__isnull=True)
-    #     if GenomeBuild.grch38().is_annotated:
-    #         tests |= Q(allele_info__grch38__isnull=True)
-    #
-    #     requires_relinking = Classification.objects.filter(tests)
-    #     if vc_import:
-    #         requires_relinking = requires_relinking.filter(classification_import=vc_import)
-    #
-    #     relink_count = requires_relinking.count()
-    #
-    #     vc: Classification
-    #     for vc in requires_relinking:
-    #         vc.set_variant(vc.variant)
-    #         vc.save()
-    #
-    #     logging.info("Bulk Update of variant relinking complete")
-    #     return relink_count
 
     @property
     def variant_coordinate(self):
@@ -667,7 +651,10 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
 
     @property
     def imported_c_hgvs(self):
-        return self.get(SpecialEKeys.C_HGVS)
+        if c_hgvs := self.get(SpecialEKeys.C_HGVS):
+            # remove any white space inside the c.HGVS
+            c_hgvs = re.sub(r'\s+', '', c_hgvs)
+            return c_hgvs
 
     @property
     def imported_g_hgvs(self):
@@ -759,9 +746,9 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
     def ensure_allele_info(self) -> Optional[ImportedAlleleInfo]:
         return self.ensure_allele_info_with_created()[0]
 
-    def ensure_allele_info_with_created(self) -> Tuple[Optional[ImportedAlleleInfo], bool]:
+    def ensure_allele_info_with_created(self, force_allele_info_update_check: bool = False) -> Tuple[Optional[ImportedAlleleInfo], bool]:
         created = False
-        if not self.allele_info:
+        if not self.allele_info or force_allele_info_update_check:
             try:
                 genome_build_patch_version = self.get_genome_build_patch_version()
             except Exception:
@@ -781,8 +768,11 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 return None, False
 
             allele_info = ImportedAlleleInfo.get_or_create(**fields)
-            self.allele_info = allele_info
-            created = True
+            if self.allele_info == allele_info:
+                created = False
+            else:
+                self.allele_info = allele_info
+                created = True
         return self.allele_info, created
 
     def update_allele_info_from_classification(self, force_update: bool = False) -> bool:
@@ -795,7 +785,8 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 return False
 
         if allele_info := self.ensure_allele_info():
-            allele_info.update_variant_coordinate()  # only need this for systems that were migrated when half of the AlleleInfo was done
+            # only need update_variant_coordinate for systems that were migrated when half of the AlleleInfo was done
+            allele_info.update_variant_coordinate()
             allele_info.update_status()
             allele_info.apply_validation()
             allele_info.save()
@@ -807,42 +798,14 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         else:
             return False
 
-    def attempt_set_variant_info_from_pre_existing_imported_allele_info(self) -> bool:
+    def attempt_set_variant_info_from_pre_existing_imported_allele_info(self) -> ImportedAlleleInfo:
         """
         Link to ImportedAlleleInfo (if haven't already), then update classification with any existing ImportedAlleleInfo
         :return: True if there's nothing more to do, False if this may still require matching
         """
         allele_info = self.ensure_allele_info()
         self.apply_allele_info_to_classification()
-        return allele_info.status in {ImportedAlleleInfoStatus.MATCHED_ALL_BUILDS, ImportedAlleleInfoStatus.FAILED}
-
-    # def set_variant_failed_matching(self, message: Optional[str] = None):
-    #     if allele_info := self.ensure_allele_info():
-    #         allele_info.set_matching_failed(message=message)
-    #
-    # @transaction.atomic()
-    # def set_variant(self, variant: Variant = None, message: str = None):
-    #     """
-    #     DEPRECATED - go via the AlleleInfo instead
-    #
-    #     Updates the data in the AlleleInfo (force_update=True) with the provided variant
-    #     @param variant The variant that we matched on, can't be None (see set_variant_failed_matching)
-    #     @param message Any message to include about a matching failure or success
-    #     @param failed If we're unable to match and wont be able to match again in future
-    #
-    #     Calling set_variant will automatically call .save()
-    #     If there is no variant and failed = True, any classification_import will be unset
-    #     can alternatively set variant to None to re-trigger matching
-    #     """
-    #     if not variant:
-    #         raise ValueError("set_variant requires a non-None variant, use set_variant_prepare_for_rematch or set_variant_failed_matching")
-    #
-    #     if allele_info := self.ensure_allele_info():
-    #         allele_info.set_variant_and_save(matched_variant=variant, message=message, force_update=True)
-    #         # below is done automatically via a signal
-    #         # self.apply_allele_info_to_classification()
-    #     else:
-    #         raise ValueError("Can't derive GenomeBuild, can't make AlleleInfo, therfore can't set_variant")
+        return allele_info
 
     def apply_allele_info_to_classification(self):
         if not self.allele_info:
@@ -930,7 +893,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             :param save: Should be True unless we're in test mode
             :param source: see patch_value
             :param make_fields_immutable: see patch_value
-            :param populate_with_defaults: if True with populate data with defaults as defined by the EvidenceKeys overrides
+            :param populate_with_defaults: populate data with defaults as defined by the EvidenceKeys overrides
         """
         if data is None:
             data = {}
@@ -943,11 +906,6 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                                 lab=lab,
                                 lab_record_id=lab_record_id,
                                 **kwargs)
-
-        # -- this has to be done after calls to create now
-        # so we can fire any logic that needs to happen upon linking to a variant
-        # if record.variant:
-        #    record.set_variant(record.variant)
 
         if populate_with_defaults:
             for e_key in record.evidence_keys.all_keys:
@@ -1052,7 +1010,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
     def process_option_values(cell: VCDataCell, values: List[Any]) -> Optional[List[str]]:
         e_key = cell.e_key
         options = e_key.virtual_options or []
-        # Do a case insensitive check for each value against the key and any aliases
+        # Do a case-insensitive check for each value against the key and any aliases
         # if there's a match to any of those, normalise back to the key (with the case of the key)
         results: List[str] = []
         # remove duplicates
@@ -1142,17 +1100,6 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         if value is not None:
             # remove support for existing_variant_id
             # variant matching is best done through allele_info stuff now
-
-            # special keys just
-            # if e_key.key == 'existing_variant_id':
-            #     try:
-            #         self.set_variant(Variant.objects.get(pk=int(value)))
-            #         # self.requires_auto_population = True
-            #         return None  # clear out the value
-            #     except:
-            #         cell.add_validation(code=ValidationCode.MATCHING_ERROR, severity='error',
-            #                             message="Couldn't resolve Variant " + str(value) + ")")
-            #
             if e_key.key == 'existing_sample_id':
                 try:
                     self.sample = Sample.objects.get(pk=int(value))
@@ -1228,7 +1175,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 if e_key.value_type == EvidenceKeyValueType.FREE_ENTRY:
                     # strip out HTML from single row files to keep our data simple
                     # allow HTML in text areas
-                    if not value.startswith("http"):  # this makes beautiful soap angry thinking we're asking it to go to the URL
+                    if not value.startswith("http"):  # makes beautiful soap angry thinking we want to go to the URL
                         value = cautious_attempt_html_to_text(value)
 
                 cell.value = value
@@ -1436,7 +1383,8 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             :param leave_existing_values: Only update empty fields
             :param save: saves to the database (leave as False if test mode or going to do other changes)
             :param make_patch_fields_immutable: Make all fields updated in this patch immutable.
-            :param remove_api_immutable: If True, immutability level (under variantgrid) is removed from all fields. Requires source: SubissionSource.VariantGrid
+            :param remove_api_immutable: If True, immutability level (under variantgrid) is removed from all fields.
+                                         Requires source: SubissionSource.VariantGrid
             :param initial_data: if True, divides c.hgvs to
             :param revalidate_all: if True, runs validation over all fields we have, otherwise only the values being patched
             :param ignore_if_only_patching: if provided, if only these fields are different in the patch, don't both to patch anything
@@ -1450,7 +1398,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         key_dict: EvidenceKeyMap = self.evidence_keys
 
         use_evidence = VCDataDict(copy.deepcopy(self.evidence),
-                                  evidence_keys=self.evidence_keys)  # make a deep copy so we don't accidentally mutate the data
+                                  evidence_keys=self.evidence_keys)  # deep copy so don't accidentally mutate the data
         patch = VCDataDict(data=EvidenceMixin.to_patch(patch),
                            evidence_keys=self.evidence_keys)  # the patch we're going to apply ontop of the evidence
 
@@ -1595,14 +1543,16 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 patched.raw = cell.diff(None)
             elif cell.raw is None:
                 if not source.can_edit(existing_immutability):
-                    patch_response.append_warning(key=key, code="immutable", message=f"Cannot change immutable value for {key} from {existing.value} to blank")
+                    message = f"Cannot change immutable value for {key} from {existing.value} to blank"
+                    patch_response.append_warning(key=key, code="immutable", message=message)
                     patched.wipe(WipeMode.POP)  # reject entire change if attempting to change immutable value
                 else:
                     patched.wipe(WipeMode.SET_NONE)
             else:
                 patched.raw = cell.diff(dest=existing, ignore_if_omitted={'immutable'})
                 if ('value' in patched or 'explain' in patched) and not source.can_edit(existing_immutability):
-                    patch_response.append_warning(key=key, code="immutable", message=f"Cannot change immutable value or explain for {key} from {existing.value} to {patched.value}")
+                    msg = f"Cannot change immutable value or explain for {key} from {existing.value} to {patched.value}"
+                    patch_response.append_warning(key=key, code="immutable", message=msg)
                     patched.wipe(WipeMode.POP)  # reject entire change if attempting to change immutable value
                 else:
 
@@ -1667,7 +1617,8 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             self.clinical_significance = clinical_significance_choice
             pending_modification.clinical_significance = clinical_significance_choice
 
-            patch_response.append_warning(code="patched", message='Patched changed values for ' + ', '.join(sorted(diffs_only_patch.keys())))
+            message = 'Patched changed values for ' + ', '.join(sorted(diffs_only_patch.keys()))
+            patch_response.append_warning(code="patched", message=message)
 
             if save:
                 self.save()
@@ -2016,47 +1967,10 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         visible_evidence = {}
         for k, v in evidence.items():
             if k in visible_keys:
-                value = v
-            else:
-                value = {'value': "(hidden)", 'hidden': True}
-            visible_evidence[k] = value
+                visible_evidence[k] = v
+            elif 'value' in v or 'explain' in v or 'note' in v:
+                visible_evidence[k] = {'value': "(hidden)", 'hidden': True}
         return visible_evidence
-
-    # def get_variant_info_dict(self):
-    #     allele = self.allele_object
-    #     genome_builds = {}
-    #     valid_builds = GenomeBuild.builds_with_annotation_cached()
-    #     for variant_allele in allele.variantallele_set.filter(genome_build__in=valid_builds) \
-    #             .select_related(
-    #         'variant',
-    #         'variant__locus',
-    #         'variant__locus__ref',
-    #         'variant__locus__contig',
-    #         'variant__alt',
-    #         'genome_build'
-    #     ):
-    #         variant = variant_allele.variant
-    #         hgvs_matcher = HGVSMatcher(genome_build=variant_allele.genome_build)
-    #         # getting the g_hgvs is a relatively expensive operation
-    #         # investigate removing it as nothing uses it (as far as I know)
-    #         g_hgvs = hgvs_matcher.variant_to_g_hgvs(variant)
-    #         c_hgvs = self.get_c_hgvs(variant_allele.genome_build)
-    #         build_info = {
-    #             SpecialEKeys.VARIANT_COORDINATE: str(variant),
-    #             SpecialEKeys.G_HGVS: g_hgvs,
-    #             SpecialEKeys.C_HGVS: c_hgvs,
-    #             # "origin" : variant_allele.get_origin_display(),
-    #             "variant_id": variant.pk,
-    #         }
-    #         # origin / conversion tool etc a little bit too detailed for end users downloading this
-    #         """
-    #         if variant_allele.allele_linking_tool:
-    #             build_info["conversion_tool"] = variant_allele.get_allele_linking_tool_display()
-    #
-    #         if variant_allele.error:
-    #             build_info["error"] = variant_allele.error
-    #         """
-    #         genome_builds[variant_allele.genome_build.name] = build_info
 
     def get_allele_info_dict(self) -> Optional[Dict[str, Any]]:
         allele_info_dict = {}
@@ -2071,7 +1985,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             }
 
             if (genome_build := self.get_genome_build_opt()) and \
-                    (preferred_build := allele_info[self.get_genome_build()]) and \
+                    (preferred_build := allele_info[genome_build]) and \
                     (c_hgvs := preferred_build.c_hgvs_obj):
                 resolved_dict.update(c_hgvs.to_json())
             elif c_hgvs_raw := self.get(SpecialEKeys.C_HGVS):
@@ -2116,17 +2030,23 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         return match_gene | match_evidence
 
     @staticmethod
-    def get_classifications_qs(user: User, clinical_significance_list: Iterable[str] = None) -> QuerySet:
-        vcm_qs = ClassificationModification.latest_for_user(user, published=True)
+    def get_classifications_qs(user: User, clinical_significance_list: Iterable[str] = None,
+                               lab_list: Iterable[Lab] = None) -> QuerySet:
+        cm_qs = ClassificationModification.latest_for_user(user, published=True)
         if clinical_significance_list:
-            vcm_qs = vcm_qs.filter(clinical_significance__in=clinical_significance_list)
-        return Classification.objects.filter(pk__in=vcm_qs.values('classification'))
+            cm_qs = cm_qs.filter(clinical_significance__in=clinical_significance_list)
+        qs = Classification.objects.filter(pk__in=cm_qs.values('classification'))
+        if lab_list:
+            qs = qs.filter(lab__in=lab_list)
+        return qs
 
     @staticmethod
-    def get_variant_q(user: User, genome_build: GenomeBuild, clinical_significance_list: Iterable[str] = None) -> Q:
+    def get_variant_q(user: User, genome_build: GenomeBuild,
+                      clinical_significance_list: Iterable[str] = None,
+                      lab_list: Iterable[Lab] = None) -> Q:
         """ returns a Q object filtering variants to those with a PUBLISHED classification
             (optionally classification clinical significance in clinical_significance_list """
-        vc_qs = Classification.get_classifications_qs(user, clinical_significance_list)
+        vc_qs = Classification.get_classifications_qs(user, clinical_significance_list, lab_list)
         return Classification.get_variant_q_from_classification_qs(vc_qs, genome_build)
 
     @staticmethod
@@ -2254,19 +2174,6 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         return self._generate_c_hgvs_extra(genome_build).format()
 
     def __str__(self) -> str:
-        """
-        if self.variant:
-            variant_details = str(self.variant)
-        else:
-            variant_details_list = []
-            for ek in SpecialEKeys.VARIANT_LINKING_HGVS_KEYS:
-                hgvs_val = self.get(ek)
-                if hgvs_val:
-                    variant_details_list.append(hgvs_val)
-                    break
-            variant_details_list.append("(not linked to variant)")
-            variant_details = " ".join(variant_details_list)
-        """
         genome_build = GenomeBuildManager.get_current_genome_build()
         cached_c_hgvs = self.get_c_hgvs(genome_build=genome_build)
         if not cached_c_hgvs:
@@ -2384,7 +2291,7 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
 
     def get_absolute_url(self):
         return reverse('view_classification',
-                       kwargs={'record_id': str(self.classification.id) + '.' + str(self.created.timestamp())})
+                       kwargs={'classification_id': str(self.classification.id) + '.' + str(self.created.timestamp())})
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -2471,7 +2378,8 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
             and not self.published
 
     @transaction.atomic()
-    def publish(self, share_level: Union[ShareLevel, str, int], user: User, vc: 'Classification', debug_timer: DebugTimer = DebugTimer.NullTimer) -> bool:
+    def publish(self, share_level: Union[ShareLevel, str, int], user: User, vc: 'Classification',
+                debug_timer: DebugTimer = DebugTimer.NullTimer) -> bool:
         """
         :param share_level: The share level we want to publish as
         :param user: The user who initiated the publishing
@@ -2576,11 +2484,12 @@ class ClassificationModification(GuardianPermissionsMixin, EvidenceMixin, models
 
     def is_significantly_equal(self, other: 'ClassificationModification', care_about_explains: bool = False) -> bool:
         """
-        Determines as far as a user is concerned if two versions of a classification are equal based on evidence key data and share level.
-        Would typically be used to determine if should show the column in history.
+        Determines as far as a user is concerned if two versions of a classification are equal based on evidence key
+        data and share level.
+        Would typically be used to determine if we should show the column in history.
         Raises an error if run on different classification ids.
         :param other: Another modification
-        :param care_about_explains: True if a change in only the explain should cause records not to be considered the same
+        :param care_about_explains: True = change in only 'explain' should cause records not to be considered the same
         :return: True if the user should see these as the same, False otherwise
         """
         if self.classification_id != other.classification_id:
@@ -2657,8 +2566,8 @@ class ClassificationConsensus:
             self.vcm: Optional[ClassificationModification] = None
             if allele:
                 variants = allele.variants
-            vcms = list(ClassificationModification.latest_for_user(user=user, variant=variants, published=True).filter(classification__lab__external=False).all())
-            if vcms:
+            qs = ClassificationModification.latest_for_user(user=user, variant=variants, published=True)
+            if vcms := list(qs.filter(classification__lab__external=False)):
                 vcms.sort(key=lambda vcm: vcm.curated_date_check)
                 self.vcm = vcms[-1]
 

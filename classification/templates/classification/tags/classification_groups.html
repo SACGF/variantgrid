@@ -65,7 +65,7 @@
             <th>Imported As</th>
             <th>Allele</th>
             <th>Gene Symbol</th>
-            <th>Records</th>
+            <th><div style="margin-top: 16px">Classification Records</div></th>
         </tr>
     </thead>
     <tbody>
@@ -101,7 +101,7 @@
         },
         columns: [
             {}, // ID
-            {}, // HGVS
+            {className: 'dt-hgvs'}, // HGVS
             {}, // Clinical Sig
             {}, // Conditions
             {}, // Zygosities
@@ -109,8 +109,8 @@
             {}, // last record
             {visible: false}, // sorting column
             {className: 'none'}, // imported as
-            {visible: false, className: 'none'}, // allele (trying to hide for now as redundant to imported as)
-            {visible: false,className: 'none'}, // gene link (hiding for now as redundant to imported as)
+            {className: 'none'}, // allele
+            {className: 'none'}, // gene symbols
             {className: 'none'}, // record sub-table
         ]
     });

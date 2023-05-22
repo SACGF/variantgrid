@@ -4,7 +4,7 @@ from django.db import migrations
 from django.db.models import F
 
 
-def _one_off_allele_info_combined(apps, schema_editor):
+def _one_off_allele_info_combined(apps, _schema_editor):
     # We've already done the md5sum into the individual fields
     ImportedAlleleInfo = apps.get_model("classification", "ImportedAlleleInfo")
 

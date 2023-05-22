@@ -1,7 +1,11 @@
 {% extends menu_genes_base %}
-{% load jqgrid_tags %}
 
 {% block submenu_page_content %}
+    <script>
+    function datatableFilter(data) {
+        data.collection_id = {{ canonical_transcript_collection.pk }}
+    }
+    </script>
 
     <h2>Canonical Transcripts: {{ canonical_transcript_collection }}</h2>
 
@@ -37,8 +41,7 @@
     {% endif %}
     </p>
 
-    <div>
-    {% jqgrid 'canonical_transcript_collection_grid' 'CanonicalTranscripts' search=True pk=canonical_transcript_collection.pk %}
-    </div>
+    <table id="canonical-transcript-datatable" class="sticky-header" data-datatable-responsive="true" data-datatable-url="{% url 'canonical_transcript_datatable' %}" data-datatable-data="datatableFilter"></table>
+
 
 {% endblock submenu_page_content %}

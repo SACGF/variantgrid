@@ -27,6 +27,7 @@ from library.constants import DAY_SECS
 from library.enums.log_level import LogLevel
 from library.genomics.vcf_utils import get_variant_caller_and_version_from_vcf
 from library.log_utils import get_traceback, log_traceback
+from library.preview_request import PreviewModelMixin
 from library.utils import sorted_nicely
 from library.utils.file_utils import name_from_filename, remove_gz_if_exists
 from patients.models import FakeData, Patient
@@ -174,10 +175,10 @@ class SeqAutoMessage(TimeStampedModel):
         return f"{self.seqauto_run} {self.get_severity_display()} {record}: {self.message}"
 
 
-class SequencingRun(SeqAutoRecord):
+class SequencingRun(PreviewModelMixin, SeqAutoRecord):
     """ Represents a flowcell (or other technology with multiple sequencing samples) """
     name = models.TextField(primary_key=True)
-    date = models.DateField(null=True)  # Eg from the sequencing name - used to sort
+    date = models.DateField(null=True)  # e.g. from the sequencing name - used to sort
     sequencer = models.ForeignKey(Sequencer, on_delete=CASCADE)
     gold_standard = models.BooleanField(default=False)
     bad = models.BooleanField(default=False)
@@ -189,6 +190,14 @@ class SequencingRun(SeqAutoRecord):
     has_basecalls = models.BooleanField(default=False)
     has_interop = models.BooleanField(default=False)  # Quality, Index and Tile
     fake_data = models.ForeignKey(FakeData, null=True, blank=True, on_delete=CASCADE)
+
+    @classmethod
+    def preview_icon(cls) -> str:
+        return "fa-solid fa-person-running"
+
+    @classmethod
+    def preview_enabled(cls) -> bool:
+        return settings.SEQAUTO_ENABLED
 
     def _validate(self):
         sample_sheet_changed_code = "sample_sheet_changed"
@@ -505,7 +514,8 @@ class IlluminaFlowcellQC(SeqAutoRecord):
 
     @staticmethod
     def get_path_from_sequencing_run(sequencing_run):
-        illuminate_dir = settings.SEQAUTO_ILLUMINATE_QC_DIR_PATTERN % sequencing_run.get_params()
+        illuminate_dir = settings.SEQAUTO_ILLUMINATE_QC_DIR_PATTERN % sequencing_run.get_params()  # this may fail if
+        # sa path signals haven't handled enrichment kit
         return os.path.join(illuminate_dir, "illuminate_report.txt")
 
     @staticmethod
@@ -518,7 +528,7 @@ class IlluminaFlowcellQC(SeqAutoRecord):
 
 class ReadQ30(models.Model):
     illumina_flowcell_qc = models.ForeignKey(IlluminaFlowcellQC, on_delete=CASCADE)
-    sequencer_read_id = models.IntegerField()  # Eg HiSeq= [R1,Index,R2], NextSeq/MiSeq=[R1,Index1,Index2,R2]
+    sequencer_read_id = models.IntegerField()  # e.g. HiSeq= [R1,Index,R2], NextSeq/MiSeq=[R1,Index1,Index2,R2]
     read = models.CharField(max_length=2, choices=SequencerRead.choices)
     percent = models.FloatField()
     is_index = models.BooleanField(default=False)

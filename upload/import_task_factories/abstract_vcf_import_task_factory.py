@@ -40,7 +40,7 @@ class AbstractVCFImportTaskFactory(ImportTaskFactory):
         return [UploadPipelineFinishedTask]
 
     def get_pre_vcf_task(self, upload_pipeline):
-        """ Run before loading initial VCF (use for eg retrieving/making it) """
+        """ Run before loading initial VCF (use for e.g. retrieving/making it) """
         return None
 
     def get_create_data_from_vcf_header_task(self, upload_pipeline, input_filename):

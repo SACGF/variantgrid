@@ -33,7 +33,7 @@ class GeneForm(forms.Form):
 
 
 class GeneAndTranscriptForm(forms.Form):
-    """ Restricts Gene to eg RefSeq or Ensembl """
+    """ Restricts Gene to e.g. RefSeq or Ensembl """
 
     def __init__(self, *args, **kwargs):
         genome_build = kwargs.pop("genome_build")

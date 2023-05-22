@@ -189,7 +189,7 @@ def preprocess_vcf(upload_step, remove_info=False, annotate_gnomad_af=False):
         if not df.empty:
             import_info = VCFSkippedContigs.objects.create(upload_step=clean_sub_step)
 
-            for contig, count in df.iloc[:, 0].iteritems():
+            for contig, count in df.iloc[:, 0].items():
                 VCFSkippedContig.objects.create(import_info=import_info,
                                                 contig=contig,
                                                 num_skipped=count)
@@ -235,6 +235,6 @@ def _store_vcf_skip_stats(filename, upload_set, description):
     if os.path.exists(filename):
         df = pd.read_csv(filename, header=None, sep='\t', index_col=0)
         if not df.empty:
-            for name, count in df.iloc[:, 0].iteritems():
+            for name, count in df.iloc[:, 0].items():
                 message_string = f"Skipped {count} '{name}' {description}"
                 SimpleVCFImportInfo.objects.create(upload_step=upload_set, message_string=message_string)

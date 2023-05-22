@@ -287,19 +287,16 @@ class ClassificationAdmin(ModelAdminBasics):
         self.message_user(request, str(queryset.count()) + " records revalidated")
 
     @admin_action("Matching: Re-Match Variant")
-    def reattempt_variant_matching(self, request, queryset: QuerySet[Classification]):
+    def admin_reattempt_variant_matching(self, request, queryset: QuerySet[Classification]):
         for classification in queryset:
-            _, created = classification.ensure_allele_info_with_created()
+            _, created = classification.ensure_allele_info_with_created(force_allele_info_update_check=True)
             if created:
                 classification.save()
 
         allele_info_ids = queryset.values_list('allele_info', flat=True)
         allele_info_qs = ImportedAlleleInfo.objects.filter(id__in=allele_info_ids)
 
-        valid_record_count, invalid_record_count = reattempt_variant_matching(request.user, allele_info_qs)
-        if invalid_record_count:
-            self.message_user(request, f'Records with missing or invalid builds/coordinates : {invalid_record_count}')
-        self.message_user(request, f'Records re-matching : {valid_record_count}')
+        reattempt_variant_matching(request.user, allele_info_qs, False)
 
     @admin_action("Matching: Re-Calculate c.hgvs, transcripts")
     def recalculate_cached_chgvs(self, request, queryset: QuerySet[Classification]):
@@ -320,7 +317,7 @@ class ClassificationAdmin(ModelAdminBasics):
         for vc in queryset:
             if vc.has_errors():
                 in_error += 1
-            if vc.share_level_enum >= share_level and not vc.has_outstanding_changes():
+            elif vc.share_level_enum >= share_level and not vc.has_outstanding_changes():
                 already_published += 1
             else:
                 try:
@@ -739,8 +736,8 @@ class ImportedAlleleInfoAdmin(ModelAdminBasics):
         "imported_genome_build_patch_version",
         "status",
         "validation_include",
-        "grch37",
-        "grch38",
+        "grch37_limit",
+        "grch38_limit",
         "latest_validation"
         #"variant_coordinate",
         #"created"
@@ -748,6 +745,14 @@ class ImportedAlleleInfoAdmin(ModelAdminBasics):
     list_filter = ('imported_genome_build_patch_version', 'status', 'latest_validation__confirmed', ValidationFilter, MatchingOnFilter)
     search_fields = ('id', 'imported_c_hgvs', 'imported_g_hgvs')
     inlines = (ImportedAlleleInfoValidationInline,)
+
+    @admin_list_column("grch37", "grch37")
+    def grch37_limit(self, obj: ImportedAlleleInfo):
+        return obj.grch37
+
+    @admin_list_column("grch38", "grch38")
+    def grch38_limit(self, obj: ImportedAlleleInfo):
+        return obj.grch38
 
     @admin_list_column("Imported HGVS", "imported_c_hgvs")
     def imported_hgvs(self, obj: ImportedAlleleInfo):
@@ -759,16 +764,26 @@ class ImportedAlleleInfoAdmin(ModelAdminBasics):
             return latest_validation.include
         return False
 
-    @admin_action("Re-Match")
-    def re_match(self, request, queryset: QuerySet[ImportedAlleleInfo]):
-        reattempt_variant_matching(request.user, queryset)
+    @admin_action("Re-Match Soft")
+    def re_match_soft(self, request, queryset: QuerySet[ImportedAlleleInfo]):
+        """
+        Soft remwatch will leave everything linked while attempting to match again
+        """
+        for allele_info in queryset:
+            allele_info.classification_import = None
+            allele_info.status = ImportedAlleleInfoStatus.PROCESSING
+            allele_info.save()
 
-        # classifications_qs = Classification.objects.filter(allele_info__in=queryset)
-        # self.message_user(request, f'Found : {classifications_qs.count()} linked classifications')
-        #valid_record_count, invalid_record_count = reattempt_variant_matching(request.user, classifications_qs)
-        #if invalid_record_count:
-        #    self.message_user(request, f'Records with missing or invalid builds/coordinates : {invalid_record_count}')
-        #self.message_user(request, f'Classification Records re-matching : {valid_record_count}')
+        rematched = reattempt_variant_matching(request.user, queryset, False)
+        self.message_user(request, message=f"Allele Infos rematched {rematched}")
+
+    @admin_action("Re-Match Hard (unmatched, rematches)")
+    def re_match_hard(self, request, queryset: QuerySet[ImportedAlleleInfo]):
+        """
+        Hard rematch will reset the imported allele info, and match from the start
+        """
+        rematched = reattempt_variant_matching(request.user, queryset, True)
+        self.message_user(request, message=f"Allele Infos rematched {rematched}")
 
     @admin_action("Recalc c.hgvs")
     def update_variant_coordinate(self, request, queryset: QuerySet[ImportedAlleleInfo]):

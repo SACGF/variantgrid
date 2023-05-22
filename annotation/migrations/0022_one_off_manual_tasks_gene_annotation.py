@@ -10,7 +10,7 @@ def _check_has_existing_samples(apps):
     return Sample.objects.all().exists()
 
 
-def _check_has_gene_annotation(apps):
+def _check_has_gene_annotation(_apps):
     return settings.ANNOTATION_GENE_ANNOTATION_VERSION_ENABLED
 
 

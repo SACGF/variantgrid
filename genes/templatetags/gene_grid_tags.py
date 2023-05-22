@@ -145,10 +145,6 @@ def gene_grid(context, columns_from_url=None,
     gene_symbol_form.fields["gene_symbol"].widget.attrs['data-placeholder'] = "Add Gene Symbol"
 
     return {
-        "ENRICHMENT_KIT_COLUMNS": settings.GENE_GRID_ENRICHMENT_KIT_COLUMNS,
-        "ENRICHMENT_KIT_COLUMN_TOOL_TIPS": settings.GENE_GRID_ENRICHMENT_KIT_COLUMN_TOOL_TIPS,
-        "ENRICHMENT_KIT_COLUMN_LABELS": settings.GENE_GRID_ENRICHMENT_KIT_COLUMN_LABELS,
-        "ENRICHMENT_KIT_COLUMN_LABEL_TOOL_TIPS": settings.GENE_GRID_ENRICHMENT_KIT_COLUMN_LABEL_TOOL_TIPS,
         "initial_columns": initial_columns,
         "init_callback": init_callback,
         "update_url_callback": update_url_callback,

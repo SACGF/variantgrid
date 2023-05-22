@@ -87,10 +87,12 @@ let VCLinks = (function() {
             }
 
             let links = [];
-            let igvLink = this.generateIgv();
-            if (igvLink) {
-                // always put igvLink first as it's special
-                links.push(igvLink);
+            if (data.igv_links_enabled) {
+                let igvLink = this.generateIgv();
+                if (igvLink) {
+                    // always put igvLink first as it's special
+                    links.push(igvLink);
+                }
             }
 
             links.push(this.generateBeacon());

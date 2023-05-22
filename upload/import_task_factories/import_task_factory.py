@@ -19,12 +19,12 @@ class ImportTaskFactory(ABC):
 
     @abstractmethod
     def get_data_classes(self) -> Iterable[Type[models.Model]]:
-        """ eg return UploadedVCF, UploadedGeneList """
+        """ e.g. return UploadedVCF, UploadedGeneList """
         pass
 
     @abstractmethod
     def get_possible_extensions(self) -> Iterable[str]:
-        """ eg return ['csv', 'xls'] """
+        """ e.g. return ['csv', 'xls'] """
         pass
 
     def get_processing_ability(self, user: User, filename: str, file_extension: str) -> int:

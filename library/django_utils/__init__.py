@@ -1,6 +1,5 @@
 import datetime
 import operator
-from collections import defaultdict
 from functools import reduce
 from functools import wraps, partial
 from typing import List, Tuple, Dict
@@ -33,6 +32,7 @@ def get_url_from_view_path(view_path):
     from django.contrib.sites.models import Site
     current_site = Site.objects.get_current()
     protocol = 'http'
+    # TODO can do better than this for determining https vs http
     if 'shariant.org.au' in current_site.domain or 'variantgrid.com.au' in current_site.domain:
         protocol = 'https'
     return f'{protocol}://{current_site.domain}{view_path}'
@@ -98,21 +98,6 @@ def get_model_fields_and_formatted_values_tuples_list(model):
         if field:
             rows.append((name, field))
     return rows
-
-
-def column_arrays_from_values_queryset(qs, *fields, **formatters):
-    column_arrays = defaultdict(list)
-    keys = [f.split('__')[-1] for f in fields]
-    annotation_run_values = qs.values(*fields)
-    for value in annotation_run_values:
-        for k, field in zip(keys, fields):
-            v = value[field]
-            f = formatters.get(field)
-            if f:
-                v = f(v)
-            column_arrays[k].append(v)
-
-    return column_arrays
 
 
 def get_choices_formatter(choices, default=None):

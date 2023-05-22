@@ -13,7 +13,7 @@ from library.jqgrid.jqgrid_user_row_config import JqGridUserRowConfig
 from library.unit_percent import get_allele_frequency_formatter
 from library.utils import calculate_age
 from library.utils.database_utils import get_queryset_column_names, \
-    get_queryset_select_from_where_parts, queryset_to_sql
+    get_queryset_select_from_where_parts
 from snpdb.grid_columns.custom_columns import get_variantgrid_extra_annotate
 from snpdb.models import VCF, Cohort, Sample, ImportStatus, \
     GenomicIntervalsCollection, CustomColumnsCollection, Variant, Trio, UserGridConfig, GenomeBuild, ClinGenAllele, \
@@ -64,9 +64,9 @@ class VCFListGrid(JqGridUserRowConfig):
                                   'sortname': 'id',
                                   'sortorder': 'desc'})
 
-    def delete_row(self, vcf_id):
+    def delete_row(self, pk):
         """ Do async as it may be slow """
-        soft_delete_vcfs(self.user, vcf_id)
+        soft_delete_vcfs(self.user, pk)
 
 
 # TODO: Merge this an cohort grid below into 1
@@ -169,10 +169,10 @@ class SamplesListGrid(JqGridUserRowConfig):
                                   'sortname': 'id',
                                   'sortorder': 'desc'})
 
-    def delete_row(self, sample_id):
+    def delete_row(self, pk):
         """ Do async as it may take a few secs to delete """
 
-        sample = Sample.get_for_user(self.user, sample_id)
+        sample = Sample.get_for_user(self.user, pk)
         sample.check_can_write(self.user)
         Sample.objects.filter(pk=sample.pk).update(import_status=ImportStatus.MARKED_FOR_DELETION)
         task = remove_soft_deleted_vcfs_task.si()  # @UndefinedVariable

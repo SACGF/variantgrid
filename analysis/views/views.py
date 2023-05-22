@@ -121,18 +121,19 @@ def view_analysis(request, analysis_id, active_node_id=0):
     analysis_variables = [[av.node_id, av.field] for av in AnalysisVariable.objects.filter(node__analysis=analysis)]
     analysis_tags_node = TagNode.get_analysis_tags_node(analysis)
 
-    context = {"node_classes_form": forms.AnalysisNodeClassesForm(**node_classes_kwargs),
-               "nodes": nodes,
-               "node_count_colors": get_node_count_colors("color"),
-               "analysis": analysis,
-               "analysis_settings": get_analysis_settings(request.user, analysis),
-               "analysis_tags_node": analysis_tags_node,
-               "active_node_id": active_node_id,
-               "node_help": node_help_dict,
-               "analysis_variables": analysis_variables,
-               "has_write_permission": analysis.can_write(request.user),
-               "warnings": analysis.get_toolbar_warnings(request.user),
-               "ANALYSIS_DUAL_SCREEN_MODE_FEATURE_ENABLED": settings.ANALYSIS_DUAL_SCREEN_MODE_FEATURE_ENABLED}
+    context = {
+        "node_classes_form": forms.AnalysisNodeClassesForm(**node_classes_kwargs),
+        "nodes": nodes,
+        "node_count_colors": get_node_count_colors("color"),
+        "analysis": analysis,
+        "analysis_settings": get_analysis_settings(request.user, analysis),
+        "analysis_tags_node": analysis_tags_node,
+        "active_node_id": active_node_id,
+        "node_help": node_help_dict,
+        "analysis_variables": analysis_variables,
+        "has_write_permission": analysis.can_write(request.user),
+        "warnings": analysis.get_toolbar_warnings(request.user),
+    }
     return render(request, 'analysis/analysis.html', context)
 
 

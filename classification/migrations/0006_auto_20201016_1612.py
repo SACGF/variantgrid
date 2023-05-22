@@ -3,15 +3,6 @@
 from django.db import migrations
 
 
-def _check_has_flags_of_interest(apps):
-    Flag = apps.get_model("flags", "Flag")
-    flags_of_interest = Flag.objects.filter(flag_type__in=[
-        "classification_transcript_version_change",
-        "matching_variant_warning_flag",
-    ]).filter(data__isnull=True)
-    return flags_of_interest.exists()
-
-
 class Migration(migrations.Migration):
 
     dependencies = [

@@ -14,7 +14,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from genes.models import GeneVersion
-from genes.views import get_coverage_stats
+from genes.views.views import get_coverage_stats
 from library.constants import WEEK_SECS
 from library.utils import defaultdict_to_dict
 from seqauto.models import GoldCoverageSummary, EnrichmentKit

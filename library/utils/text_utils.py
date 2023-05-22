@@ -79,5 +79,7 @@ def delimited_row(data: list, delimiter: str = ',') -> str:
 
 
 def clean_string(input_string: str) -> str:
+    if input_string is None:
+        return ""
     """ Removes non-printable characters, strips whitespace """
     return re.sub(f'[^{re.escape(string.printable)}]', '', input_string.strip())

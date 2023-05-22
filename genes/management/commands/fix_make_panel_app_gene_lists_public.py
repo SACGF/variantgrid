@@ -11,4 +11,3 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         for gene_list in GeneList.objects.filter(category__name=GeneListCategory.PANEL_APP_CACHE):
             add_public_group_read_permission(gene_list)
-

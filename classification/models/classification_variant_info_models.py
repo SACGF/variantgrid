@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Optional, List, Dict, Any, TypedDict, Literal
+from typing import Optional, List, Dict, Any, TypedDict, Literal, Tuple
 
 import django.dispatch
 from django.conf import settings
@@ -237,7 +237,7 @@ class ImportedAlleleInfoValidationTagEntry:
 
     @property
     def field_pretty(self) -> str:
-        return pretty_label(self.field).replace("C Nomen", "c.nomen")
+        return pretty_label(self.field).replace("C Nomen", "c.nomen").replace("Hgvs", "HGVS")
 
     @property
     def severity_pretty(self) -> str:
@@ -355,6 +355,10 @@ class ImportedAlleleInfo(TimeStampedModel):
     The genome build used to import
     Should this be the raw 
     """
+    @property
+    def imported_genome_build(self) -> Optional[GenomeBuild]:
+        if patch_version := self.imported_genome_build_patch_version:
+            return patch_version.genome_build
 
     variant_coordinate = TextField(null=True, blank=True)
 
@@ -394,6 +398,19 @@ class ImportedAlleleInfo(TimeStampedModel):
 
     def get_absolute_url(self):
         return reverse('view_imported_allele_info_detail', kwargs={'allele_info_id': self.pk})
+
+    def __str__(self):
+        return f"{self.imported_genome_build_patch_version} {self.imported_c_hgvs or self.imported_g_hgvs}"
+
+    @property
+    def variant_coordinates_imported_and_resolved(self) -> Tuple[VariantCoordinate, VariantCoordinate]:
+        imported_vc: Optional[VariantCoordinate] = self.variant_coordinate_obj
+        resolved_vc: Optional[VariantCoordinate] = None
+
+        if vi := self.variant_info_for_imported_genome_build:
+            resolved_vc = vi.variant.coordinate
+
+        return imported_vc, resolved_vc
 
     def save(self, force_insert=False, force_update=False, using=None, update_fields=None, **kwargs):
         if not self.imported_md5_hash:
@@ -495,6 +512,18 @@ class ImportedAlleleInfo(TimeStampedModel):
             return CHGVS(self.imported_c_hgvs)
 
     @property
+    def imported_g_hgvs_obj(self) -> Optional[CHGVS]:
+        if self.imported_g_hgvs:
+            return CHGVS(self.imported_g_hgvs)
+
+    def imported_hgvs_obj(self) -> Optional[CHGVS]:
+        if c_hgvs := self.imported_c_hgvs_obj:
+            return c_hgvs
+        if g_hgvs := self.imported_g_hgvs_obj:
+            return g_hgvs
+        return None
+
+    @property
     def get_transcript(self) -> str:
         if self.imported_transcript:
             return self.imported_transcript
@@ -580,7 +609,9 @@ class ImportedAlleleInfo(TimeStampedModel):
     def resolved_builds(self) -> List[ResolvedVariantInfo]:
         return list(ResolvedVariantInfo.objects.filter(allele_info=self).select_related('genome_build'))
 
-    def update_variant_coordinate(self):
+    def update_variant_coordinate(self) -> bool:
+        """ returns if a valid variant_coordinate could be derived """
+
         # TODO, support variant_coordinate being provided
         # Code used to check to see if transcript was supported here
         # but it's better to do that in the validation step
@@ -588,7 +619,7 @@ class ImportedAlleleInfo(TimeStampedModel):
         use_hgvs = self.imported_c_hgvs or self.imported_g_hgvs
         try:
             hgvs_matcher = HGVSMatcher(self.imported_genome_build_patch_version.genome_build)
-            vc_extra = hgvs_matcher.get_variant_tuple_used_transcript_kind_and_method(use_hgvs)
+            vc_extra = hgvs_matcher.get_variant_tuple_used_transcript_kind_method_and_matches_reference(use_hgvs)
             self.message = f"HGVS matched by '{vc_extra.method}'"
             self.variant_coordinate = str(vc_extra.variant_coordinate)
         except Exception as e:
@@ -608,9 +639,17 @@ class ImportedAlleleInfo(TimeStampedModel):
             self.status = ImportedAlleleInfoStatus.FAILED
 
     @staticmethod
+    def _tidy_input_value(key: str, value: str) -> str:
+        # try to do only very safe tidying up of c.HGVS values, e.g. removing random spaces
+        if key in ("imported_c_hgvs", "imported_g_hgvs") and isinstance(value, str):
+            value = value.replace(' ', '')
+        return value
+
+    @staticmethod
     def get_or_create(**kwargs: Dict[str, Any]) -> 'ImportedAlleleInfo':
+        tidied = {key: ImportedAlleleInfo._tidy_input_value(key, value) for key, value in kwargs.items()}
         try:
-            allele_info, created = ImportedAlleleInfo.objects.get_or_create(**kwargs)
+            allele_info, created = ImportedAlleleInfo.objects.get_or_create(**tidied)
             if created:
                 allele_info.update_variant_coordinate()
                 allele_info.apply_validation()
@@ -618,7 +657,7 @@ class ImportedAlleleInfo(TimeStampedModel):
             return allele_info
         except ImportedAlleleInfo.MultipleObjectsReturned:
             # don't think this happens anymore, but just give us some better reporting if it does
-            report_exc_info(extra_data={"kwargs": kwargs})
+            report_exc_info(extra_data={"kwargs": tidied})
             raise
 
     @property
@@ -639,24 +678,17 @@ class ImportedAlleleInfo(TimeStampedModel):
         self.status = ImportedAlleleInfoStatus.FAILED
         self.save()
 
-    def set_variant_prepare_for_rematch_and_save(self, classification_import: 'ClassificationImport', clear_existing: bool = False):
-        # TODO, instead of cleainng everything out, can we just provide classification_import?
+    def hard_reset_matching_info(self):
         self.status = ImportedAlleleInfoStatus.PROCESSING
+        self.matched_variant = None
+        self.allele = None
+        for genome_build in [GenomeBuild.grch37(), GenomeBuild.grch38()]:
+            self._update_variant(genome_build=genome_build, variant=None)
         self.update_variant_coordinate()
-        self.classification_import = classification_import
+        self.classification_import = None
+        self.apply_validation()
         self.save()
-        if clear_existing:
-            self.matched_variant = None
-            self.allele = None
-
-            # should we actually do allele info changed signal? or save it for after we've matched
-            for genome_build in [GenomeBuild.grch37(), GenomeBuild.grch38()]:
-                self._update_variant(genome_build=genome_build, variant=None)
-            self.apply_validation()
-            self.save()
-
-            # should we actually do allele info changed signal? or save it for after we've matched
-            allele_info_changed_signal.send(sender=ImportedAlleleInfo, allele_info=self)
+        allele_info_changed_signal.send(sender=ImportedAlleleInfo, allele_info=self)
 
     def refresh_and_save(self, force_update=False, liftover_complete=False):
         """
@@ -681,7 +713,10 @@ class ImportedAlleleInfo(TimeStampedModel):
             raise ValueError("ImportedAlleleInfo.update_and_save requires a matched_variant, instead call reset_with_status")
 
         if not force_update and self.matched_variant == matched_variant and self.status == ImportedAlleleInfoStatus.MATCHED_ALL_BUILDS:
-            # nothing to do, and no force update
+            # nothing to do, and no force update, just update message if we need to
+            if message and message != self.message:
+                self.message = message
+                self.save()
             return
 
         self.matched_variant = matched_variant

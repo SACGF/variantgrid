@@ -6,7 +6,6 @@ from operator import attrgetter
 from typing import List, Optional, Dict, Iterable, Set
 
 import requests
-from django.conf import settings
 from django.contrib.auth.models import User
 from django.contrib.postgres.fields import ArrayField
 from django.db import models, transaction
@@ -488,9 +487,6 @@ class ConditionMatchingSuggestion:
         self.alias_index: Optional[int] = None
         """ If not null, the index of the alias of the term we matched via text, useful to determine auto-assign """
 
-        self.matched_via_alias_and_exact_term: Optional[str] = None
-        """ If not null, the ID of a term from another ontology that this text matched """
-
         self.merged = False
         """ Was this suggestion merged, e.g. if there was an condition text 'BAM' that matched Best At Motoneuron and Blood Attacked Myliver """
 
@@ -535,7 +531,7 @@ class ConditionMatchingSuggestion:
             if len(terms) != 1:
                 return False
 
-            if self.alias_index is not None and self.matched_via_alias_and_exact_term is None:
+            if self.alias_index is not None:
                 return False
 
             for message in self.messages:
@@ -611,7 +607,7 @@ class ConditionMatchingSuggestion:
         return None
 
     def __bool__(self):
-        return not not self.terms or not not self.messages
+        return bool(self.terms) or bool(self.messages)
 
 
 @receiver(classification_post_publish_signal, sender=Classification)
@@ -787,10 +783,10 @@ def search_text_to_suggestion(search_text: SearchText, term: OntologyTerm) -> Co
                     parts = [p.strip() for p in omim_name.split(';')]
                     full_name = parts[0]
                     # we could loop through all the name parts, but don't want to as the OMIM acronymn is a little too ambigious
-                    if search_text.effective_equals(SearchText(full_name)):
-                        safe_alias = True  # still mark it as True so we don't have a validation message
-                        cms.alias_index = match_info.alias_index
-                        cms.matched_via_alias_and_exact_term = omim_term.id
+                    # if search_text.effective_equals(SearchText(full_name)):
+                    #     safe_alias = True  # still mark it as True so we don't have a validation message
+                    #     cms.alias_index = match_info.alias_index
+                    #     cms.matched_via_alias_and_exact_term = omim_term.id
 
             if not safe_alias:
                 cms.add_message(ConditionMatchingMessage(severity="info", text=f"Text matched on alias of {term.id}"))

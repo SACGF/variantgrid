@@ -1,9 +1,12 @@
 {% extends "uicore/page/base.html" %}
+{% load english_tags %}
 {% load crispy_forms_field %}
 {% load ui_utils %}
 {% load ui_menu_bars %}
-{% load search_tags %}
 {% load user_tag_color_tags %}
+{% load settings_tags %}
+{% load js_tags %}
+
 {% block submenu %}{% menu_bar_data %}{% endblock %}
 
 {% block title %}Search{% endblock %}
@@ -24,6 +27,36 @@
             color: #444;
             display: block;
         }
+        .search-results a:hover .search-identifier {
+            color: #44a;
+            text-decoration: underline;
+        }
+        .list-group-item-action {
+            cursor: pointer;
+        }
+        .list-group-item-action .search-identifier {
+            color: #448;
+            cursor: pointer !important;
+        }
+        .search-results .list-group-item-okay {
+            background-color: #fff;
+        }
+        .search-results .list-group-item-action:hover {
+            background-color: #f6f6ff;
+        }
+        .searched, .searched label {
+            color: #448844 !important;
+        }
+        .extra-summary label {
+            text-transform: capitalize;
+            font-weight: 500;
+            margin-right: 4px;
+            color: #444!important;
+            margin-top: 4px;
+        }
+        .extra.normal + .extra.normal {
+            margin-left: 8px;
+        }
     </style>
     <script>
         $(document).ready(() => {
@@ -35,138 +68,214 @@
     </script>
 {% endblock %}
 {% block content %}
+    {% settings_value 'VARIANT_VCF_DB_PREFIX' as variant_vcf_db_prefix %}
+    {% settings_value 'SEARCH_SUMMARY' as show_search_summary %}
+    <script>
+        function updateSearchMode() {
+            let feeling_lucky = $("#feeling-lucky").is(':checked')
+            $("#search-mode").val(feeling_lucky ? "lucky" : "preview");
+            console.log("Search mode now = ");
+            console.log($("#search-mode").val());
+        }
+    </script>
 
-    <div class="container">
-        <h3>Search</h3>
+    {% if search and search_results.results %}
+        <script>
+            function scrollToResults(category) {
+                let scrollMe = isPhoneMode() ? $('body') : $('.main-content');
+                let scrollTo = $(`#results-${category}`);
+                let scrollToOffset = scrollTo.position().top;
+
+                scrollMe.animate({scrollTop: scrollToOffset - 30}, 100, 'swing', () => {
+                    $(`.result-${category}`).animate({'background-color': '#cceecc'}, 150).animate({'background-color': 'inherit'}, 100); //.fadeOut(100).fadeIn(100);
+                });
+                return false;
+            }
+            function searchAgain() {
+                let scrollMe = isPhoneMode() ? $('body') : $('.main-content');
+                scrollMe.animate({scrollTop: 0}, 100);
+                $('#big_search').focus();
+            }
+        </script>
+
+        <div class="current-record-menu-item">
+            <div class="mt-2">
+                <div class="d-none d-lg-block">
+                    <div><a class="hover-link" onclick="searchAgain()">Search Again</a></div>
+                    <hr/>
+                </div>
+                <div><label>Results</label></div>
+                {% for sc in search_results.search_counts %}
+                    <div style="position:relative">
+                        <a class="hover-link"
+                        {% if sc.excluded_results %}title="Calculated {{ sc.total }} results, limiting results to {{ sc.resolved }}"{% endif %}
+                        onclick="scrollToResults('{{ sc.category|id_safe }}')">{{ sc.category }}</a> : <span class="d-inline-block text-monospace" style="min-width:20px">{{ sc.resolved }}{% if sc.excluded_results %}<span style="position:absolute;right:-10px">*</span>{% endif %}</span>
+                    </div>
+                {% endfor %}
+
+            </div>
+        </div>
+    {% endif %}
+
+    <div class="container position-relative">
+        <div>
+            <h3>{% if classify %}Classify{% else %}Search{% endif %}</h3>
+        </div>
 
         <form id="search-form inline-form" method="get">
+            {% if classify %}<input type="hidden" name="classify" value="True" />{% endif %}
             <div class="input-group">
                 <input id="big_search" class="form-control" name="search" placeholder="Search" value="{{ form.search.value }}" autofocus="autofocus">
                 <div class="input-group-append">
                     <button id='search-page-button' class="input-group-append btn btn-primary">Go</button>
                 </div>
             </div>
+            <input id="search-mode" name="mode" type="hidden" value="{{ form.mode.value }}" />
+            <label class="form-check-label form-check-inline mt-2">
+                <input id='feeling-lucky' type='checkbox' value="lucky" class="form-check mr-2" {% if form.mode.value != 'preview' %}checked{% endif %} onclick="updateSearchMode()"/>
+                Automatically open single valid search result
+            </label>
         </form>
 
         {% if search %}
-            <p>
-                <b>Searched:</b>
-                {% if search_results.search_types %}
-                    {{ search_results.search_types_string }}.
-                {% else %}
-                    <b>error - could not recognise search pattern.</b>
-                {% endif %}
-            </p>
             <div id='results' class="mt-4">
-                <h4>Results</h4>
-                {% if search_results.results %}
-                    <table class="table">
-                        {% for search_result in search_results.results %}
-                            {% if not search_result.is_debug_data %}
-                                <tr {% if not search_result.is_preferred_build or not search_result.is_preferred_annotation %}
-                                    class="not-preferred hover-detail" title="Search result is not in preferred build and/or annotation consortium"
-                                {% endif %}
-                                >
-                                    <td>{{ search_result.header_string }}</td>
-                                    <td>{% if search_result.messages %}{% for message in search_result.messages %}
-                                        <span class="search-message text-danger">{{ message }}</span>
-                                    {% endfor %}<br>{% endif %}
-                                        <a class="hover-link" href="{{ search_result.record.get_absolute_url }}">{{ search_result.record }}</a>
-                                        {% if search_summary %}
-                                            {% search_summary request.user search_result %}
-                                        {% endif %}
-                                    </td>
-                                </tr>
-                            {% endif %}
+                <div class="row">
+                    {% if search_results.results %}
+                        <h4 class="col-8">{{ search_results.results|length }}{% if search_results.has_excluded_records %}*{% endif %}{% if search_results.results|length == 1 %} Result{% else %} Results{% endif %} Found for "{{ search }}"</h4>
+                    {% else %}
+                        <h4 class="col-8 no-value">No Results Found</h4>
+                    {% endif %}
+                    <div class="col-4 text-right">
+                        <a class="hover-link" href="{% url 'view_user_settings' %}" title="Default Genome Build can be changed on the User Details page under Settings">Preferred Genome Build</a> : {{ search_results.search_input.genome_build_preferred }}
+                    </div>
+                </div>
+
+                {% comment %}Overall Messages{% endcomment %}
+                {% if search_results.results or search_results.messages_overall %}
+                    <nomin>
+                    <ul class="list-group search-results">
+                        {% comment %}TOP LEVEL SEARCH INFO/WARNINGS/ERRORS{% endcomment %}
+                        {% for message in search_results.messages_overall %}
+                            <div class="list-group-item list-group-item-{{ message.severity|severity_bs }}">
+                                <div class="row d-flex align-items-center" style="color:#444">
+                                    <div class="col-3 text-right">
+                                        {{ message.severity | severity_icon }}{% if message.search_info.preview_icon %}<i class="{{ message.search_info.preview_icon }} text-info mr-2" style="opacity:0.75"></i>{% endif %}
+                                        <label>{{ message.search_info.preview_category }}</label>
+                                        {% if message.search_info.sub_name %}<div class="text-info text-small">via {{ message.search_info.sub_name }} Search</div>{% endif %}
+                                    </div>
+                                    <div class="col-9">
+                                        {{ message.message|enrich }}
+                                    </div>
+                                </div>
+                            </div>
                         {% endfor %}
-                    </table>
-                {% else %}
-                    <p class="error-value" style="padding-left:20px;">No results found.</p>
+
+                        {% for search_result in search_results.results %}
+                            {% with preview=search_result.preview %}
+                                {% comment %}The below anchor is used to jump to results of a certain kind{% endcomment %}
+                                <a {% ifchanged preview.category %}id="results-{{ preview.category|id_safe }}"{% endifchanged %}
+                                        class="list-group-item list-group-item-action list-group-item-okay result-{{ preview.category|id_safe }}" href="{{ preview.internal_url }}"
+                                        style="{% if search_result.genome_build_mismatch %}opacity:0.5{% endif %}"
+                                        >
+                                    <div class="row d-flex align-items-center" style="color:#444">
+
+                                        {% comment %}"Header" information on the left{% endcomment %}
+                                        <div class="col-3 text-right">
+                                            {% if single_preferred_result and single_preferred_result == search_result %}<i class="fa-solid fa-star text-success" title="This is the best result"></i>{% endif %}
+                                            {% if preview.icon %}<i class="{{ search_result.preview_icon_with_severity }} mr-2" style="opacity:0.75"></i>{% endif %}
+                                            <label>{{ preview.category }}</label>
+                                            {% if search_result.sub_name %}<div class="text-small text-info">via {{ search_result.sub_name }} Search</div>{% endif %}
+                                            {% if search_result.annotation_consortia %}
+                                                <div class="text-small">
+                                                    {% for consortia in search_result.annotation_consortia %}
+                                                        {{ consortia.label }}{% if not forloop.last %} and {% endif %}
+                                                    {% endfor %}
+                                                </div>
+                                            {% endif %}
+                                            {% if search_result.genome_builds %}
+                                                <nomin class="d-block text-small">
+                                                    <span class="text-secondary">{% if search_result.genome_build_mismatch %}{{ 'W' | severity_icon:'This is not your preferred genome build' }}{% endif %}
+                                                    Matched on </span> {% for gb_messages in search_result.genome_builds_with_messages %}
+                                                    <label
+                                                        {% if gb_messages.message_summary %}title="{{ gb_messages.message_summary }}" class="text-{{ gb_messages.severity_bs }} hover-detail"{% endif %}
+                                                    >{{ gb_messages.genome_build }}</label>
+                                                    {% if not forloop.last %} and {% endif %}{% endfor %}
+                                                </nomin>
+                                            {% endif %}
+                                        </div>
+
+                                        {% comment %}Record information on the right{% endcomment %}
+                                        <div class="col-9">
+                                            {% if search_result.messages %}
+                                                <div class="mb-2">
+                                                    {% for message in search_result.genome_build_relevant_messages %}
+                                                        <div class="text-danger">
+                                                            <span class="mr-1">{% if message.substituted %}<i class="fa-solid fa-shuffle"></i>{% else %}{{ message.severity | severity_icon }}{% endif %}</span>
+                                                            {{ message.message|enrich }}{% if message.genome_build and search_result.has_multiple_genome_builds %}&nbsp;<span class="text-secondary">({{ message.genome_build }})</span>{% endif %}
+                                                        </div>
+                                                    {% endfor %}
+                                                </div>
+                                            {% endif %}
+                                            <label class="search-identifier">{{ preview.identifier }}</label>&nbsp;{% if preview.title %}<span class="search-title">{{ preview.title }}</span>{% endif %}
+                                            {% if preview.summary_all %}<div class="d-block text-small text-secondary extra-summary">
+                                                {% for extra in preview.summary_all %}
+                                                    <span class="extra {% if extra.dedicated_row %}important d-block{% else %}normal d-inline-block{% endif %}">{% if extra.icon %}<i class="{{ extra.icon }} text-success mr-1"></i>{% endif %}{% if extra.key %}<label>{{ extra.key }} </label> {% endif %}
+                                                        {{ extra.value|format_value:200 }}
+                                                    </span>
+                                                {% endfor %}
+                                            </div>{% endif %}
+                                        </div>
+                                    </div>
+                                </a>
+                            {% endwith %}
+                        {% endfor %}
+                    </ul>
+                    </nomin>
                 {% endif %}
             </div>
         {% endif %}
 
-        <div class="mt-4">
-        <h4>Accepted Inputs</h4>
-        <div class="row equal">
-            <div class="col-12 col-lg-6">
-                <div class="card">
-                    <div class="card-header">Variants</div>
-                    <div class="card-body">
-                        {% labelled label="HGVS" %}
-                            Supports 'c.' and '.g'. If no transcript version is provided, the most recent is used.<br/>
-                            <span class="example">NM_001080463.1:c.5972T>A</span><br/>
-                            <span class="example">NM_000492.3(CFTR):c.1438G>T</span><br/>
-                            <span class="example">NC_000007.13:g.117199563G>T</span><br/>
-                            The <a class="hover-link" href="http://reg.clinicalgenome.org/redmine/projects/registry/gene_to_hgvs">ClinGen Allele Registry</a> is useful to find transcripts.
-                        {% endlabelled %}
-                        {% labelled label="Locus" %}<span class="example">chr1:169519049</span>{% endlabelled %}
-                        {% labelled label="Variant" %}
-                            <span class="example">1:169519049 T>C</span>, <span class="example">1-169519049-T-C</span> (gnomAD style) or by ID: <span class="example">v1001 or {{ variant_vcf_db_prefix }}1001</span>
-                        {% endlabelled %}
-                        {% labelled label="dbSNP ID" %}<span class="example">rs6025</span>{% endlabelled %}
-                        {% labelled label="ClinGenAllele" %}<span class="example">CA285410130</span>{% endlabelled %}
-                    </div>
-                </div>
-            </div>
-            <div class="col-12 col-lg-6">
-                <div class="card">
-                    <div class="card-header">Data</div>
-                    <div class="card-body">
-                        {% labelled label="Gene Symbol" %}
-                            1 word, case insensitive name match <span class="example">gata2</span>, <span class="example">GATA2</span>.<br/>
-                        {% endlabelled %}
-                        {% if url_name_visible.genes %}
-                            {% comment %}This stuff is still searchable even if genes URL is not visible, but of limited use in such environments{% endcomment %}
-                            {% labelled label="Gene ID" %}
-                                <span class="example">ENSG00000179348</span>
-                            {% endlabelled %}
-                            {% labelled label="Transcript ID" %}
-                                <span class="example">NM_001080463</span> or with version <span class="example">NM_001080463.2</span>
-                            {% endlabelled %}
-                        {% endif %}
-                        {% labelled label="Ontology" %}
-                            <span class="example">OMIM:616299</span> or <span class="example">HP:0001332</span> or <span class="example">MONDO:0002974</span><br/>or text such as <span class="example">intestinal polyposis</span>
-                            <br/>or for a dedicated MONDO search <a class="external-link" href="https://www.ebi.ac.uk/ols/ontologies/mondo">OLS Ontology Search</a>
-                        {% endlabelled %}
-                        {% if url_name_visible.patients %}
-                            {% labelled label="Cohort" %}
-                                case insensitive search match in name
-                            {% endlabelled %}
-                            {% labelled label="Sample" %}
-                                case insensitive search match in name
-                            {% endlabelled %}
-                            {% labelled label="Patients" %}
-                                <span class="example">Last, First</span> or <span class="example">First</span> or <span class="example">Last</span>
-                            {% endlabelled %}
-                            {% labelled label="Pedigree" %}
-                                case insensitive search match in name
-                            {% endlabelled %}
-                        {% endif %}
-                        {% if url_name_visible.sequencing_data %}
-                            {% labelled label="Flowcell" %}
-                                1 word: 6 digits then underscore <span class="example">160513_NB501009_0029_AH3FFJBGXY</span>
-                            {% endlabelled %}
-                        {% endif %}
-                        {% labelled label="Classification" %}
-                            The Lab Record ID of the record <span class="example">vc1545</span>
-                        {% endlabelled %}
-                        {% labelled label="Lab, Organisation" %}
-                            At least three letters <span class="example">path</span>
-                        {% endlabelled %}
-                        {% if external_codes %}
-                            {% labelled label="Patient/Case/Pathology tests with external codes" %}
-                                <ul>
-                                    {% for code in external_codes %}
-                                        <li>{{ code }}</li>
+        <div class="card mt-4">
+            <div class="card-header">Accepted Inputs</div>
+            <div class="card-body">
+                {% for search_response in search_results.responses %}
+                    <div class="row d-flex align-items-center" style="min-height:30px;">
+                        <div class="col-3 text-right {% if not search_response.sub_name and search_response.matched_pattern %}searched{% endif %}">
+                            {% ifchanged search_response.preview_category %}
+                                <i class="{{ search_response.preview_icon }} mr-2" style="opacity:0.75"></i>
+                                <label>
+                                    {{ search_response.preview_category }}
+                                </label>
+                            {% endifchanged %}
+                        </div>
+                        <div class="col-9">
+                            {% if search_response.admin_only %}<i class="fa-solid fa-key mr-2"></i>{% endif %}
+                            {% if search_response.sub_name %}
+                                <label {% if search_response.matched_pattern %}class="searched"{% endif %}>{{ search_response.sub_name }}</label><span class="d-inline mx-1">-</span>
+                            {% endif %}
+                            {% if search_response.example %}
+                                {% if search_response.example.note %}
+                                    {{ search_response.example.note }}
+                                {% endif %}
+                                {% if search_response.example.examples %}
+                                    {% for example in search_response.example.examples %}
+                                        <span class="example ml-1">{{ example }}</span>
+                                        <nomin> </nomin>
                                     {% endfor %}
-                                </ul>
-                            {% endlabelled %}
-                        {% endif %}
+                                {% endif %}
+                            {% else %}
+                                You can search for this
+                            {% endif %}
+                        </div>
                     </div>
-                </div>
+                {% endfor %}
             </div>
-        </div>
+            {% if search %}
+                <div class="card-footer">
+                     <i class="fa-solid fa-info-circle text-primary mr-2"></i> The search text "<span class="text-secondary">{{ search }}</span>" activated the searches marked <span class="searched">in green</span>.
+                </div>
+            {% endif %}
         </div>
     </div>
+
 {% endblock %}

@@ -79,7 +79,7 @@ def _migrate_citations(apps, _schema_editor):
     print(f"Completed {len(all_clinvar_citations)} migrations")
 
 
-def _unmigrate_citations(apps, schema_editor):
+def _unmigrate_citations(apps, _schema_editor):
     Citation2 = apps.get_model("annotation", "Citation2")
     GeneSymbolCitation = apps.get_model("annotation", "GeneSymbolCitation")
     ClinVarCitation = apps.get_model("annotation", "ClinVarCitation")

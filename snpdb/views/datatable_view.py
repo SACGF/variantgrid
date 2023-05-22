@@ -264,6 +264,11 @@ class DatatableConfig(Generic[DC]):
             return json.loads(value)
         return None
 
+    def _get_sort_tiebreaker(self) -> str:
+        """ Ensure we always have a 'tie breaker' and thus consistent sort order for paging.
+            May need to overwrite if you use a group by/count in queryset thus no PK """
+        return "pk"
+
     def ordering(self, qs: QuerySet) -> QuerySet[DC]:
         """ Get parameters from the request and prepare order by clause """
         #  'order[0][column]': ['0'], 'order[0][dir]': ['asc']
@@ -288,7 +293,7 @@ class DatatableConfig(Generic[DC]):
                 if col.name not in sorted_set:
                     sort_by_list += col.sort_string(col.default_sort == SortOrder.DESC)
 
-        sort_by_list.append("pk")  # Ensure we always have a 'tie breaker' and thus consistent sort order for paging
+        sort_by_list.append(self._get_sort_tiebreaker())
         return qs.order_by(*sort_by_list)
 
     def pre_render(self, qs: QuerySet[DC]):

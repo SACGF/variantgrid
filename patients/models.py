@@ -1,4 +1,5 @@
 import os
+from typing import Optional
 
 import nameparser
 from django.conf import settings
@@ -16,6 +17,7 @@ from library.django_utils.django_file_system_storage import PrivateUploadStorage
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
 from library.enums.file_attachments import AttachmentFileType
 from library.enums.titles import Title
+from library.preview_request import PreviewData, PreviewModelMixin, PreviewKeyValue
 from library.utils import calculate_age
 from patients.models_enums import NucleicAcid, Mutation, Sex, PopulationGroup
 
@@ -50,10 +52,18 @@ class ExternalModelManager(TimeStampedModel):
         return name
 
 
-class ExternalPK(models.Model):
+class ExternalPK(models.Model, PreviewModelMixin):
     code = models.TextField()
     external_type = models.TextField()
     external_manager = models.ForeignKey(ExternalModelManager, on_delete=CASCADE)
+
+    @classmethod
+    def preview_icon(cls) -> str:
+        return "fa-solid fa-person-walking-arrow-right"
+
+    @classmethod
+    def preview_if_url_visible(cls) -> Optional[str]:
+        return 'patients'
 
     class Meta:
         unique_together = ('code', 'external_type', 'external_manager')
@@ -89,6 +99,14 @@ def patient_name(first_name, last_name):
         return f"{first_name} {last_name}"
     return last_name
 
+
+def patient_name_surname_first(first_name, last_name):
+    if not (first_name or last_name):
+        return 'Unknown Patient'
+    if first_name:
+        return f"{last_name}, {first_name}"
+    return last_name
+
 # PATIENT / SAMPLE AGES AND DATES:
 # We recommend using dates rather than storing age/deceased as age will not keep
 # up to date over time.
@@ -100,7 +118,7 @@ def patient_name(first_name, last_name):
 # But as this isn't always available - hardcode age etc using _underscore prefixed fields
 
 
-class Patient(GuardianPermissionsMixin, HasPhenotypeDescriptionMixin, ExternallyManagedModel):
+class Patient(GuardianPermissionsMixin, HasPhenotypeDescriptionMixin, ExternallyManagedModel, PreviewModelMixin):
     family_code = models.TextField(null=True, blank=True)
     first_name = models.TextField(null=True, blank=True)
     last_name = models.TextField(null=True)
@@ -124,6 +142,30 @@ class Patient(GuardianPermissionsMixin, HasPhenotypeDescriptionMixin, Externally
     fake_data = models.ForeignKey(FakeData, null=True, on_delete=CASCADE)
     _deceased = models.BooleanField(null=True, blank=True)
 
+    @classmethod
+    def preview_icon(cls) -> str:
+        return "fa-solid fa-user-injured"
+
+    @classmethod
+    def preview_if_url_visible(cls) -> Optional[str]:
+        return 'patients'
+
+    @property
+    def preview(self) -> PreviewData:
+        parts = []
+        if self.sex:
+            parts.append(PreviewKeyValue(key="Sex", value=self.sex.title()))
+        if self.date_of_birth:
+            parts.append(PreviewKeyValue(key="DOB", value=self.date_of_birth))
+        if self.deceased:
+            parts.append(PreviewKeyValue(value="deceased"))
+
+        return self.preview_with(
+            identifier=self.external_pk or f"({self.pk})",
+            title=self.name_last_name_first,
+            summary_extra=parts
+        )
+
     def can_write(self, user):
         return ExternallyManagedModel.can_write(self, user) and GuardianPermissionsMixin.can_write(self, user)
 
@@ -134,6 +176,10 @@ class Patient(GuardianPermissionsMixin, HasPhenotypeDescriptionMixin, Externally
     @property
     def name(self):
         return patient_name(self.first_name, self.last_name)
+
+    @property
+    def name_last_name_first(self):
+        return patient_name_surname_first(self.first_name, self.last_name)
 
     @property
     def deceased(self):
@@ -222,7 +268,7 @@ class Patient(GuardianPermissionsMixin, HasPhenotypeDescriptionMixin, Externally
 
 
 class PatientPopulation(models.Model):
-    """ Can have many-to-one - eg Obama would have an entry for
+    """ Can have many-to-one - e.g. Obama would have an entry for
         both AFRICAN_AFRICAN_AMERICAN and NON_FINNISH_EUROPEAN """
     patient = models.ForeignKey(Patient, on_delete=CASCADE)
     population = models.CharField(max_length=3, choices=PopulationGroup.choices)

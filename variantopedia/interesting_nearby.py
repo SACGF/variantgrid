@@ -179,13 +179,11 @@ def interesting_counts(qs, user, genome_build, clinical_significance=False):
     clinical_significance_list = [c[0] for c in ClinicalSignificance.SHORT_CHOICES]
     classification_qs = Classification.get_classifications_qs(user,
                                                               clinical_significance_list=clinical_significance_list)
-    classifications_ids = list(classification_qs.values_list("pk", flat=True))
-    q_classification = Q(classification__in=classifications_ids)
-    q_classification &= Classification.get_variant_q_from_classification_qs(classification_qs, genome_build)
+    q_classification = Classification.get_variant_q_from_classification_qs(classification_qs, genome_build)
 
     classifications = {
         "clinvar": ("clinvar", Q(clinvar__isnull=False), "highest_pathogenicity"),
-        "classification": ("classification", q_classification, "clinical_significance")
+        "classification": ("variantallele__allele__classification", q_classification, "clinical_significance")
     }
 
     for classification, (count_path, classification_q, clinical_significance_path) in classifications.items():
@@ -211,7 +209,7 @@ def get_transcripts_and_codons(variant: Variant):
     transcript_codons = {}
     transcript_qs = variant.varianttranscriptannotation_set.filter(exon__isnull=False, hgvs_c__isnull=False)
     for t, hgvs_c in transcript_qs.values_list("transcript_id", "hgvs_c"):
-        if m := re.match(r".*(:c\.\d+)", hgvs_c):  # Pulls out eg ":c.1057"
+        if m := re.match(r".*(:c\.\d+)", hgvs_c):  # Pulls out e.g. ":c.1057"
             codon = m.group(1)
             transcript_codons[t] = codon
     return transcript_codons

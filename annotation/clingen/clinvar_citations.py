@@ -31,7 +31,7 @@ def store_clinvar_citations_from_web(cached_web_resource):
 
     clinvar_citations_collection = ClinVarCitationsCollection.objects.create(cached_web_resource=cached_web_resource)
 
-    rows = list()
+    rows = []
     citation_ids: Set[CitationIdNormalized] = set()
     for _, row in df.iterrows():
         citation_source = row[CITATION_SOURCE]
@@ -45,7 +45,7 @@ def store_clinvar_citations_from_web(cached_web_resource):
                               citation_id=citation_id.full_id)
         rows.append(cvc)
 
-    logging.info(f"About to ensure existence of {len(citation_ids)} citations")
+    logging.info("About to ensure existence of %d citations", len(citation_ids))
     Citation.objects.bulk_create(objs=[citation_id.for_bulk_create() for citation_id in citation_ids], batch_size=2000, ignore_conflicts=True)
 
     num_citations = len(rows)

@@ -167,9 +167,13 @@ let CitationsManager = (function() {
                     $('<span>', {text:' Loading...', class:'text-muted'})
                 ]});
             } else if (renderNonCitations) {
+                let text = dbRef.id;
+                if (dbRef.db == "HTTP" || dbRef.db == "HTTPS") {
+                    text = `${dbRef.db.toLowerCase()}:${dbRef.idx}`
+                }
                 let citationDom = $('<div>', {class: 'citation'});
                 if (dbRef.id && dbRef.url) {
-                    $('<a>', {class: 'no-details', text: dbRef.id, href: dbRef.url, target: '_blank'}).appendTo(citationDom);
+                    $('<a>', {class: 'no-details', text: text, href: dbRef.url, target: '_blank'}).appendTo(citationDom);
                 }
                 return citationDom;
             } else {

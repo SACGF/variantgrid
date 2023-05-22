@@ -1,3 +1,5 @@
+from typing import Any
+
 import markdown
 from django import template
 
@@ -89,6 +91,10 @@ class PandasDataFrameTableTag(template.Node):
             if significant_figures is not None:
                 format_string = "%%.%df" % significant_figures
                 kwargs['float_format'] = lambda f: format_string % f
+
+            kwargs['classes'] = 'table df-table'
+            # we want to justify everything right, but data columns seem to be justified left
+
             return df.to_html(**kwargs)
         except template.VariableDoesNotExist:
             return ''

@@ -64,7 +64,11 @@ class ScheduleMultiFileOutputTasksTask(ImportVCFStepTask):
         child_class_name = full_class_name(child_task_class)
         sort_order = upload_step.upload_pipeline.get_max_step_sort_order()
 
-        for input_filename, items_to_process in upload_step.get_multi_input_files_and_records():
+        multi_steps = upload_step.get_multi_input_files_and_records()
+        if not multi_steps:
+            raise ValueError("No split VCF records. This is caused by pipeline error or empty VCF after cleaning")
+
+        for input_filename, items_to_process in multi_steps:
             sort_order += 1
             child_step = UploadStep.objects.create(upload_pipeline=upload_step.upload_pipeline,
                                                    name=UploadStep.PROCESS_VCF_TASK_NAME,

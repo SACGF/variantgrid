@@ -22,7 +22,7 @@
     {% endcomment %}
 
         <div class="mt-4">
-            Code last modified: {% timestamp git.last_modified_date time_ago=True %}, see
+            <label>Code last modified</label>: {% timestamp git.last_modified_date time_ago=True %}, see
             <a href="{% url 'changelog' %}">changelog</a>.
         </div>
 
@@ -50,10 +50,11 @@
         {% endif %}
 
         {% if latest_sequencing_vcfs %}
-            <h3>Recently Uploaded Sequencing Data</h3>
-            <table>
+            <h4>Recently Uploaded Sequencing Data</h4>
+            <table class="table">
             {% for sp in latest_sequencing_vcfs %}
-            <tr><td>
+            <tr>
+                <th>
                     <div title='{{ sp.sequencing_run.sequencer }}' class='sequencer'>
                         <div class='sequencer-icon icon32 {{ sp.sequencing_run.sequencer.sequencer_model.css_class }}'>
                         </div>
@@ -64,36 +65,37 @@
                     {% else %}
                         {{ sp.sequencing_run }}
                     {% endif %}
+                </th>
                 <td>
                     <a href="{% url 'view_vcf' sp.vcf.pk %}"><div title='Combined VCF' class='vcf-icon icon32'></div></a>
-
+                </td>
                 <td>
-                <table>           
-                {% for ss in sp.sequencing_run.sequencingruncurrentsamplesheet.sample_sheet.sequencingsample_set.all %}
-                    {% if not ss.is_control %}
-                    <tr>
-                    <td>{% for sfss in ss.samplefromsequencingsample_set.all %}
-                            <a href="{% url 'view_sample' sfss.sample.pk %}">
-                        {% endfor %}
-                        {{ ss.sample_name }}
-                        {% if ss.samplefromsequencingsample %}
-                        </a>
+                    <table class="table">
+                    {% for ss in sp.sequencing_run.sequencingruncurrentsamplesheet.sample_sheet.sequencingsample_set.all %}
+                        {% if not ss.is_control %}
+                            <tr>
+                                <td>
+                                    {% for sfss in ss.samplefromsequencingsample_set.all %}
+                                        <a href="{% url 'view_sample' sfss.sample.pk %}">
+                                    {% endfor %}
+                                    {{ ss.sample_name }}
+                                    {% if ss.samplefromsequencingsample %}
+                                    </a>
+                                    {% endif %}
+                                </td>
+                                <!-- Commented out showing patients... (bit dodgy) -->
+                                {% if ENABLE_PATIENTS_ON_FRONTPAGE %}
+                                    <td>
+                                        {% if ss.patient %}
+                                            <a href="{% url 'view_patient' ss.patient.pk %}"><div class='patient-icon'></div>{{ ss.patient }}</a>
+                                        {% endif %}
+                                    </td>
+                                {% endif %}
+                            </tr>
                         {% endif %}
-                    </td>
-                    <!-- Commented out showing patients... (bit dodgy) -->
-                    {% if ENABLE_PATIENTS_ON_FRONTPAGE %}
-                    <td>
-                        {% if ss.patient %}
-                            <a href="{% url 'view_patient' ss.patient.pk %}"><div class='patient-icon'></div>{{ ss.patient }}</a>
-                        {% endif %}
-                    </td>
-                    {% endif %}
-                    </tr>
-                    {% endif %}
-                {% endfor %}
-                </table>        
-
-
+                    {% endfor %}
+                    </table>
+                </td>
             {% endfor %}
             </table>        
         {% endif %}

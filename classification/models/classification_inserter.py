@@ -1,20 +1,18 @@
-from typing import Dict, Any, Optional, Set, Mapping
+from typing import Dict, Optional, Set, Mapping
 
-from django.conf import settings
 from django.contrib.auth.models import User
 from django.db import transaction
 from django.utils.timezone import now
 
 from classification.enums import ShareLevel, ForceUpdate, SubmissionSource, SpecialEKeys
-from classification.models import ClassificationImport, ClassificationProcessError, ClassificationRef, \
+from classification.models import ClassificationProcessError, ClassificationRef, \
     EvidenceMixin, classification_flag_types, ClassificationJsonParams, ClassificationModification, \
     ClassificationPatchResponse, ClassificationImportRun
 from classification.models.classification_utils import ClassificationPatchStatus
-from classification.tasks.classification_import_task import process_classification_import_task
+from classification.models.variant_resolver import VariantResolver
 from eventlog.models import create_event
 from library.log_utils import report_exc_info
 from library.utils import DebugTimer
-from snpdb.models import GenomeBuild, ImportSource
 
 
 class BulkClassificationInserter:
@@ -25,7 +23,7 @@ class BulkClassificationInserter:
         from being published
         """
         self.user = user
-        self._import_for_genome_build: Dict[Any, ClassificationImport] = {}
+        self.variant_resolver = VariantResolver(user=user)
         self.single_insert = False
         self.api_version = api_version
         self.force_publish = force_publish
@@ -33,20 +31,6 @@ class BulkClassificationInserter:
         self.new_record_count = 0
         self.start = now()
         self.debug_timer = DebugTimer()
-
-    def import_for(self, genome_build: GenomeBuild) -> ClassificationImport:
-        """
-        Returns the ClassificationImport record that a classification should attach to, to have its variant processed
-        """
-        # Transcript type check is now done in AlleleInfo
-        if existing := self._import_for_genome_build.get(genome_build):
-            return existing
-        new_import = ClassificationImport.objects.create(genome_build=genome_build, user=self.user)
-        self._import_for_genome_build[genome_build] = new_import
-        return new_import
-
-    def all_imports(self):
-        return self._import_for_genome_build.values()
 
     @staticmethod
     def verify_source(data) -> SubmissionSource:
@@ -195,14 +179,9 @@ class BulkClassificationInserter:
 
                         # FIXME here's where we can see if we've already matched a varaint
 
-                        genome_build = record.get_genome_build()
-
-                        if record.attempt_set_variant_info_from_pre_existing_imported_allele_info():
-                            # this combo of import data has already been resolved (or failed), either way, nothing more to do
-                            pass
-                        elif allele_info := record.allele_info:
-                            if allele_info.classification_import is None:
-                                allele_info.set_variant_prepare_for_rematch_and_save(classification_import=self.import_for(genome_build=genome_build))
+                        if allele_info := record.attempt_set_variant_info_from_pre_existing_imported_allele_info():
+                            # note will only queue to resolve if it's a newly created allele info
+                            self.variant_resolver.queue_resolve(allele_info)
 
                         record.save()
 
@@ -389,10 +368,7 @@ class BulkClassificationInserter:
     def finish(self):
         debug_timer: DebugTimer = self.debug_timer
 
-        if settings.VARIANT_CLASSIFICATION_MATCH_VARIANTS:
-            for vc_import in self.all_imports():
-                task = process_classification_import_task.si(vc_import.pk, ImportSource.API)
-                task.apply_async()
+        self.variant_resolver.process_queue()
 
         debug_timer.tick("Setup Async Variant Matching")
 

@@ -1,0 +1,76 @@
+##fileformat=VCFv4.1
+##fileDate=20210617
+##source=Pisces 5.2.11.63
+##VariantPhaser=Scylla 5.2.11.63
+##reference=/opt/illumina/resources/genomes/hg19_hardPAR
+##ALT=<ID=<M>,Description="There is an overlapping other allele that has been called in a separate VCF record">
+##filteringProgram=Pepe 2.0.0.23
+##INFO=<ID=DP,Number=1,Type=Integer,Description="Total Depth">
+##FILTER=<ID=LowDP,Description="Low coverage (DP tag), therefore no genotype called. Note different depth thresholds for variant and reference calls.">
+##FILTER=<ID=Blacklist,Description="Variant overlaps a region in the blacklist BED file">
+##FILTER=<ID=LowSupport,Description="Variant is supported by too few fragments">
+##FILTER=<ID=LowVarSupport,Description="Variant is supported by too few reads">
+##FILTER=<ID=q0,Description="Quality score less than 0, by Scylla">
+##FILTER=<ID=SB,Description="Variant strand bias too high, by Scylla">
+##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
+##FORMAT=<ID=GQ,Number=1,Type=Integer,Description="Genotype Quality">
+##FORMAT=<ID=AD,Number=.,Type=Integer,Description="Allele Depth">
+##FORMAT=<ID=DP,Number=1,Type=Integer,Description="Total Depth Used For Variant Calling">
+##FORMAT=<ID=VF,Number=.,Type=Float,Description="Variant Frequency">
+##FORMAT=<ID=NL,Number=1,Type=Integer,Description="Applied BaseCall Noise Level">
+##FORMAT=<ID=SB,Number=1,Type=Float,Description="StrandBias Score">
+##FORMAT=<ID=NC,Number=1,Type=Float,Description="Fraction of bases which were uncalled or with basecall quality below the minimum threshold">
+##FORMAT=<ID=US,Number=.,Type=Integer,Description="Supporting read type counts">
+##FORMAT=<ID=AQ,Number=1,Type=Float,Description="Variant artifact adjusted quality score">
+##FORMAT=<ID=LQ,Number=1,Type=Float,Description="Likelihood ratio quality score">
+##contig=<ID=chr1,length=249250621>
+##contig=<ID=chr2,length=243199373>
+##contig=<ID=chr3,length=198022430>
+##contig=<ID=chr4,length=191154276>
+##contig=<ID=chr5,length=180915260>
+##contig=<ID=chr6,length=171115067>
+##contig=<ID=chr7,length=159138663>
+##contig=<ID=chr8,length=146364022>
+##contig=<ID=chr9,length=141213431>
+##contig=<ID=chr10,length=135534747>
+##contig=<ID=chr11,length=135006516>
+##contig=<ID=chr12,length=133851895>
+##contig=<ID=chr13,length=115169878>
+##contig=<ID=chr14,length=107349540>
+##contig=<ID=chr15,length=102531392>
+##contig=<ID=chr16,length=90354753>
+##contig=<ID=chr17,length=81195210>
+##contig=<ID=chr18,length=78077248>
+##contig=<ID=chr19,length=59128983>
+##contig=<ID=chr20,length=63025520>
+##contig=<ID=chr21,length=48129895>
+##contig=<ID=chr22,length=51304566>
+##contig=<ID=chrX,length=155270560>
+##contig=<ID=chrY,length=59373566>
+##VcfMatching=Yente 2.0.0.7
+##INFO=<ID=calledBy,Number=.,Type=String,Description="The variant call tool">
+##fileDate=20210617
+##INFO=<ID=SVTYPE,Number=1,Type=String,Description="Type of structural variant">
+##INFO=<ID=END,Number=1,Type=Integer,Description="End position of the variant described in this record">
+##FORMAT=<ID=FC,Number=1,Type=Float,Description="Copy number variant fold change, calculated as ratio of sample to control">
+##FILTER=<ID=LowValidation,Description="Algorithm for copy number loss has been validated using only simulation datasets">
+##ALT=<ID=DEL,Description="Identified deletion in target gene">
+##ALT=<ID=DUP,Description="Identified duplication in target gene">
+##source=Craft 1.0.0.52
+##reference=/opt/illumina/resources/genomes/hg19_hardPAR/genome.fa
+##INFO=<ID=EVENT,Number=1,Type=String,Description="ID of event associated to breakend">
+##INFO=<ID=SVTYPE_ORI,Number=1,Type=String,Description="Original type of structural variant">
+##INFO=<ID=CN,Number=1,Type=Integer,Description="Copy number of segment containing breakend">
+##INFO=<ID=SVLEN,Number=.,Type=Integer,Description="Difference in length between REF and ALT alleles">
+##INFO=<ID=VARTYPE,Number=1,Type=String,Description="Type of variant/arrangement">
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	SAMPLE
+chr1	17075982	.	C	<CNV>	15	PASS	CN=2;EVENT=CNV_4;SVTYPE=BND;VARTYPE=copy_number_variation;END=17090656	FC	1.125
+chr3	30416088	.	G	<CNV>	38	PASS	CN=2;EVENT=CNV_5;SVTYPE=BND;VARTYPE=copy_number_variation;END=31143527	FC	1.151
+chr4	223493399	.	G	<CNV>	3	PASS	CN=2;EVENT=CNV_18;SVTYPE=BND;VARTYPE=copy_number_variation;END=223530880	FC	1.043
+chr5	123021630	.	C	<CNV>	34	PASS	CN=2;EVENT=CNV_21;SVTYPE=BND;VARTYPE=copy_number_variation;END=123420103	FC	0.860
+chr6	51086969	.	C	<CNV>	31	PASS	CN=2;EVENT=CNV_22;SVTYPE=BND;VARTYPE=copy_number_variation;END=51273312	FC	0.886
+chr8	170434395	.	T	<CNV>	13	PASS	CN=2;EVENT=CNV_25;SVTYPE=BND;VARTYPE=copy_number_variation;END=170624505	FC	0.914
+chr9	21497499	.	C	<CNV>	5	PASS	CN=2;EVENT=CNV_26;SVTYPE=BND;VARTYPE=copy_number_variation;END=22621922	FC	0.982
+chr11	33572705	.	C	<CNV>	62	PASS	CN=2;EVENT=CNV_30;SVTYPE=BND;VARTYPE=copy_number_variation;END=33623989	FC	1.098
+chr12	55510405	.	T	<CNV>	108	PASS	CN=3;EVENT=CNV_35;SVTYPE=BND;VARTYPE=copy_number_variation;END=55523684	FC	1.290
+chr13	2239807	.	A	<CNV>	3	PASS	CN=2;EVENT=CNV_41;SVTYPE=BND;VARTYPE=copy_number_variation;END=2259806	FC	1.036

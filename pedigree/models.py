@@ -9,8 +9,10 @@ from model_utils.models import TimeStampedModel
 from library.django_utils import SortByPKMixin
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsAutoInitialSaveMixin, \
     GuardianPermissionsMixin
+from library.preview_request import PreviewModelMixin
 from patients.models_enums import Sex
 from snpdb.models import ImportStatus, Cohort, CohortSample, Sample, SomalierRelate
+from variantgrid.perm_path import get_visible_url_names
 
 
 class PedFile(GuardianPermissionsMixin, models.Model):
@@ -111,7 +113,7 @@ def validate(records):
     return errors_list
 
 
-class Pedigree(GuardianPermissionsAutoInitialSaveMixin, SortByPKMixin, TimeStampedModel):
+class Pedigree(GuardianPermissionsAutoInitialSaveMixin, PreviewModelMixin, SortByPKMixin, TimeStampedModel):
     user = models.ForeignKey(User, on_delete=CASCADE)
     name = models.TextField(blank=False)
     cohort = models.ForeignKey(Cohort, on_delete=CASCADE)
@@ -125,6 +127,15 @@ class Pedigree(GuardianPermissionsAutoInitialSaveMixin, SortByPKMixin, TimeStamp
             pfr_qs = pfr_qs.filter(affection=affected)
         samples = pfr_qs.values_list("cohortsamplepedfilerecord__cohort_sample__sample", flat=True)
         return Sample.objects.filter(pk__in=samples).order_by("pk")
+
+    @classmethod
+    def preview_icon(cls) -> str:
+        # TODO can we work out how to vertically flip this?
+        return "fa-solid fa-network-wired"
+
+    @classmethod
+    def preview_if_url_visible(cls) -> str:
+        return 'pedigrees'
 
     @property
     def genome_build(self):

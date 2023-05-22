@@ -418,3 +418,26 @@ def get_traceback():
 def log_traceback(level=logging.ERROR):
     tb = get_traceback()
     logging.log(level, tb)
+
+
+_LOG_LEVEL_SEVERITY = {
+    LogLevel.DEBUG: 0,
+    LogLevel.INFO: 1,
+    LogLevel.WARNING: 2,
+    LogLevel.ERROR: 3
+}
+
+_LOG_LEVEL_TO_BOOTSTRAP = {
+    LogLevel.DEBUG: 'info',
+    LogLevel.INFO: 'info',
+    LogLevel.WARNING: 'warning',
+    LogLevel.ERROR: 'danger'
+}
+
+
+def log_level_to_int(log_level: LogLevel) -> int:
+    return _LOG_LEVEL_SEVERITY.get(log_level, 0)
+
+
+def log_level_to_bootstrap(log_level: LogLevel):
+    return _LOG_LEVEL_TO_BOOTSTRAP[log_level]

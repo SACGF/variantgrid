@@ -135,7 +135,7 @@ class TestSeqAutoModels(TestCase):
                             gene_matcher=self.gene_matcher,
                             canonical_transcript_manager=self.canonical_transcript_manager,
                             transcript_versions_by_id=self.transcript_versions_by_id)
-        msg = "Missing file should set data_state to DELETED was %s" % qcgc.get_data_state_display()
+        msg = f"Missing file should set data_state to DELETED was {qcgc.get_data_state_display()}"
         self.assertEqual(qcgc.data_state, DataState.DELETED, msg)
 
     def test_gold_coverage(self):
@@ -166,14 +166,9 @@ class TestSeqAutoModels(TestCase):
                                 canonical_transcript_manager=self.canonical_transcript_manager,
                                 transcript_versions_by_id=self.transcript_versions_by_id)
 
-#            logging.info("%s Coverage:" % sample_name)
-#            logging.info(gcc.genecoverage_set.filter(gene_symbol__contains="MIR1302").values())
-#
-#            logging.info("%s Canonical:" % sample_name)
-#            logging.info(gcc.genecoveragecanonicaltranscript_set.filter(gene_symbol__contains="MIR1302").values())
-
         calculate_gold_summary(enrichment_kit.pk)
 
         num_gold_samples = enrichment_kit.goldreference.goldgenecoveragecollection_set.count()
-        msg = "Created gold samples for each of %s" % ", ".join(SAMPLE_NAMES)
+        sample_names = ', '.join(SAMPLE_NAMES)
+        msg = f"Created gold samples for each of {sample_names}"
         self.assertEqual(num_gold_samples, len(SAMPLE_NAMES), msg)

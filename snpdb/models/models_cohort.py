@@ -23,15 +23,17 @@ from library.django_utils import SortByPKMixin
 from library.django_utils.django_partition import RelatedModelsPartitionModel
 from library.django_utils.django_postgres import PostgresRealField
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsAutoInitialSaveMixin
+from library.preview_request import PreviewModelMixin, PreviewKeyValue
 from library.utils import invert_dict
 from patients.models_enums import Zygosity
 from snpdb.models.models_enums import ImportStatus
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_variant import Variant
 from snpdb.models.models_vcf import VCF, Sample
+from variantgrid.perm_path import get_visible_url_names
 
 
-class Cohort(GuardianPermissionsAutoInitialSaveMixin, SortByPKMixin, TimeStampedModel):
+class Cohort(GuardianPermissionsAutoInitialSaveMixin, PreviewModelMixin, SortByPKMixin, TimeStampedModel):
     """ Cohort - a collection of samples
 
         We pack data from all of the samples (zygosity, allele_depth, read_depth, genotype_quality, phred_likelihood) into 1 row
@@ -51,6 +53,24 @@ class Cohort(GuardianPermissionsAutoInitialSaveMixin, SortByPKMixin, TimeStamped
     # Deal with parent_cohort delete in snpdb.signals.signal_handlers.pre_delete_cohort
     parent_cohort = models.ForeignKey("self", null=True, related_name="sub_cohort_set", on_delete=DO_NOTHING)
     sample_count = models.IntegerField(null=True)
+
+    @classmethod
+    def preview_icon(cls) -> str:
+        return "fa-solid fa-people-arrows"
+
+    @classmethod
+    def preview_if_url_visible(cls) -> str:
+        return "patients"
+
+    @property
+    def preview(self) -> 'PreviewData':
+        extras = []
+        if samples := PreviewKeyValue.count(Sample, self.sample_count):
+            extras.append(samples)
+        return self.preview_with(
+            identifier=self.name,
+            summary_extra=extras
+        )
 
     @property
     def has_genotype(self):
@@ -361,6 +381,9 @@ class CohortGenotypeCollection(RelatedModelsPartitionModel):
     common_collection = models.OneToOneField('self', null=True, related_name="uncommon", on_delete=CASCADE)
     # common filter will be set on the 'common' CGC
     common_filter = models.ForeignKey(CohortGenotypeCommonFilterVersion, null=True, on_delete=PROTECT)
+
+    class Meta:
+        unique_together = ('cohort', 'cohort_version')
 
     def percent_common(self) -> float:
         common = self.common_collection.cohortgenotype_set.count()

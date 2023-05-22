@@ -2,8 +2,7 @@ stream-zip==0.0.47
 more-itertools==8.12.0
 beautifulsoup4==4.10.0
 bgzip==0.4.0
-# Biopython - UniProt parsing broken in v1.79 Can go back to normal package next release
-git+https://github.com/biopython/biopython@bd7aa851f798d79ef0f4c7813a6b12d38c3158f2#egg=biopython
+biopython==1.81
 cdot==0.2.13
 celery==5.2.3
 ConfigArgParse==1.5.3
@@ -45,6 +44,7 @@ HTSeq==2.0.1
 ijson==3.1.4
 ipython==8.6.0
 kombu==5.2.3
+levenshtein==0.20.9
 Markdown==3.1.1
 matplotlib==3.5.1
 mozilla_django_oidc==2.0.0
@@ -59,7 +59,6 @@ psycopg2==2.9.3
 PyPDF2==2.6.0
 pysam==0.18.0
 python_dateutil==2.8.2
-python_Levenshtein==0.12.2
 pyvcf3==1.0.3
 redis==3.5.3
 reportlab==3.6.6

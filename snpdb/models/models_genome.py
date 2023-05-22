@@ -6,6 +6,7 @@ from typing import Dict, Optional, List
 
 from django.conf import settings
 from django.db import models
+from django.db.models import QuerySet
 from django.db.models.deletion import CASCADE
 from django.db.models.query_utils import Q
 
@@ -78,7 +79,7 @@ class GenomeBuild(models.Model, SortMetaOrderingMixin):
     @staticmethod
     def detect_from_filename(filename) -> Optional['GenomeBuild']:
         """ Attempt to detect from filename
-            eg "foo_grch37.bed" (returns GRCh37) - must only contain name/alias from 1 build """
+            e.g. "foo_grch37.bed" (returns GRCh37) - must only contain name/alias from 1 build """
 
         lc_filename = filename.lower()
         possible_builds = set()
@@ -91,12 +92,12 @@ class GenomeBuild(models.Model, SortMetaOrderingMixin):
         return None
 
     @staticmethod
-    def builds_with_annotation():
+    def builds_with_annotation() -> QuerySet['GenomeBuild']:
         enabled_annotation = []
         for build_name, values in settings.ANNOTATION.items():
             if values.get("enabled"):
                 enabled_annotation.append(build_name)
-        return GenomeBuild.objects.filter(name__in=enabled_annotation)
+        return GenomeBuild.objects.filter(name__in=enabled_annotation).order_by('name')
 
     @staticmethod
     @timed_cache(ttl=60)
@@ -189,7 +190,6 @@ class GenomeBuild(models.Model, SortMetaOrderingMixin):
 
     @cached_property
     def genome_fasta(self):
-        from snpdb.models import GenomeFasta
         return GenomeFasta.get_for_genome_build(self)
 
     @property
@@ -302,7 +302,7 @@ class GenomeBuildPatchVersion(models.Model):
 
 class Contig(models.Model):
     """ Contigs don't directly link to genome build so builds can share contigs
-        eg hg19 and GRCh37 are the same except for mitochondrion
+        e.g. hg19 and GRCh37 are the same except for mitochondrion
         @see annotation.reference_contigs.get_assembly_report_df """
 
     name = models.TextField()

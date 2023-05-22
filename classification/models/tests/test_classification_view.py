@@ -175,7 +175,7 @@ class ClassificationTestCaseViews(TestCase):
         # now in test mode we always return all data (for the sake of useful information when testing)
         response_json = response.data
         response_json.pop('data')
-        response_json.pop('allele') # allele data changes a bit, should test elsewhere
+        response_json.pop('allele')  # allele data changes a bit, should test elsewhere
         expected = {
             'id': None,
             'lab_record_id': 'test_123456',

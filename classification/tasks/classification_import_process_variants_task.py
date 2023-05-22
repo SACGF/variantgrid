@@ -47,7 +47,8 @@ class ClassificationImportProcessVariantsTask(ImportVCFStepTask):
         variant_tuples_by_hash: Dict[Any, VariantCoordinate] = {}
         allele_info_by_hash: Dict[Any, ImportedAlleleInfo] = {}
 
-        no_variant_qs = classification_import.importedalleleinfo_set.filter(matched_variant__isnull=True)
+        # TODO, should we filter on matched_variant__isnull=True, or on status, or not filter at all so we can rematch
+        no_variant_qs = classification_import.importedalleleinfo_set.all()  # .filter(matched_variant__isnull=True)
         for allele_info in no_variant_qs:
             if variant_coordinate := allele_info.variant_coordinate_obj:
                 variant_hash = variant_pk_lookup.add(*variant_coordinate)
@@ -55,7 +56,7 @@ class ClassificationImportProcessVariantsTask(ImportVCFStepTask):
                 allele_info_by_hash[variant_hash] = allele_info
             else:
                 pass
-                # if there's no variant_coordinate, record already knows it's in error
+                # if there's no variant_coordinate, record already knows it's in error, shouldn't have been linked
 
         # # Create a list of variant tuples for classifications that have no variant set
         # no_variant_qs = classification_import.classification_set.filter(variant__isnull=True)
@@ -94,7 +95,7 @@ class ClassificationImportProcessVariantsTask(ImportVCFStepTask):
 
                 # go via the set method so signals can be called
                 if variant:
-                    allele_info.set_variant_and_save(matched_variant=variant, message=validation_message, force_update=True)
+                    allele_info.set_variant_and_save(matched_variant=variant, message=validation_message, force_update=False)
                     # classification.set_variant(variant, validation_message)
                 else:
                     allele_info.set_matching_failed(validation_message)

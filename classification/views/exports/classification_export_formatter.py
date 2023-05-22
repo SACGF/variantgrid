@@ -2,7 +2,7 @@ import zipfile
 from abc import ABC, abstractmethod
 from datetime import datetime
 from io import StringIO
-from typing import Optional, List, Iterator, Tuple, Any, Callable, Iterable, Generator
+from typing import Optional, List, Iterator, Tuple, Any, Callable, Iterable
 
 from django.http import HttpResponse, StreamingHttpResponse
 from django.http.response import HttpResponseBase
@@ -96,7 +96,6 @@ class ClassificationExportFormatter(ABC):
                 return str_buffer.getvalue()
 
             yield next_file()
-
 
     @abstractmethod
     def content_type(self) -> str:

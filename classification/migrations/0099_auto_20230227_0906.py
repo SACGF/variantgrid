@@ -9,8 +9,6 @@ def _has_c_hgvs_validation(apps):
     # We've already done the md5sum into the individual fields
     Classification = apps.get_model("classification", "Classification")
     return Classification.objects.filter(evidence__c_hgvs__validation__isnull=False).exists()
-    for c in Classification.objects.filter(evidence__c_hgvs__validation__isnull=False):
-        c.revalidate()
 
 
 class Migration(migrations.Migration):

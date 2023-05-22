@@ -59,8 +59,7 @@ class TestCloneAnalysisNodes(TestCase):
         VariantTag.objects.create(genome_build=cls.grch37, analysis=cls.analysis,
                                   variant=variant, tag=cls.tag, user=user)
 
-    def _test_clone_node(self, node, full_test=False):
-        """ full_test = check entire query (including parents) not just node """
+    def _test_clone_node(self, node):
         clone = node.save_clone()
         node_arg_q_dict = str(node._get_node_arg_q_dict())
         clone_arg_q_dict = str(clone._get_node_arg_q_dict())

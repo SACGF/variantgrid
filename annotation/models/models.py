@@ -71,7 +71,7 @@ class ClinVarVersion(SubVersionPartition):
     def get_annotation_date_from_filename(filename):
         # file looks like: clinvar_20160302.vcf.gz
         base_name = os.path.basename(filename)
-        # Allow a bit of lee-way as may want to call it eg clinvar_20190708_grch37.vcf.gz
+        # Allow a bit of lee-way as may want to call it e.g. clinvar_20190708_grch37.vcf.gz
         CLINVAR_PATTERN = r"^clinvar_(\d{8}).*\.vcf"
         if m := re.match(CLINVAR_PATTERN, base_name):
             date_time = m.group(1)
@@ -345,7 +345,7 @@ class ColumnVEPField(models.Model):
     def vep_info_field(self):
         """ For VCFs, be sure to set source_field_has_custom_prefix=True
             Annotating with a VCF (short name = TopMed) brings in the DB column as "TopMed" and
-            prefixes INFO fields, eg 'TOPMED' => TopMed_TOPMED.
+            prefixes INFO fields, e.g. 'TOPMED' => TopMed_TOPMED.
             We need to adjust for this in BulkVEPVCFAnnotationInserter """
 
         vif = self.source_field
@@ -490,7 +490,7 @@ class VariantAnnotationVersion(SubVersionPartition):
                     release = "105.20201022"
                     gff_url = f"http://ftp.ncbi.nlm.nih.gov/refseq/H_sapiens/annotation/annotation_releases/{release}/GCF_000001405.25_GRCh37.p13/GCF_000001405.25_GRCh37.p13_genomic.gff.gz"
             elif self.genome_build.name == "GRCh38":
-                if m := re.match("(109.20\d{6}) - GCF_000001405.39_GRCh38.p13_genomic.gff", self.refseq):
+                if m := re.match(r"(109.20\d{6}) - GCF_000001405.39_GRCh38.p13_genomic.gff", self.refseq):
                     release = m.group(1)
                     gff_url = f"http://ftp.ncbi.nlm.nih.gov/refseq/H_sapiens/annotation/annotation_releases/{release}/GCF_000001405.39_GRCh38.p13/GCF_000001405.39_GRCh38.p13_genomic.gff.gz"
                 else:
@@ -516,11 +516,11 @@ class VariantAnnotationVersion(SubVersionPartition):
             # These ones got renamed as the filename wasn't unique
             if self.annotation_consortium == AnnotationConsortium.REFSEQ:
                 if self.genome_build.name == "GRCh37":
-                    if m := re.match("http://ftp.ncbi.nlm.nih.gov/refseq/H_sapiens/annotation/annotation_releases/(105.20\d{6})/GCF_000001405.25_GRCh37.p13/(GCF_000001405.25_GRCh37.p13_genomic).gff.gz", gff_url):
+                    if m := re.match(r"http://ftp.ncbi.nlm.nih.gov/refseq/H_sapiens/annotation/annotation_releases/(105.20\d{6})/GCF_000001405.25_GRCh37.p13/(GCF_000001405.25_GRCh37.p13_genomic).gff.gz", gff_url):
                         name_components = [m.group(2), m.group(1), "gff"]
                 elif self.genome_build.name == "GRCh38":
                     # GCF_000001405.39_GRCh38.p13_genomic.109.20210514.gff.json.gz
-                    if m := re.match("http://ftp.ncbi.nlm.nih.gov/refseq/H_sapiens/annotation/annotation_releases/(109.20\d{6})/GCF_000001405.39_GRCh38.p13/(GCF_000001405.39_GRCh38.p13_genomic).gff.gz", gff_url):
+                    if m := re.match(r"http://ftp.ncbi.nlm.nih.gov/refseq/H_sapiens/annotation/annotation_releases/(109.20\d{6})/GCF_000001405.39_GRCh38.p13/(GCF_000001405.39_GRCh38.p13_genomic).gff.gz", gff_url):
                         name_components = [m.group(2), m.group(1), "gff"]
             name_components.append("json.gz")
 
@@ -691,7 +691,7 @@ class AbstractVariantAnnotation(models.Model):
     mutation_assessor_pred_most_damaging = models.CharField(max_length=1, choices=MutationAssessorPrediction.CHOICES, null=True, blank=True)
     mutation_taster_pred_most_damaging = models.CharField(max_length=1, choices=MutationTasterPrediction.CHOICES, null=True, blank=True)
     polyphen2_hvar_pred_most_damaging = models.CharField(max_length=1, choices=Polyphen2Prediction.CHOICES, null=True, blank=True)
-    # protein_position = text as it can be eg indel: "22-23" or splicing: "?-10" or "10-?"
+    # protein_position = text as it can be e.g. indel: "22-23" or splicing: "?-10" or "10-?"
     protein_position = models.TextField(null=True, blank=True)
     revel_score = models.FloatField(null=True, blank=True)
     sift = models.CharField(max_length=1, choices=SIFTPrediction.CHOICES, null=True, blank=True)
@@ -1066,7 +1066,7 @@ class AnnotationVersionManager(models.Manager):
 
 
 # Use this as a way to keep all the versions together.
-# We re-use this, if nobody has referenced it - as you may eg update
+# We re-use this, if nobody has referenced it - as you may e.g. update
 # variant/gene/clinvar annotations every 6 months etc and no point having so many sub-versions
 class AnnotationVersion(models.Model):
     objects = AnnotationVersionManager()  # Always select_related

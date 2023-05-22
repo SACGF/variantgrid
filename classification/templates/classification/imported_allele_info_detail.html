@@ -13,15 +13,16 @@
     {% endfor %}
     {% endcomment %}
     {% if allele_info.imported_g_hgvs %}
-        {% labelled label="Imported g.HGVS" value_css="text-monospace"  %}{{ allele_info.imported_g_hgvs }}{% endlabelled %}
+        {% labelled label=g_hgvs_label value_css="text-monospace"  %}{{ allele_info.imported_g_hgvs }}{% endlabelled %}
+    {% else %}
+        {% labelled label=c_hgvses.0.identifier value_css="text-monospace" %}{{ c_hgvses.0.html }}{% endlabelled %}
     {% endif %}
-    {% labelled label=c_hgvses.0.identifier value_css="text-monospace" %}{{ c_hgvses.0.html }}{% endlabelled %}
     {% if normalized_diff %}
-        {% labelled label="Normalised Diffs" value_css="text-muted" %}<i class="fa-solid fa-arrows-up-down"></i> {{ normalized_diff|separator:', ' }}{% endlabelled %}
+        {% labelled label="Normalised Diffs" label_css="text-muted" value_css="text-muted" %}<i class="fa-solid fa-arrows-up-down"></i> {{ normalized_diff|separator:', ' }}{% endlabelled %}
     {% endif %}
     {% labelled label=c_hgvses.1.identifier value_css="text-monospace" %}{{ c_hgvses.1.html }}{% endlabelled %}
     {% if liftover_diff %}
-        {% labelled label="Liftover Diffs" value_css="text-muted" %}<i class="fa-solid fa-arrows-up-down"></i> {{ liftover_diff|separator:', ' }}{% endlabelled %}
+        {% labelled label="Liftover Diffs" label_css="text-muted" value_css="text-muted" %}<i class="fa-solid fa-arrows-up-down"></i> {{ liftover_diff|separator:', ' }}{% endlabelled %}
     {% endif %}
     {% labelled label=c_hgvses.2.identifier value_css="text-monospace" %}{{ c_hgvses.2.html }}{% endlabelled %}
     {% labelled label=variant_coordinate_label value_css="text-monospace" %}{{ allele_info.variant_coordinate }}{% endlabelled %}
@@ -47,10 +48,13 @@
     {% labelled label="Can Include in Exports" %}{{ allele_info.latest_validation.include | boolean }} {% admin_link allele_info %}{% endlabelled %}
     {% if allele_info.latest_validation.confirmed %}
         {% labelled label="Manually Confirmed" %}{{ True | boolean }} by {{ allele_info.latest_validation.confirmed_by }}{% endlabelled %}
-        {% labelled label="Confirmed Note" %}{{ allele_info.latest_validation.confirmed_by_note | multi_line_text }}{% endlabelled %}
     {% else %}
         {% labelled label="Manually Confirmed" %}{{ False | boolean }}{% endlabelled %}
     {% endif %}
+    {% if allele_info.latest_validation.confirmed or allele_info.latest_validation.confirmed_by_note %}
+        {% labelled label="Confirmed Note" %}{{ allele_info.latest_validation.confirmed_by_note | multi_line_text }}{% endlabelled %}
+    {% endif %}
+
     {% if allele_info.message %}
         {% labelled label="Note" %}{{ allele_info.message }}{% endlabelled %}
     {% endif %}
@@ -60,7 +64,7 @@
         {% if not on_allele_page %}
             {% labelled label="Allele" %}
                 {% if allele_info.allele %}
-                    <a class="hover-link" href="{{ allele_info.allele.get_absolute_url }}">{{ allele_info.allele }}</a>
+                    {% allele allele_info.allele %}
                 {% else %}<span class="no-value">-</span>{% endif %}
             {% endlabelled %}
         {% endif %}
@@ -78,11 +82,11 @@
         {% endlabelled %}
         {% if not on_allele_page %}
             {% labelled label="Classifications" %}
-                {% for classification in allele_info.classification_set.all %}
+                {% for classification in classifications %}
                     <div>
-                    {% classification_quick classification %}
-                        <div class="flags d-inline-block" style="margin-left:12px" data-flags="{{ classification.flag_collection_id }}">...</div>
+                    {% classification_quick classification mode="compact" %}
                     </div>
+                    {% empty %}<span class="no-value">-</span>
                 {% endfor %}
             {% endlabelled %}
         {% endif %}

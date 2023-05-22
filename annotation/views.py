@@ -242,7 +242,6 @@ def annotation_detail(request):
         "dbnsfp_gene_annotation": dbnsfp_gene_annotation,
         "num_annotation_columns": VariantGridColumn.objects.count(),
         "cached_web_resources": cached_web_resources,
-        "python_command": settings.PYTHON_COMMAND,
         "somalier": somalier,
         "cdot_version": cdot.__version__,
     }

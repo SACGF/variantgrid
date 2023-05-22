@@ -16,7 +16,7 @@ class AnnotationConsortium(models.TextChoices):
             prefix = transcript_accession[:length]
             if prefix in prefixes:
                 return ac
-        raise ValueError(f"Couldn't determine annotation consortium for {transcript_accession}")
+        raise ValueError(f"Couldn't determine annotation consortium for \"{transcript_accession}\"")
 
 
 class HGNCStatus(models.TextChoices):

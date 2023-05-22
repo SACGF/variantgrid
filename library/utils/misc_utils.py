@@ -13,13 +13,13 @@ FLOAT_REGEX = r'([-+]?[0-9]*\.?[0-9]+.|Infinity)'
 
 class DjangoJSONEncoder(JSONEncoder):
 
-    def default(self, obj):
-        if isinstance(obj, QuerySet):
+    def default(self, o):
+        if isinstance(o, QuerySet):
             # `default` must return a python serializable
             # structure, the easiest way is to load the JSON
             # string produced by `serialize` and return it
-            return json.loads(serialize('json', obj))
-        return JSONEncoder.default(self, obj)
+            return json.loads(serialize('json', o))
+        return JSONEncoder.default(self, o)
 
 
 class Struct:
@@ -70,17 +70,6 @@ class ChoicesEnum(Enum):
     @classmethod
     def choices(cls):
         return [(tag.value, tag.name) for tag in cls]
-
-
-def timestamp_as_number_formatter(row: Dict, field: str):
-    """
-    Useful for JQGrids where we want to send down time as a timestamp so we can put it in the user's timezone
-    :param row: JQGrid row object
-    :param field: field to access row (row[field] should be a timestamp)
-    :return: unix time
-    """
-    val = row[field]
-    return val.timestamp() if val else None
 
 
 def count(obj: Any) -> int:

@@ -43,7 +43,7 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument('--replace', action='store_true', help="Replace existing version if exists")
-        parser.add_argument('--dbnsfp-version', required=True, help="dbNSFP version eg '4.3'")
+        parser.add_argument('--dbnsfp-version', required=True, help="dbNSFP version e.g. '4.3'")
         parser.add_argument('dbnsfp_gene_filename')
 
     def handle(self, *args, **options):
@@ -82,7 +82,7 @@ class Command(BaseCommand):
 
     def _import_dbnsfp_gene(self, filename: str, dbnsfp_version):
         records = []
-        df = pd.read_csv(filename, sep='\t', index_col=None)
+        df = pd.read_csv(filename, sep='\t', index_col=None, low_memory=False)
         df = df_nan_to_none(df.replace(".", None))
         gene_symbols = GeneSymbol.get_upper_case_lookup()
         new_gene_symbols = set()

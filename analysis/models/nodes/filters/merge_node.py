@@ -13,9 +13,6 @@ class MergeNode(AnalysisNode):
     min_inputs = 1
     max_inputs = AnalysisNode.PARENT_CAP_NOT_SET
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
     def modifies_parents(self):
         return self._num_unique_parents_in_queryset > 1
 
@@ -66,8 +63,8 @@ class MergeNode(AnalysisNode):
                 extract_arg_q_hash = {None: {combine_q_hash}}
                 MergeNode._remove_arg_q_hash(combine_parent_arg_q_dict, extract_arg_q_hash)
                 combine_q = all_q_by_hash[combine_q_hash]
-                if q := MergeNode._split_common_filters(combine_parent_arg_q_dict):
-                    combine_q &= q
+                if common_q := MergeNode._split_common_filters(combine_parent_arg_q_dict):
+                    combine_q &= common_q
                 or_list.append(combine_q)
 
         for parent in non_combine_parents:

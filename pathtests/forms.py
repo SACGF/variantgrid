@@ -65,7 +65,8 @@ class CreatePathologyTestForm(forms.Form):
         EXCLUSIVE_FIELDS = ['gene_list', 'pathology_test_version']
         field_values = [self.cleaned_data[s] for s in EXCLUSIVE_FIELDS]
         if len(list(filter(is_not_none, field_values))) > 1:
-            raise ValidationError("You must select at most ONE of %s" % ', '.join(EXCLUSIVE_FIELDS))
+            exclusive_fields = ', '.join(EXCLUSIVE_FIELDS)
+            raise ValidationError(f"You must select at most ONE of {exclusive_fields}")
         return cleaned_data
 
 

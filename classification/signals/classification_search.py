@@ -1,37 +1,32 @@
 import operator
 from functools import reduce
-from typing import Any, Union, Optional
+from typing import Optional, List
 
 from django.conf import settings
+from django.contrib.auth.models import User
 from django.db.models import Q
 from django.dispatch import receiver
-from django.utils.safestring import SafeString
 from pyhgvs import HGVSName, InvalidHGVSName
+from threadlocals.threadlocals import get_current_user
 
 from annotation.models import VariantAnnotationVersion
-from classification.enums import SpecialEKeys
-from classification.models import Classification, ClassificationModification, EvidenceKeyMap
-from snpdb.models import Lab, Organization
-from snpdb.search2 import SearchResponseRecordAbstract, search_signal, SearchInput, SearchResponse
+from classification.models import Classification, ClassificationModification, ImportedAlleleInfo
+from library.preview_request import preview_extra_signal, PreviewKeyValue
+from ontology.models import OntologyTerm
+from snpdb.genome_build_manager import GenomeBuildManager
+from snpdb.models import Lab, Organization, Allele, Variant
+from snpdb.search import search_receiver, SearchInputInstance, SearchExample
+from snpdb.user_settings_manager import UserSettingsManager
 
 
-class SearchResponseClassification(SearchResponseRecordAbstract[Classification]):
-
-    @classmethod
-    def search_type(cls) -> str:
-        return "Classification"
-
-    def display(self) -> Union[str, SafeString]:
-        last_published = self.record.last_published_version
-        classification: Classification = self.record
-        clin_sig = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE).\
-            pretty_value(last_published.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)) or 'Unclassified'
-        return f"({clin_sig}) {classification.lab.name} / {classification.lab_record_id}"
-
-
-@receiver(search_signal, sender=SearchInput)
-def search_classifications(sender: Any, search_input: SearchInput, **kwargs) -> SearchResponse:
-    response: SearchResponse[SearchResponseClassification] = SearchResponse(SearchResponseClassification)
+@search_receiver(
+    search_type=Classification,
+    example=SearchExample(
+        note="The lab record ID",
+        examples=["vc1545"]
+    )
+)
+def classification_search(search_input: SearchInputInstance):
 
     search_string = search_input.search_string
     """ Search for LabId which can be either:
@@ -62,6 +57,8 @@ def search_classifications(sender: Any, search_input: SearchInput, **kwargs) -> 
             if lab_qs:
                 filters.append(Q(classification__lab_record_id=lab_record_id) & Q(classification__lab__in=lab_qs))
 
+    # FIXME put this in its own search, or just remove it and the setting
+    # maybe have variants report how many classifcations they have
     # We can also filter for c.HGVS in classifications
     if settings.SEARCH_CLASSIFICATION_HGVS_SUFFIX:
         if search_string.startswith("c.") or search_string.startswith("n."):
@@ -93,7 +90,40 @@ def search_classifications(sender: Any, search_input: SearchInput, **kwargs) -> 
         classification__last_source_id=search_string).values('classification')
 
     # convert from modifications back to Classification so absolute_url returns the editable link
-    qs = Classification.objects.filter(Q(pk__in=cm_ids) | Q(pk__in=cm_source_ids))
-    response.extend(SearchResponseClassification.from_iterable(qs))
+    yield Classification.objects.filter(Q(pk__in=cm_ids) | Q(pk__in=cm_source_ids))
 
-    return response
+
+def _allele_preview_classifications_extra(user: User, obj: Allele) -> List[PreviewKeyValue]:
+    cms = ClassificationModification.latest_for_user(user=user, allele=obj)
+    extras = []
+    if count := cms.count():
+        extras += [PreviewKeyValue.count(Classification, count)]
+    if count:
+        genome_build = GenomeBuildManager.get_current_genome_build()
+        column = ClassificationModification.column_name_for_build(genome_build)
+        # provide the c.HGVS for alleles
+        if c_hgvs := sorted(
+                c_hgvs for c_hgvs in cms.order_by(column).values_list(column, flat=True).distinct().all() if c_hgvs):
+            for hgvs in c_hgvs:
+                extras.append(PreviewKeyValue(f"{genome_build.name}", hgvs, dedicated_row=True))
+
+    return extras
+
+
+@receiver(preview_extra_signal, sender=Allele)
+def allele_preview_classifications_extra(sender, user: User, obj: Allele, **kwargs):
+    return _allele_preview_classifications_extra(user, obj)
+
+
+@receiver(preview_extra_signal, sender=Variant)
+def variant_preview_classifications_extra(sender, user: User, obj: Variant, **kwargs):
+    if allele := obj.allele:
+        return _allele_preview_classifications_extra(user, allele)
+
+
+@receiver(preview_extra_signal, sender=OntologyTerm)
+def ontology_preview_classifications_extra(sender, user: User, obj: OntologyTerm, **kwargs):
+    terms = [{"term_id": obj.pk}]
+    qs = ClassificationModification.latest_for_user(user=user, published=True, exclude_withdrawn=True, classification__condition_resolution__resolved_terms__contains=terms)
+    if num_classifications := qs.count():
+        return [PreviewKeyValue.count(Classification, num_classifications)]

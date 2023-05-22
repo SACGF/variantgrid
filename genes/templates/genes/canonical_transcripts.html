@@ -3,15 +3,6 @@
 
 {% block title %}Canonical Transcripts{% endblock title %}
 
-{% block jsdocumentready %}
-    jQuery.extend($.fn.fmatter , {
-        viewCanonicalTranscriptCollection : function(pk) {
-            const URL = Urls.view_canonical_transcript_collection(pk);
-            return "<a class='grid-link' href='" + URL + "'><div class='grid-link-icon view-details-link'></div></a>";
-        }
-    });
-{% endblock jsdocumentready %}
-
 {% block submenu_page_content %}
     {% page_help page_id='genes/canonical_transcripts_help' title='Canoical Transcripts' %}
 
@@ -19,9 +10,6 @@
         System Default: <a class="hover-link" href="{{ default_ctc.get_absolute_url }}">{{ default_ctc }}</a>
     {% endif %}
 
-    <div id='canonical-transcripts'>
-    {% load jqgrid_tags %}
-    {% jqgrid 'canonical_transcript_collections_grid' 'canonical-transcripts' search=False delete=False %}
-    </div>
+    <table id="canonical-transcripts-datatable" class="sticky-header" data-datatable-responsive="true" data-datatable-url="{% url 'canonical_transcript_collections_datatable' %}"></table>
 
 {% endblock submenu_page_content %}

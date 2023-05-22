@@ -309,7 +309,7 @@ class OntologyMatching:
         if search_text:
             # WARNING, this code is duplicated in condition_text_matching.embedded_ids_check
             matches = db_ref_regexes.search(search_text)
-            detected_any_ids = not not matches
+            detected_any_ids = bool(matches)
             detected_ontology_id = False
             matches = [match for match in matches if match.db in OntologyService.CONDITION_ONTOLOGIES]
 

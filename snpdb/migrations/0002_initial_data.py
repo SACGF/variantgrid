@@ -1075,7 +1075,7 @@ def _create_columns(apps, _schema_editor):
          'annotation_level': 'T',
          'width': None,
          'label': 'Transcript biotype',
-         'description': 'Transcript Biotype eg miRNA, lncRNA, snoRNA etc',
+         'description': 'Transcript Biotype e.g. miRNA, lncRNA, snoRNA etc',
          'model_field': True,
          'queryset_field': True},
         {'grid_column_name': 'transcript_count',
@@ -1131,7 +1131,7 @@ def _create_columns(apps, _schema_editor):
          'annotation_level': 'V',
          'width': None,
          'label': 'Variant class',
-         'description': '<a href="https://asia.ensembl.org/info/genome/variation/prediction/classification.html#classes">Variant Class</a> using Sequence Ontology terms, eg SNV/indel/deletion etc',
+         'description': '<a href="https://asia.ensembl.org/info/genome/variation/prediction/classification.html#classes">Variant Class</a> using Sequence Ontology terms, e.g. SNV/indel/deletion etc',
          'model_field': True,
          'queryset_field': True}
     ]

@@ -295,7 +295,7 @@ def vep_parse_version_line(line):
         value_sep = "="
 
         lexer = shlex(line, posix=True)
-        # need "-" for eg 'ensembl-funcgen' and '.' as they have unquoted versions like: 97.378db18
+        # need "-" for e.g. 'ensembl-funcgen' and '.' as they have unquoted versions like: 97.378db18
         lexer.wordchars += value_sep + "-."
         lexer.whitespace = " "
         vep_version_dict = {"refseq": ""}  # Defaults - refseq won't be populated with Ensembl annotation

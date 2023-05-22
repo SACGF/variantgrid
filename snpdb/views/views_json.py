@@ -42,6 +42,7 @@ def cached_generated_file_check(request, cgf_id):
     return JsonResponse(data)
 
 
+@require_POST
 def create_cohort_genotype(request, cohort_id):
     cohort = Cohort.get_for_user(request.user, cohort_id)
 

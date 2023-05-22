@@ -51,7 +51,7 @@ def create_manual_variants(user, genome_build: GenomeBuild, variants_text: str):
         if entry_type != ManualVariantEntryType.UNKNOWN:
             try:
                 variants_list.extend(get_manual_variant_tuples(mve))
-            except ValueError as ve:
+            except Exception as ve:
                 mve.error_message = f"Error parsing {entry_type}: '{ve}'"
                 mve.save()
 

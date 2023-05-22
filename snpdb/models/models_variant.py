@@ -2,7 +2,7 @@ import logging
 import re
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Optional, Pattern, Tuple, Iterable, Set, Union, Dict, Any
+from typing import Optional, Pattern, Tuple, Iterable, Set, Union, Dict, Any, List
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -22,7 +22,8 @@ from flags.models import FlagCollection, flag_collection_extra_info_signal, Flag
 from flags.models.models import FlagsMixin, FlagTypeContext
 from library.django_utils.django_partition import RelatedModelsPartitionModel
 from library.genomics import format_chrom
-from library.utils import md5sum_str, FormerTuple
+from library.preview_request import PreviewModelMixin, PreviewKeyValue
+from library.utils import md5sum_str, FormerTuple, first
 from snpdb.models import Wiki
 from snpdb.models.models_clingen_allele import ClinGenAllele
 from snpdb.models.models_enums import AlleleConversionTool, AlleleOrigin, ProcessingStatus
@@ -35,12 +36,23 @@ VARIANT_PATTERN = re.compile(r"^(MT|(?:chr)?(?:[XYM]|\d+)):(\d+)[,\s]*([GATC]+)>
 HGVS_UNCLEANED_PATTERN = re.compile(r"(^(N[MC]_|ENST)\d+.*:|[cnmg]\.|[^:]:[cnmg]).*\d+")
 
 
-class Allele(FlagsMixin, models.Model):
+class Allele(FlagsMixin, PreviewModelMixin, models.Model):
     """ Genome build independent - ie GRCh37 and GRCh38 variants for same change point to same allele
         This is generally done via ClinGen Allele Registry, but sometimes that can fail.
         Linked against Variant with VariantAllele below """
 
     clingen_allele = models.OneToOneField(ClinGenAllele, null=True, on_delete=CASCADE)
+
+    @classmethod
+    def preview_icon(cls) -> str:
+        return "fa-solid fa-a p-1 text-light border rounded bg-dark"
+
+    @property
+    def preview(self) -> 'PreviewData':
+        return self.preview_with(
+            identifier=f"Allele ({self.pk})",
+            summary_extra=[PreviewKeyValue("ClinGenAllele ID", str(self.clingen_allele) if self.clingen_allele else "Unknown")]
+        )
 
     def get_absolute_url(self):
         # will show allele if there is one, otherwise go to variant page
@@ -48,6 +60,13 @@ class Allele(FlagsMixin, models.Model):
 
     def flag_type_context(self) -> FlagTypeContext:
         return FlagTypeContext.objects.get(pk="allele")
+
+    @property
+    def compact_str(self):
+        if clingen := self.clingen_allele:
+            return str(clingen)
+        else:
+            return str(self)
 
     @property
     def metrics_logging_key(self):
@@ -203,13 +222,6 @@ class Allele(FlagsMixin, models.Model):
         else:
             return f"Allele {self.pk}"
 
-    def validate(self, liftover_complete=True):
-        """
-        DEPRECATED, done by ImportedAlleleInfo now
-        :param liftover_complete: If False does not check for missing representations
-        """
-        pass
-
 
 @receiver(flag_collection_extra_info_signal, sender=FlagCollection)
 def get_extra_info(flag_infos: FlagInfos, user: User, **kwargs):  # pylint: disable=unused-argument
@@ -309,7 +321,7 @@ class Locus(models.Model):
         return f"{self.chrom}:{self.position} {self.ref}"
 
 
-class Variant(models.Model):
+class Variant(PreviewModelMixin, models.Model):
     """ Variants represent the different alleles at a locus
         Usually 2+ per line in a VCF file (ref + >= 1 alts pointing to the same locus for the row)
         There is only 1 Variant for a given locus/alt per database (handled via insertion queues) """
@@ -320,6 +332,10 @@ class Variant(models.Model):
 
     class Meta:
         unique_together = ("locus", "alt")
+
+    @classmethod
+    def preview_icon(cls) -> str:
+        return "fa-solid fa-v p-1 text-light border rounded bg-dark"
 
     @staticmethod
     def get_chrom_q(chrom):
@@ -350,6 +366,18 @@ class Variant(models.Model):
                                f"{path_to_variant}locus__ref__seq", V(">"),
                                f"{path_to_variant}alt__seq", output_field=TextField())}
         return qs.annotate(**kwargs)
+
+    @staticmethod
+    def validate(genome_build, chrom, position) -> List[str]:
+        errors = []
+        try:
+            contig = genome_build.chrom_contig_mappings[chrom]
+            position = int(position)
+            if not (0 < position < contig.length):
+                errors.append(f"position '{position}' is outside contig '{contig}' length={contig.length}")
+        except KeyError:
+            errors.append(f"Chromsome/contig '{chrom}' not a valid in genome build {genome_build}")
+        return errors
 
     @staticmethod
     def format_tuple(chrom, position, ref, alt, abbreviate=False) -> str:

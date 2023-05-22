@@ -51,9 +51,6 @@ def classification_group_row(group: ClassificationGroup, sub_row: Optional[int] 
         "group": group,
         "row_class": f"cc-{sub_row} collapse" if sub_row else "",
         "sub_index": sub_index,
-        "show_username": settings.VARIANT_CLASSIFICATION_GRID_SHOW_USERNAME,
-        "show_allele_origin": settings.VARIANT_CLASSIFICATION_GRID_SHOW_ORIGIN,
-        "show_specimen_id": settings.VARIANT_CLASSIFICAITON_SHOW_SPECIMEN_ID
     }
 
 
@@ -245,12 +242,12 @@ def clinical_context(context, cc: ClinicalContext, show_link: Optional[bool] = N
 
 
 @register.inclusion_tag("classification/tags/classification_quick.html", takes_context=True)
-def classification_quick(context, vc: Union[Classification, ClassificationModification], show_clinical_grouping=True):
+def classification_quick(context, vc: Union[Classification, ClassificationModification], show_clinical_grouping=True, mode: Optional[str] = "detailed"):
     user = context.request.user
     vcm = vc
     if isinstance(vc, Classification):
         vcm = ClassificationModification.latest_for_user(user=user, classification=vc, published=True, exclude_withdrawn=False).first()
-    return {"vcm": vcm, "show_clinical_grouping": show_clinical_grouping}
+    return {"vcm": vcm, "show_clinical_grouping": show_clinical_grouping, "mode": mode}
 
 
 class ClinicalGrouping:
@@ -376,6 +373,16 @@ def c_hgvs(c_hgvs: Union[CHGVS, ClassificationModification, str], show_genome_bu
     return {"c_hgvs": c_hgvs, "show_genome_build": show_genome_build and c_hgvs.genome_build is not None}
 
 
+@register.inclusion_tag("classification/tags/allele.html")
+def allele(allele: Allele):
+    return {"allele": allele}
+
+
+@register.inclusion_tag("classification/tags/gene_symbol.html")
+def gene_symbol(gene_symbol: GeneSymbol):
+    return {"gene_symbol": gene_symbol}
+
+
 @register.inclusion_tag("classification/tags/classification_row.html", takes_context=True)
 def classification_row(
         context,
@@ -430,7 +437,7 @@ def classification_row(
         "show_clinical_context": show_clinical_context,
         "edit_clinical_context": edit_clinical_context,
         "show_allele_origin": settings.VARIANT_CLASSIFICATION_GRID_SHOW_ORIGIN,
-        "show_specimen_id": settings.VARIANT_CLASSIFICAITON_SHOW_SPECIMEN_ID
+        "show_specimen_id": settings.VARIANT_CLASSIFICATION_SHOW_SPECIMEN_ID
     }
 
 

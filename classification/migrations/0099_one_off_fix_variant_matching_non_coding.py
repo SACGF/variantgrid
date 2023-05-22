@@ -2,15 +2,6 @@
 
 from django.db import migrations
 
-from manual.operations.manual_operations import ManualOperation
-
-
-def _check_has_non_coding_c_hgvs(apps):
-    ResolvedVariantInfo = apps.get_model("classification", "ResolvedVariantInfo")
-    rv_qs = ResolvedVariantInfo.objects.filter(allele_info__imported_c_hgvs__icontains='n.', c_hgvs__icontains='c.')
-    return rv_qs.exists()
-
-
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -18,8 +9,5 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        ManualOperation(
-            task_id=ManualOperation.task_id_manage(["fix_variant_matching", "--non-coding"]),
-            test=_check_has_non_coding_c_hgvs
-        )
+        # This is intentionally blank - redundant with 0101 migration
     ]

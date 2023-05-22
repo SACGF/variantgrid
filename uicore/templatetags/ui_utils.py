@@ -12,7 +12,9 @@ from django.template.base import FilterExpression, kwarg_re
 from django.utils import html
 from django.utils.safestring import SafeString
 
-from library.utils import diff_text
+from library.enums.log_level import LogLevel
+from library.log_utils import log_level_to_bootstrap
+from library.utils import diff_text, html_id_safe
 from snpdb.admin_utils import get_admin_url
 from variantgrid.perm_path import get_visible_url_names
 
@@ -364,25 +366,37 @@ class ModalTag(template.Node):
 def severity_icon(severity: str, title: Optional[str] = None) -> str:
     if not severity:
         severity = 'I'
+
+    classes = ["fas"]
     title_html = ""
     if title:
+        classes.append('hover-detail')
         title_html = f' title="{title}"'
+
     severity = severity.upper()
     if severity.startswith('C'):  # critical
-        return SafeString(f'<i class="fas fa-bomb text-danger"{title_html}></i>')
-    if severity.startswith('E'):  # error
-        return SafeString(f'<i class="fas fa-exclamation-circle text-danger"{title_html}></i>')
-    if severity.startswith('W'):  # warning
-        return SafeString(f'<i class="fas fa-exclamation-triangle text-warning"{title_html}></i>')
-    if severity.startswith('I'):  # info
-        return SafeString(f'<i class="fas fa-info-circle text-info"{title_html}></i>')
-    if severity.startswith('D'):  # debug
-        return SafeString(f'<i class="fas fa-key text-info"{title_html}></i>')
-    if severity.startswith('S'):  # success
-        return SafeString(f'<i class="fas fa-check-circle text-success"{title_html}></i>')
-    # debug
+        classes += ['fa-bomb', 'text-danger']
+    elif severity.startswith('E') or severity == 'DANGER':  # error
+        classes += ['fa-exclamation-circle', 'text-danger']
+    elif severity.startswith('W'):  # warning
+        classes += ['fa-exclamation-triangle', 'text-warning']
+    elif severity.startswith('I'):  # info
+        classes += ['fa-info-circle', 'text-info']
+    elif severity.startswith('D'):  # debug
+        classes += ['fa-key', 'text-info']
+    elif severity.startswith('S'):  # success
+        classes += ['fa-check-circle', 'text-success']
+    else:
+        # not sure what this was meant to be
+        classes += ['fa-question-circle', 'text-secondary']
 
-    return SafeString(f'<i class="fas fa-question-circle text-secondary"{title_html}></i>')
+    class_string = " ".join(class_str for class_str in classes)
+    return SafeString(f'<i class="{class_string}"{title_html}></i>')
+
+
+@register.filter()
+def severity_bs(severity: LogLevel) -> str:
+    return log_level_to_bootstrap(severity)
 
 
 @register.filter()
@@ -594,3 +608,33 @@ def value_with_icon(value: Optional[Any] = None, help: Optional[str] = None, ico
 @register.filter(name='separator')
 def separator(items: Iterable[Any] = None, separator: str = ','):
     return SafeString(separator.join(html.escape(str(x)) for x in items))
+
+
+@register.filter(name='id_safe')
+def id_safe(id: str):
+    return html_id_safe(id)
+
+
+QUOTES_RE = re.compile(r'"(.*?)"')
+
+
+@register.filter(name='enrich')
+def enrich(text: str):
+    """
+    Take some plain text and make it look fancy as HTML. Currently just formats data in double quotes.
+    :param text: The text to be enriched
+    :return: HTML
+    """
+    parts = []
+    is_quotes = False
+    for part in QUOTES_RE.split(text):
+        if part:
+            part = escape(part)
+            part = part.replace("\n", "<br/>")
+
+            if is_quotes:
+                parts.append(f'<span class="quoted">{part}</span>')
+            else:
+                parts.append(part)
+        is_quotes = not is_quotes
+    return SafeString(" ".join(parts))

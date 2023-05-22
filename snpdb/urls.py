@@ -5,6 +5,7 @@ from rest_framework.documentation import include_docs_urls
 from rest_framework.urlpatterns import format_suffix_patterns
 
 from library.django_utils.jqgrid_view import JQGridView
+from library.preview_request import preview_view
 from snpdb.grids import CohortListGrid, CohortSampleListGrid, SamplesListGrid, GenomicIntervalsListGrid, \
     CustomColumnsCollectionColumns, TriosListGrid, VCFListGrid, TagColorsCollectionColumns
 from snpdb.views import views, views_json, views_rest, \
@@ -119,6 +120,9 @@ urlpatterns = [
     perm_path('autocomplete/Username/', views_autocomplete.UsernameAutocompleteView.as_view(), name='username_autocomplete'),
     perm_path('autocomplete/Lab/', views_autocomplete.LabAutocompleteView.as_view(), name='lab_autocomplete'),
     perm_path('autocomplete/VCF/', views_autocomplete.VCFAutocompleteView.as_view(), name='vcf_autocomplete'),
+
+    #Previews
+    perm_path('preview/<str:db>/<str:idx>', preview_view, name='preview_data'),
 
     # Debug dev help
     perm_path('ajax_hello_world/<str:data>', views.ajax_hello_world, name='ajax_hello_world'),

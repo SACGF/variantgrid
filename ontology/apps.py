@@ -14,4 +14,5 @@ class OntologyConfig(AppConfig):
 
         # imported to activate receivers
         from ontology.signals import ontology_health_check  # pylint: disable=unused-import
+        from ontology.signals import ontology_preview  # pylint: disable=unused-import
         # pylint: enable=import-outside-toplevel

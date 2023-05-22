@@ -44,6 +44,7 @@ from library.django_utils.django_partition import RelatedModelsPartitionModel
 from library.guardian_utils import assign_permission_to_user_and_groups, DjangoPermission, admin_bot, \
     add_public_group_read_permission
 from library.log_utils import log_traceback
+from library.preview_request import PreviewData, PreviewModelMixin
 from library.utils import get_single_element, iter_fixed_chunks
 from library.utils.file_utils import mk_path
 from snpdb.models import Wiki, Company, Sample, DataState
@@ -87,7 +88,7 @@ class HGNC(models.Model):
     ensembl_gene_id = models.TextField(null=True, blank=True)
     gene_group_ids = models.TextField(null=True, blank=True)
     gene_groups = models.TextField(null=True, blank=True)
-    # Believe it or not, gene_symbol is not unique - eg MMP21 has multiple entries
+    # Believe it or not, gene_symbol is not unique - e.g. MMP21 has multiple entries
     gene_symbol = models.ForeignKey('GeneSymbol', on_delete=CASCADE)
     hgnc_import = models.ForeignKey(HGNCImport, on_delete=CASCADE)
     location = models.TextField(null=True, blank=True)
@@ -166,7 +167,7 @@ class UniProt(models.Model):
         return self.accession
 
 
-class GeneSymbol(models.Model):
+class GeneSymbol(models.Model, PreviewModelMixin):
     symbol = CITextField(primary_key=True)
 
     @staticmethod
@@ -200,6 +201,14 @@ class GeneSymbol(models.Model):
     @cached_property
     def alias_meta(self) -> 'GeneSymbolAliasesMeta':
         return GeneSymbolAliasesMeta(self)
+
+    @classmethod
+    def preview_icon(cls) -> str:
+        return "fa-solid fa-dna"
+
+    @property
+    def preview(self):
+        return self.preview_with(title="")
 
     def has_different_genes(self, other: 'GeneSymbol') -> bool:
         """
@@ -371,12 +380,30 @@ class GeneAnnotationImport(TimeStampedModel):
         return self.url
 
 
-class Gene(models.Model):
+class Gene(PreviewModelMixin, models.Model):
     """ A stable identifier - build independent - has build specific versions with gene details """
     FAKE_GENE_ID_PREFIX = "unknown_"  # Legacy from when we allowed inserting GenePred w/o GFF3
     identifier = models.TextField(primary_key=True)
     annotation_consortium = models.CharField(max_length=1, choices=AnnotationConsortium.choices)
     summary = models.TextField(null=True, blank=True)  # Only used by RefSeq
+
+    @property
+    def prefixed_identifier(self) -> str:
+        if self.annotation_consortium == AnnotationConsortium.REFSEQ:
+            return f"GeneID:{self.identifier}"
+        else:
+            return self.identifier
+
+    @classmethod
+    def preview_icon(cls) -> str:
+        return "fa-solid fa-dna"
+
+    @property
+    def preview(self) -> 'PreviewData':
+        return self.preview_with(
+            identifier=self.prefixed_identifier,
+            summary=self.summary
+        )
 
     @property
     def is_legacy(self):
@@ -441,12 +468,7 @@ class Gene(models.Model):
         return self.identifier < other.identifier
 
     def __str__(self):
-        if self.annotation_consortium == AnnotationConsortium.REFSEQ:
-            gene_id_summary = f"GeneID:{self.identifier}"
-        else:
-            gene_id_summary = self.identifier
-
-        return f"{gene_id_summary} ({self.get_annotation_consortium_display()})"
+        return f"{self.prefixed_identifier} ({self.get_annotation_consortium_display()})"
 
 
 class GeneVersion(models.Model):
@@ -454,7 +476,7 @@ class GeneVersion(models.Model):
         Genes/TranscriptVersion needs to be able to represent both RefSeq and Ensembl """
     gene = models.ForeignKey(Gene, on_delete=CASCADE)
     version = models.IntegerField()  # RefSeq GeneIDs are always 0 (not versioned) need non-null for unique_together
-    # symbol can be null as Ensembl has genes w/o symbols, eg ENSG00000238009 (lncRNA)
+    # symbol can be null as Ensembl has genes w/o symbols, e.g. ENSG00000238009 (lncRNA)
     gene_symbol = models.ForeignKey(GeneSymbol, null=True, on_delete=CASCADE)
     # HGNC assignment - hgnc_identifier is set from the annotation file
     #                   hgnc (ForeignKey) is linked to our HGNC models
@@ -566,10 +588,14 @@ class GeneVersion(models.Model):
 TranscriptParts = namedtuple('TranscriptParts', ['identifier', 'version'])
 
 
-class Transcript(models.Model):
+class Transcript(models.Model, PreviewModelMixin):
     """ A stable identifier - has versions with actual transcript details """
     identifier = models.TextField(primary_key=True)
     annotation_consortium = models.CharField(max_length=1, choices=AnnotationConsortium.choices)
+
+    @classmethod
+    def preview_icon(cls) -> str:
+        return "fa-solid fa-timeline"
 
     def get_absolute_url(self):
         kwargs = {"transcript_id": self.identifier}
@@ -608,7 +634,7 @@ class Transcript(models.Model):
         return self.identifier
 
 
-class TranscriptVersion(SortByPKMixin, models.Model):
+class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
     """ We store the ID and version separately, ie:
         ENST00000284274.4 => transcript=ENST00000284274, version=4
 
@@ -628,6 +654,16 @@ class TranscriptVersion(SortByPKMixin, models.Model):
     import_source = models.ForeignKey(GeneAnnotationImport, on_delete=CASCADE)
     biotype = models.TextField(null=True)  # Ensembl has gene + transcript biotypes
     data = models.JSONField(null=False, blank=True, default=dict)  # for cdot data
+
+    @classmethod
+    def preview_icon(cls) -> str:
+        return Transcript.preview_icon()
+
+    @property
+    def preview(self) -> PreviewData:
+        return self.preview_with(
+            identifier=f"{self.transcript.identifier}.{self.version}"
+        )
 
     # These are in data.tags
     CANONICAL_SCORES = {
@@ -732,7 +768,7 @@ class TranscriptVersion(SortByPKMixin, models.Model):
     @cached_property
     def gene_symbol(self):
         """ Returns HGNC symbol if available (to keep consistency between builds) or GeneVersion symbol (from GFF)
-            GeneVersion symbol from GFF can diverge eg Entrez GeneID: 6901 - TAZ(37) and TAFAZZIN(38) """
+            GeneVersion symbol from GFF can diverge e.g. Entrez GeneID: 6901 - TAZ(37) and TAFAZZIN(38) """
         if hgnc := self.gene_version.hgnc:
             gene_symbol = hgnc.gene_symbol
         else:
@@ -938,6 +974,10 @@ class TranscriptVersion(SortByPKMixin, models.Model):
     def _sum_intervals(intervals: List[Tuple]):
         return sum(b - a for a, b in intervals)
 
+    @property
+    def genome_build_data(self) -> Dict:
+        return self.data.get("genome_builds", {}).get(self.genome_build.name, {})
+
     @cached_property
     def pyhgvs_data(self):
         transcript_json = self.data.copy()
@@ -999,7 +1039,9 @@ class TranscriptVersion(SortByPKMixin, models.Model):
         """ 'tag' has been in cdot since 0.2.12 """
         REMOVE_TAGS = {"basic"}  # This is on pretty much every Ensembl transcript
         tag_list = []
-        if tag_list_str := self.data.get("tag"):
+        # 'tag' was in the transcript in versions 0.2.12 - 0.2.13
+        # It is inside genome build data after 0.2.14
+        if tag_list_str := self.genome_build_data.get("tag") or self.data.get("tag"):
             tag_list = sorted(tag for tag in tag_list_str.split(",") if tag not in REMOVE_TAGS)
         return tag_list
 
@@ -1232,7 +1274,7 @@ class TranscriptVersionSequenceInfo(TimeStampedModel):
             data = Entrez.efetch(db='nuccore', id=transcript_accession, rettype='gb', retmode='text')
         except HTTPError as e:
             if e.code == 400:
-                raise BadTranscript(f"Bad Transcript: Entrez API reports '{transcript_accession}' not found")
+                raise BadTranscript(f"Bad Transcript: Entrez API reports \"{transcript_accession}\" not found")
             raise e
         api_response = data.read()
         with StringIO(api_response) as f:
@@ -1393,7 +1435,7 @@ class GeneAnnotationRelease(models.Model):
 
         This release can be set on a VariantAnnotationVersion to be able to get genes/transcripts from a VEP build
     """
-    version = models.TextField()  # Needs to support eg "109.20190607"
+    version = models.TextField()  # Needs to support e.g. "109.20190607"
     annotation_consortium = models.CharField(max_length=1, choices=AnnotationConsortium.choices)
     genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)
     gene_annotation_import = models.ForeignKey(GeneAnnotationImport, on_delete=CASCADE)
@@ -1570,7 +1612,7 @@ class GeneListCategory(models.Model):
         return self.name
 
 
-class GeneList(models.Model):
+class GeneList(TimeStampedModel):
     """ Stores a gene/transcript list (to be used as a filter) """
 
     category = models.ForeignKey(GeneListCategory, null=True, blank=True, on_delete=CASCADE)
@@ -1683,6 +1725,10 @@ class GeneList(models.Model):
         name_or_symbol_match = Q(original_name__in=gene_symbol_deletions) | Q(gene_symbol__in=gene_symbol_deletions)
         qs = self.genelistgenesymbol_set.filter(name_or_symbol_match)
         num_deleted = qs.delete()
+
+        if num_added or num_deleted:
+            self.update_modified()
+
         return num_added, num_deleted
 
     @staticmethod
@@ -1721,6 +1767,9 @@ class GeneList(models.Model):
         qs = cls._visible_gene_lists(gene_lists_qs)
         gene_symbol = get_object_or_404(GeneSymbol, pk=gene_symbol)
         return qs.filter(genelistgenesymbol__gene_symbol=gene_symbol)
+
+    def update_modified(self):
+        GeneList.objects.filter(pk=self.pk).update(modified=timezone.now())
 
     def __str__(self):
         return f"{self.name} ({self.genelistgenesymbol_set.count()} x genes)"

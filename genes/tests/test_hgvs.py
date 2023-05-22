@@ -33,7 +33,12 @@ class TestHGVS(TestCase):
             "NM_001754.5(RUNX1):c.1415T>C",
             "NM_032638:c.1126_1133DUP",  # Case
             "NM_001754.5:557T>A",  # Missing "c."
+            "NM_001754.5:c557T>A",  # Missing "."
+            "NM_001754.5(RUNX1):557T>A",  # Has gene, missing "c."
+            "NM_001754.5(RUNX1):c557T>A",  # Has gene, Missing "."
             "NC_000007.13:117199563G>T",  # Missing "g."
+            "NC_000007.13:g117199563G>T",  # Missing "."
+            "NM_000350.2(ABCA4):c-52delC",  # Missing "." with "-"
         ]
 
         for bad_hgvs in BAD_HGVS:
@@ -47,8 +52,8 @@ class TestHGVS(TestCase):
             HGVSName(fixed_hgvs)
 
     def test_fix_gene_transcript(self):
-        swap_warning = "Warning: swapped gene/transcript"
-        uc_warning = "Warning: Upper cased transcript"
+        swap_warning = "Swapped gene/transcript"
+        uc_warning = "Upper cased transcript"
 
         TEST_CASES = [
             ("nm_000059.4:c.316+5G>A", [uc_warning]),

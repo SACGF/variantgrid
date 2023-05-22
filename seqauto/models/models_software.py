@@ -19,13 +19,6 @@ class VariantCaller(SoftwareVersion):
         return reverse('view_variant_caller', kwargs={'pk': self.pk})
 
 
-def get_fake_variant_caller():
-    """ Temp hack - TODO: Write something to extract this from VCF header """
-    variant_caller, _ = VariantCaller.objects.get_or_create(name='fake_variant_caller',
-                                                            version='0.666')
-    return variant_caller
-
-
 class Aligner(SoftwareVersion):
 
     def __str__(self):

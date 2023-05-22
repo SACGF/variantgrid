@@ -605,7 +605,7 @@ class PhenotypeMatcher:
             "widespread eyes": (load_hpo_by_id, 316),
         }
 
-        # People put down eg Waardenburg but there are many different OMIM diseases - we'll put ALL of them
+        # People put down e.g. Waardenburg but there are many different OMIM diseases - we'll put ALL of them
         # Switching to MONDO will help disease families, as it's hierarchial (unlike OMIM)
         ALPORT_SYNDROME = (load_omim_pks_containing_name, "Alport Syndrome")
         CILIARY_DYSKINESIA = (load_omim_pks_containing_name, "Ciliary dyskinesia")

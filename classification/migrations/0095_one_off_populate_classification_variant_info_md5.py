@@ -5,7 +5,7 @@ from django.db import migrations
 from library.utils.hash_utils import md5sum_str
 
 
-def _one_off_populate_classification_variant_info_md5(apps, schema_editor):
+def _one_off_populate_classification_variant_info_md5(apps, _schema_editor):
     ImportedAlleleInfo = apps.get_model("classification", "ImportedAlleleInfo")
 
     # There will only ever be g.HGVS or c.HGVS set - so do them separately

@@ -509,7 +509,14 @@
 
         {% if gene_in_gene_lists %}
             <h4>Gene Lists containing {{ gene_symbol }}</h4>
-            {% jqgrid 'gene_lists_for_gene_symbol_grid' category.name search=False delete=False gene_symbol=gene_symbol.pk %}
+
+            <script>
+                function geneListsDatatableFilter(data) {
+                    data.gene_symbol = "{{ gene_symbol  }}";
+                }
+            </script>
+            <table id="gene-lists-datatable" class="sticky-header" data-datatable-responsive="true" data-datatable-url="{% url 'gene_lists_datatable' %}" data-datatable-data="geneListsDatatableFilter"></table>
+
         {% endif %}
 
         <div id='qc-gene-coverage-graph-container'></div>

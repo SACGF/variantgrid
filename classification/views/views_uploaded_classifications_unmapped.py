@@ -20,6 +20,7 @@ from classification.models.uploaded_classifications_unmapped import UploadedClas
 from classification.tasks.classification_import_map_and_insert_task import ClassificationImportMapInsertTask
 from library.django_utils import get_url_from_view_path
 from library.log_utils import NotificationBuilder, report_exc_info
+from library.utils import empty_to_none
 from snpdb.lab_picker import LabPickerData
 from snpdb.models import Lab
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
@@ -170,8 +171,8 @@ class UploadedClassificationsUnmappedView(View):
 
         context = {"lab_picker": lab_picker}
         selected_lab = lab_picker.selected_lab
-        if selected_lab.upload_location:
-            if server_address := resolve_uploaded_url_to_handle(selected_lab.upload_location):
+        if upload_location := empty_to_none(selected_lab.upload_location):
+            if server_address := resolve_uploaded_url_to_handle(upload_location):
                 existing: Set[FileMeta] = set()
                 for unmapped in UploadedClassificationsUnmapped.objects.filter(lab=selected_lab):
                     if meta := FileMeta.from_unmapped(unmapped):

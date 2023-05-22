@@ -5,7 +5,7 @@ from django.db import migrations
 
 def _default_vcf_source_settings(apps, _schema_editor):
     MIXED = 'M'
-    SOMATIC_ONLY = 'S'  # Eg Tumor/Normal subtraction
+    SOMATIC_ONLY = 'S'  # e.g. Tumor/Normal subtraction
     VCFSourceSettings = apps.get_model("snpdb", "VCFSourceSettings")
 
     VCFSourceSettings.objects.all().delete()  # Delete previous

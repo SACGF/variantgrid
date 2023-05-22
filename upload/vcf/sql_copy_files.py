@@ -27,17 +27,6 @@ GENE_COVERAGE_HEADER = [
 GENE_COVERAGE_CANONICAL_TRANSCRIPT_HEADER = ["canonical_transcript_collection_id"] + GENE_COVERAGE_HEADER
 
 
-def get_database_settings():
-    """ returns host, database_name, user, password """
-
-    db_settings = db.connections.databases['default']
-    host = db_settings['HOST']
-    database_name = db_settings['NAME']
-    user = db_settings['USER']
-    password = db_settings['PASSWORD']
-    return host, database_name, user, password
-
-
 def sql_copy_csv(input_filename, table_name, columns, delimiter=',', quote=None):
     logging.info("sql_copy_csv %s", input_filename)
     with open(input_filename, 'rb') as f:

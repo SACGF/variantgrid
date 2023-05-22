@@ -4,6 +4,7 @@ from django.forms.widgets import HiddenInput
 
 class SearchForm(forms.Form):
     search = forms.CharField(widget=forms.TextInput(attrs={'placeholder': 'Search...'}), required=True)
+    mode = forms.CharField(required=False)
 
     def __init__(self, *args, **kwargs):
         search_allow_blank = kwargs.pop("search_allow_blank", False)

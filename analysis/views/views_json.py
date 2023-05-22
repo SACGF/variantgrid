@@ -107,7 +107,9 @@ def node_create(request, analysis_id, node_type):
     analysis = get_analysis_or_404(request.user, analysis_id, write=True)
 
     node_class = NODE_TYPES_HASH[node_type]
-    node = node_class.objects.create(analysis=analysis)
+    x = 10 + random.random() * 50
+    y = 50 + random.random() * 20
+    node = node_class.objects.create(analysis=analysis, x=x, y=y)
     update_analysis(node.analysis_id)
     return JsonResponse(get_rendering_dict(node))
 

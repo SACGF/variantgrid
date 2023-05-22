@@ -33,6 +33,7 @@ from classification.classification_changes import ClassificationChanges
 from classification.classification_stats import get_grouped_classification_counts, \
     get_classification_counts, get_criteria_counts
 from classification.enums import SubmissionSource, SpecialEKeys
+from classification.forms import ClassificationAlleleOriginForm
 from classification.models import ClassificationAttachment, Classification, \
     ClassificationRef, ClassificationJsonParams, ClassificationConsensus, ClassificationReportTemplate, ReportNames, \
     ConditionResolvedDict, DiscordanceReport
@@ -52,7 +53,7 @@ from library.django_utils import require_superuser, get_url_from_view_path
 from library.log_utils import log_traceback
 from library.utils import delimited_row
 from library.utils.file_utils import rm_if_exists
-from snpdb.forms import SampleChoiceForm, UserSelectForm, LabSelectForm
+from snpdb.forms import SampleChoiceForm, UserSelectForm, LabMultiSelectForm, LabSelectForm
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import Variant, UserSettings, Sample, Lab, Allele
 from snpdb.models.models_genome import GenomeBuild
@@ -150,13 +151,10 @@ def classifications(request):
         "gene_form": GeneSymbolForm(),
         "user_form": UserSelectForm(),
         "lab_form": LabSelectForm(),
+        "allele_origin_form": ClassificationAlleleOriginForm(),
         "labs": Lab.valid_labs_qs(request.user),
         "search_and_classify_form": search_and_classify_form,
         "genome_build": user_settings.default_genome_build,
-        "VARIANT_CLASSIFICATION_GRID_SHOW_USERNAME": settings.VARIANT_CLASSIFICATION_GRID_SHOW_USERNAME,
-        "VARIANT_CLASSIFICATION_GRID_SHOW_ORIGIN": settings.VARIANT_CLASSIFICATION_GRID_SHOW_ORIGIN,
-        "VARIANT_CLASSIFICATION_ID_FILTER": settings.VARIANT_CLASSIFICATION_ID_FILTER,
-        "VARIANT_CLASSIFICATION_REDCAP_EXPORT": settings.VARIANT_CLASSIFICATION_REDCAP_EXPORT,
         "user_settings": user_settings,
     }
     return render(request, 'classification/classifications.html', context)
@@ -582,15 +580,16 @@ class CreateClassificationForVariantView(TemplateView):
         lab, lab_error = UserSettings.get_lab_and_error(self.request.user)
 
         consensus = ClassificationConsensus(variant, self.request.user)
-        return {'variant': variant,
-                "genome_build": genome_build,
-                "form_post_url": self._get_form_post_url(),
-                'variant_sample_autocomplete_form': self._get_sample_form(),
-                "vts": vts,
-                "lab": lab,
-                "lab_error": lab_error,
-                "initially_require_sample": settings.VARIANT_CLASSIFICATION_WEB_FORM_CREATE_INITIALLY_REQUIRE_SAMPLE,
-                "consensus": consensus}
+        return {
+            'variant': variant,
+            "genome_build": genome_build,
+            "form_post_url": self._get_form_post_url(),
+            'variant_sample_autocomplete_form': self._get_sample_form(),
+            "vts": vts,
+            "lab": lab,
+            "lab_error": lab_error,
+            "consensus": consensus
+        }
 
 
 def create_classification_from_hgvs(request, genome_build_name, hgvs_string):

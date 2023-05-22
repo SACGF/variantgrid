@@ -26,9 +26,11 @@ from classification.models import Classification, ClinVarExport, ClinVarAllele, 
     ConditionResolved
 from genes.hgvs import CHGVS
 from library.guardian_utils import admin_bot
+from library.log_utils import report_exc_info
 from ontology.models import OntologyTerm, OntologySnake, OntologyTermRelation
 from snpdb.models import GenomeBuild, Variant, Allele, ClinVarKey
-from variantopedia.search import search_hgvs, SearchResult, ClassifyVariant
+from snpdb.search import SearchInput
+from snpdb.signals.variant_search import search_hgvs
 
 C_HGVS_AND_P_DOT = re.compile(r"^(?P<c_hgvs>.+?)( \((?P<p_hgvs>p[.].+)\))?$")
 
@@ -267,18 +269,21 @@ class ClinVarLegacyRow:
 
         try:
             if c_hgvs_preferred_str := self.c_hgvs_preferred_str:
-                if results := search_hgvs(c_hgvs_preferred_str, user=admin_bot(), genome_build=GenomeBuild.grch38(), variant_qs=Variant.objects.all()):
-                    for result in results:
+                search_input = SearchInput(user=admin_bot(), search_string=c_hgvs_preferred_str, genome_build_preferred=GenomeBuild.grch38())
+                try:
+                    response = search_hgvs(search_input)
+                    for result_entry in response.results:
+                        # FIXME test this
+                        result = result_entry.preview.obj
                         variant: Optional[Variant] = None
-                        if isinstance(result, SearchResult):
-                            result = result.record
                         if isinstance(result, Variant):
                             variant = result
-                        elif isinstance(result, ClassifyVariant):
-                            variant = result.variant
                         if variant:
                             if allele := variant.allele:
                                 allele_to_match_types[allele].add(ClinVarLegacyAlleleMatchType.VARIANT_PREFERRED_VARIANT)
+                except:
+                    report_exc_info()
+                    pass
         except InvalidHGVSName:
             pass
         except NotImplementedError:

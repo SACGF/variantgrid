@@ -110,7 +110,7 @@ def _update_gene_relations_activate(ontology_builder: OntologyBuilder, hgnc_term
                             add_term_if_valid(result.id_fixed)
                             found_term = True
                     if not found_term:
-                        # just look for abandoned 6 digit numbers numbers
+                        # just look for abandoned 6 digit numbers
                         for omim_id in ABANDONED_OMIM_RE.finditer(phenotype_row):
                             add_term_if_valid(f"OMIM:{omim_id.group(1)}")
 

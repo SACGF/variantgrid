@@ -1,4 +1,5 @@
 from django.db import transaction
+
 from analysis.tasks.variant_tag_tasks import variant_tag_created_task, variant_tag_deleted_in_analysis_task, \
     analysis_tag_nodes_set_dirty
 

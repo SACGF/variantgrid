@@ -54,7 +54,7 @@ class BuiltInFilterNode(AnalysisNode):
 
     @staticmethod
     def get_help_text() -> str:
-        return "Built in filters used in node counts eg Impact / OMIM / ClinVar / COSMIC"
+        return "Built in filters used in node counts e.g. Impact / OMIM / ClinVar / COSMIC"
 
     def get_css_classes(self):
         css_classes = super().get_css_classes()

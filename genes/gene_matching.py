@@ -55,10 +55,12 @@ class GeneSymbolMatcher:
             gene_list_gene_symbols.append(GeneListGeneSymbol(gene_list=gene_list,
                                                              original_name=original_name,
                                                              gene_symbol_id=gene_symbol_id,
-                                                             gene_symbol_alias_id=alias_id))
+                                                             gene_symbol_alias_id=alias_id,
+                                                             modification_info=modification_info))
 
         if save:
             GeneListGeneSymbol.objects.bulk_create(gene_list_gene_symbols, ignore_conflicts=True)
+            gene_list.update_modified()
             self._match_symbols_to_genes_in_releases()
 
         return gene_list_gene_symbols
@@ -104,9 +106,7 @@ class ReleaseGeneMatcher:
             genes_dict[symbol_upper].append(gene_id)
         return genes_dict
 
-    @cached_property
-    def aliases_dict(self) -> Dict[str, Dict]:
-        """ Get symbols from other GeneVersions that match genes from our release """
+    def _get_genes_dict(self):
         qs = GeneVersion.objects.filter(gene__in=self.release.get_genes())
         release_symbol = GeneSymbol.objects.filter(geneversion__gene=OuterRef("gene"),
                                                    geneversion__releasegeneversion__release=self.release)
@@ -118,6 +118,12 @@ class ReleaseGeneMatcher:
         for symbol_upper, gene_id, version, genome_build_name in values:
             match_info = f"Gene v{version}/{genome_build_name}"
             genes_dict[symbol_upper][gene_id] = match_info
+        return genes_dict
+
+    @cached_property
+    def aliases_dict(self) -> Dict[str, Dict]:
+        """ Get symbols from other GeneVersions that match genes from our release """
+        genes_dict = self._get_genes_dict()
 
         # Gene Symbol alias
         qs = GeneSymbolAlias.objects.filter(gene_symbol__releasegenesymbol__release=self.release)

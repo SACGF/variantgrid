@@ -11,7 +11,6 @@ from django.urls.base import reverse
 from django.utils import timezone
 from htmlmin.decorators import not_minified_response
 from requests.models import Response
-from rest_framework.request import Request
 from rest_framework.views import APIView
 
 from classification.models import Classification
