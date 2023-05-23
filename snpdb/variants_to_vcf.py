@@ -3,7 +3,7 @@ from typing import Dict
 
 from bgzip import BGZipWriter
 
-from snpdb.models import VCF, Zygosity, Sample
+from snpdb.models import VCF, Zygosity, Sample, Variant
 from snpdb.vcf_export_utils import get_vcf_header_from_contigs, get_vcf_header_lines
 
 
@@ -82,7 +82,9 @@ def vcf_export_to_file(vcf: VCF, exported_vcf_filename, original_qs=None, sample
 
     qs = vcf.get_variant_qs(original_qs)
     ca = vcf.cohort.cohort_genotype_collection.cohortgenotype_alias
-    qs = qs.filter(**{f"{ca}__filters__isnull": True})  # Somalier only uses PASS by default
+    # Restrict to just this build (was returning multiple results due to GRCh37/hg19)
+    qs = qs.filter(locus__contig__genomebuildcontig__genome_build=vcf.genome_build,
+                   **{f"{ca}__filters__isnull": True})  # Somalier only uses PASS by default
     columns = ["id", "locus__contig__name", "locus__position", "locus__ref__seq", "alt__seq",
                f"{ca}__samples_zygosity", f"{ca}__samples_allele_depth",
                f"{ca}__samples_read_depth", f"{ca}__samples_allele_frequency"]
@@ -94,6 +96,7 @@ def vcf_export_to_file(vcf: VCF, exported_vcf_filename, original_qs=None, sample
     vcf_sample_names = [sample_name_func(s) for s, w in zip(samples, sample_whitelist) if w]
     header_lines = get_vcf_header_from_contigs(vcf.genome_build, samples=vcf_sample_names)
     sample_zygosity_count = [Counter() for _ in samples]
+    empty = [None] * len(samples)
 
     with open(exported_vcf_filename, "wb") as raw:
         with BGZipWriter(raw) as f:
@@ -103,17 +106,35 @@ def vcf_export_to_file(vcf: VCF, exported_vcf_filename, original_qs=None, sample
 
             values = qs.values_list(*columns)
             for pk, chrom, position, ref, alt, samples_zygosity, allele_depth, read_depth, allele_frequency in values:
+                if allele_depth is None:
+                    allele_depth = empty
+                if read_depth is None:
+                    read_depth = empty
+                if allele_frequency is None:
+                    allele_frequency = empty
+
                 samples_list = []
                 for i, (z, ad, dp, af) in enumerate(zip(samples_zygosity, allele_depth, read_depth, allele_frequency)):
                     if sample_whitelist[i]:
                         sample_zygosity_count[i][z] += 1
-                        gt = Zygosity.get_genotype(z)
-                        if vcf.allele_frequency_percent:
-                            ref_depth = round(dp * (100 - af) / 100)
+                        if z == Zygosity.UNKNOWN_ZYGOSITY:
+                            sample = "./."
                         else:
-                            ref_depth = round(dp * (1 - af))
-                        ad = f"{ref_depth},{ad}"
-                        sample = ":".join((str(s) for s in (gt, ad, dp)))
+                            gt = Zygosity.get_genotype(z)
+                            if ad is not None:
+                                if dp is not None and af is not None:
+                                    if vcf.allele_frequency_percent:
+                                        ref_depth = round(dp * (100 - af) / 100)
+                                    else:
+                                        ref_depth = round(dp * (1 - af))
+                                else:
+                                    ref_depth = '.'
+                                ad = f"{ref_depth},{ad}"
+                            else:
+                                ad = '.'
+                            if dp is None:
+                                dp = '.'
+                            sample = ":".join((str(s) for s in (gt, ad, dp)))
                         samples_list.append(sample)
 
                 row = [chrom, str(position), str(pk), ref, alt or ref, '.', '.', '.', vcf_format] + samples_list
