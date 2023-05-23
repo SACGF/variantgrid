@@ -10,7 +10,7 @@ from classification.enums import SpecialEKeys
 from classification.models import DiscordanceReport, EvidenceKeyMap
 from review.models import review_detail_signal, Review
 from snpdb.models import Lab
-
+import json
 
 @dataclass(frozen=True)
 class PendingChange:
@@ -46,3 +46,9 @@ def discordance_report_changes_summary(sender, instance: Review, **kwargs):
                 row = t.render(context={"change": change})
                 rows.append(row)
             return SafeString("".join(rows))
+        elif outcome := data.get("outcome"):
+            if outcome == "postpone":
+                return "Outcome has been delayed for a future discussion"
+    else:
+        return "Outcome was not decided"
+    return json.dumps(instance.post_review_data)

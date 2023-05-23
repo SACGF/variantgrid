@@ -32,12 +32,12 @@
             {% for answer in review.answers %}
                 <hr class="dashed" />
                 <div>
-                    <label>{{ answer.question.label }} : <span class="font-weight-bold {% if answer.resolution.value == "R" %}text-success{% else %}text-danger{% endif %}">{{ answer.resolution.label }}</span></label>
-                    <div class="text-secondary">{{ answer.details }}</div>
+                    <label>{{ answer.question.label }} : <span class="font-weight-bold {% if answer.resolution.value == "Y" %}text-success{% else %}text-danger{% endif %}">{{ answer.resolution.label }}</span></label>
+                    <div class="text-secondary">{{ answer.details | enrich }}</div>
                 </div>
             {% endfor %}
         {% endlabelled %}
-        {% if review.post_review_data %}
+        {% if show_outcome %}
             <hr class="dashed" />
             {{ review.post_review_data_formatted }}
         {% endif %}

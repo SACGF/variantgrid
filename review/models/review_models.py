@@ -169,18 +169,14 @@ class Review(TimeStampedModel):
     """
     post_review_data = JSONField(default=dict, blank=True)
 
-    def as_json(self, include_review_data: bool = True, include_post_review_data: bool = False) -> Dict:
-        data = {}  # {"user": self.user.username}
-        if include_review_data:
-            data.update({
-                "reviewing_date": f"{self.review_date:%Y-%m-%d}",
-                "reviewing_labs": [lab.group_name for lab in self.reviewing_labs.all()],
-                "is_complete": self.is_complete,
-                "meeting_meta": self.meeting_meta
-            })
-        if include_post_review_data:
-            data["post_review_data"] = self.post_review_data
-        return data
+    def as_json(self) -> Dict:
+        return {
+            "reviewing_date": f"{self.review_date:%Y-%m-%d}",
+            "reviewing_labs": [lab.group_name for lab in self.reviewing_labs.all()],
+            "is_complete": self.is_complete,
+            "meeting_meta": self.meeting_meta,
+            "post_review_data": self.post_review_data
+        }
 
     def can_view(self, user: User) -> bool:
         source_object = self.reviewing.source_object
@@ -277,10 +273,8 @@ class ReviewableModelMixin(models.Model):
     def reviews_all(self) -> QuerySet[Review]:
         if reviews := self.reviews:
             return reviews.review_set.order_by('-review_date').all()
-
-    def reviews_filtered(self) -> QuerySet[Review]:
-        if reviews := self.reviews_all():
-            return reviews.filter(is_complete=True)
+        else:
+            return Review.objects.none()
 
 
 review_detail_signal = django.dispatch.Signal()

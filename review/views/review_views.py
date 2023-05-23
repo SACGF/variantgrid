@@ -8,7 +8,8 @@ from django.utils import timezone
 
 from library.log_utils import log_admin_change
 from library.utils.django_utils import render_ajax_view
-from review.models import ReviewedObject, Review, ReviewTopic, ReviewQuestion, ReviewMedium, ReviewParticipants
+from review.models import ReviewedObject, Review, ReviewTopic, ReviewQuestion, ReviewMedium, ReviewParticipants, \
+    ReviewableModelMixin
 from review.widgets.multi_lab_selector import MultiChoiceLabField
 from snpdb.models import UserSettings
 from uicore.widgets.describe_difference_widget import DescribeDifferenceField, DescribeDifference
@@ -104,7 +105,7 @@ class ReviewForm(Form):
 
             log_admin_change(
                 obj=self.review,
-                message=self.review.as_json(include_review_data=True, include_post_review_data=False),
+                message=self.review.as_json(),
                 user=review.user
             )
 
@@ -116,13 +117,9 @@ class ReviewForm(Form):
     #     }
 
 
-def new_review(request, reviewed_object_id: int, topic_id: str):
-    reviewed_object = ReviewedObject.objects.get(pk=reviewed_object_id)
+def _handle_review(request, review: Review, reviewing: Optional[ReviewableModelMixin] = None):
 
-    topic = ReviewTopic.objects.get(pk=topic_id)
-    review = reviewed_object.new_review(topic=topic, user=request.user)
     discussion_form: Optional[ReviewForm]
-
     if request.method == "POST":
         discussion_form = ReviewForm(review=review, data=request.POST)
         if discussion_form.is_valid():
@@ -131,39 +128,33 @@ def new_review(request, reviewed_object_id: int, topic_id: str):
 
             return redirect(discussion_form.review.next_step_url())
     else:
-        discussion_form = ReviewForm(review=review, initial={"reviewing_labs": {UserSettings.get_for_user(request.user).default_lab}})
+        initial = {}
+        if not review.pk:
+            initial["reviewing_labs"] = {UserSettings.get_for_user(request.user).default_lab}
+        discussion_form = ReviewForm(review=review, initial=initial)
 
     return render(request, 'review/review.html', {
-        'reviewing': reviewed_object,
+        'reviewing': reviewing if reviewing else review.reviewing,
         'review': review,
         'mode': 'edit',
         'form': discussion_form
     })
+
+
+def new_review(request, reviewed_object_id: int, topic_id: str):
+    reviewed_object = ReviewedObject.objects.get(pk=reviewed_object_id)
+
+    topic = ReviewTopic.objects.get(pk=topic_id)
+    review = reviewed_object.new_review(topic=topic, user=request.user)
+
+    return _handle_review(request=request, review=review, reviewing=reviewed_object)
 
 
 def edit_review(request, review_id: int):
     review = Review.objects.get(pk=review_id)
     review.check_can_view(request.user)
 
-    discussed_object = review.reviewing
-    discussion_form: Optional[ReviewForm]
-
-    if request.method == "POST":
-        discussion_form = ReviewForm(review=review, data=request.POST)
-        if discussion_form.is_valid():
-            review.user = request.user
-            discussion_form.save()
-            messages.add_message(request, level=messages.SUCCESS, message="Review saved successfully")
-            # TODO, redirect if save is successful
-    else:
-        discussion_form = ReviewForm(review=review)
-
-    return render(request, 'review/review.html', {
-        'discussing': discussed_object,
-        'review': review,
-        'mode': 'edit',
-        'form': discussion_form
-    })
+    return _handle_review(request=request, review=review)
 
 
 def view_discussion_detail(request, review_id: int):
@@ -172,5 +163,6 @@ def view_discussion_detail(request, review_id: int):
 
     return render_ajax_view(request, 'review/review_detail.html', {
         "review": review,
-        "show_source_object": request.GET.get("show_source_object") != "false"
+        "show_source_object": request.GET.get("show_source_object") != "false",
+        "show_outcome": request.GET.get("show_outcome") != "false"
     })

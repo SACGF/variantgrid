@@ -275,14 +275,21 @@ class DiscordanceReportTemplateData:
                 return True
         return False
 
+    @cached_property
+    def review(self) -> Review:
+        return self.report.reviews_all().first()
+
 
 def discordance_report_review(request: HttpRequest, discordance_report_id: int) -> HttpResponse:
     data = DiscordanceReportTemplateData(discordance_report_id, user=request.user)
     if not data.is_user_editable:
         raise PermissionDenied("User is not involved with lab that's involved with discordance")
 
-    discussed_object = data.report.reviews_safe
-    return redirect(reverse('start_review', kwargs={"reviewed_object_id": discussed_object.pk, "topic_id": "discordance_report"}))
+    if existing := data.report.reviews_all().first():
+        return redirect(reverse('edit_review', kwargs={"review_id": existing.pk}))
+    else:
+        discussed_object = data.report.reviews_safe
+        return redirect(reverse('start_review', kwargs={"reviewed_object_id": discussed_object.pk, "topic_id": "discordance_report"}))
 
 
 def discordance_report_view(request: HttpRequest, discordance_report_id: int) -> HttpResponse:
@@ -340,7 +347,17 @@ def action_discordance_report_review(request: HttpRequest, review_id: int) -> Ht
             raise PermissionDenied("User is not involved with lab that's involved with discordance")
 
         action = request.POST.get('action')
-        if action == "action":
+        if action == "postpone":
+            review.complete_with_data_and_save({
+                "outcome": "postpone"
+            })
+            log_admin_change(
+                obj=review,
+                message=review.as_json(),
+                user=review.user
+            )
+
+        elif action == "change":
 
             notes = request.POST.get('notes')
             report = data.report
@@ -395,17 +412,19 @@ def action_discordance_report_review(request: HttpRequest, review_id: int) -> Ht
                                 comment="Changed back to original value in Discordance Report action"
                             )
 
-            review.complete_with_data_and_save({"changes": review_data})
+            resolution = request.POST.get("resolution")
+            review.complete_with_data_and_save({
+                "outcome": resolution,
+                "changes": review_data
+            })
             log_admin_change(
                 obj=review,
-                message=review.as_json(include_review_data=False, include_post_review_data=True),
+                message=review.as_json(),
                 user=review.user
             )
 
             # generate fresh to get rid of cached db objects and cached calculations
             data = data.refreshed()
-
-            resolution = request.POST.get("resolution")
             if resolution == "discordant":
                 report.report_closed_by = request.user
                 report.continued_discordance_reason = ContinuedDiscordanceReason.NOT_DEFINED
@@ -417,6 +436,9 @@ def action_discordance_report_review(request: HttpRequest, review_id: int) -> Ht
                 discordance_change_signal.send(DiscordanceReport, discordance_report=data.report, cause="Pending Concordance")
             else:
                 raise ValueError(f"Expected resolution of {resolution} but allele {report.clinical_context.allele_id} is not pending concordance")
+
+        else:
+            raise ValueError(f"Unsupported action \"{action}\"")
 
         return redirect(reverse('discordance_report', kwargs={'discordance_report_id': data.discordance_report_id}))
 

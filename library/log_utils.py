@@ -25,11 +25,11 @@ from library.constants import MINUTE_SECS
 from library.enums.log_level import LogLevel
 
 
-def get_current_logged_in_user():
+def get_current_logged_in_user() -> Optional[User]:
     user: User = get_current_user()
     if user:
         if not user.is_authenticated:
-            user = None
+            return None
     return user
 
 
@@ -65,7 +65,7 @@ def report_event(name: str, request: Request = None, extra_data: Dict = None):
                          severity=LogLevel.INFO)
 
 
-def log_admin_change(obj: Model, message: str, user: Optional[User] = None):
+def log_admin_change(obj: Model, message: Union[str, dict], user: Optional[User] = None):
     """
     Log that an object has been successfully changed.
 
@@ -123,7 +123,7 @@ def report_exc_info(extra_data=None, request=None, report_externally=True):
 class NotificationBuilder:
     # Preference is to use AdminNotificationBuilder or LabNoficationBuilder now
 
-    SLACK_EMOJI_RE = re.compile(r"[:][A-Z_]+[:]", re.IGNORECASE)
+    SLACK_EMOJI_RE = re.compile(r":[A-Z_]+:", re.IGNORECASE)
     DE_P = re.compile(r"<p>(.*?)</p>", re.IGNORECASE | re.DOTALL)
 
     @staticmethod

@@ -78,13 +78,6 @@
                     {% endif %}
                  {% endlabelled %}
                  {% labelled label="Allele" %}<a class="hover-link" href="{% url 'view_allele' data.allele.id %}">{{ data.allele.clingen_allele }}</a>{% endlabelled %}
-                 {% comment %}
-                 {% for va in allele.variant_alleles %}
-                     {% labelled label=va.genome_build %}
-                        <a class="hover-link variant-coordinate" href="{% url 'view_variant' va.variant_id %}">{{ va.variant }}</a>
-                     {% endlabelled %}
-                {% endfor %}
-                {% endcomment %}
                 {% labelled label="c.HGVS "|add:data.genome_build.name %}
                     {% for c_hgvs in data.c_hgvses %}<div>{% c_hgvs c_hgvs %}</div>{% endfor %}
                 {% endlabelled %}
@@ -104,16 +97,6 @@
                 {% if data.report.resolved_text %}
                     {% labelled label="Final Trigger to end Discordance" %}{{ data.report.resolved_text }}{% endlabelled %}
                 {% endif %}
-                {% comment %}
-                {% if data.report.continued_discordance_reason %}
-                    {% labelled label="Reason for Continued Discordance" %}{{ data.report.get_continued_discordance_reason_display }}{% endlabelled %}
-                {% endif %}
-                {% endcomment %}
-                {% comment %}
-                {% labelled label="Notes" %}
-                    {% if data.report.notes %}<nomin><div class="formatted-text">{{ data.report.notes }}</div></nomin>{% else %}<span class="no-value">-</span>{% endif %}
-                {% endlabelled %}
-                {% endcomment %}
              </div>
         </div>
     </div>
@@ -132,11 +115,12 @@
             {% classification_groups nlc.classifications group_utils=data.group_utils title=nlc.reason context_object=report %}
         {% endfor %}
 
-        <h4>Reviews</h4>
-        {% for review in data.report.reviews_filtered %}
-            <div data-toggle="ajax" href="{% url 'review_detail' review.pk %}?show_source_object=false" {% if not forloop.first %}class="mt-4"{% endif %}></div>
-            {% empty %}<div class="no-value">There are no reviews of this Discordance Report</div>
-        {% endfor %}
+        <h4>Review</h4>
+        {% if data.review %}
+            <div data-toggle="ajax" href="{% url 'review_detail' data.review.pk %}?show_source_object=false"></div>
+        {% else %}
+            <div class="no-value">This Discordance Report has not yet been reviewed</div>
+        {% endif %}
 
         {% if data.is_user_editable %}
             {% if data.provide_reopen %}
@@ -152,8 +136,9 @@
             {% elif data.report.resolution is empty %}
                 <h4>Actions</h4>
                 {% if data.is_pending_concordance %}<p class="text-info">There are outstanding pending changes for this discordance. When labs re-submit with the agreed changes the discordance should be resolved. There is likely no need to action this.</p>{% endif %}
-                <a class="btn btn-primary" href="{% url 'discordance_report_review' discordance_report_id=data.report.pk %}">Perform Discordance Review</a>
-
+                <a class="btn btn-primary" href="{% url 'discordance_report_review' discordance_report_id=data.report.pk %}">
+                    {% if data.review %}Continue{% else %}Start{% endif %} Discordance Review
+                </a>
             {% endif %}
         {% endif %}
 

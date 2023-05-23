@@ -8,8 +8,9 @@ from django.db.models import TextChoices
 
 
 class DifferenceResolution(TextChoices):
-    RESOLVED = "R", "Resolved"
-    UNRESOLVED = "U", "Still Outstanding"
+    RESOLVED = "Y", "Resolved"
+    UNRESOLVED = "N", "Not Resolved"
+    UNSURE = "X", "Still Discussing"
 
 
 @dataclass
