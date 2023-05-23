@@ -318,7 +318,14 @@ class ModelAdminBasics(admin.ModelAdmin):
         return {}
 
     def get_form(self, request, obj=None, **kwargs):
-        return super().get_form(request, obj, widgets=self.widget_overrides(), **kwargs)
+        kwarg_widgets = kwargs.pop('widgets', {})
+        overrides = self.widget_overrides()
+        widgets = {}
+        widgets.update(kwarg_widgets)
+        widgets.update(overrides)
+        print(widgets)
+
+        return super().get_form(request, obj, widgets=widgets, **kwargs)
 
 
 class GuardedModelAdminBasics(GuardedModelAdminMixin, ModelAdminBasics):
