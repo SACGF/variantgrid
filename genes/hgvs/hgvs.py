@@ -42,7 +42,6 @@ from snpdb.clingen_allele import get_clingen_allele_from_hgvs, get_clingen_allel
 from snpdb.models import Variant, ClinGenAllele
 from snpdb.models.models_genome import GenomeBuild, Contig
 from snpdb.models.models_variant import VariantCoordinate
-from snpdb.variant_end import get_start_end
 
 
 class CHGVSDiff(enum.Flag):
@@ -575,6 +574,8 @@ class HGVSMatcher:
             'n': self.am.n_to_g,
         }
         var_x = self.hp.parse_hgvs_variant(hgvs_string)
+        ev = ExtrinsicValidator(self.hdp)
+        ev.validate(var_x)  # Validate in transcript range
         if converter := CONVERT_TO_G.get(var_x.type):
             var_x = converter(var_x)
         return var_x
@@ -592,12 +593,8 @@ class HGVSMatcher:
     def _variant_coords_to_hgvs(self, chrom, position, ref, alt, transcript_version=None):
         ac = self.genome_build.convert_chrom_to_contig_name(chrom)
 
-        start, end = get_start_end(position, ref, alt)
-        if ref == '' and alt != '':
-            # insertion
-            end += 1
-        else:
-            start += 1
+        start = position + 1
+        end = start + len(ref)
 
         keep_left_anchor = False
         if not keep_left_anchor:
@@ -606,6 +603,7 @@ class HGVSMatcher:
             if lp > 0:
                 ref = ref[lp:]
                 alt = alt[lp:]
+                print(f"Incrementing start by {lp}")
                 start += lp
 
         var_g = SequenceVariant(ac=ac,
@@ -813,7 +811,7 @@ class HGVSMatcher:
                 hgvs_name.transcript = tv.accession
                 hgvs_string_for_version = hgvs_name.format()
                 if method == self.HGVS_METHOD_BIOCOMMONS:
-                    variant_tuple, matches_reference = self._pyhgvs_get_variant_tuple_and_reference_match(hgvs_string_for_version, tv)
+                    variant_tuple, matches_reference = self._hgvs_get_variant_tuple_and_reference_match(hgvs_string_for_version)
                 elif method == self.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY:
                     if self._clingen_allele_registry_ok(tv.accession):
                         error_message = f"Could not convert '{hgvs_string}' using ClinGenAllele Registry: %s"
@@ -938,7 +936,7 @@ class HGVSMatcher:
                 return self._lrg_variant_to_hgvs(variant, transcript_accession)
 
             hgvs_methods = {}
-            hgvs_name = None
+            hgvs_variant = None
             for transcript_version, method in self.filter_best_transcripts_and_method_by_accession(transcript_accession):
                 hgvs_method = f"{method}: {transcript_version}"
                 hgvs_methods[hgvs_method] = None
@@ -953,18 +951,18 @@ class HGVSMatcher:
                                      f"{transcript_version.accession} contig={transcript_contig} (chrom={transcript_chrom})"
                         raise self.TranscriptContigMismatchError(contig_msg)
 
-                    hgvs_name = self._variant_coords_to_hgvs(chrom, offset, ref, alt, transcript_version)
+                    hgvs_variant = self._variant_coords_to_hgvs(chrom, offset, ref, alt, transcript_version)
                 elif method == self.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY:
                     if self._clingen_allele_registry_ok(transcript_version.accession):
                         error_message = f"Could not convert '{variant}' ({transcript_version}) using {method}: %s"
                         # TODO: We could also use VEP then add reference bases on our HGVSs
                         try:
                             if ca := get_clingen_allele_for_variant(self.genome_build, variant):
-                                if hgvs_name := ca.get_c_hgvs_name(transcript_version.accession):
+                                if hgvs_variant := ca.get_c_hgvs_name(transcript_version.accession):
                                     # Use our latest symbol as ClinGen can be out of date, and this keeps it consistent
                                     # regardless of whether we use PyHGVS or ClinGen to resolve
                                     if gene_symbol := transcript_version.gene_symbol:
-                                        hgvs_name.gene = str(gene_symbol)
+                                        hgvs_variant.gene = str(gene_symbol)
                                     hgvs_method = method
                         except ClinGenAlleleServerException as cga_se:
                             # If it's unknown reference we can just retry with another version, other errors are fatal
@@ -978,11 +976,11 @@ class HGVSMatcher:
                             logging.error(error_message, cgare)
                             hgvs_methods[hgvs_method] = str(cgare)
 
-                if hgvs_name:
+                if hgvs_variant:
                     break
 
             if hgvs_methods:
-                if hgvs_name is None:
+                if hgvs_variant is None:
                     method_and_errors = []
                     for method, errors in hgvs_methods.items():
                         if errors:
@@ -995,12 +993,10 @@ class HGVSMatcher:
                 TranscriptVersion.raise_bad_or_missing_transcript(transcript_accession)
         else:
             # No transcript = Genomic HGVS
-
-            hgvs_name = pyhgvs.variant_to_hgvs_name(chrom, offset, ref, alt, self.genome_build.genome_fasta.fasta,
-                                                    transcript=None, max_allele_length=sys.maxsize)
+            hgvs_variant = self._variant_coords_to_hgvs(chrom, offset, ref, alt)
             hgvs_method = self.HGVS_METHOD_BIOCOMMONS
 
-        return hgvs_name, hgvs_method
+        return hgvs_variant, hgvs_method
 
     def variant_to_hgvs(self, variant: Variant, transcript_name=None,
                         max_ref_length=settings.HGVS_MAX_REF_ALLELE_LENGTH) -> Optional[str]:
@@ -1035,10 +1031,8 @@ class HGVSMatcher:
         if alt_length == 1 and len(ref) == alt_length:
             hgvs_str = self._fast_variant_coordinate_to_g_hgvs(contig.refseq_accession, offset, ref, alt)
         else:
-            hgvs_name = pyhgvs.variant_to_hgvs_name(chrom, offset, ref, alt, self.genome_build.genome_fasta.fasta,
-                                                    transcript=None)
-            hgvs_name.chrom = contig.refseq_accession
-            hgvs_str = hgvs_name.format()
+            hgvs_variant = self._variant_coords_to_hgvs(chrom, offset, ref, alt)
+            hgvs_str = str(hgvs_variant)
         return hgvs_str
 
     def variant_to_c_hgvs_extra(self, variant: Variant, transcript_name: str) -> HGVSNameExtra:

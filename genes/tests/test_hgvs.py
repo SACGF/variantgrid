@@ -96,25 +96,25 @@ class TestHGVS(TestCase):
     def test_sort_transcript_versions(self):
         transcript_version_and_methods = [
             (FakeTranscriptVersion("", 1), HGVSMatcher.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY),
-            (FakeTranscriptVersion("", 1), HGVSMatcher.HGVS_METHOD_PYHGVS),
+            (FakeTranscriptVersion("", 1), HGVSMatcher.HGVS_METHOD_BIOCOMMONS),
             (FakeTranscriptVersion("", 2), HGVSMatcher.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY),
-            (FakeTranscriptVersion("", 2), HGVSMatcher.HGVS_METHOD_PYHGVS),
+            (FakeTranscriptVersion("", 2), HGVSMatcher.HGVS_METHOD_BIOCOMMONS),
             (FakeTranscriptVersion("", 3), HGVSMatcher.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY),
-            (FakeTranscriptVersion("", 3), HGVSMatcher.HGVS_METHOD_PYHGVS),
+            (FakeTranscriptVersion("", 3), HGVSMatcher.HGVS_METHOD_BIOCOMMONS),
             # Missing v4
             (FakeTranscriptVersion("", 4), HGVSMatcher.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY),
             (FakeTranscriptVersion("", 5), HGVSMatcher.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY),
-            (FakeTranscriptVersion("", 5), HGVSMatcher.HGVS_METHOD_PYHGVS),
+            (FakeTranscriptVersion("", 5), HGVSMatcher.HGVS_METHOD_BIOCOMMONS),
             (FakeTranscriptVersion("", 6), HGVSMatcher.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY),
-            (FakeTranscriptVersion("", 6), HGVSMatcher.HGVS_METHOD_PYHGVS),
+            (FakeTranscriptVersion("", 6), HGVSMatcher.HGVS_METHOD_BIOCOMMONS),
         ]
 
         expected_up_then_down = [
-            (FakeTranscriptVersion("", 5), HGVSMatcher.HGVS_METHOD_PYHGVS),
-            (FakeTranscriptVersion("", 6), HGVSMatcher.HGVS_METHOD_PYHGVS),
-            (FakeTranscriptVersion("", 3), HGVSMatcher.HGVS_METHOD_PYHGVS),
-            (FakeTranscriptVersion("", 2), HGVSMatcher.HGVS_METHOD_PYHGVS),
-            (FakeTranscriptVersion("", 1), HGVSMatcher.HGVS_METHOD_PYHGVS),
+            (FakeTranscriptVersion("", 5), HGVSMatcher.HGVS_METHOD_BIOCOMMONS),
+            (FakeTranscriptVersion("", 6), HGVSMatcher.HGVS_METHOD_BIOCOMMONS),
+            (FakeTranscriptVersion("", 3), HGVSMatcher.HGVS_METHOD_BIOCOMMONS),
+            (FakeTranscriptVersion("", 2), HGVSMatcher.HGVS_METHOD_BIOCOMMONS),
+            (FakeTranscriptVersion("", 1), HGVSMatcher.HGVS_METHOD_BIOCOMMONS),
             (FakeTranscriptVersion("", 4), HGVSMatcher.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY),
             (FakeTranscriptVersion("", 5), HGVSMatcher.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY),
             (FakeTranscriptVersion("", 6), HGVSMatcher.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY),
@@ -124,11 +124,11 @@ class TestHGVS(TestCase):
         ]
 
         expected_closest = [
-            (FakeTranscriptVersion("", 5), HGVSMatcher.HGVS_METHOD_PYHGVS),
-            (FakeTranscriptVersion("", 3), HGVSMatcher.HGVS_METHOD_PYHGVS),
-            (FakeTranscriptVersion("", 6), HGVSMatcher.HGVS_METHOD_PYHGVS),
-            (FakeTranscriptVersion("", 2), HGVSMatcher.HGVS_METHOD_PYHGVS),
-            (FakeTranscriptVersion("", 1), HGVSMatcher.HGVS_METHOD_PYHGVS),
+            (FakeTranscriptVersion("", 5), HGVSMatcher.HGVS_METHOD_BIOCOMMONS),
+            (FakeTranscriptVersion("", 3), HGVSMatcher.HGVS_METHOD_BIOCOMMONS),
+            (FakeTranscriptVersion("", 6), HGVSMatcher.HGVS_METHOD_BIOCOMMONS),
+            (FakeTranscriptVersion("", 2), HGVSMatcher.HGVS_METHOD_BIOCOMMONS),
+            (FakeTranscriptVersion("", 1), HGVSMatcher.HGVS_METHOD_BIOCOMMONS),
             (FakeTranscriptVersion("", 4), HGVSMatcher.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY),
             (FakeTranscriptVersion("", 5), HGVSMatcher.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY),
             (FakeTranscriptVersion("", 3), HGVSMatcher.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY),
