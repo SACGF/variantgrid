@@ -32,11 +32,20 @@
 {% if diff_latest or diff_all or download_link or history_link %}
     <div data-toolbar="#{{ table_id }}" class="link-toolbar">
         {% if title %}<label>{{ title }}</label>{% endif %}
-        {% if diff_latest %}
-            <a class="hover-link" href="{% url 'classification_diff' %}?cids={{ diff_latest }}{{ logging_key | safe }}">Show Diff Latest</a>
-        {% endif %}
-        {% if diff_all %}
-            <a class="hover-link" href="{% url 'classification_diff' %}?cids={{ diff_all }}{{ logging_key | safe }}">Show Diff All</a>
+        {% if diff_latest and diff_all %}
+            <div class="d-inline-block">
+                Show Evidence Differences Between
+                (<a class="hover-link" href="{% url 'classification_diff' %}?cids={{ diff_latest }}{{ logging_key | safe }}" title="Some labs have multiple classifications, only compare the latest classification from each lab">Latest Classification per Lab</a>) or
+                (<a class="hover-link" href="{% url 'classification_diff' %}?cids={{ diff_all }}{{ logging_key | safe }}" title="Some labs have multiple classifications, compare every classification. There may be some redundancy">Every Classification</a>)
+            </div>
+        {% else %}
+            {% if diff_latest %}
+                {% comment %}There shouldn't be a secnario where diff_all is True but diff_latest is False{% endcomment %}
+                <a class="hover-link" href="{% url 'classification_diff' %}?cids={{ diff_latest }}{{ logging_key | safe }}">Show Evidence Differences</a>
+            {% endif %}
+            {% if diff_all %}
+                <a class="hover-link" href="{% url 'classification_diff' %}?cids={{ diff_all }}{{ logging_key | safe }}">Show Evidence Differences</a>
+            {% endif %}
         {% endif %}
         {% if download_link %}
             <a class="download-link" href="{{ download_link }}">Download as CSV</a>
