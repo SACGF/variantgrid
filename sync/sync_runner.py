@@ -24,7 +24,7 @@ class SyncRunInstance:
 
     def get_config(self, param: str, mandatory: bool = True):
         value = self.sync_destination.config.get(param)
-        if value is None:
+        if value is None and mandatory:
             raise ValueError(f"Expected SyncDestination config property of {param}")
         return value
 

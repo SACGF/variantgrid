@@ -34,13 +34,23 @@ class AlissaUploadSyncer(SyncRunner):
         if sync_run_instance.max_rows:
             raise ValueError("AlissaUploadSyncer does not support max_rows")
 
-        exclude_group_names = sync_run_instance.get_config("exclude_sources")
+
         excludes = set()
-        for source in exclude_group_names:
-            if "/" in source:
-                excludes.add(Lab.objects.filter(group_name=source).get())
-            else:
-                excludes.add(Organization.objects.filter(group_name=source).get())
+        if exclude_group_names := sync_run_instance.get_config("exclude_sources", mandatory=False):
+            for source in exclude_group_names:
+                if "/" in source:
+                    excludes.add(Lab.objects.filter(group_name=source).get())
+                else:
+                    excludes.add(Organization.objects.filter(group_name=source).get())
+
+        # this will only be used for testing, note that it's mutually exclusive with exclude
+        includes = set()
+        if include_group_names := sync_run_instance.get_config("include_sources", mandatory=False):
+            for source in include_group_names:
+                includes.add(Lab.objects.filter(group_name=source).get())
+
+        if not excludes and not includes:
+            raise ValueError("Either exclude_sources or include_sources must be provided")
 
         genome_build_name = sync_run_instance.get_config("genome_build")
         genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
@@ -59,8 +69,10 @@ class AlissaUploadSyncer(SyncRunner):
                 user=admin_bot(),
                 genome_build=genome_build,
                 exclude_sources=excludes,
+                include_sources=includes,
                 min_share_level=ShareLevel.ALL_USERS,
-                since=since
+                since=since,
+                rows_per_file=100
             ),
             format_details=format_details
         )
