@@ -281,6 +281,11 @@ strong {
 hr {
     width: 100%;
 }
+hr.dashed {
+    border-top-style: dashed;
+    //width: calc(100% - 20px);
+  padding-left: 20px;
+}
 
 // give labels pointers
 label.form-check-label, label[for] {
@@ -887,6 +892,10 @@ table.as_table {
     white-space: pre-wrap;
     word-break: break-word;
 }
+.formatted-text-new-lines {
+  white-space: pre;
+  word-break: break-word;
+}
 
 .code {
     font-family: monospace;
@@ -1370,5 +1379,36 @@ li.help-item {
     content: "\"";
     font-weight: normal;
     opacity: 0.5;
+  }
+}
+
+.preview-icon {
+  opacity: 0.6;
+  margin-right: 2px;
+}
+
+.preview-data {
+  .preview-category {
+    font-weight: 500;
+  }
+  .preview-title {
+    font-weight: 500;
+  }
+  .preview-key-values {
+    font-size: smaller;
+    .preview-key {
+      font-weight: 500;
+    }
+  }
+}
+
+.field-errors {
+  margin-top: 8px;
+  animation: fadeInOpacity ease-out 1s;
+  div {
+    border: 1px solid #fee;
+    background-color: #fee;
+    padding: 8px;
+    border-radius: 4px;
   }
 }

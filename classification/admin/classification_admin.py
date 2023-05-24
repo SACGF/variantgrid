@@ -1,9 +1,10 @@
 import json
-from typing import Set, Union
+from typing import Set, Union, Dict
 
 from django.contrib import admin, messages
 from django.contrib.admin import RelatedFieldListFilter, BooleanFieldListFilter
 from django.db.models import QuerySet, Q
+from django.forms import Widget
 from django.utils import timezone
 
 from annotation.models.models import AnnotationVersion
@@ -493,20 +494,19 @@ class EvidenceKeyAdmin(ModelAdminBasics):
         for key in queryset:
             try:
                 key.validate()
-                good_count = good_count + 1
+                good_count += 1
             except ValueError as ve:
                 self.message_user(request, str(ve), 'error')
 
         self.message_user(request, str(good_count) + " keys passed validation")
 
-    def get_form(self, request, obj=None, **kwargs):
-        return super().get_form(request, obj, widgets={
+    def widget_overrides(self) -> Dict[str, Widget]:
+        return {
             'key': admin.widgets.AdminTextInputWidget(),
             'label': admin.widgets.AdminTextInputWidget(),
             'sub_label': admin.widgets.AdminTextInputWidget(),
-            'see': admin.widgets.AdminURLFieldWidget(),
-            'if_key': admin.widgets.AdminTextInputWidget()
-        }, **kwargs)
+            'see': admin.widgets.AdminURLFieldWidget()
+        }
 
 
 @admin.register(ClassificationReportTemplate)

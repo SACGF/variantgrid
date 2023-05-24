@@ -12,9 +12,26 @@ from variantgrid.views import ContactFormView
 
 admin.autodiscover()
 
-APPS_WITH_URLS = ["analysis", "annotation", "eventlog",
-                  "expression", "flags", "genes", "pathtests", "patients", "pedigree", "ontology",
-                  "sapath", "seqauto", "snpdb", "upload", "classification", "variantopedia", "manual"]
+APPS_WITH_URLS = [
+    "analysis",
+    "annotation",
+    "eventlog",
+    "expression",
+    "flags",
+    "genes",
+    "pathtests",
+    "patients",
+    "pedigree",
+    "ontology",
+    "sapath",
+    "seqauto",
+    "snpdb",
+    "upload",
+    "classification",
+    "variantopedia",
+    "manual",
+    "review"
+]
 
 urlpatterns = [
     path('', views.index),
@@ -54,6 +71,7 @@ if settings.USE_OIDC:
 
 handler404 = views.page_not_found
 handler500 = views.server_error
+
 
 for app_name in APPS_WITH_URLS:
     if apps.is_installed(app_name):

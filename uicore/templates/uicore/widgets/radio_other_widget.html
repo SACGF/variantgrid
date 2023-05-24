@@ -1,0 +1,29 @@
+<div id="{{ widget.name }}-selection">
+    {% for option in widget.options %}
+        <label class="form-check-label checkbox-row py-2 ml-4">
+            <input {% if option.selected %}checked="checked"{% endif %} type="radio" class="form-check-input" name="{{ widget.name }}" value="{{ option.value }}">
+            {{ option.label }}
+        </label>
+    {% endfor %}
+    <label class="form-check-label checkbox-row py-2 ml-4">
+         <input {% if widget.other.selected %}checked="checked"{% endif %} type="radio" class="form-check-input" name="{{ widget.name }}" value="other">
+         {{ widget.other.label }}
+    </label>
+</div>
+<div id="{{ widget.name }}-other" class="{% if not widget.other.selected %}collapse{% endif %}">
+    <input class="form-control" placeholder="Please specify" name="{{ widget.name }}-other" value="{{ widget.other.value }}" />
+</div>
+<script>
+    function other{{ widget.name }}Check() {
+        if ($("[name='{{ widget.name }}']:checked").val() == "other") {
+            $("#{{ widget.name }}-other").show();
+        } else {
+            $("#{{ widget.name }}-other").hide();
+        }
+    }
+    $(() => {
+        $("#{{ widget.name }}-selection .checkbox-row").click(() => {
+            other{{ widget.name }}Check();
+        });
+    });
+</script>

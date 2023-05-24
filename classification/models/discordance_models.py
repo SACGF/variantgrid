@@ -9,6 +9,7 @@ from typing import Set, Optional, List, Dict, Tuple, Any, Iterable
 import django.dispatch
 from django.conf import settings
 from django.contrib.auth.models import User
+from django.core.exceptions import PermissionDenied
 from django.db import models, transaction
 from django.db.models import QuerySet
 from django.db.models.deletion import PROTECT, CASCADE
@@ -23,9 +24,12 @@ from classification.models.classification import ClassificationModification, Cla
 from classification.models.classification_lab_summaries import ClassificationLabSummaryEntry, ClassificationLabSummary
 from classification.models.clinical_context_models import ClinicalContext
 from classification.models.flag_types import classification_flag_types, ClassificationFlagTypes
+from review.models import ReviewableModelMixin, Review
 from flags.models.enums import FlagStatus
 from flags.models.models import FlagComment
 from genes.hgvs import CHGVS
+from library.preview_request import PreviewModelMixin, PreviewKeyValue
+from library.utils import invalidate_cached_property
 from library.django_utils import get_url_from_view_path
 from library.utils import invalidate_cached_property, ExportRow, export_column, ExportDataType
 from snpdb.genome_build_manager import GenomeBuildManager
@@ -41,7 +45,7 @@ class NotifyLevel(str, Enum):
     ALWAYS_NOTIFY = "always-notify"
 
 
-class DiscordanceReport(TimeStampedModel):
+class DiscordanceReport(TimeStampedModel, ReviewableModelMixin, PreviewModelMixin):
 
     resolution = models.TextField(default=DiscordanceReportResolution.ONGOING, choices=DiscordanceReportResolution.CHOICES, max_length=1, null=True, blank=True)
     # TODO remove continued discordane reason, it should be redundant to notes
@@ -59,6 +63,34 @@ class DiscordanceReport(TimeStampedModel):
 
     cause_text = models.TextField(null=False, blank=True, default='')
     resolved_text = models.TextField(null=False, blank=True, default='')
+
+    def preview_category(cls) -> str:
+        return "Discordance Report"
+
+    def preview_icon(cls) -> str:
+        return "fa-solid fa-arrow-down-up-across-line"
+
+    def preview(self) -> 'PreviewData':
+        from classification.models import ImportedAlleleInfo
+        all_chgvs = ImportedAlleleInfo.all_chgvs(self.clinical_context.allele)
+        preferred_genome_build = GenomeBuildManager.get_current_genome_build()
+        desired_builds = [c_hgvs for c_hgvs in all_chgvs if c_hgvs.genome_build == preferred_genome_build]
+        if not desired_builds:
+            desired_builds = all_chgvs
+
+        c_hgvs_key_values = []
+        for c_hgvs in desired_builds:
+            c_hgvs_key_values.append(
+                PreviewKeyValue(key=f"{c_hgvs.genome_build} c.HGVS", value=str(c_hgvs))
+            )
+
+        return self.preview_with(
+            identifier=f"DR_{self.pk}",
+            summary_extra=
+                [PreviewKeyValue(key="Allele", value=f"{self.clinical_context.allele:CA}")] +
+                c_hgvs_key_values +
+                [PreviewKeyValue(key="Status", value=f"{self.get_resolution_display() or 'Discordant'}")]
+        )
 
     class LabInvolvement(int, Enum):
         WITHDRAWN = 1
@@ -173,6 +205,13 @@ class DiscordanceReport(TimeStampedModel):
     def all_actively_involved_labs(self) -> Set[Lab]:
         return {lab for lab, status in self.involved_labs.items() if status == DiscordanceReport.LabInvolvement.ACTIVE}
 
+    @property
+    def reviewing_labs(self) -> Set[Lab]:
+        return self.all_actively_involved_labs
+
+    def post_review_url(self, review: Review) -> str:
+        return reverse('discordance_report_review_action', kwargs={"review_id": review.pk})
+
     @cached_property
     def discordance_report_classifications(self) -> List['DiscordanceReportClassification']:
         return list(self.discordancereportclassification_set.select_related(
@@ -189,6 +228,14 @@ class DiscordanceReport(TimeStampedModel):
             status = DiscordanceReport.LabInvolvement.WITHDRAWN if effective_c.withdrawn else DiscordanceReport.LabInvolvement.ACTIVE
             lab_status[lab] = max(lab_status.get(lab, 0), status)
         return lab_status
+
+    def can_view(self, user: User):
+        return self.user_is_involved(user)
+
+    def check_can_view(self, user):
+        if not self.can_view(user):
+            msg = f"You do not have READ permission to view {self.pk}"
+            raise PermissionDenied(msg)
 
     def user_is_involved(self, user: User) -> bool:
         if user.is_superuser:

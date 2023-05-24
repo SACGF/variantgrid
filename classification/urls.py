@@ -23,7 +23,7 @@ from classification.views.condition_matching_view import condition_matching_view
     ConditionTextColumns, ConditionTextMatchingAPI
 from classification.views.discordance_report_views import discordance_report_view, export_discordance_report, \
     discordance_reports_view, discordance_reports_history_detail, discordance_reports_active_detail, \
-    discordance_reports_download
+    discordance_report_review, action_discordance_report_review, discordance_reports_download
 from classification.views.evidence_keys_view import EvidenceKeysView
 from classification.views.exports.classification_export_formatter_redcap import redcap_data_dictionary
 from classification.views.imported_allele_info_view import view_imported_allele_info, ImportedAlleleInfoColumns, \
@@ -132,10 +132,12 @@ urlpatterns = [
     perm_path('discrodance_reports/<str:lab_id>/download', discordance_reports_download, name='discordance_reports_download'),
     # 'classification' is redundant but there'll be other references to these URLs, so keep the URLs valid
     perm_path('classification/discordance_report/<int:discordance_report_id>', discordance_report_view, name='discordance_report_deprecated'),
+    perm_path('classification/discordance_report/<int:discordance_report_id>/review', discordance_report_review, name='discordance_report_review'),
     perm_path('classification/discordance_report/<int:discordance_report_id>/export', export_discordance_report, name='discordance_export_deprecated'),
 
     perm_path('discordance_report/<int:discordance_report_id>', discordance_report_view, name='discordance_report'),
     perm_path('discordance_report/<int:discordance_report_id>/export', export_discordance_report, name='discordance_export'),
+    perm_path('discordance_report_review_action/<int:review_id>', action_discordance_report_review, name='discordance_report_review_action'),
 
     perm_path('export', classification_export_view.export_view, name='classification_export'),
     perm_path('export_redirect', classification_export_view.export_view_redirector, name='classification_export_redirect'),

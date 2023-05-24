@@ -1,0 +1,217 @@
+{% extends "uicore/page/base.html" %}
+{% load crispy_forms_tags %}
+{% load static %}
+{% load js_tags %}
+{% load classification_tags %}
+{% load ui_tabs_builder %}
+{% load ui_utils %}
+{% load ui_help %}
+{% load ui_menu_bars %}
+{% block title %}Discordance Report{% endblock %}
+{% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
+{% block head %}
+    <script>
+        let clinSigToBuckets = {{ buckets | jsonify }};
+        /*
+        function notesVal() {
+            let notes = $('#notes').val().trim();
+            return notes.length > 0 ? notes : null;
+        }
+        function isConfirmed() {
+            return $('#discordance-confirm').is(':checked');
+        }
+         */
+
+        function isDiscordant() {
+            let usedBuckets = {};
+            let noBuckets = false;
+            $('.clin-sig-change').each((index, elem) => {
+                let bucket = clinSigToBuckets[$(elem).val()];
+                if (bucket) {
+                    usedBuckets[bucket] = true;
+                } else {
+                    noBuckets = true;
+                }
+            });
+            $('#no-bucket').collapse(noBuckets ? 'show' : 'hide');
+            let discordant = Object.keys(usedBuckets).length > 1;
+            let resultingStatusDom = $('#resulting-status');
+            resultingStatusDom.text(discordant ? "Continued Discordance" : "Pending Concordance");
+
+            let resolveButton = $('#resolve-button');
+            let resolution = $('#resolution');
+
+            if (discordant) {
+                resolution.val("discordant");
+                resolveButton.text("Finish: Mark as Continued Discordance");
+                resolveButton.removeClass("btn-primary");
+                resolveButton.addClass("btn-danger");
+                resultingStatusDom.addClass("text-danger");
+                resultingStatusDom.removeClass("text-success");
+            } else {
+                resolution.val("concordant");
+                resolveButton.text("Finish: Mark as Pending Concordance");
+                resolveButton.addClass("btn-primary");
+                resolveButton.removeClass("btn-danger");
+                resultingStatusDom.removeClass("text-danger");
+                resultingStatusDom.addClass("text-success");
+            }
+            // resolveButton.text(discordant ? "Mark as Continued Discordance" : "Mark as Pending Concordance")
+            /*
+            if (isConfirmed() && notesVal()) {
+                resolveButton.removeClass('disabled');
+            } else {
+                resolveButton.addClass('disabled');
+            }
+             */
+        }
+        /*
+        function submitCheck() {
+            let warnings = [];
+            if (notesVal() == null) {
+                warnings.push("Please provide text in the notes field.");
+            }
+            if (!isConfirmed()) {
+                warnings.push("All changes must be marked as agreed upon.");
+            }
+            if (warnings.length > 0) {
+                let warning = warnings.join("\n");
+                window.alert(`Before submitting:\n${warning}`)
+                return false;  // don't submit if checkbox isn't ticked
+            }
+        }
+         */
+        function showFormCheck() {
+            let value = $("input[name='outcome']:checked").val();
+            console.log(value);
+            let allValues = {
+                "#pending-changes": value == "agree",
+                "#postponed-changes": value == "postpone"
+            }
+            Object.entries(allValues).forEach(entry => {
+                let [key, value] = entry;
+                if (value) {
+                    $(key).slideDown();
+                } else {
+                    $(key).slideUp();
+                }
+            })
+        }
+
+        $(document).ready(() => {
+           $('#resolve-form input, #resolve-form select').change(isDiscordant);
+           isDiscordant();
+
+           $("input[name='outcome']").change(showFormCheck);
+           showFormCheck();
+        });
+    </script>
+{% endblock %}
+{% block content %}
+    <div class="container">
+        <h4>Step 2 of 2</h4>
+
+        <div data-toggle="ajax-collapse" href="{% url 'review_detail' review.pk %}?show_outcome=false" title="Review Summary"></div>
+
+        <form method="post" id="resolve-form">
+            <div class="card mt-4">
+                <div class="card-header">Discordance Outcome</div>
+                <div class="card-body">
+                    <p>Please choose one</p>
+                    <div class="form-check">
+                        <label class="form-check-label">
+                            <input type="radio" name="outcome" value="agree" class="form-check-input" />Discussion complete, and re-classifications (if any) have been agreed upon.
+                        </label>
+                    </div>
+                    <div class="text-secondary my-4">-- OR --</div>
+                    <div class="form-check">
+                        <label class="form-check-label">
+                            <input type="radio" name="outcome" value="postpone" class="form-check-input" />Postpone outcome for a future discussion.
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="collapse" id="postponed-changes">
+                <div class="card mt-4">
+                    <div class="card-header">Postpone for Future Discussion</div>
+                    <div class="card-body">
+                        You have agreed to delay any changes at this time, but plan to discuss this discordance again in future.<br/>
+                    </div>
+                    <div class="card-footer">
+                        <button class="btn btn-primary" name="action" value="postpone">Postpone</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="collapse" id="pending-changes">
+                <div class="card mt-4">
+                    <div class="card-header">Agreed Pending Changes</div>
+                    <div class="card-body">
+
+                        <input type="hidden" name="resolution" id="resolution" value="X" />
+                        {% csrf_token %}
+                        <p class="text-secondary">
+                            Select the new clinical significance next to each lab that has agreed to re-classify.<br/>
+                            IMPORTANT: classifications will still need to be re-submitted to {{ site_name }} with these changes.
+                        </p>
+
+                        {% labelled label="Agreed Changes (if any)"%}
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Lab</th>
+                                    <th class="text-center">Current</th>
+                                    <th></th>
+                                    <th>Change To <i class="fa-solid fa-arrow-down text-primary"></i></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for lab_clin_sig in data.lab_clin_sigs %}
+                                    <tr>
+                                        <td>{% lab lab_clin_sig.lab %}{% if lab_clin_sig.count > 1 %} x {{ lab_clin_sig.count }}{% endif %}</td>
+                                        <td class="cs-{{ lab_clin_sig.clin_sig }} text-center">{{ lab_clin_sig.clin_sig | ekey:"clinical_significance" }}</td>
+                                        <td style="vertical-align: middle;"><i class="fas fa-arrow-right"></i></td>
+                                        <td>
+                                            <select class="form-control clin-sig-change" name="{{ lab_clin_sig.lab.pk }}-{{ lab_clin_sig.clin_sig }}">
+                                                {% for clin_sig in data.all_clin_sig_options %}
+                                                    {% if clin_sig.key == lab_clin_sig.pending_clin_sig %}
+                                                        <option value="{{ clin_sig.key }}" selected="selected">
+                                                            {{ clin_sig.label }}
+                                                                {% if clin_sig.key == lab_clin_sig.clin_sig %} : NO CHANGE
+                                                                {% elif clin_sig.key == lab_clin_sig.pending_clin_sig %} : ALREADY PENDING
+                                                                {% endif %}
+                                                        </option>
+                                                    {% else %}
+                                                        <option value="{{ clin_sig.key }}">
+                                                            {{ clin_sig.label }}{% if clin_sig.key == lab_clin_sig.clin_sig %} : NO CHANGE{% endif %}
+                                                        </option>
+                                                    {% endif %}
+                                                {% endfor %}
+                                            </select>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                        {% endlabelled %}
+                        <div id="no-bucket" class="collapse">
+                            <div class="text-info m-4">
+                                {{ 'i'|severity_icon }} The following clinical significances are not used in discordance calculations:
+                                {% for clin_sig in data.bucketless_clin_sig_options %}{% if not forloop.first %}, {% endif %}{{ clin_sig.label }}{% endfor %}
+                            </div>
+                        </div>
+                        {% labelled label="Resulting Status" %}<div id="resulting-status" class="font-weight-bold"></div>{% endlabelled %}
+                        {% comment %}
+                            {% labelled label="Notes*" %}<textarea id="notes" name="notes" class="form-control">{{ data.report.notes }}</textarea>{% endlabelled %}
+                            {% labelled label="" name="confirm" value_css="form-check" %}<label class="form-check-label"><input id="discordance-confirm" class="form-check-input" type="checkbox" />All changes have been agreed upon by the relevant lab(s)</label>{% endlabelled %}
+                        {% endcomment %}
+                    </div>
+                    <div class="card-footer">
+                        <button id="resolve-button" class="btn btn-primary" name="action" value="change">Apply</button>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+{% endblock %}

@@ -1,0 +1,33 @@
+<label class="form-check-label ml-4 w-100">
+    <input type="checkbox"
+           class="form-check-input"
+           name="{{ widget.name }}"
+           data-toggle="collapse"
+           href="#{{ widget.name }}-detail"
+           value="on"
+           {% if widget.value.selected %}checked="checked"{% endif %}
+    >
+    {{ widget.attrs.label }}
+</label>
+{% if widget.attrs.help_text %}
+    <div class="text-secondary">
+        {{ widget.attrs.help_text }}
+    </div>
+{% endif %}
+<div id="{{ widget.name }}-detail" class="mt-4 collapse {% if widget.value.selected %}show{% endif %}">
+    <div class="row">
+        <div class="col-4 text-right" style="margin-top: auto; margin-bottom: auto"><label>Please provide details</label></div>
+        <div class="col-8 vertical-align-center"><textarea class="form-control" name="{{ widget.name }}-details">{{ widget.value.details|default_if_none:'' }}</textarea></div>
+    </div>
+    <div class="row align-center justify-content-center mt-4">
+        <div class="col-4 text-right" style="margin-top: auto; margin-bottom: auto"><label>Was this resolved</label></div>
+        <div class="col-8">
+            <select class="form-control" name="{{ widget.name }}-resolution">
+                <option value="">-</option>
+                <option value="Y" {% if widget.value.resolution == "Y" %}selected="selected"{% endif %}>Yes</option>
+                <option value="N" {% if widget.value.resolution == "N" %}selected="selected"{% endif %}>No</option>
+                <option value="X" {% if widget.value.resolution == "X" %}selected="selected"{% endif %}>Still in Discussion</option>
+            </select>
+        </div>
+    </div>
+</div>

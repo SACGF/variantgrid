@@ -13,8 +13,9 @@ django-amazon-ses==4.0.1
 django_autocomplete_light==3.9.1
 django-avatar==7.0.0
 django_cache_memoize==0.1.10
-django-compressor==4.0
-django_crispy_forms==1.14.0
+django-compressor==4.3.1
+django_crispy_forms==2.0
+crispy-bootstrap4==2022.1
 django_dag==1.4.3
 django_datetime_utc==1.0.3
 django_debug_toolbar==3.2.4
@@ -33,7 +34,7 @@ django_termsandconditions==2.0.9
 django-reversion-compare==0.15.0
 djangorestframework==3.14.0
 easy_thumbnails==2.8.1
-fontawesomefree==6.2.0
+fontawesomefree==6.4.0
 git+https://github.com/davmlaw/django-json-widget#egg=django_json_widget
 git+https://github.com/davmlaw/django-jfu#egg=django-jfu
 git+https://github.com/davmlaw/django-messages/#egg=django-messages

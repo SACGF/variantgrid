@@ -219,6 +219,11 @@ hr {
   width: 100%;
 }
 
+hr.dashed {
+  border-top-style: dashed;
+  padding-left: 20px;
+}
+
 label.form-check-label, label[for] {
   cursor: pointer;
 }
@@ -807,6 +812,11 @@ table.as_table td {
   word-break: break-word;
 }
 
+.formatted-text-new-lines {
+  white-space: pre;
+  word-break: break-word;
+}
+
 .code {
   font-family: monospace;
   color: #444;
@@ -1324,6 +1334,35 @@ li.help-item :last-child {
   content: "\"";
   font-weight: normal;
   opacity: 0.5;
+}
+
+.preview-icon {
+  opacity: 0.6;
+  margin-right: 2px;
+}
+
+.preview-data .preview-category {
+  font-weight: 500;
+}
+.preview-data .preview-title {
+  font-weight: 500;
+}
+.preview-data .preview-key-values {
+  font-size: smaller;
+}
+.preview-data .preview-key-values .preview-key {
+  font-weight: 500;
+}
+
+.field-errors {
+  margin-top: 8px;
+  animation: fadeInOpacity ease-out 1s;
+}
+.field-errors div {
+  border: 1px solid #fee;
+  background-color: #fee;
+  padding: 8px;
+  border-radius: 4px;
 }
 
 /*# sourceMappingURL=global_bs.css.map */

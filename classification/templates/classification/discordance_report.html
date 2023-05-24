@@ -11,91 +11,48 @@
 {% block submenu %}{% menu_bar_classifications %}{% endblock submenu %}
 {% block head %}
 <script>
-    let clinSigToBuckets = {{ buckets | jsonify }};
-
-    function notesVal() {
-        let notes = $('#notes').val().trim();
-        return notes.length > 0 ? notes : null;
-    }
-    function isConfirmed() {
-        return $('#discordance-confirm').is(':checked');
-    }
-
-    function isDiscordant() {
-        let usedBuckets = {};
-        let noBuckets = false;
-        $('.clin-sig-change').each((index, elem) => {
-            let bucket = clinSigToBuckets[$(elem).val()];
-            if (bucket) {
-                usedBuckets[bucket] = true;
-            } else {
-                noBuckets = true;
-            }
-        });
-        $('#no-bucket').collapse(noBuckets ? 'show' : 'hide');
-        let discordant = Object.keys(usedBuckets).length > 1;
-        let resultingStatusDom = $('#resulting-status');
-        resultingStatusDom.text(discordant ? "Continued Discordance" : "Pending Concordance");
-
-        let resolveButton = $('#resolve-button');
-        let resolution = $('#resolution');
-
-        if (discordant) {
-            resolution.val("discordant");
-            resolveButton.text("Mark as Continued Discordance");
-            resolveButton.removeClass("btn-primary");
-            resolveButton.addClass("btn-danger");
-            resultingStatusDom.addClass("text-danger");
-            resultingStatusDom.removeClass("text-success");
-        } else {
-            resolution.val("concordant");
-            resolveButton.text("Mark as Pending Concordance");
-            resolveButton.addClass("btn-primary");
-            resolveButton.removeClass("btn-danger");
-            resultingStatusDom.removeClass("text-danger");
-            resultingStatusDom.addClass("text-success");
-        }
-        resolveButton.text(discordant ? "Mark as Continued Discordance" : "Mark as Pending Concordance")
-
-        if (isConfirmed() && notesVal()) {
-            resolveButton.removeClass('disabled');
-        } else {
-            resolveButton.addClass('disabled');
-        }
-    }
-
-    function submitCheck() {
-        let warnings = [];
-        if (notesVal() == null) {
-            warnings.push("Please provide text in the notes field.");
-        }
-        if (!isConfirmed()) {
-            warnings.push("All changes must be marked as agreed upon.");
-        }
-        if (warnings.length > 0) {
-            let warning = warnings.join("\n");
-            window.alert(`Before submitting:\n${warning}`)
-            return false;  // don't submit if checkbox isn't ticked
-        }
-    }
-
     function reopenWarning() {
-        return window.confirm("This will re-open this Discordance, with the intent of having the involved labs discuss and come to a consensus. Are you sure you wish to re-open?");
+        return window.confirm("This will re-open this Discordance, with the intent of having the involved labs re-discuss and come to a consensus. Are you sure you wish to re-open?");
     }
-
-    $(document).ready(() => {
-       $('#resolve-form input, #resolve-form select').change(isDiscordant);
-       isDiscordant();
-    });
 </script>
 {% endblock %}
 {% block content %}
     <div class="container">
-        {% page_help title="Discordance Report" page_id='classification/discordance_report_help' %}
+        {% page_help_embedded title="Resolving Discordances" %}
+            <h4>What is Discordance?</h4>
+            <p>A discordance is reported when two or more classifications for the same allele fall into two or more of the following categories:
+            <ul>
+            <li>{% clinical_significance_inline "B" %}, {% clinical_significance_inline "LB" %}</li>
+                <li>{% clinical_significance_inline "VUS" %}</li>
+                <li>{% clinical_significance_inline "LP" %}, {% clinical_significance_inline "P" %}</li>
+                </ul>
+            For example, Benign and Likely Benign are considered concordant, whereas VUS and Likely Pathogenic are considered discordant.
+            </p>
+
+            <h4>Steps to Concordance</h4>
+            <p>
+                <b>Internal Review</b> - Perform an internal review of your lab's classification(s). If you determine that you need to change any of your data, please do so in your interpretation system and the changes will be reflected in
+                {{ site_name }} when they sync next. If the review will take some time, you can raise an Internal Review flag to indicate that the review is taking place.
+            </p>
+            <p>
+                <b>Discordance Discussion</b> - Compare your classification with those from other labs using the Show Diffs button.<br/>
+            Review any outstanding suggestions against your lab's classification. Raise the suggestion flag on other classifications if you believe that evidence from other labs requires discussion.
+            </p>
+            <h4>Other Resolutions</h4>
+            <p>
+            A discordance report can also be closed when one of the following happen.
+            </p>
+            <p>
+                <b>Withdrawn</b> - If a conflicting classification is withdrawn it will no longer be considered in the discordance calculation.
+            </p>
+            <p>
+                <b>Continued Discordance</b> - This can be raised if the labs cannot agree on how to reach concordance. By selecting this option, the discordance report will be closed until new information is available.
+            </p>
+        {% end_page_help_embedded %}
 
          <div class="card">
             <div class="card-header">
-                <h5>Discordance (DR_{{ data.report.id }}) {% admin_link data.report %}</h5>
+                <h5>Discordance Report (<i class="{{ data.report.preview.icon }} preview-icon"></i> DR_{{ data.report.id }}) {% admin_link data.report %}</h5>
             </div>
              <div class="card-body">
                  {% labelled label="Resolution" %}
@@ -121,13 +78,6 @@
                     {% endif %}
                  {% endlabelled %}
                  {% labelled label="Allele" %}<a class="hover-link" href="{% url 'view_allele' data.allele.id %}">{{ data.allele.clingen_allele }}</a>{% endlabelled %}
-                 {% comment %}
-                 {% for va in allele.variant_alleles %}
-                     {% labelled label=va.genome_build %}
-                        <a class="hover-link variant-coordinate" href="{% url 'view_variant' va.variant_id %}">{{ va.variant }}</a>
-                     {% endlabelled %}
-                {% endfor %}
-                {% endcomment %}
                 {% labelled label="c.HGVS "|add:data.genome_build.name %}
                     {% for c_hgvs in data.c_hgvses %}<div>{% c_hgvs c_hgvs %}</div>{% endfor %}
                 {% endlabelled %}
@@ -147,14 +97,6 @@
                 {% if data.report.resolved_text %}
                     {% labelled label="Final Trigger to end Discordance" %}{{ data.report.resolved_text }}{% endlabelled %}
                 {% endif %}
-                {% comment %}
-                {% if data.report.continued_discordance_reason %}
-                    {% labelled label="Reason for Continued Discordance" %}{{ data.report.get_continued_discordance_reason_display }}{% endlabelled %}
-                {% endif %}
-                {% endcomment %}
-                {% labelled label="Notes" %}
-                    {% if data.report.notes %}<nomin><div class="formatted-text">{{ data.report.notes }}</div></nomin>{% else %}<span class="no-value">-</span>{% endif %}
-                {% endlabelled %}
              </div>
         </div>
     </div>
@@ -173,6 +115,13 @@
             {% classification_groups nlc.classifications group_utils=data.group_utils title=nlc.reason context_object=report %}
         {% endfor %}
 
+        <h4>Review</h4>
+        {% if data.review %}
+            <div data-toggle="ajax" href="{% url 'review_detail' data.review.pk %}?show_source_object=false"></div>
+        {% else %}
+            <div class="no-value">This Discordance Report has not yet been reviewed</div>
+        {% endif %}
+
         {% if data.is_user_editable %}
             {% if data.provide_reopen %}
                 <h4>Actions</h4>
@@ -187,75 +136,9 @@
             {% elif data.report.resolution is empty %}
                 <h4>Actions</h4>
                 {% if data.is_pending_concordance %}<p class="text-info">There are outstanding pending changes for this discordance. When labs re-submit with the agreed changes the discordance should be resolved. There is likely no need to action this.</p>{% endif %}
-                {% modal label="Action Discordance" show_prefix=False button=True %}
-                    <form method="post" id="resolve-form">
-                        <div class="modal-body">
-                            <input type="hidden" name="action" value="action" />
-                            <input type="hidden" name="resolution" id="resolution" value="X" />
-                            {% csrf_token %}
-                            <div class="m-4">
-                                <p>{{ 'I' | severity_icon }} Use this dialog during or after a discussion with the other involved labs. If changes to classifications are agreed upon, they all need to be entered here at the same time.</p>
-                                <h5>{{ data.resolve_label }}</h5>
-                                <p class="text-info">
-                                    Upon discussing this discordance with all relevant labs, if labs agree to re-classify, select the new clinical significance next to that lab.<br/>
-                                    IMPORTANT: classifications will still need to be re-submitted to {{ site_name }} with these changes.
-                                </p>
-
-                                {% labelled label="Agreed Changes (if any)"%}
-                                <table class="table">
-                                    <thead>
-                                        <tr>
-                                            <th>Lab</th>
-                                            <th>Current</th>
-                                            <th></th>
-                                            <th>Change To</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {% for lab_clin_sig in data.lab_clin_sigs %}
-                                            <tr>
-                                                <td>{% lab lab_clin_sig.lab %}{% if lab_clin_sig.count > 1 %} x {{ lab_clin_sig.count }}{% endif %}</td>
-                                                <td class="cs-{{ lab_clin_sig.clin_sig }} text-center">{{ lab_clin_sig.clin_sig | ekey:"clinical_significance" }}</td>
-                                                <td style="vertical-align: middle;"><i class="fas fa-arrow-right"></i></td>
-                                                <td>
-                                                    <select class="form-control clin-sig-change" name="{{ lab_clin_sig.lab.pk }}-{{ lab_clin_sig.clin_sig }}">
-                                                        {% for clin_sig in data.all_clin_sig_options %}
-                                                            {% if clin_sig.key == lab_clin_sig.pending_clin_sig %}
-                                                                <option value="{{ clin_sig.key }}" selected="selected">
-                                                                    {{ clin_sig.label }}
-                                                                        {% if clin_sig.key == lab_clin_sig.clin_sig %} : NO CHANGE
-                                                                        {% elif clin_sig.key == lab_clin_sig.pending_clin_sig %} : ALREADY PENDING
-                                                                        {% endif %}
-                                                                </option>
-                                                            {% else %}
-                                                                <option value="{{ clin_sig.key }}">
-                                                                    {{ clin_sig.label }}{% if clin_sig.key == lab_clin_sig.clin_sig %} : NO CHANGE{% endif %}
-                                                                </option>
-                                                            {% endif %}
-                                                        {% endfor %}
-                                                    </select>
-                                                </td>
-                                            </tr>
-                                        {% endfor %}
-                                    </tbody>
-                                </table>
-                                {% endlabelled %}
-                                <div id="no-bucket" class="collapse">
-                                    <div class="text-info m-4">
-                                        {{ 'i'|severity_icon }} The following clinical significances are not used in discordance calculations:
-                                        {% for clin_sig in data.bucketless_clin_sig_options %}{% if not forloop.first %}, {% endif %}{{ clin_sig.label }}{% endfor %}
-                                    </div>
-                                </div>
-                                {% labelled label="Resulting Status" %}<div id="resulting-status" class="font-weight-bold"></div>{% endlabelled %}
-                                {% labelled label="Notes*" %}<textarea id="notes" name="notes" class="form-control">{{ data.report.notes }}</textarea>{% endlabelled %}
-                                {% labelled label="" name="confirm" value_css="form-check" %}<label class="form-check-label"><input id="discordance-confirm" class="form-check-input" type="checkbox" />All changes have been agreed upon by the relevant lab(s)</label>{% endlabelled %}
-                            </div>
-                        </div>
-                        <div class="modal-footer">
-                            <button id="resolve-button" class="btn btn-primary" onclick="return submitCheck()">Apply</button>
-                        </div>
-                    </form>
-                {% endmodal %}
+                <a class="btn btn-primary" href="{% url 'discordance_report_review' discordance_report_id=data.report.pk %}">
+                    {% if data.review %}Continue{% else %}Start{% endif %} Discordance Review
+                </a>
             {% endif %}
         {% endif %}
 
