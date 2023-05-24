@@ -56,6 +56,12 @@ class UploadedClassificationsUnmappedValidationRow(ExportRow):
 
 
 class UploadedClassificationsUnmapped(TimeStampedModel):
+
+    """
+    Used to keep track of a file from a curation system, uploaded to Shariant.
+    The intent being that the file will then have to be mapped by an external system.
+    """
+
     class Meta:
         verbose_name = "Classification upload file"
 

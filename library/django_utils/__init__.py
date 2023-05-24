@@ -6,6 +6,7 @@ from typing import List, Tuple, Dict
 
 import nameparser
 from dateutil import parser
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
 from django.core.exceptions import PermissionDenied, ValidationError, ObjectDoesNotExist
@@ -17,6 +18,7 @@ from django.db.models.query_utils import Q
 from django.urls.base import reverse_lazy
 from django.utils import timezone
 from django.utils.timezone import localtime
+from redis import Redis
 from threadlocals.threadlocals import get_current_request
 
 from library.utils import invert_dict
@@ -26,6 +28,7 @@ def get_url_from_view_path(view_path):
     if request := get_current_request():
         return request.build_absolute_uri(view_path)
 
+    # dirty fallback if we don't have a request
     from django.contrib.sites.models import Site
     current_site = Site.objects.get_current()
     protocol = 'http'
@@ -142,6 +145,11 @@ def get_field_counts(qs, field):
 
 
 staff_only = partial(staff_member_required, login_url=reverse_lazy('staff_only'))
+
+
+def get_redis(**kwargs):
+    port = kwargs.pop("port", settings.REDIS_PORT)
+    return Redis(port=port, decode_responses=True, **kwargs)
 
 
 def get_lower_choice(choices, value):

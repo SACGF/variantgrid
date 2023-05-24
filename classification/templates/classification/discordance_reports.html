@@ -21,6 +21,8 @@
 
         {% lab_picker dlab.lab_picker %}
 
+        <a href="{% url 'discordance_reports_download' dlab.lab_picker.selection %}" class="download-link">Download Discordance Reports</a>
+
         <div data-toggle="ajax" href="{% url 'discordance_reports_active_detail' dlab.lab_picker.selection %}" data-id="active-discordances">
             <div class="loading-message">Loading Discordances</div>
         </div>

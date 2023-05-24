@@ -8,7 +8,8 @@ EstablishedType = TypeVar("EstablishedType", bound=Hashable)
 
 class ConsolidatingMerger(Generic[EstablishedType, CandidateType]):
     """
-    Lets you combine old-candidates with new candidates
+    Used for picking a classification candidate out of multiple options.
+    Currently only used for picking a record (out of potentially many) to upload to ClinVar
     """
 
     def __init__(self):

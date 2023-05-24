@@ -128,8 +128,13 @@ class ClassificationExportFormatter(ABC):
             if next_rows := source.peek(default=False):
                 next_rows_count = len(next_rows)
                 # code somewhat assumes header count = 1
-                if not this_entry_row_count == 0 and this_entry_row_count + next_rows_count >= self.classification_filter.rows_per_file:
-                    break
+
+                # if we have a rows per file limit and we're not on row 0 (don't want to get stuck in a scenario where
+                # we have infinite files with 0 rows due to some weird configuration)
+                if self.classification_filter.rows_per_file and not this_entry_row_count == 0:
+                    # make sure our existing data, plus the next round of data wont exceed the row limit
+                    if this_entry_row_count + next_rows_count >= self.classification_filter.rows_per_file:
+                        break
                 # now that we're sure we want the rows, call next (which will give us the same data)
                 # and progress the iterator
                 next(source)

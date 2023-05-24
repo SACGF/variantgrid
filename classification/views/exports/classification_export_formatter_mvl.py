@@ -28,14 +28,6 @@ class FormatDetailsMVLFileFormat(str, Enum):
     JSON = "json"
 
 
-@dataclass
-class MVLJSONExtra:
-    username: str = "bcm"
-    mvl_id: int = 1
-    curated: bool = True
-    import_option: str = "MIRROR"
-
-
 class FormatDetailsMVL:
     """
     Object to track how specific Alissa instance wants to format data.
@@ -59,7 +51,6 @@ class FormatDetailsMVL:
         self.conflict_strategy = ConflictStrategy.MOST_PATHOGENIC
         self.is_shell = False
         self.format: FormatDetailsMVLFileFormat = FormatDetailsMVLFileFormat.TSV
-        self.mvl_json_extra: MVLJSONExtra = MVLJSONExtra()
 
     RAW_SCORE = {
         'B': 1,
@@ -370,16 +361,7 @@ class ClassificationExportFormatterMVL(ClassificationExportFormatter):
                 return str(obj).replace("\n", "").replace("\"", "")
 
             # can't juse simple JSON because we don't want to close this off yet
-            mvl_json_extra = self.format_details.mvl_json_extra
-            return [
-f"""{{
-    "username": "{make_json_safe(mvl_json_extra.username)}",
-    "mvlId": {mvl_json_extra.mvl_id},
-    "curated": {make_json_safe(mvl_json_extra.curated)},
-    "importOption": "{make_json_safe(mvl_json_extra.import_option)}",
-    "molecularVariants": [
-"""
-            ]
+            return ['{"molecularVariants":[']
         else:
             raise ValueError(f"Unexpected file format {self.format_details.format}")
 
