@@ -334,7 +334,6 @@ class ClassificationExportFormatterMVL(ClassificationExportFormatter):
     def __init__(self, classification_filter: ClassificationFilter, format_details: FormatDetailsMVL):
         self.format_details = format_details
         self.grouping_utils = ClassificationGroupUtils()
-        self.first_row = True
         super().__init__(classification_filter=classification_filter)
 
     @property
@@ -365,6 +364,13 @@ class ClassificationExportFormatterMVL(ClassificationExportFormatter):
         else:
             raise ValueError(f"Unexpected file format {self.format_details.format}")
 
+    @property
+    def delimiter_for_row(self):
+        if self.file_format == FormatDetailsMVLFileFormat.JSON:
+            return ","
+        else:
+            return ""
+
     def footer(self) -> List[str]:
         if self.file_format == FormatDetailsMVLFileFormat.JSON:
             return ["]}"]
@@ -386,9 +392,6 @@ class ClassificationExportFormatterMVL(ClassificationExportFormatter):
                 categories={"format": "tsv"}
             ))
         elif self.file_format == FormatDetailsMVLFileFormat.JSON:
-            # FIXME this will break if split over multiple files
-            # and can't even reset first_row in header, due to streaming data pre-generating and peeking as a call
-            # to row() can produce multiple rows that should be grouped (so order of header and row aren't guarenteed)
             output: List[str] = []
             for c_data in c_datas:
                 export_row = MVLCHGVSData(
@@ -397,10 +400,6 @@ class ClassificationExportFormatterMVL(ClassificationExportFormatter):
                     self.grouping_utils
                 )
                 row_json = json.dumps(MVLEntry(export_row).to_json(categories={"format": "json"}))
-                if not self.first_row:
-                    row_json = f",{row_json}"
-                self.first_row = False
-                row_json = f"\t\t{row_json}"
                 output.append(row_json)
             return output
 

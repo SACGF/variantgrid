@@ -29,6 +29,10 @@ class ClassificationExportFormatter(ABC):
         self.started = datetime.utcnow()
 
     @property
+    def delimiter_for_row(self):
+        return ""
+
+    @property
     def is_genome_build_relevant(self) -> bool:
         return True
 
@@ -121,12 +125,22 @@ class ClassificationExportFormatter(ABC):
             yield header
 
         this_entry_row_count = 0
+
+        is_first_row = True
         while True:
             # peek the next entry to see if it's big enough that we should split the file
             # if it's not too big (or if we've reached the end where False will be returned)
             # then add the footer and this iteration is done
             if next_rows := source.peek(default=False):
-                next_rows_count = len(next_rows)
+                use_rows = []
+                for row in next_rows:
+                    if not is_first_row:
+                        row = f"{self.delimiter_for_row}{row}"
+                    else:
+                        is_first_row = False
+                    use_rows.append(row)
+
+                next_rows_count = len(use_rows)
                 # code somewhat assumes header count = 1
 
                 # if we have a rows per file limit and we're not on row 0 (don't want to get stuck in a scenario where
@@ -141,7 +155,7 @@ class ClassificationExportFormatter(ABC):
 
                 this_entry_row_count += next_rows_count
                 self.row_count += next_rows_count
-                yield next_rows
+                yield use_rows
             else:
                 break
 
