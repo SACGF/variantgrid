@@ -212,6 +212,8 @@ def view_imported_allele_info_detail(request: HttpRequest, allele_info_id: int):
     FALLBACK_HGVS = re.compile("(?P<all>.*)")
 
     use_text = allele_info.imported_c_hgvs or (allele_info.grch37.c_hgvs if allele_info.grch37 else None) or (allele_info.grch38.c_hgvs if allele_info.grch38 else None)
+    if not use_text:
+        use_text = ""
 
     use_regex = FALLBACK_HGVS
     regex_attempt_order = [HGVS_REGEX_REF_ALT, HGVS_REGEX_DEL_INS, HGVS_REGEX_SIMPLE_OP, HGVS_REGEX_BASIC]
