@@ -4,10 +4,10 @@ from django.contrib import admin, messages
 from django.contrib.admin import RelatedFieldListFilter
 from django.db.models import QuerySet
 
-from snpdb.admin_utils import ModelAdminBasics, admin_action
+from snpdb.admin_utils import ModelAdminBasics, admin_action, admin_list_column
 from sync.models import SyncRun, ClassificationModificationSyncRecord
 from sync.models.models import SyncDestination
-from sync.shariant import VariantGridUploadSyncer
+import json
 
 
 @admin.register(SyncDestination)
@@ -65,11 +65,17 @@ class SyncDestinationAdmin(ModelAdminBasics):
 
 @admin.register(SyncRun)
 class SyncRunAdmin(ModelAdminBasics):
-    list_display = ('id', 'destination', 'created', 'status', 'meta')
+    list_display = ('id', 'destination', 'created', 'status', 'meta_short')
     list_filter = (('destination', RelatedFieldListFilter),)
 
     def has_add_permission(self, request):
         return False
+
+    @admin_list_column(short_description="Meta", limit=100)
+    def meta_short(self, obj: SyncRun):
+        if meta := obj.meta:
+            return json.dumps(meta)
+        return ""
 
 
 @admin.register(ClassificationModificationSyncRecord)

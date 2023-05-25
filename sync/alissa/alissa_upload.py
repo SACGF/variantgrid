@@ -10,7 +10,7 @@ from classification.views.exports.classification_export_formatter_mvl import For
     FormatDetailsMVLFileFormat
 from library.constants import MINUTE_SECS
 from library.guardian_utils import admin_bot
-from library.log_utils import report_message
+from library.log_utils import report_message, AdminNotificationBuilder, report_exc_info
 from snpdb.models import Lab, GenomeBuild, Organization
 from sync.sync_runner import SyncRunner, register_sync_runner, SyncRunInstance
 import json
@@ -96,15 +96,12 @@ class AlissaUploadSyncer(SyncRunner):
         import_option = AlissaImportOption.MIRROR if sync_run_instance.full_sync else AlissaImportOption.CONTRIBUTE
         response_jsons = []
 
+        total_failed = 0
+        total_differs = 0
+        total_imported = 0
         for file in exporter.serve_in_memory():
             if exporter.row_count > 0:
-                json_data = dict()
-                try:
-                    json_data = json.loads(file)
-                except JSONDecodeError:
-                    print("Error parsing")
-                    print(file)
-                    print()
+                json_data = json.loads(file)
 
                 uploaded_any_rows = True
                 sync_run_instance.run_start()
@@ -121,22 +118,41 @@ class AlissaUploadSyncer(SyncRunner):
                     timeout=MINUTE_SECS,
                 )
                 response.raise_for_status()
+
                 try:
+                    total_failed += int(response_json.get("numberFailed"))
+                    total_differs += int(response_json.get("numberDiffers"))
+                    total_imported += int(response_json.get("numberImported"))
+
                     if response_json := response.json():
                         response_jsons.append(response_json)
                         if response_error := response_json.get("error"):
-                            report_message(f"Error uploading \"{sync_run_instance.sync_destination.name}\" to Alissa: \"{response_error}\"", level='error')
+                            notify = AdminNotificationBuilder(message="Error Uploading")
+                            notify.add_field("Sync Destination", sync_run_instance.name)
+                            notify.add_field("Error", response_error)
+                            notify.send()
                         elif numberFailed := int(response_json.get("numberFailed")):
                             if numberFailed > 0:
-                                report_message(f"{numberFailed} failure(s) uploading \"{sync_run_instance.sync_destination.name}\"", level='warning')
+                                notify = AdminNotificationBuilder(message="Error Uploading")
+                                notify.add_field("Sync Destination", sync_run_instance.name)
+                                notify.add_field("Failures", numberFailed)
+                                for failure in response.json.get("failures")[0:10]:
+                                    notify.add_markdown(failure[0:100])
+                                if numberFailed > 10:
+                                    notify.add_markdown("And more")
+                                notify.send()
                 except:
+                    report_exc_info()
                     pass
 
         sync_run_instance.run_completed(
             had_records=uploaded_any_rows,
             meta={
                 "server_date": exporter.classification_filter.last_modified_header,
-                "rows_uploaded": exporter.row_count,
+                "rows_sent": exporter.row_count,
+                "total_failed": total_failed,
+                "total_differs": total_differs,
+                "total_imported": total_imported,
                 "responses": response_jsons
             }
         )
