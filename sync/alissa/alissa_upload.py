@@ -10,6 +10,7 @@ from classification.views.exports.classification_export_formatter_mvl import For
     FormatDetailsMVLFileFormat
 from library.constants import MINUTE_SECS
 from library.guardian_utils import admin_bot
+from library.log_utils import report_message
 from snpdb.models import Lab, GenomeBuild, Organization
 from sync.sync_runner import SyncRunner, register_sync_runner, SyncRunInstance
 import json
@@ -114,6 +115,11 @@ class AlissaUploadSyncer(SyncRunner):
                 try:
                     if response_json := response.json():
                         response_jsons.append(response_json)
+                        if response_error := response_json.get("error"):
+                            report_message(f"Error uploading \"{sync_run_instance.sync_destination.name}\" to Alissa: \"{response_error}\"", level='error')
+                        elif numberFailed := int(response_json.get("numberFailed")):
+                            if numberFailed > 0:
+                                report_message(f"{numberFailed} failure(s) uploading \"{sync_run_instance.sync_destination.name}\"", level='warning')
                 except:
                     pass
 
