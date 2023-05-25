@@ -14,7 +14,6 @@ from classification.views.exports.classification_export_formatter import Classif
 class ClassificationExportFormatterJSON(ClassificationExportFormatter):
 
     def __init__(self, classification_filter: ClassificationFilter):
-        self.first_row = True
         super().__init__(classification_filter=classification_filter)
 
     @classmethod
@@ -31,6 +30,10 @@ class ClassificationExportFormatterJSON(ClassificationExportFormatter):
                                         strip_complicated=True,
                                         include_messages=False)
 
+    @property
+    def delimiter_for_row(self):
+        return ","
+
     def header(self) -> List[str]:
         return ['{"records":[']
 
@@ -38,10 +41,6 @@ class ClassificationExportFormatterJSON(ClassificationExportFormatter):
         rows = []
         for ci in allele_data.all_cms:
             if row := self.to_row(ci.classification, withdrawn=ci.withdrawn):
-                if not self.first_row:
-                    row = f",{row}"
-                else:
-                    self.first_row = False
                 rows.append(row)
         return rows
 

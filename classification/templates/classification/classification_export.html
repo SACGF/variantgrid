@@ -36,6 +36,11 @@
 
         params.type = format;
 
+        let rowsPerFile = $("#rows_per_file").val();
+        if (rowsPerFile.length) {
+            params.rows_per_file = rowsPerFile;
+        }
+
         if (format === 'mvl') {
             let mvlFileFormat = $("input[name='mvl_file_format']:checked").val();
             if (mvlFileFormat) {
@@ -59,11 +64,6 @@
             if (detailLevelChecked.length) {
                 params.mvl_detail = detailLevelChecked.val();
             }
-            let rowsPerFile = $("#rows_per_file").val();
-            if (rowsPerFile.length) {
-                params.rows_per_file = rowsPerFile;
-            }
-
         } else if (format === 'vcf') {
             let encoding = $("input[name='encoding']:checked").val();
             params.encoding = encoding;
@@ -242,7 +242,12 @@
         <p class="text-muted">Filters to single Allele ID, if the export otherwise wouldn't include this allele
         the export will be blank.</p>
     {% endlabelled %}
-
+    {% labelled label="Rows Per File" %}
+        <input class="form-control" id="rows_per_file" type="number" value="" placeholder="10,000 for MVL, unlimited for other formats"/>
+        <span class="text-muted">Various versions of Alissa and other systems limit how many rows can be in an individual file.<br/>
+        Providing a value for this field will result in a zip file with each entry in the zip not having more than this number of rows.<br/>
+        Min value of 100, set to 0 to force a single file for MVLs.</span>
+    {% endlabelled %}
     {% labelled label="Organistion Exclusion" %}
         {% for org in orgs %}
             <div class="form-check">
@@ -341,11 +346,6 @@
         {% labelled label="MVL Grouping" %}
             MVLs will have one row per transcript-variant combination.<br/>
             If there are multiple classifications for a transcript-variant pair then the details of those will be in the report abstract section for that row.
-        {% endlabelled %}
-        {% labelled label="Rows Per File" %}
-            <input class="form-control" id="rows_per_file" type="number" value="10000" />
-            <span class="text-muted">Various versions of Alissa limit how many rows can be in an individual MVL file<br/>
-            Minimum value is 100, but can set to 0 to have it all in a single file.</span>
         {% endlabelled %}
         {% labelled label="MVL File Format" admin_only=True %}
             <div class="form-check">

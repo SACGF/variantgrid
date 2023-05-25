@@ -1,5 +1,6 @@
 import zipfile
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from datetime import datetime
 from io import StringIO
 from typing import Optional, List, Iterator, Tuple, Any, Callable, Iterable
@@ -15,6 +16,12 @@ from classification.views.exports.classification_export_filter import AlleleData
 from library.guardian_utils import bot_group
 from library.log_utils import NotificationBuilder, report_exc_info
 from snpdb.models import GenomeBuild
+
+
+@dataclass(frozen=True)
+class ClassificationExportExtraData:
+    filename_part: str
+    content: str
 
 
 class ClassificationExportFormatter(ABC):
@@ -131,7 +138,8 @@ class ClassificationExportFormatter(ABC):
             # peek the next entry to see if it's big enough that we should split the file
             # if it's not too big (or if we've reached the end where False will be returned)
             # then add the footer and this iteration is done
-            if next_rows := source.peek(default=False):
+            next_rows = source.peek(default=None)
+            if next_rows is not None:
                 use_rows = []
                 for row in next_rows:
                     if not is_first_row:
@@ -192,10 +200,9 @@ class ClassificationExportFormatter(ABC):
     def _non_streaming_zip(self) -> HttpResponse:
         response = HttpResponse(content_type='application/zip')
         with zipfile.ZipFile(response, 'w') as zf:
-            data_peek = self._peekable_data()
 
             data_peek = self._peekable_data()
-            while data_peek.peek(default=False):
+            while data_peek.peek(default=None) is not None:
                 self.file_count += 1
 
                 def next_file() -> str:
@@ -206,6 +213,11 @@ class ClassificationExportFormatter(ABC):
                     return str_buffer.getvalue()
 
                 zf.writestr(self.filename(part=self.file_count), next_file())
+
+            if extra := self.extra_data(as_individual_file=True):
+                str_buffer = StringIO()
+                str_buffer.write(extra.content)
+                zf.writestr(self.filename(part=extra.filename_part), str_buffer.getvalue())
 
         response['Last-Modified'] = self.classification_filter.last_modified_header
         response['Content-Disposition'] = f'attachment; filename="{self.filename(extension_override="zip")}"'
@@ -228,6 +240,10 @@ class ClassificationExportFormatter(ABC):
 
             for footer in self.with_new_lines(self.footer()):
                 yield footer
+
+            if extra_data := self.extra_data(as_individual_file=False):
+                yield extra_data.content
+
         except:
             report_exc_info()
             yield "An error occurred generating the file"
@@ -259,8 +275,11 @@ class ClassificationExportFormatter(ABC):
 
     def row_generator(self) -> Iterable[List[str]]:
         for allele_data in self.classification_filter.allele_data_filtered_pre_processed(self.batch_pre_cache()):
-            if rows := self.row(allele_data):
+            rows = self.row(allele_data)
+            if rows:
                 yield self.with_new_lines(rows)
+            else:
+                yield rows  # could be an empty list instead of None, in which case we want to keep on going
 
     @abstractmethod
     def row(self, allele_data: AlleleData) -> List[str]:
@@ -276,6 +295,9 @@ class ClassificationExportFormatter(ABC):
         :return: A list of rows to be \n at the bottom of each file
         """
         return []
+
+    def extra_data(self, as_individual_file: bool = False) -> Optional[ClassificationExportExtraData]:
+        return None
 
     def send_stats(self):
         """

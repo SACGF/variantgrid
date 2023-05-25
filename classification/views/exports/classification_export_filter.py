@@ -319,6 +319,8 @@ class ClassificationFilter:
                     rows_per_file = 100
             except:
                 pass
+        elif request.query_params.get("type") == "mvl":
+            rows_per_file = 10000
 
         # TODO include rows_per_file into filter? right now it's hardcoded when doing MVL
 

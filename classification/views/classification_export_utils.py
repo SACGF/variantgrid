@@ -97,6 +97,7 @@ class UsedKeyTracker:
         self.ordered_keys = None
         self.include_explains = include_explains
         self.ignore_evidence_keys = ignore_evidence_keys
+        self.process()
 
     @property
     def keys_ignore_exclude(self) -> Iterable[EvidenceKey]:
@@ -159,7 +160,6 @@ class UsedKeyTracker:
                 self.ordered_keys.append(used_key)
 
     def header(self) -> List[str]:
-        self.process()
         cols: List[str] = []
         for used_key in self.ordered_keys:
             if used_key.has_value:

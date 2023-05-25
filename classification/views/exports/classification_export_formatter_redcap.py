@@ -47,6 +47,15 @@ class ClassificationExportFormatterRedCap(ClassificationExportFormatter):
         self.group_on = 'redcap_record_id'
         self.e_keys = EvidenceKeyMap.cached()
         super().__init__(classification_filter=classification_filter)
+        for group in self.redcap_rows():
+            for idx, vcm in enumerate(group.data):
+                used_keys: UsedKeyTracker
+                if len(self.used_key_arrays) < (idx + 1):
+                    used_keys = UsedKeyTracker(self.classification_filter.user, self.e_keys, RedcapKeyValueFormatter(index=idx + 1))
+                    self.used_key_arrays.append(used_keys)
+                else:
+                    used_keys = self.used_key_arrays[idx]
+                used_keys.check_record(vcm)
 
     @classmethod
     def from_request(cls, request: HttpRequest) -> 'ClassificationExportFormatterRedCap':
@@ -64,16 +73,6 @@ class ClassificationExportFormatterRedCap(ClassificationExportFormatter):
     def header(self) -> List[str]:
         out = io.StringIO()
         writer = csv.writer(out, delimiter=',')
-
-        for group in self.redcap_rows():
-            for idx, vcm in enumerate(group.data):
-                used_keys: UsedKeyTracker
-                if len(self.used_key_arrays) < (idx + 1):
-                    used_keys = UsedKeyTracker(self.classification_filter.user, self.e_keys, RedcapKeyValueFormatter(index=idx + 1))
-                    self.used_key_arrays.append(used_keys)
-                else:
-                    used_keys = self.used_key_arrays[idx]
-                used_keys.check_record(vcm)
 
         header_array = [REDCAP_PREFIX + 'record_id', REDCAP_PREFIX + 'count']
         standard_keys = ['id', 'lab', 'lab_record_id', 'version', 'evidence_weights', 'citations']

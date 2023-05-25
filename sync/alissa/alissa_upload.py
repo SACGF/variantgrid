@@ -1,5 +1,6 @@
 from datetime import datetime
 from enum import Enum
+from json import JSONDecodeError
 from typing import Optional
 
 from classification.enums import ShareLevel
@@ -86,6 +87,14 @@ class AlissaUploadSyncer(SyncRunner):
 
         for file in exporter.serve_in_memory():
             if exporter.row_count > 0:
+                json_data = dict()
+                try:
+                    json_data = json.loads(file)
+                except JSONDecodeError:
+                    print("Error parsing")
+                    print(file)
+                    print()
+
                 uploaded_any_rows = True
                 sync_run_instance.run_start()
                 params = {
