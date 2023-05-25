@@ -84,6 +84,7 @@ class AlissaUploadSyncer(SyncRunner):
         # For full syncs, set the ImportOption to "MIRROR", which will delete everything and replace it with our first post
         # then subsequent posts will just add
         import_option = AlissaImportOption.MIRROR if sync_run_instance.full_sync else AlissaImportOption.CONTRIBUTE
+        response_jsons = []
 
         for file in exporter.serve_in_memory():
             if exporter.row_count > 0:
@@ -110,11 +111,17 @@ class AlissaUploadSyncer(SyncRunner):
                     timeout=MINUTE_SECS,
                 )
                 response.raise_for_status()
+                try:
+                    if response_json := response.json():
+                        response_jsons.append(response_json)
+                except:
+                    pass
 
         sync_run_instance.run_completed(
             had_records=uploaded_any_rows,
             meta={
                 "server_date": exporter.classification_filter.last_modified_header,
-                "rows_uploaded": exporter.row_count
+                "rows_uploaded": exporter.row_count,
+                "responses": response_jsons
             }
         )
