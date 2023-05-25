@@ -36,7 +36,6 @@ class AlissaUploadSyncer(SyncRunner):
         if sync_run_instance.max_rows:
             raise ValueError("AlissaUploadSyncer does not support max_rows")
 
-
         excludes = set()
         if exclude_group_names := sync_run_instance.get_config("exclude_sources", mandatory=False):
             for source in exclude_group_names:
@@ -59,6 +58,16 @@ class AlissaUploadSyncer(SyncRunner):
 
         format_details = FormatDetailsMVL()
         format_details.format = FormatDetailsMVLFileFormat.JSON
+        if mapping := sync_run_instance.get_config("classification_mapping"):
+            classification_mapping = {
+                'B': 'BENIGN',
+                'LB': 'LIKELY_BENIGN',
+                'VUS': 'VOUS',
+                'LP': 'LIKELY_PATHOGENIC',
+                'P': 'PATHOGENIC'
+            }
+            classification_mapping.update(mapping)
+            format_details.classification_mapping = classification_mapping
 
         mvl_id = int(sync_run_instance.get_config("mvl_id"))
 
@@ -74,7 +83,7 @@ class AlissaUploadSyncer(SyncRunner):
                 include_sources=includes,
                 min_share_level=ShareLevel.ALL_USERS,
                 since=since,
-                rows_per_file=100
+                rows_per_file=1000
             ),
             format_details=format_details
         )
@@ -108,7 +117,7 @@ class AlissaUploadSyncer(SyncRunner):
                 response = alissa.post(
                     url_suffix=f'managedvariantlists/{mvl_id}/import',
                     params=params,
-                    json=json.loads(file),  # we're turning json into string to turn it back into json, probably a way we can send the already stringified version
+                    json=json_data,  # we're turning json into string to turn it back into json, probably a way we can send the already stringified version
                     timeout=MINUTE_SECS,
                 )
                 response.raise_for_status()
