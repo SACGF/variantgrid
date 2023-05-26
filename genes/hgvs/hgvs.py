@@ -23,6 +23,7 @@ from hgvs.assemblymapper import AssemblyMapper
 from hgvs.edit import NARefAlt
 from hgvs.exceptions import HGVSDataNotAvailableError
 from hgvs.location import Interval, SimplePosition
+from hgvs.normalizer import Normalizer
 from hgvs.parser import Parser
 from hgvs.posedit import PosEdit
 from hgvs.sequencevariant import SequenceVariant
@@ -591,29 +592,38 @@ class HGVSMatcher:
         return (chrom, position, ref, alt), matches_reference
 
     def _variant_coords_to_hgvs(self, chrom, position, ref, alt, transcript_version=None):
-        ac = self.genome_build.convert_chrom_to_contig_name(chrom)
+        ac = self.genome_build.convert_chrom_to_contig_accession(chrom)
 
-        start = position + 1
-        end = start + len(ref)
+        is_snv = len(ref) == len(alt) == 1
+        if not is_snv:  # Everything else is offset by 1
+            ref = ref[1:]
+            alt = alt[1:]
+            position += 1
 
-        keep_left_anchor = False
-        if not keep_left_anchor:
-            pfx = os.path.commonprefix([ref, alt])
-            lp = len(pfx)
-            if lp > 0:
-                ref = ref[lp:]
-                alt = alt[lp:]
-                print(f"Incrementing start by {lp}")
-                start += lp
+        if ref == '':
+            ref = None
+        if alt == '':
+            alt = None
+
+        if ref is None:  # Insert
+            # Insert uses coordinates around the insert point.
+            start = position - 1
+            end = position
+        else:
+            start = position
+            end = position + len(ref) - 1
 
         var_g = SequenceVariant(ac=ac,
                                 type='g',
                                 posedit=PosEdit(Interval(start=SimplePosition(start),
                                                          end=SimplePosition(end),
                                                          uncertain=False),
-                                                NARefAlt(ref=ref if ref != '' else None,
-                                                         alt=alt if alt != '' else None,
+                                                NARefAlt(ref=ref,
+                                                         alt=alt,
                                                          uncertain=False)))
+
+        n = Normalizer(self.hdp)
+        var_g = n.normalize(var_g)
 
         if transcript_version:
             # Coding non coding?
