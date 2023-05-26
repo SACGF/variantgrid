@@ -10,8 +10,7 @@ from classification.views.exports.classification_export_formatter_mvl import For
     FormatDetailsMVLFileFormat
 from library.constants import MINUTE_SECS
 from library.guardian_utils import admin_bot
-from library.log_utils import report_message, AdminNotificationBuilder, report_exc_info
-from library.utils import parse_http_header_date
+from library.log_utils import AdminNotificationBuilder, report_exc_info
 from snpdb.models import Lab, GenomeBuild, Organization
 from sync.sync_runner import SyncRunner, register_sync_runner, SyncRunInstance
 import json
@@ -146,12 +145,9 @@ class AlissaUploadSyncer(SyncRunner):
                     report_exc_info()
                     pass
 
-        server_date = exporter.classification_filter.last_modified_header
         since_timestamp = None
         if since:
             since_timestamp = int(since.timestamp())
-        if server_date:
-            server_date_timestamp = parse_http_header_date(server_date).timestamp()
         sync_run_instance.run_completed(
             had_records=uploaded_any_rows,
             meta={
