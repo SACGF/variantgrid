@@ -148,6 +148,7 @@ class AlissaUploadSyncer(SyncRunner):
         sync_run_instance.run_completed(
             had_records=uploaded_any_rows,
             meta={
+                "since": str(since),
                 "server_date": exporter.classification_filter.last_modified_header,
                 "rows_sent": exporter.row_count,
                 "total_failed": total_failed,
