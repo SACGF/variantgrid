@@ -5,6 +5,7 @@ from functools import cached_property
 from typing import Optional, Callable, Dict, List
 from dateutil import tz
 from library.oauth import ServerAuth
+from library.utils import parse_http_header_date
 from sync.models import SyncStatus
 from sync.models.models import SyncDestination, SyncRun
 
@@ -38,8 +39,7 @@ class SyncRunInstance:
         if success := self.last_success():
             if meta := success.meta:
                 if server_date_str := meta.get(meta_key):
-                    dz = datetime.strptime(server_date_str, "%a, %d %b %Y %H:%M:%S %Z").astimezone(tz=tz.UTC)
-                    return dz
+                    return parse_http_header_date(server_date_str)
 
     @cached_property
     def sync_run(self) -> SyncRun:

@@ -20,7 +20,7 @@ from classification.enums.discordance_enums import DiscordanceReportResolution
 from classification.models import ClassificationModification, Classification, classification_flag_types, \
     DiscordanceReport, ClinicalContext, ImportedAlleleInfo
 from flags.models import FlagsMixin, Flag, FlagComment
-from library.utils import batch_iterator, local_date_string
+from library.utils import batch_iterator, local_date_string, http_header_date_now
 from snpdb.models import GenomeBuild, Lab, Organization, Allele, Variant
 
 
@@ -232,7 +232,7 @@ class ClassificationFilter:
     _last_modified: str = None
 
     def __post_init__(self):
-        self._last_modified = timezone.now().astimezone(tz.UTC).strftime("%a, %d %b %Y %H:%M:%S GMT")
+        self._last_modified = http_header_date_now()
         if self.path_info and self.request_params:
             pass
         elif request := get_current_request():

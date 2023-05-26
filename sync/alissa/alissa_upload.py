@@ -11,6 +11,7 @@ from classification.views.exports.classification_export_formatter_mvl import For
 from library.constants import MINUTE_SECS
 from library.guardian_utils import admin_bot
 from library.log_utils import report_message, AdminNotificationBuilder, report_exc_info
+from library.utils import parse_http_header_date
 from snpdb.models import Lab, GenomeBuild, Organization
 from sync.sync_runner import SyncRunner, register_sync_runner, SyncRunInstance
 import json
@@ -147,14 +148,16 @@ class AlissaUploadSyncer(SyncRunner):
 
         server_date = exporter.classification_filter.last_modified_header
         server_date_timestamp = None
+        since_str = None
+        if since:
+            since_str = str(int(since.timestamp()))
         if server_date:
-            server_date_timestamp = datetime.strptime(server_date, "%a, %d %b %Y %H:%M:%S %Z").timestamp()
+            server_date_timestamp = parse_http_header_date(server_date).timestamp()
         sync_run_instance.run_completed(
             had_records=uploaded_any_rows,
             meta={
-                "since": str(since),
+                "since": since_str,
                 "server_date": exporter.classification_filter.last_modified_header,
-                "server_date_timestamp": server_date_timestamp,
                 "rows_sent": exporter.row_count,
                 "total_failed": total_failed,
                 "total_differs": total_differs,

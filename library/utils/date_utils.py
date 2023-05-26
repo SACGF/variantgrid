@@ -2,6 +2,7 @@ import time
 from datetime import date, datetime, timedelta
 from typing import Optional, Tuple, List
 
+from dateutil import tz
 from django.utils import timezone
 from django.utils.timezone import localtime
 
@@ -58,3 +59,11 @@ def month_range(start_month: int, start_year: int, offset_start: int, offset_end
     num_months = offset_end - offset_start
     labels = [fmt(start_year + (start_month + i) // 12, 1 + (start_month + i) % 12) for i in range(-1, num_months)]
     return labels
+
+
+def http_header_date_now():
+    return datetime.utcnow().strftime("%a, %d %b %Y %H:%M:%S GMT")
+
+
+def parse_http_header_date(date_str: str):
+    return datetime.strptime(date_str, "%a, %d %b %Y %H:%M:%S %Z").replace(tzinfo=tz.UTC)

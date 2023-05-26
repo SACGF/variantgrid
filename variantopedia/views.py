@@ -31,6 +31,7 @@ from library.enums.log_level import LogLevel
 from library.git import Git
 from library.guardian_utils import admin_bot
 from library.log_utils import log_traceback, report_message, slack_bot_username
+from library.utils import http_header_date_now, parse_http_header_date
 from pathtests.models import cases_for_user
 from patients.models import Clinician
 from seqauto.models import VCFFromSequencingRun, get_20x_gene_coverage
@@ -221,7 +222,7 @@ def server_status(request):
         "highest_variant_annotated": highest_variant_annotated,
         "sample_enrichment_kits_df": sample_enrichment_kits_df,
         "total_counts": total_counts,
-        "sync_destination_reports": SyncDestination.get_reports(),
+        "sync_destination_reports": SyncDestination.get_reports()
     }
     return render(request, "variantopedia/server_status.html", context)
 
