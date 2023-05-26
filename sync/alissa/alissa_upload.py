@@ -120,11 +120,11 @@ class AlissaUploadSyncer(SyncRunner):
                 response.raise_for_status()
 
                 try:
-                    total_failed += int(response_json.get("numberFailed"))
-                    total_differs += int(response_json.get("numberDiffers"))
-                    total_imported += int(response_json.get("numberImported"))
-
                     if response_json := response.json():
+                        total_failed += int(response_json.get("numberFailed"))
+                        total_differs += int(response_json.get("numberDiffers"))
+                        total_imported += int(response_json.get("numberImported"))
+
                         response_jsons.append(response_json)
                         if response_error := response_json.get("error"):
                             notify = AdminNotificationBuilder(message="Error Uploading")
@@ -145,11 +145,16 @@ class AlissaUploadSyncer(SyncRunner):
                     report_exc_info()
                     pass
 
+        server_date = exporter.classification_filter.last_modified_header
+        server_date_timestamp = None
+        if server_date:
+            server_date_timestamp = datetime.strptime(server_date, "%a, %d %b %Y %H:%M:%S %Z").timestamp()
         sync_run_instance.run_completed(
             had_records=uploaded_any_rows,
             meta={
                 "since": str(since),
                 "server_date": exporter.classification_filter.last_modified_header,
+                "server_date_timestamp": server_date_timestamp,
                 "rows_sent": exporter.row_count,
                 "total_failed": total_failed,
                 "total_differs": total_differs,

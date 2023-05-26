@@ -38,7 +38,8 @@ class SyncRunInstance:
         if success := self.last_success():
             if meta := success.meta:
                 if server_date_str := meta.get(meta_key):
-                    return datetime.strptime(server_date_str, "%a, %d %b %Y %H:%M:%S %Z").replace(tzinfo=tz.UTC)
+                    dz = datetime.strptime(server_date_str, "%a, %d %b %Y %H:%M:%S %Z").astimezone(tz=tz.UTC)
+                    return dz
 
     @cached_property
     def sync_run(self) -> SyncRun:

@@ -5,10 +5,12 @@ from functools import cached_property, reduce
 from operator import __or__
 from typing import List, Type, Union, Set, Optional, Dict, Iterator, Any, Callable
 
+from dateutil.tz import tz
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.db.models import QuerySet, Q
 from django.http import HttpRequest
+from django.utils import timezone
 from django.utils.timezone import now
 from guardian.shortcuts import get_objects_for_user
 from threadlocals.threadlocals import get_current_request
@@ -230,7 +232,7 @@ class ClassificationFilter:
     _last_modified: str = None
 
     def __post_init__(self):
-        self._last_modified = now().strftime("%a, %d %b %Y %H:%M:%S GMT")
+        self._last_modified = timezone.now().astimezone(tz.UTC).strftime("%a, %d %b %Y %H:%M:%S GMT")
         if self.path_info and self.request_params:
             pass
         elif request := get_current_request():
