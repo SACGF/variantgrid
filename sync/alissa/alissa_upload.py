@@ -147,16 +147,15 @@ class AlissaUploadSyncer(SyncRunner):
                     pass
 
         server_date = exporter.classification_filter.last_modified_header
-        server_date_timestamp = None
-        since_str = None
+        since_timestamp = None
         if since:
-            since_str = str(int(since.timestamp()))
+            since_timestamp = int(since.timestamp())
         if server_date:
             server_date_timestamp = parse_http_header_date(server_date).timestamp()
         sync_run_instance.run_completed(
             had_records=uploaded_any_rows,
             meta={
-                "since": since_str,
+                "since": since_timestamp,
                 "server_date": exporter.classification_filter.last_modified_header,
                 "rows_sent": exporter.row_count,
                 "total_failed": total_failed,
