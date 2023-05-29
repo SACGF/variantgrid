@@ -84,10 +84,12 @@ class ViewEventCounts:
         for values in ViewEvent.objects \
                 .values(field_name, 'user')\
                 .filter(self.base_filter)\
-                .filter(**{f"{field_name}__isnull": False})\
+                .filter(**{f"{field_name}__isnull": False}) \
+                .exclude(**{f"{field_name}__in": ["", " "]}) \
                 .annotate(total=Count('pk'))\
                 .order_by():
             if non_blank := values.get(field_name):
+                print(f"{field_name} \"{non_blank}\"")
                 id_to_count[non_blank] += 1  # just want to count once per unique user
             # TODO limit the number of results we look at? (though wont work if we want unique users)
 
@@ -190,6 +192,8 @@ class ViewEventCounts:
             views = views.filter(args__gene_symbol=gene_symbol_id)
         elif user_id := request.GET.get('user_id'):
             views = views.filter(user=user_id)
+        else:
+            views = ViewEvent.objects.none()
 
         return views
 
