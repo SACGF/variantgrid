@@ -1408,15 +1408,19 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 if isinstance(gene_symbol, str) and gene_symbol != gene_symbol.upper():
                     gene_symbol_cell.value = gene_symbol.upper()
 
+        # remove all whitespace from c.HGVS
+        if SpecialEKeys.C_HGVS in patch:
+            c_parts_cell = patch[SpecialEKeys.C_HGVS]
+            if c_hgvs := c_parts_cell.value:
+                c_hgvs = re.sub(r'\s+', '', c_hgvs)
+                c_parts_cell.value = c_hgvs
+
         if initial_data:
             # if c.hgvs contains other values (such as
             if SpecialEKeys.C_HGVS in patch:
                 c_parts_cell = patch[SpecialEKeys.C_HGVS]
                 c_hgvs = c_parts_cell.value
                 if c_hgvs:
-                    c_hgvs = re.sub(r'\s+', '', c_hgvs)
-                    c_parts_cell.value = c_hgvs
-
                     c_parts = CHGVS(full_c_hgvs=c_hgvs)
                     transcript = c_parts.transcript
                     gene_symbol = c_parts.gene
