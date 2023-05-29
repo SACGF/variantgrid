@@ -25,8 +25,6 @@ from django.dispatch.dispatcher import receiver
 from django.urls.base import reverse
 from django_extensions.db.models import TimeStampedModel
 from guardian.shortcuts import assign_perm, get_objects_for_user
-from pandas.io.html import _remove_whitespace
-
 from annotation.models.models import AnnotationVersion, VariantAnnotationVersion, VariantAnnotation
 from annotation.regexes import db_ref_regexes, DbRegexes
 from classification.enums import ClinicalSignificance, SubmissionSource, ShareLevel, SpecialEKeys, \
@@ -1416,6 +1414,9 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 c_parts_cell = patch[SpecialEKeys.C_HGVS]
                 c_hgvs = c_parts_cell.value
                 if c_hgvs:
+                    c_hgvs = re.sub(r'\s+', '', c_hgvs)
+                    c_parts_cell.value = c_hgvs
+
                     c_parts = CHGVS(full_c_hgvs=c_hgvs)
                     transcript = c_parts.transcript
                     gene_symbol = c_parts.gene
