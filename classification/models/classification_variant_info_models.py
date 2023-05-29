@@ -543,10 +543,12 @@ class ImportedAlleleInfo(TimeStampedModel):
     @property
     def gene_symbols(self) -> List[GeneSymbol]:
         gene_symbol_set = {build.gene_symbol for build in self.resolved_builds if build.gene_symbol}
-        if c_hgvs_obj := self.imported_c_hgvs_obj:
-            if imported_gene_symbol_str := c_hgvs_obj.gene_symbol:
-                if symbol := GeneSymbol.cast(imported_gene_symbol_str):
-                    gene_symbol_set.add(symbol)
+        if not gene_symbol_set:
+            # only include imported gene symbols if we didn't resolve to real alleles
+            if c_hgvs_obj := self.imported_c_hgvs_obj:
+                if imported_gene_symbol_str := c_hgvs_obj.gene_symbol:
+                    if symbol := GeneSymbol.cast(imported_gene_symbol_str):
+                        gene_symbol_set.add(symbol)
         return list(sorted(gene_symbol_set))
 
     @property
