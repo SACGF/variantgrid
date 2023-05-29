@@ -41,6 +41,11 @@
             params.rows_per_file = rowsPerFile;
         }
 
+        let row_limit = $("#row_limit").val();
+        if (row_limit.length) {
+            params.row_limit = row_limit;
+        }
+
         if (format === 'mvl') {
             let mvlFileFormat = $("input[name='mvl_file_format']:checked").val();
             if (mvlFileFormat) {
@@ -248,6 +253,11 @@
         Providing a value for this field will result in a zip file with each entry in the zip not having more than this number of rows.<br/>
         Min value of 100, set to 0 to force a single file for MVLs.</span>
     {% endlabelled %}
+    {% labelled label="Total Row Limit" admin_only=True %}
+        <input class="form-control" id="row_limit" type="number" value="" />
+        <span class="text-muted">Maximum number of rows (approx) to be downloaded.</span>
+    {% endlabelled %}
+
     {% labelled label="Organistion Exclusion" %}
         {% for org in orgs %}
             <div class="form-check">

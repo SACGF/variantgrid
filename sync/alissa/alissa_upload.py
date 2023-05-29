@@ -33,8 +33,6 @@ class AlissaUploadSyncer(SyncRunner):
     """
 
     def sync(self, sync_run_instance: SyncRunInstance):
-        if sync_run_instance.max_rows:
-            raise ValueError("AlissaUploadSyncer does not support max_rows")
 
         excludes = set()
         if exclude_group_names := sync_run_instance.get_config("exclude_sources", mandatory=False):
@@ -83,7 +81,8 @@ class AlissaUploadSyncer(SyncRunner):
                 include_sources=includes,
                 min_share_level=ShareLevel.ALL_USERS,
                 since=since,
-                rows_per_file=1000
+                rows_per_file=1000, # Alissa can handle 10,000 but 1,000 at a time just seems safer
+                row_limit=sync_run_instance.max_rows
             ),
             format_details=format_details
         )
@@ -93,7 +92,8 @@ class AlissaUploadSyncer(SyncRunner):
 
         # For full syncs, set the ImportOption to "MIRROR", which will delete everything and replace it with our first post
         # then subsequent posts will just add
-        import_option = AlissaImportOption.MIRROR if sync_run_instance.full_sync else AlissaImportOption.CONTRIBUTE
+        partial_upload = (not sync_run_instance.full_sync) or sync_run_instance.max_rows
+        import_option = AlissaImportOption.CONTRIBUTE if partial_upload else AlissaImportOption.MIRROR
         response_jsons = []
 
         total_failed = 0

@@ -229,6 +229,7 @@ class ClassificationFilter:
     benchmarking: bool = False
     path_info: Optional[str] = None
     request_params: Optional[dict] = None
+    row_limit: Optional[int] = None
     _last_modified: str = None
 
     def __post_init__(self):
@@ -324,7 +325,9 @@ class ClassificationFilter:
         elif request.query_params.get("type") == "mvl":
             rows_per_file = 10000
 
-        # TODO include rows_per_file into filter? right now it's hardcoded when doing MVL
+        row_limit = None
+        if row_limit_str := request.query_params.get('row_limit'):
+            row_limit = int(row_limit_str)
 
         return ClassificationFilter(
             user=user,
@@ -336,7 +339,8 @@ class ClassificationFilter:
             since=since,
             allele=allele,
             benchmarking=benchmarking,
-            rows_per_file=rows_per_file
+            rows_per_file=rows_per_file,
+            row_limit=row_limit
         )
 
     @cached_property

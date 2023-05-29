@@ -3,7 +3,6 @@ from dataclasses import dataclass
 from datetime import datetime
 from functools import cached_property
 from typing import Optional, Callable, Dict, List
-from dateutil import tz
 from library.oauth import ServerAuth
 from library.utils import parse_http_header_date
 from sync.models import SyncStatus

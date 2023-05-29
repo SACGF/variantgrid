@@ -275,11 +275,17 @@ class ClassificationExportFormatter(ABC):
 
     def row_generator(self) -> Iterable[List[str]]:
         for allele_data in self.classification_filter.allele_data_filtered_pre_processed(self.batch_pre_cache()):
+
+            if row_limit := self.classification_filter.row_limit:
+                if self.row_count >= row_limit:
+                    return None
+
             rows = self.row(allele_data)
             if rows:
                 yield self.with_new_lines(rows)
             else:
                 yield rows  # could be an empty list instead of None, in which case we want to keep on going
+                # whereas None indicates end of the file
 
     @abstractmethod
     def row(self, allele_data: AlleleData) -> List[str]:
