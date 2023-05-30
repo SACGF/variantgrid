@@ -2,8 +2,8 @@
 See https://bitbucket.org/sacgf/variantgrid/wiki/Annotation%20Setup
 (test)
 """
-GDAL_LIBRARY_PATH="/opt/homebrew/Cellar/gdal/3.6.2/lib/libgdal.32.dylib"
-GEOS_LIBRARY_PATH="/opt/homebrew/Cellar/geos/3.11.1/lib/libgeos_c.dylib"
+GDAL_LIBRARY_PATH="/opt/homebrew/Cellar/gdal/3.6.4_4/lib/libgdal.32.3.6.4.dylib"
+GEOS_LIBRARY_PATH="/opt/homebrew/Cellar/geos/3.11.2/lib/libgeos_c.1.17.2.dylib"
 # IMPORTANT : THE BELOW IMPORTS ARE USED TO APPLY THEIR RESPECTIVE SETTINGS VALUES
 from variantgrid.settings.components.celery_settings import *  # pylint: disable=wildcard-import, unused-wildcard-import
 from variantgrid.settings.components.default_settings import *  # pylint: disable=wildcard-import, unused-wildcard-import
@@ -20,6 +20,7 @@ KEYCLOAK_SYNC_DETAILS = get_keycloak_sync_secrets()
 """
 
 # CLINVAR_EXPORT = get_clinvar_export_secrets()
+SYNC_DETAILS = get_shariant_sync_secrets()
 
 # import all the base settings #
 CELERY_ENABLED=False
