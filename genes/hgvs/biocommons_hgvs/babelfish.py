@@ -5,9 +5,14 @@
 
 """translate between HGVS and other formats"""
 
-from bioutils.assemblies import make_ac_name_map
+from bioutils.assemblies import make_ac_name_map, make_name_ac_map
 
+import hgvs
 import hgvs.normalizer
+from hgvs.edit import NARefAlt
+from hgvs.location import Interval, SimplePosition
+from hgvs.posedit import PosEdit
+from hgvs.sequencevariant import SequenceVariant
 
 
 def _as_interbase(posedit):
@@ -25,7 +30,8 @@ class Babelfish:
     def __init__(self, hdp, assembly_name):
         self.hdp = hdp
         self.hn = hgvs.normalizer.Normalizer(hdp, cross_boundaries=False, shuffle_direction=5, validate=False)
-        self.ac_to_chr_name_map = make_ac_name_map(assembly_name)
+        self.ac_to_name_map = make_ac_name_map(assembly_name)
+        self.name_to_ac_map = make_name_ac_map(assembly_name)
 
     def hgvs_to_vcf(self, var_g):
         """**EXPERIMENTAL**
@@ -45,7 +51,7 @@ class Babelfish:
 
         (start_i, end_i) = _as_interbase(vleft.posedit)
 
-        chr = self.ac_to_chr_name_map[vleft.ac]
+        chr = self.ac_to_name_map[vleft.ac]
 
         typ = vleft.posedit.edit.type
 
@@ -71,7 +77,51 @@ class Babelfish:
             ref = self.hdp.seqfetcher.fetch_seq(vleft.ac, start_i, end_i)
             alt = ref[0] + alt
 
-        return (chr, start_i + 1, ref, alt, typ)
+        return chr, start_i + 1, ref, alt, typ
+
+    def vcf_to_hgvs(self, chrom, position, ref, alt, transcript_accession=None):
+        if transcript_accession:
+            return self.vcf_to_c_hgvs(chrom, position, ref, alt, transcript_accession)
+        return self.vcf_to_g_hgvs(chrom, position, ref, alt, transcript_accession)
+
+    def vcf_to_c_hgvs(self, chrom, position, ref, alt, transcript_accession=None):
+        var_g = self.vcf_to_g_hgvs(chrom, position, ref, alt)
+        return self.am.g_to_c(var_g, transcript_accession)
+
+    def vcf_to_g_hgvs(self, chrom, position, ref, alt):
+        ac = self.name_to_ac_map[chrom]
+
+        is_snv = len(ref) == len(alt) == 1
+        if not is_snv:  # Everything else is offset by 1
+            ref = ref[1:]
+            alt = alt[1:]
+            position += 1
+
+        if ref == '':
+            ref = None
+        if alt == '':
+            alt = None
+
+        if ref is None:  # Insert
+            # Insert uses coordinates around the insert point.
+            start = position - 1
+            end = position
+        else:
+            start = position
+            end = position + len(ref) - 1
+
+        var_g = SequenceVariant(ac=ac,
+                                type='g',
+                                posedit=PosEdit(Interval(start=SimplePosition(start),
+                                                         end=SimplePosition(end),
+                                                         uncertain=False),
+                                                NARefAlt(ref=ref,
+                                                         alt=alt,
+                                                         uncertain=False)))
+
+        n = hgvs.Normalizer(self.hdp)
+        return n.normalize(var_g)
+
 
 
 if __name__ == "__main__":
@@ -91,6 +141,10 @@ if __name__ == "__main__":
 
     def _h2v(h):
         return babelfish38.hgvs_to_vcf(hgvs.easy.parser.parse(h))
+
+    def _v22(*v):
+        return babelfish38.vcf_to_hgvs(*v)
+
 
     def _vp(h):
         v = hgvs.easy.parser.parse(h)
@@ -118,4 +172,6 @@ if __name__ == "__main__":
         "NC_000006.12:g.49949414_49949415insA",
         "NC_000006.12:g.49949414_49949415insAA",
     ):
-        print('assert _h2v("{h}") == {res}'.format(res=str(_h2v(h)), h=h))
+        v = _h2v(h)
+        _v22(*v)  # Try converting it back
+        print('assert _h2v("{h}") == {res}'.format(res=str(v), h=h))

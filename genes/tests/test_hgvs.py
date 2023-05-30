@@ -7,7 +7,8 @@ from django.test.testcases import TestCase
 from pyhgvs import HGVSName, InvalidHGVSName
 
 from annotation.tests.test_data_fake_genes import create_fake_transcript_version
-from genes.hgvs import HGVSMatcher, FakeTranscriptVersion, HGVSNameExtra
+from genes.hgvs import HGVSMatcher, HGVSNameExtra
+from genes.hgvs.hgvs_matcher import FakeTranscriptVersion
 from snpdb.models import GenomeBuild
 
 

@@ -35,3 +35,7 @@ def get_refseq_type(name):
     """
     prefix = name[:3]
     return REFSEQ_PREFIX_LOOKUP.get(prefix, (None, ''))[0]
+
+
+def transcript_is_lrg(transcript_accession: str):
+    return transcript_accession.startswith("LRG_")

@@ -13,7 +13,8 @@ from pyhgvs import HGVSName, InvalidHGVSName
 
 from annotation.manual_variant_entry import check_can_create_variants, CreateManualVariantForbidden
 from classification.models import Classification, CreateNoClassificationForbidden
-from genes.hgvs import HGVSMatcher, HgvsMatchRefAllele
+from genes.hgvs import HGVSMatcher
+from genes.hgvs.hgvs_converter import HgvsMatchRefAllele
 from genes.models import MissingTranscript, MANE, TranscriptVersion, GeneSymbol
 from genes.models_enums import AnnotationConsortium
 from library.enums.log_level import LogLevel
@@ -518,8 +519,7 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
             results = get_results_from_variant_tuples(variant_qs, variant_tuple)
             variant = results.get()
             if classify:
-                transcript_id = hgvs_matcher.get_transcript_id(hgvs_string,
-                                                               transcript_version=False)
+                transcript_id = hgvs_matcher.get_transcript_id(hgvs_string)
                 yield VariantExtra.classify_variant(
                     for_user=user,
                     transcript_id=transcript_id,

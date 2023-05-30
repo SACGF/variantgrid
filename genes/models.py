@@ -850,13 +850,13 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
         return False
 
     @staticmethod
-    def get_transcript_id_and_version(transcript_name: str) -> Tuple[str, int]:
-        parts = transcript_name.split(".")
+    def get_transcript_id_and_version(transcript_accession: str) -> Tuple[str, int]:
+        parts = transcript_accession.split(".")
         if len(parts) == 2:
             identifier = str(parts[0])
             version = int(parts[1])
         else:
-            identifier, version = transcript_name, None
+            identifier, version = transcript_accession, None
         return identifier, version
 
     @staticmethod
