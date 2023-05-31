@@ -24,7 +24,7 @@ class CitationCounter:
                     source=citation_source,
                     index=db_ref.get('idx')
                 )
-                self.all_citations[citation_id].add(cm.classification.lab.name)
+                self.all_citations[citation_id].add(str(cm.classification.lab))
 
     def citation_ids(self) -> List[str]:
         return [citation_id.full_id for citation_id in sorted(set(self.all_citations.keys()))]

@@ -279,9 +279,9 @@ class MVLEntry(ExportRow):
             citation_counter.reference_citations(group.most_recent)
         citations_html = "<br><b>Citations Latest</b>:<br>"
         has_citation = False
-        for citation, labs in citation_counter.ordered_references():
+        for citation, lab_names in citation_counter.ordered_references():
             has_citation = True
-            references = ", ".join(labs)
+            references = ", ".join(lab_names)
             citations_html += f"<p>{simple_citation_html(citation)}<br><i>Referenced by</i>: {references}</p>"
 
         if not has_citation:
