@@ -2,7 +2,6 @@ import abc
 from enum import Enum
 from typing import Tuple
 
-from genes.hgvs import HGVSNameExtra
 from snpdb.models import GenomeBuild, VariantCoordinate
 
 
@@ -19,6 +18,13 @@ class HgvsMatchRefAllele:
     def __bool__(self):
         return self.provided_ref == self.calculated_ref
 
+    def __repr__(self):
+        return f"{self.provided_ref=},{self.calculated_ref=}"
+
+    def __eq__(self, other):
+        return self.provided_ref == other.provided_ref and self.calculated_ref == other.calculated_ref
+
+
 # We need a common Exception
 # Common HGVS Extra??
 
@@ -31,19 +37,19 @@ class HGVSConverter(abc.ABC):
         self.genome_build = genome_build
 
     @abc.abstractmethod
-    def variant_coords_to_g_hgvs(self, vc: VariantCoordinate) -> HGVSNameExtra:
+    def variant_coords_to_g_hgvs(self, vc: VariantCoordinate) -> str:
         pass
 
     @abc.abstractmethod
-    def variant_coords_to_c_hgvs(self, vc: VariantCoordinate, transcript_version) -> HGVSNameExtra:
+    def variant_coords_to_c_hgvs(self, vc: VariantCoordinate, transcript_version) -> str:
         pass
 
     @abc.abstractmethod
-    def hgvs_to_variant_coords_and_reference_match(self, hgvs_string: str) -> Tuple[VariantCoordinate, HgvsMatchRefAllele]:
+    def hgvs_to_variant_coords_and_reference_match(self, hgvs_string: str, transcript_version) -> Tuple[VariantCoordinate, HgvsMatchRefAllele]:
         pass
 
     @abc.abstractmethod
-    def hgvs_clean_for_clingen(self, hgvs_string: str) -> str:
+    def c_hgvs_remove_gene_symbol(self, hgvs_string: str) -> str:
         pass
 
     @abc.abstractmethod

@@ -12,6 +12,7 @@ from pyhgvs import HGVSName
 from genes.hgvs import HGVSNameExtra, CHGVS
 from genes.hgvs.biocommons_hgvs.hgvs_converter_biocommons import BioCommonsHGVSConverter
 from genes.hgvs.hgvs_converter import HGVSConverterType
+from genes.hgvs.hgvs_converter_combo import ComboCheckerHGVSConverter
 from genes.hgvs.pyhgvs.hgvs_converter_pyhgvs import PyHGVSConverter
 from genes.models import TranscriptVersion, Transcript, GeneSymbol, LRGRefSeqGene, BadTranscript, \
     NoTranscript
@@ -57,7 +58,10 @@ class HGVSConverterFactory:
     """
 
     @staticmethod
-    def factory(genome_build: GenomeBuild, hgvs_converter_type: HGVSConverterType):
+    def factory(genome_build: GenomeBuild, hgvs_converter_type: HGVSConverterType = None):
+        if hgvs_converter_type is None:
+            hgvs_converter_type = HGVSConverterType[settings.HGVS_DEFAULT_METHOD.upper()]
+
         if hgvs_converter_type == HGVSConverterType.BIOCOMMONS_HGVS:
             return BioCommonsHGVSConverter(genome_build)
         elif hgvs_converter_type == HGVSConverterType.PYHGVS:
@@ -92,13 +96,12 @@ class HGVSMatcher:
     def __init__(self, genome_build: GenomeBuild, hgvs_converter_type=None):
         self.genome_build = genome_build
         self.attempt_clingen = True  # Stop on any non-recoverable error - keep going if unknown reference
-        if hgvs_converter_type is None:
-            hgvs_converter_type = HGVSConverterType[settings.HGVS_DEFAULT_METHOD.upper()]
-
-        self.hgvs_converter = HGVSConverterFactory.factory(genome_build, hgvs_converter_type)
+        converters = [BioCommonsHGVSConverter(genome_build), PyHGVSConverter(genome_build)]
+        self.hgvs_converter = ComboCheckerHGVSConverter(genome_build, converters, die_on_error=False)
+#        self.hgvs_converter = HGVSConverterFactory.factory(genome_build, hgvs_converter_type)
 
     def _clingen_get_variant_tuple(self, hgvs_string: str):
-        cleaned_hgvs = self.hgvs_converter.hgvs_clean_for_clingen(hgvs_string)
+        cleaned_hgvs = self.hgvs_converter.c_hgvs_remove_gene_symbol(hgvs_string)
 
         try:
             ca = get_clingen_allele_from_hgvs(cleaned_hgvs, require_allele_id=False)
@@ -344,9 +347,6 @@ class HGVSMatcher:
     def get_transcript_id(self, hgvs_string: str) -> str:
         transcript_accession = self.hgvs_converter.get_transcript_accession(hgvs_string)
         return TranscriptVersion.get_transcript_id_and_version(transcript_accession)[0]
-
-    def _variant_to_hgvs_extra(self, variant: Variant, transcript_name=None) -> HGVSNameExtra:
-        return self._variant_to_hgvs(variant, transcript_name)[0]
 
     def _lrg_variant_to_hgvs(self, variant: Variant, lrg_identifier: str = None) -> Tuple[HGVSNameExtra, str]:
         if transcript_version := LRGRefSeqGene.get_transcript_version(self.genome_build, lrg_identifier):

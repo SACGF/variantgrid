@@ -4,15 +4,20 @@
 # https://github.com/biocommons/hgvs/issues/653
 
 """translate between HGVS and other formats"""
+from functools import cached_property
 
 from bioutils.assemblies import make_ac_name_map, make_name_ac_map
 
 import hgvs
 import hgvs.normalizer
+from hgvs.assemblymapper import AssemblyMapper
 from hgvs.edit import NARefAlt
 from hgvs.location import Interval, SimplePosition
+from hgvs.normalizer import Normalizer
+from hgvs.parser import Parser
 from hgvs.posedit import PosEdit
 from hgvs.sequencevariant import SequenceVariant
+from hgvs.validator import ExtrinsicValidator
 
 
 def _as_interbase(posedit):
@@ -26,10 +31,29 @@ def _as_interbase(posedit):
     return (start_i, end_i)
 
 
+class ParserSingleton:
+    __instance = None
+
+    def __init__(self):
+        print("ParserSingleton.__init__")
+        self._parser = Parser()
+
+    @classmethod
+    def parser(cls):
+        if not cls.__instance:
+            cls.__instance = ParserSingleton()
+        return cls.__instance._parser
+
+
 class Babelfish:
     def __init__(self, hdp, assembly_name):
+        self.assembly_name = assembly_name
         self.hdp = hdp
         self.hn = hgvs.normalizer.Normalizer(hdp, cross_boundaries=False, shuffle_direction=5, validate=False)
+        self.am = AssemblyMapper(self.hdp,
+                                 assembly_name=assembly_name,
+                                 alt_aln_method='splign', replace_reference=True)
+        self.ev = ExtrinsicValidator(self.hdp)
         self.ac_to_name_map = make_ac_name_map(assembly_name)
         self.name_to_ac_map = make_name_ac_map(assembly_name)
 
@@ -84,7 +108,7 @@ class Babelfish:
             return self.vcf_to_c_hgvs(chrom, position, ref, alt, transcript_accession)
         return self.vcf_to_g_hgvs(chrom, position, ref, alt, transcript_accession)
 
-    def vcf_to_c_hgvs(self, chrom, position, ref, alt, transcript_accession=None):
+    def vcf_to_c_hgvs(self, chrom, position, ref, alt, transcript_accession):
         var_g = self.vcf_to_g_hgvs(chrom, position, ref, alt)
         return self.am.g_to_c(var_g, transcript_accession)
 
@@ -119,9 +143,21 @@ class Babelfish:
                                                          alt=alt,
                                                          uncertain=False)))
 
-        n = hgvs.Normalizer(self.hdp)
+        n = Normalizer(self.hdp)
         return n.normalize(var_g)
 
+    def hgvs_to_g_hgvs(self, hgvs_string: str):
+        CONVERT_TO_G = {
+            'c': self.am.c_to_g,
+            'n': self.am.n_to_g,
+        }
+
+        parser = ParserSingleton.parser()
+        var_x = parser.parse_hgvs_variant(hgvs_string)
+        self.ev.validate(var_x)  # Validate in transcript range
+        if converter := CONVERT_TO_G.get(var_x.type):
+            var_x = converter(var_x)
+        return var_x
 
 
 if __name__ == "__main__":

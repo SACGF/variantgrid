@@ -392,6 +392,8 @@ class CHGVS:
 class HGVSNameExtra:
 
     def __init__(self, hgvs_name: Optional[HGVSName] = None):
+        if isinstance(hgvs_name, HGVSNameExtra):
+            raise ValueError("Double extra!")
         self._hgvs_name = hgvs_name
 
     def _safe(self) -> HGVSName:
