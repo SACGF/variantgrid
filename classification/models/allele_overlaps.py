@@ -359,10 +359,14 @@ class OverlapsCalculator:
             for cc in overlap.clinical_groupings:
                 yield cc
 
-    def overlaps_vus(self) -> Iterator[ClinicalGroupingOverlap]:
+    @cached_property
+    def overlaps_vus(self) -> List[ClinicalGroupingOverlap]:
+        overlaps = []
         for cc in self.clinical_groupings_overlaps:
             if cc.is_all_vus and cc.is_multi_lab:
-                yield cc
+                if cc.allele:
+                    overlaps.append(cc)
+        return overlaps
 
     @property
     def overlap_sets(self) -> List[OverlapSet]:

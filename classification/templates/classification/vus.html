@@ -22,7 +22,6 @@
         </ul>
     {% end_page_help_embedded %}
     {% lab_picker data=lab_picker_data %}
-    <p class="text-info">In future we hope to provide more tools to assist in resolving VUSs to Pathogenic/Benign</p>
     <div data-toggle="ajax" href="{% url 'vus_detail' lab_picker_data.selection %}">
         <div class="loading-message">Loading VUS Overlaps, this may take a while.</div>
     </div>
