@@ -204,23 +204,28 @@ def view_imported_allele_info_detail(request: HttpRequest, allele_info_id: int):
 
     HGVS_BASE_REGEX_STR = '^(?P<transcript>[^.]+?)(?P<transcript_version>\.[0-9]+)?(?P<gene_symbol>[(].*[)])?(?P<c_dot>:[cng]\.)'
 
-    HGVS_REGEX_BASIC = re.compile(HGVS_BASE_REGEX_STR + '(?P<c_nomen_pos>[0-9+_-]*)(?P<c_nomen_change>.*?)$')
+    HGVS_REGEX_BASIC = re.compile(HGVS_BASE_REGEX_STR + '(?P<c_nomen_full>.*?)$')
     HGVS_REGEX_REF_ALT = re.compile(HGVS_BASE_REGEX_STR + '(?P<c_nomen_pos>[0-9+_-]*?)(?P<ref>[ACTG]+)(?P<operation>>)(?P<alt>[ACTG]+)$')
     HGVS_REGEX_DEL_INS = re.compile(HGVS_BASE_REGEX_STR + '(?P<c_nomen_pos>[0-9+_-]*?)(?P<del>del)(?P<ref>[ACTG]*)(?P<ins>ins)(?P<alt>[ACTG]*)$')
     HGVS_REGEX_SIMPLE_OP = re.compile(HGVS_BASE_REGEX_STR + '(?P<c_nomen_pos>[0-9+_-]*?)(?P<operation>dup|del|ins)(?P<alt>[ACTG]*)$')
 
     FALLBACK_HGVS = re.compile("(?P<all>.*)")
-
-    use_text = allele_info.imported_c_hgvs or (allele_info.grch37.c_hgvs if allele_info.grch37 else None) or (allele_info.grch38.c_hgvs if allele_info.grch38 else None)
-    if not use_text:
-        use_text = ""
+    use_texts = [text for text in [allele_info.imported_c_hgvs, allele_info.grch37.c_hgvs if allele_info.grch37 else None, allele_info.grch38.c_hgvs if allele_info.grch38 else None] if text]
 
     use_regex = FALLBACK_HGVS
-    regex_attempt_order = [HGVS_REGEX_REF_ALT, HGVS_REGEX_DEL_INS, HGVS_REGEX_SIMPLE_OP, HGVS_REGEX_BASIC]
-    for regex in regex_attempt_order:
-        if regex.match(use_text):
-            use_regex = regex
-            break
+    if use_texts:
+        regex_attempt_order = [HGVS_REGEX_REF_ALT, HGVS_REGEX_DEL_INS, HGVS_REGEX_SIMPLE_OP, HGVS_REGEX_BASIC]
+        for regex in regex_attempt_order:
+            is_a_match = True
+            for use_text in use_texts:
+                if not regex.match(use_text):
+                    is_a_match = False
+                    break
+
+            if is_a_match:
+                use_regex = regex
+                print(use_regex)
+                break
 
     multi_diff = MultiDiff(use_regex)
     parts = []
