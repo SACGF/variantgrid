@@ -224,7 +224,6 @@ def view_imported_allele_info_detail(request: HttpRequest, allele_info_id: int):
 
             if is_a_match:
                 use_regex = regex
-                print(use_regex)
                 break
 
     multi_diff = MultiDiff(use_regex)
