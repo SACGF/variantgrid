@@ -313,8 +313,9 @@ class HGVSMatcher:
                 else:
                     raise ValueError(f"'{transcript_accession}': No transcripts found")
         else:
+            # g. HGVS
             method = self.hgvs_converter.description()
-            variant_tuple, matches_reference = self.hgvs_converter.hgvs_to_variant_coords_and_reference_match(hgvs_string)
+            variant_tuple, matches_reference = self.hgvs_converter.hgvs_to_variant_coords_and_reference_match(hgvs_string, None)
 
         (chrom, position, ref, alt) = variant_tuple
 
@@ -345,9 +346,7 @@ class HGVSMatcher:
         return TranscriptVersion.get_transcript_id_and_version(transcript_accession)[0]
 
     def _variant_to_hgvs_extra(self, variant: Variant, transcript_name=None) -> HGVSNameExtra:
-        hgvs_name, _ = self._variant_to_hgvs(variant, transcript_name)
-        # logging.debug("%s -> %s (%s)", variant, hgvs_name, hgvs_method)
-        return HGVSNameExtra(hgvs_name)
+        return self._variant_to_hgvs(variant, transcript_name)[0]
 
     def _lrg_variant_to_hgvs(self, variant: Variant, lrg_identifier: str = None) -> Tuple[HGVSNameExtra, str]:
         if transcript_version := LRGRefSeqGene.get_transcript_version(self.genome_build, lrg_identifier):
@@ -379,13 +378,13 @@ class HGVSMatcher:
             We always generate the HGVS with full-length reference bases etc, as we adjust that in HGVSExtra.format()
         """
 
+        hgvs_name_extra = None
         hgvs_method = None
         if transcript_accession:
             if transcript_is_lrg(transcript_accession):
                 return self._lrg_variant_to_hgvs(variant, transcript_accession)
 
             hgvs_methods = {}
-            hgvs_name_extra = None
             for transcript_version, method in self.filter_best_transcripts_and_method_by_accession(transcript_accession):
                 hgvs_method = f"{method}: {transcript_version}"
                 hgvs_methods[hgvs_method] = None
@@ -404,11 +403,11 @@ class HGVSMatcher:
                         # TODO: We could also use VEP then add reference bases on our HGVSs
                         try:
                             if ca := get_clingen_allele_for_variant(self.genome_build, variant):
-                                if hgvs_variant := ca.get_c_hgvs_name(transcript_version.accession):
+                                if hgvs_name_extra := ca.get_c_hgvs_name(transcript_version.accession):
                                     # Use our latest symbol as ClinGen can be out of date, and this keeps it consistent
                                     # regardless of whether we use PyHGVS or ClinGen to resolve
                                     if gene_symbol := transcript_version.gene_symbol:
-                                        hgvs_variant.gene = str(gene_symbol)
+                                        hgvs_name_extra.gene = str(gene_symbol)
                                     hgvs_method = method
                         except ClinGenAlleleServerException as cga_se:
                             # If it's unknown reference we can just retry with another version, other errors are fatal
@@ -439,15 +438,15 @@ class HGVSMatcher:
                 TranscriptVersion.raise_bad_or_missing_transcript(transcript_accession)
         else:
             # No transcript = Genomic HGVS
-            hgvs_variant = self.hgvs_converter.variant_coords_to_g_hgvs(variant.coordinate)
+            hgvs_name_extra = self.hgvs_converter.variant_coords_to_g_hgvs(variant.coordinate)
             hgvs_method = self.hgvs_converter.description()
 
-        return hgvs_variant, hgvs_method
+        return hgvs_name_extra, hgvs_method
 
     def variant_to_hgvs(self, variant: Variant, transcript_name=None,
                         max_ref_length=settings.HGVS_MAX_REF_ALLELE_LENGTH) -> Optional[str]:
         """ returns c.HGVS is transcript provided, g.HGVS if no transcript"""
-        hgvs_extra = self._variant_to_hgvs_extra(variant=variant, transcript_name=transcript_name)
+        hgvs_extra = self._variant_to_hgvs(variant, transcript_name)[0]
         return hgvs_extra.format(max_ref_length=max_ref_length)
 
     @staticmethod
@@ -460,14 +459,7 @@ class HGVSMatcher:
         return f"{refseq_accession}:g.{offset}{hgvs_allele}"
 
     def variant_to_g_hgvs(self, variant: Variant) -> str:
-        refseq_accession = variant.locus.contig.refseq_accession
-        if variant.alt.length != 1 or variant.is_indel:
-            g_hgvs = self.variant_to_hgvs(variant)
-            g_hgvs_str = f"{refseq_accession}:{g_hgvs}"
-        else:
-            g_hgvs_str = self._fast_variant_coordinate_to_g_hgvs(refseq_accession, variant.locus.position,
-                                                                 variant.locus.ref.seq, variant.vcf_alt)
-        return g_hgvs_str
+        return self.variant_coordinate_to_g_hgvs(variant.coordinate)
 
     def variant_coordinate_to_g_hgvs(self, variant_coordinate: VariantCoordinate) -> str:
         (chrom, offset, ref, alt) = variant_coordinate
