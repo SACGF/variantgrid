@@ -1,4 +1,5 @@
 import json
+from datetime import timedelta
 from typing import Set, Union, Dict
 
 from django.contrib import admin, messages
@@ -19,11 +20,14 @@ from classification.models.classification import Classification
 from classification.models.classification_import_run import ClassificationImportRun, ClassificationImportRunStatus
 from classification.models.classification_variant_info_models import ResolvedVariantInfo, ImportedAlleleInfoValidation
 from classification.models.clinical_context_models import ClinicalContextRecalcTrigger
+from classification.models.discordance_lab_summaries import DiscordanceLabSummary
 from classification.signals import send_discordance_notification
 from classification.tasks.classification_import_map_and_insert_task import ClassificationImportMapInsertTask
 from library.guardian_utils import admin_bot
+from library.utils import ExportRow, export_column, ExportDataType
 from snpdb.admin_utils import ModelAdminBasics, admin_action, admin_list_column, AllValuesChoicesFieldListFilter, \
     admin_model_action
+from snpdb.lab_picker import LabPickerData
 from snpdb.models import GenomeBuild, Lab
 
 
@@ -560,9 +564,121 @@ class DiscordanceReportClassificationAdmin(admin.TabularInline):
         return False
 
 
+class DiscordanceReportAdminExport(ExportRow):
+
+    def __init__(self, discordance_report: DiscordanceReport, perspective: LabPickerData):
+        self.discordance_report = discordance_report
+        self.summaries = DiscordanceLabSummary.for_discordance_report(discordance_report, perspective)
+
+    @export_column("Report number")
+    def _report_number(self):
+        return self.discordance_report.pk
+
+    @export_column("# labs")
+    def _labs_involved(self):
+        return len(set([summary.lab for summary in self.summaries]))
+
+    @export_column("# classifications")
+    def _classification_count(self):
+        return sum((summary.count for summary in self.summaries))
+
+    @export_column("Status")
+    def _status(self):
+        return self.discordance_report.status
+
+    @export_column("Date Opened", data_type=ExportDataType.date)
+    def _date_opened(self):
+        return self.discordance_report.report_started_date
+
+    @export_column("Date Closed", data_type=ExportDataType.date)
+    def _date_closed(self):
+        return self.discordance_report.report_completed_date
+
+    @export_column("Days in Discordance")
+    def _days_in_discordance(self):
+        dr = self.discordance_report
+        closed = dr.report_completed_date
+        delta: timedelta
+        if not closed:
+            delta = timezone.now() - dr.report_started_date
+        else:
+            delta = closed - dr.report_started_date
+        return delta.days
+
+    @export_column("Gene Symbol")
+    def _gene_symbol(self):
+        all_chgvs = ImportedAlleleInfo.all_chgvs(self.discordance_report.clinical_context.allele)
+        return ", ".join(sorted(set([chgvs.gene_symbol for chgvs in all_chgvs])))
+
+    @export_column("c.HGVS (38)")
+    def _variant(self):
+        all_chgvs = ImportedAlleleInfo.all_chgvs(self.discordance_report.clinical_context.allele)
+        c38s = sorted([str(chgvs) for chgvs in all_chgvs if chgvs.genome_build == GenomeBuild.grch38()])
+        if c38s:
+            return ", ".join(c38s)
+
+    @export_column("Admin Notes")
+    def _admin_notes(self):
+        return self.discordance_report.admin_note
+
+    @export_column("Labs")
+    def _labs(self):
+        return ", ".join(str(summary.lab) for summary in self.summaries)
+
+    @export_column("Clinical Significances (Original)")
+    def _cs_original(self):
+        return ", ".join(str(summary.clinical_significance_from) for summary in self.summaries)
+
+    @export_column("Clinical Significances (Current)")
+    def _cs_current(self):
+        return ", ".join(str(summary.clinical_significance_to) for summary in self.summaries)
+
+    @export_column("Upgrade/Downgrade")
+    def _upgrade_downgrade(self):
+        cs_to_index = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE).option_dictionary_property("vg")
+        def up_down_for(summary: DiscordanceLabSummary):
+
+            from_value = int(cs_to_index.get(summary.clinical_significance_from, "0"))
+            to_value = int(cs_to_index.get(summary.clinical_significance_to, "0"))
+
+            if summary.clinical_significance_to == 'withdrawn':
+                return "withdrawn"
+            elif from_value == to_value:
+                return "same"
+            elif from_value == 0 or to_value == 0:
+                return "?"
+            else:
+                if to_value > from_value:
+                    return "upgrade"
+                else:
+                    return "downgrade"
+        return ", ".join((up_down_for(summary) for summary in self.summaries))
+
+    @export_column("Certainty")
+    def _certainty(self):
+        cs_to_index = EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE).option_dictionary_property("vg")
+
+        def up_down_for(summary: DiscordanceLabSummary):
+            from_value = int(cs_to_index.get(summary.clinical_significance_from, "0"))
+            to_value = int(cs_to_index.get(summary.clinical_significance_to, "0"))
+
+            if summary.clinical_significance_to == 'withdrawn':
+                return "withdrawn"
+            elif from_value == to_value:
+                return "same"
+            elif from_value == 0 or to_value == 0:
+                return "?"
+            else:
+                if abs(to_value - 3) > abs(from_value - 3):
+                    return "upgrade"
+                else:
+                    return "downgrade"
+        return ", ".join((up_down_for(summary) for summary in self.summaries))
+
+
 @admin.register(DiscordanceReport)
 class DiscordanceReportAdmin(ModelAdminBasics):
-    list_display = ["pk", "report_started_date", "c_hgvs",  "days_open", "classification_count", "clinical_sigs", "labs"]
+    list_display = ["pk", "report_started_date", "c_hgvs",  "days_open", "classification_count", "clinical_sigs", "labs", "anotes"]
     list_select_related = ('clinical_context', 'clinical_context__allele')
     list_filter = [DiscordanceReportAdminLabFilter]
     inlines = (DiscordanceReportClassificationAdmin,)
@@ -571,6 +687,11 @@ class DiscordanceReportAdmin(ModelAdminBasics):
     # def allele(self, obj: DiscordanceReport) -> str:
     #     cc = obj.clinical_context
     #     return str(cc.allele)
+
+    @admin_list_column("Admin Notes")
+    def anotes(self, obj: DiscordanceReport):
+        # make this an admin list column so it crops the characters
+        return obj.admin_note
 
     @admin_list_column("c.HGVS")
     def c_hgvs(self, obj: DiscordanceReport):
@@ -633,6 +754,60 @@ class DiscordanceReportAdmin(ModelAdminBasics):
         for ds in queryset:
             ds.clinical_context.recalc_and_save(cause="Admin recalculation", cause_code=ClinicalContextRecalcTrigger.ADMIN)
 
+    @admin_action("Export Admin Report CSV")
+    def export_admin_report(self, request, queryset: QuerySet[DiscordanceReport]):
+        perspective = LabPickerData.for_user(request.user)
+        return DiscordanceReportAdminExport.streaming(request, (DiscordanceReportAdminExport(dr, perspective) for dr in queryset), filename="discordance_admin_report")
+
+    #
+    # @admin_action("Export Discordance List")
+    # def export_discordance_list(self, request, queryset):
+    #
+    #     class ClassificationLabSummaryExport(ExportRow):
+    #
+    #         def __init__(self, drcls: ClassificationLabSummary):
+    #             self.drcls = drcls
+    #
+    #         @export_column(label="Lab")
+    #         def lab(self):
+    #             return str(self.drcls.lab)
+    #
+    #     class AdminDiscordanceExport(ExportRow):
+    #
+    #         def __init__(self, discordance_report: DiscordanceReport):
+    #             self.discordance_report = discordance_report
+    #
+    #         @export_column(label="id")
+    #         def _id(self):
+    #             return self.discordance_report.id
+    #
+    #         @export_column(label="Discordance Date", data_type=ExportDataType.date)
+    #         def _discordance_date(self):
+    #             return self.discordance_report.report_started_date
+    #
+    #         @export_column(label="URL")
+    #         def _url(self):
+    #             return get_url_from_view_path(self.discordance_report.get_absolute_url())
+    #
+    #         @export_column(label="status")
+    #         def _status(self):
+    #             return self.discordance_report.resolution_text
+    #
+    #         @export_column(label="c.HGVS")
+    #         def _chgvs(self):
+    #             return str(first(ImportedAlleleInfo.all_chgvs(self.discordance_report.clinical_context.allele)))
+    #
+    #         @cached_property
+    #         def _lab_summaries(self) -> List[ClassificationLabSummary]:
+    #             return ClassificationLabSummary.from_discordance(self.discordance_report, LabPickerData.for_user(request.user)
+    #
+    #         @export_column(label="Group1", sub_data=ClassificationLabSummaryExport)
+    #         def _group_1(self):
+    #             return ClassificationLabSummaryExport(ClassificationLabSummary.from_discordance(self.discordance_report, LabPickerData.for_user(request.user))[0])
+    #
+    #
+    #     return AdminDiscordanceExport.streaming(request, queryset, filename="discordance_reports_admin")
+    #
 
 @admin.register(UploadedClassificationsUnmapped)
 class UploadedClassificationsUnmappedAdmin(ModelAdminBasics):

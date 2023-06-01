@@ -29,7 +29,6 @@ from flags.models.enums import FlagStatus
 from flags.models.models import FlagComment
 from genes.hgvs import CHGVS
 from library.preview_request import PreviewModelMixin, PreviewKeyValue
-from library.utils import invalidate_cached_property
 from library.django_utils import get_url_from_view_path
 from library.utils import invalidate_cached_property, ExportRow, export_column, ExportDataType
 from snpdb.genome_build_manager import GenomeBuildManager
@@ -63,6 +62,8 @@ class DiscordanceReport(TimeStampedModel, ReviewableModelMixin, PreviewModelMixi
 
     cause_text = models.TextField(null=False, blank=True, default='')
     resolved_text = models.TextField(null=False, blank=True, default='')
+
+    admin_note = models.TextField(null=False, blank=True, default='')
 
     def preview_category(cls) -> str:
         return "Discordance Report"
@@ -395,6 +396,10 @@ class DiscordanceReport(TimeStampedModel, ReviewableModelMixin, PreviewModelMixi
 
 class DiscordanceReportRowData(ExportRow):
 
+    def __init__(self, discordance_report: DiscordanceReport, perspective: LabPickerData):
+        self.discordance_report = discordance_report
+        self.perspective = perspective
+
     @export_column(label="id")
     def _id(self):
         return self.discordance_report.id
@@ -437,11 +442,6 @@ class DiscordanceReportRowData(ExportRow):
             if condition := cm.classification.condition_resolution_obj:
                 rows.add(condition.as_plain_text)
         return "\n".join(sorted(rows))
-
-
-    def __init__(self, discordance_report: DiscordanceReport, perspective: LabPickerData):
-        self.discordance_report = discordance_report
-        self.perspective = perspective
 
     @cached_property
     def all_actively_involved_labs(self):
@@ -517,41 +517,8 @@ class DiscordanceReportRowData(ExportRow):
 
     @cached_property
     def lab_significances(self) -> List[ClassificationLabSummary]:
-        group_counts: Dict[ClassificationLabSummaryEntry, int] = defaultdict(int)
-        for drc in DiscordanceReportClassification.objects.filter(report=self.discordance_report).select_related(
-            'classification_original',
-            'classification_original__classification',
-            'classification_original__classification__lab',
-            'classification_original__classification__lab__organization',
-            'classification_final'
-        ):
-            clinical_significance_from = drc.classification_original.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
-            clinical_significance_to: Optional[str] = None
-            pending: bool = False
-            if drc.withdrawn_effective:
-                clinical_significance_to = 'withdrawn'
-            else:
-                if self.discordance_report.is_latest:
-                    # classification is still outstanding, check to see if there pending changes
-                    if flag := drc.classification_original.classification.flag_collection.get_open_flag_of_type(classification_flag_types.classification_pending_changes):
-                        clinical_significance_to = flag.data.get(ClassificationFlagTypes.CLASSIFICATION_PENDING_CHANGES_CLIN_SIG_KEY) or "unknown"
-                        pending = True
-
-                if not clinical_significance_to:
-                    clinical_significance_to = drc.classification_effective.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
-
-            group_counts[ClassificationLabSummaryEntry(
-                lab=drc.classification_original.classification.lab,
-                clinical_significance_from=clinical_significance_from,
-                clinical_significance_to=clinical_significance_to,
-                pending=pending
-            )] += 1
-
-        return sorted([ClassificationLabSummary(
-            group=group,
-            is_internal=group.lab in self.perspective.labs_if_not_admin,
-            count=count
-        ) for group, count in group_counts.items()])
+        from classification.models.discordance_lab_summaries import DiscordanceLabSummary
+        return DiscordanceLabSummary.for_discordance_report(discordance_report=self.discordance_report, perspective=self.perspective)
 
 
 @dataclass(frozen=True)
