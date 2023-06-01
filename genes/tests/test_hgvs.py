@@ -7,7 +7,9 @@ from django.test.testcases import TestCase
 from pyhgvs import HGVSName, InvalidHGVSName
 
 from annotation.tests.test_data_fake_genes import create_fake_transcript_version
-from genes.hgvs import HGVSMatcher, FakeTranscriptVersion, HGVSNameExtra
+from genes.hgvs import HGVSMatcher
+from genes.hgvs.hgvs_matcher import FakeTranscriptVersion
+from genes.hgvs.pyhgvs.hgvs_converter_pyhgvs import PyHGVSVariant
 from snpdb.models import GenomeBuild
 
 
@@ -75,11 +77,11 @@ class TestHGVS(TestCase):
         }
 
         for hgvs_string, hgvs_expected_trimmed in LONG_AND_TRIMMED_HGVS.items():
-            hgvs_name_extra = HGVSNameExtra(HGVSName(hgvs_string))
-            hgvs_actual_trimmed = hgvs_name_extra.format(max_ref_length=10)
+            hgvs_variant = PyHGVSVariant(HGVSName(hgvs_string))
+            hgvs_actual_trimmed = hgvs_variant.format(max_ref_length=10)
             self.assertEqual(hgvs_actual_trimmed, hgvs_expected_trimmed)
 
-            hgvs_actual_no_trim = hgvs_name_extra.format(max_ref_length=100)
+            hgvs_actual_no_trim = hgvs_variant.format(max_ref_length=100)
             self.assertEqual(hgvs_actual_no_trim, hgvs_string)  # No change
 
     @skip
@@ -96,25 +98,25 @@ class TestHGVS(TestCase):
     def test_sort_transcript_versions(self):
         transcript_version_and_methods = [
             (FakeTranscriptVersion("", 1), HGVSMatcher.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY),
-            (FakeTranscriptVersion("", 1), HGVSMatcher.HGVS_METHOD_PYHGVS),
+            (FakeTranscriptVersion("", 1), HGVSMatcher.HGVS_METHOD_INTERNAL_LIBRARY),
             (FakeTranscriptVersion("", 2), HGVSMatcher.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY),
-            (FakeTranscriptVersion("", 2), HGVSMatcher.HGVS_METHOD_PYHGVS),
+            (FakeTranscriptVersion("", 2), HGVSMatcher.HGVS_METHOD_INTERNAL_LIBRARY),
             (FakeTranscriptVersion("", 3), HGVSMatcher.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY),
-            (FakeTranscriptVersion("", 3), HGVSMatcher.HGVS_METHOD_PYHGVS),
+            (FakeTranscriptVersion("", 3), HGVSMatcher.HGVS_METHOD_INTERNAL_LIBRARY),
             # Missing v4
             (FakeTranscriptVersion("", 4), HGVSMatcher.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY),
             (FakeTranscriptVersion("", 5), HGVSMatcher.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY),
-            (FakeTranscriptVersion("", 5), HGVSMatcher.HGVS_METHOD_PYHGVS),
+            (FakeTranscriptVersion("", 5), HGVSMatcher.HGVS_METHOD_INTERNAL_LIBRARY),
             (FakeTranscriptVersion("", 6), HGVSMatcher.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY),
-            (FakeTranscriptVersion("", 6), HGVSMatcher.HGVS_METHOD_PYHGVS),
+            (FakeTranscriptVersion("", 6), HGVSMatcher.HGVS_METHOD_INTERNAL_LIBRARY),
         ]
 
         expected_up_then_down = [
-            (FakeTranscriptVersion("", 5), HGVSMatcher.HGVS_METHOD_PYHGVS),
-            (FakeTranscriptVersion("", 6), HGVSMatcher.HGVS_METHOD_PYHGVS),
-            (FakeTranscriptVersion("", 3), HGVSMatcher.HGVS_METHOD_PYHGVS),
-            (FakeTranscriptVersion("", 2), HGVSMatcher.HGVS_METHOD_PYHGVS),
-            (FakeTranscriptVersion("", 1), HGVSMatcher.HGVS_METHOD_PYHGVS),
+            (FakeTranscriptVersion("", 5), HGVSMatcher.HGVS_METHOD_INTERNAL_LIBRARY),
+            (FakeTranscriptVersion("", 6), HGVSMatcher.HGVS_METHOD_INTERNAL_LIBRARY),
+            (FakeTranscriptVersion("", 3), HGVSMatcher.HGVS_METHOD_INTERNAL_LIBRARY),
+            (FakeTranscriptVersion("", 2), HGVSMatcher.HGVS_METHOD_INTERNAL_LIBRARY),
+            (FakeTranscriptVersion("", 1), HGVSMatcher.HGVS_METHOD_INTERNAL_LIBRARY),
             (FakeTranscriptVersion("", 4), HGVSMatcher.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY),
             (FakeTranscriptVersion("", 5), HGVSMatcher.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY),
             (FakeTranscriptVersion("", 6), HGVSMatcher.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY),
@@ -124,11 +126,11 @@ class TestHGVS(TestCase):
         ]
 
         expected_closest = [
-            (FakeTranscriptVersion("", 5), HGVSMatcher.HGVS_METHOD_PYHGVS),
-            (FakeTranscriptVersion("", 3), HGVSMatcher.HGVS_METHOD_PYHGVS),
-            (FakeTranscriptVersion("", 6), HGVSMatcher.HGVS_METHOD_PYHGVS),
-            (FakeTranscriptVersion("", 2), HGVSMatcher.HGVS_METHOD_PYHGVS),
-            (FakeTranscriptVersion("", 1), HGVSMatcher.HGVS_METHOD_PYHGVS),
+            (FakeTranscriptVersion("", 5), HGVSMatcher.HGVS_METHOD_INTERNAL_LIBRARY),
+            (FakeTranscriptVersion("", 3), HGVSMatcher.HGVS_METHOD_INTERNAL_LIBRARY),
+            (FakeTranscriptVersion("", 6), HGVSMatcher.HGVS_METHOD_INTERNAL_LIBRARY),
+            (FakeTranscriptVersion("", 2), HGVSMatcher.HGVS_METHOD_INTERNAL_LIBRARY),
+            (FakeTranscriptVersion("", 1), HGVSMatcher.HGVS_METHOD_INTERNAL_LIBRARY),
             (FakeTranscriptVersion("", 4), HGVSMatcher.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY),
             (FakeTranscriptVersion("", 5), HGVSMatcher.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY),
             (FakeTranscriptVersion("", 3), HGVSMatcher.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY),

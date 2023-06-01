@@ -530,29 +530,32 @@ class GeneVersion(models.Model):
 
     @cached_property
     def _transcript_extents(self):
-        """ Stores chroms/min_start/max_end/strands - which are aggregate of all linked TranscriptVersions """
+        """ Stores chroms/min_start/max_end/strands - calculated from all linked TranscriptVersions """
 
-        FIELDS = ["chrom", "start", "end", "strand"]
-        data = defaultdict(set)
+        FIELDS = ["contig", "strand"]
+        all_transcripts_data = defaultdict(set)
         for tv in self.transcriptversion_set.all():
             for f in FIELDS:
-                data[f].add(tv.pyhgvs_data[f])
+                all_transcripts_data[f].add(tv.genome_build_data[f])
+            all_transcripts_data["start"].add(tv.start)
+            all_transcripts_data["end"].add(tv.end)
 
         # Sometimes chrom is a contig so we'll end up with chrom as "3,NC_000003.11" - check only 1 and convert to name
-        chrom_list = data["chrom"]
-        contigs = {self.genome_build.chrom_contig_mappings[chrom] for chrom in chrom_list}
+        chrom_set = all_transcripts_data["contig"]
+        contigs = {self.genome_build.chrom_contig_mappings[chrom] for chrom in chrom_set}
         if len(contigs) != 1:
-            raise ValueError(f"{self}: 'chrom' ({data['chrom']}) didn't matp to exactly 1 contig: '{contigs}'")
-        data["chrom"] = contigs.pop().name
+            raise ValueError(f"{self}: 'chrom' ({all_transcripts_data['contig']}) didn't map to exactly 1 contig: '{contigs}'")
 
-        data["start"] = min(data["start"])
-        data["end"] = min(data["end"])
+        strand_set = all_transcripts_data["strand"]
+        if len(strand_set) != 1:
+            raise ValueError(f"{self}: Not exactly 1 value for 'strand', was: {strand_set}")
 
-        strand = data["strand"]
-        if len(strand) != 1:
-            raise ValueError(f"{self}: Not exactly 1 value for 'strand', was: {strand}")
-        data["strand"] = data["strand"].pop()
-        return data
+        return {
+            "chrom": contigs.pop().name,
+            "start": min(all_transcripts_data["start"]),
+            "end": min(all_transcripts_data["end"]),
+            "strand": strand_set.pop(),
+        }
 
     @staticmethod
     def get_gene_id_and_version(gene_accession: str) -> Tuple[str, Optional[int]]:
@@ -679,26 +682,29 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
     @cached_property
     def _transcript_regions(self) -> Tuple[List, List, List]:
         """ Returns 5'UTR, CDS, 3'UTR """
-        cds_start = self.pyhgvs_data["cds_start"]
-        cds_end = self.pyhgvs_data["cds_end"]
+        cds_start = self.genome_build_data.get("cds_start")
+        cds_end = self.genome_build_data.get("cds_end")
         left_utr = []
         cds = []
         right_utr = []
-        for exon_start, exon_end, *_ in self.pyhgvs_data["exons"]:
-            if exon_start < cds_start:
-                left_end = min(cds_start, exon_end)
-                left_utr.append((exon_start, left_end))
+        for exon_start, exon_end, *_ in self.genome_build_data["exons"]:
+            if cds_start:
+                if exon_start < cds_start:
+                    left_end = min(cds_start, exon_end)
+                    left_utr.append((exon_start, left_end))
 
-            if exon_end > cds_start and exon_start < cds_end:
-                start = max(exon_start, cds_start)
-                end = min(exon_end, cds_end)
-                cds.append((start, end))
+                if exon_end > cds_start and exon_start < cds_end:
+                    start = max(exon_start, cds_start)
+                    end = min(exon_end, cds_end)
+                    cds.append((start, end))
 
-            if exon_end > cds_end:
-                right_start = max(exon_start, cds_end)
-                right_utr.append((right_start, exon_end))
+                if exon_end > cds_end:
+                    right_start = max(exon_start, cds_end)
+                    right_utr.append((right_start, exon_end))
+            else:
+                left_utr.append((exon_start, exon_end))
 
-        if self.pyhgvs_data["strand"] == '+':
+        if self.genome_build_data["strand"] == '+':
             return left_utr, cds, right_utr
         else:
             return right_utr, cds, left_utr
@@ -805,9 +811,9 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
         match_summary = ""
         if cdna_errors := self._validate_cdna_match():
             match_summary = ", ".join(cdna_errors)
-        elif cdna_match := self.pyhgvs_data.get("cdna_match"):
+        elif exons := self.genome_build_data.get("exons"):
             gap_operations = Counter()
-            for (_, _, _, _, gap) in cdna_match:
+            for (_, _, _, _, gap) in exons:
                 if gap:
                     for gap_op in gap.split():
                         code = gap_op[0]
@@ -835,22 +841,22 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
         if self.transcript.annotation_consortium == AnnotationConsortium.REFSEQ:
             # Sometimes RefSeq transcripts have gaps when aligning to the genome
             # We've modified PyHGVS to be able to handle this
-            GAP_CODES = ["cdna_match", "partial", "alignent_gap_error"]
-            if any(gap in self.pyhgvs_data for gap in GAP_CODES):
-                return True
+            for ex in self.genome_build_data["exons"]:
+                if ex[-1] is not None:
+                    return True
             return not self.sequence_length_matches_exon_length_ignoring_poly_a_tail
 
         # Ensembl transcripts use genomic sequence so there is never any gap
         return False
 
     @staticmethod
-    def get_transcript_id_and_version(transcript_name: str) -> Tuple[str, int]:
-        parts = transcript_name.split(".")
+    def get_transcript_id_and_version(transcript_accession: str) -> Tuple[str, int]:
+        parts = transcript_accession.split(".")
         if len(parts) == 2:
             identifier = str(parts[0])
             version = int(parts[1])
         else:
-            identifier, version = transcript_name, None
+            identifier, version = transcript_accession, None
         return identifier, version
 
     @staticmethod
@@ -974,9 +980,9 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
     def _sum_intervals(intervals: List[Tuple]):
         return sum(b - a for a, b in intervals)
 
-    @property
+    @cached_property
     def genome_build_data(self) -> Dict:
-        return self.data.get("genome_builds", {}).get(self.genome_build.name, {})
+        return self.data["genome_builds"][self.genome_build.name]
 
     @cached_property
     def pyhgvs_data(self):
@@ -990,16 +996,13 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
 
     @cached_property
     def length(self) -> Optional[int]:
-        if cdna_match := self.pyhgvs_data.get('cdna_match'):
-            # cdna_match = (genomic start, genomic end, cDNA start, cDNA end, gap) (genomic=0 based, transcript=1)
-            if self.pyhgvs_data["strand"] == '-':
-                transcript_end_match = cdna_match[0]
-            else:
-                transcript_end_match = cdna_match[-1]
-            return transcript_end_match[3]
-        if exons := self.pyhgvs_data.get("exons"):
-            return self._sum_intervals(exons)
-        return None
+        exons = self.genome_build_data["exons"]
+        strand = self.genome_build_data["strand"]
+        if strand == '-':
+            transcript_end_match = exons[0]
+        else:
+            transcript_end_match = exons[-1]
+        return transcript_end_match[4]
 
     @cached_property
     def fivep_utr_length(self) -> int:
@@ -1023,16 +1026,24 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
 
     @property
     def chrom(self):
-        raw_chrom = self.pyhgvs_data["chrom"]  # Could be stored as contig
-        return self.genome_build.chrom_contig_mappings[raw_chrom].name
+        raw_contig = self.genome_build_data["contig"]
+        return self.genome_build.chrom_contig_mappings[raw_contig].name
+
+    @property
+    def start(self) -> int:
+        exons = self.genome_build_data["exons"]
+        return exons[0][0]
+
+    @property
+    def end(self) -> int:
+        exons = self.genome_build_data["exons"]
+        return exons[-1][1]
 
     @property
     def coordinates(self):
         """ 1-based for humans """
-        coords = None
-        if self.pyhgvs_data:
-            coords = f"{self.chrom}:{self.pyhgvs_data['start'] + 1}-{self.pyhgvs_data['end']} ({self.pyhgvs_data['strand']})"
-        return coords
+        strand = self.genome_build_data["strand"]
+        return f"{self.chrom}:{self.start + 1}-{self.end} ({strand})"
 
     @cached_property
     def tags(self) -> List[str]:
@@ -1064,29 +1075,27 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
         return bool(self.canonical_score)
 
     def get_contigs(self) -> Set[Contig]:
-        raw_chrom = {self.pyhgvs_data["chrom"]}
-        if other_chroms := self.pyhgvs_data.get("other_chroms"):
-            raw_chrom.update(other_chroms)
-        return {self.genome_build.chrom_contig_mappings[c] for c in raw_chrom}
+        contigs = {self.genome_build_data["contig"]}
+        if other_contigs := self.genome_build_data.get("other_chroms"):
+            contigs.update(other_contigs)
+        return {self.genome_build.chrom_contig_mappings[c] for c in contigs}
 
     def get_chromosomes(self) -> Set[str]:
         return {c.name for c in self.get_contigs()}
 
     def _validate_cdna_match(self) -> List[str]:
         cdna_match_errors = []
-        if alignent_gap_error := self.pyhgvs_data.get("alignent_gap_error"):
-            cdna_match_errors.append(alignent_gap_error)
-
-        if cdna_match := self.pyhgvs_data.get('cdna_match'):
+        if exons := self.genome_build_data.get('exons'):
             # cdna_match = (genomic start, genomic end, cDNA start, cDNA end, gap) (genomic=0 based, transcript=1)
-            if self.pyhgvs_data["strand"] == '-':
-                cdna_match = list(reversed(cdna_match))
-
-            if cdna_match[0][2] != 1:
-                cdna_match_errors.append(f"cDNA match starts at {cdna_match[0][2]} not 1")
+            if self.genome_build_data["strand"] == '-':
+                exons = list(reversed(exons))
 
             last_end = None
-            for _, _, cdna_start, cdna_end, _ in cdna_match:
+            for _, _, exon_id, cdna_start, cdna_end, _ in exons:
+                if exon_id == 0:
+                    if cdna_start != 1:
+                        cdna_match_errors.append(f"cDNA match starts at {cdna_start} not 1")
+
                 if last_end:
                     missing = cdna_start - (last_end + 1)
                     if missing:
@@ -1099,8 +1108,8 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
     @property
     def has_valid_data(self) -> bool:
         try:
-            for key in ["chrom", "start", "end", "strand", "exons"]:
-                _ = self.pyhgvs_data[key]
+            for key in ["contig", "strand", "exons"]:
+                _ = self.genome_build_data[key]
         except KeyError:
             return False
 
@@ -1117,8 +1126,8 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
                 differences[f] = (mine, other)
 
         if self.data and transcript_version.data:
-            my_chrom = self.pyhgvs_data["chrom"]
-            other_chrom = transcript_version.pyhgvs_data["chrom"]
+            my_chrom = self.genome_build_data["contig"]
+            other_chrom = transcript_version.genome_build_data["contig"]
             if my_chrom != other_chrom:
                 try:
                     # Could be different but map to the same thing - try resolving it to contig name
@@ -1130,15 +1139,15 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
                     # Can't convert - just show differences
                     differences["contig"] = (my_chrom, other_chrom)
 
-            my_exon_count = len(self.pyhgvs_data["exons"])
-            other_exon_count = len(transcript_version.pyhgvs_data["exons"])
+            my_exon_count = len(self.genome_build_data["exons"])
+            other_exon_count = len(transcript_version.genome_build_data["exons"])
             if my_exon_count != other_exon_count:
                 differences["exon count"] = (my_exon_count, other_exon_count)
             else:
                 exon = 1
-                my_exons = self.pyhgvs_data["exons"]
-                other_exons = transcript_version.pyhgvs_data["exons"]
-                if self.pyhgvs_data["strand"] == "-":
+                my_exons = self.genome_build_data["exons"]
+                other_exons = transcript_version.genome_build_data["exons"]
+                if self.genome_build_data["strand"] == "-":
                     my_exons = reversed(my_exons)
                     other_exons = reversed(other_exons)
 
@@ -1149,8 +1158,8 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
                         differences[f"exon {exon}"] = (my_len, other_len)
                     exon += 1
         else:
-            my_keys = set(self.pyhgvs_data.keys())
-            other_keys = set(transcript_version.pyhgvs_data.keys())
+            my_keys = set(self.genome_build_data.keys())
+            other_keys = set(transcript_version.genome_build_data.keys())
             if my_keys ^ other_keys:
                 differences["data"] = (my_keys, other_keys)
 

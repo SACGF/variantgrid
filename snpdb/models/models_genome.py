@@ -161,10 +161,10 @@ class GenomeBuild(models.Model, SortMetaOrderingMixin):
     def get_chrom_contig_id_mappings(self) -> Dict[str, int]:
         return {k: v.pk for k, v in self.chrom_contig_mappings.items()}
 
-    def convert_chrom_to_contig_name(self, chrom: str) -> str:
+    def convert_chrom_to_contig_accession(self, chrom: str) -> str:
         """ chrom = ucsc_name/genbank_accession/refseq accession """
         contig = self.chrom_contig_mappings[chrom]
-        return contig.name
+        return contig.refseq_accession
 
     @property
     def settings(self):

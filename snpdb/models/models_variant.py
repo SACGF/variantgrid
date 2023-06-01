@@ -424,7 +424,11 @@ class Variant(PreviewModelMixin, models.Model):
     def coordinate(self) -> VariantCoordinate:
         locus = self.locus
         contig = locus.contig
-        return VariantCoordinate(chrom=contig.name, pos=locus.position, ref=locus.ref.seq, alt=self.alt.seq)
+        ref = locus.ref.seq
+        alt = self.alt.seq
+        if alt == Variant.REFERENCE_ALT:
+            alt = ref
+        return VariantCoordinate(chrom=contig.name, pos=locus.position, ref=ref, alt=alt)
 
     @staticmethod
     def is_ref_alt_reference(ref, alt):

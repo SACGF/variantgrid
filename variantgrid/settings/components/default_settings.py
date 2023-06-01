@@ -380,6 +380,7 @@ COMPANY = None  # Used for gene list categories
 
 GENERATED_DIR = os.path.join(MEDIA_ROOT, 'generated')
 
+HGVS_DEFAULT_METHOD = "pyhgvs"  # HGVSConverterType (any case) ie "pyhgvs", "biocommons_hgvs"
 HGVS_MAX_REF_ALLELE_LENGTH = 10  # Set to 0 for "del" instead of "delC" etc
 
 PATIENTS_READ_ONLY_SHOW_AGE_NOT_DOB = False

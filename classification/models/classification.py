@@ -41,7 +41,7 @@ from classification.models.flag_types import classification_flag_types
 from flags.models import Flag, FlagPermissionLevel, FlagStatus
 from flags.models.models import FlagsMixin, FlagCollection, FlagTypeContext, \
     flag_collection_extra_info_signal, FlagInfos
-from genes.hgvs import HGVSMatcher, CHGVS, HGVSNameExtra
+from genes.hgvs import HGVSMatcher, CHGVS, HGVSVariant
 from genes.models import Gene
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
 from library.guardian_utils import clear_permissions
@@ -2152,16 +2152,16 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         c_hgvs.is_desired_build = preferred_genome_build == c_hgvs.genome_build
         return c_hgvs
 
-    def _generate_c_hgvs_extra(self, genome_build: GenomeBuild) -> HGVSNameExtra:
+    def _generate_c_hgvs(self, genome_build: GenomeBuild) -> str:
         variant = self.get_variant_for_build(genome_build)
         hgvs_matcher = HGVSMatcher(genome_build=genome_build)
 
-        c_hgvs: HGVSNameExtra = HGVSNameExtra()
+        c_hgvs: str = None
         if variant:
             transcript_id = None
             try:
                 transcript_id = self.transcript
-                c_hgvs = hgvs_matcher.variant_to_c_hgvs_extra(variant, transcript_id)
+                c_hgvs = hgvs_matcher.variant_to_c_hgvs(variant, transcript_id)
             except Exception:
                 # can't map between builds
                 report_exc_info(extra_data={
@@ -2176,7 +2176,7 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             return self.chgvs_grch37 if not use_full else self.chgvs_grch37_full
         if genome_build == genome_build.grch38():
             return self.chgvs_grch38 if not use_full else self.chgvs_grch38_full
-        return self._generate_c_hgvs_extra(genome_build).format()
+        return self._generate_c_hgvs(genome_build)
 
     def __str__(self) -> str:
         genome_build = GenomeBuildManager.get_current_genome_build()
