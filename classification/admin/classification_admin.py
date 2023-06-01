@@ -675,9 +675,9 @@ class DiscordanceReportAdminExport(ExportRow):
                 return "?"
             else:
                 if abs(to_value - 3) > abs(from_value - 3):
-                    return "upgrade"
+                    return "more"
                 else:
-                    return "downgrade"
+                    return "less"
         return "\n".join((up_down_for(summary) for summary in self.summaries))
 
 
