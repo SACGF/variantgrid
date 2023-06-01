@@ -630,6 +630,14 @@ class DiscordanceReportAdminExport(ExportRow):
     def _labs(self):
         return "\n".join(str(summary.lab) for summary in self.summaries)
 
+    @export_column("Conditions")
+    def _conditions(self):
+        condition_rows = []
+        for summary in self.summaries:
+            conditions = set([drc.classification_effective.condition_text or "" for drc in summary.drcs])
+            condition_rows.append(", ".join(sorted(conditions)))
+        return "\n".join(condition_rows)
+
     @export_column("Clinical Significances (Original)")
     def _cs_original(self):
         return "\n".join(str(summary.clinical_significance_from) for summary in self.summaries)
