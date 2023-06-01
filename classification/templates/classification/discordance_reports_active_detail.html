@@ -75,7 +75,7 @@
                         </span>
                         {% with contact=lab_count.lab.contact_details %}
                             {% if contact %}
-                                <div class="float-right">
+                                <div class="float-right text-secondary">
                                     {% if contact.website %}<i class="fas fa-globe"></i>{% endif %}
                                     {% if contact.email %}<i class="fas fa-envelope"></i>{% endif %}
                                     {% if contact.phone %}<i class="fas fa-phone"></i>{% endif %}
@@ -105,7 +105,7 @@
                                     {% labelled label="Contact Phone" %}{{ contact.phone }}{% endlabelled %}
                                 {% endif %}
                                 {% if contact.email %}
-                                    {% labelled label="Contact Email" %}<a href="mailto:{{ contact.email }}">{{ contact.email }}</a>{% endlabelled %}
+                                    {% labelled label="Contact Email" %}<a href="mailto:{{ contact.email }}" class="mail-link">{{ contact.email }}</a>{% endlabelled %}
                                 {% endif %}
                             {% endif %}
                         </div>

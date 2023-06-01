@@ -11,6 +11,11 @@ from zipfile import ZipFile
 
 
 class FileHandle(ABC):
+    """
+    Used as an abstract over file data - typical implementation is an S3 file, but one could be written for a regular
+    ol file in the local filesystem
+    """
+
 
     @abstractmethod
     def _data_handle(self):

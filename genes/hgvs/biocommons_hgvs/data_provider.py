@@ -8,8 +8,8 @@ from snpdb.models import Contig
 class SingleBuildFastaSeqFetcher(FastaSeqFetcher):
     """ We want this to fail with ContigNotInBuildError if asked for a contig not in the
         the genome build provided """
-    def __init__(self, genome_build, cache=True):
-        super().__init__(genome_build.genome_fasta.filename, cache=cache)
+    def __init__(self, genome_build):
+        super().__init__(genome_build.genome_fasta.filename)
         self.genome_build = genome_build
 
     def fetch_seq(self, ac, start_i=None, end_i=None):

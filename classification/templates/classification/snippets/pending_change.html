@@ -1,0 +1,9 @@
+{% load classification_tags %}
+<div class="row">
+    <div class="col-12 col-md-3 text-md-right">
+        {% lab change.lab %}
+    </div><div class="col-12 col-md-9">
+        to change classifications from
+        {% clinical_significance_inline change.from_cs %} to {% clinical_significance_inline change.to_cs %}
+    </div>
+</div>

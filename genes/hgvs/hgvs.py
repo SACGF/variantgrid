@@ -1,3 +1,4 @@
+import abc
 import enum
 import re
 from dataclasses import dataclass
@@ -389,67 +390,13 @@ class CHGVS:
         return cdiff
 
 
-class HGVSNameExtra:
+class HGVSVariant(abc.ABC):
+    @abc.abstractmethod
+    def format(self, max_ref_length=settings.HGVS_MAX_REF_ALLELE_LENGTH):
+        pass
 
-    def __init__(self, hgvs_name: Optional[HGVSName] = None):
-        if isinstance(hgvs_name, HGVSNameExtra):
-            raise ValueError("Double extra!")
-        self._hgvs_name = hgvs_name
-
-    def _safe(self) -> HGVSName:
-        params = vars(self._hgvs_name)
-        params.pop('name', None)  # don't provide name a second time as parsing of name redundantly recalculates values
-        copy = HGVSName(**params)
-        return copy
-
-    def format(self, max_ref_length=settings.HGVS_MAX_REF_ALLELE_LENGTH) -> Optional[str]:
-        # would be better practise to throw an error if we couldn't generate
-        # but this keeps existing behaviour
-        if not self._hgvs_name:
-            return None
-
-        if HGVSNameExtra.can_shrink_long_ref(self._hgvs_name, max_ref_length=max_ref_length):
-            hgvs_name = self._safe()
-            HGVSNameExtra.format_hgvs_remove_long_ref(hgvs_name, max_ref_length=max_ref_length)
-            return hgvs_name.format()
-        return self._hgvs_name.format()
-
-    @staticmethod
-    def can_shrink_long_ref(hgvs_name, max_ref_length=10) -> bool:
-        SHRINKABLE_MUTATION_TYPES = {"del", "dup", "delins"}
-        return hgvs_name.mutation_type in SHRINKABLE_MUTATION_TYPES and len(hgvs_name.ref_allele) > max_ref_length
-
-    @staticmethod
-    def format_hgvs_remove_long_ref(hgvs_name, max_ref_length=10):
-        """ Similar to pyhgvs.variant_to_hgvs_name but only for dels, delins and dups and we don't specify length
-
-            From a Facebook post:
-            Q: What is the correct way to describe a deletion, c.7432-2025_7536+372del2502 or c.7432-2025_7536+372del.
-            While ClinVar seems to prefer the first, #HGVS seems to prefer the second format.
-            A: HGVS descriptions do not contain redundant information. The size of the deletion, in the example 2502
-            nucleotides, can be deduced from the variant description. HGVS thus suggests to use c.7432-2025_7536+372del.
-        """
-
-        if HGVSNameExtra.can_shrink_long_ref(hgvs_name, max_ref_length=max_ref_length):
-            hgvs_name.ref_allele = ""
-
-    def ref_lengths(self) -> int:
-        if not self._hgvs_name:
-            return 0
-
-        count = 0
-        h_name = self._hgvs_name
-        parts = [
-            h_name.ref_allele,
-            h_name.ref2_allele
-        ]
-        for part in parts:
-            if part:
-                count += len(part)
-        return count
-
-    def __str__(self):
-        return self.format()
+    def __eq__(self, other):
+        return self.format() == other.format()
 
 
 def get_kind_and_transcript_accession_from_invalid_hgvs(hgvs_string: str):

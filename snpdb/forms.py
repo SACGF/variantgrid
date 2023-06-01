@@ -445,6 +445,7 @@ class SettingsOverrideForm(BaseModelForm):
             "variant_link_in_analysis_opens_new_tab": settings_config.analysis_enabled,
             "tool_tips": settings_config.analysis_enabled,
             "node_debug_tab": settings_config.analysis_enabled,
+            "tag_colors": settings_config.analysis_enabled,
             "import_messages": settings_config.upload_enabled,
             "igv_port": settings_config.igv_links_enabled,
         }

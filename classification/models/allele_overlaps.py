@@ -18,7 +18,6 @@ from library.utils import group_by_key, segment, first
 from snpdb.lab_picker import LabPickerData
 from snpdb.models import Allele, Lab
 
-
 @dataclass(frozen=True)
 class _PatientIdLab:
     lab: Lab
@@ -27,6 +26,10 @@ class _PatientIdLab:
 
 @dataclass(frozen=True)
 class PatientCount:
+    """
+    Used to attempt to count how many unique patients each lab has seen.
+    Is complicated by spotty use of patient_id, and some labs only being able to provide one classification per allele
+    """
 
     counts: Dict[_PatientIdLab, int]
 
@@ -356,10 +359,14 @@ class OverlapsCalculator:
             for cc in overlap.clinical_groupings:
                 yield cc
 
-    def overlaps_vus(self) -> Iterator[ClinicalGroupingOverlap]:
+    @cached_property
+    def overlaps_vus(self) -> List[ClinicalGroupingOverlap]:
+        overlaps = []
         for cc in self.clinical_groupings_overlaps:
             if cc.is_all_vus and cc.is_multi_lab:
-                yield cc
+                if cc.allele:
+                    overlaps.append(cc)
+        return overlaps
 
     @property
     def overlap_sets(self) -> List[OverlapSet]:

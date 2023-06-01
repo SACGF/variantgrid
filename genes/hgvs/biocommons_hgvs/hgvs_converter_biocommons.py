@@ -2,14 +2,24 @@ import re
 from importlib import metadata
 from typing import Tuple
 
+from django.conf import settings
 from hgvs.exceptions import HGVSDataNotAvailableError
 from hgvs.sequencevariant import SequenceVariant
 from hgvs.validator import ExtrinsicValidator
 
+from genes.hgvs import HGVSVariant
 from genes.hgvs.biocommons_hgvs.babelfish import Babelfish, ParserSingleton
 from genes.hgvs.biocommons_hgvs.data_provider import DjangoTranscriptDataProvider
 from genes.hgvs.hgvs_converter import HGVSConverter, HgvsMatchRefAllele
 from snpdb.models import GenomeBuild, VariantCoordinate, Contig
+
+
+class BioCommonsHGVSVariant(HGVSVariant):
+    def __init__(self, sequence_variant: SequenceVariant):
+        self.sequence_variant = sequence_variant
+
+    def format(self, max_ref_length=settings.HGVS_MAX_REF_ALLELE_LENGTH):
+        return self.sequence_variant.format()
 
 
 class BioCommonsHGVSConverter(HGVSConverter):
@@ -20,13 +30,13 @@ class BioCommonsHGVSConverter(HGVSConverter):
         self.hdp = DjangoTranscriptDataProvider(genome_build)
         self.babelfish = Babelfish(self.hdp, genome_build.name)
 
-    def variant_coords_to_g_hgvs(self, vc: VariantCoordinate) -> str:
+    def variant_coords_to_g_hgvs(self, vc: VariantCoordinate) -> HGVSVariant:
         var_g = self.babelfish.vcf_to_g_hgvs(*vc)
-        return var_g.format()
+        return BioCommonsHGVSVariant(var_g)
 
-    def variant_coords_to_c_hgvs(self, vc: VariantCoordinate, transcript_version) -> str:
+    def variant_coords_to_c_hgvs(self, vc: VariantCoordinate, transcript_version) -> HGVSVariant:
         var_c = self.babelfish.vcf_to_c_hgvs(*vc, transcript_accession=str(transcript_version))
-        return var_c.format()
+        return BioCommonsHGVSVariant(var_c)
 
     def hgvs_to_variant_coords_and_reference_match(self, hgvs_string: str, transcript_version=None) -> Tuple[VariantCoordinate, HgvsMatchRefAllele]:
         var_g = self.babelfish.hgvs_to_g_hgvs(hgvs_string)

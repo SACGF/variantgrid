@@ -19,6 +19,7 @@ from library.log_utils import report_exc_info, report_message, log_level_to_int,
 from library.preview_request import PreviewCoordinator, PreviewData, PreviewModelMixin
 from library.utils import clean_string, first
 from snpdb.models import UserSettings, GenomeBuild, Variant, Allele
+import logging
 
 
 search_signal = Signal()
@@ -882,9 +883,14 @@ def search_receiver(
                                     limit -= 1
 
             except Exception as e:
+                message = str(e)
+                # Maybe all ValueErrors don't have user-friendly messages, but haven't gone through the code to check
+                if "invalid literal" in message:
+                    message = f"Unexpected error processing \"{search_input.search_string}\""
+
                 # TODO, determine if the Exception type is valid for users or not
-                overall_messages.add(SearchMessageOverall(str(e), severity=LogLevel.ERROR))
-                print(f"Error handling search_receiver on {func}")
+                overall_messages.add(SearchMessageOverall(message, severity=LogLevel.ERROR))
+                logging.error(f"Error handling search_receiver on {func}")
                 report_exc_info()
 
             response = SearchResponse(

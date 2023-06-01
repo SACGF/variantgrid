@@ -79,7 +79,7 @@
     </td>
     {% with curated_date=group.most_recent_curated %}
     <td style="width:100px" data-order="{{ group.date_sort_order_str }}">
-        <a  href="{% url 'view_classification' group.most_recent.classification.id %}">
+        <a  href="{% url 'view_classification' group.most_recent.classification.id %}" class="hover-link">
             {% if curated_date.name %}{{ curated_date.name }}<br/>{% endif %}{% timestamp curated_date.date.timestamp time_ago=True %}
         </a><br/>
     </td>

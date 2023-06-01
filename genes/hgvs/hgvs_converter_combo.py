@@ -3,6 +3,7 @@ from typing import Tuple
 
 from more_itertools import all_equal
 
+from genes.hgvs import HGVSVariant
 from genes.hgvs.hgvs_converter import HGVSConverter, HgvsMatchRefAllele
 from library.utils import all_equal
 from snpdb.models import VariantCoordinate, GenomeBuild
@@ -27,12 +28,15 @@ class ComboCheckerHGVSConverter(HGVSConverter):
                 raise ValueError(msg)
             else:
                 logging.error(msg)
-        return results[0]  # All same so any is fine
 
-    def variant_coords_to_g_hgvs(self, vc: VariantCoordinate) -> str:
+        result = results[0]  # All same so any is fine
+        # logging.debug("HGVS Combo: %s", result)
+        return result
+
+    def variant_coords_to_g_hgvs(self, vc: VariantCoordinate) -> HGVSVariant:
         return self._call_converters("variant_coords_to_g_hgvs", vc)
 
-    def variant_coords_to_c_hgvs(self, vc: VariantCoordinate, transcript_version) -> str:
+    def variant_coords_to_c_hgvs(self, vc: VariantCoordinate, transcript_version) -> HGVSVariant:
         return self._call_converters("variant_coords_to_c_hgvs", vc, transcript_version)
 
     def hgvs_to_variant_coords_and_reference_match(self, hgvs_string: str, transcript_version) -> Tuple[VariantCoordinate, HgvsMatchRefAllele]:

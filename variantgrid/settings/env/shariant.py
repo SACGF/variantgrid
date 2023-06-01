@@ -11,6 +11,8 @@ from variantgrid.settings.components.default_settings import *  # pylint: disabl
 from variantgrid.settings.components.seqauto_settings import *  # pylint: disable=wildcard-import, unused-wildcard-import
 import re
 
+SYNC_DETAILS = get_shariant_sync_secrets()
+
 ALLELE_VALIDATION = True
 AVATAR_PROVIDERS = (
     'library.django_utils.avatar.SpaceThemedAvatarProvider'

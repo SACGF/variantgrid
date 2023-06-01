@@ -9,6 +9,7 @@ from typing import Set, Optional, List, Dict, Tuple, Any, Iterable
 import django.dispatch
 from django.conf import settings
 from django.contrib.auth.models import User
+from django.core.exceptions import PermissionDenied
 from django.db import models, transaction
 from django.db.models import QuerySet
 from django.db.models.deletion import PROTECT, CASCADE
@@ -23,10 +24,13 @@ from classification.models.classification import ClassificationModification, Cla
 from classification.models.classification_lab_summaries import ClassificationLabSummaryEntry, ClassificationLabSummary
 from classification.models.clinical_context_models import ClinicalContext
 from classification.models.flag_types import classification_flag_types, ClassificationFlagTypes
+from review.models import ReviewableModelMixin, Review
 from flags.models.enums import FlagStatus
 from flags.models.models import FlagComment
 from genes.hgvs import CHGVS
-from library.utils import invalidate_cached_property
+from library.preview_request import PreviewModelMixin, PreviewKeyValue
+from library.django_utils import get_url_from_view_path
+from library.utils import invalidate_cached_property, ExportRow, export_column, ExportDataType
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.lab_picker import LabPickerData
 from snpdb.models import Lab, GenomeBuild
@@ -40,7 +44,7 @@ class NotifyLevel(str, Enum):
     ALWAYS_NOTIFY = "always-notify"
 
 
-class DiscordanceReport(TimeStampedModel):
+class DiscordanceReport(TimeStampedModel, ReviewableModelMixin, PreviewModelMixin):
 
     resolution = models.TextField(default=DiscordanceReportResolution.ONGOING, choices=DiscordanceReportResolution.CHOICES, max_length=1, null=True, blank=True)
     # TODO remove continued discordane reason, it should be redundant to notes
@@ -58,6 +62,36 @@ class DiscordanceReport(TimeStampedModel):
 
     cause_text = models.TextField(null=False, blank=True, default='')
     resolved_text = models.TextField(null=False, blank=True, default='')
+
+    admin_note = models.TextField(null=False, blank=True, default='')
+
+    def preview_category(cls) -> str:
+        return "Discordance Report"
+
+    def preview_icon(cls) -> str:
+        return "fa-solid fa-arrow-down-up-across-line"
+
+    def preview(self) -> 'PreviewData':
+        from classification.models import ImportedAlleleInfo
+        all_chgvs = ImportedAlleleInfo.all_chgvs(self.clinical_context.allele)
+        preferred_genome_build = GenomeBuildManager.get_current_genome_build()
+        desired_builds = [c_hgvs for c_hgvs in all_chgvs if c_hgvs.genome_build == preferred_genome_build]
+        if not desired_builds:
+            desired_builds = all_chgvs
+
+        c_hgvs_key_values = []
+        for c_hgvs in desired_builds:
+            c_hgvs_key_values.append(
+                PreviewKeyValue(key=f"{c_hgvs.genome_build} c.HGVS", value=str(c_hgvs))
+            )
+
+        return self.preview_with(
+            identifier=f"DR_{self.pk}",
+            summary_extra=
+                [PreviewKeyValue(key="Allele", value=f"{self.clinical_context.allele:CA}")] +
+                c_hgvs_key_values +
+                [PreviewKeyValue(key="Status", value=f"{self.get_resolution_display() or 'Discordant'}")]
+        )
 
     class LabInvolvement(int, Enum):
         WITHDRAWN = 1
@@ -172,6 +206,13 @@ class DiscordanceReport(TimeStampedModel):
     def all_actively_involved_labs(self) -> Set[Lab]:
         return {lab for lab, status in self.involved_labs.items() if status == DiscordanceReport.LabInvolvement.ACTIVE}
 
+    @property
+    def reviewing_labs(self) -> Set[Lab]:
+        return self.all_actively_involved_labs
+
+    def post_review_url(self, review: Review) -> str:
+        return reverse('discordance_report_review_action', kwargs={"review_id": review.pk})
+
     @cached_property
     def discordance_report_classifications(self) -> List['DiscordanceReportClassification']:
         return list(self.discordancereportclassification_set.select_related(
@@ -188,6 +229,14 @@ class DiscordanceReport(TimeStampedModel):
             status = DiscordanceReport.LabInvolvement.WITHDRAWN if effective_c.withdrawn else DiscordanceReport.LabInvolvement.ACTIVE
             lab_status[lab] = max(lab_status.get(lab, 0), status)
         return lab_status
+
+    def can_view(self, user: User):
+        return self.user_is_involved(user)
+
+    def check_can_view(self, user):
+        if not self.can_view(user):
+            msg = f"You do not have READ permission to view {self.pk}"
+            raise PermissionDenied(msg)
 
     def user_is_involved(self, user: User) -> bool:
         if user.is_superuser:
@@ -345,13 +394,54 @@ class DiscordanceReport(TimeStampedModel):
 # TODO all the below classes are utilites, consider moving them out
 
 
-class DiscordanceReportRowData:
-
-    # TODO merge this with DiscordanceReportViewTemplate?
+class DiscordanceReportRowData(ExportRow):
 
     def __init__(self, discordance_report: DiscordanceReport, perspective: LabPickerData):
         self.discordance_report = discordance_report
         self.perspective = perspective
+
+    @export_column(label="id")
+    def _id(self):
+        return self.discordance_report.id
+
+    @export_column(label="Discordance Date", data_type=ExportDataType.date)
+    def _discordance_date(self):
+        return self.discordance_report.report_started_date
+
+    @export_column(label="URL")
+    def _url(self):
+        return get_url_from_view_path(self.discordance_report.get_absolute_url())
+
+    @export_column(label="status")
+    def _status(self):
+        return self.discordance_report.resolution_text
+
+    @export_column(label="c.HGVS")
+    def _chgvs(self):
+        return str(self.c_hgvs)
+
+    @export_column(label="Lab Significances")
+    def _lab_significances(self):
+        summaries = self.lab_significances
+        rows = []
+        for summary in summaries:
+            row_parts = [f"{summary.lab}: {summary.clinical_significance_from}"]
+            if summary.count > 1:
+                row_parts.append(f" x {summary.count}")
+            if summary.clinical_significance_from != summary.clinical_significance_to:
+                row_parts.append(f" -> {summary.clinical_significance_to}")
+                if summary.pending:
+                    row_parts.append(" (pending)")
+            rows.append(" ".join(row_parts))
+        return "\n".join(rows)
+
+    @export_column(label="Conditions")
+    def _conditions(self):
+        rows = set()
+        for cm in self.discordance_report.all_classification_modifications:
+            if condition := cm.classification.condition_resolution_obj:
+                rows.add(condition.as_plain_text)
+        return "\n".join(sorted(rows))
 
     @cached_property
     def all_actively_involved_labs(self):
@@ -427,41 +517,8 @@ class DiscordanceReportRowData:
 
     @cached_property
     def lab_significances(self) -> List[ClassificationLabSummary]:
-        group_counts: Dict[ClassificationLabSummaryEntry, int] = defaultdict(int)
-        for drc in DiscordanceReportClassification.objects.filter(report=self.discordance_report).select_related(
-            'classification_original',
-            'classification_original__classification',
-            'classification_original__classification__lab',
-            'classification_original__classification__lab__organization',
-            'classification_final'
-        ):
-            clinical_significance_from = drc.classification_original.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
-            clinical_significance_to: Optional[str] = None
-            pending: bool = False
-            if drc.withdrawn_effective:
-                clinical_significance_to = 'withdrawn'
-            else:
-                if self.discordance_report.is_latest:
-                    # classification is still outstanding, check to see if there pending changes
-                    if flag := drc.classification_original.classification.flag_collection.get_open_flag_of_type(classification_flag_types.classification_pending_changes):
-                        clinical_significance_to = flag.data.get(ClassificationFlagTypes.CLASSIFICATION_PENDING_CHANGES_CLIN_SIG_KEY) or "unknown"
-                        pending = True
-
-                if not clinical_significance_to:
-                    clinical_significance_to = drc.classification_effective.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
-
-            group_counts[ClassificationLabSummaryEntry(
-                lab=drc.classification_original.classification.lab,
-                clinical_significance_from=clinical_significance_from,
-                clinical_significance_to=clinical_significance_to,
-                pending=pending
-            )] += 1
-
-        return sorted([ClassificationLabSummary(
-            group=group,
-            is_internal=group.lab in self.perspective.labs_if_not_admin,
-            count=count
-        ) for group, count in group_counts.items()])
+        from classification.models.discordance_lab_summaries import DiscordanceLabSummary
+        return DiscordanceLabSummary.for_discordance_report(discordance_report=self.discordance_report, perspective=self.perspective)
 
 
 @dataclass(frozen=True)

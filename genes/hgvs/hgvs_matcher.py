@@ -9,7 +9,7 @@ from django.core.cache import cache
 from django.db.models import Max, Min
 from pyhgvs import HGVSName
 
-from genes.hgvs import HGVSNameExtra, CHGVS
+from genes.hgvs import HGVSVariant, CHGVS
 from genes.hgvs.biocommons_hgvs.hgvs_converter_biocommons import BioCommonsHGVSConverter
 from genes.hgvs.hgvs_converter import HGVSConverterType
 from genes.hgvs.hgvs_converter_combo import ComboCheckerHGVSConverter
@@ -214,13 +214,19 @@ class HGVSMatcher:
     def filter_best_transcripts_and_method_by_accession(self, transcript_accession, prefer_pyhgvs=True, closest=False) -> List[Tuple[TranscriptVersion, str]]:
         """ Get the best transcripts you'd want to match a HGVS against - assuming you will try multiple in order """
 
-        transcript_id, version = TranscriptVersion.get_transcript_id_and_version(transcript_accession)
+        transcript_id: str
+        version: int
+        try:
+            transcript_id, version = TranscriptVersion.get_transcript_id_and_version(transcript_accession)
+        except ValueError:
+            raise ValueError(f"Error parsing transcript version from \"{transcript_accession}\"")
+
         tv_qs = TranscriptVersion.objects.filter(genome_build=self.genome_build, transcript_id=transcript_id)
         if not settings.VARIANT_TRANSCRIPT_VERSION_BEST_ATTEMPT:
             if version:
                 return tv_qs.get(version=version)
             else:
-                raise ValueError("Transcript version must be provided if settings.VARIANT_TRANSCRIPT_VERSION_BEST_ATTEMPT=False")
+                raise ValueError("Transcript version must be provided")  #  if settings.VARIANT_TRANSCRIPT_VERSION_BEST_ATTEMPT=False
 
         tv_by_version = {tv.version: tv for tv in tv_qs}
         if not tv_by_version:
@@ -348,7 +354,7 @@ class HGVSMatcher:
         transcript_accession = self.hgvs_converter.get_transcript_accession(hgvs_string)
         return TranscriptVersion.get_transcript_id_and_version(transcript_accession)[0]
 
-    def _lrg_variant_to_hgvs(self, variant: Variant, lrg_identifier: str = None) -> Tuple[HGVSNameExtra, str]:
+    def _lrg_variant_to_hgvs(self, variant: Variant, lrg_identifier: str = None) -> Tuple[HGVSVariant, str]:
         if transcript_version := LRGRefSeqGene.get_transcript_version(self.genome_build, lrg_identifier):
             if transcript_version.hgvs_ok:
                 hgvs_name, hgvs_method = self._variant_to_hgvs(variant, transcript_version.accession)
@@ -373,7 +379,7 @@ class HGVSMatcher:
         problem_str = ", ".join(problems)
         raise ValueError(f"Could not convert {variant} to HGVS using '{lrg_identifier}': {problem_str}")
 
-    def _variant_to_hgvs(self, variant: Variant, transcript_accession: str=None) -> Tuple[HGVSNameExtra, str]:
+    def _variant_to_hgvs(self, variant: Variant, transcript_accession: str=None) -> Tuple[HGVSVariant, str]:
         """ returns (hgvs, method) - hgvs is c.HGVS is transcript provided, g.HGVS if not
             We always generate the HGVS with full-length reference bases etc, as we adjust that in HGVSExtra.format()
         """
@@ -472,7 +478,7 @@ class HGVSMatcher:
             hgvs_str = str(hgvs_variant)
         return hgvs_str
 
-    def variant_to_c_hgvs_extra(self, variant: Variant, transcript_accession: str) -> HGVSNameExtra:
+    def variant_to_c_hgvs_extra(self, variant: Variant, transcript_accession: str) -> HGVSVariant:
         transcript_version = TranscriptVersion.get_transcript_version(self.genome_build, transcript_accession)
         return self.hgvs_converter.variant_coords_to_c_hgvs(variant.coordinate, transcript_version)
 

@@ -5,10 +5,12 @@ from functools import cached_property, reduce
 from operator import __or__
 from typing import List, Type, Union, Set, Optional, Dict, Iterator, Any, Callable
 
+from dateutil.tz import tz
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.db.models import QuerySet, Q
 from django.http import HttpRequest
+from django.utils import timezone
 from django.utils.timezone import now
 from guardian.shortcuts import get_objects_for_user
 from threadlocals.threadlocals import get_current_request
@@ -18,7 +20,7 @@ from classification.enums.discordance_enums import DiscordanceReportResolution
 from classification.models import ClassificationModification, Classification, classification_flag_types, \
     DiscordanceReport, ClinicalContext, ImportedAlleleInfo
 from flags.models import FlagsMixin, Flag, FlagComment
-from library.utils import batch_iterator, local_date_string
+from library.utils import batch_iterator, local_date_string, http_header_date_now
 from snpdb.models import GenomeBuild, Lab, Organization, Allele, Variant
 
 
@@ -227,10 +229,11 @@ class ClassificationFilter:
     benchmarking: bool = False
     path_info: Optional[str] = None
     request_params: Optional[dict] = None
+    row_limit: Optional[int] = None
     _last_modified: str = None
 
     def __post_init__(self):
-        self._last_modified = now().strftime("%a, %d %b %Y %H:%M:%S GMT")
+        self._last_modified = http_header_date_now()
         if self.path_info and self.request_params:
             pass
         elif request := get_current_request():
@@ -319,8 +322,12 @@ class ClassificationFilter:
                     rows_per_file = 100
             except:
                 pass
+        elif request.query_params.get("type") == "mvl":
+            rows_per_file = 10000
 
-        # TODO include rows_per_file into filter? right now it's hardcoded when doing MVL
+        row_limit = None
+        if row_limit_str := request.query_params.get('row_limit'):
+            row_limit = int(row_limit_str)
 
         return ClassificationFilter(
             user=user,
@@ -332,7 +339,8 @@ class ClassificationFilter:
             since=since,
             allele=allele,
             benchmarking=benchmarking,
-            rows_per_file=rows_per_file
+            rows_per_file=rows_per_file,
+            row_limit=row_limit
         )
 
     @cached_property

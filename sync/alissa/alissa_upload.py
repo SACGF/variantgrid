@@ -1,0 +1,162 @@
+from datetime import datetime
+from enum import Enum
+from json import JSONDecodeError
+from typing import Optional
+
+from classification.enums import ShareLevel
+from classification.views.exports import ClassificationExportFormatterMVL
+from classification.views.exports.classification_export_filter import ClassificationFilter
+from classification.views.exports.classification_export_formatter_mvl import FormatDetailsMVL, \
+    FormatDetailsMVLFileFormat
+from library.constants import MINUTE_SECS
+from library.guardian_utils import admin_bot
+from library.log_utils import AdminNotificationBuilder, report_exc_info
+from snpdb.models import Lab, GenomeBuild, Organization
+from sync.sync_runner import SyncRunner, register_sync_runner, SyncRunInstance
+import json
+
+
+class AlissaImportOption(str, Enum):
+    CONTRIBUTE = "CONTRIBUTE"
+    MIRROR = "MIRROR"
+
+
+@register_sync_runner(config={"type": "alissa", "direction": "upload"})
+class AlissaUploadSyncer(SyncRunner):
+    """
+    Alissa uploads
+    required config parameters:
+        mvl_id: Index of the mvl to be uploaded to from this VariantGrid instance
+        genome_build: The genome build to export using
+        exclude_sources: An array of group names (either org or lab) to exclude from upload,
+            should include the lab that we're uploading to.
+    """
+
+    def sync(self, sync_run_instance: SyncRunInstance):
+
+        excludes = set()
+        if exclude_group_names := sync_run_instance.get_config("exclude_sources", mandatory=False):
+            for source in exclude_group_names:
+                if "/" in source:
+                    excludes.add(Lab.objects.filter(group_name=source).get())
+                else:
+                    excludes.add(Organization.objects.filter(group_name=source).get())
+
+        # this will only be used for testing, note that it's mutually exclusive with exclude
+        includes = set()
+        if include_group_names := sync_run_instance.get_config("include_sources", mandatory=False):
+            for source in include_group_names:
+                includes.add(Lab.objects.filter(group_name=source).get())
+
+        if not excludes and not includes:
+            raise ValueError("Either exclude_sources or include_sources must be provided")
+
+        genome_build_name = sync_run_instance.get_config("genome_build")
+        genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
+
+        format_details = FormatDetailsMVL()
+        format_details.format = FormatDetailsMVLFileFormat.JSON
+        if mapping := sync_run_instance.get_config("classification_mapping"):
+            classification_mapping = {
+                'B': 'BENIGN',
+                'LB': 'LIKELY_BENIGN',
+                'VUS': 'VOUS',
+                'LP': 'LIKELY_PATHOGENIC',
+                'P': 'PATHOGENIC'
+            }
+            classification_mapping.update(mapping)
+            format_details.classification_mapping = classification_mapping
+
+        mvl_id = int(sync_run_instance.get_config("mvl_id"))
+
+        since: Optional[datetime] = None
+        if not sync_run_instance.full_sync:
+            since = sync_run_instance.last_success_server_date()
+
+        exporter = ClassificationExportFormatterMVL(
+            classification_filter=ClassificationFilter(
+                user=admin_bot(),
+                genome_build=genome_build,
+                exclude_sources=excludes,
+                include_sources=includes,
+                min_share_level=ShareLevel.ALL_USERS,
+                since=since,
+                rows_per_file=1000, # Alissa can handle 10,000 but 1,000 at a time just seems safer
+                row_limit=sync_run_instance.max_rows
+            ),
+            format_details=format_details
+        )
+
+        alissa = sync_run_instance.server_auth()
+        uploaded_any_rows = False
+
+        # For full syncs, set the ImportOption to "MIRROR", which will delete everything and replace it with our first post
+        # then subsequent posts will just add
+        partial_upload = (not sync_run_instance.full_sync) or sync_run_instance.max_rows
+        import_option = AlissaImportOption.CONTRIBUTE if partial_upload else AlissaImportOption.MIRROR
+        response_jsons = []
+
+        total_failed = 0
+        total_differs = 0
+        total_imported = 0
+        for file in exporter.serve_in_memory():
+            if exporter.row_count > 0:
+                json_data = json.loads(file)
+
+                uploaded_any_rows = True
+                sync_run_instance.run_start()
+                params = {
+                    "curated": "true",
+                    "importOption": import_option.value
+                }
+                import_option = AlissaImportOption.CONTRIBUTE
+
+                response = alissa.post(
+                    url_suffix=f'managedvariantlists/{mvl_id}/import',
+                    params=params,
+                    json=json_data,  # we're turning json into string to turn it back into json, probably a way we can send the already stringified version
+                    timeout=MINUTE_SECS,
+                )
+                response.raise_for_status()
+
+                try:
+                    if response_json := response.json():
+                        total_failed += int(response_json.get("numberFailed"))
+                        total_differs += int(response_json.get("numberDiffers"))
+                        total_imported += int(response_json.get("numberImported"))
+
+                        response_jsons.append(response_json)
+                        if response_error := response_json.get("error"):
+                            notify = AdminNotificationBuilder(message="Error Uploading")
+                            notify.add_field("Sync Destination", sync_run_instance.name)
+                            notify.add_field("Error", response_error)
+                            notify.send()
+                        elif numberFailed := int(response_json.get("numberFailed")):
+                            if numberFailed > 0:
+                                notify = AdminNotificationBuilder(message="Error Uploading")
+                                notify.add_field("Sync Destination", sync_run_instance.name)
+                                notify.add_field("Failures", numberFailed)
+                                for failure in response.json.get("failures")[0:10]:
+                                    notify.add_markdown(failure[0:100])
+                                if numberFailed > 10:
+                                    notify.add_markdown("And more")
+                                notify.send()
+                except:
+                    report_exc_info()
+                    pass
+
+        since_timestamp = None
+        if since:
+            since_timestamp = int(since.timestamp())
+        sync_run_instance.run_completed(
+            had_records=uploaded_any_rows,
+            meta={
+                "since": since_timestamp,
+                "server_date": exporter.classification_filter.last_modified_header,
+                "rows_sent": exporter.row_count,
+                "total_failed": total_failed,
+                "total_differs": total_differs,
+                "total_imported": total_imported,
+                "responses": response_jsons
+            }
+        )

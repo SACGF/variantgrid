@@ -17,6 +17,7 @@ from library.utils.text_utils import delimited_row
 class ExportDataType(str, Enum):
     datetime_notz = "datetime_notz"  # if timezone doesn't really matter
     datetime = "datetime"
+    date = "date"
     any = "any"
 
 
@@ -73,6 +74,8 @@ class ExportSettings:
         return label
 
     def format_value(self, export_format: ExportFormat, data_type: ExportDataType, value: Any) -> Any:
+        if data_type == ExportDataType.date and isinstance(value, datetime):
+            return value.strftime('%Y-%m-%d')
         if export_format == ExportFormat.csv:
             if data_type == ExportDataType.datetime and isinstance(value, datetime):
                 value = value.astimezone(self.tz)

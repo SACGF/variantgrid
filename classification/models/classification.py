@@ -25,8 +25,6 @@ from django.dispatch.dispatcher import receiver
 from django.urls.base import reverse
 from django_extensions.db.models import TimeStampedModel
 from guardian.shortcuts import assign_perm, get_objects_for_user
-from pandas.io.html import _remove_whitespace
-
 from annotation.models.models import AnnotationVersion, VariantAnnotationVersion, VariantAnnotation
 from annotation.regexes import db_ref_regexes, DbRegexes
 from classification.enums import ClinicalSignificance, SubmissionSource, ShareLevel, SpecialEKeys, \
@@ -43,7 +41,7 @@ from classification.models.flag_types import classification_flag_types
 from flags.models import Flag, FlagPermissionLevel, FlagStatus
 from flags.models.models import FlagsMixin, FlagCollection, FlagTypeContext, \
     flag_collection_extra_info_signal, FlagInfos
-from genes.hgvs import HGVSMatcher, CHGVS, HGVSNameExtra
+from genes.hgvs import HGVSMatcher, CHGVS, HGVSVariant
 from genes.models import Gene
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
 from library.guardian_utils import clear_permissions
@@ -1409,6 +1407,13 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             if gene_symbol := gene_symbol_cell.value:
                 if isinstance(gene_symbol, str) and gene_symbol != gene_symbol.upper():
                     gene_symbol_cell.value = gene_symbol.upper()
+
+        # remove all whitespace from c.HGVS
+        if SpecialEKeys.C_HGVS in patch:
+            c_parts_cell = patch[SpecialEKeys.C_HGVS]
+            if c_hgvs := c_parts_cell.value:
+                c_hgvs = re.sub(r'\s+', '', c_hgvs)
+                c_parts_cell.value = c_hgvs
 
         if initial_data:
             # if c.hgvs contains other values (such as

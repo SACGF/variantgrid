@@ -246,7 +246,7 @@ function enhanceAndMonitor() {
         // similar but for radio buttons (only change if not already checked)
         {test: '.radio-row', func: (node) => {node.click(event => {$(event.currentTarget).find(':radio:not(:checked)').prop('checked', 'checked').change();});}},
         // we don't generally allow future dates
-        {test: '.date-picker', func: (node) => {node.datepicker({changeYear: true, yearRange: "-120:+0"});}},
+        {test: '.date-picker', func: (node) => {node.datepicker({changeYear: true, yearRange: "-120:+0", dateFormat: "yy-mm-dd"});}},
 
         // is this still used?? Would like to get rid of
         {test: '#id_import_status',

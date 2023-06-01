@@ -15,7 +15,7 @@ class SyncDestination(models.Model):
     Examples
     - syncing records up to shariant
     - syncing records down from shariant
-    - syncing records to clinvar (in future)
+    - syncing records to alissa (in future)
     """
 
     name = models.TextField(null=False, unique=True)
@@ -23,7 +23,7 @@ class SyncDestination(models.Model):
     enabled = models.BooleanField(null=False, blank=True, default=True)
 
     def run(self, full_sync: bool = False, max_rows: Optional[int] = None):
-        from sync.sync_runner import run_sync
+        from sync.sync_run import run_sync
         run_sync(self, full_sync=full_sync, max_rows=max_rows)
 
     @property

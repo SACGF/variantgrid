@@ -1,6 +1,7 @@
 from django.apps import AppConfig
 
 
+# noinspection PyUnresolvedReferences
 class ClassificationConfig(AppConfig):
     name = 'classification'
 

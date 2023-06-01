@@ -5,6 +5,10 @@
 
 <h5>VUS Overlaps</h5>
 
+<p>
+    <span class="text-info">In future we hope to provide more tools to assist in resolving VUSs to Pathogenic/Benign.</span><br/>
+    <span class="text-secondary">Calculated {% count overlaps.overlaps_vus singular="1 VUS overlap" plural="VUS overlaps" %}.</span>
+</p>
 <style>
     #vus_detail_table .dtrg-group .value-with-icon .value {
         font-weight: 600;
@@ -41,46 +45,43 @@
 
 <table style="display:none">
 {% for grouping in overlaps.overlaps_vus %}
-    {% if grouping.allele %}
-        <tr id="allele-{{ grouping.allele.pk }}-header">
-            <td>
-                <a href="{{ grouping.allele.get_absolute_url }}" class="hover-link">
-                {% for hgvs in grouping.c_hgvses %}
-                    <div>{% c_hgvs hgvs %}</div>
-                {% endfor %}
-                </a>
-                <div>
-                    <a class="hover-link" href="{% url 'classification_diff' %}?allele={{ grouping.allele.pk }}">Show Diffs</a>
-                </div>
-            </td>
-            <td class="text-right" style="font-weight:500">
-                <div class="v-middle h-right">
-                    {% acmg_points grouping.extreme_acmg_points %}
-                </div>
-            </td>
-            <td class="text-right" style="font-weight:500">
-                <div class="v-middle h-right">
-                    {% with patient_count=grouping.patient_count %}
-                        {% if patient_count.consolidates_variant_classifications %}
-                            {% value_with_icon value=patient_count.count help="One or more labs is unable to report number of patients, actual number of patients might be higher" icon="fa-solid fa-plus text-info" %}
-                        {% else %}
-                            {% value_with_icon value=patient_count.count %}
-                        {% endif %}
-                    {% endwith %}
-                </div>
-            </td>
-            {% with criteria_compare=grouping.criteria_compare %}
-                <td class="criteria"><div class="v-middle h-middle">{{ criteria_compare.ps4.html }}</div></td>
-                <td class="criteria"><div class="v-middle h-middle">{{ criteria_compare.pp1_bs4.html }}</div></td>
-                <td class="criteria"><div class="v-middle h-middle">{{ criteria_compare.pm6.html }}</div></td>
-                <td class="criteria"><div class="v-middle h-middle">{{ criteria_compare.ps2.html }}</div></td>
-                <td class="criteria"><div class="v-middle h-middle">{{ criteria_compare.pm3.html }}</div></td>
-                <td class="criteria"><div class="v-middle h-middle">{{ criteria_compare.pp4.html }}</div></td>
-                <td class="criteria"><div class="v-middle h-middle">{{ criteria_compare.ps3_bs3.html }}</div></td>
-            {% endwith %}
-
-        </tr>
-    {% endif %}
+    <tr id="allele-{{ grouping.allele.pk }}-header">
+        <td>
+            <a href="{{ grouping.allele.get_absolute_url }}" class="hover-link">
+            {% for hgvs in grouping.c_hgvses %}
+                <div>{% c_hgvs hgvs %}</div>
+            {% endfor %}
+            </a>
+            <div>
+                <a class="hover-link" href="{% url 'classification_diff' %}?allele={{ grouping.allele.pk }}">Show Diffs</a>
+            </div>
+        </td>
+        <td class="text-right" style="font-weight:500">
+            <div class="v-middle h-right">
+                {% acmg_points grouping.extreme_acmg_points %}
+            </div>
+        </td>
+        <td class="text-right" style="font-weight:500">
+            <div class="v-middle h-right">
+                {% with patient_count=grouping.patient_count %}
+                    {% if patient_count.consolidates_variant_classifications %}
+                        {% value_with_icon value=patient_count.count help="One or more labs is unable to report number of patients, actual number of patients might be higher" icon="fa-solid fa-plus text-info" %}
+                    {% else %}
+                        {% value_with_icon value=patient_count.count %}
+                    {% endif %}
+                {% endwith %}
+            </div>
+        </td>
+        {% with criteria_compare=grouping.criteria_compare %}
+            <td class="criteria"><div class="v-middle h-middle">{{ criteria_compare.ps4.html }}</div></td>
+            <td class="criteria"><div class="v-middle h-middle">{{ criteria_compare.pp1_bs4.html }}</div></td>
+            <td class="criteria"><div class="v-middle h-middle">{{ criteria_compare.pm6.html }}</div></td>
+            <td class="criteria"><div class="v-middle h-middle">{{ criteria_compare.ps2.html }}</div></td>
+            <td class="criteria"><div class="v-middle h-middle">{{ criteria_compare.pm3.html }}</div></td>
+            <td class="criteria"><div class="v-middle h-middle">{{ criteria_compare.pp4.html }}</div></td>
+            <td class="criteria"><div class="v-middle h-middle">{{ criteria_compare.ps3_bs3.html }}</div></td>
+        {% endwith %}
+    </tr>
 {% endfor %}
 </table>
 
@@ -102,47 +103,45 @@
     </thead>
     <tbody>
         {% for grouping in overlaps.overlaps_vus %}
-            {% if grouping.allele %}
-                {% for lab_summary in grouping.lab_clinical_significances %}
-                    <tr>
-                        <td>{{ grouping.allele.pk }}</td>
-                        {% with strengths=lab_summary.latest.criteria_strengths %}
-                            <td data-search="{% for hgvs in grouping.c_hgvses %}{{ hgvs }} {% endfor %}">
-                                <nomin>
-                                {{ lab_summary.lab }}
-                                {% if lab_summary.count > 1 %} x {{ lab_summary.count }}{% endif %}
-                                {% clinical_significance_inline lab_summary.clinical_significance_to %} </nomin>
-                                {% if strengths.has_criteria %}
-                                <span class="mono text-muted">({{ strengths.summary_string_short }})</span>
-                                {% else %}
-                                <span class="no-value">No Criteria Provided</span>
-                                {% endif %}
+            {% for lab_summary in grouping.lab_clinical_significances %}
+                <tr>
+                    <td>{{ grouping.allele.pk }}</td>
+                    {% with strengths=lab_summary.latest.criteria_strengths %}
+                        <td data-search="{% for hgvs in grouping.c_hgvses %}{{ hgvs }} {% endfor %}">
+                            <nomin>
+                            {{ lab_summary.lab }}
+                            {% if lab_summary.count > 1 %} x {{ lab_summary.count }}{% endif %}
+                            {% clinical_significance_inline lab_summary.clinical_significance_to %} </nomin>
+                            {% if strengths.has_criteria %}
+                            <span class="mono text-muted">({{ strengths.summary_string_short }})</span>
+                            {% else %}
+                            <span class="no-value">No Criteria Provided</span>
+                            {% endif %}
+                        </td>
+                        {% with points=strengths.acmg_point_score %}
+                            <td class="text-right" data-order="{{ grouping.extreme_acmg_points.sort_string }}_{{ grouping.allele.pk }}_{{ points.sort_string }}">
+                                {% acmg_points points %}
                             </td>
-                            {% with points=strengths.acmg_point_score %}
-                                <td class="text-right" data-order="{{ grouping.extreme_acmg_points.sort_string }}_{{ grouping.allele.pk }}_{{ points.sort_string }}">
-                                    {% acmg_points points %}
-                                </td>
-                            {% endwith %}
-                            <td class="text-right" data-order="{{ grouping.patient_count.sort_string }}_{{ grouping.allele.pk }}_{{ lab_summary.patient_count.sort_string }}">
-                                {% with patient_count=lab_summary.patient_count %}
-                                    {% if patient_count.consolidates_variant_classifications %}
-                                        {% value_with_icon value=patient_count.count help="This lab is unable to report number of patients, actual number of patients might be higher" icon="fa-solid fa-plus text-info" %}
-                                    {% else %}
-                                        {% value_with_icon value=patient_count.count %}
-                                    {% endif %}
-                                {% endwith %}
-                            </td>
-                            {% criteria_strength_td strengths.ps4 %}
-                            {% criteria_strength_td strengths.pp1_bs4 %}
-                            {% criteria_strength_td strengths.pm6 %}
-                            {% criteria_strength_td strengths.ps2 %}
-                            {% criteria_strength_td strengths.pm3 %}
-                            {% criteria_strength_td strengths.pp4 %}
-                            {% criteria_strength_td strengths.bs3_ps3 %}
                         {% endwith %}
-                    </tr>
-                {% endfor %}
-            {% endif %}
+                        <td class="text-right" data-order="{{ grouping.patient_count.sort_string }}_{{ grouping.allele.pk }}_{{ lab_summary.patient_count.sort_string }}">
+                            {% with patient_count=lab_summary.patient_count %}
+                                {% if patient_count.consolidates_variant_classifications %}
+                                    {% value_with_icon value=patient_count.count help="This lab is unable to report number of patients, actual number of patients might be higher" icon="fa-solid fa-plus text-info" %}
+                                {% else %}
+                                    {% value_with_icon value=patient_count.count %}
+                                {% endif %}
+                            {% endwith %}
+                        </td>
+                        {% criteria_strength_td strengths.ps4 %}
+                        {% criteria_strength_td strengths.pp1_bs4 %}
+                        {% criteria_strength_td strengths.pm6 %}
+                        {% criteria_strength_td strengths.ps2 %}
+                        {% criteria_strength_td strengths.pm3 %}
+                        {% criteria_strength_td strengths.pp4 %}
+                        {% criteria_strength_td strengths.bs3_ps3 %}
+                    {% endwith %}
+                </tr>
+            {% endfor %}
         {% endfor %}
     </tbody>
 </table>

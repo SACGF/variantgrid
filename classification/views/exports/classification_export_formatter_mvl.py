@@ -28,14 +28,6 @@ class FormatDetailsMVLFileFormat(str, Enum):
     JSON = "json"
 
 
-@dataclass
-class MVLJSONExtra:
-    username: str = "bcm"
-    mvl_id: int = 1
-    curated: bool = True
-    import_option: str = "MIRROR"
-
-
 class FormatDetailsMVL:
     """
     Object to track how specific Alissa instance wants to format data.
@@ -59,7 +51,6 @@ class FormatDetailsMVL:
         self.conflict_strategy = ConflictStrategy.MOST_PATHOGENIC
         self.is_shell = False
         self.format: FormatDetailsMVLFileFormat = FormatDetailsMVLFileFormat.TSV
-        self.mvl_json_extra: MVLJSONExtra = MVLJSONExtra()
 
     RAW_SCORE = {
         'B': 1,
@@ -288,9 +279,9 @@ class MVLEntry(ExportRow):
             citation_counter.reference_citations(group.most_recent)
         citations_html = "<br><b>Citations Latest</b>:<br>"
         has_citation = False
-        for citation, labs in citation_counter.ordered_references():
+        for citation, lab_names in citation_counter.ordered_references():
             has_citation = True
-            references = ", ".join(labs)
+            references = ", ".join(lab_names)
             citations_html += f"<p>{simple_citation_html(citation)}<br><i>Referenced by</i>: {references}</p>"
 
         if not has_citation:
@@ -343,7 +334,6 @@ class ClassificationExportFormatterMVL(ClassificationExportFormatter):
     def __init__(self, classification_filter: ClassificationFilter, format_details: FormatDetailsMVL):
         self.format_details = format_details
         self.grouping_utils = ClassificationGroupUtils()
-        self.first_row = True
         super().__init__(classification_filter=classification_filter)
 
     @property
@@ -370,18 +360,16 @@ class ClassificationExportFormatterMVL(ClassificationExportFormatter):
                 return str(obj).replace("\n", "").replace("\"", "")
 
             # can't juse simple JSON because we don't want to close this off yet
-            mvl_json_extra = self.format_details.mvl_json_extra
-            return [
-f"""{{
-    "username": "{make_json_safe(mvl_json_extra.username)}",
-    "mvlId": {mvl_json_extra.mvl_id},
-    "curated": {make_json_safe(mvl_json_extra.curated)},
-    "importOption": "{make_json_safe(mvl_json_extra.import_option)}",
-    "molecularVariants": [
-"""
-            ]
+            return ['{"molecularVariants":[']
         else:
             raise ValueError(f"Unexpected file format {self.format_details.format}")
+
+    @property
+    def delimiter_for_row(self):
+        if self.file_format == FormatDetailsMVLFileFormat.JSON:
+            return ","
+        else:
+            return ""
 
     def footer(self) -> List[str]:
         if self.file_format == FormatDetailsMVLFileFormat.JSON:
@@ -404,9 +392,6 @@ f"""{{
                 categories={"format": "tsv"}
             ))
         elif self.file_format == FormatDetailsMVLFileFormat.JSON:
-            # FIXME this will break if split over multiple files
-            # and can't even reset first_row in header, due to streaming data pre-generating and peeking as a call
-            # to row() can produce multiple rows that should be grouped (so order of header and row aren't guarenteed)
             output: List[str] = []
             for c_data in c_datas:
                 export_row = MVLCHGVSData(
@@ -415,10 +400,6 @@ f"""{{
                     self.grouping_utils
                 )
                 row_json = json.dumps(MVLEntry(export_row).to_json(categories={"format": "json"}))
-                if not self.first_row:
-                    row_json = f",{row_json}"
-                self.first_row = False
-                row_json = f"\t\t{row_json}"
                 output.append(row_json)
             return output
 

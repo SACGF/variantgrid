@@ -266,6 +266,7 @@ class ImportedAlleleInfoValidationTagEntry:
     def __str__(self):
         return f"{self.category_pretty} {self.field_pretty} : {self.severity}"
 
+
 class ImportedAlleleInfoValidation(TimeStampedModel):
     imported_allele_info = ForeignKey('ImportedAlleleInfo', on_delete=CASCADE)
     validation_tags = JSONField(null=True, blank=True)  # of type ImportedAlleleInfoValidation
@@ -283,8 +284,8 @@ class ImportedAlleleInfoValidation(TimeStampedModel):
 
     def __str__(self):
         tag_string = ""
-        if validation_tag_list := self.validation_tags_list:
-            tag_string = "\n".join([str(tag) for tag in self.validation_tags_list])
+        if validation_tags_list := self.validation_tags_list:
+            tag_string = "\n".join([str(tag) for tag in validation_tags_list])
 
         return f"Include : {self.include}\nConfirmed : {self.confirmed}\n{tag_string}"
 
@@ -523,6 +524,15 @@ class ImportedAlleleInfo(TimeStampedModel):
             return g_hgvs
         return None
 
+    @staticmethod
+    def all_chgvs(allele: Allele) -> List[CHGVS]:
+        all_chgvs = set()
+        for iai in allele.importedalleleinfo_set.all():
+            for rb in iai.resolved_builds:
+                if c_hgvs := rb.c_hgvs_obj:
+                    all_chgvs.add(c_hgvs)
+        return list(sorted(all_chgvs, key=lambda x: (x.genome_build, x.sort_str)))
+
     @property
     def get_transcript(self) -> str:
         if self.imported_transcript:
@@ -533,10 +543,12 @@ class ImportedAlleleInfo(TimeStampedModel):
     @property
     def gene_symbols(self) -> List[GeneSymbol]:
         gene_symbol_set = {build.gene_symbol for build in self.resolved_builds if build.gene_symbol}
-        if c_hgvs_obj := self.imported_c_hgvs_obj:
-            if imported_gene_symbol_str := c_hgvs_obj.gene_symbol:
-                if symbol := GeneSymbol.cast(imported_gene_symbol_str):
-                    gene_symbol_set.add(symbol)
+        if not gene_symbol_set:
+            # only include imported gene symbols if we didn't resolve to real alleles
+            if c_hgvs_obj := self.imported_c_hgvs_obj:
+                if imported_gene_symbol_str := c_hgvs_obj.gene_symbol:
+                    if symbol := GeneSymbol.cast(imported_gene_symbol_str):
+                        gene_symbol_set.add(symbol)
         return list(sorted(gene_symbol_set))
 
     @property
@@ -609,7 +621,7 @@ class ImportedAlleleInfo(TimeStampedModel):
     def resolved_builds(self) -> List[ResolvedVariantInfo]:
         return list(ResolvedVariantInfo.objects.filter(allele_info=self).select_related('genome_build'))
 
-    def update_variant_coordinate(self) -> bool:
+    def update_variant_coordinate(self):
         """ returns if a valid variant_coordinate could be derived """
 
         # TODO, support variant_coordinate being provided
@@ -706,6 +718,7 @@ class ImportedAlleleInfo(TimeStampedModel):
         :param matched_variant: The variant (for the imported genome build) that we matched on.
         :param message: Details about the matching (if blank previous message will remain)
         :param force_update: Forces recalc of c.hgvs etc. on variants, we will still test to see if variants for certain
+        :param liftover_complete: Indicates if liftover is complete (and if any missing genome build should be considered an inability to liftover)
         builds are newly provided, change etc.
         """
 

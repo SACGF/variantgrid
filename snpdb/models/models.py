@@ -612,10 +612,7 @@ class Lab(models.Model, PreviewModelMixin):
         return reverse('view_lab', kwargs={"lab_id": self.pk})
 
     def __str__(self):
-        name = self.name
-        if self.organization:
-            name = f"{self.organization.shortest_name} / {name}"
-        return name
+        return f"{self.organization.shortest_name} / {self.name}"
 
 
 class LabHead(models.Model):

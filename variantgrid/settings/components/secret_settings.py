@@ -110,7 +110,7 @@ def _get_nested(parts: List[str], value) -> Tuple[Any, bool]:
         return None, False
 
 
-def get_secret(key: str) -> Optional[Any]:
+def get_secret(key: str, mandatory: bool = True) -> Optional[Any]:
     value, found = _get_env_variable(key)
     if found:
         return value
@@ -127,14 +127,17 @@ def get_secret(key: str) -> Optional[Any]:
             logging.warning(f'Warning {key} was loaded from default_settings, migrate to settings config or env variable')
         return value
 
+    if not mandatory:
+        return None
+
     settings_filename = _settings_file()
     if not os.path.exists(settings_filename):
         raise FileNotFoundError(f"Secret settings file '{settings_filename}' not found")
     raise ValueError(f"No config value found for {key} in secret settings file '{settings_filename}'")
 
 
-def get_secrets(prefix: str, leafs: List[str]) -> Dict[str, Any]:
+def get_secrets(prefix: str, leafs: List[str], mandatory: bool = True) -> Dict[str, Any]:
     secret_dict = {}
     for leaf in leafs:
-        secret_dict[leaf] = get_secret(prefix + '.' + leaf)
+        secret_dict[leaf] = get_secret(prefix + '.' + leaf, mandatory=mandatory)
     return secret_dict

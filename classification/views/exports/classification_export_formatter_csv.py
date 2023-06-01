@@ -10,7 +10,8 @@ from classification.views.classification_export_utils import UsedKeyTracker, Key
 from classification.views.exports.classification_export_decorator import register_classification_exporter
 from classification.views.exports.classification_export_filter import AlleleData, ClassificationFilter, \
     DiscordanceReportStatus
-from classification.views.exports.classification_export_formatter import ClassificationExportFormatter
+from classification.views.exports.classification_export_formatter import ClassificationExportFormatter, \
+    ClassificationExportExtraData
 from classification.views.exports.classification_export_utils import CitationCounter
 from library.utils import delimited_row, export_column, ExportRow, ExportDataType
 from snpdb.models import GenomeBuild
@@ -208,7 +209,6 @@ class ClassificationExportFormatterCSV(ClassificationExportFormatter):
         return "csv"
 
     def header(self) -> List[str]:
-        self.error_rows = []
         header = RowID.csv_header(self._categories) + ClassificationMeta.csv_header(self._categories) + self.used_keys.header()
         return [delimited_row(header, delimiter=',')]
 
@@ -224,8 +224,17 @@ class ClassificationExportFormatterCSV(ClassificationExportFormatter):
 
         return rows
 
-    def footer(self) -> List[str]:
-        return self.error_rows
+    def extra_data(self, as_individual_file: bool = False) -> Optional[ClassificationExportExtraData]:
+        if self.error_rows:
+            content = "".join(self.error_rows)
+            if as_individual_file:
+                content = "\n".join(self.header()) + content
+
+            return ClassificationExportExtraData(
+                filename_part="errors",
+                # new lines are already built into error_rows
+                content=content
+            )
 
     @cached_property
     def _categories(self) -> Optional[Dict]:
