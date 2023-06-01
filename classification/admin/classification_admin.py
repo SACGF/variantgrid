@@ -23,6 +23,7 @@ from classification.models.clinical_context_models import ClinicalContextRecalcT
 from classification.models.discordance_lab_summaries import DiscordanceLabSummary
 from classification.signals import send_discordance_notification
 from classification.tasks.classification_import_map_and_insert_task import ClassificationImportMapInsertTask
+from library.django_utils import get_url_from_view_path
 from library.guardian_utils import admin_bot
 from library.utils import ExportRow, export_column, ExportDataType
 from snpdb.admin_utils import ModelAdminBasics, admin_action, admin_list_column, AllValuesChoicesFieldListFilter, \
@@ -574,6 +575,10 @@ class DiscordanceReportAdminExport(ExportRow):
     def _report_number(self):
         return self.discordance_report.pk
 
+    @export_column("URL")
+    def _url(self):
+        return get_url_from_view_path(self.discordance_report.get_absolute_url())
+
     @export_column("# labs")
     def _labs_involved(self):
         return len(set([summary.lab for summary in self.summaries]))
@@ -584,7 +589,7 @@ class DiscordanceReportAdminExport(ExportRow):
 
     @export_column("Status")
     def _status(self):
-        return self.discordance_report.status
+        return self.discordance_report.resolution_text or "Unknown"
 
     @export_column("Date Opened", data_type=ExportDataType.date)
     def _date_opened(self):
@@ -608,14 +613,14 @@ class DiscordanceReportAdminExport(ExportRow):
     @export_column("Gene Symbol")
     def _gene_symbol(self):
         all_chgvs = ImportedAlleleInfo.all_chgvs(self.discordance_report.clinical_context.allele)
-        return ", ".join(sorted(set([chgvs.gene_symbol for chgvs in all_chgvs])))
+        return "\n".join(sorted(set([chgvs.gene_symbol for chgvs in all_chgvs])))
 
     @export_column("c.HGVS (38)")
     def _variant(self):
         all_chgvs = ImportedAlleleInfo.all_chgvs(self.discordance_report.clinical_context.allele)
         c38s = sorted([str(chgvs) for chgvs in all_chgvs if chgvs.genome_build == GenomeBuild.grch38()])
         if c38s:
-            return ", ".join(c38s)
+            return "\n".join(c38s)
 
     @export_column("Admin Notes")
     def _admin_notes(self):
@@ -623,15 +628,15 @@ class DiscordanceReportAdminExport(ExportRow):
 
     @export_column("Labs")
     def _labs(self):
-        return ", ".join(str(summary.lab) for summary in self.summaries)
+        return "\n".join(str(summary.lab) for summary in self.summaries)
 
     @export_column("Clinical Significances (Original)")
     def _cs_original(self):
-        return ", ".join(str(summary.clinical_significance_from) for summary in self.summaries)
+        return "\n".join(str(summary.clinical_significance_from) for summary in self.summaries)
 
     @export_column("Clinical Significances (Current)")
     def _cs_current(self):
-        return ", ".join(str(summary.clinical_significance_to) for summary in self.summaries)
+        return "\n".join(str(summary.clinical_significance_to) for summary in self.summaries)
 
     @export_column("Upgrade/Downgrade")
     def _upgrade_downgrade(self):
@@ -652,7 +657,7 @@ class DiscordanceReportAdminExport(ExportRow):
                     return "upgrade"
                 else:
                     return "downgrade"
-        return ", ".join((up_down_for(summary) for summary in self.summaries))
+        return "\n".join((up_down_for(summary) for summary in self.summaries))
 
     @export_column("Certainty")
     def _certainty(self):
@@ -673,7 +678,7 @@ class DiscordanceReportAdminExport(ExportRow):
                     return "upgrade"
                 else:
                     return "downgrade"
-        return ", ".join((up_down_for(summary) for summary in self.summaries))
+        return "\n".join((up_down_for(summary) for summary in self.summaries))
 
 
 @admin.register(DiscordanceReport)
