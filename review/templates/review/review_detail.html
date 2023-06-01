@@ -1,5 +1,6 @@
 {% load ui_utils %}
 {% load js_tags %}
+{% load user_tags %}
 <div class="card">
     <div class="card-header">Review {% admin_link review %}</div>
     <div class="card-body">
@@ -27,6 +28,9 @@
                 {% if not forloop.first %}<br/>{% endif %}
                 {{ lab }}
             {% endfor %}
+        {% endlabelled %}
+        {% labelled label="Review Last Edited By" %}
+            {% user review.user show_group=True size="tiny" %} @ {% timestamp review.modified %}
         {% endlabelled %}
         {% labelled label="Details" %}
             {% for answer in review.answers %}
