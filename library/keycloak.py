@@ -46,7 +46,7 @@ class Keycloak:
         user_id = user_settings.oauth_sub
 
         response = requests.put(
-            auth=self.connector.auth(),
+            auth=self.connector.auth,
             url=self.connector.url(f'/auth/admin/realms/{self.realm}/users/{user_id}/execute-actions-email'),
             json=['UPDATE_PASSWORD'],
             timeout=MINUTE_SECS,
@@ -57,7 +57,7 @@ class Keycloak:
     def check_groups(self, groups: List[str]) -> List[str]:
         groups.sort()
         response = requests.get(
-            auth=self.connector.auth(),
+            auth=self.connector.auth,
             url=self.connector.url(f'/auth/admin/realms/{self.realm}/groups'),
             timeout=MINUTE_SECS,
         )
@@ -90,7 +90,7 @@ class Keycloak:
                         print(group_dict)
                         raise ValueError(f'No parent group found for {missing_group} ({combined})')
                     response = requests.post(
-                        auth=self.connector.auth(),
+                        auth=self.connector.auth,
                         url=self.connector.url(f'/auth/admin/realms/{self.realm}/groups/{parent}/children'),
                         json={
                             "name": combined.rsplit('/', maxsplit=1)[-1],
@@ -108,7 +108,7 @@ class Keycloak:
         params = {'email': email}
         params_str = urllib.parse.urlencode(params)
         response = requests.get(
-            auth=self.connector.auth(),
+            auth=self.connector.auth,
             url=self.connector.url(f'/auth/admin/realms/{self.realm}/users?{params_str}'),
             timeout=MINUTE_SECS,
         )
@@ -143,7 +143,7 @@ class Keycloak:
         }
 
         response = requests.post(
-            auth=self.connector.auth(),
+            auth=self.connector.auth,
             url=self.connector.url(f'/auth/admin/realms/{self.realm}/users'),
             json=user_rep,
             timeout=MINUTE_SECS,
@@ -157,7 +157,7 @@ class Keycloak:
         # add groups
         for group_id in group_ids:
             response = requests.put(
-                auth=self.connector.auth(),
+                auth=self.connector.auth,
                 url=self.connector.url(f'/auth/admin/realms/{self.realm}/users/{user_id}/groups/{group_id}'),
                 timeout=MINUTE_SECS,
             )
@@ -169,7 +169,7 @@ class Keycloak:
 
         # send password reset email (might need to double check how long this stays open for)
         response = requests.put(
-            auth=self.connector.auth(),
+            auth=self.connector.auth,
             url=self.connector.url(f'/auth/admin/realms/{self.realm}/users/{user_id}/execute-actions-email'),
             json=['UPDATE_PASSWORD'],
             timeout=MINUTE_SECS,
