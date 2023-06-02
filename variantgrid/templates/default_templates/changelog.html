@@ -9,6 +9,147 @@
     <div class="container">
         <h3>Changelog</h3>
 
+    {% if sapath_enabled %}
+        <!-- Do all as 1 big change -->
+
+        <div class="card mt-4">
+            <div class="card-header">VariantGrid 4.0</div>
+            <div class="card-body">
+                <h4>Analysis</h4>
+                <ul>
+                    <li>Performance improvements: node counts, node loading, adding tags</li>
+                    <li>Performance improvement creating analysis from template</li>
+                    <li>Prevent users from loading nodes multiple times by repeated clicking (this was causing performance issues)</li>
+                    <li>#139 - Analysis grid tags / classifications take into account sharing / withdrawn</li>
+                    <li>#137 - Tags in analysis shown on analysis listing page</li>
+                    <li>New Node - MOI (Mode of Inheritance) - uses zygosity and gene/disease associations (GenCC)</li>
+                    <li>EffectNode - has been changed to use the new pathogenicity columns, it automatically switches based on the annotation version used.</li>
+                    <li>Tissue Node works again (new Human Protein Atlas annotation)</li>
+                    <li>Trio Node Proband HET option removed + replaced with SampleNode (which is faster)</li>
+                    <li>Population node, can exclude filtered by gnomAD</li>
+                    <li>PhenotypeNode - support MONDO, shows a warning if ontology term doesn't map to genes</li>
+                </ul>
+
+
+                <h4>Annotation</h4>
+                <ul>
+                    <li>New dbNSFP gene columns (see <a href="{% url 'view_annotation_descriptions' %}">annotation descriptions)</a>
+                        GDI, GDI-Phred, P(HI), GHIS, P(rec), HIPred_score, Gene_indispensability_score,
+                        Expression(egenetics), Expression(GNF/Atlas),
+                        BioCarta Pathway, ConsensusPathDB Pathway, KEGG IDs, KEGG Pathway,
+                        GWAS traits, GO process, GO cellular, GO mol function, BioGRID interactions,
+                        ConsensusPathDB interactions, gnomAD prob LOF intolerant, gnomAD prob LOF HOM,
+                        gnomAD prob LOF tolerant, Essential Gene (CRISPR), Essential Gene (CRISPR2),
+                        Essential Gene (Gene Trap)</li>
+                    <li>New columns - <a href="https://www.nature.com/articles/s41467-017-00443-5">ALoFT</a>, NMD Escaping Variant</li>
+                    <li>Gene annotation column changes:
+                        <ul>
+                            <li>omim/hpo terms now only use direct links (was too broad due to indirect links)</li>
+                            <li>New column "MONDO terms"</li>
+                            <li>New MOI columns: eg for GATA2 they would be:
+                                <div>
+                                    <b>Gene/Disease Supportive or below:</b> <i>monocytopenia with susceptibility to infections=Autosomal dominant (Supportive: Orphanet)</i>
+                                </div>
+                                <div>
+                                    <b>Gene/Disease Moderate or above:</b> <i>deafness-lymphedema-leukemia syndrome=Autosomal dominant (Definitive: TGMI|G2P Strong: Genomics England PanelApp)|acute myeloid leukemia=Autosomal dominant (Strong: Genomics England PanelApp)|myelodysplastic syndrome=Autosomal dominant (Strong: Genomics England PanelApp)|GATA2 deficiency with susceptibility to MDS/AML=Autosomal dominant (Definitive: ClinGen)</i>
+                                </div>
+                            </li>
+                        </ul>
+                    </li>
+                    <li>Update VEP (v106), updated Mastermind, COSMIC</li>
+                    <li>Pathogenicity Predictions have changed:
+                        <ul>
+                            <li>New columns added: BayesDel (NoAF), CADD (raw), ClinPred, REVEL, MetaLR, VEST4.
+
+                                <p>These are "rankscores" ie scores scaled 0->1 based on all of the scores in non-synonymous SNVs. There is 1 score per variant (not per transcript)</p>
+                                <p>
+                                    Previously, we used levels (eg DAMAGING, BENIGN etc), but these were made by taking genome-wide thresholds, and it has been shown that this varies considerably per-gene.
+                                    We plan on developing further refinements here, eg being able to automatically use this tool/cutoff for these genes, a different tool/cutoff for other genes etc.
+                                </p>
+                            </li>
+                            <li>Old columns removed: FATHMM, Mutation Assessor, Mutation Taster, Polyphen2, CADD Phred, REVEL Score</li>
+                        </ul>
+                    </li>
+                    <li>Patients - phenotype text also matched for MONDO terms</li>
+                </ul>
+
+                <h4>Classification</h4>
+                <ul>
+                    <li>New pathogenicity prediction tool scores now autopopulate classifications</li>
+                </ul>
+
+                <h4>Data</h4>
+                <ul>
+                    <li>Samples page (data) - filter for variant type. Fix autocompletes sometimes not searching all builds</li>
+                    <li>Cohorts / Pedigree - added user to to make it easier to find</li>
+                </ul>
+
+                <h4>Gene Page</h4>
+                <ul>
+                    <li>Gene Symbol page has been rearranged/updated with new annotation fields</li>
+                    <li>Gene/Disease - use GenCC (includes ClinGen) instead of just ClinGen on Gene page, Gene Grid column</li>
+                </ul>
+
+                <h4>Ontology</h4>
+                <ul>
+                    <li>Ontology can have multiple versions</li>
+                    <li>Update ontologies to latest versions (and will be able to do this going forward)</li>
+                    <li>Ontology term page shows classifications and patients linked to term</li>
+                </ul>
+
+                <h4>Search</h4>
+                <ul>
+                    <li>Search rewritten - gives clearer results, and indication of what was searched in green</li>
+                    <li>Can now search for cohort/pedigree, ontology terms</li>
+                    <li>dbSNP lookup is faster</li>
+                    <li>Improved HGVS resolution (support for gaps, LRG, non-coding transcripts)</li>
+                    <li>Manual variant entry - improved user experience creating novel variants via search</li>
+                </ul>
+
+                <h4>Tagging</h4>
+                <ul>
+                    <li>VGP#2439 - Tag Colors used to be 1 per user, can now have multiple which can be shared/set globally (so all lab members can share colors)</li>
+                    <li>Tags for Variants grid - grid showing all tags per variant has been put back (was disabled for performance reasons)</li>
+                </ul>
+
+                <h4>Variant Details</h4>
+                <ul>
+                    <li>Show other variants on locus regardless of genotype calls, also link to alleles that were once on the same row in VCF files</li>
+                    <li>#215 - show a quick summary of gene info (gene/disease links - click to expand)</li>
+                    <li>#788 - show tag counts in grid (showing all tags could get extremely long)</li>
+                    <li>#13 - <a href="https://www.ncbi.nlm.nih.gov/refseq/MANE/">MANE</a> transcripts indicated and chosen as default transcript on variant details page/classification</li>
+                    <li>#109 - Allow users to see (limited) annotation on intergenic variants</li>
+                    <li>#668 - add tooltips to show help about columns on gene / variant pages</li>
+                    <li>Nearby variants shows tags and classification summary counts</li>
+                </ul>
+
+               <h4>Variant Grids</h4>
+                <ul>
+                    <li>#743 - variant grids - fix up column labels. Make some new links (ontology terms,pubmed, dbsnp) - </li>
+                    <li>#733 - Variant pages (gene symbol, all variants, tags etc) now styled/links the same as on Anaylsis grid</li>
+                </ul>
+
+                <h4>VCF upload</h4>
+                <ul>
+                    <li>#660 - Give warning if VCF filters are not defined in header (rather than fail to import VCF)</li>
+                </ul>
+            </div>
+        </div>
+
+
+
+    {% else %}
+        <div class="card mt-4">
+            <div class="card-header">X June 2023</div>
+            <div class="card-body">
+                <ul>
+                    <li>#788 - Variant page - show tag counts in grid (showing all tags could get extremely long)</li>
+                    <li>#139 - Analysis grid tags / classifications take into account sharing / withdrawn</li>
+                </ul>
+            </div>
+        </div>
+
+
         <div class="card mt-4">
             <div class="card-header">26 February 2023</div>
             <div class="card-body">
@@ -268,7 +409,7 @@
                     </ul>
                 </div>
             </div>
-
+    {% endif %}
         </div>
 
     </div>
