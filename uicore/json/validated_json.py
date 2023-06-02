@@ -7,10 +7,11 @@ from typing import List, Iterator, Union, Optional, Any
 from library.utils import invalidate_cached_property
 from uicore.json.json_types import JsonDataType
 
-
-# ValidatedJson (with JSonMessages) is used for serializing to JSon where there's also the need to providing infos or warnings
-# e.g. for converting a classification to the ClinVar format, but providing errors around illegal values.
-# The "pure" JSON can be extracted, or the ValidatedJson can be serialized (and later rendered)
+"""
+ValidatedJson (with JSonMessages) is used for serializing to JSon where there's also the need to providing infos or warnings
+e.g. for converting a classification to the ClinVar format, but providing errors around illegal values.
+The "pure" JSON can be extracted, or the ValidatedJson can be serialized (and later rendered)
+"""
 
 
 @dataclass(frozen=True)
