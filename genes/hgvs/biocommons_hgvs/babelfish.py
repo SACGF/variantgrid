@@ -4,6 +4,7 @@
 # https://github.com/biocommons/hgvs/issues/653
 
 """translate between HGVS and other formats"""
+import os
 
 from bioutils.assemblies import make_ac_name_map, make_name_ac_map
 
@@ -11,6 +12,7 @@ import hgvs
 import hgvs.normalizer
 from hgvs.assemblymapper import AssemblyMapper
 from hgvs.edit import NARefAlt
+from hgvs.exceptions import HGVSInvalidVariantError
 from hgvs.location import Interval, SimplePosition
 from hgvs.normalizer import Normalizer
 from hgvs.parser import Parser
@@ -114,11 +116,14 @@ class Babelfish:
     def vcf_to_g_hgvs(self, chrom, position, ref, alt):
         ac = self.name_to_ac_map[chrom]
 
-        is_snv = len(ref) == len(alt) == 1
-        if not is_snv:  # Everything else is offset by 1
-            ref = ref[1:]
-            alt = alt[1:]
-            position += 1
+        keep_left_anchor = False
+        if not keep_left_anchor:
+            pfx = os.path.commonprefix([ref, alt])
+            lp = len(pfx)
+            if lp > 0:
+                ref = ref[lp:]
+                alt = alt[lp:]
+                position += lp
 
         if ref == '':
             ref = None
@@ -153,7 +158,12 @@ class Babelfish:
 
         parser = ParserSingleton.parser()
         var_x = parser.parse_hgvs_variant(hgvs_string)
-        self.ev.validate(var_x)  # Validate in transcript range
+        try:
+            self.ev.validate(var_x, strict=True)  # Validate in transcript range
+        except HGVSInvalidVariantError as hgvs_e:
+            if 'Cannot validate sequence of an intronic variant' not in str(hgvs_e):
+                raise
+
         if converter := CONVERT_TO_G.get(var_x.type):
             var_x = converter(var_x)
         return var_x
