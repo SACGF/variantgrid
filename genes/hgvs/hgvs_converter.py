@@ -43,6 +43,10 @@ class HGVSConverter(abc.ABC):
         self.genome_build = genome_build
 
     @abc.abstractmethod
+    def create_hgvs_variant(self, hgvs_string: str) -> HGVSVariant:
+        pass
+
+    @abc.abstractmethod
     def variant_coords_to_g_hgvs(self, vc: VariantCoordinate) -> HGVSVariant:
         pass
 

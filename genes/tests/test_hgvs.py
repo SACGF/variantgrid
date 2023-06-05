@@ -50,7 +50,8 @@ class TestHGVS(TestCase):
             except:
                 pass  # Expected
 
-            fixed_hgvs = HGVSMatcher.clean_hgvs(bad_hgvs)[0]
+            hgvs_matcher = HGVSMatcher(genome_build=GenomeBuild.grch38())
+            fixed_hgvs = hgvs_matcher.clean_hgvs(bad_hgvs)[0]
             HGVSName(fixed_hgvs)
 
     def test_fix_gene_transcript(self):
@@ -63,8 +64,9 @@ class TestHGVS(TestCase):
             ("BRCA1(NM_000059.4):c.316+5G>A", [swap_warning]),
             ("BRCA1(nm_000059.4):c.316+5G>A",  [swap_warning, uc_warning]),
         ]
+        hgvs_matcher = HGVSMatcher(GenomeBuild.grch38())
         for hgvs_string, expected_warnings in TEST_CASES:
-            _, fix_messages = HGVSMatcher.fix_gene_transcript(hgvs_string)
+            _, fix_messages = hgvs_matcher.fix_gene_transcript(hgvs_string)
             for ew in expected_warnings:
                 self.assertIn(ew, fix_messages, f"Warning for {hgvs_string}")
 

@@ -18,11 +18,32 @@ from snpdb.models import GenomeBuild, VariantCoordinate, Contig
 
 class BioCommonsHGVSVariant(HGVSVariant):
     def __init__(self, sequence_variant: SequenceVariant):
-        self.sequence_variant = sequence_variant
+        self._sequence_variant = sequence_variant
+
+    @property
+    def gene(self) -> str:
+        return self._sequence_variant.gene
+
+    def _set_gene(self, value):
+        self._sequence_variant.gene = value
+
+    @property
+    def transcript(self) -> str:
+        return self._sequence_variant.ac
+
+    def _set_transcript(self, value):
+        self._sequence_variant.ac = value
+
+    @property
+    def kind(self) -> str:
+        return self._sequence_variant.type
+
+    def _set_kind(self, value):
+        self._sequence_variant.type = value
 
     def format(self, max_ref_length=settings.HGVS_MAX_REF_ALLELE_LENGTH):
         conf = {"max_ref_length": max_ref_length}
-        return self.sequence_variant.format(conf)
+        return self._sequence_variant.format(conf)
 
 
 class BioCommonsHGVSConverter(HGVSConverter):
@@ -32,6 +53,11 @@ class BioCommonsHGVSConverter(HGVSConverter):
         super().__init__(genome_build)
         self.hdp = DjangoTranscriptDataProvider(genome_build)
         self.babelfish = Babelfish(self.hdp, genome_build.name)
+
+    def create_hgvs_variant(self, hgvs_string: str) -> HGVSVariant:
+        parser = ParserSingleton.parser()
+        sequence_variant = parser.parse_hgvs_variant(hgvs_string)
+        return BioCommonsHGVSVariant(sequence_variant)
 
     def variant_coords_to_g_hgvs(self, vc: VariantCoordinate) -> HGVSVariant:
         var_g = self.babelfish.vcf_to_g_hgvs(*vc)

@@ -14,11 +14,31 @@ from snpdb.models import GenomeBuild, VariantCoordinate
 
 
 class PyHGVSVariant(HGVSVariant):
-
     def __init__(self, hgvs_name: Optional[HGVSName] = None):
         if isinstance(hgvs_name, HGVSVariant):
             raise ValueError("Double extra!")
         self._hgvs_name = hgvs_name
+
+    @property
+    def gene(self) -> str:
+        return self._hgvs_name.gene
+
+    def _set_gene(self, value):
+        self._hgvs_name.gene = value
+
+    @property
+    def transcript(self) -> str:
+        return self._hgvs_name.transcript
+
+    def _set_transcript(self, value):
+        self._hgvs_name.transcript = value
+
+    @property
+    def kind(self) -> str:
+        return self._hgvs_name.kind
+
+    def _set_kind(self, value):
+        self._hgvs_name.kind = value
 
     def _safe(self) -> HGVSName:
         params = vars(self._hgvs_name)
@@ -79,6 +99,9 @@ class PyHGVSVariant(HGVSVariant):
 class PyHGVSConverter(HGVSConverter):
     def __int__(self, genome_build: GenomeBuild):
         super().__init__(genome_build)
+
+    def create_hgvs_variant(self, hgvs_string: str) -> HGVSVariant:
+        return PyHGVSVariant(HGVSName(hgvs_string))
 
     def variant_coords_to_g_hgvs(self, vc: VariantCoordinate) -> HGVSVariant:
         chrom, offset, ref, alt = vc

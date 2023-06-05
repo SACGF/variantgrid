@@ -421,7 +421,7 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
     variant_tuple = None
     used_transcript_accession: Optional[str] = None
     kind = None
-    clean_hgvs_string, _ = HGVSMatcher.clean_hgvs(hgvs_string)
+    clean_hgvs_string, _ = hgvs_matcher.clean_hgvs(hgvs_string)
     if clean_hgvs_string != hgvs_string:
         # TODO add proper support for "cleaned" where a before and after value are presented
         yield SearchMessageOverall(f'Cleaned hgvs from \n"{hgvs_string}" to\n"{clean_hgvs_string}"', severity=LogLevel.INFO)

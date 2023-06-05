@@ -33,6 +33,9 @@ class ComboCheckerHGVSConverter(HGVSConverter):
         # logging.debug("HGVS Combo: %s", result)
         return result
 
+    def create_hgvs_variant(self, hgvs_string: str) -> HGVSVariant:
+        return self._call_converters("create_hgvs_variant", hgvs_string)
+
     def variant_coords_to_g_hgvs(self, vc: VariantCoordinate) -> HGVSVariant:
         return self._call_converters("variant_coords_to_g_hgvs", vc)
 

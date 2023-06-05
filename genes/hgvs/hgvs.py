@@ -8,7 +8,6 @@ from typing import List, Optional
 import pyhgvs
 from Bio.Data.IUPACData import protein_letters_1to3_extended
 from django.conf import settings
-from pyhgvs import HGVSName
 
 from genes.models import TranscriptVersion, TranscriptParts, Transcript, LRGRefSeqGene
 from snpdb.models.models_genome import GenomeBuild
@@ -391,6 +390,45 @@ class CHGVS:
 
 
 class HGVSVariant(abc.ABC):
+    @property
+    @abc.abstractmethod
+    def gene(self) -> str:
+        pass
+
+    @gene.setter
+    def gene(self, value):
+        self._set_gene(value)
+
+    @abc.abstractmethod
+    def _set_gene(self, value):
+        pass
+
+    @property
+    @abc.abstractmethod
+    def transcript(self) -> str:
+        pass
+
+    @transcript.setter
+    def transcript(self, value):
+        self._set_transcript(value)
+
+    @abc.abstractmethod
+    def _set_transcript(self, value):
+        pass
+
+    @property
+    @abc.abstractmethod
+    def kind(self) -> str:
+        pass
+
+    @kind.setter
+    def kind(self, value):
+        self._set_kind(value)
+
+    @abc.abstractmethod
+    def _set_kind(self, value):
+        pass
+
     @abc.abstractmethod
     def format(self, max_ref_length=settings.HGVS_MAX_REF_ALLELE_LENGTH):
         pass
