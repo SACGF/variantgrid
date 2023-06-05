@@ -18,13 +18,11 @@ from enum import Enum
 from functools import cached_property
 from typing import Dict, List, Optional, Set, Iterator
 
-from pyhgvs import InvalidHGVSName
-
 from annotation.models import ClinVar
 from classification.enums import SpecialEKeys
 from classification.models import Classification, ClinVarExport, ClinVarAllele, EvidenceKeyMap, \
     ConditionResolved
-from genes.hgvs import CHGVS
+from genes.hgvs import CHGVS, HGVSException
 from library.guardian_utils import admin_bot
 from library.log_utils import report_exc_info
 from ontology.models import OntologyTerm, OntologySnake, OntologyTermRelation
@@ -284,7 +282,7 @@ class ClinVarLegacyRow:
                 except:
                     report_exc_info()
                     pass
-        except InvalidHGVSName:
+        except HGVSException:
             pass
         except NotImplementedError:
             pass

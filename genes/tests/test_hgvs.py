@@ -4,7 +4,8 @@
 from unittest import skip
 
 from django.test.testcases import TestCase
-from pyhgvs import HGVSName, InvalidHGVSName
+from hgvs.exceptions import HGVSError
+from pyhgvs import HGVSName  # This is used for pyhgvs specific test
 
 from annotation.tests.test_data_fake_genes import create_fake_transcript_version
 from genes.hgvs import HGVSMatcher
@@ -43,16 +44,16 @@ class TestHGVS(TestCase):
             "NM_000350.2(ABCA4):c-52delC",  # Missing "." with "-"
         ]
 
+        hgvs_matcher = HGVSMatcher(genome_build=GenomeBuild.grch38())
         for bad_hgvs in BAD_HGVS:
             try:
-                HGVSName(bad_hgvs)
+                hgvs_matcher.create_hgvs_variant(bad_hgvs)
                 self.fail(f"Expected '{bad_hgvs}' to fail!")
             except:
                 pass  # Expected
 
-            hgvs_matcher = HGVSMatcher(genome_build=GenomeBuild.grch38())
             fixed_hgvs = hgvs_matcher.clean_hgvs(bad_hgvs)[0]
-            HGVSName(fixed_hgvs)
+            hgvs_matcher.create_hgvs_variant(fixed_hgvs)
 
     def test_fix_gene_transcript(self):
         swap_warning = "Swapped gene/transcript"
@@ -94,7 +95,7 @@ class TestHGVS(TestCase):
         matcher = HGVSMatcher(genome_build)
         matcher.get_variant_tuple("ENST00000300305.3:c.1440A>T")
 
-        with self.assertRaises(InvalidHGVSName):
+        with self.assertRaises(HGVSError):
             matcher.get_variant_tuple("ENST00000300305.3:c.9999A>T")
 
     def test_sort_transcript_versions(self):

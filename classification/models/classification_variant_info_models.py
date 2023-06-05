@@ -636,7 +636,7 @@ class ImportedAlleleInfo(TimeStampedModel):
             self.variant_coordinate = str(vc_extra.variant_coordinate)
         except Exception as e:
             # we rely on ValueError a lot, so best to just review errors in variant matching
-            # if not isinstance(e, (InvalidHGVSName, NotImplementedError)):
+            # if not isinstance(e, (HGVSException, NotImplementedError)):
             #     # extra not expected errors, report them in case they're coding mistakes rather than bad input
             #     report_exc_info({"hgvs": use_hgvs, "genome_build": str(self.imported_genome_build_patch_version)})
             self.message = str(e)

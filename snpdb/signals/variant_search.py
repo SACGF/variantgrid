@@ -9,11 +9,10 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.db.models import QuerySet
 from django.urls import reverse
-from pyhgvs import HGVSName, InvalidHGVSName
 
 from annotation.manual_variant_entry import check_can_create_variants, CreateManualVariantForbidden
 from classification.models import Classification, CreateNoClassificationForbidden
-from genes.hgvs import HGVSMatcher
+from genes.hgvs import HGVSMatcher, HGVSException
 from genes.hgvs.hgvs_converter import HgvsMatchRefAllele
 from genes.models import MissingTranscript, MANE, TranscriptVersion, GeneSymbol
 from genes.models_enums import AnnotationConsortium
@@ -302,6 +301,7 @@ def search_variant_db_snp(search_input: SearchInputInstance):
 
 
 def _search_hgvs_using_gene_symbol(
+        hgvs_matcher: HGVSMatcher,
         gene_symbol: GeneSymbol,
         search_messages: List[SearchMessage],
         hgvs_string: str,
@@ -313,7 +313,8 @@ def _search_hgvs_using_gene_symbol(
     # Group results + hgvs by result.record hashcode
     results_by_record: Dict[Variant, List[SearchResult]] = defaultdict(list)
     transcript_accessions_by_record: Dict[Variant, List] = defaultdict(list)
-    allele = HGVSName(hgvs_string).format(use_gene=False)
+    hgvs_variant = hgvs_matcher.create_hgvs_variant(hgvs_string)
+    hgvs_variant.gene = None
 
     transcript_versions = set()
     mane_transcripts = set()
@@ -342,7 +343,8 @@ def _search_hgvs_using_gene_symbol(
 
     # TODO: Sort transcript_versions somehow
     for transcript_version in transcript_versions:
-        transcript_hgvs = f"{transcript_version.accession}:{allele}"
+        hgvs_variant.transcript = transcript_version.accession
+        transcript_hgvs = hgvs_variant.format()
         try:
             for result in _search_hgvs_variants_results_only(transcript_hgvs, user, genome_build, variant_qs):
                 if isinstance(result, SearchResult):
@@ -376,12 +378,21 @@ def _search_hgvs_using_gene_symbol(
 
         unique_annotation_consortia = set()
         for r in results_for_record:
-            unique_annotation_consortia.update(r.annotation_consortia)
+            if r.annotation_consortia is not None:
+                unique_annotation_consortia.update(r.annotation_consortia)
 
-        messages = list(unique_messages.keys())
         # All weights should be the same, just take 1st
         have_results = True
-        yield SearchResult(preview=record.preview, messages=[SearchMessage(m) for m in messages])
+        search_messages = []
+        # This was throwing exception as we initialised SearchMessage(SearchMessage)
+        for m in list(unique_messages.keys()):
+            if isinstance(m, str):
+                search_messages.append(SearchMessage(m))
+            elif isinstance(m, SearchMessage):
+                search_messages.append(m)
+            else:
+                raise ValueError(f"Search Messages must be string or SearchMessage, was: {type(m)} = {m}")
+        yield SearchResult(preview=record.preview, messages=search_messages)
 
     if not have_results:
         # In some special cases, add in special messages for no result
@@ -452,7 +463,7 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
         try:
             if gene_symbol := hgvs_matcher.get_gene_symbol_if_no_transcript(hgvs_string):
                 has_results = False
-                for result in _search_hgvs_using_gene_symbol(gene_symbol, search_messages,
+                for result in _search_hgvs_using_gene_symbol(hgvs_matcher, gene_symbol, search_messages,
                                                              hgvs_string, user, genome_build, variant_qs):
                     if isinstance(result, SearchResult):
                         # don't count SearchMessageOverall as a result
@@ -461,7 +472,7 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
                 if has_results:
                     return
 
-        except InvalidHGVSName:
+        except HGVSException:
             # might just not be a HGVS name at all
             pass
 
@@ -500,15 +511,15 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
             if not reported:
                 search_messages.append(SearchMessage(f"Used transcript version \"{used_transcript_accession}\"", severity=LogLevel.INFO))
 
-        hgvs_name = HGVSName(hgvs_string)
+        hgvs_variant = hgvs_matcher.create_hgvs_variant(hgvs_string)
         # If these were in wrong order they have been switched now
-        if hgvs_name.transcript and hgvs_name.gene:
+        if hgvs_variant.transcript and hgvs_variant.gene:
             annotation_consortium = AnnotationConsortium.get_from_transcript_accession(used_transcript_accession)
             transcript_version = TranscriptVersion.get(used_transcript_accession, genome_build,
                                                        annotation_consortium=annotation_consortium)
             alias_symbol_strs = transcript_version.gene_version.gene_symbol.alias_meta.alias_symbol_strs
-            if hgvs_name.gene.upper() not in [a.upper() for a in alias_symbol_strs]:
-                search_messages.append(SearchMessage(f"Symbol \"{hgvs_name.gene}\" not associated with transcript "
+            if hgvs_variant.gene.upper() not in [a.upper() for a in alias_symbol_strs]:
+                search_messages.append(SearchMessage(f"Symbol \"{hgvs_variant.gene}\" not associated with transcript "
                                        f"{used_transcript_accession} (known symbols='{', '.join(alias_symbol_strs)}')"))
 
     # TODO: alter initial_score based on warning messages of alt not matching?

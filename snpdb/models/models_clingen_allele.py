@@ -6,7 +6,6 @@ from typing import Dict, Optional, Tuple
 from django.conf import settings
 from django.db import models
 from django_extensions.db.models import TimeStampedModel
-from pyhgvs import HGVSName
 
 from snpdb.models.models_enums import SequenceRole
 from snpdb.models.models_genome import GenomeBuild, Contig
@@ -96,14 +95,14 @@ class ClinGenAllele(TimeStampedModel):
                     return p_hgvs
         return None
 
-    def get_c_hgvs_name(self, transcript_accession) -> Optional[HGVSName]:
+    def get_c_hgvs_name(self, hgvs_converter, transcript_accession):
         """ c.HGVS has reference bases on it """
         from genes.models import TranscriptVersionSequenceInfo
 
         hgvs_name = None
         raw_hgvs_string, t_data = self._get_raw_hgvs_and_data(transcript_accession)
         if raw_hgvs_string:  # Has for this transcript version
-            hgvs_name = HGVSName(raw_hgvs_string)
+            hgvs_name = hgvs_converter.create_hgvs_variant(raw_hgvs_string)
             # Sometimes ClinGen return "n." on NM transcripts - reported as a bug 22/9/21
             if hgvs_name.kind == "n":
                 if transcript_accession.startswith("NM_") or "proteinEffect" in t_data:

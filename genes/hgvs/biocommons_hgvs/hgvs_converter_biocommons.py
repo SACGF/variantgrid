@@ -5,11 +5,11 @@ from importlib import metadata
 from typing import Tuple
 
 from django.conf import settings
-from hgvs.exceptions import HGVSDataNotAvailableError
+from hgvs.exceptions import HGVSDataNotAvailableError, HGVSError
 from hgvs.sequencevariant import SequenceVariant
 from hgvs.validator import ExtrinsicValidator
 
-from genes.hgvs import HGVSVariant
+from genes.hgvs import HGVSVariant, HGVSException
 from genes.hgvs.biocommons_hgvs.babelfish import Babelfish, ParserSingleton
 from genes.hgvs.biocommons_hgvs.data_provider import DjangoTranscriptDataProvider
 from genes.hgvs.hgvs_converter import HGVSConverter, HgvsMatchRefAllele
@@ -20,22 +20,19 @@ class BioCommonsHGVSVariant(HGVSVariant):
     def __init__(self, sequence_variant: SequenceVariant):
         self._sequence_variant = sequence_variant
 
-    @property
-    def gene(self) -> str:
+    def _get_gene(self) -> str:
         return self._sequence_variant.gene
 
     def _set_gene(self, value):
         self._sequence_variant.gene = value
 
-    @property
-    def transcript(self) -> str:
+    def _get_transcript(self) -> str:
         return self._sequence_variant.ac
 
     def _set_transcript(self, value):
         self._sequence_variant.ac = value
 
-    @property
-    def kind(self) -> str:
+    def _get_kind(self) -> str:
         return self._sequence_variant.type
 
     def _set_kind(self, value):
@@ -55,9 +52,12 @@ class BioCommonsHGVSConverter(HGVSConverter):
         self.babelfish = Babelfish(self.hdp, genome_build.name)
 
     def create_hgvs_variant(self, hgvs_string: str) -> HGVSVariant:
-        parser = ParserSingleton.parser()
-        sequence_variant = parser.parse_hgvs_variant(hgvs_string)
-        return BioCommonsHGVSVariant(sequence_variant)
+        try:
+            parser = ParserSingleton.parser()
+            sequence_variant = parser.parse_hgvs_variant(hgvs_string)
+            return BioCommonsHGVSVariant(sequence_variant)
+        except HGVSError as e:
+            raise HGVSException from e
 
     def variant_coords_to_g_hgvs(self, vc: VariantCoordinate) -> HGVSVariant:
         var_g = self.babelfish.vcf_to_g_hgvs(*vc)
@@ -76,7 +76,7 @@ class BioCommonsHGVSConverter(HGVSConverter):
         except HGVSDataNotAvailableError:
             raise Contig.ContigNotInBuildError()
         matches_reference = self.get_hgvs_match_ref_allele(hgvs_string, var_g, ref, alt)
-        return (chrom, position, ref, alt), matches_reference
+        return VariantCoordinate(chrom, position, ref, alt), matches_reference
 
     def c_hgvs_remove_gene_symbol(self, hgvs_string: str) -> str:
         parser = ParserSingleton.parser()

@@ -4,6 +4,7 @@ from typing import Tuple, Optional
 
 import pyhgvs
 from django.conf import settings
+from hgvs.exceptions import HGVSError
 from pyhgvs import get_genomic_sequence, HGVSName
 from pyhgvs.utils import make_transcript
 
@@ -19,22 +20,19 @@ class PyHGVSVariant(HGVSVariant):
             raise ValueError("Double extra!")
         self._hgvs_name = hgvs_name
 
-    @property
-    def gene(self) -> str:
+    def _get_gene(self) -> str:
         return self._hgvs_name.gene
 
     def _set_gene(self, value):
         self._hgvs_name.gene = value
 
-    @property
-    def transcript(self) -> str:
+    def _get_transcript(self) -> str:
         return self._hgvs_name.transcript
 
     def _set_transcript(self, value):
         self._hgvs_name.transcript = value
 
-    @property
-    def kind(self) -> str:
+    def _get_kind(self) -> str:
         return self._hgvs_name.kind
 
     def _set_kind(self, value):
@@ -101,7 +99,10 @@ class PyHGVSConverter(HGVSConverter):
         super().__init__(genome_build)
 
     def create_hgvs_variant(self, hgvs_string: str) -> HGVSVariant:
-        return PyHGVSVariant(HGVSName(hgvs_string))
+        try:
+            return PyHGVSVariant(HGVSName(hgvs_string))
+        except pyhgvs.InvalidHGVSName as e:
+            raise HGVSError from e
 
     def variant_coords_to_g_hgvs(self, vc: VariantCoordinate) -> HGVSVariant:
         chrom, offset, ref, alt = vc
@@ -136,7 +137,7 @@ class PyHGVSConverter(HGVSConverter):
         chrom = contig.name
 
         matches_reference = self.get_hgvs_match_ref_allele(hgvs_name, pyhgvs_transcript)
-        return (chrom, position, ref, alt), matches_reference
+        return VariantCoordinate(chrom, position, ref, alt), matches_reference
 
     def c_hgvs_remove_gene_symbol(self, hgvs_string: str) -> str:
         # ClinGen Allele Registry doesn't like gene names - so strip (unless LRG_)

@@ -6,17 +6,16 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.db.models import Q
 from django.dispatch import receiver
-from pyhgvs import HGVSName, InvalidHGVSName
-from threadlocals.threadlocals import get_current_user
+from pyhgvs import HGVSName
 
 from annotation.models import VariantAnnotationVersion
-from classification.models import Classification, ClassificationModification, ImportedAlleleInfo
+from classification.models import Classification, ClassificationModification
+from genes.hgvs import HGVSException
 from library.preview_request import preview_extra_signal, PreviewKeyValue
 from ontology.models import OntologyTerm
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import Lab, Organization, Allele, Variant
 from snpdb.search import search_receiver, SearchInputInstance, SearchExample
-from snpdb.user_settings_manager import UserSettingsManager
 
 
 @search_receiver(
@@ -78,7 +77,7 @@ def classification_search(search_input: SearchInputInstance):
                                     f"{vta_path}__version": vav,
                                     f"{vta_path}__hgvs_c__endswith": search_string}))
 
-            except InvalidHGVSName:
+            except HGVSException:
                 pass
 
     q_cm = reduce(operator.or_, filters)

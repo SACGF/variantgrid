@@ -3,10 +3,10 @@ import re
 from dataclasses import dataclass
 from typing import List, Optional, Tuple
 
-import pyhgvs
 from django.conf import settings
 from django.core.cache import cache
 from django.db.models import Max, Min
+from hgvs.exceptions import HGVSError
 
 from genes.hgvs import HGVSVariant, CHGVS
 from genes.hgvs.biocommons_hgvs.hgvs_converter_biocommons import BioCommonsHGVSConverter
@@ -58,7 +58,7 @@ class HGVSConverterFactory:
 
     @staticmethod
     def factory(genome_build: GenomeBuild, hgvs_converter_type: HGVSConverterType = None):
-        if settings.DEBUG:
+        if False and settings.DEBUG:
             converters = [BioCommonsHGVSConverter(genome_build), PyHGVSConverter(genome_build)]
             return ComboCheckerHGVSConverter(genome_build, converters, die_on_error=False)
 
@@ -207,6 +207,9 @@ class HGVSMatcher:
 
         return get_sort_key
 
+    def create_hgvs_variant(self, hgvs_string) -> HGVSVariant:
+        return self.hgvs_converter.create_hgvs_variant(hgvs_string)
+
     def filter_best_transcripts_and_method_by_accession(self, transcript_accession, prefer_pyhgvs=True, closest=False) -> List[Tuple[TranscriptVersion, str]]:
         """ Get the best transcripts you'd want to match a HGVS against - assuming you will try multiple in order """
 
@@ -267,7 +270,7 @@ class HGVSMatcher:
         used_transcript_accession = None
         method = None
         matches_reference = None
-        hgvs_name = self.hgvs_converter.create_hgvs_variant(hgvs_string)
+        hgvs_name = self.create_hgvs_variant(hgvs_string)
         kind = hgvs_name.kind
 
         if transcript_is_lrg(transcript_accession):
@@ -333,8 +336,8 @@ class HGVSMatcher:
                 for n in "GATC":
                     non_standard_bases = non_standard_bases.replace(n, "")
                 if non_standard_bases:
-                    reason = f"{k}={v} contains non-standard (A,C,G,T) bases: {non_standard_bases}"
-                    raise pyhgvs.InvalidHGVSName(hgvs_string, reason=reason)
+                    msg = f"'{hgvs_string}': {k}={v} contains non-standard (A,C,G,T) bases: {non_standard_bases}"
+                    raise HGVSError(msg)
 
         if Variant.is_ref_alt_reference(ref, alt):
             alt = Variant.REFERENCE_ALT
@@ -368,9 +371,9 @@ class HGVSMatcher:
 
         problems = ["No transcript via LRGRefSeqGene"]
 
-        # Use ClinGen - will raise exception if can't get it
+        # Use ClinGen - will raise exception if it can't get it
         if ca := get_clingen_allele_for_variant(self.genome_build, variant):
-            if hgvs_name := ca.get_c_hgvs_name(lrg_identifier):
+            if hgvs_name := ca.get_c_hgvs_name(self.hgvs_converter, lrg_identifier):
                 return hgvs_name, self.HGVS_METHOD_CLINGEN_ALLELE_REGISTRY
             else:
                 problems.append(f"{ca} didn't contain HGVS for '{lrg_identifier}'")
@@ -408,7 +411,7 @@ class HGVSMatcher:
                         # TODO: We could also use VEP then add reference bases on our HGVSs
                         try:
                             if ca := get_clingen_allele_for_variant(self.genome_build, variant):
-                                if hgvs_variant := ca.get_c_hgvs_name(transcript_version.accession):
+                                if hgvs_variant := ca.get_c_hgvs_name(self.hgvs_converter, transcript_version.accession):
                                     # Use our latest symbol as ClinGen can be out of date, and this keeps it consistent
                                     # regardless of whether we use PyHGVS or ClinGen to resolve
                                     if gene_symbol := transcript_version.gene_symbol:
@@ -565,7 +568,7 @@ class HGVSMatcher:
 
         # lower case transcripts w/o genes will be assigned as gene by pyHGVS
         fixed_messages = []
-        hgvs_variant = self.hgvs_converter.create_hgvs_variant(hgvs_string)
+        hgvs_variant = self.create_hgvs_variant(hgvs_string)
         transcript_ok = HGVSMatcher._looks_like_transcript(hgvs_variant.transcript)
         if not transcript_ok and hgvs_variant.gene:
             # fix gene/transcript swap and lower case separately to get separate warnings.
@@ -608,12 +611,12 @@ class HGVSMatcher:
 
     def get_gene_symbol_if_no_transcript(self, hgvs_string: str) -> Optional[GeneSymbol]:
         """ If HGVS uses gene symbol instead of transcript, return symbol """
-        hgvs_variant = self.hgvs_converter.create_hgvs_variant(hgvs_string)
-        if hgvs_variant.transcript:
+        # pyhgvs sets to gene, Biocommons always uses as transcript
+        hgvs_variant = self.create_hgvs_variant(hgvs_string)
+        if hgvs_variant.transcript and hgvs_variant.gene:
             return None  # only return symbol if transcript is not used
-        if not hgvs_variant.gene:
-            return None
-        return GeneSymbol.objects.filter(pk=hgvs_variant.gene).first()
+        symbol = hgvs_variant.transcript or hgvs_variant.gene
+        return GeneSymbol.objects.filter(pk=symbol).first()
 
 
 def get_hgvs_variant_tuple(hgvs_name: str, genome_build: GenomeBuild) -> VariantCoordinate:

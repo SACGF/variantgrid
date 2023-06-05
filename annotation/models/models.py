@@ -721,11 +721,8 @@ class AbstractVariantAnnotation(models.Model):
 
     @staticmethod
     def amino_acid_3_to_1(protein_string: str) -> str:
-        """ p.Ala2351Thr -> p.A2351T
+        """ p.Ala2351Thr -> p.A2351T """
 
-            We can't use pyhgvs.HGVSName(hgvs_string) as pyhgvs gives:
-            InvalidHGVSName: Invalid HGVS protein allele "His1753_Lys1780del"
-        """
         aa_3_to_1 = invert_dict(protein_letters_1to3)
         aa_3_regex_or = "|".join(aa_3_to_1)
 

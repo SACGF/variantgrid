@@ -389,41 +389,58 @@ class CHGVS:
         return cdiff
 
 
+class HGVSException(Exception):
+    """ A wrapper for pyhgvs and Biocommons HGVS Exceptions to allow library independent code """
+    pass
+
+
 class HGVSVariant(abc.ABC):
+    """ This class wraps pyhgvs HGVSName and BioCommons SequenceVariant functionality,
+        to allow library independent code """
+
     @property
-    @abc.abstractmethod
     def gene(self) -> str:
-        pass
+        return self._get_gene()
 
     @gene.setter
     def gene(self, value):
         self._set_gene(value)
 
     @abc.abstractmethod
+    def _get_gene(self):
+        pass
+
+    @abc.abstractmethod
     def _set_gene(self, value):
         pass
 
     @property
-    @abc.abstractmethod
     def transcript(self) -> str:
-        pass
+        return self._get_transcript()
 
     @transcript.setter
     def transcript(self, value):
         self._set_transcript(value)
 
     @abc.abstractmethod
+    def _get_transcript(self):
+        pass
+
+    @abc.abstractmethod
     def _set_transcript(self, value):
         pass
 
     @property
-    @abc.abstractmethod
     def kind(self) -> str:
-        pass
+        return self._get_kind()
 
     @kind.setter
     def kind(self, value):
         self._set_kind(value)
+
+    @abc.abstractmethod
+    def _get_kind(self):
+        pass
 
     @abc.abstractmethod
     def _set_kind(self, value):

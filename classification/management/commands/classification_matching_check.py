@@ -4,9 +4,9 @@ from traceback import print_exc
 import pandas as pd
 from django.core.management import BaseCommand
 from django.db.models import Max
-from pyhgvs import HGVSName
 
 from classification.models import Classification
+from genes.hgvs import HGVSMatcher
 from snpdb.models import Variant
 
 
@@ -47,8 +47,9 @@ class Command(BaseCommand):
                 else:
                     raise ValueError(f"Don't know how to get out cached chgvs from {c} ({genome_build=}) ")
 
+                hgvs_matcher = HGVSMatcher(genome_build)
                 if c_hgvs_name:
-                    existing_resolved_transcript = HGVSName(c_hgvs_name).transcript
+                    existing_resolved_transcript = hgvs_matcher.get_transcript_accession(c_hgvs_name)
                 else:
                     existing_resolved_transcript = None
 
