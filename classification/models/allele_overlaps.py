@@ -340,7 +340,7 @@ class OverlapsCalculator:
                             'classification__clinical_context',
                             'classification__lab',
                             'classification__lab__organization') \
-            .order_by('classification__allele_info__allele')
+            .order_by('classification__allele_info__allele').iterator()
 
         all_overlaps = []
         for allele, cms in group_by_key(cm_qs, lambda x: x.classification.allele_object):
